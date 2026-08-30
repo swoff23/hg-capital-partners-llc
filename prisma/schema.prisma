@@ -1,0 +1,199 @@
+// HG Capital OS — v1 schema
+// Scope: internal migration of Deals, Properties, Contractors, and Tasks.
+// No money, no tenants/leases, no roles. See /Users/connorswofford/.claude/plans.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users — 2 trusted internal users (Connor, Pieter). No roles in v1.
+// ---------------------------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  assignedTasks Task[] @relation("TaskAssignee")
+}
+
+// ---------------------------------------------------------------------------
+// Deals — from the "Prospective Deals" tab (~748 rows).
+// ---------------------------------------------------------------------------
+model Deal {
+  id      String @id @default(cuid())
+  address String
+
+  // Prices: parsed numbers where possible, raw text always preserved.
+  theirPrice    Decimal? @db.Decimal(12, 2)
+  theirPriceRaw String?
+  ourPrice      Decimal? @db.Decimal(12, 2) // HG target / max offer
+  ourPriceRaw   String?
+  currentOffer  Decimal? @db.Decimal(12, 2)
+
+  units  Int?
+  beds   String?
+  baths  String?
+  sqft   Int?
+  taxes  Decimal? @db.Decimal(12, 2)
+
+  status     String  @default("Active") // configurable list in src/lib/config.ts
+  priority   String? // "1 - High", etc.
+  vip        Boolean @default(false)
+  passReason String?
+
+  sourceUrl String?
+  links     Json    @default("[]") // [{ label, url }]
+
+  nextAction     String?
+  nextActionDue  DateTime?
+
+  rawLatestUpdates String? @db.Text // verbatim from the spreadsheet cell
+
+  convertedProperty   Property? @relation("DealToProperty", fields: [convertedPropertyId], references: [id])
+  convertedPropertyId String?   @unique
+
+  notes    DealNote[]
+  tasks    Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([address])
+}
+
+// Parsed timeline from the "Latest Updates" mega-cell + manual notes going forward.
+model DealNote {
+  id       String   @id @default(cuid())
+  deal     Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId   String
+  noteDate DateTime? // parsed date; null when the line had no clear date
+  body     String   @db.Text
+  source   String   @default("manual") // "migration" | "manual"
+  createdAt DateTime @default(now())
+
+  @@index([dealId, noteDate])
+}
+
+// ---------------------------------------------------------------------------
+// Properties — from the "Property Information" tab (~10 owned properties).
+// ---------------------------------------------------------------------------
+model Property {
+  id      String @id @default(cuid())
+  address String
+
+  llcOwner     String? // plain text for now (HG Capital Partners LLC, HG Buffalo Holding 1/2 LLC, ...)
+  refiTarget   String? // e.g. "-->HG3" from SREO
+  attorney     String?
+  lender       String? // Vontive / Conventus / ...
+  loanServicer String? // Fay Servicing / FCI / ...
+
+  status        String? // Rehabbing / Refinancing / Refinanced / Stabilized / Hold / Flip / Sold
+  strategy      String? // Hold / Flip / BRRRR / Sell / TBD
+  purchaseDate  DateTime?
+  purchasePrice Decimal?  @db.Decimal(12, 2)
+  refinanceDate DateTime?
+  currentLoan   Decimal?  @db.Decimal(12, 2)
+  value         Decimal?  @db.Decimal(12, 2) // appraised / estimated
+  replacementCost Decimal? @db.Decimal(12, 2)
+  rehabAmount   Decimal?  @db.Decimal(12, 2)
+  rehabMonths   Decimal?  @db.Decimal(8, 2)
+  sqft          Int?
+  unitCount     Int?
+
+  // Per-unit reference data from "Property Information":
+  // [{ label, lockboxCode, utilities: { nationalGridAcct, nationalGridAutopay, nationalGridLofl,
+  //    nationalFuelAcct, nationalFuelAutopay, nationalFuelLofl, waterAcct, waterAutopay },
+  //    equipment: [{ type, model, installYear }] }]
+  units Json @default("[]")
+
+  links Json   @default("[]") // [{ label, url }]
+  notes String? @db.Text
+
+  tasks     Task[]
+  sourceDeal Deal? @relation("DealToProperty")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([address])
+}
+
+// ---------------------------------------------------------------------------
+// Contacts — merged "Contractor Info" + "Contractor Contact Info" tabs.
+// v1: contractors only. Bank/routing numbers are NEVER imported.
+// ---------------------------------------------------------------------------
+model Contact {
+  id             String  @id @default(cuid())
+  fullName       String
+  company        String?
+  trades         String? // "what they do"
+  tenantFixes    Boolean @default(false)
+  phone          String?
+  email          String?
+  mailingAddress String?
+  billingInfo    String? // e.g. "Check", "Zelle" — no account numbers
+  availability   String?
+  w9Url          String?
+  coiUrl         String?
+  comments       String? @db.Text
+  active         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fullName])
+}
+
+// ---------------------------------------------------------------------------
+// Tasks — from the Asana CSV export (~2,175 rows). Linked to a Property via
+// the Asana section name where possible.
+// ---------------------------------------------------------------------------
+enum TaskStatus {
+  OPEN
+  DONE
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?    @db.Text
+  status      TaskStatus @default(OPEN)
+
+  assignee       User?   @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
+  assigneeUserId String?
+  assigneeName   String? // free text — covers contractors not in User
+  assigneeEmail  String?
+
+  dueDate   DateTime?
+  startDate DateTime?
+  priority  String?
+
+  bucket     String  @default("Unfiled") // Property | General | Pieter properties | JMPL | Template | Unfiled
+  sectionRaw String? // original Asana "Section/Column"
+  tags       String?
+  links      Json    @default("[]")
+
+  asanaId String? @unique // idempotent re-import
+
+  deal       Deal?     @relation(fields: [dealId], references: [id])
+  dealId     String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+  propertyId String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([bucket])
+  @@index([propertyId])
+  @@index([dealId])
+}
