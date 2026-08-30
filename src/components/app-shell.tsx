@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { cn, initials } from "@/lib/utils";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
@@ -10,18 +10,17 @@ import { SideNav } from "@/components/nav";
 export function AppShell({
   children,
   userLabel,
-  devAuth,
   initialPinned,
   signOutAction,
 }: {
   children: ReactNode;
   userLabel: string;
-  devAuth: boolean;
   initialPinned: boolean;
   signOutAction: () => void;
 }) {
   const [pinned, setPinned] = useState(initialPinned);
   const [hovered, setHovered] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const expanded = pinned || hovered;
 
   function togglePin() {
@@ -34,35 +33,104 @@ export function AppShell({
     });
   }
 
+  // Mobile drawer: lock body scroll and close on Escape while it's open.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [mobileOpen]);
+
+  // Drop the drawer state once the viewport is back to desktop width.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 64rem)");
+    const sync = () => {
+      if (mq.matches) setMobileOpen(false);
+    };
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
   return (
     <div className="min-h-screen">
       <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface px-4">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation"
+          aria-expanded={mobileOpen}
+          className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-background hover:text-foreground lg:hidden"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
         <Link href="/" className="shrink-0 text-sm font-semibold tracking-tight">
           HG Capital OS
         </Link>
-        <div className="max-w-md flex-1">
+        <div className="min-w-0 max-w-md flex-1">
           <GlobalSearch />
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          {devAuth && (
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-              dev auth
-            </span>
-          )}
+        <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
           <ThemeToggle />
         </div>
       </header>
+
+      {mobileOpen && (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Close navigation"
+          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 top-14 z-30 bg-black/40 lg:hidden"
+        />
+      )}
 
       <aside
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={cn(
-          "fixed bottom-0 left-0 top-14 z-40 hidden flex-col overflow-hidden border-r border-border bg-surface p-2 transition-[width] duration-200 ease-out md:flex",
-          expanded ? "w-60" : "w-16",
-          hovered && !pinned && "shadow-2xl",
+          "fixed bottom-0 left-0 top-14 z-40 flex flex-col overflow-hidden border-r border-border bg-surface p-2",
+          "w-64 transition-transform duration-200 ease-out lg:transition-[width]",
+          mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0",
+          expanded ? "lg:w-60" : "lg:w-16",
+          hovered && !pinned && "lg:shadow-2xl",
         )}
       >
-        <div className="mb-1 flex h-7 items-center">
+        <div className="mb-1 flex h-7 items-center justify-end">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close navigation"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-background hover:text-foreground lg:hidden"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
           <button
             type="button"
             onClick={togglePin}
@@ -70,7 +138,7 @@ export function AppShell({
             aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
             title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
             className={cn(
-              "ml-auto flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-background hover:text-foreground",
+              "hidden h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-background hover:text-foreground lg:flex",
               !expanded && "pointer-events-none opacity-0",
             )}
           >
@@ -90,9 +158,13 @@ export function AppShell({
           </button>
         </div>
 
-        <SideNav collapsed={!expanded} />
+        <SideNav collapsed={!expanded && !mobileOpen} onNavigate={() => setMobileOpen(false)} />
 
         <div className="mt-auto border-t border-border pt-2">
+          <div className="flex items-center justify-between px-2 py-1.5 lg:hidden">
+            <span className="text-xs font-medium text-muted">Appearance</span>
+            <ThemeToggle />
+          </div>
           <div className="flex items-center gap-2 px-2 py-1.5">
             <span
               title={userLabel}
@@ -115,7 +187,7 @@ export function AppShell({
       <div
         className={cn(
           "pt-14 transition-[padding] duration-200 ease-out",
-          pinned ? "md:pl-60" : "md:pl-16",
+          pinned ? "lg:pl-60" : "lg:pl-16",
         )}
       >
         <main className="min-h-[calc(100vh-3.5rem)] p-4 md:p-6">

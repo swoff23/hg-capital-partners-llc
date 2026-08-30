@@ -56,7 +56,14 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
   },
 ];
 
-export function SideNav({ collapsed = false }: { collapsed?: boolean }) {
+export function SideNav({
+  collapsed = false,
+  onNavigate,
+}: {
+  collapsed?: boolean;
+  /** Fired when a link is clicked — used to close the mobile drawer. */
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-0.5">
@@ -66,6 +73,7 @@ export function SideNav({ collapsed = false }: { collapsed?: boolean }) {
           <Link
             key={l.href}
             href={l.href}
+            onClick={onNavigate}
             title={collapsed ? l.label : undefined}
             aria-label={l.label}
             className={cn(

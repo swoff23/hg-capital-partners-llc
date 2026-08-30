@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { isAllowedEmail, AUTH_CONFIGURED } from "@/lib/auth-allowlist";
+import { isAllowedEmail } from "@/lib/auth-allowlist";
 import { SESSION_COOKIE, readSession } from "@/lib/session";
 
 export async function getCurrentUser(): Promise<User | null> {
@@ -18,5 +18,3 @@ export async function requireUser(): Promise<User> {
   if (!user) redirect("/login");
   return user;
 }
-
-export const authMode = AUTH_CONFIGURED ? "password" : "dev";

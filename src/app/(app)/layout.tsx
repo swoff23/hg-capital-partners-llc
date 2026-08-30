@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { requireUser, authMode } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { signOut } from "@/app/login/actions";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import { AppShell } from "@/components/app-shell";
@@ -10,12 +10,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const pinned = jar.get(SIDEBAR_COOKIE)?.value === "1";
 
   return (
-    <AppShell
-      userLabel={user.name ?? user.email}
-      devAuth={authMode === "dev"}
-      initialPinned={pinned}
-      signOutAction={signOut}
-    >
+    <AppShell userLabel={user.name ?? user.email} initialPinned={pinned} signOutAction={signOut}>
       {children}
     </AppShell>
   );

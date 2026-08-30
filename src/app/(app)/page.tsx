@@ -47,7 +47,7 @@ export default async function HomePage() {
         <Stat label="Vendors" value={vendors} href="/contractors" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex items-center justify-between">
             <CardTitle>My open tasks</CardTitle>
