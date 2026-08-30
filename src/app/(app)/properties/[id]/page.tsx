@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, initials } from "@/lib/utils";
 import { propertyStatusTone } from "@/lib/config";
 import { parseUnits } from "@/lib/property-types";
 import { BackLink } from "@/components/back-link";
@@ -14,20 +14,33 @@ function d(v: unknown): string | null {
   return v == null ? null : (v as { toString(): string }).toString();
 }
 
+/** Who a task is assigned to: full label + initials, or null if unassigned. */
+function taskAssignee(t: {
+  assigneeName: string | null;
+  assignee: { name: string | null; email: string } | null;
+}): { label: string; initials: string } | null {
+  const label = t.assignee?.name ?? t.assignee?.email ?? t.assigneeName;
+  if (!label) return null;
+  const forInitials = label.includes("@") ? label.split("@")[0].replace(/[._-]+/g, " ") : label;
+  return { label, initials: initials(forInitials) };
+}
+
 export default async function PropertyPage({ params }: PageProps<"/properties/[id]">) {
   await requireUser();
   const { id } = await params;
   const property = await prisma.property.findUnique({
     where: { id },
     include: {
-      tasks: { orderBy: [{ status: "asc" }, { dueDate: { sort: "asc", nulls: "last" } }] },
+      tasks: {
+        where: { status: "OPEN" },
+        orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
+        include: { assignee: { select: { name: true, email: true } } },
+      },
       sourceDeal: { select: { id: true, address: true } },
     },
   });
   if (!property) notFound();
   const units = parseUnits(property.units);
-  const openTasks = property.tasks.filter((t) => t.status === "OPEN");
-  const doneTasks = property.tasks.filter((t) => t.status === "DONE");
 
   return (
     <>
@@ -55,25 +68,33 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             </CardHeader>
             <CardBody className="p-0">
               {property.tasks.length === 0 ? (
-                <p className="p-4 text-sm text-muted">No tasks linked.</p>
+                <p className="p-4 text-sm text-muted">No open tasks.</p>
               ) : (
                 <ul className="max-h-[420px] divide-y divide-border overflow-y-auto">
-                  {[...openTasks, ...doneTasks].map((t) => (
-                    <li key={t.id} className="flex items-center gap-2 px-4 py-2 text-sm">
-                      <Link
-                        href={`/tasks/${t.id}`}
-                        className={`min-w-0 flex-1 truncate hover:underline ${t.status === "DONE" ? "text-muted line-through" : ""}`}
-                      >
-                        {t.title}
-                      </Link>
-                      {(t.assigneeName || t.assigneeUserId) && (
-                        <span className="shrink-0 text-xs text-muted">{t.assigneeName ?? "assigned"}</span>
-                      )}
-                      {t.dueDate && (
-                        <span className="shrink-0 text-xs text-muted">{fmtDate(t.dueDate)}</span>
-                      )}
-                    </li>
-                  ))}
+                  {property.tasks.map((t) => {
+                    const who = taskAssignee(t);
+                    return (
+                      <li key={t.id} className="flex items-center gap-2 px-4 py-2 text-sm">
+                        <Link
+                          href={`/tasks/${t.id}`}
+                          className="min-w-0 flex-1 truncate hover:underline"
+                        >
+                          {t.title}
+                        </Link>
+                        {who && (
+                          <span
+                            title={who.label}
+                            className="flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded bg-accent px-1 text-[10px] font-semibold text-primary"
+                          >
+                            {who.initials}
+                          </span>
+                        )}
+                        <span className="w-24 shrink-0 text-right text-xs text-muted">
+                          {t.dueDate ? fmtDate(t.dueDate) : "—"}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </CardBody>
