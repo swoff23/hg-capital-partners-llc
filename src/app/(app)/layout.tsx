@@ -1,57 +1,22 @@
-import Link from "next/link";
+import { cookies } from "next/headers";
 import { requireUser, authMode } from "@/lib/auth";
-import { SideNav } from "@/components/nav";
-import { GlobalSearch } from "@/components/global-search";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/app/login/actions";
-import { initials } from "@/lib/utils";
+import { SIDEBAR_COOKIE } from "@/lib/sidebar";
+import { AppShell } from "@/components/app-shell";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
+  const jar = await cookies();
+  const pinned = jar.get(SIDEBAR_COOKIE)?.value === "1";
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-surface p-3 md:flex">
-        <Link href="/" className="px-3 py-2 text-sm font-semibold tracking-tight">
-          HG Capital OS
-        </Link>
-        <div className="mt-3 flex-1">
-          <SideNav />
-        </div>
-        <form action={signOut} className="border-t border-border pt-3">
-          <div className="flex items-center gap-2 px-2 py-1.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary">
-              {initials(user.name ?? user.email)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">{user.name ?? user.email}</div>
-              <button className="text-xs text-muted hover:text-foreground" type="submit">
-                Sign out
-              </button>
-            </div>
-          </div>
-        </form>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center gap-3 border-b border-border bg-surface px-4">
-          <div className="md:hidden text-sm font-semibold">HG Capital OS</div>
-          <div className="max-w-md flex-1">
-            <GlobalSearch />
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            {authMode === "dev" && (
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                dev auth
-              </span>
-            )}
-            <ThemeToggle />
-          </div>
-        </header>
-        <main className="flex-1 p-4 md:p-6">
-          <div className="mx-auto max-w-6xl">{children}</div>
-        </main>
-      </div>
-    </div>
+    <AppShell
+      userLabel={user.name ?? user.email}
+      devAuth={authMode === "dev"}
+      initialPinned={pinned}
+      signOutAction={signOut}
+    >
+      {children}
+    </AppShell>
   );
 }

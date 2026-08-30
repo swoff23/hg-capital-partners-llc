@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
+import { parseAttachments, normalizeAttachmentUrl } from "@/lib/task-types";
 import { logDealTaskEvent } from "../deals/actions";
 
 export async function toggleTask(id: string) {
@@ -62,24 +63,78 @@ export async function createTask(formData: FormData) {
   redirect(`/tasks/${task.id}`);
 }
 
-export async function updateTask(id: string, formData: FormData) {
+/**
+ * Inline single-field edits from the Asana-style task detail page. Each key is
+ * optional; only keys actually present are written. `null`/`""` clears a field.
+ */
+export async function patchTask(
+  id: string,
+  data: Partial<{
+    title: string;
+    description: string | null;
+    assigneeUserId: string | null;
+    dueDate: string | null;
+    propertyId: string | null;
+  }>,
+) {
   await requireUser();
-  const str = (k: string) => (formData.get(k)?.toString().trim() || null);
-  const data: Record<string, unknown> = {};
-  if (formData.has("title") && str("title")) data.title = str("title");
-  if (formData.has("description")) data.description = str("description");
-  if (formData.has("assigneeUserId")) {
-    data.assigneeUserId = str("assigneeUserId");
-    if (str("assigneeUserId")) data.assigneeName = null;
-  }
-  if (formData.has("assigneeName") && str("assigneeName")) data.assigneeName = str("assigneeName");
-  if (formData.has("dueDate")) {
-    const d = str("dueDate");
-    data.dueDate = d ? new Date(d) : null;
-  }
-  if (formData.has("propertyId")) data.propertyId = str("propertyId");
+  const task = await prisma.task.findUnique({
+    where: { id },
+    select: { propertyId: true },
+  });
+  if (!task) return;
 
-  await prisma.task.update({ where: { id }, data });
+  const patch: Record<string, unknown> = {};
+  if (data.title !== undefined) {
+    const v = data.title.trim();
+    if (v.length >= 2) patch.title = v;
+  }
+  if (data.description !== undefined) patch.description = data.description?.trim() || null;
+  if (data.assigneeUserId !== undefined) {
+    patch.assigneeUserId = data.assigneeUserId || null;
+    if (data.assigneeUserId) patch.assigneeName = null;
+  }
+  if (data.dueDate !== undefined) patch.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+  if (data.propertyId !== undefined) {
+    patch.propertyId = data.propertyId || null;
+    patch.bucket = data.propertyId ? "Property" : "General";
+  }
+  if (Object.keys(patch).length === 0) return;
+
+  await prisma.task.update({ where: { id }, data: patch });
+
   revalidatePath(`/tasks/${id}`);
   revalidatePath("/tasks");
+  revalidatePath("/");
+  if (task.propertyId) revalidatePath(`/properties/${task.propertyId}`);
+  if (typeof patch.propertyId === "string") revalidatePath(`/properties/${patch.propertyId}`);
+}
+
+/* ---------------- Attachments (link-style, stored on Task.links) ---------------- */
+
+export async function addTaskAttachment(id: string, formData: FormData) {
+  await requireUser();
+  const rawUrl = formData.get("url")?.toString().trim();
+  if (!rawUrl) return;
+  const url = normalizeAttachmentUrl(rawUrl);
+  const title = formData.get("title")?.toString().trim() || url;
+
+  const task = await prisma.task.findUnique({ where: { id }, select: { links: true } });
+  if (!task) return;
+
+  const next = [...parseAttachments(task.links), { url, title }];
+  await prisma.task.update({ where: { id }, data: { links: next } });
+  revalidatePath(`/tasks/${id}`);
+}
+
+export async function removeTaskAttachment(id: string, index: number) {
+  await requireUser();
+  const task = await prisma.task.findUnique({ where: { id }, select: { links: true } });
+  if (!task) return;
+
+  const list = parseAttachments(task.links);
+  if (index < 0 || index >= list.length) return;
+  list.splice(index, 1);
+  await prisma.task.update({ where: { id }, data: { links: list } });
+  revalidatePath(`/tasks/${id}`);
 }
