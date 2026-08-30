@@ -14,14 +14,18 @@ import { ASANA_CSV_PATH, addressKey, parseExcelDate } from "./_lib";
 
 type Row = Record<string, string>;
 
-function classifySection(section: string): { bucket: string; propertyMatch: string | null } {
+// Asana sections that belong to Pieter's separate ventures, not HG — not imported.
+const SKIP_SECTIONS = [/^pieter properties$/i, /^jmpl properties$/i];
+
+function classifySection(
+  section: string,
+): { bucket: string; propertyMatch: string | null } | null {
   const s = (section || "").trim();
+  if (SKIP_SECTIONS.some((re) => re.test(s))) return null;
   if (!s) return { bucket: "Unfiled", propertyMatch: null };
   if (/^untitled section$/i.test(s)) return { bucket: "Unfiled", propertyMatch: null };
   if (/^general$/i.test(s)) return { bucket: "General", propertyMatch: null };
   if (/^new .*\[address\]/i.test(s)) return { bucket: "Template", propertyMatch: null };
-  if (/^pieter properties$/i.test(s)) return { bucket: "Pieter properties", propertyMatch: null };
-  if (/^jmpl properties$/i.test(s)) return { bucket: "JMPL", propertyMatch: null };
   // e.g. "58 Mariner (Conventus) (HG1)" or "118 Congress (HG)"
   if (/^\d+[a-z]?[\/\d]*\s+[A-Za-z]/.test(s)) return { bucket: "Property", propertyMatch: addressKey(s) };
   return { bucket: "Unfiled", propertyMatch: null };
@@ -61,14 +65,22 @@ export async function migrateTasks() {
   let updated = 0;
   let linked = 0;
   let done = 0;
+  let skipped = 0;
   const unlinkedProperty = new Set<string>();
+  const importedIds = new Set<string>();
 
   for (const r of rows) {
     const asanaId = r["Task ID"]?.trim();
     const title = r["Name"]?.trim();
     if (!asanaId || !title) continue;
 
-    const { bucket, propertyMatch } = classifySection(r["Section/Column"] ?? "");
+    const classified = classifySection(r["Section/Column"] ?? "");
+    if (!classified) {
+      skipped++;
+      continue; // Pieter's / JMPL ventures — not HG
+    }
+    const { bucket, propertyMatch } = classified;
+    importedIds.add(asanaId);
     bucketCounts[bucket] = (bucketCounts[bucket] ?? 0) + 1;
 
     let propertyId: string | null = null;
@@ -110,16 +122,20 @@ export async function migrateTasks() {
     else created++;
   }
 
+  // Remove any previously-imported tasks that now fall in a skipped section.
+  const purged = await prisma.task.deleteMany({
+    where: { asanaId: { not: null, notIn: [...importedIds] } },
+  });
+
   report.line(`Created ${created}, updated ${updated} (idempotent upsert on Asana Task ID).`);
+  report.line(`Skipped ${skipped} tasks in Pieter properties / JMPL sections (not HG).`);
+  if (purged.count) report.line(`Removed ${purged.count} previously-imported tasks now out of scope.`);
   report.line(`Buckets: ${JSON.stringify(bucketCounts)}`);
   report.line(`${linked} tasks linked to a property; ${done} marked Done.`);
   if (unlinkedProperty.size)
     report.warn(
       `Property-style sections with no matching property (imported unlinked): ${[...unlinkedProperty].join(", ")}`,
     );
-  report.line(
-    "'Pieter properties' and 'JMPL' buckets left unlinked — confirm whether these are HG assets or separate ventures.",
-  );
 }
 
 /** Asana dates are "YYYY-MM-DD"; the export also has occasional Excel-ish serials. */

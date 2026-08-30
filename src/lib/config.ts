@@ -32,14 +32,7 @@ export const DEAL_PRIORITIES = ["1 - High", "2 - Medium", "3 - Low", "5 - TBD", 
 
 export const TASK_STATUSES = ["OPEN", "DONE"] as const;
 
-export const TASK_BUCKETS = [
-  "Property",
-  "General",
-  "Template",
-  "Pieter properties",
-  "JMPL",
-  "Unfiled",
-] as const;
+export const TASK_BUCKETS = ["Property", "General", "Template", "Unfiled"] as const;
 
 export const PROPERTY_STATUSES = [
   "Rehabbing",
