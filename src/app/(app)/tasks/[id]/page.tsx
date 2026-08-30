@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
-import { parseAttachments } from "@/lib/task-types";
 import { BackLink } from "@/components/back-link";
 import {
   AssigneeControl,
@@ -18,10 +17,10 @@ import {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-h-[2.75rem] items-center gap-4 border-b border-border/60 last:border-0">
-      <span className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted">
+      <dt className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted">
         {label}
-      </span>
-      <div className="min-w-0 flex-1">{children}</div>
+      </dt>
+      <dd className="min-w-0 flex-1">{children}</dd>
     </div>
   );
 }
@@ -36,6 +35,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
         property: { select: { id: true, address: true } },
         deal: { select: { id: true, address: true } },
         assignee: { select: { name: true, email: true } },
+        attachments: { orderBy: { createdAt: "asc" } },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
@@ -46,7 +46,6 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   const done = task.status === "DONE";
   const assigneeLabel =
     task.assignee?.name ?? task.assignee?.email ?? task.assigneeName ?? null;
-  const attachments = parseAttachments(task.links);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -110,12 +109,12 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       <Card className="mt-4">
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Attachments</CardTitle>
-          {attachments.length > 0 && (
-            <span className="text-xs text-muted">{attachments.length}</span>
+          {task.attachments.length > 0 && (
+            <span className="text-xs text-muted">{task.attachments.length}</span>
           )}
         </CardHeader>
         <CardBody>
-          <AttachmentsSection id={task.id} attachments={attachments} />
+          <AttachmentsSection taskId={task.id} attachments={task.attachments} />
         </CardBody>
       </Card>
     </div>

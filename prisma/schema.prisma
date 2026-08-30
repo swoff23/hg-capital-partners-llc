@@ -190,6 +190,8 @@ model Task {
   property   Property? @relation(fields: [propertyId], references: [id])
   propertyId String?
 
+  attachments TaskAttachment[]
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   completedAt DateTime?
@@ -198,4 +200,20 @@ model Task {
   @@index([bucket])
   @@index([propertyId])
   @@index([dealId])
+}
+
+// Files uploaded to a task, stored in Vercel Blob (bytes live there; we keep
+// the URL + metadata here).
+model TaskAttachment {
+  id          String   @id @default(cuid())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      String
+  url         String // public Blob URL
+  pathname    String // Blob pathname — needed to delete the blob
+  filename    String // original file name, shown to the user
+  size        Int // bytes
+  contentType String?
+  createdAt   DateTime @default(now())
+
+  @@index([taskId])
 }

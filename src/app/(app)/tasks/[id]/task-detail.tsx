@@ -1,13 +1,13 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
-import { Button, Input } from "@/components/ui";
-import { cn, initials } from "@/lib/utils";
-import type { TaskAttachment } from "@/lib/task-types";
+import { upload } from "@vercel/blob/client";
+import type { TaskAttachment } from "@prisma/client";
+import { cn, formatBytes, initials } from "@/lib/utils";
 import {
   toggleTask,
   patchTask,
-  addTaskAttachment,
-  removeTaskAttachment,
+  recordTaskAttachment,
+  deleteTaskAttachment,
 } from "../actions";
 
 /* ------------------------------------------------------------------ *
@@ -234,10 +234,10 @@ export function DescriptionField({ id, value }: { id: string; value: string | nu
 }
 
 /* ------------------------------------------------------------------ *
- * Attachments (links)
+ * Attachments (files, uploaded to Vercel Blob)
  * ------------------------------------------------------------------ */
 
-function LinkIcon() {
+function FileIcon() {
   return (
     <svg
       aria-hidden
@@ -247,42 +247,79 @@ function LinkIcon() {
       stroke="currentColor"
       strokeWidth="1.5"
     >
-      <path d="M6.5 9.5l3-3M7 4.5l.8-.8a2.5 2.5 0 013.5 3.5l-.8.8M9 11.5l-.8.8a2.5 2.5 0 01-3.5-3.5l.8-.8" />
+      <path d="M9 1.5H4.5A1.5 1.5 0 003 3v10a1.5 1.5 0 001.5 1.5h7A1.5 1.5 0 0013 13V5.5L9 1.5z" />
+      <path d="M9 1.5V5.5H13" />
     </svg>
   );
 }
 
 export function AttachmentsSection({
-  id,
+  taskId,
   attachments,
 }: {
-  id: string;
+  taskId: string;
   attachments: TaskAttachment[];
 }) {
-  const [pending, start] = useTransition();
-  const formRef = useRef<HTMLFormElement>(null);
+  const [, start] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<string[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function uploadFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError(null);
+    const names = Array.from(files).map((f) => f.name);
+    setBusy((b) => [...b, ...names]);
+
+    for (const file of Array.from(files)) {
+      try {
+        const blob = await upload(`tasks/${taskId}/${file.name}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/blob/task-upload",
+          clientPayload: JSON.stringify({ taskId }),
+        });
+        await recordTaskAttachment(taskId, {
+          url: blob.url,
+          pathname: blob.pathname,
+          filename: file.name,
+          size: file.size,
+          contentType: file.type || null,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        setError(
+          /client token|not configured|Blob store/i.test(msg)
+            ? "File uploads aren't set up yet — connect a Blob store in Vercel (Storage tab)."
+            : `Couldn't upload ${file.name}${msg ? `: ${msg}` : ""}`,
+        );
+      }
+    }
+
+    setBusy((b) => b.filter((n) => !names.includes(n)));
+  }
 
   return (
     <div className="space-y-3">
       {attachments.length > 0 && (
         <ul className="divide-y divide-border rounded-lg border border-border">
-          {attachments.map((a, i) => (
-            <li key={`${a.url}-${i}`} className="flex items-center gap-2 px-3 py-2 text-sm">
-              <LinkIcon />
+          {attachments.map((a) => (
+            <li key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <FileIcon />
               <a
                 href={a.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="min-w-0 flex-1 truncate text-primary hover:underline"
-                title={a.url}
+                className="min-w-0 flex-1 truncate hover:underline"
+                title={a.filename}
               >
-                {a.title}
+                {a.filename}
               </a>
+              <span className="shrink-0 text-xs text-muted">{formatBytes(a.size)}</span>
               <button
                 type="button"
-                disabled={pending}
-                onClick={() => start(() => removeTaskAttachment(id, i))}
-                className="shrink-0 text-xs text-muted transition-colors hover:text-red-600 disabled:opacity-40"
+                onClick={() => start(() => deleteTaskAttachment(a.id))}
+                className="shrink-0 text-xs text-muted transition-colors hover:text-red-600"
               >
                 Remove
               </button>
@@ -291,29 +328,65 @@ export function AttachmentsSection({
         </ul>
       )}
 
-      <form
-        ref={formRef}
-        action={(fd) =>
-          start(async () => {
-            await addTaskAttachment(id, fd);
-            formRef.current?.reset();
-          })
-        }
-        className="flex flex-col gap-2 sm:flex-row"
+      {busy.map((name) => (
+        <div
+          key={name}
+          className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-muted"
+        >
+          <FileIcon />
+          <span className="min-w-0 flex-1 truncate">{name}</span>
+          <span className="shrink-0 text-xs">Uploading…</span>
+        </div>
+      ))}
+
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          void uploadFiles(e.dataTransfer.files);
+        }}
+        className={cn(
+          "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-6 text-center text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+          dragOver ? "border-primary bg-primary/5" : "border-border hover:bg-background",
+        )}
       >
-        <Input
-          name="url"
-          type="text"
-          inputMode="url"
-          required
-          placeholder="Paste a link (Drive, Dropbox, photo…)"
-          className="sm:flex-1"
-        />
-        <Input name="title" placeholder="Label (optional)" className="sm:w-44" />
-        <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? "Adding…" : "Add link"}
-        </Button>
-      </form>
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          className="h-5 w-5 text-muted"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
+          <path d="M12 16V4m0 0l-4 4m4-4l4 4M5 20h14" />
+        </svg>
+        <span className="text-muted">
+          <span className="font-medium text-foreground">Click to upload</span> or drag files here
+        </span>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          void uploadFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }

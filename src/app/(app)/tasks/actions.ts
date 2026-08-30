@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { del } from "@vercel/blob";
 import { formToObject } from "@/lib/forms";
-import { parseAttachments, normalizeAttachmentUrl } from "@/lib/task-types";
 import { logDealTaskEvent } from "../deals/actions";
 
 export async function toggleTask(id: string) {
@@ -110,31 +110,40 @@ export async function patchTask(
   if (typeof patch.propertyId === "string") revalidatePath(`/properties/${patch.propertyId}`);
 }
 
-/* ---------------- Attachments (link-style, stored on Task.links) ---------------- */
+/* ---------------- Attachments (files in Vercel Blob) ---------------- */
 
-export async function addTaskAttachment(id: string, formData: FormData) {
+/** Called by the client after a file finishes uploading to Blob. */
+export async function recordTaskAttachment(
+  taskId: string,
+  data: { url: string; pathname: string; filename: string; size: number; contentType: string | null },
+) {
   await requireUser();
-  const rawUrl = formData.get("url")?.toString().trim();
-  if (!rawUrl) return;
-  const url = normalizeAttachmentUrl(rawUrl);
-  const title = formData.get("title")?.toString().trim() || url;
-
-  const task = await prisma.task.findUnique({ where: { id }, select: { links: true } });
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { id: true } });
   if (!task) return;
 
-  const next = [...parseAttachments(task.links), { url, title }];
-  await prisma.task.update({ where: { id }, data: { links: next } });
-  revalidatePath(`/tasks/${id}`);
+  await prisma.taskAttachment.create({
+    data: {
+      taskId,
+      url: data.url,
+      pathname: data.pathname,
+      filename: data.filename.slice(0, 255) || "file",
+      size: Math.max(0, Math.trunc(data.size)),
+      contentType: data.contentType,
+    },
+  });
+  revalidatePath(`/tasks/${taskId}`);
 }
 
-export async function removeTaskAttachment(id: string, index: number) {
+export async function deleteTaskAttachment(attachmentId: string) {
   await requireUser();
-  const task = await prisma.task.findUnique({ where: { id }, select: { links: true } });
-  if (!task) return;
+  const att = await prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
+  if (!att) return;
 
-  const list = parseAttachments(task.links);
-  if (index < 0 || index >= list.length) return;
-  list.splice(index, 1);
-  await prisma.task.update({ where: { id }, data: { links: list } });
-  revalidatePath(`/tasks/${id}`);
+  try {
+    await del(att.url);
+  } catch {
+    // Blob already gone / token missing — still drop the DB row.
+  }
+  await prisma.taskAttachment.delete({ where: { id: attachmentId } });
+  revalidatePath(`/tasks/${att.taskId}`);
 }

@@ -57,3 +57,11 @@ export function initials(name: string | null | undefined): string {
     .map((p) => p[0]?.toUpperCase())
     .join("");
 }
+
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const n = bytes / 1024 ** i;
+  return `${i === 0 ? n : n.toFixed(n < 10 ? 1 : 0)} ${units[i]}`;
+}
