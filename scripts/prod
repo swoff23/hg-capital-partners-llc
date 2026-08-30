@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Run a command against PRODUCTION using the read-only role in .env.prod.
+#
+#   scripts/prod npx prisma studio          # browse prod data
+#   scripts/prod psql                       # psql shell on prod
+#   scripts/prod npx tsx scripts/foo.ts     # run a debug script against prod
+#
+# .env.prod is gitignored and must contain:  PROD_DATABASE_URL="postgres://…"
+# The role it points at should be SELECT-only (see DEBUG.md) so nothing here can
+# mutate production.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+envf="$root/.env.prod"
+[ -f "$envf" ] || { echo "scripts/prod: missing $envf (see DEBUG.md)" >&2; exit 1; }
+
+set -a; . "$envf"; set +a
+: "${PROD_DATABASE_URL:?scripts/prod: PROD_DATABASE_URL not set in .env.prod}"
+[ "$#" -gt 0 ] || { echo "usage: scripts/prod <command...>" >&2; exit 2; }
+
+case "$1" in
+  psql) shift; exec psql "$PROD_DATABASE_URL" "$@" ;;
+  *) exec env DATABASE_URL="$PROD_DATABASE_URL" DIRECT_URL="$PROD_DATABASE_URL" "$@" ;;
+esac

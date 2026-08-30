@@ -205,8 +205,13 @@ export const BUILDING_CAPEX_ITEMS = [
 
 export type BuildingCapexKey = (typeof BUILDING_CAPEX_ITEMS)[number]["key"];
 
-/** Per-property stored data: { roof: { year: "2010", costOverride: 27000 }, ... } */
-export type BuildingCapexEntry = { year?: string | null; costOverride?: number | null };
+/** Per-property stored data: { roof: { year: "2010", type: "Shingle", costOverride: 27000 }, ... } */
+export type BuildingCapexEntry = {
+  year?: string | null;
+  /** Free text — material / kind, e.g. "Shingle", "Copper/PEX", "Circuit breakers". */
+  type?: string | null;
+  costOverride?: number | null;
+};
 export type BuildingCapexData = Partial<Record<BuildingCapexKey, BuildingCapexEntry>>;
 
 export function parseBuildingCapex(json: unknown): BuildingCapexData {
@@ -218,6 +223,7 @@ export function parseBuildingCapex(json: unknown): BuildingCapexData {
 export type BuildingCapexRow = {
   key: BuildingCapexKey;
   label: string;
+  type: string | null;
   year: string | null;
   age: number | null;
   status: EquipmentStatus;
@@ -242,6 +248,7 @@ export function buildingCapexRows(
     return {
       key: item.key,
       label: item.label,
+      type: entry.type?.trim() || null,
       year: entry.year?.trim() || null,
       age,
       status: lifecycleStatus(age, item.monitor, item.replace),

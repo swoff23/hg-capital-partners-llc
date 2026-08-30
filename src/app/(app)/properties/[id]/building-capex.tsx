@@ -4,14 +4,18 @@ import { Badge, Button } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import {
   BUILDING_CAPEX_ITEMS,
-  buildingCapexRows,
   equipmentStatusTone,
+  lifecycleStatus,
+  parseInstallYear,
   type BuildingCapexData,
+  type EquipmentStatus,
 } from "@/lib/property-types";
 import { updateBuildingCapex } from "../actions";
 
 const inp =
   "w-full rounded border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary";
+const cols =
+  "grid grid-cols-[minmax(104px,1.25fr)_minmax(78px,1fr)_52px_44px_72px_66px] items-center gap-2";
 
 const toneText: Record<string, string> = {
   green: "text-green-700 dark:text-green-400",
@@ -20,18 +24,30 @@ const toneText: Record<string, string> = {
   gray: "text-muted",
 };
 
-type Draft = Record<string, { year: string; cost: string }>;
+const NOW = new Date().getFullYear();
+const fmtAge = (n: number | null) => (n == null ? "—" : `${n} yr${n === 1 ? "" : "s"}`);
+
+type DraftEntry = { type: string; year: string; cost: string };
+type Draft = Record<string, DraftEntry>;
 
 function toDraft(data: BuildingCapexData): Draft {
   const d: Draft = {};
   for (const item of BUILDING_CAPEX_ITEMS) {
     const e = data[item.key];
     d[item.key] = {
+      type: e?.type ?? "",
       year: e?.year ?? "",
       cost: e?.costOverride != null ? String(e.costOverride) : "",
     };
   }
   return d;
+}
+
+function StatusCell({ status }: { status: EquipmentStatus }) {
+  if (status === "Replace") return <Badge tone="red">Replace</Badge>;
+  return (
+    <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>{status}</span>
+  );
 }
 
 export function BuildingCapexSection({
@@ -45,16 +61,19 @@ export function BuildingCapexSection({
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [pending, start] = useTransition();
 
-  const rows = buildingCapexRows(initial);
-  const setCell = (key: string, field: "year" | "cost", value: string) =>
+  const setCell = (key: string, field: keyof DraftEntry, value: string) =>
     setDraft((d) => ({ ...d, [key]: { ...d[key], [field]: value } }));
 
   function save() {
-    const payload: Record<string, { year: string | null; costOverride: number | null }> = {};
+    const payload: Record<
+      string,
+      { type: string | null; year: string | null; costOverride: number | null }
+    > = {};
     for (const item of BUILDING_CAPEX_ITEMS) {
       const c = draft[item.key];
       const costNum = parseFloat(c.cost.replace(/[$,\s]/g, ""));
       payload[item.key] = {
+        type: c.type.trim() || null,
         year: c.year.trim() || null,
         costOverride: Number.isFinite(costNum) && costNum > 0 ? costNum : null,
       };
@@ -69,6 +88,18 @@ export function BuildingCapexSection({
     setDraft(toDraft(initial));
     setEditing(false);
   }
+
+  /** Row state from a source (draft in edit mode, stored data in read mode). */
+  const rowFor = (item: (typeof BUILDING_CAPEX_ITEMS)[number], src: { type: string; year: string; costOverride: number | null }) => {
+    const installY = parseInstallYear(src.year);
+    const age = installY == null ? null : Math.max(0, NOW - installY);
+    return {
+      age,
+      status: lifecycleStatus(age, item.monitor, item.replace),
+      cost: src.costOverride ?? item.defaultCost,
+      overridden: src.costOverride != null && src.costOverride !== item.defaultCost,
+    };
+  };
 
   return (
     <div className="group rounded-xl border border-border bg-surface shadow-sm">
@@ -94,61 +125,96 @@ export function BuildingCapexSection({
       </div>
 
       <div className="p-4">
-        {editing ? (
-          <div className="space-y-2">
-            {BUILDING_CAPEX_ITEMS.map((item) => (
-              <div key={item.key} className="grid grid-cols-[1fr_70px_84px] items-center gap-2">
-                <span className="text-xs">{item.label}</span>
-                <input
-                  className={inp}
-                  placeholder="Year"
-                  value={draft[item.key].year}
-                  onChange={(e) => setCell(item.key, "year", e.target.value)}
-                />
-                <input
-                  className={inp + " text-right"}
-                  placeholder={fmtMoney(item.defaultCost)}
-                  value={draft[item.key].cost}
-                  onChange={(e) => setCell(item.key, "cost", e.target.value)}
-                />
-              </div>
-            ))}
-            <p className="pt-1 text-[11px] text-muted">
-              Year installed / replaced / last renovated. Cost is optional — leave blank to use the
-              default shown.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {rows.map((r) => (
-              <div key={r.key} className="flex items-start justify-between gap-3 text-xs">
-                <div className="min-w-0">
-                  <div className="font-medium">{r.label}</div>
-                  <div className="text-[11px] text-muted">
-                    {r.year ?? "no date"}
-                    {r.age != null && ` · ${r.age} yr${r.age === 1 ? "" : "s"}`}
-                    {r.replacementYear != null && ` · replace ~${r.replacementYear}`}
-                  </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[420px] space-y-1.5">
+            <div className={cols + " text-[11px] font-medium text-muted"}>
+              <span>Component</span>
+              <span>Type</span>
+              <span>Year</span>
+              <span>Age</span>
+              <span>Status</span>
+              <span>Cost</span>
+            </div>
+
+            {BUILDING_CAPEX_ITEMS.map((item) => {
+              const d = draft[item.key];
+              const stored = initial[item.key];
+              const src = editing
+                ? {
+                    type: d.type,
+                    year: d.year,
+                    costOverride: (() => {
+                      const n = parseFloat(d.cost.replace(/[$,\s]/g, ""));
+                      return Number.isFinite(n) && n > 0 ? n : null;
+                    })(),
+                  }
+                : {
+                    type: stored?.type ?? "",
+                    year: stored?.year ?? "",
+                    costOverride: stored?.costOverride ?? null,
+                  };
+              const rs = rowFor(item, src);
+              const showCost = rs.status === "Monitor" || rs.status === "Replace";
+              const costClass =
+                "tabular-nums " +
+                (rs.status === "Replace"
+                  ? "font-semibold text-red-600 dark:text-red-400"
+                  : rs.status === "Monitor"
+                    ? "font-semibold text-amber-700 dark:text-amber-400"
+                    : "text-muted");
+
+              return (
+                <div key={item.key} className={cols}>
+                  <span className="text-xs">{item.label}</span>
+
+                  {editing ? (
+                    <input
+                      className={inp}
+                      placeholder="e.g. Shingle"
+                      value={d.type}
+                      onChange={(e) => setCell(item.key, "type", e.target.value)}
+                    />
+                  ) : (
+                    <span className="truncate text-xs text-muted">{src.type || "—"}</span>
+                  )}
+
+                  {editing ? (
+                    <input
+                      className={inp}
+                      placeholder="Year"
+                      value={d.year}
+                      onChange={(e) => setCell(item.key, "year", e.target.value)}
+                    />
+                  ) : (
+                    <span className="text-xs">{src.year || "—"}</span>
+                  )}
+
+                  <span className="text-xs tabular-nums text-muted">{fmtAge(rs.age)}</span>
+                  <span className="text-[11px]">
+                    <StatusCell status={rs.status} />
+                  </span>
+
+                  {editing ? (
+                    <input
+                      className={inp}
+                      placeholder={fmtMoney(item.defaultCost)}
+                      value={d.cost}
+                      onChange={(e) => setCell(item.key, "cost", e.target.value)}
+                    />
+                  ) : (
+                    <span className={"text-xs " + costClass}>
+                      {showCost ? fmtMoney(rs.cost) : ""}
+                      {showCost && rs.overridden && (
+                        <span className="font-normal text-muted"> *</span>
+                      )}
+                    </span>
+                  )}
                 </div>
-                <div className="shrink-0 text-right">
-                  <div className="tabular-nums">
-                    {fmtMoney(r.cost)}
-                    {r.costOverridden && <span className="text-muted"> *</span>}
-                  </div>
-                  <div className="text-[11px]">
-                    {r.status === "Replace" ? (
-                      <Badge tone="red">Replace</Badge>
-                    ) : (
-                      <span className={"font-medium " + toneText[equipmentStatusTone(r.status)]}>
-                        {r.status}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
+
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

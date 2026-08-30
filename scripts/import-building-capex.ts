@@ -2,37 +2,38 @@
  * One-off: seed Property.buildingCapex from the component-age spreadsheet.
  *
  * Source columns:
- *   L ROOF     -> buildingCapex.roof
- *   N PLUMB    -> buildingCapex.plumbing
- *   O ELECTRIC -> buildingCapex.electrical
+ *   L ROOF     -> buildingCapex.roof        (age + material, e.g. "4/20 years, Shingle")
+ *   N PLUMB    -> buildingCapex.plumbing    ("2 Years, Copper/PEX")
+ *   O ELECTRIC -> buildingCapex.electrical  ("5 Years, Circuit")
  *   M HVAC is unit-level (multiple systems / property) — not imported here.
  *
- * Age notation: first number = current age in years; a "X/YY" pair is
- * "X years old on a YY-year system", so we take X. Age -> year = 2026 - round(age).
+ * Age notation: first number = current age in years; "X/YY" is "X years old on a
+ * YY-year system", so we take X. Age -> year = 2026 - round(age).
+ * Type = free text after the first comma.
  *
- * Run:  npx tsx scripts/import-building-capex.ts          (dry run, prints the plan)
- *       npx tsx scripts/import-building-capex.ts --apply   (writes)
+ * Run:  npx tsx scripts/import-building-capex.ts          (dry run)
+ *       npx tsx scripts/import-building-capex.ts --apply
  */
 import { prisma } from "../src/lib/db";
 
 const NOW_YEAR = 2026;
 const APPLY = process.argv.includes("--apply");
 
-// address (as in the sheet) -> { roof, plumbing, electrical } raw age strings
+// address (as in the sheet) -> raw cell text for each column
 const SHEET: Record<string, { roof?: string; plumbing?: string; electrical?: string }> = {
-  "118 Congress St Buffalo NY 14213": { roof: "4/20", plumbing: "2", electrical: "5" },
-  "647 Prospect Ave Buffalo NY 14213": { roof: "2.5", plumbing: "1.5", electrical: "5" },
-  "15 Oxford Ave Buffalo NY 14209": { roof: "10/20", plumbing: "1", electrical: "1" },
-  "933 Lafayette Ave Buffalo NY 14209": { roof: "5", plumbing: "1", electrical: "1" },
-  "767 Prospect Ave Buffalo NY 14213": { roof: "4", plumbing: "1", electrical: "1" },
-  "765 Prospect Ave Buffalo NY 14213": { roof: "4", plumbing: "1", electrical: "1" },
-  "58 Mariner St Buffalo NY 14201": { roof: "15", plumbing: "1", electrical: "1/15" },
-  "428 Normal Ave Buffalo NY 14213": { roof: "9", plumbing: "1", electrical: "10" },
-  "725 Linwood Ave Buffalo NY 14209": { roof: "9", plumbing: "1", electrical: "5" },
-  "23 Sherwood Dr Buffalo NY 14213": { roof: "10/20", plumbing: "1", electrical: "10" },
+  "118 Congress St Buffalo NY 14213": { roof: "4/20 years, Shingle", plumbing: "2 Years, Copper/PEX", electrical: "5 Years, Circuit" },
+  "647 Prospect Ave Buffalo NY 14213": { roof: "2.5 Years, Shingle", plumbing: "1.5 Years, Copper/PEX", electrical: "5 Years, Circuit" },
+  "15 Oxford Ave Buffalo NY 14209": { roof: "10/20 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "1 Year, Circuit" },
+  "933 Lafayette Ave Buffalo NY 14209": { roof: "5 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "1 Year, Circuit" },
+  "767 Prospect Ave Buffalo NY 14213": { roof: "4 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "1 Year, Circuit" },
+  "765 Prospect Ave Buffalo NY 14213": { roof: "4 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "1 Year, Circuit" },
+  "58 Mariner St Buffalo NY 14201": { roof: "15 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "1/15 Years, Circuit" },
+  "428 Normal Ave Buffalo NY 14213": { roof: "9 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "10 Years, Circuit" },
+  "725 Linwood Ave Buffalo NY 14209": { roof: "9 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "5 Years, Circuit" },
+  "23 Sherwood Dr Buffalo NY 14213": { roof: "10/20 Years, Shingle", plumbing: "1 Year, Copper/PEX", electrical: "10 Years, Circuit" },
 };
 
-/** Normalise an address to "<housenumber> <streetword> <zip>" for fuzzy matching. */
+/** Normalise an address to "<housenumber>|<streetword>|<zip>" for fuzzy matching. */
 function key(addr: string): string {
   const zip = addr.match(/\b(\d{5})\b/)?.[1] ?? "";
   const num = addr.match(/^\s*(\d+)/)?.[1] ?? "";
@@ -48,35 +49,38 @@ function key(addr: string): string {
   return `${num}|${street}|${zip}`;
 }
 
-function ageToYear(raw?: string): string | null {
+function parseCell(raw?: string): { year: string; type: string | null } | null {
   if (!raw) return null;
-  const first = parseFloat(raw.split("/")[0].trim());
+  const first = parseFloat(raw.split(/[/,]/)[0].trim());
   if (!Number.isFinite(first)) return null;
-  return String(NOW_YEAR - Math.round(first));
+  const comma = raw.indexOf(",");
+  const type = comma >= 0 ? raw.slice(comma + 1).trim() || null : null;
+  return { year: String(NOW_YEAR - Math.round(first)), type };
 }
 
 async function main() {
   const props = await prisma.property.findMany({ select: { id: true, address: true, buildingCapex: true } });
   const byKey = new Map(props.map((p) => [key(p.address), p]));
 
-  for (const [sheetAddr, ages] of Object.entries(SHEET)) {
+  for (const [sheetAddr, cells] of Object.entries(SHEET)) {
     const match = byKey.get(key(sheetAddr));
     if (!match) {
       console.log(`  ⚠ NO MATCH for "${sheetAddr}" (key ${key(sheetAddr)})`);
       continue;
     }
-    const existing = (match.buildingCapex ?? {}) as Record<string, { year?: string | null }>;
+    const existing = (match.buildingCapex ?? {}) as Record<string, Record<string, unknown>>;
     const next = { ...existing };
-    const roofY = ageToYear(ages.roof);
-    const plumbY = ageToYear(ages.plumbing);
-    const elecY = ageToYear(ages.electrical);
-    if (roofY) next.roof = { ...(next.roof ?? {}), year: roofY };
-    if (plumbY) next.plumbing = { ...(next.plumbing ?? {}), year: plumbY };
-    if (elecY) next.electrical = { ...(next.electrical ?? {}), year: elecY };
+    const apply = (k: string, raw?: string) => {
+      const p = parseCell(raw);
+      if (!p) return "-";
+      next[k] = { ...(next[k] ?? {}), year: p.year, type: p.type };
+      return `${p.year}${p.type ? ` (${p.type})` : ""}`;
+    };
 
-    console.log(
-      `  ${match.address}\n    roof ${ages.roof ?? "-"} → ${roofY ?? "-"}   plumbing ${ages.plumbing ?? "-"} → ${plumbY ?? "-"}   electrical ${ages.electrical ?? "-"} → ${elecY ?? "-"}`,
-    );
+    const r = apply("roof", cells.roof);
+    const n = apply("plumbing", cells.plumbing);
+    const e = apply("electrical", cells.electrical);
+    console.log(`  ${match.address}\n    roof → ${r}   plumbing → ${n}   electrical → ${e}`);
 
     if (APPLY) {
       await prisma.property.update({

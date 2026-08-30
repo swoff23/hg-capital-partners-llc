@@ -87,22 +87,24 @@ const buildingCapexSchema = z.record(
   z.string(),
   z.object({
     year: z.string().nullish(),
+    type: z.string().nullish(),
     costOverride: z.number().nullish(),
   }),
 );
 
-/** Replace the whole building-level CapEx map (year + optional cost override per system). */
+/** Replace the whole building-level CapEx map (type + year + optional cost override per system). */
 export async function updateBuildingCapex(id: string, data: unknown) {
   await requireUser();
   const parsed = buildingCapexSchema.parse(data);
-  const clean: Record<string, { year: string | null; costOverride: number | null }> = {};
+  const clean: Record<string, { year: string | null; type: string | null; costOverride: number | null }> = {};
   for (const [key, v] of Object.entries(parsed)) {
     const year = v.year?.trim() || null;
+    const type = v.type?.trim() || null;
     const costOverride =
       v.costOverride != null && Number.isFinite(v.costOverride) && v.costOverride > 0
         ? Math.round(v.costOverride)
         : null;
-    if (year || costOverride != null) clean[key] = { year, costOverride };
+    if (year || type || costOverride != null) clean[key] = { year, type, costOverride };
   }
   await prisma.property.update({
     where: { id },

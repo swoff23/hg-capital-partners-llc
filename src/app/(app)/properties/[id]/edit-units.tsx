@@ -137,11 +137,47 @@ export function UnitsSection({
   );
 }
 
+function Accordion({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details open={defaultOpen} className="group border-t border-border">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">
+        <svg
+          className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90"
+          viewBox="0 0 12 12"
+          fill="none"
+          aria-hidden
+        >
+          <path
+            d="M4.5 3l3 3-3 3"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        {title}
+      </summary>
+      <div className="px-3 pb-3">{children}</div>
+    </details>
+  );
+}
+
 function ReadUnits({ units }: { units: PropertyUnit[] }) {
   if (units.length === 0) return <EmptyState>No unit-level records.</EmptyState>;
   return (
     <>
-      {units.map((u, i) => (
+      {units.map((u, i) => {
+        const hasUtilities = UTILITY_GROUPS.some((g) => g.fields.some(([k]) => u.utilities?.[k]));
+        const equipment = u.equipment ?? [];
+        return (
         <div key={i} className="rounded-lg border border-border">
           <div className="flex items-baseline gap-2 border-b border-border bg-background px-3 py-2">
             <span className="text-sm font-medium">{u.label || `Unit ${i + 1}`}</span>
@@ -149,37 +185,40 @@ function ReadUnits({ units }: { units: PropertyUnit[] }) {
               <span className="text-xs text-muted">🔒 {u.lockboxCode}</span>
             )}
           </div>
-          <div className="grid gap-x-6 gap-y-3 px-3 py-2 sm:grid-cols-3">
-            {UTILITY_GROUPS.map((g) => {
-              const rows = g.fields.filter(([k]) => u.utilities?.[k]);
-              if (rows.length === 0) return null;
-              return (
-                <div key={g.name}>
-                  <div className="mb-1 text-xs font-semibold">{g.name}</div>
-                  <div className="space-y-1">
-                    {rows.map(([k, label]) => (
-                      <div key={k} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="text-muted">{label}</span>
-                        <span
-                          className={
-                            "font-medium " +
-                            (UTILITY_STATUS_FIELDS.has(k)
-                              ? toneText[utilityStatusTone(u.utilities![k])]
-                              : "")
-                          }
-                        >
-                          {u.utilities![k]}
-                        </span>
+          {hasUtilities && (
+            <Accordion title="Utilities" defaultOpen>
+              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+                {UTILITY_GROUPS.map((g) => {
+                  const rows = g.fields.filter(([k]) => u.utilities?.[k]);
+                  if (rows.length === 0) return null;
+                  return (
+                    <div key={g.name}>
+                      <div className="mb-1 text-xs font-semibold">{g.name}</div>
+                      <div className="space-y-1">
+                        {rows.map(([k, label]) => (
+                          <div key={k} className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted">{label}</span>
+                            <span
+                              className={
+                                "font-medium " +
+                                (UTILITY_STATUS_FIELDS.has(k)
+                                  ? toneText[utilityStatusTone(u.utilities![k])]
+                                  : "")
+                              }
+                            >
+                              {u.utilities![k]}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {u.equipment && u.equipment.length > 0 && (
-            <div className="border-t border-border px-3 py-2">
-              <div className="mb-1 text-xs font-semibold">Equipment</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Accordion>
+          )}
+          {equipment.length > 0 && (
+            <Accordion title="Equipment">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-xs">
                   <thead>
@@ -194,7 +233,7 @@ function ReadUnits({ units }: { units: PropertyUnit[] }) {
                     </tr>
                   </thead>
                   <tbody className="align-top [&>tr>td]:py-0.5 [&>tr>td]:pr-3">
-                    {u.equipment.map((e, j) => {
+                    {equipment.map((e, j) => {
                       const status = equipmentStatus(e.type, e.installYear);
                       const cost = equipmentReplacementCost(e.type);
                       return (
@@ -224,10 +263,11 @@ function ReadUnits({ units }: { units: PropertyUnit[] }) {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </Accordion>
           )}
         </div>
-      ))}
+        );
+      })}
     </>
   );
 }

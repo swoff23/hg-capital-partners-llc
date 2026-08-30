@@ -64,9 +64,34 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
+          <BuildingCapexSection propertyId={property.id} initial={buildingCapex} />
+
           <UnitsSection propertyId={property.id} initial={units} />
 
           <CapexForecastCard units={units} building={buildingCapex} />
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          <PropertyDetailsSection
+            property={{
+                  id: property.id,
+                  version: property.updatedAt.toISOString(),
+                  address: property.address,
+                  llcOwner: property.llcOwner,
+                  attorney: property.attorney,
+                  lender: property.lender,
+                  loanServicer: property.loanServicer,
+                  status: property.status,
+                  purchaseDate: property.purchaseDate?.toISOString().slice(0, 10) ?? null,
+                  refinanceDate: property.refinanceDate?.toISOString().slice(0, 10) ?? null,
+                  purchasePrice: d(property.purchasePrice),
+                  currentLoan: d(property.currentLoan),
+                  value: d(property.value),
+                  rehabAmount: d(property.rehabAmount),
+              sqft: property.sqft,
+              unitCount: property.unitCount,
+            }}
+          />
 
           <Card>
             <CardHeader className="flex items-center justify-between">
@@ -108,30 +133,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               )}
             </CardBody>
           </Card>
-        </div>
 
-        <div className="min-w-0 space-y-4">
-          <PropertyDetailsSection
-            property={{
-                  id: property.id,
-                  version: property.updatedAt.toISOString(),
-                  address: property.address,
-                  llcOwner: property.llcOwner,
-                  attorney: property.attorney,
-                  lender: property.lender,
-                  loanServicer: property.loanServicer,
-                  status: property.status,
-                  purchaseDate: property.purchaseDate?.toISOString().slice(0, 10) ?? null,
-                  refinanceDate: property.refinanceDate?.toISOString().slice(0, 10) ?? null,
-                  purchasePrice: d(property.purchasePrice),
-                  currentLoan: d(property.currentLoan),
-                  value: d(property.value),
-                  rehabAmount: d(property.rehabAmount),
-              sqft: property.sqft,
-              unitCount: property.unitCount,
-            }}
-          />
-          <BuildingCapexSection propertyId={property.id} initial={buildingCapex} />
           <PropertyNotesSection
             id={property.id}
             version={property.updatedAt.toISOString()}
