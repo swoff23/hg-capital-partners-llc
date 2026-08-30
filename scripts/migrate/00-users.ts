@@ -2,8 +2,8 @@
  * Seed the two internal users. Emails must match the Google accounts used to sign in.
  * Adjust in src/lib/auth-allowlist.ts if these change.
  */
-import { prisma } from "../../src/lib/db.ts";
-import { report } from "./_report.ts";
+import { prisma } from "../../src/lib/db";
+import { report } from "./_report";
 
 export const SEED_USERS = [
   { email: "connoraswofford@gmail.com", name: "Connor Swofford" },

@@ -1,7 +1,7 @@
 /** Accumulates a human-readable migration report written to ./migration-report.md */
 import fs from "node:fs";
 import path from "node:path";
-import { REPO_ROOT } from "./_lib.ts";
+import { REPO_ROOT } from "./_lib";
 
 type Section = { title: string; lines: string[] };
 

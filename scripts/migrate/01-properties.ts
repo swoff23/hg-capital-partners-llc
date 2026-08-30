@@ -4,17 +4,16 @@
  *
  * Idempotent: upserts on normalized address.
  */
-import { prisma } from "../../src/lib/db.ts";
-import { report } from "./_report.ts";
+import { prisma } from "../../src/lib/db";
+import { report } from "./_report";
 import {
   readSheet,
-  cellText,
   normalizeAddress,
   parseExcelDate,
   parseFloatOrNull,
   parseIntOrNull,
   parseMoney,
-} from "./_lib.ts";
+} from "./_lib";
 
 const EQUIP_COLS: Array<[type: string, modelCol: string, yearCol: string]> = [
   ["Roof", "T", "U"],

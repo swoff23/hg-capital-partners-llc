@@ -5,13 +5,13 @@
  * Order matters: users → properties → contractors → deals → tasks
  * (tasks link to properties; task assignees match users).
  */
-import { prisma } from "../../src/lib/db.ts";
-import { report } from "./_report.ts";
-import { migrateUsers } from "./00-users.ts";
-import { migrateProperties } from "./01-properties.ts";
-import { migrateContractors } from "./02-contractors.ts";
-import { migrateDeals } from "./03-deals.ts";
-import { migrateTasks } from "./04-tasks.ts";
+import { prisma } from "../../src/lib/db";
+import { report } from "./_report";
+import { migrateUsers } from "./00-users";
+import { migrateProperties } from "./01-properties";
+import { migrateContractors } from "./02-contractors";
+import { migrateDeals } from "./03-deals";
+import { migrateTasks } from "./04-tasks";
 
 const NOT_IMPORTED = [
   "Rent Record Keeping — historical rent ledger (deferred: accounting phase)",

@@ -6,9 +6,9 @@
  *
  * Idempotent: upserts on normalized address; DealNotes for a deal are replaced on re-run.
  */
-import { prisma } from "../../src/lib/db.ts";
-import { report } from "./_report.ts";
-import { readSheet, normalizeAddress, parseMoney, parseIntOrNull, isUrl } from "./_lib.ts";
+import { prisma } from "../../src/lib/db";
+import { report } from "./_report";
+import { readSheet, normalizeAddress, parseMoney, parseIntOrNull, isUrl } from "./_lib";
 
 const MONTHS: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,

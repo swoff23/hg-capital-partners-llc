@@ -6,8 +6,8 @@
  *
  * Idempotent: upserts keyed by a stable slug of the person's name.
  */
-import { prisma } from "../../src/lib/db.ts";
-import { report } from "./_report.ts";
+import { prisma } from "../../src/lib/db";
+import { report } from "./_report";
 import {
   readSheet,
   normalizeEmail,
@@ -15,7 +15,7 @@ import {
   formatPhone,
   isUrl,
   parseExcelDate,
-} from "./_lib.ts";
+} from "./_lib";
 
 type Draft = {
   slug: string;

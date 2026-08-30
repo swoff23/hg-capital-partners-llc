@@ -8,9 +8,9 @@
  */
 import fs from "node:fs";
 import { parse } from "csv-parse/sync";
-import { prisma } from "../../src/lib/db.ts";
-import { report } from "./_report.ts";
-import { ASANA_CSV_PATH, addressKey, parseExcelDate } from "./_lib.ts";
+import { prisma } from "../../src/lib/db";
+import { report } from "./_report";
+import { ASANA_CSV_PATH, addressKey, parseExcelDate } from "./_lib";
 
 type Row = Record<string, string>;
 
