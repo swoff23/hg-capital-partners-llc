@@ -41,8 +41,6 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold tracking-tight">{deal.address}</h1>
           <Badge tone={dealStatusTone(deal.status)}>{deal.status}</Badge>
-          {deal.priority && <Badge tone="amber">{deal.priority}</Badge>}
-          {deal.vip && <Badge tone="purple">VIP</Badge>}
         </div>
         {deal.sourceUrl && (
           <a href={deal.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">
@@ -71,7 +69,6 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
                   id: deal.id,
                   version: deal.updatedAt.toISOString(),
                   status: deal.status,
-                  priority: deal.priority,
                   theirPriceRaw: deal.theirPriceRaw,
                   ourPriceRaw: deal.ourPriceRaw,
                   nextAction: deal.nextAction,
@@ -79,6 +76,7 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
                     ? deal.nextActionDue.toISOString().slice(0, 10)
                     : null,
                   passReason: deal.passReason,
+                  sourceUrl: deal.sourceUrl,
                 }}
               />
             </CardBody>
@@ -96,34 +94,37 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
                   Add
                 </Button>
               </form>
-              <ol className="relative space-y-3 border-l border-border pl-4">
-                {deal.notes.map((n) => (
-                  <li key={n.id} className="relative">
-                    <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-border" />
-                    <div className="text-xs text-muted">
-                      {n.noteDate ? fmtDate(n.noteDate) : fmtDateTime(n.createdAt)}
-                      {n.source === "manual" && <span className="ml-1">·  note</span>}
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm">{n.body}</p>
-                  </li>
-                ))}
+              <ol className="relative max-h-[520px] space-y-2.5 overflow-y-auto border-l border-border pl-4">
+                {deal.notes.map((n) => {
+                  const isChange = n.source === "change";
+                  return (
+                    <li key={n.id} className="relative">
+                      <span
+                        className={`absolute -left-[21px] top-1.5 h-1.5 w-1.5 rounded-full ${
+                          isChange ? "bg-border" : "bg-primary"
+                        }`}
+                      />
+                      <div className="text-[11px] text-muted">
+                        {n.noteDate ? fmtDate(n.noteDate) : fmtDateTime(n.createdAt)}
+                        {n.source === "manual" && <span className="ml-1">· note</span>}
+                        {n.source === "migration" && <span className="ml-1">· imported</span>}
+                      </div>
+                      <p
+                        className={
+                          isChange
+                            ? "whitespace-pre-wrap text-xs text-muted"
+                            : "whitespace-pre-wrap text-sm"
+                        }
+                      >
+                        {n.body}
+                      </p>
+                    </li>
+                  );
+                })}
                 {deal.notes.length === 0 && <li className="text-sm text-muted">No activity yet.</li>}
               </ol>
             </CardBody>
           </Card>
-
-          {deal.rawLatestUpdates && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Original spreadsheet notes (verbatim)</CardTitle>
-              </CardHeader>
-              <CardBody>
-                <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap text-xs text-muted">
-                  {deal.rawLatestUpdates}
-                </pre>
-              </CardBody>
-            </Card>
-          )}
         </div>
 
         <div className="space-y-4">

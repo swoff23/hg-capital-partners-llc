@@ -34,7 +34,7 @@ export function GlobalSearch() {
   }, []);
 
   return (
-    <div ref={boxRef} className="relative w-full max-w-md">
+    <div ref={boxRef} className="relative w-full">
       <input
         value={q}
         onChange={(e) => {

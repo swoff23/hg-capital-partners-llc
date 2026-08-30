@@ -2,7 +2,11 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const TABS = ["all", "Active", "Under Contract", "Pass"] as const;
+const TABS = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "Pass", label: "Pass" },
+] as const;
 
 export function DealFilters({
   statusCounts,
@@ -16,12 +20,18 @@ export function DealFilters({
 
   function set(key: string, value: string) {
     const next = new URLSearchParams(params);
-    if (value && value !== "all" && value !== "next") next.set(key, value);
+    if (value && value !== "active" && value !== "next") next.set(key, value);
     else next.delete(key);
     router.push(`/deals?${next.toString()}`);
   }
 
   const totalAll = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  const passCount = statusCounts["Pass"] ?? 0;
+  const counts: Record<string, number> = {
+    active: totalAll - passCount - (statusCounts["CLOSED!"] ?? 0),
+    all: totalAll,
+    Pass: passCount,
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -34,20 +44,20 @@ export function DealFilters({
         className="h-8 w-64 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none focus:border-primary"
       />
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        <div className="flex gap-1">
+        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5">
           {TABS.map((t) => (
             <button
-              key={t}
-              onClick={() => set("status", t)}
+              key={t.key}
+              onClick={() => set("status", t.key)}
               className={cn(
-                "rounded-lg px-2.5 py-1.5 text-xs font-medium",
-                current.status === t
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-surface text-muted hover:text-foreground",
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                current.status === t.key
+                  ? "bg-surface text-foreground shadow-sm"
+                  : "text-muted hover:text-foreground",
               )}
             >
-              {t === "all" ? "All" : t}
-              <span className="ml-1 opacity-70">{t === "all" ? totalAll : (statusCounts[t] ?? 0)}</span>
+              {t.label}
+              <span className="ml-1 opacity-60">{counts[t.key]}</span>
             </button>
           ))}
         </div>

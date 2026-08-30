@@ -62,14 +62,25 @@ function parseTimeline(blob: string): { notes: { date: Date | null; body: string
   return { notes, dated };
 }
 
+// HG tracks the deal's working state in the spreadsheet's "Priority" column.
+const KNOWN_STATUSES = new Set([
+  "1 - High",
+  "2 - Medium",
+  "3 - Low",
+  "4 - To Schedule",
+  "5 - TBD",
+  "6 - Holding",
+  "Closing",
+  "CLOSED!",
+  "Pass",
+]);
+
 function toStatus(statusCol: string | null, priorityCol: string | null): string {
-  const s = (statusCol ?? "").trim().toLowerCase();
-  if (s === "pass") return "Pass";
-  if (s === "active") return "Active";
-  const p = (priorityCol ?? "").trim().toLowerCase();
-  if (p === "closed!" || p === "closing") return "Under Contract";
-  if (p === "pass") return "Pass";
-  return statusCol?.trim() || "Active";
+  // An explicit "Pass" in the Status column is definitive.
+  if ((statusCol ?? "").trim().toLowerCase() === "pass") return "Pass";
+  const p = (priorityCol ?? "").trim();
+  if (KNOWN_STATUSES.has(p)) return p;
+  return "5 - TBD";
 }
 
 export async function migrateDeals() {

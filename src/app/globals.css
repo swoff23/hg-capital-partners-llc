@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode is driven by [data-theme="dark"] on <html> (set by the theme toggle). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --background: #f7f7f8;
   --surface: #ffffff;
@@ -9,6 +12,17 @@
   --primary: #1d4ed8;
   --primary-foreground: #ffffff;
   --accent: #eef2ff;
+}
+
+:root[data-theme="dark"] {
+  --background: #0b0c0e;
+  --surface: #161819;
+  --foreground: #e8e8ea;
+  --muted: #8b8f96;
+  --border: #2a2d31;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --accent: #1e293b;
 }
 
 @theme inline {
@@ -30,7 +44,6 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Thin, unobtrusive scrollbars for the internal app */
 * {
   scrollbar-width: thin;
 }

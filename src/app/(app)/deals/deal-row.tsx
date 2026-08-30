@@ -1,8 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Badge, Td } from "@/components/ui";
-import { DEAL_STATUSES, dealStatusTone, priorityTone } from "@/lib/config";
+import { Td } from "@/components/ui";
+import { DEAL_STATUSES, dealStatusTone } from "@/lib/config";
 import { fmtDate, relativeDays } from "@/lib/utils";
 import { patchDeal } from "./actions";
 
@@ -10,17 +10,20 @@ export type DealRow = {
   id: string;
   address: string;
   status: string;
-  priority: string | null;
-  vip: boolean;
+  theirPrice: number | null;
   theirPriceRaw: string | null;
+  ourPrice: number | null;
   ourPriceRaw: string | null;
   nextAction: string | null;
   nextActionDue: string | null; // yyyy-mm-dd
   sourceUrl: string | null;
-  noteCount: number;
-  taskCount: number;
   updatedAt: string;
 };
+
+function priceDisplay(n: number | null, raw: string | null): string {
+  if (n != null) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  return raw ?? "";
+}
 
 export function DealRowEditable({ deal }: { deal: DealRow }) {
   const [pending, start] = useTransition();
@@ -39,17 +42,11 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
     "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-border focus:border-primary focus:bg-surface";
 
   return (
-    <tr className={`hover:bg-background ${pending ? "opacity-60" : ""} ${flash ? "bg-green-50" : ""}`}>
+    <tr className={`hover:bg-background ${pending ? "opacity-60" : ""} ${flash ? "bg-green-500/10" : ""}`}>
       <Td>
         <Link href={`/deals/${deal.id}`} className="font-medium hover:underline">
           {deal.address}
         </Link>
-        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-          {deal.priority && <Badge tone={priorityTone(deal.priority)}>{deal.priority}</Badge>}
-          {deal.vip && <Badge tone="purple">VIP</Badge>}
-          {deal.noteCount > 0 && <span>{deal.noteCount} notes</span>}
-          {deal.taskCount > 0 && <span>· {deal.taskCount} tasks</span>}
-        </div>
       </Td>
 
       <Td>
@@ -68,16 +65,22 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
 
       <Td className="text-right">
         <input
-          defaultValue={deal.theirPriceRaw ?? ""}
-          onBlur={(e) => save({ theirPriceRaw: e.target.value }, deal.theirPriceRaw, e.target.value)}
+          key={`tp-${deal.theirPrice}-${deal.theirPriceRaw}`}
+          defaultValue={priceDisplay(deal.theirPrice, deal.theirPriceRaw)}
+          onBlur={(e) =>
+            save({ theirPriceRaw: e.target.value }, priceDisplay(deal.theirPrice, deal.theirPriceRaw), e.target.value)
+          }
           placeholder="—"
           className={`${cell} text-right tabular-nums`}
         />
       </Td>
       <Td className="text-right">
         <input
-          defaultValue={deal.ourPriceRaw ?? ""}
-          onBlur={(e) => save({ ourPriceRaw: e.target.value }, deal.ourPriceRaw, e.target.value)}
+          key={`op-${deal.ourPrice}-${deal.ourPriceRaw}`}
+          defaultValue={priceDisplay(deal.ourPrice, deal.ourPriceRaw)}
+          onBlur={(e) =>
+            save({ ourPriceRaw: e.target.value }, priceDisplay(deal.ourPrice, deal.ourPriceRaw), e.target.value)
+          }
           placeholder="—"
           className={`${cell} text-right tabular-nums`}
         />
@@ -98,7 +101,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
             className="rounded border border-transparent px-1 text-[11px] text-muted hover:border-border focus:border-primary"
           />
           {deal.nextActionDue && (
-            <span className={new Date(deal.nextActionDue) < new Date() ? "text-[11px] text-red-600" : "text-[11px] text-muted"}>
+            <span className={new Date(deal.nextActionDue) < new Date() ? "text-[11px] text-red-500" : "text-[11px] text-muted"}>
               {relativeDays(deal.nextActionDue)}
             </span>
           )}
@@ -133,14 +136,13 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
 }
 
 function toneClass(tone: string): string {
-  return (
-    {
-      gray: "bg-zinc-100 text-zinc-700 ring-zinc-200",
-      blue: "bg-blue-50 text-blue-700 ring-blue-200",
-      green: "bg-green-50 text-green-700 ring-green-200",
-      amber: "bg-amber-50 text-amber-700 ring-amber-200",
-      red: "bg-red-50 text-red-700 ring-red-200",
-      purple: "bg-purple-50 text-purple-700 ring-purple-200",
-    }[tone] ?? "bg-zinc-100 text-zinc-700 ring-zinc-200"
-  );
+  const map: Record<string, string> = {
+    gray: "bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
+    blue: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900",
+    green: "bg-green-50 text-green-700 ring-green-200 dark:bg-green-950 dark:text-green-300 dark:ring-green-900",
+    amber: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900",
+    red: "bg-red-50 text-red-700 ring-red-200 dark:bg-red-950 dark:text-red-300 dark:ring-red-900",
+    purple: "bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:ring-purple-900",
+  };
+  return map[tone] ?? map.gray;
 }

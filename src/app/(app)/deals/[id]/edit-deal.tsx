@@ -1,19 +1,19 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Button, Input, Select } from "@/components/ui";
-import { DEAL_STATUSES, DEAL_PRIORITIES, DEAL_PASS_REASONS } from "@/lib/config";
+import { DEAL_STATUSES, DEAL_PASS_REASONS } from "@/lib/config";
 import { updateDeal } from "../actions";
 
 export type EditableDeal = {
   id: string;
   version: string;
   status: string;
-  priority: string | null;
   theirPriceRaw: string | null;
   ourPriceRaw: string | null;
   nextAction: string | null;
   nextActionDue: string | null; // yyyy-mm-dd
   passReason: string | null;
+  sourceUrl: string | null;
 };
 
 export function EditDeal({ deal }: { deal: EditableDeal }) {
@@ -39,11 +39,11 @@ export function EditDeal({ deal }: { deal: EditableDeal }) {
         </Select>
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-muted">Priority</span>
-        <Select name="priority" defaultValue={deal.priority ?? ""} className="mt-1">
+        <span className="text-xs font-medium text-muted">Pass reason</span>
+        <Select name="passReason" defaultValue={deal.passReason ?? ""} className="mt-1">
           <option value="">—</option>
-          {DEAL_PRIORITIES.map((p) => (
-            <option key={p}>{p}</option>
+          {DEAL_PASS_REASONS.map((r) => (
+            <option key={r}>{r}</option>
           ))}
         </Select>
       </label>
@@ -64,13 +64,8 @@ export function EditDeal({ deal }: { deal: EditableDeal }) {
         <Input name="nextActionDue" type="date" defaultValue={deal.nextActionDue ?? ""} className="mt-1" />
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-muted">Pass reason</span>
-        <Select name="passReason" defaultValue={deal.passReason ?? ""} className="mt-1">
-          <option value="">—</option>
-          {DEAL_PASS_REASONS.map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </Select>
+        <span className="text-xs font-medium text-muted">Listing URL</span>
+        <Input name="sourceUrl" type="url" defaultValue={deal.sourceUrl ?? ""} className="mt-1" />
       </label>
       <div className="flex items-center gap-2 sm:col-span-2">
         <Button type="submit" disabled={pending}>

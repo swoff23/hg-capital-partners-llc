@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { Deal, User } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { normalizeAddress } from "@/lib/normalize";
@@ -29,8 +30,52 @@ function money(raw?: string | null): string | null {
   return (parseFloat(num) * mult).toFixed(2);
 }
 
+/** Append one or more change entries to a deal's activity timeline. */
+async function logDealChanges(dealId: string, user: User, lines: string[]) {
+  const entries = lines.filter(Boolean);
+  if (entries.length === 0) return;
+  const who = user.name ?? user.email;
+  await prisma.dealNote.createMany({
+    data: entries.map((body) => ({
+      dealId,
+      body: `${body}  ·  ${who}`,
+      noteDate: new Date(),
+      source: "change",
+    })),
+  });
+}
+
+const val = (v: string | null | undefined) => (v == null || v === "" ? "—" : v);
+
+/** Diff old deal vs the applied data object → human-readable change lines. */
+function diffDeal(before: Deal, data: Record<string, unknown>): string[] {
+  const lines: string[] = [];
+  if ("status" in data && data.status !== before.status)
+    lines.push(`Status: ${val(before.status)} → ${val(data.status as string)}`);
+  if ("priority" in data && (data.priority ?? null) !== before.priority)
+    lines.push(`Priority: ${val(before.priority)} → ${val(data.priority as string)}`);
+  if ("passReason" in data && (data.passReason ?? null) !== before.passReason)
+    lines.push(`Pass reason: ${val(before.passReason)} → ${val(data.passReason as string)}`);
+  if ("theirPriceRaw" in data && (data.theirPriceRaw ?? null) !== before.theirPriceRaw)
+    lines.push(`Their price: ${val(before.theirPriceRaw)} → ${val(data.theirPriceRaw as string)}`);
+  if ("ourPriceRaw" in data && (data.ourPriceRaw ?? null) !== before.ourPriceRaw)
+    lines.push(`Our price: ${val(before.ourPriceRaw)} → ${val(data.ourPriceRaw as string)}`);
+  if ("nextAction" in data && (data.nextAction ?? null) !== before.nextAction)
+    lines.push(`Next action: ${val(before.nextAction)} → ${val(data.nextAction as string)}`);
+  if ("nextActionDue" in data) {
+    const b = before.nextActionDue?.toISOString().slice(0, 10) ?? null;
+    const a = data.nextActionDue ? (data.nextActionDue as Date).toISOString().slice(0, 10) : null;
+    if (a !== b) lines.push(`Next action due: ${val(b)} → ${val(a)}`);
+  }
+  if ("sourceUrl" in data && (data.sourceUrl ?? null) !== before.sourceUrl)
+    lines.push(`Listing URL ${before.sourceUrl ? "updated" : "added"}`);
+  if ("address" in data && data.address !== before.address)
+    lines.push(`Address: ${before.address} → ${data.address}`);
+  return lines;
+}
+
 export async function createDeal(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const p = dealSchema.parse(formToObject(formData));
 
   const dup = await prisma.deal.findFirst({
@@ -55,15 +100,16 @@ export async function createDeal(formData: FormData) {
       nextActionDue: p.nextActionDue ? new Date(p.nextActionDue) : null,
     },
   });
+  await logDealChanges(deal.id, user, [`Deal created (status ${deal.status})`]);
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);
 }
 
 export async function updateDeal(id: string, formData: FormData) {
-  await requireUser();
-  // The edit form always submits every field; "" means "clear".
+  const user = await requireUser();
+  const before = await prisma.deal.findUniqueOrThrow({ where: { id } });
   const has = (k: string) => formData.has(k);
-  const str = (k: string) => (formData.get(k)?.toString().trim() || null);
+  const str = (k: string) => formData.get(k)?.toString().trim() || null;
   const data: Record<string, unknown> = {};
   if (has("address") && str("address")) data.address = str("address");
   if (has("status") && str("status")) data.status = str("status");
@@ -82,8 +128,10 @@ export async function updateDeal(id: string, formData: FormData) {
     const d = str("nextActionDue");
     data.nextActionDue = d ? new Date(d) : null;
   }
+  if (has("sourceUrl")) data.sourceUrl = str("sourceUrl");
 
   await prisma.deal.update({ where: { id }, data });
+  await logDealChanges(id, user, diffDeal(before, data));
   revalidatePath(`/deals/${id}`);
   revalidatePath("/deals");
 }
@@ -101,7 +149,8 @@ export async function patchDeal(
     sourceUrl: string | null;
   }>,
 ) {
-  await requireUser();
+  const user = await requireUser();
+  const before = await prisma.deal.findUniqueOrThrow({ where: { id } });
   const data: Record<string, unknown> = {};
   if (patch.status) data.status = patch.status;
   if ("priority" in patch) data.priority = patch.priority || null;
@@ -121,6 +170,7 @@ export async function patchDeal(
   if (Object.keys(data).length === 0) return;
 
   await prisma.deal.update({ where: { id }, data });
+  await logDealChanges(id, user, diffDeal(before, data));
   revalidatePath("/deals");
   revalidatePath(`/deals/${id}`);
   revalidatePath("/");
@@ -138,6 +188,14 @@ export async function addDealNote(dealId: string, formData: FormData) {
       noteDate: dateStr ? new Date(dateStr) : new Date(),
       source: "manual",
     },
+  });
+  revalidatePath(`/deals/${dealId}`);
+}
+
+/** Called by the task actions when a task is created against a deal. */
+export async function logDealTaskEvent(dealId: string, userName: string, line: string) {
+  await prisma.dealNote.create({
+    data: { dealId, body: `${line}  ·  ${userName}`, noteDate: new Date(), source: "change" },
   });
   revalidatePath(`/deals/${dealId}`);
 }

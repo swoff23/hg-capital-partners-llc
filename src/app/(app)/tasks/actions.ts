@@ -5,9 +5,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
+import { logDealTaskEvent } from "../deals/actions";
 
 export async function toggleTask(id: string) {
-  await requireUser();
+  const user = await requireUser();
   const t = await prisma.task.findUnique({ where: { id } });
   if (!t) return;
   const done = t.status === "OPEN";
@@ -15,8 +16,16 @@ export async function toggleTask(id: string) {
     where: { id },
     data: { status: done ? "DONE" : "OPEN", completedAt: done ? new Date() : null },
   });
+  if (t.dealId) {
+    await logDealTaskEvent(
+      t.dealId,
+      user.name ?? user.email,
+      `Task ${done ? "completed" : "reopened"}: ${t.title}`,
+    );
+  }
   revalidatePath("/tasks");
   revalidatePath(`/tasks/${id}`);
+  if (t.propertyId) revalidatePath(`/properties/${t.propertyId}`);
   revalidatePath("/");
 }
 
@@ -32,7 +41,7 @@ const taskSchema = z.object({
 });
 
 export async function createTask(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const p = taskSchema.parse(formToObject(formData));
   const task = await prisma.task.create({
     data: {
@@ -47,9 +56,9 @@ export async function createTask(formData: FormData) {
       bucket: p.propertyId ? "Property" : "General",
     },
   });
+  if (p.dealId) await logDealTaskEvent(p.dealId, user.name ?? user.email, `Task added: ${task.title}`);
   revalidatePath("/tasks");
   if (p.propertyId) revalidatePath(`/properties/${p.propertyId}`);
-  if (p.dealId) revalidatePath(`/deals/${p.dealId}`);
   redirect(`/tasks/${task.id}`);
 }
 

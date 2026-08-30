@@ -30,7 +30,7 @@ const btnStyles = {
   primary: "bg-primary text-primary-foreground hover:opacity-90",
   secondary: "border border-border bg-surface text-foreground hover:bg-background",
   ghost: "text-foreground hover:bg-background",
-  danger: "border border-red-200 bg-white text-red-600 hover:bg-red-50",
+  danger: "border border-red-300 bg-surface text-red-600 hover:bg-red-500/10 dark:border-red-900",
 };
 export function Button({ className, variant = "primary", size = "md", ...props }: BtnProps) {
   return (
@@ -67,12 +67,13 @@ export function LinkButton({
 
 /* ---------------- Badge ---------------- */
 const badgeTones: Record<string, string> = {
-  gray: "bg-zinc-100 text-zinc-700 ring-zinc-200",
-  blue: "bg-blue-50 text-blue-700 ring-blue-200",
-  green: "bg-green-50 text-green-700 ring-green-200",
-  amber: "bg-amber-50 text-amber-700 ring-amber-200",
-  red: "bg-red-50 text-red-700 ring-red-200",
-  purple: "bg-purple-50 text-purple-700 ring-purple-200",
+  gray: "bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
+  blue: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900",
+  green: "bg-green-50 text-green-700 ring-green-200 dark:bg-green-950 dark:text-green-300 dark:ring-green-900",
+  amber: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900",
+  red: "bg-red-50 text-red-700 ring-red-200 dark:bg-red-950 dark:text-red-300 dark:ring-red-900",
+  purple:
+    "bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:ring-purple-900",
 };
 export function Badge({
   tone = "gray",

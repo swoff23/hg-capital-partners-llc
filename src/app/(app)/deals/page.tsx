@@ -10,8 +10,13 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   await requireUser();
   const sp = (await searchParams) as SP;
 
+  const statusFilter = sp.status ?? "active";
   const where = {
-    ...(sp.status && sp.status !== "all" ? { status: sp.status } : {}),
+    ...(statusFilter === "all"
+      ? {}
+      : statusFilter === "active"
+        ? { status: { notIn: ["Pass", "CLOSED!"] } }
+        : { status: statusFilter }),
     ...(sp.q ? { address: { contains: sp.q, mode: "insensitive" as const } } : {}),
   };
 
@@ -23,7 +28,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           ? { updatedAt: "desc" }
           : [{ nextActionDue: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }],
       take: 300,
-      include: { _count: { select: { tasks: true, notes: true } } },
     }),
     prisma.deal.count(),
     prisma.deal.groupBy({ by: ["status"], _count: true }),
@@ -43,7 +47,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
 
       <DealFilters
         statusCounts={Object.fromEntries(statusCounts.map((s) => [s.status, s._count]))}
-        current={{ status: sp.status ?? "all", q: sp.q ?? "", sort: sp.sort ?? "next" }}
+        current={{ status: statusFilter, q: sp.q ?? "", sort: sp.sort ?? "next" }}
       />
 
       <Card className="mt-4 overflow-hidden">
@@ -72,17 +76,15 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                     id: d.id,
                     address: d.address,
                     status: d.status,
-                    priority: d.priority,
-                    vip: d.vip,
+                    theirPrice: d.theirPrice ? Number(d.theirPrice) : null,
                     theirPriceRaw: d.theirPriceRaw,
+                    ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
                     ourPriceRaw: d.ourPriceRaw,
                     nextAction: d.nextAction,
                     nextActionDue: d.nextActionDue
                       ? d.nextActionDue.toISOString().slice(0, 10)
                       : null,
                     sourceUrl: d.sourceUrl,
-                    noteCount: d._count.notes,
-                    taskCount: d._count.tasks,
                     updatedAt: d.updatedAt.toISOString(),
                   }}
                 />

@@ -1,17 +1,16 @@
 /** Editable lists that drive dropdowns + badge colors. Safe to adjust anytime. */
 
+// HG's working pipeline (from the "Priority" column of the master spreadsheet).
 export const DEAL_STATUSES = [
-  "Active",
-  "Reviewing",
-  "Underwriting",
-  "Interested",
-  "Tour Scheduled",
-  "Offer Submitted",
-  "Negotiating",
-  "Under Contract",
-  "Closed",
+  "1 - High",
+  "2 - Medium",
+  "3 - Low",
+  "4 - To Schedule",
+  "5 - TBD",
+  "6 - Holding",
+  "Closing",
+  "CLOSED!",
   "Pass",
-  "Lost",
 ] as const;
 
 export const DEAL_PASS_REASONS = [
@@ -54,24 +53,47 @@ export const PROPERTY_STATUSES = [
 
 export const PROPERTY_STRATEGIES = ["Hold", "Flip", "BRRRR", "Sell", "TBD"] as const;
 
+export const EQUIPMENT_TYPES = [
+  "Roof",
+  "Refrigerator",
+  "Dishwasher",
+  "Oven",
+  "Microwave",
+  "Oven Fan",
+  "Garbage Disposal",
+  "Washing Machine",
+  "Drying Machine",
+  "HVAC",
+  "Water Heater",
+  "Ceiling Fans",
+  "Garage Door Opener",
+  "Electrical Panel",
+  "Sump Pump",
+  "Other",
+] as const;
+
 type Tone = "gray" | "blue" | "green" | "amber" | "red" | "purple";
 
 export function dealStatusTone(s: string | null): Tone {
   switch (s) {
-    case "Active":
-    case "Reviewing":
-      return "blue";
-    case "Under Contract":
-    case "Closed":
-      return "green";
-    case "Negotiating":
-    case "Offer Submitted":
+    case "1 - High":
+      return "red";
+    case "2 - Medium":
       return "amber";
+    case "3 - Low":
+    case "6 - Holding":
+      return "gray";
+    case "4 - To Schedule":
+      return "purple";
+    case "5 - TBD":
+      return "blue";
+    case "Closing":
+    case "CLOSED!":
+      return "green";
     case "Pass":
-    case "Lost":
       return "gray";
     default:
-      return "purple";
+      return "gray";
   }
 }
 

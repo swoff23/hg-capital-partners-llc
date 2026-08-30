@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser, authMode } from "@/lib/auth";
 import { SideNav } from "@/components/nav";
 import { GlobalSearch } from "@/components/global-search";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/app/login/actions";
 import { initials } from "@/lib/utils";
 
@@ -35,12 +36,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center gap-3 border-b border-border bg-surface px-4">
           <div className="md:hidden text-sm font-semibold">HG Capital OS</div>
-          <GlobalSearch />
-          {authMode === "dev" && (
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
-              dev auth
-            </span>
-          )}
+          <div className="max-w-md flex-1">
+            <GlobalSearch />
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {authMode === "dev" && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                dev auth
+              </span>
+            )}
+            <ThemeToggle />
+          </div>
         </header>
         <main className="flex-1 p-4 md:p-6">
           <div className="mx-auto max-w-6xl">{children}</div>
