@@ -8,10 +8,10 @@ Plan: `~/.claude/plans/i-run-a-real-keen-meadow.md`
 ## Stack
 
 - Next.js 16 (App Router) + TypeScript + Tailwind v4
-- Postgres via Prisma 6 (Supabase in production)
-- Auth: Supabase (Google sign-in) in prod; a dev user-picker when Supabase env
-  vars are absent
-- Deploy target: Vercel
+- Postgres via Prisma 6
+- Auth: signed-cookie session, per-user password from env vars in production; a
+  dev user-picker when no password env vars are set
+- Deploy target: Vercel (+ Vercel/Neon Postgres). See `DEPLOY.md`.
 
 ## Local development
 
@@ -32,7 +32,8 @@ npm run migrate               # idempotent; writes migration-report.md
 npm run dev                   # http://localhost:3000
 ```
 
-Without Supabase configured, `/login` shows a dev user picker (Connor / Pieter).
+With no `*_PASSWORD` env vars set, `/login` shows a dev user picker (Connor /
+Pieter) — no password needed locally.
 
 ## Scripts
 
@@ -55,18 +56,12 @@ Asana, linked to a Property or Deal).
 No money, leases, tenants, roles, or external portals in v1 — see the plan's
 "OUT of v1" list.
 
-## Production setup (when ready)
+## Production setup
 
-1. Create a Supabase project. Put its URL + anon key + service role key in the
-   deployment env (`.env.example` lists the names), and set `DATABASE_URL` to the
-   Supabase connection string.
-2. Supabase → Authentication → enable Google; add the OAuth client; set the
-   callback to `https://<domain>/auth/callback`.
-3. Confirm the two allowed emails in `src/lib/auth-allowlist.ts` match Connor's
-   and Pieter's Google accounts; run `npm run migrate users`.
-4. `npx prisma migrate deploy` against the Supabase DB, then `npm run migrate`.
-5. Deploy to Vercel (Hobby for staging; Pro or Cloudflare Pages for production —
-   Vercel Hobby disallows commercial use).
+Full click-by-click guide in **`DEPLOY.md`**. In short: Vercel project + Vercel
+(Neon) Postgres + three env vars (`SESSION_SECRET`, `CONNOR_PASSWORD`,
+`PIETER_PASSWORD`). The build runs `prisma migrate deploy`; the data import
+(`npm run migrate`) runs once from a machine that has `_private/`.
 
 ## Runbook
 
@@ -74,8 +69,7 @@ No money, leases, tenants, roles, or external portals in v1 — see the plan's
 Against a fresh database it produces the cleanest result (stale rows from earlier
 runs are not deleted).
 
-**Restore a Supabase backup** — Supabase dashboard → Database → Backups →
-restore. For local dev: `dropdb hg_capital_dev && createdb hg_capital_dev &&
+**Reset local dev DB** — `dropdb hg_capital_dev && createdb hg_capital_dev &&
 npx prisma migrate deploy && npm run migrate`.
 
 **Add a user** — add the email to `src/lib/auth-allowlist.ts` and to

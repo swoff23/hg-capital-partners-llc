@@ -38,6 +38,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const save = patchProperty.bind(null, p.id);
+  const formId = `property-details-${p.id}`;
 
   if (!editing) {
     return (
@@ -63,8 +64,28 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
   }
 
   return (
-    <SectionCard title="Details" editing>
+    <SectionCard
+      title="Details"
+      editing
+      actions={
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={pending}
+            onClick={() => setEditing(false)}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} size="sm" disabled={pending}>
+            {pending ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      }
+    >
       <form
+        id={formId}
         key={p.version}
         action={(fd) => start(async () => { await save(fd); setEditing(false); })}
         className="space-y-3"
@@ -102,12 +123,6 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
           <L label="Rehab amount"><Input name="rehabAmount" defaultValue={p.rehabAmount ?? ""} /></L>
         </div>
         <L label="Notes"><Textarea name="notes" rows={3} defaultValue={p.notes ?? ""} /></L>
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save"}</Button>
-          <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
-            Cancel
-          </Button>
-        </div>
       </form>
     </SectionCard>
   );
@@ -118,21 +133,25 @@ function SectionCard({
   children,
   onEdit,
   editing,
+  actions,
 }: {
   title: string;
   children: React.ReactNode;
   onEdit?: () => void;
   editing?: boolean;
+  actions?: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-border bg-surface shadow-sm">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {onEdit && !editing && (
-          <button onClick={onEdit} className="text-xs font-medium text-primary hover:underline">
-            Edit
-          </button>
-        )}
+      <div className="flex min-h-[3.25rem] items-center justify-between gap-2 border-b border-border px-4 py-2">
+        <h3 className="shrink-0 text-sm font-semibold">{title}</h3>
+        {editing
+          ? actions
+          : onEdit && (
+              <button onClick={onEdit} className="text-xs font-medium text-primary hover:underline">
+                Edit
+              </button>
+            )}
       </div>
       <div className="p-4">{children}</div>
     </div>

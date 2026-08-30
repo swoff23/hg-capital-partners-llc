@@ -1,96 +1,102 @@
-# Deploying HG Capital OS
+# Deploying HG Capital OS — step by step
 
-Goal: a real URL Connor + Pieter sign into with a magic link. ~30 min.
+Goal: a real website Connor + Pieter log into with a password.
 
-Stack: **Supabase** (Postgres + auth email) + **Vercel** (hosting). Both have
-free tiers; see "Cost" at the bottom.
+You only need **one account: Vercel** (it provides both the hosting and the
+database). ~20 minutes. No coding.
 
 ---
 
-## 1. Push the repo (Connor)
+## Step 1 — Put the code on GitHub
+
+Open the **Terminal** app on your Mac (Cmd+Space, type "Terminal", Enter).
+Paste this and press Enter:
 
 ```bash
-cd /Users/connorswofford/dev/hg-capital-partners-llc
-git push -u origin main
+cd /Users/connorswofford/dev/hg-capital-partners-llc && git push -u origin main
 ```
 
-Repo: `https://github.com/swoff23/hg-capital-partners-llc`
+If it asks you to log in to GitHub, follow the prompts. When it finishes with
+`branch 'main' set up to track 'origin/main'`, you're done. Close Terminal.
 
 ---
 
-## 2. Create the Supabase project (Connor)
+## Step 2 — Create the Vercel project
 
-1. https://supabase.com → new project. Name it `hg-capital-os`. **Save the
-   database password** it makes you set.
-2. Once it's provisioned, collect four values:
-   - **Project Settings → API**
-     - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-     - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-     - `service_role` key (click reveal) → `SUPABASE_SERVICE_ROLE_KEY`
-   - **Project Settings → Database → Connection string → "URI"** (tab: *Session
-     pooler*). Copy it and put your DB password in place of `[YOUR-PASSWORD]` →
-     `DATABASE_URL`
-3. **Authentication → URL Configuration**
-   - Site URL: `https://<your-vercel-domain>` (fill in after step 3; can edit later)
-   - Redirect URLs: add `https://<your-vercel-domain>/auth/callback`
-4. **Authentication → Providers → Email** — make sure it's enabled (it is by
-   default). Nothing else to configure — Supabase sends the magic-link emails.
+1. Go to **https://vercel.com/signup** and sign up with **"Continue with
+   GitHub"** (use the account that owns the `hg-capital-partners-llc` repo).
+2. On the dashboard, click **"Add New…" → "Project"**.
+3. Find **`hg-capital-partners-llc`** in the list and click **"Import"**.
+4. You'll see a "Configure Project" screen. **Don't change anything yet.** Scroll
+   down and click **"Deploy"**.
+5. The first deploy will **fail** — that's expected, there's no database yet.
+   Keep going.
 
 ---
 
-## 3. Deploy on Vercel (Connor)
+## Step 3 — Add the database
 
-1. https://vercel.com → Add New → Project → import
-   `swoff23/hg-capital-partners-llc`.
-2. Framework preset: Next.js (auto-detected). Don't change build settings.
-3. **Environment Variables** — add all four from step 2:
-   ```
-   DATABASE_URL
-   NEXT_PUBLIC_SUPABASE_URL
-   NEXT_PUBLIC_SUPABASE_ANON_KEY
-   SUPABASE_SERVICE_ROLE_KEY
-   ```
-4. Deploy. First build runs `prisma migrate deploy` (creates the tables) then
-   `next build`.
-5. Copy the deployment URL (e.g. `hg-capital-os.vercel.app`) back into Supabase
-   → Authentication → URL Configuration (Site URL + Redirect URL from step 2.3).
+1. In your new project, click the **"Storage"** tab at the top.
+2. Click **"Create Database"** → choose **"Neon"** (Postgres) → **"Continue"**.
+3. Accept the defaults, pick the region closest to Buffalo (usually
+   **Washington, D.C. (iad1)**), click **"Create"**.
+4. When it asks to connect it to the project, say **yes / "Connect"**. This
+   automatically adds the `DATABASE_URL` setting for you.
 
 ---
 
-## 4. Load the data + users (Claude, one time)
+## Step 4 — Add the login settings
 
-The spreadsheets aren't in git, so the import runs from Connor's machine against
-the production database:
+1. Click the **"Settings"** tab → **"Environment Variables"** in the left menu.
+2. Add these three, one at a time (Name on the left, Value on the right, then
+   "Save"):
 
-```bash
-cd /Users/connorswofford/dev/hg-capital-partners-llc
-DATABASE_URL='<the Supabase URI from step 2>' npm run migrate
-```
+   | Name | Value |
+   |---|---|
+   | `SESSION_SECRET` | `PASTE_THE_RANDOM_STRING_CLAUDE_GIVES_YOU` |
+   | `CONNOR_PASSWORD` | a password you choose for yourself |
+   | `PIETER_PASSWORD` | a password you choose for Pieter |
 
-This seeds the two users and imports deals / properties / contractors / tasks.
-Hand Claude the `DATABASE_URL` and it will run this + verify the live site.
-
----
-
-## 5. Sign in
-
-Go to the Vercel URL → enter `connoraswofford@gmail.com` or
-`pieter@queencitycorp.com` → click the link in the email. Anyone else's email is
-rejected (allowlist in `src/lib/auth-allowlist.ts`).
+   (Claude will give you the `SESSION_SECRET` value — it's a long random string.)
 
 ---
 
-## Cost
+## Step 5 — Deploy for real
 
-| | Free tier | When to upgrade |
-|---|---|---|
-| Supabase | 500 MB DB, pauses after 7 days idle | Pro $25/mo removes the pause — worth it once Pieter relies on it |
-| Vercel | Hobby; ToS disallows commercial use | Pro $20/mo, or move hosting to Cloudflare Pages (free, commercial-OK) |
+1. Go to the **"Deployments"** tab.
+2. Click the **"⋯"** menu on the most recent (failed) deployment →
+   **"Redeploy"** → **"Redeploy"** again to confirm.
+3. Wait ~2 minutes. When it says **"Ready"**, click **"Visit"**. You'll see the
+   HG Capital OS login screen — but it has no data yet.
 
-Start free to confirm it works; plan on ~$25–45/mo for a "always on, legit"
-setup.
+Copy your site's URL (like `hg-capital-partners-llc.vercel.app`).
 
-## Redeploys
+---
 
-Every `git push` to `main` auto-deploys. Schema changes: add a migration
-locally (`npm run db:migrate`), commit, push — the build applies it.
+## Step 6 — Load your data (Claude does this)
+
+1. In Vercel: **Storage** tab → your database → **".env.local"** tab (or
+   **"Connect"** button) → copy the value that starts with
+   `postgresql://` (the `DATABASE_URL`).
+2. Paste it to Claude and say "import the data into production."
+
+Claude runs the import from your Mac (the spreadsheets live there, not on the
+internet) and confirms the live site works.
+
+---
+
+## Step 7 — Sign in
+
+Go to your Vercel URL. Pick your name, type the password you set in Step 4, and
+you're in. Send Pieter the URL + his password.
+
+---
+
+## After this
+
+- Every time Claude pushes a change, the site updates automatically in ~2 min.
+- **Cost:** free to start. Vercel's free plan technically disallows commercial
+  use — when you're ready to make it official, upgrade to Vercel Pro ($20/mo).
+  The Neon database has a free tier that's plenty for now.
+- To change a password later: Vercel → Settings → Environment Variables → edit →
+  then Deployments → Redeploy.
