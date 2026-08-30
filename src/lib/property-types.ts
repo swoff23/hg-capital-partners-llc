@@ -401,6 +401,8 @@ export type PortfolioCapexRow = {
   perYear: number[];
   total: number;
   dueNow: number;
+  /** Every scheduled replacement for this property across the horizon (year asc, then cost desc). */
+  items: CapexForecastItem[];
 };
 
 export type PortfolioCapexForecast = {
@@ -439,6 +441,7 @@ export function portfolioCapexForecast(
       perYear: py,
       total: f.total,
       dueNow: f.dueNowTotal,
+      items: f.years.flatMap((y) => y.items),
     };
   });
 
