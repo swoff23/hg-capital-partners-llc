@@ -25,10 +25,34 @@ export function parseUnits(json: unknown): PropertyUnit[] {
 export const UTILITY_LABELS: [keyof UnitUtilities, string][] = [
   ["nationalGridAcct", "National Grid acct #"],
   ["nationalGridAutopay", "NG autopay"],
-  ["nationalGridLofl", "NG landlord program"],
+  ["nationalGridLofl", "NG leave on for landlord"],
   ["nationalFuelAcct", "National Fuel acct #"],
   ["nationalFuelAutopay", "NF autopay"],
-  ["nationalFuelLofl", "NF landlord program"],
+  ["nationalFuelLofl", "NF leave on for landlord"],
   ["waterAcct", "Water acct #"],
   ["waterAutopay", "Water autopay"],
 ];
+
+/** These utility fields are a set status, not free text. */
+export const UTILITY_STATUS_FIELDS = new Set<keyof UnitUtilities>([
+  "nationalGridAutopay",
+  "nationalGridLofl",
+  "nationalFuelAutopay",
+  "nationalFuelLofl",
+  "waterAutopay",
+]);
+
+export const UTILITY_STATUS_OPTIONS = ["Done", "Need to set up", "Call to confirm", "NA"] as const;
+
+export function utilityStatusTone(v: string | null | undefined): "green" | "red" | "amber" | "gray" {
+  switch ((v ?? "").trim().toLowerCase()) {
+    case "done":
+      return "green";
+    case "need to set up":
+      return "red";
+    case "call to confirm":
+      return "amber";
+    default:
+      return "gray";
+  }
+}

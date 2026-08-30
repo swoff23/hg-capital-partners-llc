@@ -7,8 +7,8 @@ import { fmtDate } from "@/lib/utils";
 import { propertyStatusTone } from "@/lib/config";
 import { parseUnits } from "@/lib/property-types";
 import { BackLink } from "@/components/back-link";
-import { EditPropertyDetails } from "./edit-details";
-import { EditUnits } from "./edit-units";
+import { PropertyDetailsSection } from "./edit-details";
+import { UnitsSection } from "./edit-units";
 
 function d(v: unknown): string | null {
   return v == null ? null : (v as { toString(): string }).toString();
@@ -44,15 +44,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle>Units &amp; access</CardTitle>
-              <span className="text-xs text-muted">{units.length} units</span>
-            </CardHeader>
-            <CardBody>
-              <EditUnits propertyId={property.id} initial={units} />
-            </CardBody>
-          </Card>
+          <UnitsSection propertyId={property.id} initial={units} />
 
           <Card>
             <CardHeader className="flex items-center justify-between">
@@ -89,13 +81,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
         </div>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Details</CardTitle>
-            </CardHeader>
-            <CardBody>
-              <EditPropertyDetails
-                property={{
+          <PropertyDetailsSection
+            property={{
                   id: property.id,
                   version: property.updatedAt.toISOString(),
                   address: property.address,
@@ -112,13 +99,11 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
                   currentLoan: d(property.currentLoan),
                   value: d(property.value),
                   rehabAmount: d(property.rehabAmount),
-                  sqft: property.sqft,
-                  unitCount: property.unitCount,
-                  notes: property.notes,
-                }}
-              />
-            </CardBody>
-          </Card>
+              sqft: property.sqft,
+              unitCount: property.unitCount,
+              notes: property.notes,
+            }}
+          />
           {property.sourceDeal && (
             <p className="text-xs text-muted">
               From deal{" "}
