@@ -186,7 +186,7 @@ function ReadUnits({ units }: { units: PropertyUnit[] }) {
             )}
           </div>
           {hasUtilities && (
-            <Accordion title="Utilities" defaultOpen>
+            <Accordion title="Utilities">
               <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
                 {UTILITY_GROUPS.map((g) => {
                   const rows = g.fields.filter(([k]) => u.utilities?.[k]);
