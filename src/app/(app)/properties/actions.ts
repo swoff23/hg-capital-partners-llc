@@ -54,6 +54,7 @@ const unitSchema = z.object({
         type: z.string(),
         model: z.string().nullish(),
         installYear: z.string().nullish(),
+        comment: z.string().nullish(),
       }),
     )
     .optional(),
@@ -70,13 +71,43 @@ export async function updatePropertyUnits(id: string, units: unknown) {
       Object.entries(u.utilities ?? {}).map(([k, v]) => [k, v?.trim() || null]),
     ),
     equipment: (u.equipment ?? [])
-      .filter((e) => e.type && (e.model || e.installYear))
+      .filter((e) => e.type && (e.model || e.installYear || e.comment))
       .map((e) => ({
         type: e.type.trim(),
         model: e.model?.trim() || null,
         installYear: e.installYear?.trim() || null,
+        comment: e.comment?.trim() || null,
       })),
   }));
   await prisma.property.update({ where: { id }, data: { units: clean as unknown as object } });
   revalidatePath(`/properties/${id}`);
+}
+
+const buildingCapexSchema = z.record(
+  z.string(),
+  z.object({
+    year: z.string().nullish(),
+    costOverride: z.number().nullish(),
+  }),
+);
+
+/** Replace the whole building-level CapEx map (year + optional cost override per system). */
+export async function updateBuildingCapex(id: string, data: unknown) {
+  await requireUser();
+  const parsed = buildingCapexSchema.parse(data);
+  const clean: Record<string, { year: string | null; costOverride: number | null }> = {};
+  for (const [key, v] of Object.entries(parsed)) {
+    const year = v.year?.trim() || null;
+    const costOverride =
+      v.costOverride != null && Number.isFinite(v.costOverride) && v.costOverride > 0
+        ? Math.round(v.costOverride)
+        : null;
+    if (year || costOverride != null) clean[key] = { year, costOverride };
+  }
+  await prisma.property.update({
+    where: { id },
+    data: { buildingCapex: clean as unknown as object },
+  });
+  revalidatePath(`/properties/${id}`);
+  revalidatePath("/properties");
 }

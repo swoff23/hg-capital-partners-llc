@@ -116,6 +116,10 @@ model Property {
   //    equipment: [{ type, model, installYear }] }]
   units Json @default("[]")
 
+  // Building-level major CapEx items, keyed by BUILDING_CAPEX_ITEMS[].key:
+  // { roof: { year: "2010", costOverride: 27000 }, windows: { year: "2018" }, ... }
+  buildingCapex Json @default("{}")
+
   links Json   @default("[]") // [{ label, url }]
   notes String? @db.Text
 

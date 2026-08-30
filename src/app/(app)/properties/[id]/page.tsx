@@ -5,10 +5,12 @@ import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/components/ui";
 import { fmtDate, initials } from "@/lib/utils";
 import { propertyStatusTone } from "@/lib/config";
-import { parseUnits } from "@/lib/property-types";
+import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
 import { BackLink } from "@/components/back-link";
-import { PropertyDetailsSection } from "./edit-details";
+import { PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { UnitsSection } from "./edit-units";
+import { BuildingCapexSection } from "./building-capex";
+import { CapexForecastCard } from "./capex-outlook";
 
 function d(v: unknown): string | null {
   return v == null ? null : (v as { toString(): string }).toString();
@@ -41,6 +43,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   });
   if (!property) notFound();
   const units = parseUnits(property.units);
+  const buildingCapex = parseBuildingCapex(property.buildingCapex);
 
   return (
     <>
@@ -51,13 +54,19 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           {property.status && (
             <Badge tone={propertyStatusTone(property.status)}>{property.status}</Badge>
           )}
-          {property.strategy && <Badge tone="gray">{property.strategy}</Badge>}
+          {(property.unitCount ?? units.length) > 0 && (
+            <span className="text-sm text-muted">
+              {property.unitCount ?? units.length} units
+            </span>
+          )}
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <UnitsSection propertyId={property.id} initial={units} />
+
+          <CapexForecastCard units={units} building={buildingCapex} />
 
           <Card>
             <CardHeader className="flex items-center justify-between">
@@ -101,19 +110,17 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           </Card>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <PropertyDetailsSection
             property={{
                   id: property.id,
                   version: property.updatedAt.toISOString(),
                   address: property.address,
                   llcOwner: property.llcOwner,
-                  refiTarget: property.refiTarget,
                   attorney: property.attorney,
                   lender: property.lender,
                   loanServicer: property.loanServicer,
                   status: property.status,
-                  strategy: property.strategy,
                   purchaseDate: property.purchaseDate?.toISOString().slice(0, 10) ?? null,
                   refinanceDate: property.refinanceDate?.toISOString().slice(0, 10) ?? null,
                   purchasePrice: d(property.purchasePrice),
@@ -122,8 +129,13 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
                   rehabAmount: d(property.rehabAmount),
               sqft: property.sqft,
               unitCount: property.unitCount,
-              notes: property.notes,
             }}
+          />
+          <BuildingCapexSection propertyId={property.id} initial={buildingCapex} />
+          <PropertyNotesSection
+            id={property.id}
+            version={property.updatedAt.toISOString()}
+            notes={property.notes}
           />
           {property.sourceDeal && (
             <p className="text-xs text-muted">

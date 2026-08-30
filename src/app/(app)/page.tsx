@@ -4,11 +4,13 @@ import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState } from "@/components/ui";
 import { fmtDate, relativeDays } from "@/lib/utils";
 import { dealStatusTone } from "@/lib/config";
+import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
+import { PortfolioCapexForecastCard } from "./portfolio-capex";
 
 export default async function HomePage() {
   const user = await requireUser();
 
-  const [myTasks, dealsDue, counts, recentNotes] = await Promise.all([
+  const [myTasks, dealsDue, counts, recentNotes, capexProps] = await Promise.all([
     prisma.task.findMany({
       where: { assigneeUserId: user.id, status: "OPEN" },
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
@@ -32,9 +34,18 @@ export default async function HomePage() {
       take: 8,
       include: { deal: { select: { id: true, address: true } } },
     }),
+    prisma.property.findMany({
+      select: { id: true, address: true, units: true, buildingCapex: true },
+    }),
   ]);
 
   const [activeDeals, properties, openTasks, vendors] = counts;
+  const capexProperties = capexProps.map((p) => ({
+    id: p.id,
+    address: p.address,
+    units: parseUnits(p.units),
+    building: parseBuildingCapex(p.buildingCapex),
+  }));
 
   return (
     <>
@@ -48,6 +59,8 @@ export default async function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PortfolioCapexForecastCard properties={capexProperties} />
+
         <Card>
           <CardHeader className="flex items-center justify-between">
             <CardTitle>My open tasks</CardTitle>

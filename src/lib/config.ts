@@ -57,6 +57,8 @@ export const EQUIPMENT_TYPES = [
   "Washing Machine",
   "Drying Machine",
   "HVAC",
+  "Furnace",
+  "Boiler",
   "Water Heater",
   "Ceiling Fans",
   "Garage Door Opener",
