@@ -25,9 +25,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <div className="w-full max-w-xs text-center">
           <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">HG Login</p>
           <div className="my-7 h-px w-14 bg-[#c8a765]/40 mx-auto" />
-          <p className="text-sm leading-relaxed text-[#767d8a]">
-            Internal operations — sign in to continue
-          </p>
 
           {error && (
             <p className="mt-6 rounded-lg border border-[#e0796a]/25 bg-[#e0796a]/[0.08] px-3 py-2 text-xs text-[#e5a99b]">
@@ -37,22 +34,21 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
           {AUTH_CONFIGURED ? (
             <form action={login} className="mt-8 space-y-3 text-left">
-              <select
+              <input
                 name="email"
-                className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] focus:border-[#c8a765]/60 focus:outline-none"
-              >
-                {USERS.map((u) => (
-                  <option key={u.email} value={u.email} className="bg-[#0d0f13] text-[#e8eaee]">
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+                type="email"
+                placeholder="Email"
+                autoComplete="username"
+                required
+                autoFocus
+                className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none"
+              />
               <input
                 name="password"
                 type="password"
                 placeholder="Password"
+                autoComplete="current-password"
                 required
-                autoFocus
                 className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none"
               />
               <button
@@ -64,7 +60,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             </form>
           ) : (
             <div className="mt-8 space-y-2 text-left">
-              <p className="text-xs text-[#767d8a]">Dev sign-in — pick a user:</p>
               {USERS.map((u) => (
                 <form key={u.email} action={devLogin}>
                   <input type="hidden" name="email" value={u.email} />
