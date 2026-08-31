@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -17,16 +16,8 @@ export default function RentalsPage() {
       <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Rentals</p>
       <div className="my-7 h-px w-14 bg-[#c8a765]/40" />
       <h1 className="max-w-md text-[1.375rem] font-normal leading-snug text-[#e8eaee] sm:text-2xl">
-        Our current listings are posted on Zillow — the full list is landing
-        here shortly.
+        Our current listings are posted on Zillow
       </h1>
-      <p className="mt-5 max-w-sm text-sm leading-relaxed text-[#767d8a]">
-        Already a resident with a question?{" "}
-        <Link href="/residents" className="text-[#c8a765] hover:underline">
-          Visit the Residents page
-        </Link>
-        .
-      </p>
     </main>
   );
 }
