@@ -6,6 +6,7 @@ import { fmtMoney } from "@/lib/utils";
 import {
   portfolioCapexForecast,
   type CapexForecastItem,
+  type CapexRules,
   type PortfolioCapexProperty,
 } from "@/lib/property-types";
 
@@ -23,10 +24,12 @@ const TIP_HALF = 172; // ~half of the tooltip width, for clamping it to the view
 
 export function PortfolioCapexForecastCard({
   properties,
+  rules,
 }: {
   properties: PortfolioCapexProperty[];
+  rules: CapexRules;
 }) {
-  const f = portfolioCapexForecast(properties, { years: 5 });
+  const f = portfolioCapexForecast(properties, { years: 5, rules });
   const maxYear = Math.max(1, ...f.perYear);
   const rows = f.rows.filter((r) => r.total > 0);
   const lastYear = f.years[f.years.length - 1];

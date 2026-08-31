@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Badge, Button, EmptyState } from "@/components/ui";
-import type { PropertyUnit } from "@/lib/property-types";
+import type { CapexRules, PropertyUnit } from "@/lib/property-types";
 import {
   UTILITY_GROUPS,
   UTILITY_STATUS_FIELDS,
@@ -32,9 +32,11 @@ const toneText: Record<string, string> = {
 export function UnitsSection({
   propertyId,
   initial,
+  rules,
 }: {
   propertyId: string;
   initial: PropertyUnit[];
+  rules: CapexRules;
 }) {
   const [editing, setEditing] = useState(false);
   const [units, setUnits] = useState<PropertyUnit[]>(structuredClone(initial));
@@ -98,9 +100,11 @@ export function UnitsSection({
 
       <div className="space-y-4 p-4">
         {!editing ? (
-          <ReadUnits units={initial} />
+          <ReadUnits units={initial} rules={rules} />
         ) : (
-          units.map((u, i) => <EditUnitCard key={i} unit={u} index={i} mutate={mutate} />)
+          units.map((u, i) => (
+            <EditUnitCard key={i} unit={u} index={i} mutate={mutate} rules={rules} />
+          ))
         )}
       </div>
 
@@ -170,7 +174,7 @@ function Accordion({
   );
 }
 
-function ReadUnits({ units }: { units: PropertyUnit[] }) {
+function ReadUnits({ units, rules }: { units: PropertyUnit[]; rules: CapexRules }) {
   if (units.length === 0) return <EmptyState>No unit-level records.</EmptyState>;
   return (
     <>
@@ -234,8 +238,8 @@ function ReadUnits({ units }: { units: PropertyUnit[] }) {
                   </thead>
                   <tbody className="align-top [&>tr>td]:py-0.5 [&>tr>td]:pr-3">
                     {equipment.map((e, j) => {
-                      const status = equipmentStatus(e.type, e.installYear);
-                      const cost = equipmentReplacementCost(e.type);
+                      const status = equipmentStatus(e.type, e.installYear, rules);
+                      const cost = equipmentReplacementCost(e.type, rules);
                       return (
                         <tr key={j}>
                           <td className="text-muted">{e.type}</td>
@@ -276,10 +280,12 @@ function EditUnitCard({
   unit: u,
   index: i,
   mutate,
+  rules,
 }: {
   unit: PropertyUnit;
   index: number;
   mutate: (fn: (u: PropertyUnit[]) => void) => void;
+  rules: CapexRules;
 }) {
   return (
     <div className="rounded-lg border border-border">
@@ -356,8 +362,8 @@ function EditUnitCard({
               </div>
             )}
             {(u.equipment ?? []).map((e, j) => {
-              const status = equipmentStatus(e.type, e.installYear);
-              const cost = equipmentReplacementCost(e.type);
+              const status = equipmentStatus(e.type, e.installYear, rules);
+              const cost = equipmentReplacementCost(e.type, rules);
               return (
                 <div
                   key={j}

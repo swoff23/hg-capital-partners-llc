@@ -5,12 +5,15 @@ import { Badge, Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState } 
 import { fmtDate, relativeDays } from "@/lib/utils";
 import { dealStatusTone } from "@/lib/config";
 import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
+import { getCapexRules } from "@/lib/capex-rules";
 import { PortfolioCapexForecastCard } from "./portfolio-capex";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const user = await requireUser();
 
-  const [myTasks, dealsDue, counts, recentNotes, capexProps] = await Promise.all([
+  const [myTasks, dealsDue, counts, recentNotes, capexProps, capexRules] = await Promise.all([
     prisma.task.findMany({
       where: { assigneeUserId: user.id, status: "OPEN" },
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
@@ -37,6 +40,7 @@ export default async function HomePage() {
     prisma.property.findMany({
       select: { id: true, address: true, units: true, buildingCapex: true },
     }),
+    getCapexRules(),
   ]);
 
   const [activeDeals, properties, openTasks, vendors] = counts;
@@ -59,7 +63,7 @@ export default async function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PortfolioCapexForecastCard properties={capexProperties} />
+        <PortfolioCapexForecastCard properties={capexProperties} rules={capexRules} />
 
         <Card>
           <CardHeader className="flex items-center justify-between">

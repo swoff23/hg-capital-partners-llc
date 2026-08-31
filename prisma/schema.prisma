@@ -261,3 +261,16 @@ model PropertyAttachment {
 
   @@index([propertyId])
 }
+
+// ---------------------------------------------------------------------------
+// App configuration — a single row (id is always "singleton").
+// Today: only the CapEx planning rules (age bands + replacement costs) edited
+// at /settings. Built-in defaults live in src/lib/property-types.ts
+// (DEFAULT_CAPEX_RULES); absence of this row == defaults.
+// ---------------------------------------------------------------------------
+model AppConfig {
+  id         String   @id @default("singleton")
+  capexRules Json     @default("{}")
+  updatedAt  DateTime @updatedAt
+  updatedBy  String? // user.name ?? user.email of the last editor
+}

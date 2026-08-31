@@ -6,6 +6,7 @@ import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/comp
 import { fmtDate, initials } from "@/lib/utils";
 import { propertyStatusTone } from "@/lib/config";
 import { parseBuildingCapex, parseUnits } from "@/lib/property-types";
+import { getCapexRules } from "@/lib/capex-rules";
 import { BackLink } from "@/components/back-link";
 import { PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { PropertyDocumentsSection } from "./edit-documents";
@@ -50,6 +51,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   if (!property) notFound();
   const units = parseUnits(property.units);
   const buildingCapex = parseBuildingCapex(property.buildingCapex);
+  const capexRules = await getCapexRules();
 
   const unitCount = units.length || property.unitCount || 0;
 
@@ -68,11 +70,11 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
-          <CapexForecastCard units={units} building={buildingCapex} />
+          <CapexForecastCard units={units} building={buildingCapex} rules={capexRules} />
 
-          <BuildingCapexSection propertyId={property.id} initial={buildingCapex} />
+          <BuildingCapexSection propertyId={property.id} initial={buildingCapex} rules={capexRules} />
 
-          <UnitsSection propertyId={property.id} initial={units} />
+          <UnitsSection propertyId={property.id} initial={units} rules={capexRules} />
         </div>
 
         <div className="min-w-0 space-y-4">

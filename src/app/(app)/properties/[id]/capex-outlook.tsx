@@ -2,18 +2,25 @@
 import { useState } from "react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
-import { capexForecast, type BuildingCapexData, type PropertyUnit } from "@/lib/property-types";
+import {
+  capexForecast,
+  type BuildingCapexData,
+  type CapexRules,
+  type PropertyUnit,
+} from "@/lib/property-types";
 
 const fmtAge = (n: number | null) => (n == null ? "—" : `${n} yr${n === 1 ? "" : "s"}`);
 
 export function CapexForecastCard({
   units,
   building,
+  rules,
 }: {
   units: PropertyUnit[];
   building?: BuildingCapexData;
+  rules: CapexRules;
 }) {
-  const f = capexForecast(units, { years: 5, building });
+  const f = capexForecast(units, { years: 5, building, rules });
   const maxYear = Math.max(1, ...f.years.map((y) => y.total));
   const lastYear = f.fromYear + f.horizonYears - 1;
 

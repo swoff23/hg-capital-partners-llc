@@ -99,22 +99,111 @@ export function utilityStatusTone(v: string | null | undefined): "green" | "red"
   }
 }
 
-/* ---------------- Equipment lifecycle ----------------
+/* ---------------- CapEx planning rules ----------------
    Age-based planning indicators, NOT automatic replacement instructions.
-   `monitor` = first year of the "Monitor" band; `replace` = first year of the "Replace" band.
-   Keys match EQUIPMENT_TYPES values in @/lib/config. */
-export const EQUIPMENT_LIFECYCLE: Record<string, { monitor: number; replace: number }> = {
-  Roof: { monitor: 15, replace: 20 },
-  Furnace: { monitor: 12, replace: 17 },
-  Boiler: { monitor: 15, replace: 25 },
-  HVAC: { monitor: 10, replace: 15 },
-  "Water Heater": { monitor: 7, replace: 10 },
-  Refrigerator: { monitor: 9, replace: 13 },
-  Dishwasher: { monitor: 7, replace: 10 },
-  Oven: { monitor: 10, replace: 15 },
-  "Washing Machine": { monitor: 7, replace: 10 },
-  "Drying Machine": { monitor: 9, replace: 13 },
+   `monitor` = first year of the "Monitor" band; `replace` = first year of the
+   "Replace" band; the cost is the ballpark full-replacement figure the forecast
+   uses. These ship as DEFAULT_CAPEX_RULES and are editable at /settings — the
+   effective set is loaded from the AppConfig row via getCapexRules() (server).
+   Equipment `type` values match EQUIPMENT_TYPES in @/lib/config. */
+export type EquipmentRule = { type: string; monitor: number; replace: number; cost: number };
+export type BuildingRule = {
+  key: string;
+  label: string;
+  monitor: number;
+  replace: number;
+  defaultCost: number;
 };
+export type CapexRules = { equipment: EquipmentRule[]; building: BuildingRule[] };
+
+export const DEFAULT_CAPEX_RULES: CapexRules = {
+  equipment: [
+    { type: "Roof", monitor: 15, replace: 20, cost: 20000 },
+    { type: "Furnace", monitor: 12, replace: 17, cost: 6000 },
+    { type: "Boiler", monitor: 15, replace: 25, cost: 10000 },
+    { type: "HVAC", monitor: 10, replace: 15, cost: 8000 },
+    { type: "Water Heater", monitor: 7, replace: 10, cost: 1500 },
+    { type: "Refrigerator", monitor: 9, replace: 13, cost: 1000 },
+    { type: "Dishwasher", monitor: 7, replace: 10, cost: 700 },
+    { type: "Oven", monitor: 10, replace: 15, cost: 900 },
+    { type: "Washing Machine", monitor: 7, replace: 10, cost: 800 },
+    { type: "Drying Machine", monitor: 9, replace: 13, cost: 800 },
+  ],
+  building: [
+    { key: "roof", label: "Roof", monitor: 15, replace: 20, defaultCost: 25000 },
+    { key: "windows", label: "Windows", monitor: 20, replace: 30, defaultCost: 20000 },
+    { key: "electrical", label: "Electrical Service / Main Panels", monitor: 25, replace: 40, defaultCost: 15000 },
+    { key: "plumbing", label: "Main Plumbing / Supply Lines", monitor: 30, replace: 50, defaultCost: 20000 },
+    { key: "sewer", label: "Main Sewer Line", monitor: 40, replace: 60, defaultCost: 15000 },
+    { key: "porches", label: "Porches / Exterior Decks", monitor: 15, replace: 25, defaultCost: 20000 },
+    { key: "driveway", label: "Driveway / Parking", monitor: 10, replace: 20, defaultCost: 12000 },
+    { key: "siding", label: "Exterior Siding", monitor: 20, replace: 30, defaultCost: 25000 },
+    { key: "garage", label: "Garage", monitor: 20, replace: 30, defaultCost: 20000 },
+    { key: "masonry", label: "Masonry / Repointing", monitor: 15, replace: 25, defaultCost: 20000 },
+  ],
+};
+
+const RESERVED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Tolerant parse of the stored `AppConfig.capexRules` blob. Never throws.
+ * Stored JSON is authoritative and complete (never merged over defaults, so a
+ * removed rule stays removed); numbers are coerced finite-or-drop-the-row; rows
+ * are de-duped by type / key (last wins) and reserved keys are dropped. A section
+ * that is missing / not an array falls back to that section's default; a blob
+ * that parses to two empty sections falls back to the full defaults.
+ */
+export function parseCapexRules(json: unknown): CapexRules {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return DEFAULT_CAPEX_RULES;
+  const j = json as { equipment?: unknown; building?: unknown };
+
+  const fin = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const age = (v: unknown) => {
+    const n = fin(v);
+    return n == null ? null : Math.max(0, Math.trunc(n));
+  };
+  const money = (v: unknown) => {
+    const n = fin(v);
+    return n == null ? null : Math.max(0, Math.round(n));
+  };
+
+  const eqRow = (r: unknown): EquipmentRule[] => {
+    if (!r || typeof r !== "object") return [];
+    const o = r as Record<string, unknown>;
+    const type = typeof o.type === "string" ? o.type.trim() : "";
+    const m = age(o.monitor);
+    const rp = age(o.replace);
+    const c = money(o.cost);
+    if (!type || RESERVED_KEYS.has(type) || m == null || rp == null || c == null) return [];
+    return [{ type, monitor: m, replace: Math.max(m, rp), cost: c }];
+  };
+  const bRow = (r: unknown): BuildingRule[] => {
+    if (!r || typeof r !== "object") return [];
+    const o = r as Record<string, unknown>;
+    const key = typeof o.key === "string" ? o.key.trim() : "";
+    const label = typeof o.label === "string" ? o.label.trim() : "";
+    const m = age(o.monitor);
+    const rp = age(o.replace);
+    const c = money(o.defaultCost);
+    if (!key || RESERVED_KEYS.has(key) || !label || m == null || rp == null || c == null) return [];
+    return [{ key, label, monitor: m, replace: Math.max(m, rp), defaultCost: c }];
+  };
+
+  const dedupe = <T,>(rows: T[], k: (t: T) => string) =>
+    [...new Map(rows.map((t) => [k(t), t] as const)).values()];
+
+  const eqRaw = Array.isArray(j.equipment) ? j.equipment.flatMap(eqRow) : null;
+  const bRaw = Array.isArray(j.building) ? j.building.flatMap(bRow) : null;
+
+  const equipment = eqRaw ? dedupe(eqRaw, (e) => e.type) : DEFAULT_CAPEX_RULES.equipment;
+  const building = bRaw ? dedupe(bRaw, (b) => b.key) : DEFAULT_CAPEX_RULES.building;
+
+  if (equipment.length === 0 && building.length === 0) return DEFAULT_CAPEX_RULES;
+  return { equipment, building };
+}
 
 export type EquipmentStatus = "Good" | "Monitor" | "Replace" | "Unknown";
 
@@ -143,13 +232,14 @@ export function equipmentAge(raw: string | null | undefined, now: Date = new Dat
   return Math.max(0, now.getFullYear() - y);
 }
 
-/** Lifecycle indicator for an asset, or null when no lifecycle band is defined for its type. */
+/** Lifecycle indicator for an asset, or null when no rule is defined for its type. */
 export function equipmentStatus(
   type: string,
   raw: string | null | undefined,
+  rules: CapexRules,
   now: Date = new Date(),
 ): EquipmentStatus | null {
-  const band = EQUIPMENT_LIFECYCLE[type];
+  const band = rules.equipment.find((e) => e.type === type);
   if (!band) return null;
   return lifecycleStatus(equipmentAge(raw, now), band.monitor, band.replace);
 }
@@ -167,97 +257,26 @@ export function equipmentStatusTone(s: EquipmentStatus | null): "green" | "amber
   }
 }
 
-/* ---------------- CapEx planning ----------------
-   Ballpark replacement cost per asset type, used to project future capital needs.
-   Keys match EQUIPMENT_TYPES values in @/lib/config. */
-export const EQUIPMENT_REPLACEMENT_COST: Record<string, number> = {
-  Roof: 20000,
-  Furnace: 6000,
-  Boiler: 10000,
-  HVAC: 8000,
-  "Water Heater": 1500,
-  Refrigerator: 1000,
-  Dishwasher: 700,
-  Oven: 900,
-  "Washing Machine": 800,
-  "Drying Machine": 800,
-};
-
-export function equipmentReplacementCost(type: string): number | null {
-  return EQUIPMENT_REPLACEMENT_COST[type] ?? null;
+/** Ballpark replacement cost for an asset type, or null when no rule covers it. */
+export function equipmentReplacementCost(type: string, rules: CapexRules): number | null {
+  return rules.equipment.find((e) => e.type === type)?.cost ?? null;
 }
 
 /* ---------------- Major building CapEx ----------------
-   Building-level systems tracked per property. Age is measured from install / last
-   replacement / last substantial renovation. `defaultCost` can be overridden per property. */
-export const BUILDING_CAPEX_ITEMS = [
-  { key: "roof", label: "Roof", monitor: 15, replace: 20, defaultCost: 25000 },
-  { key: "windows", label: "Windows", monitor: 20, replace: 30, defaultCost: 20000 },
-  { key: "electrical", label: "Electrical Service / Main Panels", monitor: 25, replace: 40, defaultCost: 15000 },
-  { key: "plumbing", label: "Main Plumbing / Supply Lines", monitor: 30, replace: 50, defaultCost: 20000 },
-  { key: "sewer", label: "Main Sewer Line", monitor: 40, replace: 60, defaultCost: 15000 },
-  { key: "porches", label: "Porches / Exterior Decks", monitor: 15, replace: 25, defaultCost: 20000 },
-  { key: "driveway", label: "Driveway / Parking", monitor: 10, replace: 20, defaultCost: 12000 },
-  { key: "siding", label: "Exterior Siding", monitor: 20, replace: 30, defaultCost: 25000 },
-  { key: "garage", label: "Garage", monitor: 20, replace: 30, defaultCost: 20000 },
-  { key: "masonry", label: "Masonry / Repointing", monitor: 15, replace: 25, defaultCost: 20000 },
-] as const;
-
-export type BuildingCapexKey = (typeof BUILDING_CAPEX_ITEMS)[number]["key"];
-
-/** Per-property stored data: { roof: { year: "2010", type: "Shingle", costOverride: 27000 }, ... } */
+   Per-property stored data, keyed by a BuildingRule.key. */
 export type BuildingCapexEntry = {
   year?: string | null;
   /** Free text — material / kind, e.g. "Shingle", "Copper/PEX", "Circuit breakers". */
   type?: string | null;
   costOverride?: number | null;
 };
-export type BuildingCapexData = Partial<Record<BuildingCapexKey, BuildingCapexEntry>>;
+/** { roof: { year: "2010", type: "Shingle", costOverride: 27000 }, ... } */
+export type BuildingCapexData = Partial<Record<string, BuildingCapexEntry>>;
 
 export function parseBuildingCapex(json: unknown): BuildingCapexData {
   return json != null && typeof json === "object" && !Array.isArray(json)
     ? (json as BuildingCapexData)
     : {};
-}
-
-export type BuildingCapexRow = {
-  key: BuildingCapexKey;
-  label: string;
-  type: string | null;
-  year: string | null;
-  age: number | null;
-  status: EquipmentStatus;
-  /** installYear + replace threshold, or null when the year is unknown. */
-  replacementYear: number | null;
-  /** costOverride ?? defaultCost. */
-  cost: number;
-  defaultCost: number;
-  costOverridden: boolean;
-};
-
-/** Computed view of every building CapEx item for a property. */
-export function buildingCapexRows(
-  data: BuildingCapexData,
-  now: Date = new Date(),
-): BuildingCapexRow[] {
-  return BUILDING_CAPEX_ITEMS.map((item) => {
-    const entry = data[item.key] ?? {};
-    const installY = parseInstallYear(entry.year);
-    const age = installY == null ? null : Math.max(0, now.getFullYear() - installY);
-    const override = entry.costOverride ?? null;
-    return {
-      key: item.key,
-      label: item.label,
-      type: entry.type?.trim() || null,
-      year: entry.year?.trim() || null,
-      age,
-      status: lifecycleStatus(age, item.monitor, item.replace),
-      replacementYear: installY == null ? null : installY + item.replace,
-      cost: override ?? item.defaultCost,
-      defaultCost: item.defaultCost,
-      costOverridden: override != null && override !== item.defaultCost,
-    };
-  });
 }
 
 export type CapexForecastItem = {
@@ -302,7 +321,7 @@ export type CapexForecast = {
  */
 export function capexForecast(
   units: PropertyUnit[],
-  opts: { years?: number; now?: Date; building?: BuildingCapexData } = {},
+  opts: { years?: number; now?: Date; building?: BuildingCapexData; rules: CapexRules },
 ): CapexForecast {
   const horizonYears = opts.years ?? 5;
   const now = opts.now ?? new Date();
@@ -326,6 +345,7 @@ export function capexForecast(
     cost: number,
   ) => {
     const projected = installY + replace;
+    if (!Number.isFinite(projected)) return; // guard vs a malformed rule reaching buckets.get(NaN)
     if (projected > lastYear) return; // still healthy past the horizon
     const dueYear = Math.max(fromYear, projected);
     buckets.get(dueYear)!.push({
@@ -345,23 +365,24 @@ export function capexForecast(
     }
   };
 
+  const byType = new Map(opts.rules.equipment.map((r) => [r.type, r] as const));
+
   for (const [ui, u] of units.entries()) {
     for (const e of u.equipment ?? []) {
-      const band = EQUIPMENT_LIFECYCLE[e.type];
-      const cost = equipmentReplacementCost(e.type);
-      if (!band || cost == null) continue;
+      const rule = byType.get(e.type);
+      if (!rule) continue;
 
       const installY = parseInstallYear(e.installYear);
       if (installY == null) {
         unknownCount += 1;
         continue;
       }
-      schedule("unit", u.label || `Unit ${ui + 1}`, e.type, installY, band.replace, cost);
+      schedule("unit", u.label || `Unit ${ui + 1}`, e.type, installY, rule.replace, rule.cost);
     }
   }
 
   if (opts.building) {
-    for (const item of BUILDING_CAPEX_ITEMS) {
+    for (const item of opts.rules.building) {
       const entry = opts.building[item.key];
       const installY = parseInstallYear(entry?.year);
       if (installY == null) {
@@ -420,7 +441,7 @@ export type PortfolioCapexForecast = {
 /** Aggregate every property's CapEx forecast into a property × year matrix. */
 export function portfolioCapexForecast(
   properties: PortfolioCapexProperty[],
-  opts: { years?: number; now?: Date } = {},
+  opts: { years?: number; now?: Date; rules: CapexRules },
 ): PortfolioCapexForecast {
   const horizonYears = opts.years ?? 5;
   const now = opts.now ?? new Date();
@@ -431,7 +452,7 @@ export function portfolioCapexForecast(
   let dueNowTotal = 0;
 
   const rows: PortfolioCapexRow[] = properties.map((p) => {
-    const f = capexForecast(p.units, { years: horizonYears, now, building: p.building });
+    const f = capexForecast(p.units, { years: horizonYears, now, building: p.building, rules: opts.rules });
     const py = f.years.map((y) => y.total);
     py.forEach((v, i) => (perYear[i] += v));
     dueNowTotal += f.dueNowTotal;

@@ -3,11 +3,12 @@ import { useState, useTransition } from "react";
 import { Badge, Button } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import {
-  BUILDING_CAPEX_ITEMS,
   equipmentStatusTone,
   lifecycleStatus,
   parseInstallYear,
   type BuildingCapexData,
+  type BuildingRule,
+  type CapexRules,
   type EquipmentStatus,
 } from "@/lib/property-types";
 import { updateBuildingCapex } from "../actions";
@@ -30,9 +31,9 @@ const fmtAge = (n: number | null) => (n == null ? "—" : `${n} yr${n === 1 ? ""
 type DraftEntry = { type: string; year: string; cost: string };
 type Draft = Record<string, DraftEntry>;
 
-function toDraft(data: BuildingCapexData): Draft {
+function toDraft(data: BuildingCapexData, items: BuildingRule[]): Draft {
   const d: Draft = {};
-  for (const item of BUILDING_CAPEX_ITEMS) {
+  for (const item of items) {
     const e = data[item.key];
     d[item.key] = {
       type: e?.type ?? "",
@@ -53,15 +54,18 @@ function StatusCell({ status }: { status: EquipmentStatus }) {
 export function BuildingCapexSection({
   propertyId,
   initial,
+  rules,
 }: {
   propertyId: string;
   initial: BuildingCapexData;
+  rules: CapexRules;
 }) {
+  const items = rules.building;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
+  const [draft, setDraft] = useState<Draft>(() => toDraft(initial, items));
   const [pending, start] = useTransition();
 
-  const datedCount = BUILDING_CAPEX_ITEMS.filter(
+  const datedCount = items.filter(
     (item) => parseInstallYear(initial[item.key]?.year) != null,
   ).length;
 
@@ -73,7 +77,7 @@ export function BuildingCapexSection({
       string,
       { type: string | null; year: string | null; costOverride: number | null }
     > = {};
-    for (const item of BUILDING_CAPEX_ITEMS) {
+    for (const item of items) {
       const c = draft[item.key];
       const costNum = parseFloat(c.cost.replace(/[$,\s]/g, ""));
       payload[item.key] = {
@@ -89,12 +93,12 @@ export function BuildingCapexSection({
   }
 
   function cancel() {
-    setDraft(toDraft(initial));
+    setDraft(toDraft(initial, items));
     setEditing(false);
   }
 
   /** Row state from a source (draft in edit mode, stored data in read mode). */
-  const rowFor = (item: (typeof BUILDING_CAPEX_ITEMS)[number], src: { type: string; year: string; costOverride: number | null }) => {
+  const rowFor = (item: BuildingRule, src: { type: string; year: string; costOverride: number | null }) => {
     const installY = parseInstallYear(src.year);
     const age = installY == null ? null : Math.max(0, NOW - installY);
     return {
@@ -111,7 +115,7 @@ export function BuildingCapexSection({
         <div className="flex items-baseline gap-2">
           <h3 className="shrink-0 text-sm font-semibold">Building CapEx</h3>
           <span className="text-xs text-muted">
-            {datedCount} / {BUILDING_CAPEX_ITEMS.length} systems dated
+            {datedCount} / {items.length} systems dated
           </span>
         </div>
         {editing ? (
@@ -145,7 +149,7 @@ export function BuildingCapexSection({
               <span>Cost</span>
             </div>
 
-            {BUILDING_CAPEX_ITEMS.map((item) => {
+            {items.map((item) => {
               const d = draft[item.key];
               const stored = initial[item.key];
               const src = editing

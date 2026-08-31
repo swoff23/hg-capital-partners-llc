@@ -21,6 +21,44 @@ export function CardBody({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("p-4", className)} {...props} />;
 }
 
+/**
+ * Bordered card with a title bar. In view mode a hover-revealed "Edit" link
+ * (when `onEdit` is set); in edit mode the `actions` slot (Cancel / Save).
+ * Used by the property edit sections and the /settings CapEx-rules editor.
+ */
+export function SectionCard({
+  title,
+  children,
+  onEdit,
+  editing,
+  actions,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onEdit?: () => void;
+  editing?: boolean;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="group rounded-xl border border-border bg-surface shadow-sm">
+      <div className="flex min-h-[3.25rem] items-center justify-between gap-2 border-b border-border px-4 py-2">
+        <h3 className="shrink-0 text-sm font-semibold">{title}</h3>
+        {editing
+          ? actions
+          : onEdit && (
+              <button
+                onClick={onEdit}
+                className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
+              >
+                Edit
+              </button>
+            )}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
 /* ---------------- Button ---------------- */
 type BtnProps = React.ComponentProps<"button"> & {
   variant?: "primary" | "secondary" | "ghost" | "danger";

@@ -5,7 +5,7 @@ import { del } from "@vercel/blob";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { fmtDate } from "@/lib/utils";
-import type { PropertyUnit } from "@/lib/property-types";
+import { parseBuildingCapex, type PropertyUnit } from "@/lib/property-types";
 
 function decOrNull(raw: string | null): string | null {
   if (!raw) return null;
@@ -250,11 +250,23 @@ const buildingCapexSchema = z.record(
   }),
 );
 
-/** Replace the whole building-level CapEx map (type + year + optional cost override per system). */
+/**
+ * Merge a partial building-level CapEx map (type + year + optional cost override
+ * per system) into what's stored. Keys the payload doesn't mention are left
+ * untouched — so per-property data for a system that was removed from the global
+ * CapEx rules stays put and reappears if the system is re-added. A key the
+ * payload sends with everything blank is an explicit clear.
+ */
 export async function updateBuildingCapex(id: string, data: unknown) {
   await requireUser();
   const parsed = buildingCapexSchema.parse(data);
-  const clean: Record<string, { year: string | null; type: string | null; costOverride: number | null }> = {};
+  const current = await prisma.property.findUnique({
+    where: { id },
+    select: { buildingCapex: true },
+  });
+  const clean: Record<string, { year: string | null; type: string | null; costOverride: number | null }> =
+    { ...(parseBuildingCapex(current?.buildingCapex) as Record<string, { year: string | null; type: string | null; costOverride: number | null }>) };
+
   for (const [key, v] of Object.entries(parsed)) {
     const year = v.year?.trim() || null;
     const type = v.type?.trim() || null;
@@ -263,6 +275,7 @@ export async function updateBuildingCapex(id: string, data: unknown) {
         ? Math.round(v.costOverride)
         : null;
     if (year || type || costOverride != null) clean[key] = { year, type, costOverride };
+    else delete clean[key];
   }
   await prisma.property.update({
     where: { id },

@@ -1,9 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, SectionCard } from "@/components/ui";
 import { cn, fmtDate, fmtMoney, relativeDays } from "@/lib/utils";
 import { patchProperty } from "../actions";
-import { SectionCard } from "./edit-details";
 
 export type EditableInsurance = {
   id: string;

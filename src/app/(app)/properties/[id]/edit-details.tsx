@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, Field, Input, Select, Textarea } from "@/components/ui";
+import { Button, Field, Input, SectionCard, Select, Textarea } from "@/components/ui";
 import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
 import { fmtDate, fmtMoney } from "@/lib/utils";
 import { patchProperty } from "../actions";
@@ -175,38 +175,5 @@ export function PropertyNotesSection({
         />
       </form>
     </SectionCard>
-  );
-}
-
-export function SectionCard({
-  title,
-  children,
-  onEdit,
-  editing,
-  actions,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onEdit?: () => void;
-  editing?: boolean;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <div className="group rounded-xl border border-border bg-surface shadow-sm">
-      <div className="flex min-h-[3.25rem] items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <h3 className="shrink-0 text-sm font-semibold">{title}</h3>
-        {editing
-          ? actions
-          : onEdit && (
-              <button
-                onClick={onEdit}
-                className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
-              >
-                Edit
-              </button>
-            )}
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
   );
 }

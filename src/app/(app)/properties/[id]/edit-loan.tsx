@@ -1,9 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Field, Input, SectionCard } from "@/components/ui";
 import { cn, fmtDate, fmtMoney, relativeDays } from "@/lib/utils";
 import { patchProperty } from "../actions";
-import { SectionCard } from "./edit-details";
 
 export type EditableLoan = {
   id: string;
