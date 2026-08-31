@@ -384,6 +384,13 @@ function PhotoGallery({
         "in Settings → Camera → Formats, switch to \"Most Compatible\", or export as JPEG first";
     }
     if (/too large|exceeds the maximum/i.test(msg)) return "file is too large (25MB max)";
+    // @vercel/blob's client always uses this exact generic wording when the request
+    // for an upload token itself fails (auth, missing property, etc.) — it discards
+    // whatever specific reason the server actually sent back. A stale session is the
+    // most common real cause, so that's the fix worth suggesting.
+    if (/retrieve the client token/i.test(msg)) {
+      return "couldn't start the upload — reload the page, make sure you're still signed in, and try again";
+    }
     return "upload failed";
   }
 

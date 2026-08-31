@@ -1,6 +1,6 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 /**
@@ -23,7 +23,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       onBeforeGenerateToken: async (_pathname, clientPayload) => {
-        await requireUser();
+        // requireUser() calls next/navigation's redirect(), which doesn't work inside a
+        // Route Handler — it throws an opaque "NEXT_REDIRECT" that's indistinguishable
+        // from a real error. getCurrentUser() just returns null instead, for a real 401.
+        const user = await getCurrentUser();
+        if (!user) throw new Error("Your session has expired — reload the page and sign in again.");
         const { propertyId } = JSON.parse(clientPayload ?? "{}") as { propertyId?: string };
         if (!propertyId) throw new Error("Missing propertyId");
         const property = await prisma.property.findUnique({
