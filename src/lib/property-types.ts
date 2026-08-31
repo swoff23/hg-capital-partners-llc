@@ -48,16 +48,6 @@ export function parseUnits(json: unknown): PropertyUnit[] {
   }));
 }
 
-/** `Property.links` JSON — [{ label, url }]. Tolerant parse; rows with no url are dropped. */
-export type PropertyLink = { label: string; url: string };
-
-export function parsePropertyLinks(json: unknown): PropertyLink[] {
-  if (!Array.isArray(json)) return [];
-  return (json as Partial<PropertyLink>[])
-    .map((l) => ({ label: (l?.label ?? "").trim(), url: (l?.url ?? "").trim() }))
-    .filter((l) => l.url.length > 0);
-}
-
 /** Utility fields grouped by provider, for a per-utility layout. */
 export const UTILITY_GROUPS: { name: string; fields: [keyof UnitUtilities, string][] }[] = [
   {

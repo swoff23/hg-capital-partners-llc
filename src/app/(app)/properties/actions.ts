@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { del } from "@vercel/blob";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { fmtDate } from "@/lib/utils";
@@ -62,8 +63,6 @@ export async function patchProperty(id: string, formData: FormData) {
   if (has("loanMaturityDate")) data.loanMaturityDate = dateOrNull(s("loanMaturityDate"));
   if (has("refinanceDate")) data.refinanceDate = dateOrNull(s("refinanceDate"));
   if (has("refiTarget")) data.refiTarget = s("refiTarget");
-  // checkbox is absent from FormData when unchecked — a hidden marker tells us the loan form was submitted
-  if (has("loanEscrowPresent")) data.loanEscrow = formData.get("loanEscrow") === "on";
 
   // insurance
   if (has("insuranceCarrier")) data.insuranceCarrier = s("insuranceCarrier");
@@ -162,20 +161,45 @@ export async function syncPropertyReminders(propertyId: string) {
   revalidatePath(`/properties/${propertyId}`);
 }
 
-const linkSchema = z.object({ label: z.string().nullish(), url: z.string().nullish() });
+/* ---------------- Documents (files in Vercel Blob) ---------------- */
 
-/** Replace the whole Documents/Links array (label + url) for a property. */
-export async function updatePropertyLinks(id: string, links: unknown) {
+/** Called by the client after a file finishes uploading to Blob. */
+export async function recordPropertyAttachment(
+  propertyId: string,
+  data: { url: string; pathname: string; filename: string; size: number; contentType: string | null },
+) {
   await requireUser();
-  const parsed = z.array(linkSchema).parse(links);
-  const clean = parsed
-    .map((l) => ({ label: l.label?.trim() || "", url: l.url?.trim() || "" }))
-    .filter((l) => l.url.length > 0);
-  await prisma.property.update({
-    where: { id },
-    data: { links: clean as unknown as object },
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+    select: { id: true },
   });
-  revalidatePath(`/properties/${id}`);
+  if (!property) return;
+
+  await prisma.propertyAttachment.create({
+    data: {
+      propertyId,
+      url: data.url,
+      pathname: data.pathname,
+      filename: data.filename.slice(0, 255) || "file",
+      size: Math.max(0, Math.trunc(data.size)),
+      contentType: data.contentType,
+    },
+  });
+  revalidatePath(`/properties/${propertyId}`);
+}
+
+export async function deletePropertyAttachment(attachmentId: string) {
+  await requireUser();
+  const att = await prisma.propertyAttachment.findUnique({ where: { id: attachmentId } });
+  if (!att) return;
+
+  try {
+    await del(att.url);
+  } catch {
+    // Blob already gone / token missing — still drop the DB row.
+  }
+  await prisma.propertyAttachment.delete({ where: { id: attachmentId } });
+  revalidatePath(`/properties/${att.propertyId}`);
 }
 
 const unitSchema = z.object({

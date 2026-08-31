@@ -144,11 +144,11 @@ model Property {
   // { roof: { year: "2010", costOverride: 27000 }, windows: { year: "2018" }, ... }
   buildingCapex Json @default("{}")
 
-  links Json   @default("[]") // [{ label, url }]
   notes String? @db.Text
 
-  tasks     Task[]
-  sourceDeal Deal? @relation("DealToProperty")
+  tasks       Task[]
+  attachments PropertyAttachment[]
+  sourceDeal  Deal? @relation("DealToProperty")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -245,4 +245,19 @@ model TaskAttachment {
   createdAt   DateTime @default(now())
 
   @@index([taskId])
+}
+
+// Documents uploaded to a property — same Vercel Blob pattern as TaskAttachment.
+model PropertyAttachment {
+  id          String   @id @default(cuid())
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId  String
+  url         String
+  pathname    String
+  filename    String
+  size        Int
+  contentType String?
+  createdAt   DateTime @default(now())
+
+  @@index([propertyId])
 }

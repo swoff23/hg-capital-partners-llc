@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { cn, fmtDate, fmtMoney, relativeDays } from "@/lib/utils";
 import { patchProperty } from "../actions";
 import { SectionCard } from "./edit-details";
@@ -10,12 +10,18 @@ export type EditableInsurance = {
   version: string;
   insuranceCarrier: string | null;
   insurancePolicyNo: string | null;
-  insuranceCoverage: string | null;
-  insuranceDeductible: string | null;
-  insuranceLiability: string | null;
   insurancePremium: string | null;
   insuranceRenewalDate: string | null;
+  replacementCost: string | null;
 };
+
+/** Label + value — same label style as the other cards' `Field`, but grid-friendly. */
+const R = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div>
+    <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
+    <div className="mt-0.5 text-sm">{children}</div>
+  </div>
+);
 
 const L = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <label className="block">
@@ -52,14 +58,12 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
             </div>
           </div>
         )}
-        <dl>
-          <Field label="Carrier">{p.insuranceCarrier ?? "—"}</Field>
-          <Field label="Policy #">{p.insurancePolicyNo ?? "—"}</Field>
-          <Field label="Coverage">{fmtMoney(p.insuranceCoverage)}</Field>
-          <Field label="Deductible">{fmtMoney(p.insuranceDeductible)}</Field>
-          <Field label="Liability">{p.insuranceLiability ?? "—"}</Field>
-          <Field label="Premium">{fmtMoney(p.insurancePremium)}</Field>
-        </dl>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <R label="Carrier">{p.insuranceCarrier ?? "—"}</R>
+          <R label="Policy #">{p.insurancePolicyNo ?? "—"}</R>
+          <R label="Premium">{fmtMoney(p.insurancePremium)}</R>
+          <R label="Replacement cost">{fmtMoney(p.replacementCost)}</R>
+        </div>
       </SectionCard>
     );
   }
@@ -87,10 +91,8 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
       >
         <L label="Carrier"><Input name="insuranceCarrier" defaultValue={p.insuranceCarrier ?? ""} /></L>
         <L label="Policy #"><Input name="insurancePolicyNo" defaultValue={p.insurancePolicyNo ?? ""} /></L>
-        <L label="Coverage"><Input name="insuranceCoverage" defaultValue={p.insuranceCoverage ?? ""} /></L>
-        <L label="Deductible"><Input name="insuranceDeductible" defaultValue={p.insuranceDeductible ?? ""} /></L>
-        <L label="Liability"><Input name="insuranceLiability" placeholder="1M / 2M" defaultValue={p.insuranceLiability ?? ""} /></L>
         <L label="Premium"><Input name="insurancePremium" defaultValue={p.insurancePremium ?? ""} /></L>
+        <L label="Replacement cost"><Input name="replacementCost" defaultValue={p.replacementCost ?? ""} /></L>
         <L label="Renewal date"><Input name="insuranceRenewalDate" type="date" defaultValue={p.insuranceRenewalDate ?? ""} /></L>
       </form>
     </SectionCard>
