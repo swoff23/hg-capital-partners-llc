@@ -13,7 +13,7 @@ export const metadata: Metadata = {
  */
 export default function RentalsPage() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-20 text-center sm:px-10">
+    <main className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center sm:px-10">
       <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Rentals</p>
       <div className="my-7 h-px w-14 bg-[#c8a765]/40" />
       <h1 className="max-w-md text-[1.375rem] font-normal leading-snug text-[#e8eaee] sm:text-2xl">
