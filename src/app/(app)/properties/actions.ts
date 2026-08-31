@@ -284,3 +284,68 @@ export async function updateBuildingCapex(id: string, data: unknown) {
   revalidatePath(`/properties/${id}`);
   revalidatePath("/properties");
 }
+
+const listingSchema = z.object({
+  id: z.string().nullish(),
+  unitLabel: z.string(),
+  zillowUrl: z.string(),
+  rent: z.string(),
+  beds: z.string(),
+  baths: z.string(),
+  sqft: z.string(),
+  availableDate: z.string(),
+  status: z.enum(["AVAILABLE", "LEASED", "HIDDEN"]),
+  photoUrl: z.string(),
+  photoPathname: z.string(),
+});
+
+/**
+ * Replace the whole set of listings for a property (sent from the client
+ * editor). Unlike units/buildingCapex this is a real table, not a JSON blob —
+ * diffed against what's currently stored: rows no longer present are deleted
+ * (their blob photo cleaned up too), existing ids are updated in place, new
+ * rows (id: null, from "+ Add listing") are created.
+ */
+export async function updatePropertyListings(propertyId: string, listings: unknown) {
+  await requireUser();
+  const parsed = z.array(listingSchema).parse(listings);
+
+  const clean = parsed.map((l) => ({
+    id: l.id ?? null,
+    unitLabel: l.unitLabel.trim() || "Unit",
+    zillowUrl: l.zillowUrl.trim() || null,
+    rent: decOrNull(l.rent.trim() || null),
+    beds: l.beds.trim() || null,
+    baths: l.baths.trim() || null,
+    sqft: l.sqft.trim() ? Math.max(0, Math.trunc(Number(l.sqft))) || null : null,
+    availableDate: dateOrNull(l.availableDate.trim() || null),
+    status: l.status,
+    photoUrl: l.photoUrl.trim() || null,
+    photoPathname: l.photoPathname.trim() || null,
+  }));
+
+  const existing = await prisma.listing.findMany({ where: { propertyId }, select: { id: true, photoUrl: true } });
+  const keepIds = new Set(clean.map((l) => l.id).filter(Boolean) as string[]);
+  const toDelete = existing.filter((e) => !keepIds.has(e.id));
+
+  for (const row of toDelete) {
+    if (!row.photoUrl) continue;
+    try {
+      await del(row.photoUrl);
+    } catch {
+      // Blob already gone / token missing — still drop the DB row.
+    }
+  }
+
+  await prisma.$transaction([
+    ...toDelete.map((row) => prisma.listing.delete({ where: { id: row.id } })),
+    ...clean.map((l) =>
+      l.id
+        ? prisma.listing.update({ where: { id: l.id }, data: { ...l, id: undefined, propertyId } })
+        : prisma.listing.create({ data: { ...l, id: undefined, propertyId } }),
+    ),
+  ]);
+
+  revalidatePath(`/properties/${propertyId}`);
+  revalidatePath("/rentals");
+}

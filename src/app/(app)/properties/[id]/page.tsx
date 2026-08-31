@@ -13,6 +13,7 @@ import { PropertyDocumentsSection } from "./edit-documents";
 import { PropertyLoanSection } from "./edit-loan";
 import { PropertyInsuranceSection } from "./edit-insurance";
 import { UnitsSection } from "./edit-units";
+import { ListingsSection, type EditableListing } from "./edit-listings";
 import { BuildingCapexSection } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
 
@@ -46,12 +47,26 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       },
       attachments: { orderBy: { createdAt: "asc" } },
       sourceDeal: { select: { id: true, address: true } },
+      listings: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!property) notFound();
   const units = parseUnits(property.units);
   const buildingCapex = parseBuildingCapex(property.buildingCapex);
   const capexRules = await getCapexRules();
+  const listings: EditableListing[] = property.listings.map((l) => ({
+    id: l.id,
+    unitLabel: l.unitLabel,
+    zillowUrl: l.zillowUrl ?? "",
+    rent: l.rent?.toString() ?? "",
+    beds: l.beds ?? "",
+    baths: l.baths ?? "",
+    sqft: l.sqft?.toString() ?? "",
+    availableDate: ymd(l.availableDate) ?? "",
+    status: l.status,
+    photoUrl: l.photoUrl ?? "",
+    photoPathname: l.photoPathname ?? "",
+  }));
 
   const unitCount = units.length || property.unitCount || 0;
 
@@ -75,6 +90,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <BuildingCapexSection propertyId={property.id} initial={buildingCapex} rules={capexRules} />
 
           <UnitsSection propertyId={property.id} initial={units} rules={capexRules} />
+
+          <ListingsSection propertyId={property.id} initial={listings} />
         </div>
 
         <div className="min-w-0 space-y-4">

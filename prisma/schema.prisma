@@ -157,6 +157,7 @@ model Property {
   tasks       Task[]
   attachments PropertyAttachment[]
   sourceDeal  Deal?                @relation("DealToProperty")
+  listings    Listing[]
 
   qboClasses  QboClass[]
   ledgerLines LedgerLine[]
@@ -261,6 +262,8 @@ model TaskAttachment {
 }
 
 // Documents uploaded to a property — same Vercel Blob pattern as TaskAttachment.
+// PRIVATE: mortgage statements, insurance docs, etc. Never queried by the
+// public site — see Listing.photoUrl below for the public-facing equivalent.
 model PropertyAttachment {
   id          String   @id @default(cuid())
   property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -273,6 +276,45 @@ model PropertyAttachment {
   createdAt   DateTime @default(now())
 
   @@index([propertyId])
+}
+
+// ---------------------------------------------------------------------------
+// Rentals — one row per marketable unit. Zillow stays the leasing system of
+// record (PRD decision: don't duplicate the full listing there); this is just
+// enough to render a card on the public /rentals page and link out to it.
+// ---------------------------------------------------------------------------
+enum ListingStatus {
+  AVAILABLE
+  LEASED // shown in "Previously Leased" for credibility, per the PRD
+  HIDDEN // saved but not shown publicly (e.g. still being prepped)
+}
+
+model Listing {
+  id         String   @id @default(cuid())
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId String
+
+  unitLabel String // free text — matches a Property.units[].label where possible, not FK'd
+  zillowUrl String?
+
+  rent  Decimal? @db.Decimal(10, 2)
+  beds  String? // matches Deal.beds/baths — "2", "1.5", "Studio", etc.
+  baths String?
+  sqft  Int?
+
+  availableDate DateTime?
+  status        ListingStatus @default(HIDDEN)
+
+  // Deliberately its own url/pathname pair, not PropertyAttachment — a public
+  // listing photo and a private mortgage statement must never share a table.
+  photoUrl      String?
+  photoPathname String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([status])
 }
 
 // ---------------------------------------------------------------------------
