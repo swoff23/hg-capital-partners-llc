@@ -24,6 +24,9 @@ if (!mayMigrate) {
   console.log(`\n[prebuild] VERCEL_ENV=${vercelEnv} — skipping migrate deploy (only the production build applies migrations; see prod runbook to migrate a preview DB by hand).\n`);
 } else if (url && !isTxPooler) {
   execSync("npx prisma migrate deploy", { stdio: "inherit" });
+  // One-time bridge from env-var passwords to DB-backed ones — see the
+  // script's own header. Idempotent; a no-op once every user has a hash.
+  execSync("npx tsx scripts/backfill-password-hashes.ts", { stdio: "inherit" });
 } else if (isTxPooler) {
   console.log("\n[prebuild] DATABASE_URL is the Supabase transaction pooler — migrations are applied separately, skipping `migrate deploy`.\n");
 } else {

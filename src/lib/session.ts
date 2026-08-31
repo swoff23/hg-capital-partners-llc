@@ -29,11 +29,3 @@ export function readSession(value: string | undefined): string | null {
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   return email.toLowerCase();
 }
-
-/** Constant-time password check. */
-export function passwordMatches(input: string, expected: string | undefined): boolean {
-  if (!expected) return false;
-  const a = Buffer.from(input);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}

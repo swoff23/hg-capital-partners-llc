@@ -72,8 +72,10 @@ runs are not deleted).
 **Reset local dev DB** — `dropdb hg_capital_dev && createdb hg_capital_dev &&
 npx prisma migrate deploy && npm run migrate`.
 
-**Add a user** — add the email to `src/lib/auth-allowlist.ts` and to
-`SEED_USERS` in `scripts/migrate/00-users.ts`, then `npm run migrate users`.
+**Add a user** — add a row (with a `passwordEnv`) to `SEED_USERS` in
+`scripts/migrate/00-users.ts`, run `npm run migrate users`, set that env var in
+Vercel, and deploy — the next production build hashes it into
+`User.passwordHash` automatically (see `scripts/backfill-password-hashes.ts`).
 
 **Sensitive data** — contractor bank/routing numbers are never imported (dropped
 in `scripts/migrate/02-contractors.ts` and logged). `_private/` and all

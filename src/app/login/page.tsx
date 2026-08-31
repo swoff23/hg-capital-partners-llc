@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { AUTH_CONFIGURED, USERS } from "@/lib/auth-allowlist";
 import { PublicHeader } from "@/components/public/header";
 import { PublicFooter } from "@/components/public/footer";
-import { devLogin, login } from "./actions";
+import { login } from "./actions";
 
 export const metadata: Metadata = {
   title: "Sign In — HG Capital Partners",
@@ -28,51 +27,35 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
           {error && (
             <p className="mt-6 rounded-lg border border-[#e0796a]/25 bg-[#e0796a]/[0.08] px-3 py-2 text-xs text-[#e5a99b]">
-              {error === "bad" ? "Wrong email or password." : "That account isn't authorized."}
+              Wrong email or password.
             </p>
           )}
 
-          {AUTH_CONFIGURED ? (
-            <form action={login} className="mt-8 space-y-3 text-left">
-              <input
-                name="email"
-                type="email"
-                placeholder="Email"
-                autoComplete="username"
-                required
-                autoFocus
-                className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none"
-              />
-              <input
-                name="password"
-                type="password"
-                placeholder="Password"
-                autoComplete="current-password"
-                required
-                className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="mt-1 h-10 w-full rounded-full bg-[#e8eaee] text-[0.8125rem] font-medium tracking-wide text-[#08090b] transition-colors duration-200 hover:bg-[#c8a765]"
-              >
-                Sign in
-              </button>
-            </form>
-          ) : (
-            <div className="mt-8 space-y-2 text-left">
-              {USERS.map((u) => (
-                <form key={u.email} action={devLogin}>
-                  <input type="hidden" name="email" value={u.email} />
-                  <button
-                    type="submit"
-                    className="h-10 w-full rounded-full border border-white/15 px-4 text-left text-[0.8125rem] font-medium tracking-wide text-[#e8eaee] transition-colors duration-200 hover:border-[#c8a765]/60 hover:bg-white/[0.04]"
-                  >
-                    {u.name}
-                  </button>
-                </form>
-              ))}
-            </div>
-          )}
+          <form action={login} className="mt-8 space-y-3 text-left">
+            <input
+              name="email"
+              type="email"
+              placeholder="Email"
+              autoComplete="username"
+              required
+              autoFocus
+              className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none"
+            />
+            <input
+              name="password"
+              type="password"
+              placeholder="Password"
+              autoComplete="current-password"
+              required
+              className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="mt-1 h-10 w-full rounded-full bg-[#e8eaee] text-[0.8125rem] font-medium tracking-wide text-[#08090b] transition-colors duration-200 hover:bg-[#c8a765]"
+            >
+              Sign in
+            </button>
+          </form>
         </div>
       </main>
 

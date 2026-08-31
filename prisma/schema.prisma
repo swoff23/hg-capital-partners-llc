@@ -17,10 +17,15 @@ datasource db {
 // Users — 2 trusted internal users (Connor, Pieter). No roles in v1.
 // ---------------------------------------------------------------------------
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  // scrypt hash, "<saltHex>.<hashHex>" — see src/lib/password.ts. Null means
+  // this user can't sign in yet (no roles/self-signup in v1: rows without a
+  // hash are provisioned by hand, then backfilled — see
+  // scripts/backfill-password-hashes.ts).
+  passwordHash String?
+  createdAt    DateTime @default(now())
 
   assignedTasks Task[] @relation("TaskAssignee")
 }
@@ -39,11 +44,11 @@ model Deal {
   ourPriceRaw   String?
   currentOffer  Decimal? @db.Decimal(12, 2)
 
-  units  Int?
-  beds   String?
-  baths  String?
-  sqft   Int?
-  taxes  Decimal? @db.Decimal(12, 2)
+  units Int?
+  beds  String?
+  baths String?
+  sqft  Int?
+  taxes Decimal? @db.Decimal(12, 2)
 
   status     String  @default("Active") // configurable list in src/lib/config.ts
   priority   String? // "1 - High", etc.
@@ -53,16 +58,16 @@ model Deal {
   sourceUrl String?
   links     Json    @default("[]") // [{ label, url }]
 
-  nextAction     String?
-  nextActionDue  DateTime?
+  nextAction    String?
+  nextActionDue DateTime?
 
   rawLatestUpdates String? @db.Text // verbatim from the spreadsheet cell
 
   convertedProperty   Property? @relation("DealToProperty", fields: [convertedPropertyId], references: [id])
   convertedPropertyId String?   @unique
 
-  notes    DealNote[]
-  tasks    Task[]
+  notes DealNote[]
+  tasks Task[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -73,13 +78,13 @@ model Deal {
 
 // Parsed timeline from the "Latest Updates" mega-cell + manual notes going forward.
 model DealNote {
-  id       String   @id @default(cuid())
-  deal     Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  dealId   String
-  noteDate DateTime? // parsed date; null when the line had no clear date
-  body     String   @db.Text
-  source   String   @default("manual") // "migration" | "manual"
-  createdAt DateTime @default(now())
+  id        String    @id @default(cuid())
+  deal      Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId    String
+  noteDate  DateTime? // parsed date; null when the line had no clear date
+  body      String    @db.Text
+  source    String    @default("manual") // "migration" | "manual"
+  createdAt DateTime  @default(now())
 
   @@index([dealId, noteDate])
 }
@@ -97,19 +102,19 @@ model Property {
   lender       String? // Vontive / Conventus / ...
   loanServicer String? // Fay Servicing / FCI / ...
 
-  status        String? // Rehabbing / Refinancing / Refinanced / Stabilized / Hold / Flip / Sold
-  strategy      String? // Hold / Flip / BRRRR / Sell / TBD
-  purchaseDate  DateTime?
-  purchasePrice Decimal?  @db.Decimal(12, 2)
-  closingCosts  Decimal?  @db.Decimal(12, 2)
-  refinanceDate DateTime?
-  currentLoan   Decimal?  @db.Decimal(12, 2)
-  value         Decimal?  @db.Decimal(12, 2) // appraised / estimated
-  replacementCost Decimal? @db.Decimal(12, 2)
-  rehabAmount   Decimal?  @db.Decimal(12, 2)
-  rehabMonths   Decimal?  @db.Decimal(8, 2)
-  sqft          Int?
-  unitCount     Int?
+  status          String? // Rehabbing / Refinancing / Refinanced / Stabilized / Hold / Flip / Sold
+  strategy        String? // Hold / Flip / BRRRR / Sell / TBD
+  purchaseDate    DateTime?
+  purchasePrice   Decimal?  @db.Decimal(12, 2)
+  closingCosts    Decimal?  @db.Decimal(12, 2)
+  refinanceDate   DateTime?
+  currentLoan     Decimal?  @db.Decimal(12, 2)
+  value           Decimal?  @db.Decimal(12, 2) // appraised / estimated
+  replacementCost Decimal?  @db.Decimal(12, 2)
+  rehabAmount     Decimal?  @db.Decimal(12, 2)
+  rehabMonths     Decimal?  @db.Decimal(8, 2)
+  sqft            Int?
+  unitCount       Int?
 
   // Loan — flat, one current loan per property (refi history is a later model).
   loanNumber          String?
@@ -148,7 +153,7 @@ model Property {
 
   tasks       Task[]
   attachments PropertyAttachment[]
-  sourceDeal  Deal? @relation("DealToProperty")
+  sourceDeal  Deal?                @relation("DealToProperty")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -58,6 +58,9 @@ If it asks you to log in to GitHub, follow the prompts. When it finishes with
    | `PIETER_PASSWORD` | a password you choose for Pieter |
 
    (Claude will give you the `SESSION_SECRET` value — it's a long random string.)
+   These two password vars only matter once: the first production deploy hashes
+   them into the database, and they're never read again after that — see
+   "To change a password later" below.
 
 ---
 
@@ -70,6 +73,11 @@ If it asks you to log in to GitHub, follow the prompts. When it finishes with
    HG Capital OS login screen — but it has no data yet.
 
 Copy your site's URL (like `hg-capital-partners-llc.vercel.app`).
+
+> The live site is now also served at **https://www.hgcapitalpartners.com** — a
+> custom domain added under Vercel → Settings → Domains, with the DNS records
+> (`A @ → 216.198.79.1`, `CNAME www → *.vercel-dns-017.com`) set at GoDaddy on the
+> `hgcapitalpartners.com` zone. The `.vercel.app` URL keeps working too.
 
 ---
 
@@ -87,8 +95,8 @@ internet) and confirms the live site works.
 
 ## Step 7 — Sign in
 
-Go to your Vercel URL. Pick your name, type the password you set in Step 4, and
-you're in. Send Pieter the URL + his password.
+Go to **https://www.hgcapitalpartners.com**. Pick your name, type the password
+you set in Step 4, and you're in. Send Pieter the URL + his password.
 
 ---
 
@@ -98,5 +106,6 @@ you're in. Send Pieter the URL + his password.
 - **Cost:** free to start. Vercel's free plan technically disallows commercial
   use — when you're ready to make it official, upgrade to Vercel Pro ($20/mo).
   The Neon database has a free tier that's plenty for now.
-- To change a password later: Vercel → Settings → Environment Variables → edit →
-  then Deployments → Redeploy.
+- To change a password later: passwords live in the database now, not in
+  Vercel's env vars — editing `CONNOR_PASSWORD`/`PIETER_PASSWORD` after the
+  first deploy has no effect. Just ask Claude to change it.

@@ -1,23 +1,26 @@
 /**
- * Seed the two internal users. Emails must match the Google accounts used to sign in.
- * Adjust in src/lib/auth-allowlist.ts if these change.
+ * Seed the two internal users. `passwordEnv` is only used once, by
+ * scripts/backfill-password-hashes.ts, to hash that Vercel env var into
+ * User.passwordHash on first deploy — sign-in itself checks the DB, not env
+ * vars. To add someone: add a row here (with a passwordEnv if they need to
+ * sign in), `npm run migrate users`, set that env var in Vercel, deploy.
  */
 import { prisma } from "../../src/lib/db";
 import { report } from "./_report";
 
 export const SEED_USERS = [
-  { email: "connoraswofford@gmail.com", name: "Connor Swofford" },
-  { email: "pieter@queencitycorp.com", name: "Pieter Louw" },
+  { email: "connoraswofford@gmail.com", name: "Connor Swofford", passwordEnv: "CONNOR_PASSWORD" },
+  { email: "pieter@queencitycorp.com", name: "Pieter Louw", passwordEnv: "PIETER_PASSWORD" },
 ];
 
 export async function migrateUsers() {
   report.section("Users");
-  for (const u of SEED_USERS) {
-    await prisma.user.upsert({ where: { email: u.email }, create: u, update: { name: u.name } });
-    report.line(`Seeded ${u.name} <${u.email}>`);
+  for (const { email, name } of SEED_USERS) {
+    await prisma.user.upsert({ where: { email }, create: { email, name }, update: { name } });
+    report.line(`Seeded ${name} <${email}>`);
   }
   report.warn(
     "Confirm these two emails match the Google accounts Connor & Pieter will sign in with; " +
-      "update src/lib/auth-allowlist.ts and re-run if not.",
+      "update SEED_USERS above and re-run if not.",
   );
 }
