@@ -61,6 +61,10 @@ export function BuildingCapexSection({
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [pending, start] = useTransition();
 
+  const datedCount = BUILDING_CAPEX_ITEMS.filter(
+    (item) => parseInstallYear(initial[item.key]?.year) != null,
+  ).length;
+
   const setCell = (key: string, field: keyof DraftEntry, value: string) =>
     setDraft((d) => ({ ...d, [key]: { ...d[key], [field]: value } }));
 
@@ -104,7 +108,12 @@ export function BuildingCapexSection({
   return (
     <div className="group rounded-xl border border-border bg-surface shadow-sm">
       <div className="flex min-h-[3.25rem] items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <h3 className="shrink-0 text-sm font-semibold">Building CapEx</h3>
+        <div className="flex items-baseline gap-2">
+          <h3 className="shrink-0 text-sm font-semibold">Building CapEx</h3>
+          <span className="text-xs text-muted">
+            {datedCount} / {BUILDING_CAPEX_ITEMS.length} systems dated
+          </span>
+        </div>
         {editing ? (
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={cancel}>

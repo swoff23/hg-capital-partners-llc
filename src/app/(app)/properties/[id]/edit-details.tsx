@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui";
-import { PROPERTY_STATUSES } from "@/lib/config";
+import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
 import { fmtDate, fmtMoney } from "@/lib/utils";
 import { patchProperty } from "../actions";
 
@@ -14,14 +14,17 @@ export type EditableProperty = {
   lender: string | null;
   loanServicer: string | null;
   status: string | null;
+  strategy: string | null;
+  refiTarget: string | null;
   purchaseDate: string | null;
   refinanceDate: string | null;
   purchasePrice: string | null;
   currentLoan: string | null;
   value: string | null;
+  replacementCost: string | null;
   rehabAmount: string | null;
+  rehabMonths: string | null;
   sqft: number | null;
-  unitCount: number | null;
 };
 
 const L = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -30,6 +33,19 @@ const L = ({ label, children }: { label: string; children: React.ReactNode }) =>
     <div className="mt-1">{children}</div>
   </label>
 );
+
+const GroupHeading = ({ children }: { children: React.ReactNode }) => (
+  <h4 className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-muted first:mt-0">
+    {children}
+  </h4>
+);
+
+/** Rehab duration in months — some imported rows are corrupt (large negatives). */
+const months = (raw: string | null) => {
+  const n = raw == null ? NaN : Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > 120) return "—";
+  return `${n.toLocaleString(undefined, { maximumFractionDigits: 1 })} mo`;
+};
 
 export function PropertyDetailsSection({ property: p }: { property: EditableProperty }) {
   const [editing, setEditing] = useState(false);
@@ -40,19 +56,31 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
   if (!editing) {
     return (
       <SectionCard title="Details" onEdit={() => setEditing(true)}>
+        <GroupHeading>Financing</GroupHeading>
         <dl>
-          <Field label="Entity">{p.llcOwner ?? "—"}</Field>
           <Field label="Lender">{p.lender ?? "—"}</Field>
           <Field label="Loan servicer">{p.loanServicer ?? "—"}</Field>
-          <Field label="Attorney">{p.attorney ?? "—"}</Field>
-          <Field label="Units">{p.unitCount ?? "—"}</Field>
-          <Field label="Sq ft">{p.sqft?.toLocaleString() ?? "—"}</Field>
-          <Field label="Purchase date">{fmtDate(p.purchaseDate)}</Field>
-          <Field label="Purchase price">{fmtMoney(p.purchasePrice)}</Field>
-          <Field label="Refinance date">{fmtDate(p.refinanceDate)}</Field>
           <Field label="Current loan">{fmtMoney(p.currentLoan)}</Field>
           <Field label="Value">{fmtMoney(p.value)}</Field>
-          {p.rehabAmount != null && <Field label="Rehab amount">{fmtMoney(p.rehabAmount)}</Field>}
+          <Field label="Replacement cost">{fmtMoney(p.replacementCost)}</Field>
+          <Field label="Refinance date">{fmtDate(p.refinanceDate)}</Field>
+          <Field label="Refi target">{p.refiTarget ?? "—"}</Field>
+        </dl>
+
+        <GroupHeading>Acquisition</GroupHeading>
+        <dl>
+          <Field label="Purchase date">{fmtDate(p.purchaseDate)}</Field>
+          <Field label="Purchase price">{fmtMoney(p.purchasePrice)}</Field>
+          <Field label="Rehab amount">{fmtMoney(p.rehabAmount)}</Field>
+          <Field label="Rehab months">{months(p.rehabMonths)}</Field>
+          <Field label="Strategy">{p.strategy ?? "—"}</Field>
+          <Field label="Sq ft">{p.sqft?.toLocaleString() ?? "—"}</Field>
+        </dl>
+
+        <GroupHeading>Legal / admin</GroupHeading>
+        <dl>
+          <Field label="Entity">{p.llcOwner ?? "—"}</Field>
+          <Field label="Attorney">{p.attorney ?? "—"}</Field>
         </dl>
       </SectionCard>
     );
@@ -86,8 +114,39 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
         className="space-y-3"
       >
         <L label="Address"><Input name="address" defaultValue={p.address} /></L>
+
+        <GroupHeading>Financing</GroupHeading>
+        <div className="grid grid-cols-2 gap-3">
+          <L label="Lender"><Input name="lender" defaultValue={p.lender ?? ""} /></L>
+          <L label="Loan servicer"><Input name="loanServicer" defaultValue={p.loanServicer ?? ""} /></L>
+          <L label="Current loan"><Input name="currentLoan" defaultValue={p.currentLoan ?? ""} /></L>
+          <L label="Value"><Input name="value" defaultValue={p.value ?? ""} /></L>
+          <L label="Replacement cost"><Input name="replacementCost" defaultValue={p.replacementCost ?? ""} /></L>
+          <L label="Refinance date"><Input name="refinanceDate" type="date" defaultValue={p.refinanceDate ?? ""} /></L>
+          <L label="Refi target"><Input name="refiTarget" defaultValue={p.refiTarget ?? ""} /></L>
+        </div>
+
+        <GroupHeading>Acquisition</GroupHeading>
+        <div className="grid grid-cols-2 gap-3">
+          <L label="Purchase date"><Input name="purchaseDate" type="date" defaultValue={p.purchaseDate ?? ""} /></L>
+          <L label="Purchase price"><Input name="purchasePrice" defaultValue={p.purchasePrice ?? ""} /></L>
+          <L label="Rehab amount"><Input name="rehabAmount" defaultValue={p.rehabAmount ?? ""} /></L>
+          <L label="Rehab months"><Input name="rehabMonths" type="number" step="0.5" defaultValue={p.rehabMonths ?? ""} /></L>
+          <L label="Strategy">
+            <Select name="strategy" defaultValue={p.strategy ?? ""}>
+              <option value="">—</option>
+              {[...new Set([p.strategy, ...PROPERTY_STRATEGIES].filter(Boolean))].map((s) => (
+                <option key={s as string}>{s as string}</option>
+              ))}
+            </Select>
+          </L>
+          <L label="Sq ft"><Input name="sqft" type="number" defaultValue={p.sqft ?? ""} /></L>
+        </div>
+
+        <GroupHeading>Legal / admin</GroupHeading>
         <div className="grid grid-cols-2 gap-3">
           <L label="Entity / LLC"><Input name="llcOwner" defaultValue={p.llcOwner ?? ""} /></L>
+          <L label="Attorney"><Input name="attorney" defaultValue={p.attorney ?? ""} /></L>
           <L label="Status">
             <Select name="status" defaultValue={p.status ?? ""}>
               <option value="">—</option>
@@ -96,17 +155,6 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
               ))}
             </Select>
           </L>
-          <L label="Lender"><Input name="lender" defaultValue={p.lender ?? ""} /></L>
-          <L label="Loan servicer"><Input name="loanServicer" defaultValue={p.loanServicer ?? ""} /></L>
-          <L label="Attorney"><Input name="attorney" defaultValue={p.attorney ?? ""} /></L>
-          <L label="Units"><Input name="unitCount" type="number" defaultValue={p.unitCount ?? ""} /></L>
-          <L label="Sq ft"><Input name="sqft" type="number" defaultValue={p.sqft ?? ""} /></L>
-          <L label="Purchase date"><Input name="purchaseDate" type="date" defaultValue={p.purchaseDate ?? ""} /></L>
-          <L label="Purchase price"><Input name="purchasePrice" defaultValue={p.purchasePrice ?? ""} /></L>
-          <L label="Refinance date"><Input name="refinanceDate" type="date" defaultValue={p.refinanceDate ?? ""} /></L>
-          <L label="Current loan"><Input name="currentLoan" defaultValue={p.currentLoan ?? ""} /></L>
-          <L label="Value"><Input name="value" defaultValue={p.value ?? ""} /></L>
-          <L label="Rehab amount"><Input name="rehabAmount" defaultValue={p.rehabAmount ?? ""} /></L>
         </div>
       </form>
     </SectionCard>
@@ -176,7 +224,7 @@ export function PropertyNotesSection({
   );
 }
 
-function SectionCard({
+export function SectionCard({
   title,
   children,
   onEdit,

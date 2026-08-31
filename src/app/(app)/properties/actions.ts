@@ -29,19 +29,37 @@ export async function patchProperty(id: string, formData: FormData) {
   if (has("loanServicer")) data.loanServicer = s("loanServicer");
   if (has("status")) data.status = s("status");
   if (has("strategy")) data.strategy = s("strategy");
+  if (has("refiTarget")) data.refiTarget = s("refiTarget");
   if (has("notes")) data.notes = s("notes");
   if (has("purchaseDate")) data.purchaseDate = s("purchaseDate") ? new Date(s("purchaseDate")!) : null;
   if (has("refinanceDate")) data.refinanceDate = s("refinanceDate") ? new Date(s("refinanceDate")!) : null;
   if (has("purchasePrice")) data.purchasePrice = decOrNull(s("purchasePrice"));
   if (has("currentLoan")) data.currentLoan = decOrNull(s("currentLoan"));
   if (has("value")) data.value = decOrNull(s("value"));
+  if (has("replacementCost")) data.replacementCost = decOrNull(s("replacementCost"));
   if (has("rehabAmount")) data.rehabAmount = decOrNull(s("rehabAmount"));
+  if (has("rehabMonths")) data.rehabMonths = decOrNull(s("rehabMonths"));
   if (has("sqft")) data.sqft = s("sqft") ? parseInt(s("sqft")!.replace(/\D/g, ""), 10) || null : null;
-  if (has("unitCount")) data.unitCount = s("unitCount") ? parseInt(s("unitCount")!, 10) || null : null;
 
   await prisma.property.update({ where: { id }, data });
   revalidatePath(`/properties/${id}`);
   revalidatePath("/properties");
+}
+
+const linkSchema = z.object({ label: z.string().nullish(), url: z.string().nullish() });
+
+/** Replace the whole Documents/Links array (label + url) for a property. */
+export async function updatePropertyLinks(id: string, links: unknown) {
+  await requireUser();
+  const parsed = z.array(linkSchema).parse(links);
+  const clean = parsed
+    .map((l) => ({ label: l.label?.trim() || "", url: l.url?.trim() || "" }))
+    .filter((l) => l.url.length > 0);
+  await prisma.property.update({
+    where: { id },
+    data: { links: clean as unknown as object },
+  });
+  revalidatePath(`/properties/${id}`);
 }
 
 const unitSchema = z.object({
