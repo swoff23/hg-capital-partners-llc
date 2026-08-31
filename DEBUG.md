@@ -8,7 +8,7 @@ a health probe anyone can curl, and a read-only DB connection for deeper digging
 No session needed. Reports whether the site is up and its DB reachable:
 
 ```bash
-curl -s https://hg-capital-partners-llc-wy7r.vercel.app/api/health | jq
+curl -s https://www.hgcapitalpartners.com/api/health | jq
 # { "ok": true, "db": "up", "env": "production", "commit": "d9a923b", ... }
 ```
 
@@ -62,8 +62,10 @@ the password to the one you just set.
 
 ## 3. Migrations
 
-`prisma migrate deploy` runs during every Vercel build, so a `git push` that adds
-a migration applies it to prod automatically. Verify after a deploy:
+`prisma migrate deploy` runs during the **production** Vercel build only
+(gated on `VERCEL_ENV` in `scripts/prebuild.mjs` — a preview/branch build never
+touches the schema), so a `git push` to `main` that adds a migration applies it
+to prod automatically. Verify after a deploy:
 
 ```bash
 curl -s "$PROD_URL/api/health?token=$HEALTH_TOKEN" | jq '.latestMigration'
