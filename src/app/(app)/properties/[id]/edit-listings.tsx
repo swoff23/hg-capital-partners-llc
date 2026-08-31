@@ -424,19 +424,29 @@ function PhotoGallery({
     onBusyChange(true);
     const failures: string[] = [];
     try {
-      for (const file of list) {
-        try {
-          const blob = await upload(file.name, file, {
-            access: "public",
-            handleUploadUrl: "/api/blob/listing-photo-upload",
-            clientPayload: JSON.stringify({ propertyId }),
-          });
-          onAdd({ url: blob.url, pathname: blob.pathname });
-        } catch (e) {
-          // Keep going — one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
-          failures.push(`${file.name}: ${describeUploadError(e)}`);
+      // A few uploads at once instead of one at a time — each file was paying its own
+      // full round-trip (mint a token, then the transfer) in strict sequence, so five
+      // photos took ~5x one photo's time. Capped (not fully parallel) so a big batch
+      // doesn't fire a burst of concurrent token requests at the DB all at once.
+      const CONCURRENCY = 3;
+      let next = 0;
+      async function worker() {
+        while (next < list.length) {
+          const file = list[next++];
+          try {
+            const blob = await upload(file.name, file, {
+              access: "public",
+              handleUploadUrl: "/api/blob/listing-photo-upload",
+              clientPayload: JSON.stringify({ propertyId }),
+            });
+            onAdd({ url: blob.url, pathname: blob.pathname });
+          } catch (e) {
+            // Keep going — one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
+            failures.push(`${file.name}: ${describeUploadError(e)}`);
+          }
         }
       }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, list.length) }, worker));
       if (failures.length > 0) setError(failures.join("; "));
     } finally {
       setBusy(false);
