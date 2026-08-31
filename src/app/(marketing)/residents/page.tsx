@@ -11,7 +11,7 @@ export const metadata: Metadata = {
  * activates automatically the moment its const is non-null. Left null, the
  * tile shows as "Opening soon" instead of a dead link.
  */
-const BASELANE_URL: string | null = "https://www.baselane.com/login";
+const BASELANE_URL: string | null = "https://tenant.baselane.com/login";
 
 export default function ResidentsPage() {
   return (
