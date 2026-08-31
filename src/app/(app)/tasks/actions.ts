@@ -91,8 +91,9 @@ export async function patchTask(
   }
   if (data.description !== undefined) patch.description = data.description?.trim() || null;
   if (data.assigneeUserId !== undefined) {
+    // Setting a user (or unassigning) always supersedes any free-text external name.
     patch.assigneeUserId = data.assigneeUserId || null;
-    if (data.assigneeUserId) patch.assigneeName = null;
+    patch.assigneeName = null;
   }
   if (data.dueDate !== undefined) patch.dueDate = data.dueDate ? new Date(data.dueDate) : null;
   if (data.propertyId !== undefined) {
