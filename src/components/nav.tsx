@@ -38,6 +38,16 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
     ),
   },
   {
+    href: "/financials",
+    label: "Financials",
+    icon: (
+      <>
+        <path d="M3 3v18h18" />
+        <path d="M18 17V9M13 17V5M8 17v-3" />
+      </>
+    ),
+  },
+  {
     href: "/tasks",
     label: "Tasks",
     icon: (

@@ -1,6 +1,7 @@
-// HG Capital OS — v1 schema
-// Scope: internal migration of Deals, Properties, Contractors, and Tasks.
-// No money, no tenants/leases, no roles. See /Users/connorswofford/.claude/plans.
+// HG Capital OS schema.
+// Core: Deals, Properties, Contractors, Tasks (v1 migration).
+// Financials: a read-only mirror of the QuickBooks Online P&L (QuickbooksConnection …
+// LedgerLine). QuickBooks stays the system of record — see /Users/connorswofford/.claude/plans.
 
 generator client {
   provider      = "prisma-client-js"
@@ -28,6 +29,8 @@ model User {
   createdAt    DateTime @default(now())
 
   assignedTasks Task[] @relation("TaskAssignee")
+
+  qboConnections QuickbooksConnection[]
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +158,9 @@ model Property {
   attachments PropertyAttachment[]
   sourceDeal  Deal?                @relation("DealToProperty")
 
+  qboClasses  QboClass[]
+  ledgerLines LedgerLine[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -180,6 +186,8 @@ model Contact {
   coiUrl         String?
   comments       String? @db.Text
   active         Boolean @default(true)
+
+  qboVendors QboVendor[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -279,4 +287,305 @@ model AppConfig {
   moveInFormSchema Json     @default("{}")
   updatedAt        DateTime @updatedAt
   updatedBy        String? // user.name ?? user.email of the last editor
+}
+
+// ===========================================================================
+// QuickBooks Online — read-only P&L mirror.
+//
+// Structure of HG's real company file (verified from exports):
+//   - ONE company file, 5 entities (HGC, HG1, HG2, HG MGMT, BMK).
+//   - Classes ON, hierarchical: parent = entity, child = "{ENTITY} {property}".
+//   - Many classes -> one Property (properties move between LLCs on refi; the
+//     management company carries operational lines). Classes partition the
+//     ledger, so summing a property's classes never double-counts.
+//   - Books start Jan 2026 (~a few hundred P&L lines).
+//
+// Sync = full-realm wipe-and-reinsert of LedgerLine from the ProfitAndLossDetail
+// report (both bases), every run. Reclasses / voids / deletes self-heal.
+// ===========================================================================
+
+enum QboConnectionStatus {
+  ACTIVE
+  EXPIRED // token refresh failed / invalid_grant — UI shows "Reconnect"
+  REVOKED // disconnected here or in Intuit
+}
+
+enum QboBasis {
+  CASH
+  ACCRUAL
+}
+
+enum QboClassRole {
+  UNMAPPED // needs a human decision — pinned to the top of the settings table
+  PROPERTY // resolves to exactly one Property
+  ENTITY // a bare entity parent class ("HGC", "HG MGMT") — entity overhead
+  OVERHEAD // an entity "* General" bucket — entity-level, not a property
+  IGNORE // deliberately excluded from every rollup
+}
+
+// Fine-grained P&L line bucket — drives the expense-by-category bars + settings.
+enum QboCategory {
+  RENT
+  OTHER_INCOME
+  TAXES
+  INSURANCE
+  REPAIRS
+  UTILITIES
+  MANAGEMENT
+  LEGAL_PROFESSIONAL
+  LEASING_COMMISSION
+  BANK_FEES
+  SOFTWARE
+  TRAVEL
+  OTHER_OPEX
+  DEBT_INTEREST
+  UNCATEGORIZED
+  CAPEX // balance-sheet; only appears if a GeneralLedger pull is added later
+  INTERCOMPANY
+  OWNER_EQUITY
+  SUSPENSE // escrow / clearing parked in P&L (the $47,934 wire) — excluded from income
+  EXCLUDED
+  OTHER
+}
+
+// Coarse bucket that drives the NOI / cash-flow math.
+enum QboTreatment {
+  OPERATING_INCOME
+  OPERATING_EXPENSE
+  NON_OPERATING // bank interest income, owner-funded "rent"
+  DEBT_INTEREST
+  EXCLUDED // suspense, capex, principal, equity, intercompany, transfers
+}
+
+// Per-line signals the account category can't carry (owner P2P and Section-8
+// both post to "Rents").
+enum QboLineTag {
+  OWNER_FUNDED // SCHWAB P2P from the owner, mis-booked to Rents
+  SUBSIDY // Section-8 / HAP / HCV voucher rent (real tenant rent)
+  INTERNAL_TRANSFER
+  NEGATIVE_RECLASS // expense line < 0 — a real correction, kept and netted
+  CAPEX_FLAG
+}
+
+enum QboSyncTrigger {
+  INITIAL
+  CRON
+  MANUAL
+}
+
+enum QboSyncStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL // reconciliation delta over tolerance, or the run bailed on its wall-budget
+  FAILED
+}
+
+// One row. Child tables relate by realmId (@unique) so a reconnect of the same
+// company upserts this row and mappings survive.
+model QuickbooksConnection {
+  id          String              @id @default(cuid())
+  realmId     String              @unique
+  environment String              @default("production") // "sandbox" | "production"
+  status      QboConnectionStatus @default(ACTIVE)
+  companyName String?
+
+  // AES-256-GCM ciphertext (src/lib/quickbooks/crypto.ts). Never logged, never sent to the client.
+  accessTokenEnc        String    @db.Text
+  refreshTokenEnc       String    @db.Text
+  prevRefreshTokenEnc   String?   @db.Text // one-shot fallback for the rotation half-write race
+  accessTokenExpiresAt  DateTime
+  refreshTokenExpiresAt DateTime
+  tokenRefreshedAt      DateTime?
+
+  accountingMethod QboBasis @default(CASH) // the basis shown by default in the UI
+  historyStart     String   @db.VarChar(7) // earliest usable month, "2026-01"
+
+  connectedBy       User   @relation(fields: [connectedByUserId], references: [id])
+  connectedByUserId String
+
+  lastSyncAt           DateTime?
+  lastSuccessfulSyncAt DateTime?
+  lastReconciledAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entities    QboEntity[]
+  classes     QboClass[]
+  accounts    QboAccount[]
+  vendors     QboVendor[]
+  ledgerLines LedgerLine[]
+  syncRuns    QboSyncRun[]
+}
+
+// The 5 LLCs. Seeded from a static table, not discovered — the class hierarchy
+// always carries the entity as the parent class.
+model QboEntity {
+  id         String               @id @default(cuid())
+  realmId    String
+  connection QuickbooksConnection @relation(fields: [realmId], references: [realmId], onDelete: Cascade)
+
+  code           String // "HGC" | "HG1" | "HG2" | "HG MGMT" | "BMK"
+  name           String // "HG Capital Partners LLC"
+  llcOwnerNames  String[] @default([]) // Property.llcOwner strings that resolve here
+  isJointVenture Boolean  @default(false) // BMK — 50/50 with partner "BK"
+  sortOrder      Int      @default(0)
+
+  classes     QboClass[]
+  ledgerLines LedgerLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([realmId, code])
+  @@index([realmId])
+}
+
+model QboClass {
+  id         String               @id @default(cuid())
+  realmId    String
+  connection QuickbooksConnection @relation(fields: [realmId], references: [realmId], onDelete: Cascade)
+
+  qboId              String
+  name               String // leaf name, "HGC 15 Oxford"
+  fullyQualifiedName String // "HGC:HGC 15 Oxford"
+  parentQboId        String?
+  isSubClass         Boolean @default(false)
+  active             Boolean @default(true)
+
+  role       QboClassRole @default(UNMAPPED)
+  property   Property?    @relation(fields: [propertyId], references: [id])
+  propertyId String? // many classes -> one property
+  entity     QboEntity?   @relation(fields: [entityId], references: [id])
+  entityId   String? // parent entity — set even for PROPERTY / UNMAPPED
+
+  autoMatched   Boolean @default(false) // set by the matcher; any human edit clears it
+  autoMatchNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([realmId, qboId])
+  @@index([realmId, role])
+  @@index([propertyId])
+  @@index([entityId])
+}
+
+model QboAccount {
+  id         String               @id @default(cuid())
+  realmId    String
+  connection QuickbooksConnection @relation(fields: [realmId], references: [realmId], onDelete: Cascade)
+
+  qboId              String
+  name               String
+  fullyQualifiedName String
+  acctType           String // Intuit AccountType: "Income" | "Expense" | "Other Income" | ...
+  acctSubType        String?
+  classification     String // "Revenue" | "Expense" | "Asset" | "Liability" | "Equity"
+  active             Boolean @default(true)
+  parentQboId        String?
+
+  category       QboCategory  @default(OTHER)
+  treatment      QboTreatment @default(EXCLUDED) // derived from category (+ interest-income override)
+  categoryLocked Boolean      @default(false) // true once a human sets it, or the seed pins it
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([realmId, qboId])
+  @@index([realmId, category])
+}
+
+model QboVendor {
+  id         String               @id @default(cuid())
+  realmId    String
+  connection QuickbooksConnection @relation(fields: [realmId], references: [realmId], onDelete: Cascade)
+
+  qboId       String
+  displayName String
+  active      Boolean  @default(true)
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  contactId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([realmId, qboId])
+  @@index([contactId])
+}
+
+// One row per QuickBooks transaction line, per accounting basis. Rebuilt in full
+// on every sync. Every resolved dimension is denormalized here so /financials
+// views are plain groupBy — a re-map is an updateMany over these rows.
+model LedgerLine {
+  id         String               @id @default(cuid())
+  realmId    String
+  connection QuickbooksConnection @relation(fields: [realmId], references: [realmId], onDelete: Cascade)
+
+  basis       QboBasis
+  periodMonth String   @db.VarChar(7) // "2026-03"
+  txnDate     DateTime @db.Date
+
+  qboTxnId  String
+  txnType   String // "Deposit" | "Expense" | "Journal Entry" | "Bill" | ...
+  lineKey   String // "${qboTxnId}:${accountQboId}:${classKey}:${signedCents}:${ordinal}"
+  docNumber String?
+
+  name         String? // QBO "Name" (payee/customer), verbatim
+  memo         String?
+  businessName String? // QBO "Business"/Department column, verbatim (mismatch diagnostics)
+
+  accountQboId   String
+  accountName    String
+  splitAccount   String? // "Item split account" — the contra side
+  classification String
+  category       QboCategory
+  treatment      QboTreatment
+
+  classKey  String // QboClass.qboId, or "__UNCLASSED__"
+  className String?
+
+  property   Property?    @relation(fields: [propertyId], references: [id])
+  propertyId String?
+  entity     QboEntity?   @relation(fields: [entityId], references: [id])
+  entityId   String?
+  classRole  QboClassRole @default(UNMAPPED)
+
+  lineTags     QboLineTag[]
+  vendorQboId  String?
+  customerName String?
+
+  amount Decimal @db.Decimal(14, 2) // signed, natural (income +, expense +, contra/reclass -)
+  raw    Json
+
+  syncRunId String?
+  createdAt DateTime @default(now())
+
+  @@unique([realmId, basis, lineKey])
+  @@index([realmId, basis, periodMonth])
+  @@index([propertyId, basis, periodMonth])
+  @@index([entityId, basis, periodMonth])
+  @@index([realmId, basis, treatment, periodMonth])
+  @@index([realmId, basis, category, periodMonth])
+  @@index([qboTxnId])
+}
+
+model QboSyncRun {
+  id         String               @id @default(cuid())
+  realmId    String
+  connection QuickbooksConnection @relation(fields: [realmId], references: [realmId], onDelete: Cascade)
+
+  trigger QboSyncTrigger
+  status  QboSyncStatus  @default(RUNNING)
+
+  startedAt   DateTime  @default(now())
+  heartbeatAt DateTime  @default(now()) // row-based lock (pgbouncer kills advisory locks)
+  finishedAt  DateTime?
+
+  monthsProcessed Int     @default(0)
+  stats           Json    @default("{}") // { reconciliation, dataQuality, counts, warnings }
+  error           String? @db.Text
+
+  @@index([realmId, startedAt])
+  @@index([status, heartbeatAt])
 }
