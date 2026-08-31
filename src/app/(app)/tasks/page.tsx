@@ -177,9 +177,9 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
               <tr>
                 <Th className="w-11 pr-0" />
                 <SortHeader label="Task" field="task" />
-                {showAddress && <SortHeader label="Address" field="address" className="w-40" />}
-                <SortHeader label="Owner" field="owner" className="w-16" />
-                <SortHeader label="Due" field="due" className="w-28" />
+                {showAddress && <SortHeader label="Address" field="address" className="w-44" />}
+                <SortHeader label="Owner" field="owner" className="w-24" />
+                <SortHeader label="Due" field="due" className="w-32" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

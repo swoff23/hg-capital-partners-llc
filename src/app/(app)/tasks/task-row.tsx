@@ -36,38 +36,25 @@ function chipColor(s: string) {
 const quiet =
   "w-full rounded border border-transparent bg-transparent px-1.5 py-1 outline-none hover:border-border focus:border-primary focus:bg-surface";
 
-// The value in an editable field. Its cell carries `group/field`, so the
-// affordances only appear while that one field is hovered.
+// The clickable value in an editable field. Its cell carries `group/field`, so
+// the hover treatment only appears while that one field is hovered. The real
+// control is an invisible <select>/<input> laid over this whole area.
 const editable =
-  "relative inline-flex max-w-full cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors group-hover/field:bg-surface group-hover/field:ring-1 group-hover/field:ring-border";
+  "relative flex w-full cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors group-hover/field:bg-surface group-hover/field:ring-1 group-hover/field:ring-border";
 
 function shortAddr(a: string) {
   return a.split(",")[0].trim();
 }
 
-function Chevron() {
-  return (
-    <svg
-      viewBox="0 0 12 12"
-      className="h-2.5 w-2.5 shrink-0 text-muted opacity-0 transition-opacity group-hover/field:opacity-70"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden
-    >
-      <path d="M3 4.5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
+/** Sits at the far right of the field; clears the value. */
 function ClearButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <Tooltip label={label}>
+    <Tooltip label={label} className="shrink-0">
       <button
         type="button"
         onClick={onClick}
         aria-label={label}
-        className="shrink-0 rounded p-0.5 text-muted opacity-0 transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover/field:opacity-100 dark:hover:text-red-400"
+        className="rounded p-0.5 text-muted opacity-0 transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover/field:opacity-100 dark:hover:text-red-400"
       >
         <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
           <path d="M3 3l6 6M9 3l-6 6" strokeLinecap="round" />
@@ -118,6 +105,11 @@ export function TaskRow({
 
   const overdue = !task.done && !!task.dueDate && new Date(task.dueDate) < new Date();
   const hasOwner = !!(task.assigneeUserId || task.assigneeName);
+  const addressText = task.property
+    ? shortAddr(task.property.address)
+    : task.deal
+      ? `deal · ${shortAddr(task.deal.address)}`
+      : null;
 
   return (
     <tr className={cn("hover:bg-background", pending && "opacity-60")}>
@@ -145,12 +137,12 @@ export function TaskRow({
             }}
             className={cn(quiet, "text-sm", task.done && "text-muted line-through")}
           />
-          <Tooltip label="Details">
+          <Tooltip label="Details" className="shrink-0">
             <button
               type="button"
               onClick={() => router.push(`/tasks/${task.id}`)}
               aria-label="Details"
-              className="shrink-0 rounded p-1 text-muted opacity-0 transition-opacity hover:bg-border/60 hover:text-foreground focus-visible:opacity-100 group-hover/field:opacity-100"
+              className="rounded p-1 text-muted opacity-0 transition-opacity hover:bg-border/60 hover:text-foreground focus-visible:opacity-100 group-hover/field:opacity-100"
             >
               <svg viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <path d="M4.5 3l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
@@ -160,28 +152,13 @@ export function TaskRow({
         </div>
       </Td>
 
-      {/* Address — pick the property inline */}
+      {/* Address — click to pick a property; × to clear */}
       {showAddress && (
         <Td className="align-middle text-xs text-muted">
-          <div className="group/field flex items-center">
-            <Tooltip
-              label={
-                task.property
-                  ? shortAddr(task.property.address)
-                  : task.deal
-                    ? `deal · ${shortAddr(task.deal.address)}`
-                    : "Set property"
-              }
-            >
+          <div className="group/field flex items-center gap-1">
+            <Tooltip label={addressText ?? "Set property"} className="min-w-0 flex-1">
               <span className={editable}>
-                <span className="truncate">
-                  {task.property
-                    ? shortAddr(task.property.address)
-                    : task.deal
-                      ? `deal · ${shortAddr(task.deal.address)}`
-                      : "—"}
-                </span>
-                <Chevron />
+                <span className="truncate">{addressText ?? "—"}</span>
                 <select
                   value={task.property?.id ?? ""}
                   onChange={(e) => save({ propertyId: e.target.value || null })}
@@ -202,37 +179,39 @@ export function TaskRow({
                 </select>
               </span>
             </Tooltip>
+            {task.property && (
+              <ClearButton label="Clear property" onClick={() => save({ propertyId: null })} />
+            )}
           </div>
         </Td>
       )}
 
-      {/* Owner — reassign inline; clear with the × */}
+      {/* Owner — click to reassign; × to remove */}
       <Td className="align-middle">
-        <div className="group/field flex items-center gap-0.5">
-          <Tooltip label={task.assigneeLabel ?? "Assign"}>
+        <div className="group/field flex items-center gap-1">
+          <Tooltip label={task.assigneeLabel ?? "Assign"} className="min-w-0 flex-1">
             <span className={editable}>
               {task.assigneeLabel ? (
                 <span
                   className={cn(
-                    "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+                    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
                     chipColor(task.assigneeLabel),
                   )}
                 >
                   {initials(task.assigneeLabel)}
                 </span>
               ) : (
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border text-muted">
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted">
                   <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
                     <path d="M6 3v6M3 6h6" strokeLinecap="round" />
                   </svg>
                 </span>
               )}
-              <Chevron />
               <select
                 value={task.assigneeUserId ?? ""}
                 onChange={(e) => save({ assigneeUserId: e.target.value || null })}
                 aria-label="Assignee"
-                className="absolute inset-0 cursor-pointer opacity-0"
+                className="absolute inset-0 w-full cursor-pointer opacity-0"
               >
                 <option value="">Unassigned</option>
                 {task.assigneeName && !task.assigneeUserId && (
@@ -254,24 +233,17 @@ export function TaskRow({
         </div>
       </Td>
 
-      {/* Due — set a date inline; clear with the × */}
+      {/* Due — click to pick a date; × to clear */}
       <Td
         className={cn(
           "whitespace-nowrap align-middle text-xs",
           overdue ? "font-medium text-red-600 dark:text-red-400" : "text-muted",
         )}
       >
-        <div className="group/field flex items-center gap-0.5">
-          <Tooltip label={task.dueDate ? fmtDate(task.dueDate) : "Add due date"}>
+        <div className="group/field flex items-center gap-1">
+          <Tooltip label={task.dueDate ? fmtDate(task.dueDate) : "Add due date"} className="min-w-0 flex-1">
             <span className={editable}>
-              {task.dueDate ? (
-                <>
-                  <span>{dueLabel(task.dueDate)}</span>
-                  <Chevron />
-                </>
-              ) : (
-                <DueEmptyIcon />
-              )}
+              {task.dueDate ? <span className="truncate">{dueLabel(task.dueDate)}</span> : <DueEmptyIcon />}
               <input
                 type="date"
                 value={task.dueDate ?? ""}
