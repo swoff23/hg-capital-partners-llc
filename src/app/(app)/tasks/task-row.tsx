@@ -36,31 +36,29 @@ function chipColor(s: string) {
 const quiet =
   "w-full rounded border border-transparent bg-transparent px-1.5 py-1 outline-none hover:border-border focus:border-primary focus:bg-surface";
 
-// The clickable value in an editable field. Its cell carries `group/field`, so
-// the hover treatment only appears while that one field is hovered. The real
-// control is an invisible <select>/<input> laid over this whole area.
-const editable =
-  "relative flex w-full cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors group-hover/field:bg-surface group-hover/field:ring-1 group-hover/field:ring-border";
+// The whole field reads as one button: clicking it opens the picker (an
+// invisible <select>/<input> laid over the value), clicking the inset × clears.
+// `group/field` lives on the cell so the hover treatment stays field-local.
+const fieldBox =
+  "relative flex w-full min-w-0 cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors group-hover/field:bg-surface group-hover/field:ring-1 group-hover/field:ring-border";
 
 function shortAddr(a: string) {
   return a.split(",")[0].trim();
 }
 
-/** Sits at the far right of the field; clears the value. */
-function ClearButton({ label, onClick }: { label: string; onClick: () => void }) {
+function ClearX({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <Tooltip label={label} className="shrink-0">
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label={label}
-        className="rounded p-0.5 text-muted opacity-0 transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover/field:opacity-100 dark:hover:text-red-400"
-      >
-        <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-          <path d="M3 3l6 6M9 3l-6 6" strokeLinecap="round" />
-        </svg>
-      </button>
-    </Tooltip>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="relative z-10 shrink-0 rounded p-0.5 text-muted opacity-0 transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover/field:opacity-100 dark:hover:text-red-400"
+    >
+      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+        <path d="M3 3l6 6M9 3l-6 6" strokeLinecap="round" />
+      </svg>
+    </button>
   );
 }
 
@@ -85,6 +83,10 @@ function DueEmptyIcon() {
     </span>
   );
 }
+
+// Overlay control covers the value but stops short of the × when one is shown.
+const overlay = (hasClear: boolean) =>
+  cn("absolute inset-y-0 left-0 cursor-pointer opacity-0", hasClear ? "right-6" : "right-0");
 
 export function TaskRow({
   task,
@@ -152,110 +154,108 @@ export function TaskRow({
         </div>
       </Td>
 
-      {/* Address — click to pick a property; × to clear */}
+      {/* Address — click to pick a property; inset × clears it */}
       {showAddress && (
         <Td className="align-middle text-xs text-muted">
-          <div className="group/field flex items-center gap-1">
-            <Tooltip label={addressText ?? "Set property"} className="min-w-0 flex-1">
-              <span className={editable}>
-                <span className="truncate">{addressText ?? "—"}</span>
-                <select
-                  value={task.property?.id ?? ""}
-                  onChange={(e) => save({ propertyId: e.target.value || null })}
-                  aria-label="Property"
-                  className="absolute inset-0 w-full cursor-pointer opacity-0"
-                >
-                  <option value="">— none</option>
-                  {task.deal && !task.property && (
-                    <option value="" disabled>
-                      deal · {shortAddr(task.deal.address)}
-                    </option>
-                  )}
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {shortAddr(p.address)}
-                    </option>
-                  ))}
-                </select>
-              </span>
+          <div className="group/field flex">
+            <Tooltip label={addressText ?? "Set property"} className={fieldBox}>
+              <span className="flex-1 truncate">{addressText ?? "—"}</span>
+              {task.property && (
+                <ClearX label="Clear property" onClick={() => save({ propertyId: null })} />
+              )}
+              <select
+                value={task.property?.id ?? ""}
+                onChange={(e) => save({ propertyId: e.target.value || null })}
+                aria-label="Property"
+                className={overlay(!!task.property)}
+              >
+                <option value="">— none</option>
+                {task.deal && !task.property && (
+                  <option value="" disabled>
+                    deal · {shortAddr(task.deal.address)}
+                  </option>
+                )}
+                {properties.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {shortAddr(p.address)}
+                  </option>
+                ))}
+              </select>
             </Tooltip>
-            {task.property && (
-              <ClearButton label="Clear property" onClick={() => save({ propertyId: null })} />
-            )}
           </div>
         </Td>
       )}
 
-      {/* Owner — click to reassign; × to remove */}
+      {/* Owner — click to reassign; inset × removes it */}
       <Td className="align-middle">
-        <div className="group/field flex items-center gap-1">
-          <Tooltip label={task.assigneeLabel ?? "Assign"} className="min-w-0 flex-1">
-            <span className={editable}>
+        <div className="group/field flex">
+          <Tooltip label={task.assigneeLabel ?? "Assign"} className={fieldBox}>
+            <span className="flex flex-1 items-center">
               {task.assigneeLabel ? (
                 <span
                   className={cn(
-                    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                    "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
                     chipColor(task.assigneeLabel),
                   )}
                 >
                   {initials(task.assigneeLabel)}
                 </span>
               ) : (
-                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border text-muted">
                   <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
                     <path d="M6 3v6M3 6h6" strokeLinecap="round" />
                   </svg>
                 </span>
               )}
-              <select
-                value={task.assigneeUserId ?? ""}
-                onChange={(e) => save({ assigneeUserId: e.target.value || null })}
-                aria-label="Assignee"
-                className="absolute inset-0 w-full cursor-pointer opacity-0"
-              >
-                <option value="">Unassigned</option>
-                {task.assigneeName && !task.assigneeUserId && (
-                  <option value="" disabled>
-                    {task.assigneeName} (external)
-                  </option>
-                )}
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name ?? u.email}
-                  </option>
-                ))}
-              </select>
             </span>
+            {hasOwner && (
+              <ClearX label="Remove owner" onClick={() => save({ assigneeUserId: null })} />
+            )}
+            <select
+              value={task.assigneeUserId ?? ""}
+              onChange={(e) => save({ assigneeUserId: e.target.value || null })}
+              aria-label="Assignee"
+              className={overlay(hasOwner)}
+            >
+              <option value="">Unassigned</option>
+              {task.assigneeName && !task.assigneeUserId && (
+                <option value="" disabled>
+                  {task.assigneeName} (external)
+                </option>
+              )}
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name ?? u.email}
+                </option>
+              ))}
+            </select>
           </Tooltip>
-          {hasOwner && (
-            <ClearButton label="Remove owner" onClick={() => save({ assigneeUserId: null })} />
-          )}
         </div>
       </Td>
 
-      {/* Due — click to pick a date; × to clear */}
+      {/* Due — click to pick a date; inset × clears it */}
       <Td
         className={cn(
           "whitespace-nowrap align-middle text-xs",
           overdue ? "font-medium text-red-600 dark:text-red-400" : "text-muted",
         )}
       >
-        <div className="group/field flex items-center gap-1">
-          <Tooltip label={task.dueDate ? fmtDate(task.dueDate) : "Add due date"} className="min-w-0 flex-1">
-            <span className={editable}>
-              {task.dueDate ? <span className="truncate">{dueLabel(task.dueDate)}</span> : <DueEmptyIcon />}
-              <input
-                type="date"
-                value={task.dueDate ?? ""}
-                onChange={(e) => save({ dueDate: e.target.value || null })}
-                aria-label="Due date"
-                className="absolute inset-0 w-full cursor-pointer opacity-0"
-              />
+        <div className="group/field flex">
+          <Tooltip label={task.dueDate ? fmtDate(task.dueDate) : "Add due date"} className={fieldBox}>
+            <span className="flex flex-1 items-center truncate">
+              {task.dueDate ? dueLabel(task.dueDate) : <DueEmptyIcon />}
             </span>
+            {task.dueDate && (
+              <ClearX label="Clear due date" onClick={() => save({ dueDate: null })} />
+            )}
+            <input
+              type="date"
+              value={task.dueDate ?? ""}
+              onChange={(e) => save({ dueDate: e.target.value || null })}
+              aria-label="Due date"
+              className={overlay(!!task.dueDate)}
+            />
           </Tooltip>
-          {task.dueDate && (
-            <ClearButton label="Clear due date" onClick={() => save({ dueDate: null })} />
-          )}
         </div>
       </Td>
     </tr>
