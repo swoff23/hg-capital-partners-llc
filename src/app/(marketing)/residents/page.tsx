@@ -25,11 +25,11 @@ export default function ResidentsPage() {
         </h1>
 
         <div className="mt-12 grid gap-4 sm:grid-cols-3">
+          <Tile title="Pay Rent" body="Handled securely through Baselane." href={BASELANE_URL} />
           <Tile
             title="Request Maintenance"
             body="Report an issue with photos — it goes straight to our team."
           />
-          <Tile title="Pay Rent" body="Handled securely through Baselane." href={BASELANE_URL} />
           <Tile
             title="Moving In"
             body="Move-in checklist and the condition form."
@@ -46,7 +46,20 @@ function Tile({ title, body, href }: { title: string; body: string; href?: strin
     <>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-[#e8eaee]">{title}</h2>
-        {!href && (
+        {href ? (
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5 shrink-0 text-[#767d8a] transition-colors group-hover:text-[#c8a765]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M7 17 17 7M7 7h10v10" />
+          </svg>
+        ) : (
           <span className="rounded-full border border-white/10 px-2 py-0.5 text-[0.625rem] uppercase tracking-wider text-[#5b6576]">
             Soon
           </span>
@@ -57,7 +70,7 @@ function Tile({ title, body, href }: { title: string; body: string; href?: strin
   );
 
   const className =
-    "block rounded-2xl border p-6 text-left transition-colors duration-200 " +
+    "group block rounded-2xl border p-6 text-left transition-colors duration-200 " +
     (href
       ? "border-white/15 hover:border-[#c8a765]/60 hover:bg-white/[0.03]"
       : "border-white/[0.07] opacity-60");
