@@ -101,6 +101,7 @@ model Property {
   strategy      String? // Hold / Flip / BRRRR / Sell / TBD
   purchaseDate  DateTime?
   purchasePrice Decimal?  @db.Decimal(12, 2)
+  closingCosts  Decimal?  @db.Decimal(12, 2)
   refinanceDate DateTime?
   currentLoan   Decimal?  @db.Decimal(12, 2)
   value         Decimal?  @db.Decimal(12, 2) // appraised / estimated
@@ -109,6 +110,29 @@ model Property {
   rehabMonths   Decimal?  @db.Decimal(8, 2)
   sqft          Int?
   unitCount     Int?
+
+  // Loan — flat, one current loan per property (refi history is a later model).
+  loanNumber          String?
+  loanType            String? // DSCR 30yr / Bridge / Portfolio / ... (src/lib/config.ts)
+  loanOriginalAmount  Decimal?  @db.Decimal(12, 2)
+  loanRate            Decimal?  @db.Decimal(6, 3)
+  loanPaymentMonthly  Decimal?  @db.Decimal(12, 2)
+  loanOriginationDate DateTime?
+  loanMaturityDate    DateTime? // balloon / maturity — load-bearing
+  loanEscrow          Boolean   @default(false)
+
+  // Insurance — a lapse = lender force-places + technical default.
+  insuranceCarrier     String?
+  insurancePolicyNo    String?
+  insuranceCoverage    Decimal?  @db.Decimal(12, 2)
+  insuranceDeductible  Decimal?  @db.Decimal(12, 2)
+  insuranceLiability   String? // free text, e.g. "1M / 2M"
+  insurancePremium     Decimal?  @db.Decimal(12, 2)
+  insuranceRenewalDate DateTime?
+
+  // Other key dates (Buffalo: quarterly taxes — we track the next one).
+  propertyTaxDueDate       DateTime?
+  rentalRegistrationExpiry DateTime?
 
   // Per-unit reference data from "Property Information":
   // [{ label, lockboxCode, utilities: { nationalGridAcct, nationalGridAutopay, nationalGridLofl,
@@ -188,6 +212,7 @@ model Task {
   links      Json    @default("[]")
 
   asanaId String? @unique // idempotent re-import
+  autoKey String? @unique // "<propertyId>:<slug>" — handle for auto-created key-date reminders
 
   deal       Deal?     @relation(fields: [dealId], references: [id])
   dealId     String?

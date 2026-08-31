@@ -11,20 +11,18 @@ export type EditableProperty = {
   address: string;
   llcOwner: string | null;
   attorney: string | null;
-  lender: string | null;
-  loanServicer: string | null;
   status: string | null;
   strategy: string | null;
-  refiTarget: string | null;
   purchaseDate: string | null;
-  refinanceDate: string | null;
   purchasePrice: string | null;
-  currentLoan: string | null;
+  closingCosts: string | null;
   value: string | null;
   replacementCost: string | null;
   rehabAmount: string | null;
   rehabMonths: string | null;
   sqft: number | null;
+  propertyTaxDueDate: string | null;
+  rentalRegistrationExpiry: string | null;
 };
 
 const L = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -56,21 +54,17 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
   if (!editing) {
     return (
       <SectionCard title="Details" onEdit={() => setEditing(true)}>
-        <GroupHeading>Financing</GroupHeading>
+        <GroupHeading>Valuation</GroupHeading>
         <dl>
-          <Field label="Lender">{p.lender ?? "—"}</Field>
-          <Field label="Loan servicer">{p.loanServicer ?? "—"}</Field>
-          <Field label="Current loan">{fmtMoney(p.currentLoan)}</Field>
           <Field label="Value">{fmtMoney(p.value)}</Field>
           <Field label="Replacement cost">{fmtMoney(p.replacementCost)}</Field>
-          <Field label="Refinance date">{fmtDate(p.refinanceDate)}</Field>
-          <Field label="Refi target">{p.refiTarget ?? "—"}</Field>
         </dl>
 
         <GroupHeading>Acquisition</GroupHeading>
         <dl>
           <Field label="Purchase date">{fmtDate(p.purchaseDate)}</Field>
           <Field label="Purchase price">{fmtMoney(p.purchasePrice)}</Field>
+          <Field label="Closing costs">{fmtMoney(p.closingCosts)}</Field>
           <Field label="Rehab amount">{fmtMoney(p.rehabAmount)}</Field>
           <Field label="Rehab months">{months(p.rehabMonths)}</Field>
           <Field label="Strategy">{p.strategy ?? "—"}</Field>
@@ -81,6 +75,9 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
         <dl>
           <Field label="Entity">{p.llcOwner ?? "—"}</Field>
           <Field label="Attorney">{p.attorney ?? "—"}</Field>
+          <Field label="Status">{p.status ?? "—"}</Field>
+          <Field label="Property tax due">{fmtDate(p.propertyTaxDueDate)}</Field>
+          <Field label="Rental registration expires">{fmtDate(p.rentalRegistrationExpiry)}</Field>
         </dl>
       </SectionCard>
     );
@@ -115,21 +112,17 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
       >
         <L label="Address"><Input name="address" defaultValue={p.address} /></L>
 
-        <GroupHeading>Financing</GroupHeading>
+        <GroupHeading>Valuation</GroupHeading>
         <div className="grid grid-cols-2 gap-3">
-          <L label="Lender"><Input name="lender" defaultValue={p.lender ?? ""} /></L>
-          <L label="Loan servicer"><Input name="loanServicer" defaultValue={p.loanServicer ?? ""} /></L>
-          <L label="Current loan"><Input name="currentLoan" defaultValue={p.currentLoan ?? ""} /></L>
           <L label="Value"><Input name="value" defaultValue={p.value ?? ""} /></L>
           <L label="Replacement cost"><Input name="replacementCost" defaultValue={p.replacementCost ?? ""} /></L>
-          <L label="Refinance date"><Input name="refinanceDate" type="date" defaultValue={p.refinanceDate ?? ""} /></L>
-          <L label="Refi target"><Input name="refiTarget" defaultValue={p.refiTarget ?? ""} /></L>
         </div>
 
         <GroupHeading>Acquisition</GroupHeading>
         <div className="grid grid-cols-2 gap-3">
           <L label="Purchase date"><Input name="purchaseDate" type="date" defaultValue={p.purchaseDate ?? ""} /></L>
           <L label="Purchase price"><Input name="purchasePrice" defaultValue={p.purchasePrice ?? ""} /></L>
+          <L label="Closing costs"><Input name="closingCosts" defaultValue={p.closingCosts ?? ""} /></L>
           <L label="Rehab amount"><Input name="rehabAmount" defaultValue={p.rehabAmount ?? ""} /></L>
           <L label="Rehab months"><Input name="rehabMonths" type="number" step="0.5" defaultValue={p.rehabMonths ?? ""} /></L>
           <L label="Strategy">
@@ -154,6 +147,16 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
                 <option key={s as string}>{s as string}</option>
               ))}
             </Select>
+          </L>
+          <L label="Property tax due">
+            <Input name="propertyTaxDueDate" type="date" defaultValue={p.propertyTaxDueDate ?? ""} />
+          </L>
+          <L label="Rental registration expires">
+            <Input
+              name="rentalRegistrationExpiry"
+              type="date"
+              defaultValue={p.rentalRegistrationExpiry ?? ""}
+            />
           </L>
         </div>
       </form>

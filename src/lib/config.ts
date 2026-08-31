@@ -46,6 +46,18 @@ export const PROPERTY_STATUSES = [
 
 export const PROPERTY_STRATEGIES = ["Hold", "Flip", "BRRRR", "Sell", "TBD"] as const;
 
+export const LOAN_TYPES = [
+  "DSCR 30yr",
+  "DSCR ARM",
+  "Bridge",
+  "Portfolio",
+  "Conventional",
+  "HELOC",
+  "Seller",
+  "Hard money",
+  "Other",
+] as const;
+
 export const EQUIPMENT_TYPES = [
   "Roof",
   "Refrigerator",

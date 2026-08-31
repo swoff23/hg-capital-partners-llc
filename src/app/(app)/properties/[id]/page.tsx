@@ -9,10 +9,14 @@ import { capexForecast, parseBuildingCapex, parsePropertyLinks, parseUnits } fro
 import { BackLink } from "@/components/back-link";
 import { PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { PropertyDocumentsSection } from "./edit-links";
+import { PropertyLoanSection } from "./edit-loan";
+import { PropertyInsuranceSection } from "./edit-insurance";
 import { PropertySummary } from "./property-summary";
 import { UnitsSection } from "./edit-units";
 import { BuildingCapexSection } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
+
+const ymd = (dt: Date | null) => dt?.toISOString().slice(0, 10) ?? null;
 
 function d(v: unknown): string | null {
   return v == null ? null : (v as { toString(): string }).toString();
@@ -57,10 +61,27 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   const unitCount = units.length || property.unitCount || 0;
   const purchasePrice = n(property.purchasePrice);
   const rehabAmount = n(property.rehabAmount);
+  const closingCosts = n(property.closingCosts);
   const allInBasis =
-    purchasePrice != null || rehabAmount != null ? (purchasePrice ?? 0) + (rehabAmount ?? 0) : null;
-  const nextTaskDue = property.tasks.find((t) => t.dueDate)?.dueDate ?? null;
+    purchasePrice != null || rehabAmount != null || closingCosts != null
+      ? (purchasePrice ?? 0) + (rehabAmount ?? 0) + (closingCosts ?? 0)
+      : null;
   const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`;
+
+  // Key dates → the summary's "next" tile, falling back to the soonest dated task.
+  const keyDates = (
+    [
+      { label: "Loan matures", date: property.loanMaturityDate },
+      { label: "Insurance renews", date: property.insuranceRenewalDate },
+      { label: "Property tax due", date: property.propertyTaxDueDate },
+      { label: "Rental registration", date: property.rentalRegistrationExpiry },
+    ] as { label: string; date: Date | null }[]
+  )
+    .filter((k): k is { label: string; date: Date } => !!k.date)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  const nextTaskDue = property.tasks.find((t) => t.dueDate)?.dueDate ?? null;
+  const nextKeyDate =
+    keyDates[0] ?? (nextTaskDue ? { label: "Next task due", date: nextTaskDue } : null);
 
   return (
     <>
@@ -89,7 +110,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           value={n(property.value)}
           currentLoan={n(property.currentLoan)}
           capexDueSoon={forecast.dueNowTotal}
-          nextTaskDue={nextTaskDue}
+          nextKeyDate={nextKeyDate}
         />
       </div>
 
@@ -110,20 +131,52 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               address: property.address,
               llcOwner: property.llcOwner,
               attorney: property.attorney,
-              lender: property.lender,
-              loanServicer: property.loanServicer,
               status: property.status,
               strategy: property.strategy,
-              refiTarget: property.refiTarget,
-              purchaseDate: property.purchaseDate?.toISOString().slice(0, 10) ?? null,
-              refinanceDate: property.refinanceDate?.toISOString().slice(0, 10) ?? null,
+              purchaseDate: ymd(property.purchaseDate),
               purchasePrice: d(property.purchasePrice),
-              currentLoan: d(property.currentLoan),
+              closingCosts: d(property.closingCosts),
               value: d(property.value),
               replacementCost: d(property.replacementCost),
               rehabAmount: d(property.rehabAmount),
               rehabMonths: d(property.rehabMonths),
               sqft: property.sqft,
+              propertyTaxDueDate: ymd(property.propertyTaxDueDate),
+              rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
+            }}
+          />
+
+          <PropertyLoanSection
+            loan={{
+              id: property.id,
+              version: property.updatedAt.toISOString(),
+              lender: property.lender,
+              loanServicer: property.loanServicer,
+              loanNumber: property.loanNumber,
+              loanType: property.loanType,
+              loanOriginalAmount: d(property.loanOriginalAmount),
+              currentLoan: d(property.currentLoan),
+              loanRate: d(property.loanRate),
+              loanPaymentMonthly: d(property.loanPaymentMonthly),
+              loanOriginationDate: ymd(property.loanOriginationDate),
+              loanMaturityDate: ymd(property.loanMaturityDate),
+              refinanceDate: ymd(property.refinanceDate),
+              refiTarget: property.refiTarget,
+              loanEscrow: property.loanEscrow,
+            }}
+          />
+
+          <PropertyInsuranceSection
+            insurance={{
+              id: property.id,
+              version: property.updatedAt.toISOString(),
+              insuranceCarrier: property.insuranceCarrier,
+              insurancePolicyNo: property.insurancePolicyNo,
+              insuranceCoverage: d(property.insuranceCoverage),
+              insuranceDeductible: d(property.insuranceDeductible),
+              insuranceLiability: property.insuranceLiability,
+              insurancePremium: d(property.insurancePremium),
+              insuranceRenewalDate: ymd(property.insuranceRenewalDate),
             }}
           />
 

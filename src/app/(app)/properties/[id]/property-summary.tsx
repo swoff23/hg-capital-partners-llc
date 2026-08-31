@@ -2,22 +2,21 @@ import { fmtDate, fmtMoney } from "@/lib/utils";
 
 /**
  * One-row answer-at-a-glance strip. Values are derived on the page from data we
- * already have. Cash flow / mo joins once the rent roll (step C) lands; "Next
- * task due" becomes "Next key date" once loan-maturity / insurance-renewal / tax
- * dates exist (step B).
+ * already have. Cash flow / mo joins once the rent roll (step C) lands.
  */
 export function PropertySummary({
   allInBasis,
   value,
   currentLoan,
   capexDueSoon,
-  nextTaskDue,
+  nextKeyDate,
 }: {
   allInBasis: number | null;
   value: number | null;
   currentLoan: number | null;
   capexDueSoon: number;
-  nextTaskDue: Date | string | null;
+  /** Soonest of the property's key dates, or a fallback (next task due). */
+  nextKeyDate: { label: string; date: Date | string } | null;
 }) {
   const equity = value != null && currentLoan != null ? value - currentLoan : null;
   const ltv = value != null && value > 0 && currentLoan != null ? currentLoan / value : null;
@@ -37,8 +36,10 @@ export function PropertySummary({
         value={capexDueSoon > 0 ? fmtMoney(capexDueSoon) : "—"}
         tone={capexDueSoon > 0 ? "red" : undefined}
       />
-      {/* TODO(step B): swap for the soonest of loan-maturity / insurance renewal / tax due. */}
-      <Tile label="Next task due" value={nextTaskDue ? fmtDate(nextTaskDue) : "—"} />
+      <Tile
+        label={nextKeyDate ? nextKeyDate.label : "Next key date"}
+        value={nextKeyDate ? fmtDate(nextKeyDate.date) : "—"}
+      />
     </div>
   );
 }
