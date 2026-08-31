@@ -24,15 +24,15 @@ export default function ResidentsPage() {
         </h1>
 
         <div className="mt-12 grid gap-4 sm:grid-cols-3">
-          <Tile title="Pay Rent" body="Handled securely through Baselane." href={BASELANE_URL} />
-          <Tile
-            title="Request Maintenance"
-            body="Report an issue with photos — it goes straight to our team."
-          />
           <Tile
             title="Moving In"
             body="Move-in checklist and the condition form."
             href="/residents/moving-in"
+          />
+          <Tile title="Pay Rent" body="Handled securely through Baselane." href={BASELANE_URL} />
+          <Tile
+            title="Request Maintenance"
+            body="Report an issue with photos — it goes straight to our team."
           />
         </div>
       </div>
