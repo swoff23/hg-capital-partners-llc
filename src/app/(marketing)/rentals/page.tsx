@@ -85,12 +85,6 @@ export default async function RentalsPage() {
 }
 
 function ListingCard({ listing: l }: { listing: ListingCardData }) {
-  const details = [
-    l.beds && `${l.beds} bd`,
-    l.baths && `${l.baths} ba`,
-    l.sqft && `${l.sqft} sqft`,
-  ].filter(Boolean);
-
   const card = (
     <div
       className={
@@ -118,18 +112,25 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
 
       <div className="p-5">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium text-[#e8eaee]">{l.unitLabel}</h2>
-          {l.rent && !l.leased && (
+          <h2 className="text-sm font-medium text-[#e8eaee]">{l.address}</h2>
+          {!l.leased && (
             <span className="shrink-0 text-sm font-medium text-[#e8eaee]">
-              ${Number(l.rent).toLocaleString()}
-              <span className="text-[#767d8a]">/mo</span>
+              {l.rent ? (
+                <>
+                  ${Number(l.rent).toLocaleString()}
+                  <span className="text-[#767d8a]">/mo</span>
+                </>
+              ) : (
+                <span className="text-[#767d8a]">Price on request</span>
+              )}
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-xs text-[#767d8a]">{l.address}</p>
-        {details.length > 0 && (
-          <p className="mt-2 text-xs text-[#767d8a]">{details.join(" · ")}</p>
-        )}
+        <p className="mt-0.5 text-xs text-[#767d8a]">{l.unitLabel}</p>
+        <p className="mt-2 text-xs text-[#767d8a]">
+          {l.beds ? `${l.beds} bd` : "— bd"} · {l.baths ? `${l.baths} ba` : "— ba"} ·{" "}
+          {l.sqft ? `${l.sqft} sqft` : "— sqft"}
+        </p>
         {l.zillowUrl && !l.leased && (
           <div className="mt-4 flex items-center gap-1.5 text-xs font-medium text-[#c8a765]">
             View on Zillow
