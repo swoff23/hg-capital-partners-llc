@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Td } from "@/components/ui";
 import { DEAL_STATUSES, dealStatusTone } from "@/lib/config";
-import { fmtDate, relativeDays } from "@/lib/utils";
+import { fmtDate } from "@/lib/utils";
 import { patchDeal } from "./actions";
 
 export type DealRow = {
@@ -15,7 +15,6 @@ export type DealRow = {
   ourPrice: number | null;
   ourPriceRaw: string | null;
   nextAction: string | null;
-  nextActionDue: string | null; // yyyy-mm-dd
   sourceUrl: string | null;
   updatedAt: string;
 };
@@ -44,9 +43,22 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
   return (
     <tr className={`hover:bg-background ${pending ? "opacity-60" : ""} ${flash ? "bg-green-500/10" : ""}`}>
       <Td>
-        <Link href={`/deals/${deal.id}`} className="font-medium hover:underline">
-          {deal.address}
-        </Link>
+        <div className="flex items-center gap-1.5">
+          <Link href={`/deals/${deal.id}`} className="font-medium hover:underline">
+            {deal.address}
+          </Link>
+          {deal.sourceUrl && (
+            <a
+              href={deal.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Open listing — ${deal.sourceUrl}`}
+              className="shrink-0 rounded border border-border px-1 text-[11px] leading-4 text-primary hover:bg-background"
+            >
+              ↗
+            </a>
+          )}
+        </div>
       </Td>
 
       <Td>
@@ -93,41 +105,6 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
           placeholder="Add next action…"
           className={cell}
         />
-        <div className="mt-0.5 flex items-center gap-1">
-          <input
-            type="date"
-            defaultValue={deal.nextActionDue ?? ""}
-            onChange={(e) => save({ nextActionDue: e.target.value }, deal.nextActionDue, e.target.value)}
-            className="rounded border border-transparent px-1 text-[11px] text-muted hover:border-border focus:border-primary"
-          />
-          {deal.nextActionDue && (
-            <span className={new Date(deal.nextActionDue) < new Date() ? "text-[11px] text-red-500" : "text-[11px] text-muted"}>
-              {relativeDays(deal.nextActionDue)}
-            </span>
-          )}
-        </div>
-      </Td>
-
-      <Td className="min-w-[160px]">
-        <div className="flex items-center gap-1">
-          <input
-            defaultValue={deal.sourceUrl ?? ""}
-            onBlur={(e) => save({ sourceUrl: e.target.value }, deal.sourceUrl, e.target.value)}
-            placeholder="Listing URL…"
-            className={cell}
-          />
-          {deal.sourceUrl && (
-            <a
-              href={deal.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 text-primary"
-              title={deal.sourceUrl}
-            >
-              ↗
-            </a>
-          )}
-        </div>
       </Td>
 
       <Td className="whitespace-nowrap text-xs text-muted">{fmtDate(deal.updatedAt)}</Td>

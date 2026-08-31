@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -13,17 +14,28 @@ export function DealFilters({
   current,
 }: {
   statusCounts: Record<string, number>;
-  current: { status: string; q: string; sort: string };
+  current: { status: string; q: string };
 }) {
   const router = useRouter();
   const params = useSearchParams();
 
-  function set(key: string, value: string) {
+  function set(key: string, value: string, { replace = false }: { replace?: boolean } = {}) {
     const next = new URLSearchParams(params);
-    if (value && value !== "active" && value !== "next") next.set(key, value);
+    if (value && value !== "active") next.set(key, value);
     else next.delete(key);
-    router.push(`/deals?${next.toString()}`);
+    const url = `/deals?${next.toString()}`;
+    if (replace) router.replace(url);
+    else router.push(url);
   }
+
+  // Live search: filter as you type, debounced, without stacking browser history.
+  const [q, setQ] = useState(current.q);
+  useEffect(() => {
+    if (q.trim() === current.q) return;
+    const id = setTimeout(() => set("q", q.trim(), { replace: true }), 250);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, current.q]);
 
   const totalAll = Object.values(statusCounts).reduce((a, b) => a + b, 0);
   const passCount = statusCounts["Pass"] ?? 0;
@@ -36,11 +48,9 @@ export function DealFilters({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <input
-        defaultValue={current.q}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") set("q", (e.target as HTMLInputElement).value);
-        }}
-        placeholder="Filter by address…  (Enter)"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Filter by address…"
         className="h-8 w-64 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none focus:border-primary"
       />
       <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -61,14 +71,6 @@ export function DealFilters({
             </button>
           ))}
         </div>
-        <select
-          value={current.sort}
-          onChange={(e) => set("sort", e.target.value)}
-          className="h-8 rounded-lg border border-border bg-surface px-2 text-xs"
-        >
-          <option value="next">Sort: next action due</option>
-          <option value="activity">Sort: recently updated</option>
-        </select>
       </div>
     </div>
   );

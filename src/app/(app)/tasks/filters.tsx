@@ -1,7 +1,7 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { TASK_BUCKETS } from "@/lib/config";
 
 const STATUS_TABS = [
   { key: "all", label: "All" },
@@ -9,36 +9,46 @@ const STATUS_TABS = [
   { key: "done", label: "Done" },
 ] as const;
 
+type Owner = { value: string; label: string };
+
 export function TaskFilters({
   current,
+  owners,
   properties,
 }: {
-  current: { status: string; assignee: string; bucket: string; q: string; property: string };
+  current: { status: string; owner: string; q: string; property: string };
+  owners: { users: Owner[]; external: Owner[] };
   properties: { id: string; address: string }[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
 
-  function set(key: string, value: string) {
+  function set(key: string, value: string, { replace = false }: { replace?: boolean } = {}) {
     const next = new URLSearchParams(params);
-    const isDefault =
-      (key === "status" && value === "open") ||
-      (key === "assignee" && value === "all") ||
-      (key === "bucket" && value === "all") ||
-      !value;
+    const isDefault = (key === "status" && value === "open") || !value;
     if (isDefault) next.delete(key);
     else next.set(key, value);
-    router.push(`/tasks?${next.toString()}`);
+    if (key === "owner") next.delete("assignee"); // supersedes the legacy shortcut
+    const url = `/tasks?${next.toString()}`;
+    if (replace) router.replace(url);
+    else router.push(url);
   }
+
+  // Live search: filter as you type, debounced, without stacking browser history.
+  const [q, setQ] = useState(current.q);
+  useEffect(() => {
+    if (q.trim() === current.q) return;
+    const id = setTimeout(() => set("q", q.trim(), { replace: true }), 250);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, current.q]);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <input
-        defaultValue={current.q}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") set("q", (e.target as HTMLInputElement).value);
-        }}
-        placeholder="Filter by title…  (Enter)"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Filter by title…"
         className="h-8 w-64 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none focus:border-primary"
       />
 
@@ -60,29 +70,31 @@ export function TaskFilters({
           ))}
         </div>
 
-        <button
-          onClick={() => set("assignee", current.assignee === "me" ? "all" : "me")}
-          className={cn(
-            "rounded-lg px-2.5 py-1.5 text-xs font-medium",
-            current.assignee === "me"
-              ? "bg-primary text-primary-foreground"
-              : "bg-surface text-muted hover:text-foreground",
-          )}
-        >
-          Mine
-        </button>
-
         <select
-          value={current.bucket}
-          onChange={(e) => set("bucket", e.target.value)}
-          className="h-8 rounded-lg border border-border bg-surface px-2 text-xs"
+          value={current.owner}
+          onChange={(e) => set("owner", e.target.value)}
+          className="h-8 max-w-[180px] rounded-lg border border-border bg-surface px-2 text-xs"
         >
-          <option value="all">All buckets</option>
-          {TASK_BUCKETS.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
+          <option value="">All owners</option>
+          <option value="none">Unassigned</option>
+          {owners.users.length > 0 && (
+            <optgroup label="Team">
+              {owners.users.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {owners.external.length > 0 && (
+            <optgroup label="External">
+              {owners.external.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
 
         <select

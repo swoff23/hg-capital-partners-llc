@@ -4,7 +4,7 @@ import { Card, LinkButton, PageHeader, Table, Th, EmptyState } from "@/component
 import { DealFilters } from "./filters";
 import { DealRowEditable } from "./deal-row";
 
-type SP = { status?: string; q?: string; sort?: string };
+type SP = { status?: string; q?: string };
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   await requireUser();
@@ -23,10 +23,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   const [deals, total, statusCounts] = await Promise.all([
     prisma.deal.findMany({
       where,
-      orderBy:
-        sp.sort === "activity"
-          ? { updatedAt: "desc" }
-          : [{ nextActionDue: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }],
+      orderBy: { updatedAt: "desc" },
       take: 300,
     }),
     prisma.deal.count(),
@@ -47,7 +44,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
 
       <DealFilters
         statusCounts={Object.fromEntries(statusCounts.map((s) => [s.status, s._count]))}
-        current={{ status: statusFilter, q: sp.q ?? "", sort: sp.sort ?? "next" }}
+        current={{ status: statusFilter, q: sp.q ?? "" }}
       />
 
       <Card className="mt-4 overflow-hidden">
@@ -64,7 +61,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                 <Th className="text-right">Their price</Th>
                 <Th className="text-right">Our price</Th>
                 <Th>Next action</Th>
-                <Th>Listing</Th>
                 <Th>Updated</Th>
               </tr>
             </thead>
@@ -81,9 +77,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                     ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
                     ourPriceRaw: d.ourPriceRaw,
                     nextAction: d.nextAction,
-                    nextActionDue: d.nextActionDue
-                      ? d.nextActionDue.toISOString().slice(0, 10)
-                      : null,
                     sourceUrl: d.sourceUrl,
                     updatedAt: d.updatedAt.toISOString(),
                   }}

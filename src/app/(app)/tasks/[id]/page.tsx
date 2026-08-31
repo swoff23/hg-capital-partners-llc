@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { BackLink } from "@/components/back-link";
 import {
   AssigneeControl,
@@ -32,8 +31,6 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     prisma.task.findUnique({
       where: { id },
       include: {
-        property: { select: { id: true, address: true } },
-        deal: { select: { id: true, address: true } },
         assignee: { select: { name: true, email: true } },
         attachments: { orderBy: { createdAt: "asc" } },
       },
@@ -54,22 +51,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+        <CardHeader>
           <CompleteButton id={task.id} done={done} />
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge tone={done ? "green" : "blue"}>{done ? "Completed" : "Open"}</Badge>
-            {task.property ? (
-              <Link href={`/properties/${task.property.id}`}>
-                <Badge tone="gray">{task.property.address.split(",")[0]}</Badge>
-              </Link>
-            ) : task.deal ? (
-              <Link href={`/deals/${task.deal.id}`}>
-                <Badge tone="gray">deal · {task.deal.address.split(",")[0]}</Badge>
-              </Link>
-            ) : (
-              <Badge tone="gray">{task.bucket}</Badge>
-            )}
-          </div>
         </CardHeader>
 
         <CardBody className="space-y-4">

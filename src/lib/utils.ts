@@ -48,6 +48,27 @@ export function relativeDays(d: Date | string | null | undefined): string {
   return `in ${days}d`;
 }
 
+/**
+ * Due-date label: anything overdue → "yesterday"; due today → "today"; within the
+ * next week → the weekday name; further out → the calendar date (year shown only
+ * when it isn't the current one).
+ */
+export function dueLabel(d: Date | string | null | undefined): string {
+  if (!d) return "";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(date.getTime())) return "";
+  const days = Math.round((date.getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return "yesterday";
+  if (days === 0) return "today";
+  if (days < 7) return date.toLocaleDateString("en-US", { weekday: "long" });
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
 export function initials(name: string | null | undefined): string {
   if (!name) return "?";
   return name
