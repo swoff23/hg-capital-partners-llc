@@ -375,11 +375,24 @@ function PhotoGallery({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Turn a raw @vercel/blob (or fetch) error into something an admin can act on. */
+  function describeUploadError(e: unknown): string {
+    const msg = e instanceof Error ? e.message : "";
+    if (/not configured|Blob store/i.test(msg)) return "uploads aren't set up yet";
+    if (/content type mismatch/i.test(msg)) {
+      return "unsupported file type — iPhone photos saved as HEIC aren't supported; " +
+        "in Settings → Camera → Formats, switch to \"Most Compatible\", or export as JPEG first";
+    }
+    if (/too large|exceeds the maximum/i.test(msg)) return "file is too large (25MB max)";
+    return "upload failed";
+  }
+
   async function pick(files: FileList | null) {
     const list = Array.from(files ?? []);
     if (list.length === 0) return;
     setError(null);
     setBusy(true);
+    const failures: string[] = [];
     for (const file of list) {
       try {
         const blob = await upload(file.name, file, {
@@ -389,11 +402,11 @@ function PhotoGallery({
         });
         onAdd({ url: blob.url, pathname: blob.pathname });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "";
-        setError(/not configured|Blob store/i.test(msg) ? "Uploads aren't set up yet." : "Upload failed.");
-        break;
+        // Keep going — one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
+        failures.push(`${file.name}: ${describeUploadError(e)}`);
       }
     }
+    if (failures.length > 0) setError(failures.join("; "));
     setBusy(false);
   }
 

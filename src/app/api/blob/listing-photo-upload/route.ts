@@ -4,11 +4,11 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 /**
- * Mints short-lived client-upload tokens for a listing's hero photo. Same
+ * Mints short-lived client-upload tokens for a listing's photo gallery. Same
  * pattern as api/blob/property-upload — authenticated (only Connor/Pieter add
  * listings), scoped to a real property, browser uploads straight to Blob.
- * Images only, well under the 50MB document limit — this is one photo, not a
- * file cabinet.
+ * Images only (JPEG/PNG/WebP/AVIF — not HEIC: most browsers can't render it
+ * inline, so a HEIC upload would look broken on the public site).
  */
 export async function POST(request: Request): Promise<NextResponse> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -35,7 +35,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         if (!property) throw new Error("Property not found");
         return {
           addRandomSuffix: true,
-          maximumSizeInBytes: 10 * 1024 * 1024,
+          // 25MB — a plain 10MB cap rejected real phone photos (modern
+          // cameras routinely produce 12-20MB JPEGs).
+          maximumSizeInBytes: 25 * 1024 * 1024,
           allowedContentTypes: ["image/jpeg", "image/png", "image/webp", "image/avif"],
         };
       },
