@@ -16,7 +16,7 @@ export default function RentalsPage() {
       <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Rentals</p>
       <div className="my-7 h-px w-14 bg-[#c8a765]/40" />
       <h1 className="max-w-md text-[1.375rem] font-normal leading-snug text-[#e8eaee] sm:text-2xl">
-        Our current listings are posted on Zillow
+        Our current listings are posted on Zillow.
       </h1>
     </main>
   );
