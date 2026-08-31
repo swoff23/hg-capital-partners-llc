@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { normalizeAddress } from "@/lib/normalize";
 import { formToObject } from "@/lib/forms";
+import { initials } from "@/lib/utils";
 
 const dealSchema = z.object({
   address: z.string().min(4),
@@ -17,7 +18,6 @@ const dealSchema = z.object({
   units: z.coerce.number().int().positive().optional(),
   sourceUrl: z.string().url().optional(),
   nextAction: z.string().optional(),
-  nextActionDue: z.string().optional(),
   passReason: z.string().optional(),
 });
 
@@ -56,17 +56,14 @@ function diffDeal(before: Deal, data: Record<string, unknown>): string[] {
     lines.push(`Priority: ${val(before.priority)} → ${val(data.priority as string)}`);
   if ("passReason" in data && (data.passReason ?? null) !== before.passReason)
     lines.push(`Pass reason: ${val(before.passReason)} → ${val(data.passReason as string)}`);
+  if ("units" in data && (data.units ?? null) !== before.units)
+    lines.push(`Units: ${before.units ?? "—"} → ${(data.units as number | null) ?? "—"}`);
   if ("theirPriceRaw" in data && (data.theirPriceRaw ?? null) !== before.theirPriceRaw)
     lines.push(`Their price: ${val(before.theirPriceRaw)} → ${val(data.theirPriceRaw as string)}`);
   if ("ourPriceRaw" in data && (data.ourPriceRaw ?? null) !== before.ourPriceRaw)
     lines.push(`Our price: ${val(before.ourPriceRaw)} → ${val(data.ourPriceRaw as string)}`);
   if ("nextAction" in data && (data.nextAction ?? null) !== before.nextAction)
     lines.push(`Next action: ${val(before.nextAction)} → ${val(data.nextAction as string)}`);
-  if ("nextActionDue" in data) {
-    const b = before.nextActionDue?.toISOString().slice(0, 10) ?? null;
-    const a = data.nextActionDue ? (data.nextActionDue as Date).toISOString().slice(0, 10) : null;
-    if (a !== b) lines.push(`Next action due: ${val(b)} → ${val(a)}`);
-  }
   if ("sourceUrl" in data && (data.sourceUrl ?? null) !== before.sourceUrl)
     lines.push(`Listing URL ${before.sourceUrl ? "updated" : "added"}`);
   if ("address" in data && data.address !== before.address)
@@ -97,7 +94,6 @@ export async function createDeal(formData: FormData) {
       units: p.units ?? null,
       sourceUrl: p.sourceUrl || null,
       nextAction: p.nextAction || null,
-      nextActionDue: p.nextActionDue ? new Date(p.nextActionDue) : null,
     },
   });
   await logDealChanges(deal.id, user, [`Deal created (status ${deal.status})`]);
@@ -124,10 +120,6 @@ export async function updateDeal(id: string, formData: FormData) {
     data.ourPrice = money(str("ourPriceRaw"));
   }
   if (has("nextAction")) data.nextAction = str("nextAction");
-  if (has("nextActionDue")) {
-    const d = str("nextActionDue");
-    data.nextActionDue = d ? new Date(d) : null;
-  }
   if (has("sourceUrl")) data.sourceUrl = str("sourceUrl");
 
   await prisma.deal.update({ where: { id }, data });
@@ -136,16 +128,17 @@ export async function updateDeal(id: string, formData: FormData) {
   revalidatePath("/deals");
 }
 
-/** Inline edits from the Acquisitions list. Only whitelisted fields. */
+/** Inline edits from the Deals list and detail page. Only whitelisted fields. */
 export async function patchDeal(
   id: string,
   patch: Partial<{
     status: string;
     priority: string | null;
+    passReason: string | null;
     theirPriceRaw: string | null;
     ourPriceRaw: string | null;
+    units: number | null;
     nextAction: string | null;
-    nextActionDue: string | null;
     sourceUrl: string | null;
   }>,
 ) {
@@ -154,6 +147,8 @@ export async function patchDeal(
   const data: Record<string, unknown> = {};
   if (patch.status) data.status = patch.status;
   if ("priority" in patch) data.priority = patch.priority || null;
+  if ("passReason" in patch) data.passReason = patch.passReason || null;
+  if ("units" in patch) data.units = patch.units ?? null;
   if ("sourceUrl" in patch) data.sourceUrl = patch.sourceUrl?.trim() || null;
   if ("theirPriceRaw" in patch) {
     data.theirPriceRaw = patch.theirPriceRaw || null;
@@ -164,9 +159,6 @@ export async function patchDeal(
     data.ourPrice = money(patch.ourPriceRaw);
   }
   if ("nextAction" in patch) data.nextAction = patch.nextAction || null;
-  if ("nextActionDue" in patch) {
-    data.nextActionDue = patch.nextActionDue ? new Date(patch.nextActionDue) : null;
-  }
   if (Object.keys(data).length === 0) return;
 
   await prisma.deal.update({ where: { id }, data });
@@ -184,7 +176,7 @@ export async function addDealNote(dealId: string, formData: FormData) {
   await prisma.dealNote.create({
     data: {
       dealId,
-      body: `${body}\n\n— ${user.name ?? user.email}`,
+      body: `${body} (${initials(user.name ?? user.email)})`,
       noteDate: dateStr ? new Date(dateStr) : new Date(),
       source: "manual",
     },

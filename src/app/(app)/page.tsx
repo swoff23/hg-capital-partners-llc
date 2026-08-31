@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState } from "@/components/ui";
 import { fmtDate, relativeDays } from "@/lib/utils";
-import { dealStatusTone } from "@/lib/config";
 import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { PortfolioCapexForecastCard } from "./portfolio-capex";
@@ -13,17 +12,12 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const user = await requireUser();
 
-  const [myTasks, dealsDue, counts, recentNotes, capexProps, capexRules] = await Promise.all([
+  const [myTasks, counts, recentNotes, capexProps, capexRules] = await Promise.all([
     prisma.task.findMany({
       where: { assigneeUserId: user.id, status: "OPEN" },
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
       take: 12,
       include: { property: { select: { id: true, address: true } } },
-    }),
-    prisma.deal.findMany({
-      where: { status: { notIn: ["Pass", "Lost", "Closed"] }, nextActionDue: { not: null } },
-      orderBy: { nextActionDue: "asc" },
-      take: 10,
     }),
     Promise.all([
       prisma.deal.count({ where: { status: { notIn: ["Pass", "Lost"] } } }),
@@ -99,38 +93,6 @@ export default async function HomePage() {
                         {relativeDays(t.dueDate)}
                       </span>
                     )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Deals with a next action due</CardTitle>
-          </CardHeader>
-          <CardBody className="p-0">
-            {dealsDue.length === 0 ? (
-              <div className="p-4">
-                <EmptyState>No deal next-actions scheduled.</EmptyState>
-              </div>
-            ) : (
-              <ul className="divide-y divide-border">
-                {dealsDue.map((d) => (
-                  <li key={d.id} className="px-4 py-2.5 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Link href={`/deals/${d.id}`} className="min-w-0 flex-1 truncate font-medium hover:underline">
-                        {d.address}
-                      </Link>
-                      <Badge tone={dealStatusTone(d.status)}>{d.status}</Badge>
-                      <span
-                        className={`shrink-0 text-xs ${d.nextActionDue && new Date(d.nextActionDue) < new Date() ? "text-red-600" : "text-muted"}`}
-                      >
-                        {relativeDays(d.nextActionDue)}
-                      </span>
-                    </div>
-                    {d.nextAction && <p className="mt-0.5 truncate text-xs text-muted">{d.nextAction}</p>}
                   </li>
                 ))}
               </ul>

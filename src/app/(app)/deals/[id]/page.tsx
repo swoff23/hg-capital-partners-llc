@@ -2,22 +2,29 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import {
-  Badge,
-  Card,
-  CardBody,
-  CardHeader,
-  CardTitle,
-  Field,
-  LinkButton,
-  Textarea,
-  Button,
-} from "@/components/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { dealStatusTone } from "@/lib/config";
-import { EditDeal } from "./edit-deal";
 import { BackLink } from "@/components/back-link";
 import { addDealNote } from "../actions";
+import {
+  StatusControl,
+  PassReasonControl,
+  PriceField,
+  UnitsField,
+  NextActionField,
+  ListingUrlField,
+} from "./deal-detail";
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[2.75rem] items-center gap-4 border-b border-border/60 last:border-0">
+      <dt className="w-32 shrink-0 text-xs font-medium uppercase tracking-wide text-muted">
+        {label}
+      </dt>
+      <dd className="min-w-0 flex-1">{children}</dd>
+    </div>
+  );
+}
 
 export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
   await requireUser();
@@ -26,7 +33,6 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
     where: { id },
     include: {
       notes: { orderBy: [{ noteDate: "desc" }, { createdAt: "desc" }] },
-      tasks: { orderBy: { createdAt: "desc" } },
       convertedProperty: { select: { id: true, address: true } },
     },
   });
@@ -35,18 +41,13 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
   const addNote = addDealNote.bind(null, deal.id);
 
   return (
-    <>
+    <div className="mx-auto max-w-2xl">
       <div className="mb-4">
-        <BackLink fallback="/deals" label="Acquisitions" />
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">{deal.address}</h1>
-          <Badge tone={dealStatusTone(deal.status)}>{deal.status}</Badge>
-        </div>
-        {deal.sourceUrl && (
-          <a href={deal.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">
-            Listing ↗
-          </a>
-        )}
+        <BackLink fallback="/deals" label="Deals" />
+        <h1 className="mt-1 text-xl font-semibold tracking-tight">{deal.address}</h1>
+        <p className="mt-1 text-xs text-muted">
+          Added {fmtDate(deal.createdAt)} · Updated {fmtDate(deal.updatedAt)}
+        </p>
         {deal.convertedProperty && (
           <p className="mt-1 text-xs text-muted">
             Converted →{" "}
@@ -57,119 +58,82 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Deal</CardTitle>
-            </CardHeader>
-            <CardBody>
-              <EditDeal
-                deal={{
-                  id: deal.id,
-                  version: deal.updatedAt.toISOString(),
-                  status: deal.status,
-                  theirPriceRaw: deal.theirPriceRaw,
-                  ourPriceRaw: deal.ourPriceRaw,
-                  nextAction: deal.nextAction,
-                  nextActionDue: deal.nextActionDue
-                    ? deal.nextActionDue.toISOString().slice(0, 10)
-                    : null,
-                  passReason: deal.passReason,
-                  sourceUrl: deal.sourceUrl,
-                }}
-              />
-            </CardBody>
-          </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Deal</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <dl className="rounded-lg border border-border px-3">
+            <Row label="Status">
+              <StatusControl id={deal.id} status={deal.status} />
+            </Row>
+            <Row label="Their price">
+              <PriceField id={deal.id} value={deal.theirPriceRaw} which="their" />
+            </Row>
+            <Row label="Our price">
+              <PriceField id={deal.id} value={deal.ourPriceRaw} which="our" />
+            </Row>
+            <Row label="Units">
+              <UnitsField id={deal.id} value={deal.units} />
+            </Row>
+            <Row label="Next action">
+              <NextActionField id={deal.id} value={deal.nextAction} />
+            </Row>
+            <Row label="Listing URL">
+              <ListingUrlField id={deal.id} value={deal.sourceUrl} />
+            </Row>
+            {deal.status === "Pass" && (
+              <Row label="Pass reason">
+                <PassReasonControl id={deal.id} value={deal.passReason} />
+              </Row>
+            )}
+          </dl>
+        </CardBody>
+      </Card>
 
-          <Card>
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle>Activity timeline</CardTitle>
-              <span className="text-xs text-muted">{deal.notes.length} entries</span>
-            </CardHeader>
-            <CardBody className="space-y-4">
-              <form action={addNote} className="flex gap-2">
-                <Textarea name="body" rows={2} placeholder="Add a note…" className="flex-1" />
-                <Button type="submit" className="self-end">
-                  Add
-                </Button>
-              </form>
-              <ol className="relative max-h-[520px] space-y-2.5 overflow-y-auto border-l border-border pl-4">
-                {deal.notes.map((n) => {
-                  const isChange = n.source === "change";
-                  return (
-                    <li key={n.id} className="relative">
-                      <span
-                        className={`absolute -left-[21px] top-1.5 h-1.5 w-1.5 rounded-full ${
-                          isChange ? "bg-border" : "bg-primary"
-                        }`}
-                      />
-                      <div className="text-[11px] text-muted">
-                        {n.noteDate ? fmtDate(n.noteDate) : fmtDateTime(n.createdAt)}
-                        {n.source === "manual" && <span className="ml-1">· note</span>}
-                        {n.source === "migration" && <span className="ml-1">· imported</span>}
-                      </div>
-                      <p
-                        className={
-                          isChange
-                            ? "whitespace-pre-wrap text-xs text-muted"
-                            : "whitespace-pre-wrap text-sm"
-                        }
-                      >
-                        {n.body}
-                      </p>
-                    </li>
-                  );
-                })}
-                {deal.notes.length === 0 && <li className="text-sm text-muted">No activity yet.</li>}
-              </ol>
-            </CardBody>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Details</CardTitle>
-            </CardHeader>
-            <CardBody>
-              <dl>
-                <Field label="Units">{deal.units ?? "—"}</Field>
-                <Field label="Their price">{deal.theirPriceRaw ?? "—"}</Field>
-                <Field label="Our price">{deal.ourPriceRaw ?? "—"}</Field>
-                <Field label="Pass reason">{deal.passReason ?? "—"}</Field>
-                <Field label="Added">{fmtDate(deal.createdAt)}</Field>
-                <Field label="Updated">{fmtDate(deal.updatedAt)}</Field>
-              </dl>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle>Tasks</CardTitle>
-              <LinkButton href={`/tasks/new?dealId=${deal.id}`} size="sm">
-                + Task
-              </LinkButton>
-            </CardHeader>
-            <CardBody className="p-0">
-              {deal.tasks.length === 0 ? (
-                <p className="p-4 text-sm text-muted">No tasks.</p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {deal.tasks.map((t) => (
-                    <li key={t.id} className="px-4 py-2 text-sm">
-                      <Link href={`/tasks/${t.id}`} className="hover:underline">
-                        {t.status === "DONE" ? "✓ " : ""}
-                        {t.title}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
-        </div>
-      </div>
-    </>
+      <Card className="mt-4">
+        <CardHeader className="flex items-center justify-between">
+          <CardTitle>Activity timeline</CardTitle>
+          <span className="text-xs text-muted">{deal.notes.length} entries</span>
+        </CardHeader>
+        <CardBody className="space-y-4">
+          <form action={addNote} className="flex gap-2">
+            <Textarea name="body" rows={2} placeholder="Add a note…" className="flex-1" />
+            <Button type="submit" className="self-end">
+              Add
+            </Button>
+          </form>
+          <ol className="relative max-h-[520px] space-y-2.5 overflow-y-auto border-l border-border pl-4">
+            {deal.notes.map((n) => {
+              const isChange = n.source === "change";
+              return (
+                <li key={n.id} className="relative">
+                  <span
+                    className={`absolute -left-[21px] top-1.5 h-1.5 w-1.5 rounded-full ${
+                      isChange ? "bg-border" : "bg-primary"
+                    }`}
+                  />
+                  <div className="text-[11px] text-muted">
+                    {n.noteDate ? fmtDate(n.noteDate) : fmtDateTime(n.createdAt)}
+                    {n.source === "manual" && <span className="ml-1">· note</span>}
+                    {n.source === "migration" && <span className="ml-1">· imported</span>}
+                  </div>
+                  <p
+                    className={
+                      isChange ? "whitespace-pre-wrap text-xs text-muted" : "whitespace-pre-wrap text-sm"
+                    }
+                  >
+                    {n.body}
+                  </p>
+                </li>
+              );
+            })}
+            {deal.notes.length === 0 && <li className="text-sm text-muted">No activity yet.</li>}
+          </ol>
+        </CardBody>
+      </Card>
+    </div>
   );
 }
+
+export const dynamic = "force-dynamic";

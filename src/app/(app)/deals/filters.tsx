@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { StatusMultiSelect } from "./status-multiselect";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -14,7 +15,7 @@ export function DealFilters({
   current,
 }: {
   statusCounts: Record<string, number>;
-  current: { status: string; q: string };
+  current: { status: string; statuses: string[]; q: string };
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -23,6 +24,7 @@ export function DealFilters({
     const next = new URLSearchParams(params);
     if (value && value !== "active") next.set(key, value);
     else next.delete(key);
+    if (key === "status") next.delete("statuses"); // a tab click supersedes the multiselect
     const url = `/deals?${next.toString()}`;
     if (replace) router.replace(url);
     else router.push(url);
@@ -61,7 +63,7 @@ export function DealFilters({
               onClick={() => set("status", t.key)}
               className={cn(
                 "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                current.status === t.key
+                current.statuses.length === 0 && current.status === t.key
                   ? "bg-surface text-foreground shadow-sm"
                   : "text-muted hover:text-foreground",
               )}
@@ -71,6 +73,8 @@ export function DealFilters({
             </button>
           ))}
         </div>
+
+        <StatusMultiSelect selected={current.statuses} />
       </div>
     </div>
   );

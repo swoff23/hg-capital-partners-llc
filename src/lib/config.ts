@@ -8,7 +8,6 @@ export const DEAL_STATUSES = [
   "4 - To Schedule",
   "5 - TBD",
   "6 - Holding",
-  "Closing",
   "CLOSED!",
   "Pass",
 ] as const;
@@ -69,6 +68,19 @@ export const EQUIPMENT_TYPES = [
 
 type Tone = "gray" | "blue" | "green" | "amber" | "red" | "purple";
 
+const TONE_CLASSES: Record<Tone, string> = {
+  gray: "bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
+  blue: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900",
+  green: "bg-green-50 text-green-700 ring-green-200 dark:bg-green-950 dark:text-green-300 dark:ring-green-900",
+  amber: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900",
+  red: "bg-red-50 text-red-700 ring-red-200 dark:bg-red-950 dark:text-red-300 dark:ring-red-900",
+  purple: "bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:ring-purple-900",
+};
+/** Tailwind classes for a `Tone` — shared by the deal status badge/select wherever it's rendered. */
+export function toneClass(tone: Tone): string {
+  return TONE_CLASSES[tone];
+}
+
 export function dealStatusTone(s: string | null): Tone {
   switch (s) {
     case "1 - High":
@@ -82,7 +94,6 @@ export function dealStatusTone(s: string | null): Tone {
       return "purple";
     case "5 - TBD":
       return "blue";
-    case "Closing":
     case "CLOSED!":
       return "green";
     case "Pass":

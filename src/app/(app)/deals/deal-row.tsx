@@ -2,7 +2,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Td } from "@/components/ui";
-import { DEAL_STATUSES, dealStatusTone } from "@/lib/config";
+import { Tooltip } from "@/components/tooltip";
+import { DEAL_STATUSES, dealStatusTone, toneClass } from "@/lib/config";
 import { fmtDate } from "@/lib/utils";
 import { patchDeal } from "./actions";
 
@@ -17,6 +18,8 @@ export type DealRow = {
   nextAction: string | null;
   sourceUrl: string | null;
   updatedAt: string;
+  /** Most recent manual activity notes, newest first — 0, 1, or 2 entries. */
+  latestNotes: { body: string; date: string }[];
 };
 
 function priceDisplay(n: number | null, raw: string | null): string {
@@ -43,7 +46,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
   return (
     <tr className={`hover:bg-background ${pending ? "opacity-60" : ""} ${flash ? "bg-green-500/10" : ""}`}>
       <Td>
-        <div className="flex items-center gap-1.5">
+        <div className="group/addr flex items-center gap-1.5">
           <Link href={`/deals/${deal.id}`} className="font-medium hover:underline">
             {deal.address}
           </Link>
@@ -53,7 +56,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
               target="_blank"
               rel="noopener noreferrer"
               title={`Open listing — ${deal.sourceUrl}`}
-              className="shrink-0 rounded border border-border px-1 text-[11px] leading-4 text-primary hover:bg-background"
+              className="shrink-0 rounded border border-border px-1 text-[11px] leading-4 text-primary opacity-0 transition-opacity hover:bg-background focus-visible:opacity-100 group-hover/addr:opacity-100"
             >
               ↗
             </a>
@@ -98,6 +101,18 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         />
       </Td>
 
+      <Td className="max-w-[240px] text-xs text-muted">
+        {deal.latestNotes.length > 0 && (
+          <div className="space-y-0.5">
+            {deal.latestNotes.map((n, i) => (
+              <Tooltip key={i} label={`${fmtDate(n.date)} — ${n.body}`} className="block truncate">
+                <span className="truncate">{n.body}</span>
+              </Tooltip>
+            ))}
+          </div>
+        )}
+      </Td>
+
       <Td className="min-w-[220px]">
         <input
           defaultValue={deal.nextAction ?? ""}
@@ -110,16 +125,4 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
       <Td className="whitespace-nowrap text-xs text-muted">{fmtDate(deal.updatedAt)}</Td>
     </tr>
   );
-}
-
-function toneClass(tone: string): string {
-  const map: Record<string, string> = {
-    gray: "bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
-    blue: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900",
-    green: "bg-green-50 text-green-700 ring-green-200 dark:bg-green-950 dark:text-green-300 dark:ring-green-900",
-    amber: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900",
-    red: "bg-red-50 text-red-700 ring-red-200 dark:bg-red-950 dark:text-red-300 dark:ring-red-900",
-    purple: "bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:ring-purple-900",
-  };
-  return map[tone] ?? map.gray;
 }

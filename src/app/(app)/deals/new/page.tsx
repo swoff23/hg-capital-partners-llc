@@ -45,10 +45,6 @@ export default async function NewDealPage() {
               <span className="text-xs font-medium text-muted">Next action</span>
               <Input name="nextAction" placeholder="Run comps, schedule tour…" className="mt-1" />
             </label>
-            <label className="block">
-              <span className="text-xs font-medium text-muted">Next action due</span>
-              <Input name="nextActionDue" type="date" className="mt-1" />
-            </label>
             <Button type="submit">Create deal</Button>
           </form>
         </CardBody>

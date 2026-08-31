@@ -17,7 +17,7 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
   },
   {
     href: "/deals",
-    label: "Acquisitions",
+    label: "Deals",
     icon: (
       <>
         <path d="M22 7 13.5 15.5 8.5 10.5 2 17" />
