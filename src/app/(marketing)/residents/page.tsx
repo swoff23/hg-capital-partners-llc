@@ -12,7 +12,6 @@ export const metadata: Metadata = {
  * tile shows as "Opening soon" instead of a dead link.
  */
 const BASELANE_URL: string | null = "https://www.baselane.com/login";
-const MOVE_IN_JOTFORM_URL: string | null = null;
 
 export default function ResidentsPage() {
   return (
@@ -33,7 +32,7 @@ export default function ResidentsPage() {
           <Tile
             title="Moving In"
             body="Move-in checklist and the condition form."
-            href={MOVE_IN_JOTFORM_URL}
+            href="/residents/moving-in"
           />
         </div>
       </div>
@@ -42,23 +41,29 @@ export default function ResidentsPage() {
 }
 
 function Tile({ title, body, href }: { title: string; body: string; href?: string | null }) {
+  // Internal pages (href starting with "/") stay in the same tab and skip the
+  // external-link arrow — that icon specifically signals "leaves this site."
+  const external = !!href && !href.startsWith("/");
+
   const inner = (
     <>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-[#e8eaee]">{title}</h2>
         {href ? (
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 shrink-0 text-[#767d8a] transition-colors group-hover:text-[#c8a765]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M7 17 17 7M7 7h10v10" />
-          </svg>
+          external && (
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5 shrink-0 text-[#767d8a] transition-colors group-hover:text-[#c8a765]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M7 17 17 7M7 7h10v10" />
+            </svg>
+          )
         ) : (
           <span className="rounded-full border border-white/10 px-2 py-0.5 text-[0.625rem] uppercase tracking-wider text-[#5b6576]">
             Soon
@@ -75,11 +80,14 @@ function Tile({ title, body, href }: { title: string; body: string; href?: strin
       ? "border-white/15 hover:border-[#c8a765]/60 hover:bg-white/[0.03]"
       : "border-white/[0.07] opacity-60");
 
-  return href ? (
+  if (!href) return <div className={className}>{inner}</div>;
+  return external ? (
     <Link href={href} target="_blank" rel="noopener noreferrer" className={className}>
       {inner}
     </Link>
   ) : (
-    <div className={className}>{inner}</div>
+    <Link href={href} className={className}>
+      {inner}
+    </Link>
   );
 }

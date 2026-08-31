@@ -274,8 +274,9 @@ model PropertyAttachment {
 // (DEFAULT_CAPEX_RULES); absence of this row == defaults.
 // ---------------------------------------------------------------------------
 model AppConfig {
-  id         String   @id @default("singleton")
-  capexRules Json     @default("{}")
-  updatedAt  DateTime @updatedAt
-  updatedBy  String? // user.name ?? user.email of the last editor
+  id               String   @id @default("singleton")
+  capexRules       Json     @default("{}")
+  moveInFormSchema Json     @default("{}")
+  updatedAt        DateTime @updatedAt
+  updatedBy        String? // user.name ?? user.email of the last editor
 }
