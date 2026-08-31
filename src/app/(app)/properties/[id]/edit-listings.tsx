@@ -62,6 +62,11 @@ export function ListingsSection({
   const [listings, setListings] = useState<EditableListing[]>(structuredClone(initial));
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, start] = useTransition();
+  // How many photo uploads are currently in flight, across every listing card. A photo
+  // isn't in `listings` state until its upload resolves and calls onAdd — saving while
+  // this is > 0 would silently persist the listings *without* the photo still uploading,
+  // with no error to show for it. Save stays disabled until every upload settles.
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const dirty = JSON.stringify(listings) !== JSON.stringify(initial);
 
@@ -114,8 +119,13 @@ export function ListingsSection({
             >
               + Add listing
             </Button>
-            <Button size="sm" onClick={save} disabled={pending}>
-              {pending ? "Saving…" : "Save"}
+            <Button
+              size="sm"
+              onClick={save}
+              disabled={pending || uploadingCount > 0}
+              title={uploadingCount > 0 ? "Wait for photo uploads to finish first" : undefined}
+            >
+              {pending ? "Saving…" : uploadingCount > 0 ? "Uploading…" : "Save"}
             </Button>
             <Button size="sm" variant="secondary" onClick={cancel}>
               Cancel
@@ -142,6 +152,7 @@ export function ListingsSection({
               propertyId={propertyId}
               unitLabels={unitLabels}
               mutate={mutate}
+              onUploadBusyChange={(busy) => setUploadingCount((c) => c + (busy ? 1 : -1))}
             />
           ))
         )}
@@ -169,8 +180,13 @@ export function ListingsSection({
               <Button size="sm" variant="secondary" onClick={discard}>
                 Discard
               </Button>
-              <Button size="sm" onClick={save} disabled={pending}>
-                {pending ? "Saving…" : "Save changes"}
+              <Button
+                size="sm"
+                onClick={save}
+                disabled={pending || uploadingCount > 0}
+                title={uploadingCount > 0 ? "Wait for photo uploads to finish first" : undefined}
+              >
+                {pending ? "Saving…" : uploadingCount > 0 ? "Uploading…" : "Save changes"}
               </Button>
             </div>
           </div>
@@ -233,12 +249,14 @@ function EditListingCard({
   propertyId,
   unitLabels,
   mutate,
+  onUploadBusyChange,
 }: {
   listing: EditableListing;
   index: number;
   propertyId: string;
   unitLabels: string[];
   mutate: (fn: (l: EditableListing[]) => void) => void;
+  onUploadBusyChange: (busy: boolean) => void;
 }) {
   // Include the listing's current label even if it's since been renamed/removed
   // from Units & access, so an existing pick never silently disappears.
@@ -292,6 +310,7 @@ function EditListingCard({
               [arr[j], arr[target]] = [arr[target], arr[j]];
             })
           }
+          onBusyChange={onUploadBusyChange}
         />
 
         <div className="grid gap-2 sm:grid-cols-3">
@@ -364,12 +383,15 @@ function PhotoGallery({
   onAdd,
   onRemove,
   onMove,
+  onBusyChange,
 }: {
   propertyId: string;
   photos: EditablePhoto[];
   onAdd: (photo: EditablePhoto) => void;
   onRemove: (index: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
+  /** Tells the parent (which gates Save on it) whenever an upload starts/finishes here. */
+  onBusyChange: (busy: boolean) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -399,22 +421,27 @@ function PhotoGallery({
     if (list.length === 0) return;
     setError(null);
     setBusy(true);
+    onBusyChange(true);
     const failures: string[] = [];
-    for (const file of list) {
-      try {
-        const blob = await upload(file.name, file, {
-          access: "public",
-          handleUploadUrl: "/api/blob/listing-photo-upload",
-          clientPayload: JSON.stringify({ propertyId }),
-        });
-        onAdd({ url: blob.url, pathname: blob.pathname });
-      } catch (e) {
-        // Keep going — one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
-        failures.push(`${file.name}: ${describeUploadError(e)}`);
+    try {
+      for (const file of list) {
+        try {
+          const blob = await upload(file.name, file, {
+            access: "public",
+            handleUploadUrl: "/api/blob/listing-photo-upload",
+            clientPayload: JSON.stringify({ propertyId }),
+          });
+          onAdd({ url: blob.url, pathname: blob.pathname });
+        } catch (e) {
+          // Keep going — one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
+          failures.push(`${file.name}: ${describeUploadError(e)}`);
+        }
       }
+      if (failures.length > 0) setError(failures.join("; "));
+    } finally {
+      setBusy(false);
+      onBusyChange(false);
     }
-    if (failures.length > 0) setError(failures.join("; "));
-    setBusy(false);
   }
 
   return (
