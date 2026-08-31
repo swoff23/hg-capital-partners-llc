@@ -110,6 +110,9 @@ export async function migrateProperties() {
 
     const s = sreoByAddr.get(key) ?? findSreoLoose(sreoByAddr, key);
 
+    const purchaseDate = parseExcelDate(s?.["I"]);
+    const refinanceDate = parseExcelDate(s?.["J"]);
+
     const data = {
       address: displayAddress,
       llcOwner: first("G") ?? s?.["C"] ?? null,
@@ -119,14 +122,14 @@ export async function migrateProperties() {
       refiTarget: s?.["F"] ?? null,
       status: s?.["G"] ?? null,
       strategy: s?.["H"] ?? null,
-      purchaseDate: parseExcelDate(s?.["I"]),
-      refinanceDate: parseExcelDate(s?.["J"]),
+      purchaseDate,
+      refinanceDate,
       purchasePrice: dec(parseMoney(s?.["M"]) ?? parseFloatOrNull(s?.["M"])),
       currentLoan: dec(parseFloatOrNull(s?.["N"])),
       value: dec(parseFloatOrNull(s?.["P"])),
       replacementCost: dec(parseFloatOrNull(s?.["Q"])),
       rehabAmount: dec(parseFloatOrNull(s?.["K"])),
-      rehabMonths: dec(parseFloatOrNull(s?.["L"])),
+      rehabMonths: dec(rehabMonths(purchaseDate, refinanceDate)),
       sqft: parseIntOrNull(s?.["E"]),
       unitCount: parseIntOrNull(s?.["D"]) ?? units.length,
       units: units as unknown as object,
@@ -152,20 +155,22 @@ export async function migrateProperties() {
     const existing = await prisma.property.findFirst({
       where: { address: { equals: address, mode: "insensitive" } },
     });
+    const purchaseDate = parseExcelDate(s["I"]);
+    const refinanceDate = parseExcelDate(s["J"]);
     const data = {
       address,
       llcOwner: s["C"] ?? null,
       refiTarget: s["F"] ?? null,
       status: s["G"] ?? null,
       strategy: s["H"] ?? null,
-      purchaseDate: parseExcelDate(s["I"]),
-      refinanceDate: parseExcelDate(s["J"]),
+      purchaseDate,
+      refinanceDate,
       purchasePrice: dec(parseFloatOrNull(s["M"])),
       currentLoan: dec(parseFloatOrNull(s["N"])),
       value: dec(parseFloatOrNull(s["P"])),
       replacementCost: dec(parseFloatOrNull(s["Q"])),
       rehabAmount: dec(parseFloatOrNull(s["K"])),
-      rehabMonths: dec(parseFloatOrNull(s["L"])),
+      rehabMonths: dec(rehabMonths(purchaseDate, refinanceDate)),
       sqft: parseIntOrNull(s["E"]),
       unitCount: parseIntOrNull(s["D"]),
       units: [] as unknown as object,
@@ -185,6 +190,21 @@ export async function migrateProperties() {
 
 function dec(n: number | null): string | null {
   return n == null ? null : n.toFixed(2);
+}
+
+/**
+ * Rehab duration = months between purchase and refinance.
+ *
+ * SREO column L holds this as an Excel formula `=(J-I)/30.1` (days ÷ ~days-per-month).
+ * When Refinance Date (J) is still blank — property not yet refinanced — Excel reads
+ * the empty cell as 0 and the formula yields a large negative (`-purchaseSerial/30.1`,
+ * e.g. -1523). So we recompute from the parsed dates and return null until refinanced,
+ * keeping the same 30.1-day month as the sheet so refinanced rows match their old values.
+ */
+function rehabMonths(purchase: Date | null, refinance: Date | null): number | null {
+  if (!purchase || !refinance) return null;
+  const days = (refinance.getTime() - purchase.getTime()) / 86_400_000;
+  return days > 0 ? days / 30.1 : null;
 }
 
 // Match a property key like "765 prospect ..." against an SREO key that may combine
