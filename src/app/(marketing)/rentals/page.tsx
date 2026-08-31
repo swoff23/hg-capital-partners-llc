@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
+import { PhotoCarousel } from "./photo-carousel";
 
 export const metadata: Metadata = {
   title: "Rentals — HG Capital Partners",
@@ -17,7 +18,7 @@ type ListingCardData = {
   beds: string | null;
   baths: string | null;
   sqft: number | null;
-  photoUrl: string | null;
+  photos: string[];
   leased: boolean;
 };
 
@@ -25,7 +26,10 @@ export default async function RentalsPage() {
   const rows = await prisma.listing.findMany({
     where: { status: { in: ["AVAILABLE", "LEASED"] } },
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
-    include: { property: { select: { address: true } } },
+    include: {
+      property: { select: { address: true } },
+      photos: { orderBy: { sortOrder: "asc" }, select: { url: true } },
+    },
   });
 
   const listings: ListingCardData[] = rows.map((l) => ({
@@ -37,7 +41,7 @@ export default async function RentalsPage() {
     beds: l.beds,
     baths: l.baths,
     sqft: l.sqft,
-    photoUrl: l.photoUrl,
+    photos: l.photos.map((p) => p.url),
     leased: l.status === "LEASED",
   }));
 
@@ -85,24 +89,15 @@ export default async function RentalsPage() {
 }
 
 function ListingCard({ listing: l }: { listing: ListingCardData }) {
-  const card = (
+  return (
     <div
       className={
         "group overflow-hidden rounded-2xl border transition-colors duration-200 " +
-        (l.leased
-          ? "border-white/[0.08] opacity-70"
-          : "border-white/15 hover:border-[#c8a765]/60 hover:bg-white/[0.03]")
+        (l.leased ? "border-white/[0.08] opacity-70" : "border-white/15 hover:border-[#c8a765]/60")
       }
     >
       <div className="relative aspect-[4/3] bg-white/[0.03]">
-        {l.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- external Blob URL, fine unoptimized
-          <img src={l.photoUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-[#4c525c]">
-            No photo yet
-          </div>
-        )}
+        <PhotoCarousel photos={l.photos} />
         {l.leased && (
           <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-[#08090b]/80 px-2.5 py-1 text-[0.625rem] font-medium uppercase tracking-wider text-[#e8eaee]">
             Leased
@@ -132,11 +127,16 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
           {l.sqft ? `${l.sqft} sqft` : "— sqft"}
         </p>
         {l.zillowUrl && !l.leased && (
-          <div className="mt-4 flex items-center gap-1.5 text-xs font-medium text-[#c8a765]">
+          <a
+            href={l.zillowUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 flex items-center gap-1.5 text-xs font-medium text-[#c8a765] hover:underline"
+          >
             View on Zillow
             <svg
               viewBox="0 0 24 24"
-              className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+              className="h-3 w-3"
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
@@ -146,17 +146,9 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
             >
               <path d="M7 17 17 7M7 7h10v10" />
             </svg>
-          </div>
+          </a>
         )}
       </div>
     </div>
-  );
-
-  return l.zillowUrl && !l.leased ? (
-    <a href={l.zillowUrl} target="_blank" rel="noopener noreferrer" className="block">
-      {card}
-    </a>
-  ) : (
-    card
   );
 }

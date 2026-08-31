@@ -4,6 +4,8 @@ import { upload } from "@vercel/blob/client";
 import { Badge, Button, EmptyState, Select } from "@/components/ui";
 import { updatePropertyListings } from "../actions";
 
+export type EditablePhoto = { url: string; pathname: string };
+
 export type EditableListing = {
   id: string | null; // null = not yet saved
   unitLabel: string;
@@ -14,8 +16,7 @@ export type EditableListing = {
   sqft: string;
   availableDate: string; // yyyy-mm-dd or ""
   status: "AVAILABLE" | "LEASED" | "HIDDEN";
-  photoUrl: string;
-  photoPathname: string;
+  photos: EditablePhoto[]; // order = display/carousel order
 };
 
 const inp =
@@ -43,17 +44,19 @@ function blankListing(): EditableListing {
     sqft: "",
     availableDate: "",
     status: "HIDDEN",
-    photoUrl: "",
-    photoPathname: "",
+    photos: [],
   };
 }
 
 export function ListingsSection({
   propertyId,
   initial,
+  unitLabels,
 }: {
   propertyId: string;
   initial: EditableListing[];
+  /** Unit labels from the Units & access section above — the only valid choices, so the two stay consistent. */
+  unitLabels: string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [listings, setListings] = useState<EditableListing[]>(structuredClone(initial));
@@ -102,7 +105,13 @@ export function ListingsSection({
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => mutate((x) => x.push(blankListing()))}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={unitLabels.length === 0}
+              title={unitLabels.length === 0 ? "Add a unit in Units & access above first" : undefined}
+              onClick={() => mutate((x) => x.push(blankListing()))}
+            >
               + Add listing
             </Button>
             <Button size="sm" onClick={save} disabled={pending}>
@@ -119,10 +128,21 @@ export function ListingsSection({
         {!editing ? (
           <ReadListings listings={initial} />
         ) : listings.length === 0 ? (
-          <EmptyState>No listings yet.</EmptyState>
+          unitLabels.length === 0 ? (
+            <EmptyState>Add at least one unit in Units &amp; access above before creating a listing.</EmptyState>
+          ) : (
+            <EmptyState>No listings yet.</EmptyState>
+          )
         ) : (
           listings.map((l, i) => (
-            <EditListingCard key={l.id ?? `new-${i}`} listing={l} index={i} propertyId={propertyId} mutate={mutate} />
+            <EditListingCard
+              key={l.id ?? `new-${i}`}
+              listing={l}
+              index={i}
+              propertyId={propertyId}
+              unitLabels={unitLabels}
+              mutate={mutate}
+            />
           ))
         )}
       </div>
@@ -166,9 +186,9 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
     <div className="space-y-2">
       {listings.map((l, i) => (
         <div key={l.id ?? i} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
-          {l.photoUrl ? (
+          {l.photos[0] ? (
             // eslint-disable-next-line @next/next/no-img-element -- small admin thumbnail, not the public page
-            <img src={l.photoUrl} alt="" className="h-10 w-14 shrink-0 rounded object-cover" />
+            <img src={l.photos[0].url} alt="" className="h-10 w-14 shrink-0 rounded object-cover" />
           ) : (
             <div className="h-10 w-14 shrink-0 rounded bg-background" />
           )}
@@ -176,6 +196,9 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">{l.unitLabel || "Unlabeled unit"}</span>
               <Badge tone={STATUS_TONE[l.status]}>{STATUS_LABEL[l.status]}</Badge>
+              {l.photos.length > 1 && (
+                <span className="text-xs text-muted">{l.photos.length} photos</span>
+              )}
             </div>
             <div className="mt-0.5 text-xs text-muted">
               {[
@@ -208,22 +231,36 @@ function EditListingCard({
   listing: l,
   index: i,
   propertyId,
+  unitLabels,
   mutate,
 }: {
   listing: EditableListing;
   index: number;
   propertyId: string;
+  unitLabels: string[];
   mutate: (fn: (l: EditableListing[]) => void) => void;
 }) {
+  // Include the listing's current label even if it's since been renamed/removed
+  // from Units & access, so an existing pick never silently disappears.
+  const options = l.unitLabel && !unitLabels.includes(l.unitLabel) ? [l.unitLabel, ...unitLabels] : unitLabels;
+
   return (
     <div className="rounded-lg border border-border">
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2">
-        <input
-          className={inp + " max-w-[160px]"}
-          placeholder="Unit label"
+        <Select
+          className="h-7 w-auto max-w-[180px] py-0 text-xs"
           value={l.unitLabel}
           onChange={(e) => mutate((x) => (x[i].unitLabel = e.target.value))}
-        />
+        >
+          <option value="" disabled>
+            Select unit…
+          </option>
+          {options.map((label) => (
+            <option key={label} value={label}>
+              {label}
+            </option>
+          ))}
+        </Select>
         <Select
           className="h-7 w-auto py-0 text-xs"
           value={l.status}
@@ -241,19 +278,23 @@ function EditListingCard({
         </button>
       </div>
 
-      <div className="grid gap-3 p-3 sm:grid-cols-[auto_1fr]">
-        <PhotoUpload
+      <div className="space-y-3 p-3">
+        <PhotoGallery
           propertyId={propertyId}
-          photoUrl={l.photoUrl}
-          onChange={(photoUrl, photoPathname) =>
+          photos={l.photos}
+          onAdd={(photo) => mutate((x) => void x[i].photos.push(photo))}
+          onRemove={(j) => mutate((x) => void x[i].photos.splice(j, 1))}
+          onMove={(j, dir) =>
             mutate((x) => {
-              x[i].photoUrl = photoUrl;
-              x[i].photoPathname = photoPathname;
+              const arr = x[i].photos;
+              const target = j + dir;
+              if (target < 0 || target >= arr.length) return;
+              [arr[j], arr[target]] = [arr[target], arr[j]];
             })
           }
         />
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           <label className="text-xs">
             <span className="mb-1 block text-muted">Zillow link</span>
             <input
@@ -316,73 +357,107 @@ function EditListingCard({
   );
 }
 
-function PhotoUpload({
+/** Horizontal strip of photo thumbnails — add, remove, and left/right reorder. */
+function PhotoGallery({
   propertyId,
-  photoUrl,
-  onChange,
+  photos,
+  onAdd,
+  onRemove,
+  onMove,
 }: {
   propertyId: string;
-  photoUrl: string;
-  onChange: (photoUrl: string, photoPathname: string) => void;
+  photos: EditablePhoto[];
+  onAdd: (photo: EditablePhoto) => void;
+  onRemove: (index: number) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function pick(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
+    const list = Array.from(files ?? []);
+    if (list.length === 0) return;
     setError(null);
     setBusy(true);
-    try {
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/blob/listing-photo-upload",
-        clientPayload: JSON.stringify({ propertyId }),
-      });
-      onChange(blob.url, blob.pathname);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      setError(/not configured|Blob store/i.test(msg) ? "Uploads aren't set up yet." : "Upload failed.");
+    for (const file of list) {
+      try {
+        const blob = await upload(file.name, file, {
+          access: "public",
+          handleUploadUrl: "/api/blob/listing-photo-upload",
+          clientPayload: JSON.stringify({ propertyId }),
+        });
+        onAdd({ url: blob.url, pathname: blob.pathname });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        setError(/not configured|Blob store/i.test(msg) ? "Uploads aren't set up yet." : "Upload failed.");
+        break;
+      }
     }
     setBusy(false);
   }
 
   return (
-    <div className="w-28 shrink-0">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="block h-20 w-28 overflow-hidden rounded-lg border border-dashed border-border bg-background text-center text-[10px] text-muted hover:border-primary"
-      >
-        {busy ? (
-          "Uploading…"
-        ) : photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- admin preview, not the public page
-          <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="flex h-full items-center justify-center px-1">Add photo</span>
-        )}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          void pick(e.target.files);
-          e.target.value = "";
-        }}
-      />
-      {photoUrl && !busy && (
+    <div>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((p, j) => (
+          <div key={p.pathname} className="group/photo relative h-20 w-28 shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element -- admin preview, not the public page */}
+            <img src={p.url} alt="" className="h-full w-full rounded-lg border border-border object-cover" />
+            <button
+              type="button"
+              onClick={() => onRemove(j)}
+              aria-label="Remove photo"
+              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white opacity-0 transition-opacity group-hover/photo:opacity-100"
+            >
+              ✕
+            </button>
+            <div className="absolute inset-x-1 bottom-1 flex justify-between opacity-0 transition-opacity group-hover/photo:opacity-100">
+              <button
+                type="button"
+                onClick={() => onMove(j, -1)}
+                disabled={j === 0}
+                aria-label="Move left"
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white disabled:opacity-30"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={() => onMove(j, 1)}
+                disabled={j === photos.length - 1}
+                aria-label="Move right"
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white disabled:opacity-30"
+              >
+                ›
+              </button>
+            </div>
+            {j === 0 && (
+              <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[9px] text-white">Cover</span>
+            )}
+          </div>
+        ))}
+
         <button
           type="button"
-          onClick={() => onChange("", "")}
-          className="mt-1 text-[10px] text-red-500 hover:underline"
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+          className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-background text-center text-[10px] text-muted hover:border-primary disabled:opacity-60"
         >
-          Remove photo
+          {busy ? "Uploading…" : "+ Add photo"}
         </button>
-      )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            void pick(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
       {error && <p className="mt-1 text-[10px] text-red-600">{error}</p>}
     </div>
   );

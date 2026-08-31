@@ -305,16 +305,32 @@ model Listing {
   availableDate DateTime?
   status        ListingStatus @default(HIDDEN)
 
-  // Deliberately its own url/pathname pair, not PropertyAttachment — a public
-  // listing photo and a private mortgage statement must never share a table.
-  photoUrl      String?
-  photoPathname String?
+  photos ListingPhoto[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([propertyId])
   @@index([status])
+}
+
+// A listing's photo gallery — deliberately its own table, not
+// PropertyAttachment: a public listing photo and a private mortgage
+// statement must never share a table. sortOrder controls both the admin
+// editor's left/right reorder and the public carousel's slide order; on
+// save the whole set is replaced (full-replace, same convention as
+// Property.units/buildingCapex), so a removed photo simply doesn't come back.
+model ListingPhoto {
+  id        String  @id @default(cuid())
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+  url       String
+  pathname  String
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
 }
 
 // ---------------------------------------------------------------------------

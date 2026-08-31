@@ -47,7 +47,10 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       },
       attachments: { orderBy: { createdAt: "asc" } },
       sourceDeal: { select: { id: true, address: true } },
-      listings: { orderBy: { createdAt: "asc" } },
+      listings: {
+        orderBy: { createdAt: "asc" },
+        include: { photos: { orderBy: { sortOrder: "asc" } } },
+      },
     },
   });
   if (!property) notFound();
@@ -64,11 +67,11 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     sqft: l.sqft?.toString() ?? "",
     availableDate: ymd(l.availableDate) ?? "",
     status: l.status,
-    photoUrl: l.photoUrl ?? "",
-    photoPathname: l.photoPathname ?? "",
+    photos: l.photos.map((p) => ({ url: p.url, pathname: p.pathname })),
   }));
 
   const unitCount = units.length || property.unitCount || 0;
+  const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
 
   return (
     <>
@@ -91,7 +94,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
           <UnitsSection propertyId={property.id} initial={units} rules={capexRules} />
 
-          <ListingsSection propertyId={property.id} initial={listings} />
+          <ListingsSection propertyId={property.id} initial={listings} unitLabels={unitLabels} />
         </div>
 
         <div className="min-w-0 space-y-4">

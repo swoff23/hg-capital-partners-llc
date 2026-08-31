@@ -295,16 +295,17 @@ const listingSchema = z.object({
   sqft: z.string(),
   availableDate: z.string(),
   status: z.enum(["AVAILABLE", "LEASED", "HIDDEN"]),
-  photoUrl: z.string(),
-  photoPathname: z.string(),
+  photos: z.array(z.object({ url: z.string(), pathname: z.string() })).max(20),
 });
 
 /**
  * Replace the whole set of listings for a property (sent from the client
  * editor). Unlike units/buildingCapex this is a real table, not a JSON blob —
  * diffed against what's currently stored: rows no longer present are deleted
- * (their blob photo cleaned up too), existing ids are updated in place, new
- * rows (id: null, from "+ Add listing") are created.
+ * (their blob photos cleaned up too), existing ids are updated in place, new
+ * rows (id: null, from "+ Add listing") are created. A listing's photo set is
+ * itself full-replace on every save — same convention as the rest of this
+ * function — so any photo blob no longer referenced gets deleted too.
  */
 export async function updatePropertyListings(propertyId: string, listings: unknown) {
   await requireUser();
@@ -320,18 +321,33 @@ export async function updatePropertyListings(propertyId: string, listings: unkno
     sqft: l.sqft.trim() ? Math.max(0, Math.trunc(Number(l.sqft))) || null : null,
     availableDate: dateOrNull(l.availableDate.trim() || null),
     status: l.status,
-    photoUrl: l.photoUrl.trim() || null,
-    photoPathname: l.photoPathname.trim() || null,
+    photos: l.photos
+      .filter((p) => p.url.trim() && p.pathname.trim())
+      .map((p, sortOrder) => ({ url: p.url.trim(), pathname: p.pathname.trim(), sortOrder })),
   }));
 
-  const existing = await prisma.listing.findMany({ where: { propertyId }, select: { id: true, photoUrl: true } });
+  const existing = await prisma.listing.findMany({
+    where: { propertyId },
+    select: { id: true, photos: { select: { url: true } } },
+  });
+  const existingById = new Map(existing.map((e) => [e.id, e]));
   const keepIds = new Set(clean.map((l) => l.id).filter(Boolean) as string[]);
   const toDelete = existing.filter((e) => !keepIds.has(e.id));
 
-  for (const row of toDelete) {
-    if (!row.photoUrl) continue;
+  // Blob URLs to clean up: every photo on a deleted listing, plus any photo
+  // dropped from an updated listing's gallery (present before, absent now).
+  const urlsToDelete: string[] = [];
+  for (const row of toDelete) urlsToDelete.push(...row.photos.map((p) => p.url));
+  for (const l of clean) {
+    if (!l.id) continue;
+    const before = existingById.get(l.id);
+    if (!before) continue;
+    const afterUrls = new Set(l.photos.map((p) => p.url));
+    for (const p of before.photos) if (!afterUrls.has(p.url)) urlsToDelete.push(p.url);
+  }
+  for (const url of urlsToDelete) {
     try {
-      await del(row.photoUrl);
+      await del(url);
     } catch {
       // Blob already gone / token missing — still drop the DB row.
     }
@@ -339,10 +355,15 @@ export async function updatePropertyListings(propertyId: string, listings: unkno
 
   await prisma.$transaction([
     ...toDelete.map((row) => prisma.listing.delete({ where: { id: row.id } })),
-    ...clean.map((l) =>
+    ...clean.map(({ photos, ...l }) =>
       l.id
-        ? prisma.listing.update({ where: { id: l.id }, data: { ...l, id: undefined, propertyId } })
-        : prisma.listing.create({ data: { ...l, id: undefined, propertyId } }),
+        ? prisma.listing.update({
+            where: { id: l.id },
+            data: { ...l, id: undefined, propertyId, photos: { deleteMany: {}, create: photos } },
+          })
+        : prisma.listing.create({
+            data: { ...l, id: undefined, propertyId, photos: { create: photos } },
+          }),
     ),
   ]);
 
