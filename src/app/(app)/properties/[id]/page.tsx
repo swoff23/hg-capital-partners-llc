@@ -16,6 +16,7 @@ import { UnitsSection } from "./edit-units";
 import { ListingsSection, type EditableListing } from "./edit-listings";
 import { BuildingCapexSection } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
+import { PropertyFinancialsCard } from "./financials";
 
 const ymd = (dt: Date | null) => dt?.toISOString().slice(0, 10) ?? null;
 
@@ -88,6 +89,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
+          <PropertyFinancialsCard propertyId={property.id} />
+
           <CapexForecastCard units={units} building={buildingCapex} rules={capexRules} />
 
           <BuildingCapexSection propertyId={property.id} initial={buildingCapex} rules={capexRules} />
