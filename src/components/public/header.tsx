@@ -2,14 +2,13 @@ import Link from "next/link";
 
 /**
  * Top nav for every public page (PRD §3: "Primary navigation: Rentals |
- * Residents | About | HG Login"). Deliberately plain text, not a pill or
- * button — HG Login stays the quietest link on the page; it's a door for two
- * people, not a call to action.
+ * Residents | HG Login"). Deliberately plain text, not a pill or button —
+ * HG Login stays the quietest link on the page; it's a door for two people,
+ * not a call to action.
  */
 const LINKS = [
   { href: "/rentals", label: "Rentals" },
   { href: "/residents", label: "Residents" },
-  { href: "/about", label: "About" },
 ];
 
 export function PublicHeader() {

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState } from "@/components/ui";
-import { fmtDate, relativeDays } from "@/lib/utils";
+import { relativeDays } from "@/lib/utils";
 import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
+import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
 import { PortfolioCapexForecastCard } from "./portfolio-capex";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const user = await requireUser();
 
-  const [myTasks, counts, recentNotes, capexProps, capexRules] = await Promise.all([
+  const [myTasks, counts, capexProps, capexRules] = await Promise.all([
     prisma.task.findMany({
       where: { assigneeUserId: user.id, status: "OPEN" },
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
@@ -20,24 +21,17 @@ export default async function HomePage() {
       include: { property: { select: { id: true, address: true } } },
     }),
     Promise.all([
-      prisma.deal.count({ where: { status: { notIn: ["Pass", "Lost"] } } }),
+      prisma.deal.count({ where: { status: { in: ACTIVE_DEAL_STATUSES } } }),
       prisma.property.count(),
       prisma.task.count({ where: { status: "OPEN" } }),
-      prisma.contact.count({ where: { active: true } }),
     ]),
-    prisma.dealNote.findMany({
-      orderBy: { noteDate: "desc" },
-      where: { noteDate: { not: null } },
-      take: 8,
-      include: { deal: { select: { id: true, address: true } } },
-    }),
     prisma.property.findMany({
       select: { id: true, address: true, units: true, buildingCapex: true },
     }),
     getCapexRules(),
   ]);
 
-  const [activeDeals, properties, openTasks, vendors] = counts;
+  const [activeDeals, properties, openTasks] = counts;
   const capexProperties = capexProps.map((p) => ({
     id: p.id,
     address: p.address,
@@ -49,17 +43,16 @@ export default async function HomePage() {
     <>
       <PageHeader title={`Good ${greeting()}, ${user.name?.split(" ")[0] ?? "there"}`} subtitle="What needs attention" />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-3 gap-3">
         <Stat label="Active deals" value={activeDeals} href="/deals" />
         <Stat label="Properties" value={properties} href="/properties" />
         <Stat label="Open tasks" value={openTasks} href="/tasks" />
-        <Stat label="Vendors" value={vendors} href="/contractors" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PortfolioCapexForecastCard properties={capexProperties} rules={capexRules} />
 
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader className="flex items-center justify-between">
             <CardTitle>My open tasks</CardTitle>
             <Link href="/tasks?assignee=me" className="text-xs text-primary">
@@ -97,25 +90,6 @@ export default async function HomePage() {
                 ))}
               </ul>
             )}
-          </CardBody>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent acquisition activity</CardTitle>
-          </CardHeader>
-          <CardBody className="p-0">
-            <ul className="divide-y divide-border">
-              {recentNotes.map((n) => (
-                <li key={n.id} className="flex gap-3 px-4 py-2.5 text-sm">
-                  <span className="w-20 shrink-0 text-xs text-muted">{fmtDate(n.noteDate)}</span>
-                  <Link href={`/deals/${n.deal.id}`} className="w-40 shrink-0 truncate text-xs font-medium hover:underline">
-                    {shortAddr(n.deal.address)}
-                  </Link>
-                  <span className="min-w-0 flex-1 truncate text-muted">{n.body}</span>
-                </li>
-              ))}
-            </ul>
           </CardBody>
         </Card>
       </div>
