@@ -14,6 +14,7 @@ import {
   parsePlainProfitAndLoss,
   parseProfitAndLossByClass,
   parseProfitAndLossDetail,
+  PNL_DETAIL_COLUMNS,
 } from "./report-parse";
 import { computeNoi } from "./compute";
 import { checkReconciliation } from "./reconcile";
@@ -112,12 +113,7 @@ async function syncMasterData(realmId: string, accessToken: string) {
   const entityByCode = new Map(entities.map((e) => [e.code, e.id]));
 
   // 2. classes
-  const classRows = await query<QboClassRow>(
-    realmId,
-    "Class",
-    "Id, Name, FullyQualifiedName, ParentRef, SubClass, Active",
-    accessToken,
-  );
+  const classRows = await query<QboClassRow>(realmId, "Class", accessToken);
   const properties = await prisma.property.findMany({ select: { id: true, address: true } });
   const propIndex = buildPropertyIndex(properties);
 
@@ -162,12 +158,7 @@ async function syncMasterData(realmId: string, accessToken: string) {
   }
 
   // 3. accounts
-  const acctRows = await query<QboAccountRow>(
-    realmId,
-    "Account",
-    "Id, Name, FullyQualifiedName, AccountType, AccountSubType, Classification, Active, ParentRef",
-    accessToken,
-  );
+  const acctRows = await query<QboAccountRow>(realmId, "Account", accessToken);
   for (const a of acctRows) {
     const fqn = a.FullyQualifiedName || a.Name;
     const classification = a.Classification ?? "";
@@ -215,12 +206,7 @@ async function syncMasterData(realmId: string, accessToken: string) {
   }
 
   // 4. vendors — matched to Contact best-effort, stored, not surfaced in v1
-  const vendorRows = await query<QboVendorRow>(
-    realmId,
-    "Vendor",
-    "Id, DisplayName, Active",
-    accessToken,
-  );
+  const vendorRows = await query<QboVendorRow>(realmId, "Vendor", accessToken);
   const contacts = await prisma.contact.findMany({ select: { id: true, fullName: true, company: true } });
   const contactByName = new Map<string, string>();
   for (const ct of contacts) {
@@ -313,8 +299,7 @@ export async function runQuickbooksSync(opts: { trigger: QboSyncTrigger }): Prom
             start_date: start,
             end_date: end,
             accounting_method: basis === "CASH" ? "Cash" : "Accrual",
-            columns:
-              "tx_date,txn_type,doc_num,name,memo,account_name,split_acc,klass_name,subt_nat_amount",
+            columns: PNL_DETAIL_COLUMNS.join(","),
             sort_by: "tx_date",
           },
           accessToken,

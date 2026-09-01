@@ -56,6 +56,7 @@ function colKey(c: QboColumn): string | undefined {
   return c.MetaData?.find((m) => m.Name === "ColKey")?.Value;
 }
 
+/** `group` values — used by the plain/by-class ProfitAndLoss report (confirmed live: it sets `group` on flat top-level rows). */
 const SECTION_GROUPS: Record<string, PnlSection> = {
   Income: "Income",
   COGS: "COGS",
@@ -66,16 +67,35 @@ const SECTION_GROUPS: Record<string, PnlSection> = {
 /** Summary-only sections — no transaction rows of their own; we re-sum leaves. */
 const SKIP_GROUPS = new Set(["GrossProfit", "NetOperatingIncome", "NetOtherIncome", "NetIncome"]);
 
+/**
+ * Header text — used by ProfitAndLossDetail instead (confirmed live: it never
+ * sets `group` on any row; sections are only identifiable by name, one level
+ * under an unnamed wrapper — see the comment at its call site below).
+ */
+const SECTION_NAMES: Record<string, PnlSection> = {
+  Income: "Income",
+  "Cost of Goods Sold": "COGS",
+  Expenses: "Expenses",
+  "Other Income": "OtherIncome",
+  "Other Expense": "OtherExpenses",
+  "Other Expenses": "OtherExpenses", // seen written either way live
+};
+
 // --- ProfitAndLossDetail -> RawDetailLine[] -------------------------------
 
-/** The `columns` we request; a QBO 200 that omits any of these is a silent failure. */
+/**
+ * The `columns` we request. `account_name` is deliberately excluded from the
+ * required set below (and can be dropped from the request entirely) —
+ * confirmed live that QBO doesn't support it as a flat column on this report;
+ * account name always comes from the section header instead. Requiring it
+ * here would be a false-positive shape failure on every sync.
+ */
 export const PNL_DETAIL_COLUMNS = [
   "tx_date",
   "txn_type",
   "doc_num",
   "name",
   "memo",
-  "account_name",
   "split_acc",
   "klass_name",
   "subt_nat_amount",
@@ -146,7 +166,12 @@ export function parseProfitAndLossDetail(
           accountQboId: acctCell.id ?? header.id,
           accountName,
           splitAccount: cell(iSplit).value || null,
-          classQboId: classCell.id ?? null,
+          // `||` not `??`: an unclassed line's cell is `{value:"",id:""}` —
+          // present but empty, not absent — confirmed live against the
+          // sandbox. `??` doesn't catch that, which silently left `classKey`
+          // as `""` instead of the UNCLASSED sentinel and broke the by-class
+          // reconciliation cross-check for every unclassed dollar.
+          classQboId: classCell.id || null,
           className: classCell.value || null,
           amountCents,
           section,
@@ -158,26 +183,39 @@ export function parseProfitAndLossDetail(
     }
   };
 
+  // Unlike the plain/by-class ProfitAndLoss report, ProfitAndLossDetail never
+  // sets `group` on any row — confirmed live against the sandbox. Instead the
+  // whole report is wrapped in one or two unnamed-to-us containers
+  // ("Ordinary Income/Expenses", "Other Income/Expense"), each holding the
+  // real sections (Income / Cost of Goods Sold / Expenses / Other Income /
+  // Other Expense) as its direct children, identified only by their Header
+  // text. A bare trailing "Net Income" total (no Header at all) can also
+  // appear as its own top-level sibling. So: for every top-level row, look
+  // one level down and match children by name; anything unnamed or
+  // unrecognized (the wrapper itself, "Gross Profit", the trailing total) is
+  // silently skipped rather than walked, since it carries no lines of its
+  // own beyond what its named children already contribute.
   for (const top of json.Rows?.Row ?? []) {
-    const group = top.group ?? "";
-    if (SKIP_GROUPS.has(group)) continue;
-    const section = SECTION_GROUPS[group];
-    if (!section) continue;
-    walk(top, section, { name: "", id: null });
+    for (const child of top.Rows?.Row ?? []) {
+      const name = child.Header?.ColData?.[0]?.value;
+      const section = name ? SECTION_NAMES[name] : undefined;
+      if (!section) continue;
+      walk(child, section, { name: "", id: null });
 
-    // Assert the parsed lines tie to this section's Summary — catches a sign
-    // convention surprise, a dropped row, or the wrong amount column.
-    const summaryCell = top.Summary?.ColData;
-    if (summaryCell?.length) {
-      const reported =
-        toCents(summaryCell[iAmt]?.value) || toCents(summaryCell[summaryCell.length - 1]?.value);
-      const parsed = sectionTotals.get(section) ?? 0;
-      if (reported !== 0 && Math.abs(parsed - reported) > 1) {
-        throw new QboReportShapeError(
-          `ProfitAndLossDetail section "${group}" line-sum ${parsed}¢ ≠ Summary ${reported}¢ ` +
-            `(basis ${basis}, ${periodMonth}) — check the amount column / sign convention`,
-          { parsed, reported },
-        );
+      // Assert the parsed lines tie to this section's Summary — catches a
+      // sign convention surprise, a dropped row, or the wrong amount column.
+      const summaryCell = child.Summary?.ColData;
+      if (summaryCell?.length) {
+        const reported =
+          toCents(summaryCell[iAmt]?.value) || toCents(summaryCell[summaryCell.length - 1]?.value);
+        const parsed = sectionTotals.get(section) ?? 0;
+        if (reported !== 0 && Math.abs(parsed - reported) > 1) {
+          throw new QboReportShapeError(
+            `ProfitAndLossDetail section "${name}" line-sum ${parsed}¢ ≠ Summary ${reported}¢ ` +
+              `(basis ${basis}, ${periodMonth}) — check the amount column / sign convention`,
+            { parsed, reported },
+          );
+        }
       }
     }
   }
@@ -197,7 +235,12 @@ export function parseProfitAndLossByClass(input: unknown): PnlByClassCell[] {
     if (key === "total" || key === "grand_total") return;
     classCols.push({
       idx,
-      classId: key && key !== "NotSpecified" && key !== "" ? key : null,
+      // Intuit's real ColKey for the unclassed bucket is "not_specified"
+      // (snake_case) — confirmed live against the sandbox, not the
+      // "NotSpecified" this originally assumed. Without an exact match here
+      // that whole column gets treated as a literal class id, so every
+      // unclassed dollar silently fails the by-class reconciliation tie-out.
+      classId: key && key !== "not_specified" && key !== "" ? key : null,
       title: c.ColTitle || "Not Specified",
     });
   });
@@ -207,25 +250,37 @@ export function parseProfitAndLossByClass(input: unknown): PnlByClassCell[] {
 
   const out: PnlByClassCell[] = [];
 
+  const emitCell = (cd: QboColData[], section: PnlSection) => {
+    const accountName = cd[0]?.value ?? "";
+    const accountQboId = cd[0]?.id ?? null;
+    for (const c of classCols) {
+      const cents = toCents(cd[c.idx]?.value);
+      if (cents === 0) continue;
+      out.push({
+        accountQboId,
+        accountName,
+        classQboId: c.classId,
+        className: c.title,
+        section,
+        amountCents: cents,
+      });
+    }
+  };
+
   const walk = (row: QboRow, section: PnlSection) => {
     for (const child of row.Rows?.Row ?? []) {
       if (child.type === "Data" && child.ColData?.length) {
-        const cd = child.ColData;
-        const accountName = cd[0]?.value ?? "";
-        const accountQboId = cd[0]?.id ?? null;
-        for (const c of classCols) {
-          const cents = toCents(cd[c.idx]?.value);
-          if (cents === 0) continue;
-          out.push({
-            accountQboId,
-            accountName,
-            classQboId: c.classId,
-            className: c.title,
-            section,
-            amountCents: cents,
-          });
-        }
+        emitCell(child.ColData, section);
       } else if (child.type === "Section" || child.Rows) {
+        // A parent account with sub-accounts (e.g. "Landscaping Services"
+        // over "Job Materials"/"Labor") can carry its own direct-posted
+        // amount right on ITS OWN Header.ColData, alongside its name —
+        // confirmed live: the parent's total only ties out once that's
+        // added to its children's sum. A real account's Header carries an
+        // `id`; a pure category label ("Income", "Expenses", ...) never
+        // does, so this can't double-count those.
+        const hd = child.Header?.ColData;
+        if (hd?.length && hd[0]?.id) emitCell(hd, section);
         walk(child, section);
       }
     }

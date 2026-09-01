@@ -111,14 +111,17 @@ async function qboFetch(pathAndQuery: string, accessToken: string, attempt = 0):
 export async function query<T = Record<string, unknown>>(
   realmId: string,
   entity: string,
-  columns: string,
   accessToken: string,
 ): Promise<T[]> {
   const out: T[] = [];
   let start = 1;
   const PAGE = 1000;
   for (;;) {
-    const q = `SELECT ${columns} FROM ${entity} WHERE Active IN (true, false) STARTPOSITION ${start} MAXRESULTS ${PAGE}`;
+    // Always `SELECT *`: QBO's query language rejects an explicit column list
+    // that names a reference-type field (e.g. `ParentRef`) with a generic
+    // "QueryProcessingError" — confirmed live against the sandbox. `SELECT *`
+    // returns the full object regardless, so there's no payload cost to it.
+    const q = `SELECT * FROM ${entity} WHERE Active IN (true, false) STARTPOSITION ${start} MAXRESULTS ${PAGE}`;
     const json = (await qboFetch(
       `/v3/company/${realmId}/query?query=${encodeURIComponent(q)}&minorversion=${qbo.minorVersion}`,
       accessToken,
