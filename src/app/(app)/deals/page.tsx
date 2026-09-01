@@ -6,6 +6,7 @@ import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES } from "@/lib/config";
 import { DealFilters } from "./filters";
 import { DealRowEditable } from "./deal-row";
 import { SortHeader } from "./sort-header";
+import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
 
 type SP = { status?: string; statuses?: string; q?: string; sort?: string };
 
@@ -19,6 +20,7 @@ const SORT_COLUMNS: Record<
   (desc: boolean) => Prisma.DealOrderByWithRelationInput
 > = {
   address: (desc) => ({ address: desc ? "desc" : "asc" }),
+  units: (desc) => ({ units: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   theirPrice: (desc) => ({ theirPrice: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   ourPrice: (desc) => ({ ourPrice: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   nextAction: (desc) => ({ nextAction: { sort: desc ? "desc" : "asc", nulls: "last" } }),
@@ -109,42 +111,50 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
             <EmptyState>No deals match.</EmptyState>
           </div>
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <SortHeader label="Address" field="address" />
-                <SortHeader label="Status" field="status" />
-                <SortHeader label="Their price" field="theirPrice" align="right" />
-                <SortHeader label="Our price" field="ourPrice" align="right" />
-                <Th>Latest note</Th>
-                <SortHeader label="Next action" field="nextAction" />
-                <SortHeader label="Updated" field="updated" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {deals.map((d) => (
-                <DealRowEditable
-                  key={d.id}
-                  deal={{
-                    id: d.id,
-                    address: d.address,
-                    status: d.status,
-                    theirPrice: d.theirPrice ? Number(d.theirPrice) : null,
-                    theirPriceRaw: d.theirPriceRaw,
-                    ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
-                    ourPriceRaw: d.ourPriceRaw,
-                    nextAction: d.nextAction,
-                    sourceUrl: d.sourceUrl,
-                    updatedAt: d.updatedAt.toISOString(),
-                    latestNotes: d.notes.map((n) => ({
-                      body: n.body,
-                      date: (n.noteDate ?? n.createdAt).toISOString(),
-                    })),
-                  }}
-                />
-              ))}
-            </tbody>
-          </Table>
+          <ColumnWidthsProvider>
+            <Table style={{ tableLayout: "fixed" }}>
+              <Cols />
+              <thead>
+                <tr>
+                  <SortHeader label="Address" field="address" resizeKey="address" />
+                  <SortHeader label="Status" field="status" resizeKey="status" />
+                  <SortHeader label="Units" field="units" resizeKey="units" />
+                  <SortHeader label="Their price" field="theirPrice" resizeKey="theirPrice" />
+                  <SortHeader label="Our price" field="ourPrice" resizeKey="ourPrice" />
+                  <Th className="relative">
+                    Latest note
+                    <ResizeHandle columnKey="latestNote" />
+                  </Th>
+                  <SortHeader label="Next action" field="nextAction" resizeKey="nextAction" />
+                  <SortHeader label="Updated" field="updated" resizeKey="updated" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {deals.map((d) => (
+                  <DealRowEditable
+                    key={d.id}
+                    deal={{
+                      id: d.id,
+                      address: d.address,
+                      status: d.status,
+                      units: d.units,
+                      theirPrice: d.theirPrice ? Number(d.theirPrice) : null,
+                      theirPriceRaw: d.theirPriceRaw,
+                      ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
+                      ourPriceRaw: d.ourPriceRaw,
+                      nextAction: d.nextAction,
+                      sourceUrl: d.sourceUrl,
+                      updatedAt: d.updatedAt.toISOString(),
+                      latestNotes: d.notes.map((n) => ({
+                        body: n.body,
+                        date: (n.noteDate ?? n.createdAt).toISOString(),
+                      })),
+                    }}
+                  />
+                ))}
+              </tbody>
+            </Table>
+          </ColumnWidthsProvider>
         )}
       </Card>
       {truncated && (

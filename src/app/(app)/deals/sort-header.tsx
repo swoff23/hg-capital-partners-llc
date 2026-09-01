@@ -1,8 +1,9 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { ResizeHandle, type ColumnKey } from "./column-widths";
 
-export type SortField = "address" | "status" | "theirPrice" | "ourPrice" | "nextAction" | "updated";
+export type SortField = "address" | "status" | "units" | "theirPrice" | "ourPrice" | "nextAction" | "updated";
 
 // No ?sort param means "grouped by pipeline status" — same default as the DB query in page.tsx.
 const DEFAULT_SORT = "status";
@@ -16,11 +17,13 @@ export function SortHeader({
   field,
   className,
   align = "left",
+  resizeKey,
 }: {
   label: string;
   field: SortField;
   className?: string;
   align?: "left" | "right";
+  resizeKey?: ColumnKey;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -57,7 +60,7 @@ export function SortHeader({
   return (
     <th
       aria-sort={active ? (desc ? "descending" : "ascending") : "none"}
-      className={cn(TH_BASE, align === "right" ? "text-right" : "text-left", className)}
+      className={cn(TH_BASE, "relative", align === "right" ? "text-right" : "text-left", className)}
     >
       <button
         type="button"
@@ -70,6 +73,7 @@ export function SortHeader({
         {label}
         {caret}
       </button>
+      {resizeKey && <ResizeHandle columnKey={resizeKey} />}
     </th>
   );
 }

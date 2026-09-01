@@ -11,6 +11,7 @@ export type DealRow = {
   id: string;
   address: string;
   status: string;
+  units: number | null;
   theirPrice: number | null;
   theirPriceRaw: string | null;
   ourPrice: number | null;
@@ -84,7 +85,24 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         </select>
       </Td>
 
-      <Td className="text-right">
+      <Td>
+        <input
+          key={`u-${deal.units}`}
+          type="number"
+          min={0}
+          defaultValue={deal.units ?? ""}
+          onBlur={(e) => {
+            const raw = e.target.value.trim();
+            const parsed = raw === "" ? null : Number.parseInt(raw, 10);
+            const next = parsed != null && Number.isNaN(parsed) ? deal.units : parsed;
+            save({ units: next }, deal.units, next);
+          }}
+          placeholder="—"
+          className={`${cell} tabular-nums`}
+        />
+      </Td>
+
+      <Td>
         <input
           key={`tp-${deal.theirPrice}-${deal.theirPriceRaw}`}
           defaultValue={priceDisplay(deal.theirPrice, deal.theirPriceRaw)}
@@ -92,10 +110,10 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
             save({ theirPriceRaw: e.target.value }, priceDisplay(deal.theirPrice, deal.theirPriceRaw), e.target.value)
           }
           placeholder="—"
-          className={`${cell} text-right tabular-nums`}
+          className={`${cell} tabular-nums`}
         />
       </Td>
-      <Td className="text-right">
+      <Td>
         <input
           key={`op-${deal.ourPrice}-${deal.ourPriceRaw}`}
           defaultValue={priceDisplay(deal.ourPrice, deal.ourPriceRaw)}
@@ -103,11 +121,11 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
             save({ ourPriceRaw: e.target.value }, priceDisplay(deal.ourPrice, deal.ourPriceRaw), e.target.value)
           }
           placeholder="—"
-          className={`${cell} text-right tabular-nums`}
+          className={`${cell} tabular-nums`}
         />
       </Td>
 
-      <Td className="max-w-[240px] text-xs text-muted">
+      <Td className="text-xs text-muted">
         {deal.latestNotes.length > 0 && (
           <div className="space-y-0.5">
             {deal.latestNotes.map((n, i) => (
@@ -119,7 +137,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         )}
       </Td>
 
-      <Td className="min-w-[220px]">
+      <Td>
         <input
           defaultValue={deal.nextAction ?? ""}
           onBlur={(e) => save({ nextAction: e.target.value }, deal.nextAction, e.target.value)}
@@ -128,7 +146,9 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         />
       </Td>
 
-      <Td className="whitespace-nowrap text-xs text-muted">{fmtDate(deal.updatedAt)}</Td>
+      <Td className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted">
+        {fmtDate(deal.updatedAt)}
+      </Td>
     </tr>
   );
 }
