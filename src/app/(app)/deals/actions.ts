@@ -132,6 +132,7 @@ export async function updateDeal(id: string, formData: FormData) {
 export async function patchDeal(
   id: string,
   patch: Partial<{
+    address: string;
     status: string;
     priority: string | null;
     passReason: string | null;
@@ -145,6 +146,7 @@ export async function patchDeal(
   const user = await requireUser();
   const before = await prisma.deal.findUniqueOrThrow({ where: { id } });
   const data: Record<string, unknown> = {};
+  if (patch.address?.trim()) data.address = patch.address.trim();
   if (patch.status) data.status = patch.status;
   if ("priority" in patch) data.priority = patch.priority || null;
   if ("passReason" in patch) data.passReason = patch.passReason || null;

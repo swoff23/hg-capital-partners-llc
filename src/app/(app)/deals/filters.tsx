@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { StatusMultiSelect } from "./status-multiselect";
 
 const TABS = [
   { key: "all", label: "All" },
+  { key: "5 - TBD", label: "TBD" },
   { key: "active", label: "Active" },
   { key: "Pass", label: "Pass" },
 ] as const;
@@ -42,8 +44,9 @@ export function DealFilters({
   const totalAll = Object.values(statusCounts).reduce((a, b) => a + b, 0);
   const passCount = statusCounts["Pass"] ?? 0;
   const counts: Record<string, number> = {
-    active: totalAll - passCount - (statusCounts["CLOSED!"] ?? 0),
     all: totalAll,
+    "5 - TBD": statusCounts["5 - TBD"] ?? 0,
+    active: ACTIVE_DEAL_STATUSES.reduce((sum, s) => sum + (statusCounts[s] ?? 0), 0),
     Pass: passCount,
   };
 

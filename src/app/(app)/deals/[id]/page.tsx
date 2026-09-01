@@ -7,6 +7,7 @@ import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { BackLink } from "@/components/back-link";
 import { addDealNote } from "../actions";
 import {
+  AddressField,
   StatusControl,
   PassReasonControl,
   PriceField,
@@ -44,10 +45,9 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
     <div className="mx-auto max-w-2xl">
       <div className="mb-4">
         <BackLink fallback="/deals" label="Deals" />
-        <h1 className="mt-1 text-xl font-semibold tracking-tight">{deal.address}</h1>
-        <p className="mt-1 text-xs text-muted">
-          Added {fmtDate(deal.createdAt)} · Updated {fmtDate(deal.updatedAt)}
-        </p>
+        <div className="mt-1">
+          <AddressField id={deal.id} value={deal.address} />
+        </div>
         {deal.convertedProperty && (
           <p className="mt-1 text-xs text-muted">
             Converted →{" "}

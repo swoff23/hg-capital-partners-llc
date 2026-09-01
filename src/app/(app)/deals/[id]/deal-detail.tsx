@@ -24,11 +24,69 @@ function Chevron() {
 }
 
 /* ------------------------------------------------------------------ *
+ * Address — page heading, editable in place
+ * ------------------------------------------------------------------ */
+
+export function AddressField({ id, value }: { id: string; value: string }) {
+  const [v, setV] = useState(value);
+  const [seen, setSeen] = useState(value);
+  const [pending, start] = useTransition();
+  if (value !== seen) {
+    setSeen(value);
+    setV(value);
+  }
+
+  function commit() {
+    const trimmed = v.trim();
+    if (!trimmed || trimmed === value) {
+      setV(value);
+      return;
+    }
+    start(() => patchDeal(id, { address: trimmed }));
+  }
+
+  return (
+    <div className="group/addr relative -mx-2">
+      <input
+        aria-label="Address"
+        value={v}
+        disabled={pending}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setV(value);
+            e.currentTarget.blur();
+          }
+        }}
+        className="w-full rounded-md bg-transparent px-2 py-1 pr-6 text-xl font-semibold tracking-tight text-foreground outline-none transition-colors hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 disabled:opacity-40"
+      />
+      <svg
+        aria-hidden
+        viewBox="0 0 16 16"
+        className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted opacity-0 transition-opacity group-hover/addr:opacity-100"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      >
+        <path d="M11.3 2.3a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-7.2 7.2-3 .8.8-3 7.2-7.2Z" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Status — the primary workflow control, styled like a colored badge
  * ------------------------------------------------------------------ */
 
 export function StatusControl({ id, status }: { id: string; status: string }) {
   const [pending, start] = useTransition();
+  // Normally just DEAL_STATUSES in pipeline order. Only prepend `status` when it's a legacy
+  // value no longer in that list, so it still shows up as selected.
+  const statusOptions: readonly string[] = (DEAL_STATUSES as readonly string[]).includes(status)
+    ? DEAL_STATUSES
+    : [status, ...DEAL_STATUSES];
   return (
     <div className="relative inline-block">
       <select
@@ -42,7 +100,7 @@ export function StatusControl({ id, status }: { id: string; status: string }) {
           pending && "opacity-60",
         )}
       >
-        {[...new Set([status, ...DEAL_STATUSES])].map((s) => (
+        {statusOptions.map((s) => (
           <option key={s} value={s}>
             {s}
           </option>

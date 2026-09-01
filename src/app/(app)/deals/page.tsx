@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, LinkButton, PageHeader, Table, Th, EmptyState } from "@/components/ui";
-import { DEAL_STATUSES } from "@/lib/config";
+import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES } from "@/lib/config";
 import { DealFilters } from "./filters";
 import { DealRowEditable } from "./deal-row";
 import { SortHeader } from "./sort-header";
@@ -53,7 +53,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
       : statusFilter === "all"
         ? {}
         : statusFilter === "active"
-          ? { status: { notIn: ["Pass", "CLOSED!"] } }
+          ? { status: { in: ACTIVE_DEAL_STATUSES } }
           : { status: statusFilter }),
     ...(sp.q ? { address: { contains: sp.q, mode: "insensitive" as const } } : {}),
   };

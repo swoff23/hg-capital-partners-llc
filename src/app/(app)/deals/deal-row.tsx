@@ -43,6 +43,12 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
   const cell =
     "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-border focus:border-primary focus:bg-surface";
 
+  // Normally the dropdown is just DEAL_STATUSES in pipeline order. Only prepend deal.status
+  // when it's a legacy value no longer in that list, so it still shows up as selected.
+  const statusOptions: readonly string[] = (DEAL_STATUSES as readonly string[]).includes(deal.status)
+    ? DEAL_STATUSES
+    : [deal.status, ...DEAL_STATUSES];
+
   return (
     <tr className={`hover:bg-background ${pending ? "opacity-60" : ""} ${flash ? "bg-green-500/10" : ""}`}>
       <Td>
@@ -70,7 +76,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
           onChange={(e) => save({ status: e.target.value }, deal.status, e.target.value)}
           className={`rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${toneClass(dealStatusTone(deal.status))}`}
         >
-          {[...new Set([deal.status, ...DEAL_STATUSES])].map((s) => (
+          {statusOptions.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

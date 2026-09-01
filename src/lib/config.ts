@@ -12,6 +12,9 @@ export const DEAL_STATUSES = [
   "Pass",
 ] as const;
 
+// "Active" filter = everything ranked above TBD in the pipeline (excludes TBD, Holding, Closed, and Pass).
+export const ACTIVE_DEAL_STATUSES = DEAL_STATUSES.slice(0, DEAL_STATUSES.indexOf("5 - TBD"));
+
 export const DEAL_PASS_REASONS = [
   "Price",
   "Condition",
