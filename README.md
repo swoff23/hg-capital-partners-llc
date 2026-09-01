@@ -80,3 +80,11 @@ Vercel, and deploy — the next production build hashes it into
 **Sensitive data** — contractor bank/routing numbers are never imported (dropped
 in `scripts/migrate/02-contractors.ts` and logged). `_private/` and all
 `*.xlsx` / `*.csv` are gitignored.
+
+**Row level security** — Supabase serves `public` over PostgREST, so every table
+must have RLS enabled or it is readable with the project's `anon` key. There are
+no policies: the app connects as the table owner (`postgres`) via Prisma, and an
+owner bypasses RLS unless `FORCE ROW LEVEL SECURITY` is set — never set it.
+**A migration that adds a table must also enable RLS on it**
+(`ALTER TABLE "Foo" ENABLE ROW LEVEL SECURITY;`); `src/lib/db-rls.test.ts` fails
+if one is missed.
