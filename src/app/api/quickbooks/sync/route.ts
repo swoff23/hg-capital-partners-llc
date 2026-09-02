@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runQuickbooksSync } from "@/lib/quickbooks/sync";
+import { getEnv } from "@/lib/env";
 import { cronAuthorized } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export const maxDuration = 60; // Vercel Hobby cap
  * behind requireUser().
  */
 export async function GET(request: NextRequest) {
-  const auth = cronAuthorized(process.env.CRON_SECRET, request.headers.get("authorization"));
+  const auth = cronAuthorized(getEnv().CRON_SECRET, request.headers.get("authorization"));
   if (auth === "unconfigured") {
     return NextResponse.json(
       { error: "CRON_SECRET is not set — the sync route is disabled until it is" },

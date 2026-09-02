@@ -27,7 +27,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
           {error && (
             <p className="mt-6 rounded-lg border border-[#e0796a]/25 bg-[#e0796a]/[0.08] px-3 py-2 text-xs text-[#e5a99b]">
-              Wrong email or password.
+              {error === "locked"
+                ? "Too many failed attempts. Try again in 15 minutes."
+                : "Wrong email or password."}
             </p>
           )}
 

@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { getEnv } from "@/lib/env";
 
 /**
  * Normalize the connection string for serverless + Supabase's PgBouncer pooler.
@@ -6,7 +7,7 @@ import { PrismaClient } from "@prisma/client";
  * errors on prepared statements at runtime.
  */
 function connectionUrl(): string | undefined {
-  const url = process.env.DATABASE_URL;
+  const url = getEnv().DATABASE_URL;
   if (!url) return url;
   const isTxPooler = /pooler\.supabase\.com:6543/.test(url);
   if (isTxPooler && !/[?&]pgbouncer=/.test(url)) {
@@ -21,7 +22,7 @@ export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     datasourceUrl: connectionUrl(),
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    log: getEnv().NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (!getEnv().isProduction) globalForPrisma.prisma = prisma;

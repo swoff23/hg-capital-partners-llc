@@ -1,5 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
+import { getEnv } from "@/lib/env";
 import { qbo } from "./config";
 
 /**
@@ -8,10 +9,10 @@ import { qbo } from "./config";
  * here and in client.ts#withFreshToken; at rest they're AES-GCM (crypto.ts).
  */
 
-const STATE_SECRET = process.env.SESSION_SECRET || "dev-only-insecure-secret-change-in-prod";
+const stateSecret = () => getEnv().sessionSecret;
 
 export function signState(nonce: string): string {
-  const mac = crypto.createHmac("sha256", STATE_SECRET).update(nonce).digest("base64url");
+  const mac = crypto.createHmac("sha256", stateSecret()).update(nonce).digest("base64url");
   return `${Buffer.from(nonce).toString("base64url")}.${mac}`;
 }
 
@@ -24,7 +25,7 @@ export function verifyState(value: string | undefined | null): string | null {
   } catch {
     return null;
   }
-  const expected = crypto.createHmac("sha256", STATE_SECRET).update(nonce).digest("base64url");
+  const expected = crypto.createHmac("sha256", stateSecret()).update(nonce).digest("base64url");
   const a = Buffer.from(mac);
   const b = Buffer.from(expected);
   return a.length === b.length && crypto.timingSafeEqual(a, b) ? nonce : null;

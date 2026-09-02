@@ -1,31 +1,22 @@
 import "server-only";
-import crypto from "node:crypto";
+import { getEnv } from "./env";
+import { readSessionToken, signSessionToken } from "./session-token";
 
 /**
- * Tiny signed-cookie session. Value is `email.hmac`. No DB, no third-party auth.
- * Secret comes from SESSION_SECRET in production; a dev fallback keeps localhost working.
+ * Signed-cookie session. No DB, no third-party auth. The token format and
+ * verification live in session-token.ts (pure, tested); this wrapper supplies
+ * the secret and the clock.
  */
-const SECRET = process.env.SESSION_SECRET || "dev-only-insecure-secret-change-in-prod";
-
 export const SESSION_COOKIE = "hgos_session";
 
+/** Sessions expire 30 days after sign-in; the cookie's maxAge matches. */
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function signSession(email: string): string {
-  const mac = crypto.createHmac("sha256", SECRET).update(email).digest("base64url");
-  return `${Buffer.from(email).toString("base64url")}.${mac}`;
+  return signSessionToken(email, { secret: getEnv().sessionSecret, now: Date.now(), ttlMs: SESSION_TTL_MS });
 }
 
+/** The session's email (lowercased), or null if missing / invalid / expired. */
 export function readSession(value: string | undefined): string | null {
-  if (!value || !value.includes(".")) return null;
-  const [encEmail, mac] = value.split(".");
-  let email: string;
-  try {
-    email = Buffer.from(encEmail, "base64url").toString("utf8");
-  } catch {
-    return null;
-  }
-  const expected = crypto.createHmac("sha256", SECRET).update(email).digest("base64url");
-  const a = Buffer.from(mac);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-  return email.toLowerCase();
+  return readSessionToken(value, { secret: getEnv().sessionSecret, now: Date.now() })?.email ?? null;
 }

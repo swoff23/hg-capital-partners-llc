@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getEnv } from "@/lib/env";
 import { qbo } from "@/lib/quickbooks/config";
 import { authorizeUrl, signState } from "@/lib/quickbooks/oauth";
 
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   res.cookies.set("qbo_oauth_state", nonce, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: getEnv().isProduction,
     path: "/",
     maxAge: 600,
   });

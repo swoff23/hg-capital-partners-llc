@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       accessTokenExpiresAt: tokens.accessTokenExpiresAt,
       refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
       accountingMethod: "CASH",
-      historyStart: process.env.QBO_HISTORY_START || "2026-01",
+      historyStart: qbo.historyStart(),
       connectedByUserId: user.id,
     },
     update: {

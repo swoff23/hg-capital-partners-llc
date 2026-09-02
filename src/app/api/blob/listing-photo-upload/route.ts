@@ -2,6 +2,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 
 /**
  * Mints short-lived client-upload tokens for a listing's photo gallery. Same
@@ -11,7 +12,7 @@ import { prisma } from "@/lib/db";
  * inline, so a HEIC upload would look broken on the public site).
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!getEnv().BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
       { error: "File uploads aren't configured — no Blob store connected yet." },
       { status: 503 },

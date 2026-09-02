@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import { healthDetailAllowed } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +19,11 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const provided =
     new URL(request.url).searchParams.get("token") ?? request.headers.get("x-health-token");
-  const detailed = healthDetailAllowed(process.env.HEALTH_TOKEN, provided);
+  const e = getEnv();
+  const detailed = healthDetailAllowed(e.HEALTH_TOKEN, provided);
 
-  const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
-  const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null;
+  const commit = e.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
+  const env = e.VERCEL_ENV ?? e.NODE_ENV;
 
   let db: "up" | "down" = "down";
   let migrations: { name: string; appliedAt: string | null; rolledBackAt: string | null }[] = [];

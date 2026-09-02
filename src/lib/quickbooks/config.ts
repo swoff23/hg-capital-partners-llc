@@ -1,37 +1,38 @@
 import "server-only";
+import { getEnv } from "@/lib/env";
 
 /**
- * QuickBooks Online environment + endpoint config. Secrets are read from
- * process.env at call time (matching the rest of the app — no central secret
- * module). Only `oauth.ts` / `client.ts` import this.
+ * QuickBooks Online environment + endpoint config. Secrets come from the
+ * validated env (src/lib/env.ts). `getEnv().qbo` is all-or-nothing: null
+ * unless every required key is set, which is what gates the "Connect" UI.
  */
-
-function required(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env ${name} — QuickBooks integration is not configured`);
-  return v;
-}
 
 export type QboEnvironment = "sandbox" | "production";
 
+function required() {
+  const q = getEnv().qbo;
+  if (!q) throw new Error("QuickBooks integration is not configured — set QBO_CLIENT_ID / SECRET / REDIRECT_URI / TOKEN_SECRET");
+  return q;
+}
+
 export const qbo = {
-  clientId: () => required("QBO_CLIENT_ID"),
-  clientSecret: () => required("QBO_CLIENT_SECRET"),
-  redirectUri: () => required("QBO_REDIRECT_URI"),
-  tokenSecret: () => required("QBO_TOKEN_SECRET"),
+  clientId: () => required().clientId,
+  clientSecret: () => required().clientSecret,
+  redirectUri: () => required().redirectUri,
+  tokenSecret: () => required().tokenSecret,
 
   environment(): QboEnvironment {
-    return process.env.QBO_ENVIRONMENT === "production" ? "production" : "sandbox";
+    return getEnv().qbo?.environment ?? getEnv().QBO_ENVIRONMENT;
+  },
+
+  /** First month of history to pull, "YYYY-MM". */
+  historyStart(): string {
+    return getEnv().qbo?.historyStart ?? getEnv().QBO_HISTORY_START ?? "2026-01";
   },
 
   /** True once the minimum env is present — gates the "Connect" UI. */
   isConfigured(): boolean {
-    return !!(
-      process.env.QBO_CLIENT_ID &&
-      process.env.QBO_CLIENT_SECRET &&
-      process.env.QBO_REDIRECT_URI &&
-      process.env.QBO_TOKEN_SECRET
-    );
+    return getEnv().qbo !== null;
   },
 
   apiBase(): string {

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { _resetEnvCache, getEnv } from "@/lib/env";
 
 /**
  * AES-256-GCM for the QuickBooks tokens at rest. Key = 32 bytes, base64 in
@@ -21,7 +22,7 @@ let cachedKey: Buffer | null = null;
 
 function getKey(): Buffer {
   if (cachedKey) return cachedKey;
-  const raw = process.env.QBO_TOKEN_SECRET;
+  const raw = getEnv().QBO_TOKEN_SECRET;
   if (!raw) throw new QboCryptoError("QBO_TOKEN_SECRET is not set");
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32) {
@@ -36,6 +37,7 @@ function getKey(): Buffer {
 /** For tests: clear the module key cache after changing the env var. */
 export function _resetKeyCache(): void {
   cachedKey = null;
+  _resetEnvCache();
 }
 
 export function encryptSecret(plaintext: string): string {
