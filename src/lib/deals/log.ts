@@ -1,6 +1,5 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
-import type { User } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 /**
@@ -14,7 +13,13 @@ import { prisma } from "@/lib/db";
  */
 
 /** Append one or more change entries. Empty lines are dropped; no-op when nothing is left. */
-export async function logDealChanges(dealId: string, user: User, lines: string[]): Promise<void> {
+/** Who did it — the signed-in user, or any {name,email} shape. */
+export interface DealActor {
+  name: string | null;
+  email: string;
+}
+
+export async function logDealChanges(dealId: string, user: DealActor, lines: string[]): Promise<void> {
   const entries = lines.filter(Boolean);
   if (entries.length === 0) return;
   const who = user.name ?? user.email;

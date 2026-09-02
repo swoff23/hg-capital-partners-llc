@@ -4,7 +4,7 @@ import { del } from "@vercel/blob";
 import type { Task, TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ymdToDate } from "@/lib/dates";
-import { logDealTaskEvent } from "@/lib/deal-log";
+import { logDealTaskEvent } from "@/lib/deals/log";
 import { TEMPLATE_BUCKET } from "@/lib/config";
 
 /**

@@ -1,17 +1,17 @@
 "use server";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { Deal } from "@prisma/client";
-import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { normalizeAddress } from "@/lib/normalize";
 import { formToObject } from "@/lib/forms";
-import { DEAL_STATUSES, DEFAULT_DEAL_STATUS, isDealStatus } from "@/lib/config";
-import { initials } from "@/lib/utils";
-import { logDealChanges } from "@/lib/deal-log";
-import { amountToDecimal as money } from "@/lib/money";
+import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "@/lib/config";
 import { withLog } from "@/lib/server-action";
+import * as deals from "@/lib/deals/service";
+
+/**
+ * Thin server actions: authenticate, validate, call the deal service,
+ * redirect. Everything that touches the database lives in
+ * src/lib/deals/service.ts.
+ */
 
 const dealSchema = z.object({
   address: z.string().min(4),
@@ -25,151 +25,27 @@ const dealSchema = z.object({
   passReason: z.string().optional(),
 });
 
-const val = (v: string | null | undefined) => (v == null || v === "" ? "—" : v);
-
-/** Diff old deal vs the applied data object → human-readable change lines. */
-function diffDeal(before: Deal, data: Record<string, unknown>): string[] {
-  const lines: string[] = [];
-  if ("status" in data && data.status !== before.status)
-    lines.push(`Status: ${val(before.status)} → ${val(data.status as string)}`);
-  if ("priority" in data && (data.priority ?? null) !== before.priority)
-    lines.push(`Priority: ${val(before.priority)} → ${val(data.priority as string)}`);
-  if ("passReason" in data && (data.passReason ?? null) !== before.passReason)
-    lines.push(`Pass reason: ${val(before.passReason)} → ${val(data.passReason as string)}`);
-  if ("units" in data && (data.units ?? null) !== before.units)
-    lines.push(`Units: ${before.units ?? "—"} → ${(data.units as number | null) ?? "—"}`);
-  if ("theirPriceRaw" in data && (data.theirPriceRaw ?? null) !== before.theirPriceRaw)
-    lines.push(`Their price: ${val(before.theirPriceRaw)} → ${val(data.theirPriceRaw as string)}`);
-  if ("ourPriceRaw" in data && (data.ourPriceRaw ?? null) !== before.ourPriceRaw)
-    lines.push(`Our price: ${val(before.ourPriceRaw)} → ${val(data.ourPriceRaw as string)}`);
-  if ("nextAction" in data && (data.nextAction ?? null) !== before.nextAction)
-    lines.push(`Next action: ${val(before.nextAction)} → ${val(data.nextAction as string)}`);
-  if ("sourceUrl" in data && (data.sourceUrl ?? null) !== before.sourceUrl)
-    lines.push(`Listing URL ${before.sourceUrl ? "updated" : "added"}`);
-  if ("address" in data && data.address !== before.address)
-    lines.push(`Address: ${before.address} → ${data.address}`);
-  return lines;
-}
-
 export async function createDeal(formData: FormData) {
   return withLog("createDeal", async () => {
     const user = await requireUser();
     const p = dealSchema.parse(formToObject(formData));
-
-    const dup = await prisma.deal.findFirst({
-      where: { address: { contains: p.address.split(",")[0].trim(), mode: "insensitive" } },
-    });
-    if (dup && normalizeAddress(dup.address) === normalizeAddress(p.address)) {
-      redirect(`/deals/${dup.id}?dup=1`);
-    }
-
-    const deal = await prisma.deal.create({
-      data: {
-        address: p.address.trim(),
-        status: p.status,
-        priority: p.priority || null,
-        theirPriceRaw: p.theirPriceRaw || null,
-        theirPrice: money(p.theirPriceRaw),
-        ourPriceRaw: p.ourPriceRaw || null,
-        ourPrice: money(p.ourPriceRaw),
-        units: p.units ?? null,
-        sourceUrl: p.sourceUrl || null,
-        nextAction: p.nextAction || null,
-      },
-    });
-    await logDealChanges(deal.id, user, [`Deal created (status ${deal.status})`]);
-    revalidatePath("/deals");
-    redirect(`/deals/${deal.id}`);
-  });
-}
-
-export async function updateDeal(id: string, formData: FormData) {
-  return withLog("updateDeal", async () => {
-    const user = await requireUser();
-    const before = await prisma.deal.findUniqueOrThrow({ where: { id } });
-    const has = (k: string) => formData.has(k);
-    const str = (k: string) => formData.get(k)?.toString().trim() || null;
-    const data: Record<string, unknown> = {};
-    if (has("address") && str("address")) data.address = str("address");
-    if (has("status") && isDealStatus(str("status"))) data.status = str("status");
-    if (has("priority")) data.priority = str("priority");
-    if (has("passReason")) data.passReason = str("passReason");
-    if (has("theirPriceRaw")) {
-      data.theirPriceRaw = str("theirPriceRaw");
-      data.theirPrice = money(str("theirPriceRaw"));
-    }
-    if (has("ourPriceRaw")) {
-      data.ourPriceRaw = str("ourPriceRaw");
-      data.ourPrice = money(str("ourPriceRaw"));
-    }
-    if (has("nextAction")) data.nextAction = str("nextAction");
-    if (has("sourceUrl")) data.sourceUrl = str("sourceUrl");
-
-    await prisma.deal.update({ where: { id }, data });
-    await logDealChanges(id, user, diffDeal(before, data));
-    revalidatePath(`/deals/${id}`);
-    revalidatePath("/deals");
+    const r = await deals.createDeal(p, user);
+    if (r.duplicateOf) redirect(`/deals/${r.duplicateOf.id}?dup=1`);
+    redirect(`/deals/${r.deal.id}`);
   });
 }
 
 /** Inline edits from the Deals list and detail page. Only whitelisted fields. */
-export async function patchDeal(
-  id: string,
-  patch: Partial<{
-    address: string;
-    status: string;
-    priority: string | null;
-    passReason: string | null;
-    theirPriceRaw: string | null;
-    ourPriceRaw: string | null;
-    units: number | null;
-    nextAction: string | null;
-    sourceUrl: string | null;
-  }>,
-) {
+export async function patchDeal(id: string, patch: deals.DealPatch) {
   return withLog("patchDeal", async () => {
     const user = await requireUser();
-    const before = await prisma.deal.findUniqueOrThrow({ where: { id } });
-    const data: Record<string, unknown> = {};
-    if (patch.address?.trim()) data.address = patch.address.trim();
-    if (patch.status && isDealStatus(patch.status)) data.status = patch.status;
-    if ("priority" in patch) data.priority = patch.priority || null;
-    if ("passReason" in patch) data.passReason = patch.passReason || null;
-    if ("units" in patch) data.units = patch.units ?? null;
-    if ("sourceUrl" in patch) data.sourceUrl = patch.sourceUrl?.trim() || null;
-    if ("theirPriceRaw" in patch) {
-      data.theirPriceRaw = patch.theirPriceRaw || null;
-      data.theirPrice = money(patch.theirPriceRaw);
-    }
-    if ("ourPriceRaw" in patch) {
-      data.ourPriceRaw = patch.ourPriceRaw || null;
-      data.ourPrice = money(patch.ourPriceRaw);
-    }
-    if ("nextAction" in patch) data.nextAction = patch.nextAction || null;
-    if (Object.keys(data).length === 0) return;
-
-    await prisma.deal.update({ where: { id }, data });
-    await logDealChanges(id, user, diffDeal(before, data));
-    revalidatePath("/deals");
-    revalidatePath(`/deals/${id}`);
-    revalidatePath("/");
+    await deals.patchDeal(id, patch, user);
   });
 }
 
 export async function addDealNote(dealId: string, formData: FormData) {
   return withLog("addDealNote", async () => {
     const user = await requireUser();
-    const body = String(formData.get("body") ?? "").trim();
-    if (!body) return;
-    const dateStr = String(formData.get("noteDate") ?? "");
-    await prisma.dealNote.create({
-      data: {
-        dealId,
-        body: `${body} (${initials(user.name ?? user.email)})`,
-        noteDate: dateStr ? new Date(dateStr) : new Date(),
-        source: "manual",
-      },
-    });
-    revalidatePath(`/deals/${dealId}`);
+    await deals.addDealNote(dealId, String(formData.get("body") ?? ""), user);
   });
 }
