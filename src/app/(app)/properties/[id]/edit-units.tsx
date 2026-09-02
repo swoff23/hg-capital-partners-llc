@@ -41,6 +41,7 @@ export function UnitsSection({
   const [editing, setEditing] = useState(false);
   const [units, setUnits] = useState<PropertyUnit[]>(structuredClone(initial));
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const dirty = JSON.stringify(units) !== JSON.stringify(initial);
@@ -54,14 +55,21 @@ export function UnitsSection({
   }
 
   function save() {
+    setError(null);
     start(async () => {
-      await updatePropertyUnits(propertyId, units);
+      const r = await updatePropertyUnits(propertyId, units);
+      if (!r.ok) {
+        setError(r.error);
+        setConfirmOpen(false);
+        return;
+      }
       setConfirmOpen(false);
       setEditing(false);
     });
   }
 
   function discard() {
+    setError(null);
     setUnits(structuredClone(initial));
     setConfirmOpen(false);
     setEditing(false);
@@ -107,6 +115,8 @@ export function UnitsSection({
           ))
         )}
       </div>
+
+      {error && <p className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
       {confirmOpen && (
         <div

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseMoveInFormSchema, type MoveInFormSchema } from "@/lib/move-in-form-types";
+import type { ActionResult } from "@/lib/action-result";
+import { withResult } from "@/lib/server-action";
 
 const RESERVED = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -32,32 +34,34 @@ const schema = z.object({ sections: z.array(section).min(1).max(20) });
  * repeatable section's max-count/required toggle are actually editable here —
  * still validated in full server-side in case that ever changes.
  */
-export async function saveMoveInFormSchema(input: unknown): Promise<MoveInFormSchema> {
-  const user = await requireUser();
-  const parsed = schema.parse(input);
+export async function saveMoveInFormSchema(input: unknown): Promise<ActionResult<MoveInFormSchema>> {
+  return withResult("saveMoveInFormSchema", async () => {
+    const user = await requireUser();
+    const parsed = schema.parse(input);
 
-  for (const s of parsed.sections) {
-    if (RESERVED.has(s.key)) throw new Error(`Reserved section key: ${s.key}`);
-    for (const it of s.items) if (RESERVED.has(it.key)) throw new Error(`Reserved item key: ${it.key}`);
-  }
+    for (const s of parsed.sections) {
+      if (RESERVED.has(s.key)) throw new Error(`Reserved section key: ${s.key}`);
+      for (const it of s.items) if (RESERVED.has(it.key)) throw new Error(`Reserved item key: ${it.key}`);
+    }
 
-  const value: MoveInFormSchema = {
-    sections: parsed.sections.map((s) => ({
-      ...s,
-      maxCount: Math.max(s.minCount, s.maxCount),
-    })),
-  };
+    const value: MoveInFormSchema = {
+      sections: parsed.sections.map((s) => ({
+        ...s,
+        maxCount: Math.max(s.minCount, s.maxCount),
+      })),
+    };
 
-  await prisma.appConfig.upsert({
-    where: { id: "singleton" },
-    create: { id: "singleton", moveInFormSchema: value as unknown as object, updatedBy: user.name ?? user.email },
-    update: { moveInFormSchema: value as unknown as object, updatedBy: user.name ?? user.email },
+    await prisma.appConfig.upsert({
+      where: { id: "singleton" },
+      create: { id: "singleton", moveInFormSchema: value as unknown as object, updatedBy: user.name ?? user.email },
+      update: { moveInFormSchema: value as unknown as object, updatedBy: user.name ?? user.email },
+    });
+
+    revalidatePath("/settings/move-in-form");
+    revalidatePath("/residents/moving-in");
+
+    // Round-trip through the same tolerant parser the read path uses, so the
+    // client gets back exactly what a future page load would see.
+    return parseMoveInFormSchema(value);
   });
-
-  revalidatePath("/settings/move-in-form");
-  revalidatePath("/residents/moving-in");
-
-  // Round-trip through the same tolerant parser the read path uses, so the
-  // client gets back exactly what a future page load would see.
-  return parseMoveInFormSchema(value);
 }

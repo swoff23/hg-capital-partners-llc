@@ -150,12 +150,9 @@ export function MoveInFormEditor({ initial }: { initial: MoveInFormSchema }) {
   function save() {
     setError(null);
     start(async () => {
-      try {
-        const saved = await saveMoveInFormSchema(schema);
-        setSchema(saved);
-      } catch {
-        setError("Could not save — check the form and try again.");
-      }
+      const r = await saveMoveInFormSchema(schema);
+      if (r.ok) setSchema(r.data);
+      else setError(r.error);
     });
   }
 

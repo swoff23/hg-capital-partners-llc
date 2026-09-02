@@ -228,12 +228,12 @@ export function CapexRulesEditor({ initial }: { initial: CapexRules }) {
     setRules(next);
     setError(null);
     start(async () => {
-      try {
-        const saved = await saveCapexRules(next);
-        setRules(saved);
-      } catch {
+      const r = await saveCapexRules(next);
+      if (r.ok) {
+        setRules(r.data);
+      } else {
         setRules(prev);
-        setError("Could not save that change — check the value and try again.");
+        setError(r.error);
       }
     });
   }

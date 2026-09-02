@@ -9,6 +9,7 @@ import { getConnection } from "@/lib/quickbooks/client";
 import { revokeToken } from "@/lib/quickbooks/oauth";
 import { decryptSecret } from "@/lib/quickbooks/crypto";
 import { runQuickbooksSync } from "@/lib/quickbooks/sync";
+import { withLog } from "@/lib/server-action";
 
 function revalidate() {
   revalidatePath("/financials");
@@ -35,41 +36,47 @@ async function restampClass(realmId: string, classId: string) {
 const ROLES = ["UNMAPPED", "PROPERTY", "ENTITY", "OVERHEAD", "IGNORE"] as const;
 
 export async function setClassRole(classId: string, roleInput: string) {
-  await requireUser();
-  const role = z.enum(ROLES).parse(roleInput);
-  const realmId = await realm();
-  await prisma.qboClass.update({
-    where: { id: classId },
-    data: { role, autoMatched: false, ...(role === "PROPERTY" ? {} : { propertyId: null }) },
+  return withLog("setClassRole", async () => {
+    await requireUser();
+    const role = z.enum(ROLES).parse(roleInput);
+    const realmId = await realm();
+    await prisma.qboClass.update({
+      where: { id: classId },
+      data: { role, autoMatched: false, ...(role === "PROPERTY" ? {} : { propertyId: null }) },
+    });
+    await restampClass(realmId, classId);
+    revalidate();
   });
-  await restampClass(realmId, classId);
-  revalidate();
 }
 
 export async function mapClassToProperty(classId: string, propertyId: string | null) {
-  await requireUser();
-  const realmId = await realm();
-  await prisma.qboClass.update({
-    where: { id: classId },
-    data: {
-      propertyId: propertyId || null,
-      role: propertyId ? "PROPERTY" : "UNMAPPED",
-      autoMatched: false,
-    },
+  return withLog("mapClassToProperty", async () => {
+    await requireUser();
+    const realmId = await realm();
+    await prisma.qboClass.update({
+      where: { id: classId },
+      data: {
+        propertyId: propertyId || null,
+        role: propertyId ? "PROPERTY" : "UNMAPPED",
+        autoMatched: false,
+      },
+    });
+    await restampClass(realmId, classId);
+    revalidate();
   });
-  await restampClass(realmId, classId);
-  revalidate();
 }
 
 export async function setClassEntity(classId: string, entityId: string | null) {
-  await requireUser();
-  const realmId = await realm();
-  await prisma.qboClass.update({
-    where: { id: classId },
-    data: { entityId: entityId || null, autoMatched: false },
+  return withLog("setClassEntity", async () => {
+    await requireUser();
+    const realmId = await realm();
+    await prisma.qboClass.update({
+      where: { id: classId },
+      data: { entityId: entityId || null, autoMatched: false },
+    });
+    await restampClass(realmId, classId);
+    revalidate();
   });
-  await restampClass(realmId, classId);
-  revalidate();
 }
 
 const CATEGORIES = [
@@ -80,52 +87,60 @@ const CATEGORIES = [
 ] as const;
 
 export async function setAccountCategory(accountId: string, categoryInput: string) {
-  await requireUser();
-  const category = z.enum(CATEGORIES).parse(categoryInput);
-  const realmId = await realm();
-  const acct = await prisma.qboAccount.update({
-    where: { id: accountId },
-    data: { category, categoryLocked: true },
+  return withLog("setAccountCategory", async () => {
+    await requireUser();
+    const category = z.enum(CATEGORIES).parse(categoryInput);
+    const realmId = await realm();
+    const acct = await prisma.qboAccount.update({
+      where: { id: accountId },
+      data: { category, categoryLocked: true },
+    });
+    const treatment = treatmentForCategory(category, acct.classification || null);
+    await prisma.qboAccount.update({ where: { id: accountId }, data: { treatment } });
+    await prisma.ledgerLine.updateMany({
+      where: { realmId, accountQboId: acct.qboId },
+      data: { category, treatment },
+    });
+    revalidate();
   });
-  const treatment = treatmentForCategory(category, acct.classification || null);
-  await prisma.qboAccount.update({ where: { id: accountId }, data: { treatment } });
-  await prisma.ledgerLine.updateMany({
-    where: { realmId, accountQboId: acct.qboId },
-    data: { category, treatment },
-  });
-  revalidate();
 }
 
 export async function setAccountingMethod(method: "CASH" | "ACCRUAL") {
-  await requireUser();
-  z.enum(["CASH", "ACCRUAL"]).parse(method);
-  await prisma.quickbooksConnection.update({
-    where: { realmId: await realm() },
-    data: { accountingMethod: method },
+  return withLog("setAccountingMethod", async () => {
+    await requireUser();
+    z.enum(["CASH", "ACCRUAL"]).parse(method);
+    await prisma.quickbooksConnection.update({
+      where: { realmId: await realm() },
+      data: { accountingMethod: method },
+    });
+    revalidate();
   });
-  revalidate();
 }
 
 export async function syncNow() {
-  await requireUser();
-  const result = await runQuickbooksSync({ trigger: "MANUAL" });
-  revalidate();
-  return result;
+  return withLog("syncNow", async () => {
+    await requireUser();
+    const result = await runQuickbooksSync({ trigger: "MANUAL" });
+    revalidate();
+    return result;
+  });
 }
 
 export async function disconnectQuickbooks(forget: boolean) {
-  await requireUser();
-  const conn = await getConnection();
-  if (!conn) return;
-  try {
-    await revokeToken(decryptSecret(conn.refreshTokenEnc));
-  } catch {
-    /* best effort */
-  }
-  if (forget) {
-    await prisma.quickbooksConnection.delete({ where: { id: conn.id } });
-  } else {
-    await prisma.quickbooksConnection.update({ where: { id: conn.id }, data: { status: "REVOKED" } });
-  }
-  revalidate();
+  return withLog("disconnectQuickbooks", async () => {
+    await requireUser();
+    const conn = await getConnection();
+    if (!conn) return;
+    try {
+      await revokeToken(decryptSecret(conn.refreshTokenEnc));
+    } catch {
+      /* best effort */
+    }
+    if (forget) {
+      await prisma.quickbooksConnection.delete({ where: { id: conn.id } });
+    } else {
+      await prisma.quickbooksConnection.update({ where: { id: conn.id }, data: { status: "REVOKED" } });
+    }
+    revalidate();
+  });
 }

@@ -63,6 +63,7 @@ export function BuildingCapexSection({
   const items = rules.building;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial, items));
+  const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const datedCount = items.filter(
@@ -86,13 +87,19 @@ export function BuildingCapexSection({
         costOverride: Number.isFinite(costNum) && costNum > 0 ? costNum : null,
       };
     }
+    setError(null);
     start(async () => {
-      await updateBuildingCapex(propertyId, payload);
+      const r = await updateBuildingCapex(propertyId, payload);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
       setEditing(false);
     });
   }
 
   function cancel() {
+    setError(null);
     setDraft(toDraft(initial, items));
     setEditing(false);
   }
@@ -136,6 +143,8 @@ export function BuildingCapexSection({
           </button>
         )}
       </div>
+
+      {error && <p className="px-4 pt-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="p-4">
         <div className="overflow-x-auto">

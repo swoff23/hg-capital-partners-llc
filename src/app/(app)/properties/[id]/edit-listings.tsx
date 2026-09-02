@@ -61,6 +61,7 @@ export function ListingsSection({
   const [editing, setEditing] = useState(false);
   const [listings, setListings] = useState<EditableListing[]>(structuredClone(initial));
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   // How many photo uploads are currently in flight, across every listing card. A photo
   // isn't in `listings` state until its upload resolves and calls onAdd — saving while
@@ -79,14 +80,21 @@ export function ListingsSection({
   }
 
   function save() {
+    setError(null);
     start(async () => {
-      await updatePropertyListings(propertyId, listings);
+      const r = await updatePropertyListings(propertyId, listings);
+      if (!r.ok) {
+        setError(r.error);
+        setConfirmOpen(false);
+        return;
+      }
       setConfirmOpen(false);
       setEditing(false);
     });
   }
 
   function discard() {
+    setError(null);
     setListings(structuredClone(initial));
     setConfirmOpen(false);
     setEditing(false);
@@ -157,6 +165,8 @@ export function ListingsSection({
           ))
         )}
       </div>
+
+      {error && <p className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
       {confirmOpen && (
         <div

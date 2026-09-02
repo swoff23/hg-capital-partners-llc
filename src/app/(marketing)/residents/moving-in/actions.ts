@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
+import { withResult } from "@/lib/server-action";
 
 // This is the app's first unauthenticated write path — deliberately no
 // requireUser() below. Anyone with the URL can submit a report; that's the
@@ -36,6 +37,15 @@ const submissionSchema = z.object({
 });
 
 export async function submitMoveInInspection(
+  input: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Expected failures are returned by the body; anything thrown (DB down) is
+  // logged and turned into the generic line rather than crashing the form.
+  const r = await withResult("submitMoveInInspection", () => submitMoveInInspectionBody(input));
+  return r.ok ? r.data : { ok: false, error: "Something went wrong. Please try again in a moment." };
+}
+
+async function submitMoveInInspectionBody(
   input: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const parsed = submissionSchema.safeParse(input);
