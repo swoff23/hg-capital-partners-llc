@@ -8,6 +8,8 @@ import { exchangeCode, verifyState } from "@/lib/quickbooks/oauth";
 import { runQuickbooksSync } from "@/lib/quickbooks/sync";
 
 export const dynamic = "force-dynamic";
+// The initial sync runs in after(); without this the platform default can kill it mid-run.
+export const maxDuration = 60;
 
 /** Intuit redirects here with ?code&state&realmId. */
 export async function GET(request: NextRequest) {

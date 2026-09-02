@@ -5,15 +5,13 @@ import { getConnection } from "./client";
 import { computeNoi, type ComputeLine, type NoiResult } from "./compute";
 import { buildDataQuality, type DataQualityReport } from "./data-quality";
 import { propertyTokens } from "./mapping";
+import { currentMonth } from "./months";
 
 /** Read layer for /financials. All amounts in cents. */
 
 const d2c = (v: unknown): number => (v == null ? 0 : Math.round(Number(v) * 100));
 
-function thisMonth(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
+const thisMonth = currentMonth;
 
 async function loadLines(realmId: string, basis: QboBasis, propertyId?: string) {
   const rows = await prisma.ledgerLine.findMany({
