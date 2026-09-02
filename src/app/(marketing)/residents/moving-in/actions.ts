@@ -4,12 +4,18 @@ import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { withResult } from "@/lib/server-action";
 import { createTask } from "@/lib/tasks/service";
+import { headers } from "next/headers";
+import { clientIp, RateLimiter } from "@/lib/rate-limit";
 
 // This is the app's first unauthenticated write path — deliberately no
 // requireUser() below. Anyone with the URL can submit a report; that's the
-// point (a signed-out tenant fills this in). Zod bounds + a honeypot are the
-// only abuse protection — no file uploads, no auth, low real-world volume, so
-// rate limiting isn't built here. See the move-in form plan for the tradeoff.
+// point (a signed-out tenant fills this in). Abuse protection: zod bounds, a
+// honeypot, a per-IP limit (5 / hour) and a global cap (40 / day) — every
+// submission becomes a Task on the team's list, so the ceiling is what
+// matters. No file uploads, no auth.
+const perIp = new RateLimiter(5, 60 * 60_000);
+const globalCap = new RateLimiter(40, 24 * 60 * 60_000);
+const RATE_LIMITED = "Too many submissions right now. Please try again later, or text us instead.";
 
 const RATING = z.enum(["Good", "Fair", "Poor", "N/A"]);
 const itemAnswer = z.object({
@@ -55,6 +61,10 @@ async function submitMoveInInspectionBody(
 
   // Honeypot: pretend success, create nothing, don't tip off a bot.
   if (p.honeypot) return { ok: true };
+
+  const ip = clientIp(await headers());
+  if (!perIp.allow(ip).ok || !globalCap.allow("moving-in").ok) return { ok: false, error: RATE_LIMITED };
+  perIp.prune();
 
   const property = await prisma.property.findUnique({
     where: { id: p.propertyId },
