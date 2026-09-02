@@ -11,6 +11,10 @@
 
 export type ActionResult<T = void> = { ok: true; data: T } | { ok: false; error: string };
 
+/** Optimistic-concurrency failure: the row changed since the editor loaded it. */
+export const CONFLICT_MESSAGE =
+  "Someone else saved changes to this since you opened it. Reload the page to see the latest, then reapply your edit.";
+
 export const GENERIC_ERROR = "Something went wrong saving that. Try again; if it keeps happening, reload the page.";
 
 interface ZodLikeIssue {

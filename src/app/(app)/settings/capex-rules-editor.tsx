@@ -216,8 +216,16 @@ const headerRow = (first: string) => (
   </div>
 );
 
-export function CapexRulesEditor({ initial }: { initial: CapexRules }) {
+export function CapexRulesEditor({
+  initial,
+  initialVersion,
+}: {
+  initial: CapexRules;
+  /** AppConfig.updatedAt the page rendered with; sent back so a stale tab cannot overwrite a newer save. */
+  initialVersion: string | null;
+}) {
   const [rules, setRules] = useState<EditableCapexRules>(initial);
+  const [version, setVersion] = useState<string | null>(initialVersion);
   const [, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -228,9 +236,10 @@ export function CapexRulesEditor({ initial }: { initial: CapexRules }) {
     setRules(next);
     setError(null);
     start(async () => {
-      const r = await saveCapexRules(next);
+      const r = await saveCapexRules(next, version);
       if (r.ok) {
-        setRules(r.data);
+        setRules(r.data.rules);
+        setVersion(r.data.version);
       } else {
         setRules(prev);
         setError(r.error);

@@ -131,8 +131,16 @@ function SectionEditor({
   );
 }
 
-export function MoveInFormEditor({ initial }: { initial: MoveInFormSchema }) {
+export function MoveInFormEditor({
+  initial,
+  initialVersion,
+}: {
+  initial: MoveInFormSchema;
+  /** AppConfig.updatedAt the page rendered with; sent back so a stale tab cannot overwrite a newer save. */
+  initialVersion: string | null;
+}) {
   const [schema, setSchema] = useState<MoveInFormSchema>(structuredClone(initial));
+  const [version, setVersion] = useState<string | null>(initialVersion);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -150,9 +158,11 @@ export function MoveInFormEditor({ initial }: { initial: MoveInFormSchema }) {
   function save() {
     setError(null);
     start(async () => {
-      const r = await saveMoveInFormSchema(schema);
-      if (r.ok) setSchema(r.data);
-      else setError(r.error);
+      const r = await saveMoveInFormSchema(schema, version);
+      if (r.ok) {
+        setSchema(r.data.schema);
+        setVersion(r.data.version);
+      } else setError(r.error);
     });
   }
 

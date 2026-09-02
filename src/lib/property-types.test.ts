@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_CAPEX_RULES,
+  orphanedEquipmentTypes,
   parseCapexRules,
   capexForecast,
   type CapexRules,
@@ -114,4 +115,19 @@ test("capexForecast: only rules-covered types are scheduled", () => {
   assert.equal(items.length, 1);
   assert.equal(items[0].type, "Sump Pump");
   assert.equal(items[0].cost, 1200);
+});
+
+test("orphanedEquipmentTypes: only dropped types that some unit still uses", () => {
+  const prev = DEFAULT_CAPEX_RULES;
+  const next = { ...prev, equipment: prev.equipment.filter((e) => e.type !== "Roof" && e.type !== "Dishwasher") };
+  const props = [
+    { address: "1 A St", units: [{ equipment: [{ type: "Roof", installYear: "2010" }, { type: "Oven" }] }] },
+    { address: "2 B St", units: [{ equipment: [{ type: "Roof" }] }, { equipment: [{ type: "Roof" }] }] },
+    { address: "3 C St", units: [] },
+  ];
+  assert.deepEqual(orphanedEquipmentTypes(prev, next, props), [
+    { type: "Roof", count: 3, properties: ["1 A St", "2 B St"] },
+  ]);
+  assert.deepEqual(orphanedEquipmentTypes(prev, prev, props), []);
+  assert.deepEqual(orphanedEquipmentTypes(prev, next, []), []);
 });

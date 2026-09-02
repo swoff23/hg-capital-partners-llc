@@ -50,10 +50,13 @@ function blankListing(): EditableListing {
 
 export function ListingsSection({
   propertyId,
+  version,
   initial,
   unitLabels,
 }: {
   propertyId: string;
+  /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
+  version: string;
   initial: EditableListing[];
   /** Unit labels from the Units & access section above — the only valid choices, so the two stay consistent. */
   unitLabels: string[];
@@ -82,7 +85,7 @@ export function ListingsSection({
   function save() {
     setError(null);
     start(async () => {
-      const r = await updatePropertyListings(propertyId, listings);
+      const r = await updatePropertyListings(propertyId, listings, version);
       if (!r.ok) {
         setError(r.error);
         setConfirmOpen(false);

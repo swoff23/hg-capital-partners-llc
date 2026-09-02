@@ -205,6 +205,45 @@ export function parseCapexRules(json: unknown): CapexRules {
   return { equipment, building };
 }
 
+export interface OrphanedEquipmentType {
+  type: string;
+  /** Equipment entries across all units that carry this type. */
+  count: number;
+  /** Addresses of the properties affected. */
+  properties: string[];
+}
+
+/**
+ * Equipment types that `next` drops relative to `prev` while some unit still
+ * has equipment of that type. Equipment matches a rule by the `type` string,
+ * so removing (or renaming, which the editor sends as remove + add) a rule
+ * silently strips the lifecycle status and forecast from every matching
+ * appliance. saveCapexRules refuses such a change and reports these.
+ */
+export function orphanedEquipmentTypes(
+  prev: CapexRules,
+  next: CapexRules,
+  properties: { address: string; units: PropertyUnit[] }[],
+): OrphanedEquipmentType[] {
+  const nextTypes = new Set(next.equipment.map((e) => e.type));
+  const dropped = prev.equipment.map((e) => e.type).filter((t) => !nextTypes.has(t));
+  if (dropped.length === 0) return [];
+  const out: OrphanedEquipmentType[] = [];
+  for (const type of dropped) {
+    let count = 0;
+    const addrs: string[] = [];
+    for (const p of properties) {
+      const n = p.units.reduce((s, u) => s + (u.equipment ?? []).filter((e) => e.type === type).length, 0);
+      if (n > 0) {
+        count += n;
+        addrs.push(p.address);
+      }
+    }
+    if (count > 0) out.push({ type, count, properties: addrs });
+  }
+  return out;
+}
+
 export type EquipmentStatus = "Good" | "Monitor" | "Replace" | "Unknown";
 
 /** Shared Good/Monitor/Replace/Unknown banding by age. */

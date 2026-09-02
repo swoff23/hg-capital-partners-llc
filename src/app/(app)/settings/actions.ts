@@ -3,8 +3,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { parseBuildingCapex, type CapexRules } from "@/lib/property-types";
+import { orphanedEquipmentTypes, parseBuildingCapex, parseUnits, type CapexRules } from "@/lib/property-types";
 import type { ActionResult } from "@/lib/action-result";
+import { getAppConfig } from "@/lib/app-config";
+import { saveAppConfigAtVersion } from "@/lib/app-config-write";
 import { withResult } from "@/lib/server-action";
 
 const RESERVED = new Set(["__proto__", "constructor", "prototype"]);
@@ -69,7 +71,15 @@ function slug(label: string): string {
  * system is sent with `key: null` and needs its server-generated key echoed back
  * before the next edit to that row, or a fresh slug would be minted every time.
  */
-export async function saveCapexRules(input: unknown): Promise<ActionResult<CapexRules>> {
+export interface SavedCapexRules {
+  rules: CapexRules;
+  version: string;
+}
+
+export async function saveCapexRules(
+  input: unknown,
+  expectedVersion: string | null,
+): Promise<ActionResult<SavedCapexRules>> {
   return withResult("saveCapexRules", async () => {
     const user = await requireUser();
     const parsed = schema.parse(input);
@@ -85,9 +95,8 @@ export async function saveCapexRules(input: unknown): Promise<ActionResult<Capex
       cost: Math.round(e.cost),
     }));
 
-    const inUse = (await prisma.property.findMany({ select: { buildingCapex: true } })).flatMap((p) =>
-      Object.keys(parseBuildingCapex(p.buildingCapex)),
-    );
+    const props = await prisma.property.findMany({ select: { address: true, buildingCapex: true, units: true } });
+    const inUse = props.flatMap((p) => Object.keys(parseBuildingCapex(p.buildingCapex)));
     const taken = new Set<string>([
       ...inUse,
       ...(parsed.building.map((b) => b.key?.trim()).filter(Boolean) as string[]),
@@ -120,22 +129,33 @@ export async function saveCapexRules(input: unknown): Promise<ActionResult<Capex
     });
 
     const capexRules: CapexRules = { equipment, building };
-    await prisma.appConfig.upsert({
-      where: { id: "singleton" },
-      create: {
-        id: "singleton",
-        capexRules: capexRules as unknown as object,
-        updatedBy: user.name ?? user.email,
-      },
-      update: {
-        capexRules: capexRules as unknown as object,
-        updatedBy: user.name ?? user.email,
-      },
+
+    // Equipment matches a rule by its type string: dropping (or renaming —
+    // the editor sends that as drop + add) a type that units still carry
+    // would silently strip those appliances out of the forecast.
+    const current = await getAppConfig();
+    const orphans = orphanedEquipmentTypes(
+      current.capexRules,
+      capexRules,
+      props.map((p) => ({ address: p.address, units: parseUnits(p.units) })),
+    );
+    if (orphans.length > 0) {
+      const detail = orphans
+        .map((o) => `${o.type} (${o.count} on ${o.properties.length} propert${o.properties.length === 1 ? "y" : "ies"})`)
+        .join(", ");
+      throw new Error(
+        `Cannot remove or rename a type that units still use: ${detail}. Change the equipment on those units first, or keep the rule.`,
+      );
+    }
+
+    const version = await saveAppConfigAtVersion(expectedVersion, {
+      capexRules: capexRules as unknown as object,
+      updatedBy: user.name ?? user.email,
     });
 
     revalidatePath("/settings");
     revalidatePath("/");
     revalidatePath("/properties/[id]", "page");
-    return capexRules;
+    return { rules: capexRules, version };
   });
 }

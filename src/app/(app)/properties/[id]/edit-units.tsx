@@ -31,10 +31,13 @@ const toneText: Record<string, string> = {
 
 export function UnitsSection({
   propertyId,
+  version,
   initial,
   rules,
 }: {
   propertyId: string;
+  /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
+  version: string;
   initial: PropertyUnit[];
   rules: CapexRules;
 }) {
@@ -57,7 +60,7 @@ export function UnitsSection({
   function save() {
     setError(null);
     start(async () => {
-      const r = await updatePropertyUnits(propertyId, units);
+      const r = await updatePropertyUnits(propertyId, units, version);
       if (!r.ok) {
         setError(r.error);
         setConfirmOpen(false);

@@ -1,10 +1,10 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseMoveInFormSchema, type MoveInFormSchema } from "@/lib/move-in-form-types";
 import type { ActionResult } from "@/lib/action-result";
+import { saveAppConfigAtVersion } from "@/lib/app-config-write";
 import { withResult } from "@/lib/server-action";
 
 const RESERVED = new Set(["__proto__", "constructor", "prototype"]);
@@ -34,7 +34,15 @@ const schema = z.object({ sections: z.array(section).min(1).max(20) });
  * repeatable section's max-count/required toggle are actually editable here —
  * still validated in full server-side in case that ever changes.
  */
-export async function saveMoveInFormSchema(input: unknown): Promise<ActionResult<MoveInFormSchema>> {
+export interface SavedMoveInFormSchema {
+  schema: MoveInFormSchema;
+  version: string;
+}
+
+export async function saveMoveInFormSchema(
+  input: unknown,
+  expectedVersion: string | null,
+): Promise<ActionResult<SavedMoveInFormSchema>> {
   return withResult("saveMoveInFormSchema", async () => {
     const user = await requireUser();
     const parsed = schema.parse(input);
@@ -51,10 +59,9 @@ export async function saveMoveInFormSchema(input: unknown): Promise<ActionResult
       })),
     };
 
-    await prisma.appConfig.upsert({
-      where: { id: "singleton" },
-      create: { id: "singleton", moveInFormSchema: value as unknown as object, updatedBy: user.name ?? user.email },
-      update: { moveInFormSchema: value as unknown as object, updatedBy: user.name ?? user.email },
+    const version = await saveAppConfigAtVersion(expectedVersion, {
+      moveInFormSchema: value as unknown as object,
+      updatedBy: user.name ?? user.email,
     });
 
     revalidatePath("/settings/move-in-form");
@@ -62,6 +69,6 @@ export async function saveMoveInFormSchema(input: unknown): Promise<ActionResult
 
     // Round-trip through the same tolerant parser the read path uses, so the
     // client gets back exactly what a future page load would see.
-    return parseMoveInFormSchema(value);
+    return { schema: parseMoveInFormSchema(value), version };
   });
 }

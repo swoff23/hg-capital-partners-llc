@@ -1,11 +1,11 @@
 import { requireUser } from "@/lib/auth";
-import { getMoveInFormSchema } from "@/lib/move-in-form";
+import { getAppConfig } from "@/lib/app-config";
 import { MoveInFormEditor } from "./move-in-form-editor";
 
 export const dynamic = "force-dynamic";
 
 export default async function MoveInFormSettingsPage() {
   await requireUser();
-  const schema = await getMoveInFormSchema();
-  return <MoveInFormEditor initial={schema} />;
+  const { moveInFormSchema, version } = await getAppConfig();
+  return <MoveInFormEditor initial={moveInFormSchema} initialVersion={version} />;
 }

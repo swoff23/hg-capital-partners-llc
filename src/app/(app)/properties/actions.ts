@@ -10,11 +10,31 @@ import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
 import { formToObject } from "@/lib/forms";
 import { parseBuildingCapex, type PropertyUnit } from "@/lib/property-types";
-import type { ActionResult } from "@/lib/action-result";
+import { CONFLICT_MESSAGE, type ActionResult } from "@/lib/action-result";
 import { withLog, withResult } from "@/lib/server-action";
 
 const decOrNull = amountToDecimal;
 const dateOrNull = ymdToDate;
+
+/**
+ * Optimistic concurrency for the whole-blob saves. The editor sends the
+ * `updatedAt` it rendered with; the write only matches a row that still has
+ * it. Two tabs saving units can no longer silently overwrite each other.
+ */
+function versionDate(expectedVersion: string): Date {
+  const d = new Date(expectedVersion);
+  if (Number.isNaN(d.getTime())) throw new Error(CONFLICT_MESSAGE);
+  return d;
+}
+
+async function updatePropertyAtVersion(
+  id: string,
+  expectedVersion: string,
+  data: Parameters<typeof prisma.property.updateMany>[0]["data"],
+): Promise<void> {
+  const r = await prisma.property.updateMany({ where: { id, updatedAt: versionDate(expectedVersion) }, data });
+  if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
+}
 
 /** Key-date fields that, when edited, trigger a reminder-task resync. */
 const KEY_DATE_FIELDS = [
@@ -252,7 +272,7 @@ const unitSchema = z.object({
 });
 
 /** Replace the whole per-unit reference array (sent from the client editor). */
-export async function updatePropertyUnits(id: string, units: unknown): Promise<ActionResult> {
+export async function updatePropertyUnits(id: string, units: unknown, expectedVersion: string): Promise<ActionResult> {
   return withResult("updatePropertyUnits", async () => {
     await requireUser();
     const parsed = z.array(unitSchema).parse(units);
@@ -271,7 +291,7 @@ export async function updatePropertyUnits(id: string, units: unknown): Promise<A
           comment: e.comment?.trim() || null,
         })),
     }));
-    await prisma.property.update({ where: { id }, data: { units: clean as unknown as object } });
+    await updatePropertyAtVersion(id, expectedVersion, { units: clean as unknown as object });
     revalidatePath(`/properties/${id}`);
   });
 }
@@ -292,14 +312,17 @@ const buildingCapexSchema = z.record(
  * CapEx rules stays put and reappears if the system is re-added. A key the
  * payload sends with everything blank is an explicit clear.
  */
-export async function updateBuildingCapex(id: string, data: unknown): Promise<ActionResult> {
+export async function updateBuildingCapex(id: string, data: unknown, expectedVersion: string): Promise<ActionResult> {
   return withResult("updateBuildingCapex", async () => {
     await requireUser();
     const parsed = buildingCapexSchema.parse(data);
     const current = await prisma.property.findUnique({
       where: { id },
-      select: { buildingCapex: true },
+      select: { buildingCapex: true, updatedAt: true },
     });
+    if (!current || current.updatedAt.getTime() !== versionDate(expectedVersion).getTime()) {
+      throw new Error(CONFLICT_MESSAGE);
+    }
     const clean: Record<string, { year: string | null; type: string | null; costOverride: number | null }> =
       { ...(parseBuildingCapex(current?.buildingCapex) as Record<string, { year: string | null; type: string | null; costOverride: number | null }>) };
 
@@ -313,10 +336,7 @@ export async function updateBuildingCapex(id: string, data: unknown): Promise<Ac
       if (year || type || costOverride != null) clean[key] = { year, type, costOverride };
       else delete clean[key];
     }
-    await prisma.property.update({
-      where: { id },
-      data: { buildingCapex: clean as unknown as object },
-    });
+    await updatePropertyAtVersion(id, expectedVersion, { buildingCapex: clean as unknown as object });
     revalidatePath(`/properties/${id}`);
     revalidatePath("/properties");
   });
@@ -344,7 +364,11 @@ const listingSchema = z.object({
  * itself full-replace on every save — same convention as the rest of this
  * function — so any photo blob no longer referenced gets deleted too.
  */
-export async function updatePropertyListings(propertyId: string, listings: unknown): Promise<ActionResult> {
+export async function updatePropertyListings(
+  propertyId: string,
+  listings: unknown,
+  expectedVersion: string,
+): Promise<ActionResult> {
   return withResult("updatePropertyListings", async () => {
     await requireUser();
     const parsed = z.array(listingSchema).parse(listings);
@@ -383,27 +407,36 @@ export async function updatePropertyListings(propertyId: string, listings: unkno
       const afterUrls = new Set(l.photos.map((p) => p.url));
       for (const p of before.photos) if (!afterUrls.has(p.url)) urlsToDelete.push(p.url);
     }
+    // Listings don't touch Property.updatedAt on their own, so the guard
+    // bumps it inside the same transaction: the version the editor loaded
+    // must still be current, and every save advances it.
+    await prisma.$transaction(async (tx) => {
+      const touched = await tx.property.updateMany({
+        where: { id: propertyId, updatedAt: versionDate(expectedVersion) },
+        data: { updatedAt: new Date() },
+      });
+      if (touched.count === 0) throw new Error(CONFLICT_MESSAGE);
+      for (const row of toDelete) await tx.listing.delete({ where: { id: row.id } });
+      for (const { photos, ...l } of clean) {
+        if (l.id) {
+          await tx.listing.update({
+            where: { id: l.id },
+            data: { ...l, id: undefined, propertyId, photos: { deleteMany: {}, create: photos } },
+          });
+        } else {
+          await tx.listing.create({ data: { ...l, id: undefined, propertyId, photos: { create: photos } } });
+        }
+      }
+    });
+
+    // Only after the DB commit — a conflict must not delete photos that are still referenced.
     for (const url of urlsToDelete) {
       try {
         await del(url);
       } catch {
-        // Blob already gone / token missing — still drop the DB row.
+        // Blob already gone / token missing — the DB row is gone regardless.
       }
     }
-
-    await prisma.$transaction([
-      ...toDelete.map((row) => prisma.listing.delete({ where: { id: row.id } })),
-      ...clean.map(({ photos, ...l }) =>
-        l.id
-          ? prisma.listing.update({
-              where: { id: l.id },
-              data: { ...l, id: undefined, propertyId, photos: { deleteMany: {}, create: photos } },
-            })
-          : prisma.listing.create({
-              data: { ...l, id: undefined, propertyId, photos: { create: photos } },
-            }),
-      ),
-    ]);
 
     revalidatePath(`/properties/${propertyId}`);
     revalidatePath("/rentals");

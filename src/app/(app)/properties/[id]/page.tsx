@@ -97,11 +97,26 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
           <CapexForecastCard units={units} building={buildingCapex} rules={capexRules} />
 
-          <BuildingCapexSection propertyId={property.id} initial={buildingCapex} rules={capexRules} />
+          <BuildingCapexSection
+            propertyId={property.id}
+            version={property.updatedAt.toISOString()}
+            initial={buildingCapex}
+            rules={capexRules}
+          />
 
-          <UnitsSection propertyId={property.id} initial={units} rules={capexRules} />
+          <UnitsSection
+            propertyId={property.id}
+            version={property.updatedAt.toISOString()}
+            initial={units}
+            rules={capexRules}
+          />
 
-          <ListingsSection propertyId={property.id} initial={listings} unitLabels={unitLabels} />
+          <ListingsSection
+            propertyId={property.id}
+            version={property.updatedAt.toISOString()}
+            initial={listings}
+            unitLabels={unitLabels}
+          />
         </div>
 
         <div className="min-w-0 space-y-4">

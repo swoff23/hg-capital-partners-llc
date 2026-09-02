@@ -53,10 +53,13 @@ function StatusCell({ status }: { status: EquipmentStatus }) {
 
 export function BuildingCapexSection({
   propertyId,
+  version,
   initial,
   rules,
 }: {
   propertyId: string;
+  /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
+  version: string;
   initial: BuildingCapexData;
   rules: CapexRules;
 }) {
@@ -89,7 +92,7 @@ export function BuildingCapexSection({
     }
     setError(null);
     start(async () => {
-      const r = await updateBuildingCapex(propertyId, payload);
+      const r = await updateBuildingCapex(propertyId, payload, version);
       if (!r.ok) {
         setError(r.error);
         return;
