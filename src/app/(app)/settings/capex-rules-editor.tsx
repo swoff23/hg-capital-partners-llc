@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Button, PageHeader, SectionCard } from "@/components/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { fmtMoney } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
 import { DEFAULT_CAPEX_RULES, type BuildingRule, type CapexRules } from "@/lib/property-types";
@@ -179,32 +180,6 @@ function ComboField({
   );
 }
 
-function ConfirmDialog({
-  title,
-  body,
-  actions,
-  onClose,
-}: {
-  title: string;
-  body: React.ReactNode;
-  actions: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h4 className="text-sm font-semibold">{title}</h4>
-        <div className="mt-1 text-xs text-muted">{body}</div>
-        <div className="mt-4 flex items-center justify-end gap-2">{actions}</div>
-      </div>
-    </div>
-  );
-}
 
 const headerRow = (first: string) => (
   <div className={rowGrid + " px-1 text-[10px] font-medium uppercase tracking-wide text-muted"}>
