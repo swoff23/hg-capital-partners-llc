@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the Vercel production runtime (see /api/health -> node).
+          node-version: 24
+          cache: npm
+
+      # postinstall runs `prisma generate`; it does not need a database.
+      - run: npm ci
+
+      # `next typegen` (route types) + `tsc --noEmit`. No database needed.
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      # node:test via tsx. All tests are pure / file-based today; if a DB-backed
+      # test is ever added it must skip itself when DATABASE_URL is unset.
+      - run: npm test
