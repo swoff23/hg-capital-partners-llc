@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { del } from "@vercel/blob";
 import { formToObject } from "@/lib/forms";
-import { logDealTaskEvent } from "../deals/actions";
+import { logDealTaskEvent } from "@/lib/deal-log";
 
 export async function toggleTask(id: string) {
   const user = await requireUser();

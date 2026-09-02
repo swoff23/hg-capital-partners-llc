@@ -2,12 +2,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { Deal, User } from "@prisma/client";
+import type { Deal } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { normalizeAddress } from "@/lib/normalize";
 import { formToObject } from "@/lib/forms";
 import { initials } from "@/lib/utils";
+import { logDealChanges } from "@/lib/deal-log";
 
 const dealSchema = z.object({
   address: z.string().min(4),
@@ -28,21 +29,6 @@ function money(raw?: string | null): string | null {
   const num = s.replace(/[km]$/, "");
   if (!/^-?\d+(\.\d+)?$/.test(num)) return null; // "300s", ranges, notes → keep raw only
   return (parseFloat(num) * mult).toFixed(2);
-}
-
-/** Append one or more change entries to a deal's activity timeline. */
-async function logDealChanges(dealId: string, user: User, lines: string[]) {
-  const entries = lines.filter(Boolean);
-  if (entries.length === 0) return;
-  const who = user.name ?? user.email;
-  await prisma.dealNote.createMany({
-    data: entries.map((body) => ({
-      dealId,
-      body: `${body}  ·  ${who}`,
-      noteDate: new Date(),
-      source: "change",
-    })),
-  });
 }
 
 const val = (v: string | null | undefined) => (v == null || v === "" ? "—" : v);
@@ -182,14 +168,6 @@ export async function addDealNote(dealId: string, formData: FormData) {
       noteDate: dateStr ? new Date(dateStr) : new Date(),
       source: "manual",
     },
-  });
-  revalidatePath(`/deals/${dealId}`);
-}
-
-/** Called by the task actions when a task is created against a deal. */
-export async function logDealTaskEvent(dealId: string, userName: string, line: string) {
-  await prisma.dealNote.create({
-    data: { dealId, body: `${line}  ·  ${userName}`, noteDate: new Date(), source: "change" },
   });
   revalidatePath(`/deals/${dealId}`);
 }

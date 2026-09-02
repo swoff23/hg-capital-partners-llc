@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { healthDetailAllowed } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
 
@@ -7,16 +8,17 @@ export const dynamic = "force-dynamic";
  * Deploy / DB health probe. Curl-friendly, no session needed.
  *
  * Set HEALTH_TOKEN (Vercel env + local .env.prod) to unlock the detailed payload.
- * Without a valid token it still answers, but only { ok, db, env, commit } — enough
- * to see if the site is up, not enough to enumerate the schema.
+ * Without a configured token, or without a matching one, it still answers but
+ * only with { ok, db, env, commit, at } — enough to see if the site is up, not
+ * enough to enumerate the schema. Fails closed: no token configured means
+ * nobody gets the detail (see src/lib/secrets.ts).
  *
  *   curl -s "$PROD/api/health?token=$HEALTH_TOKEN" | jq
  */
 export async function GET(request: NextRequest) {
-  const token = process.env.HEALTH_TOKEN;
   const provided =
     new URL(request.url).searchParams.get("token") ?? request.headers.get("x-health-token");
-  const detailed = !token || provided === token;
+  const detailed = healthDetailAllowed(process.env.HEALTH_TOKEN, provided);
 
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
   const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null;
