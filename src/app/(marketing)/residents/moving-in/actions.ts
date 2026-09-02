@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { withResult } from "@/lib/server-action";
+import { createTask } from "@/lib/tasks/service";
 
 // This is the app's first unauthenticated write path — deliberately no
 // requireUser() below. Anyone with the URL can submit a report; that's the
@@ -93,15 +94,14 @@ async function submitMoveInInspectionBody(
   }
   lines.push(`Submitted by: ${p.submitterName} <${p.submitterEmail}>`);
 
-  await prisma.task.create({
-    data: {
+  await createTask(
+    {
       title: `Move-in inspection — ${property.address} — ${p.tenantName}`,
       description: lines.join("\n"),
       propertyId: property.id,
-      bucket: "Property",
-      status: "OPEN",
     },
-  });
+    null, // public submission — nobody to attribute it to
+  );
 
   return { ok: true };
 }

@@ -1,36 +1,20 @@
 "use server";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { del } from "@vercel/blob";
 import { formToObject } from "@/lib/forms";
-import { logDealTaskEvent } from "@/lib/deal-log";
-import { ymdToDate } from "@/lib/dates";
 import { withLog } from "@/lib/server-action";
+import * as tasks from "@/lib/tasks/service";
+
+/**
+ * Thin server actions: authenticate, validate, call the task service, redirect.
+ * Everything that touches the database lives in src/lib/tasks/service.ts.
+ */
 
 export async function toggleTask(id: string) {
   return withLog("toggleTask", async () => {
     const user = await requireUser();
-    const t = await prisma.task.findUnique({ where: { id } });
-    if (!t) return;
-    const done = t.status === "OPEN";
-    await prisma.task.update({
-      where: { id },
-      data: { status: done ? "DONE" : "OPEN", completedAt: done ? new Date() : null },
-    });
-    if (t.dealId) {
-      await logDealTaskEvent(
-        t.dealId,
-        user.name ?? user.email,
-        `Task ${done ? "completed" : "reopened"}: ${t.title}`,
-      );
-    }
-    revalidatePath("/tasks");
-    revalidatePath(`/tasks/${id}`);
-    if (t.propertyId) revalidatePath(`/properties/${t.propertyId}`);
-    revalidatePath("/");
+    await tasks.toggleTask(id, user);
   });
 }
 
@@ -49,114 +33,31 @@ export async function createTask(formData: FormData) {
   return withLog("createTask", async () => {
     const user = await requireUser();
     const p = taskSchema.parse(formToObject(formData));
-    const task = await prisma.task.create({
-      data: {
-        title: p.title.trim(),
-        description: p.description ?? null,
-        assigneeUserId: p.assigneeUserId ?? null,
-        assigneeName: p.assigneeName ?? null,
-        dueDate: ymdToDate(p.dueDate),
-        priority: p.priority ?? null,
-        propertyId: p.propertyId ?? null,
-        dealId: p.dealId ?? null,
-        bucket: p.propertyId ? "Property" : "General",
-      },
-    });
-    if (p.dealId) await logDealTaskEvent(p.dealId, user.name ?? user.email, `Task added: ${task.title}`);
-    revalidatePath("/tasks");
-    if (p.propertyId) revalidatePath(`/properties/${p.propertyId}`);
+    const task = await tasks.createTask(p, user);
     redirect(`/tasks/${task.id}`);
   });
 }
 
-/**
- * Inline single-field edits from the Asana-style task detail page. Each key is
- * optional; only keys actually present are written. `null`/`""` clears a field.
- */
-export async function patchTask(
-  id: string,
-  data: Partial<{
-    title: string;
-    description: string | null;
-    assigneeUserId: string | null;
-    dueDate: string | null;
-    propertyId: string | null;
-  }>,
-) {
+/** Inline single-field edits from the task list and detail page. */
+export async function patchTask(id: string, data: tasks.TaskPatch) {
   return withLog("patchTask", async () => {
     await requireUser();
-    const task = await prisma.task.findUnique({
-      where: { id },
-      select: { propertyId: true },
-    });
-    if (!task) return;
-
-    const patch: Record<string, unknown> = {};
-    if (data.title !== undefined) {
-      const v = data.title.trim();
-      if (v.length >= 2) patch.title = v;
-    }
-    if (data.description !== undefined) patch.description = data.description?.trim() || null;
-    if (data.assigneeUserId !== undefined) {
-      // Setting a user (or unassigning) always supersedes any free-text external name.
-      patch.assigneeUserId = data.assigneeUserId || null;
-      patch.assigneeName = null;
-    }
-    if (data.dueDate !== undefined) patch.dueDate = ymdToDate(data.dueDate);
-    if (data.propertyId !== undefined) {
-      patch.propertyId = data.propertyId || null;
-      patch.bucket = data.propertyId ? "Property" : "General";
-    }
-    if (Object.keys(patch).length === 0) return;
-
-    await prisma.task.update({ where: { id }, data: patch });
-
-    revalidatePath(`/tasks/${id}`);
-    revalidatePath("/tasks");
-    revalidatePath("/");
-    if (task.propertyId) revalidatePath(`/properties/${task.propertyId}`);
-    if (typeof patch.propertyId === "string") revalidatePath(`/properties/${patch.propertyId}`);
+    await tasks.patchTask(id, data);
   });
 }
 
 /* ---------------- Attachments (files in Vercel Blob) ---------------- */
 
-/** Called by the client after a file finishes uploading to Blob. */
-export async function recordTaskAttachment(
-  taskId: string,
-  data: { url: string; pathname: string; filename: string; size: number; contentType: string | null },
-) {
+export async function recordTaskAttachment(taskId: string, data: tasks.AttachmentInput) {
   return withLog("recordTaskAttachment", async () => {
     await requireUser();
-    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { id: true } });
-    if (!task) return;
-
-    await prisma.taskAttachment.create({
-      data: {
-        taskId,
-        url: data.url,
-        pathname: data.pathname,
-        filename: data.filename.slice(0, 255) || "file",
-        size: Math.max(0, Math.trunc(data.size)),
-        contentType: data.contentType,
-      },
-    });
-    revalidatePath(`/tasks/${taskId}`);
+    await tasks.recordTaskAttachment(taskId, data);
   });
 }
 
 export async function deleteTaskAttachment(attachmentId: string) {
   return withLog("deleteTaskAttachment", async () => {
     await requireUser();
-    const att = await prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
-    if (!att) return;
-
-    try {
-      await del(att.url);
-    } catch {
-      // Blob already gone / token missing — still drop the DB row.
-    }
-    await prisma.taskAttachment.delete({ where: { id: attachmentId } });
-    revalidatePath(`/tasks/${att.taskId}`);
+    await tasks.deleteTaskAttachment(attachmentId);
   });
 }

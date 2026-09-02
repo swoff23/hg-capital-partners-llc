@@ -12,6 +12,7 @@ import { formToObject } from "@/lib/forms";
 import { parseBuildingCapex, type PropertyUnit } from "@/lib/property-types";
 import { CONFLICT_MESSAGE, type ActionResult } from "@/lib/action-result";
 import { withLog, withResult } from "@/lib/server-action";
+import { deleteOpenAutoTask, upsertAutoTask } from "@/lib/tasks/service";
 
 const decOrNull = amountToDecimal;
 const dateOrNull = ymdToDate;
@@ -194,13 +195,9 @@ export async function syncPropertyReminders(propertyId: string) {
       const date = p[r.field];
       if (date) {
         const dueDate = new Date(date.getTime() - r.leadDays * 86_400_000);
-        await prisma.task.upsert({
-          where: { autoKey },
-          create: { autoKey, title: r.title(date), dueDate, propertyId, bucket: "Property" },
-          update: { title: r.title(date), dueDate },
-        });
+        await upsertAutoTask(autoKey, propertyId, r.title(date), dueDate);
       } else {
-        await prisma.task.deleteMany({ where: { autoKey, status: "OPEN" } });
+        await deleteOpenAutoTask(autoKey);
       }
     }
 
