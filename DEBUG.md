@@ -12,8 +12,9 @@ curl -s https://www.hgcapitalpartners.com/api/health | jq
 # { "ok": true, "db": "up", "env": "production", "commit": "d9a923b", ... }
 ```
 
-With the token it also lists applied migrations and the running Node version —
-enough to spot schema drift (column missing, migration not applied) after a deploy:
+With a matching `HEALTH_TOKEN` it also lists applied migrations and the running
+Node version — enough to spot schema drift after a deploy. This fails closed:
+if `HEALTH_TOKEN` is not set in Vercel, nobody gets the detail.
 
 ```bash
 curl -s "$PROD_URL/api/health?token=$HEALTH_TOKEN" | jq
@@ -26,7 +27,23 @@ Returns **503** when the DB is unreachable, **200** otherwise.
 
 Set `HEALTH_TOKEN` (any long random string) in the Vercel project env vars, and
 the same value in local `.env.prod`. Without the token the endpoint still works
-but only returns `{ ok, db, env, commit }`.
+but only returns `{ ok, db, env, commit, at }`.
+
+## 1b. Cron / sync probe
+
+`GET /api/quickbooks/sync` runs the nightly QuickBooks sync. It requires
+`Authorization: Bearer $CRON_SECRET` (Vercel adds it on cron invocations);
+with `CRON_SECRET` unset it answers 503 and does nothing.
+
+```bash
+curl -s -H "Authorization: Bearer $CRON_SECRET" "$PROD_URL/api/quickbooks/sync" | jq
+# { "runId": "...", "status": "SUCCESS" | "PARTIAL" | "FAILED", "monthsProcessed": 7, "monthsPlanned": 7, "lineCount": 173 }
+```
+
+Every run is a `QboSyncRun` row; `stats` holds the planned months, the sweep
+cursor, reconciliation results, and warnings. Server-side failures are logged
+as one JSON line per error (`scope: "action:<name>"` or `"qbo:sync"`) in the
+Vercel Logs tab.
 
 ## 2. Read-only prod access — `scripts/prod`
 

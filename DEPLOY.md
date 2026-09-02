@@ -1,111 +1,56 @@
-# Deploying HG Capital OS — step by step
+# Deploying HG Capital OS
 
-Goal: a real website Connor + Pieter log into with a password.
+Production is Vercel + Supabase Postgres, live at https://www.hgcapitalpartners.com
+(custom domain on the `hgcapitalpartners.com` GoDaddy zone; the `.vercel.app`
+URL works too). Every push to `main` builds and deploys in ~2 minutes; the
+production build applies pending Prisma migrations first (`scripts/prebuild.mjs`,
+production builds only).
 
-You only need **one account: Vercel** (it provides both the hosting and the
-database). ~20 minutes. No coding.
+## Environment variables (Vercel → Settings → Environment Variables)
 
----
+| Name | Required | What |
+|---|---|---|
+| `DATABASE_URL` | yes | Supabase connection string. Use the **session** pooler or direct URL so migrations can run; the transaction pooler (port 6543) skips them. |
+| `SESSION_SECRET` | yes | 32+ random chars. Signs the login cookie and the QuickBooks OAuth state. Rotating it signs everyone out. |
+| `HEALTH_TOKEN` | recommended | Unlocks the detailed `/api/health` payload. Without it the probe still answers, but only `{ ok, db, env, commit, at }`. |
+| `CRON_SECRET` | before QuickBooks | Vercel sends it as `Authorization: Bearer …` on the nightly cron. Until it is set, `/api/quickbooks/sync` answers 503 and never runs. |
+| `BLOB_READ_WRITE_TOKEN` | yes | Added automatically when the Blob store is connected under Storage. |
+| `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `QBO_REDIRECT_URI`, `QBO_TOKEN_SECRET` | for Financials | Intuit production keys; redirect URI is `https://www.hgcapitalpartners.com/api/quickbooks/callback`; token secret is 32 random bytes base64. All four or nothing — the Connect button appears only when all are present. |
+| `QBO_ENVIRONMENT` | for Financials | `production` (defaults to `sandbox`). |
+| `QBO_HISTORY_START` | optional | First month to pull, `YYYY-MM`. Defaults to `2026-01`. |
+| `CONNOR_PASSWORD`, `PIETER_PASSWORD` | one-time | Hashed into the DB by the build (only when the user's hash is empty). Safe to delete once both users can sign in. |
 
-## Step 1 — Put the code on GitHub
-
-Open the **Terminal** app on your Mac (Cmd+Space, type "Terminal", Enter).
-Paste this and press Enter:
+Generate a secret:
 
 ```bash
-cd /Users/connorswofford/dev/hg-capital-partners-llc && git push -u origin main
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-If it asks you to log in to GitHub, follow the prompts. When it finishes with
-`branch 'main' set up to track 'origin/main'`, you're done. Close Terminal.
+The Supabase integration also adds a dozen `SUPABASE_*` / `POSTGRES_*` /
+`NEXT_PUBLIC_SUPABASE_*` variables. The app reads none of them.
 
----
+## Preview deployments
 
-## Step 2 — Create the Vercel project
+Preview deployments have no `DATABASE_URL` (it is scoped to Production only) and
+therefore do not work. Either attach a branch database to the Preview
+environment or ignore previews.
 
-1. Go to **https://vercel.com/signup** and sign up with **"Continue with
-   GitHub"** (use the account that owns the `hg-capital-partners-llc` repo).
-2. On the dashboard, click **"Add New…" → "Project"**.
-3. Find **`hg-capital-partners-llc`** in the list and click **"Import"**.
-4. You'll see a "Configure Project" screen. **Don't change anything yet.** Scroll
-   down and click **"Deploy"**.
-5. The first deploy will **fail** — that's expected, there's no database yet.
-   Keep going.
+## First-time setup (already done for production)
 
----
+1. Import the GitHub repo into a Vercel project.
+2. Storage → create a Blob store and connect it.
+3. Add the environment variables above.
+4. Deploy. The build runs migrations and the password backfill.
+5. From a machine that has `_private/`, run the data import against the
+   production `DATABASE_URL` once: `DATABASE_URL=… npm run migrate`.
+6. Sign in. Settings → Storage → "Move documents to private storage" (no-op on
+   a fresh install).
 
-## Step 3 — Add the database
+## After a deploy
 
-1. In your new project, click the **"Storage"** tab at the top.
-2. Click **"Create Database"** → choose **"Neon"** (Postgres) → **"Continue"**.
-3. Accept the defaults, pick the region closest to Buffalo (usually
-   **Washington, D.C. (iad1)**), click **"Create"**.
-4. When it asks to connect it to the project, say **yes / "Connect"**. This
-   automatically adds the `DATABASE_URL` setting for you.
+```bash
+curl -s "https://www.hgcapitalpartners.com/api/health?token=$HEALTH_TOKEN" | jq '.commit, .latestMigration'
+```
 
----
-
-## Step 4 — Add the login settings
-
-1. Click the **"Settings"** tab → **"Environment Variables"** in the left menu.
-2. Add these three, one at a time (Name on the left, Value on the right, then
-   "Save"):
-
-   | Name | Value |
-   |---|---|
-   | `SESSION_SECRET` | `PASTE_THE_RANDOM_STRING_CLAUDE_GIVES_YOU` |
-   | `CONNOR_PASSWORD` | a password you choose for yourself |
-   | `PIETER_PASSWORD` | a password you choose for Pieter |
-
-   (Claude will give you the `SESSION_SECRET` value — it's a long random string.)
-   These two password vars only matter once: the first production deploy hashes
-   them into the database, and they're never read again after that — see
-   "To change a password later" below.
-
----
-
-## Step 5 — Deploy for real
-
-1. Go to the **"Deployments"** tab.
-2. Click the **"⋯"** menu on the most recent (failed) deployment →
-   **"Redeploy"** → **"Redeploy"** again to confirm.
-3. Wait ~2 minutes. When it says **"Ready"**, click **"Visit"**. You'll see the
-   HG Capital OS login screen — but it has no data yet.
-
-Copy your site's URL (like `hg-capital-partners-llc.vercel.app`).
-
-> The live site is now also served at **https://www.hgcapitalpartners.com** — a
-> custom domain added under Vercel → Settings → Domains, with the DNS records
-> (`A @ → 216.198.79.1`, `CNAME www → *.vercel-dns-017.com`) set at GoDaddy on the
-> `hgcapitalpartners.com` zone. The `.vercel.app` URL keeps working too.
-
----
-
-## Step 6 — Load your data (Claude does this)
-
-1. In Vercel: **Storage** tab → your database → **".env.local"** tab (or
-   **"Connect"** button) → copy the value that starts with
-   `postgresql://` (the `DATABASE_URL`).
-2. Paste it to Claude and say "import the data into production."
-
-Claude runs the import from your Mac (the spreadsheets live there, not on the
-internet) and confirms the live site works.
-
----
-
-## Step 7 — Sign in
-
-Go to **https://www.hgcapitalpartners.com**. Pick your name, type the password
-you set in Step 4, and you're in. Send Pieter the URL + his password.
-
----
-
-## After this
-
-- Every time Claude pushes a change, the site updates automatically in ~2 min.
-- **Cost:** free to start. Vercel's free plan technically disallows commercial
-  use — when you're ready to make it official, upgrade to Vercel Pro ($20/mo).
-  The Neon database has a free tier that's plenty for now.
-- To change a password later: passwords live in the database now, not in
-  Vercel's env vars — editing `CONNOR_PASSWORD`/`PIETER_PASSWORD` after the
-  first deploy has no effect. Just ask Claude to change it.
+Sessions issued before September 2026 used an older cookie format; users sign
+in again once.

@@ -1,90 +1,98 @@
 # HG Capital OS
 
-Internal operating system for HG Capital — v1 consolidates the Master Database
-(deals, properties, contractors) and Asana tasks into one app.
-
-Plan: `~/.claude/plans/i-run-a-real-keen-meadow.md`
+Internal operating system for HG Capital: deals, the owned portfolio (units,
+CapEx, loans, insurance, documents), tasks, vendors, and a read-only mirror of
+the QuickBooks P&L. A small public site (`/welcome`, `/rentals`, `/residents`)
+lives in the same app.
 
 ## Stack
 
-- Next.js 16 (App Router) + TypeScript + Tailwind v4
-- Postgres via Prisma 6
-- Auth: signed-cookie session, per-user password from env vars in production; a
-  dev user-picker when no password env vars are set
-- Deploy target: Vercel (+ Vercel/Neon Postgres). See `DEPLOY.md`.
+- Next.js 16 (App Router, React Compiler) + TypeScript + Tailwind v4
+- Postgres on Supabase, via Prisma 6 — the app connects as the table owner and
+  never uses PostgREST or the Supabase client
+- Auth: email + password (scrypt hash in `User.passwordHash`), signed cookie
+  session with a 30-day expiry, per-email login throttle. Two users, no roles.
+- Files: Vercel Blob. Documents and task attachments are private and served
+  through `/api/files`; rental photos are public.
+- Deploy: Vercel, auto-deploy on push to `main`. See `DEPLOY.md`.
+
+## Layout
+
+```
+src/app/(app)/*        signed-in pages; each area has a thin actions.ts
+src/app/(marketing)/*  public pages
+src/app/api/*          health, search, blob token minting, file delivery, QuickBooks OAuth + cron
+src/lib/<domain>/      services that own every database write: tasks, deals, properties
+src/lib/quickbooks/    pure core (categorize, classify, compute, reconcile, report-parse, months) + sync/queries
+src/lib/*.ts           shared pure helpers: env, dates, money, normalize, secrets, session-token, …
+scripts/migrate/       one-time import of the Master Database xlsx + Asana CSV
+prisma/                schema + migrations
+```
+
+Rules of the road:
+
+- **Server actions only authenticate, validate, and call a service.** Anything
+  that touches Prisma lives in `src/lib/<domain>/service.ts`.
+- **Pure helpers get tests.** `npm test` runs every `*.test.ts` (node:test via
+  tsx); CI runs typecheck + lint + test on every push.
+- **Dates that are calendar dates go through `src/lib/dates.ts`**, money
+  through `src/lib/money.ts`, addresses through `src/lib/normalize.ts`.
+- **Whole-blob saves carry a version.** Units, building CapEx, listings, and
+  the two settings blobs send the `updatedAt` they rendered with and refuse to
+  overwrite a newer row.
+- **`process.env` is read in exactly one place**, `src/lib/env.ts`.
+- **A migration that adds a table must enable RLS on it**
+  (`ALTER TABLE "Foo" ENABLE ROW LEVEL SECURITY;`); `src/lib/db-rls.test.ts`
+  fails otherwise. Never `FORCE ROW LEVEL SECURITY`.
 
 ## Local development
 
 Prereqs: Node 20+, local Postgres (`brew install postgresql@16`).
 
 ```bash
-# one time
 createdb hg_capital_dev
-cp .env.example .env          # DATABASE_URL defaults to the local db
+cp .env.example .env          # fill DATABASE_URL; leave SESSION_SECRET blank locally
 npm install
 npx prisma migrate deploy
 
-# import the Master Database + Asana export (place the source files in _private/)
-#   _private/HG Master Database.xlsx
-#   _private/HG_Capital.csv
-npm run migrate               # idempotent; writes migration-report.md
+# one-time data import (source files in _private/, never committed)
+npm run migrate
+
+# a local login: hashes the value into your LOCAL User row (only fills empty hashes)
+CONNOR_PASSWORD=whatever npx tsx scripts/backfill-password-hashes.ts
 
 npm run dev                   # http://localhost:3000
 ```
 
-With no `*_PASSWORD` env vars set, `/login` shows a dev user picker (Connor /
-Pieter) — no password needed locally.
-
-## Scripts
-
 | Command | What |
 |---|---|
-| `npm run dev` | Dev server |
-| `npm run build` / `npm start` | Production build / serve |
-| `npm run typecheck` | `tsc --noEmit` |
+| `npm run dev` / `build` / `start` | Dev server / production build / serve |
+| `npm run typecheck` | `next typegen && tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run migrate` | Full data migration (or `npm run migrate deals` for one step) |
+| `npm test` | All unit tests |
+| `npm run migrate [step]` | Spreadsheet/Asana import (idempotent) |
 | `npm run db:migrate` | Create + apply a new Prisma migration |
 | `npm run db:studio` | Prisma Studio |
 
-## Data model (v1)
-
-`User` · `Deal` (+ `DealNote` timeline) · `Property` (per-unit access / utilities
-/ equipment in a JSON `units` array) · `Contact` (contractors) · `Task` (from
-Asana, linked to a Property or Deal).
-
-No money, leases, tenants, roles, or external portals in v1 — see the plan's
-"OUT of v1" list.
-
-## Production setup
-
-Full click-by-click guide in **`DEPLOY.md`**. In short: Vercel project + Vercel
-(Neon) Postgres + three env vars (`SESSION_SECRET`, `CONNOR_PASSWORD`,
-`PIETER_PASSWORD`). The build runs `prisma migrate deploy`; the data import
-(`npm run migrate`) runs once from a machine that has `_private/`.
-
 ## Runbook
 
-**Re-run the migration** — safe anytime; idempotent on address / Asana ID.
-Against a fresh database it produces the cleanest result (stale rows from earlier
-runs are not deleted).
+**Add a user** — add a row to `SEED_USERS` in `scripts/migrate/00-users.ts`,
+run `npm run migrate users`, set that person's `*_PASSWORD` env var in Vercel,
+redeploy once (the build hashes it into the DB, then the var can be removed).
 
-**Reset local dev DB** — `dropdb hg_capital_dev && createdb hg_capital_dev &&
+**Change a password** — passwords live in the DB. Set a new value in the
+matching `*_PASSWORD` var, clear the user's `passwordHash` (Supabase SQL editor
+or Prisma Studio), redeploy.
+
+**Re-run the import** — safe anytime; idempotent on address / Asana ID.
+
+**Reset the local DB** — `dropdb hg_capital_dev && createdb hg_capital_dev &&
 npx prisma migrate deploy && npm run migrate`.
 
-**Add a user** — add a row (with a `passwordEnv`) to `SEED_USERS` in
-`scripts/migrate/00-users.ts`, run `npm run migrate users`, set that env var in
-Vercel, and deploy — the next production build hashes it into
-`User.passwordHash` automatically (see `scripts/backfill-password-hashes.ts`).
+**Move old documents to private storage** — Settings → Storage → one button.
 
-**Sensitive data** — contractor bank/routing numbers are never imported (dropped
-in `scripts/migrate/02-contractors.ts` and logged). `_private/` and all
-`*.xlsx` / `*.csv` are gitignored.
+**QuickBooks** — connect from Financials → Settings once the `QBO_*` vars are
+set. The nightly cron rebuilds the last 3 months plus a rotating slice of
+older history; "Refresh from QuickBooks" rebuilds everything.
 
-**Row level security** — Supabase serves `public` over PostgREST, so every table
-must have RLS enabled or it is readable with the project's `anon` key. There are
-no policies: the app connects as the table owner (`postgres`) via Prisma, and an
-owner bypasses RLS unless `FORCE ROW LEVEL SECURITY` is set — never set it.
-**A migration that adds a table must also enable RLS on it**
-(`ALTER TABLE "Foo" ENABLE ROW LEVEL SECURITY;`); `src/lib/db-rls.test.ts` fails
-if one is missed.
+**Production debugging** — `DEBUG.md`.
