@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Button, Input, SectionCard } from "@/components/ui";
-import { cn, fmtDate, fmtMoney, relativeDays } from "@/lib/utils";
+import { cn, fmtMoney } from "@/lib/utils";
+import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
 import { patchProperty } from "../actions";
 
 export type EditableInsurance = {
@@ -36,7 +37,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
   const formId = `property-insurance-${p.id}`;
 
   const renewal = p.insuranceRenewalDate;
-  const overdue = !!renewal && new Date(renewal) < new Date();
+  const overdue = isPastDay(renewal);
 
   if (!editing) {
     return (
@@ -45,7 +46,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
           <div className="mb-3 rounded-lg border border-border bg-background px-3 py-2">
             <div className="text-xs text-muted">Renewal</div>
             <div className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold">{fmtDate(renewal)}</span>
+              <span className="text-sm font-semibold">{fmtDay(renewal)}</span>
               <span
                 className={cn(
                   "text-xs",

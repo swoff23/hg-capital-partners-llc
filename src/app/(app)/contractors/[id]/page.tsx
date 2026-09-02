@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, Field } from "@/components/ui";
 import { BackLink } from "@/components/back-link";
 import { fmtDate } from "@/lib/utils";
+import { fmtDay } from "@/lib/dates";
+import { shortAddress } from "@/lib/normalize";
 
 export default async function ContractorPage({ params }: PageProps<"/contractors/[id]">) {
   await requireUser();
@@ -101,11 +103,11 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                         href={`/properties/${t.property.id}`}
                         className="shrink-0 text-xs text-muted hover:underline"
                       >
-                        {t.property.address.split(",")[0]}
+                        {shortAddress(t.property.address)}
                       </Link>
                     )}
                     <span className="shrink-0 text-xs text-muted">
-                      {t.status === "DONE" ? fmtDate(t.completedAt) : fmtDate(t.dueDate)}
+                      {t.status === "DONE" ? fmtDate(t.completedAt) : fmtDay(t.dueDate)}
                     </span>
                   </li>
                 ))}

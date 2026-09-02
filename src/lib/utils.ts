@@ -17,6 +17,7 @@ export function fmtMoney(v: unknown, opts: { compact?: boolean } = {}): string {
   }).format(n);
 }
 
+/** Instants (createdAt, updatedAt, sync times). For date-only fields use fmtDay in @/lib/dates. */
 export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
@@ -34,38 +35,6 @@ export function fmtDateTime(d: Date | string | null | undefined): string {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  });
-}
-
-export function relativeDays(d: Date | string | null | undefined): string {
-  if (!d) return "";
-  const date = typeof d === "string" ? new Date(d) : d;
-  const days = Math.round((date.getTime() - Date.now()) / 86_400_000);
-  if (days === 0) return "today";
-  if (days === 1) return "tomorrow";
-  if (days === -1) return "yesterday";
-  if (days < 0) return `${-days}d ago`;
-  return `in ${days}d`;
-}
-
-/**
- * Due-date label: anything overdue → "yesterday"; due today → "today"; within the
- * next week → the weekday name; further out → the calendar date (year shown only
- * when it isn't the current one).
- */
-export function dueLabel(d: Date | string | null | undefined): string {
-  if (!d) return "";
-  const date = typeof d === "string" ? new Date(d) : d;
-  if (Number.isNaN(date.getTime())) return "";
-  const days = Math.round((date.getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return "yesterday";
-  if (days === 0) return "today";
-  if (days < 7) return date.toLocaleDateString("en-US", { weekday: "long" });
-  const sameYear = date.getFullYear() === new Date().getFullYear();
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
   });
 }
 

@@ -2,7 +2,8 @@
 import { useState, useTransition } from "react";
 import { Button, Field, Input, SectionCard, Select, Textarea } from "@/components/ui";
 import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
-import { fmtDate, fmtMoney } from "@/lib/utils";
+import { fmtMoney } from "@/lib/utils";
+import { fmtDay } from "@/lib/dates";
 import { patchProperty } from "../actions";
 
 export type EditableProperty = {
@@ -90,14 +91,14 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
       <SectionCard title="Details" onEdit={() => setEditing(true)}>
         <dl>
           <Field label="Value">{fmtMoney(p.value)}</Field>
-          <Field label="Purchase date">{fmtDate(p.purchaseDate)}</Field>
+          <Field label="Purchase date">{fmtDay(p.purchaseDate)}</Field>
           <Field label="Purchase price">{fmtMoney(p.purchasePrice)}</Field>
-          <Field label="Refinance date">{fmtDate(p.refinanceDate)}</Field>
+          <Field label="Refinance date">{fmtDay(p.refinanceDate)}</Field>
           <Field label="Strategy">{p.strategy ?? "—"}</Field>
           <Field label="Sq ft">{p.sqft?.toLocaleString() ?? "—"}</Field>
           <Field label="Entity">{p.llcOwner ?? "—"}</Field>
           <Field label="Status">{p.status ?? "—"}</Field>
-          <Field label="Rental registration expires">{fmtDate(p.rentalRegistrationExpiry)}</Field>
+          <Field label="Rental registration expires">{fmtDay(p.rentalRegistrationExpiry)}</Field>
         </dl>
       </SectionCard>
     );

@@ -5,20 +5,14 @@ import { z } from "zod";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { fmtDate } from "@/lib/utils";
+import { amountToDecimal } from "@/lib/money";
+import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
 import { formToObject } from "@/lib/forms";
 import { parseBuildingCapex, type PropertyUnit } from "@/lib/property-types";
 
-function decOrNull(raw: string | null): string | null {
-  if (!raw) return null;
-  const s = raw.toLowerCase().replace(/[$,%\s]/g, "");
-  const mult = /k$/.test(s) ? 1e3 : /m$/.test(s) ? 1e6 : 1;
-  const num = s.replace(/[km]$/, "");
-  if (!/^-?\d+(\.\d+)?$/.test(num)) return null;
-  return (parseFloat(num) * mult).toFixed(2);
-}
-const dateOrNull = (v: string | null) => (v ? new Date(v) : null);
+const decOrNull = amountToDecimal;
+const dateOrNull = ymdToDate;
 
 /** Key-date fields that, when edited, trigger a reminder-task resync. */
 const KEY_DATE_FIELDS = [
@@ -127,25 +121,25 @@ const REMINDERS: ReminderDef[] = [
     slug: "loanMaturity",
     field: "loanMaturityDate",
     leadDays: 60,
-    title: (d) => `Loan maturity ${fmtDate(d)} — refinance or extend`,
+    title: (d) => `Loan maturity ${fmtDay(d)} — refinance or extend`,
   },
   {
     slug: "insuranceRenewal",
     field: "insuranceRenewalDate",
     leadDays: 30,
-    title: (d) => `Insurance renews ${fmtDate(d)} — confirm coverage`,
+    title: (d) => `Insurance renews ${fmtDay(d)} — confirm coverage`,
   },
   {
     slug: "propertyTax",
     field: "propertyTaxDueDate",
     leadDays: 21,
-    title: (d) => `Property tax due ${fmtDate(d)}`,
+    title: (d) => `Property tax due ${fmtDay(d)}`,
   },
   {
     slug: "rentalRegistration",
     field: "rentalRegistrationExpiry",
     leadDays: 30,
-    title: (d) => `Rental registration expires ${fmtDate(d)} — renew`,
+    title: (d) => `Rental registration expires ${fmtDay(d)} — renew`,
   },
 ];
 

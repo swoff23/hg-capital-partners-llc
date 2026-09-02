@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { del } from "@vercel/blob";
 import { formToObject } from "@/lib/forms";
 import { logDealTaskEvent } from "@/lib/deal-log";
+import { ymdToDate } from "@/lib/dates";
 
 export async function toggleTask(id: string) {
   const user = await requireUser();
@@ -50,7 +51,7 @@ export async function createTask(formData: FormData) {
       description: p.description ?? null,
       assigneeUserId: p.assigneeUserId ?? null,
       assigneeName: p.assigneeName ?? null,
-      dueDate: p.dueDate ? new Date(p.dueDate) : null,
+      dueDate: ymdToDate(p.dueDate),
       priority: p.priority ?? null,
       propertyId: p.propertyId ?? null,
       dealId: p.dealId ?? null,
@@ -95,7 +96,7 @@ export async function patchTask(
     patch.assigneeUserId = data.assigneeUserId || null;
     patch.assigneeName = null;
   }
-  if (data.dueDate !== undefined) patch.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+  if (data.dueDate !== undefined) patch.dueDate = ymdToDate(data.dueDate);
   if (data.propertyId !== undefined) {
     patch.propertyId = data.propertyId || null;
     patch.bucket = data.propertyId ? "Property" : "General";

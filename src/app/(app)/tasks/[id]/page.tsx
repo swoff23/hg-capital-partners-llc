@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { BackLink } from "@/components/back-link";
+import { toYmd } from "@/lib/dates";
 import {
   AssigneeControl,
   AttachmentsSection,
@@ -70,7 +71,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
             <Row label="Due date">
               <DueDateControl
                 id={task.id}
-                value={task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null}
+                value={toYmd(task.dueDate)}
               />
             </Row>
             <Row label="Project">

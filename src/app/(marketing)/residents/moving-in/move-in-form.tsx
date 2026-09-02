@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import type { MoveInFormSchema, MoveInSection } from "@/lib/move-in-form-types";
 import { submitMoveInInspection } from "./actions";
+import { todayYmd } from "@/lib/dates";
 
 const RATINGS = ["Good", "Fair", "Poor", "N/A"] as const;
 type Rating = (typeof RATINGS)[number] | "";
@@ -37,7 +38,7 @@ export function MoveInForm({
   properties: { id: string; address: string }[];
 }) {
   const [tenantName, setTenantName] = useState("");
-  const [inspectionDate, setInspectionDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [inspectionDate, setInspectionDate] = useState(() => todayYmd());
   const [propertyId, setPropertyId] = useState("");
   const [sections, setSections] = useState<SectionAnswers>(() => initialSections(schema));
   const [additionalComments, setAdditionalComments] = useState("");

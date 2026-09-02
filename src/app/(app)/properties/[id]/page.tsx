@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/components/ui";
-import { fmtDate, initials } from "@/lib/utils";
+import { initials } from "@/lib/utils";
+import { fmtDay, toYmd } from "@/lib/dates";
 import { propertyStatusTone } from "@/lib/config";
 import { parseBuildingCapex, parseUnits } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
@@ -18,7 +19,7 @@ import { BuildingCapexSection } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
 import { PropertyFinancialsCard } from "./financials";
 
-const ymd = (dt: Date | null) => dt?.toISOString().slice(0, 10) ?? null;
+const ymd = toYmd;
 
 function d(v: unknown): string | null {
   return v == null ? null : (v as { toString(): string }).toString();
@@ -179,7 +180,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
                           </span>
                         )}
                         <span className="w-24 shrink-0 text-right text-xs text-muted">
-                          {t.dueDate ? fmtDate(t.dueDate) : "—"}
+                          {fmtDay(t.dueDate)}
                         </span>
                       </li>
                     );

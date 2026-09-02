@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
+import { shortAddress } from "@/lib/normalize";
 import {
   portfolioCapexForecast,
   type CapexForecastItem,
@@ -195,7 +196,7 @@ export function PortfolioCapexForecastCard({
                     >
                       <td className="max-w-[220px] truncate">
                         <Link href={`/properties/${r.id}`} className="hover:underline">
-                          {shortAddr(r.address)}
+                          {shortAddress(r.address)}
                         </Link>
                       </td>
                       {r.perYear.map((v, i) => {
@@ -206,7 +207,7 @@ export function PortfolioCapexForecastCard({
                         return (
                           <td
                             key={i}
-                            {...tipOn(`${shortAddr(r.address)} · ${year}`, items, false)}
+                            {...tipOn(`${shortAddress(r.address)} · ${year}`, items, false)}
                             className={
                               "text-right tabular-nums transition-opacity " +
                               (items.length > 0 ? "cursor-help " : "") +
@@ -227,7 +228,7 @@ export function PortfolioCapexForecastCard({
                       })}
                       <td
                         {...tipOn(
-                          `${shortAddr(r.address)} · ${f.fromYear}–${lastYear}`,
+                          `${shortAddress(r.address)} · ${f.fromYear}–${lastYear}`,
                           r.items,
                           true,
                         )}
@@ -334,6 +335,3 @@ export function PortfolioCapexForecastCard({
   );
 }
 
-function shortAddr(a: string) {
-  return a.split(",")[0].replace(/\s+(buffalo|ny).*/i, "").trim();
-}

@@ -54,18 +54,7 @@ export function cellText(value: unknown): string | null {
   return null;
 }
 
-/** Parse "$150k", "127,000", "1.5M", "300s" → number | null. Keeps only clean numeric intent. */
-export function parseMoney(raw: string | null | undefined): number | null {
-  if (!raw) return null;
-  let s = raw.toString().trim().toLowerCase();
-  s = s.replace(/[$,\s]/g, "").replace(/usd/g, "");
-  const mult = /k$/.test(s) ? 1_000 : /m$/.test(s) ? 1_000_000 : 1;
-  s = s.replace(/[km]$/, "");
-  // "300s" style approximations, ranges, notes → not a clean number
-  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
-  const n = parseFloat(s) * mult;
-  return Number.isFinite(n) ? n : null;
-}
+export { parseAmount as parseMoney } from "../../src/lib/money";
 
 export function parseIntOrNull(raw: string | null | undefined): number | null {
   if (!raw) return null;
@@ -118,28 +107,7 @@ export function normalizeEmail(raw: string | null | undefined): string | null {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s) ? s : null;
 }
 
-/** Normalize a street address for dedupe/matching (lowercase, expand nothing, strip punctuation). */
-export function normalizeAddress(raw: string | null | undefined): string {
-  if (!raw) return "";
-  return raw
-    .toString()
-    .toLowerCase()
-    .replace(/\n/g, " ")
-    .replace(/\bavenue\b/g, "ave")
-    .replace(/\bstreet\b/g, "st")
-    .replace(/\bdrive\b/g, "dr")
-    .replace(/\broad\b/g, "rd")
-    .replace(/[.,#]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Leading street token for fuzzy property<->section matching, e.g. "58 mariner". */
-export function addressKey(raw: string | null | undefined): string {
-  const n = normalizeAddress(raw);
-  const m = n.match(/^(\d+[a-z]?(?:\/\d+)?)\s+([a-z]+)/);
-  return m ? `${m[1].split("/")[0]} ${m[2]}` : n.split(" ").slice(0, 2).join(" ");
-}
+export { normalizeAddress, addressKey } from "../../src/lib/normalize";
 
 export function isUrl(s: string | null | undefined): boolean {
   return !!s && /^https?:\/\//i.test(s.toString().trim());

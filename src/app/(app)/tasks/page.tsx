@@ -15,6 +15,7 @@ import { TaskFilters } from "./filters";
 import { SortHeader } from "./sort-header";
 import { TaskRow } from "./task-row";
 import { shortAddress } from "@/lib/normalize";
+import { toYmd } from "@/lib/dates";
 import type { Prisma } from "@prisma/client";
 
 type SP = {
@@ -187,7 +188,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
                     id: t.id,
                     title: t.title,
                     done: t.status === "DONE",
-                    dueDate: t.dueDate ? t.dueDate.toISOString().slice(0, 10) : null,
+                    dueDate: toYmd(t.dueDate),
                     assigneeUserId: t.assigneeUserId,
                     assigneeName: t.assigneeName,
                     assigneeLabel: t.assignee?.name ?? t.assigneeName ?? null,

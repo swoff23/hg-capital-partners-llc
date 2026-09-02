@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState } from "@/components/ui";
-import { relativeDays } from "@/lib/utils";
+import { isPastDay, relativeDays } from "@/lib/dates";
+import { shortAddress } from "@/lib/normalize";
 import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
@@ -76,12 +77,12 @@ export default async function HomePage() {
                         href={`/properties/${t.property.id}`}
                         className="hidden shrink-0 text-xs text-muted hover:underline sm:block"
                       >
-                        {shortAddr(t.property.address)}
+                        {shortAddress(t.property.address)}
                       </Link>
                     )}
                     {t.dueDate && (
                       <span
-                        className={`shrink-0 text-xs ${new Date(t.dueDate) < new Date() ? "text-red-600" : "text-muted"}`}
+                        className={`shrink-0 text-xs ${isPastDay(t.dueDate) ? "text-red-600" : "text-muted"}`}
                       >
                         {relativeDays(t.dueDate)}
                       </span>
@@ -113,7 +114,4 @@ function Stat({ label, value, href }: { label: string; value: number; href: stri
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
-}
-function shortAddr(a: string) {
-  return a.split(",")[0].replace(/\s+(buffalo|ny).*/i, "").trim();
 }

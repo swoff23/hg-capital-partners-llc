@@ -9,6 +9,7 @@ import { normalizeAddress } from "@/lib/normalize";
 import { formToObject } from "@/lib/forms";
 import { initials } from "@/lib/utils";
 import { logDealChanges } from "@/lib/deal-log";
+import { amountToDecimal as money } from "@/lib/money";
 
 const dealSchema = z.object({
   address: z.string().min(4),
@@ -21,15 +22,6 @@ const dealSchema = z.object({
   nextAction: z.string().optional(),
   passReason: z.string().optional(),
 });
-
-function money(raw?: string | null): string | null {
-  if (!raw) return null;
-  const s = raw.toLowerCase().replace(/[$,\s]/g, "");
-  const mult = /k$/.test(s) ? 1e3 : /m$/.test(s) ? 1e6 : 1;
-  const num = s.replace(/[km]$/, "");
-  if (!/^-?\d+(\.\d+)?$/.test(num)) return null; // "300s", ranges, notes → keep raw only
-  return (parseFloat(num) * mult).toFixed(2);
-}
 
 const val = (v: string | null | undefined) => (v == null || v === "" ? "—" : v);
 

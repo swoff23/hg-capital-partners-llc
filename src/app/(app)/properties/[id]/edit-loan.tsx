@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Button, Field, Input, SectionCard } from "@/components/ui";
-import { cn, fmtDate, fmtMoney, relativeDays } from "@/lib/utils";
+import { cn, fmtMoney } from "@/lib/utils";
+import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
 import { patchProperty } from "../actions";
 
 export type EditableLoan = {
@@ -35,7 +36,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
   const save = patchProperty.bind(null, p.id);
   const formId = `property-loan-${p.id}`;
 
-  const overdue = !!p.loanMaturityDate && new Date(p.loanMaturityDate) < new Date();
+  const overdue = isPastDay(p.loanMaturityDate);
 
   if (!editing) {
     return (
@@ -44,7 +45,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
           <div className="mb-3 rounded-lg border border-border bg-background px-3 py-2">
             <div className="text-xs text-muted">Maturity</div>
             <div className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold">{fmtDate(p.loanMaturityDate)}</span>
+              <span className="text-sm font-semibold">{fmtDay(p.loanMaturityDate)}</span>
               <span
                 className={cn(
                   "text-xs",
@@ -63,7 +64,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
           <Field label="Original amount">{fmtMoney(p.loanOriginalAmount)}</Field>
           <Field label="Rate">{rate(p.loanRate)}</Field>
           <Field label="Payment / mo">{fmtMoney(p.loanPaymentMonthly)}</Field>
-          <Field label="Originated">{fmtDate(p.loanOriginationDate)}</Field>
+          <Field label="Originated">{fmtDay(p.loanOriginationDate)}</Field>
         </dl>
       </SectionCard>
     );

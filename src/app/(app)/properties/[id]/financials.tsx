@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
+import { fmtDay } from "@/lib/dates";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { CATEGORY_LABELS } from "../../financials/_components/labels";
 import { fmtCents, MoneyBars, PartialLabel, SourceBadge } from "../../financials/_components/ui";
@@ -81,7 +81,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
             <ul className="divide-y divide-border text-xs">
               {data.recentLines.slice(0, 8).map((l, i) => (
                 <li key={i} className="flex items-center gap-2 py-1.5">
-                  <span className="w-16 shrink-0 text-muted">{fmtDate(l.txnDate)}</span>
+                  <span className="w-16 shrink-0 text-muted">{fmtDay(l.txnDate)}</span>
                   <span className="min-w-0 flex-1 truncate" title={l.name ?? l.accountName}>
                     {l.name || l.accountName}
                   </span>

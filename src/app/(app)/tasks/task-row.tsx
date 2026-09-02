@@ -3,7 +3,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Td } from "@/components/ui";
 import { Tooltip } from "@/components/tooltip";
-import { cn, dueLabel, fmtDate, initials } from "@/lib/utils";
+import { cn, initials } from "@/lib/utils";
+import { dueLabel, fmtDay, isPastDay } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { TaskCheckbox } from "./task-checkbox";
 import { patchTask } from "./actions";
@@ -102,7 +103,7 @@ export function TaskRow({
 
   const save = (data: Parameters<typeof patchTask>[1]) => start(() => patchTask(task.id, data));
 
-  const overdue = !task.done && !!task.dueDate && new Date(task.dueDate) < new Date();
+  const overdue = !task.done && isPastDay(task.dueDate);
   const hasOwner = !!(task.assigneeUserId || task.assigneeName);
   const addressText = task.property
     ? shortAddress(task.property.address)
@@ -238,7 +239,7 @@ export function TaskRow({
         )}
       >
         <div className="group/field flex">
-          <Tooltip label={task.dueDate ? fmtDate(task.dueDate) : "Add due date"} className={fieldBox}>
+          <Tooltip label={task.dueDate ? fmtDay(task.dueDate) : "Add due date"} className={fieldBox}>
             <span className="flex flex-1 items-center truncate">
               {task.dueDate ? dueLabel(task.dueDate) : <DueEmptyIcon />}
             </span>
