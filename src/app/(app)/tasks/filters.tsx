@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { shortAddress } from "@/lib/normalize";
 
 const STATUS_TABS = [
   { key: "all", label: "All" },
@@ -105,7 +106,7 @@ export function TaskFilters({
           <option value="">All properties</option>
           {properties.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.address.split(",")[0]}
+              {shortAddress(p.address)}
             </option>
           ))}
         </select>

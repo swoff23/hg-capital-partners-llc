@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Button, Card, CardBody, Input, PageHeader, Select, Textarea } from "@/components/ui";
+import { shortAddress } from "@/lib/normalize";
 import { createTask } from "../actions";
 
 export default async function NewTaskPage({ searchParams }: PageProps<"/tasks/new">) {
@@ -57,7 +58,7 @@ export default async function NewTaskPage({ searchParams }: PageProps<"/tasks/ne
                   <option value="">— none</option>
                   {properties.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.address}
+                      {shortAddress(p.address)}
                     </option>
                   ))}
                 </Select>

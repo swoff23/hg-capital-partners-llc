@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import type { TaskAttachment } from "@prisma/client";
 import { Attachments } from "@/components/attachments";
 import { cn, initials } from "@/lib/utils";
+import { shortAddress } from "@/lib/normalize";
 import {
   toggleTask,
   patchTask,
@@ -193,7 +194,7 @@ export function PropertyControl({
         <option value="">No project</option>
         {properties.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.address}
+            {shortAddress(p.address)}
           </option>
         ))}
       </select>

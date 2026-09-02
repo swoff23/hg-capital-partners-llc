@@ -14,6 +14,7 @@ import {
 import { TaskFilters } from "./filters";
 import { SortHeader } from "./sort-header";
 import { TaskRow } from "./task-row";
+import { shortAddress } from "@/lib/normalize";
 import type { Prisma } from "@prisma/client";
 
 type SP = {
@@ -32,10 +33,6 @@ type TaskListItem = Prisma.TaskGetPayload<{
     assignee: { select: { name: true } };
   };
 }>;
-
-function shortAddr(a: string) {
-  return a.split(",")[0].trim();
-}
 
 /** In-memory sort — owner/address are coalesced across relations, so we can't do it in SQL. */
 function sortTasks(list: TaskListItem[], field: string, desc: boolean): TaskListItem[] {
@@ -162,7 +159,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
         {scopedProperty && (
           <CardHeader>
             <Link href={`/properties/${scopedProperty.id}`} className="hover:underline">
-              <CardTitle>{shortAddr(scopedProperty.address)}</CardTitle>
+              <CardTitle>{shortAddress(scopedProperty.address)}</CardTitle>
             </Link>
           </CardHeader>
         )}

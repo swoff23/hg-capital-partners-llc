@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Td } from "@/components/ui";
 import { Tooltip } from "@/components/tooltip";
 import { cn, dueLabel, fmtDate, initials } from "@/lib/utils";
+import { shortAddress } from "@/lib/normalize";
 import { TaskCheckbox } from "./task-checkbox";
 import { patchTask } from "./actions";
 
@@ -41,10 +42,6 @@ const quiet =
 // `group/field` lives on the cell so the hover treatment stays field-local.
 const fieldBox =
   "relative flex w-full min-w-0 cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors group-hover/field:bg-surface group-hover/field:ring-1 group-hover/field:ring-border";
-
-function shortAddr(a: string) {
-  return a.split(",")[0].trim();
-}
 
 function ClearX({ label, onClick }: { label: string; onClick: () => void }) {
   return (
@@ -108,9 +105,9 @@ export function TaskRow({
   const overdue = !task.done && !!task.dueDate && new Date(task.dueDate) < new Date();
   const hasOwner = !!(task.assigneeUserId || task.assigneeName);
   const addressText = task.property
-    ? shortAddr(task.property.address)
+    ? shortAddress(task.property.address)
     : task.deal
-      ? `deal · ${shortAddr(task.deal.address)}`
+      ? `deal · ${shortAddress(task.deal.address)}`
       : null;
 
   return (
@@ -172,12 +169,12 @@ export function TaskRow({
                 <option value="">— none</option>
                 {task.deal && !task.property && (
                   <option value="" disabled>
-                    deal · {shortAddr(task.deal.address)}
+                    deal · {shortAddress(task.deal.address)}
                   </option>
                 )}
                 {properties.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {shortAddr(p.address)}
+                    {shortAddress(p.address)}
                   </option>
                 ))}
               </select>

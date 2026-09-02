@@ -8,7 +8,7 @@ import { propertyStatusTone } from "@/lib/config";
 import { parseBuildingCapex, parseUnits } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { BackLink } from "@/components/back-link";
-import { PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
+import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { PropertyDocumentsSection } from "./edit-documents";
 import { PropertyLoanSection } from "./edit-loan";
 import { PropertyInsuranceSection } from "./edit-insurance";
@@ -79,10 +79,13 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       <div className="mb-4">
         <BackLink fallback="/properties" label="Portfolio" />
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h1 className="text-xl font-semibold tracking-tight">{property.address}</h1>
-          {property.status && (
-            <Badge tone={propertyStatusTone(property.status)}>{property.status}</Badge>
-          )}
+          <PropertyAddressField id={property.id} value={property.address} />
+          {property.status &&
+            (property.status === "Refinanced" ? (
+              <span className="text-sm text-muted">{property.status}</span>
+            ) : (
+              <Badge tone={propertyStatusTone(property.status)}>{property.status}</Badge>
+            ))}
           {unitCount > 0 && <span className="text-sm text-muted">{unitCount} units</span>}
         </div>
       </div>

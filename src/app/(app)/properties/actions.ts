@@ -1,10 +1,13 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { fmtDate } from "@/lib/utils";
+import { normalizeAddress } from "@/lib/normalize";
+import { formToObject } from "@/lib/forms";
 import { parseBuildingCapex, type PropertyUnit } from "@/lib/property-types";
 
 function decOrNull(raw: string | null): string | null {
@@ -24,6 +27,30 @@ const KEY_DATE_FIELDS = [
   "propertyTaxDueDate",
   "rentalRegistrationExpiry",
 ] as const;
+
+const propertySchema = z.object({
+  address: z.string().min(4),
+  llcOwner: z.string().optional(),
+  status: z.string().optional(),
+});
+
+export async function createProperty(formData: FormData) {
+  await requireUser();
+  const p = propertySchema.parse(formToObject(formData));
+
+  const dup = await prisma.property.findFirst({
+    where: { address: { contains: p.address.split(",")[0].trim(), mode: "insensitive" } },
+  });
+  if (dup && normalizeAddress(dup.address) === normalizeAddress(p.address)) {
+    redirect(`/properties/${dup.id}?dup=1`);
+  }
+
+  const property = await prisma.property.create({
+    data: { address: p.address.trim(), llcOwner: p.llcOwner || null, status: p.status || null },
+  });
+  revalidatePath("/properties");
+  redirect(`/properties/${property.id}`);
+}
 
 /** Edit the property's scalar detail fields. Form always submits every field ("" = clear). */
 export async function patchProperty(id: string, formData: FormData) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, PageHeader, Table, Td, Th, EmptyState } from "@/components/ui";
+import { Badge, Card, LinkButton, PageHeader, Table, Td, Th, EmptyState } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import { propertyStatusTone } from "@/lib/config";
 
@@ -32,7 +32,15 @@ export default async function PropertiesPage() {
 
   return (
     <>
-      <PageHeader title="Portfolio" subtitle={`${properties.length} owned properties`} />
+      <PageHeader
+        title="Portfolio"
+        subtitle={`${properties.length} owned properties`}
+        actions={
+          <LinkButton href="/properties/new" variant="primary">
+            + New property
+          </LinkButton>
+        }
+      />
       <Card className="overflow-hidden">
         {properties.length === 0 ? (
           <div className="p-4">
@@ -60,7 +68,15 @@ export default async function PropertiesPage() {
                     </Link>
                   </Td>
                   <Td className="text-xs text-muted">{p.llcOwner ?? "—"}</Td>
-                  <Td>{p.status ? <Badge tone={propertyStatusTone(p.status)}>{p.status}</Badge> : "—"}</Td>
+                  <Td>
+                    {p.status === "Refinanced" ? (
+                      p.status
+                    ) : p.status ? (
+                      <Badge tone={propertyStatusTone(p.status)}>{p.status}</Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </Td>
                   <Td className="tabular-nums">{openMap.get(p.id) ?? 0}</Td>
                   <Td className="tabular-nums">{p.unitCount ?? "—"}</Td>
                   <Td className="tabular-nums">{fmtMoney(p.purchasePrice)}</Td>
