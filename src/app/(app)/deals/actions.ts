@@ -7,13 +7,14 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { normalizeAddress } from "@/lib/normalize";
 import { formToObject } from "@/lib/forms";
+import { DEAL_STATUSES, DEFAULT_DEAL_STATUS, isDealStatus } from "@/lib/config";
 import { initials } from "@/lib/utils";
 import { logDealChanges } from "@/lib/deal-log";
 import { amountToDecimal as money } from "@/lib/money";
 
 const dealSchema = z.object({
   address: z.string().min(4),
-  status: z.string().default("Active"),
+  status: z.enum(DEAL_STATUSES).default(DEFAULT_DEAL_STATUS),
   priority: z.string().optional(),
   theirPriceRaw: z.string().optional(),
   ourPriceRaw: z.string().optional(),
@@ -86,7 +87,7 @@ export async function updateDeal(id: string, formData: FormData) {
   const str = (k: string) => formData.get(k)?.toString().trim() || null;
   const data: Record<string, unknown> = {};
   if (has("address") && str("address")) data.address = str("address");
-  if (has("status") && str("status")) data.status = str("status");
+  if (has("status") && isDealStatus(str("status"))) data.status = str("status");
   if (has("priority")) data.priority = str("priority");
   if (has("passReason")) data.passReason = str("passReason");
   if (has("theirPriceRaw")) {
@@ -125,7 +126,7 @@ export async function patchDeal(
   const before = await prisma.deal.findUniqueOrThrow({ where: { id } });
   const data: Record<string, unknown> = {};
   if (patch.address?.trim()) data.address = patch.address.trim();
-  if (patch.status) data.status = patch.status;
+  if (patch.status && isDealStatus(patch.status)) data.status = patch.status;
   if ("priority" in patch) data.priority = patch.priority || null;
   if ("passReason" in patch) data.passReason = patch.passReason || null;
   if ("units" in patch) data.units = patch.units ?? null;

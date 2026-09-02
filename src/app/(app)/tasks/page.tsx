@@ -16,6 +16,7 @@ import { SortHeader } from "./sort-header";
 import { TaskRow } from "./task-row";
 import { shortAddress } from "@/lib/normalize";
 import { toYmd } from "@/lib/dates";
+import { excludeTemplateTasks } from "@/lib/task-scope";
 import type { Prisma } from "@prisma/client";
 
 type SP = {
@@ -26,6 +27,8 @@ type SP = {
   property?: string;
   sort?: string; // "task" | "address" | "owner" | "due", "-" prefix = descending; default "due"
 };
+
+const PAGE = 400;
 
 type TaskListItem = Prisma.TaskGetPayload<{
   include: {
@@ -75,25 +78,37 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
         : {};
 
   const where: Prisma.TaskWhereInput = {
+    ...excludeTemplateTasks,
     ...(sp.status === "done" ? { status: "DONE" } : sp.status === "all" ? {} : { status: "OPEN" }),
     ...ownerWhere,
     ...(sp.property ? { propertyId: sp.property } : {}),
     ...(sp.q ? { title: { contains: sp.q, mode: "insensitive" } } : {}),
   };
 
-  const [tasks, openCount, mineCount, properties, users, externalOwners] = await Promise.all([
+  const sortRaw = sp.sort ?? "";
+  const sortDesc = sortRaw.startsWith("-");
+  const sortField = (sortDesc ? sortRaw.slice(1) : sortRaw) || "due";
+
+  // Only the default due-date sort can be pushed to SQL: address and owner
+  // are coalesced across relations (property/deal, user/free text). Those
+  // sorts fetch the whole filtered set and sort in memory — sorting a
+  // truncated page would show a random 400, not the top 400.
+  const sqlSorted = sortField === "due";
+
+  const [tasks, matchCount, openCount, mineCount, properties, users, externalOwners] = await Promise.all([
     prisma.task.findMany({
       where,
-      orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
-      take: 400,
+      orderBy: [{ dueDate: { sort: sortDesc ? "desc" : "asc", nulls: "last" } }, { createdAt: "desc" }],
+      ...(sqlSorted ? { take: PAGE } : {}),
       include: {
         property: { select: { id: true, address: true } },
         deal: { select: { id: true, address: true } },
         assignee: { select: { name: true } },
       },
     }),
-    prisma.task.count({ where: { status: "OPEN" } }),
-    prisma.task.count({ where: { status: "OPEN", assigneeUserId: user.id } }),
+    prisma.task.count({ where }),
+    prisma.task.count({ where: { status: "OPEN", ...excludeTemplateTasks } }),
+    prisma.task.count({ where: { status: "OPEN", assigneeUserId: user.id, ...excludeTemplateTasks } }),
     prisma.property.findMany({ select: { id: true, address: true }, orderBy: { address: "asc" } }),
     prisma.user.findMany({ select: { id: true, name: true, email: true } }),
     prisma.task.findMany({
@@ -128,10 +143,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const scopedProperty = sp.property ? (properties.find((p) => p.id === sp.property) ?? null) : null;
   const showAddress = !scopedProperty;
 
-  const sortRaw = sp.sort ?? "";
-  const sortDesc = sortRaw.startsWith("-");
-  const sortField = (sortDesc ? sortRaw.slice(1) : sortRaw) || "due";
-  const sortedTasks = sortTasks(tasks, sortField, sortDesc);
+  const sortedTasks = sqlSorted ? tasks : sortTasks(tasks, sortField, sortDesc).slice(0, PAGE);
 
   return (
     <>
@@ -204,7 +216,11 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
           </Table>
         )}
       </Card>
-      {tasks.length === 400 && <p className="mt-2 text-xs text-muted">Showing first 400.</p>}
+      {matchCount > PAGE && (
+        <p className="mt-2 text-xs text-muted">
+          Showing first {PAGE} of {matchCount}. Narrow the filters to see the rest.
+        </p>
+      )}
     </>
   );
 }

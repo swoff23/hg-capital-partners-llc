@@ -12,6 +12,20 @@ export const DEAL_STATUSES = [
   "Pass",
 ] as const;
 
+export type DealStatus = (typeof DEAL_STATUSES)[number];
+
+export function isDealStatus(s: unknown): s is DealStatus {
+  return typeof s === "string" && (DEAL_STATUSES as readonly string[]).includes(s);
+}
+
+/**
+ * Status for a deal created without one. The Prisma column still defaults to
+ * the legacy "Active" (not in DEAL_STATUSES — a deal with it would vanish from
+ * the Active tab); the app never relies on that default. Changing the column
+ * default is a schema migration, tracked for the schema batch.
+ */
+export const DEFAULT_DEAL_STATUS: DealStatus = "5 - TBD";
+
 // "Active" filter = everything ranked above TBD in the pipeline (excludes TBD, Holding, Closed, and Pass).
 export const ACTIVE_DEAL_STATUSES = DEAL_STATUSES.slice(0, DEAL_STATUSES.indexOf("5 - TBD"));
 
@@ -35,6 +49,13 @@ export const DEAL_PRIORITIES = ["1 - High", "2 - Medium", "3 - Low", "5 - TBD", 
 export const TASK_STATUSES = ["OPEN", "DONE"] as const;
 
 export const TASK_BUCKETS = ["Property", "General", "Template", "Unfiled"] as const;
+
+/**
+ * Imported Asana playbooks ("NEW TENANT [address]" etc.) live as Task rows in
+ * this bucket with no property. They are templates, not work: every task list
+ * and count must exclude them (see excludeTemplateTasks in @/lib/task-scope).
+ */
+export const TEMPLATE_BUCKET = "Template";
 
 export const PROPERTY_STATUSES = [
   "Rehabbing",

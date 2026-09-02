@@ -7,6 +7,7 @@ import { shortAddress } from "@/lib/normalize";
 import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
+import { excludeTemplateTasks } from "@/lib/task-scope";
 import { PortfolioCapexForecastCard } from "./portfolio-capex";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export default async function HomePage() {
 
   const [myTasks, counts, capexProps, capexRules] = await Promise.all([
     prisma.task.findMany({
-      where: { assigneeUserId: user.id, status: "OPEN" },
+      where: { assigneeUserId: user.id, status: "OPEN", ...excludeTemplateTasks },
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
       take: 12,
       include: { property: { select: { id: true, address: true } } },
@@ -24,7 +25,7 @@ export default async function HomePage() {
     Promise.all([
       prisma.deal.count({ where: { status: { in: ACTIVE_DEAL_STATUSES } } }),
       prisma.property.count(),
-      prisma.task.count({ where: { status: "OPEN" } }),
+      prisma.task.count({ where: { status: "OPEN", ...excludeTemplateTasks } }),
     ]),
     prisma.property.findMany({
       select: { id: true, address: true, units: true, buildingCapex: true },

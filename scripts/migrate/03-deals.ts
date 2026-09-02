@@ -9,6 +9,7 @@
 import { prisma } from "../../src/lib/db";
 import { report } from "./_report";
 import { readSheet, normalizeAddress, parseMoney, parseIntOrNull, isUrl } from "./_lib";
+import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "../../src/lib/config";
 
 const MONTHS: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
@@ -63,24 +64,15 @@ function parseTimeline(blob: string): { notes: { date: Date | null; body: string
 }
 
 // HG tracks the deal's working state in the spreadsheet's "Priority" column.
-const KNOWN_STATUSES = new Set([
-  "1 - High",
-  "2 - Medium",
-  "3 - Low",
-  "4 - To Schedule",
-  "5 - TBD",
-  "6 - Holding",
-  "Closing",
-  "CLOSED!",
-  "Pass",
-]);
+// The app's list (src/lib/config.ts) is the only list; anything else -> the default.
+const KNOWN_STATUSES = new Set<string>(DEAL_STATUSES);
 
 function toStatus(statusCol: string | null, priorityCol: string | null): string {
   // An explicit "Pass" in the Status column is definitive.
   if ((statusCol ?? "").trim().toLowerCase() === "pass") return "Pass";
   const p = (priorityCol ?? "").trim();
   if (KNOWN_STATUSES.has(p)) return p;
-  return "5 - TBD";
+  return DEFAULT_DEAL_STATUS;
 }
 
 export async function migrateDeals() {

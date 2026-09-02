@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { Button, Card, CardBody, Input, PageHeader, Select } from "@/components/ui";
-import { DEAL_STATUSES } from "@/lib/config";
+import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "@/lib/config";
 import { createDeal } from "../actions";
 
 export default async function NewDealPage() {
@@ -18,7 +18,7 @@ export default async function NewDealPage() {
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-xs font-medium text-muted">Status</span>
-                <Select name="status" defaultValue="Active" className="mt-1">
+                <Select name="status" defaultValue={DEFAULT_DEAL_STATUS} className="mt-1">
                   {DEAL_STATUSES.map((s) => (
                     <option key={s}>{s}</option>
                   ))}
