@@ -207,12 +207,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
           <PropertyDocumentsSection
             propertyId={property.id}
-            attachments={property.attachments.map((a) => ({
-              id: a.id,
-              url: a.url,
-              filename: a.filename,
-              size: a.size,
-            }))}
+            attachments={property.attachments.map((a) => ({ id: a.id, filename: a.filename, size: a.size }))}
           />
 
           <PropertyNotesSection

@@ -21,9 +21,9 @@ export function PropertyDocumentsSection({
       </CardHeader>
       <CardBody>
         <Attachments
+          kind="property"
           items={attachments}
           uploadPathPrefix={`properties/${propertyId}`}
-          handleUploadUrl="/api/blob/property-upload"
           clientPayload={JSON.stringify({ propertyId })}
           onRecord={(data) => recordPropertyAttachment(propertyId, data)}
           onDelete={(id) => deletePropertyAttachment(id)}

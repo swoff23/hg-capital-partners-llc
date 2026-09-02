@@ -16,6 +16,7 @@ export default async function SettingsLayout({ children }: LayoutProps<"/setting
         tabs={[
           { href: "", label: "CapEx rules" },
           { href: "/move-in-form", label: "Move-in form" },
+          { href: "/storage", label: "Storage" },
         ]}
       />
       {children}

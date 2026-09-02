@@ -247,9 +247,9 @@ export function AttachmentsSection({
 }) {
   return (
     <Attachments
-      items={attachments.map((a) => ({ id: a.id, url: a.url, filename: a.filename, size: a.size }))}
+      kind="task"
+      items={attachments.map((a) => ({ id: a.id, filename: a.filename, size: a.size }))}
       uploadPathPrefix={`tasks/${taskId}`}
-      handleUploadUrl="/api/blob/task-upload"
       clientPayload={JSON.stringify({ taskId })}
       onRecord={(data) => recordTaskAttachment(taskId, data)}
       onDelete={(id) => deleteTaskAttachment(id)}

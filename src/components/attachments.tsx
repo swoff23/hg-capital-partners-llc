@@ -3,7 +3,10 @@ import { useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
 import { cn, formatBytes } from "@/lib/utils";
 
-export type AttachmentItem = { id: string; url: string; filename: string; size: number };
+export type AttachmentItem = { id: string; filename: string; size: number };
+
+/** Which table the rows live in — decides the download route and the upload endpoint. */
+export type AttachmentKind = "task" | "property";
 
 type RecordData = {
   url: string;
@@ -15,20 +18,22 @@ type RecordData = {
 
 /**
  * Drag-or-click file uploader backed by Vercel Blob. The browser uploads
- * straight to Blob (no serverless body limit); `onRecord` writes the DB row and
- * `onDelete` removes it. Shared by task attachments and property documents.
+ * straight to Blob (no serverless body limit) as a PRIVATE blob; `onRecord`
+ * writes the DB row and `onDelete` removes it. Links open through the
+ * session-gated /api/files route, never the raw blob URL. Shared by task
+ * attachments and property documents.
  */
 export function Attachments({
+  kind,
   items,
   uploadPathPrefix,
-  handleUploadUrl,
   clientPayload,
   onRecord,
   onDelete,
 }: {
+  kind: AttachmentKind;
   items: AttachmentItem[];
   uploadPathPrefix: string;
-  handleUploadUrl: string;
   clientPayload: string;
   onRecord: (data: RecordData) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -48,8 +53,8 @@ export function Attachments({
     for (const file of Array.from(files)) {
       try {
         const blob = await upload(`${uploadPathPrefix}/${file.name}`, file, {
-          access: "public",
-          handleUploadUrl,
+          access: "private",
+          handleUploadUrl: `/api/blob/${kind}-upload`,
           clientPayload,
         });
         await onRecord({
@@ -80,7 +85,7 @@ export function Attachments({
             <li key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <FileIcon />
               <a
-                href={a.url}
+                href={`/api/files/${kind}/${a.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="min-w-0 flex-1 truncate hover:underline"
