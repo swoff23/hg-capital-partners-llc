@@ -58,8 +58,8 @@ npx prisma migrate deploy
 # one-time data import (source files in _private/, never committed)
 npm run migrate
 
-# a local login: hashes the value into your LOCAL User row (only fills empty hashes)
-CONNOR_PASSWORD=whatever npx tsx scripts/backfill-password-hashes.ts
+# a local login: set CONNOR_PASSWORD in .env, then hash it into your LOCAL User row
+npm run db:dev-passwords
 
 npm run dev                   # http://localhost:3000
 ```
@@ -73,6 +73,7 @@ npm run dev                   # http://localhost:3000
 | `npm run migrate [step]` | Spreadsheet/Asana import (idempotent) |
 | `npm run db:migrate` | Create + apply a new Prisma migration |
 | `npm run db:studio` | Prisma Studio |
+| `npm run db:dev-passwords` | Local only: set each user's password from their `*_PASSWORD` in `.env` |
 
 ## Runbook
 
@@ -82,7 +83,9 @@ redeploy once (the build hashes it into the DB, then the var can be removed).
 
 **Change a password** — passwords live in the DB. Set a new value in the
 matching `*_PASSWORD` var, clear the user's `passwordHash` (Supabase SQL editor
-or Prisma Studio), redeploy.
+or Prisma Studio), redeploy. Locally, just change the var in `.env` and run
+`npm run db:dev-passwords` — it overwrites the local hash and refuses to run
+against a non-localhost `DATABASE_URL`.
 
 **Re-run the import** — safe anytime; idempotent on address / Asana ID.
 
