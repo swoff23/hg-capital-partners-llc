@@ -47,3 +47,14 @@ body {
 * {
   scrollbar-width: thin;
 }
+
+/* iOS Safari zooms the whole page when a focused field's text is under 16px.
+   Touch screens get 16px fields; mouse-and-keyboard layouts keep their compact
+   sizes. Unlayered, so it wins over the text-* utilities on each field. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}

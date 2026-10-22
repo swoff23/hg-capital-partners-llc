@@ -44,7 +44,7 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 
 | Job | Use | Notes |
 |---|---|---|
-| Text field | `components/ui.tsx` `Input` | 14px text, so iOS zooms on focus (Known gaps) |
+| Text field | `components/ui.tsx` `Input` | 14px text with a mouse; every field gets 16px on touch screens (`app/globals.css`) so iOS doesn't zoom on focus |
 | Multi-line text | `components/ui.tsx` `Textarea` | |
 | Select | `components/ui.tsx` `Select` | |
 | Button | `components/ui.tsx` `Button` (primary, secondary, ghost, danger; sm, md) | `LinkButton` for navigation styled as a button |
@@ -137,7 +137,8 @@ Jobs nothing covers yet, and holes in the picks. The first feature that needs on
 - **Dialog shell.** Nothing for a dialog with a form. `ConfirmDialog` has no Esc, focus trap, portal or scroll lock; grow it into a `Dialog` shell instead of adding a third inline copy.
 - **Toast.** No toast or saved confirmation; saves only show inline errors.
 - **Form field layout.** No shared label, helper text and error wrapper.
-- **iOS input zoom.** `Input`, `Select` and `Textarea` use 14px text, so iOS Safari zooms the page on focus. Fix it in the primitives (16px on phones), not per field.
+- **Tap targets.** The device check warns on every page about controls under 44px tall on touch screens (`h-8` and `h-9` buttons and fields, text links in tables). Raise them in the primitives, not per page.
+- **Wrapped control rows.** The device check warns that rows of controls wrap on `/deals`, `/tasks`, `/login`, `/rentals`, `/residents`, `/residents/moving-in`, `/settings/move-in-form` and `/welcome`. CLAUDE.md says they shouldn't; shorten labels or collapse into a Filters button.
 - **Tooltip on touch.** `Tooltip` opens on hover only, so touch users never see it. Give it a tap path.
 - **Popover hook.** No shared open, outside-click and Esc logic, and neither current popover closes on Esc.
 - **Segmented control, sortable header, inline text edit.** Exist only as feature copies (Duplicates). Extract on the next touch.

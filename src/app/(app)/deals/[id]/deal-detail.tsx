@@ -44,14 +44,14 @@ export function StatusControl({ id, status }: { id: string; status: string }) {
     ? DEAL_STATUSES
     : [status, ...DEAL_STATUSES];
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block max-w-full">
       <select
         aria-label="Status"
         value={status}
         disabled={pending}
         onChange={(e) => start(() => patchDeal(id, { status: e.target.value }))}
         className={cn(
-          "appearance-none rounded-md py-1 pl-2.5 pr-7 text-sm font-medium outline-none ring-1 ring-inset transition-opacity",
+          "max-w-full appearance-none rounded-md py-1 pl-2.5 pr-7 text-sm font-medium outline-none ring-1 ring-inset transition-opacity",
           toneClass(dealStatusTone(status)),
           pending && "opacity-60",
         )}
