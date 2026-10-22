@@ -5,6 +5,17 @@ CapEx, loans, insurance, documents), tasks, vendors, and a read-only mirror of
 the QuickBooks P&L. A small public site (`/welcome`, `/rentals`, `/residents`)
 lives in the same app.
 
+## Before you build
+
+The working rules (planning, reuse, design references, copy, device check, landing) live in [CLAUDE.md](CLAUDE.md). Claude Code loads that file automatically, and it applies to people just the same.
+
+1. **Plan first.** Feature-sized work gets its questions answered and a spec saved in `docs/` before any code.
+2. **Check what we have.** Look up the job in [docs/components.md](docs/components.md) and search `src/components/`. Use what fits, or extend it with a prop instead of copying it.
+3. **Nothing fits?** Research the pattern on Mobbin, then build it.
+4. **Design for every size.** Every mock covers laptop (1280x800), tablet (768x1024) and mobile (375x667).
+5. **Leave it findable.** Add a new reusable component to `docs/components.md` in the same commit.
+6. **Check devices before handoff.** Run `npm run test:devices`, open each dialog and state you touched at 375 and 320, and look over `device-report/index.html`.
+
 ## Stack
 
 - Next.js 16 (App Router, React Compiler) + TypeScript + Tailwind v4
@@ -70,6 +81,8 @@ npm run dev                   # http://localhost:3000
 | `npm run typecheck` | `next typegen && tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm test` | All unit tests |
+| `npm run test:devices` | Device check: every route on phones, iPad and desktop, report in `device-report/` |
+| `npm run test:devices:known` | Same run, rewrites `tests/devices/known-issues.json` (owner's OK first) |
 | `npm run migrate [step]` | Spreadsheet/Asana import (idempotent) |
 | `npm run db:migrate` | Create + apply a new Prisma migration |
 | `npm run db:studio` | Prisma Studio |
