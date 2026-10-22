@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/device-check-gate.mjs\"; if [ -f \"$f\" ] && command -v node >/dev/null; then node \"$f\"; fi",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
