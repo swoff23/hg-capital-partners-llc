@@ -154,7 +154,7 @@ export function MoveInFormEditor({
     <div className="space-y-4">
       <PageHeader
         title="Settings"
-        subtitle="Move-in inspection form — rooms and items tenants are asked to rate"
+        subtitle="Rooms and items tenants rate on the move-in inspection"
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={save} disabled={pending || !dirty}>

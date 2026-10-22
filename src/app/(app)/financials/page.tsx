@@ -65,7 +65,7 @@ export default async function FinancialsOverviewPage({
 
       {data.lastSync?.status === "PARTIAL" && (
         <div className="rounded-lg border border-amber-300 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:text-amber-500">
-          Last sync didn&apos;t reconcile to the cent — figures may be mid-update. See{" "}
+          The last sync didn&apos;t reconcile to the cent, so figures may be mid-update. See{" "}
           <Link href="/financials/settings" className="underline">
             Settings
           </Link>{" "}
@@ -200,9 +200,9 @@ export default async function FinancialsOverviewPage({
             ))}
             <tr className="bg-background/50 text-muted">
               <Td className="italic">
-                Unattributed (entity / overhead / no class) —{" "}
+                Unattributed (entity / overhead / no class){" "}
                 <Link href="/financials/settings" className="text-primary hover:underline">
-                  review
+                  Review
                 </Link>
               </Td>
               <Td className="tabular-nums">{fmtCents(data.unattributed.incomeCents)}</Td>

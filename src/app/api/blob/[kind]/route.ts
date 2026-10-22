@@ -49,7 +49,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
   if (!cfg) return NextResponse.json({ error: "Unknown upload kind" }, { status: 404 });
 
   if (!getEnv().BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json({ error: "File uploads aren't configured — no Blob store connected yet." }, { status: 503 });
+    return NextResponse.json({ error: "File uploads need a Blob store, and none is connected yet." }, { status: 503 });
   }
 
   const body = (await request.json()) as HandleUploadBody;
@@ -62,7 +62,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
         // getCurrentUser() (not requireUser) so an expired session is a real
         // error message instead of an opaque NEXT_REDIRECT inside a Route Handler.
         const user = await getCurrentUser();
-        if (!user) throw new Error("Your session has expired — reload the page and sign in again.");
+        if (!user) throw new Error("Your session expired, so reload the page and sign in again.");
         const payload = JSON.parse(clientPayload ?? "{}") as Record<string, string | undefined>;
         const id = payload[cfg.idKey];
         if (!id) throw new Error(`Missing ${cfg.idKey}`);

@@ -68,7 +68,7 @@ export function Attachments({
         const msg = e instanceof Error ? e.message : "";
         setError(
           /client token|not configured|Blob store/i.test(msg)
-            ? "File uploads aren't set up yet — connect a Blob store in Vercel (Storage tab)."
+            ? "Connect a Blob store in Vercel (Storage tab) to turn on file uploads."
             : `Couldn't upload ${file.name}${msg ? `: ${msg}` : ""}`,
         );
       }

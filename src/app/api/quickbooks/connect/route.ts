@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   if (!qbo.isConfigured()) {
     return NextResponse.json(
-      { error: "QuickBooks is not configured — set QBO_CLIENT_ID / SECRET / REDIRECT_URI / TOKEN_SECRET" },
+      { error: "QuickBooks needs QBO_CLIENT_ID, QBO_CLIENT_SECRET, QBO_REDIRECT_URI and QBO_TOKEN_SECRET set" },
       { status: 503 },
     );
   }

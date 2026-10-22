@@ -415,8 +415,8 @@ function PhotoGallery({
     const msg = e instanceof Error ? e.message : "";
     if (/not configured|Blob store/i.test(msg)) return "uploads aren't set up yet";
     if (/content type mismatch/i.test(msg)) {
-      return "unsupported file type — iPhone photos saved as HEIC aren't supported; " +
-        "in Settings → Camera → Formats, switch to \"Most Compatible\", or export as JPEG first";
+      return "HEIC photos aren't supported. Export as JPEG first, or on iPhone set " +
+        "Settings → Camera → Formats to \"Most Compatible\"";
     }
     if (/too large|exceeds the maximum/i.test(msg)) return "file is too large (25MB max)";
     // @vercel/blob's client always uses this exact generic wording when the request
@@ -424,7 +424,7 @@ function PhotoGallery({
     // whatever specific reason the server actually sent back. A stale session is the
     // most common real cause, so that's the fix worth suggesting.
     if (/retrieve the client token/i.test(msg)) {
-      return "couldn't start the upload — reload the page, make sure you're still signed in, and try again";
+      return "couldn't start the upload. Reload the page, check you're still signed in, and try again";
     }
     return "upload failed";
   }

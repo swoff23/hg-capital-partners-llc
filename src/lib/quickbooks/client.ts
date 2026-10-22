@@ -70,7 +70,7 @@ export async function withFreshToken(
         where: { id: conn.id },
         data: { status: "EXPIRED" },
       });
-      throw new QboReconnectRequired("QuickBooks token refresh failed — reconnect required", {
+      throw new QboReconnectRequired("QuickBooks token refresh failed. Reconnect to resume syncing", {
         cause: err,
       });
     }

@@ -167,7 +167,7 @@ export function TaskRow({
                 aria-label="Property"
                 className={overlay(!!task.property)}
               >
-                <option value="">— none</option>
+                <option value="">None</option>
                 {task.deal && !task.property && (
                   <option value="" disabled>
                     deal · {shortAddress(task.deal.address)}

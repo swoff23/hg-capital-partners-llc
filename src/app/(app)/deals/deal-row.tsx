@@ -62,7 +62,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
               href={deal.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              title={`Open listing — ${deal.sourceUrl}`}
+              title={`Open ${deal.sourceUrl}`}
               className="shrink-0 rounded border border-border px-1 text-[11px] leading-4 text-primary opacity-0 transition-opacity hover:bg-background focus-visible:opacity-100 group-hover/addr:opacity-100"
             >
               ↗
@@ -129,7 +129,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         {deal.latestNotes.length > 0 && (
           <div className="space-y-0.5">
             {deal.latestNotes.map((n, i) => (
-              <Tooltip key={i} label={`${fmtDate(n.date)} — ${n.body}`} className="block truncate">
+              <Tooltip key={i} label={`${n.body} (${fmtDate(n.date)})`} className="block truncate">
                 <span className="truncate">{n.body}</span>
               </Tooltip>
             ))}

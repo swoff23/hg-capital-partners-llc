@@ -128,10 +128,10 @@ type ReminderDef = {
 };
 
 const REMINDERS: ReminderDef[] = [
-  { slug: "loanMaturity", field: "loanMaturityDate", leadDays: 60, title: (d) => `Loan maturity ${fmtDay(d)} — refinance or extend` },
-  { slug: "insuranceRenewal", field: "insuranceRenewalDate", leadDays: 30, title: (d) => `Insurance renews ${fmtDay(d)} — confirm coverage` },
+  { slug: "loanMaturity", field: "loanMaturityDate", leadDays: 60, title: (d) => `Refinance or extend the loan maturing ${fmtDay(d)}` },
+  { slug: "insuranceRenewal", field: "insuranceRenewalDate", leadDays: 30, title: (d) => `Confirm coverage before insurance renews ${fmtDay(d)}` },
   { slug: "propertyTax", field: "propertyTaxDueDate", leadDays: 21, title: (d) => `Property tax due ${fmtDay(d)}` },
-  { slug: "rentalRegistration", field: "rentalRegistrationExpiry", leadDays: 30, title: (d) => `Rental registration expires ${fmtDay(d)} — renew` },
+  { slug: "rentalRegistration", field: "rentalRegistrationExpiry", leadDays: 30, title: (d) => `Renew the rental registration expiring ${fmtDay(d)}` },
 ];
 
 /**

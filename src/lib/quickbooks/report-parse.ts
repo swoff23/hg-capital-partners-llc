@@ -107,7 +107,7 @@ export function assertColumnsPresent(input: unknown): void {
   const missing = PNL_DETAIL_COLUMNS.filter((k) => !returned.has(k));
   if (missing.length) {
     throw new QboReportShapeError(
-      `ProfitAndLossDetail dropped columns: ${missing.join(", ")} — QBO silently omits unsupported keys`,
+      `QBO silently omitted unsupported ProfitAndLossDetail columns: ${missing.join(", ")}`,
       { returned: [...returned] },
     );
   }
@@ -212,7 +212,7 @@ export function parseProfitAndLossDetail(
         if (reported !== 0 && Math.abs(parsed - reported) > 1) {
           throw new QboReportShapeError(
             `ProfitAndLossDetail section "${name}" line-sum ${parsed}¢ ≠ Summary ${reported}¢ ` +
-              `(basis ${basis}, ${periodMonth}) — check the amount column / sign convention`,
+              `(basis ${basis}, ${periodMonth}). Check the amount column and sign convention`,
             { parsed, reported },
           );
         }

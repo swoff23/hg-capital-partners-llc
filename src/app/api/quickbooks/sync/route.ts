@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const auth = cronAuthorized(getEnv().CRON_SECRET, request.headers.get("authorization"));
   if (auth === "unconfigured") {
     return NextResponse.json(
-      { error: "CRON_SECRET is not set — the sync route is disabled until it is" },
+      { error: "The sync route stays disabled until CRON_SECRET is set" },
       { status: 503 },
     );
   }

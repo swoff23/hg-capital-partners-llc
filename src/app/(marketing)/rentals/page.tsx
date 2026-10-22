@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { PhotoCarousel } from "./photo-carousel";
 
 export const metadata: Metadata = {
-  title: "Rentals — HG Capital Partners",
+  title: "Rentals | HG Capital Partners",
   description: "Available apartments in Buffalo, New York.",
 };
 
@@ -67,7 +67,7 @@ export default async function RentalsPage() {
           </div>
         ) : (
           <p className="mx-auto mt-12 max-w-sm text-center text-sm leading-relaxed text-[#767d8a]">
-            Nothing available right now — check back soon, or see our current listings on Zillow.
+            No openings right now. Check back soon, or see our listings on Zillow.
           </p>
         )}
 
@@ -123,8 +123,9 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
         </div>
         <p className="mt-0.5 text-xs text-[#767d8a]">{l.unitLabel}</p>
         <p className="mt-2 text-xs text-[#767d8a]">
-          {l.beds ? `${l.beds} bd` : "— bd"} · {l.baths ? `${l.baths} ba` : "— ba"} ·{" "}
-          {l.sqft ? `${l.sqft} sqft` : "— sqft"}
+          {[l.beds && `${l.beds} bd`, l.baths && `${l.baths} ba`, l.sqft && `${l.sqft} sqft`]
+            .filter(Boolean)
+            .join(" · ") || "Details on request"}
         </p>
         {l.zillowUrl && !l.leased && (
           <a

@@ -29,7 +29,7 @@ export default async function FinancialsSettingsPage() {
             </a>
           ) : (
             <p className="text-sm text-muted">
-              Not configured — set the <code>QBO_*</code> environment variables first.
+              Set the <code>QBO_*</code> environment variables to connect QuickBooks.
             </p>
           )}
         </CardBody>
@@ -102,7 +102,7 @@ export default async function FinancialsSettingsPage() {
       {dq && (
         <Card>
           <CardHeader>
-            <CardTitle>Data quality — a QuickBooks cleanup punch list</CardTitle>
+            <CardTitle>QuickBooks cleanup list</CardTitle>
           </CardHeader>
           <CardBody className="space-y-1.5 text-sm">
             <DqRow
@@ -115,7 +115,7 @@ export default async function FinancialsSettingsPage() {
               label="Suspense / clearing balance"
               value={fmtCents(dq.suspenseCents)}
               bad={dq.suspenseCents !== 0}
-              note="excluded from income — ask the bookkeeper to reclass to an escrow/asset account"
+              note="left out of income until the bookkeeper reclasses it to an escrow or asset account"
             />
             <DqRow
               label="Uncategorized Expense"
@@ -137,7 +137,7 @@ export default async function FinancialsSettingsPage() {
               label="Owner-funded rent (P2P)"
               value={fmtCents(dq.ownerFundedCents)}
               bad={dq.ownerFundedCents !== 0}
-              note="booked to Rents but owner-sourced — excluded from NOI & collected rent"
+              note="owner money booked to Rents, left out of NOI and collected rent"
             />
             <DqRow
               label="Section-8 / voucher rent"
@@ -239,7 +239,7 @@ function DqRow({
         {label}
       </span>
       <span className="tabular-nums">{value}</span>
-      {note && <span className="text-[11px] text-muted">— {note}</span>}
+      {note && <span className="text-[11px] text-muted">{note}</span>}
     </div>
   );
 }

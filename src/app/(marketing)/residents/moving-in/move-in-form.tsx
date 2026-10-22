@@ -111,7 +111,7 @@ export function MoveInForm({
   if (done) {
     return (
       <div className="rounded-2xl border border-white/15 p-8 text-center">
-        <p className="text-sm font-medium text-[#e8eaee]">Thanks — your move-in report is in.</p>
+        <p className="text-sm font-medium text-[#e8eaee]">Thanks! Your move-in report is in.</p>
         <p className="mt-2 text-sm leading-relaxed text-[#767d8a]">
           We&rsquo;ve received it and will follow up if anything needs attention.
         </p>
@@ -271,7 +271,7 @@ function SectionBlock({
                 <input
                   value={inst.location}
                   onChange={(e) => onLocationChange(i, e.target.value)}
-                  placeholder={`${section.label} ${i + 1} — e.g. "Upstairs"`}
+                  placeholder={`${section.label} ${i + 1} (e.g. "Upstairs")`}
                   className={`${inputClass} h-9`}
                 />
                 {i > 0 && (

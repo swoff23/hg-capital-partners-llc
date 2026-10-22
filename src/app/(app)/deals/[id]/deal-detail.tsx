@@ -243,7 +243,7 @@ export function ListingUrlField({ id, value }: { id: string; value: string | nul
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          title={`Open listing — ${value}`}
+          title={`Open ${value}`}
           className="shrink-0 rounded border border-border px-1.5 py-1 text-xs text-primary hover:bg-background"
         >
           Open ↗

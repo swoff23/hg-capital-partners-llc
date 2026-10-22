@@ -5,7 +5,7 @@ import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { MoveInForm } from "./move-in-form";
 
 export const metadata: Metadata = {
-  title: "Moving In — HG Capital Partners",
+  title: "Moving In | HG Capital Partners",
   description: "Move-in checklist and the condition report for HG Capital residents.",
 };
 
@@ -17,8 +17,8 @@ const CHECKLIST = [
     title: "Security deposit",
     body: (
       <>
-        Pay via Baselane — you&rsquo;ll receive an invite. See your welcome email for the
-        exact amount and other payment options.
+        Baselane will email you an invite to pay. Your welcome email has the exact amount and
+        other payment options.
       </>
     ),
   },
@@ -35,8 +35,8 @@ const CHECKLIST = [
         <a href="https://www.nationalfuel.com/" target="_blank" rel="noopener noreferrer" className="text-[#c8a765] hover:underline">
           National Fuel
         </a>{" "}
-        to open an account in your name, starting on your lease date. Text us once it&rsquo;s
-        done — this is required before move-in.
+        to open an account in your name, starting on your lease date. It&rsquo;s required before
+        move-in, so text us once it&rsquo;s done.
       </>
     ),
   },
@@ -69,7 +69,7 @@ const CHECKLIST = [
     body: (
       <>
         We&rsquo;ll set up a group text for anything that comes up. Rent is paid through
-        Baselane, via a separate email invite — autopay is recommended.
+        Baselane, via a separate email invite. We recommend autopay.
       </>
     ),
   },

@@ -27,7 +27,7 @@ function getKey(): Buffer {
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32) {
     throw new QboCryptoError(
-      `QBO_TOKEN_SECRET must decode to 32 bytes (got ${key.length}) — use \`openssl rand -base64 32\``,
+      `QBO_TOKEN_SECRET must decode to 32 bytes (got ${key.length}). Generate one with \`openssl rand -base64 32\``,
     );
   }
   cachedKey = key;
@@ -64,6 +64,6 @@ export function decryptSecret(ciphertext: string): string {
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
   } catch {
-    throw new QboCryptoError("token decryption failed — wrong key or tampered ciphertext");
+    throw new QboCryptoError("token decryption failed (wrong key or tampered ciphertext)");
   }
 }

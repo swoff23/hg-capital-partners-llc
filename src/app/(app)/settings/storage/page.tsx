@@ -13,7 +13,7 @@ export default async function StorageSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Settings" subtitle="Storage — where uploaded documents live" />
+      <PageHeader title="Settings" subtitle="Where uploaded documents live" />
       <Card>
         <CardHeader>
           <CardTitle>Documents</CardTitle>
@@ -22,7 +22,7 @@ export default async function StorageSettingsPage() {
           <p className="text-muted">
             Property documents and task attachments are stored as <strong>private</strong> blobs and
             served only to signed-in users through <code>/api/files</code>. Rental listing photos stay
-            public on purpose — they are on the public site.
+            public because the public site shows them.
           </p>
           <p>
             {counts.properties} property document{counts.properties === 1 ? "" : "s"} ·{" "}
@@ -34,7 +34,7 @@ export default async function StorageSettingsPage() {
           </p>
           <MigrateButton disabled={!configured} />
           {!configured && (
-            <p className="text-xs text-muted">Not available here — no Blob store token in this environment.</p>
+            <p className="text-xs text-muted">Needs a Blob store token, and this environment doesn&apos;t have one.</p>
           )}
         </CardBody>
       </Card>

@@ -19,7 +19,7 @@ export default async function NewPropertyPage() {
               <label className="block">
                 <span className="text-xs font-medium text-muted">Status</span>
                 <Select name="status" defaultValue="" className="mt-1">
-                  <option value="">— none</option>
+                  <option value="">None</option>
                   {PROPERTY_STATUSES.map((s) => (
                     <option key={s}>{s}</option>
                   ))}

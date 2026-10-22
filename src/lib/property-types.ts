@@ -36,7 +36,7 @@ export function normalizeEquipment(e: UnitEquipment): UnitEquipment {
   if (!/\s|[?!,;]|or\b/i.test(raw)) return e; // single token like "circa2004" — leave alone
 
   const year = raw.match(/(19|20)\d{2}/)?.[0] ?? "";
-  const comment = [e.comment?.trim(), raw].filter(Boolean).join(" — ");
+  const comment = [e.comment?.trim(), raw].filter(Boolean).join("; ");
   return { ...e, installYear: year, comment };
 }
 

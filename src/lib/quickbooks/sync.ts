@@ -375,7 +375,7 @@ export async function runQuickbooksSync(opts: { trigger: QboSyncTrigger; scope?:
   // claim the lock (a TOCTOU race here only risks two identical rebuilds of the same months — each slice is atomic)
   await prisma.qboSyncRun.updateMany({
     where: { status: "RUNNING", heartbeatAt: { lt: new Date(Date.now() - STALE_LOCK_MS) } },
-    data: { status: "FAILED", error: "superseded — stale lock", finishedAt: new Date() },
+    data: { status: "FAILED", error: "superseded after its lock went stale", finishedAt: new Date() },
   });
   const active = await prisma.qboSyncRun.findFirst({ where: { status: "RUNNING" } });
   if (active) return { runId: active.id, skipped: true, status: "PARTIAL", monthsProcessed: 0, lineCount: 0 };
@@ -457,7 +457,7 @@ export async function runQuickbooksSync(opts: { trigger: QboSyncTrigger; scope?:
       reconciled = true;
       await bump();
     } else if (!stoppedEarly) {
-      warnings.push("reconciliation skipped — wall budget exhausted after writing");
+      warnings.push("reconciliation skipped because the wall budget ran out after writing");
     }
 
     const dataQuality = await buildDataQuality(realmId, propTokens);

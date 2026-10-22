@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Residents — HG Capital Partners",
+  title: "Residents | HG Capital Partners",
   description: "Maintenance, rent, and move-in resources for HG Capital residents.",
 };
 
@@ -32,7 +32,7 @@ export default function ResidentsPage() {
           <Tile title="Pay Rent" body="Handled securely through Baselane." href={BASELANE_URL} />
           <Tile
             title="Request Maintenance"
-            body="Report an issue with photos — it goes straight to our team."
+            body="Send photos of the issue straight to our team."
           />
         </div>
       </div>

@@ -30,7 +30,7 @@ export const getAppConfig = cache(async (): Promise<AppConfigSnapshot> => {
       version: row.updatedAt.toISOString(),
     };
   } catch (err) {
-    console.error("getAppConfig: falling back to defaults —", err);
+    console.error("getAppConfig failed, using defaults:", err);
     return { capexRules: DEFAULT_CAPEX_RULES, moveInFormSchema: DEFAULT_MOVE_IN_FORM_SCHEMA, version: null };
   }
 });

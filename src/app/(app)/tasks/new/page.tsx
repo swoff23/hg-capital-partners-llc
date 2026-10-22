@@ -38,7 +38,7 @@ export default async function NewTaskPage({ searchParams }: PageProps<"/tasks/ne
               <label className="block">
                 <span className="text-xs font-medium text-muted">Assignee</span>
                 <Select name="assigneeUserId" defaultValue={user.id} className="mt-1">
-                  <option value="">— unassigned</option>
+                  <option value="">Unassigned</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name ?? u.email}
@@ -55,7 +55,7 @@ export default async function NewTaskPage({ searchParams }: PageProps<"/tasks/ne
               <label className="block">
                 <span className="text-xs font-medium text-muted">Property</span>
                 <Select name="propertyId" defaultValue={sp.propertyId ?? ""} className="mt-1">
-                  <option value="">— none</option>
+                  <option value="">None</option>
                   {properties.map((p) => (
                     <option key={p.id} value={p.id}>
                       {shortAddress(p.address)}

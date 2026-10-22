@@ -104,7 +104,7 @@ function build(source: EnvSource): Env {
       if (isProduction) throw new EnvError("SESSION_SECRET is required in production");
       if (!warnedDevSecret) {
         warnedDevSecret = true;
-        console.warn("[env] SESSION_SECRET is unset — using the insecure dev-only secret");
+        console.warn("[env] SESSION_SECRET is unset, so sessions use the insecure dev-only secret");
       }
       return DEV_SESSION_SECRET;
     },

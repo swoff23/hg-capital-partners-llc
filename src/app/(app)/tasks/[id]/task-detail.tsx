@@ -137,7 +137,7 @@ export function AssigneeControl({
           onChange={(e) => start(() => patchTask(id, { assigneeUserId: e.target.value || null }))}
           className={cn(quiet, "appearance-none pr-7", !value && !label && "text-muted")}
         >
-          <option value="">{label ? `${label} — external` : "Unassigned"}</option>
+          <option value="">{label ? `${label} (external)` : "Unassigned"}</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
               {u.name ?? u.email}

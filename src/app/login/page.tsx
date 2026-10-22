@@ -6,7 +6,7 @@ import { PublicFooter } from "@/components/public/footer";
 import { login } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Sign In — HG Capital Partners",
+  title: "Sign In | HG Capital Partners",
   description: "Internal operations sign-in.",
 };
 

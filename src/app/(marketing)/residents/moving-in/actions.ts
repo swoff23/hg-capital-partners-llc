@@ -88,12 +88,12 @@ async function submitMoveInInspectionBody(
     sec.instances.forEach((inst, idx) => {
       if (inst.answers.length === 0 && !inst.location) return; // skip a fully-empty instance
       const heading = def.repeatable
-        ? `${def.label}${inst.location ? ` — ${inst.location}` : ` #${idx + 1}`}`
+        ? `${def.label}${inst.location ? ` (${inst.location})` : ` #${idx + 1}`}`
         : def.label;
       lines.push(heading);
       for (const a of inst.answers) {
         const label = itemByKey.get(a.itemKey) ?? a.itemKey;
-        lines.push(`  ${label}: ${a.rating}${a.comment ? ` — ${a.comment}` : ""}`);
+        lines.push(`  ${label}: ${a.rating}${a.comment ? ` (${a.comment})` : ""}`);
       }
       lines.push("");
     });
@@ -106,7 +106,7 @@ async function submitMoveInInspectionBody(
 
   await createTask(
     {
-      title: `Move-in inspection — ${property.address} — ${p.tenantName}`,
+      title: `Move-in inspection for ${p.tenantName} at ${property.address}`,
       description: lines.join("\n"),
       propertyId: property.id,
     },

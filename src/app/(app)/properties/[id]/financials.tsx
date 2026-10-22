@@ -93,7 +93,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
         )}
 
         <p className="text-[11px] text-muted">
-          Direct-classed lines only; entity/overhead costs aren&apos;t attributed here — see the{" "}
+          Direct-classed lines only. Entity and overhead costs show in the{" "}
           <Link href="/financials" className="text-primary hover:underline">
             portfolio view
           </Link>

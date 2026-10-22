@@ -11,7 +11,7 @@ export type QboEnvironment = "sandbox" | "production";
 
 function required() {
   const q = getEnv().qbo;
-  if (!q) throw new Error("QuickBooks integration is not configured — set QBO_CLIENT_ID / SECRET / REDIRECT_URI / TOKEN_SECRET");
+  if (!q) throw new Error("QuickBooks needs QBO_CLIENT_ID, QBO_CLIENT_SECRET, QBO_REDIRECT_URI and QBO_TOKEN_SECRET set");
   return q;
 }
 

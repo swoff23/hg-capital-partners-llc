@@ -26,8 +26,8 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
       <SourceBadge basis={basis} syncedAt={roll.lastSyncAt} />
 
       <p className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted">
-        Cash rent <strong>received</strong> by month — summed across every class mapped to the
-        property (so an entity transfer on refinance shows no gap). No lease data yet, so
+        Cash rent <strong>received</strong> by month, summed across every class mapped to the
+        property so an entity transfer on refinance shows no gap. No lease data yet, so
         scheduled/market rent, delinquency, and vacancy are out of scope. Section-8 / voucher rent is
         included; owner P2P deposits mis-booked to Rents are excluded and shown separately.
       </p>
