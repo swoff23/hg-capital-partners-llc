@@ -55,7 +55,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Select | `components/ui.tsx` `Select` | |
 | Button | `components/ui.tsx` `Button` (primary, secondary, ghost, danger; sm, md) | `LinkButton` for navigation styled as a button; `buttonClass()` for a plain `<a>` (an `sms:` or `mailto:` link). `Button`, `LinkButton`, `Input`, `Select` and `Textarea` are at least 44px tall on touch (`pointer-coarse:min-h-11`); a mouse keeps the compact sizes |
 | Pending action | `useTransition`, a disabled `Button` and a label swap ("Saving…") | See `app/(app)/settings/move-in-form/move-in-form-editor.tsx`, `financials/_components/refresh-button.tsx`. The sign-in screens use `app/login/_components/auth-submit.tsx` `AuthSubmit` (`useFormStatus`; `native` for a form that posts to a URL) |
-| Section with view and edit modes | `components/ui.tsx` `SectionCard` | Edit link shows on hover, always on phones; `actions` slot holds Cancel and Save |
+| Section with view and edit modes | `components/ui.tsx` `SectionCard` | Edit link shows on hover with a mouse, always on touch screens (`pointer-coarse:`); `actions` slot holds Cancel and Save |
 | Edit a heading in place | `components/inline-address-field.tsx` `InlineAddressField` | Commits on blur or Enter, reverts on Esc. The base for any inline text edit: `label` names it, `minLength` reverts anything shorter, `multiline` lets a long heading wrap (the task title). Only a real edit saves (`lib/inline-edit.ts`), so focus and blur never rewrite a stored value |
 | Save on blur, cancel on Esc | `components/use-inline-edit-keys.ts` `useInlineEditKeys` | Enter saves, Esc reverts without saving. `InlineAddressField` (so the task title too), the deal page fields and the CapEx rules editor use it; use it for any field that saves on blur |
 | File upload with drag and drop | `components/attachments.tsx` `Attachments` | Documents. Private Vercel Blob uploads; `kind` picks task or property |
@@ -82,6 +82,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Job | Use | Notes |
 |---|---|---|
 | App sidebar | `components/nav.tsx` `SideNav` inside `components/app-shell.tsx` `AppShell` | Pinned state lives in a cookie (`lib/sidebar.ts`) |
+| Keep a tab left open current | `components/refresh-on-return.tsx` `RefreshOnReturn` | Mounted once in `app/(app)/layout.tsx`. Refreshes the page's server data when someone comes back: shown again after a minute hidden, back online, restored by Safari, or a new Eastern day. No polling. Holds off while a field is focused or holds unsaved typing, and on the property page until its editors survive a refresh (`lib/refresh-on-return.ts`) |
 | Page sections that are separate routes | `components/nav.tsx` `TopTabs` | Underline tabs. Financials and Settings layouts |
 | Views and filters inside a page | `components/segmented-control.tsx` `SegmentedControl` | Pill toggles with `aria-pressed`, styled from the attribute; one weight for both states. `sm` for filter bars (deals), `md` for a page's main switch (44px on touch). `count` shows dimmed after a label |
 | Back to the list | `components/back-link.tsx` `BackLink` | Returns to the exact previous page, filters and scroll intact, when it can. `className` sizes it, e.g. the 44px "My jobs" link in the portal header. Inside a `LeaveGuard` it asks first while the page is held |
@@ -147,6 +148,7 @@ Use the pick; folding a copy into it is welcome when you're already in that file
 | Age in years | `fmtAge` in `properties/[id]/capex-outlook.tsx`, `building-capex.tsx` and `edit-units.tsx`; `fmtYrs` in `settings/capex-rules-editor.tsx` | Move one into `lib/` |
 | Button | `Button` in 20 files; about 50 raw `<button>`s, many icon or link style | `Button`; add a variant before hand-rolling |
 | Text field | `Input`, `Select`, `Textarea` in 9 files; about 60 raw fields (filter bars at `h-8 text-xs`, inline edits, public forms) | `Input` and friends; add a small size for filter bars |
+| Section card with an Edit link | `SectionCard`, plus hand-rolled headers in `app/(app)/properties/[id]/edit-units.tsx`, `edit-listings.tsx` and `building-capex.tsx` (their Edit is still hidden on touch screens from `sm` up) | `SectionCard` |
 
 ## Known gaps
 

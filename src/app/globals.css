@@ -110,3 +110,21 @@ body {
     font-size: max(16px, 1em);
   }
 }
+
+/* Print the page, not the app around it. The app shell's header and sidebar
+   (components/app-shell.tsx) are position: fixed, so they would print at the
+   top of every sheet, over its first lines; the shell's padding only makes
+   room for them. Keyed off that fixed header, so pages outside the shell
+   print as they are. Unlayered, so it wins over the shell's utilities. */
+@media print {
+  header.fixed,
+  header.fixed ~ aside,
+  header.fixed ~ button {
+    display: none;
+  }
+  header.fixed ~ div,
+  header.fixed ~ div > main {
+    min-height: 0;
+    padding: 0;
+  }
+}

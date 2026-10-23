@@ -22,8 +22,9 @@ export function CardBody({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 /**
- * Bordered card with a title bar. In view mode a hover-revealed "Edit" link
- * (when `onEdit` is set); in edit mode the `actions` slot (Cancel / Save).
+ * Bordered card with a title bar. In view mode an "Edit" link (when `onEdit`
+ * is set), revealed on hover with a mouse and always shown on touch screens;
+ * in edit mode the `actions` slot (Cancel / Save).
  * Used by the property edit sections and the /settings CapEx-rules editor.
  */
 export function SectionCard({
@@ -48,7 +49,7 @@ export function SectionCard({
           : onEdit && (
               <button
                 onClick={onEdit}
-                className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
+                className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
               >
                 Edit
               </button>

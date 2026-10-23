@@ -198,7 +198,7 @@ export function MoveInForm({
           value={additionalComments}
           onChange={(e) => setAdditionalComments(e.target.value)}
           rows={3}
-          className={`mt-1.5 resize-y rounded-lg border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none`}
+          className={`mt-1.5 block w-full resize-y rounded-lg border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none`}
         />
       </label>
 

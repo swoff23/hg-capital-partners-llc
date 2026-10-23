@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { signOut } from "@/app/login/actions";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import { AppShell } from "@/components/app-shell";
+import { RefreshOnReturn } from "@/components/refresh-on-return";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
@@ -11,6 +12,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <AppShell userLabel={user.name ?? user.email} initialPinned={pinned} signOutAction={signOut}>
+      <RefreshOnReturn />
       {children}
     </AppShell>
   );
