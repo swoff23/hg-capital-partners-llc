@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { amountToDecimal, parseAmount, toDecimalString } from "./money";
+import { amountToDecimal, evenShare, parseAmount, toDecimalString } from "./money";
 
 test("parseAmount: the shapes people actually type", () => {
   assert.equal(parseAmount("425000"), 425000);
@@ -35,4 +35,18 @@ test("toDecimalString / amountToDecimal", () => {
   assert.equal(toDecimalString(null), null);
   assert.equal(amountToDecimal("425k"), "425000.00");
   assert.equal(amountToDecimal("300s"), null);
+});
+
+test("evenShare: the 765/767 Prospect split, and shares always sum to the total", () => {
+  assert.equal(evenShare(292890, 2, 0), 146445);
+  assert.equal(evenShare(292890, 2, 1), 146445);
+  assert.equal(evenShare(4593, 2, 0, 1), 2297);
+  assert.equal(evenShare(4593, 2, 1, 1), 2296);
+  assert.equal(evenShare(100, 3, 0), 33.34);
+  assert.equal(evenShare(100, 3, 1), 33.33);
+  assert.equal(evenShare(100, 3, 2), 33.33);
+  for (const [total, parts, step] of [[240000, 2, 0.01], [0.05, 3, 0.01], [1234.57, 4, 0.01], [7, 3, 1]]) {
+    const sum = Array.from({ length: parts }, (_, i) => evenShare(total, parts, i, step)).reduce((a, b) => a + b, 0);
+    assert.equal(Math.round(sum * 100), Math.round(total * 100));
+  }
 });

@@ -5,6 +5,7 @@ import { Badge, Card, LinkButton, PageHeader, Table, Td, Th, EmptyState } from "
 import { fmtMoney } from "@/lib/utils";
 import { propertyStatusTone } from "@/lib/config";
 import { activeTask } from "@/lib/task-scope";
+import { propertyUnitCount } from "@/lib/property-types";
 
 export default async function PropertiesPage() {
   await requireUser();
@@ -22,7 +23,7 @@ export default async function PropertiesPage() {
 
   const totals = properties.reduce(
     (acc, p) => {
-      acc.units += p.unitCount ?? 0;
+      acc.units += propertyUnitCount(p) ?? 0;
       acc.purchase += Number(p.purchasePrice ?? 0);
       acc.value += Number(p.value ?? 0);
       acc.openTasks += openMap.get(p.id) ?? 0;
@@ -79,7 +80,7 @@ export default async function PropertiesPage() {
                     )}
                   </Td>
                   <Td className="tabular-nums">{openMap.get(p.id) ?? 0}</Td>
-                  <Td className="tabular-nums">{p.unitCount ?? "—"}</Td>
+                  <Td className="tabular-nums">{propertyUnitCount(p) ?? "—"}</Td>
                   <Td className="tabular-nums">{fmtMoney(p.purchasePrice)}</Td>
                   <Td className="tabular-nums">{fmtMoney(p.value)}</Td>
                 </tr>

@@ -2,6 +2,7 @@
 import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { inlineEditCommit } from "@/lib/inline-edit";
 import { cn } from "@/lib/utils";
+import { useInlineEditKeys } from "./use-inline-edit-keys";
 
 const supportsFieldSizing = () => typeof CSS !== "undefined" && CSS.supports("field-sizing", "content");
 
@@ -74,22 +75,15 @@ export function InlineAddressField({
       await onCommit(trimmed);
     });
   }
+  const keys = useInlineEditKeys(() => setV(value), commit);
 
   const props = {
     "aria-label": label,
     value: v,
     disabled: pending,
-    onBlur: commit,
-    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        e.currentTarget.blur();
-      }
-      if (e.key === "Escape") {
-        setV(value);
-        e.currentTarget.blur();
-      }
-    },
+    // Enter commits and Esc reverts without saving (see useInlineEditKeys).
+    onBlur: keys.onBlur,
+    onKeyDown: keys.onKeyDown,
     className: cn(
       "w-full rounded-md bg-transparent px-2 py-1 pr-6 text-xl font-semibold tracking-tight text-foreground outline-none transition-colors hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 disabled:opacity-40",
       // field-sizing gets the height right before hydration where it's supported; the effect covers the rest.

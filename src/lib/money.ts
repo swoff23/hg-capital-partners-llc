@@ -37,3 +37,15 @@ export function toDecimalString(n: number | null | undefined): string | null {
 export function amountToDecimal(raw: unknown): string | null {
   return toDecimalString(parseAmount(raw));
 }
+
+/**
+ * Share `index` of a non-negative `total` split evenly `parts` ways, in whole
+ * steps of `step` (0.01 for money, 1 for counts and square feet). The first
+ * shares take the remainder, so the shares always add back up to the total.
+ */
+export function evenShare(total: number, parts: number, index: number, step = 0.01): number {
+  const scale = Math.round(1 / step);
+  const whole = Math.round(total * scale);
+  const share = Math.floor(whole / parts) + (index < whole % parts ? 1 : 0);
+  return share / scale;
+}

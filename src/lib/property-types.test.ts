@@ -5,11 +5,45 @@ import {
   orphanedEquipmentTypes,
   parseCapexRules,
   capexForecast,
+  isHouseMeterRow,
+  propertyUnitCount,
+  syncedUnitCount,
   reconcileUnits,
   renamedLabel,
   withUnitIds,
   type CapexRules,
 } from "./property-types";
+
+test("isHouseMeterRow: only the building's own meters, never a real unit", () => {
+  assert.equal(isHouseMeterRow({ label: "HSE (house)" }), true);
+  assert.equal(isHouseMeterRow({ label: "hse" }), true);
+  assert.equal(isHouseMeterRow({ label: "Common (house)" }), true);
+  for (const label of ["Rear house", "Front", "Unit 1", "1st Rear / Apt #3", "", null, undefined]) {
+    assert.equal(isHouseMeterRow({ label }), false, String(label));
+  }
+});
+
+test("syncedUnitCount: follows the records only while the stored count agrees with them", () => {
+  const two = [{ label: "Lower" }, { label: "Upper" }];
+  const three = [...two, { label: "Attic" }];
+  assert.equal(syncedUnitCount(2, two, three), 3);
+  assert.equal(syncedUnitCount(null, two, three), 3);
+  assert.equal(syncedUnitCount(3, three, two), 2);
+  assert.equal(syncedUnitCount(2, three, [...three, { label: "Rear" }]), undefined); // set on purpose (767)
+  assert.equal(syncedUnitCount(2, two, [...two, { label: "HSE (house)" }]), undefined); // a meter isn't a unit
+  assert.equal(syncedUnitCount(2, two, two), undefined);
+  assert.equal(syncedUnitCount(1, [{ label: "Only" }], []), null);
+});
+
+test("propertyUnitCount: the stored count wins; else unit records less house meters", () => {
+  const records = [{ label: "Lower" }, { label: "Upper" }, { label: "Attic" }, { label: "HSE (house)" }];
+  assert.equal(propertyUnitCount({ unitCount: 3, units: records }), 3);
+  assert.equal(propertyUnitCount({ unitCount: 2, units: [{ label: "A" }, { label: "B" }, { label: "C" }] }), 2);
+  assert.equal(propertyUnitCount({ unitCount: null, units: records }), 3);
+  assert.equal(propertyUnitCount({ unitCount: null, units: [{ label: "HSE (house)" }] }), null);
+  assert.equal(propertyUnitCount({ unitCount: null, units: null }), null);
+  assert.equal(propertyUnitCount({ unitCount: 0, units: records }), 0);
+});
 
 test("parseCapexRules: junk / empty input falls back to the full defaults", () => {
   for (const junk of [null, undefined, "x", 42, [], {}, { equipment: null, building: 0 }]) {

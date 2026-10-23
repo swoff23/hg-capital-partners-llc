@@ -1,9 +1,10 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button, Field, Input, SectionCard } from "@/components/ui";
 import { cn, fmtMoney } from "@/lib/utils";
 import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
 import { patchProperty } from "../actions";
+import { useSectionSave } from "./use-section-save";
 
 export type EditableLoan = {
   id: string;
@@ -32,8 +33,7 @@ const rate = (r: string | null) => {
 
 export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
   const [editing, setEditing] = useState(false);
-  const [pending, start] = useTransition();
-  const save = patchProperty.bind(null, p.id);
+  const { pending, error, onSubmit, clearError } = useSectionSave(patchProperty.bind(null, p.id), () => setEditing(false));
   const formId = `property-loan-${p.id}`;
 
   const overdue = isPastDay(p.loanMaturityDate);
@@ -76,7 +76,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
       editing
       actions={
         <div className="flex items-center gap-2">
-          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => setEditing(false)}>
+          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { setEditing(false); clearError(); }}>
             Cancel
           </Button>
           <Button type="submit" form={formId} size="sm" disabled={pending}>
@@ -85,12 +85,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
         </div>
       }
     >
-      <form
-        id={formId}
-        key={p.version}
-        action={(fd) => start(async () => { await save(fd); setEditing(false); })}
-        className="grid grid-cols-2 gap-3"
-      >
+      <form id={formId} key={p.version} onSubmit={onSubmit} className="grid grid-cols-2 gap-3">
         <L label="Lender"><Input name="lender" defaultValue={p.lender ?? ""} /></L>
         <L label="Servicer"><Input name="loanServicer" defaultValue={p.loanServicer ?? ""} /></L>
         <L label="Loan #"><Input name="loanNumber" defaultValue={p.loanNumber ?? ""} /></L>
@@ -99,6 +94,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
         <L label="Payment / mo"><Input name="loanPaymentMonthly" defaultValue={p.loanPaymentMonthly ?? ""} /></L>
         <L label="Origination date"><Input name="loanOriginationDate" type="date" defaultValue={p.loanOriginationDate ?? ""} /></L>
         <L label="Maturity date"><Input name="loanMaturityDate" type="date" defaultValue={p.loanMaturityDate ?? ""} /></L>
+        {error && <p role="alert" className="col-span-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </form>
     </SectionCard>
   );

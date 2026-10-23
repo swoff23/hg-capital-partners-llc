@@ -63,5 +63,9 @@ next-env.d.ts
 # device check (npm run test:devices)
 /.next-devices/
 /device-report/
+
+# UI/UX review page with evidence screenshots (docs/uiux-review is the committed version).
+# Kept out of git for the same reason as the device report: real tenant, loan and P&L figures.
+/uiux-review/
 /test-results/
 /playwright-report/

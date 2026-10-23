@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
 import type { ListingStatus, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { amountToDecimal } from "@/lib/money";
+import { badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
-import { parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
+import { parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, syncedUnitCount, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
 import { CONFLICT_MESSAGE } from "@/lib/action-result";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
@@ -108,11 +108,23 @@ export async function patchProperty(id: string, patch: PropertyPatch): Promise<v
   const s = (k: string) => patch[k]?.trim() || null;
 
   const data: Record<string, unknown> = {};
+  const bad: string[] = [];
   if (has("address") && s("address")) data.address = s("address");
   for (const k of TEXT_FIELDS) if (has(k)) data[k] = s(k);
-  for (const k of MONEY_FIELDS) if (has(k)) data[k] = amountToDecimal(s(k));
+  for (const k of MONEY_FIELDS) {
+    if (!has(k)) continue;
+    const r = k === "loanRate" ? readRate(patch[k]) : readAmount(patch[k]);
+    if (r.ok) data[k] = r.value;
+    else bad.push(k);
+  }
   for (const k of DATE_FIELDS) if (has(k)) data[k] = ymdToDate(s(k));
-  if (has("sqft")) data.sqft = s("sqft") ? parseInt(s("sqft")!.replace(/\D/g, ""), 10) || null : null;
+  if (has("sqft")) {
+    const r = readWholeNumber(patch.sqft);
+    if (r.ok) data.sqft = r.value;
+    else bad.push("sqft");
+  }
+  // Nothing is written when a number didn't read: storing null would erase what's there.
+  if (bad.length) throw new Error(badNumbersMessage(bad));
 
   if (Object.keys(data).length > 0) await prisma.property.update({ where: { id }, data });
   if (KEY_DATE_FIELDS.some((k) => has(k))) await syncPropertyReminders(id);
@@ -223,12 +235,19 @@ export async function replaceUnits(id: string, units: PropertyUnit[], expectedVe
       })),
   }));
   const renamed = await prisma.$transaction(async (tx) => {
-    const current = await tx.property.findUnique({ where: { id }, select: { units: true, updatedAt: true } });
+    const current = await tx.property.findUnique({ where: { id }, select: { units: true, unitCount: true, updatedAt: true } });
     if (!current || current.updatedAt.getTime() !== versionDate(expectedVersion).getTime()) throw new Error(CONFLICT_MESSAGE);
-    const { units: stored, renames } = reconcileUnits(parseUnits(current.units), clean, randomUUID);
-    const r = await tx.property.updateMany({ where: { id, updatedAt: current.updatedAt }, data: { units: stored as unknown as object } });
+    const before = parseUnits(current.units);
+    const { units: stored, renames } = reconcileUnits(before, clean, randomUUID);
+    // The stored count is what Portfolio and the header show; keep it in step with the records.
+    const unitCount = syncedUnitCount(current.unitCount, before, stored);
+    const r = await tx.property.updateMany({
+      where: { id, updatedAt: current.updatedAt },
+      data: { units: stored as unknown as object, ...(unitCount !== undefined && { unitCount }) },
+    });
     if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
-    if (renames.length === 0) return { listings: 0, tasks: [] };
+    const countChanged = unitCount !== undefined;
+    if (renames.length === 0) return { listings: 0, tasks: [], countChanged };
     // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
     const listings = await tx.listing.findMany({ where: { propertyId: id }, select: { id: true, unitLabel: true } });
     let listingCount = 0;
@@ -238,9 +257,10 @@ export async function replaceUnits(id: string, units: PropertyUnit[], expectedVe
       await tx.listing.update({ where: { id: l.id }, data: { unitLabel: to } });
       listingCount++;
     }
-    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p) };
+    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p), countChanged };
   }, TX_LIMITS);
   revalidatePath(`/properties/${id}`);
+  if (renamed.countChanged) revalidatePath("/properties");
   if (renamed.listings) revalidatePath("/rentals");
   revalidateTasks(renamed.tasks);
 }
@@ -294,20 +314,27 @@ export interface ListingInput {
  * orphaned photo blobs are deleted only after the commit.
  */
 export async function replaceListings(propertyId: string, listings: ListingInput[], expectedVersion: string): Promise<void> {
-  const clean = listings.map((l) => ({
-    id: l.id ?? null,
-    unitLabel: l.unitLabel.trim() || "Unit",
-    zillowUrl: l.zillowUrl.trim() || null,
-    rent: amountToDecimal(l.rent.trim() || null),
-    beds: l.beds.trim() || null,
-    baths: l.baths.trim() || null,
-    sqft: l.sqft.trim() ? Math.max(0, Math.trunc(Number(l.sqft))) || null : null,
-    availableDate: ymdToDate(l.availableDate.trim() || null),
-    status: l.status,
-    photos: l.photos
-      .filter((p) => p.url.trim() && p.pathname.trim())
-      .map((p, sortOrder) => ({ url: p.url.trim(), pathname: p.pathname.trim(), sortOrder })),
-  }));
+  const clean = listings.map((l) => {
+    const unitLabel = l.unitLabel.trim() || "Unit";
+    const rent = readAmount(l.rent);
+    if (!rent.ok) throw new Error(`Rent for ${unitLabel} isn't a number.`);
+    const sqft = readWholeNumber(l.sqft);
+    if (!sqft.ok) throw new Error(`Sq ft for ${unitLabel} isn't a whole number.`);
+    return {
+      id: l.id ?? null,
+      unitLabel,
+      zillowUrl: l.zillowUrl.trim() || null,
+      rent: rent.value,
+      beds: l.beds.trim() || null,
+      baths: l.baths.trim() || null,
+      sqft: sqft.value,
+      availableDate: ymdToDate(l.availableDate.trim() || null),
+      status: l.status,
+      photos: l.photos
+        .filter((p) => p.url.trim() && p.pathname.trim())
+        .map((p, sortOrder) => ({ url: p.url.trim(), pathname: p.pathname.trim(), sortOrder })),
+    };
+  });
 
   const existing = await prisma.listing.findMany({ where: { propertyId }, select: { id: true, photos: { select: { url: true } } } });
   const existingById = new Map(existing.map((e) => [e.id, e]));

@@ -5,7 +5,18 @@
  * Idempotent: upserts on normalized address.
  */
 import { prisma } from "../../src/lib/db";
+import { evenShare } from "../../src/lib/money";
+import { countUnitRecords } from "../../src/lib/property-types";
 import { report } from "./_report";
+
+/**
+ * Unit counts Connor confirmed where the SREO sheet is wrong, keyed by house
+ * number and street ("23 sherwood"). The stored count is what Portfolio and
+ * the property header show, so a re-import must not put these back.
+ */
+const UNIT_COUNT_OVERRIDES: Record<string, number> = {
+  "23 sherwood": 2,
+};
 import {
   readSheet,
   normalizeAddress,
@@ -108,7 +119,16 @@ export async function migrateProperties() {
       })).filter((e) => e.model || e.installYear),
     }));
 
-    const s = sreoByAddr.get(key) ?? findSreoLoose(sreoByAddr, key);
+    const exact = sreoByAddr.get(key);
+    const loose = exact ? undefined : findSreoLoose(sreoByAddr, key);
+    const s = exact ?? loose?.row;
+    // A combined SREO line ("765/767 prospect") describes buildings bought
+    // together: each gets an even share of its additive figures, so Portfolio
+    // counts the deal once. Rehab months is a duration, so it isn't split.
+    const parts = loose?.parts ?? 1;
+    const share = (n: number | null, step?: number) =>
+      n == null || parts === 1 ? n : evenShare(n, parts, loose!.index, step);
+    if (parts > 1) report.line(`${displayAddress}: combined SREO line split ${parts} ways.`);
 
     const data = {
       address: displayAddress,
@@ -121,14 +141,17 @@ export async function migrateProperties() {
       strategy: s?.["H"] ?? null,
       purchaseDate: parseExcelDate(s?.["I"]),
       refinanceDate: parseExcelDate(s?.["J"]),
-      purchasePrice: dec(parseMoney(s?.["M"]) ?? parseFloatOrNull(s?.["M"])),
-      currentLoan: dec(parseFloatOrNull(s?.["N"])),
-      value: dec(parseFloatOrNull(s?.["P"])),
-      replacementCost: dec(parseFloatOrNull(s?.["Q"])),
-      rehabAmount: dec(parseFloatOrNull(s?.["K"])),
+      purchasePrice: dec(share(parseMoney(s?.["M"]) ?? parseFloatOrNull(s?.["M"]))),
+      currentLoan: dec(share(parseFloatOrNull(s?.["N"]))),
+      value: dec(share(parseFloatOrNull(s?.["P"]))),
+      replacementCost: dec(share(parseFloatOrNull(s?.["Q"]))),
+      rehabAmount: dec(share(parseFloatOrNull(s?.["K"]))),
       rehabMonths: dec(parseFloatOrNull(s?.["L"])),
-      sqft: parseIntOrNull(s?.["E"]),
-      unitCount: parseIntOrNull(s?.["D"]) ?? units.length,
+      sqft: share(parseIntOrNull(s?.["E"]), 1),
+      unitCount:
+        UNIT_COUNT_OVERRIDES[key.split(" ").slice(0, 2).join(" ")] ??
+        share(parseIntOrNull(s?.["D"]), 1) ??
+        (countUnitRecords(units) || null),
       units: units as unknown as object,
     };
 
@@ -193,11 +216,17 @@ function numMatches(sreoNum: string, num: string) {
   return sreoNum === num || sreoNum.split("/").includes(num);
 }
 
+/** The SREO row for a property, plus which of the row's house numbers it is ("765/767" has 2). */
 function findSreoLoose(map: Map<string, Record<string, string | null>>, key: string) {
   const [num, street] = key.split(" ");
   for (const [k, v] of map) {
     const [kn, ks] = k.split(" ");
-    if (numMatches(kn, num) && ks === street) return v;
+    if (!numMatches(kn, num) || ks !== street) continue;
+    // Only a property that is one of a combined line's numbers takes a share;
+    // a property whose own number is the whole key ("765/767") gets all of it.
+    if (kn === num) return { row: v, index: 0, parts: 1 };
+    const nums = kn.split("/");
+    return { row: v, index: nums.indexOf(num), parts: nums.length };
   }
   return undefined;
 }

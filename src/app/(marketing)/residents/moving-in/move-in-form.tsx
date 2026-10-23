@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import type { MoveInFormSchema, MoveInSection } from "@/lib/move-in-form-types";
 import { submitMoveInInspection } from "./actions";
 import { todayYmd } from "@/lib/dates";
+import { callAction } from "@/lib/action-result";
 
 const RATINGS = ["Good", "Fair", "Poor", "N/A"] as const;
 type Rating = (typeof RATINGS)[number] | "";
@@ -102,7 +103,13 @@ export function MoveInForm({
         submitterEmail,
         honeypot: honeypot || undefined,
       };
-      const result = await submitMoveInInspection(payload);
+      // A dropped connection rejects the call instead of returning an error. Left
+      // uncaught it reaches the error boundary, which replaces the form and loses
+      // every answer; callAction turns it into a message and the report stays.
+      const result = await callAction(async () => {
+        const r = await submitMoveInInspection(payload);
+        return r.ok ? { ok: true as const, data: undefined } : r;
+      });
       if (result.ok) setDone(true);
       else setError(result.error);
     });
@@ -218,7 +225,7 @@ export function MoveInForm({
       </div>
 
       {error && (
-        <p className="rounded-lg border border-[#e0796a]/25 bg-[#e0796a]/[0.08] px-3 py-2 text-xs text-[#e5a99b]">
+        <p role="alert" className="rounded-lg border border-[#e0796a]/25 bg-[#e0796a]/[0.08] px-3 py-2 text-xs text-[#e5a99b]">
           {error}
         </p>
       )}

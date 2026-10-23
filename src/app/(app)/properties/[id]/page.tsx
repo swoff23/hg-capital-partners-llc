@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { targetDate } from "@/lib/tasks/rules";
 import { Avatar } from "@/components/avatar";
 import { StatusBadge } from "@/components/status-badge";
-import { parseBuildingCapex, parseUnits, withUnitIds } from "@/lib/property-types";
+import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { BackLink } from "@/components/back-link";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
@@ -80,7 +80,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     photos: l.photos.map((p) => ({ url: p.url, pathname: p.pathname })),
   }));
 
-  const unitCount = units.length || property.unitCount || 0;
+  const unitCount = propertyUnitCount(property) ?? 0;
   const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
 
   // Each task's Target (D7: the visit date while Scheduled, otherwise Due), soonest first, as on Today.
