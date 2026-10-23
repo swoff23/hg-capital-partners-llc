@@ -40,7 +40,9 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 
 - [ ] Playbook timing: for NEW TENANT, NEW MOVE OUT and NEW REFI, when each step is due relative to the start date ("collect the deposit 3 days before move-in"). Until then you set dates on the review screen when you apply a playbook.
 - [ ] Look at the new screens on a computer: Today, All, the task page, playbooks and a contractor's page.
-- [ ] The UI/UX review session will send you brand guidelines (fonts, colors, status colors) to approve before anything changes.
+- [ ] Look at the brand proposal ([preview](https://claude.ai/artifact/XKYY2B8qpQ1amVDBwDPbQa), [docs/brand-guidelines.md](brand-guidelines.md)) and [Home as Today](home-as-today.md), then say "build it" or what to change. Nothing changes until you do.
+
+- [ ] In Vercel, turn on Skew Protection (Project Settings, Advanced). Now that you're on Pro, it keeps a page that was open during a deploy talking to the version it loaded, instead of failing its next save.
 
 ## Small calls (no rush)
 

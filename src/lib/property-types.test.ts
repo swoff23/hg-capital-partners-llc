@@ -10,6 +10,7 @@ import {
   portfolioCapexForecast,
   isHouseMeterRow,
   propertyUnitCount,
+  rentableUnitLabels,
   reconcileUnits,
   renamedLabel,
   UTILITY_STATUS_FIELDS,
@@ -41,6 +42,15 @@ test("isHouseMeterRow: only the building's own meters, never a real unit", () =>
   for (const label of ["Rear house", "Front", "Unit 1", "1st Rear / Apt #3", "", null, undefined]) {
     assert.equal(isHouseMeterRow({ label }), false, String(label));
   }
+});
+
+test("rentableUnitLabels: rentable units only, trimmed, each once", () => {
+  assert.deepEqual(
+    rentableUnitLabels([{ label: " Lower " }, { label: "Upper" }, { label: "HSE (house)" }, { label: "" }, { label: null }, { label: "Upper" }]),
+    ["Lower", "Upper"],
+  );
+  assert.deepEqual(rentableUnitLabels(null), []);
+  assert.deepEqual(rentableUnitLabels("junk"), []);
 });
 
 test("propertyUnitCount: the unit records, less house meters; the stored number only without records", () => {

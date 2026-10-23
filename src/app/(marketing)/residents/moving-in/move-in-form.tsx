@@ -36,11 +36,14 @@ export function MoveInForm({
   properties,
 }: {
   schema: MoveInFormSchema;
-  properties: { id: string; address: string }[];
+  properties: { id: string; address: string; units: string[] }[];
 }) {
   const [tenantName, setTenantName] = useState("");
   const [inspectionDate, setInspectionDate] = useState(() => todayYmd());
   const [propertyId, setPropertyId] = useState("");
+  const [unitLabel, setUnitLabel] = useState("");
+  // Ask for the unit only where there's a choice; a one-unit property sends its unit.
+  const units = properties.find((p) => p.id === propertyId)?.units ?? [];
   const [sections, setSections] = useState<SectionAnswers>(() => initialSections(schema));
   const [additionalComments, setAdditionalComments] = useState("");
   const [submitterName, setSubmitterName] = useState("");
@@ -89,6 +92,7 @@ export function MoveInForm({
         tenantName,
         inspectionDate,
         propertyId,
+        unitLabel: units.length === 1 ? units[0] : unitLabel || undefined,
         sections: schema.sections.map((s) => ({
           sectionKey: s.key,
           instances: sections[s.key].map((inst) => ({
@@ -165,7 +169,10 @@ export function MoveInForm({
           <select
             required
             value={propertyId}
-            onChange={(e) => setPropertyId(e.target.value)}
+            onChange={(e) => {
+              setPropertyId(e.target.value);
+              setUnitLabel("");
+            }}
             className={`mt-1.5 ${inputClass}`}
           >
             <option value="" disabled className="bg-[#0d0f13]">
@@ -178,6 +185,26 @@ export function MoveInForm({
             ))}
           </select>
         </label>
+        {units.length > 1 && (
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Unit</span>
+            <select
+              required
+              value={unitLabel}
+              onChange={(e) => setUnitLabel(e.target.value)}
+              className={`mt-1.5 ${inputClass}`}
+            >
+              <option value="" disabled className="bg-[#0d0f13]">
+                Select your unit
+              </option>
+              {units.map((u) => (
+                <option key={u} value={u} className="bg-[#0d0f13]">
+                  {u}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {schema.sections.map((section) => (

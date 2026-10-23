@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern } from "@/lib/dates";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
+import { rentableUnitLabels } from "@/lib/property-types";
 import { withResult } from "@/lib/server-action";
 import { createTask, systemPrincipal } from "@/lib/tasks/service";
 import { headers } from "next/headers";
@@ -37,6 +38,7 @@ const submissionSchema = z.object({
   tenantName: z.string().trim().min(1).max(120),
   inspectionDate: z.string().max(20),
   propertyId: z.string().min(1).max(40),
+  unitLabel: z.string().trim().max(80).optional(),
   sections: z.array(sectionAnswer).max(20),
   additionalComments: z.string().max(2000).optional(),
   submitterName: z.string().trim().min(1).max(120),
@@ -69,9 +71,21 @@ async function submitMoveInInspectionBody(
 
   const property = await prisma.property.findUnique({
     where: { id: p.propertyId },
-    select: { id: true, address: true },
+    select: { id: true, address: true, units: true },
   });
   if (!property) return { ok: false, error: "Please select a valid property." };
+
+  // The unit, so staff don't have to work it out from the lease: one of the
+  // property's rentable units (the same list the form offered), matched the
+  // way tasks and lockbox codes match labels. The form requires it where
+  // there's a choice; a page loaded before this field existed sends none,
+  // and that report still goes through without a unit.
+  const units = rentableUnitLabels(property.units);
+  const unit =
+    units.length === 1
+      ? units[0]
+      : units.find((u) => u.toLowerCase() === (p.unitLabel ?? "").trim().toLowerCase()) ?? null;
+  if (units.length > 1 && p.unitLabel && !unit) return { ok: false, error: "Please select your unit." };
 
   const schema = await getMoveInFormSchema();
   const sectionByKey = new Map(schema.sections.map((s) => [s.key, s]));
@@ -80,6 +94,7 @@ async function submitMoveInInspectionBody(
   lines.push(`Tenant: ${p.tenantName}`);
   lines.push(`Inspection date: ${p.inspectionDate}`);
   lines.push(`Property: ${property.address}`);
+  if (unit) lines.push(`Unit: ${unit}`);
   lines.push("");
 
   for (const sec of p.sections) {
@@ -110,9 +125,10 @@ async function submitMoveInInspectionBody(
   // late the next day instead of sinking among the undated rows.
   await createTask(
     {
-      title: `Move-in inspection for ${p.tenantName} at ${property.address}`,
+      title: `Move-in inspection for ${p.tenantName} at ${property.address}${unit ? `, ${unit}` : ""}`,
       description: lines.join("\n"),
       propertyId: property.id,
+      unitLabel: unit,
       dueDate: todayYmdEastern(),
     },
     systemPrincipal("Move-in form"), // public submission; nobody signed in to attribute it to

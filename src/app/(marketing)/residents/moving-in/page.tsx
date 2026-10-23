@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
+import { rentableUnitLabels } from "@/lib/property-types";
 import { MoveInForm } from "./move-in-form";
 
 export const metadata: Metadata = {
@@ -76,10 +77,12 @@ const CHECKLIST = [
 ];
 
 export default async function MovingInPage() {
-  const [schema, properties] = await Promise.all([
+  const [schema, rows] = await Promise.all([
     getMoveInFormSchema(),
-    prisma.property.findMany({ select: { id: true, address: true }, orderBy: { address: "asc" } }),
+    prisma.property.findMany({ select: { id: true, address: true, units: true }, orderBy: { address: "asc" } }),
   ]);
+  // Only unit labels reach this public page; lockbox codes and utility accounts never leave the server.
+  const properties = rows.map((p) => ({ id: p.id, address: p.address, units: rentableUnitLabels(p.units) }));
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-16 sm:px-10">

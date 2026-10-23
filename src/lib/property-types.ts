@@ -78,6 +78,15 @@ export function countUnitRecords(units: readonly PropertyUnit[]): number {
   return units.filter((u) => !isHouseMeterRow(u)).length;
 }
 
+/** The labels a resident or a form can pick from: rentable units only, trimmed, each once. */
+export function rentableUnitLabels(units: unknown): string[] {
+  const labels = parseUnits(units)
+    .filter((u) => !isHouseMeterRow(u))
+    .map((u) => u.label?.trim() ?? "")
+    .filter(Boolean);
+  return [...new Set(labels)];
+}
+
 /* ---------------- Unit ids and renames (G2C-001) ---------------- */
 
 /**
