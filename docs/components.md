@@ -132,7 +132,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Task file URL | `lib/attachments/media.ts` `taskFileUrl` | `/api/files/task/<id>`, with `?v=thumb` or `?v=poster` |
 | File size | `lib/utils.ts` `formatBytes` | |
 | Address | `lib/normalize.ts` `shortAddress`, `normalizeAddress` | |
-| Same building typed two ways | `lib/normalize.ts` `sameStreetAddress`, `streetKey` | House number, direction and street name; two different ZIPs never match. The deal duplicate check |
+| Same building typed two ways | `lib/normalize.ts` `sameStreetAddress`, `streetKey` | House number, direction and street name; two different street types, ZIPs or (without two ZIPs) towns never match. The deal duplicate check |
 
 ## Duplicates
 

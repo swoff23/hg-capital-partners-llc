@@ -34,13 +34,84 @@ const DIRECTIONS = ["north", "south", "east", "west"];
 /** "w" or "west" is "west"; anything else is undefined. */
 const direction = (t: string | undefined) => DIRECTIONS.find((d) => t === d || t === d[0]);
 
-// Street-type words as they read after normalizeAddress, which already turns
-// avenue, street, drive and road into ave, st, dr and rd.
-const STREET_TYPES = new Set([
-  "ave", "av", "st", "dr", "rd", "blvd", "boulevard", "pkwy", "parkway", "pky",
-  "pl", "place", "ct", "court", "ln", "lane", "ter", "terrace", "way", "cir",
-  "circle", "hwy", "highway", "sq", "square", "trl", "trail", "aly", "alley", "row", "expy",
+// Street-type words as they read after normalizeAddress (which already turns
+// avenue, street, drive and road into ave, st, dr and rd), each mapped to one
+// spelling so "Parkway" and "Pkwy" agree.
+const STREET_TYPES = new Map<string, string>([
+  ["ave", "ave"], ["av", "ave"], ["st", "st"], ["dr", "dr"], ["rd", "rd"],
+  ["blvd", "blvd"], ["boulevard", "blvd"], ["pkwy", "pkwy"], ["parkway", "pkwy"], ["pky", "pkwy"],
+  ["pl", "pl"], ["place", "pl"], ["ct", "ct"], ["court", "ct"], ["ln", "ln"], ["lane", "ln"],
+  ["ter", "ter"], ["terrace", "ter"], ["way", "way"], ["cir", "cir"], ["circle", "cir"],
+  ["hwy", "hwy"], ["highway", "hwy"], ["sq", "sq"], ["square", "sq"], ["trl", "trl"], ["trail", "trl"],
+  ["aly", "aly"], ["alley", "aly"], ["row", "row"], ["expy", "expy"],
 ]);
+
+// Unit words that take an identifier after them ("apt 2", "unit b"), and ones
+// that stand alone ("upper"). Neither is part of the town.
+const UNIT_WORDS = new Set(["apt", "apartment", "unit", "ste", "suite", "fl", "floor", "rm", "room", "bldg", "building"]);
+const UNIT_SPOTS = new Set(["upper", "lower", "upr", "lwr", "rear", "front", "basement"]);
+
+/** The town words left over after the street: no units, numbers, state or ZIP. */
+function townName(words: string[]): string | null {
+  const kept: string[] = [];
+  for (let j = 0; j < words.length; j++) {
+    const w = words[j];
+    if (UNIT_WORDS.has(w)) {
+      j++;
+      continue;
+    }
+    const next = words[j + 1];
+    if ((w === "new" && next === "york") || (w === "n" && next === "y")) {
+      j++;
+      continue;
+    }
+    if (/\d/.test(w) || UNIT_SPOTS.has(w) || w === "ny" || w === "usa") continue;
+    const d = direction(w);
+    if (w.length === 1 && !d) continue;
+    kept.push(d ?? w);
+  }
+  return kept.length ? kept.join(" ") : null;
+}
+
+interface StreetParts {
+  key: string;
+  /** The street type in one spelling, when the address names one. */
+  type: string | null;
+  /** The town, when the address names one. */
+  town: string | null;
+}
+
+function streetParts(raw: string | null | undefined): StreetParts {
+  const n = normalizeAddress(raw);
+  const whole = { key: n, type: null, town: null };
+  // Words tagged with the comma-separated part they came from, so a town after
+  // a comma reads as a town even when the street has no type.
+  const words = (raw ?? "")
+    .toString()
+    .split(/[,\n]/)
+    .flatMap((p, part) => normalizeAddress(p).split(" ").filter(Boolean).map((word) => ({ word, part })));
+  const tokens = words.map((w) => w.word);
+  const num = tokens[0]?.match(/^(\d+[a-z]?)(?:[/-]\d+[a-z]?)?$/);
+  if (!num) return whole;
+  let i = 1;
+  let dir = "";
+  // "West" is a direction in "West Delavan Ave" and the name in "West Ave".
+  const lead = direction(tokens[1]);
+  if (lead && tokens[2] && !STREET_TYPES.has(tokens[2])) {
+    dir = lead[0];
+    i = 2;
+  }
+  if (!tokens[i]) return whole;
+  const name = [direction(tokens[i]) ?? tokens[i]];
+  const end = tokens.findIndex((t, j) => j > i && STREET_TYPES.has(t));
+  if (end > 0) name.push(...tokens.slice(i + 1, end));
+  const rest = end > 0 ? words.slice(end + 1) : words.filter((w) => w.part > words[i].part);
+  return {
+    key: [num[1], dir, ...name].filter(Boolean).join(" "),
+    type: end > 0 ? (STREET_TYPES.get(tokens[end]) ?? null) : null,
+    town: townName(rest.map((w) => w.word)),
+  };
+}
 
 /**
  * House number, direction and street name, for catching one building typed
@@ -52,23 +123,7 @@ const STREET_TYPES = new Set([
  * that doesn't start with a number keys as its whole normalized self.
  */
 export function streetKey(raw: string | null | undefined): string {
-  const n = normalizeAddress(raw);
-  const tokens = n.split(" ");
-  const num = tokens[0].match(/^(\d+[a-z]?)(?:[/-]\d+[a-z]?)?$/);
-  if (!num) return n;
-  let i = 1;
-  let dir = "";
-  // "West" is a direction in "West Delavan Ave" and the name in "West Ave".
-  const lead = direction(tokens[1]);
-  if (lead && tokens[2] && !STREET_TYPES.has(tokens[2])) {
-    dir = lead[0];
-    i = 2;
-  }
-  if (!tokens[i]) return n;
-  const name = [direction(tokens[i]) ?? tokens[i]];
-  const end = tokens.findIndex((t, j) => j > i && STREET_TYPES.has(t));
-  if (end > 0) name.push(...tokens.slice(i + 1, end));
-  return [num[1], dir, ...name].filter(Boolean).join(" ");
+  return streetParts(raw).key;
 }
 
 /** The ZIP code, when one follows the house number. */
@@ -82,14 +137,19 @@ function zipCode(raw: string | null | undefined): string | null {
 }
 
 /**
- * Whether two typed addresses are the same building: the same streetKey and
- * not two different ZIP codes. "Avenue" or "Ave", punctuation, and a missing
- * city, state or ZIP don't matter.
+ * Whether two typed addresses are the same building: the same streetKey, and
+ * nothing that both name disagrees. Two street types must match ("Pkwy" is
+ * "Parkway", St isn't Ave). Two ZIPs decide on their own; without two ZIPs,
+ * two named towns must match. "Avenue" or "Ave", punctuation, units, and a
+ * missing type, town, state or ZIP don't count against.
  */
 export function sameStreetAddress(a: string | null | undefined, b: string | null | undefined): boolean {
-  const key = streetKey(a);
-  if (!key || key !== streetKey(b)) return false;
+  const pa = streetParts(a);
+  const pb = streetParts(b);
+  if (!pa.key || pa.key !== pb.key) return false;
+  if (pa.type && pb.type && pa.type !== pb.type) return false;
   const za = zipCode(a);
   const zb = zipCode(b);
-  return !za || !zb || za === zb;
+  if (za && zb) return za === zb;
+  return !pa.town || !pb.town || pa.town === pb.town;
 }

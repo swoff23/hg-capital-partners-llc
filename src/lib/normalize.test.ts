@@ -63,6 +63,23 @@ test("sameStreetAddress: one building typed two ways", () => {
   assert.equal(sameStreetAddress("100 Main St, Buffalo, NY 14201", "100 Main St, Williamsville, NY 14221"), false);
   assert.ok(sameStreetAddress("100 Main St, Buffalo, NY 14201", "100 Main St"));
   assert.ok(sameStreetAddress("100 Main St 14201-1234", "100 Main St Buffalo 14201"));
+  // Two street types must agree, in any spelling.
+  assert.equal(sameStreetAddress("100 Main St", "100 Main Ave"), false);
+  assert.equal(sameStreetAddress("100 Delaware Ave, Buffalo, NY 14202", "100 Delaware Rd, Kenmore"), false);
+  assert.equal(sameStreetAddress("100 Main St 14201", "100 Main Ave 14201"), false);
+  assert.ok(sameStreetAddress("893 Columbus Parkway", "893 Columbus Pkwy, Buffalo"));
+  assert.ok(sameStreetAddress("12 Oak Ct", "12 Oak Court"));
+  assert.ok(sameStreetAddress("12 Oak Av", "12 Oak Avenue"));
+  // Without two ZIPs, two named towns must agree.
+  assert.equal(sameStreetAddress("100 Main St, Buffalo", "100 Main St, Williamsville"), false);
+  assert.equal(sameStreetAddress("100 Main St, Buffalo, NY 14201", "100 Main St Williamsville"), false);
+  assert.equal(sameStreetAddress("352 Auburn, Buffalo", "352 Auburn, Kenmore"), false);
+  assert.ok(sameStreetAddress("100 Main St, Buffalo", "100 Main St Buffalo NY"));
+  assert.ok(sameStreetAddress("100 Main St Apt 2, Buffalo, N.Y.", "100 Main Street Upper, Buffalo, New York"));
+  assert.ok(sameStreetAddress("100 Main St, N Tonawanda", "100 Main St, North Tonawanda, NY"));
+  assert.ok(sameStreetAddress("100 Main St, West Seneca", "100 Main St"));
+  // Matching ZIPs decide, even when the towns are written differently.
+  assert.ok(sameStreetAddress("100 Main St, Amherst, NY 14221", "100 Main St, Williamsville, NY 14221"));
   // A five-digit house number isn't a ZIP.
   assert.ok(sameStreetAddress("10450 Main St", "10450 Main Street, Clarence"));
   // No number: only an exact (normalized) match.

@@ -32,8 +32,9 @@ function revalidateDeal(id: string): void {
 
 /**
  * The existing deal this address would duplicate, or null: the same house
- * number and street however it was typed (see sameStreetAddress), newest
- * first. The house number narrows the rows; the street match is done here.
+ * number and street however it was typed, with no street type, ZIP or town
+ * that disagrees (see sameStreetAddress), newest first. The house number
+ * narrows the rows; the street match is done here.
  */
 export async function findDuplicateDeal(address: string): Promise<Deal | null> {
   const lead = streetKey(address).split(" ")[0];
