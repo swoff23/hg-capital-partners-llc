@@ -1,6 +1,6 @@
 # Brand rollout: where it stands
 
-Paused Oct 23, 2026 at Connor's request (out of credits). Connor said "build it" for docs/brand-guidelines.md and docs/home-as-today.md the same day. Branch: `claude/app-uiux-review-mobbin-e2e22f`, pushed to GitHub. Nothing from the brand is on main or in production yet. Main has fix batch 2 (fa4c400).
+Paused Oct 23, 2026 at Connor's request (out of credits). Connor said "build it" for docs/brand-guidelines.md and docs/home-as-today.md the same day. Branch: `claude/app-uiux-review-mobbin-e2e22f`, pushed to GitHub. At Connor's request, slices 1 and 2 went to main and production that night (fd1391f), so the live app is partly old and partly new until the page slices land. Everything after fd1391f is only on the branch.
 
 ## Done on the branch
 
