@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { getConnection } from "@/lib/quickbooks/client";
 import { qbo } from "@/lib/quickbooks/config";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
-import { oauthReturnLine } from "@/lib/quickbooks/notices";
+import type { QboBasis } from "@prisma/client";
+import { oauthReturnLine, reconcileGap, reconcileLine } from "@/lib/quickbooks/notices";
 import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { fmtCents } from "../_components/ui";
@@ -189,7 +190,7 @@ export default async function FinancialsSettingsPage({
                 note="map these below or that property's income is dropped"
               />
             )}
-            {lastRun?.stats != null && <ReconSummary stats={lastRun.stats} />}
+            {lastRun?.stats != null && <ReconSummary stats={lastRun.stats} basis={conn.accountingMethod} />}
           </CardBody>
         </Card>
       )}
@@ -275,21 +276,21 @@ function DqRow({
   );
 }
 
-function ReconSummary({ stats }: { stats: unknown }) {
+/**
+ * The basis these figures are on comes first. The other basis shows only when
+ * it doesn't tie, so a ?basis= override banner on the Overview is explained too.
+ */
+function ReconSummary({ stats, basis }: { stats: unknown; basis: QboBasis }) {
   const recon =
-    typeof stats === "object" && stats
-      ? ((stats as Record<string, unknown>).reconciliation as Record<string, unknown> | undefined)
-      : undefined;
-  const cash = recon?.CASH as
-    | { sumToWhole?: { ok?: boolean; deltaCents?: number }; noiVsQbo?: { ok?: boolean; residualCents?: number }; cellMismatches?: unknown[] }
-    | undefined;
-  if (!cash) return null;
-  return (
-    <div className="pt-1 text-[11px] text-muted">
-      Cash reconciliation: sum-to-whole {cash.sumToWhole?.ok ? "✓" : `off by ${fmtCents(cash.sumToWhole?.deltaCents ?? 0)}`}
-      {" · "}NOI vs QBO {cash.noiVsQbo?.ok ? "✓" : `off by ${fmtCents(cash.noiVsQbo?.residualCents ?? 0)}`}
-      {" · "}
-      {(cash.cellMismatches?.length ?? 0) === 0 ? "no cell mismatches" : `${cash.cellMismatches?.length} cell mismatches`}
+    typeof stats === "object" && stats ? (stats as Record<string, unknown>).reconciliation : undefined;
+  const other: QboBasis = basis === "CASH" ? "ACCRUAL" : "CASH";
+  const lines = [
+    reconcileLine(recon, basis),
+    reconcileGap(recon, other).kind === "ok" ? null : reconcileLine(recon, other),
+  ].filter((l): l is string => l != null);
+  return lines.map((line) => (
+    <div key={line} className="pt-1 text-[11px] text-muted">
+      {line}
     </div>
-  );
+  ));
 }

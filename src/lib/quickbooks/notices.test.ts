@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { oauthReturnLine, partialSyncLine, reconcileGap } from "./notices";
+import { oauthReturnLine, partialSyncLine, reconcileGap, reconcileLine } from "./notices";
 
 const tied = {
   sumToWhole: { ok: true, deltaCents: 0 },
@@ -88,4 +88,40 @@ test("oauthReturnLine: one line per way the Intuit round trip ends", () => {
   }
   // an error wins over a stray connected flag
   assert.equal(oauthReturnLine({ connected: "1", error: ["access_denied"] })?.text, "Connection cancelled. Nothing changed.");
+});
+
+test("reconcileLine: the review's case, Accrual NOI $50 off while Cash ties", () => {
+  const rec = { CASH: tied, ACCRUAL: { ...tied, noiVsQbo: { ok: false, residualCents: -5_000 } } };
+  assert.equal(
+    reconcileLine(rec, "ACCRUAL"),
+    "Accrual reconciliation: NOI off by $50 · net income ✓ · account totals ✓",
+  );
+  assert.equal(reconcileLine(rec, "CASH"), "Cash reconciliation: NOI ✓ · net income ✓ · account totals ✓");
+});
+
+test("reconcileLine: names what the banner names, net income from either check", () => {
+  const whole = { CASH: { ...tied, sumToWhole: { ok: false, deltaCents: 12_345 } } };
+  assert.equal(
+    reconcileLine(whole, "CASH"),
+    "Cash reconciliation: NOI ✓ · net income off by $123 · account totals ✓",
+  );
+  const identity = { CASH: { ...tied, netIncomeIdentity: { ok: false, deltaCents: -40 } } };
+  assert.equal(
+    reconcileLine(identity, "CASH"),
+    "Cash reconciliation: NOI ✓ · net income off by under $1 · account totals ✓",
+  );
+  assert.equal(
+    reconcileLine({ CASH: { ...tied, cellMismatches: [{}] } }, "CASH"),
+    "Cash reconciliation: NOI ✓ · net income ✓ · 1 account total doesn't match",
+  );
+  assert.equal(
+    reconcileLine({ CASH: { ...tied, cellMismatches: [{}, {}, {}] } }, "CASH"),
+    "Cash reconciliation: NOI ✓ · net income ✓ · 3 account totals don't match",
+  );
+});
+
+test("reconcileLine: null when the run has no reconciliation for the basis", () => {
+  assert.equal(reconcileLine({ CASH: tied }, "ACCRUAL"), null);
+  assert.equal(reconcileLine({}, "CASH"), null);
+  assert.equal(reconcileLine(null, "CASH"), null);
 });

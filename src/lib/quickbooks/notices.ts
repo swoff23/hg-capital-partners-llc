@@ -72,6 +72,44 @@ export function partialSyncLine(gap: ReconcileGap, asOf: string): string | null 
   }
 }
 
+const BASIS_LABEL: Record<QboBasis, string> = { CASH: "Cash", ACCRUAL: "Accrual" };
+
+const offByShort = (cents: number) =>
+  Math.abs(cents) < 100 ? "off by under $1" : `off by ${fmtMoney(Math.abs(cents) / 100)}`;
+
+/**
+ * The reconciliation line on Settings for one basis. It names the same three
+ * checks as the Overview banner (NOI, net income, account totals), so the
+ * banner's Review link lands on the gap it named. null when the run has no
+ * reconciliation for this basis.
+ */
+export function reconcileLine(reconciliation: unknown, basis: QboBasis): string | null {
+  const r =
+    reconciliation && typeof reconciliation === "object"
+      ? (reconciliation as Record<string, unknown>)[basis]
+      : null;
+  if (!r || typeof r !== "object") return null;
+  const rc = r as Record<string, unknown>;
+
+  const noi = asCheck(rc.noiVsQbo);
+  const whole = asCheck(rc.sumToWhole);
+  const identity = asCheck(rc.netIncomeIdentity);
+  const netOff =
+    whole?.ok === false ? (whole.deltaCents ?? 0) : identity?.ok === false ? (identity.deltaCents ?? 0) : null;
+  const cells = Array.isArray(rc.cellMismatches) ? rc.cellMismatches.length : 0;
+
+  const parts = [
+    noi?.ok === false ? `NOI ${offByShort(noi.residualCents ?? 0)}` : "NOI ✓",
+    netOff == null ? "net income ✓" : `net income ${offByShort(netOff)}`,
+    cells === 0
+      ? "account totals ✓"
+      : cells === 1
+        ? "1 account total doesn't match"
+        : `${cells} account totals don't match`,
+  ];
+  return `${BASIS_LABEL[basis]} reconciliation: ${parts.join(" · ")}`;
+}
+
 export interface OAuthReturnLine {
   tone: "info" | "error";
   text: string;
