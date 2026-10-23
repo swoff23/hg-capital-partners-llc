@@ -8,7 +8,7 @@ import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
 import { parseBuildingCapex, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
 import { CONFLICT_MESSAGE } from "@/lib/action-result";
-import { deleteOpenAutoTask, upsertAutoTask } from "@/lib/tasks/service";
+import { cancelOpenAutoTask, upsertAutoTask } from "@/lib/tasks/service";
 
 /**
  * Property domain: every write to Property / PropertyAttachment / Listing
@@ -150,7 +150,7 @@ export async function syncPropertyReminders(propertyId: string): Promise<void> {
     const autoKey = `${propertyId}:${r.slug}`;
     const date = p[r.field];
     if (date) await upsertAutoTask(autoKey, propertyId, r.title(date), new Date(date.getTime() - r.leadDays * 86_400_000));
-    else await deleteOpenAutoTask(autoKey);
+    else await cancelOpenAutoTask(autoKey);
   }
   revalidatePath("/tasks");
   revalidatePath("/");

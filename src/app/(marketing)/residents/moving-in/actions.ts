@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { withResult } from "@/lib/server-action";
-import { createTask } from "@/lib/tasks/service";
+import { createTask, systemPrincipal } from "@/lib/tasks/service";
 import { headers } from "next/headers";
 import { clientIp, RateLimiter } from "@/lib/rate-limit";
 
@@ -110,7 +110,7 @@ async function submitMoveInInspectionBody(
       description: lines.join("\n"),
       propertyId: property.id,
     },
-    null, // public submission — nobody to attribute it to
+    systemPrincipal("Move-in form"), // public submission; nobody signed in to attribute it to
   );
 
   return { ok: true };

@@ -16,6 +16,7 @@
     "db:reset": "prisma migrate reset",
     "db:dev-passwords": "tsx --env-file=.env scripts/dev-reset-passwords.ts",
     "migrate": "tsx scripts/migrate/run.ts",
+    "asana:snapshot": "tsx --env-file=.env scripts/asana/10-snapshot.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

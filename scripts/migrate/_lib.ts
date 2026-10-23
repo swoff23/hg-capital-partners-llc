@@ -1,5 +1,5 @@
 /**
- * Shared helpers for the one-time migration of the HG Master Database + Asana export.
+ * Shared helpers for the one-time migration of the HG Master Database spreadsheet.
  * Source files live in ../_private (gitignored). Nothing here is used by the app runtime.
  */
 import path from "node:path";
@@ -10,7 +10,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(__dirname, "../..");
 export const PRIVATE_DIR = path.join(REPO_ROOT, "_private");
 export const XLSX_PATH = path.join(PRIVATE_DIR, "HG Master Database.xlsx");
-export const ASANA_CSV_PATH = path.join(PRIVATE_DIR, "HG_Capital.csv");
 
 /** Load a worksheet as an array of row objects keyed by column letter (A, B, C, ...). */
 export async function readSheet(

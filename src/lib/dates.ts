@@ -66,20 +66,43 @@ export function todayYmd(now: Date = new Date()): Ymd {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+/** HG works on Buffalo time. */
+export const HG_TIME_ZONE = "America/New_York";
+
+/**
+ * Today's calendar date in Buffalo, wherever the code runs. Server code that
+ * decides "today" or "overdue" (task lists, emails, crons) must use this:
+ * todayYmd() on Vercel is UTC, which rolls over at 8pm Eastern.
+ */
+export function todayYmdEastern(now: Date = new Date()): Ymd {
+  const get = (type: string) =>
+    new Intl.DateTimeFormat("en-US", { timeZone: HG_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(now)
+      .find((p) => p.type === type)!.value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 function epochDays(v: Ymd): number {
   const p = parts(v)!;
   return Date.UTC(p.y, p.m - 1, p.d) / 86_400_000;
 }
 
+/**
+ * "Now" for the helpers below: an instant (read as the local calendar date,
+ * see todayYmd) or an explicit "YYYY-MM-DD" such as todayYmdEastern().
+ */
+type Now = Date | Ymd;
+const todayOf = (now: Now): Ymd => (typeof now === "string" ? now : todayYmd(now));
+
 /** Whole days from today until `v` (negative = past). Null when `v` is blank/invalid. */
-export function daysUntil(v: Date | string | null | undefined, now: Date = new Date()): number | null {
+export function daysUntil(v: Date | string | null | undefined, now: Now = new Date()): number | null {
   const y = toYmd(v);
   if (!y) return null;
-  return epochDays(y) - epochDays(todayYmd(now));
+  return epochDays(y) - epochDays(todayOf(now));
 }
 
 /** Strictly before today. False for blank/invalid. */
-export function isPastDay(v: Date | string | null | undefined, now: Date = new Date()): boolean {
+export function isPastDay(v: Date | string | null | undefined, now: Now = new Date()): boolean {
   const d = daysUntil(v, now);
   return d != null && d < 0;
 }
@@ -87,12 +110,12 @@ export function isPastDay(v: Date | string | null | undefined, now: Date = new D
 /** "Mar 1, 2026" — never shifts by timezone. "—" for blank/invalid. */
 export function fmtDay(
   v: Date | string | null | undefined,
-  opts: { year?: "always" | "auto"; now?: Date } = {},
+  opts: { year?: "always" | "auto"; now?: Now } = {},
 ): string {
   const y = toYmd(v);
   if (!y) return "—";
   const p = parts(y)!;
-  const showYear = opts.year !== "auto" || p.y !== (opts.now ?? new Date()).getFullYear();
+  const showYear = opts.year !== "auto" || p.y !== Number(todayOf(opts.now ?? new Date()).slice(0, 4));
   return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", {
     timeZone: "UTC",
     month: "short",
@@ -102,7 +125,7 @@ export function fmtDay(
 }
 
 /** "today" / "tomorrow" / "yesterday" / "3d ago" / "in 3d". "" for blank/invalid. */
-export function relativeDays(v: Date | string | null | undefined, now: Date = new Date()): string {
+export function relativeDays(v: Date | string | null | undefined, now: Now = new Date()): string {
   const days = daysUntil(v, now);
   if (days == null) return "";
   if (days === 0) return "today";
@@ -113,22 +136,26 @@ export function relativeDays(v: Date | string | null | undefined, now: Date = ne
 }
 
 /**
- * Due-date label: anything overdue → "yesterday"; due today → "today"; within
- * the next week → the weekday name; further out → the calendar date (year
- * shown only when it isn't the current one). "" for blank/invalid.
+ * Due-date label. Overdue: "yesterday", then "3d late" up to a week, then the
+ * calendar date (so a task 40 days late doesn't read like one a day late).
+ * Due today → "today"; within the next week → the weekday name; further out →
+ * the calendar date (year shown only when it isn't the current one). "" for
+ * blank/invalid.
  */
-export function dueLabel(v: Date | string | null | undefined, now: Date = new Date()): string {
+export function dueLabel(v: Date | string | null | undefined, now: Now = new Date()): string {
   const y = toYmd(v);
   if (!y) return "";
-  const days = daysUntil(y, now)!;
-  if (days < 0) return "yesterday";
+  const today = todayOf(now);
+  const days = daysUntil(y, today)!;
+  if (days === -1) return "yesterday";
+  if (days < 0 && days > -7) return `${-days}d late`;
   if (days === 0) return "today";
   const p = parts(y)!;
-  if (days < 7) {
+  if (days > 0 && days < 7) {
     return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", {
       timeZone: "UTC",
       weekday: "long",
     });
   }
-  return fmtDay(y, { year: "auto", now });
+  return fmtDay(y, { year: "auto", now: today });
 }

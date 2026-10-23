@@ -16,7 +16,7 @@ import { SortHeader } from "./sort-header";
 import { TaskRow } from "./task-row";
 import { shortAddress } from "@/lib/normalize";
 import { toYmd } from "@/lib/dates";
-import { excludeTemplateTasks } from "@/lib/task-scope";
+import { activeTask, closedTask, excludeTemplateTasks } from "@/lib/task-scope";
 import type { Prisma } from "@prisma/client";
 
 type SP = {
@@ -79,7 +79,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
 
   const where: Prisma.TaskWhereInput = {
     ...excludeTemplateTasks,
-    ...(sp.status === "done" ? { status: "DONE" } : sp.status === "all" ? {} : { status: "OPEN" }),
+    ...(sp.status === "done" ? closedTask : sp.status === "all" ? {} : activeTask),
     ...ownerWhere,
     ...(sp.property ? { propertyId: sp.property } : {}),
     ...(sp.q ? { title: { contains: sp.q, mode: "insensitive" } } : {}),
@@ -107,8 +107,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
       },
     }),
     prisma.task.count({ where }),
-    prisma.task.count({ where: { status: "OPEN", ...excludeTemplateTasks } }),
-    prisma.task.count({ where: { status: "OPEN", assigneeUserId: user.id, ...excludeTemplateTasks } }),
+    prisma.task.count({ where: { ...activeTask, ...excludeTemplateTasks } }),
+    prisma.task.count({ where: { ...activeTask, assigneeUserId: user.id, ...excludeTemplateTasks } }),
     prisma.property.findMany({ select: { id: true, address: true }, orderBy: { address: "asc" } }),
     prisma.user.findMany({ select: { id: true, name: true, email: true } }),
     prisma.task.findMany({

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { daysUntil, dueLabel, fmtDay, isPastDay, relativeDays, todayYmd, toYmd, ymdToDate } from "./dates";
+import { daysUntil, dueLabel, fmtDay, isPastDay, relativeDays, todayYmd, todayYmdEastern, toYmd, ymdToDate } from "./dates";
 
 // A fixed "now": 2026-03-01 at 03:30 local. The assertions below must hold
 // whatever TZ the test process runs in — that is the point of the module.
@@ -65,11 +65,34 @@ test("relativeDays", () => {
 });
 
 test("dueLabel", () => {
-  assert.equal(dueLabel("2026-02-01", now), "yesterday"); // any overdue
+  assert.equal(dueLabel("2026-02-28", now), "yesterday");
+  assert.equal(dueLabel("2026-02-26", now), "3d late");
+  assert.equal(dueLabel("2026-02-23", now), "6d late");
+  assert.equal(dueLabel("2026-02-22", now), "Feb 22"); // a week or more late: the date
+  assert.equal(dueLabel("2026-02-01", now), "Feb 1");
+  assert.equal(dueLabel("2025-12-30", now), "Dec 30, 2025");
   assert.equal(dueLabel("2026-03-01", now), "today");
   assert.equal(dueLabel("2026-03-02", now), "Monday"); // 2026-03-02 is a Monday
   assert.equal(dueLabel("2026-03-07", now), "Saturday");
   assert.equal(dueLabel("2026-03-08", now), "Mar 8");
   assert.equal(dueLabel("2027-01-05", now), "Jan 5, 2027");
   assert.equal(dueLabel(null, now), "");
+});
+
+test("todayYmdEastern: Buffalo's date, not UTC's", () => {
+  // 11:30pm EDT on Oct 22 is already Oct 23 in UTC.
+  assert.equal(todayYmdEastern(new Date("2026-10-23T03:30:00Z")), "2026-10-22");
+  assert.equal(todayYmdEastern(new Date("2026-10-23T04:00:00Z")), "2026-10-23");
+  // After DST ends (Nov 1, 2026) Eastern is UTC-5.
+  assert.equal(todayYmdEastern(new Date("2026-11-02T04:30:00Z")), "2026-11-01");
+  assert.equal(todayYmdEastern(new Date("2026-11-02T05:00:00Z")), "2026-11-02");
+});
+
+test("helpers accept an explicit today (Ymd) instead of an instant", () => {
+  assert.equal(daysUntil("2026-10-25", "2026-10-22"), 3);
+  assert.equal(isPastDay("2026-10-21", "2026-10-22"), true);
+  assert.equal(relativeDays("2026-10-21", "2026-10-22"), "yesterday");
+  assert.equal(dueLabel("2026-10-19", "2026-10-22"), "3d late");
+  assert.equal(fmtDay("2026-12-05", { year: "auto", now: "2026-10-22" }), "Dec 5");
+  assert.equal(fmtDay("2027-01-05", { year: "auto", now: "2026-10-22" }), "Jan 5, 2027");
 });

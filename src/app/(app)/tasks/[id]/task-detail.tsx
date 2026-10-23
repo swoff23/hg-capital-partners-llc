@@ -248,7 +248,7 @@ export function AttachmentsSection({
   return (
     <Attachments
       kind="task"
-      items={attachments.map((a) => ({ id: a.id, filename: a.filename, size: a.size }))}
+      items={attachments.map((a) => ({ id: a.id, filename: a.filename, size: a.size ?? 0 }))}
       uploadPathPrefix={`tasks/${taskId}`}
       clientPayload={JSON.stringify({ taskId })}
       onRecord={(data) => recordTaskAttachment(taskId, data)}

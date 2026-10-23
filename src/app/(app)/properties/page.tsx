@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { Badge, Card, LinkButton, PageHeader, Table, Td, Th, EmptyState } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import { propertyStatusTone } from "@/lib/config";
+import { activeTask } from "@/lib/task-scope";
 
 export default async function PropertiesPage() {
   await requireUser();
@@ -14,7 +15,7 @@ export default async function PropertiesPage() {
 
   const openByProp = await prisma.task.groupBy({
     by: ["propertyId"],
-    where: { status: "OPEN", propertyId: { not: null } },
+    where: { ...activeTask, propertyId: { not: null } },
     _count: true,
   });
   const openMap = new Map(openByProp.map((r) => [r.propertyId, r._count]));
