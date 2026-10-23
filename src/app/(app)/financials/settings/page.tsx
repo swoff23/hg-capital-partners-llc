@@ -4,23 +4,33 @@ import { prisma } from "@/lib/db";
 import { getConnection } from "@/lib/quickbooks/client";
 import { qbo } from "@/lib/quickbooks/config";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
+import { oauthReturnLine } from "@/lib/quickbooks/notices";
 import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { fmtCents } from "../_components/ui";
 import { RefreshButton } from "../_components/refresh-button";
 import { ClassMappingTable, AccountCategoryTable } from "./tables";
-import { BasisToggle, DisconnectButton } from "./controls";
+import { BasisToggle, DisconnectButton, OAuthReturnNotice } from "./controls";
 
 export const dynamic = "force-dynamic";
 
-export default async function FinancialsSettingsPage() {
+const split = (s: { lineCount: number; inCents: number; outCents: number }) =>
+  `${s.lineCount} lines · ${fmtCents(s.inCents)} in · ${fmtCents(s.outCents)} out`;
+
+export default async function FinancialsSettingsPage({
+  searchParams,
+}: PageProps<"/financials/settings">) {
   await requireUser(); // here as well as in the layout, which doesn't gate every render
-  const conn = await getConnection();
+  const [conn, sp] = await Promise.all([getConnection(), searchParams]);
+  // /api/quickbooks/callback lands here with ?connected=1 or ?error=<code>
+  const oauth = oauthReturnLine({ connected: sp.connected, error: sp.error });
 
   if (!conn || conn.status === "REVOKED") {
     return (
       <Card>
         <CardBody className="space-y-3">
+          {/* the Connect button below is the retry */}
+          {oauth && <OAuthReturnNotice tone={oauth.tone} text={oauth.text} retryHref={null} />}
           <EmptyState>QuickBooks isn&apos;t connected.</EmptyState>
           {qbo.isConfigured() ? (
             <a
@@ -74,6 +84,13 @@ export default async function FinancialsSettingsPage() {
           <RefreshButton />
         </CardHeader>
         <CardBody className="space-y-2 text-sm">
+          {oauth && (
+            <OAuthReturnNotice
+              tone={oauth.tone}
+              text={oauth.text}
+              retryHref={oauth.retry && qbo.isConfigured() ? "/api/quickbooks/connect" : null}
+            />
+          )}
           <Row label="Status">
             <Badge tone={conn.status === "ACTIVE" ? "green" : "red"}>{conn.status}</Badge>
             {conn.status === "EXPIRED" && (
@@ -101,16 +118,19 @@ export default async function FinancialsSettingsPage() {
         </CardBody>
       </Card>
 
-      {dq && (
-        <Card>
+      {dq && overview && (
+        <Card id="cleanup">
           <CardHeader>
             <CardTitle>QuickBooks cleanup list</CardTitle>
           </CardHeader>
           <CardBody className="space-y-1.5 text-sm">
             <DqRow
               label="Unclassified lines"
-              value={`${fmtCents(dq.unclassed.cents)} · ${dq.unclassed.lineCount} lines`}
-              bad={Math.abs(dq.unclassed.cents) > 50_000 || dq.unclassed.lineCount > 3}
+              value={split(dq.unclassed)}
+              bad={
+                Math.abs(dq.unclassed.inCents) + Math.abs(dq.unclassed.outCents) > 50_000 ||
+                dq.unclassed.lineCount > 3
+              }
               note="assign a class in QuickBooks"
             />
             <DqRow
@@ -129,12 +149,21 @@ export default async function FinancialsSettingsPage() {
               value={`${fmtCents(dq.negativeReclass.grossCents)} · ${dq.negativeReclass.lineCount} lines`}
               bad={dq.negativeReclass.lineCount > 5}
             />
+            {/* the same figure as the Overview's "Not assigned to a property" row */}
             <DqRow
-              label="Unattributed (entity / General / no class)"
-              value={`${fmtCents(dq.unattributed.netCents)} net · +${fmtCents(dq.unattributed.incomeCents)} / −${fmtCents(dq.unattributed.expenseCents)}`}
+              label="Not assigned to a property"
+              value={`${fmtCents(overview.unassigned.incomeCents)} in · ${fmtCents(overview.unassigned.expenseCents)} out`}
               bad={false}
-              note="real cost, not attributable to a property"
+              note="map classes below"
             />
+            {dq.ignored.lineCount > 0 && (
+              <DqRow
+                label="Ignored classes"
+                value={split(dq.ignored)}
+                bad={false}
+                note="left out of every total"
+              />
+            )}
             <DqRow
               label="Owner-funded rent (P2P)"
               value={fmtCents(dq.ownerFundedCents)}
@@ -165,7 +194,7 @@ export default async function FinancialsSettingsPage() {
         </Card>
       )}
 
-      <Card className="overflow-hidden">
+      <Card id="class-mapping" className="overflow-hidden">
         <CardHeader>
           <CardTitle>Class → property mapping</CardTitle>
         </CardHeader>
@@ -184,7 +213,7 @@ export default async function FinancialsSettingsPage() {
         />
       </Card>
 
-      <Card className="overflow-hidden">
+      <Card id="account-categories" className="overflow-hidden">
         <CardHeader>
           <CardTitle>Account categories</CardTitle>
         </CardHeader>

@@ -3,7 +3,13 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { fmtDay } from "@/lib/dates";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { CATEGORY_LABELS } from "../../financials/_components/labels";
-import { fmtCents, MoneyBars, PartialLabel, SourceBadge } from "../../financials/_components/ui";
+import {
+  fmtCents,
+  MoneyBars,
+  PartialLabel,
+  SandboxNotice,
+  SourceBadge,
+} from "../../financials/_components/ui";
 
 /**
  * QuickBooks P&L for this property. Renders nothing when QuickBooks isn't
@@ -12,7 +18,7 @@ import { fmtCents, MoneyBars, PartialLabel, SourceBadge } from "../../financials
  * a card (so the gap is visible) with a link to fix the mapping.
  */
 export async function PropertyFinancialsCard({ propertyId }: { propertyId: string }) {
-  const data = await getPropertyFinancials(propertyId, "CASH");
+  const data = await getPropertyFinancials(propertyId); // the basis chosen in Financials → Settings
   if (!data || !data.connected) return null;
 
   if (!data.mapped) {
@@ -44,6 +50,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
       </CardHeader>
       <CardBody className="space-y-3">
         <SourceBadge basis={data.basis} syncedAt={data.lastSyncAt} />
+        {data.sandbox && <SandboxNotice />}
 
         <div className="grid grid-cols-3 gap-2 text-sm">
           <div>

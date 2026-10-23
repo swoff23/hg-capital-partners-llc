@@ -1,10 +1,46 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { disconnectQuickbooks, setAccountingMethod } from "./actions";
+
+/**
+ * How the Intuit sign-in ended (oauthReturnLine in lib/quickbooks/notices.ts).
+ * Strips ?connected / ?error once shown, so a reload doesn't repeat it;
+ * replaceState leaves the server-rendered line on screen and Next keeps its
+ * router in step.
+ */
+export function OAuthReturnNotice({
+  tone,
+  text,
+  retryHref,
+}: {
+  tone: "info" | "error";
+  text: string;
+  retryHref: string | null;
+}) {
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("connected");
+    url.searchParams.delete("error");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+  return (
+    <p className={cn("text-xs", tone === "error" ? "text-red-600 dark:text-red-400" : "text-muted")}>
+      {text}
+      {retryHref && (
+        <>
+          {" "}
+          <a href={retryHref} className="text-primary hover:underline">
+            Connect again
+          </a>
+        </>
+      )}
+    </p>
+  );
+}
 
 export function BasisToggle({ current }: { current: "CASH" | "ACCRUAL" }) {
   const router = useRouter();
