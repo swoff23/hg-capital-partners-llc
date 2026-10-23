@@ -95,6 +95,26 @@ export function monthsOfData(months: string[], opts: MonthsOfDataOpts = {}) {
   return { n: monthDiff(first, last) + 1, first, last };
 }
 
+/**
+ * A line's amount as money in (positive) or money out (negative). Stored
+ * amounts are positive for both income and expense, so a $1,350 rent deposit
+ * and a $1,350 repair look the same until the treatment signs them. A negative
+ * expense (a refund or reclass) comes out positive: money back in. EXCLUDED
+ * lines (transfers, principal, suspense) aren't money in or out, so they're 0.
+ */
+export function signedLineCents(treatment: QboTreatment, amountCents: number): number {
+  switch (treatment) {
+    case "OPERATING_INCOME":
+    case "NON_OPERATING":
+      return amountCents;
+    case "OPERATING_EXPENSE":
+    case "DEBT_INTEREST":
+      return -amountCents;
+    default:
+      return 0;
+  }
+}
+
 export function computeNoi(lines: ComputeLine[], opts: MonthsOfDataOpts = {}): NoiResult {
   let rent = 0;
   let otherIncome = 0;

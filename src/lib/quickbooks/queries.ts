@@ -1,5 +1,5 @@
 import "server-only";
-import type { QboBasis, QboCategory } from "@prisma/client";
+import type { QboBasis, QboCategory, QboTreatment } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getConnection } from "./client";
 import { computeNoi, type ComputeLine, type NoiResult } from "./compute";
@@ -174,15 +174,19 @@ export interface PropertyFinancials {
   connected: boolean;
   basis: QboBasis;
   mapped: boolean;
+  /** Any synced line at all is classed to this property (false: the figures would all be $0). */
+  hasLines: boolean;
   noi: NoiResult;
   expenseByCategory: { category: QboCategory; cents: number }[];
   monthly: { periodMonth: string; incomeCents: number; expenseCents: number }[];
+  /** The 8 latest money-in or money-out lines; EXCLUDED ones (transfers, principal) are left out. */
   recentLines: {
     txnDate: Date;
     txnType: string;
     name: string | null;
     accountName: string;
     className: string | null;
+    treatment: QboTreatment;
     amountCents: number;
   }[];
   lastSyncAt: Date | null;
@@ -200,15 +204,16 @@ export async function getPropertyFinancials(
     prisma.qboClass.findFirst({ where: { realmId: conn.realmId, propertyId, role: "PROPERTY" } }),
     prisma.property.findUnique({ where: { id: propertyId }, select: { purchaseDate: true } }),
     prisma.ledgerLine.findMany({
-      where: { realmId: conn.realmId, basis, propertyId },
+      where: { realmId: conn.realmId, basis, propertyId, treatment: { not: "EXCLUDED" } },
       orderBy: { txnDate: "desc" },
-      take: 15,
+      take: 8,
       select: {
         txnDate: true,
         txnType: true,
         name: true,
         accountName: true,
         className: true,
+        treatment: true,
         amount: true,
       },
     }),
@@ -243,6 +248,7 @@ export async function getPropertyFinancials(
     connected: conn.status === "ACTIVE",
     basis,
     mapped: !!mappedClass,
+    hasLines: rows.length > 0,
     noi,
     expenseByCategory,
     monthly,

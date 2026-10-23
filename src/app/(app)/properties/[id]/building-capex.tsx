@@ -1,10 +1,12 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Badge, Button } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import { fmtMoney } from "@/lib/utils";
 import {
   equipmentStatusTone,
   lifecycleStatus,
+  parseCapexCost,
   parseInstallYear,
   type BuildingCapexData,
   type BuildingRule,
@@ -83,16 +85,15 @@ export function BuildingCapexSection({
     > = {};
     for (const item of items) {
       const c = draft[item.key];
-      const costNum = parseFloat(c.cost.replace(/[$,\s]/g, ""));
       payload[item.key] = {
         type: c.type.trim() || null,
         year: c.year.trim() || null,
-        costOverride: Number.isFinite(costNum) && costNum > 0 ? costNum : null,
+        costOverride: parseCapexCost(c.cost),
       };
     }
     setError(null);
     start(async () => {
-      const r = await updateBuildingCapex(propertyId, payload, version);
+      const r = await callAction(() => updateBuildingCapex(propertyId, payload, version));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -168,10 +169,7 @@ export function BuildingCapexSection({
                 ? {
                     type: d.type,
                     year: d.year,
-                    costOverride: (() => {
-                      const n = parseFloat(d.cost.replace(/[$,\s]/g, ""));
-                      return Number.isFinite(n) && n > 0 ? n : null;
-                    })(),
+                    costOverride: parseCapexCost(d.cost),
                   }
                 : {
                     type: stored?.type ?? "",
@@ -225,6 +223,12 @@ export function BuildingCapexSection({
                       placeholder={fmtMoney(item.defaultCost)}
                       value={d.cost}
                       onChange={(e) => setCell(item.key, "cost", e.target.value)}
+                      // Show what will be stored: "8k" becomes "$8,000"; anything that
+                      // isn't one clean amount clears back to the default cost.
+                      onBlur={(e) => {
+                        const n = parseCapexCost(e.target.value);
+                        setCell(item.key, "cost", n == null ? "" : fmtMoney(n));
+                      }}
                     />
                   ) : (
                     <span className={"text-xs " + costClass}>

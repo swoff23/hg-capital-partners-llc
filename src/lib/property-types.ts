@@ -1,3 +1,5 @@
+import { parseAmount } from "./money";
+
 export type UnitUtilities = {
   nationalGridAcct?: string | null;
   nationalGridAutopay?: string | null;
@@ -421,6 +423,16 @@ export function parseBuildingCapex(json: unknown): BuildingCapexData {
     : {};
 }
 
+/**
+ * A building system's typed cost override ("8k", "$27,000", "1.2M") in
+ * dollars, or null when it's blank, not one clean amount, or not positive,
+ * in which case the rule's default cost applies.
+ */
+export function parseCapexCost(raw: string | null | undefined): number | null {
+  const n = parseAmount(raw);
+  return n != null && n > 0 ? n : null;
+}
+
 export type CapexForecastItem = {
   /** Unit label, or "Building" for property-level systems. */
   unitLabel: string;
@@ -549,6 +561,15 @@ export function capexForecast(
   return { horizonYears, fromYear, years, total, dueNowTotal, dueNowCount, unknownCount };
 }
 
+/**
+ * The line under a CapEx forecast total that names what the total leaves out
+ * (priced assets with no readable install year), or null when nothing is left out.
+ */
+export function capexUndatedNote(unknownCount: number): string | null {
+  if (!(unknownCount > 0)) return null;
+  return `Excludes ${unknownCount} item${unknownCount === 1 ? "" : "s"} with no install year`;
+}
+
 /* ---------------- Portfolio rollup ---------------- */
 export type PortfolioCapexProperty = {
   id: string;
@@ -576,6 +597,8 @@ export type PortfolioCapexForecast = {
   perYear: number[];
   total: number;
   dueNowTotal: number;
+  /** Priced assets across the portfolio left out of the forecast for want of an install year. */
+  unknownCount: number;
   /** Per-property breakdown, highest 5-year total first. */
   rows: PortfolioCapexRow[];
 };
@@ -592,12 +615,14 @@ export function portfolioCapexForecast(
 
   const perYear = new Array(horizonYears).fill(0);
   let dueNowTotal = 0;
+  let unknownCount = 0;
 
   const rows: PortfolioCapexRow[] = properties.map((p) => {
     const f = capexForecast(p.units, { years: horizonYears, now, building: p.building, rules: opts.rules });
     const py = f.years.map((y) => y.total);
     py.forEach((v, i) => (perYear[i] += v));
     dueNowTotal += f.dueNowTotal;
+    unknownCount += f.unknownCount;
     return {
       id: p.id,
       address: p.address,
@@ -610,5 +635,5 @@ export function portfolioCapexForecast(
 
   rows.sort((a, b) => b.total - a.total);
   const total = perYear.reduce((s, v) => s + v, 0);
-  return { fromYear, horizonYears, years, perYear, total, dueNowTotal, rows };
+  return { fromYear, horizonYears, years, perYear, total, dueNowTotal, unknownCount, rows };
 }
