@@ -123,10 +123,13 @@ export function isPastDay(v: Date | string | null | undefined, now: Now = new Da
   return d != null && d < 0;
 }
 
-/** "Mar 1, 2026" — never shifts by timezone. "—" for blank/invalid. */
+/**
+ * "Mar 1, 2026", or "Sun, Mar 1, 2026" with `weekday`. Never shifts by
+ * timezone. "—" for blank/invalid.
+ */
 export function fmtDay(
   v: Date | string | null | undefined,
-  opts: { year?: "always" | "auto"; now?: Now } = {},
+  opts: { year?: "always" | "auto"; now?: Now; weekday?: boolean } = {},
 ): string {
   const y = toYmd(v);
   if (!y) return "—";
@@ -134,6 +137,7 @@ export function fmtDay(
   const showYear = opts.year !== "auto" || p.y !== Number(todayOf(opts.now ?? new Date()).slice(0, 4));
   return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", {
     timeZone: "UTC",
+    ...(opts.weekday ? { weekday: "short" } : {}),
     month: "short",
     day: "numeric",
     ...(showYear ? { year: "numeric" } : {}),

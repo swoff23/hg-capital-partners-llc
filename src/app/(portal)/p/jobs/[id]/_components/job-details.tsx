@@ -3,6 +3,7 @@ import { useOptimistic, useTransition } from "react";
 import { Copy, KeyRound, Navigation } from "lucide-react";
 import { useToast } from "@/components/toast";
 import { Button, LinkButton } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { setChecklistItemAction } from "../actions";
 
@@ -76,7 +77,8 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
   const toggle = (id: string, done: boolean) =>
     startTransition(async () => {
       setShown({ id, done });
-      const res = await setChecklistItemAction(id, done);
+      // On a failure the tick goes back by itself: the optimistic value only lasts as long as the transition.
+      const res = await callAction(() => setChecklistItemAction(id, done));
       if (!res.ok) toast({ message: res.error });
     });
 

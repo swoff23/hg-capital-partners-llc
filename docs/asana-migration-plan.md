@@ -180,6 +180,8 @@ Sources: the Asana CSV export, the live Asana API (read-only), a code audit, abo
 
 The existing per-email throttle applies to both account types.
 
+**Back to the page asked for.** A signed-out contractor who opens a `/p` link (an email's "Open job") goes to `/login?next=<that page>`, and after sign-in, and the first-password step if it's due, lands on it. `src/proxy.ts` hands each `/p` request's path to `requirePortalPrincipal()`; `src/lib/portal/next-path.ts` only lets a `/p` path through (no `//`, backslash, control character or dot segment, checked again after one decode, 512 characters at most) and anything else falls back to `/p`. Staff sign-in ignores `next`.
+
 **Contractor sessions.** A `PortalSession` row holds a random token (stored hashed), an expiry 30 days after sign-in, the user agent and a revoked-at time. The cookie helper uses `__Host-hg_portal` (Secure) on HTTPS and `hg_portal` on local http, so dev and the device check work. Always HttpOnly, `Path=/`, `SameSite=Lax`. Every request checks the row, so "Sign out everywhere" takes effect immediately.
 
 **First sign-in.** When `mustChangePassword` is set, every portal page redirects to "Choose your own password" until it's done.
@@ -251,7 +253,9 @@ All changes are additive. The new status values go in **their own migration file
 **Repeats.** When a task with `repeatRule` reaches Done (Approve, for contractor jobs), core creates the next copy:
 - same title, notes, property, unit, assignee, repeat rule and series;
 - checklist reset;
-- the next due date computed from the previous due date (or from the completion date if there wasn't one).
+- the next due date computed from the previous due date (or from the completion date if there wasn't one);
+- one copy per finish: finishing a reopened task again reuses the copy that's still there, with no second "assigned you" email;
+- reopening a Done task takes its copy back while nobody has touched it (still To do, no edits, comments, files, checked items, portal views or sent email; `isUntouchedCopy` in `repeat.ts`), so a tick by mistake leaves only the two status lines. Done to Canceled keeps the copy.
 
 ### 5.3 Files and media
 

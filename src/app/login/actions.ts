@@ -6,9 +6,10 @@ import { getEnv } from "@/lib/env";
 import { loginThrottle } from "@/lib/login-throttle";
 import { verifyPassword } from "@/lib/password";
 import { authenticatePortalAccount } from "@/lib/portal/accounts";
+import { afterPortalSignIn, portalReturnPath, withNext } from "@/lib/portal/next-path";
 import { requestIpHash } from "@/lib/portal/request";
 import { startPasswordReset } from "@/lib/portal/reset";
-import { WELCOME_PASSWORD_PATH, startPortalSession } from "@/lib/portal/session";
+import { startPortalSession } from "@/lib/portal/session";
 import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from "@/lib/session";
 
 const cookieOpts = () => ({
@@ -25,24 +26,29 @@ const cookieOpts = () => ({
  * portal on, the email is tried as a contractor login. Either way one scrypt
  * runs and a failure shows the same line, so the page doesn't reveal which
  * kind of account an email has, or whether it has one.
+ *
+ * The form's hidden `next` (the /p page a signed-out contractor was sent here
+ * from, src/lib/portal/next-path.ts) only ever steers a contractor. Staff
+ * always land on the dashboard, as before.
  */
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const next = getEnv().portalEnabled ? portalReturnPath(formData.get("next")) : null;
 
   // Per-email throttle (see src/lib/login-throttle.ts), shared by staff and
   // contractor logins. Checked before the scrypt work so a locked key costs
   // nothing.
   if (email && loginThrottle.check(email).locked) {
-    redirect("/login?error=locked");
+    redirect(withNext("/login?error=locked", next));
   }
 
   function fail(): never {
     const nowLocked = email ? loginThrottle.recordFailure(email) : false;
     loginThrottle.prune();
-    redirect(nowLocked ? "/login?error=locked" : "/login?error=bad");
+    redirect(withNext(nowLocked ? "/login?error=locked" : "/login?error=bad", next));
   }
 
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
@@ -61,7 +67,7 @@ export async function login(formData: FormData) {
 
   loginThrottle.reset(email);
   await startPortalSession(result.accountId);
-  redirect(result.mustChangePassword ? WELCOME_PASSWORD_PATH : "/p");
+  redirect(afterPortalSignIn(result.mustChangePassword, next));
 }
 
 export async function signOut() {

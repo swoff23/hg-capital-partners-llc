@@ -1,6 +1,7 @@
 import "server-only";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
+import { resendBody, type EmailMessage } from "./resend";
 
 /**
  * Sends one email through Resend's REST API (docs/asana-migration-plan.md
@@ -12,14 +13,12 @@ import { logError } from "@/lib/log";
  *    so reset links and notification bundles can be followed in dev;
  *  - in production, nothing is printed (the body can carry a reset link)
  *    and the send fails.
+ *
+ * Replies go to EMAIL_REPLY_TO when it's set (resend.ts), otherwise to the
+ * From address on the sending subdomain.
  */
 
-export interface EmailMessage {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-}
+export type { EmailMessage };
 
 export interface SendResult {
   ok: boolean;
@@ -51,13 +50,7 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
     const res = await fetch(RESEND_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: config.from,
-        to: [msg.to],
-        subject: msg.subject,
-        text: msg.text,
-        ...(msg.html ? { html: msg.html } : {}),
-      }),
+      body: JSON.stringify(resendBody(config, msg)),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string; name?: string };

@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { InlineAddressField } from "@/components/inline-address-field";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
 import { Button } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { deleteTask, setTaskStatus, updateTask } from "./actions";
 import { useStatusRun } from "./status-run";
@@ -23,7 +24,7 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
       multiline
       className={cn("text-xl sm:text-2xl", closed && "text-muted line-through")}
       onCommit={async (next) => {
-        const res = await updateTask(taskId, { title: next });
+        const res = await callAction(() => updateTask(taskId, { title: next }));
         if (!res.ok) toast({ message: res.error });
       }}
     />
@@ -47,6 +48,17 @@ export function MoreMenu({
   const { run, pending, toast } = useStatusRun();
   const [confirming, setConfirming] = useState(false);
   const [deleting, startDelete] = useTransition();
+
+  function remove() {
+    startDelete(async () => {
+      // Success redirects to the task list, which callAction lets through.
+      const res = await callAction(async () => {
+        await deleteTask(taskId);
+        return { ok: true, data: undefined };
+      });
+      if (!res.ok) toast({ message: res.error });
+    });
+  }
 
   async function copyLink() {
     try {
@@ -100,7 +112,7 @@ export function MoreMenu({
               <Button variant="secondary" size="sm" disabled={deleting} onClick={() => setConfirming(false)}>
                 Keep it
               </Button>
-              <Button variant="danger" size="sm" disabled={deleting} onClick={() => startDelete(() => deleteTask(taskId))}>
+              <Button variant="danger" size="sm" disabled={deleting} onClick={remove}>
                 {deleting ? "Deleting…" : "Delete"}
               </Button>
             </>

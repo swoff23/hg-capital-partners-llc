@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type Task, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
-import { todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
+import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
-import { nextOccurrence, parseRepeatRule, type RepeatRule } from "./repeat";
+import { isUntouchedCopy, nextOccurrence, parseRepeatRule, repeatCreatedCopy, type RepeatRule } from "./repeat";
 import {
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
@@ -21,8 +21,9 @@ import {
  * the system (reminders, the move-in form, repeats) and the Asana importer
  * (scripts/asana/). Each write records who did it (a Principal), adds its
  * timeline event, keeps contractor access in step with the assignee, creates
- * the next copy of a repeating task, and queues the email the change calls
- * for, all inside the caller's transaction.
+ * the next copy of a repeating task (one per finish, taken back by a reopen
+ * while untouched), and queues the email the change calls for, all inside
+ * the caller's transaction.
  *
  * Deliberately no `server-only`, no revalidatePath, no network: the importer
  * runs this outside Next, and the service layer revalidates and talks to Blob
@@ -160,6 +161,16 @@ export interface OutboxItem {
 
 type NotifyTask = Pick<Task, "id" | "assigneeContactId">;
 
+/**
+ * A date as an email line says it: "Thu, Oct 29", with the year only when it
+ * isn't this year in Buffalo. content.ts shows it as written.
+ */
+const emailDay = (d: Date | Ymd, now: Date) => fmtDay(d, { weekday: true, year: "auto", now: todayYmdEastern(now) });
+
+/** The assignment line; a Scheduled job says its visit date. */
+const assignedSummary = (t: Pick<Task, "title" | "status" | "scheduledFor">, now: Date) =>
+  t.status === "SCHEDULED" && t.scheduledFor ? `assigned you "${t.title}" for ${emailDay(t.scheduledFor, now)}` : `assigned you "${t.title}"`;
+
 async function contractorHasLogin(tx: Tx, contactId: string | null): Promise<boolean> {
   if (!contactId) return false;
   const acct = await tx.portalAccount.findUnique({ where: { contactId }, select: { status: true } });
@@ -288,7 +299,7 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
   await addEvent(tx, task.id, p, { kind: "CREATED" });
   if (assigneeContactId) {
     await syncAssigneeAccess(tx, task.id, assigneeContactId, p, now);
-    await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, `assigned you "${task.title}"`, now);
+    await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
   }
   await logDeal(tx, task.dealId, p, `Task added: ${task.title}`, now);
   return task;
@@ -381,13 +392,17 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
       ? `marked "${task.title}" done`
       : before.status === "REVIEW" && to === "IN_PROGRESS"
         ? `sent "${task.title}" back${note ? `: ${note}` : ""}`
-        : `set "${task.title}" to ${to.replace("_", " ").toLowerCase()}`;
+        : to === "SCHEDULED" && scheduledFor
+          ? `scheduled "${task.title}" for ${emailDay(scheduledFor, now)}`
+          : `set "${task.title}" to ${to.replace("_", " ").toLowerCase()}`;
   await notify(tx, task, p, { kind: "STATUS", visibility }, summary, now);
 
   if (to === "DONE" || reopening) {
     await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now);
   }
   const nextTaskId = to === "DONE" && before.status !== "DONE" ? await createNextRepeat(tx, task, p, now) : null;
+  // Done to Canceled isn't a reopen: the copy stays.
+  if (before.status === "DONE" && isActiveStatus(to)) await takeBackRepeat(tx, taskId);
   return { task, nextTaskId };
 }
 
@@ -396,13 +411,35 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
 // ---------------------------------------------------------------------------
 
 /**
+ * The copy the task's latest REPEAT_CREATED line names, when that copy still
+ * exists. Ties on createdAt (one transaction) fall back to the cuid, which
+ * grows with time.
+ */
+async function latestRepeatCopy(tx: Tx, taskId: string): Promise<{ eventId: string; nextId: string; madeInAsana: boolean } | null> {
+  const ev = await tx.taskEvent.findFirst({
+    where: { taskId, kind: "REPEAT_CREATED" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, data: true },
+  });
+  const copy = repeatCreatedCopy(ev?.data);
+  if (!ev || !copy) return null;
+  const next = await tx.task.findUnique({ where: { id: copy.next }, select: { id: true } });
+  return next ? { eventId: ev.id, nextId: next.id, madeInAsana: copy.madeInAsana } : null;
+}
+
+/**
  * Create the next copy of a finished repeating task. Returns its id, or null
- * when it doesn't repeat. Exported for the Asana delta, which closes tasks
- * completed in Asana without going through setStatus.
+ * when it doesn't repeat. One copy per finish: when an earlier finish already
+ * made one that still exists (the task was reopened and the copy kept), that
+ * copy's id comes back and nothing is written, so no second copy and no
+ * second "assigned you" email. Exported for the Asana delta, which closes
+ * tasks completed in Asana without going through setStatus.
  */
 export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Date): Promise<string | null> {
   const rule = parseRepeatRule(done.repeatRule);
   if (!rule) return null;
+  const existing = await latestRepeatCopy(tx, done.id);
+  if (existing) return existing.nextId;
   const from = toYmd(done.dueDate) ?? todayYmdEastern(now);
   const seriesId = done.repeatSeriesId ?? done.id;
   if (!done.repeatSeriesId) await tx.task.update({ where: { id: done.id }, data: { repeatSeriesId: seriesId } });
@@ -432,9 +469,54 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
   await addEvent(tx, done.id, { kind: "system", label: "Repeats" }, { kind: "REPEAT_CREATED", data: { next: next.id, due: toYmd(next.dueDate) } });
   if (next.assigneeContactId) {
     await syncAssigneeAccess(tx, next.id, next.assigneeContactId, p, now);
-    await notify(tx, next, p, { kind: "ASSIGNED", visibility: "SHARED" }, `assigned you "${next.title}"`, now);
+    await notify(tx, next, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(next, now), now);
   }
   return next.id;
+}
+
+/**
+ * Reopening a finished task takes back the copy its finish made, while nobody
+ * has touched that copy (repeat.ts isUntouchedCopy): the copy goes, with its
+ * checklist, access rows and unsent email (all cascade), and so does the
+ * REPEAT_CREATED line, so a tick by mistake and an untick leave only the two
+ * STATUS lines. A touched copy stays, and finishing again reuses it.
+ * Asana's own copy stays too: the delta mirrors it. Returns whether it went.
+ */
+async function takeBackRepeat(tx: Tx, doneId: string): Promise<boolean> {
+  const made = await latestRepeatCopy(tx, doneId);
+  if (!made || made.madeInAsana) return false;
+  // Lock the copy, so a comment, file or edit landing now either commits
+  // first and is seen below, or waits and then finds the copy gone.
+  const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id" = ${made.nextId} FOR UPDATE`;
+  if (locked.length === 0) return false;
+  // And its email rows, so a send run can't take one between this read and the delete.
+  const emails = await tx.$queryRaw<{ sentAt: Date | null; attempts: number }[]>`
+    SELECT "sentAt", "attempts" FROM "NotificationOutbox" WHERE "taskId" = ${made.nextId} FOR UPDATE`;
+  const copy = await tx.task.findUnique({
+    where: { id: made.nextId },
+    select: {
+      status: true,
+      appEditedAt: true,
+      asanaId: true,
+      events: { select: { kind: true } },
+      _count: { select: { attachments: true, readStates: true, checklist: { where: { done: true } } } },
+    },
+  });
+  if (!copy) return false;
+  const untouched = isUntouchedCopy({
+    status: copy.status,
+    appEditedAt: copy.appEditedAt,
+    asanaId: copy.asanaId,
+    eventKinds: copy.events.map((e) => e.kind),
+    attachments: copy._count.attachments,
+    checkedItems: copy._count.checklist,
+    readStates: copy._count.readStates,
+    emails,
+  });
+  if (!untouched) return false;
+  await tx.task.delete({ where: { id: made.nextId } });
+  await tx.taskEvent.delete({ where: { id: made.eventId } });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -540,13 +622,14 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
 
   if (newContactId !== undefined) {
     await syncAssigneeAccess(tx, taskId, newContactId, p, now);
-    if (newContactId) await notify(tx, after, p, { kind: "ASSIGNED", visibility: "SHARED" }, `assigned you "${after.title}"`, now);
+    if (newContactId) await notify(tx, after, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(after, now), now);
   } else if (after.assigneeContactId) {
     // Same contractor: tell them about what they can see change.
     const targetBefore = toYmd(targetDate(before));
     const targetAfter = toYmd(targetDate(after));
     if (targetBefore !== targetAfter) {
-      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${targetAfter ?? "no date"}`, now);
+      const to = targetAfter ? emailDay(targetAfter, now) : "no date";
+      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now);
     }
     if (events.some((e) => e.kind === "NOTES")) {
       await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now);
@@ -675,10 +758,14 @@ export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p:
   return updated;
 }
 
-export async function addChecklistItem(tx: Tx, taskId: string, title: string, p: Principal) {
+export async function addChecklistItem(tx: Tx, taskId: string, title: string, p: Principal, now = new Date()) {
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't add checklist items yet.");
   const t = title.trim();
   if (!t) throw new TaskRuleError("The item needs a name.");
   const last = await tx.taskChecklistItem.findFirst({ where: { taskId }, orderBy: { position: "desc" }, select: { position: true } });
-  return tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1 } });
+  const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1 } });
+  // Stamped like every other edit, so a repeat copy someone added to counts
+  // as touched and isn't taken back when the finished task reopens.
+  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
+  return item;
 }

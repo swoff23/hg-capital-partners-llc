@@ -6,7 +6,8 @@ import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import type { Principal } from "@/lib/tasks/core";
 import { sessionExpiresAt, sessionIsLive, shouldTouchSession } from "./limits";
-import { portalCookieForRequest, requestUserAgent } from "./request";
+import { PORTAL_HOME, WELCOME_PASSWORD_PATH, afterPortalSignIn, withNext } from "./next-path";
+import { portalCookieForRequest, requestUserAgent, requestedPortalPath } from "./request";
 import { hashToken, isWellFormedToken, newToken } from "./tokens";
 
 /**
@@ -21,9 +22,6 @@ import { hashToken, isWellFormedToken, newToken } from "./tokens";
  */
 
 export type PortalPrincipal = { contactId: string; accountId: string; sessionId: string; email: string; label: string };
-
-/** Where a contractor still holding a starting password is sent. */
-export const WELCOME_PASSWORD_PATH = "/p/welcome/password";
 
 interface PortalSessionState {
   principal: PortalPrincipal;
@@ -106,24 +104,32 @@ export async function getPortalPrincipal(opts: { allowStartingPassword?: boolean
  *  - /p/welcome/password while the starting password is still in use.
  * The welcome page itself passes `{ passwordPage: true }`, which flips the
  * last rule: it sends anyone who has already chosen a password on to /p.
+ *
+ * Each redirect keeps the page asked for (next-path.ts): as ?next= on /login
+ * and the first-password page, and as the destination once the password is
+ * chosen. So an email's job link still opens that job after sign-in.
  */
 export async function requirePortalPrincipal(opts: { passwordPage?: boolean } = {}): Promise<PortalPrincipal> {
   if (!getEnv().portalEnabled) notFound();
   const state = await readSession();
-  if (!state) redirect("/login");
+  if (!state) redirect(withNext("/login", await requestedPortalPath()));
   if (opts.passwordPage) {
-    if (!state.mustChangePassword) redirect("/p");
+    if (!state.mustChangePassword) redirect((await requestedPortalPath()) ?? PORTAL_HOME);
   } else if (state.mustChangePassword) {
-    redirect(WELCOME_PASSWORD_PATH);
+    redirect(withNext(WELCOME_PASSWORD_PATH, await requestedPortalPath()));
   }
   return state.principal;
 }
 
-/** Where a signed-in contractor belongs, for /login to bounce them on. Null when signed out. */
-export async function portalHomePath(): Promise<string | null> {
+/**
+ * Where a signed-in contractor belongs, for /login to bounce them on: `next`
+ * (already checked with portalReturnPath) or My jobs, by way of the
+ * first-password page if need be. Null when signed out.
+ */
+export async function portalHomePath(next: string | null = null): Promise<string | null> {
   const state = await readSession();
   if (!state) return null;
-  return state.mustChangePassword ? WELCOME_PASSWORD_PATH : "/p";
+  return afterPortalSignIn(state.mustChangePassword, next);
 }
 
 /** The contractor as the actor on a task write (src/lib/tasks/core.ts). */

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
+import { portalReturnPath } from "@/lib/portal/next-path";
 import { portalHomePath } from "@/lib/portal/session";
 import { login } from "./actions";
 import { AuthError, AuthFrame, AuthNotice, authButtonClass, authInputClass, authLinkClass } from "./_components/auth-frame";
@@ -14,10 +15,12 @@ export const metadata: Metadata = {
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   if (await getCurrentUser()) redirect("/");
-  const portalHome = await portalHomePath();
-  if (portalHome) redirect(portalHome);
-  const { error, notice } = (await searchParams) as { error?: string; notice?: string };
+  const { error, notice, next: rawNext } = (await searchParams) as { error?: string; notice?: string; next?: string };
   const portalEnabled = getEnv().portalEnabled;
+  // The /p page a signed-out contractor was sent here from. Staff sign-in ignores it.
+  const next = portalEnabled ? portalReturnPath(rawNext) : null;
+  const portalHome = await portalHomePath(next);
+  if (portalHome) redirect(portalHome);
 
   return (
     <AuthFrame>
@@ -30,6 +33,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       )}
 
       <form action={login} className="mt-8 space-y-3 text-left">
+        {next && <input type="hidden" name="next" value={next} />}
         <input
           name="email"
           type="email"

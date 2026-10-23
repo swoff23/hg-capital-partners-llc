@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
 import { AuthError, AuthFrame, authButtonClass, authInputClass, authLinkClass } from "@/app/login/_components/auth-frame";
 import { MIN_PASSWORD_LENGTH, PASSWORD_MESSAGES, isPasswordProblem } from "@/lib/portal/credentials";
+import { portalReturnPath } from "@/lib/portal/next-path";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { chooseOwnPassword, signOutPortal } from "../../actions";
 
 export const metadata: Metadata = { title: "Choose Your Password" };
 
 // Shown after the first sign-in, until the starting password is replaced.
-// Every other /p page sends the contractor here while it's still in use.
+// Every other /p page sends the contractor here while it's still in use,
+// with the page they asked for as ?next=, which the form passes on.
 export default async function WelcomePasswordPage({ searchParams }: PageProps<"/p/welcome/password">) {
   const principal = await requirePortalPrincipal({ passwordPage: true });
-  const { error } = (await searchParams) as { error?: string };
+  const { error, next: rawNext } = (await searchParams) as { error?: string; next?: string };
+  const next = portalReturnPath(rawNext);
   const firstName = principal.label.trim().split(/\s+/)[0] || principal.label;
   const message = !isPasswordProblem(error)
     ? null
@@ -25,6 +28,7 @@ export default async function WelcomePasswordPage({ searchParams }: PageProps<"/
       {message && <AuthError>{message}</AuthError>}
 
       <form action={chooseOwnPassword} className="mt-8 space-y-3 text-left">
+        {next && <input type="hidden" name="next" value={next} />}
         {/* Lets password managers file the new password under the right login. */}
         <input type="email" name="username" value={principal.email} autoComplete="username" readOnly hidden />
         <input

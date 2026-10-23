@@ -1,4 +1,4 @@
-import { HG_TIME_ZONE, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { HG_TIME_ZONE, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL } from "@/lib/task-scope";
 import { firstName, joinNames } from "@/lib/portal/job-view";
@@ -73,28 +73,29 @@ export function openUrl(appUrl: string, audience: Audience, taskId: string): str
 
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 
-function fmtYmd(ymd: Ymd): string {
-  return new Date(`${ymd}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
-}
-
 /** "set it to in progress" back to the label the app shows ("In progress"). */
 const STATUS_BY_WORDS = new Map(Object.entries(STATUS_LABEL).map(([k, label]) => [k.replace("_", " ").toLowerCase(), label]));
 
 /**
  * One change, after the person's first name, without the task's title
- * (the subject has it): "moved the target to Fri, Oct 30", "marked it done",
- * `: "Doors arrive Thu"`.
+ * (the subject has it): "moved the target to Fri, Oct 30", "scheduled it for
+ * Thu, Oct 29", "marked it done", `: "Doors arrive Thu"`. Dates arrive
+ * already written out (core.ts emailDay). The title patterns are greedy so a
+ * title with a quote in it ("Hang 36" mirror") still comes out whole.
  */
 export function itemText(item: OutboxItem): string {
   const s = oneLine(item.summary);
   switch (item.kind) {
-    case "ASSIGNED":
-      return "assigned you this job";
+    case "ASSIGNED": {
+      // Anchored on the date, so a title like `Quote "A" for B` isn't read as one.
+      const m = /^assigned you ".*" for ([A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}(?:, \d{4})?)$/.exec(s);
+      return m ? `assigned you this job for ${m[1]}` : "assigned you this job";
+    }
     case "NOTES":
       return "updated the notes";
     case "TARGET": {
-      const m = /to (\d{4}-\d{2}-\d{2})$/.exec(s);
-      return m ? `moved the target to ${fmtYmd(m[1])}` : "cleared the target date";
+      const m = /^moved ".*" to (.+)$/.exec(s);
+      return m && m[1] !== "no date" ? `moved the target to ${m[1]}` : "cleared the target date";
     }
     case "COMMENT": {
       const files = /^added files \(\+(\d+) files?\)$/.exec(s);
@@ -102,9 +103,14 @@ export function itemText(item: OutboxItem): string {
       return s.startsWith('"') ? `: ${s}` : s;
     }
     case "STATUS": {
+      const scheduled = /^scheduled ".*" for (.+)$/.exec(s);
+      if (scheduled) return `scheduled it for ${scheduled[1]}`;
       const set = /^set ".*" to (.+)$/.exec(s);
       if (set?.[1] === "in progress") return "started the job";
       if (set) return `moved it to ${STATUS_BY_WORDS.get(set[1]) ?? set[1]}`;
+      if (/^marked ".*" done$/.test(s)) return "marked it done";
+      const back = /^sent ".*" back(: .+)?$/.exec(s);
+      if (back) return `sent it back${back[1] ?? ""}`;
       return s.replace(/"[^"]*"/, "it");
     }
     default:

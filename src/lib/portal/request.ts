@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { getEnv } from "@/lib/env";
 import { clientIp } from "@/lib/rate-limit";
 import { isHttpsRequest, portalCookie, type PortalCookie } from "./cookie";
+import { PORTAL_PATH_HEADER, portalReturnPath } from "./next-path";
 import { keyedHash } from "./tokens";
 
 /** Facts about the current request that sign-in and the audit log need. */
@@ -20,6 +21,11 @@ export async function requestIpHash(): Promise<string> {
 
 export async function requestUserAgent(): Promise<string | null> {
   return (await headers()).get("user-agent")?.slice(0, 300) ?? null;
+}
+
+/** The /p page this request is for, to come back to after sign-in (next-path.ts). Null for My jobs or anything else. */
+export async function requestedPortalPath(): Promise<string | null> {
+  return portalReturnPath((await headers()).get(PORTAL_PATH_HEADER));
 }
 
 /** Audit-log key for an email someone typed, so unknown addresses aren't stored in the clear. */

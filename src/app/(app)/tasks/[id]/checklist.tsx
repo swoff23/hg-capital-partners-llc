@@ -91,7 +91,8 @@ function AddItem({ taskId }: { taskId: string }) {
     const t = title.trim();
     if (!t) return;
     setTitle("");
-    run(() => addChecklistItem(taskId, t));
+    // Put the text back if it didn't save, unless something newer was typed since.
+    run(() => addChecklistItem(taskId, t), { failed: () => setTitle((cur) => cur || t) });
     input.current?.focus();
   }
 

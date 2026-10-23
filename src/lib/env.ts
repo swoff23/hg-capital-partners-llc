@@ -63,6 +63,8 @@ const schema = z.object({
   // Resend (src/lib/email/send.ts). Both unset locally: emails print to the console.
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(), // "HG Capital <jobs@mail.example.com>"
+  // Where replies go, e.g. "office@hgcapitalpartners.com". Unset: replies go to EMAIL_FROM.
+  EMAIL_REPLY_TO: z.email("must be an email address").optional(),
   // Origin for links in emails, e.g. "https://hgcapitalpartners.com".
   APP_URL: z.string().url().optional(),
 });
@@ -82,6 +84,8 @@ export interface QboEnv {
 export interface EmailEnv {
   apiKey: string;
   from: string;
+  /** EMAIL_REPLY_TO, or null to send no Reply-To. */
+  replyTo: string | null;
 }
 
 export interface Env extends Raw {
@@ -92,7 +96,7 @@ export interface Env extends Raw {
   readonly qbo: QboEnv | null;
   /** PORTAL_ENABLED is "1" or "true". */
   readonly portalEnabled: boolean;
-  /** Resend config, or null unless both RESEND_API_KEY and EMAIL_FROM are set. */
+  /** Resend config, or null unless both RESEND_API_KEY and EMAIL_FROM are set. EMAIL_REPLY_TO is optional. */
   readonly email: EmailEnv | null;
   /** Origin for links in emails, no trailing slash. Throws in production if unset. */
   readonly appUrl: string;
@@ -155,7 +159,7 @@ function build(source: EnvSource): Env {
     },
     get email(): EmailEnv | null {
       if (!raw.RESEND_API_KEY || !raw.EMAIL_FROM) return null;
-      return { apiKey: raw.RESEND_API_KEY, from: raw.EMAIL_FROM };
+      return { apiKey: raw.RESEND_API_KEY, from: raw.EMAIL_FROM, replyTo: raw.EMAIL_REPLY_TO ?? null };
     },
     get appUrl(): string {
       if (raw.APP_URL) return raw.APP_URL.replace(/\/+$/, "");

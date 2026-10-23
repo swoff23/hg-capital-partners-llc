@@ -4,6 +4,7 @@ import { ListChecks } from "lucide-react";
 import { AssigneePicker, type AssigneeContractor, type AssigneeUser, type AssigneeValue } from "@/components/assignee-picker";
 import { DueDatePicker } from "@/components/due-date-picker";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
 import { applyTokens, dueFromOffset, extractTokens, hasOpenTokens, isAddressToken, type TemplateItem } from "@/lib/tasks/template-items";
 import { cn } from "@/lib/utils";
@@ -73,18 +74,20 @@ export function ApplyFlow({
     setError("");
     if (!propertyId) return setError("Pick a property.");
     start(async () => {
-      const res = await applyPlaybook(templateId, {
-        propertyId,
-        rows: kept.map((i) => ({
-          title: titleOf(i).trim(),
-          notes: notesOf(i),
-          assignee: rows[i].assignee,
-          dueDate: dueOf(i),
-          checklist: checklistOf(i),
-        })),
-      });
-      // Success redirects to the task list; only a refusal comes back.
-      if (res && !res.ok) setError(res.error);
+      const res = await callAction(() =>
+        applyPlaybook(templateId, {
+          propertyId,
+          rows: kept.map((i) => ({
+            title: titleOf(i).trim(),
+            notes: notesOf(i),
+            assignee: rows[i].assignee,
+            dueDate: dueOf(i),
+            checklist: checklistOf(i),
+          })),
+        }),
+      );
+      // Success redirects to the task list (callAction lets it through); only a refusal comes back.
+      if (!res.ok) setError(res.error);
     });
   }
 

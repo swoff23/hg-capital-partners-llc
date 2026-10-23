@@ -97,6 +97,13 @@ test("helpers accept an explicit today (Ymd) instead of an instant", () => {
   assert.equal(fmtDay("2027-01-05", { year: "auto", now: "2026-10-22" }), "Jan 5, 2027");
 });
 
+test("fmtDay can lead with the weekday, still without shifting", () => {
+  assert.equal(fmtDay("2026-10-29", { weekday: true, year: "auto", now: "2026-10-22" }), "Thu, Oct 29");
+  assert.equal(fmtDay(new Date(Date.UTC(2026, 9, 29)), { weekday: true, year: "auto", now: "2026-10-22" }), "Thu, Oct 29");
+  assert.equal(fmtDay("2027-01-05", { weekday: true, year: "auto", now: "2026-12-30" }), "Tue, Jan 5, 2027");
+  assert.equal(fmtDay(null, { weekday: true }), "—");
+});
+
 test("easternDayStart: Buffalo midnight in UTC, across daylight time", () => {
   assert.equal(easternDayStart("2026-10-22").toISOString(), "2026-10-22T04:00:00.000Z");
   assert.equal(easternDayStart("2026-12-01").toISOString(), "2026-12-01T05:00:00.000Z");

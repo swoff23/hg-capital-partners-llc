@@ -5,7 +5,7 @@ import { Button as AriaButton } from "react-aria-components";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Button } from "@/components/ui";
-import type { ActionResult } from "@/lib/action-result";
+import { callAction, type ActionResult } from "@/lib/action-result";
 import { formatBytes } from "@/lib/utils";
 
 /** A document or a link on a task. Photos and videos go in MediaGrid instead. */
@@ -105,7 +105,7 @@ export function FilesList({
                 onClick={() =>
                   start(async () => {
                     setError("");
-                    const res = await onDelete(target.id);
+                    const res = await callAction(() => onDelete(target.id));
                     if (res.ok) setTarget(null);
                     else setError(res.error);
                   })

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { upload } from "@vercel/blob/client";
 import { Camera, ImagePlus, Play, RotateCw, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui";
+import { isOfflineError } from "@/lib/action-result";
 import { MULTIPART_THRESHOLD, type FileKind } from "@/lib/attachments/content-types";
 import { CAMERA_ACCEPT, checkMediaFile, pickerAccept, shownReason, uploadNotice } from "@/lib/attachments/media";
 import { taskUploadPath } from "@/lib/attachments/paths";
@@ -153,14 +154,23 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
       patch(key, { status: "saving", progress: 1 });
       // One record-only retry: a refusal may have discarded the blob, so after that it uploads again.
       job.pathname = job.pathname ? undefined : pathname;
-      const res = await latest.current.record({ pathname, filename: job.file.name, ...job.meta });
+      let res: RecordMediaResult;
+      try {
+        res = await latest.current.record({ pathname, filename: job.file.name, ...job.meta });
+      } catch (err) {
+        // The call itself failed (no signal, an error page, an action retired by a deploy), not a
+        // refusal: its own words mean nothing here. A redirect isn't rethrown: the router is
+        // already navigating, and this runs detached, so a rethrow would only go unhandled.
+        res = { ok: false, error: isOfflineError(err) ? "no connection" : "it couldn't be saved" };
+      }
       if (!res.ok || !res.data) throw new Error(res.error || "it couldn't be saved");
       recorded.current.push(res.data.id);
       jobs.current.delete(key);
       drop(key);
     } catch (e) {
       if (controller.signal.aborted || !jobs.current.has(key)) return;
-      patch(key, { status: "failed", error: e instanceof Error ? e.message : "" });
+      // The browser's own words for a dropped connection ("Failed to fetch", "Load failed") mean nothing to anyone.
+      patch(key, { status: "failed", error: isOfflineError(e) ? "no connection" : e instanceof Error ? e.message : "" });
     } finally {
       job.controller = null;
     }
@@ -242,6 +252,20 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
   useEffect(() => {
     latest.current.onPendingChange?.(pending);
   }, [pending]);
+
+  // Leaving the page cancels whatever is still going up, so the browser asks
+  // first: a reload, closing the tab, a typed URL. In-app links don't fire
+  // beforeunload, and iOS Safari never asks.
+  const busy = pending > 0;
+  useEffect(() => {
+    if (!busy) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ""; // Older Chrome and Safari still look for this.
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [busy]);
 
   const notice = uploadNotice(uploads.filter((u) => u.error).map((u) => ({ name: u.name, reason: u.error! })));
 

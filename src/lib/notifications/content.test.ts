@@ -27,7 +27,7 @@ const TITLE = "Cabinet install";
 
 test("subject: one person's changes read as an update", () => {
   assert.equal(
-    emailSubject([item("TARGET", `moved "${TITLE}" to 2026-10-30`), item("COMMENT", '"Doors arrive Thu"')], TITLE),
+    emailSubject([item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), item("COMMENT", '"Doors arrive Thu"')], TITLE),
     "Connor updated Cabinet install",
   );
 });
@@ -49,12 +49,15 @@ test("subject: an assignment alone says assigned; two partners are both named", 
 });
 
 test("each change reads as one line without the title", () => {
-  assert.equal(itemText(item("TARGET", `moved "${TITLE}" to 2026-10-30`)), "moved the target to Fri, Oct 30");
+  assert.equal(itemText(item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)), "moved the target to Fri, Oct 30");
   assert.equal(itemText(item("TARGET", `moved "${TITLE}" to no date`)), "cleared the target date");
   assert.equal(itemText(item("NOTES", `updated the notes on "${TITLE}"`)), "updated the notes");
   assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}"`)), "assigned you this job");
+  assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}" for Thu, Oct 29`)), "assigned you this job for Thu, Oct 29");
+  assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}" for Tue, Jan 5, 2027`)), "assigned you this job for Tue, Jan 5, 2027");
+  assert.equal(itemText(item("ASSIGNED", `assigned you "Quote \"A\" for B"`)), "assigned you this job");
   assert.equal(itemText(item("STATUS", `set "${TITLE}" to in progress`)), "started the job");
-  assert.equal(itemText(item("STATUS", `set "${TITLE}" to scheduled`)), "moved it to Scheduled");
+  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
   assert.equal(itemText(item("STATUS", `set "${TITLE}" to open`)), "moved it to To do");
   assert.equal(itemText(item("STATUS", `sent "${TITLE}" back: Level the uppers`)), "sent it back: Level the uppers");
   assert.equal(itemText(item("STATUS", `marked "${TITLE}" done`)), "marked it done");
@@ -63,11 +66,35 @@ test("each change reads as one line without the title", () => {
   assert.equal(itemText(item("ATTACHMENT", "added IMG_0042.jpg")), "added IMG_0042.jpg");
 });
 
+test("a scheduled job's email gives the visit date", () => {
+  const email = taskEmail({
+    items: [item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)],
+    title: TITLE,
+    address: "23 Sherwood St, Buffalo, NY 14213",
+    audience: "contractor",
+    appUrl: "https://hg.example.com",
+    taskId: "t1",
+  });
+  assert.deepEqual(email.items, ["Connor scheduled it for Thu, Oct 29"]);
+  // Next year's date says the year.
+  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Tue, Jan 5, 2027`)), "scheduled it for Tue, Jan 5, 2027");
+});
+
+test("a title with a quote in it comes out whole", () => {
+  const t = 'Hang 36" mirror';
+  assert.equal(itemText(item("STATUS", `scheduled "${t}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
+  assert.equal(itemText(item("TARGET", `moved "${t}" to Fri, Oct 30`)), "moved the target to Fri, Oct 30");
+  assert.equal(itemText(item("STATUS", `marked "${t}" done`)), "marked it done");
+  assert.equal(itemText(item("STATUS", `sent "${t}" back: Level it`)), "sent it back: Level it");
+  assert.equal(itemText(item("STATUS", `sent "${t}" back`)), "sent it back");
+  assert.equal(itemText(item("STATUS", `set "${t}" to done`)), "moved it to Done");
+});
+
 test("lines: comments quote, oldest first, only the latest target and notes", () => {
   const lines = itemLines([
-    item("TARGET", `moved "${TITLE}" to 2026-10-29`),
+    item("TARGET", `moved "${TITLE}" to Thu, Oct 29`),
     item("COMMENT", '"Doors arrive Thu" (+1 file)'),
-    item("TARGET", `moved "${TITLE}" to 2026-10-30`),
+    item("TARGET", `moved "${TITLE}" to Fri, Oct 30`),
   ]);
   assert.deepEqual(lines, ['Connor: "Doors arrive Thu" (+1 file)', "Connor moved the target to Fri, Oct 30"]);
 });

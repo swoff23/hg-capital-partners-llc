@@ -11,9 +11,9 @@ import { useTaskList } from "./task-list-context";
  * the job to In progress.
  */
 export function ReviewActions({ task }: { task: ListTask }) {
-  const { approve, sendBack } = useTaskList();
+  const { approve, sendBack, sendBackDraft } = useTaskList();
   const [open, setOpen] = useState(false);
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(() => sendBackDraft(task.id));
   const first = assigneeName(task.assignee)?.split(" ")[0];
 
   function submit(e: FormEvent) {

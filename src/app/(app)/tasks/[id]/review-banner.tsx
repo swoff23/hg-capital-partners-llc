@@ -28,6 +28,8 @@ export function ReviewBanner({
 }) {
   const { run, pending } = useStatusRun();
   const [sendingBack, setSendingBack] = useState(false);
+  // A note that didn't go through, to start the sheet with next time.
+  const [draft, setDraft] = useState("");
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm sm:flex-row sm:items-center">
@@ -49,9 +51,14 @@ export function ReviewBanner({
       <Sheet title={`Send back to ${name}`} isOpen={sendingBack} onOpenChange={setSendingBack}>
         {({ close }) => (
           <SendBackForm
+            initial={draft}
             onSend={(note) => {
               close();
-              run(() => setTaskStatus(taskId, "IN_PROGRESS", { note, expected: "REVIEW" }), { done: `Sent back to ${name}` });
+              setDraft("");
+              run(() => setTaskStatus(taskId, "IN_PROGRESS", { note, expected: "REVIEW" }), {
+                done: `Sent back to ${name}`,
+                failed: () => setDraft(note),
+              });
             }}
           />
         )}
@@ -60,8 +67,8 @@ export function ReviewBanner({
   );
 }
 
-function SendBackForm({ onSend }: { onSend: (note: string) => void }) {
-  const [note, setNote] = useState("");
+function SendBackForm({ initial, onSend }: { initial: string; onSend: (note: string) => void }) {
+  const [note, setNote] = useState(initial);
   const ok = note.trim().length > 0;
   return (
     <form

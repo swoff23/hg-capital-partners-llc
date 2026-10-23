@@ -6,6 +6,7 @@ import { MediaUploadTray, useMediaUploader } from "@/components/media-uploader";
 import { Sheet } from "@/components/sheet";
 import { useToast, useToastInset } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import { finishingLabel, joinNames, nextStep } from "@/lib/portal/job-view";
 import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJobAction } from "../actions";
 
@@ -53,9 +54,11 @@ export function JobActions({
     live.current = { body, sheetOpen, ready };
   });
 
+  // Every call goes through callAction: with no signal it fails like a refusal
+  // (a toast), and the typed text, the open sheet and the photos stay put.
   const post = (text: string, ids: string[]) =>
     startSending(async () => {
-      const res = await postJobUpdateAction(taskId, { body: text, attachmentIds: ids });
+      const res = await callAction(() => postJobUpdateAction(taskId, { body: text, attachmentIds: ids }));
       if (!res.ok) {
         toast({ message: res.error });
         setReady((r) => [...new Set([...r, ...ids])]);
@@ -105,7 +108,7 @@ export function JobActions({
 
   function start() {
     startStarting(async () => {
-      const res = await startJobAction(taskId);
+      const res = await callAction(() => startJobAction(taskId));
       toast({ message: res.ok ? "Job started" : res.error });
     });
   }
@@ -118,7 +121,7 @@ export function JobActions({
   function finish() {
     startFinishing(async () => {
       const ids = ready;
-      const res = await markJobDoneAction(taskId, { body: note.trim(), attachmentIds: ids });
+      const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: ids }));
       if (!res.ok) {
         toast({ message: res.error });
         return;

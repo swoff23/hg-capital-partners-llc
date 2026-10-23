@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Download, ImageOff, Trash2, X } from "lucide
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
-import type { ActionResult } from "@/lib/action-result";
+import { callAction, type ActionResult } from "@/lib/action-result";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { cn, fmtDateTime } from "@/lib/utils";
 
@@ -200,7 +200,7 @@ function ConfirmDelete({
           onClick={() =>
             start(async () => {
               setError("");
-              const res = await onDelete(item.id);
+              const res = await callAction(() => onDelete(item.id));
               if (res.ok) onDone();
               else setError(res.error);
             })

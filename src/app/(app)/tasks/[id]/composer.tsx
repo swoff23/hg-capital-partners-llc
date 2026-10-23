@@ -5,6 +5,7 @@ import { MediaUploadTray, useMediaUploader } from "@/components/media-uploader";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useToast, useToastInset } from "@/components/toast";
 import { Button } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { cn } from "@/lib/utils";
@@ -135,7 +136,8 @@ export function Composer({
     const body = text;
     const attachmentIds = ready.map((r) => r.id);
     startSend(async () => {
-      const res = await addTaskComment(taskId, { body, visibility, attachmentIds });
+      // The draft and the files stay until it's sent, so a failure loses nothing.
+      const res = await callAction(() => addTaskComment(taskId, { body, visibility, attachmentIds }));
       if (!res.ok) {
         toast({ message: res.error });
         return;
@@ -147,7 +149,7 @@ export function Composer({
 
   function unready(r: ComposerDraft) {
     forget([r.id]);
-    void deleteTaskFile(r.id).then((res) => {
+    void callAction(() => deleteTaskFile(r.id)).then((res) => {
       if (!res.ok) toast({ message: `Couldn't remove ${r.filename}.` });
     });
   }

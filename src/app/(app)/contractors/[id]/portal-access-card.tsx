@@ -4,7 +4,7 @@ import { Copy, MessageSquareText } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, buttonClass } from "@/components/ui";
-import type { ActionResult } from "@/lib/action-result";
+import { callAction, type ActionResult } from "@/lib/action-result";
 import { firstName } from "@/lib/names";
 import { loginTextBody, smsHref } from "@/lib/portal/login-text";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,7 @@ export function PortalAccessCard({
   function act<T>(action: () => Promise<ActionResult<T>>, onOk: (data: T) => void) {
     setError("");
     start(async () => {
-      const res = await action();
+      const res = await callAction(action);
       if (res.ok) onOk(res.data);
       else setError(res.error);
     });

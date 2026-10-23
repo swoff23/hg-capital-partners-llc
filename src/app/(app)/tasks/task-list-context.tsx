@@ -1,7 +1,7 @@
 "use client";
-import { createContext, useContext, useOptimistic, useTransition, type ReactNode } from "react";
+import { createContext, useContext, useOptimistic, useState, useTransition, type ReactNode } from "react";
 import { useToast } from "@/components/toast";
-import { GENERIC_ERROR, type ActionResult } from "@/lib/action-result";
+import { callAction, type ActionResult } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
 import {
   applyPatch,
@@ -33,6 +33,8 @@ interface TaskListApi {
   setDone: (task: ListTask, done: boolean) => void;
   approve: (task: ListTask) => void;
   sendBack: (task: ListTask, note: string) => void;
+  /** A Send back note that didn't go through, to start the sheet with next time. */
+  sendBackDraft: (taskId: string) => string;
 }
 
 const TaskListContext = createContext<TaskListApi | null>(null);
@@ -47,18 +49,26 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
   const [tasks, patch] = useOptimistic(rows, applyPatch);
   const [, startTransition] = useTransition();
   const { toast } = useToast();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
-  function run<T>(optimistic: ListPatch, action: () => Promise<ActionResult<T>>, onDone?: (data: T) => void) {
+  function run<T>(optimistic: ListPatch, action: () => Promise<ActionResult<T>>, onDone?: (data: T) => void, onFailed?: () => void) {
     startTransition(async () => {
       patch(optimistic);
-      let result: ActionResult<T>;
-      try {
-        result = await action();
-      } catch {
-        result = { ok: false, error: GENERIC_ERROR };
-      }
+      const result = await callAction(action);
       if (result.ok) onDone?.(result.data);
-      else toast({ message: result.error });
+      else {
+        toast({ message: result.error });
+        onFailed?.();
+      }
+    });
+  }
+
+  function keepDraft(taskId: string, note: string | null) {
+    setDrafts((all) => {
+      const next = { ...all };
+      if (note) next[taskId] = note;
+      else delete next[taskId];
+      return next;
     });
   }
 
@@ -107,9 +117,15 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
       run(
         { kind: "status", id: task.id, status: "IN_PROGRESS" },
         () => sendBackTask(task.id, note),
-        () => toast({ message: who ? `Sent back to ${who}` : "Sent back" }),
+        () => {
+          keepDraft(task.id, null);
+          toast({ message: who ? `Sent back to ${who}` : "Sent back" });
+        },
+        // The row left Needs review while it saved, so its sheet is gone: keep the note for the next try.
+        () => keepDraft(task.id, note),
       );
     },
+    sendBackDraft: (taskId) => drafts[taskId] ?? "",
   };
 
   return <TaskListContext value={api}>{children}</TaskListContext>;
