@@ -19,14 +19,32 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
 };
 
+/**
+ * Which session a route loads with: "staff" for (app) pages, "portal" (the
+ * fixture contractor from setup.ts) for (portal) pages. Public pages and
+ * /login load signed out. "portal-welcome" is the second fixture, still on
+ * its starting password, for the one page only it can see.
+ */
+export type RouteSession = "none" | "staff" | "portal" | "portal-welcome";
+
 export interface Route {
   /** The URL pattern, e.g. /deals/[id] */
   pattern: string;
   /** SAMPLE_PARAMS keys for its dynamic segments, in order */
   params: string[];
-  /** Under (app), so it needs a session. Public pages and /login load signed out. */
-  signedIn: boolean;
+  session: RouteSession;
 }
+
+const SESSION_BY_GROUP: Record<string, RouteSession> = { "(app)": "staff", "(portal)": "portal" };
+
+/**
+ * Pages that need a different session from their group's, by URL pattern.
+ * "Choose your own password" sends anyone who already chose one on to /p, so
+ * it's checked as the fixture that hasn't. setup.ts fails on a stale key.
+ */
+export const ROUTE_SESSION_OVERRIDE: Record<string, RouteSession> = {
+  "/p/welcome/password": "portal-welcome",
+};
 
 function findPages(dir: string, segments: string[] = []): string[][] {
   const found: string[][] = [];
@@ -51,7 +69,9 @@ export function listRoutes(): Route[] {
       const params = visible
         .map((seg, i) => (seg.startsWith("[") ? `${visible[i - 1] ?? ""}/${seg}` : null))
         .filter((k): k is string => k !== null);
-      return { pattern: "/" + visible.join("/"), params, signedIn: segments[0] === "(app)" };
+      const pattern = "/" + visible.join("/");
+      const session = ROUTE_SESSION_OVERRIDE[pattern] ?? SESSION_BY_GROUP[segments[0]] ?? "none";
+      return { pattern, params, session };
     })
     .sort((a, b) => a.pattern.localeCompare(b.pattern));
 }

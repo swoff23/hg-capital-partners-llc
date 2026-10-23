@@ -61,6 +61,32 @@ test("QBO_ENVIRONMENT and QBO_HISTORY_START are validated", () => {
   assert.equal(parseEnv({ ...base, QBO_ENVIRONMENT: "production", QBO_HISTORY_START: "2025-07" }).QBO_HISTORY_START, "2025-07");
 });
 
+test("portalEnabled is on only for 1 or true", () => {
+  assert.equal(parseEnv(base).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "" }).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "0" }).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "false" }).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "1" }).portalEnabled, true);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "TRUE" }).portalEnabled, true);
+  assert.throws(() => parseEnv({ ...base, PORTAL_ENABLED: "yes" }), EnvError);
+});
+
+test("email is null unless both Resend keys are present", () => {
+  assert.equal(parseEnv({ ...base, RESEND_API_KEY: "re_x" }).email, null);
+  assert.equal(parseEnv({ ...base, EMAIL_FROM: "HG <a@b.c>" }).email, null);
+  assert.deepEqual(parseEnv({ ...base, RESEND_API_KEY: "re_x", EMAIL_FROM: "HG <a@b.c>" }).email, {
+    apiKey: "re_x",
+    from: "HG <a@b.c>",
+  });
+});
+
+test("appUrl defaults to localhost in dev, is required in production, drops a trailing slash", () => {
+  assert.equal(parseEnv({ NODE_ENV: "development" }).appUrl, "http://localhost:3000");
+  assert.throws(() => parseEnv(base).appUrl, EnvError);
+  assert.equal(parseEnv({ ...base, APP_URL: "https://hg.example.com/" }).appUrl, "https://hg.example.com");
+  assert.throws(() => parseEnv({ ...base, APP_URL: "hg.example.com" }), EnvError);
+});
+
 test("NODE_ENV defaults to development", () => {
   const env = parseEnv({});
   assert.equal(env.NODE_ENV, "development");

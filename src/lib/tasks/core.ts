@@ -125,6 +125,12 @@ async function syncAssigneeAccess(tx: Tx, taskId: string, contactId: string | nu
   });
 }
 
+/**
+ * The same, for the Asana importer (src/lib/asana/import.ts), which writes
+ * task rows itself so it can keep Asana's ids and timestamps.
+ */
+export { syncAssigneeAccess as grantAssigneeAccess };
+
 // ---------------------------------------------------------------------------
 // Notifications (sent later by src/lib/notifications/outbox.ts)
 // ---------------------------------------------------------------------------
@@ -354,8 +360,12 @@ export function toggleDone(tx: Tx, task: Pick<Task, "id" | "status">, p: Princip
 // Repeats
 // ---------------------------------------------------------------------------
 
-/** Create the next copy of a finished repeating task. Returns its id, or null when it doesn't repeat. */
-async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Date): Promise<string | null> {
+/**
+ * Create the next copy of a finished repeating task. Returns its id, or null
+ * when it doesn't repeat. Exported for the Asana delta, which closes tasks
+ * completed in Asana without going through setStatus.
+ */
+export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Date): Promise<string | null> {
   const rule = parseRepeatRule(done.repeatRule);
   if (!rule) return null;
   const from = toYmd(done.dueDate) ?? todayYmdEastern(now);

@@ -44,6 +44,8 @@ next-env.d.ts
 
 # HG — private source data & migration artifacts (never commit: contains PII, EINs, lockbox codes)
 /_private/
+# pg_dump backups (production data); keep them under _private/backups/
+*.dump
 /migration-archive/
 /migration-report.md
 *.xlsx

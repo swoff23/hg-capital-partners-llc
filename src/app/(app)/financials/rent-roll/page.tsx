@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { QboBasis } from "@prisma/client";
+import { requireUser } from "@/lib/auth";
 import { Card, CardBody, EmptyState, Table, Td, Th } from "@/components/ui";
 import { getRentRoll } from "@/lib/quickbooks/queries";
 import { fmtCents, PartialLabel, SourceBadge } from "../_components/ui";
@@ -7,6 +8,7 @@ import { fmtCents, PartialLabel, SourceBadge } from "../_components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function RentRollPage({ searchParams }: PageProps<"/financials/rent-roll">) {
+  await requireUser(); // here as well as in the layout, which doesn't gate every render
   const sp = await searchParams;
   const basis: QboBasis = sp.basis === "accrual" ? "ACCRUAL" : "CASH";
   const roll = await getRentRoll(basis);

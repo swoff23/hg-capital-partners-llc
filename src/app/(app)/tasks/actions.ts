@@ -1,9 +1,10 @@
 "use server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
-import { withLog } from "@/lib/server-action";
+import { withLog, withResult } from "@/lib/server-action";
 import * as tasks from "@/lib/tasks/service";
 
 /**
@@ -84,16 +85,34 @@ export async function patchTask(id: string, data: z.input<typeof patchSchema>) {
 
 /* ---------------- Attachments (files in Vercel Blob) ---------------- */
 
-export async function recordTaskAttachment(taskId: string, data: tasks.AttachmentInput) {
-  return withLog("recordTaskAttachment", async () => {
+// Where the browser put the file and what to call it. Never its URL, size or
+// type: the service reads those from Blob itself. Shared unless the composer
+// says Internal (D15).
+const uploadedSchema = z
+  .object({
+    pathname: z.string().min(1).max(300),
+    filename: z.string().min(1).max(255),
+    width: z.number().int().positive().max(20000).nullish(),
+    height: z.number().int().positive().max(20000).nullish(),
+    durationSec: z.number().positive().max(24 * 3600).nullish(),
+    thumbPathname: z.string().min(1).max(300).nullish(),
+    posterPathname: z.string().min(1).max(300).nullish(),
+    visibility: z.enum(["SHARED", "INTERNAL"]).default("SHARED"),
+  })
+  .strict();
+
+/** After the browser finished uploading straight to Blob. Returns a message instead of throwing, for the uploader to show. */
+export async function recordTaskAttachment(taskId: string, data: z.input<typeof uploadedSchema>): Promise<ActionResult> {
+  return withResult("recordTaskAttachment", async () => {
     const user = await requireUser();
-    await tasks.recordTaskAttachment(taskId, data, tasks.staffPrincipal(user));
+    const { visibility, ...file } = uploadedSchema.parse(data);
+    await tasks.recordTaskAttachment(z.string().min(1).parse(taskId), file, tasks.staffPrincipal(user), { visibility });
   });
 }
 
 export async function deleteTaskAttachment(attachmentId: string) {
   return withLog("deleteTaskAttachment", async () => {
     await requireUser();
-    await tasks.deleteTaskAttachment(attachmentId);
+    await tasks.deleteTaskAttachment(z.string().min(1).parse(attachmentId));
   });
 }
