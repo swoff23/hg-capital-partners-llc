@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { todayYmdEastern } from "@/lib/dates";
-import { shouldRefresh, type ReturnTrigger } from "@/lib/refresh-on-return";
+import { ONLINE_SETTLE_MS, shouldRefresh, type ReturnTrigger } from "@/lib/refresh-on-return";
 
 /** How often a showing tab checks whether the Eastern day has rolled over. */
 const CLOCK_MS = 60_000;
@@ -43,7 +43,8 @@ export function RefreshOnReturn() {
     function consider(trigger: ReturnTrigger) {
       const now = Date.now();
       const today = todayYmdEastern();
-      if (!shouldRefresh(trigger, { pathname, loadedDay, today, sinceLastMs: now - lastAt })) return;
+      const state = { pathname, loadedDay, today, sinceLastMs: now - lastAt, online: navigator.onLine };
+      if (!shouldRefresh(trigger, state)) return;
       // Left for the next return, which asks again.
       if (holdsTyping()) return;
       loadedDay = today;
@@ -60,7 +61,11 @@ export function RefreshOnReturn() {
       hiddenAt = null;
       consider({ kind: "visible", hiddenMs });
     }
-    const onOnline = () => consider({ kind: "online" });
+    let onlineTimer: number | undefined;
+    function onOnline() {
+      window.clearTimeout(onlineTimer);
+      onlineTimer = window.setTimeout(() => consider({ kind: "online" }), ONLINE_SETTLE_MS);
+    }
     const onPageShow = (e: PageTransitionEvent) => consider({ kind: "pageshow", persisted: e.persisted });
     const clock = window.setInterval(() => {
       if (document.visibilityState === "visible") consider({ kind: "clock" });
@@ -74,6 +79,7 @@ export function RefreshOnReturn() {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("pageshow", onPageShow);
       window.clearInterval(clock);
+      window.clearTimeout(onlineTimer);
     };
   }, [router, pathname]);
 

@@ -10,6 +10,10 @@
  *  - the Buffalo calendar day has changed since the page loaded, so "Today"
  *    and "3d ago" are right again.
  *
+ * Never while the device is offline: in Next 16 a refresh whose fetch fails
+ * falls back to a full browser navigation, which swaps the tab for the
+ * browser's offline page. The "online" trigger catches up once it's back.
+ *
  * Pure; see refresh-on-return.test.ts.
  */
 import type { Ymd } from "./dates";
@@ -20,15 +24,31 @@ export const STALE_AFTER_MS = 60_000;
 /** One restore can fire pageshow and visibilitychange together; it refreshes once. */
 export const MIN_GAP_MS = 5_000;
 
+/** Wait this long after "online" before refreshing; the interface can come up before requests get through. */
+export const ONLINE_SETTLE_MS = 2_000;
+
 /**
- * Pages that don't refresh by themselves yet. A refresh under the property
- * page's open editors would drop what's typed in Details, Loan, Insurance and
- * Notes (their forms are keyed by version) and would let a stale Units,
- * Rentals or Building CapEx draft past the conflict check (it saves with the
- * version prop, which the refresh moves on). Drop the entry once those
- * editors keep their draft and the version they opened with.
+ * Pages that don't refresh by themselves yet. A refresh can turn into a full
+ * reload (a deploy since the tab loaded, a failed or non-OK response), and
+ * these pages hold controlled drafts that a reload wipes and holdsTyping
+ * can't see.
+ *
+ *  - The property page: a refresh under its open editors would drop what's
+ *    typed in Details, Loan, Insurance and Notes (their forms are keyed by
+ *    version) and would let a stale Units, Rentals or Building CapEx draft
+ *    past the conflict check (it saves with the version prop, which the
+ *    refresh moves on). Drop the entry once those editors keep their draft
+ *    and the version they opened with.
+ *  - The move-in form editor: the whole schema is one draft saved with Save.
+ *  - Applying a playbook: the filled fields, ticked rows and due dates are a
+ *    draft, and its rows are built once from the items and read by index, so
+ *    a refresh that changes the playbook's items breaks the page.
  */
-const HELD: readonly RegExp[] = [/^\/properties\/[^/]+\/?$/];
+const HELD: readonly RegExp[] = [
+  /^\/properties\/[^/]+\/?$/,
+  /^\/settings\/move-in-form\/?$/,
+  /^\/templates\/[^/]+\/apply\/?$/,
+];
 
 export type ReturnTrigger =
   | { kind: "visible"; hiddenMs: number }
@@ -44,6 +64,8 @@ export type ReturnState = {
   today: Ymd;
   /** Since the page loaded or last refreshed. */
   sinceLastMs: number;
+  /** navigator.onLine at the moment of the trigger. */
+  online: boolean;
 };
 
 export function refreshHeld(pathname: string): boolean {
@@ -51,6 +73,7 @@ export function refreshHeld(pathname: string): boolean {
 }
 
 export function shouldRefresh(trigger: ReturnTrigger, s: ReturnState): boolean {
+  if (!s.online) return false;
   if (refreshHeld(s.pathname)) return false;
   if (s.sinceLastMs < MIN_GAP_MS) return false;
   if (s.today !== s.loadedDay) return true;
