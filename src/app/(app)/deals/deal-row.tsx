@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Td } from "@/components/ui";
 import { Tooltip } from "@/components/tooltip";
 import { DEAL_STATUSES, dealStatusTone, toneClass } from "@/lib/config";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, fmtMoney } from "@/lib/utils";
 import { patchDeal } from "./actions";
 
 export type DealRow = {
@@ -19,13 +19,43 @@ export type DealRow = {
   nextAction: string | null;
   sourceUrl: string | null;
   updatedAt: string;
-  /** Most recent manual activity notes, newest first — 0, 1, or 2 entries. */
-  latestNotes: { body: string; date: string }[];
+  /** Most recent notes (typed or imported, never change entries), newest first: 0, 1, or 2. `date` is null for an undated imported line. */
+  latestNotes: { body: string; date: string | null }[];
 };
 
 function priceDisplay(n: number | null, raw: string | null): string {
-  if (n != null) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  return raw ?? "";
+  return n != null ? fmtMoney(n) : (raw ?? "");
+}
+
+const cell =
+  "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-border focus:border-primary focus:bg-surface";
+
+/**
+ * A price field. Touch screens give every field 16px text (globals.css) so
+ * iOS doesn't zoom on focus, and at 16px a six-figure price no longer fits
+ * the column. So on touch the figure is drawn at the list's size over the
+ * field, and the field's own text shows only while it's being edited. A
+ * mouse sees the plain field.
+ */
+function PriceCell({ value, onSave }: { value: string; onSave: (next: string) => void }) {
+  const [typed, setTyped] = useState(value);
+  return (
+    <div className="relative">
+      <input
+        defaultValue={value}
+        onChange={(e) => setTyped(e.target.value)}
+        onBlur={(e) => onSave(e.target.value)}
+        placeholder="—"
+        className={`${cell} peer tabular-nums pointer-coarse:text-transparent pointer-coarse:focus:text-foreground`}
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 hidden items-center overflow-hidden border border-transparent px-1 text-xs tabular-nums pointer-coarse:flex pointer-coarse:peer-focus:hidden"
+      >
+        <span className={typed ? "truncate" : "truncate text-muted"}>{typed || "—"}</span>
+      </span>
+    </div>
+  );
 }
 
 export function DealRowEditable({ deal }: { deal: DealRow }) {
@@ -41,14 +71,13 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
     });
   }
 
-  const cell =
-    "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-border focus:border-primary focus:bg-surface";
-
   // Normally the dropdown is just DEAL_STATUSES in pipeline order. Only prepend deal.status
   // when it's a legacy value no longer in that list, so it still shows up as selected.
   const statusOptions: readonly string[] = (DEAL_STATUSES as readonly string[]).includes(deal.status)
     ? DEAL_STATUSES
     : [deal.status, ...DEAL_STATUSES];
+  const theirPrice = priceDisplay(deal.theirPrice, deal.theirPriceRaw);
+  const ourPrice = priceDisplay(deal.ourPrice, deal.ourPriceRaw);
 
   return (
     <tr className={`hover:bg-background ${pending ? "opacity-60" : ""} ${flash ? "bg-green-500/10" : ""}`}>
@@ -103,25 +132,17 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
       </Td>
 
       <Td>
-        <input
+        <PriceCell
           key={`tp-${deal.theirPrice}-${deal.theirPriceRaw}`}
-          defaultValue={priceDisplay(deal.theirPrice, deal.theirPriceRaw)}
-          onBlur={(e) =>
-            save({ theirPriceRaw: e.target.value }, priceDisplay(deal.theirPrice, deal.theirPriceRaw), e.target.value)
-          }
-          placeholder="—"
-          className={`${cell} tabular-nums`}
+          value={theirPrice}
+          onSave={(next) => save({ theirPriceRaw: next }, theirPrice, next)}
         />
       </Td>
       <Td>
-        <input
+        <PriceCell
           key={`op-${deal.ourPrice}-${deal.ourPriceRaw}`}
-          defaultValue={priceDisplay(deal.ourPrice, deal.ourPriceRaw)}
-          onBlur={(e) =>
-            save({ ourPriceRaw: e.target.value }, priceDisplay(deal.ourPrice, deal.ourPriceRaw), e.target.value)
-          }
-          placeholder="—"
-          className={`${cell} tabular-nums`}
+          value={ourPrice}
+          onSave={(next) => save({ ourPriceRaw: next }, ourPrice, next)}
         />
       </Td>
 
@@ -129,7 +150,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         {deal.latestNotes.length > 0 && (
           <div className="space-y-0.5">
             {deal.latestNotes.map((n, i) => (
-              <Tooltip key={i} label={`${n.body} (${fmtDate(n.date)})`} className="block truncate">
+              <Tooltip key={i} label={n.date ? `${n.body} (${fmtDate(n.date)})` : n.body} className="block truncate">
                 <span className="truncate">{n.body}</span>
               </Tooltip>
             ))}

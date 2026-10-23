@@ -2,7 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import type { Deal } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { normalizeAddress } from "@/lib/normalize";
+import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
 import { initials } from "@/lib/utils";
 import { isDealStatus, type DealStatus } from "@/lib/config";
@@ -11,7 +11,7 @@ import { logDealChanges } from "./log";
 /**
  * Deal domain: every write to Deal / DealNote goes through here. The server
  * actions authenticate + parse and call in. Rules that live here:
- *   - an address that normalizes to an existing deal's address is a duplicate
+ *   - an address with an existing deal's house number and street is a duplicate
  *   - prices keep the raw text and a parsed Decimal (null when not one number)
  *   - status is validated against DEAL_STATUSES; unknown values are ignored
  *   - every change is diffed and appended to the deal's activity timeline
@@ -30,12 +30,20 @@ function revalidateDeal(id: string): void {
   revalidatePath("/");
 }
 
-/** The existing deal this address would duplicate, or null. */
+/**
+ * The existing deal this address would duplicate, or null: the same house
+ * number and street however it was typed, with no street type, ZIP or town
+ * that disagrees (see sameStreetAddress), newest first. The house number
+ * narrows the rows; the street match is done here.
+ */
 export async function findDuplicateDeal(address: string): Promise<Deal | null> {
-  const dup = await prisma.deal.findFirst({
-    where: { address: { contains: address.split(",")[0].trim(), mode: "insensitive" } },
+  const lead = streetKey(address).split(" ")[0];
+  if (!lead) return null;
+  const candidates = await prisma.deal.findMany({
+    where: { address: { contains: lead, mode: "insensitive" } },
+    orderBy: { updatedAt: "desc" },
   });
-  return dup && normalizeAddress(dup.address) === normalizeAddress(address) ? dup : null;
+  return candidates.find((d) => sameStreetAddress(d.address, address)) ?? null;
 }
 
 export interface NewDeal {

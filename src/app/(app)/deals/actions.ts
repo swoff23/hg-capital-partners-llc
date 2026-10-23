@@ -4,7 +4,8 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
 import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "@/lib/config";
-import { withLog } from "@/lib/server-action";
+import type { ActionResult } from "@/lib/action-result";
+import { withLog, withResult } from "@/lib/server-action";
 import * as deals from "@/lib/deals/service";
 
 /**
@@ -25,12 +26,22 @@ const dealSchema = z.object({
   passReason: z.string().optional(),
 });
 
-export async function createDeal(formData: FormData) {
-  return withLog("createDeal", async () => {
+/** The deal an address already belongs to, for the New deal form to point at. */
+export type ExistingDeal = { id: string; address: string; status: string };
+
+/**
+ * Creates the deal and opens it. When the address is already a deal, nothing
+ * is saved and that deal comes back, so the form keeps what was typed.
+ */
+export async function createDeal(formData: FormData): Promise<ActionResult<{ duplicateOf: ExistingDeal }>> {
+  return withResult("createDeal", async () => {
     const user = await requireUser();
     const p = dealSchema.parse(formToObject(formData));
     const r = await deals.createDeal(p, user);
-    if (r.duplicateOf) redirect(`/deals/${r.duplicateOf.id}?dup=1`);
+    if (r.duplicateOf) {
+      const { id, address, status } = r.duplicateOf;
+      return { duplicateOf: { id, address, status } };
+    }
     redirect(`/deals/${r.deal.id}`);
   });
 }

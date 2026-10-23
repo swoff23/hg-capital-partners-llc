@@ -20,12 +20,19 @@ const propertySchema = z.object({
   status: z.string().optional(),
 });
 
-export async function createProperty(formData: FormData) {
-  return withLog("createProperty", async () => {
+/** The property an address already belongs to, for the New property form to point at. */
+export type ExistingProperty = { id: string; address: string };
+
+/**
+ * Creates the property and opens it. When the address is already a property,
+ * nothing is saved and that property comes back, so the form keeps what was typed.
+ */
+export async function createProperty(formData: FormData): Promise<ActionResult<{ duplicateOf: ExistingProperty }>> {
+  return withResult("createProperty", async () => {
     await requireUser();
     const p = propertySchema.parse(formToObject(formData));
     const r = await properties.createProperty(p);
-    if (r.duplicateOf) redirect(`/properties/${r.duplicateOf.id}?dup=1`);
+    if (r.duplicateOf) return { duplicateOf: { id: r.duplicateOf.id, address: r.duplicateOf.address } };
     redirect(`/properties/${r.property.id}`);
   });
 }

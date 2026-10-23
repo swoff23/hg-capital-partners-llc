@@ -73,11 +73,12 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
       orderBy: dbOrderBy(sortField, sortDesc),
       ...(sortField === "status" ? {} : { take: 300 }),
       include: {
-        // Most recent manually-entered activity notes — shown as a column so they're visible
-        // without opening each deal. Auto-logged "change" entries are excluded.
+        // Most recent notes, typed here or imported from the spreadsheet, shown as a column so
+        // they're visible without opening each deal. Auto-logged "change" entries are excluded.
+        // Undated imported lines sort after every dated one.
         notes: {
-          where: { source: "manual" },
-          orderBy: [{ noteDate: "desc" }, { createdAt: "desc" }],
+          where: { source: { not: "change" } },
+          orderBy: [{ noteDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
           take: 2,
         },
       },
@@ -145,9 +146,10 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                       nextAction: d.nextAction,
                       sourceUrl: d.sourceUrl,
                       updatedAt: d.updatedAt.toISOString(),
+                      // An undated imported line has no date of its own; its createdAt is the import run.
                       latestNotes: d.notes.map((n) => ({
                         body: n.body,
-                        date: (n.noteDate ?? n.createdAt).toISOString(),
+                        date: n.noteDate?.toISOString() ?? null,
                       })),
                     }}
                   />
