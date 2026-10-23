@@ -167,7 +167,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         />
       </Td>
 
-      <Td className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted">
+      <Td className="num overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted">
         {fmtDate(deal.updatedAt)}
       </Td>
     </tr>

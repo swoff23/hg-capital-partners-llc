@@ -56,6 +56,17 @@ export const brandTokens = {
 
 export type BrandToken = keyof typeof brandTokens;
 
+/**
+ * The few dark tokens that something outside CSS needs: the browser's theme
+ * color (src/app/layout.tsx) and the favicon's dark-ground edge
+ * (src/lib/monogram-art.ts). Each mirrors the value in globals.css's
+ * :root[data-theme="dark"] block; brand-tokens.test.ts checks them too.
+ */
+export const brandTokensDark = {
+  canvas: "#0a0e17",
+  line: "#212835",
+} as const satisfies Partial<Record<BrandToken, string>>;
+
 /** The CSS custom property a token mirrors: "fill1" is "--fill-1", "toastFg2" is "--toast-fg-2". */
 export function cssVarName(token: BrandToken): string {
   return "--" + token.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()).replace(/\d+/g, (d) => "-" + d);

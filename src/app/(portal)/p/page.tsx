@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import { Monogram } from "@/components/monogram";
+import { BRAND } from "@/lib/brand";
 import { todayYmdEastern } from "@/lib/dates";
 import { JOBS_GROUP_COOKIE, firstName, parseJobsGroup, parseJobsTab } from "@/lib/portal/job-view";
 import { listMyJobs } from "@/lib/portal/queries";
@@ -16,9 +18,12 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
 
   return (
     <>
-      <header className="border-b border-border bg-surface">
+      <header className="border-b border-line bg-canvas">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4 sm:px-6">
-          <span className="shrink-0 text-sm font-semibold tracking-tight">HG Capital</span>
+          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1">
+            <Monogram size={32} />
+            {BRAND.portal}
+          </span>
           <AccountMenu name={principal.label} email={principal.email} />
         </div>
       </header>

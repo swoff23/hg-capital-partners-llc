@@ -31,9 +31,11 @@ export type PhotoThumbSize = keyof typeof SIZES;
  * `failed` marks an upload that didn't go up: a 2px --danger ring in place
  * of the edge, and with `onRetry` a Retry pill near the bottom.
  *
- * `alt` names the place: "Front of 767 Prospect Ave". Pass `unoptimized`
- * for a photo behind a session-checked route, which the image optimizer
- * can't fetch (it forwards no cookies).
+ * `alt` names the place: "Front of 767 Prospect Ave". A photo behind a
+ * session-checked route (/api/files/...) is always served unoptimized, since
+ * the image optimizer forwards no cookies and would cache it publicly; pass
+ * `unoptimized` for any other such route. Public Vercel Blob photos from our
+ * store are allowed in next.config.ts.
  */
 export function PhotoThumb({
   src,
@@ -70,7 +72,7 @@ export function PhotoThumb({
           alt={alt}
           fill
           sizes={sizes}
-          unoptimized={unoptimized}
+          unoptimized={unoptimized || src.startsWith("/api/files/")}
           preload={preload}
           onLoad={() => setLoaded(true)}
           onError={() => setBroken(true)}

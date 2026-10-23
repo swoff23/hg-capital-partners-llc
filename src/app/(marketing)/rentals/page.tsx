@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { PhotoCarousel } from "./photo-carousel";
 
 export const metadata: Metadata = {
-  title: "Rentals | HG Capital Partners",
+  title: { absolute: `Rentals | ${BRAND.company}` },
   description: "Available apartments in Buffalo, New York.",
 };
 

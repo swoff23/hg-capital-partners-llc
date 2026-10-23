@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { brandTokens, cssVarName, type BrandToken } from "./brand-tokens";
+import { brandTokens, brandTokensDark, cssVarName, type BrandToken } from "./brand-tokens";
 
 function repoRoot(): string {
   let dir = process.cwd();
@@ -42,4 +42,17 @@ test("brandTokens mirrors every hex token on :root in globals.css, value for val
   // Same names both ways, so a token added on one side only fails too.
   assert.deepEqual(Object.keys(mirror).sort(), Object.keys(css).sort());
   assert.deepEqual(mirror, css);
+});
+
+test("brandTokensDark matches the dark block in globals.css", () => {
+  const css = fs.readFileSync(path.join(repoRoot(), "src", "app", "globals.css"), "utf8");
+  const block = css.match(/^:root\[data-theme="dark"\],\s*\[data-surface="public"\] \{([\s\S]*?)^\}/m);
+  assert.ok(block, "globals.css has no dark `:root[data-theme=\"dark\"]` block at the start of a line");
+  const body: string = block[1];
+  for (const [token, hex] of Object.entries(brandTokensDark)) {
+    const name = cssVarName(token as BrandToken);
+    const m: RegExpMatchArray | null = body.match(new RegExp(`${name}\\s*:\\s*(#[0-9a-f]{3,8})\\s*;`, "i"));
+    assert.ok(m, `${name} is not a hex token in the dark block`);
+    assert.equal(hex.toLowerCase(), m[1].toLowerCase(), name);
+  }
 });

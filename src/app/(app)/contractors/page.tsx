@@ -52,7 +52,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                   </Td>
                   <Td className="text-xs text-muted">{c.company ?? "—"}</Td>
                   <Td className="max-w-xs text-xs">{cleanTrades(c.trades) ?? "—"}</Td>
-                  <Td className="whitespace-nowrap text-xs">
+                  <Td className="num whitespace-nowrap text-xs">
                     <ContactLink href={telHref(c.phoneE164 ?? c.phone)}>{c.phone ?? "—"}</ContactLink>
                   </Td>
                   <Td className="text-xs">

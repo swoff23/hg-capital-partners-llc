@@ -93,27 +93,24 @@ export function FilesList({
             </>
           }
           onClose={close}
+          cancelLabel="Keep it"
+          busy={pending}
           actions={
-            <>
-              <Button variant="secondary" size="sm" disabled={pending} onClick={close}>
-                Keep it
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  start(async () => {
-                    setError("");
-                    const res = await callAction(() => onDelete(target.id));
-                    if (res.ok) setTarget(null);
-                    else setError(res.error);
-                  })
-                }
-              >
-                {pending ? "Deleting…" : target.kind === "LINK" ? "Delete link" : "Delete file"}
-              </Button>
-            </>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  setError("");
+                  const res = await callAction(() => onDelete(target.id));
+                  if (res.ok) setTarget(null);
+                  else setError(res.error);
+                })
+              }
+            >
+              {pending ? "Deleting…" : target.kind === "LINK" ? "Delete link" : "Delete file"}
+            </Button>
           }
         />
       )}

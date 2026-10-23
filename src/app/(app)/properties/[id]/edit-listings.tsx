@@ -196,11 +196,9 @@ export function ListingsSection({
           title="Discard unsaved changes?"
           body="You have unsaved changes to Rentals. Save them, or discard and exit."
           onClose={() => setConfirmOpen(false)}
+          cancelLabel="Keep editing"
           actions={
             <>
-              <Button size="sm" variant="secondary" onClick={() => setConfirmOpen(false)}>
-                Keep editing
-              </Button>
               <Button size="sm" variant="secondary" onClick={discard}>
                 Discard
               </Button>

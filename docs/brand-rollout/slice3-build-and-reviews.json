@@ -1,0 +1,201 @@
+[
+ {
+  "summary": "I built slice 3 (the shell) and the primitive decisions made after slice 2. Typecheck, lint and the 607 unit tests pass, and the device check ended with 0 new errors. Nothing is committed. Two items are not built and are listed under left: the phone tab bar, because the app has no bottom bar today (nav is the drawer), and the phone title collapse, because the phone bar's middle is taken by the search field.\n\nWhat changed:\n- **Sidebar and drawer:** both sit on --canvas and use lucide icons (16px at 1.5 stroke, 20px at 1.75 on touch). Items are 32px with a mouse and 44px on touch (TOUCH_HEIGHT). Idle items are fg-2 with fg-3 icons and fill-1 on hover. The current item is fill-2 with the 2px by 16px act notch and aria-current. The 28px Avatar now sits at the bottom of the sidebar.\n- **Lockup:** the Monogram tile plus \"HG Capital\" (BRAND.app, text-label 600). The words are screen-reader-only below sm. \"HG Capital OS\" is gone everywhere.\n- **Top bar:** below lg it is 52px on canvas over a line rule. From lg it is the 56px desktop header on surface, with its tile centered over the rail's icons. --app-bar-h is 3.25rem, and 3.5rem from 64rem. The shell reads it for height, top and padding, so the sticky Th still follows it.\n- **Portal:** the page is bg-surface with text-fg-1. Both page headers are canvas with a line rule, and /p shows the \"HG Jobs\" lockup (32px tile plus BRAND.portal).\n- **Icons:** src/app/favicon.ico is deleted. src/app/icon.svg is the monogram as path outlines with a dark-ground line edge. apple-icon.tsx makes the 180 full-bleed PNG and icon1.tsx the 512 rounded PNG. All three come from one source, src/lib/monogram-art.ts, which reads brandTokens. I checked the routes against the device-check build: they return 200 and all three link tags are emitted.\n- **Metadata:** the title template is \"%s · HG\" with \"HG Capital\" as the default, and themeColor is #f8f7f3 light and #0a0e17 dark. Pages that set their own titles keep them exactly, via title.absolute with BRAND.company.\n- **Email:** render.ts reads brandTokens and BRAND. The letterhead is a 32px tile (table cell) plus \"HG Capital Partners\" over a 1px gold-deep rule. The button is rounded-md instead of a pill, on canvas, surface and line colors. Content and logic are unchanged and the old tests pass. Two new tests check that every color is a brand token and that the letterhead is right.\n- **Tabular figures:** td and th are out of the global rule; it now covers .num and the figure tokens only. Every numeric cell already carried tabular-nums or numeric except three, which I fixed: the deals Updated date and the contractors phone cells take `num`, and the 5-year CapEx year headers take tabular-nums.\n- **Primitives:**\n  - StatusMark has a fixed 1.5px non-scaling stroke.\n  - Neutral Badge is on fill-2.\n  - Avatar is surface with a line-strong edge and fg-2 initials. 20 and 24px show one initial, 28 and 32px show two, always at 12px. A 28px size was added.\n  - ConfirmDialog is rebuilt on React Aria (details under decisions).\n  - Tooltip has a tap path on touch.\n  - SpotArt has four new drawings: job-done, move-in-sent, request-sent and month-closed.\n  - PhotoThumb always serves /api/files/ unoptimized.\n  - next.config.ts allows our store's public Blob host in images.remotePatterns.\n- **Brand constant:** src/lib/brand.ts already existed. The shell, the layout titles, the public and login titles and email now read BRAND.\n- **docs/components.md:** rows updated or added for the shell, ConfirmDialog, Tooltip, SpotArt, Badge, StatusMark, Avatar, Table, PhotoThumb, Monogram, the monogram art files and chromeIconClass. The Known gaps entries for ConfirmDialog, Tooltip on touch and spot art are removed.\n\nHand checks, outside the device sweep, in Chromium and WebKit, against a local next start of the device-check build on port 3200 (3001 left alone):\n- **ConfirmDialog:** Delete task at 375, 320 and 1280, and the 3-action units discard dialog at 375 and 320 (touch), 320 with a mouse, and 1280. Focus starts inside and stays inside after Tab, Esc closes, focus returns to \"More actions\", and the dialog portals under body. The 3-action dialog stacks full width with the primary on top below sm, and shows \"Keep editing Esc\" in one row at 1280.\n- **Drawer:** at 375 and 320 the items are 44px with no sideways scroll.\n- **Rail:** collapsed and hover-expanded at 1280, light and dark.\n- **Top bar:** 52px on canvas at 375 (light and dark), 56px on surface at 1280.\n- **Tooltip:** on iPad touch, a tap opens it and a tap elsewhere closes it.\n- **Email:** a rendered sample letterhead checked in Chromium.\n\nScreenshot review against after-slice-2:\n- Pages checked: /, /properties, /properties/[id], /tasks, /deals, /financials and /p, on iphone-se and desktop-chrome.\n- What differs is only what this slice meant to change: the shell chrome and lockup, content starting 4px higher under the 52px phone bar, and one-initial avatars on task rows. Neutral badges and the deal-status select are a little darker on fill-2.\n- Table figures line up as before. Address cells wrap the same.",
+  "files": [
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/app-shell.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/nav.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/ui.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/confirm-dialog.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/tooltip.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/spot-art.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/photo-thumb.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/avatar.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/status-badge.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/layout.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/globals.css",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/icon.svg",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/icon1.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/apple-icon.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/favicon.ico (deleted)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/lib/monogram-art.ts",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/lib/monogram-art.test.ts",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/lib/monogram-image.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/lib/brand-tokens.ts",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/lib/brand-tokens.test.ts",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/lib/email/render.ts",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/lib/email/render.test.ts",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/next.config.ts",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/docs/components.md",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/docs/brand-guidelines.md (the guidelines session's uncommitted edits, untouched by me; include in the commit)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(marketing)/layout.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(marketing)/rentals/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(marketing)/residents/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(marketing)/residents/moving-in/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(marketing)/welcome/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/login/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/login/forgot/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/login/reset/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/contractors/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/contractors/[id]/portal-access-card.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/deals/deal-row.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/portfolio-capex.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/properties/[id]/edit-units.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/properties/[id]/edit-listings.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/settings/capex-rules-editor.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/settings/move-in-form/move-in-form-editor.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/tasks/[id]/files-list.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/tasks/[id]/header.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/layout.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/jobs/[id]/page.tsx",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/welcome/password/page.tsx"
+  ],
+  "peerFiles": [
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/tasks/[id]/files-list.tsx (ConfirmDialog caller moved to cancelLabel=\"Keep it\" busy={pending}; actions now the Delete button only)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(app)/tasks/[id]/header.tsx (ConfirmDialog caller moved to cancelLabel=\"Keep it\" busy={deleting}; onClose guard kept)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/layout.tsx (title kept via absolute and BRAND.company; text-foreground to text-fg-1; comment)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/page.tsx (header bg-canvas border-line; HG Jobs lockup: Monogram 32 plus BRAND.portal)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/jobs/[id]/page.tsx (sticky header bg-canvas border-line only)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/app/(portal)/p/welcome/password/page.tsx (viewport themeColor dark canvas only)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/avatar.tsx (spec look; one initial at 20 and 24, two at 28 and 32, 12px; new 28 size; outline accepted but no longer changes the look)",
+   "/Users/connorswofford/dev/hg-capital-partners-llc/.claude/worktrees/skills-grill-me-setup-a0e88f/src/components/status-badge.tsx (StatusMark: vector-effect non-scaling-stroke on every shape, doc comment)"
+  ],
+  "left": [
+   "Phone tab bar: not built. The app has no bottom bar today; below lg the nav lives in the drawer. A tab bar would be a new layout, and someone has to choose which 5 of the 7 sections it shows. Section 9 styles it but doesn't place it. The drawer and its items are restyled and 44px on touch. Decision for Connor or the guidelines session.",
+   "Phone title collapse (section 3): not built. The 52px phone bar has no free slot, because the search field fills its middle at 320 to 768. Showing the h1 title there means collapsing search into an icon button, which is a moved control and a new layout. The IntersectionObserver part is easy once a slot is decided.",
+   "Avatar contractor mark: section 9 gives every avatar the surface ground and line-strong edge, which was the old `outline` contractor style. Team and contractor avatars now look the same, so task rows, the assignee picker and activity lose that cue. The prop is kept and documented. The guidelines should say whether contractors keep a distinct mark.",
+   "themeColor follows the OS scheme, not the in-app theme toggle. With the OS in light and the app toggled to dark, the browser bar stays limestone. A fix would be updating the theme-color meta in THEME_SCRIPT and ThemeToggle, which the spec doesn't cover.",
+   "Brand literals not yet on BRAND, all outside this slice: the public header wordmark and footer \"HG Capital Partners LLC\" (slice 5), the portal copy \"HG jobs\" in src/lib/portal/reset.ts and login-text.ts (copy, kept as is), and QuickBooks entity names (data).",
+   "Kbd candidates where shortcuts already exist, left unprinted to keep this slice small. Both are peer files: the due-date picker's quick-pick keys 1 to 5, and the composer's Send on Cmd+Enter. Global search has no shortcut, so no Find keycap was added.",
+   "TopTabs in nav.tsx still uses the alias classes (border-primary, text-muted for idle; section 9 says idle fg-2). This slice didn't list it, so it's left for whoever owns TopTabs.",
+   "Page gutters (32/24/16) and the list and record widths (1600 / 1200 with a 320 rail) from section 5 aren't applied. The shell keeps p-4 md:p-6 and max-w-6xl, since that change belongs with slice 4's pages.",
+   "The Monogram component (slice 2) centers the line box, so at 24px its letters sit slightly high and left of the tile's optical center. icon.svg centers the cap height and ink exactly. It's worth matching Monogram to it.",
+   "/favicon.ico now returns the HTML 404, since the spec deletes the file. Browsers use the link tags, but a crawler asking for /favicon.ico gets a 13KB HTML page.",
+   "Pages that set themeColor: (marketing)/layout.tsx, the three /login pages and /p/welcome/password set #0a0e17, so the always-dark public and sign-in frames don't get a limestone browser bar. Section 11 lists that for the marketing layout in slice 5; the rest of slice 5's public restyle is untouched.",
+   "Pre-existing lint warnings remain in the callers I touched (raw palette and arbitrary sizes in edit-units, edit-listings, capex-rules-editor, move-in-form-editor, files-list and portfolio-capex), and the hex warnings on the public pages. Those belong to slices 4 and 5."
+  ],
+  "checks": "- npm run typecheck: passed (next typegen plus tsc --noEmit, no errors).\n- npm run lint: 0 errors, 208 warnings. The touched files have no new warnings; the ones in them are pre-existing page literals (raw palette, arbitrary sizes, public hex).\n- npm test: 607 tests, 607 pass, 0 fail. New tests: brandTokensDark against the dark block, icon.svg against monogramSvg(), the favicon and bleed variants, every email color being a brand token, and the letterhead.\n- npm run test:devices: \"186 passed (1.8m). 31 pages on 6 devices. 0 with new errors, 0 with known issues only, 29 with warnings only.\"\n- No files were edited after that run. tests/devices/known-issues.json is unchanged.",
+  "commit": "",
+  "decisions": [
+   "The phone bar is the below-lg bar, so the iPad portrait drawer layout uses it too: 52px on canvas with a line rule. From lg the header is 56px on surface. --app-bar-h is 3.25rem, and 3.5rem from 64rem. The shell reads it with h-, top- and pt-(--app-bar-h), and the sticky Th already used it.",
+   "The lockup stays in the header where \"HG Capital OS\" was, rather than moving into the sidebar. From lg the header is px-5, so the 24px tile centers on the rail's icon column (x=32). The words are sr-only below sm, so the link is still named \"HG Capital\".",
+   "Nav icons are swapped to lucide equivalents: House, TrendingUp, Building2, ChartColumn, SquareCheckBig, Wrench and Settings2, plus Menu, X and Pin in the shell. chromeIconClass (in nav.tsx) sets the size and stroke. In SVG, Tailwind's stroke-[1.5] compiles to 1.5px, which is 1.5 user units, the same as lucide's attribute.",
+   "Sidebar hover turns the label and icon fg-1 as well as the fill-1 ground, following section 6's 'hover and current --fg-1' for icons and matching ghost buttons. Items are px-4 (px-3.5 on touch) so the icon centers in the 48px collapsed rail.",
+   "The drawer and the hover-expanded rail transitions moved to duration-sheet with ease-spring (section 7, side panels). The drawer uses shadow-overlay and bg-scrim; the hover-expanded rail uses shadow-float.",
+   "The sidebar footer uses the shared Avatar at a new 28 size instead of a hand-rolled copy, inset 10px so it centers on the rail's icons. Name and Sign out moved from text-xs to text-meta.",
+   "The shell's hamburger and drawer close buttons are 44px on touch (pointer-coarse:size-11), in addition to the nav items.",
+   "The favicon is real outlines, not live text. I extracted Geist 600 H and G from Chromium's PDF output of the variable font, so the mark renders in Geist wherever no web font loads. The art is centered on the ink and the cap height.",
+   "Icons come from one source: src/lib/monogram-art.ts holds the glyphs and builds the SVG from brandTokens. icon.svg is committed as static text, and a test fails with the regeneration command if it drifts. The apple-icon and 512 icon render the same SVG through next/og's ImageResponse at build time, so a re-brand is a token swap plus regenerating icon.svg.",
+   "The 512 icon is icon1.tsx, a numbered rel=icon (rounded tile), rather than a web manifest. A manifest would need a product call on name and display mode for an origin shared by the app, the portal and the public site.",
+   "icon.svg gets a 1px --line edge (non-scaling) under prefers-color-scheme: dark, so the ink tile doesn't vanish into a dark tab strip.",
+   "Titles: the root default is BRAND.app with the template '%s · HG'. No (app) page sets a title, so all show 'HG Capital'. Public, login and portal titles would have gained ' · HG', so they use title.absolute and read exactly as before. The portal layout keeps its own '%s | HG Capital Partners' template for its children.",
+   "brandTokensDark (canvas and line) was added to brand-tokens.ts with its own test against the dark block, because the existing test requires the light mirror to match :root exactly.",
+   "Email letterhead: the tile is a table cell, not an image, so it shows with images blocked; the letters fall back to the reader's sans. The rule is a full-width 1px gold-deep border under the letterhead. The card is canvas, surface and line, rounded 8, with a rounded-md button.",
+   "ConfirmDialog API: the dialog now draws Cancel itself (cancelLabel, default \"Cancel\"), so it can print the Esc keycap inside it. `actions` holds the rest, primary last, and `busy` disables Cancel and dismissal while an action runs. All 9 call sites are migrated.",
+   "ConfirmDialog stacking: below sm it stacks only when the footer has three children (CSS :has), as in Apple alerts; two actions stay side by side. The keycap is aria-hidden, with aria-keyshortcuts=\"Escape\" on the button. It is hidden on touch (Kbd's rule) and also below sm, where a 320px mouse window has no room.",
+   "Tooltip: a mouse uses pointerenter and pointerleave with the delay. Touch toggles on tap and closes on the next tap elsewhere, a scroll or Esc. The label is clamped inside the viewport with the arrow still on the trigger, and long labels wrap at 20rem. The clamp writes style in a layout effect rather than setting state.",
+   "Tabular figures: number columns that stay left-aligned take `num` instead of `numeric`, so they keep their alignment (the deals Updated date, the contractor phone). The capex year headers take tabular-nums. The due-date calendar's day numbers are centered in fixed cells and were left alone, to avoid an edit in a peer file.",
+   "Remote images: next.config.ts allows only our own store's host, `<storeId>.public.blob.vercel-storage.com`, with the id parsed from BLOB_READ_WRITE_TOKEN at build. With no token, nothing is allowed. PhotoThumb forces unoptimized for any /api/files/ src, since the optimizer forwards no cookies.",
+   "The four SpotArt drawings keep all-clear's rules: a 96 grid, 1.5 strokes in fg-1 and exactly one fill-gold each. The clipboard's clip, the key's bow (with a hole for the ring), a lit attic window over the envelope, and a ribbon on a ledger whose right page ends in a double total rule. Names: job-done, move-in-sent, request-sent, month-closed.",
+   "References used (from the guidelines): Mercury monogram tile https://mobbin.com/screens/d575358b-679b-4d52-aa98-5026970291b3, Linear menu with printed shortcuts https://mobbin.com/screens/83e65fd8-259c-4568-8fa6-5a2269ed4123, Vercel Esc keycap https://mobbin.com/screens/63496168-dbae-470d-9039-6883d8d1e479, Relume red Delete confirm https://mobbin.com/screens/4bc93d85-683e-4461-8e1a-fd1b519f240d, Apple HIG alerts https://developer.apple.com/design/human-interface-guidelines/alerts, Linear Mobile status rings https://mobbin.com/screens/f8a9de1f-ef1c-45e6-8db3-9239bdd5c690, Gusto one-accent line art https://mobbin.com/screens/f74caf21-298d-44dc-af95-bd86acc044db."
+  ]
+ },
+ {
+  "verdict": "ship",
+  "findings": [
+   {
+    "severity": "nit",
+    "file": "src/components/app-shell.tsx",
+    "line": 82,
+    "problem": "The hamburger glyph no longer lines up with the drawer's icon column, which sits right under it when the drawer opens. With a mouse below lg the icon center is at x=24 and the drawer icons are at x=32, 8px apart. On touch it is 26 against 32. Before this slice the gap was 2px (28 against 30). The desktop tile was aligned to the rail at x=32 but the phone hamburger was not (CLAUDE.md: things that should line up, line up exactly).",
+    "evidence": "Header px-4 (16) with -ml-2 gives a left edge of 8 and a 32px button, so the 16px icon centers at 24. On touch, -ml-3 gives a left edge of 4 and a 44px button, so the 20px icon centers at 26. In the drawer, aside p-2 (8) plus item px-4 (16) puts the icon at 24 to 40, center 32. On touch, 8 + px-3.5 (14) puts it at 22 to 42, center 32 (nav.tsx:64).",
+    "fix": "Drop -ml-2 so the 32px button starts at the 16px gutter (center 32), and use pointer-coarse:-ml-1.5 so the 44px button starts at 10 (center 32)."
+   },
+   {
+    "severity": "nit",
+    "file": "src/lib/monogram-art.ts",
+    "line": 50,
+    "problem": "The favicon's 1px --line edge on dark grounds draws at only half a pixel along the straight sides. The stroke is centered on the tile boundary at 0 and 100, and the SVG viewport clips the outer half. Spec section 6 asks for a 1px --line edge.",
+    "evidence": "I rendered src/app/icon.svg in Chromium with colorScheme dark at 100px on black. The edge pixel at (20,70) is #1a2433, which is a blend of --line #212835 and the ink tile #152133, not #212835. The rounded corners keep the full width, so the edge is uneven too.",
+    "fix": "Clip the edge rect to the tile shape with a clipPath and use stroke-width 2 (non-scaling), so exactly 1px lands inside on every side. Then regenerate icon.svg."
+   },
+   {
+    "severity": "nit",
+    "file": "src/components/confirm-dialog.tsx",
+    "line": 54,
+    "problem": "In a two-action dialog both button labels wrap to two lines at 320px on touch. The rebuilt footer only stacks when it has three children. The move-in form editor's 'Keep editing' / 'Discard changes' dialog is the one affected. The geometry is the same as before the rebuild, but this slice owns the footer layout now.",
+    "evidence": "I measured the built CSS and Geist in Chromium and WebKit at 320x600 with hasTouch. The footer is 246px wide, the buttons shrink to 106px and 132px, and both labels render on two lines (screenshot dlg2_320_z.png in the scratchpad). At 375 on touch and at 320 with a mouse they fit on one line. The three-action units and listings footers fit at 1280 with only 2px to spare (340 of 342px).",
+    "fix": "Shorten the caller's label ('Discard', as edit-units and edit-listings already use), or let the footer stack below sm whenever its buttons don't fit on one line."
+   },
+   {
+    "severity": "nit",
+    "file": "src/components/app-shell.tsx",
+    "line": 76,
+    "problem": "From lg the header is on --surface. Section 4 gives --canvas the job 'Chrome: sidebar, phone bars', and the section 11 row for app-shell.tsx says '--canvas chrome'. The spec doesn't name the desktop header's ground. The builder recorded surface as a decision, not as an open question, so a white bar now sits above the limestone rail with the tile on white.",
+    "evidence": "In device-report/shots/tasks__desktop-chrome.jpg, pixel (5,5) is #ffffff in the header and (5,100) is #faf6f3 in the rail. Below lg the same bar is #f8f7f3 (tasks__iphone-se.jpg at (5,5)).",
+    "fix": "Ask the guidelines session to choose: either drop lg:bg-surface so the whole shell chrome is --canvas, or have the guidelines name the desktop header's ground."
+   },
+   {
+    "severity": "nit",
+    "file": "src/app/layout.tsx",
+    "line": 11,
+    "problem": "The comment says a page's own title reads 'Rentals · HG'. Rentals actually uses title.absolute and reads 'Rentals | HG Capital Partners'. No page uses the '%s · HG' template today.",
+    "evidence": "rentals/page.tsx sets title: { absolute: `Rentals | ${BRAND.company}` }. The prerendered .next-devices/server/app/residents.html has <title>Residents | HG Capital Partners</title>.",
+    "fix": "Reword the comment so it says the template is for pages that set a plain title, and that public, login and portal titles are absolute."
+   },
+   {
+    "severity": "nit",
+    "file": "docs/components.md",
+    "line": 24,
+    "problem": "The lib/brand-tokens.ts row still describes only brandTokens, the light mirror. The new brandTokensDark export isn't listed, though six files now import it for themeColor and the favicon edge. Someone looking for a dark hex won't find it.",
+    "evidence": "grep finds brandTokensDark in src/app/layout.tsx, (marketing)/layout.tsx, login/page.tsx, login/forgot, login/reset, p/welcome/password and lib/monogram-art.ts. docs/components.md line 24 mentions only `brandTokens`.",
+    "fix": "Add brandTokensDark (canvas and line, checked against the dark block) to that row."
+   },
+   {
+    "severity": "nit",
+    "file": "src/components/monogram.tsx",
+    "line": 33,
+    "problem": "Section 6 contradicts itself on the tile radius: 'Radius 22% of the size (6px at 24, 7px at 32)'. 22% of 24 is 5.28px, so the shell's 24px tile renders at 5.28px, not 6px. At 32px the email (7px) and the component (7.04px) agree with the spec.",
+    "evidence": "monogram.tsx sets borderRadius '22%'. Header and phone bar use Monogram size={24}. 0.22 x 24 = 5.28.",
+    "fix": "Raise it with the guidelines session: either the parenthetical becomes '5px at 24' or the radius rounds up at small sizes. No code change until it's settled."
+   }
+  ]
+ },
+ {
+  "verdict": "fix-first",
+  "findings": [
+   {
+    "severity": "should-fix",
+    "file": "src/components/app-shell.tsx",
+    "line": 117,
+    "problem": "The phone drawer can't scroll (the aside is `overflow-hidden` with no vertical scroll). Nav items are now 44px on touch and the close row is 44px, so on a phone held sideways the last nav item falls off the bottom and can't be reached. Before this slice, all seven items fit at 375px tall and only the footer was cut off. So this is a regression for the nav itself, and Sign out and Appearance stay unreachable as before.",
+    "evidence": "I rendered the drawer markup with the device-check build's own CSS (.next-devices/static/chunks/*.css) in Chromium with touch on. Harness: /private/tmp/claude-501/-Users-connorswofford-dev-hg-capital-partners-llc--claude-worktrees-skills-grill-me-setup-a0e88f/f0d1c1e6-d5e7-4ed9-b7f1-2d14a7484a64/scratchpad/review3/h/drawer.html. At 667x375 (iPhone SE landscape) the aside spans y 52 to 375, and Settings sits at y 368 to 412, so it is clipped. The theme toggle sits at y 427 and Sign out at y 493. The result is the same at 812x375. Screenshot: /private/tmp/claude-501/-Users-connorswofford-dev-hg-capital-partners-llc--claude-worktrees-skills-grill-me-setup-a0e88f/f0d1c1e6-d5e7-4ed9-b7f1-2d14a7484a64/scratchpad/review3/h/drawer_667x375.png shows Contractors as the last visible row. The same markup before the slice (36px items under a 56px bar, drawer_before.html) put Settings at y 324 to 360, inside the viewport. The 6-device sweep only runs portrait, so it can't catch this.",
+    "fix": "Let the drawer scroll below lg, for example by adding `max-lg:overflow-y-auto` to the aside, or `overflow-y-auto` while `mobileOpen`. Keep overflow-x hidden so the collapsed rail still hides its labels. Then hand-check 667x375 and 812x375."
+   },
+   {
+    "severity": "nit",
+    "file": "src/components/app-shell.tsx",
+    "line": 163,
+    "problem": "This slice brought the drawer's nav items, hamburger and close button to 44px on touch, but left the drawer footer's controls under 44px. Sign out is 20px tall and the Appearance theme toggle is 32px. Section 5 sets a 44px minimum on touch, and the slice restyled this footer.",
+    "evidence": "device-report/index.html reports `div.min-w-0.flex-1 > form > button.text-meta.text-fg-3 \"Sign out\" (20px)` and `div.mt-auto.border-t > div.flex.items-center > button.flex.h-8 \"Toggle dark mode\" (32px)` among the smallest tap targets on every app route. The harness measures Sign out at 53x20 at 375x667 with touch.",
+    "fix": "Give Sign out a 44px touch target (`inline-flex items-center pointer-coarse:min-h-11`, or make the whole user row the Sign out control). Size the drawer's ThemeToggle with `pointer-coarse:size-11`."
+   },
+   {
+    "severity": "nit",
+    "file": "src/components/avatar.tsx",
+    "line": 48,
+    "problem": "20 and 24px avatars now show one initial, and `outline` no longer marks contractors. On phone task rows the avatar is the only sign of who a task belongs to, so assignees who share a first letter look the same, and team members can't be told from contractors. This follows the guidelines' new Avatar rule, so it is a spec question rather than a build error.",
+    "evidence": "`initials(name, email).slice(0, letters)` with letters 1 for sizes 20 and 24. task-row.tsx:135 renders `<Avatar size={20} outline={job} />`. The first-name label is hidden below `@min-[28rem]`, and the `title` only shows on mouse hover. The contractors screenshot lists David, David Waryk, Device Check Contractor, Device Check Newcomer and Dust 2 Sparkles, which all render as \"D\". tasks_all__iphone-se.jpg shows rows that read \"PL\" and \"CS\" before and \"P\" and \"C\" now. tasks__desktop-chrome.jpg shows the old contractor \"JA\" now as \"J\".",
+    "fix": "Raise it with the guidelines session, for example two initials at 24px, or keep the first name beside the avatar on phone rows. Until then, leave the build as the spec says."
+   },
+   {
+    "severity": "nit",
+    "file": "src/components/ui.tsx",
+    "line": 202,
+    "problem": "The neutral Badge moved to --fill-2, which is also the hover fill of menu and listbox rows. In the deals status filter popover, each neutral status chip loses its ground while its row is hovered, so the chip reads as plain text until the pointer moves away. The text stays readable.",
+    "evidence": "src/app/(app)/deals/status-multiselect.tsx:56: the row is `hover:bg-fill-2`, and line 67 is the chip `badgeToneClass(dealStatusTone(s))`, now `bg-fill-2 text-fg-2`. dealStatusTone returns neutral for every status except CLOSED!. Before this slice the chip was fill-1 on the fill-2 hover, a 1.14 step.",
+    "fix": "Polish only: give chips inside hoverable menu rows the Tag look (no fill, a --line-strong edge, as section 9 defines Tags), or hover these rows with --fill-1 plus the Check mark. Confirm with the guidelines session, since section 9 sets both the neutral badge and menu hover to --fill-2."
+   }
+  ]
+ }
+]

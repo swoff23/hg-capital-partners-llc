@@ -187,21 +187,16 @@ export function PortalAccessCard({
           body={`${first} is signed out everywhere and needs the new password to get back in.`}
           onClose={() => setConfirm(null)}
           actions={
-            <>
-              <Button variant="secondary" size="sm" onClick={() => setConfirm(null)}>
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                disabled={pending}
-                onClick={() => {
-                  setConfirm(null);
-                  act(() => resetPortalPassword(account.id), (d) => setShown({ email: account.email, password: d.password }));
-                }}
-              >
-                Reset password
-              </Button>
-            </>
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() => {
+                setConfirm(null);
+                act(() => resetPortalPassword(account.id), (d) => setShown({ email: account.email, password: d.password }));
+              }}
+            >
+              Reset password
+            </Button>
           }
         />
       )}
@@ -211,23 +206,18 @@ export function PortalAccessCard({
           body={`${first} is signed out everywhere and can't sign in until you restore access.`}
           onClose={() => setConfirm(null)}
           actions={
-            <>
-              <Button variant="secondary" size="sm" onClick={() => setConfirm(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={pending}
-                onClick={() => {
-                  setConfirm(null);
-                  setShown(null);
-                  act(() => removePortalAccess(account.id), () => toast({ message: `${first} can't sign in now` }));
-                }}
-              >
-                Remove access
-              </Button>
-            </>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={pending}
+              onClick={() => {
+                setConfirm(null);
+                setShown(null);
+                act(() => removePortalAccess(account.id), () => toast({ message: `${first} can't sign in now` }));
+              }}
+            >
+              Remove access
+            </Button>
           }
         />
       )}

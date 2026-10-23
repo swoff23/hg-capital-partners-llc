@@ -167,15 +167,11 @@ export function UnitsSection({
           title={removing.title}
           body={removing.body}
           onClose={() => setRemoving(null)}
+          cancelLabel="Keep it"
           actions={
-            <>
-              <Button size="sm" variant="secondary" onClick={() => setRemoving(null)}>
-                Keep it
-              </Button>
-              <Button size="sm" variant="destructive" onClick={confirmRemove}>
-                Remove unit
-              </Button>
-            </>
+            <Button size="sm" variant="destructive" onClick={confirmRemove}>
+              Remove unit
+            </Button>
           }
         />
       )}
@@ -185,11 +181,9 @@ export function UnitsSection({
           title="Discard unsaved changes?"
           body={<>You have unsaved changes to units &amp; access. Save them, or discard and exit.</>}
           onClose={() => setConfirmOpen(false)}
+          cancelLabel="Keep editing"
           actions={
             <>
-              <Button size="sm" variant="secondary" onClick={() => setConfirmOpen(false)}>
-                Keep editing
-              </Button>
               <Button size="sm" variant="secondary" onClick={discard}>
                 Discard
               </Button>

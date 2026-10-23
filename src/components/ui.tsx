@@ -100,8 +100,9 @@ export function SectionCard({
 /**
  * Touch screens get 44px tap targets; a mouse keeps the compact sizes. A
  * minimum, so a caller's own height still applies wherever it's taller.
+ * Exported for controls outside this file (the sidebar's nav items).
  */
-const TOUCH_HEIGHT = "pointer-coarse:min-h-11";
+export const TOUCH_HEIGHT = "pointer-coarse:min-h-11";
 
 /* ---------------- Button ----------------
    primary: the one next step in a view. secondary: everything else. ghost:
@@ -193,11 +194,12 @@ export function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
 /* ---------------- Badge ----------------
    One tone map for every badge in the app. Color is state: neutral for a
    label, danger for late or failed, warn for a partner's decision, ok for
-   done or money in. Blue and purple are retired. */
+   done or money in. Blue and purple are retired. Neutral sits on --fill-2,
+   so it still shows inside a raised layer (a menu, a dialog) in dark. */
 export type BadgeTone = "neutral" | "danger" | "warn" | "ok";
 
 const badgeTones: Record<BadgeTone, string> = {
-  neutral: "bg-fill-1 text-fg-2",
+  neutral: "bg-fill-2 text-fg-2",
   danger: "bg-danger-tint text-danger",
   warn: "bg-warn-tint text-warn",
   ok: "bg-ok-tint text-ok",

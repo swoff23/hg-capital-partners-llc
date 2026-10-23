@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { rentableUnitLabels } from "@/lib/property-types";
 import { MoveInForm } from "./move-in-form";
 
 export const metadata: Metadata = {
-  title: "Moving In | HG Capital Partners",
+  title: { absolute: `Moving In | ${BRAND.company}` },
   description: "Move-in checklist and the condition report for HG Capital residents.",
 };
 

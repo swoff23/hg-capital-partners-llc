@@ -43,7 +43,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
   // LeaveGuard: "My jobs" asks first while photos are still uploading (JobActions holds it).
   return (
     <LeaveGuard>
-      <header className="sticky top-0 z-20 border-b border-border bg-surface">
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-2 sm:px-4">
           <BackLink fallback="/p" label="My jobs" className="h-11 rounded-lg px-2 text-sm hover:no-underline" />
           {tel && (

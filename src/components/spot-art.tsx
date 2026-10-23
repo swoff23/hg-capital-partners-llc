@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
  * Never in rows, toasts or dialogs, and a payoff tied to a property shows
  * that property's photo instead.
  *
- * One drawing so far. The other four (a clipboard with a check, a key on a
- * ring, an envelope with a roofline, an open ledger) ship one at a time.
+ * Five drawings, one per payoff: all clear (the empty queue), a job done, a
+ * move-in report sent, a request sent and a month closed.
  */
 const ART = {
   /** All clear: a Buffalo double, two flats over two porches, one door lit in gold. */
@@ -33,6 +33,54 @@ const ART = {
       {/* Lower flat: the front window and the two doors */}
       <rect x="31" y="69" width="12" height="10" rx="0.75" />
       <rect x="48" y="69" width="7" height="15" rx="0.75" />
+    </>
+  ),
+  /** Job done: a clipboard with a check, its brass clip in gold. */
+  "job-done": (
+    <>
+      <rect x="38" y="12" width="20" height="10" rx="2" className="fill-gold" />
+      {/* The board, open at the top where the clip sits */}
+      <path d="M38 17h-8a3 3 0 0 0-3 3v61a3 3 0 0 0 3 3h36a3 3 0 0 0 3-3V20a3 3 0 0 0-3-3h-8" />
+      <path d="m38 49 7 7 14-15" />
+      <path d="M38 68h20M38 75h12" />
+    </>
+  ),
+  /** Move-in report sent: a key on a ring, the key's bow in gold. */
+  "move-in-sent": (
+    <>
+      {/* The bow, with the hole the ring runs through */}
+      <path
+        fillRule="evenodd"
+        className="fill-gold"
+        d="M58 47a10 10 0 1 1-20 0a10 10 0 1 1 20 0ZM46.7 42.6a3 3 0 1 0-6 0a3 3 0 1 0 6 0Z"
+      />
+      <circle cx="34" cy="32" r="14" />
+      {/* The blade and its two teeth */}
+      <path d="M55.1 54.1 80 79M68.7 67.7l-4.2 4.2M74.4 73.4l-4.2 4.2" />
+    </>
+  ),
+  /** Request sent: an envelope under a roofline, its attic window lit in gold. */
+  "request-sent": (
+    <>
+      <rect x="44" y="27" width="8" height="8" rx="0.75" className="fill-gold" />
+      {/* The roof, past the envelope's sides like an eave */}
+      <path d="M14 44 48 15l34 29" />
+      <rect x="20" y="44" width="56" height="38" rx="2" />
+      <path d="m20 46 28 20 28-20" />
+    </>
+  ),
+  /** Month closed: an open ledger, the right page ruled off twice, its ribbon in gold. */
+  "month-closed": (
+    <>
+      <path d="M45 72h6v14l-3-3-3 3Z" className="fill-gold" />
+      {/* Two pages and the spine */}
+      <path d="M48 24c-8-6-20-8-34-6v54c14-2 26 0 34 6" />
+      <path d="M48 24c8-6 20-8 34-6v54c-14-2-26 0-34 6" />
+      <path d="M48 24v54" />
+      <path d="M22 32h18M22 40h18M22 48h18M22 56h12" />
+      {/* Entries, then the total's double rule */}
+      <path d="M56 32h18M56 40h18M56 48h18" />
+      <path d="M60 57h14M60 60h14" />
     </>
   ),
 } satisfies Record<string, ReactNode>;

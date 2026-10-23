@@ -50,6 +50,7 @@ High · Fix · effort S · `Print of /tasks, /properties/[id] Tasks card and /de
 
 High · Fix · effort S · `Print of every signed-in page (AppShell)` · One design system, fixed in the primitives
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, app-wide): Pages no longer print the app's fixed header, sidebar or drawer backdrop, and the shell padding is reset in print. These are @media print rules in src/app/globals.css, keyed to the shell's fixed header. The back link is also hidden in print through one print:hidden class in src/components/back-link.tsx, a file outside my area. Left: G1E-003: the print letterhead from G1E-011 (a new design) is not built.
 - **Today:** The header is position: fixed (app-shell.tsx:63), so the hamburger, the 'HG Capital OS' wordmark and the search box print at the top of every page. On pages 2 and 3 of the 767 Prospect printout it sits on top of content, hiding the 'Exterior Siding' row and the 'Strategy' label. The back link and the main area's top padding print too.
 - **Why:** A printed record should open with the record. The bar is a Stripe invoice PDF or a QuickBooks report, which carry no app chrome. Hidden rows also mean lost content.
 - **Change:** In print, hide the header, the aside, the drawer backdrop and the back link (print:hidden), and reset main's padding (print:p-0). Put the print letterhead from G1E-011 in their place.

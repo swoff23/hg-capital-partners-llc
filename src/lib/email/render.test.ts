@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { brandTokens } from "@/lib/brand-tokens";
 import { escapeHtml, renderPlainEmail } from "./render";
 
 const input = {
@@ -69,4 +70,21 @@ test("a closing line sits after the items and before the button, escaped", () =>
 
 test("escapeHtml covers the five specials", () => {
   assert.equal(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
+});
+
+test("every color in the html is a brand token", () => {
+  const { html } = renderPlainEmail({ ...input, items: ["One"], closing: "Thanks.", footnote: "Small print." });
+  const allowed = new Set(Object.values(brandTokens).map((v) => v.toLowerCase()));
+  const used = [...html.matchAll(/#[0-9a-f]{3,8}\b/gi)].map((m) => m[0].toLowerCase());
+  assert.ok(used.length > 0);
+  assert.deepEqual(used.filter((c) => !allowed.has(c)), []);
+});
+
+test("the letterhead is the HG tile and the company name over a gold-deep rule", () => {
+  const { html } = renderPlainEmail(input);
+  assert.ok(html.includes(`background:${brandTokens.inkTile}`));
+  assert.ok(html.includes(">HG</td>"));
+  assert.ok(html.includes(">HG Capital Partners</td>"));
+  assert.ok(html.includes(`border-bottom:1px solid ${brandTokens.goldDeep}`));
+  assert.ok(html.indexOf("HG Capital Partners") < html.indexOf(input.line));
 });

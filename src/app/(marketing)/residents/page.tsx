@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Residents | HG Capital Partners",
+  title: { absolute: `Residents | ${BRAND.company}` },
   description: "Maintenance, rent, and move-in resources for HG Capital residents.",
 };
 

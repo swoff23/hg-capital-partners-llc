@@ -1,9 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "HG Capital Partners",
+  title: { absolute: BRAND.company },
   description: "Thoughtfully maintained apartments in Buffalo, New York.",
 };
 

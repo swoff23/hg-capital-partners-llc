@@ -107,15 +107,12 @@ export function MoreMenu({
           title="Delete this task?"
           body={`“${title}” goes for good, with its notes, checklist, activity and files.`}
           onClose={() => !deleting && setConfirming(false)}
+          cancelLabel="Keep it"
+          busy={deleting}
           actions={
-            <>
-              <Button variant="secondary" size="sm" disabled={deleting} onClick={() => setConfirming(false)}>
-                Keep it
-              </Button>
-              <Button variant="destructive" size="sm" disabled={deleting} onClick={remove}>
-                {deleting ? "Deleting…" : "Delete task"}
-              </Button>
-            </>
+            <Button variant="destructive" size="sm" disabled={deleting} onClick={remove}>
+              {deleting ? "Deleting…" : "Delete task"}
+            </Button>
           }
         />
       )}

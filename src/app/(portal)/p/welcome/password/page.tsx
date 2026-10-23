@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { brandTokensDark } from "@/lib/brand-tokens";
 import { AuthError, AuthFrame, authLinkClass } from "@/app/login/_components/auth-frame";
 import { AuthSubmit } from "@/app/login/_components/auth-submit";
 import { PasswordField } from "@/app/login/_components/password-field";
@@ -9,6 +10,9 @@ import { requirePortalPrincipal } from "@/lib/portal/session";
 import { chooseOwnPassword, signOutPortal } from "../../actions";
 
 export const metadata: Metadata = { title: "Choose Your Password" };
+
+// The sign-in frame is the public site's dark material, so the browser's bar is too.
+export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
 
 // Shown after the first sign-in, until the starting password is replaced.
 // Every other /p page sends the contractor here while it's still in use,

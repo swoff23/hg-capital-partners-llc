@@ -86,9 +86,16 @@
   --dur-photo: 200ms;
   --dur-check: 180ms;
 
-  /* The fixed app bar's height (h-14 in components/app-shell.tsx). A sticky
-     table header holds just under it. */
-  --app-bar-h: 3.5rem;
+  /* The fixed app bar's height: 52px for the phone and tablet bar, 56px for
+     the desktop header (from lg, below). components/app-shell.tsx sizes the
+     bar from it, and a sticky table header holds just under it. */
+  --app-bar-h: 3.25rem;
+}
+
+@media (width >= 64rem) {
+  :root {
+    --app-bar-h: 3.5rem;
+  }
 }
 
 /* ---------------- Color: dark, and the public site ---------------- */
@@ -402,9 +409,9 @@ body {
     outline-offset: 2px;
   }
 
-  /* Tabular figures by default, so column alignment never hangs on a utility. */
-  td,
-  th,
+  /* Tabular figures where digits line up: .num, the figure tokens, and the
+     numeric cells (Th and Td's `numeric` prop sets tabular-nums). Not every
+     td: Geist's tabular digits are wider, so text cells would wrap sooner. */
   .num,
   .text-figure-l,
   .text-figure-m {

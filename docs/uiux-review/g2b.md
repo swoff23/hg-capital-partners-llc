@@ -1,6 +1,6 @@
 # Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap
 
-Part of the [UI/UX review](README.md). 37 findings: 0 critical, 7 high, 13 medium, 17 low.
+Part of the [UI/UX review](README.md). 36 findings: 0 critical, 6 high, 13 medium, 17 low.
 
 ## How it should work
 
@@ -68,26 +68,13 @@ Mobbin: 18 searches, all citations from returned screens. Ramp is not on Mobbin,
 
 ## Findings
 
-### G2B-002
-
-**Pin the version when Edit opens, and start the draft from the latest data**
-
-High · Fix · effort S · `Property page: Units & access, Rentals and Building CapEx editors` · Every save is safe, instant and undoable
-
-- **Today:** The guard is bypassed only when the page re-renders with a newer version between mount and Edit, after the other partner changed that section. Today the re-render comes from your own save in another card on the same page. Without it, the stale version prop correctly returns CONFLICT.
-- **Why:** The version guard is the only protection on these whole-section editors. As written, it fails silently in exactly the case it exists for, and on listings it deletes public photos.
-- **Change:** When Edit opens, copy the current `initial` into the draft and save the current `version` in state. Save sends that saved version, never the prop. Ignore prop changes while editing. Settings already works this way (capex-rules-editor.tsx:203, move-in-form-editor.tsx:117); match it. Add a test: a refresh between Edit and Save must return CONFLICT.
-- **Desktop, tablet, phone:** No visual change at any width.
-- **Reuse:** The version-in-state pattern already used in src/app/(app)/settings/capex-rules-editor.tsx and move-in-form-editor.tsx.
-- **Code:** `src/app/(app)/properties/[id]/edit-units.tsx:45,63,92`, `src/app/(app)/properties/[id]/edit-listings.tsx:66,88,117`, `src/app/(app)/properties/[id]/building-capex.tsx:69,95,142`, `src/lib/properties/service.ts:257-300 (listings missing from the draft and their blobs are deleted)`, `src/app/(app)/properties/[id]/page.tsx:102-215 (version is property.updatedAt, passed as a prop)`
-- **Verification:** partly. The code matches. Drafts are built once at mount (edit-units.tsx:45, edit-listings.tsx:65, building-capex.tsx:68), Edit only sets editing=true, Save sends the live version prop, and replaceListings deletes rows missing from the draft plus their blobs. building-capex also sends every system key, so a stale draft overwrites the whole set. Today, though, the bypass needs a narrow sequence: the other partner changes that section, then this tab re-renders with a newer version before Edit is pressed. Without that re-render, the stale prop makes the guard fire correctly. That makes it high, not critical. It becomes routine once G2B-005 adds refresh on focus, so 005 must ship with this fix, as the finding says.
-
 ### G2B-003
 
 **Send only the fields that changed from the Details, Loan, Insurance and Notes forms**
 
 High · Fix · effort S · `Property page: Details, Loan, Insurance and Notes editors` · Every save is safe, instant and undoable
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, property-record): Details, Loan, Insurance and Notes now send only the fields that changed, each with the value the form loaded. patchProperty refuses with CONFLICT_MESSAGE when a field someone else changed meanwhile would be overwritten, and the write is also guarded by the updatedAt it just read. Notes is refused if the stored text moved. Forms render from a snapshot taken when Edit opens, so a refresh mid-edit no longer wipes what's typed (key={version} is gone). Uses callAction. Pure helpers in src/lib/properties/edits.ts (changedFields, staleFields, fieldText) with tests. Left: G2B-003 / G2B-011: no per-section version was sent. The field-level expected check covers the conflict. Because the blob editors use the whole-row updatedAt, your own save in another card still makes an open Units, Rentals or CapEx save return CONFLICT. That's safe, but it's a false conflict until per-section versions exist. G2B-003 / G2B-007: the refused save shows the existing CONFLICT_MESSAGE. The G2B-007 conflict notice isn't built.
 - **Today:** These forms post every input. The Loan form alone posts 8 fields (edit-loan.tsx:88-101). They go to patchProperty, which writes every key present with no version check (properties/service.ts:105-118). If Pieter changes the loan rate while Connor's Loan form is open, Connor's Save writes the old rate back. Notes is a single text blob, so the later Save erases the other partner's paragraph. There is no history to recover either.
 - **Why:** This is silent reversion of money and date data: rate, payment, premium, coverage, and maturity and renewal dates. Those dates also regenerate the reminder tasks through syncPropertyReminders. Nobody notices until a lender or insurer does.
 - **Change:** On submit, compare each input with the value it loaded and send only the keys that changed. Send the section's version (G2B-011). If a changed field's stored value differs from what the form loaded, return the conflict notice from G2B-007 instead of writing. For Notes, send the text it loaded as `expected` and refuse when the stored text differs.
@@ -138,6 +125,7 @@ High · New capability · effort M · `Today, Mine column (and Home's task card 
 
 High · Fix · effort S · `Every signed-in page (app shell)` · Every save is safe, instant and undoable
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, app-wide): New src/components/refresh-on-return.tsx, mounted once in src/app/(app)/layout.tsx, calls router.refresh() when a tab comes back after more than 60s hidden, comes back online, is restored from Safari's back-forward cache, or the Eastern date changes. There is no server polling. It waits while a field is focused or holds unsaved typing, and skips /properties/[id] until G2B-002 and G2B-012 land. The decision logic is pure, in src/lib/refresh-on-return.ts, with 7 tests in src/lib/refresh-on-return.test.ts. Left: G2B-005: the property page (/properties/[id]) does not refresh on its own yet. Its Details, Loan, Insurance and Notes forms are keyed by version, so a refresh would erase what's typed (G2B-012). Its Units, Rentals and Building CapEx editors save with the version prop, so a refresh would let a stale draft past the conflict check (G2B-002). Remove the HELD entry in src/lib/refresh-on-return.ts once those two land. G2B-012 is not in this batch.
 - **Today:** The repo has no router.refresh outside Financials settings, and nothing listens for visibilitychange, focus or reconnects, and nothing polls. I patched fetch on /tasks, then fired visibilitychange, focus and online: zero requests in 2.5 seconds. A tab opened in the morning shows the morning all day. The 'Today' grouping and labels like '56d ago' go stale overnight, and iPhone Safari restores pages from its back-forward cache unchanged.
 - **Why:** Out-of-date screens are the root cause of every overwrite in this unit. Linear and Stripe show current data when you return to a tab, and they do it without polling.
 - **Change:** Add one small client hook in AppShell that calls router.refresh():

@@ -75,6 +75,7 @@ Mobbin: 12 searches (11 screen searches, 1 flow search), web and iOS.
 
 High · Fix · effort S · `/financials/settings class mapping, Overview, Rent roll, property card` · The QuickBooks mirror is honest about what it covers · quick win
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, financials): Lines on Ignore classes are now left out of loadLines, the rent roll query, the property card's recent lines and every data-quality sum. Settings shows an 'Ignored classes · N lines · $X in · $Y out' row ('left out of every total'), so the gap to QuickBooks stays explained. Reconciliation in sync.ts still checks every ledger line against QuickBooks, so it is unchanged. Left: G2A-004: the picker help text for Ignore ('Leave out of every total') isn't done, because it would widen the role select. The new cleanup-list row covers the explanation.
 - **Today:** The Role select offers "Ignore" (tables.tsx:14, labels.ts:32), and the schema calls IGNORE "deliberately excluded from every rollup" (prisma/schema.prisma:381). No read path filters it:
 - getFinancialsOverview builds Portfolio NOI from every line and puts IGNORE lines into the By property "Unattributed" row (queries.ts:86-99).
 - Data quality ignores the role too.
@@ -95,6 +96,7 @@ Only the label changes.
 
 High · Fix · effort S · `/financials/settings after the Intuit round trip` · The QuickBooks mirror is honest about what it covers
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, financials): The Settings page reads ?connected and ?error from the Intuit return (oauthReturnLine in notices.ts). It shows one line: 'Connected to QuickBooks. A full sync is running now.', 'Connection cancelled. Nothing changed.', 'That sign-in expired.' or 'QuickBooks didn't finish connecting.'. Error lines get a 'Connect again' link. A small client component (OAuthReturnNotice in settings/controls.tsx) clears the param with history.replaceState, so a reload doesn't repeat the line. Left: G2A-005: the toast and the company name in 'Connected to <company>' aren't done. QuickbooksConnection.companyName is never written anywhere, so the line says 'Connected to QuickBooks'. 'Syncing Jan to Oct' month wording isn't done.
 - **Today:** The callback redirects to ?connected=1 or ?error=<code> (callback/route.ts:18-23,33-42,79), but settings/page.tsx reads no searchParams.
 
 At 1280, 375 and WebKit 375, all six URLs render byte-for-byte the same page: plain, connected, access_denied, state_mismatch, token_exchange_failed and missing_params. A reload keeps the param in the URL.
@@ -127,6 +129,7 @@ Each error line carries a Connect again button.
 
 High · Fix · effort S · `/financials Overview (Unattributed tile vs By property row)` · The QuickBooks mirror is honest about what it covers
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, financials): The tile, the By property row and Settings now all show one 'not assigned' figure, computed once in queries.ts (the operating lines on the page's basis). The data-quality unattributed sum, which was cash-only and counted non-operating income and interest, is removed. Left: G2A-011: showing 'Not assigned' only once (FINANCIALS-041) and splitting out a separate 'Not yet mapped · $X' line linked to the checklist are design and feature work. The tile and the row now agree but both still show.
 - **Today:** The tile and the row already differ on the Accrual view (-$1,904 vs $1,642) because the tile is always Cash basis and also counts non-operating income and debt interest; unmapped and ignored classes would add further divergence.
 - **Why:** Two different numbers with the same label on one screen undermine trust in every other figure on the page.
 - **Change:** Compute Unattributed once (queries) and show it once (FINANCIALS-041). Split out "Not yet mapped · $X" as its own line linking to the checklist, so unmapped property money isn't presented as company overhead.
@@ -163,6 +166,7 @@ High · New capability · effort M · `Financials > Settings right after connect
 
 High · Fix · effort S · `/financials/settings Basis row (and Overview, Rent roll, property card)` · The QuickBooks mirror is honest about what it covers
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, financials): getFinancialsOverview, getRentRoll and getPropertyFinancials now default to conn.accountingMethod. ?basis=cash or ?basis=accrual is a one-off override (basisFromParam), and SourceBadge and the 'Show other basis' link follow the basis actually shown. The rent roll explainer reads 'Rent earned' on accrual instead of 'Cash rent received'. Left: G2A-V01: a possible later step is one Cash/Accrual segmented control on the Overview in place of the Settings row. That needs Connor's design call. BasisToggle (settings/controls.tsx) still calls setAccountingMethod without callAction and wasn't touched.
 - **Today:** Settings shows a Cash | Accrual toggle that writes QuickbooksConnection.accountingMethod (controls.tsx:9-28, actions.ts:108-118). Only the Settings page itself reads it back (settings/page.tsx:56,86). Elsewhere it is ignored:
 - Overview and Rent roll read only ?basis= and default to CASH (financials/page.tsx:20, rent-roll/page.tsx:11).
 - The property card hard-codes CASH (properties/[id]/financials.tsx:15).

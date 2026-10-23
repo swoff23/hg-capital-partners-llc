@@ -1,0 +1,564 @@
+[
+ {
+  "id": "G2B-001",
+  "status": "fixed",
+  "note": "Fixed on the migration branch in dd00a9e (on top of 4652abb): core.setStatus locks the row with FOR NO KEY UPDATE and takes an expected status; on a mismatch it writes nothing and TaskChangedError names who moved it. The list checkbox (list-actions.ts:63-68), Approve and Send back (review-banner.tsx:42,54), the status menu, Waiting and Scheduled (status-control.tsx:46,84,97) and Cancel with Undo (header.tsx:78-80) all send the status they showed. Verified by reading the diff."
+ },
+ {
+  "id": "BPLAY-001",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): createNextRepeat reuses the copy a finish already made, and reopening takes back an untouched copy with its REPEAT_CREATED line (core.ts, repeat.ts isUntouchedCopy). Verified in the diff."
+ },
+ {
+  "id": "BTASKS-003",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): reopening a repeating task takes back its untouched next copy; finishing again reuses a touched one. Verified in the diff."
+ },
+ {
+  "id": "G1C-001",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): finishing again reuses the existing copy instead of creating a second one. Verified in the diff."
+ },
+ {
+  "id": "BPORTAL-001",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): callAction (src/lib/action-result.ts) turns a dropped connection into \"No connection. Try again when you have signal.\" on Send, Start job, Mark done and the checklist, and typed text is kept. Verified in the diff."
+ },
+ {
+  "id": "BPLAY-008",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): apply-flow calls through callAction, so a dropped connection returns an error instead of replacing the page. Verified in the diff."
+ },
+ {
+  "id": "BPORTAL-005",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): the proxy hands /p pages their path, and sign-in and the first-password step return there through a strict same-origin validator (src/lib/portal/next-path.ts). Verified in the diff."
+ },
+ {
+  "id": "G1A-V01",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): contractors return to the job after sign-in (next= through login and first password). Verified in the diff."
+ },
+ {
+  "id": "BCONTRACT-001",
+  "status": "fixed",
+  "note": "Fixed in 4cf099d (on top of dd00a9e): the Scheduled email reads \"scheduled it for Thu, Oct 29\", also when assigning an already Scheduled job (notifications/content.ts). Verified in the diff."
+ },
+ {
+  "id": "BCONTRACT-003",
+  "status": "fixed",
+  "note": "Fixed in 0148abf (on top of 4cf099d): every Portal access card action runs through thenRefresh, which revalidates the contractor page in a finally block, so after a lost Create login response the retry gets \"already has a login\" back with a fresh card showing Reset password instead of Create. Offline is handled by callAction (4cf099d). Verified in the diff."
+ },
+ {
+  "id": "BCONTRACT-002",
+  "status": "partly",
+  "note": "Partly fixed in 4cf099d (on top of dd00a9e): optional EMAIL_REPLY_TO sets reply_to. The \"Reply in the job\" line went to Connor as a content call."
+ },
+ {
+  "id": "ADMIN-001",
+  "status": "partly",
+  "note": "Partly fixed on the migration branch in 4cf099d (on top of dd00a9e): callAction now covers the portal access card, the task page (use-run, composer, files, header) and apply-flow. The settings editors, deals, properties, financials and the public move-in form still crash the page when offline."
+ },
+ {
+  "id": "BPORTAL-002",
+  "status": "fixed",
+  "note": "Fixed on main in 0ab449b (Connor deferred the choice; option A): Mark done stays disabled while any photo tile has failed, the tray leads with the count (\"2 photos didn't upload: no connection\"), and each tile has Retry or Remove. Leaving mid-upload also asks first."
+ },
+ {
+  "id": "VISUAL-005",
+  "status": "edit",
+  "title": "The property task card still formats due dates its own way",
+  "severity": "medium"
+ },
+ {
+  "id": "DATA-IV01",
+  "status": "edit",
+  "title": "Legacy Asana assignee names leave contractor job history empty",
+  "severity": "high"
+ },
+ {
+  "id": "DATA-IV01",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: scripts/asana/40-link-legacy.ts can link open name-only tasks by Asana id, people.json or email, and by exact name only once confirmed. It is a dry run by default and has not been run, so no jobs have been linked yet. Still open: closed history is skipped on purpose, so done jobs don't come back (Connor's call on D25/D18); Brandon Kmiotek and John OConnell have no Contact to link to; and the code fix for take: 60 with a header count equal to the rows shown is still needed."
+ },
+ {
+  "id": "ADMIN-017",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: wrong-person matching was already gone (page.tsx:46), and the new 40-link-legacy script plus its dry-run count of open name-only tasks is the way to link Kenneth, Idrius, Zack, José and Brandon Zarbo's open jobs. Still open: the script hasn't run, and it skips closed rows, so Jon Oconnel and Jeremiah Anderson still show 0 (history is Connor's call). Brandon Kmiotek and John OConnell have no Contact, the name variants need people.json or --accept-name-matches, the /tasks/all External group still lists names that are also contractors, and nothing in the app flags an unlinked assignment or blocks cutover on one."
+ },
+ {
+  "id": "IA-043",
+  "status": "partly",
+  "note": "Partly fixed in c805e38: the contractor Jobs list now applies excludeTemplateTasks, and its header counts every job, not the 60 rows shown. Still open: an Open | Done switch, which is a design call for Connor."
+ },
+ {
+  "id": "BTASKS-001",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the leftovers now have a backfill (40-link-legacy.ts, matching by email and then confirmed exact name), and its dry run reports how many open tasks still carry only a legacy name, as the finding asked. It has not been run. Still open, as design calls for Connor: legacy-name rows still get a filled avatar with no muted 'Asana: name' sublabel, and the task page shows only the muted 'Assigned in Asana to' line with no one-tap 'Assign to X?' suggestion."
+ },
+ {
+  "id": "TASKS-006",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the legacy link script would attach the email-valued names (zack@outlawcarpentry.com, fallettaidrius@gmail.com) to Zack's and Idrius's Contacts, so those 6 open tasks would stop reading Unassigned, but it hasn't been run. The claimed stale-screen check is G2B-013's fix and doesn't touch this. Still open: Brandon Kmiotek, John OConnell and jdanderson285@gmail.com have no Contact, so the picker can't choose them. Any pick still erases the name-only assignee, because isAssignee counts a legacy name as nobody. Creating those Contacts is a data job for Connor, and letting the picker keep a name-only person is his design call. The migration session's position: replacing a name-only holder is an ordinary reassignment once the screen showed that name, and only Brandon Kmiotek's open job is affected until Connor adds him as a contact."
+ },
+ {
+  "id": "G2B-013",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the task page now sends the assignee it showed. patchTask locks the row, refuses a reassignment from a stale screen with 'Pieter assigned this to Zack Reading.' and refreshes the page. The unchecked list path is gone. Still open, as design calls for Connor: there's no 'Reassign anyway' action on the refusal, and a reassign still has no Undo toast the way Due does."
+ },
+ {
+  "id": "G1A-008",
+  "status": "note",
+  "note": "Still open at 9f74ea1: nothing changed for this. The 14 missing contractor emails are data only Connor can supply. /contractors still has no portal-readiness column or filter, and the Portal access card still doesn't warn about shared-looking addresses such as info@ or office@. Both are design calls for Connor."
+ },
+ {
+  "id": "G2B-IV01",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: Shared staff and system comments, status lines and files now record the contractor assigned at the time, set in setStatus, addComment and recordAttachment. The portal timeline, the new-update counts, the gallery and the file route all show a staff row only to that contractor, or to anyone when no contractor was assigned. Imported Asana rows stay visible. Rows written before the migration have no audience (no backfill), so staff replies already on a job still show to the next contractor. The assign-toast copy (I04) is a separate finding. The migration session expects no such rows in production (CSV tasks were never linked to contacts, and main had no app-created tasks or attachments as of Oct 22), so no backfill is planned. Production wasn't queried to confirm."
+ },
+ {
+  "id": "G2B-I03",
+  "status": "note",
+  "note": "Still open at 9f74ea1: on a job whose contractor has no login, the task page still reads 'Visible to Zack', 'Shown to Zack' and 'Reply to Zack', and nothing loads the assignee's portal status. The fix is small once the copy is picked, so this is a copy and design decision for Connor."
+ },
+ {
+  "id": "BPORTAL-003",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: photos still held when the contractor moves to another page in the app now post as their own update, except ones a Mark done is still sending. The browser asks before a reload or a closed tab while photos are held, but iOS Safari never asks. addComment now refuses a files-only post whose files another post already took. Still open: photos are still held while the composer has text, the 'N uploads ready to send' state is still there, closing the Mark done sheet still posts nothing, and on iOS a reload or closed tab still loses the notification. Whether photos post as soon as they upload, and whether closing the sheet posts them, is Connor's call."
+ },
+ {
+  "id": "BPORTAL-004",
+  "status": "partly",
+  "note": "Partly fixed at 9f74ea1: the beforeunload guard on a reload or closed tab exists, but it landed earlier in 4cf099d. 9f74ea1 only moved it into a reusable useLeaveWarning hook, with no change in behaviour for uploads still going up. Still open: BackLink and in-app back still unmount the uploader and abort every upload without a prompt, there is no 'Uploading 2 of 5' pill on To do or Scheduled jobs, and the uploader isn't lifted into the portal layout. The BackLink sheet and the pill are design calls for Connor."
+ },
+ {
+  "id": "BPORTAL-009",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: firstName now uses a one-word nickname in parentheses, so 'Jacob (Jake) hoak' greets as 'Jake' in the My jobs heading, the Mark done payoff and the login text. Still open: contacts named after a company still come out as 'Hi Dust', 'Hi Fox' and 'Thanks, Fox!'. There's no First name field on PortalAccount and no company fallback ('Your jobs', 'Thanks!'), which is a data and design decision for Connor."
+ },
+ {
+  "id": "BCONTRACT-023",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the portal's own firstName in job-view.ts now calls the names.ts helper, so the two can't disagree, though the wrapper is still there. Still open: business contacts 'Fox Pest' and 'Dust 2 Sparkles' still come out as 'Fox' and 'Dust'. No 'Called' short-name field was added to Contact, and cleanup-contacts.ts leaves company names alone. Whether to add the field or fix the contact data is a decision for Connor."
+ },
+ {
+  "id": "BTASKS-037",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: initials() now strips non-letters, drops anything in parentheses and reads a name containing '@' as an email's local part, so 'Jacob (Jake) hoak' gives 'JH'. Tests were added. It takes the first two words rather than the first and last, so a three-word name like 'Mary Ann Smith' gives 'MA'. 'fallettaidrius@gmail.com' still gives 'F' because its local part is one word."
+ },
+ {
+  "id": "BPORTAL-023",
+  "status": "note",
+  "note": "Still open at 9f74ea1: OFFICE_PHONE_E164 is still an empty string in code, so the 'Call HG' button never shows. The only change is that officeTelHref now reuses telHref. Connor needs to supply the number (or choose a per-job 'Call Connor' row), and moving the number into app config is still a code fix."
+ },
+ {
+  "id": "G1A-V05",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: the one email template now has a <head> with a utf-8 charset meta and a width=device-width viewport meta, and render.test.ts checks for them. The G1A-032 color-scheme metas aren't in the block (that's a separate finding). Nothing in git shows the manual check in iOS Mail, Gmail iOS or Outlook iOS was run."
+ },
+ {
+  "id": "BPORTAL-013",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: Sign in, Email me a link and both Save password buttons now use AuthSubmit (disabled, with 'Signing in…', 'Sending…' and 'Saving…'), and failures on /login, /login/forgot, /login/reset and /p/welcome/password now show AuthCrash inside the sign-in frame instead of Next's white page. Still open: the Sign out button on /p/welcome/password is still a plain button with no pending state, which is a small code fix. The migration session holds the Sign out pending label as a copy question for Connor, recommending to leave it."
+ },
+ {
+  "id": "PUBLIC-004",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: the login form now runs through useActionState, so a failed POST is caught by the new src/app/login/error.tsx, which shows 'No connection. Try again when you have signal.' and Try again inside the dark AuthFrame, and the typed email comes back after the retry. The recovery is a full frame screen rather than the inline line suggested, and no src/app/global-error.tsx backstop was added."
+ },
+ {
+  "id": "PUBLIC-V04",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: login() returns { error, email } through useActionState instead of redirecting to /login?error=bad, so the email field keeps what was typed (defaultValue), the password clears on React's form reset, and focus moves to the password field. The email never goes in the URL."
+ },
+ {
+  "id": "BPORTAL-012",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: a wrong password now comes back inline with the email kept and the password field focused, with no email in the URL. Still open: there is no show-password toggle on the login, reset or first-password fields, which the other session left for Connor as a design decision."
+ },
+ {
+  "id": "G2D-IV01",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: the proxy now overwrites x-hg-app-path on every staff section request, requireUser redirects to /login?next=<path and query>, and login() sends staff to that path after checking it with staffReturnPath. That check only accepts Home or the seven (app) sections, never /p, and rejects '//', backslashes, control characters and dot segments."
+ },
+ {
+  "id": "PUBLIC-005",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: signed out, /tasks/<id> now redirects to /login?next=/tasks/<id>. A successful staff sign-in goes there, and contractors still go to their /p page. Anything unsafe or out of scope falls back to '/' or My jobs. Because a failed attempt no longer redirects, the hidden next field survives it."
+ },
+ {
+  "id": "FEEL-018",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: a signed-out GET of a staff page now redirects to /login?next=<path>, and a save after the session expires goes to the same URL for the page it was posted from (withResult rethrows the redirect), so sign-in returns to the task. The suggested in-place 'Signed out. Sign in again' toast was not built, so the unsaved edit is still dropped on that bounce."
+ },
+ {
+  "id": "G1E-I02",
+  "status": "fixed",
+  "note": "Fixed in c805e38 (after 9f74ea1): texted task and record links already returned to the record after sign-in, and now a signed-out browser visit to /api/files/<kind>/<id> gets a 307 to /login?next=<file> and comes back to the file. Fetches still get a 401, and the staff return-path validator accepts only /api/files/(task|property)/<id>. Verified in the diff."
+ },
+ {
+  "id": "BPLAY-002",
+  "status": "note",
+  "note": "Still open at 9f74ea1: the importer still writes no dueOffsetDays, the anchor picker still shows only when an item has an offset, and it still defaults to today, so every imported playbook creates undated tasks. The offsets are content for Connor, and the always-visible empty anchor, anchor quick picks and dated-count button are design calls for him too."
+ },
+ {
+  "id": "JOURNEYS-IV01",
+  "status": "note",
+  "note": "Still open at 9f74ea1: nothing adds offsets to NEW TENANT or NEW MOVE OUT, and the importer's template items still carry no dueOffsetDays, so the apply form never asks for the move-in date and all 10 tasks land undated. Connor has to choose the offsets (content) before cutover."
+ },
+ {
+  "id": "G1C-005",
+  "status": "note",
+  "note": "Still open at 9f74ea1: the importer's TemplateItem still has no dueOffsetDays field and the build loop never sets one; only the app-side parser reads the field, as it already did at 0148abf. The importer field is a small code change, but it only helps once Connor provides the per-step offsets (content)."
+ },
+ {
+  "id": "BTASKS-002",
+  "status": "note",
+  "note": "Still open at 9f74ea1: createNextRepeat still steps once from the finished copy's due date with no roll-forward, so a copy finished more than one interval late is created overdue. There is still no completion toast naming the next date. This changes plan section 5.2, so it is Connor's decision."
+ },
+ {
+  "id": "BPLAY-003",
+  "status": "note",
+  "note": "Still open at 9f74ea1: the next copy is still nextOccurrence(rule, previous due) with no catch-up past today, and there are no On schedule or After done modes. This waits on Connor's call to change spec 5.2."
+ },
+ {
+  "id": "G1C-008",
+  "status": "note",
+  "note": "Still open at 9f74ea1: a monthly task due Sep 1 closed on Oct 22 still creates a copy due Oct 1, because createNextRepeat steps once from the previous due date. No completion toast names the next date. This waits on Connor's decision to change plan section 5.2."
+ },
+ {
+  "id": "BPLAY-021",
+  "status": "note",
+  "note": "Still open at 9f74ea1: weekly rules still store no weekday and step 7 days from the last copy's (possibly moved) due date, so moving one copy still moves the whole series. Pinning a weekday changes approved spec 5.2, so it is Connor's decision."
+ },
+ {
+  "id": "BPLAY-020",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: quarterly now saves dayOfMonth from the due date's day, so Aug 31 goes Nov 30, Feb 28, May 31, Aug 31, and the chip reads \"Quarterly on the 31st\". Still open: yearly is deliberately left unpinned, so Feb 29 still slides to Feb 28 for good (Connor's call), and quarterly rules saved before this commit only get the pin when re-saved."
+ },
+ {
+  "id": "BPLAY-022",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: New task's Repeats now takes its day from the Due date (or today when there is none). Choosing a repeat with no Due fills Due with the first occurrence, and changing Due moves a day that came from it, so Due Nov 15 gives Monthly on the 15th. The server also dates an undated repeating task on create and patch. The suggested \"First one due\" line in the panel was not added; the filled Due field shows the date instead."
+ },
+ {
+  "id": "BPLAY-009",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: titleOf now runs applyTokens over the hand-edited title as well, so filling Tenant after editing a title clears its [Tenant]. That clears the red border, the hint and the disabled Create, which all read from titleOf."
+ },
+ {
+  "id": "G1C-003",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: [tenant name] now shares the Tenant field, [Address], [property] and [property address] map to one address key, and labels read in sentence case. Notes and checklist scanning and case-insensitive matching were already there at 0148abf. Still open: the address still shows as an editable field instead of never being asked, and [tenant number] is labeled \"Tenant number\" rather than \"Tenant phone\"; both are design or copy calls for Connor."
+ },
+ {
+  "id": "BPLAY-010",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: Tenant and tenant name are now one field, labels are sentence case, email and number fields get type=email and type=tel, and the hint uses the field label. Still open: \"Property address\" is still an editable input repeating the property, notes-only values (Tenant email, Tenant number) still block Create and their notes still aren't shown, and the hint copy and \"Tenant name\" / \"Tenant phone\" labels aren't the recommended wording. These are design and copy calls for Connor."
+ },
+ {
+  "id": "G1C-047",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the Asana load report now has an \"Open tasks with [brackets] in the title, to rename\" section that lists every open bracketed title with its task id and section. Still open: there are no inline rename fields, and the 8 renames themselves are a data task for Connor in the load review."
+ },
+ {
+  "id": "G1A-I03",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: Approve (REVIEW to DONE) now writes 'approved \"...\"', the email line reads 'Connor approved it' like the job page, and the subjects read 'Connor approved Cabinet install' and 'Connor sent back Cabinet install'. Both cases are covered in content.test.ts and core.test.ts."
+ },
+ {
+  "id": "BCONTRACT-008",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: Approve reads 'Connor approved it', and 'started the job' is written only for a contractor's own Start, so a partner's move reads 'Connor moved it to In progress' in both the email and the portal Updates. The extra payoff copy ('Thanks, Zack.') and a 'See job' button were not added (the button is still 'Open job'), and that copy is left to Connor."
+ },
+ {
+  "id": "BCONTRACT-007",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: when the latest status change in the bundle is sent back, scheduled or approved, the subject now says so ('Connor scheduled Cabinet install for Fri, Oct 30', using the latest date in the email). Still open: target moved, target cleared, comments, files, notes and a contractor's Start still arrive as 'X updated T'. Subjects still never include the property, titles aren't shortened, and the partner-side 'Zack finished' form wasn't added. The outcome-first subject wording is Connor's copy decision."
+ },
+ {
+  "id": "BCONTRACT-V03",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: the outbox now selects the task's unitLabel, and the job line names the unit the way My jobs does, so 'Bathroom tile' with unit 2 emails as 'Bathroom tile, 415 Crescent Ave · 2'. Two small gaps: a bare number reads '· 2' rather than 'Unit 2', and the suffix is still added when the title already names the unit."
+ },
+ {
+  "id": "BCONTRACT-004",
+  "status": "note",
+  "note": "Still open at 9f74ea1: the Portal access card still gets only active = portalAccount.status === 'ACTIVE' and lastSignIn. The page doesn't select mustChangePassword or session lastUsedAt, so a login nobody has used still shows the green Active badge. The new badge states and their copy (Invited, Active with last seen, Access off) are a design and content decision for Connor, and the code follows from that."
+ },
+ {
+  "id": "BCONTRACT-027",
+  "status": "note",
+  "note": "Still open at 9f74ea1: contact.active is still not passed to the Portal access card, so an inactive contractor with a login shows Active and the full set of actions even though sign-in and emails refuse him. The 'Access off: contractor is inactive' state and its actions are Connor's design and copy call, and the code then needs to pass the flag through."
+ },
+ {
+  "id": "ADMIN-004",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the directory Phone column and the record's Phone are now tel: links, and Email is a mailto: link, in the same text style with underline on hover. Still open: there's no sms: Text link on touch, no maps link for the mailing address, no Copy button, and phone numbers inside notes are still plain text (Steve Fuller's after-hours line). Those extras are left to Connor."
+ },
+ {
+  "id": "ADMIN-022",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: on the record page, W-9 and COI now read 'On file' when the notes hold the importer's 'W-9 on file:' or 'Insurance on file:' line, so Jose Alvarez no longer shows '—'. Still open: the note lines aren't removed (Jose and Zack Reading both still show the residue), there's no cleanup script for them, a missing doc still shows '—' rather than 'Missing', and the directory's Docs column still shows '—' for Jose. Whether this should be a field is Connor's call."
+ },
+ {
+  "id": "ADMIN-023",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: repeated trades are dropped on display, both importer merge passes now de-dupe the same way, and scripts/cleanup-contacts.ts lists (and with --apply writes) de-duped trades and capitalized lowercase name words. It's a dry run by default and is gated for production. Still open: nobody has run it, so 'John detzler' and the others still show lowercase. It doesn't move trade words out of Company ('Electric', 'House Cleaner') or map trades to the ADMIN-024 list, and the production run is Connor's."
+ },
+ {
+  "id": "COPY-004",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the global search placeholder now reads 'Search addresses, contractors, tasks…'. Still open: search results still label a contractor 'Vendor', which needs the w-16 type column widened, a layout call for Connor. The directory subtitle still reads 'N contractors & service providers', a plain copy fix that wasn't made and isn't in the claim."
+ },
+ {
+  "id": "BTASKS-V03",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the placeholder no longer says vendors. Still open: it's a single string with no short form below 640px, so on a 375 phone the longer 'Search addresses, contractors, tasks…' still truncates. The short mobile copy ('Search') is a small copy and code change that hasn't been made."
+ },
+ {
+  "id": "BCONTRACT-024",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: the placeholder reads 'Search addresses, contractors, tasks…'. Still open: a search for Zack still returns 'VENDOR Zack Reading · Outlaw Carpentry', because the result type is still 'Vendor'. 'Contractor' needs a wider type column, which is held as a layout question for Connor."
+ },
+ {
+  "id": "TASKS-010",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: where field-sizing:content is supported, the title textarea no longer gets an inline px height, so it re-fits when the width changes. Where it isn't supported, the JS fallback now re-measures through a ResizeObserver whenever the width changes, covering a rotated phone or a narrower window. I read the code but didn't re-run the resize test. The 24px size is still tracked in TASKS-015."
+ },
+ {
+  "id": "G2C-001",
+  "status": "partly",
+  "note": "Partly fixed in 9f74ea1: every unit in Property.units gets a stable id on its next save, and a rename carries to the property's tasks and listings in the same transaction when the old and new labels are each unique. Still open: Task.unitLabel and Listing.unitLabel are still free-text labels with no unitId, and the lockbox code is still resolved by label. Removing a unit doesn't ask first, and a non-unique rename or a removal still leaves stale labels, so the lockbox card disappears without warning. The unitId columns are a schema decision for Connor."
+ },
+ {
+  "id": "G2C-IV02",
+  "status": "note",
+  "note": "Still open at 9f74ea1: the move-in report's createTask still sets no due date or assignee, so the task still trails the dated rows in Unassigned and comes last on the property Tasks card. Setting Due to the arrival day is a one-line code change, but it is held as Connor's call."
+ },
+ {
+  "id": "MOBILE-V02",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: the property Tasks card now marks a past Target red with the same red as Today's date chip, using Today's late rule (never Waiting or Review). It drops the year for the current year ('Aug 28'), and overdue tasks still sort first by the soonest-date order."
+ },
+ {
+  "id": "G2C-V06",
+  "status": "fixed",
+  "note": "Fixed in 9f74ea1: the rebuilt card colors late dates red using isTargetLate, which excludes Review and Waiting, and drops the current year, so 767 Prospect's Mud Drywall reads a red 'Aug 28' as on Today. One small difference: the card uses isTargetLate for staff tasks too, so a staff task in Scheduled is judged by its visit date. For every other status that is the same as isOverdue."
+ },
+ {
+  "id": "PORTFOLIO-V01",
+  "status": "fixed",
+  "note": "Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). The combined 765/767 SREO line is split evenly (Connor's call): $120,000 purchase, $275,000 value and $146,445 loan each. The importer splits combined lines the same way."
+ },
+ {
+  "id": "PORTFOLIO-001",
+  "status": "fixed",
+  "note": "Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). Portfolio, its total and the property header read one count, and house-meter rows never count. Since Oct 23 the count follows the unit records (add or remove a unit to change it), and 767 Prospect's third record was removed (Connor: two units)."
+ },
+ {
+  "id": "FEEL-001",
+  "status": "fixed",
+  "note": "Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). A typed number that doesn't read is refused with the field named and nothing is written; blank still clears. Listing rent and sq ft too, and loan rates keep three decimals."
+ },
+ {
+  "id": "DEALS-001",
+  "status": "fixed",
+  "note": "Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). useInlineEditKeys skips the save after Esc on the address and task title (InlineAddressField), the deal fields and the CapEx rules editor."
+ },
+ {
+  "id": "PUBLIC-001",
+  "status": "fixed",
+  "note": "Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). The move-in submit goes through callAction: a dropped connection shows the offline message and every answer stays."
+ },
+ {
+  "id": "DATA-006",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): The partial-sync banner now names the gap for the basis on screen and the run date, e.g. 'NOI is $2,916 off from QuickBooks as of Sep 2, 2026.' It says 'to the cent' only when the gap is under $1. If the run stopped early it says 'The last sync didn't finish...'. If this basis ties, no banner shows and the badge doesn't say 'reconciliation off'. Logic is in src/lib/quickbooks/notices.ts (reconcileGap, partialSyncLine)."
+ },
+ {
+  "id": "COPY-010",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): Same banner fix: the 'mid-update' copy is gone, it states the gap and date, and 'Review' links to /financials/settings#cleanup."
+ },
+ {
+  "id": "COPY-V04",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): 'Unattributed (entity / no-class) ... real cost, no property' is now 'Not assigned to a property' with '$X in · $Y out' on the Overview tile, the By property row (link now reads 'Map classes' and goes to #class-mapping) and the Settings cleanup list. The 'real cost' note and the parentheticals are gone. Left: COPY-V04: the Overview tile has no 'Map classes' link of its own. The By property row carries it."
+ },
+ {
+  "id": "G2A-011",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): The tile, the By property row and Settings now all show one 'not assigned' figure, computed once in queries.ts (the operating lines on the page's basis). The data-quality unattributed sum, which was cash-only and counted non-operating income and interest, is removed. Left: G2A-011: showing 'Not assigned' only once (FINANCIALS-041) and splitting out a separate 'Not yet mapped · $X' line linked to the checklist are design and feature work. The tile and the row now agree but both still show."
+ },
+ {
+  "id": "DATA-IV02",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): Unclassified now shows line count, money in and money out separately ('87 lines · $5,080 in · $6,984 out') instead of adding income and expense together. The split is inOutCents in rollup.ts: Revenue/Expense classification first, treatment as the fallback. The 'needs attention' threshold uses |in|+|out|."
+ },
+ {
+  "id": "FINANCIALS-004",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): buildDataQuality takes the basis, and the Overview and Settings pass the basis on screen, so Unclassified, Suspense and the rest match the view. Sync stats still use Cash by default."
+ },
+ {
+  "id": "DATA-011",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): By property now includes every property with a PROPERTY-role class, even with no lines. Those rows show a lone em-dash in the money cells and a muted 'No activity' note. Sort is NOI descending with no-activity rows last by address (splitByProperty and comparePropertyRows in rollup.ts)."
+ },
+ {
+  "id": "DATA-010",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): When the rent roll has zero rows it shows the existing EmptyState instead of a $0 Portfolio total. If rent exists but none is mapped: 'No rent is matched to a property yet. Map QuickBooks classes'. If there is no rent in the data at all: 'No rent in the synced QuickBooks data. Check account categories'."
+ },
+ {
+  "id": "G2A-004",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): Lines on Ignore classes are now left out of loadLines, the rent roll query, the property card's recent lines and every data-quality sum. Settings shows an 'Ignored classes · N lines · $X in · $Y out' row ('left out of every total'), so the gap to QuickBooks stays explained. Reconciliation in sync.ts still checks every ledger line against QuickBooks, so it is unchanged. Left: G2A-004: the picker help text for Ignore ('Leave out of every total') isn't done, because it would widen the role select. The new cleanup-list row covers the explanation."
+ },
+ {
+  "id": "G2A-V01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): getFinancialsOverview, getRentRoll and getPropertyFinancials now default to conn.accountingMethod. ?basis=cash or ?basis=accrual is a one-off override (basisFromParam), and SourceBadge and the 'Show other basis' link follow the basis actually shown. The rent roll explainer reads 'Rent earned' on accrual instead of 'Cash rent received'. Left: G2A-V01: a possible later step is one Cash/Accrual segmented control on the Overview in place of the Settings row. That needs Connor's design call. BasisToggle (settings/controls.tsx) still calls setAccountingMethod without callAction and wasn't touched."
+ },
+ {
+  "id": "G2A-005",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): The Settings page reads ?connected and ?error from the Intuit return (oauthReturnLine in notices.ts). It shows one line: 'Connected to QuickBooks. A full sync is running now.', 'Connection cancelled. Nothing changed.', 'That sign-in expired.' or 'QuickBooks didn't finish connecting.'. Error lines get a 'Connect again' link. A small client component (OAuthReturnNotice in settings/controls.tsx) clears the param with history.replaceState, so a reload doesn't repeat the line. Left: G2A-005: the toast and the company name in 'Connected to <company>' aren't done. QuickbooksConnection.companyName is never written anywhere, so the line says 'Connected to QuickBooks'. 'Syncing Jan to Oct' month wording isn't done."
+ },
+ {
+  "id": "FINANCIALS-005",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): The KPI 'Cash flow after debt' is now 'NOI after interest' and the hint is gone. NoiResult.cashFlowAfterDebtCents is renamed to noiAfterInterestCents in compute.ts, reconcile.ts and compute.test.ts."
+ },
+ {
+  "id": "FINANCIALS-002",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): PartialLabel ('(N mo)') no longer hides at 12 months or more, so cumulative totals past a year stay labelled. Left: FINANCIALS-002: replacing the '(N mo)' pill with an explicit date range in the control row is a redesign, so it isn't built. Capping the Overview at the current calendar year until FINANCIALS-001 is a scope and product call, so it isn't done either. Separately, monthsOfData leaves out the running month while the totals include it."
+ },
+ {
+  "id": "DATA-007",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, financials): Overview, Rent roll and the property card show one gray line, 'Sandbox test data, not the real books.', while conn.environment is sandbox (new SandboxNotice in financials/_components/ui.tsx, plus a sandbox flag on the three query results). Left: DATA-007: the recommended copy ('Connect the production QuickBooks company to see real figures') is shortened to 'Sandbox test data, not the real books.' so it fits one line at 375."
+ },
+ {
+  "id": "G2B-003",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-record): Details, Loan, Insurance and Notes now send only the fields that changed, each with the value the form loaded. patchProperty refuses with CONFLICT_MESSAGE when a field someone else changed meanwhile would be overwritten, and the write is also guarded by the updatedAt it just read. Notes is refused if the stored text moved. Forms render from a snapshot taken when Edit opens, so a refresh mid-edit no longer wipes what's typed (key={version} is gone). Uses callAction. Pure helpers in src/lib/properties/edits.ts (changedFields, staleFields, fieldText) with tests. Left: G2B-003 / G2B-011: no per-section version was sent. The field-level expected check covers the conflict. Because the blob editors use the whole-row updatedAt, your own save in another card still makes an open Units, Rentals or CapEx save return CONFLICT. That's safe, but it's a false conflict until per-section versions exist. G2B-003 / G2B-007: the refused save shows the existing CONFLICT_MESSAGE. The G2B-007 conflict notice isn't built."
+ },
+ {
+  "id": "G2B-002",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-record): Units, Rentals and Building CapEx pin the version in state when Edit opens and send that version, never the prop. Each starts its draft from the latest initial: Rentals and CapEx didn't before. Rentals had a real data-loss path where a second Edit after adding a listing re-sent null ids, deleting the row and its photo blobs. Units and CapEx saves now go through callAction. Service uses isAtVersion, which is tested for the case where a refresh between Edit and Save must be refused."
+ },
+ {
+  "id": "PROPERTY-002",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-record): The Loan card shows Balance (currentLoan) as its first row and lets you edit it. Under it are Equity and LTV (one decimal), worked out from value and balance by loanPosition in src/lib/properties/figures.ts, which has tests. A bad number now names the field 'Balance'. Left: PROPERTY-002: the data note that 765 and 767 Prospect both carry $292,890 against $550,000 is a split-SREO-line import question (scripts/migrate/01-properties.ts splits combined lines). Not touched. The stat strip (PROPERTY-012) was not built."
+ },
+ {
+  "id": "PROPERTY-007",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-record): Added Property tax due date, closing costs, rehab amount, refi target and attorney to Details, so the tax reminder can now be created. Added loan type and escrow (yes/no) to Loan; patchProperty now accepts loanEscrow. Added coverage, deductible and liability to Insurance. All are view and edit rows in the existing cards. Left: PROPERTY-007: the derived 'All-in basis' row was not added (a new figure). Whether to drop rehabMonths needs Connor. Loan type is free text; there's no LOAN_TYPES list in config."
+ },
+ {
+  "id": "JOURNEYS-006",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-record): The Maturity (Loan) and Renewal (Insurance) boxes always show now. When empty they read 'Not set' in amber, with an Add button that opens that card's editor. Both cards use one new shared box, properties/[id]/key-date.tsx. Left: JOURNEYS-006: the one-line notice at the top of the property page ('2 key dates missing...') and feeding missing dates into the portfolio Key dates list (JOURNEYS-007) are new features, not done."
+ },
+ {
+  "id": "PROPERTY-V01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-record): Removed nationalGridLofl from UTILITY_STATUS_FIELDS, so it edits as text and keeps its account numbers. Added utilityStatusChoices (tested): every status select now keeps a stored value that isn't one of the statuses as a selected option, so opening or leaving it never loses data. Left: PROPERTY-V01: ask Connor what LOFL means so the label can say it. National Fuel LOFL is still a status select."
+ },
+ {
+  "id": "PROPERTY-IV01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-record): The property address is now the page's h1. It sizes to its text and wraps; clicking or tapping it swaps in the field, Enter saves and Esc reverts. This is an opt-in heading prop on InlineAddressField and looks the same at rest. Deals and tasks are unchanged. The rename sends the address it replaces (the same conflict guard) and goes through callAction; a failed rename shows a toast instead of the error screen. Left: PROPERTY-IV01: the deal page (/deals/[id]) has the same clipped-address bug. Passing heading (and multiline) to AddressField in deals/[id]/deal-detail.tsx fixes it; that's outside this area."
+ },
+ {
+  "id": "DATA-V01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-money): The Home and property 5-year CapEx forecast totals now show a muted line under them, e.g. \"Excludes 22 items with no install year\", and hide it at zero. Before, undated equipment was dropped with no sign. portfolioCapexForecast now adds up each property's unknownCount, and the copy comes from a new tested helper, capexUndatedNote, in src/lib/property-types.ts. Left: DATA-V01: the property card's undated-items line doesn't link to the Units section yet. UnitsSection has no anchor, and adding one means touching edit-units.tsx, which is outside this area. DATA-V01 / PROPERTY-022 / DATA-036: making Year a numeric field with an 'Approx.' checkbox, moving the existing words (Old, Newer, x) into a comment, and adding an 'N items need a year' link that filters the register to those items are a redesign plus a data migration, so they're not done."
+ },
+ {
+  "id": "PROPERTY-022",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-money): The bug part (free-text years like Old, Newer or x silently dropping equipment from the forecast) is fixed by the same undated-items line as DATA-V01. A test with Old, Newer, x and a blank year confirms the count. Left: DATA-V01 / PROPERTY-022 / DATA-036: making Year a numeric field with an 'Approx.' checkbox, moving the existing words (Old, Newer, x) into a comment, and adding an 'N items need a year' link that filters the register to those items are a redesign plus a data migration, so they're not done."
+ },
+ {
+  "id": "DATA-005",
+  "status": "fixed",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-money): The Building CapEx cost override is now read by parseCapexCost, which uses parseAmount, in both the save and the live preview. \"8k\" saves $8,000 (it used to save $8) and \"1.2M\" saves $1,200,000. When you leave the field it shows the parsed amount (\"$8,000\"), or clears back to the default cost if the text isn't one clean amount. The save call now goes through callAction. Tested in property-types.test.ts."
+ },
+ {
+  "id": "DATA-012",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-money): A mapped property with no synced QuickBooks lines now shows \"No QuickBooks activity for this property yet.\" instead of Income $0, Opex $0 and NOI $0. This uses a new hasLines field on PropertyFinancials in src/lib/quickbooks/queries.ts. Left: DATA-012: saying which period the Financials figures cover is DATA-020, not done here. I changed the suggested copy 'since it was mapped' to 'yet', because the sync re-applies the class mapping to every synced month, so 'since it was mapped' would be wrong."
+ },
+ {
+  "id": "FINANCIALS-I10",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, property-money): Recent transactions are now signed from their treatment: +$1,350 for income and non-operating money in, and −$1,350 (true minus sign) for expenses and debt interest. A negative expense, such as a refund, shows as money in. EXCLUDED lines are filtered out in the query, and it now fetches 8 rows instead of 15. The signing logic is a new tested helper, signedLineCents, in src/lib/quickbooks/compute.ts. Left: FINANCIALS-I10: showing income amounts in an income color waits on FINANCIALS-015 settling that color. For now the signs use the default text color."
+ },
+ {
+  "id": "DATA-IV04",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, deals): Changed the /deals Latest note query (src/app/(app)/deals/page.tsx) to drop only source 'change' entries instead of keeping only 'manual', so imported spreadsheet notes show again. It sorts by noteDate desc with nulls last, then createdAt. An undated imported line now passes date null, so its tooltip no longer shows the import run's createdAt as the note date (deal-row.tsx). Left: DATA-IV04: pairing with DATA-I13's single dated line. The deal page timeline still orders noteDate desc with Postgres default nulls first, so undated imported lines sit at the top there."
+ },
+ {
+  "id": "DEALS-V01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, deals): Rewrote findDuplicateDeal (src/lib/deals/service.ts) to match on house number, direction and street name using new streetKey and sameStreetAddress helpers in src/lib/normalize.ts, with tests. '352 Auburn Avenue Buffalo , NY 14213' now matches '352 Auburn Ave Buffalo 14213'. Two different ZIPs never match, 421 W and 421 E Delavan stay apart, and 'West Ave' is read as a street name, not a direction. The house number narrows the rows and the match runs in memory. Applies on create. Left: DEALS-V01: the 'Also a deal: 352 Auburn Ave · Holding' line under the deal page heading. It is new UI and needs Connor's approval. It should go in the same spot and style as the existing 'Converted →' line. DEALS-V01: the duplicate check on address edit (patchDeal). Without the 'Also a deal' line there is nowhere to show it, and blocking the edit would either crash through withLog or silently drop the typed address. findDuplicateDeal would need an excludeId when this is added. DEALS-V01: a Merge item in the ⋯ menu (moves notes and tasks into this deal) is a new feature. DEALS-V01: the one-time sweep of all 675 deals to list duplicate pairs for Connor was not run. Per the rules, no DB commands. It is read-only and could use sameStreetAddress."
+ },
+ {
+  "id": "IA-003",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, deals): createDeal and createProperty now return an ActionResult (withResult) and no longer redirect to the existing record with ?dup=1. Nothing is saved and the typed values stay in the form. Both forms moved into client components (deals/new/new-deal-form.tsx, properties/new/new-property-form.tsx) that post through callAction. On a duplicate they show one line under Address: 'Already in Deals: <address> · <status>. Open it' (or 'Already in Properties: <address>. Open it'). Other errors and OFFLINE_ERROR show as one line under the button, which reads 'Creating…' while pending. Markup and layout are otherwise the same. Left: IA-003: checking the address while it's typed and holding Create until the user picks. This is a new live-lookup interaction. IA-003: findDuplicateProperty (src/lib/properties/service.ts, outside this area) still compares the whole normalized string. It could switch to sameStreetAddress like deals. The 'Create anyway' path on the New deal form when a duplicate is flagged: declined here. It's a design change that needs Connor's OK. A false match can still happen when the existing deal names no type, town or ZIP (for example an existing '100 Main' against a new '100 Main St, Williamsville'). In that case IA-003 still refuses the create with no way through. Left for Connor to decide."
+ },
+ {
+  "id": "DEALS-IV01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, deals): Added a PriceCell in deal-row.tsx. On pointer-coarse, the Their price and Our price figures are drawn at text-xs over the input (pointer-events-none, aria-hidden). The input's 16px text is transparent until focus, so six-figure prices are no longer cut off and the 16px rule still applies while editing. Mouse layouts are unchanged, and it is CSS only with no hydration switch. priceDisplay now formats through fmtMoney (removes a listed duplicate). Left: DEALS-IV01: right-aligning the price figures (the review asked for right-aligned tabular numerals). That is a restyle, so it was not done."
+ },
+ {
+  "id": "DEALS-006",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, deals): Rebuilt StatusMultiSelect on components/popover.tsx Popover and PopoverTrigger, with a react-aria Button trigger and placement 'bottom end'. It flips and shifts to stay on screen, so the checklist no longer opens off the left edge at 375 and 320. Esc and outside click now close it, and the hand-rolled mousedown listener is gone. The panel now sizes to its content instead of a fixed w-56 and uses the shared popover surface. Left: DEALS-006: a bottom sheet on phones with 'Show 13 deals' and 'Clear' is a new design. Removing the control entirely (DEALS-015) is a separate decision."
+ },
+ {
+  "id": "SHELL-001",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, search): Both findings were still present in the code at b40a4ec. src/components/global-search.tsx now follows the WAI-ARIA combobox pattern with a listbox popup. The input has role combobox, aria-expanded, aria-controls, aria-activedescendant, aria-label and autoComplete off. Results are buttons with role option, aria-selected and tabIndex -1. The first result is highlighted when results arrive, and the highlight uses the existing hover fill, so nothing is restyled. Arrows move the highlight and wrap, Enter opens it, Esc closes the list and a second Esc clears the text, and Tab closes the list. Esc stops propagation so it doesn't also close the mobile nav drawer. A slow response for an older query no longer replaces newer results (stale flag), and a dropped connection no longer throws (try/catch). The search uses fetch, not a server action, so callAction doesn't apply. Left: SHELL-001: I didn't rebuild on React Aria ComboBox. It would mean moving the dropdown into a portal Popover, which changes the layout. Its Esc handling also differs from the spec: it clears or reverts the text on the first press. React Aria Autocomplete, which the assignee picker uses, doesn't set role combobox or aria-expanded. So I fixed it in place with the hand-written APG pattern. The Popover move from the 'Old popovers' known gap is still open. SHELL-001: a Cmd+K shortcut to focus search, key hints in the footer and the full-screen phone sheet (SHELL-005) are new features and were not built."
+ },
+ {
+  "id": "IA-I01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, search): New pure helpers in src/lib/search.ts: searchTerms, everyTermMatches and foldAccents, tested in src/lib/search.test.ts. /api/search now splits the query into words and requires every word to match some field, in any order. Each word is tried as typed, without accents, and with street words in both forms through normalizeAddress, so 'Avenue' finds 'Ave.' and 'Rd' finds 'Road'. Tasks now also match on their property or deal address, the staff assignee name, the assigned contractor's name and the legacy assigneeName. The reported cases now match: '647 Prospect Avenue', '118 Congress Street', 'congress roof', 'framing mariner', and 'José' finding 'Jose Alvarez'. Two files outside the area changed minimally. src/lib/normalize.ts: the street-word table is now the exported STREET_WORDS, so the search can map short forms back to long ones; normalizeAddress output is unchanged and its tests pass. docs/components.md: the GlobalSearch row and the 'Old popovers' known gap are corrected. Left: IA-I01: accents stored in the database still block matches. Typing 'Jose' won't find a stored 'José', for example in a task's legacy assigneeName. Fixing it needs the Postgres unaccent extension (or pg_trgm), or a stored normalized searchText column, and either one needs a migration. IA-I01: the '118 Congress St.' sublabel under task results is a visual change and waits for Connor's approval. IA-I01: a 'No matches' row when a search finds nothing (at every width, not only 320px) is a new empty state and was not built."
+ },
+ {
+  "id": "G1E-003",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, app-wide): Pages no longer print the app's fixed header, sidebar or drawer backdrop, and the shell padding is reset in print. These are @media print rules in src/app/globals.css, keyed to the shell's fixed header. The back link is also hidden in print through one print:hidden class in src/components/back-link.tsx, a file outside my area. Left: G1E-003: the print letterhead from G1E-011 (a new design) is not built."
+ },
+ {
+  "id": "G2C-V01",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, app-wide): The SectionCard Edit link now shows on every touch screen. In src/components/ui.tsx, max-sm:opacity-100 became pointer-coarse:opacity-100, so touch tablets see Edit on Details, Loan, Insurance and Notes, and a mouse still gets the hover reveal. Left: G2C-V01: Units & access (edit-units.tsx:122), Rentals (edit-listings.tsx:131) and Building CapEx (building-capex.tsx:143) have their own copies of the Edit button, still 'max-sm:opacity-100', so they stay hidden on touch tablets. They are property-area files that G2B-002 and DATA-005 also edit. The fix is the same one-class change, or moving them onto SectionCard. I logged it in docs/components.md under Duplicates."
+ },
+ {
+  "id": "G2B-005",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, app-wide): New src/components/refresh-on-return.tsx, mounted once in src/app/(app)/layout.tsx, calls router.refresh() when a tab comes back after more than 60s hidden, comes back online, is restored from Safari's back-forward cache, or the Eastern date changes. There is no server polling. It waits while a field is focused or holds unsaved typing, and skips /properties/[id] until G2B-002 and G2B-012 land. The decision logic is pure, in src/lib/refresh-on-return.ts, with 7 tests in src/lib/refresh-on-return.test.ts. Left: G2B-005: the property page (/properties/[id]) does not refresh on its own yet. Its Details, Loan, Insurance and Notes forms are keyed by version, so a refresh would erase what's typed (G2B-012). Its Units, Rentals and Building CapEx editors save with the version prop, so a refresh would let a stale draft past the conflict check (G2B-002). Remove the HELD entry in src/lib/refresh-on-return.ts once those two land. G2B-012 is not in this batch."
+ },
+ {
+  "id": "PUBLIC-007",
+  "status": "partly",
+  "note": "Fixed on main in fa4c400 (fix batch 2, app-wide): The move-in 'Additional comments' textarea is now a full-width box under its label ('block w-full' in src/app/(marketing)/residents/moving-in/move-in-form.tsx). Left: PUBLIC-007: I left the comments box at 3 rows; the review's 4-row suggestion is a size change, not part of the bug."
+ },
+ {
+  "id": "PUBLIC-003",
+  "status": "fixed",
+  "note": "Fixed on main in 1d02d46: the move-in form asks for the unit when the property has two or more rentable units (house meters left out), a one-unit property sends its unit, and the action matches it against the property's own labels before it goes into the task title, description and unitLabel."
+ }
+]

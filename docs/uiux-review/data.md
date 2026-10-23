@@ -1,6 +1,6 @@
 # Lens: tables, numbers, money, charts and status
 
-Part of the [UI/UX review](README.md). 27 findings: 0 critical, 12 high, 9 medium, 6 low.
+Part of the [UI/UX review](README.md). 22 findings: 0 critical, 7 high, 9 medium, 6 low.
 
 ## How it should work
 
@@ -24,47 +24,13 @@ Server on :3200 was up; every shot is Chromium (no WebKit run). Routes exercised
 
 ## Findings
 
-### DATA-005
-
-**Typing "8k" as a building system cost saves $8**
-
-High · Fix · effort S · `/properties/[id] Building CapEx edit` · Fix wrong numbers and records first
-
-- **Today:** Building CapEx parses the cost override with parseFloat(cost.replace(/[$,\s]/g, "")). parseFloat("8k") is 8 and "1.2M" is 1.2, so either saves as a valid override. Deals and the rest of the app accept "425k" through parseAmount.
-- **Why:** A silent money error feeds straight into the 5-year forecast and the Home total. The same shorthand works everywhere else in the app.
-- **Change:** Replace both parseFloat calls with parseAmount from src/lib/money.ts. Show the parsed value on blur ("$8,000") so the person sees what was stored.
-- **Desktop, tablet, phone:** No layout change.
-- **Reuse:** src/lib/money.ts parseAmount
-- **Code:** `src/app/(app)/properties/[id]/building-capex.tsx:86`, `src/app/(app)/properties/[id]/building-capex.tsx:172`, `src/lib/money.ts:16-29`
-- **Verification:** confirmed. Code confirmed at building-capex.tsx:86 and :172: parseFloat after stripping $ , and spaces, so "8k" becomes 8 and "1.2M" becomes 1.2. These are the only two parseFloat money parses left in src/app. I didn't submit a save; the helper aborts writes anyway.
-
-### DATA-006
-
-**The banner says figures are off "to the cent" when NOI is $2,916 off**
-
-High · Fix · effort S · `/financials (sync banner)` · The QuickBooks mirror is honest about what it covers
-
-- **Today:** The Overview banner reads "The last sync didn't reconcile to the cent, so figures may be mid-update." Settings, in 11px text, says "NOI vs QBO off by -$2,916". The NOI the Overview shows is -$1,904.
-- **Why:** The gap is 150% of the figure on screen, but the copy suggests rounding noise. Trustworthy money pages say how far off they are.
-- **Change:** When noiVsQbo is not ok, the banner states the size: "NOI differs from QuickBooks by $2,916. Review in Settings." Keep "to the cent" only when the residual is under $1.
-- **Desktop, tablet, phone:** One line at desktop. On tablet and phone it wraps to two lines and keeps the amount.
-- **Reuse:** src/app/(app)/financials/page.tsx banner; reconciliation stats already read in financials/settings/page.tsx
-- **References:** 
-  - [Flighty](https://mobbin.com/screens/09e08a95-1063-4e78-baeb-a68dddb6136a): The status line states the size of the change in plain words ('Departure changed to 10:15 AM. Flight now departs 1h 20m later').
-  - [Mercury](https://mobbin.com/screens/c6574c88-b41c-417d-acf3-3bd0fc60c6b1): Insights state a data gap as one sentence with exact figures and a link to the rows.
-  - [Xero](https://mobbin.com/screens/5f186488-9c1c-4065-ab67-22e4fe9e6a2e): Freshness and sync state shown in plain words next to the report
-  - [Xero](https://mobbin.com/screens/e194359a-f186-4480-8073-37d9c0390ae5): 'Total is out by: 6.75' states the exact gap next to the Reconcile action.
-  - [Square](https://mobbin.com/screens/93f0333b-55c6-4b0f-9a0e-881c5498d490): The reconciliation opens with one sentence naming the amount and whether it is fully accounted for.
-- **Code:** `src/app/(app)/financials/page.tsx:66-74`, `src/app/(app)/financials/settings/page.tsx:258-259`, `src/lib/quickbooks/reconcile.ts:106-112`, `src/app/(app)/financials/settings/page.tsx:247-263`
-- **Also found as:** G2A-IV06 (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views), FINANCIALS-051 (Financials, rent roll and financial settings)
-- **Verification:** confirmed. Banner copy confirmed (verify-DATA/fin--desktop-light.png). Settings shows "NOI vs QBO off by -$2,916" (finset--s700--desktop-light.png). reconcile.ts:100-112 defines that residual as what's left after the expected reclasses and says it "should be ~0". So this is a real discrepancy, not a definitional gap, and the banner understates it.
-
 ### DATA-007
 
 **Sandbox QuickBooks data is shown as real P&L with no label**
 
 High · Fix · effort S · `/financials, /financials/rent-roll, property Financials card` · The QuickBooks mirror is honest about what it covers
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, financials): Overview, Rent roll and the property card show one gray line, 'Sandbox test data, not the real books.', while conn.environment is sandbox (new SandboxNotice in financials/_components/ui.tsx, plus a sandbox flag on the three query results). Left: DATA-007: the recommended copy ('Connect the production QuickBooks company to see real figures') is shortened to 'Sandbox test data, not the real books.' so it fits one line at 375.
 - **Today:** Settings lists "Environment sandbox", but the Overview, Rent roll and property Financials cards show a "QuickBooks" badge and real-looking figures ($5,080 income, NOI -$1,904) with nothing saying it is test data.
 - **Why:** Partners could quote or act on sample-company numbers. Stripe marks every test-data view in plain words.
 - **Change:** When conn.environment is sandbox, put one line above the figures on every Financials surface: "Sandbox data. Connect the production QuickBooks company to see real figures." Use the gray neutral tone, not amber, since it is a mode rather than a warning.
@@ -75,58 +41,13 @@ High · Fix · effort S · `/financials, /financials/rent-roll, property Financi
 - **Code:** `src/app/(app)/financials/settings/page.tsx:84`
 - **Verification:** confirmed. Settings reads "Environment sandbox" while Overview, Rent roll and the property card show unlabeled figures. Mobbin d7461782 checked: it is Stripe's test-mode bar with that exact copy. Stripe uses a strong orange bar, while the finding proposes gray; either works as long as it's always present. Risk depends on production still being sandbox-connected; project notes say production connect is next.
 
-### DATA-010
-
-**Rent roll shows only "Portfolio $0", no rows and no empty state**
-
-High · Fix · effort S · `/financials/rent-roll` · The QuickBooks mirror is honest about what it covers
-
-- **Today:** Rent roll renders only a header and "Portfolio $0". There are no Rent-category lines in the synced data at all (no month columns), so the cause isn't missing class mapping.
-- **Why:** A $0 total reads as "no rent was collected", which contradicts the Overview. The real state is that nothing is attributed to a property yet.
-- **Change:** When roll.rows is empty, replace the table with the inline empty line: "No rent is matched to a property yet. Map QuickBooks classes in Settings." with the link. Never render a $0 total over zero rows.
-- **Desktop, tablet, phone:** The same single line plus link at every size.
-- **Reuse:** EmptyState in src/components/ui.tsx
-- **References:** 
-  - [Mercury](https://mobbin.com/screens/63939c2c-1c29-423a-b038-13d57cccb930): 'Recent transactions' with no rows shows ghost rows behind 'No transactions yet' and one line saying what will fill it.
-  - [Mercury](https://mobbin.com/screens/9c0b1be4-b1f9-4d6b-8cfa-17bae36d2582): Full-page table empty state: heading, one sentence on when rows appear, one action; no $0 total.
-  - [Square](https://mobbin.com/screens/250d922f-0b7d-4f45-af91-c0e7336874c2): One plain empty line with the single action that fixes it
-  - [Mercury](https://mobbin.com/screens/4328a055-c9d1-4466-9c90-d6b723ec7f2c): 'Payroll account will show up here when it's connected' with one Connect button over the table area.
-  - [Mercury](https://mobbin.com/screens/c6e6d13c-8ac5-42de-9984-7247ec630040): 'No rules yet', one line and one action, with no icon or frame.
-  - [Xero](https://mobbin.com/screens/59100a9a-4ca1-4d66-bd16-38c0066dc191): Empty reconcile table says "No transactions have been imported yet", with the start action ("Get started by importing a bank statement") right above it.
-  - [Mercury](https://mobbin.com/screens/d0553915-6c36-4702-a8ef-907d38c5099e): Empty transactions table states "No transactions yet" and what will appear there.
-  - [Stripe](https://mobbin.com/screens/c8ea641a-ba21-4d53-8d9e-05f15c59265a): 'No overdue invoices in selected time period' inside the widget frame
-  - [Mercury](https://mobbin.com/screens/f2cff3f5-1af2-44eb-9243-61dfc93ca146): Phone: 'No money in' stated under the month bars
-  - [Stripe](https://mobbin.com/screens/ba72cc6a-153e-43d4-81db-dcd9703bdd17): Empty state says what will appear and links to learn more
-  - [Linear](https://mobbin.com/screens/f2e7538e-b21c-4933-a5d2-4e4c31853e88): One sentence of purpose plus a primary action
-- **Code:** `src/app/(app)/financials/rent-roll/page.tsx:35-97`, `src/app/(app)/financials/rent-roll/page.tsx:29`, `src/app/(app)/financials/rent-roll/page.tsx:24-98`, `src/lib/quickbooks/queries.ts:299-301`, `src/app/(app)/financials/rent-roll/page.tsx:18-35`
-- **Also found as:** VISUAL-V07 (Lens: visual design system across every screen), G2A-V03 (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views), FINANCIALS-029 (Financials, rent roll and financial settings), COPY-012 (Lens: words on every screen)
-- **Verification:** partly. The header-plus-$0 table with no empty state is confirmed (verify-DATA/rr--desktop-light.png). The diagnosis is off. getRentRoll reads only category RENT lines, and no month columns render at all, so this QuickBooks company has zero Rent-category lines. The $5,080 on Overview is other operating income, not unmatched rent. The proposed copy ("Map QuickBooks classes in Settings") would send Connor to the wrong fix. The empty state needs two cases: no rent lines at all, and rent lines with no mapped property.
-
-### DATA-011
-
-**"By property" lists no properties although two are mapped**
-
-High · Fix · effort S · `/financials By property table` · The QuickBooks mirror is honest about what it covers
-
-- **Today:** 118 Congress and 725 Linwood are mapped to classes in Settings, but the By property table holds only the italic Unattributed row and the Portfolio total. byProperty only includes properties that have lines.
-- **Why:** Mapped properties vanish instead of showing they had no activity, so a mapping looks broken.
-- **Change:** Include every mapped property in byProperty. A property with no lines shows "—" in each money cell (not $0) and a muted "No activity" note. Sort by NOI with no-activity rows last.
-- **Desktop, tablet, phone:** Desktop and tablet keep the table. On phone it renders as list rows (DATA-018).
-- **Reuse:** getFinancialsOverview in src/lib/quickbooks/queries.ts
-- **References:** 
-  - [Attio](https://mobbin.com/screens/c6a29ce7-72af-4679-bd07-0085f5aa05b3): Records without a value keep their row with an empty money cell
-  - [Turo](https://mobbin.com/screens/da7b1b2b-c1fd-4b93-901a-c1e2d7999e83): The 'All vehicles | 2026 earnings' list keeps every vehicle, including one at $0
-  - [Copilot](https://mobbin.com/screens/d4cb6fb7-48bc-4984-9476-5e1b4dbe1104): Empty groups (Investments $0.00, Loans $0.00) stay listed, each with a 'Link a new account' action, instead of disappearing.
-- **Code:** `src/lib/quickbooks/queries.ts:100-116`, `src/lib/quickbooks/queries.ts:89-117`, `DB: QboClass role PROPERTY 2 rows, 9 of 11 properties unmapped`, `src/lib/quickbooks/queries.ts:89-116`, `src/app/(app)/financials/page.tsx:186-200`
-- **Also found as:** DATA-V07 (Lens: tables, numbers, money, charts and status), FINANCIALS-V02 (Financials, rent roll and financial settings), G2A-I09 (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views)
-- **Verification:** confirmed. Confirmed. 118 Congress and 725 Linwood are mapped (finset--s700) but By property shows only the Unattributed row (fin--s700--desktop-light.png). byPropMap is built only from rows that have lines (queries.ts:89-116).
-
 ### DATA-012
 
 **A mapped property with no synced lines shows Income $0, Opex $0, NOI $0**
 
 High · Fix · effort S · `/properties/[id] Financials card` · The QuickBooks mirror is honest about what it covers
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, property-money): A mapped property with no synced QuickBooks lines now shows "No QuickBooks activity for this property yet." instead of Income $0, Opex $0 and NOI $0. This uses a new hasLines field on PropertyFinancials in src/lib/quickbooks/queries.ts. Left: DATA-012: saying which period the Financials figures cover is DATA-020, not done here. I changed the suggested copy 'since it was mapped' to 'yet', because the sync re-applies the class mapping to every synced month, so 'since it was mapped' would be wrong.
 - **Today:** On 118 Congress (Refinanced, 3 units), the Financials card shows three $0 figures, with no period, as if the property earned nothing.
 - **Why:** $0 is a claim about money. With no lines the honest state is "no QuickBooks activity yet", not zero income.
 - **Change:** When the property has no lines, replace the three figures with one line: "No QuickBooks activity for this property since it was mapped." Show the figures only once at least one line exists, with the period stated (DATA-020).
@@ -210,30 +131,13 @@ High · Fix · effort M · `/contractors/[id] Jobs card` · Fix wrong numbers an
 - **Also found as:** ADMIN-017 (Contractors directory, contractor detail and Settings), IA-043 (Lens: information architecture and global SaaS patterns)
 - **Verification:** verifier-found
 
-### DATA-IV02
-
-**'Unclassified $12,065' adds income and expense together**
-
-High · Fix · effort S · `/financials data-quality row and /financials/settings cleanup list` · The QuickBooks mirror is honest about what it covers · quick win
-
-- **Today:** The Unclassified figure is the plain sum of amount over unclassed lines. Amounts are stored positive for both income and expense, so $12,065 is $5,080 of income plus $6,984 of expense, a number that matches nothing in QuickBooks. Settings repeats it ('Unclassified lines $12,065 · 87 lines'), while the Unattributed line beside it correctly splits '+$5,080 / −$6,984'.
-- **Why:** A money figure that adds inflows to outflows misstates the size of the cleanup job, and DATA-I05 would put it into a sentence. On a read-only mirror, one wrong total undermines trust in the rest.
-- **Change:** Compute unclassed income and expense separately and show them the way Unattributed does: '87 lines · +$5,080 in · −$6,984 out'.
-- **Desktop, tablet, phone:** Same text at all sizes. On phone the in and out figures wrap under the line count.
-- **Reuse:** The income and expense split already computed for Unattributed in buildDataQuality (data-quality.ts:88-97).
-- **References:** 
-  - [Mercury](https://mobbin.com/screens/67a22ab9-8672-4acb-a980-cfda6b7e810d): "4 uncategorized payments made up 8% of 48 money-out transactions": the cleanup item is framed as a count with direction, not a mixed sum.
-  - [Xero](https://mobbin.com/screens/df886246-1ccc-456f-8952-b33a264771a6): Tasks card lists "29 Items to reconcile": a count that links to the work.
-- **Code:** `src/lib/quickbooks/data-quality.ts:72-76`, `src/lib/quickbooks/data-quality.ts:107`, `prisma/schema.prisma:616`, `src/lib/quickbooks/data-quality.ts:73-77`, `src/app/(app)/financials/page.tsx:93-98`, `src/app/(app)/financials/settings/page.tsx:108-113`, `Local LedgerLine CASH: __UNCLASSED__ OPERATING_INCOME 5080.27 + OPERATING_EXPENSE 6984.39`, `src/lib/quickbooks/data-quality.ts:73-76`
-- **Also found as:** G2A-V02 (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views), G2A-IV05 (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views)
-- **Verification:** verifier-found
-
 ### DATA-IV04
 
 **Latest note is blank on 674 of 675 deals because imported notes are filtered out**
 
 High · Fix · effort S · `/deals Latest note column` · Fix wrong numbers and records first
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, deals): Changed the /deals Latest note query (src/app/(app)/deals/page.tsx) to drop only source 'change' entries instead of keeping only 'manual', so imported spreadsheet notes show again. It sorts by noteDate desc with nulls last, then createdAt. An undated imported line now passes date null, so its tooltip no longer shows the import run's createdAt as the note date (deal-row.tsx). Left: DATA-IV04: pairing with DATA-I13's single dated line. The deal page timeline still orders noteDate desc with Postgres default nulls first, so undated imported lines sit at the top there.
 - **Today:** The list loads only notes whose source is 'manual'. That drops the 1,050 notes imported from the spreadsheet on 517 deals. Only 29 Livingston, with three test notes, shows anything, so 12 of the 13 Active deals have an empty Latest note cell. The code comment says the goal was to skip auto-logged 'change' entries.
 - **Why:** The pipeline's most useful column is empty, so every deal has to be opened to see where it stands. That is the job the column exists for.
 - **Change:** Exclude only change entries (source not 'change') and order by note date, newest first, with undated notes last. Pair it with DATA-I13's single dated line.
@@ -249,6 +153,7 @@ High · Fix · effort S · `/deals Latest note column` · Fix wrong numbers and 
 
 High · Fix · effort S · `Home and property "5-year CapEx forecast"` · Fix wrong numbers and records first · quick win
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, property-money): The Home and property 5-year CapEx forecast totals now show a muted line under them, e.g. "Excludes 22 items with no install year", and hide it at zero. Before, undated equipment was dropped with no sign. portfolioCapexForecast now adds up each property's unknownCount, and the copy comes from a new tested helper, capexUndatedNote, in src/lib/property-types.ts. Left: DATA-V01: the property card's undated-items line doesn't link to the Units section yet. UnitsSection has no anchor, and adding one means touching edit-units.tsx, which is outside this area. DATA-V01 / PROPERTY-022 / DATA-036: making Year a numeric field with an 'Approx.' checkbox, moving the existing words (Old, Newer, x) into a comment, and adding an 'N items need a year' link that filters the register to those items are a redesign plus a data migration, so they're not done.
 - **Today:** capexForecast skips any unit equipment whose install year doesn't parse and counts it in unknownCount, but nothing under src/app ever reads unknownCount. Across the 11 properties, 22 of 55 equipment rows are skipped: 19 have words in Year (Newer, Old, Older, New, Fine, x) and 3 are blank. 7 of the 22 are HVAC units, $8,000 each under the rules. Home still presents "$38,900" as the 5-year total with no hint that 40% of the equipment isn't counted.
 - **Why:** A forecast total that quietly omits a third of its inputs reads as complete, and partners will budget from it. Trustworthy money pages state their coverage when the inputs are incomplete.
 - **Change:** When unknownCount > 0, add one muted line under the headline total: "Excludes 22 items with no install year". On the property card it reads "Excludes 3 items with no install year" and links to that property's Units section. Hide the line at zero. Pair it with the Year validation and cleanup in DATA-036 so the count falls over time.

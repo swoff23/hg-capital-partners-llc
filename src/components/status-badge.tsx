@@ -73,8 +73,8 @@ const GLYPH: Record<TaskStatus, ReactNode> = {
 
 /**
  * A task status's glyph: 14px with a mouse, 16px on touch, in the status's
- * tone. The stroke is 1.5 on lucide's 24 grid and scales with the size, as
- * lucide's own icons do (docs/brand-guidelines.md, section 6).
+ * tone. The stroke is a fixed 1.5px at every size (non-scaling), so a ring
+ * still reads in sunlight on a job site (docs/brand-guidelines.md, section 9).
  */
 export function StatusMark({ status, className }: { status: TaskStatus; className?: string }) {
   return (
@@ -86,7 +86,12 @@ export function StatusMark({ status, className }: { status: TaskStatus; classNam
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={cn("size-3.5 shrink-0 pointer-coarse:size-4", STATUS_TONE[status], className)}
+      className={cn(
+        // vector-effect isn't inherited, so it goes on every shape.
+        "size-3.5 shrink-0 pointer-coarse:size-4 [&_*]:[vector-effect:non-scaling-stroke]",
+        STATUS_TONE[status],
+        className,
+      )}
     >
       {GLYPH[status]}
     </svg>

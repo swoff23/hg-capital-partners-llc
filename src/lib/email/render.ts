@@ -1,10 +1,17 @@
+import { BRAND } from "@/lib/brand";
+import { brandTokens as t } from "@/lib/brand-tokens";
+
 /**
- * The one email layout (docs/asana-migration-plan.md §6, screen 7): the HG
- * name, one line, one button. Plain text goes alongside for clients that
- * don't render HTML and for the dev console. Pure; see render.test.ts.
+ * The one email layout (docs/asana-migration-plan.md §6, screen 7): the
+ * letterhead, one line, one button. Plain text goes alongside for clients
+ * that don't render HTML and for the dev console. Pure; see render.test.ts.
  *
  * Inline styles and a table because that's what Gmail and iOS Mail honor.
- * Colors are the public site's: near-black text on white, gold rule.
+ * Email can't read CSS variables, so every color comes from brand-tokens.ts,
+ * the hex mirror of the light tokens (docs/brand-guidelines.md, section 11).
+ * The letterhead is the monogram tile and the company name over a 1px
+ * --gold-deep rule (section 6). The tile is a table cell, not an image, so it
+ * shows with images blocked; the letters fall back to the reader's sans.
  */
 
 export interface PlainEmailInput {
@@ -26,7 +33,13 @@ export interface RenderedEmail {
   html: string;
 }
 
-const BRAND = "HG Capital Partners";
+const FONT = "Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+
+/** The monogram tile at 32px (radius 22%, letters at 42%) and the name beside it. */
+const LETTERHEAD = `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+<td width="32" height="32" align="center" valign="middle" style="width:32px;height:32px;background:${t.inkTile};border-radius:7px;color:${t.gold};font-size:13px;font-weight:600;letter-spacing:-0.04em;line-height:32px;">${BRAND.mark}</td>
+<td style="padding-left:10px;font-size:15px;line-height:20px;font-weight:600;color:${t.fg1};">${BRAND.company}</td>
+</tr></table>`;
 
 export function escapeHtml(s: string): string {
   return s
@@ -46,7 +59,7 @@ export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
 
   const items = input.items ?? [];
   const text = [
-    BRAND,
+    BRAND.company,
     "",
     input.line,
     ...(items.length ? ["", ...items] : []),
@@ -64,17 +77,16 @@ export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="margin:0;padding:0;background:#f4f4f5;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background:${t.canvas};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${t.canvas};padding:32px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:12px;padding:32px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#18181b;">
-<tr><td style="font-size:12px;letter-spacing:0.28em;text-transform:uppercase;color:#8a6d2f;">${BRAND}</td></tr>
-<tr><td style="padding:12px 0 0;"><div style="height:1px;width:48px;background:#c8a765;"></div></td></tr>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${t.surface};border:1px solid ${t.line};border-radius:8px;padding:32px 28px;font-family:${FONT};color:${t.fg1};">
+<tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.goldDeep};">${LETTERHEAD}</td></tr>
 <tr><td style="padding:24px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.line)}</td></tr>
-${items.map((item) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:#3f3f46;">${escapeHtml(item)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:16px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
-<a href="${href}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:999px;">${escapeHtml(input.buttonLabel)}</a>
+${items.map((item) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeHtml(item)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:16px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
+<a href="${href}" style="display:inline-block;background:${t.act};color:${t.onAct};text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:6px;">${escapeHtml(input.buttonLabel)}</a>
 </td></tr>
-${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:#71717a;">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>
+${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:${t.fg3};">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>
 </td></tr>
 </table>
 </body>

@@ -182,15 +182,11 @@ export function MoveInFormEditor({
           title="Discard changes?"
           onClose={() => setConfirmOpen(false)}
           body="This discards everything you've edited on this tab since the last save."
+          cancelLabel="Keep editing"
           actions={
-            <>
-              <Button size="sm" variant="secondary" onClick={() => setConfirmOpen(false)}>
-                Keep editing
-              </Button>
-              <Button size="sm" variant="destructive" onClick={discard}>
-                Discard changes
-              </Button>
-            </>
+            <Button size="sm" variant="destructive" onClick={discard}>
+              Discard changes
+            </Button>
           }
         />
       )}

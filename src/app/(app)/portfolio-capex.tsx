@@ -175,7 +175,7 @@ export function PortfolioCapexForecastCard({
                     <th
                       key={y}
                       className={
-                        "text-right transition-opacity " +
+                        "text-right tabular-nums transition-opacity " +
                         (selYear != null && selYear !== y ? "opacity-30" : "")
                       }
                     >

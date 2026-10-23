@@ -1,12 +1,20 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { cn, initials } from "@/lib/utils";
+import { Menu, Pin, X } from "lucide-react";
+import { BRAND } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
+import { Avatar } from "@/components/avatar";
 import { GlobalSearch } from "@/components/global-search";
+import { Monogram } from "@/components/monogram";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SideNav } from "@/components/nav";
+import { SideNav, chromeIconClass } from "@/components/nav";
 import { ToastProvider } from "@/components/toast";
+
+/** The shell's icon buttons: 32px with a mouse, 44px on touch; idle --fg-3, --fg-1 on hover. */
+const chromeButtonClass =
+  "flex size-8 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-1 hover:text-fg-1 pointer-coarse:size-11";
 
 export function AppShell({
   children,
@@ -59,30 +67,30 @@ export function AppShell({
     return () => mq.removeEventListener("change", sync);
   }, []);
 
+  // The chrome is --canvas: the sidebar, and below lg the 52px top bar. From
+  // lg the header is the desktop one, 56px on --surface like the work area
+  // (docs/brand-guidelines.md, section 9). --app-bar-h in globals.css holds
+  // the bar's height at each size, so everything under it reads one value.
   const shell = (
     <div className="min-h-screen">
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface px-4">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-(--app-bar-h) items-center gap-3 border-b border-line bg-canvas px-4 lg:bg-surface lg:px-5">
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
-          className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-background hover:text-foreground lg:hidden"
+          className={cn(chromeButtonClass, "-ml-2 pointer-coarse:-ml-3 lg:hidden")}
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <path d="M3 6h18M3 12h18M3 18h18" />
-          </svg>
+          <Menu aria-hidden="true" className={chromeIconClass} />
         </button>
-        <Link href="/" className="shrink-0 text-sm font-semibold tracking-tight">
-          HG Capital OS
+        {/* The lockup: the tile and the app's name, which drops on phones.
+            From lg the tile sits centered over the rail's icons. */}
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1 pointer-coarse:min-h-11"
+        >
+          <Monogram size={24} />
+          <span className="max-sm:sr-only">{BRAND.app}</span>
         </Link>
         <div className="min-w-0 max-w-md flex-1">
           <GlobalSearch />
@@ -98,7 +106,7 @@ export function AppShell({
           tabIndex={-1}
           aria-label="Close navigation"
           onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 top-14 z-30 bg-black/40 lg:hidden"
+          className="fixed inset-0 top-(--app-bar-h) z-30 bg-scrim lg:hidden"
         />
       )}
 
@@ -106,31 +114,22 @@ export function AppShell({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={cn(
-          "fixed bottom-0 left-0 top-14 z-40 flex flex-col overflow-hidden border-r border-border bg-surface p-2",
-          "w-64 transition-transform duration-200 ease-out lg:transition-[width]",
-          mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0",
+          "fixed bottom-0 left-0 top-(--app-bar-h) z-40 flex flex-col overflow-hidden border-r border-line bg-canvas p-2",
+          "w-64 transition-transform duration-sheet ease-spring lg:transition-[width]",
+          // The phone drawer is the Overlay level; the rail, opened by hover over the page, floats.
+          mobileOpen ? "translate-x-0 shadow-overlay" : "-translate-x-full lg:translate-x-0",
           expanded ? "lg:w-60" : "lg:w-16",
-          hovered && !pinned && "lg:shadow-2xl",
+          hovered && !pinned && "lg:shadow-float",
         )}
       >
-        <div className="mb-1 flex h-7 items-center justify-end">
+        <div className="mb-1 flex min-h-7 items-center justify-end">
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close navigation"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-background hover:text-foreground lg:hidden"
+            className={cn(chromeButtonClass, "size-7 lg:hidden")}
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <X aria-hidden="true" className={chromeIconClass} />
           </button>
           <button
             type="button"
@@ -139,44 +138,29 @@ export function AppShell({
             aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
             title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
             className={cn(
-              "hidden h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-background hover:text-foreground lg:flex",
+              chromeButtonClass,
+              "hidden size-7 lg:flex",
               !expanded && "pointer-events-none opacity-0",
             )}
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-4 w-4"
-              fill={pinned ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 17v5" />
-              <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
-            </svg>
+            <Pin aria-hidden="true" fill={pinned ? "currentColor" : "none"} className={chromeIconClass} />
           </button>
         </div>
 
         <SideNav collapsed={!expanded && !mobileOpen} onNavigate={() => setMobileOpen(false)} />
 
-        <div className="mt-auto border-t border-border pt-2">
+        <div className="mt-auto border-t border-line pt-2">
           <div className="flex items-center justify-between px-2 py-1.5 lg:hidden">
-            <span className="text-xs font-medium text-muted">Appearance</span>
+            <span className="text-meta font-medium text-fg-2">Appearance</span>
             <ThemeToggle />
           </div>
-          <div className="flex items-center gap-2 px-2 py-1.5">
-            <span
-              title={userLabel}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary"
-            >
-              {initials(userLabel)}
-            </span>
+          {/* 10px in, so the 28px avatar centers on the rail's icons. */}
+          <div title={userLabel} className="flex items-center gap-2 px-2.5 py-1.5">
+            <Avatar name={userLabel} size={28} />
             <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-              <div className="truncate text-xs font-medium">{userLabel}</div>
+              <div className="truncate text-meta font-medium text-fg-1">{userLabel}</div>
               <form action={signOutAction}>
-                <button className="text-xs text-muted hover:text-foreground" type="submit">
+                <button className="text-meta text-fg-3 transition-colors hover:text-fg-1" type="submit">
                   Sign out
                 </button>
               </form>
@@ -187,11 +171,11 @@ export function AppShell({
 
       <div
         className={cn(
-          "pt-14 transition-[padding] duration-200 ease-out",
+          "pt-(--app-bar-h) transition-[padding] duration-sheet ease-spring",
           pinned ? "lg:pl-60" : "lg:pl-16",
         )}
       >
-        <main className="min-h-[calc(100vh-3.5rem)] p-4 md:p-6">
+        <main className="min-h-[calc(100vh-var(--app-bar-h))] p-4 md:p-6">
           <div className="mx-auto max-w-6xl">{children}</div>
         </main>
       </div>

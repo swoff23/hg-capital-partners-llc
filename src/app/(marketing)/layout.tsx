@@ -1,5 +1,10 @@
+import type { Viewport } from "next";
 import { PublicHeader } from "@/components/public/header";
 import { PublicFooter } from "@/components/public/footer";
+import { brandTokensDark } from "@/lib/brand-tokens";
+
+// The public site is always the dark material, so the browser's bar is too.
+export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
 
 /**
  * Public-facing pages (landing, rentals, residents, about — and later the

@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { brandTokensDark } from "@/lib/brand-tokens";
+import { BRAND } from "@/lib/brand";
 import { getEnv } from "@/lib/env";
 import { requestPasswordReset } from "../actions";
 import { AuthFrame, AuthNotice, authInputClass, authLinkClass } from "../_components/auth-frame";
 import { AuthSubmit } from "../_components/auth-submit";
 
 export const metadata: Metadata = {
-  title: "Forgot Password | HG Capital Partners",
+  title: { absolute: `Forgot Password | ${BRAND.company}` },
   robots: { index: false, follow: false },
 };
+
+// The sign-in frame is the public site's dark material, so the browser's bar is too.
+export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
 
 // Contractor logins only (docs/asana-migration-plan.md, defaults 2): a staff
 // email gets the same "sent" answer, and nothing is emailed.

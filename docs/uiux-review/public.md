@@ -1,6 +1,6 @@
 # Login and the public site
 
-Part of the [UI/UX review](README.md). 54 findings: 0 critical, 9 high, 28 medium, 17 low.
+Part of the [UI/UX review](README.md). 53 findings: 0 critical, 8 high, 28 medium, 17 low.
 
 ## How it should work
 
@@ -24,31 +24,13 @@ Server on port 3200 was up. Every page was signed out unless noted. Routes and v
 
 ## Findings
 
-### PUBLIC-003
-
-**Move-in report never records which unit it covers**
-
-High · Fix · effort S · `/residents/moving-in` · Rentals, residents and the public site run one lifecycle
-
-- **Today:** The report records tenant name and property but not the unit. Staff have to infer the unit from the tenant's lease in multi-unit buildings.
-- **Why:** Wrong data. Staff have to guess which apartment the condition record belongs to, which weakens the report as deposit evidence.
-- **Change:** After a property is chosen, show a Unit select built from Property.units, hidden when the property has one unit. Write the unit into the task title ('Move-in inspection, 767 Prospect Ave, 1st Rear, Dana') and the description.
-- **Desktop, tablet, phone:** Desktop and tablet: Property and Unit side by side, with Property wider. Phone: stacked.
-- **Reuse:** Property.units JSON (prisma/schema.prisma:149), the existing select styling, createTask.
-- **References:** 
-  - [Jobber](https://mobbin.com/flows/59cc7ab8-69a0-4295-93e5-27735c624281): New job opens with a "Service for" block that names the client and the full address before any detail, so the record's place is never ambiguous.
-  - [Zillow](https://mobbin.com/screens/e668a0c3-6dbe-44aa-9a9f-d5bacb907ac4): 'Create a property condition report' sits in a specific lease's menu, tying the report to one tenancy
-  - [Jobber](https://mobbin.com/screens/a9ae73c4-ea73-4778-a64c-1590c987122f): A new request is pinned to a specific client and service address before any detail
-- **Code:** `src/app/(marketing)/residents/moving-in/actions.ts:107-114`, `src/app/(marketing)/residents/moving-in/page.tsx:79-82`, `src/app/(marketing)/residents/moving-in/move-in-form.tsx:156-173`, `prisma/schema.prisma:149`, `src/app/(marketing)/residents/moving-in/actions.ts:36-38`, `src/app/(marketing)/residents/moving-in/actions.ts:109`, `src/app/(marketing)/residents/moving-in/move-in-form.tsx:136-173`, `src/app/(marketing)/residents/moving-in/actions.ts:35-44,107-114`, `branch: src/app/(marketing)/residents/moving-in/move-in-form.tsx:136-173`, `branch: src/app/(marketing)/residents/moving-in/actions.ts:35-44,107-114`, `branch: prisma/schema.prisma:263`, `branch: src/app/(app)/tasks/[id]/fields.tsx:132-145`
-- **Also found as:** PUBLIC-IV01 (Login and the public site), JOURNEYS-I02 (Lens: the core jobs, end to end), G1B-V01 (After a tenant submits: the move-in report on the staff side)
-- **Verification:** partly. Code confirms the task title and description carry only the property address (actions.ts:79-81, 107-111). It isn't wrong data, though: tenant name plus property maps to a unit through the lease or rent roll, so this is missing convenience data. Calibrated to medium. When building the Unit select, send only unit labels to the client: Property.units also holds lockbox codes and utility account numbers (schema.prisma:146-149).
-
 ### PUBLIC-007
 
 **The 'Additional comments' box renders as a small inline box beside its label**
 
 High · Fix · effort S · `/residents/moving-in` · Rentals, residents and the public site run one lifecycle
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, app-wide): The move-in 'Additional comments' textarea is now a full-width box under its label ('block w-full' in src/app/(marketing)/residents/moving-in/move-in-form.tsx). Left: PUBLIC-007: I left the comments box at 3 rows; the review's 4-row suggestion is a size change, not part of the bug.
 - **Today:** The textarea has no block or w-full class. At desktop it sits inline to the right of 'ADDITIONAL COMMENTS', about 200px wide. On phone it wraps below the label but is only about 220px of a 327px column, with the resize handle showing.
 - **Why:** It's visibly broken at the moment the resident is wrapping up, which makes the form feel unfinished.
 - **Change:** Make it a block, full-width textarea under its label, 4 rows, matching the other fields' border, radius and padding.

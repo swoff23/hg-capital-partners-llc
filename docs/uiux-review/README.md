@@ -50,18 +50,18 @@ Task, contractor and portal findings were re-checked on the Asana migration bran
 
 | | |
 |---|---|
-| Distinct findings | 1076 (1813 raw, 721 duplicates folded in) |
-| Critical / high / medium / low | 0 / 160 / 481 / 435 |
-| Fixes (no design call needed) / design changes / new capabilities | 360 / 471 / 245 |
-| Mobbin references | 1574 |
+| Distinct findings | 1066 (1813 raw, 721 duplicates folded in) |
+| Critical / high / medium / low | 0 / 150 / 481 / 435 |
+| Fixes (no design call needed) / design changes / new capabilities | 350 / 471 / 245 |
+| Mobbin references | 1563 |
 | Areas and lenses reviewed | 28 |
 
 ## Themes
 
 | Theme | What it means | Findings | Critical | High |
 |---|---|---|---|---|
-| **Fix wrong numbers and records first** | Several screens show data that is wrong or contradicts itself: unit counts that differ between Portfolio and the property page, one SREO line counted twice, forecasts that silently drop undated items, jobs matched to the wrong contractor by first name, inputs that save $8 for '8k' or erase stored account numbers, and clocks running on UTC. Stripe and Mercury earn trust by never showing a figure they can't back up, and a calmer layout around a wrong number only makes it more convincing. Most of these are small fixes plus one canonical address format, and they come before any redesign. | 31 | 0 | 10 |
-| **Every save is safe, instant and undoable** | One failed save swaps the whole page for an error card and throws away what was typed, files delete in one tap, double taps create duplicates, ticking a task gives no feedback or Undo, and two people editing the same record overwrite each other. Linear, Superhuman and Vercel's guidelines treat speed and safety as one design: optimistic writes with rollback, Undo toasts instead of confirms, pending states, drafts that survive a reload and conflict notices that name who changed what. Fix it once in shared helpers and primitives rather than editor by editor. | 54 | 0 | 16 |
+| **Fix wrong numbers and records first** | Several screens show data that is wrong or contradicts itself: unit counts that differ between Portfolio and the property page, one SREO line counted twice, forecasts that silently drop undated items, jobs matched to the wrong contractor by first name, inputs that save $8 for '8k' or erase stored account numbers, and clocks running on UTC. Stripe and Mercury earn trust by never showing a figure they can't back up, and a calmer layout around a wrong number only makes it more convincing. Most of these are small fixes plus one canonical address format, and they come before any redesign. | 30 | 0 | 9 |
+| **Every save is safe, instant and undoable** | One failed save swaps the whole page for an error card and throws away what was typed, files delete in one tap, double taps create duplicates, ticking a task gives no feedback or Undo, and two people editing the same record overwrite each other. Linear, Superhuman and Vercel's guidelines treat speed and safety as one design: optimistic writes with rollback, Undo toasts instead of confirms, pending states, drafts that survive a reload and conflict notices that name who changed what. Fix it once in shared helpers and primitives rather than editor by editor. | 53 | 0 | 15 |
 | **Home and Today become one work queue** | Home leads with inventory counts and a 5-year CapEx matrix while the tasks that need you sit below the fold, and the branch's Today, repeats and playbooks still produce undated runs, late copies, a 34-row Unassigned pile and completions that say nothing about what comes next. Things 3, Ramp and Linear open on what needs you now, who acts next and a one-tap finish with Undo. Make the queue the center of the app, with clear handoffs between the two partners, and repeats and playbooks that schedule themselves and report back. | 125 | 0 | 16 |
 | **One record layout for every record** | Properties, deals, tasks and contractors use three different detail layouts, with titles that are clipped text inputs and no heading, stacked uppercase labels over columns of dashes, key dates and the loan balance hidden, and notes buried among system changes. Stripe, Attio and Linear repeat one anatomy: an identity header with the key figure, status and actions, tabs with counts, one timeline in the main column and a facts rail where empty fields read as verbs. Build it first as the D10 property hub, then reuse it for deals, tasks and contractors. | 60 | 0 | 10 |
 | **Lists answer first and stay calm at 675 rows** | The deals list is a sheet of live inputs that scrolls sideways at 1280 and stops at 300 rows, and other lists scroll inside 70vh boxes, can't be bulk-edited and dead-end on empty filters. Attio, Stripe and Shopify keep large lists calm with read-only rows that open the record, grouped stages or a board, footer totals, filters that save as views and a floating bulk bar. The deals pipeline is where to prove the pattern before applying it to Portfolio and Contractors. | 54 | 0 | 8 |
@@ -69,10 +69,10 @@ Task, contractor and portal findings were re-checked on the Asana migration bran
 | **The phone is a chosen subset, and touch has no hover** | Phones and iPads get squeezed desktop tables, filter rows that wrap to three lines, Edit and photo controls that only appear on hover, 20 to 38px targets, clipped prices and a hamburger drawer. Linear Mobile, Shopify and Stripe's iOS app pick the few jobs people do away from a desk, reflow lists into two-line rows, and use sheets with pinned buttons and a labeled bottom bar. Build that subset on purpose, as D10 already plans, and fix touch rules in the primitives rather than page by page. | 71 | 0 | 16 |
 | **Create where you are** | Every New is a separate full page that loses the context you came from, sends you somewhere else afterwards, validates with browser bubbles and can't carry on to the next item. Linear, Todoist and Attio create in a sheet prefilled from the current page, parse what you type and offer Save and add another. One create sheet pattern, opened from the shell, lists and records, covers tasks, deals, properties and the deal-to-property conversion. | 30 | 0 | 3 |
 | **Money, numbers and dates read one way** | Money columns are left-aligned, negatives mix hyphens and minus signs, the same price reads '425k' on one page and '$425,000' on another, and due dates use four vocabularies, including an overdue label that read 'yesterday' for 18-month-old tasks. Mercury, Stripe and Vercel typeset numbers: right-aligned tabular figures, a true minus, one decimal policy per context and one date formatter. A shared formatter plus a few table rules fixes most of these at once. | 21 | 0 | 3 |
-| **The QuickBooks mirror is honest about what it covers** | Financials never states its period, labels a 51-day-old sync with a brand chip, adds income and expense together in its cleanup total, ships a basis toggle that changes nothing, shows confident $0 figures where nothing is booked and fills tiles with bookkeeping caveats. Mercury and Stripe lead with a few headline numbers, a period control, a plain freshness line and a drill-down to the lines behind every figure. Fix the trust bugs first, then rebuild Overview, Rent and the QuickBooks settings around the decisions an owner makes. | 111 | 0 | 27 |
+| **The QuickBooks mirror is honest about what it covers** | Financials never states its period, labels a 51-day-old sync with a brand chip, adds income and expense together in its cleanup total, ships a basis toggle that changes nothing, shows confident $0 figures where nothing is booked and fills tiles with bookkeeping caveats. Mercury and Stripe lead with a few headline numbers, a period control, a plain freshness line and a drill-down to the lines behind every figure. Fix the trust bugs first, then rebuild Overview, Rent and the QuickBooks settings around the decisions an owner makes. | 104 | 0 | 20 |
 | **One design system, fixed in the primitives** | Status renders five different ways, red and green each do several jobs, avatars use hashed rainbow colors, emoji stand in for icons, dark mode fails contrast, dialogs ignore Esc and the gray canvas stacks shadowed cards inside cards. Vercel's Geist and Linear give every token one job and keep surfaces flat and neutral, so the few colored marks are found first. Fix these in tokens and shared components so every page inherits the calm, and let the gold accent and real property photos keep it from looking generic. | 90 | 0 | 7 |
 | **Plain, consistent words** | The app still says Vendors, Project and Owner after the agreed renames, deal statuses mix priority with spreadsheet sort numbers, screen readers hear variable names like theirPriceRaw, and internal caveats, footnotes and env var names sit on screen. Monzo, Basecamp and Stripe use one short, specific name per thing and explain only what helps a decision. A one-page glossary and a single sweep of labels and empty states removes most of these. | 53 | 0 | 3 |
-| **Rentals, residents and the public site run one lifecycle** | Listings go public without rent or photos, units appear twice with no tenancy record, the move-in report is a 7,400px form that loses answers on reload and lands as a text dump inside a task, and the public site has no property photography. Zillow Rental Manager, Airbnb and Thumbtack tie listing, tenancy and resident intake to one unit and end every resident flow by saying what happens next. Model the tenancy, gate what goes public, and turn the move-in report into a dated record on the unit. | 146 | 0 | 21 |
+| **Rentals, residents and the public site run one lifecycle** | Listings go public without rent or photos, units appear twice with no tenancy record, the move-in report is a 7,400px form that loses answers on reload and lands as a text dump inside a task, and the public site has no property photography. Zillow Rental Manager, Airbnb and Thumbtack tie listing, tenancy and resident intake to one unit and end every resident flow by saying what happens next. Model the tenancy, gate what goes public, and turn the move-in report into a dated record on the unit. | 145 | 0 | 20 |
 | **Contractor jobs and media close the loop** | Contractors are about to sign in, but the portal shows them a red Review chip, Mark done can skip photos that failed to upload, partners approve without seeing proof, emails don't name the job or accept replies, and files open raw or delete with no Undo. Jobber, Basecamp and Gusto label what each side can see, show the evidence before approval and end each job on a payoff with the next step. Ship the portal with one media system and explicit visibility, and let every job report back to the partners. | 154 | 0 | 11 |
 
 ## Fix first
@@ -85,15 +85,9 @@ Critical findings, then high-severity fixes that need no design approval.
 - [BPLAY-010](bplay.md#bplay-010) **High**, S: Fill-in fields are raw Asana placeholders: duplicate, lowercase, and hidden (Branch: playbooks, templates and repeats)
 - [BPORTAL-013](bportal.md#bportal-013) **High**, S: Sign-in forms have no pending state, and a failed submit shows a white framework page (Branch: contractor portal and contractor sign-in)
 - [COPY-004](copy.md#copy-004) **High**, S: Finish the approved rename from 'Vendors' to 'Contractors' (Lens: words on every screen)
-- [COPY-010](copy.md#copy-010) **High**, S: The partial-sync banner says 'mid-update' about a 51-day-old sync (Lens: words on every screen)
 - [COPY-V04](copy.md#copy-v04) **High**, S: The 'Unattributed' figure is called 'real cost' but contains all of the period's income (Lens: words on every screen)
-- [DATA-005](data.md#data-005) **High**, S: Typing "8k" as a building system cost saves $8 (Lens: tables, numbers, money, charts and status)
-- [DATA-006](data.md#data-006) **High**, S: The banner says figures are off "to the cent" when NOI is $2,916 off (Lens: tables, numbers, money, charts and status)
 - [DATA-007](data.md#data-007) **High**, S: Sandbox QuickBooks data is shown as real P&L with no label (Lens: tables, numbers, money, charts and status)
-- [DATA-010](data.md#data-010) **High**, S: Rent roll shows only "Portfolio $0", no rows and no empty state (Lens: tables, numbers, money, charts and status)
-- [DATA-011](data.md#data-011) **High**, S: "By property" lists no properties although two are mapped (Lens: tables, numbers, money, charts and status)
 - [DATA-012](data.md#data-012) **High**, S: A mapped property with no synced lines shows Income $0, Opex $0, NOI $0 (Lens: tables, numbers, money, charts and status)
-- [DATA-IV02](data.md#data-iv02) **High**, S: 'Unclassified $12,065' adds income and expense together (Lens: tables, numbers, money, charts and status)
 - [DATA-IV04](data.md#data-iv04) **High**, S: Latest note is blank on 674 of 675 deals because imported notes are filtered out (Lens: tables, numbers, money, charts and status)
 - [DATA-V01](data.md#data-v01) **High**, S: The CapEx forecast silently leaves out 22 undated items, 7 of them HVAC (Lens: tables, numbers, money, charts and status)
 - [DEALS-006](deals.md#deals-006) **High**, S: The status filter popover opens off the left edge on phones (Deals pipeline, new deal and deal detail)
@@ -101,8 +95,6 @@ Critical findings, then high-severity fixes that need no design approval.
 - [FEEL-005](feel.md#feel-005) **High**, S: Submit buttons have no pending state, so double taps create duplicate tasks (Lens: interaction quality, feedback, states, speed and accessibility)
 - [FEEL-010](feel.md#feel-010) **High**, S: Filters and sorts don't respond until the server returns, and each one adds a history entry (Lens: interaction quality, feedback, states, speed and accessibility)
 - [FINANCIALS-002](financials.md#financials-002) **High**, S: Stop hiding the months label once history reaches 12 months (Financials, rent roll and financial settings)
-- [FINANCIALS-004](financials.md#financials-004) **High**, S: Match the data-quality figures to the basis the page is showing (Financials, rent roll and financial settings)
-- [FINANCIALS-005](financials.md#financials-005) **High**, S: Rename 'Cash flow after debt': it only subtracts interest (Financials, rent roll and financial settings)
 - [FINANCIALS-I10](financials.md#financials-i10) **High**, S: Show money in and money out apart in a property's recent transactions (Financials, rent roll and financial settings)
 - [G1A-008](g1a.md#g1a-008) **High**, S: 14 of 29 contractors have no email, so they can't get a login on Oct 29 (Contractor loop before the Oct 29 invites: sign-in, first password, My jobs, job page, emails, Approve)
 - [G1E-001](g1e.md#g1e-001) **High**, S: Printouts stop silently at the scroll box: /tasks prints about 14 of 193 open tasks (What leaves the app: printouts, PDFs and the Google listing)
@@ -111,7 +103,6 @@ Critical findings, then high-severity fixes that need no design approval.
 - [G2A-005](g2a.md#g2a-005) **High**, S: The OAuth return is silent: success, cancel and failure all look the same (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views)
 - [G2A-011](g2a.md#g2a-011) **High**, S: The two "Unattributed" figures will disagree as soon as any class is unmapped (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views)
 - [G2A-V01](g2a.md#g2a-v01) **High**, S: The Settings Basis toggle changes nothing anywhere (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views)
-- [G2B-002](g2b.md#g2b-002) **High**, S: Pin the version when Edit opens, and start the draft from the latest data (Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap)
 - [G2B-003](g2b.md#g2b-003) **High**, S: Send only the fields that changed from the Details, Loan, Insurance and Notes forms (Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap)
 - [G2B-005](g2b.md#g2b-005) **High**, S: Refresh a page when its tab comes back into view (Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap)
 - [G2B-I03](g2b.md#g2b-i03) **High**, S: Say who will actually see a reply, and say so when the contractor has no login (Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap)
@@ -126,7 +117,6 @@ Critical findings, then high-severity fixes that need no design approval.
 - [PROPERTY-002](property.md#property-002) **High**, S: The current loan balance is stored for every property but never shown, so equity and LTV are invisible (Property detail page (future property hub))
 - [PROPERTY-IV01](property.md#property-iv01) **High**, S: Show the full address as the page title instead of clipping it at about 20 characters (Property detail page (future property hub))
 - [PROPERTY-V01](property.md#property-v01) **High**, S: National Grid 'LOFL' stores account numbers but edits as a status select, so one touch erases them (Property detail page (future property hub))
-- [PUBLIC-003](public.md#public-003) **High**, S: Move-in report never records which unit it covers (Login and the public site)
 - [PUBLIC-007](public.md#public-007) **High**, S: The 'Additional comments' box renders as a small inline box beside its label (Login and the public site)
 - [PUBLIC-016](public.md#public-016) **High**, S: Sign-in fields have no labels and the page has no heading (Login and the public site)
 - [SHELL-IV02](shell.md#shell-iv02) **High**, S: Rank open tasks and active deals first in search, and drop placeholder rows (App shell, sidebar, top bar, global search and Home)
@@ -146,7 +136,6 @@ Critical findings, then high-severity fixes that need no design approval.
 
 ## Quick wins
 
-- [DATA-IV02](data.md#data-iv02) **High**, S: 'Unclassified $12,065' adds income and expense together (Lens: tables, numbers, money, charts and status)
 - [DATA-V01](data.md#data-v01) **High**, S: The CapEx forecast silently leaves out 22 undated items, 7 of them HVAC (Lens: tables, numbers, money, charts and status)
 - [DEALS-IV01](deals.md#deals-iv01) **High**, S: Stop clipping the last digit of prices on touch screens (Deals pipeline, new deal and deal detail)
 - [G1A-008](g1a.md#g1a-008) **High**, S: 14 of 29 contractors have no email, so they can't get a login on Oct 29 (Contractor loop before the Oct 29 invites: sign-in, first password, My jobs, job page, emails, Approve)
@@ -518,10 +507,10 @@ Routing rule: anything on tasks, contractors, the portal, login or job emails go
 **Main (the first six lines are critical: land them by Sun Oct 25, before the Oct 27 production load; the rest go between branch landings)**
 - PORTFOLIO-V01 (PROPERTY-I14, [PORTFOLIO-V02](portfolio.md#portfolio-v02)): split the shared 765/767 Prospect line so totals stop double-counting.
 - PORTFOLIO-001 (IA-001, DATA-002, PROPERTY-V04, [G2C-018](g2c.md#g2c-018)): one unit count, house meters excluded.
-- FEEL-001 ([DATA-005](data.md#data-005)): money inputs parse '8k' and never blank a stored value.
+- FEEL-001 (DATA-005): money inputs parse '8k' and never blank a stored value.
 - [PROPERTY-V01](property.md#property-v01) (PROPERTY-IV02): the unit editor stops erasing LOFL account numbers.
 - DEALS-001: Esc reverts a deal edit.
-- [G2B-002](g2b.md#g2b-002), [G2B-003](g2b.md#g2b-003), [G2B-011](g2b.md#g2b-011): property editors pin the version at Edit and send only changed fields.
+- G2B-002, [G2B-003](g2b.md#g2b-003), [G2B-011](g2b.md#g2b-011): property editors pin the version at Edit and send only changed fields.
 - [PROPERTY-002](property.md#property-002) (G1E-IV02), [PROPERTY-007](property.md#property-007): show the loan balance; give the ten stored fields a UI.
 - [DATA-V01](data.md#data-v01) ([COPY-V05](property.md#property-022), [PROPERTY-022](property.md#property-022), [DATA-036](property.md#property-022)), [ADMIN-002](admin.md#admin-002), [ADMIN-016](admin.md#admin-016): the forecast names what it left out; delete the blank and duplicate CapEx rules.
 - [PROPERTY-001](g1d.md#g1d-v01), [G2C-006](g2c.md#g2c-006): Documents and listing photos confirm before deleting.
@@ -531,9 +520,9 @@ Routing rule: anything on tasks, contractors, the portal, login or job emails go
 - DATA-IV04, DEALS-IV03, [DEALS-004](data.md#data-041): Latest note includes imports; closed deals link to properties; the list passes 300.
 - [PORTFOLIO-047](copy.md#copy-017) ([DEALS-025](copy.md#copy-017), [DEALS-V02](deals.md#deals-v02), [DEALS-040](deals.md#deals-040)): one canonical address format, URLs rejected.
 - DATA-IV02, [G2A-004](g2a.md#g2a-004), G2A-IV04, DATA-IV03: Unclassified stops mixing signs; Ignore excludes; the dead Basis toggle goes; data quality matches the basis.
-- [DATA-007](data.md#data-007), [FINANCIALS-005](financials.md#financials-005), [COPY-V04](copy.md#copy-v04), G2A-IV06: label sandbox data, rename Cash flow after debt, state gaps in dollars.
+- [DATA-007](data.md#data-007), FINANCIALS-005, [COPY-V04](copy.md#copy-v04), G2A-IV06: label sandbox data, rename Cash flow after debt, state gaps in dollars.
 - [G2A-001](g2a.md#g2a-001), G2A-IV01, [G2A-006](g2a.md#g2a-006), [G2A-I02](g2a.md#g2a-i02): newest months survive the cap; connect errors show a reason; expired or stale sync never reads green.
-- [DATA-012](data.md#data-012), [DATA-V07](data.md#data-011), [DATA-I03](data.md#data-i03), [FINANCIALS-002](financials.md#financials-002): no confident $0, every property in By property, 58 Mariner at 50%, one period label.
+- [DATA-012](data.md#data-012), DATA-V07, [DATA-I03](data.md#data-i03), [FINANCIALS-002](financials.md#financials-002): no confident $0, every property in By property, 58 Mariner at 50%, one period label.
 - PUBLIC-001, [PUBLIC-002](g2c.md#g2c-i01), PUBLIC-IV01, [G1B-012](g1b.md#g1b-012): failed submits keep the report; /rentals hides incomplete listings; ask the unit; skipped items read Not rated.
 - [ADMIN-001](g2b.md#g2b-v01), [ADMIN-006](admin.md#admin-006), [FINANCIALS-017](admin.md#admin-i13): Settings saves fail inline, unsaved edits ask first, Disconnect confirms.
 - [G2B-005](g2b.md#g2b-005), [G2B-I13](g2b.md#g2b-i13), [G1E-003](g1e.md#g1e-003), [G1E-007](g1e.md#g1e-007): refresh on focus, survive deploys, print cleanly, fix the vercel.app 500s.
@@ -750,6 +739,16 @@ Fixed since the review ran, on main or on the Asana migration branch (now on mai
 - FEEL-001 (Lens: interaction quality, feedback, states, speed and accessibility), fixed: A typo in a money field silently wipes the stored value. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). A typed number that doesn't read is refused with the field named and nothing is written; blank still clears. Listing rent and sq ft too, and loan rates keep three decimals.
 - DEALS-001 (Deals pipeline, new deal and deal detail), fixed: Esc saves the edit instead of reverting it. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). useInlineEditKeys skips the save after Esc on the address and task title (InlineAddressField), the deal fields and the CapEx rules editor.
 - PUBLIC-001 (Login and the public site), fixed: A failed move-in submit wipes the whole report and shows 'That page didn't load'. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). The move-in submit goes through callAction: a dropped connection shows the offline message and every answer stays.
+- DATA-006 (Lens: tables, numbers, money, charts and status), fixed: The banner says figures are off "to the cent" when NOI is $2,916 off. Fixed on main in fa4c400 (fix batch 2, financials): The partial-sync banner now names the gap for the basis on screen and the run date, e.g. 'NOI is $2,916 off from QuickBooks as of Sep 2, 2026.' It says 'to the cent' only when the gap is under $1. If the run stopped early it says 'The last sync didn't finish...'. If this basis ties, no banner shows and the badge doesn't say 'reconciliation off'. Logic is in src/lib/quickbooks/notices.ts (reconcileGap, partialSyncLine).
+- COPY-010 (Lens: words on every screen), fixed: The partial-sync banner says 'mid-update' about a 51-day-old sync. Fixed on main in fa4c400 (fix batch 2, financials): Same banner fix: the 'mid-update' copy is gone, it states the gap and date, and 'Review' links to /financials/settings#cleanup.
+- DATA-IV02 (Lens: tables, numbers, money, charts and status), fixed: 'Unclassified $12,065' adds income and expense together. Fixed on main in fa4c400 (fix batch 2, financials): Unclassified now shows line count, money in and money out separately ('87 lines · $5,080 in · $6,984 out') instead of adding income and expense together. The split is inOutCents in rollup.ts: Revenue/Expense classification first, treatment as the fallback. The 'needs attention' threshold uses |in|+|out|.
+- FINANCIALS-004 (Financials, rent roll and financial settings), fixed: Match the data-quality figures to the basis the page is showing. Fixed on main in fa4c400 (fix batch 2, financials): buildDataQuality takes the basis, and the Overview and Settings pass the basis on screen, so Unclassified, Suspense and the rest match the view. Sync stats still use Cash by default.
+- DATA-011 (Lens: tables, numbers, money, charts and status), fixed: "By property" lists no properties although two are mapped. Fixed on main in fa4c400 (fix batch 2, financials): By property now includes every property with a PROPERTY-role class, even with no lines. Those rows show a lone em-dash in the money cells and a muted 'No activity' note. Sort is NOI descending with no-activity rows last by address (splitByProperty and comparePropertyRows in rollup.ts).
+- DATA-010 (Lens: tables, numbers, money, charts and status), fixed: Rent roll shows only "Portfolio $0", no rows and no empty state. Fixed on main in fa4c400 (fix batch 2, financials): When the rent roll has zero rows it shows the existing EmptyState instead of a $0 Portfolio total. If rent exists but none is mapped: 'No rent is matched to a property yet. Map QuickBooks classes'. If there is no rent in the data at all: 'No rent in the synced QuickBooks data. Check account categories'.
+- FINANCIALS-005 (Financials, rent roll and financial settings), fixed: Rename 'Cash flow after debt': it only subtracts interest. Fixed on main in fa4c400 (fix batch 2, financials): The KPI 'Cash flow after debt' is now 'NOI after interest' and the hint is gone. NoiResult.cashFlowAfterDebtCents is renamed to noiAfterInterestCents in compute.ts, reconcile.ts and compute.test.ts.
+- G2B-002 (Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap), fixed: Pin the version when Edit opens, and start the draft from the latest data. Fixed on main in fa4c400 (fix batch 2, property-record): Units, Rentals and Building CapEx pin the version in state when Edit opens and send that version, never the prop. Each starts its draft from the latest initial: Rentals and CapEx didn't before. Rentals had a real data-loss path where a second Edit after adding a listing re-sent null ids, deleting the row and its photo blobs. Units and CapEx saves now go through callAction. Service uses isAtVersion, which is tested for the case where a refresh between Edit and Save must be refused.
+- DATA-005 (Lens: tables, numbers, money, charts and status), fixed: Typing "8k" as a building system cost saves $8. Fixed on main in fa4c400 (fix batch 2, property-money): The Building CapEx cost override is now read by parseCapexCost, which uses parseAmount, in both the save and the live preview. "8k" saves $8,000 (it used to save $8) and "1.2M" saves $1,200,000. When you leave the field it shows the parsed amount ("$8,000"), or clears back to the default cost if the text isn't one clean amount. The save call now goes through callAction. Tested in property-types.test.ts.
+- PUBLIC-003 (Login and the public site), fixed: Move-in report never records which unit it covers. Fixed on main in 1d02d46: the move-in form asks for the unit when the property has two or more rentable units (house meters left out), a one-unit property sends its unit, and the action matches it against the property's own labels before it goes into the task title, description and unitLabel.
 
 ## Areas
 
@@ -760,15 +759,15 @@ Fixed since the review ran, on main or on the Asana migration branch (now on mai
 | [Property detail page (future property hub)](property.md) | 45 | 0 | 12 |
 | [Deals pipeline, new deal and deal detail](deals.md) | 61 | 0 | 9 |
 | [Tasks list, new task and task detail](tasks.md) | 30 | 0 | 4 |
-| [Financials, rent roll and financial settings](financials.md) | 66 | 0 | 9 |
+| [Financials, rent roll and financial settings](financials.md) | 64 | 0 | 7 |
 | [Contractors directory, contractor detail and Settings](admin.md) | 48 | 0 | 6 |
-| [Login and the public site](public.md) | 54 | 0 | 9 |
+| [Login and the public site](public.md) | 53 | 0 | 8 |
 | [Lens: visual design system across every screen](visual.md) | 59 | 0 | 10 |
 | [Lens: information architecture and global SaaS patterns](ia.md) | 31 | 0 | 6 |
 | [Lens: phone and tablet experience on every route](mobile.md) | 26 | 0 | 6 |
 | [Lens: interaction quality, feedback, states, speed and accessibility](feel.md) | 31 | 0 | 7 |
-| [Lens: tables, numbers, money, charts and status](data.md) | 27 | 0 | 12 |
-| [Lens: words on every screen](copy.md) | 40 | 0 | 10 |
+| [Lens: tables, numbers, money, charts and status](data.md) | 22 | 0 | 7 |
+| [Lens: words on every screen](copy.md) | 39 | 0 | 9 |
 | [Lens: the core jobs, end to end](journeys.md) | 15 | 0 | 2 |
 | [Contractor loop before the Oct 29 invites: sign-in, first password, My jobs, job page, emails, Approve](g1a.md) | 35 | 0 | 4 |
 | [After a tenant submits: the move-in report on the staff side](g1b.md) | 32 | 0 | 4 |
@@ -776,7 +775,7 @@ Fixed since the review ran, on main or on the Asana migration branch (now on mai
 | [Photos, videos and documents: viewing and capturing, not just the upload box](g1d.md) | 49 | 0 | 4 |
 | [What leaves the app: printouts, PDFs and the Google listing](g1e.md) | 38 | 0 | 2 |
 | [QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views](g2a.md) | 40 | 0 | 5 |
-| [Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap](g2b.md) | 37 | 0 | 7 |
+| [Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap](g2b.md) | 36 | 0 | 6 |
 | [A unit changing tenants, end to end: notice, turn, listing, move-in report and first rent](g2c.md) | 51 | 0 | 9 |
 | [Staff sign-in lifecycle: sign out, a 30-day expiry mid-edit, changing a password, and passkeys](g2d.md) | 28 | 0 | 0 |
 | [Branch: Today, All tasks, new task and the task page](btasks.md) | 37 | 0 | 5 |

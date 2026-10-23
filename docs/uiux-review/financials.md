@@ -1,6 +1,6 @@
 # Financials, rent roll and financial settings
 
-Part of the [UI/UX review](README.md). 66 findings: 0 critical, 9 high, 35 medium, 22 low.
+Part of the [UI/UX review](README.md). 64 findings: 0 critical, 7 high, 35 medium, 22 low.
 
 ## How it should work
 
@@ -57,6 +57,7 @@ High · New capability · effort M · `/financials (Overview)` · The QuickBooks
 
 High · Fix · effort S · `/financials, /financials/rent-roll, property Financials card` · The QuickBooks mirror is honest about what it covers
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, financials): PartialLabel ('(N mo)') no longer hides at 12 months or more, so cumulative totals past a year stay labelled. Left: FINANCIALS-002: replacing the '(N mo)' pill with an explicit date range in the control row is a redesign, so it isn't built. Capping the Overview at the current calendar year until FINANCIALS-001 is a scope and product call, so it isn't done either. Separately, monthsOfData leaves out the running month while the totals include it.
 - **Today:** PartialLabel returns nothing once months >= 12, and the Overview totals have no date filter. History starts 2026-01, so from the January 2027 sync every KPI and table cell will show 13 or more months of cumulative figures with no label at all.
 - **Why:** An unlabeled multi-year total reads as an annual figure. That's wrong-looking money on the main screen within about ten weeks.
 - **Change:** Replace the '(N mo)' pill with an explicit range in the control row, such as 'Jan 1 to Oct 22, 2026', built from the first month with data and the last sync date. Never hide it. Until FINANCIALS-001 ships, cap Overview at the current calendar year.
@@ -67,35 +68,6 @@ High · Fix · effort S · `/financials, /financials/rent-roll, property Financi
   - [Stripe](https://mobbin.com/screens/cb9a784d-e7d5-451b-88a8-bac710506120): Explicit '2 Dec–9 Dec' range chip next to 'Last 4 weeks'
 - **Code:** `src/app/(app)/financials/_components/ui.tsx:10-13`, `src/lib/quickbooks/queries.ts:16-30`, `src/lib/quickbooks/config.ts:29-30`
 - **Verification:** confirmed. PartialLabel returns null at months >= 12 (ui.tsx:11), and totals have no date filter. With history starting 2026-01, the label disappears on the January 2027 sync. The total then covers 12 months plus the January MTD lines, and it keeps growing after that. Fix together with FINANCIALS-023, which covers the same label logic.
-
-### FINANCIALS-004
-
-**Match the data-quality figures to the basis the page is showing**
-
-High · Fix · effort S · `/financials?basis=accrual` · The QuickBooks mirror is honest about what it covers
-
-- **Today:** On the accrual view the 'Unattributed' tile still reads -$1,904 while the Unattributed row in the table on the same screen reads $1,642. buildDataQuality hard-codes CASH, so the Unclassified and Suspense tiles stay on cash basis too.
-- **Why:** The same label shows two different amounts on one screen.
-- **Change:** Pass the page's basis into buildDataQuality and compute every tile on that basis.
-- **Desktop, tablet, phone:** Same at every size.
-- **Reuse:** buildDataQuality in src/lib/quickbooks/data-quality.ts.
-- **Code:** `src/lib/quickbooks/data-quality.ts:53-58`, `src/lib/quickbooks/queries.ts:144-147`, `src/lib/quickbooks/data-quality.ts:57`, `src/app/(app)/financials/page.tsx:91-112`, `src/lib/quickbooks/queries.ts:145-148`
-- **Also found as:** DATA-IV03 (Lens: tables, numbers, money, charts and status)
-- **Verification:** confirmed. Reproduced on ?basis=accrual: the tile reads 'Unattributed (entity / no-class) -$1,904' while the table row reads $1,642. The two also disagree on cash basis, not only between bases. The tile (data-quality.ts:87-96) includes NON_OPERATING income and DEBT_INTEREST. The row (queries.ts:118, 161-165) counts operating lines only. So the two drift apart whenever an entity class carries mortgage or bank interest. Pass the basis in and use one definition. FINANCIALS-010 and FINANCIALS-041 delete the tile, which also resolves this.
-
-### FINANCIALS-005
-
-**Rename 'Cash flow after debt': it only subtracts interest**
-
-High · Fix · effort S · `/financials (Overview KPI)` · The QuickBooks mirror is honest about what it covers
-
-- **Today:** 'Cash flow after debt' is NOI minus mortgage interest; principal is left out. The tile also carries the hint 'principal & CapEx are balance-sheet, not here'.
-- **Why:** In real estate, cash flow after debt means after full debt service. This label overstates cash flow by the principal in every payment, and the hint is an internal caveat that the copy rules keep out of the UI.
-- **Change:** Rename it 'NOI after interest' now and drop the hint. Add true 'Cash flow after debt service' in FINANCIALS-008.
-- **Desktop, tablet, phone:** Same label everywhere; on phone it shortens to 'After interest'.
-- **Reuse:** Kpi.
-- **Code:** `src/app/(app)/financials/page.tsx:81-87`, `src/lib/quickbooks/compute.ts:14-15`, `src/lib/quickbooks/compute.ts:157`
-- **Verification:** confirmed. compute.ts:157 is noi - debtInterest. The hint 'principal & CapEx are balance-sheet, not here' wraps to two lines at 1280, which also breaks the one-line rule.
 
 ### FINANCIALS-007
 
@@ -196,6 +168,7 @@ High · Design change · effort M · `/financials (Monthly income vs expense)` �
 
 High · Fix · effort S · `/properties/[id] Financials card (future hub Financials tab)` · Money, numbers and dates read one way
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, property-money): Recent transactions are now signed from their treatment: +$1,350 for income and non-operating money in, and −$1,350 (true minus sign) for expenses and debt interest. A negative expense, such as a refund, shows as money in. EXCLUDED lines are filtered out in the query, and it now fetches 8 rows instead of 15. The signing logic is a new tested helper, signedLineCents, in src/lib/quickbooks/compute.ts. Left: FINANCIALS-I10: showing income amounts in an income color waits on FINANCIALS-015 settling that color. For now the signs use the default text color.
 - **Today:** The property card's 'Recent transactions' lists QuickBooks lines with date, name and an amount (src/app/(app)/properties/[id]/financials.tsx:78-93). The query pulls every line for the property whatever its treatment (src/lib/quickbooks/queries.ts:202-214). Amounts are stored signed naturally, with income and expense both positive (prisma/schema.prisma LedgerLine.amount). So a $1,350 rent deposit and a $1,350 repair print identically, and excluded lines such as transfers appear unmarked. The query fetches 15 lines and the card shows 8 (financials.tsx:82). The card renders empty locally because no property has classed lines.
 - **Why:** Mercury prints money in with a plus sign and color, prints money out plain, and strikes through failed items, so a list reads like a statement. A money list that hides direction is a correctness problem, not polish.
 - **Change:** Sign each row from its treatment. Income reads '+$1,350' in the income color FINANCIALS-015 settles on, and expense reads '−$1,350' in the default text color. Leave excluded lines out of this list, and fetch 8 rows instead of 15.

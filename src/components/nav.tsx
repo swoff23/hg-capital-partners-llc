@@ -1,124 +1,78 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import {
+  Building2,
+  ChartColumn,
+  House,
+  Settings2,
+  SquareCheckBig,
+  TrendingUp,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+import { TOUCH_HEIGHT } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-const LINKS: { href: string; label: string; icon: ReactNode }[] = [
-  {
-    href: "/",
-    label: "Home",
-    icon: (
-      <>
-        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-        <path d="M9 22V12h6v10" />
-      </>
-    ),
-  },
-  {
-    href: "/deals",
-    label: "Deals",
-    icon: (
-      <>
-        <path d="M22 7 13.5 15.5 8.5 10.5 2 17" />
-        <path d="M16 7h6v6" />
-      </>
-    ),
-  },
-  {
-    href: "/properties",
-    label: "Portfolio",
-    icon: (
-      <>
-        <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
-        <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
-        <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
-        <path d="M10 6h4M10 10h4M10 14h4M10 18h4" />
-      </>
-    ),
-  },
-  {
-    href: "/financials",
-    label: "Financials",
-    icon: (
-      <>
-        <path d="M3 3v18h18" />
-        <path d="M18 17V9M13 17V5M8 17v-3" />
-      </>
-    ),
-  },
-  {
-    href: "/tasks",
-    label: "Tasks",
-    icon: (
-      <>
-        <path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5" />
-        <path d="m9 11 3 3L22 4" />
-      </>
-    ),
-  },
-  {
-    href: "/contractors",
-    label: "Contractors",
-    icon: (
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    ),
-  },
-  {
-    href: "/settings",
-    label: "Settings",
-    icon: (
-      <>
-        <path d="M20 7h-9" />
-        <path d="M14 17H5" />
-        <circle cx="17" cy="17" r="3" />
-        <circle cx="7" cy="7" r="3" />
-      </>
-    ),
-  },
+const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/", label: "Home", icon: House },
+  { href: "/deals", label: "Deals", icon: TrendingUp },
+  { href: "/properties", label: "Portfolio", icon: Building2 },
+  { href: "/financials", label: "Financials", icon: ChartColumn },
+  { href: "/tasks", label: "Tasks", icon: SquareCheckBig },
+  { href: "/contractors", label: "Contractors", icon: Wrench },
+  { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
+/**
+ * A chrome icon (nav items, the shell's buttons): 16px at a 1.5 stroke with
+ * a mouse, 20px at 1.75 on touch (docs/brand-guidelines.md, section 6).
+ */
+export const chromeIconClass = "size-4 shrink-0 stroke-[1.5] pointer-coarse:size-5 pointer-coarse:stroke-[1.75]";
+
+/**
+ * The app's sections, in the sidebar and the phone drawer. Items are 32px
+ * with a mouse and 44px on touch. Idle: label --fg-2, icon --fg-3, --fill-1
+ * on hover. The current item is --fill-2 with label and icon in --fg-1, and
+ * the 2px by 16px --act notch at its left edge is its 3:1 mark, since the
+ * fill alone is about 1.2:1 (section 9).
+ */
 export function SideNav({
   collapsed = false,
   onNavigate,
 }: {
   collapsed?: boolean;
-  /** Fired when a link is clicked — used to close the mobile drawer. */
+  /** Fired when a link is clicked: closes the mobile drawer. */
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-0.5">
-      {LINKS.map((l) => {
-        const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+      {LINKS.map(({ href, label, icon: Icon }) => {
+        const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
           <Link
-            key={l.href}
-            href={l.href}
+            key={href}
+            href={href}
             onClick={onNavigate}
-            title={collapsed ? l.label : undefined}
-            aria-label={l.label}
+            title={collapsed ? label : undefined}
+            aria-label={label}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              // The current item's ink notch is its 3:1 mark; the fill alone is about 1.2:1.
+              // 16px in from the item's edge with a mouse (14 on touch), so the
+              // icon sits centered in the collapsed rail.
+              "group relative flex h-8 items-center gap-3 rounded-md px-4 text-label transition-colors pointer-coarse:px-3.5",
+              TOUCH_HEIGHT,
               active
-                ? "bg-accent text-primary before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:bg-act"
-                : "text-foreground hover:bg-background",
+                ? "bg-fill-2 text-fg-1 before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:bg-act"
+                : "text-fg-2 hover:bg-fill-1 hover:text-fg-1",
             )}
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5 shrink-0"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Icon
               aria-hidden="true"
-            >
-              {l.icon}
-            </svg>
-            <span className="truncate">{l.label}</span>
+              className={cn(chromeIconClass, active ? "text-fg-1" : "text-fg-3 group-hover:text-fg-1")}
+            />
+            <span className="truncate">{label}</span>
           </Link>
         );
       })}

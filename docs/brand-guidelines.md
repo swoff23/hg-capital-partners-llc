@@ -69,7 +69,7 @@ One token per role. Desktop is `pointer: fine`; touch is `pointer: coarse` (phon
 
 ### Figures, money and codes
 
-- **Tabular by default.** `font-variant-numeric: tabular-nums` on `td`, `th`, `.num` and every figure token, set globally so alignment never depends on a utility.
+- **Tabular where digits line up.** `font-variant-numeric: tabular-nums` on every numeric cell (the `numeric` prop on `Th` and `Td`), `.num` and every figure token. Not on every `td`: Geist's tabular digits are wider, so addresses and names in text cells wrap sooner on a tablet.
 - **Right-aligned** money and count columns, with headers aligned to match ([Mercury Books](https://mobbin.com/screens/91ad4bbc-ef0f-4edf-a79f-fc6b9cb4ab7c)).
 - **Whole dollars** in totals, KPIs, lists, rent and prices: `$425,000`, `$1,450/mo`. `$425k` only on chart axes.
 - **Cents** only on a single transaction line and a bill's key figure: `.cents { font-size: 0.62em; vertical-align: 0.27em; }`, which lifts them to the cap line, in the figure's own color ([Mercury iOS](https://mobbin.com/screens/82e8f14d-9bf6-4956-bb4d-8d9306d167d3)).
@@ -99,7 +99,7 @@ Tokens live on `:root` (light) and `:root[data-theme="dark"]`, mapped in `@theme
 | `--surface` | `#ffffff` | `#0f141e` | Work surface and `body` | `--fg-1` 16.19 / 15.22 |
 | `--raised` | `#ffffff` | `#161d28` | Menus, popovers, dialogs, sheets | `--fg-1` 16.19 / 13.98 |
 | `--fill-1` | `#f2f0ec` | `#181e2a` | Row hover, segmented track, meter track, keycap, photo placeholder | `--fg-1` 14.22 / 13.79; `--fg-3` 5.17 / 6.25; 1.14 / 1.10 vs surface |
-| `--fill-2` | `#e7e5e0` | `#212835` | Current nav item, menu highlight, avatar ground | `--fg-1` 12.86 / 12.22; `--fg-3` 4.68 / 5.54 |
+| `--fill-2` | `#e7e5e0` | `#212835` | Current nav item, menu highlight, neutral badge ground | `--fg-1` 12.86 / 12.22; `--fg-3` 4.68 / 5.54 |
 | `--select` | `#e4e9f0` | `#2a3548` | `::selection`, bulk-selected rows | `--fg-1` 13.27 / 10.19; `--fg-3` 4.82 / 4.62 |
 | `--line` | `#e7e5e0` | `#212835` | Hairlines, row dividers, card edges (decorative) | 1.26 / 1.25 vs surface |
 | `--line-strong` | `#d5d1ca` | `#323947` | Secondary button edge, header and subtotal rules, keycap edges, and floating-layer edges in dark (decorative) | 1.52 / 1.59 vs surface |
@@ -337,6 +337,8 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 - **Checkbox and radio:** 16px, `--surface` with a `--line-control` edge; checked is `--act` fill and edge with an `--on-act` mark. **Switch:** a 32 by 18 track with a 12px knob. Off is `--surface` with a `--line-control` edge and knob; on is an `--act` track with an `--on-act` knob.
 - **Segmented control:** `--fill-1` track, `rounded-md`, 2px padding and 2px between segments; segments are `rounded-sm` and 4px shorter than the control. The selected segment is `--surface` with a `--line-control` edge (3.42 / 3.65 vs the track), same weight, `aria-pressed`.
 - **Menus and listboxes:** hover and keyboard focus use `--fill-2`; the chosen option carries a lucide `Check` in `--fg-1` at its trailing edge, so the pick never rests on a fill.
+- **Calendar:** today carries a 1px inset `--line-control` ring at the same weight as other days; the picked day is the `--act` fill ([Material date picker](https://m3.material.io/components/date-pickers/guidelines)).
+- **Avatar:** `--surface` ground with a 1px `--line-strong` edge and `--fg-2` initials, so it holds on any fill, including a highlighted listbox row. 20 and 24px avatars show one initial at 12px; 28px and up show two.
 - **Tabs** (`TopTabs`): idle `--fg-2`, selected `--fg-1` with a 2px `--act` underline, both 500, counts in `--fg-3`; `role="tab"` and `aria-selected`. The row clips at a `--line` divider.
 - **Sidebar:** `--canvas`. Items 32px, `rounded-md`. Idle label `--fg-2`, icon `--fg-3`, hover `--fill-1`. Current item: `--fill-2`, label and icon `--fg-1`, and a 2px by 16px `--act` notch at the left edge (12.86 / 12.22). The notch is invented: references select with a fill alone at about 1.2:1.
 - **Phone tab bar:** `--canvas` with a `--line` rule above. 20px `--fg-3` icons over 12 / 16 500 labels in `--fg-2`. The current tab is `--fg-1` with a 16 by 2px `--act` notch on the bar's top edge.
@@ -345,7 +347,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 ### Badges and status marks
 
-- **StatusMark** (**new**, `status-badge.tsx`): the ring family at 14px (16 touch), 1.5 stroke ([Linear Mobile](https://mobbin.com/screens/f8a9de1f-ef1c-45e6-8db3-9239bdd5c690)).
+- **StatusMark** (**new**, `status-badge.tsx`): the ring family at 14px (16 touch), a fixed 1.5px stroke at every size (non-scaling), so a ring still reads in sunlight on a job site ([Linear Mobile](https://mobbin.com/screens/f8a9de1f-ef1c-45e6-8db3-9239bdd5c690)).
 
 | Status | Glyph | Tone |
 |---|---|---|
@@ -363,7 +365,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 - Every task status renders through `StatusBadge` and its one tone map in `status-badge.tsx`; no other file picks a status color.
 - A system item in Needs you (a stale sync, a missing key fact) takes the lucide icon of the thing at the mark's size, 2 stroke, in `--warn`: `RefreshCw` plus "Stale" for a sync.
 - Deal stages and the property lifecycle reuse the ring, filling by stage in `--fg-2`; Closed is `--ok`, Passed is the slashed ring.
-- **Badge:** `rounded-sm`, `text-micro`, 20px tall, no ring. Tones: `neutral` (`--fg-2` on `--fill-1`, 7.40 / 8.91), `danger`, `warn`, `ok` (tint grounds). Blue and purple are retired.
+- **Badge:** `rounded-sm`, `text-micro`, 20px tall, no ring. Tones: `neutral` (`--fg-2` on `--fill-2`, 6.69 / 7.89, so it still shows inside a raised layer in dark), `danger`, `warn`, `ok` (tint grounds). Blue and purple are retired.
 - **Tags:** no fill, a `--line-strong` edge, `--fg-2` text, `rounded-sm`, `text-micro`, 22px tall with 8px side padding.
 - **Unread dot:** 8px `--act`, 12px in from a card's top and right edges. It means new and nothing else.
 
@@ -396,6 +398,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 - **Dialog:** `--raised`, `rounded-xl`, overlay shadow and scrim. The title names the object; the body is one sentence of consequence.
 - Cancel and the primary sit bottom right with their keys. A destructive confirm uses `destructive` and names what goes ([Relume](https://mobbin.com/screens/4bc93d85-683e-4461-8e1a-fd1b519f240d)).
+- Esc closes the dialog, focus stays inside it while open and returns to the trigger after, and it portals to `<body>`. Below `sm` a dialog with three actions stacks them full width with the primary on top, as Apple's alerts do ([HIG alerts](https://developer.apple.com/design/human-interface-guidelines/alerts)).
 - **Sheet (phone):** `rounded-xl` top corners, title, content, and the primary pinned above the safe area. Esc closes one layer.
 
 ### Toasts
@@ -438,7 +441,7 @@ The dark front door stays and becomes the app's own dark material. Same Geist, s
 
 | File | Today | Change |
 |---|---|---|
-| `src/app/globals.css` | 8 zinc and blue tokens | All tokens above, light and dark; `@theme inline` color map; type tokens in `@theme` plus one `pointer: coarse` block; shadow and motion tokens; `color-scheme`; `::selection`; global `:focus-visible`; tabular on `td`, `th`, `.num` and the figure tokens; `.cents`; reduced-motion block; `[data-surface="public"]` scope and the widened `dark` custom variant |
+| `src/app/globals.css` | 8 zinc and blue tokens | All tokens above, light and dark; `@theme inline` color map; type tokens in `@theme` plus one `pointer: coarse` block; shadow and motion tokens; `color-scheme`; `::selection`; global `:focus-visible`; tabular on numeric cells, `.num` and the figure tokens; `.cents`; reduced-motion block; `[data-surface="public"]` scope and the widened `dark` custom variant |
 | `src/app/globals.css` aliases | | One release: `--background` to `--fill-1`, `--foreground` to `--fg-1`, `--muted` to `--fg-3`, `--border` to `--line`, `--primary` to `--act`, `--primary-foreground` to `--on-act`, `--accent` to `--fill-2`. `body` moves to `--surface` explicitly |
 | `src/components/ui.tsx` | Blue primary with opacity hover; `rounded-lg` controls; zinc and purple badges; uppercase `Th` and `Field`; `shadow-sm` cards; 70vh tables; dashed `EmptyState` | Buttons, fields, badges, tables, `Card`, `Section`, `PageHeader` (`text-title`), `Field`, `EmptyState` as in section 9; new `TextLink` and `Kbd` |
 | `src/components/status-badge.tsx` | Seven tones (blue, purple, amber, red) | `StatusMark` ring family; tones neutral, `warn` (Review), `ok` (Done) |

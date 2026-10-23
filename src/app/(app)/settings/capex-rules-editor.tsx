@@ -395,14 +395,9 @@ export function CapexRulesEditor({
           onClose={() => setConfirmReset(false)}
           body="This immediately replaces every rule below with the built-in defaults, discarding anything you've added or changed."
           actions={
-            <>
-              <Button size="sm" variant="secondary" onClick={() => setConfirmReset(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" variant="destructive" onClick={resetToDefaults}>
-                Reset rules
-              </Button>
-            </>
+            <Button size="sm" variant="destructive" onClick={resetToDefaults}>
+              Reset rules
+            </Button>
           }
         />
       )}

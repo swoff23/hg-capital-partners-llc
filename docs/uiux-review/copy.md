@@ -1,6 +1,6 @@
 # Lens: words on every screen
 
-Part of the [UI/UX review](README.md). 40 findings: 0 critical, 10 high, 14 medium, 16 low.
+Part of the [UI/UX review](README.md). 39 findings: 0 critical, 9 high, 14 medium, 16 low.
 
 ## How it should work
 
@@ -80,23 +80,6 @@ High · Design change · effort S · `Financials Overview and Rent roll` · The 
 - **Code:** `src/app/(app)/financials/_components/ui.tsx:98-112`, `src/app/(app)/financials/_components/ui.tsx:94-113`, `src/app/(app)/financials/_components/ui.tsx:94-109`, `src/app/(app)/financials/_components/ui.tsx:103-109`
 - **Also found as:** DATA-009 (Lens: tables, numbers, money, charts and status), PROPERTY-048 (Property detail page (future property hub)), VISUAL-I06 (Lens: visual design system across every screen), G2A-I18 (QuickBooks go-live: connect, OAuth return, first sync, first mapping and the populated money views)
 - **Verification:** confirmed. Verified: amber 'QuickBooks' badge followed by 'Cash basis · synced 51d ago · reconciliation off'. The badge color carries the warning and no absolute date is shown. On Rent roll the same line omits 'reconciliation off'.
-
-### COPY-010
-
-**The partial-sync banner says 'mid-update' about a 51-day-old sync**
-
-High · Fix · effort S · `Financials Overview` · The QuickBooks mirror is honest about what it covers
-
-- **Today:** The banner reads 'The last sync didn't reconcile to the cent, so figures may be mid-update. See Settings for the details.' The sync ran on Sep 2, so nothing is mid-update. Settings shows the real gap: 'NOI vs QBO off by -$2,916'.
-- **Why:** The banner misstates the situation and hides the number that matters.
-- **Change:** State the gap and the date with one action: 'These figures are $2,916 off from QuickBooks as of Sep 2. Review'. 'Review' links to the cleanup list.
-- **Desktop, tablet, phone:** One line on desktop and tablet. Wraps to two lines on phone, with 'Review' as the trailing link.
-- **Reuse:** financials/page.tsx:66-72. The delta is already computed for financials/settings/page.tsx:258.
-- **References:** 
-  - [Wise](https://mobbin.com/screens/d7da9beb-2dd6-4e38-8efd-a08113f32614): The current state is one bold plain sentence ('Your money's being processed'), with timestamps on finished steps. A sync banner should say the same: what's done, when and what's pending.
-  - [Stripe](https://mobbin.com/screens/ebf7e9fe-326a-4459-ae16-f94aea16f56b): 'Last updated 6 Dec, 00:42' sits in the Details rail as a plain dated fact, not a hedge.
-  - [QuickBooks](https://mobbin.com/screens/c846a277-b056-4f86-a879-8822b316bc1d): Connection notice states the concrete consequence and timing in plain words
-- **Verification:** confirmed. The banner text matches word for word. The cleanup list does show 'NOI vs QBO off by -$2,916'. The proposed sentence is accurate and one line.
 
 ### COPY-011
 
@@ -221,6 +204,7 @@ High · Design change · effort S · `Property page > Rentals card (read and edi
 
 High · Fix · effort S · `Financials Overview and By property table` · The QuickBooks mirror is honest about what it covers
 
+- **Migration branch:** Still applies on the migration branch. Fixed on main in fa4c400 (fix batch 2, financials): 'Unattributed (entity / no-class) ... real cost, no property' is now 'Not assigned to a property' with '$X in · $Y out' on the Overview tile, the By property row (link now reads 'Map classes' and goes to #class-mapping) and the Settings cleanup list. The 'real cost' note and the parentheticals are gone. Left: COPY-V04: the Overview tile has no 'Map classes' link of its own. The By property row carries it.
 - **Today:** The Overview tile reads 'Unattributed (entity / no-class) -$1,904 · real cost, no property'. The Settings cleanup list shows the same bucket as '+$5,080 / −$6,984'. That's every dollar of operating income for the period (the Income KPI is $5,080) plus every expense. The By property table has no property rows, only this bucket and the total.
 - **Why:** 'Real cost' tells the owner that $1,904 of company overhead was spent. In fact, all of the rent came in unclassed. Two findings in this review (COPY-011 and COPY-024) would rename it 'Company overhead', which repeats the error. Wrong labels on money undercut trust faster than anything else.
 - **Change:** Label the bucket by its state: 'Not assigned to a property'. Show income and expenses separately as '$5,080 in · $6,984 out', with a 'Map classes' link to the mapping table. Drop 'real cost' and the parenthetical. In By property, the row reads 'Not assigned to a property · Map classes'.
