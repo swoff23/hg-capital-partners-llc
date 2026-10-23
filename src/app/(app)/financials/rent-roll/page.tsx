@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { Card, CardBody, EmptyState, Table, Td, Th } from "@/components/ui";
+import { Card, CardBody, EmptyState, Table, Td, Th, TextLink } from "@/components/ui";
 import { getRentRoll } from "@/lib/quickbooks/queries";
 import { basisFromParam } from "@/lib/quickbooks/rollup";
 import { fmtCents, PartialLabel, SandboxNotice, SourceBadge } from "../_components/ui";
@@ -53,19 +53,12 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
               {roll.months.length > 0 ? (
                 <>
                   No rent is matched to a property yet.{" "}
-                  <Link href="/financials/settings#class-mapping" className="text-primary hover:underline">
-                    Map QuickBooks classes
-                  </Link>
+                  <TextLink href="/financials/settings#class-mapping">Map QuickBooks classes</TextLink>
                 </>
               ) : (
                 <>
                   No rent in the synced QuickBooks data.{" "}
-                  <Link
-                    href="/financials/settings#account-categories"
-                    className="text-primary hover:underline"
-                  >
-                    Check account categories
-                  </Link>
+                  <TextLink href="/financials/settings#account-categories">Check account categories</TextLink>
                 </>
               )}
             </EmptyState>

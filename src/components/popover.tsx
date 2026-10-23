@@ -26,7 +26,7 @@ export const PopoverTrigger = DialogTrigger;
 
 /** The floating surface, shared by Popover and Menu. */
 export const popoverSurface = cn(
-  "overflow-auto rounded-xl border border-border bg-surface text-foreground shadow-lg outline-none",
+  "overflow-auto rounded-xl border border-border bg-raised text-foreground shadow-lg outline-none",
   "data-[placement=bottom]:origin-top data-[placement=top]:origin-bottom",
   "data-entering:animate-pop-in data-exiting:animate-pop-out motion-reduce:animate-none",
 );

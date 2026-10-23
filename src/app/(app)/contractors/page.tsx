@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, PageHeader, Table, Td, Th, EmptyState } from "@/components/ui";
+import { Badge, Card, PageHeader, Table, Td, Th, EmptyState, textLinkClass } from "@/components/ui";
 import { cleanTrades, telHref } from "@/lib/contacts";
 import { ContactLink } from "./contact-link";
 
@@ -56,9 +56,9 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                     <ContactLink href={telHref(c.phoneE164 ?? c.phone)}>{c.phone ?? "—"}</ContactLink>
                   </Td>
                   <Td className="text-xs">
-                    {c.w9Url && <a href={c.w9Url} target="_blank" rel="noreferrer" className="text-primary">W-9</a>}
+                    {c.w9Url && <a href={c.w9Url} target="_blank" rel="noreferrer" className={textLinkClass}>W-9</a>}
                     {c.w9Url && c.coiUrl && " · "}
-                    {c.coiUrl && <a href={c.coiUrl} target="_blank" rel="noreferrer" className="text-primary">COI</a>}
+                    {c.coiUrl && <a href={c.coiUrl} target="_blank" rel="noreferrer" className={textLinkClass}>COI</a>}
                     {!c.w9Url && !c.coiUrl && "—"}
                   </Td>
                 </tr>

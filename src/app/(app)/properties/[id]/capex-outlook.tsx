@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, textLinkClass } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import {
   capexForecast,
@@ -94,10 +94,10 @@ export function CapexForecastCard({
                     className={
                       "block h-full rounded " +
                       (active
-                        ? "bg-primary"
+                        ? "bg-chart-1"
                         : y.year === f.fromYear
                           ? "bg-red-500/70 dark:bg-red-500/60"
-                          : "bg-primary/50")
+                          : "bg-chart-1/50")
                     }
                     style={{ width: `${(y.total / maxYear) * 100}%` }}
                   />
@@ -137,7 +137,7 @@ export function CapexForecastCard({
                   <button
                     type="button"
                     onClick={() => setSelectedYear(null)}
-                    className="font-medium text-primary hover:underline"
+                    className={`font-medium ${textLinkClass}`}
                   >
                     clear
                   </button>

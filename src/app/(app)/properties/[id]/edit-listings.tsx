@@ -202,7 +202,7 @@ export function ListingsSection({
           <div
             role="dialog"
             aria-modal="true"
-            className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-lg"
+            className="w-full max-w-sm rounded-xl border border-border bg-raised p-5 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <h4 className="text-sm font-semibold">Discard unsaved changes?</h4>

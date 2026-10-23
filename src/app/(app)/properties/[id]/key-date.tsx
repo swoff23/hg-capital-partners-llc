@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { textLinkClass } from "@/components/ui";
 import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
 
 /**
@@ -26,7 +27,7 @@ export function KeyDate({ label, date, onAdd }: { label: string; date: string | 
         ) : (
           <>
             <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Not set</span>
-            <button type="button" onClick={onAdd} className="text-xs font-medium text-primary hover:underline">
+            <button type="button" onClick={onAdd} className={cn(textLinkClass, "text-xs font-medium")}>
               Add
             </button>
           </>

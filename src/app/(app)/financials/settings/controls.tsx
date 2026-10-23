@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Button } from "@/components/ui";
+import { Button, textLinkClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { disconnectQuickbooks, setAccountingMethod } from "./actions";
 
@@ -33,7 +33,7 @@ export function OAuthReturnNotice({
       {retryHref && (
         <>
           {" "}
-          <a href={retryHref} className="text-primary hover:underline">
+          <a href={retryHref} className={textLinkClass}>
             Connect again
           </a>
         </>

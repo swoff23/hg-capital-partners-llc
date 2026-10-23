@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, TextLink } from "@/components/ui";
 import { fmtDay } from "@/lib/dates";
 import { signedLineCents } from "@/lib/quickbooks/compute";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
@@ -34,9 +34,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
         </CardHeader>
         <CardBody className="text-sm text-muted">
           No QuickBooks class is mapped to this property yet.{" "}
-          <Link href="/financials/settings" className="text-primary hover:underline">
-            Map it in Financials → Settings
-          </Link>
+          <TextLink href="/financials/settings">Map it in Financials → Settings</TextLink>
           .
         </CardBody>
       </Card>
@@ -113,9 +111,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
 
         <p className="text-[11px] text-muted">
           Direct-classed lines only. Entity and overhead costs show in the{" "}
-          <Link href="/financials" className="text-primary hover:underline">
-            portfolio view
-          </Link>
+          <TextLink href="/financials">portfolio view</TextLink>
           .
         </p>
       </CardBody>

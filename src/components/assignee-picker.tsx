@@ -121,7 +121,7 @@ export function AssigneePicker({
 
 const itemClass = cn(
   "flex min-h-9 cursor-default items-center gap-2.5 rounded-md px-3 py-1 text-sm outline-none pointer-coarse:min-h-11",
-  "data-focused:bg-background data-pressed:bg-background",
+  "data-focused:bg-fill-2 data-pressed:bg-fill-2",
 );
 const headerClass = "px-3 pb-1 pt-2.5 text-xs font-medium uppercase tracking-wide text-muted";
 

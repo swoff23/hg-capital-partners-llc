@@ -44,7 +44,7 @@ export function StatusMultiSelect({ selected }: { selected: string[] }) {
           <button
             type="button"
             onClick={() => apply([])}
-            className="mb-1 w-full rounded px-2 py-1 text-left text-xs font-medium text-primary hover:bg-background"
+            className="mb-1 w-full rounded px-2 py-1 text-left text-xs font-medium text-primary hover:bg-fill-2"
           >
             Clear
           </button>
@@ -52,7 +52,7 @@ export function StatusMultiSelect({ selected }: { selected: string[] }) {
         {DEAL_STATUSES.map((s) => (
           <label
             key={s}
-            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-background"
+            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-fill-2"
           >
             <input
               type="checkbox"

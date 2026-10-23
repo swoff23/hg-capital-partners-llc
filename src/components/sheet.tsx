@@ -60,7 +60,7 @@ export function Sheet({
     >
       <Modal
         className={cn(
-          "flex max-h-[90dvh] w-full flex-col overflow-hidden bg-surface text-foreground shadow-xl outline-none",
+          "flex max-h-[90dvh] w-full flex-col overflow-hidden bg-raised text-foreground shadow-xl outline-none",
           "rounded-t-2xl pb-[env(safe-area-inset-bottom)]",
           "md:max-h-[85dvh] md:w-auto md:min-w-80 md:max-w-lg md:rounded-xl md:border md:border-border md:pb-0",
           "data-entering:animate-sheet-in data-exiting:animate-sheet-out md:data-entering:animate-pop-in md:data-exiting:animate-pop-out motion-reduce:animate-none",
@@ -98,7 +98,7 @@ function SheetHeader({ title, hidden, onClose }: { title: string; hidden: boolea
       <AriaButton
         onPress={onClose}
         aria-label="Close"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted outline-none transition-colors hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:h-11 pointer-coarse:w-11"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted outline-none transition-colors hover:bg-fill-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:h-11 pointer-coarse:w-11"
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </AriaButton>

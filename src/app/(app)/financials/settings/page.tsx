@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getConnection } from "@/lib/quickbooks/client";
@@ -6,7 +5,7 @@ import { qbo } from "@/lib/quickbooks/config";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
 import type { QboBasis } from "@prisma/client";
 import { oauthReturnLine, reconcileGap, reconcileLine } from "@/lib/quickbooks/notices";
-import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState } from "@/components/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState, TextLink, textLinkClass } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { fmtCents } from "../_components/ui";
 import { RefreshButton } from "../_components/refresh-button";
@@ -95,7 +94,7 @@ export default async function FinancialsSettingsPage({
           <Row label="Status">
             <Badge tone={conn.status === "ACTIVE" ? "green" : "red"}>{conn.status}</Badge>
             {conn.status === "EXPIRED" && (
-              <a href="/api/quickbooks/connect" className="ml-2 text-primary hover:underline">
+              <a href="/api/quickbooks/connect" className={`ml-2 ${textLinkClass}`}>
                 Reconnect
               </a>
             )}
@@ -232,13 +231,9 @@ export default async function FinancialsSettingsPage({
 
       <p className="text-xs text-muted">
         Reconciliation target: our numbers tie to QuickBooks&apos; own{" "}
-        <Link
-          href="https://qbo.intuit.com"
-          className="text-primary hover:underline"
-          target="_blank"
-        >
+        <TextLink href="https://qbo.intuit.com" target="_blank">
           Profit &amp; Loss by Class
-        </Link>{" "}
+        </TextLink>{" "}
         report. Independent check: per-property rent vs the old rent spreadsheet.
       </p>
     </div>

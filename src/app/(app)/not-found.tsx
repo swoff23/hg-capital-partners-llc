@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, TextLink } from "@/components/ui";
 
 /** Rendered when a signed-in page calls notFound() — a deal / property / task id that no longer exists. */
 export default function AppNotFound() {
@@ -12,10 +11,10 @@ export default function AppNotFound() {
         <CardBody className="space-y-3 text-sm">
           <p className="text-muted">That record doesn&apos;t exist, or the link is out of date.</p>
           <div className="flex flex-wrap gap-3 text-xs">
-            <Link href="/" className="text-primary hover:underline">Home</Link>
-            <Link href="/deals" className="text-primary hover:underline">Deals</Link>
-            <Link href="/properties" className="text-primary hover:underline">Portfolio</Link>
-            <Link href="/tasks" className="text-primary hover:underline">Tasks</Link>
+            <TextLink href="/">Home</TextLink>
+            <TextLink href="/deals">Deals</TextLink>
+            <TextLink href="/properties">Portfolio</TextLink>
+            <TextLink href="/tasks">Tasks</TextLink>
           </div>
         </CardBody>
       </Card>

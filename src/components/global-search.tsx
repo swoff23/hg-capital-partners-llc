@@ -124,7 +124,7 @@ export function GlobalSearch() {
           aria-label="Search results"
           // Keep focus in the input so the keys keep working after a click.
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute z-20 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-lg max-sm:inset-x-4 max-sm:top-full sm:w-full"
+          className="absolute z-20 mt-1 overflow-hidden rounded-lg border border-border bg-raised shadow-lg max-sm:inset-x-4 max-sm:top-full sm:w-full"
         >
           {results.map((r, i) => (
             <button
@@ -138,7 +138,7 @@ export function GlobalSearch() {
               onClick={() => go(r)}
               className={cn(
                 "flex w-full items-center gap-2 px-3 py-2 text-left text-sm",
-                i === active && "bg-background",
+                i === active && "bg-fill-2",
               )}
             >
               {/* Wide enough for CONTRACTOR, the longest type (81px in Geist), at every width. */}

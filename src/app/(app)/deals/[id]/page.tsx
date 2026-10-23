@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@/components/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Textarea, TextLink } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { BackLink } from "@/components/back-link";
 import { ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
@@ -52,9 +51,7 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
         {deal.convertedProperty && (
           <p className="mt-1 text-xs text-muted">
             Converted →{" "}
-            <Link href={`/properties/${deal.convertedProperty.id}`} className="text-primary hover:underline">
-              {deal.convertedProperty.address}
-            </Link>
+            <TextLink href={`/properties/${deal.convertedProperty.id}`}>{deal.convertedProperty.address}</TextLink>
           </p>
         )}
       </div>

@@ -75,7 +75,7 @@ export function MoneyBars({
           </span>
           <span className="h-4 flex-1 overflow-hidden rounded bg-background">
             <span
-              className={cn("block h-full rounded", r.cents < 0 ? "bg-amber-500/70" : "bg-primary/50")}
+              className={cn("block h-full rounded", r.cents < 0 ? "bg-amber-500/70" : "bg-chart-1/50")}
               style={{ width: `${(Math.abs(r.cents) / max) * 100}%` }}
             />
           </span>

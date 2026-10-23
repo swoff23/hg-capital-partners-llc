@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  */
 export default function PortalLayout({ children }: LayoutProps<"/p">) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-surface text-foreground">
       <ToastProvider>{children}</ToastProvider>
     </div>
   );

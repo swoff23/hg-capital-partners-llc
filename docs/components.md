@@ -15,11 +15,13 @@ Paths are under `src/`. Last full sweep: 2026-10-22.
 
 | Place | What's there | When to use it |
 |---|---|---|
-| `components/ui.tsx` | `Card` (with `CardHeader`, `CardTitle`, `CardBody`), `SectionCard`, `Button`, `LinkButton`, `buttonClass`, `Badge`, `Input`, `Textarea`, `Select`, `Table`, `Th`, `Td`, `PageHeader`, `Field`, `EmptyState`, `pickerChip` | **Home for new primitives** |
+| `components/ui.tsx` | `Card` (with `CardHeader`, `CardTitle`, `CardBody`), `SectionCard`, `Button`, `LinkButton`, `buttonClass`, `TextLink`, `textLinkClass`, `Badge`, `Input`, `Textarea`, `Select`, `Table`, `Th`, `Td`, `PageHeader`, `Field`, `EmptyState`, `pickerChip` | **Home for new primitives** |
 | `components/*.tsx` | App shell and nav, popover, sheet, menu, toast, date, assignee and repeat pickers, avatar, status badge, segmented control, media uploader, grid and lightbox, activity timeline, confirm dialog, tooltip, global search, file uploads, inline heading edit, theme toggle, back link | Shared app pieces; new general-purpose components go here |
 | `components/public/` | `PublicHeader`, `PublicFooter` | Public site only |
 | `app/(app)/financials/_components/ui.tsx` | `Kpi`, `MoneyBars`, `SourceBadge`, `PartialLabel`, `fmtCents` | Money figures; move a piece to `components/` before reusing it outside Financials |
 | `lib/utils.ts`, `lib/dates.ts`, `lib/money.ts`, `lib/normalize.ts` | Formatting and parsing | All display formatting |
+| `app/globals.css` | Color, type, elevation and motion tokens ([brand guidelines](brand-guidelines.md)) | Every color, size and shadow. Utilities read them: `text-fg-2`, `bg-canvas`, `border-line-control`, `text-body`, `shadow-float`, `duration-fast` |
+| `lib/brand-tokens.ts` | `brandTokens`, a hex mirror of the light tokens | Email and anything else that can't read CSS variables. A test fails when it and `globals.css` disagree |
 
 Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) use the tokens in `app/globals.css` and the primitives above. The public site (`app/(marketing)`) is hand-styled on fixed hex colors and shares nothing with `ui.tsx` today.
 
@@ -85,6 +87,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Keep a tab left open current | `components/refresh-on-return.tsx` `RefreshOnReturn` | Mounted once in `app/(app)/layout.tsx`. Refreshes the page's server data when someone comes back: shown again after a minute hidden, back online, restored by Safari, or a new Eastern day. No polling. Holds off while offline, while a field is focused or holds unsaved typing, and on pages with controlled drafts: the property page, the move-in form editor and applying a playbook (`lib/refresh-on-return.ts`) |
 | Page sections that are separate routes | `components/nav.tsx` `TopTabs` | Underline tabs. Financials and Settings layouts |
 | Views and filters inside a page | `components/segmented-control.tsx` `SegmentedControl` | Pill toggles with `aria-pressed`, styled from the attribute; one weight for both states. `sm` for filter bars (deals), `md` for a page's main switch (44px on touch). `count` shows dimmed after a label |
+| Link inside a sentence, or beside a value it could pass for | `components/ui.tsx` `TextLink` (a Next `Link`), `textLinkClass` (an `<a>` or `<button>`) | Body ink (`--fg-1`), whatever the sentence's color, with a 1px underline at a 3px offset, 2px on hover, so it never rests on color alone. Also for a link in a table cell, a field value or a card header slot. Standalone links known by position or a glyph (breadcrumbs, "Portfolio →", "+ Add", Edit) skip it: ink, underline on hover |
 | Back to the list | `components/back-link.tsx` `BackLink` | Returns to the exact previous page, filters and scroll intact, when it can. `className` sizes it, e.g. the 44px "My jobs" link in the portal header. Inside a `LeaveGuard` it asks first while the page is held |
 | Page title row | `components/ui.tsx` `PageHeader` | Title, subtitle, actions slot |
 | Public site header and footer | `components/public/header.tsx` `PublicHeader`, `footer.tsx` `PublicFooter` | |
@@ -120,7 +123,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 
 | Job | Use | Notes |
 |---|---|---|
-| Class names | `lib/utils.ts` `cn` | clsx plus tailwind-merge |
+| Class names | `lib/utils.ts` `cn` | clsx plus tailwind-merge, taught the type, shadow and motion token names so `cn("text-fg-2", "text-body")` keeps both |
 | Money in dollars | `lib/utils.ts` `fmtMoney` | `compact` option; "—" when empty |
 | Money in cents | `app/(app)/financials/_components/ui.tsx` `fmtCents` | Wraps `fmtMoney` |
 | Parse a money input | `lib/money.ts` `parseAmount`, `amountToDecimal` | |

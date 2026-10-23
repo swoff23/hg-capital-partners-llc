@@ -62,7 +62,7 @@ export function MenuItem({
         "[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
         variant === "destructive"
           ? "text-red-600 data-focused:bg-red-500/10 dark:text-red-400 [&_svg]:text-current"
-          : "text-foreground data-focused:bg-background [&_svg]:text-muted",
+          : "text-foreground data-focused:bg-fill-2 [&_svg]:text-muted",
         "data-disabled:opacity-50",
         className,
       )}

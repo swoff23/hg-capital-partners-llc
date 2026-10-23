@@ -155,7 +155,7 @@ function DuePanel({
               aria-keyshortcuts={String(i + 1)}
               className={cn(
                 "flex h-8 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm outline-none transition-colors",
-                "hover:bg-background data-focus-visible:bg-background data-pressed:bg-background pointer-coarse:h-11",
+                "hover:bg-fill-2 data-focus-visible:bg-fill-2 data-pressed:bg-fill-2 pointer-coarse:h-11",
               )}
             >
               <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
@@ -173,7 +173,7 @@ function DuePanel({
 }
 
 const navButton =
-  "flex h-7 w-7 items-center justify-center rounded-md text-muted outline-none transition-colors hover:bg-background hover:text-foreground data-focus-visible:ring-2 data-focus-visible:ring-primary/30 pointer-coarse:h-11 pointer-coarse:w-11";
+  "flex h-7 w-7 items-center justify-center rounded-md text-muted outline-none transition-colors hover:bg-fill-2 hover:text-foreground data-focus-visible:ring-2 data-focus-visible:ring-primary/30 pointer-coarse:h-11 pointer-coarse:w-11";
 
 function MonthCalendar({
   value,
@@ -219,7 +219,7 @@ function MonthCalendar({
                   isOutsideMonth && "invisible",
                   isSelected
                     ? "bg-primary font-semibold text-primary-foreground"
-                    : cn("hover:bg-background data-pressed:bg-background", date.toString() === today && "font-semibold text-primary"),
+                    : cn("hover:bg-fill-2 data-pressed:bg-fill-2", date.toString() === today && "font-semibold ring-1 ring-inset ring-line-control"),
                   isFocusVisible && "ring-2 ring-primary/40",
                 )
               }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState, TextLink } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
 import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
@@ -54,9 +54,9 @@ export default async function HomePage() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex items-center justify-between">
             <CardTitle>My open tasks</CardTitle>
-            <Link href="/tasks" className="text-xs text-primary">
+            <TextLink href="/tasks" className="text-xs">
               Today
-            </Link>
+            </TextLink>
           </CardHeader>
           <CardBody className="p-0">
             {myTasks.length === 0 ? (

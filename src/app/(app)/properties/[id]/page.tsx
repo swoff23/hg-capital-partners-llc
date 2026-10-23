@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/components/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton, TextLink } from "@/components/ui";
 import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { propertyStatusTone } from "@/lib/config";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
@@ -258,9 +258,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           {property.sourceDeal && (
             <p className="text-xs text-muted">
               From deal{" "}
-              <Link href={`/deals/${property.sourceDeal.id}`} className="text-primary hover:underline">
-                {property.sourceDeal.address}
-              </Link>
+              <TextLink href={`/deals/${property.sourceDeal.id}`}>{property.sourceDeal.address}</TextLink>
             </p>
           )}
         </div>

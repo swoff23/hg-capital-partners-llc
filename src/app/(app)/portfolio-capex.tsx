@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, textLinkClass } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import { shortAddress } from "@/lib/normalize";
 import {
@@ -92,7 +92,7 @@ export function PortfolioCapexForecastCard({
                 <button
                   type="button"
                   onClick={() => setSelYear(null)}
-                  className="text-primary hover:underline"
+                  className={textLinkClass}
                 >
                   show all 5 years
                 </button>
@@ -143,10 +143,10 @@ export function PortfolioCapexForecastCard({
                     className={
                       "block h-full rounded " +
                       (active
-                        ? "bg-primary"
+                        ? "bg-chart-1"
                         : i === 0
                           ? "bg-red-500/70 dark:bg-red-500/60"
-                          : "bg-primary/50")
+                          : "bg-chart-1/50")
                     }
                     style={{ width: `${(f.perYear[i] / maxYear) * 100}%` }}
                   />
@@ -297,7 +297,7 @@ export function PortfolioCapexForecastCard({
       {tip && (
         <div
           className={
-            "pointer-events-none fixed z-50 w-[336px] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-border bg-surface p-3 text-xs shadow-lg " +
+            "pointer-events-none fixed z-50 w-[336px] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-border bg-raised p-3 text-xs shadow-lg " +
             (tip.flip ? "-translate-y-full" : "")
           }
           style={{ left: tip.x, top: tip.top }}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { Card, CardBody, CardHeader, CardTitle, EmptyState, Table, Td, Th } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, EmptyState, Table, Td, Th, TextLink } from "@/components/ui";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
 import { qbo } from "@/lib/quickbooks/config";
 import { partialSyncLine, reconcileGap } from "@/lib/quickbooks/notices";
@@ -71,13 +71,9 @@ export default async function FinancialsOverviewPage({
           status={syncNotice ? data.lastSync?.status : null}
         />
         <div className="flex items-center gap-2">
-          <Link
-            href={`/financials?basis=${other}`}
-            className="text-xs text-primary hover:underline"
-            prefetch={false}
-          >
+          <TextLink href={`/financials?basis=${other}`} className="text-xs" prefetch={false}>
             Show {other} basis
-          </Link>
+          </TextLink>
           <RefreshButton />
         </div>
       </div>
@@ -160,7 +156,7 @@ export default async function FinancialsOverviewPage({
                   <div className="flex-1 space-y-0.5">
                     <span className="block h-2.5 overflow-hidden rounded bg-background">
                       <span
-                        className="block h-full rounded bg-primary/60"
+                        className="block h-full rounded bg-chart-1/60"
                         style={{ width: `${(m.incomeCents / max) * 100}%` }}
                       />
                     </span>
@@ -176,7 +172,7 @@ export default async function FinancialsOverviewPage({
               );
             })}
             <p className="pt-1 text-[11px] text-muted">
-              <span className="inline-block h-2 w-2 rounded-sm bg-primary/60 align-middle" /> income
+              <span className="inline-block h-2 w-2 rounded-sm bg-chart-1/60 align-middle" /> income
               &nbsp;·&nbsp;
               <span className="inline-block h-2 w-2 rounded-sm bg-amber-500/60 align-middle" /> expense
               &nbsp;·&nbsp; right column = NOI
@@ -216,24 +212,22 @@ export default async function FinancialsOverviewPage({
                       <span className="ml-1 text-[11px] font-normal text-muted">No activity</span>
                     )}
                   </Td>
-                  <Td className="tabular-nums">{money(row.noi.operatingIncomeCents)}</Td>
-                  <Td className="tabular-nums">{money(row.noi.operatingExpenseCents)}</Td>
-                  <Td className="tabular-nums font-medium">{money(row.noi.noiCents)}</Td>
-                  <Td className="tabular-nums text-muted">{pct(row.noi.noiMargin)}</Td>
-                  <Td className="tabular-nums text-muted">{money(row.noi.debtInterestCents)}</Td>
+                  <Td className="whitespace-nowrap tabular-nums">{money(row.noi.operatingIncomeCents)}</Td>
+                  <Td className="whitespace-nowrap tabular-nums">{money(row.noi.operatingExpenseCents)}</Td>
+                  <Td className="whitespace-nowrap tabular-nums font-medium">{money(row.noi.noiCents)}</Td>
+                  <Td className="whitespace-nowrap tabular-nums text-muted">{pct(row.noi.noiMargin)}</Td>
+                  <Td className="whitespace-nowrap tabular-nums text-muted">{money(row.noi.debtInterestCents)}</Td>
                 </tr>
               );
             })}
             <tr className="bg-background/50 text-muted">
               <Td className="italic">
                 Not assigned to a property{" "}
-                <Link href="/financials/settings#class-mapping" className="text-primary hover:underline">
-                  Map classes
-                </Link>
+                <TextLink href="/financials/settings#class-mapping">Map classes</TextLink>
               </Td>
-              <Td className="tabular-nums">{fmtCents(data.unassigned.incomeCents)}</Td>
-              <Td className="tabular-nums">{fmtCents(data.unassigned.expenseCents)}</Td>
-              <Td className="tabular-nums">{fmtCents(data.unassigned.noiCents)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{fmtCents(data.unassigned.incomeCents)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{fmtCents(data.unassigned.expenseCents)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{fmtCents(data.unassigned.noiCents)}</Td>
               <Td />
               <Td />
             </tr>
@@ -241,11 +235,11 @@ export default async function FinancialsOverviewPage({
           <tfoot>
             <tr className="border-t-2 border-border font-semibold">
               <Td>Portfolio</Td>
-              <Td className="tabular-nums">{fmtCents(p.operatingIncomeCents)}</Td>
-              <Td className="tabular-nums">{fmtCents(p.operatingExpenseCents)}</Td>
-              <Td className="tabular-nums">{fmtCents(p.noiCents)}</Td>
-              <Td className="tabular-nums">{pct(p.noiMargin)}</Td>
-              <Td className="tabular-nums">{fmtCents(p.debtInterestCents)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.operatingIncomeCents)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.operatingExpenseCents)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.noiCents)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{pct(p.noiMargin)}</Td>
+              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.debtInterestCents)}</Td>
             </tr>
           </tfoot>
         </Table>

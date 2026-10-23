@@ -111,6 +111,20 @@ export function LinkButton({
   return <Link className={cn(buttonClass({ variant, size }), className)} {...props} />;
 }
 
+/* ---------------- TextLink ----------------
+   A link its position doesn't mark: inside a sentence, or beside a value or
+   label it could pass for (a table cell, a field value, a card header slot).
+   Body ink (--fg-1), whatever the sentence's color, with a 1px underline at a
+   3px offset, 2px on hover, so it never rests on color alone (WCAG 1.4.1).
+   Standalone links known by position or a glyph (breadcrumbs, "Portfolio →",
+   "+ Add", Edit) don't use it; they underline on hover. textLinkClass is for
+   an <a> or a <button>. */
+export const textLinkClass = "text-fg-1 underline decoration-1 underline-offset-3 hover:decoration-2";
+
+export function TextLink({ className, ...props }: React.ComponentProps<typeof Link>) {
+  return <Link className={cn(textLinkClass, className)} {...props} />;
+}
+
 /* ---------------- Badge ---------------- */
 const badgeTones: Record<string, string> = {
   gray: "bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",

@@ -1,7 +1,6 @@
 "use client";
 import { useState, useTransition, type FormEvent } from "react";
-import Link from "next/link";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, Input, Select, TextLink } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "@/lib/config";
 import { shortAddress } from "@/lib/normalize";
@@ -44,9 +43,9 @@ export function NewDealForm() {
         {existing && (
           <p className="mt-1 text-xs text-red-600 dark:text-red-400">
             Already in Deals: {shortAddress(existing.address)} · {existing.status}.{" "}
-            <Link href={`/deals/${existing.id}`} className="font-medium text-primary hover:underline">
+            <TextLink href={`/deals/${existing.id}`} className="font-medium">
               Open it
-            </Link>
+            </TextLink>
           </p>
         )}
       </div>
