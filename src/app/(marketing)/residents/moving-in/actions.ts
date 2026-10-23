@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { todayYmdEastern } from "@/lib/dates";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { withResult } from "@/lib/server-action";
 import { createTask, systemPrincipal } from "@/lib/tasks/service";
@@ -104,11 +105,15 @@ async function submitMoveInInspectionBody(
   }
   lines.push(`Submitted by: ${p.submitterName} <${p.submitterEmail}>`);
 
+  // Due the day it arrives, still unassigned (decision 17, G2C-IV02): it sorts
+  // with that day's rows on Today and the property's Tasks card, and reads
+  // late the next day instead of sinking among the undated rows.
   await createTask(
     {
       title: `Move-in inspection for ${p.tenantName} at ${property.address}`,
       description: lines.join("\n"),
       propertyId: property.id,
+      dueDate: todayYmdEastern(),
     },
     systemPrincipal("Move-in form"), // public submission; nobody signed in to attribute it to
   );

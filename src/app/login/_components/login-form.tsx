@@ -4,6 +4,7 @@ import { login } from "../actions";
 import { LOGIN_MESSAGES, LOGIN_START } from "../login-state";
 import { AuthError, AuthNotice, authInputClass } from "./auth-frame";
 import { AuthSubmit } from "./auth-submit";
+import { PasswordField } from "./password-field";
 
 /**
  * The /login form. A wrong password or a lockout comes back as state rather
@@ -54,16 +55,14 @@ export function LoginForm({ next, passwordChanged }: { next: string | null; pass
           defaultValue={email}
           className={authInputClass}
         />
-        <input
+        <PasswordField
           ref={passwordRef}
           name="password"
-          type="password"
           placeholder="Password"
           aria-label="Password"
           autoComplete="current-password"
           required
           autoFocus={!!email}
-          className={authInputClass}
         />
         <AuthSubmit pendingLabel="Signing in…">Sign in</AuthSubmit>
       </form>

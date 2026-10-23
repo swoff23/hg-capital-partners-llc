@@ -86,6 +86,7 @@ export function asanaPersonFor(name: string, email: string | null, people: reado
 const describe = (p: Person, names: ReadonlyMap<string, string>): string => {
   const m = p.match;
   if (m.kind === "user") return `${names.get(m.userId) ?? m.userId} (by ${m.via})`;
+  if (m.kind === "contact" && m.create) return `${m.create.fullName}, a contact the Asana load creates (people.json)`;
   if (m.kind === "contact") return `${names.get(m.contactId) ?? m.contactId} (by ${m.via}${m.confirmed ? "" : ", NOT confirmed"})`;
   const why = { override: "people.json says no one", unmatched: "no match", ambiguous: "ambiguous", former: "former Asana user" }[m.reason];
   return m.suggestions.length ? `${why}; maybe ${m.suggestions.join(", ")}` : why;
@@ -118,6 +119,9 @@ export function planLegacyLinks(
       decision = { kind: "leave", reason: "closed: the CSV's are deleted under D25, and contractor history starts at cutover (D18)" };
     } else if (row.asanaId && !row.asanaSyncedAt) {
       decision = { kind: "leave", reason: "a CSV row the Asana load hasn't reconciled yet; the load updates or deletes it" };
+    } else if (m.kind === "contact" && m.create) {
+      // This linker never creates contacts; the load does, and the next run here links to it by gid.
+      decision = { kind: "leave", reason: `people.json creates ${m.create.fullName} as a contact during the Asana load; run the load first` };
     } else if (m.kind === "user") {
       decision = { kind: "link", assignee: { userId: m.userId }, to: names.get(m.userId) ?? m.userId, via: m.via };
     } else if (m.kind === "contact" && m.confirmed) {

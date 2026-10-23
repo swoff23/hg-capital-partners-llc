@@ -23,7 +23,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
 
   return (
     <>
-      <PageHeader title="Contractors" subtitle={`${contacts.length} contractors & service providers`} />
+      <PageHeader title="Contractors" subtitle={`${contacts.length} contractor${contacts.length === 1 ? "" : "s"}`} />
       <Card className="overflow-hidden">
         {contacts.length === 0 ? (
           <div className="p-4">

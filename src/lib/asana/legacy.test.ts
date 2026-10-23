@@ -80,6 +80,16 @@ test("no contact for the person: left with the reason, never guessed onto someon
     kind: "leave",
     reason: "people.json says no one",
   });
+  // people.json creating him is the load's job; here it waits for the load, never links to a contact not there yet.
+  const create = { "g-bk": { createContact: { fullName: "Brandon Kmiotek", email: "bk@realty.example" } } };
+  assert.deepEqual(decisionOf([row({ assigneeName: "Brandon Kmiotek", assigneeEmail: "bk@realty.example", ...SYNCED })], { overrides: create })[0], {
+    kind: "leave",
+    reason: "people.json creates Brandon Kmiotek as a contact during the Asana load; run the load first",
+  });
+  // After the load made him (gid saved), the same people.json links to that contact.
+  const made: DbContact = { id: "c-bk", fullName: "Brandon Kmiotek", email: "bk@realty.example", asanaGid: "g-bk", active: true };
+  const after = planLegacyLinks([row({ assigneeName: "Brandon Kmiotek", ...SYNCED })], { users: USERS, contacts: [...CONTACTS, made] }, ASANA, { overrides: create });
+  assert.deepEqual(after.rows[0].decision, { kind: "link", assignee: { contactId: "c-bk" }, to: "Brandon Kmiotek", via: "asanaGid" });
 });
 
 test("two contacts with the same name: nobody", () => {

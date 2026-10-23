@@ -168,16 +168,37 @@ export interface DbContact {
   active: boolean;
 }
 
-/** Connor's confirmations, by Asana user gid (people.json next to the snapshot). */
-export type PersonOverride = { userId: string } | { contactId: string } | { none: true };
+/** A contractor with no Contact yet, added by the import (people.json "createContact"). No login, no invite, no email. */
+export interface ContactDraft {
+  fullName: string;
+  email: string | null;
+}
 
-export type MatchVia = "asanaGid" | "override" | "email" | "name";
+/**
+ * Connor's confirmations, by Asana user gid (people.json next to the snapshot):
+ * a staff user, an existing contact, nobody, or a contact to create.
+ */
+export type PersonOverride = { userId: string } | { contactId: string } | { none: true } | { createContact: { fullName: string; email?: string | null } };
+
+export type MatchVia = "asanaGid" | "override" | "email" | "name" | "create";
 
 export type PersonMatch =
   | { kind: "user"; userId: string; via: MatchVia }
   // A name-only match isn't confirmed until Connor says so (people.json or --accept-name-matches).
-  | { kind: "contact"; contactId: string; via: MatchVia; confirmed: boolean }
+  // via "create": `contactId` is the id the load gives the new Contact (ImportPlan.newContacts).
+  | { kind: "contact"; contactId: string; via: MatchVia; confirmed: boolean; create?: ContactDraft }
   | { kind: "none"; reason: "override" | "unmatched" | "ambiguous" | "former"; suggestions: string[] };
+
+/** A createContact entry's fields, trimmed, or null when it has no name or an email that isn't one address. */
+export function contactDraft(o: unknown): ContactDraft | null {
+  if (!o || typeof o !== "object") return null;
+  const r = o as Record<string, unknown>;
+  const fullName = typeof r.fullName === "string" ? r.fullName.trim().replace(/\s+/g, " ") : "";
+  if (!fullName) return null;
+  const email = typeof r.email === "string" ? r.email.trim().toLowerCase() : "";
+  if (email && !/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email)) return null;
+  return { fullName, email: email || null };
+}
 
 export interface Person {
   gid: string;
@@ -197,10 +218,11 @@ export function normalizeName(s: string | null | undefined): string {
 }
 
 /** Contact.email sometimes holds two addresses; split them. */
-function emailsOf(raw: string | null | undefined): string[] {
+export function emailsOf(raw: string | null | undefined): string[] {
   return (raw ?? "")
     .split(/[\s,;]+/)
-    .map((e) => e.trim().toLowerCase())
+    // "Brandon <kmiotek.realty@gmail.com>" keeps the address, not the brackets.
+    .map((e) => e.trim().replace(/^<+|>+$/g, "").toLowerCase())
     .filter((e) => e.includes("@"));
 }
 
@@ -208,12 +230,18 @@ function emailsOf(raw: string | null | undefined): string[] {
  * Match every Asana person to a staff User (by email) or a Contact (by email,
  * then by exact normalized name). Rows already carrying the gid win, and
  * Connor's overrides win over everything. Ambiguous matches match nothing.
+ *
+ * A createContact override plans a new Contact, with an id from `newId`,
+ * unless one already exists: the row carrying the gid (a re-run after the
+ * load made it) or the one row with that email. A contact already named
+ * that, with neither, isn't guessed at: the person stays unmatched and the
+ * report says to point people.json at it instead.
  */
 export function matchPeople(
   refs: Iterable<AsanaRef>,
   users: readonly DbUser[],
   contacts: readonly DbContact[],
-  opts: { overrides?: Readonly<Record<string, PersonOverride>>; acceptNameMatches?: boolean } = {},
+  opts: { overrides?: Readonly<Record<string, PersonOverride>>; acceptNameMatches?: boolean; newId?: () => string } = {},
 ): Map<string, Person> {
   const byGid = new Map<string, AsanaRef>();
   for (const r of refs) {
@@ -238,8 +266,30 @@ export function matchPeople(
     const name = ref.name?.trim() || "(unknown)";
     const email = ref.email?.trim().toLowerCase() || null;
     const person = (match: PersonMatch) => out.set(ref.gid, { gid: ref.gid, name, email, match });
+    // A row already linked to a different Asana person can't be this one by name. By email it
+    // can when it's the only row with that address: one person with two Asana accounts.
+    const free = <T extends { asanaGid: string | null }>(rows: T[] | undefined) => (rows ?? []).filter((r) => !r.asanaGid || r.asanaGid === ref.gid);
+    const byEmail = <T extends { asanaGid: string | null }>(rows: T[] | undefined) => (rows?.length === 1 ? rows : free(rows));
 
     const o = opts.overrides?.[ref.gid];
+    if (o && "createContact" in o) {
+      const draft = contactDraft(o.createContact);
+      const linked = contacts.find((c) => c.asanaGid === ref.gid);
+      const sameEmail = draft?.email ? byEmail(contactsByEmail.get(draft.email)) : [];
+      const sameName = draft ? free(contactsByName.get(normalizeName(draft.fullName))) : [];
+      if (!draft) person({ kind: "none", reason: "ambiguous", suggestions: [`people.json createContact needs a fullName and at most one email: ${JSON.stringify(o)}`] });
+      else if (linked) person({ kind: "contact", contactId: linked.id, via: "asanaGid", confirmed: true });
+      else if (sameEmail.length === 1) person({ kind: "contact", contactId: sameEmail[0].id, via: "email", confirmed: true });
+      else if (sameEmail.length > 1) person({ kind: "none", reason: "ambiguous", suggestions: sameEmail.map((x) => `${x.fullName} (${x.id})`) });
+      else if (sameName.length) {
+        const hint = sameName.map((x) => `${x.fullName} (${x.id}) already has that name; to use it, put { "contactId": "${x.id}" } in people.json`);
+        person({ kind: "none", reason: "ambiguous", suggestions: hint });
+      } else {
+        const id = opts.newId ? opts.newId() : `asana-contact-${ref.gid}`;
+        person({ kind: "contact", contactId: id, via: "create", confirmed: true, create: draft });
+      }
+      continue;
+    }
     if (o) {
       if ("userId" in o && userById.has(o.userId)) person({ kind: "user", userId: o.userId, via: "override" });
       else if ("contactId" in o && contactById.has(o.contactId)) person({ kind: "contact", contactId: o.contactId, via: "override", confirmed: true });
@@ -257,10 +307,6 @@ export function matchPeople(
       person({ kind: "contact", contactId: linkedContact.id, via: "asanaGid", confirmed: true });
       continue;
     }
-    // A row already linked to a different Asana person can't be this one by name. By email it
-    // can when it's the only row with that address: one person with two Asana accounts.
-    const free = <T extends { asanaGid: string | null }>(rows: T[] | undefined) => (rows ?? []).filter((r) => !r.asanaGid || r.asanaGid === ref.gid);
-    const byEmail = <T extends { asanaGid: string | null }>(rows: T[] | undefined) => (rows?.length === 1 ? rows : free(rows));
     if (email) {
       const u = byEmail(usersByEmail.get(email));
       if (u.length === 1) {
@@ -1022,11 +1068,19 @@ export interface ImportPlan {
   mode: "load" | "delta";
   /** Everyone in the snapshot; `refs` counts mentions on the tasks and playbooks being written (0: only on archived or completed work). */
   people: Array<Person & { refs: number }>;
+  /** Contacts people.json asks the import to create (createContact). Written before anything that names them. */
+  newContacts: NewContactPlan[];
   templates: TemplatePlan[];
   tasks: TaskPlan[];
   deletes: DeleteRow[];
   appOnly: Array<{ taskId: string; title: string; status: TaskStatus }>;
   report: PlanReport;
+}
+
+export interface NewContactPlan extends ContactDraft {
+  /** Assigned up front, so the plan's tasks can already name the contact. */
+  id: string;
+  asanaGid: string;
 }
 
 /** Done or canceled in the app; what Asana's `completed` maps to. */
@@ -1086,7 +1140,11 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
   const refs: AsanaRef[] = [...input.users];
   for (const t of input.tasks) for (const r of [t.assignee, t.created_by, t.completed_by]) if (r) refs.push(r);
   for (const list of Object.values(input.stories)) for (const s of list) for (const r of [s.created_by, s.assignee]) if (r) refs.push(r);
-  const people = matchPeople(refs, db.users, db.contacts, { overrides: opts.overrides, acceptNameMatches: opts.acceptNameMatches });
+  const people = matchPeople(refs, db.users, db.contacts, { overrides: opts.overrides, acceptNameMatches: opts.acceptNameMatches, newId: opts.newId });
+  const newContacts: NewContactPlan[] = [...people.values()].flatMap((p) =>
+    p.match.kind === "contact" && p.match.create ? [{ id: p.match.contactId, asanaGid: p.gid, ...p.match.create }] : [],
+  );
+  const contactName = new Map([...db.contacts.map((c) => [c.id, c.fullName] as const), ...newContacts.map((c) => [c.id, c.fullName] as const)]);
 
   const propertyIdByKey = new Map(db.properties.map((p) => [addressKey(p.address), p.id]));
   const propertyAddress = new Map(db.properties.map((p) => [p.id, p.address]));
@@ -1568,8 +1626,7 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
   const byContact = new Map<string, WillSee>();
   for (const tp of tasks) {
     if (!tp.contactId) continue;
-    const contact = db.contacts.find((c) => c.id === tp.contactId);
-    const ws = byContact.get(tp.contactId) ?? { contactId: tp.contactId, name: contact?.fullName ?? tp.contactId, jobs: [] };
+    const ws = byContact.get(tp.contactId) ?? { contactId: tp.contactId, name: contactName.get(tp.contactId) ?? tp.contactId, jobs: [] };
     byContact.set(tp.contactId, ws);
     const shared = tp.events.filter((e) => e.kind === "COMMENT" && e.visibility === "SHARED").sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const files = tp.attachments.filter((a) => a.source.type !== "missing");
@@ -1612,7 +1669,7 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
       ? db.tasks.filter((r) => !r.asanaId).map((r) => ({ taskId: r.id, title: r.title, status: r.status }))
       : [];
 
-  return { mode, people: [...people.values()].map((p) => ({ ...p, refs: mentions.get(p.gid) ?? 0 })), templates, tasks, deletes, appOnly, report };
+  return { mode, people: [...people.values()].map((p) => ({ ...p, refs: mentions.get(p.gid) ?? 0 })), newContacts, templates, tasks, deletes, appOnly, report };
 }
 
 // ---------------------------------------------------------------------------

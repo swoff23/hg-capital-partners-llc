@@ -6,6 +6,7 @@ import { AssigneePicker, type AssigneeContractor, type AssigneeUser, type Assign
 import { DueDatePicker } from "@/components/due-date-picker";
 import { RepeatPicker } from "@/components/repeat-picker";
 import type { Ymd } from "@/lib/dates";
+import { weekdayOf } from "@/lib/quick-dates";
 import { fmtShortDay } from "@/lib/tasks/activity";
 import type { RepeatRule } from "@/lib/tasks/repeat";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,7 @@ export function TaskFields({
   contractors: AssigneeContractor[];
   properties: PropertyOption[];
   /** Set when a contractor is assigned and the property has lockbox codes (D21). */
-  lockbox: { state: "shown" | "pick-unit"; contractor: string } | null;
+  lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
   created: string;
   className?: string;
 }) {
@@ -68,6 +69,7 @@ export function TaskFields({
   }
 
   const defaultDay = Number((v.dueDate ?? today).slice(8, 10));
+  const defaultWeekday = weekdayOf(v.dueDate ?? today);
 
   return (
     <div
@@ -149,6 +151,7 @@ export function TaskFields({
         <RepeatPicker
           value={v.repeatRule}
           defaultDay={defaultDay}
+          defaultWeekday={defaultWeekday}
           placeholder={
             <>
               <span className="lg:hidden">Repeat</span>
@@ -160,11 +163,25 @@ export function TaskFields({
       </Row>
       {lockbox && (
         <Row label="Lockbox">
-          <span className="inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-xs text-muted lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-px">
+          {/* relative: the sr-only text is absolute, and must stay inside the phone chip row's scroller, not widen the page. */}
+          <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-xs text-muted lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-px">
             <KeyRound aria-hidden="true" />
-            {lockbox.state === "shown"
-              ? `Shown to ${lockbox.contractor}`
-              : `Pick a unit so ${lockbox.contractor} sees the lockbox code`}
+            {/* Short so each stays one line in the rail; the full sentence is what's read out. */}
+            {lockbox.state === "shown" ? (
+              lockbox.hasLogin ? (
+                `Shown to ${lockbox.contractor}`
+              ) : (
+                <>
+                  <span aria-hidden="true">Once {lockbox.contractor} signs in</span>
+                  <span className="sr-only">{lockbox.contractor} sees the lockbox code after signing in</span>
+                </>
+              )
+            ) : (
+              <>
+                <span aria-hidden="true">Pick a unit for the code</span>
+                <span className="sr-only">Pick a unit so {lockbox.contractor} sees the lockbox code</span>
+              </>
+            )}
           </span>
         </Row>
       )}

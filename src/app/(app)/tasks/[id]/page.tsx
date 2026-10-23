@@ -44,7 +44,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       assigneeContactId: true,
       assigneeName: true,
       createdBy: { select: { name: true, email: true } },
-      assigneeContact: { select: { id: true, fullName: true } },
+      assigneeContact: { select: { id: true, fullName: true, active: true } },
       checklist: { orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { id: true, title: true, done: true } },
       attachments: {
         where: { deletedAt: null },
@@ -101,6 +101,11 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   const overdue = (OVERDUE_ELIGIBLE as readonly TaskStatus[]).includes(task.status) && (daysUntil(due, today) ?? 0) < 0;
   const contractor = task.assigneeContact;
   const contractorFirst = contractor ? firstName(contractor.fullName) || contractor.fullName : null;
+  // Whether that contractor has a login (G2B-I03): the picker's own "Has login"
+  // flag (status ACTIVE), the same rule core.ts emails by, and only while the
+  // contact is active, since sign-in refuses an inactive one (the card's Access
+  // off). Nothing else about the account is read.
+  const contractorHasLogin = !!contractor?.active && contractors.some((c) => c.id === contractor.id && c.hasLogin);
   const property = properties.find((p) => p.id === task.propertyId) ?? null;
 
   // Unit labels only: lockbox codes never leave the server (D21).
@@ -112,7 +117,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   const lockbox = (() => {
     if (!contractorFirst || !property || !active) return null;
     const state = lockboxState(parseUnits(property.units), task.unitLabel);
-    return state === "none" ? null : { state, contractor: contractorFirst };
+    return state === "none" ? null : { state, contractor: contractorFirst, hasLogin: contractorHasLogin };
   })();
 
   const userName = (u: { name: string | null; email: string }) => u.name || u.email;
@@ -230,6 +235,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       lockbox={lockbox}
       created={created}
       contractorFirst={contractorFirst}
+      contractorHasLogin={contractorHasLogin}
       staffNames={staffNames}
       review={review}
       checklist={task.checklist}

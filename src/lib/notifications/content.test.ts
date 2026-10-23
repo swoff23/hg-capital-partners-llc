@@ -12,6 +12,7 @@ import {
   parseItems,
   reachedCapNow,
   refusedRetryAt,
+  replyLine,
   retryAt,
   sendBudget,
   sendFailureKind,
@@ -159,6 +160,68 @@ test("the whole email: job and street, the lines, one button to the right place"
     buttonUrl: "https://hg.example.com/tasks/t1",
   });
   assert.equal(openUrl("https://hg.example.com", "contractor", "t1"), "https://hg.example.com/p/jobs/t1");
+});
+
+test("an approval thanks the contractor by first name, and the button reads See job (BCONTRACT-008)", () => {
+  const base = {
+    title: TITLE,
+    address: "23 Sherwood St, Buffalo, NY 14213",
+    audience: "contractor" as const,
+    appUrl: "https://hg.example.com",
+    taskId: "t1",
+    staffNames: ["Connor", "Pieter"],
+  };
+  const approved = [item("COMMENT", '"Looks great"', "Pieter Hoff"), item("STATUS", `approved "${TITLE}"`, "Pieter Hoff")];
+  // Approved means Done: the job is closed by send time, so there's nowhere to reply.
+  assert.deepEqual(taskEmail({ ...base, items: approved, recipientName: "Zack (Outlaw Carpentry)", jobOpen: false }), {
+    subject: "Pieter approved Cabinet install",
+    line: "Cabinet install, 23 Sherwood St",
+    items: ['Pieter: "Looks great"', "Pieter approved it"],
+    closing: "Thanks, Zack.",
+    buttonLabel: "See job",
+    buttonUrl: "https://hg.example.com/p/jobs/t1",
+  });
+  // The name he goes by; no name on the contact still thanks.
+  assert.equal(taskEmail({ ...base, items: approved, recipientName: "Jacob (Jake) Hoak" }).closing, "Thanks, Jake.");
+  assert.equal(taskEmail({ ...base, items: approved, recipientName: null }).closing, "Thanks.");
+  // A comment after the approval doesn't take it back.
+  const thenComment = [...approved, item("COMMENT", '"Invoice by Friday"')];
+  assert.equal(taskEmail({ ...base, items: thenComment, recipientName: "Zack Smith" }).buttonLabel, "See job");
+  // Approved, then reopened: the latest status change isn't an approval.
+  const reopened = taskEmail({
+    ...base,
+    items: [item("STATUS", `approved "${TITLE}"`), item("STATUS", `set "${TITLE}" to in progress`)],
+    recipientName: "Zack Smith",
+  });
+  assert.equal(reopened.closing, undefined);
+  assert.equal(reopened.buttonLabel, "Open job");
+  // Every other contractor email keeps Open job, with no thanks.
+  const sentBack = taskEmail({ ...base, items: [item("STATUS", `sent "${TITLE}" back: Level the uppers`)], recipientName: "Zack Smith" });
+  assert.equal(sentBack.closing, undefined);
+  assert.equal(sentBack.buttonLabel, "Open job");
+  // Staff never get the thanks or See job.
+  const staff = taskEmail({ ...base, audience: "staff", items: approved, recipientName: "Zack Smith" });
+  assert.equal(staff.closing, undefined);
+  assert.equal(staff.buttonLabel, "Open task");
+});
+
+test("contractor emails say where to reply, naming the partners; staff emails don't", () => {
+  assert.equal(replyLine(["Connor", "Pieter"]), "Reply in the job so Connor and Pieter both see it.");
+  assert.equal(replyLine(["Connor"]), "Reply in the job so Connor sees it.");
+  assert.equal(replyLine(["Connor", "Pieter", "Dana"]), "Reply in the job so Connor, Pieter and Dana all see it.");
+  assert.equal(replyLine([]), "Reply in the job so HG sees it.");
+  const base = { items: [item("NOTES", "updated the notes")], title: TITLE, address: null, appUrl: "https://hg.example.com", taskId: "t1" };
+  assert.equal(
+    taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"] }).footnote,
+    "Reply in the job so Connor and Pieter both see it.",
+  );
+  // Only while the job is still open when the email goes out.
+  assert.equal(
+    taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"], jobOpen: true }).footnote,
+    "Reply in the job so Connor and Pieter both see it.",
+  );
+  assert.ok(!("footnote" in taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"], jobOpen: false })));
+  assert.ok(!("footnote" in taskEmail({ ...base, audience: "staff", staffNames: ["Connor", "Pieter"] })));
 });
 
 test("a title with line breaks can't break the subject", () => {

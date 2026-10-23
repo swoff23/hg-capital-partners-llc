@@ -1,4 +1,5 @@
 import type { TaskStatus } from "@prisma/client";
+import type { FileKind } from "@/lib/attachments/content-types";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
@@ -254,4 +255,30 @@ export function nextStep(status: TaskStatus): NextStep {
 /** "Finishing 1 upload…", "Finishing 3 uploads…". */
 export function finishingLabel(pending: number): string {
   return `Finishing ${pending} upload${pending === 1 ? "" : "s"}…`;
+}
+
+/**
+ * The Mark done sheet's main button (decision 13). It waits for uploads still
+ * going up, and stays off while any photo failed to upload, until each red
+ * tile is retried or removed; the tray's red line says why. With no photos
+ * and no note it reads "Skip".
+ */
+export function markDoneButton(s: { pending: number; failed: number; sending: boolean; hasContent: boolean }): {
+  label: string;
+  enabled: boolean;
+} {
+  if (s.pending > 0) return { label: finishingLabel(s.pending), enabled: false };
+  if (s.sending) return { label: "Sending…", enabled: false };
+  if (s.failed > 0) return { label: "Mark done", enabled: false };
+  return { label: s.hasContent ? "Mark done" : "Skip", enabled: true };
+}
+
+/**
+ * The leave sheet's title while files are still going up (decision 24):
+ * "2 photos are still uploading", "1 video is still uploading", and "files"
+ * for a mix, as addedText names them.
+ */
+export function stillUploading(kinds: readonly (FileKind | null)[]): string {
+  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
+  return kinds.length === 1 ? `1 ${noun} is still uploading` : `${kinds.length} ${noun}s are still uploading`;
 }

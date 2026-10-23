@@ -230,7 +230,16 @@ export function readSnapshot(dir: string, extraFileDirs: readonly string[] = [])
   };
 }
 
-/** Connor's confirmations: { "<asana user gid>": { "contactId": "..." } | { "userId": "..." } | { "none": true } }. */
+/**
+ * Connor's confirmations, keyed by Asana user gid:
+ *   { "<gid>": { "userId": "..." } }        a staff user
+ *   { "<gid>": { "contactId": "..." } }     an existing contact (ids differ between databases: take them from that database's dry run)
+ *   { "<gid>": { "none": true } }           nobody; the name stays as text
+ *   { "<gid>": { "createContact": { "fullName": "...", "email": "..." } } }
+ *                                           a contractor with no contact yet: --apply creates one with this gid, before
+ *                                           tasks are written, so their jobs link to them. No login, no invite, no email.
+ *                                           A later run finds it by gid (or that email) and creates nothing.
+ */
 export function readOverrides(file: string | undefined): Record<string, PersonOverride> {
   if (!file || !fs.existsSync(file)) return {};
   const v = mustRead<Record<string, PersonOverride>>(file);

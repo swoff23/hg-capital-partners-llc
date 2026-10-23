@@ -7,11 +7,13 @@ import { getEnv } from "@/lib/env";
 import { Badge, Card, CardBody, CardHeader, CardTitle, Field } from "@/components/ui";
 import { BackLink } from "@/components/back-link";
 import { StatusBadge } from "@/components/status-badge";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { fmtDate } from "@/lib/utils";
 import { fmtDay } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
+import { portalAccess } from "@/lib/portal/access-state";
 import { excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
-import { cleanTrades, docOnFile, mailtoHref, telHref } from "@/lib/contacts";
+import { cleanTrades, docOnFile, mailtoHref, mapsHref, telHref, textHref } from "@/lib/contacts";
+import { firstName } from "@/lib/names";
 import { ContactLink } from "../contact-link";
 import { PortalAccessCard } from "./portal-access-card";
 
@@ -35,10 +37,15 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
     where: { id },
     include: {
       // Never the password hash: only what the Portal access card shows.
-      portalAccount: { select: { id: true, email: true, status: true, lastSignInAt: true } },
+      portalAccount: {
+        select: { id: true, email: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true },
+      },
     },
   });
   if (!c) notFound();
+  const phone = c.phoneE164 ?? c.phone;
+  const sms = textHref(phone);
+  const access = c.portalAccount ? portalAccess(c.portalAccount, c.active) : null;
 
   // Their jobs: tasks actually assigned to this contact, never a playbook's
   // template rows. The list stops at 60; the count is all of them.
@@ -75,12 +82,26 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               <dl>
                 <Field label="Trades">{cleanTrades(c.trades) ?? "—"}</Field>
                 <Field label="Phone">
-                  <ContactLink href={telHref(c.phoneE164 ?? c.phone)}>{c.phone ?? "—"}</ContactLink>
+                  <ContactLink href={telHref(phone)}>{c.phone ?? "—"}</ContactLink>
+                  {/* Touch only, where a tap opens Messages (ADMIN-004). The ::after reaches 44px. */}
+                  {sms && (
+                    <ContactLink
+                      href={sms}
+                      aria-label={`Text ${firstName(c.fullName) || c.fullName}`}
+                      className="relative ml-3 text-primary after:absolute after:-inset-x-2.5 after:-inset-y-3.5 pointer-fine:hidden"
+                    >
+                      Text
+                    </ContactLink>
+                  )}
                 </Field>
                 <Field label="Email">
                   <ContactLink href={mailtoHref(c.email)}>{c.email ?? "—"}</ContactLink>
                 </Field>
-                <Field label="Mailing address">{c.mailingAddress ?? "—"}</Field>
+                <Field label="Mailing address">
+                  <ContactLink href={mapsHref(c.mailingAddress)} newTab>
+                    {c.mailingAddress ?? "—"}
+                  </ContactLink>
+                </Field>
                 <Field label="Billing">{c.billingInfo ?? "—"}</Field>
                 <Field label="Availability">{c.availability ?? "—"}</Field>
                 <Field label="W-9">
@@ -118,16 +139,18 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             contactId={c.id}
             contactName={c.fullName}
             defaultEmail={c.email}
-            phone={c.phoneE164 ?? c.phone}
+            phone={phone}
             staffName={me.name ?? me.email}
             appUrl={await signInOrigin()}
             account={
-              c.portalAccount
+              c.portalAccount && access
                 ? {
                     id: c.portalAccount.id,
                     email: c.portalAccount.email,
-                    active: c.portalAccount.status === "ACTIVE",
-                    lastSignIn: c.portalAccount.lastSignInAt ? fmtDateTime(c.portalAccount.lastSignInAt) : null,
+                    state: access.state,
+                    line: access.line,
+                    restorable: c.portalAccount.status !== "ACTIVE",
+                    contactActive: c.active,
                   }
                 : null
             }

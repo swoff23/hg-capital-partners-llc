@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge, Button, EmptyState } from "@/components/ui";
 import type { CapexRules, PropertyUnit } from "@/lib/property-types";
 import {
@@ -12,6 +13,7 @@ import {
   equipmentStatusTone,
   equipmentReplacementCost,
 } from "@/lib/property-types";
+import { removeUnitQuestion, unitRefKey, type UnitRefs } from "@/lib/properties/unit-refs";
 import { fmtMoney } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
 import { updatePropertyUnits } from "../actions";
@@ -34,16 +36,20 @@ export function UnitsSection({
   version,
   initial,
   rules,
+  unitRefs,
 }: {
   propertyId: string;
   /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
   version: string;
   initial: PropertyUnit[];
   rules: CapexRules;
+  /** Open tasks and listings per saved unit label (unit-refs.ts countUnitRefs). */
+  unitRefs: Record<string, UnitRefs>;
 }) {
   const [editing, setEditing] = useState(false);
   const [units, setUnits] = useState<PropertyUnit[]>(structuredClone(initial));
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [removing, setRemoving] = useState<{ index: number; title: string; body: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -83,6 +89,24 @@ export function UnitsSection({
     else discard();
   }
 
+  // Tasks and listings name a unit by its saved label, so a unit they point at
+  // asks first (decision 19), unless another unit keeps that label.
+  function removeUnit(i: number) {
+    const saved = initial.find((u) => u.id && u.id === units[i].id)?.label ?? "";
+    const key = unitRefKey(saved);
+    const kept = units.some((u, j) => j !== i && unitRefKey(u.label) === key);
+    const question = key && !kept ? removeUnitQuestion(saved, unitRefs[key]) : null;
+    if (question) setRemoving({ index: i, ...question });
+    else mutate((x) => x.splice(i, 1));
+  }
+
+  function confirmRemove() {
+    if (!removing) return;
+    const { index } = removing;
+    mutate((x) => x.splice(index, 1));
+    setRemoving(null);
+  }
+
   return (
     <div className="group rounded-xl border border-border bg-surface shadow-sm">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -119,12 +143,37 @@ export function UnitsSection({
           <ReadUnits units={initial} rules={rules} />
         ) : (
           units.map((u, i) => (
-            <EditUnitCard key={u.id ?? `new-${i}`} unit={u} index={i} mutate={mutate} rules={rules} />
+            <EditUnitCard
+              key={u.id ?? `new-${i}`}
+              unit={u}
+              index={i}
+              mutate={mutate}
+              rules={rules}
+              onRemove={() => removeUnit(i)}
+            />
           ))
         )}
       </div>
 
       {error && <p className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
+
+      {removing && (
+        <ConfirmDialog
+          title={removing.title}
+          body={removing.body}
+          onClose={() => setRemoving(null)}
+          actions={
+            <>
+              <Button size="sm" variant="secondary" onClick={() => setRemoving(null)}>
+                Keep it
+              </Button>
+              <Button size="sm" variant="danger" onClick={confirmRemove}>
+                Remove
+              </Button>
+            </>
+          }
+        />
+      )}
 
       {confirmOpen && (
         <div
@@ -299,11 +348,13 @@ function EditUnitCard({
   index: i,
   mutate,
   rules,
+  onRemove,
 }: {
   unit: PropertyUnit;
   index: number;
   mutate: (fn: (u: PropertyUnit[]) => void) => void;
   rules: CapexRules;
+  onRemove: () => void;
 }) {
   return (
     <div className="rounded-lg border border-border">
@@ -320,10 +371,7 @@ function EditUnitCard({
           value={u.lockboxCode ?? ""}
           onChange={(e) => mutate((x) => (x[i].lockboxCode = e.target.value))}
         />
-        <button
-          onClick={() => mutate((x) => x.splice(i, 1))}
-          className="ml-auto text-xs text-red-500 hover:underline"
-        >
+        <button onClick={onRemove} className="ml-auto text-xs text-red-500 hover:underline">
           Remove unit
         </button>
       </div>

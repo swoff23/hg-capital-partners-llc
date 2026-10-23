@@ -14,11 +14,13 @@ import {
   groupByProperty,
   groupJobs,
   joinNames,
+  markDoneButton,
   nextStep,
   parseJobsGroup,
   parseJobsTab,
   portalActorLabel,
   statusUpdateText,
+  stillUploading,
   targetLabel,
   updateTimeLabel,
   type JobCard,
@@ -221,4 +223,25 @@ test("parsing the tab and the remembered grouping", () => {
 test("finishing label counts uploads", () => {
   assert.equal(finishingLabel(1), "Finishing 1 upload…");
   assert.equal(finishingLabel(3), "Finishing 3 uploads…");
+});
+
+test("Mark done waits for uploads and stays off while a photo failed (decision 13)", () => {
+  const idle = { pending: 0, failed: 0, sending: false, hasContent: false };
+  assert.deepEqual(markDoneButton(idle), { label: "Skip", enabled: true });
+  assert.deepEqual(markDoneButton({ ...idle, hasContent: true }), { label: "Mark done", enabled: true });
+  assert.deepEqual(markDoneButton({ ...idle, pending: 2 }), { label: "Finishing 2 uploads…", enabled: false });
+  assert.deepEqual(markDoneButton({ ...idle, sending: true }), { label: "Sending…", enabled: false });
+  // A failed photo never turns the button into "Skip": it waits for a Retry or a Remove.
+  assert.deepEqual(markDoneButton({ ...idle, failed: 2 }), { label: "Mark done", enabled: false });
+  assert.deepEqual(markDoneButton({ ...idle, failed: 1, hasContent: true }), { label: "Mark done", enabled: false });
+  // A retry puts the tile back in flight: the button counts it again.
+  assert.deepEqual(markDoneButton({ ...idle, failed: 1, pending: 1 }), { label: "Finishing 1 upload…", enabled: false });
+});
+
+test("the leave sheet names what's still uploading (decision 24)", () => {
+  assert.equal(stillUploading(["image", "image"]), "2 photos are still uploading");
+  assert.equal(stillUploading(["image"]), "1 photo is still uploading");
+  assert.equal(stillUploading(["video", "video", "video"]), "3 videos are still uploading");
+  assert.equal(stillUploading(["image", "video"]), "2 files are still uploading");
+  assert.equal(stillUploading(["file"]), "1 file is still uploading");
 });

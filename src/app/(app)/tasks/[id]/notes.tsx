@@ -7,9 +7,20 @@ import { useRun } from "./use-run";
 /**
  * The task's notes: a textarea that grows with its text and saves when it
  * loses focus. Notes are always visible to the assigned contractor (D16), so
- * the line above says who'll see them.
+ * the line above says who'll see them, and that it waits for their login
+ * when they don't have one yet (G2B-I03).
  */
-export function NotesField({ taskId, value, visibleTo }: { taskId: string; value: string | null; visibleTo: string | null }) {
+export function NotesField({
+  taskId,
+  value,
+  visibleTo,
+  hasLogin,
+}: {
+  taskId: string;
+  value: string | null;
+  visibleTo: string | null;
+  hasLogin: boolean;
+}) {
   const { run, pending } = useRun();
   const [text, setText] = useState(value ?? "");
   const [seen, setSeen] = useState(value);
@@ -36,7 +47,7 @@ export function NotesField({ taskId, value, visibleTo }: { taskId: string; value
       {visibleTo && (
         <p className="mb-1 flex items-center gap-1.5 text-xs text-muted">
           <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-          Visible to {visibleTo}
+          {hasLogin ? `Visible to ${visibleTo}` : `${visibleTo} sees notes after signing in`}
         </p>
       )}
       <textarea

@@ -11,15 +11,18 @@ import { REPEAT_MODES, choiceFromRule, ruleFromChoice, switchMode, type RepeatCh
 import { cn } from "@/lib/utils";
 
 /**
- * The Repeats field (D27): a chip with the rule ("Every 2 weeks",
- * "Monthly on the 5th") that opens a small editor. Never, every N days,
- * every N weeks, monthly on a day, quarterly, yearly. A Popover with a
+ * The Repeats field (D27): a chip with the rule ("Every 2 weeks on Mon",
+ * "Monthly on the 5th"; the full weekday in its label, and the text cut off
+ * rather than spill in a narrow column) that opens a small editor. Never,
+ * every N days, every N weeks, monthly on a day, quarterly, yearly. Weekly
+ * takes the due date's weekday, as quarterly takes its day. A Popover with a
  * mouse, a Sheet on touch, like the other picker chips.
  */
 export function RepeatPicker({
   value,
   onChange,
   defaultDay,
+  defaultWeekday,
   placeholder = "Never",
   isDisabled,
   className,
@@ -28,6 +31,8 @@ export function RepeatPicker({
   onChange: (rule: RepeatRule | null) => void;
   /** Seeds "monthly on day D": the due date's day, or today's. */
   defaultDay: number;
+  /** Pins weekly to a day of the week (0 Sunday): the due date's, or today's. */
+  defaultWeekday: number;
   /** The chip's text when it doesn't repeat. */
   placeholder?: ReactNode;
   isDisabled?: boolean;
@@ -41,7 +46,15 @@ export function RepeatPicker({
     if (JSON.stringify(rule) !== JSON.stringify(value)) onChange(rule);
   }
 
-  const panel = <RepeatPanel initial={choiceFromRule(value, defaultDay)} defaultDay={defaultDay} onSave={save} onCancel={() => setOpen(false)} />;
+  const panel = (
+    <RepeatPanel
+      initial={choiceFromRule(value, defaultDay, defaultWeekday)}
+      defaultDay={defaultDay}
+      defaultWeekday={defaultWeekday}
+      onSave={save}
+      onCancel={() => setOpen(false)}
+    />
+  );
 
   return (
     <DialogTrigger isOpen={open} onOpenChange={setOpen}>
@@ -51,7 +64,7 @@ export function RepeatPicker({
         className={cn(pickerChip, !value && "text-muted", className)}
       >
         <Repeat aria-hidden="true" />
-        {value ? describeRepeat(value) : placeholder}
+        <span className="min-w-0 truncate">{value ? describeRepeat(value, { short: true }) : placeholder}</span>
       </AriaButton>
       {touch ? (
         <Sheet title="Repeats">{panel}</Sheet>
@@ -67,12 +80,15 @@ export function RepeatPicker({
 function RepeatPanel({
   initial,
   defaultDay,
+  defaultWeekday,
   onSave,
   onCancel,
 }: {
   initial: RepeatChoice;
   /** The due date's day (or today's), for a mode that wasn't the stored one. */
   defaultDay: number;
+  /** The due date's weekday (or today's), likewise. */
+  defaultWeekday: number;
   onSave: (rule: RepeatRule | null) => void;
   onCancel: () => void;
 }) {
@@ -108,7 +124,7 @@ function RepeatPanel({
         aria-label="How often"
         value={choice.mode}
         autoFocus
-        onChange={(e) => setChoice(switchMode(initial, e.target.value as RepeatMode, defaultDay))}
+        onChange={(e) => setChoice(switchMode(initial, e.target.value as RepeatMode, defaultDay, defaultWeekday))}
       >
         {REPEAT_MODES.map((m) => (
           <option key={m.mode} value={m.mode}>

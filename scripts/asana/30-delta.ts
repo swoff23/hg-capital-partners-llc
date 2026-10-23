@@ -41,7 +41,7 @@ import { prisma } from "../../src/lib/db";
 import { getEnv } from "../../src/lib/env";
 import { isAsanaHosted, safeFileName, snapshotStamp } from "../../src/lib/asana/snapshot-helpers";
 import { buildPlan, deltaScope, type AsanaAttachment, type AsanaRef, type AsanaStory, type AsanaTask, type PlanDb } from "../../src/lib/asana/map";
-import { StalePlanError, writeIdentity, writeTask } from "../../src/lib/asana/import";
+import { StalePlanError, writeIdentity, writeNewContacts, writeTask } from "../../src/lib/asana/import";
 import { formatReport } from "../../src/lib/asana/report";
 import { AsanaClient, AsanaError, downloadTo } from "./client";
 import {
@@ -303,6 +303,11 @@ async function main() {
   }
 
   const now = new Date();
+  // Normally the load already made them, and this list is empty.
+  if (plan.newContacts.length) {
+    const made = await prisma.$transaction((tx) => writeNewContacts(tx, plan.newContacts), TX);
+    log(`contacts from people.json: ${made.created} created${made.existing ? `, ${made.existing} already there` : ""}`);
+  }
   const identity = await prisma.$transaction((tx) => writeIdentity(tx, plan.people), TX);
   if (identity.linked) log(`linked ${identity.linked} more people to their Asana ids`);
   const stale: string[] = [];

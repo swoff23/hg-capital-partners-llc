@@ -226,7 +226,7 @@ All changes are additive. The new status values go in **their own migration file
 | Change | Fields |
 |---|---|
 | `TaskStatus` | Keep `OPEN` (shown as "To do"), add `SCHEDULED`, `IN_PROGRESS`, `WAITING`, `REVIEW`, `CANCELED` |
-| `Task` | `assigneeContactId` (FK; CHECK it's never set together with `assigneeUserId`), `scheduledFor`, `waitingOn`, `unitLabel`, `repeatRule` (JSON: frequency, interval, day of month), `repeatSeriesId`, `createdByUserId`, `completedByUserId` / `completedByContactId`, `taskTemplateId`, `appEditedAt`, `asanaLastSynced` (JSON), `asanaSyncedAt` |
+| `Task` | `assigneeContactId` (FK; CHECK it's never set together with `assigneeUserId`), `scheduledFor`, `waitingOn`, `unitLabel`, `repeatRule` (JSON: frequency, interval, day of month, weekday for weekly), `repeatSeriesId`, `createdByUserId`, `completedByUserId` / `completedByContactId`, `taskTemplateId`, `appEditedAt`, `asanaLastSynced` (JSON), `asanaSyncedAt` |
 | `TaskEvent` (new) | `taskId`, `kind` (COMMENT, CREATED, ASSIGNED, STATUS, DUE, SCHEDULED, PROPERTY, TITLE, NOTES, ATTACHMENT, CHECKLIST, ACCESS, REPEAT_CREATED, CONFLICT), `visibility` (SHARED / INTERNAL; system kinds INTERNAL), `actorUserId?`, `actorContactId?`, `actorLabel`, `body`, `data` JSON, `source` (app, portal, system, asana), `asanaStoryGid @unique`, `createdAt` |
 | `TaskAttachment` | `eventId?`, `uploadedByUserId?` / `uploadedByContactId?`, `visibility`, `kind` (IMAGE, VIDEO, FILE, LINK), `pathname @unique` (nullable for LINK), nullable `size`, `linkUrl`, `thumbPathname`, `posterPathname`, `width`, `height`, `durationSec`, `asanaGid @unique`, `deletedAt` |
 | `TaskChecklistItem` (new) | `taskId`, `title`, `done`, `doneAt`, `doneByUserId?` / `doneByContactId?`, `assigneeUserId?` / `assigneeContactId?`, `dueDate`, `position`, `asanaGid @unique` |
@@ -253,7 +253,8 @@ All changes are additive. The new status values go in **their own migration file
 **Repeats.** When a task with `repeatRule` reaches Done (Approve, for contractor jobs), core creates the next copy:
 - same title, notes, property, unit, assignee, repeat rule and series;
 - checklist reset;
-- the next due date computed from the previous due date (or from the completion date if there wasn't one);
+- the next due date is the rule's first date on or after today in Buffalo time, stepping from the previous due date (or from the completion date if there wasn't one) and keeping the pinned day, so a late finish never makes a copy that's already overdue: a monthly task due Jul 5 finished Oct 23 makes Nov 5, not Aug 5 (`nextRepeatDue` in `repeat.ts`);
+- weekly rules pin the weekday the due date had when the rule was saved ("Every week on Monday"), as monthly and quarterly rules pin the day of the month, so moving one copy, earlier or later, doesn't move the series: the next copy steps from the date the series gave this copy (kept as `due` on the copy's CREATED line, or on the REPEAT_CREATED line for older copies), not its moved date. A Monday copy moved to the Saturday before still makes the next Monday a week on, every 2 weeks keeps Nov 2 then Nov 16, and a monthly Oct 30 copy moved to Nov 2 still makes Nov 30. A copy given a date off the pinned day (the rule was re-pinned since), the series' first task, yearly rules and rules saved before the pin step from the copy's own due date (`repeatFrom` in `repeat.ts`);
 - one copy per finish: finishing a reopened task again reuses the copy that's still there, with no second "assigned you" email;
 - reopening a Done task takes its copy back while nobody has touched it (still To do, no edits, comments, files, checked items, portal views or sent email; `isUntouchedCopy` in `repeat.ts`), so a tick by mistake leaves only the two status lines. Done to Canceled keeps the copy.
 
@@ -261,7 +262,7 @@ All changes are additive. The new status values go in **their own migration file
 
 **Upload kinds.** Staff `task-upload` and `portal-task-upload`.
 - The server validates every requested path against `^tasks/<taskId>/(orig|thumb|poster)/[A-Za-z0-9._-]{1,100}$`, with random suffix on and overwrite off.
-- Tokens are per type: images get an image allowlist and 25 MB; videos get MOV/MP4 and 500 MB. No SVG or HTML. Multipart above 100 MB.
+- Tokens are per type: images get an image allowlist and 25 MB; videos get MOV/MP4 and 500 MB. No SVG or HTML. Multipart above 8 MB, so a dropped part resends 8 MB, not the whole video.
 - The portal kind checks access, and that the job is active, when the token is minted.
 
 **Recording.** `recordAttachment(taskId, pathname)` ignores what the browser claims. It calls `head(pathname)` and requires:
@@ -315,7 +316,7 @@ It stores head()'s values. Uploads still finishing after a contractor taps Mark 
 - Pulls every story (paginated), and every subtask recursively with its stories and files.
 - Pulls the project brief and status updates, plus the files on the project's Key resources and inline in the brief.
 - Saves the structured before/after values on system stories (dates, sections, assignees, names), not just Asana's sentence.
-- **Two things the Asana API can't reach, so they're manual steps on Oct 26:** the project's Messages tab (print each thread to PDF into `<snapshot>/messages/`) and any Asana video messages (listed in the manifest with their links). The snapshot reports `needs-manual-steps` until they're saved and it's re-run with `--ack-manual`.
+- **The one manual save on Oct 26 is Asana video messages:** the API can't reach them, so save each one by hand from the link the manifest lists. The project's Messages tab is also out of the API's reach, but it's acknowledged without saving, because Connor confirmed it has nothing worth keeping. Then finish with `--resume <dir> --ack-manual`; until then the snapshot reports `needs-manual-steps`.
 - For each file: fetches a fresh download link right before downloading, retries on 403, and checks bytes on disk against the size. Dropbox, Drive, Box and external files are recorded as links.
 - Output goes to `_private/asana-snapshot/<timestamp>/` with a manifest. A run that misses any file fails loudly with a list.
 - The zip goes to a private Blob as the permanent archive.
@@ -335,6 +336,7 @@ It stores head()'s values. Uploads still finishing after a contractor taps Mark 
 
 *People and visibility*
 - **Identity:** a review list of every user ID found anywhere in the snapshot. Connor confirms the 11 contractor matches Monday.
+- **people.json lives with the snapshot:** copy it from the trial snapshot into Monday's official one (or pass `--people <file>`), and replace any `contactId` in it with the id the production dry run prints.
 - **Visibility (D16, D17):** imported comments and files are Shared. Open tasks assigned to a confirmed contractor get `TaskAccess`.
 
 *Structure*

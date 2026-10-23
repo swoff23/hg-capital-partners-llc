@@ -9,10 +9,26 @@ export function telHref(phone: string | null | undefined): string | null {
   return /^\+?\d{10,15}$/.test(digits) ? `tel:${digits}` : null;
 }
 
+/** "sms:7165551234" for the numbers telHref takes, or null: the Text link beside a phone. */
+export function textHref(phone: string | null | undefined): string | null {
+  const tel = telHref(phone);
+  return tel && `sms:${tel.slice("tel:".length)}`;
+}
+
 /** "mailto:zack@example.com" for something shaped like one address, or null. */
 export function mailtoHref(email: string | null | undefined): string | null {
   const e = (email ?? "").trim();
   return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(e) ? `mailto:${e}` : null;
+}
+
+/**
+ * An Apple Maps search for a mailing address, or null when it's blank. Apple
+ * Maps like the portal's Directions button: the Maps app on an iPhone, the
+ * web map elsewhere.
+ */
+export function mapsHref(address: string | null | undefined): string | null {
+  const a = (address ?? "").trim().replace(/\s+/g, " ");
+  return /[\p{L}\d]/u.test(a) ? `https://maps.apple.com/?q=${encodeURIComponent(a)}` : null;
 }
 
 /**
@@ -59,24 +75,44 @@ export interface ContactFix {
   /** The name after, when it changes. */
   name?: string;
   /** The trades before and after, when they change. */
-  trades?: { from: string; to: string | null };
+  trades?: { from: string | null; to: string | null };
+  /** The company before and after, when it changes (only Connor's hand fixes below). */
+  company?: { from: string | null; to: string | null };
 }
 
 /**
- * What scripts/cleanup-contacts.ts would change (ADMIN-023): repeated trades
- * and all-lowercase name words. Company, notes and anything else are left
- * for Connor. Contacts that need nothing aren't listed.
+ * Connor's hand fixes (docs/asana-cutover-decisions.md item 31): a trade
+ * typed into Company moves to Trades, and a company typed into the name
+ * moves to Company. Each matches one record by its exact current name and
+ * company, so it can't reach any other row, and does nothing once applied.
  */
-export function planContactFixes(contacts: readonly { id: string; fullName: string; trades: string | null }[]): ContactFix[] {
+function handFix(c: { fullName: string; company?: string | null }): { name?: string; company: string | null; addTrade?: string } | null {
+  // A caller that didn't read the company (undefined) matches none of these.
+  const { company } = c;
+  if (c.fullName === "Jeremiah Anderson" && company === "Electric") return { company: null, addTrade: "Electric" };
+  if (c.fullName === "Kim Lockett" && company === "House Cleaner") return { company: null, addTrade: "House Cleaner" };
+  if (c.fullName === "Mike Morris (Freedom Electric)" && (company === null || company === "Freedom Electric")) return { name: "Mike Morris", company: "Freedom Electric" };
+  return null;
+}
+
+/**
+ * What scripts/cleanup-contacts.ts would change (ADMIN-023): repeated trades,
+ * all-lowercase name words, and Connor's hand fixes above. Notes and
+ * anything else are left for Connor. Contacts that need nothing aren't listed.
+ */
+export function planContactFixes(contacts: readonly { id: string; fullName: string; trades: string | null; company?: string | null }[]): ContactFix[] {
   const out: ContactFix[] = [];
   for (const c of contacts) {
     const fix: ContactFix = { id: c.id, fullName: c.fullName };
-    const name = capitalizedName(c.fullName);
+    const hand = handFix(c);
+    const name = hand?.name ?? capitalizedName(c.fullName);
     if (name) fix.name = name;
-    // cleanTrades keeps a value with no repeats as it is (trimmed), so this only lists repeats.
-    const trades = cleanTrades(c.trades);
-    if (c.trades !== null && trades !== c.trades.trim()) fix.trades = { from: c.trades, to: trades };
-    if (fix.name || fix.trades) out.push(fix);
+    // cleanTrades keeps a value with no repeats as it is (trimmed), so this only lists repeats,
+    // and a trade moved in from Company that's already listed changes nothing.
+    const trades = cleanTrades(hand?.addTrade ? [c.trades, hand.addTrade].filter((t) => t?.trim()).join(" / ") : c.trades);
+    if ((c.trades !== null || hand?.addTrade) && trades !== (c.trades?.trim() ?? null)) fix.trades = { from: c.trades, to: trades };
+    if (hand && hand.company !== (c.company ?? null)) fix.company = { from: c.company ?? null, to: hand.company };
+    if (fix.name || fix.trades || fix.company) out.push(fix);
   }
   return out;
 }

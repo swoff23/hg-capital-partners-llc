@@ -4,6 +4,7 @@ import { AssigneePicker, type AssigneeContractor, type AssigneeUser, type Assign
 import { RepeatPicker } from "@/components/repeat-picker";
 import { Input, Select } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
+import { weekdayOf } from "@/lib/quick-dates";
 import { firstOccurrence, type RepeatRule } from "@/lib/tasks/repeat";
 import { followDueDay } from "@/lib/tasks/repeat-choice";
 import { STATUS_LABEL } from "@/lib/task-scope";
@@ -17,7 +18,7 @@ const encode = (v: AssigneeValue) => (!v ? "" : "userId" in v ? `u:${v.userId}` 
  * The new task form's assignee, due date, status and Repeats: the same
  * pickers as the task page, posting through hidden fields. Waiting asks what
  * it's waiting on; Scheduled asks for the visit date. Repeats reads its day
- * from the due date, and a repeat picked with no due date fills in the first
+ * and weekday from the due date, and a repeat picked with no due date fills in the first
  * one, so a repeating task never starts undated.
  */
 export function NewTaskFields({
@@ -85,7 +86,12 @@ export function NewTaskFields({
         <div>
           <span className="text-xs font-medium text-muted">Repeats</span>
           <div className="mt-1 flex h-9 items-center pointer-coarse:h-11">
-            <RepeatPicker value={repeat} onChange={changeRepeat} defaultDay={Number((due || today).slice(8, 10))} />
+            <RepeatPicker
+              value={repeat}
+              onChange={changeRepeat}
+              defaultDay={Number((due || today).slice(8, 10))}
+              defaultWeekday={weekdayOf(due || today)}
+            />
           </div>
           <input type="hidden" name="repeatRule" value={repeat ? JSON.stringify(repeat) : ""} />
         </div>

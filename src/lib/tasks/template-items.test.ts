@@ -4,8 +4,10 @@ import {
   applyTokens,
   dueFromOffset,
   extractTokens,
+  fillNotes,
   hasOpenTokens,
   isAddressToken,
+  notesOnlyTokens,
   parseTemplateItems,
   rowTitle,
   sameToken,
@@ -101,6 +103,58 @@ test("the move-in playbook's own wording leaves no brackets once each field is f
   assert.deepEqual(tokens.map(tokenLabel), ["Tenant", "Tenant email", "Tenant number", "Property address"]);
   const values = Object.fromEntries(tokens.map((t) => [t, `value of ${t}`]));
   for (const s of strings) assert.equal(hasOpenTokens(applyTokens(s, values)), false, s);
+});
+
+// The imported NEW TENANT playbook's shapes (decision 27, BPLAY-010 option B).
+const NEW_TENANT = [
+  { title: "Get [Tenant] on Baselane", notes: "[tenant name]\n    [tenant email]\n    [tenant number]" },
+  { title: "Setup [Tenant] group text", notes: "Hey [tenant]! We're the owners of [property address].\n\nThanks!" },
+  { title: "Store [Tenant] insurance", checklist: ["Email [tenant email] the form"] },
+];
+
+test("only tokens no title or checklist uses are optional, and the address never is", () => {
+  assert.deepEqual(notesOnlyTokens(NEW_TENANT.slice(0, 2)), ["tenant email", "tenant number"]);
+  // A checklist item that needs the email makes it required again.
+  assert.deepEqual(notesOnlyTokens(NEW_TENANT), ["tenant number"]);
+  assert.deepEqual(notesOnlyTokens([{ title: "Walk through with [tenant]" }]), []);
+});
+
+test("a blank optional field drops its whole line from the notes; nothing in brackets is left", () => {
+  const optional = notesOnlyTokens(NEW_TENANT.slice(0, 2));
+  const notes = NEW_TENANT[0].notes;
+  const dana = { Tenant: "Dana Reyes", "tenant email": "", "tenant number": "" };
+  assert.equal(fillNotes(notes, dana, optional), "Dana Reyes");
+  assert.equal(fillNotes(notes, { ...dana, "tenant number": "716-555-0142" }, optional), "Dana Reyes\n    716-555-0142");
+  assert.equal(
+    fillNotes(notes, { ...dana, "tenant email": "dana@example.com", "tenant number": "716-555-0142" }, optional),
+    "Dana Reyes\n    dana@example.com\n    716-555-0142",
+  );
+  // A spelling of the key counts as its value; whitespace alone is blank.
+  assert.equal(fillNotes(notes, { ...dana, "Tenant Email": "dana@example.com", "tenant number": "  " }, optional), "Dana Reyes\n    dana@example.com");
+  // Every line dropped: no notes at all.
+  assert.equal(fillNotes("[tenant email]\n[tenant number]", {}, optional), null);
+  // Lines dropped mid-note leave no run of blank lines behind.
+  assert.equal(fillNotes("Call first.\n\n[tenant number]\n\nThen email.", {}, optional), "Call first.\n\nThen email.");
+});
+
+test("notes with nothing optional left blank fill exactly as before", () => {
+  const values = { Tenant: "Dana Reyes", "property address": "118 Congress" };
+  const notes = NEW_TENANT[1].notes!;
+  assert.equal(fillNotes(notes, values, ["tenant email"]), applyTokens(notes, values));
+  // A required token left blank stays in brackets, so the apply step still blocks on it.
+  assert.equal(fillNotes(notes, { "property address": "118 Congress" }, []), "Hey [tenant]! We're the owners of 118 Congress.\n\nThanks!");
+  assert.equal(fillNotes(undefined, values, []), null);
+  assert.equal(fillNotes("", values, []), null);
+});
+
+test("an address ending in a period doesn't double the sentence's own", () => {
+  // shortAddress("118 Congress St. Buffalo, NY 14213") is "118 Congress St.", and the group text ends "[property address]."
+  const values = { Tenant: "Dana Reyes", "property address": "118 Congress St." };
+  assert.equal(fillNotes(NEW_TENANT[1].notes, values, []), "Hey Dana Reyes! We're the owners of 118 Congress St.\n\nThanks!");
+  assert.equal(applyTokens("Keys for [property address]", values), "Keys for 118 Congress St.");
+  assert.equal(applyTokens("[property address], Buffalo", values), "118 Congress St., Buffalo");
+  assert.equal(applyTokens("Owners of [property address]...", values), "Owners of 118 Congress St...");
+  assert.equal(applyTokens("Owners of [property address].", { "property address": "58 Mariner Street" }), "Owners of 58 Mariner Street.");
 });
 
 test("token labels read in sentence case", () => {

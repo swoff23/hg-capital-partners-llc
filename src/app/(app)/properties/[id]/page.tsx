@@ -13,6 +13,7 @@ import { Avatar } from "@/components/avatar";
 import { StatusBadge } from "@/components/status-badge";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
+import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { PropertyDocumentsSection } from "./edit-documents";
@@ -130,6 +131,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             // Every unit with an id, so the save can tell a rename from a remove and an add.
             initial={withUnitIds(units)}
             rules={capexRules}
+            // What names each unit, so removing one that's still in use asks first.
+            unitRefs={countUnitRefs(property.tasks, property.listings)}
           />
 
           <ListingsSection

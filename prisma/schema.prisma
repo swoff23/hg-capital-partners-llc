@@ -264,7 +264,7 @@ model Task {
   priority     String?
 
   // Repeats: when done, the next copy is created (src/lib/tasks/repeat.ts).
-  // { freq: "days" | "weeks" | "monthly" | "quarterly" | "yearly", interval: n, dayOfMonth?: 1-31 }
+  // { freq: "days" | "weeks" | "monthly" | "quarterly" | "yearly", interval: n, dayOfMonth?: 1-31, weekday?: 0-6 (weekly, 0 Sunday) }
   repeatRule     Json?
   repeatSeriesId String?
 

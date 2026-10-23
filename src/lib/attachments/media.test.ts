@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { BlobServiceNotAvailable } from "@vercel/blob";
 import { contentTypeForName, fileKindForType } from "./content-types";
-import { MEDIA_ACCEPT, checkMediaFile, fmtDuration, pickerAccept, taskFileUrl, uploadNotice } from "./media";
+import { MEDIA_ACCEPT, checkMediaFile, fmtDuration, pickerAccept, taskFileUrl, uploadFailureReason, uploadNotice } from "./media";
 
 const MB = 1024 * 1024;
 
@@ -57,28 +58,56 @@ test("checkMediaFile: size caps per kind, and empty files", () => {
   assert.deepEqual(checkMediaFile({ name: "zero.jpg", type: "image/jpeg", size: 0 }), { ok: false, error: "the file is empty" });
 });
 
-test("uploadNotice: one line however many failed", () => {
+test("uploadNotice: one line however many failed, count first", () => {
   assert.equal(uploadNotice([]), "");
-  assert.equal(uploadNotice([{ name: "a.jpg", reason: "over the 25 MB photo limit" }]), "Couldn't add a.jpg: over the 25 MB photo limit");
+  const offline = { kind: "image" as const, reason: "no connection" };
   assert.equal(
     uploadNotice([
-      { name: "a.jpg", reason: "same" },
-      { name: "b.jpg", reason: "same" },
+      { name: "PXL_20261023_101500123.jpg", ...offline },
+      { name: "PXL_20261023_101500456.jpg", ...offline },
     ]),
-    "Couldn't add a.jpg and 1 more: same",
+    "2 photos didn't upload: no connection",
   );
+  assert.equal(uploadNotice([{ name: "VID_0001.mp4", kind: "video", reason: "no connection" }]), "1 video didn't upload: no connection");
   assert.equal(
     uploadNotice([
-      { name: "a.jpg", reason: "one" },
-      { name: "b.jpg", reason: "two" },
+      { name: "a.jpg", kind: "image", reason: "no connection" },
+      { name: "b.mov", kind: "video", reason: "no connection" },
     ]),
-    "Couldn't add 2 files. a.jpg: one",
+    "2 files didn't upload: no connection",
+  );
+  // Refused by the check (no kind): the extension names it, and the check's reason follows.
+  assert.equal(uploadNotice([{ name: "big.jpg", kind: null, reason: "over the 25 MB photo limit" }]), "1 photo didn't upload: over the 25 MB photo limit");
+  assert.equal(
+    uploadNotice([{ name: "bid.pdf", kind: null, reason: "only photos and videos can be added here" }]),
+    "1 file didn't upload: only photos and videos can be added here",
+  );
+  // Different reasons can't share the line: the count alone.
+  assert.equal(
+    uploadNotice([
+      { name: "a.jpg", kind: "image", reason: "no connection" },
+      { name: "b.jpg", kind: null, reason: "over the 25 MB photo limit" },
+    ]),
+    "2 photos didn't upload",
   );
   assert.equal(
-    uploadNotice([{ name: "a.jpg", reason: "Failed to retrieve the client token" }]),
-    "Couldn't add a.jpg: the upload was refused. Reload and try again",
+    uploadNotice([{ name: "a.jpg", kind: "image", reason: "Failed to retrieve the client token" }]),
+    "1 photo didn't upload: the upload was refused. Reload and try again",
   );
-  assert.equal(uploadNotice([{ name: "a.jpg", reason: "File uploads need a Blob store" }]), "File uploads aren't set up yet.");
+  assert.equal(uploadNotice([{ name: "a.jpg", kind: "image", reason: "" }]), "1 photo didn't upload");
+  assert.equal(uploadNotice([{ name: "a.jpg", kind: "image", reason: "File uploads need a Blob store" }]), "File uploads aren't set up yet.");
+});
+
+test("uploadFailureReason: a dropped connection reads no connection, single PUT or multipart", () => {
+  // A single PUT rethrows the browser's own TypeError.
+  assert.equal(uploadFailureReason(new TypeError("Failed to fetch")), "no connection");
+  assert.equal(uploadFailureReason(new TypeError("Load failed")), "no connection");
+  // Multipart turns a part's failed fetch into Blob's own error.
+  assert.equal(uploadFailureReason(new BlobServiceNotAvailable()), "no connection");
+  assert.equal(uploadFailureReason(new Error("Vercel Blob: The blob service is currently not available. Please try again.")), "no connection");
+  // Anything else keeps its words; a non-error has none.
+  assert.equal(uploadFailureReason(new Error("Vercel Blob: Failed to retrieve the client token")), "Vercel Blob: Failed to retrieve the client token");
+  assert.equal(uploadFailureReason("x"), "");
 });
 
 test("fmtDuration: m:ss under an hour, h:mm:ss over", () => {

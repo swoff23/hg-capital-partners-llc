@@ -28,7 +28,8 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Job | Use | Notes |
 |---|---|---|
 | Dialog with a form, or a picker on touch | `components/sheet.tsx` `Sheet`, `SheetTrigger` | React Aria Modal: bottom sheet below `md`, centered dialog from `md`. Esc closes one layer, focus trap, scroll lock, focus returns to the trigger. `title` names it; children may be `({ close }) => …` |
-| Confirm (destructive, or "discard changes?") | `components/confirm-dialog.tsx` `ConfirmDialog` | Backdrop click closes. No Esc, focus trap or portal yet; rebuild on `Sheet` (Known gaps) |
+| Confirm (destructive, or "discard changes?") | `components/confirm-dialog.tsx` `ConfirmDialog` | Backdrop click closes. `body` is optional when the title is the whole question. No Esc, focus trap or portal yet; rebuild on `Sheet` (Known gaps) |
+| Ask before an in-app link leaves work behind | `components/leave-guard.tsx` `LeaveGuard`, `useHoldLeave`, `useLeaveGuard` | Wrap the page in `LeaveGuard`; whatever knows calls `useHoldLeave({ title, stay })` while it matters. `BackLink` inside, or any link that leaves through `useLeaveGuard()`, then asks in a `Sheet` with just the title: "Leave anyway" and `stay` as the main button. Closes by itself, and stays, once the hold lifts. The contractor job page holds it while photos upload. Reloads and closed tabs are `useLeaveWarning`'s; browser Back isn't caught |
 | Photo and video viewer | `components/lightbox.tsx` `Lightbox` | Black stage, "3 / 11", arrows, arrow keys and swipe, Download, who added it and when. Videos play inline. `onDelete` (staff) adds Delete, confirmed in a `Sheet` on top. `MediaGrid` opens it |
 | Mobile nav drawer | `components/app-shell.tsx` `AppShell` | Built into the shell below `lg`; Esc closes |
 | Popover with a mouse, Sheet on touch | `components/use-coarse-pointer.ts` `useCoarsePointer` | Same test as Tailwind's `pointer-coarse:`. False until hydrated |
@@ -41,7 +42,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Action menu (⋯) | `components/menu.tsx` `Menu`, `MenuItem`, `MenuSeparator`, `MenuTrigger` | Arrow keys and typeahead. `variant="destructive"` for Delete; `icon` takes a lucide element. 44px rows on touch |
 | Tooltip | `components/tooltip.tsx` `Tooltip` | Fixed position, so it escapes table and card clipping. Hover only (Known gaps) |
 | Checklist popover for a multi-pick filter | `app/(app)/deals/status-multiselect.tsx` `StatusMultiSelect` | Outside click closes; no Esc. Rebuild on `Popover` before a second use |
-| Search with a results dropdown | `components/global-search.tsx` `GlobalSearch` | Queries `/api/search`; outside click closes |
+| Search with a results dropdown | `components/global-search.tsx` `GlobalSearch` | Queries `/api/search`; outside click closes. Below `sm` the results span the header between the page gutters |
 | Pick one from a list in a form | `components/ui.tsx` `Select` | Native `<select>` |
 
 ## Forms
@@ -49,6 +50,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Job | Use | Notes |
 |---|---|---|
 | Text field | `components/ui.tsx` `Input` | 14px text with a mouse; every field gets 16px on touch screens (`app/globals.css`) so iOS doesn't zoom on focus. At least 44px tall on touch |
+| Password with show and hide | `app/login/_components/password-field.tsx` `PasswordField` | Sign-in screens only (public palette): /login, the reset link, the contractor's first password. Eye button inside the field's right edge, 44px at every width, `aria-pressed`. Shown as text it still doesn't capitalize or autocorrect |
 | Multi-line text | `components/ui.tsx` `Textarea` | |
 | Select | `components/ui.tsx` `Select` | |
 | Button | `components/ui.tsx` `Button` (primary, secondary, ghost, danger; sm, md) | `LinkButton` for navigation styled as a button; `buttonClass()` for a plain `<a>` (an `sms:` or `mailto:` link). `Button`, `LinkButton`, `Input`, `Select` and `Textarea` are at least 44px tall on touch (`pointer-coarse:min-h-11`); a mouse keeps the compact sizes |
@@ -57,9 +59,9 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Edit a heading in place | `components/inline-address-field.tsx` `InlineAddressField` | Commits on blur or Enter, reverts on Esc. The base for any inline text edit: `label` names it, `minLength` reverts anything shorter, `multiline` lets a long heading wrap (the task title). Only a real edit saves (`lib/inline-edit.ts`), so focus and blur never rewrite a stored value |
 | Save on blur, cancel on Esc | `components/use-inline-edit-keys.ts` `useInlineEditKeys` | Enter saves, Esc reverts without saving. `InlineAddressField` (so the task title too), the deal page fields and the CapEx rules editor use it; use it for any field that saves on blur |
 | File upload with drag and drop | `components/attachments.tsx` `Attachments` | Documents. Private Vercel Blob uploads; `kind` picks task or property |
-| Task photos and videos upload | `components/media-uploader.tsx` `MediaUploader`, `useMediaUploader`, `MediaUploadTray` | "Take photo or video" (camera, touch only by default) and "Choose files", which offers what `allowed` lets in (documents too with `"file"`). Checks type and size first, 3 at a time, multipart over 100 MB, 56px tiles with progress ring, Retry and Remove. `pending` holds "Mark done"; `onRecorded(ids)` when the queue drains. `useLeaveWarning(active)` is the browser's leave prompt the uploader raises while files go up; reuse it for anything else a reload would lose |
+| Task photos and videos upload | `components/media-uploader.tsx` `MediaUploader`, `useMediaUploader`, `MediaUploadTray` | "Take photo or video" (camera, touch only by default) and "Choose files", which offers what `allowed` lets in (documents too with `"file"`). Checks type and size first, 3 at a time, multipart over 8 MB (`usesMultipart`; each 8 MB part retried on its own, one multipart file at a time), 56px tiles with progress ring, Retry and Remove, and one red line that leads with the count ("2 photos didn't upload: no connection"). `pending` and `failed` (red tiles not yet retried or removed) hold "Mark done"; `isGoingUp(upload)` is what `pending` counts; `onRecorded(ids)` when the queue drains. `useLeaveWarning(active)` is the browser's leave prompt the uploader raises while files go up; reuse it for anything else a reload would lose |
 | Due date | `components/due-date-picker.tsx` `DueDatePicker` | Date chip with `dueLabel()`, red when `overdue`. Quick picks (Today, Tomorrow, Monday, Next week, No date; keys 1 to 5) over a calendar. Popover with a mouse, Sheet on touch. `"YYYY-MM-DD"` or null. `prefix` puts a word before the date where no label sits beside the chip ("Visit Thu") |
-| Repeats | `components/repeat-picker.tsx` `RepeatPicker` | Chip with the rule ("Every 2 weeks") that opens a small editor: Never, every N days, every N weeks, monthly on a day, quarterly, yearly. Popover with a mouse, Sheet on touch. `RepeatRule` or null |
+| Repeats | `components/repeat-picker.tsx` `RepeatPicker` | Chip with the rule ("Every 2 weeks on Mon", full weekday in its label; cut off, never spilling, in a narrow column) that opens a small editor: Never, every N days, every N weeks, monthly on a day, quarterly, yearly. `defaultDay` and `defaultWeekday` come from the due date (or today): monthly starts on that day, weekly pins that weekday. Popover with a mouse, Sheet on touch. `RepeatRule` or null |
 | Assignee | `components/assignee-picker.tsx` `AssigneePicker` | Unassigned, Team, Contractors (trade, "Has login"). Type to filter by name or trade. Popover with a mouse, Sheet on touch. Value `{userId}`, `{contactId}` or null |
 | Picker trigger chip | `components/ui.tsx` `pickerChip` | Class string shared by the date and assignee chips; 44px hit area on touch without growing |
 | Done checkbox | `app/(app)/tasks/task-checkbox.tsx` `TaskCheckbox` | Tasks only. 18px circle in a 44px hit area; the caller owns the state, so a tap shows at once |
@@ -82,7 +84,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | App sidebar | `components/nav.tsx` `SideNav` inside `components/app-shell.tsx` `AppShell` | Pinned state lives in a cookie (`lib/sidebar.ts`) |
 | Page sections that are separate routes | `components/nav.tsx` `TopTabs` | Underline tabs. Financials and Settings layouts |
 | Views and filters inside a page | `components/segmented-control.tsx` `SegmentedControl` | Pill toggles with `aria-pressed`, styled from the attribute; one weight for both states. `sm` for filter bars (deals), `md` for a page's main switch (44px on touch). `count` shows dimmed after a label |
-| Back to the list | `components/back-link.tsx` `BackLink` | Returns to the exact previous page, filters and scroll intact, when it can. `className` sizes it, e.g. the 44px "My jobs" link in the portal header |
+| Back to the list | `components/back-link.tsx` `BackLink` | Returns to the exact previous page, filters and scroll intact, when it can. `className` sizes it, e.g. the 44px "My jobs" link in the portal header. Inside a `LeaveGuard` it asks first while the page is held |
 | Page title row | `components/ui.tsx` `PageHeader` | Title, subtitle, actions slot |
 | Public site header and footer | `components/public/header.tsx` `PublicHeader`, `footer.tsx` `PublicFooter` | |
 | Light and dark switch | `components/theme-toggle.tsx` `ThemeToggle` | App only. `THEME_SCRIPT` sets the theme before paint |

@@ -55,13 +55,13 @@ export type ComposerDraft = { id: string; filename: string };
 
 /**
  * Reply on a task: text, photos and videos, documents. Shared by default
- * (D15); on a contractor's job the Shared side reads "Reply to Zack" and
- * Internal turns the box amber. Files upload as they're picked or dropped
- * and go out with the message; Send waits for them. Until Send they're
- * Internal whichever side is picked (core.addComment gives them the
- * message's visibility), and the page hands back any left from an earlier
- * visit as `drafts`. Cmd or Ctrl+Enter sends. On a phone it sits on the
- * bottom edge, and its tools show while you write.
+ * (D15); on the job of a contractor with a login the Shared side reads
+ * "Reply to Zack", and Internal turns the box amber. Files upload as
+ * they're picked or dropped and go out with the message; Send waits for
+ * them. Until Send they're Internal whichever side is picked
+ * (core.addComment gives them the message's visibility), and the page hands
+ * back any left from an earlier visit as `drafts`. Cmd or Ctrl+Enter sends.
+ * On a phone it sits on the bottom edge, and its tools show while you write.
  */
 export function Composer({
   taskId,
@@ -70,7 +70,7 @@ export function Composer({
   drafts,
 }: {
   taskId: string;
-  /** Set when a contractor is assigned. */
+  /** Set when the assigned contractor has a portal login, so a reply reaches them (G2B-I03). */
   contractorFirstName: string | null;
   /** "Connor and Pieter": who sees an Internal note. */
   staffNames: string;

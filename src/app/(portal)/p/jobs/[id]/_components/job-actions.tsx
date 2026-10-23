@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Send } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
-import { MediaUploadTray, useLeaveWarning, useMediaUploader } from "@/components/media-uploader";
+import { useHoldLeave, useLeaveGuard } from "@/components/leave-guard";
+import { MediaUploadTray, isGoingUp, useLeaveWarning, useMediaUploader } from "@/components/media-uploader";
 import { Sheet } from "@/components/sheet";
 import { useToast, useToastInset } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
-import { finishingLabel, joinNames, nextStep } from "@/lib/portal/job-view";
+import { finishingLabel, joinNames, markDoneButton, nextStep, stillUploading } from "@/lib/portal/job-view";
 import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJobAction } from "../actions";
 
 /** Height of the sticky bar above the safe area: 48px buttons plus 12px padding each side. */
@@ -27,6 +29,12 @@ const BAR_PX = 72;
  * timeline line and the email) once it's posted. Leaving the page for
  * another one in the app posts whatever is still held. A reload or a closed
  * tab asks first where the browser allows it (iOS Safari never does).
+ *
+ * Leaving cancels whatever is still going up, so while anything is, "My
+ * jobs" and the payoff's "Back to my jobs" ask first in a sheet (the page's
+ * LeaveGuard, decision 24). Mark done waits for uploads, and for each failed
+ * photo to be retried or removed (decision 13). "Add photos" is off while
+ * the Mark done is sending: a photo picked then wouldn't go with it.
  */
 export function JobActions({
   taskId,
@@ -86,7 +94,11 @@ export function JobActions({
       post("", [...waiting, ...ids]);
     },
   });
-  const { pending } = uploader;
+  const { pending, failed } = uploader;
+
+  // "My jobs" and the payoff's "Back to my jobs" ask before they cancel what's still going up.
+  const goingUp = stillUploading(uploader.uploads.filter(isGoingUp).map((u) => u.kind));
+  useHoldLeave(pending > 0 ? { title: goingUp, stay: "Keep uploading" } : null);
 
   // The photos a Mark done is sending right now, so leaving mid-send doesn't
   // post them a second time as an empty update.
@@ -161,7 +173,7 @@ export function JobActions({
   }
 
   const canSend = (body.trim() !== "" || ready.length > 0) && !sending;
-  const finishLabel = pending > 0 ? finishingLabel(pending) : finishing ? "Sending…" : ready.length > 0 || note.trim() ? "Mark done" : "Skip";
+  const done = markDoneButton({ pending, failed, sending: finishing, hasContent: ready.length > 0 || note.trim() !== "" });
 
   return (
     <>
@@ -262,12 +274,13 @@ export function JobActions({
             <div className="flex items-center gap-3">
               {/* The picker, not the camera alone: on a phone it offers Take Photo and the library, so shots taken
                   earlier in the Camera app can go too. */}
-              <Button variant="secondary" className="h-12 min-w-0 flex-1 whitespace-nowrap" onClick={uploader.chooseFiles}>
+              <Button variant="secondary" className="h-12 min-w-0 flex-1 whitespace-nowrap" disabled={finishing} onClick={uploader.chooseFiles}>
                 <ImagePlus className="h-4 w-4 shrink-0" aria-hidden="true" />
                 Add photos
               </Button>
-              <Button className="h-12 min-w-0 flex-1 whitespace-nowrap" disabled={pending > 0 || finishing} onClick={finish}>
-                <span className="truncate">{finishLabel}</span>
+              {/* Off while a photo failed to upload: the tray's red line above says which (decision 13). */}
+              <Button className="h-12 min-w-0 flex-1 whitespace-nowrap" disabled={!done.enabled} onClick={finish}>
+                <span className="truncate">{done.label}</span>
               </Button>
             </div>
           </div>
@@ -286,6 +299,9 @@ function Payoff({ firstName, staffNames }: { firstName: string; staffNames: stri
   // out and Esc still closes the sheet.
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
+  // Through the page's LeaveGuard, like "My jobs": it asks first if anything is still going up.
+  const guard = useLeaveGuard();
+  const router = useRouter();
   return (
     <div className="flex flex-col items-center px-6 pb-6 pt-8 text-center">
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-primary motion-safe:animate-pop-in">
@@ -297,7 +313,17 @@ function Payoff({ firstName, staffNames }: { firstName: string; staffNames: stri
       <p className="mt-1.5 max-w-xs text-sm text-muted">
         Sent to {to}. You&apos;ll get an email if anything else is needed.
       </p>
-      <LinkButton href="/p" variant="primary" className="mt-6 h-12 w-full">
+      <LinkButton
+        href="/p"
+        variant="primary"
+        className="mt-6 h-12 w-full"
+        onClick={(e) => {
+          // A new tab or window leaves nothing behind.
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          guard(() => router.push("/p"));
+        }}
+      >
         Back to my jobs
       </LinkButton>
     </div>

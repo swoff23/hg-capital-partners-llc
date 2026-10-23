@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       ...properties.map((p) => ({ type: "Property", id: p.id, label: p.address, href: `/properties/${p.id}` })),
       ...deals.map((d) => ({ type: "Deal", id: d.id, label: `${d.address} · ${d.status}`, href: `/deals/${d.id}` })),
       ...contacts.map((c) => ({
-        type: "Vendor",
+        type: "Contractor",
         id: c.id,
         label: [c.fullName, c.company].filter(Boolean).join(" · "),
         href: `/contractors/${c.id}`,

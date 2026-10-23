@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { useLeaveGuard } from "@/components/leave-guard";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,10 +23,13 @@ function cameFromApp(): boolean {
 /**
  * Back navigation: returns to the exact previous page (filters + scroll intact) when we
  * arrived from within the app, otherwise falls back to the section root.
- * `className` adjusts size, e.g. a 44px target in a phone header.
+ * `className` adjusts size, e.g. a 44px target in a phone header. Inside a
+ * LeaveGuard it asks first while something holds the page (photos still
+ * uploading on the contractor's job).
  */
 export function BackLink({ fallback, label, className }: { fallback: string; label: string; className?: string }) {
   const router = useRouter();
+  const guard = useLeaveGuard();
 
   function goBack() {
     if (cameFromApp()) router.back();
@@ -34,7 +38,7 @@ export function BackLink({ fallback, label, className }: { fallback: string; lab
 
   return (
     <button
-      onClick={goBack}
+      onClick={() => guard(goBack)}
       className={cn("inline-flex items-center gap-1 text-xs text-muted hover:text-foreground hover:underline", className)}
     >
       <span aria-hidden>←</span> {label}

@@ -16,7 +16,8 @@
  *   --yes-delete "DELETE <n>"  the answer to that question when there's no terminal (n = rows listed; the bare n also counts)
  *   --confirm-prod <ref>     needed to --apply anywhere but a local database: ywdjaygwkqyrmbdnvaai
  *   --backup <file>          needed with it: the pg_dump taken in the last 30 minutes (under _private/)
- *   --people <file>          Connor's identity confirmations (default <snapshot>/people.json)
+ *   --people <file>          Connor's identity confirmations (default <snapshot>/people.json; format in _import-lib.ts readOverrides)
+ *                            people.json lives with the snapshot: copy it from the trial snapshot into Monday's official one (or pass --people), and replace any contactId with the id the production dry run prints
  *   --accept-name-matches    treat name-only contact matches as confirmed
  *   --refresh-templates      rewrite templates that already exist
  *   --skip-files             write everything but the files (a later run uploads them)
@@ -41,7 +42,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "../../src/lib/db";
 import { buildPlan } from "../../src/lib/asana/map";
-import { deleteCsvRows, StalePlanError, writeIdentity, writeTask, writeTemplate } from "../../src/lib/asana/import";
+import { deleteCsvRows, StalePlanError, writeIdentity, writeNewContacts, writeTask, writeTemplate } from "../../src/lib/asana/import";
 import { formatReport } from "../../src/lib/asana/report";
 import {
   assertBackup,
@@ -143,8 +144,12 @@ async function main() {
     return;
   }
 
-  // 5. Write. People and templates first, then each task in its own transaction.
+  // 5. Write. New contacts, people and templates first, then each task in its own transaction.
   const now = new Date();
+  if (plan.newContacts.length) {
+    const made = await prisma.$transaction((tx) => writeNewContacts(tx, plan.newContacts), TX);
+    log(`contacts from people.json: ${made.created} created${made.existing ? `, ${made.existing} already there` : ""}`);
+  }
   const identity = await prisma.$transaction((tx) => writeIdentity(tx, plan.people), TX);
   log(`linked ${identity.linked} people to their Asana ids${identity.skipped.length ? `; skipped: ${identity.skipped.join("; ")}` : ""}`);
   for (const t of plan.templates) {

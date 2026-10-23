@@ -8,7 +8,8 @@ export function ConfirmDialog({
   onClose,
 }: {
   title: string;
-  body: React.ReactNode;
+  /** Optional when the title already says it all. */
+  body?: React.ReactNode;
   actions: React.ReactNode;
   onClose: () => void;
 }) {
@@ -21,7 +22,7 @@ export function ConfirmDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <h4 className="text-sm font-semibold">{title}</h4>
-        <div className="mt-1 text-xs text-muted">{body}</div>
+        {body && <div className="mt-1 text-xs text-muted">{body}</div>}
         <div className="mt-4 flex items-center justify-end gap-2">{actions}</div>
       </div>
     </div>

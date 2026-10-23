@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { AuthError, AuthFrame, authInputClass, authLinkClass } from "@/app/login/_components/auth-frame";
+import { AuthError, AuthFrame, authLinkClass } from "@/app/login/_components/auth-frame";
 import { AuthSubmit } from "@/app/login/_components/auth-submit";
+import { PasswordField } from "@/app/login/_components/password-field";
 import { MIN_PASSWORD_LENGTH, PASSWORD_MESSAGES, isPasswordProblem } from "@/lib/portal/credentials";
 import { firstName as greetingName } from "@/lib/portal/job-view";
 import { portalReturnPath } from "@/lib/portal/next-path";
@@ -33,35 +34,29 @@ export default async function WelcomePasswordPage({ searchParams }: PageProps<"/
         {next && <input type="hidden" name="next" value={next} />}
         {/* Lets password managers file the new password under the right login. */}
         <input type="email" name="username" value={principal.email} autoComplete="username" readOnly hidden />
-        <input
+        <PasswordField
           name="current"
-          type="password"
           placeholder="Starting password"
           aria-label="Starting password"
           autoComplete="current-password"
           required
           autoFocus
-          className={authInputClass}
         />
-        <input
+        <PasswordField
           name="password"
-          type="password"
           placeholder="New password"
           aria-label="New password"
           autoComplete="new-password"
           minLength={MIN_PASSWORD_LENGTH}
           required
-          className={authInputClass}
         />
-        <input
+        <PasswordField
           name="confirm"
-          type="password"
           placeholder="New password again"
           aria-label="New password again"
           autoComplete="new-password"
           minLength={MIN_PASSWORD_LENGTH}
           required
-          className={authInputClass}
         />
         <AuthSubmit pendingLabel="Saving…">Save password</AuthSubmit>
       </form>

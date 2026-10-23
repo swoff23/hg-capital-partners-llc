@@ -27,11 +27,15 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 3)}...`
 function matchLabel(p: Person, names: ReadonlyMap<string, string>): string {
   const m = p.match;
   if (m.kind === "user") return `staff ${names.get(m.userId) ?? m.userId} (by ${m.via})`;
-  if (m.kind === "contact") return `contact ${names.get(m.contactId) ?? m.contactId} (by ${m.via}${m.confirmed ? "" : ", NOT confirmed"})`;
+  if (m.kind === "contact" && m.create) return `will create contact ${m.create.fullName}${m.create.email ? ` <${m.create.email}>` : ""} (people.json)`;
+  // An unconfirmed match shows its id, for people.json: ids differ between databases.
+  if (m.kind === "contact") return `contact ${names.get(m.contactId) ?? m.contactId} (by ${m.via}${m.confirmed ? "" : `, NOT confirmed; id ${m.contactId}`})`;
   return `no match (${m.reason})${m.suggestions.length ? `; maybe ${m.suggestions.join(", ")}` : ""}`;
 }
 
-export function formatReport(plan: ImportPlan, ctx: ReportContext): string {
+export function formatReport(plan: ImportPlan, rawCtx: ReportContext): string {
+  // Contacts this run creates aren't in the database's names yet.
+  const ctx = { ...rawCtx, names: new Map([...rawCtx.names, ...plan.newContacts.map((c) => [c.id, c.fullName] as const)]) };
   const out: string[] = [];
   const h = (s: string) => out.push("", `-- ${s} ${"-".repeat(Math.max(0, 72 - s.length))}`);
   const r = plan.report;
@@ -112,6 +116,10 @@ export function formatReport(plan: ImportPlan, ctx: ReportContext): string {
   const counts = { user: 0, contact: 0, none: 0 };
   for (const p of relevant) counts[p.match.kind]++;
   out.push(`  on imported work: ${relevant.length} people; ${counts.user} staff, ${counts.contact} contacts, ${counts.none} unmatched (shown as text)`);
+  if (plan.newContacts.length) {
+    out.push(`  will create ${plan.newContacts.length} contact${plan.newContacts.length === 1 ? "" : "s"} from people.json before the tasks (no login, no invite, no email):`);
+    for (const c of plan.newContacts) out.push(`    + ${c.fullName}${c.email ? ` <${c.email}>` : ""}  [Asana ${c.asanaGid}]`);
+  }
   for (const p of relevant) out.push(line(p));
   if (others.length) {
     out.push(`  not on imported work (archived or completed only), ${others.length}; matches here are saved too:`);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { capitalizedName, cleanTrades, docOnFile, mailtoHref, planContactFixes, telHref } from "./contacts";
+import { capitalizedName, cleanTrades, docOnFile, mailtoHref, mapsHref, planContactFixes, telHref, textHref } from "./contacts";
 
 test("phone numbers and emails become tel: and mailto: links (ADMIN-004)", () => {
   assert.equal(telHref("716-555-1234"), "tel:7165551234");
@@ -12,6 +12,18 @@ test("phone numbers and emails become tel: and mailto: links (ADMIN-004)", () =>
   assert.equal(mailtoHref("zack@example"), null);
   assert.equal(mailtoHref("a@x.com, b@y.com"), null);
   assert.equal(mailtoHref(null), null);
+});
+
+test("a phone gets a Text link and a mailing address a maps link (ADMIN-004)", () => {
+  assert.equal(textHref("716-555-1234"), "sms:7165551234");
+  assert.equal(textHref("+1 (716) 555-1234"), "sms:+17165551234");
+  assert.equal(textHref("555-1234"), null);
+  assert.equal(textHref(null), null);
+  assert.equal(mapsHref("25 Moore Ave Buffalo  14223"), "https://maps.apple.com/?q=25%20Moore%20Ave%20Buffalo%2014223");
+  assert.equal(mapsHref("6207 route 98, Arcade N.Y. 14009"), "https://maps.apple.com/?q=6207%20route%2098%2C%20Arcade%20N.Y.%2014009");
+  assert.equal(mapsHref(" - "), null);
+  assert.equal(mapsHref(""), null);
+  assert.equal(mapsHref(null), null);
 });
 
 test("a W-9 the import noted as on file is found in the notes (ADMIN-022)", () => {
@@ -67,4 +79,48 @@ test("the cleanup lists only contacts that change, and only what changes", () =>
     ]),
     [],
   );
+});
+
+test("Connor's three hand fixes: trades out of Company, the company out of a name, matched exactly (decision 31)", () => {
+  const before = [
+    { id: "jer", fullName: "Jeremiah Anderson", company: "Electric", trades: "Electric / Electric" },
+    { id: "kim", fullName: "Kim Lockett", company: "House Cleaner", trades: "House Cleaner / Property Cleaning" },
+    { id: "mike", fullName: "Mike Morris (Freedom Electric)", company: "Freedom Electric", trades: "Electric / Electric" },
+    // Same names with other values, and the same company on someone else: never touched.
+    { id: "jer2", fullName: "Jeremiah Anderson", company: "Anderson Electric LLC", trades: "Electric" },
+    { id: "kim2", fullName: "Kim lockett", company: "House Cleaner", trades: "Cleaning" },
+    { id: "other", fullName: "Sam Sparks", company: "Electric", trades: null },
+    { id: "mike2", fullName: "Mike Morris (Freedom Electric)", company: "Morris Co", trades: null },
+  ];
+  assert.deepEqual(planContactFixes(before), [
+    { id: "jer", fullName: "Jeremiah Anderson", trades: { from: "Electric / Electric", to: "Electric" }, company: { from: "Electric", to: null } },
+    // House Cleaner is already a trade: only Company changes.
+    { id: "kim", fullName: "Kim Lockett", company: { from: "House Cleaner", to: null } },
+    { id: "mike", fullName: "Mike Morris (Freedom Electric)", name: "Mike Morris", trades: { from: "Electric / Electric", to: "Electric" } },
+    { id: "kim2", fullName: "Kim lockett", name: "Kim Lockett" },
+  ]);
+
+  // A trade that wasn't listed yet is added; a blank company is filled.
+  assert.deepEqual(planContactFixes([{ id: "jer", fullName: "Jeremiah Anderson", company: "Electric", trades: null }]), [
+    { id: "jer", fullName: "Jeremiah Anderson", trades: { from: null, to: "Electric" }, company: { from: "Electric", to: null } },
+  ]);
+  assert.deepEqual(planContactFixes([{ id: "kim", fullName: "Kim Lockett", company: "House Cleaner", trades: "Property Cleaning" }])[0].trades, {
+    from: "Property Cleaning",
+    to: "Property Cleaning / House Cleaner",
+  });
+  assert.deepEqual(planContactFixes([{ id: "mike", fullName: "Mike Morris (Freedom Electric)", company: null, trades: "Electric" }]), [
+    { id: "mike", fullName: "Mike Morris (Freedom Electric)", name: "Mike Morris", company: { from: null, to: "Freedom Electric" } },
+  ]);
+
+  // Applied: a second run finds nothing.
+  assert.deepEqual(
+    planContactFixes([
+      { id: "jer", fullName: "Jeremiah Anderson", company: null, trades: "Electric" },
+      { id: "kim", fullName: "Kim Lockett", company: null, trades: "House Cleaner / Property Cleaning" },
+      { id: "mike", fullName: "Mike Morris", company: "Freedom Electric", trades: "Electric" },
+    ]),
+    [],
+  );
+  // A caller that didn't read Company changes no company.
+  assert.deepEqual(planContactFixes([{ id: "kim", fullName: "Kim Lockett", trades: null }]), []);
 });

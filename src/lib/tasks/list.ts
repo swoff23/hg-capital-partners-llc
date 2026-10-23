@@ -259,7 +259,9 @@ export interface DateChange {
 export type ListPatch =
   | { kind: "dates"; changes: DateChange[] }
   | { kind: "check"; id: string; checked: boolean }
-  | { kind: "status"; id: string; status: TaskStatus };
+  | { kind: "status"; id: string; status: TaskStatus }
+  /** The row as it was, back in the list: Undo after a tick, once the refresh has dropped it. */
+  | { kind: "restore"; task: ListTask };
 
 /** The list as it should look while a save is in flight. */
 export function applyPatch(tasks: ListTask[], patch: ListPatch): ListTask[] {
@@ -276,6 +278,8 @@ export function applyPatch(tasks: ListTask[], patch: ListPatch): ListTask[] {
       return tasks.map((t) => (t.id === patch.id ? { ...t, checked: patch.checked } : t));
     case "status":
       return tasks.map((t) => (t.id === patch.id ? { ...t, status: patch.status, checked: patch.status === "DONE" } : t));
+    case "restore":
+      return tasks.some((t) => t.id === patch.task.id) ? tasks.map((t) => (t.id === patch.task.id ? patch.task : t)) : [...tasks, patch.task];
   }
 }
 
@@ -296,6 +300,32 @@ export function movedMessage(value: Ymd | null): string {
 /** "Moved 3 tasks to today". */
 export function movedAllMessage(count: number): string {
   return `Moved ${count} ${count === 1 ? "task" : "tasks"} to today`;
+}
+
+/** What a tick that finished a task did: the next copy's due date when it repeats. */
+export interface TickResult {
+  nextDue: Ymd | null;
+}
+
+/**
+ * The Done toast: "Done: Call plumber", or for a repeat "Done. Next due
+ * Nov 5", short enough for a 320 phone. The year shows only when the date is
+ * more than about 11 months out, so a monthly copy made in December reads
+ * "Jan 5" and a yearly one "Oct 22, 2027".
+ */
+export function doneMessage(title: string, nextDue: Ymd | null, today: Ymd): string {
+  if (!nextDue) return `Done: ${title}`;
+  const ahead = daysUntil(nextDue, today);
+  if (ahead === null) return `Done: ${title}`;
+  if (ahead === 0) return "Done. Next due today";
+  const [y, m, d] = toYmd(nextDue)!.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    ...(ahead > 334 ? { year: "numeric" } : {}),
+  });
+  return `Done. Next due ${date}`;
 }
 
 // ---------------------------------------------------------------------------

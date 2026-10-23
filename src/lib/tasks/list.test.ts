@@ -6,6 +6,7 @@ import {
   byDateThenStatus,
   compareByDue,
   compareByTarget,
+  doneMessage,
   groupContractors,
   groupMine,
   isOverdue,
@@ -228,4 +229,30 @@ test("toast copy", () => {
   assert.equal(movedMessage(null), "Date removed");
   assert.equal(movedAllMessage(1), "Moved 1 task to today");
   assert.equal(movedAllMessage(3), "Moved 3 tasks to today");
+});
+
+test("Done toast: names the task, or for a repeat when the next one is due", () => {
+  assert.equal(doneMessage("Call plumber", null, TODAY), "Done: Call plumber");
+  assert.equal(doneMessage("Check if any taxes are due", "2026-11-05", TODAY), "Done. Next due Nov 5");
+  assert.equal(doneMessage("Walk the vacant units", TODAY, TODAY), "Done. Next due today");
+  assert.equal(doneMessage("Pay the water bill", "2027-01-05", "2026-12-20"), "Done. Next due Jan 5", "next year, but close: no year");
+  assert.equal(doneMessage("Check the sump pump", "2027-08-20", TODAY), "Done. Next due Aug 20", "10 months out");
+  assert.equal(doneMessage("Renew insurance", "2027-10-22", TODAY), "Done. Next due Oct 22, 2027", "a year out");
+  assert.equal(doneMessage("Service the boiler", "2027-09-30", TODAY), "Done. Next due Sep 30, 2027", "over 11 months out");
+});
+
+test("Done toast's Undo: the row comes back with the status it had, unticked", () => {
+  const waiting = task({ status: "WAITING", waitingOn: "City inspection" });
+  const other = task();
+  // Today and All > Open: the refresh after the tick has already dropped the row.
+  const undone = applyPatch([other], { kind: "restore", task: { ...waiting, status: "WAITING", checked: false } });
+  assert.deepEqual(undone.map((t) => t.id), [other.id, waiting.id]);
+  assert.equal(undone[1].status, "WAITING");
+  assert.equal(undone[1].checked, false);
+  assert.equal(undone[1].waitingOn, "City inspection");
+  // A list that still shows the ticked row: it's replaced, not added twice.
+  const ticked = applyPatch([waiting, other], { kind: "check", id: waiting.id, checked: true });
+  const again = applyPatch(ticked, { kind: "restore", task: { ...waiting, status: "WAITING", checked: false } });
+  assert.deepEqual(again.map((t) => t.id), [waiting.id, other.id]);
+  assert.equal(again[0].checked, false);
 });

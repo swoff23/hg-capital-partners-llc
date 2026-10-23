@@ -30,8 +30,18 @@ export const UPLOAD_RULES: Record<FileKind, UploadRule> = {
 /** Thumbnails and video posters: stills every browser can draw. */
 export const PREVIEW_RULE: UploadRule = { contentTypes: ["image/jpeg", "image/png", "image/webp"], maxBytes: 25 * MB };
 
-/** Above this the uploader sends parts in parallel, each retried on its own. */
-export const MULTIPART_THRESHOLD = 100 * MB;
+/**
+ * Above this the uploader sends parts in parallel, each retried on its own,
+ * so a 30 to 70 MB phone video on a weak signal resends one 8 MB part, not
+ * the whole file. Blob's parts are 8 MB (and must be at least 5 MB), so
+ * anything smaller goes in one request.
+ */
+export const MULTIPART_THRESHOLD = 8 * MB;
+
+/** Whether a file this size goes up in parts (over MULTIPART_THRESHOLD). */
+export function usesMultipart(size: number): boolean {
+  return size > MULTIPART_THRESHOLD;
+}
 
 /** "Image/JPEG; charset=x" → "image/jpeg". Anything that isn't a plain type/subtype is "". */
 export function normalizeContentType(type: string | null | undefined): string {

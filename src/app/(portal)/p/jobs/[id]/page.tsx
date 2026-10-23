@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FileText, Phone } from "lucide-react";
 import { BackLink } from "@/components/back-link";
+import { LeaveGuard } from "@/components/leave-guard";
 import { MediaGrid } from "@/components/media-grid";
 import { StatusBadge } from "@/components/status-badge";
 import { taskFileUrl } from "@/lib/attachments/media";
@@ -39,8 +40,9 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
   const hasBar = nextStep(job.status) !== null;
   const tel = officeTelHref();
 
+  // LeaveGuard: "My jobs" asks first while photos are still uploading (JobActions holds it).
   return (
-    <>
+    <LeaveGuard>
       <header className="sticky top-0 z-20 border-b border-border bg-surface">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-2 sm:px-4">
           <BackLink fallback="/p" label="My jobs" className="h-11 rounded-lg px-2 text-sm hover:no-underline" />
@@ -106,7 +108,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
           )}
         </Section>
       </main>
-    </>
+    </LeaveGuard>
   );
 }
 

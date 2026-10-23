@@ -4,8 +4,8 @@ import { upload } from "@vercel/blob/client";
 import { Camera, ImagePlus, Play, RotateCw, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { isOfflineError } from "@/lib/action-result";
-import { MULTIPART_THRESHOLD, type FileKind } from "@/lib/attachments/content-types";
-import { CAMERA_ACCEPT, checkMediaFile, pickerAccept, shownReason, uploadNotice } from "@/lib/attachments/media";
+import { usesMultipart, type FileKind } from "@/lib/attachments/content-types";
+import { CAMERA_ACCEPT, checkMediaFile, pickerAccept, shownReason, uploadFailureReason, uploadNotice } from "@/lib/attachments/media";
 import { taskUploadPath } from "@/lib/attachments/paths";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +17,11 @@ import { cn } from "@/lib/utils";
  *
  * Each file is checked here first (type and size, one-line reasons), then
  * goes straight to private Vercel Blob at tasks/<taskId>/orig/<name>, three at
- * a time, multipart above 100 MB, with progress. `record` writes the row (the
- * server re-checks the blob with head()); `onRecorded` gets the new ids each
- * time the queue drains. Failed files keep a Retry; any file can be removed.
+ * a time, multipart above 8 MB (usesMultipart), with progress. Only one
+ * multipart file goes up at a time, since each holds its parts in memory;
+ * photos keep the other slots. `record` writes the row (the server re-checks
+ * the blob with head()); `onRecorded` gets the new ids each time the queue
+ * drains. Failed files keep a Retry; any file can be removed.
  *
  *   <MediaUploader taskId={id} uploadKind="task-upload" record={recordAction} onRecorded={…}>
  *     {({ takePhoto, chooseFiles, pending }) => …your buttons…}
@@ -28,6 +30,7 @@ import { cn } from "@/lib/utils";
  * When the buttons and the thumbnails live apart (a sticky bottom bar), use
  * useMediaUploader() with <MediaUploadTray> and render `inputs` once.
  * `pending` counts files not yet recorded: hold "Mark done" until it's 0.
+ * `failed` counts the red tiles still waiting for a Retry or a Remove.
  */
 
 export type UploadKind = "task-upload" | "portal-task-upload";
@@ -72,6 +75,8 @@ export type MediaUploaderApi = {
   uploads: MediaUpload[];
   /** Files not yet recorded (queued, uploading or saving). */
   pending: number;
+  /** Red tiles: files that didn't go up (failed, or refused by the check) and are still waiting for a Retry or a Remove. */
+  failed: number;
   /** One line about what failed, or "". */
   notice: string;
   /** Opens the camera on a phone ("Take photo or video"). */
@@ -85,6 +90,11 @@ export type MediaUploaderApi = {
   /** The two hidden file inputs. Render once. */
   inputs: ReactNode;
 };
+
+/** Not recorded yet: waiting its turn, going up, or being saved. What `pending` counts. */
+export function isGoingUp(u: MediaUpload): boolean {
+  return u.status === "queued" || u.status === "uploading" || u.status === "saving";
+}
 
 const CONCURRENCY = 3;
 const META_TIMEOUT_MS = 3000;
@@ -106,6 +116,8 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
   const jobs = useRef(new Map<string, Job>());
   const queue = useRef<string[]>([]);
   const active = useRef(0);
+  /** A multipart file is going up. @vercel/blob reads up to 96 MB of its parts into memory, so only one at a time. */
+  const multipartActive = useRef(false);
   const recorded = useRef<string[]>([]);
   /** Preview object URLs by upload key, revoked when the tile goes. */
   const previews = useRef(new Map<string, string>());
@@ -144,7 +156,7 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
           handleUploadUrl: `/api/blob/${uploadKind}`,
           clientPayload: JSON.stringify({ taskId, fileKind: job.fileKind }),
           contentType: job.contentType,
-          multipart: job.file.size > MULTIPART_THRESHOLD,
+          multipart: usesMultipart(job.file.size),
           abortSignal: controller.signal,
           onUploadProgress: ({ percentage }) => patch(key, { progress: Math.min(1, percentage / 100) }),
         });
@@ -169,19 +181,32 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
       drop(key);
     } catch (e) {
       if (controller.signal.aborted || !jobs.current.has(key)) return;
-      // The browser's own words for a dropped connection ("Failed to fetch", "Load failed") mean nothing to anyone.
-      patch(key, { status: "failed", error: isOfflineError(e) ? "no connection" : e instanceof Error ? e.message : "" });
+      // The browser's and Blob's own words for a dropped connection ("Failed to fetch", "Load failed",
+      // "The blob service is currently not available") mean nothing to anyone.
+      patch(key, { status: "failed", error: uploadFailureReason(e) });
     } finally {
       job.controller = null;
     }
   }
 
+  /** Whether this queued file sends its bytes in parts (a record-only retry sends none). */
+  const goesMultipart = (key: string) => {
+    const job = jobs.current.get(key);
+    return !!job && !job.pathname && usesMultipart(job.file.size);
+  };
+
   function pump() {
-    while (active.current < CONCURRENCY && queue.current.length > 0) {
-      const key = queue.current.shift()!;
+    while (active.current < CONCURRENCY) {
+      // The next file in line, passing over multipart ones while one is already going up.
+      const i = queue.current.findIndex((k) => !multipartActive.current || !goesMultipart(k));
+      if (i < 0) break;
+      const [key] = queue.current.splice(i, 1);
+      const multipart = goesMultipart(key);
+      if (multipart) multipartActive.current = true;
       active.current++;
       void run(key).finally(() => {
         active.current--;
+        if (multipart) multipartActive.current = false;
         pump();
         if (active.current === 0 && queue.current.length === 0 && recorded.current.length > 0) {
           const ids = recorded.current;
@@ -248,7 +273,8 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
     };
   }, []);
 
-  const pending = uploads.filter((u) => u.status === "queued" || u.status === "uploading" || u.status === "saving").length;
+  const pending = uploads.filter(isGoingUp).length;
+  const failed = uploads.filter((u) => u.status === "failed" || u.status === "invalid").length;
   useEffect(() => {
     latest.current.onPendingChange?.(pending);
   }, [pending]);
@@ -256,7 +282,7 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
   // Leaving the page cancels whatever is still going up, so the browser asks first.
   useLeaveWarning(pending > 0);
 
-  const notice = uploadNotice(uploads.filter((u) => u.error).map((u) => ({ name: u.name, reason: u.error! })));
+  const notice = uploadNotice(uploads.filter((u) => u.error).map((u) => ({ name: u.name, kind: u.kind, reason: u.error! })));
 
   const onPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(e.target.files);
@@ -272,6 +298,7 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
   return {
     uploads,
     pending,
+    failed,
     notice,
     takePhoto: () => cameraRef.current?.click(),
     chooseFiles: () => filesRef.current?.click(),

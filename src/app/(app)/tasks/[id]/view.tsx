@@ -33,10 +33,12 @@ export interface TaskPageViewProps {
   users: AssigneeUser[];
   contractors: AssigneeContractor[];
   properties: PropertyOption[];
-  lockbox: { state: "shown" | "pick-unit"; contractor: string } | null;
+  lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
   created: string;
   /** First name of the assigned contractor. */
   contractorFirst: string | null;
+  /** The assigned contractor has a portal login; until then nothing here says they'll see it now. */
+  contractorHasLogin: boolean;
   /** "Connor and Pieter". */
   staffNames: string;
   review: { name: string; fullName: string; isContractor: boolean; photos: number } | null;
@@ -120,7 +122,7 @@ export function TaskPageView(p: TaskPageViewProps) {
           <Card className="divide-y divide-border">
             <div className="p-4">
               {task.legacyAssignee && <p className="mb-2 text-xs text-muted">Assigned in Asana to {task.legacyAssignee}</p>}
-              <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} />
+              <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} hasLogin={p.contractorHasLogin} />
             </div>
             <div className="p-4">
               <Checklist taskId={task.id} items={p.checklist} />
@@ -144,7 +146,13 @@ export function TaskPageView(p: TaskPageViewProps) {
             <TaskActivity rows={p.rows} dayLabels={p.dayLabels} />
           </section>
 
-          <Composer taskId={task.id} contractorFirstName={p.contractorFirst} staffNames={p.staffNames} drafts={p.drafts} />
+          {/* Without a login the composer reads as on a job with no contractor ("Shared", "Add a comment"): no reply reaches them yet. */}
+          <Composer
+            taskId={task.id}
+            contractorFirstName={p.contractorHasLogin ? p.contractorFirst : null}
+            staffNames={p.staffNames}
+            drafts={p.drafts}
+          />
         </div>
       </div>
     </StatusRunProvider>

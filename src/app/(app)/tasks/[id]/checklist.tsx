@@ -73,6 +73,9 @@ function AddItem({ taskId }: { taskId: string }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  // Esc closes the row, and a browser may fire blur as the input goes away,
+  // with the typed text still in that render's handler. This keeps that blur from adding it.
+  const cancelled = useRef(false);
 
   if (!open) {
     return (
@@ -112,12 +115,14 @@ function AddItem({ taskId }: { taskId: string }) {
             add();
           }
           if (e.key === "Escape") {
+            cancelled.current = true;
             setTitle("");
             setOpen(false);
           }
         }}
         onBlur={() => {
-          if (title.trim()) add();
+          if (!cancelled.current && title.trim()) add();
+          cancelled.current = false;
           setOpen(false);
         }}
         className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"

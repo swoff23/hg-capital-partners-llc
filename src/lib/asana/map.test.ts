@@ -218,6 +218,41 @@ test("matchPeople: a second Asana account with the same email still matches, run
   assert.equal(matchPeople([{ gid: "44", name: "Pat Plumber" }], USERS, pat).get("44")!.match.kind, "none");
 });
 
+test("matchPeople: createContact plans a new contact, once, and never a second copy of someone already there", () => {
+  const brandon = { gid: "77", name: "Brandon K", email: "brandon@realty.example" };
+  const make = { createContact: { fullName: " Brandon  Kmiotek ", email: "Brandon@Realty.example" } };
+  const planned = matchPeople([brandon], USERS, CONTACTS, { overrides: { "77": make }, newId: () => "c-new" }).get("77")!.match;
+  assert.deepEqual(planned, {
+    kind: "contact",
+    contactId: "c-new",
+    via: "create",
+    confirmed: true,
+    create: { fullName: "Brandon Kmiotek", email: "brandon@realty.example" },
+  });
+
+  // The run after the load: the contact carries the gid, so it's matched, not made again.
+  const made: DbContact = { id: "c-new", fullName: "Brandon Kmiotek", email: "brandon@realty.example", asanaGid: "77", active: true };
+  const rerun = matchPeople([brandon], USERS, [...CONTACTS, made], { overrides: { "77": make }, newId: () => "c-other" }).get("77")!.match;
+  assert.deepEqual(rerun, { kind: "contact", contactId: "c-new", via: "asanaGid", confirmed: true });
+
+  // Someone added him by hand with that email: that row is used.
+  const byHand: DbContact = { ...made, id: "c-hand", asanaGid: null };
+  const found = matchPeople([brandon], USERS, [...CONTACTS, byHand], { overrides: { "77": make }, newId: () => "c-other" }).get("77")!.match;
+  assert.deepEqual(found, { kind: "contact", contactId: "c-hand", via: "email", confirmed: true });
+
+  // Same name, no email to tell them apart: not guessed, and the report says how to point at it.
+  const named: DbContact = { ...byHand, email: null };
+  const unsure = matchPeople([brandon], USERS, [...CONTACTS, named], { overrides: { "77": make }, newId: () => "c-other" }).get("77")!.match;
+  assert.equal(unsure.kind === "none" && unsure.reason, "ambiguous");
+  assert.match(unsure.kind === "none" ? unsure.suggestions[0] : "", /\{ "contactId": "c-hand" \}/);
+
+  // No name, or two addresses in one: refused, nothing planned.
+  for (const bad of [{ fullName: "  " }, { fullName: "Brandon", email: "a@x.com, b@y.com" }]) {
+    const m = matchPeople([brandon], USERS, CONTACTS, { overrides: { "77": { createContact: bad } }, newId: () => "c-new" }).get("77")!.match;
+    assert.equal(m.kind, "none", JSON.stringify(bad));
+  }
+});
+
 test("matchPeople: two contacts with the same email or name match nobody", () => {
   const dupes: DbContact[] = [...CONTACTS, { id: "c-pat2", fullName: "Pat Plumber", email: null, asanaGid: null, active: true }];
   const people = matchPeople([{ gid: "4", name: "Pat Plumber" }], USERS, dupes);
@@ -509,6 +544,26 @@ test("load: someone who gets a Contact after the load is linked on the next run,
   const kept = buildPlan(inputOf(snap), dbOf({ tasks: taken, contacts: [...CONTACTS, rae] }), opts).tasks.find((t) => t.taskId === gutter.id)!;
   assert.equal(kept.write.assigneeContactId, undefined);
   assert.deepEqual(kept.conflicts.map((c) => c.field), ["assignee"]);
+});
+
+test("load: a contact people.json asks to create is planned first, and their jobs link to it", () => {
+  const raeGid = snap.users.find((u) => u.name === "Rae Realtor")!.gid;
+  const overrides = { [raeGid]: { createContact: { fullName: "Rae Realtor", email: "rae@realty.example" } } };
+  const first = buildPlan(inputOf(snap), dbOf(), { ...opts, overrides });
+  assert.equal(first.newContacts.length, 1);
+  const rae = first.newContacts[0];
+  assert.deepEqual({ ...rae, id: "" }, { id: "", asanaGid: raeGid, fullName: "Rae Realtor", email: "rae@realty.example" });
+  const gutter = taskNamed(first, "Gutter cleaning");
+  assert.deepEqual([gutter.write.assigneeContactId, gutter.write.assigneeName, gutter.contactId], [rae.id, null, rae.id]);
+  assert.ok(first.report.willSee.some((w) => w.contactId === rae.id && w.name === "Rae Realtor"), "the will-see list names her");
+
+  // Once written (the contact with her gid, the tasks synced), the next run creates nothing and changes nothing.
+  const made: DbContact = { id: rae.id, fullName: "Rae Realtor", email: "rae@realty.example", asanaGid: raeGid, active: true };
+  const next = buildPlan(inputOf(snap), dbOf({ tasks: rowsAfter(first), contacts: [...CONTACTS, made] }), { ...opts, overrides });
+  assert.deepEqual(next.newContacts, []);
+  const again = next.tasks.find((t) => t.taskId === gutter.taskId)!;
+  assert.equal(again.contactId, rae.id);
+  assert.equal(again.write.assigneeContactId, undefined, "already hers: no field change");
 });
 
 test("load: dates go through dates.ts, created times come from Asana", () => {
@@ -964,3 +1019,10 @@ function topOf(t: { parent?: { gid: string } | null; gid: string }, all: Array<{
   while (cur.parent?.gid) cur = all.find((x) => x.gid === cur.parent!.gid) ?? { gid: cur.parent.gid };
   return cur.gid;
 }
+
+test("emailsOf: every address in a contact's email field, without names or angle brackets", async () => {
+  const { emailsOf } = await import("./map");
+  assert.deepEqual(emailsOf("Brandon <Kmiotek.Realty@gmail.com>"), ["kmiotek.realty@gmail.com"]);
+  assert.deepEqual(emailsOf("a@x.com, b@y.com; <c@z.com>"), ["a@x.com", "b@y.com", "c@z.com"]);
+  assert.deepEqual(emailsOf(null), []);
+});

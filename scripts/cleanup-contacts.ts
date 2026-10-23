@@ -1,9 +1,13 @@
 /**
  * Tidy the contractor records the spreadsheet import left messy (ADMIN-023):
  * trades the import's merge repeated ("HVAC / HVAC") and name words typed in
- * lowercase ("John detzler"). The rules are src/lib/contacts.ts
- * planContactFixes. Company names, notes and anything else that needs a
- * judgment call are left alone.
+ * lowercase ("John detzler"). Plus Connor's three hand fixes (cutover
+ * decision 31): "Electric" (Jeremiah Anderson) and "House Cleaner" (Kim
+ * Lockett) move from Company to Trades, and "Mike Morris (Freedom Electric)"
+ * becomes Mike Morris at Freedom Electric; each matches only that record's
+ * exact current name and company. The rules are src/lib/contacts.ts
+ * planContactFixes. Notes and anything else that needs a judgment call are
+ * left alone.
  *
  *   npx tsx --env-file=.env scripts/cleanup-contacts.ts            # dry run: lists every change, writes nothing
  *   npx tsx --env-file=.env scripts/cleanup-contacts.ts --apply    # write them
@@ -32,13 +36,15 @@ async function main() {
   const target = await guardTarget(prisma, { apply, tag: TAG });
   if (apply && !target.local) assertBackup(flagValue("--backup"), target, TAG);
 
-  const contacts = await prisma.contact.findMany({ select: { id: true, fullName: true, trades: true }, orderBy: { fullName: "asc" } });
+  const contacts = await prisma.contact.findMany({ select: { id: true, fullName: true, trades: true, company: true }, orderBy: { fullName: "asc" } });
   const plan = planContactFixes(contacts);
   log(`${contacts.length} contacts, ${plan.length} to change.`);
+  const shown = (v: string | null) => (v === null ? "(none)" : `"${v}"`);
   for (const f of plan) {
     const lines = [
       f.name ? `name: "${f.fullName}" to "${f.name}"` : null,
-      f.trades ? `trades: "${f.trades.from}" to ${f.trades.to === null ? "(none)" : `"${f.trades.to}"`}` : null,
+      f.trades ? `trades: ${shown(f.trades.from)} to ${shown(f.trades.to)}` : null,
+      f.company ? `company: ${shown(f.company.from)} to ${shown(f.company.to)}` : null,
     ].filter(Boolean);
     log(`  ${f.fullName} (${f.id}): ${lines.join("; ")}`);
   }
@@ -55,8 +61,8 @@ async function main() {
       const was = before.get(f.id)!;
       const r = await tx.contact.updateMany({
         // Only while the row still holds what the plan read.
-        where: { id: f.id, fullName: was.fullName, trades: was.trades },
-        data: { ...(f.name ? { fullName: f.name } : {}), ...(f.trades ? { trades: f.trades.to } : {}) },
+        where: { id: f.id, fullName: was.fullName, trades: was.trades, company: was.company },
+        data: { ...(f.name ? { fullName: f.name } : {}), ...(f.trades ? { trades: f.trades.to } : {}), ...(f.company ? { company: f.company.to } : {}) },
       });
       if (r.count) written++;
       else skipped++;

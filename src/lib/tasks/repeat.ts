@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { toYmd, type Ymd } from "@/lib/dates";
+import { weekdayOf } from "@/lib/quick-dates";
 
 /**
  * Repeating tasks (docs/asana-migration-plan.md D27): when a task with a
- * repeat rule is done, the next copy is created, due on the next occurrence.
- * Pure; see repeat.test.ts.
+ * repeat rule is done, the next copy is created, due on the next occurrence
+ * that isn't already past. Pure; see repeat.test.ts.
  */
 
 export const repeatRuleSchema = z.object({
@@ -12,6 +13,12 @@ export const repeatRuleSchema = z.object({
   interval: z.number().int().min(1).max(365).default(1),
   /** Monthly/quarterly/yearly only: pin to this day of the month (clamped to short months). */
   dayOfMonth: z.number().int().min(1).max(31).optional(),
+  /**
+   * Weekly only: pin to this day of the week, 0 Sunday to 6 Saturday, so
+   * moving one copy doesn't move the series. A weekly rule saved before the
+   * pin existed has none and steps from the last copy's due date.
+   */
+  weekday: z.number().int().min(0).max(6).optional(),
 });
 
 export type RepeatRule = z.infer<typeof repeatRuleSchema>;
@@ -31,20 +38,24 @@ function ymd(y: number, m0: number, d: number): Ymd {
 }
 
 /**
- * The next due date after `from` (the finished copy's due date, or the day it
- * was finished when it had none). Month steps keep the day of month and clamp
- * it: Jan 31 monthly is Feb 28, then Mar 31 when dayOfMonth is pinned to 31.
+ * The `k`th step after `from`, counted from `from` itself so a pinned day
+ * holds however many steps there are. A pinned weekday is the one on or
+ * before the step: Every week on Monday, from a copy pushed from Monday to
+ * Friday, is the Monday after that Friday.
  */
-export function nextOccurrence(rule: RepeatRule, from: Ymd): Ymd {
+function occurrence(rule: RepeatRule, from: Ymd, k: number): Ymd {
   const [y, m, d] = from.split("-").map(Number);
   const m0 = m - 1;
   switch (rule.freq) {
     case "days":
-      return ymd(y, m0, d + rule.interval);
-    case "weeks":
-      return ymd(y, m0, d + 7 * rule.interval);
+      return ymd(y, m0, d + k * rule.interval);
+    case "weeks": {
+      const step = d + 7 * k * rule.interval;
+      if (rule.weekday === undefined) return ymd(y, m0, step);
+      return ymd(y, m0, step - ((new Date(Date.UTC(y, m0, step)).getUTCDay() - rule.weekday + 7) % 7));
+    }
     default: {
-      const months = rule.freq === "monthly" ? rule.interval : rule.freq === "quarterly" ? 3 * rule.interval : 12 * rule.interval;
+      const months = k * (rule.freq === "monthly" ? rule.interval : rule.freq === "quarterly" ? 3 * rule.interval : 12 * rule.interval);
       const total = m0 + months;
       const ny = y + Math.floor(total / 12);
       const nm0 = ((total % 12) + 12) % 12;
@@ -55,12 +66,65 @@ export function nextOccurrence(rule: RepeatRule, from: Ymd): Ymd {
 }
 
 /**
+ * The next due date after `from` (repeatFrom). Month steps keep the day of
+ * month and clamp it: Jan 31 monthly is Feb 28, then Mar 31 when dayOfMonth
+ * is pinned to 31. Week steps land on a pinned weekday.
+ */
+export function nextOccurrence(rule: RepeatRule, from: Ymd): Ymd {
+  return occurrence(rule, from, 1);
+}
+
+/**
+ * The due date of the copy that finishing a repeat makes: the first step
+ * after `from` that is on or after `today` (Buffalo's), so a repeat finished
+ * late never makes a copy that's already overdue. The pinned day holds: a
+ * monthly task due Jul 5 and finished Oct 23 makes Nov 5, not Aug 5.
+ */
+export function nextRepeatDue(rule: RepeatRule, from: Ymd, today: Ymd): Ymd {
+  let k = 1;
+  let next = occurrence(rule, from, k);
+  while (next < today) next = occurrence(rule, from, ++k);
+  return next;
+}
+
+/** A rule pinned to a weekday (weekly) or a day of the month (monthly, quarterly). */
+export function hasPinnedDay(rule: RepeatRule): boolean {
+  if (rule.freq === "weeks") return rule.weekday !== undefined;
+  return (rule.freq === "monthly" || rule.freq === "quarterly") && !!rule.dayOfMonth;
+}
+
+/** Whether `day` falls on the rule's pinned day (a pinned 31st counts on a short month's last day). */
+function onPinnedDay(rule: RepeatRule, day: Ymd): boolean {
+  if (rule.freq === "weeks") return rule.weekday !== undefined && weekdayOf(day) === rule.weekday;
+  if (!hasPinnedDay(rule)) return false;
+  const [y, m, d] = day.split("-").map(Number);
+  return d === Math.min(rule.dayOfMonth!, daysInMonth(y, m - 1));
+}
+
+/**
+ * The date a finished copy's next one steps from. A rule pinned to a weekday
+ * or a day of the month steps from `slot`, the date the series gave the copy
+ * when it was made, not the date it was moved to, so moving one copy earlier
+ * or later doesn't move the series (an Oct 30 copy moved to Nov 2 still makes
+ * Nov 30). A slot off the pinned day (the rule was re-pinned since) doesn't
+ * count. Otherwise it's the copy's due date, or today when it has none.
+ */
+export function repeatFrom(rule: RepeatRule, slot: Ymd | null, due: Ymd | null, today: Ymd): Ymd {
+  if (slot && onPinnedDay(rule, slot)) return slot;
+  return due ?? today;
+}
+
+/**
  * The first due date for a repeat that has none yet: the first day on or after
  * `today` the rule lands on. A pinned day of the month is this month's (clamped
- * to short months) unless it has passed, then next month's; any other rule
- * starts today.
+ * to short months) unless it has passed, then next month's; a pinned weekday
+ * is the next one, today included; any other rule starts today.
  */
 export function firstOccurrence(rule: RepeatRule, today: Ymd): Ymd {
+  if (rule.freq === "weeks" && rule.weekday !== undefined) {
+    const [y, m, d] = today.split("-").map(Number);
+    return ymd(y, m - 1, d + ((rule.weekday - weekdayOf(today) + 7) % 7));
+  }
   if (!rule.dayOfMonth) return today;
   const [y, m, d] = today.split("-").map(Number);
   const thisMonth = Math.min(rule.dayOfMonth, daysInMonth(y, m - 1));
@@ -78,15 +142,21 @@ function ordinal(n: number): string {
   return `${n}${s}`;
 }
 
-/** "Every day", "Every 2 weeks", "Monthly on the 5th", "Quarterly", "Every 2 years". */
-export function describeRepeat(rule: RepeatRule): string {
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
+/**
+ * "Every day", "Every 2 weeks on Monday", "Monthly on the 5th", "Quarterly",
+ * "Every 2 years". `short` gives the weekday in three letters ("Every week on
+ * Mon") for the Repeats chip.
+ */
+export function describeRepeat(rule: RepeatRule, { short = false }: { short?: boolean } = {}): string {
   const n = rule.interval;
   const on = rule.dayOfMonth ? ` on the ${ordinal(rule.dayOfMonth)}` : "";
   switch (rule.freq) {
     case "days":
       return n === 1 ? "Every day" : `Every ${n} days`;
     case "weeks":
-      return n === 1 ? "Every week" : `Every ${n} weeks`;
+      return (n === 1 ? "Every week" : `Every ${n} weeks`) + (rule.weekday !== undefined ? ` on ${short ? WEEKDAYS[rule.weekday].slice(0, 3) : WEEKDAYS[rule.weekday]}` : "");
     case "monthly":
       return (n === 1 ? "Monthly" : `Every ${n} months`) + on;
     case "quarterly":
@@ -100,16 +170,31 @@ export function describeRepeat(rule: RepeatRule): string {
 // One copy per finish (core.ts createNextRepeat and setStatus)
 // ---------------------------------------------------------------------------
 
+function record(data: unknown): Record<string, unknown> | null {
+  return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+}
+
 /**
- * The copy a REPEAT_CREATED event points at, from its stored data. Null for
- * data that doesn't name one. `madeInAsana` marks Asana's own copy, which the
- * importer joined to the series (src/lib/asana/import.ts joinSeries).
+ * The copy a REPEAT_CREATED event points at, from its stored data, and the
+ * date it was given. Null for data that doesn't name one. `madeInAsana` marks
+ * Asana's own copy, which the importer joined to the series
+ * (src/lib/asana/import.ts joinSeries).
  */
-export function repeatCreatedCopy(data: unknown): { next: string; madeInAsana: boolean } | null {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const d = data as Record<string, unknown>;
-  if (typeof d.next !== "string" || !d.next) return null;
-  return { next: d.next, madeInAsana: d.madeInAsana === true };
+export function repeatCreatedCopy(data: unknown): { next: string; madeInAsana: boolean; due: Ymd | null } | null {
+  const d = record(data);
+  if (!d || typeof d.next !== "string" || !d.next) return null;
+  return { next: d.next, madeInAsana: d.madeInAsana === true, due: typeof d.due === "string" ? toYmd(d.due) : null };
+}
+
+/**
+ * Where a copy came from, from its CREATED event's data: the task whose
+ * finish made it, and the date the series gave it then (null on a copy made
+ * before that was kept). Null for a task that isn't a copy.
+ */
+export function copyOrigin(data: unknown): { repeatOf: string; due: Ymd | null } | null {
+  const d = record(data);
+  if (!d || typeof d.repeatOf !== "string" || !d.repeatOf) return null;
+  return { repeatOf: d.repeatOf, due: typeof d.due === "string" ? toYmd(d.due) : null };
 }
 
 /** What a repeat copy carries, read just before reopening the task whose finish made it. */

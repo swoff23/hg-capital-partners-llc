@@ -5,7 +5,7 @@
  *   npm run asana:snapshot -- --resume <dir>         # finish or refresh one
  *   npm run asana:snapshot -- --no-files             # metadata only (fast trial)
  *   npm run asana:snapshot -- --resume <dir> --ack-manual
- *        # after saving the Messages tab and any video messages by hand (below)
+ *        # after saving any video messages by hand (the Messages tab needs no save; below)
  *
  * Writes to <main checkout>/_private/asana-snapshot/<timestamp>/ (gitignored),
  * so the archive outlives any worktree. Override with --out <dir>; the script
@@ -30,9 +30,15 @@
  *
  * Not reachable through Asana's API, so listed in manifest.manual and kept
  * out of "complete" until --ack-manual:
- *   - the project's Messages tab: save it by hand into <snapshot>/messages/
+ *   - the project's Messages tab (its line clears once <snapshot>/messages/
+ *     holds a file; Monday's backup doesn't save it, below)
  *   - Asana video messages (host "vimeo"): open each view_url and save it
  * Links to Dropbox, Drive, Box and other sites are recorded, not downloaded.
+ *
+ * The official backup (Mon Oct 26): only the video messages are saved by
+ * hand. The Messages tab is acknowledged without saving it, because Connor
+ * confirmed it has nothing worth keeping (cutover decision 8). Then finish
+ * with `--resume <dir> --ack-manual`.
  *
  * Layout:
  *   manifest.json        start/finish, status, counts, missing files, errors
@@ -437,7 +443,8 @@ async function main() {
   const links = attachments.filter((a) => !isAsanaHosted(a) && a.host !== "vimeo");
   const messagesSaved = fs.existsSync(path.join(out, "messages")) && fs.readdirSync(path.join(out, "messages")).length > 0;
   const manual = [
-    ...(messagesSaved ? [] : [`Project Messages tab: no Asana API. Save each thread (print to PDF) into ${path.join(out, "messages")}`]),
+    // Connor confirmed the Messages tab has nothing worth keeping (Oct 23): acknowledge it with --ack-manual, no save needed.
+    ...(messagesSaved ? [] : [`Project Messages tab: no Asana API. Nothing to save (confirmed Oct 23); acknowledge with --ack-manual`]),
     ...videoMessages.map((a) => `Video message "${a.name}" on ${a.parentGid}: open ${a.view_url ?? a.permanent_url} and save it`),
   ];
   const ackManual = flag("--ack-manual");

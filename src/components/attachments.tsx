@@ -2,7 +2,7 @@
 import { useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
 import type { ActionResult } from "@/lib/action-result";
-import { MULTIPART_THRESHOLD, UPLOAD_RULES, fileKindForType, filenameForType, uploadContentType } from "@/lib/attachments/content-types";
+import { UPLOAD_RULES, fileKindForType, filenameForType, uploadContentType, usesMultipart } from "@/lib/attachments/content-types";
 import { safeUploadName } from "@/lib/attachments/paths";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -117,7 +117,7 @@ export function Attachments(props: AttachmentsProps) {
       handleUploadUrl: "/api/blob/task-upload",
       clientPayload: JSON.stringify({ ...(JSON.parse(clientPayload) as object), fileKind }),
       contentType,
-      multipart: file.size > MULTIPART_THRESHOLD,
+      multipart: usesMultipart(file.size),
     });
     const res = await props.onRecord({ pathname: blob.pathname, filename: file.name });
     if (res && !res.ok) throw new Error(res.error);

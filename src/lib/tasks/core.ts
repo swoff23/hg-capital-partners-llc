@@ -4,7 +4,7 @@ import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates
 import { firstName } from "@/lib/names";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
-import { isUntouchedCopy, nextOccurrence, parseRepeatRule, repeatCreatedCopy, repeatDue, type RepeatRule } from "./repeat";
+import { copyOrigin, hasPinnedDay, isUntouchedCopy, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, type RepeatRule } from "./repeat";
 import {
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
@@ -374,6 +374,8 @@ export interface StatusResult {
   task: Task;
   /** The next copy, when finishing a repeating task created one. */
   nextTaskId: string | null;
+  /** That copy's due date, for "Done. Next due Nov 5". */
+  nextDue: Ymd | null;
 }
 
 export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Principal, opts: StatusOptions = {}, now = new Date()): Promise<StatusResult> {
@@ -443,9 +445,10 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
     await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now);
   }
   const nextTaskId = to === "DONE" && before.status !== "DONE" ? await createNextRepeat(tx, task, p, now) : null;
+  const nextDue = nextTaskId ? toYmd((await tx.task.findUnique({ where: { id: nextTaskId }, select: { dueDate: true } }))?.dueDate) : null;
   // Done to Canceled isn't a reopen: the copy stays.
   if (before.status === "DONE" && isActiveStatus(to)) await takeBackRepeat(tx, taskId);
-  return { task, nextTaskId };
+  return { task, nextTaskId, nextDue };
 }
 
 // ---------------------------------------------------------------------------
@@ -470,19 +473,49 @@ async function latestRepeatCopy(tx: Tx, taskId: string): Promise<{ eventId: stri
 }
 
 /**
+ * The date the series gave a copy when it was made, however it was moved
+ * since (repeat.ts repeatFrom): its own CREATED line's `due`, or, for a copy
+ * made before that line kept one, the `due` on the REPEAT_CREATED line that
+ * made it. Null for a series' first task.
+ */
+async function repeatSlot(tx: Tx, taskId: string): Promise<Ymd | null> {
+  const created = await tx.taskEvent.findFirst({
+    where: { taskId, kind: "CREATED" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { data: true },
+  });
+  const origin = copyOrigin(created?.data);
+  if (!origin) return null;
+  if (origin.due) return origin.due;
+  const made = await tx.taskEvent.findFirst({
+    where: { taskId: origin.repeatOf, kind: "REPEAT_CREATED", data: { path: ["next"], equals: taskId } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { data: true },
+  });
+  return repeatCreatedCopy(made?.data)?.due ?? null;
+}
+
+/**
  * Create the next copy of a finished repeating task. Returns its id, or null
  * when it doesn't repeat. One copy per finish: when an earlier finish already
  * made one that still exists (the task was reopened and the copy kept), that
  * copy's id comes back and nothing is written, so no second copy and no
- * second "assigned you" email. Exported for the Asana delta, which closes
- * tasks completed in Asana without going through setStatus.
+ * second "assigned you" email. A new copy is due on the rule's first date on
+ * or after today in Buffalo (repeat.ts nextRepeatDue), so finishing a late
+ * repeat never makes one that's already overdue. A rule with a pinned day
+ * steps from the date the series gave the finished copy, not the date it was
+ * moved to (repeatSlot), and every copy's CREATED line keeps the date it was given.
+ * Exported for the Asana delta, which closes tasks completed in Asana
+ * without going through setStatus.
  */
 export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Date): Promise<string | null> {
   const rule = parseRepeatRule(done.repeatRule);
   if (!rule) return null;
   const existing = await latestRepeatCopy(tx, done.id);
   if (existing) return existing.nextId;
-  const from = toYmd(done.dueDate) ?? todayYmdEastern(now);
+  const today = todayYmdEastern(now);
+  const slot = hasPinnedDay(rule) ? await repeatSlot(tx, done.id) : null;
+  const due = nextRepeatDue(rule, repeatFrom(rule, slot, toYmd(done.dueDate), today), today);
   const seriesId = done.repeatSeriesId ?? done.id;
   if (!done.repeatSeriesId) await tx.task.update({ where: { id: done.id }, data: { repeatSeriesId: seriesId } });
 
@@ -491,7 +524,7 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
       title: done.title,
       description: done.description,
       status: "OPEN", // status-write: a fresh copy starts as To do
-      dueDate: ymdToDate(nextOccurrence(rule, from)),
+      dueDate: ymdToDate(due),
       propertyId: done.propertyId,
       unitLabel: done.unitLabel,
       assigneeUserId: done.assigneeUserId,
@@ -507,8 +540,8 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
   if (items.length) {
     await tx.taskChecklistItem.createMany({ data: items.map((i) => ({ taskId: next.id, title: i.title, position: i.position })) });
   }
-  await addEvent(tx, next.id, { kind: "system", label: "Repeats" }, { kind: "CREATED", data: { repeatOf: done.id } });
-  await addEvent(tx, done.id, { kind: "system", label: "Repeats" }, { kind: "REPEAT_CREATED", data: { next: next.id, due: toYmd(next.dueDate) } });
+  await addEvent(tx, next.id, { kind: "system", label: "Repeats" }, { kind: "CREATED", data: { repeatOf: done.id, due } });
+  await addEvent(tx, done.id, { kind: "system", label: "Repeats" }, { kind: "REPEAT_CREATED", data: { next: next.id, due } });
   if (next.assigneeContactId) {
     await syncAssigneeAccess(tx, next.id, next.assigneeContactId, p, now);
     await notify(tx, next, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(next, now), now);

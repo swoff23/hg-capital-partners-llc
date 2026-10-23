@@ -4,6 +4,8 @@ import { renderPlainEmail } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
+import { staffFirstNames } from "@/lib/portal/queries";
+import { isActiveStatus } from "@/lib/task-scope";
 import {
   DAILY_EMAIL_CAP,
   deliveryFor,
@@ -116,13 +118,15 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         select: {
           title: true,
           unitLabel: true,
+          // Read at send time: the reply line goes only on a job still open.
+          status: true,
           property: { select: { address: true } },
           // Who can open the job right now (D12), checked again at send time.
           access: { where: { revokedAt: null }, select: { contactId: true } },
         },
       },
       recipientUser: { select: { email: true } },
-      recipientContact: { select: { active: true, portalAccount: { select: { email: true, status: true } } } },
+      recipientContact: { select: { active: true, fullName: true, portalAccount: { select: { email: true, status: true } } } },
     },
   });
   if (rows.length === 0) return result;
@@ -133,6 +137,8 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
   let lastSendAt = 0;
   // Set once Resend refuses for its own limits: everything after waits.
   let refused = false;
+  // The partners a contractor's reply line names, read once per run.
+  let staffNames: string[] | null = null;
 
   for (const row of rows) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
@@ -158,6 +164,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       continue;
     }
 
+    if (delivery.audience === "contractor") staffNames ??= await staffFirstNames();
     const email = taskEmail({
       items,
       title: row.task.title,
@@ -166,8 +173,18 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       audience: delivery.audience,
       appUrl,
       taskId: row.taskId,
+      recipientName: row.recipientContact?.fullName,
+      staffNames: staffNames ?? [],
+      jobOpen: isActiveStatus(row.task.status),
     });
-    const rendered = renderPlainEmail({ line: email.line, items: email.items, buttonLabel: email.buttonLabel, buttonUrl: email.buttonUrl });
+    const rendered = renderPlainEmail({
+      line: email.line,
+      items: email.items,
+      closing: email.closing,
+      buttonLabel: email.buttonLabel,
+      buttonUrl: email.buttonUrl,
+      footnote: email.footnote,
+    });
     const wait = lastSendAt + SEND_GAP_MS - Date.now();
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     lastSendAt = Date.now();

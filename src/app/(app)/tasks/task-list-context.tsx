@@ -6,6 +6,7 @@ import type { Ymd } from "@/lib/dates";
 import {
   applyPatch,
   assigneeName,
+  doneMessage,
   movedAllMessage,
   movedMessage,
   targetField,
@@ -13,14 +14,15 @@ import {
   type ListPatch,
   type ListTask,
 } from "@/lib/tasks/list";
-import { approveTask, rescheduleTasks, sendBackTask, setTaskDone, undoReschedule } from "./list-actions";
+import { approveTask, rescheduleTasks, sendBackTask, setTaskDone, undoDone, undoReschedule } from "./list-actions";
 
 /**
  * The rows a task list shows and the edits it makes, shared by Today, All
  * and Home's card. Each edit shows at once (useOptimistic), then the server
  * action runs; its revalidation brings the real rows back. A failure puts
  * the row back as it was and says why in a toast. Reschedules toast with an
- * Undo that restores the old dates.
+ * Undo that restores the old dates; a tick toasts with an Undo that puts the
+ * task back to the status it had.
  */
 
 interface TaskListApi {
@@ -107,7 +109,22 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
       // where that tap is heading.
       const settled = task.checked === (task.status === "DONE");
       const shown = settled ? task.status : task.checked ? "DONE" : "OPEN";
-      run({ kind: "check", id: task.id, checked: done }, () => setTaskDone(task.id, done, shown));
+      run(
+        { kind: "check", id: task.id, checked: done },
+        () => setTaskDone(task.id, done, shown),
+        // A tick that finished it says so, with an Undo back to the status it
+        // had, Canceled included. An untick, or a tick someone else beat, says
+        // nothing. Undo puts the row itself back: by then the refresh has
+        // dropped it from Today and All > Open.
+        (ticked) => {
+          if (!ticked) return;
+          const back: ListPatch = { kind: "restore", task: { ...task, status: shown, checked: false } };
+          toast({
+            message: doneMessage(task.title, ticked.nextDue, today),
+            action: { label: "Undo", onAction: () => run(back, () => undoDone(task.id, shown, task.waitingOn)) },
+          });
+        },
+      );
     },
     approve(task) {
       run({ kind: "status", id: task.id, status: "DONE" }, () => approveTask(task.id), () => toast({ message: `Approved: ${task.title}` }));

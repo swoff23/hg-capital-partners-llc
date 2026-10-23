@@ -10,9 +10,15 @@ import {
   nameExtension,
   normalizeContentType,
   uploadContentType,
+  usesMultipart,
 } from "./content-types";
 
 const MB = 1024 * 1024;
+
+test("usesMultipart: over 8 MB goes up in parts, so a dropped connection resends one part (decision 24)", () => {
+  assert.equal(usesMultipart(8 * MB), false);
+  assert.equal(usesMultipart(8 * MB + 1), true);
+});
 
 test("normalizeContentType: lowercases, drops parameters, refuses junk", () => {
   assert.equal(normalizeContentType("Image/JPEG"), "image/jpeg");

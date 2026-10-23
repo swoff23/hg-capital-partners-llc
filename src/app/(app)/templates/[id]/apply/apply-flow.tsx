@@ -10,8 +10,10 @@ import {
   applyTokens,
   dueFromOffset,
   extractTokens,
+  fillNotes,
   hasOpenTokens,
   isAddressToken,
+  notesOnlyTokens,
   rowTitle,
   sameToken,
   tokenInputType,
@@ -65,12 +67,15 @@ export function ApplyFlow({
 
   const property = properties.find((p) => p.id === propertyId);
   const tokens = extractTokens(items.flatMap((i) => [i.title, i.notes, ...(i.checklist ?? [])]));
+  // Used only in notes (tenant email, number): left blank, their line drops from the notes.
+  const optional = notesOnlyTokens(items);
+  const isOptional = (token: string) => optional.some((o) => sameToken(o, token));
   const valueOf = (token: string) => typed[token] ?? (isAddressToken(token) && property ? property.label : "");
   const values = Object.fromEntries(tokens.map((t) => [t, valueOf(t)]));
   const usesAnchor = items.some((i) => i.dueOffsetDays !== undefined);
 
   const titleOf = (i: number) => rowTitle(rows[i].title, items[i].title, values);
-  const notesOf = (i: number) => (items[i].notes ? applyTokens(items[i].notes!, values) : null);
+  const notesOf = (i: number) => fillNotes(items[i].notes, values, optional);
   const checklistOf = (i: number) => (items[i].checklist ?? []).map((c) => applyTokens(c, values));
   const dueOf = (i: number) => (rows[i].due !== undefined ? rows[i].due : dueFromOffset(anchor, items[i].dueOffsetDays));
   const kept = rows.map((r, i) => (r.include && titleOf(i).trim().length >= 2 ? i : -1)).filter((i) => i >= 0);
@@ -133,7 +138,10 @@ export function ApplyFlow({
             <div className="grid gap-4 sm:grid-cols-2">
               {tokens.map((t) => (
                 <label key={t} className="block">
-                  <span className="text-xs font-medium text-muted">{tokenLabel(t)}</span>
+                  <span className="text-xs font-medium text-muted">
+                    {tokenLabel(t)}
+                    {isOptional(t) && <span className="ml-2 font-normal">{" (optional)"}</span>}
+                  </span>
                   <Input
                     type={tokenInputType(t)}
                     value={valueOf(t)}

@@ -33,8 +33,11 @@ export function GlobalSearch() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  // On a phone the header leaves the box narrow, so the results hang from the
+  // header (fixed, so it's their containing block) across the page gutters,
+  // and names keep their room. From sm up they sit under the box.
   return (
-    <div ref={boxRef} className="relative w-full">
+    <div ref={boxRef} className="w-full sm:relative">
       <input
         value={q}
         onChange={(e) => {
@@ -46,7 +49,7 @@ export function GlobalSearch() {
         className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
       />
       {open && results.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <div className="absolute z-20 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-lg max-sm:inset-x-4 max-sm:top-full sm:w-full">
           {results.map((r) => (
             <button
               key={`${r.type}-${r.id}`}
@@ -59,7 +62,8 @@ export function GlobalSearch() {
                 "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-background",
               )}
             >
-              <span className="w-16 shrink-0 text-xs font-medium uppercase text-muted">{r.type}</span>
+              {/* Wide enough for CONTRACTOR, the longest type (81px in Geist), at every width. */}
+              <span className="w-22 shrink-0 text-xs font-medium uppercase text-muted">{r.type}</span>
               <span className="truncate">{r.label}</span>
             </button>
           ))}

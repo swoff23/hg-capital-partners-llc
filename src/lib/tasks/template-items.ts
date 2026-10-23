@@ -83,11 +83,52 @@ export function rowTitle(edited: string | undefined, itemTitle: string, values: 
   return applyTokens(edited ?? itemTitle, values);
 }
 
-/** Fill [Token]s from `values` (keyed by token name, any spelling of it). Blank or unknown tokens stay as written. */
-export function applyTokens(s: string, values: Readonly<Record<string, string>>): string {
+/** Typed values by token key, blank ones left out. */
+function valuesByKey(values: Readonly<Record<string, string>>): Map<string, string> {
   const byKey = new Map<string, string>();
   for (const [k, v] of Object.entries(values)) if (v.trim() && !byKey.has(tokenKey(k))) byKey.set(tokenKey(k), v.trim());
-  return s.replace(TOKEN_RE, (whole, name: string) => byKey.get(tokenKey(name)) ?? whole);
+  return byKey;
+}
+
+/**
+ * Fill [Token]s from `values` (keyed by token name, any spelling of it). Blank or unknown tokens stay as written.
+ * A value ending in a period ("118 Congress St.") right before the text's own period gives one period, not "St..".
+ */
+export function applyTokens(s: string, values: Readonly<Record<string, string>>): string {
+  const byKey = valuesByKey(values);
+  return s.replace(TOKEN_RE, (whole: string, name: string, at: number) => {
+    const v = byKey.get(tokenKey(name));
+    if (v === undefined) return whole;
+    return v.endsWith(".") && s[at + whole.length] === "." ? v.slice(0, -1) : v;
+  });
+}
+
+/**
+ * Tokens only notes use (D28, BPLAY-010), first-seen spelling: optional
+ * when applying, because a blank one drops its line (fillNotes). A token in
+ * any title or checklist item stays required, and so does the address,
+ * which fills from the property.
+ */
+export function notesOnlyTokens(items: readonly Pick<TemplateItem, "title" | "notes" | "checklist">[]): string[] {
+  const required = new Set(extractTokens(items.flatMap((i) => [i.title, ...(i.checklist ?? [])])).map(tokenKey));
+  return extractTokens(items.map((i) => i.notes)).filter((t) => !required.has(tokenKey(t)) && !isAddressToken(t));
+}
+
+/**
+ * An item's notes for the task it creates: tokens filled, and every line
+ * holding an `optional` token left blank dropped whole, so no [brackets]
+ * reach the task. Null when nothing is left.
+ */
+export function fillNotes(notes: string | null | undefined, values: Readonly<Record<string, string>>, optional: readonly string[]): string | null {
+  if (!notes) return null;
+  const byKey = valuesByKey(values);
+  const skip = new Set(optional.map(tokenKey).filter((k) => !byKey.has(k)));
+  const lines = notes.split("\n");
+  const kept = lines.filter((line) => ![...line.matchAll(TOKEN_RE)].some((m) => skip.has(tokenKey(m[1]))));
+  const filled = applyTokens(kept.join("\n"), values);
+  // Nothing dropped: exactly as before. Otherwise no blank runs left where lines were.
+  const out = kept.length === lines.length ? filled : filled.replace(/\n[ \t]*(\n[ \t]*)+\n/g, "\n\n").trim();
+  return out.trim() ? out : null;
 }
 
 /** Two spellings of one token: they share a field and a value. */

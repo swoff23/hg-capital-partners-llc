@@ -1,4 +1,5 @@
-import { FILE_KINDS, UPLOAD_RULES, fileKindForType, uploadContentType, type FileKind } from "./content-types";
+import { isOfflineError } from "@/lib/action-result";
+import { FILE_KINDS, UPLOAD_RULES, contentTypeForName, fileKindForType, uploadContentType, type FileKind } from "./content-types";
 
 /**
  * Browser-side helpers for task photos and videos: the check a file gets
@@ -60,7 +61,8 @@ export function checkMediaFile(
   return { ok: true, contentType, fileKind };
 }
 
-export type UploadFailure = { name: string; reason: string };
+/** The kind the upload was checked as; null when the check refused its type. The name's extension fills in. */
+export type UploadFailure = { name: string; kind: FileKind | null; reason: string };
 
 /**
  * @vercel/blob's upload() says "Failed to retrieve the client token" for any
@@ -69,22 +71,42 @@ export type UploadFailure = { name: string; reason: string };
 const TOKEN_REFUSED = /client token/i;
 /** The record step's message when no Blob store is connected (tasks/service.ts). */
 const NO_BLOB_STORE = /not configured|Blob store/i;
+/**
+ * @vercel/blob's BlobServiceNotAvailable. Its multipart upload throws this
+ * when a part's fetch fails ("Failed to fetch", "fetch failed"), where a
+ * single PUT rethrows the browser's own TypeError.
+ */
+const BLOB_SERVICE_DOWN = /blob service is currently not available/i;
 
 export function shownReason(reason: string): string {
   if (TOKEN_REFUSED.test(reason)) return "the upload was refused. Reload and try again";
   return reason;
 }
 
-/** One line for however many files failed. Empty when none did. */
+/**
+ * Why an upload to Blob failed, for the tile and the red line: "no connection"
+ * for a dropped connection however it surfaced, else the error's own message.
+ */
+export function uploadFailureReason(e: unknown): string {
+  if (isOfflineError(e) || (e instanceof Error && BLOB_SERVICE_DOWN.test(e.message))) return "no connection";
+  return e instanceof Error ? e.message : "";
+}
+
+/**
+ * One line for however many files failed, count first so the reason fits on
+ * a phone: "2 photos didn't upload: no connection". Nouns as addedText words
+ * them (a mix is "files"); the names are on each tile. Empty when none did.
+ */
 export function uploadNotice(failures: UploadFailure[]): string {
   if (failures.length === 0) return "";
   if (failures.some((f) => NO_BLOB_STORE.test(f.reason))) return "File uploads aren't set up yet.";
-  const [first, ...rest] = failures;
-  const reason = shownReason(first.reason);
-  const why = reason ? `: ${reason}` : "";
-  if (rest.length === 0) return `Couldn't add ${first.name}${why}`;
-  if (rest.every((f) => shownReason(f.reason) === reason)) return `Couldn't add ${first.name} and ${rest.length} more${why}`;
-  return `Couldn't add ${failures.length} files. ${first.name}${why}`;
+  const kinds = failures.map((f) => f.kind ?? fileKindForType(contentTypeForName(f.name)));
+  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
+  const count = `${failures.length} ${noun}${failures.length === 1 ? "" : "s"} didn't upload`;
+  const reason = shownReason(failures[0].reason);
+  // Different reasons can't share one line; each tile's label has its own.
+  const same = failures.every((f) => shownReason(f.reason) === reason);
+  return same && reason ? `${count}: ${reason}` : count;
 }
 
 /** "0:07", "4:32", "1:02:03". Empty for a missing or nonsense length. */

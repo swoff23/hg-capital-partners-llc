@@ -12,6 +12,8 @@ export interface PlainEmailInput {
   line: string;
   /** Short lines under it, one per change (the task notification bundles). */
   items?: string[];
+  /** Optional closing line before the button ("Thanks, Zack."). */
+  closing?: string;
   buttonLabel: string;
   /** Absolute URL the button opens. */
   buttonUrl: string;
@@ -48,6 +50,7 @@ export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
     "",
     input.line,
     ...(items.length ? ["", ...items] : []),
+    ...(input.closing ? ["", input.closing] : []),
     "",
     `${input.buttonLabel}: ${url.toString()}`,
     ...(input.footnote ? ["", input.footnote] : []),
@@ -68,7 +71,7 @@ export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
 <tr><td style="font-size:12px;letter-spacing:0.28em;text-transform:uppercase;color:#8a6d2f;">${BRAND}</td></tr>
 <tr><td style="padding:12px 0 0;"><div style="height:1px;width:48px;background:#c8a765;"></div></td></tr>
 <tr><td style="padding:24px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.line)}</td></tr>
-${items.map((item) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:#3f3f46;">${escapeHtml(item)}</td></tr>\n`).join("")}<tr><td style="padding:24px 0 0;">
+${items.map((item) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:#3f3f46;">${escapeHtml(item)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:16px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
 <a href="${href}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:999px;">${escapeHtml(input.buttonLabel)}</a>
 </td></tr>
 ${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:#71717a;">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>

@@ -86,6 +86,22 @@ test("load report: every section of the review is there, and lockbox digits neve
   assert.ok(!/4821|1357/.test(text), "codes are masked everywhere in the report");
 });
 
+test("load report: a contact people.json asks for is listed as one the run will create, by name in every list", () => {
+  const raeGid = snap.users.find((u) => u.name === "Rae Realtor")!.gid;
+  const overrides = { [raeGid]: { createContact: { fullName: "Rae Realtor", email: "rae@realty.example" } } };
+  const plan = buildPlan(input(snap), db(), { ...opts, overrides });
+  const text = formatReport(plan, { title: "Asana load (dry run)", names });
+  assert.match(text, /will create 1 contact from people\.json before the tasks \(no login, no invite, no email\):\n {4}\+ Rae Realtor <rae@realty\.example> {2}\[Asana \d+\]/);
+  assert.match(text, /Rae Realtor <rae@realty\.example>\s+\d+x {2}will create contact Rae Realtor <rae@realty\.example> \(people\.json\)/);
+  assert.match(text, new RegExp(`Rae Realtor \\(${plan.newContacts[0].id}\\): 1 open job`), "the will-see list names her, not her new id");
+});
+
+test("load report: a name-only match shows the contact id people.json needs to confirm it", () => {
+  const pat: DbContact = { id: "c-pat", fullName: "Pat Plumber", email: null, asanaGid: null, active: true };
+  const text = formatReport(buildPlan(input(snap), { ...db(), contacts: [...CONTACTS, pat] }, opts), { title: "Asana load (dry run)", names });
+  assert.match(text, /contact c-pat \(by name, NOT confirmed; id c-pat\)/);
+});
+
 test("load report: open titles that kept Asana's [brackets] are listed to rename, closed ones aren't", () => {
   const s = structuredClone(snap);
   const open = s.tasks.find((t) => t.gid === gidOf("Replace kitchen faucet"))!;

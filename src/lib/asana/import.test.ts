@@ -4,7 +4,18 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Tx } from "@/lib/tasks/core";
 import { notifyAudience, type NotifyChange } from "@/lib/tasks/rules";
-import { ASANA_PRINCIPAL, deleteCsvRows, linkLegacyAssignee, StalePlanError, writeAttachment, writeIdentity, writeTask, writeTemplate } from "./import";
+import {
+  ASANA_PRINCIPAL,
+  ContactExistsError,
+  deleteCsvRows,
+  linkLegacyAssignee,
+  StalePlanError,
+  writeAttachment,
+  writeIdentity,
+  writeNewContacts,
+  writeTask,
+  writeTemplate,
+} from "./import";
 import { buildPlan, type DbContact, type DbUser, type TaskPlan } from "./map";
 import { buildFixture, DEFAULT_WORLD } from "./__fixtures__/snapshot";
 
@@ -175,8 +186,72 @@ test("writing every task in a load plan never touches the outbox", async () => {
     assert.equal(await writeAttachment(tx, a, stored), "created");
   }
   for (const t of plan.templates) assert.equal(await writeTemplate(fakeTx().tx, t), "created");
+  await writeNewContacts(fakeTx().tx, plan.newContacts);
   await writeIdentity(fakeTx().tx, plan.people);
   await deleteCsvRows(fakeTx().tx, ["r1", "r2"]);
+});
+
+/** `tx` with some of one model's reads answered by `reads`; everything else is the fake as is. */
+function withReads(tx: Tx, model: string, reads: Record<string, (args: unknown) => unknown>): Tx {
+  const orig = (tx as unknown as Record<string, Record<string, (a: unknown) => Promise<unknown>>>)[model];
+  const m = new Proxy(orig, { get: (t, op: string) => (reads[op] ? async (a: unknown) => reads[op](a) : t[op]) });
+  return new Proxy(tx as object, { get: (t, k: string) => (k === model ? m : (t as Record<string, unknown>)[k]) }) as Tx;
+}
+
+test("people.json's new contact: created with its gid before the tasks, nothing else, and never twice", async () => {
+  const brandon = { id: "c-new", asanaGid: "77", fullName: "Brandon Kmiotek", email: "brandon@realty.example" };
+  const fresh = fakeTx();
+  const none = withReads(fresh.tx, "contact", { findUnique: () => null, findMany: () => [] });
+  assert.deepEqual(await writeNewContacts(none, [brandon]), { created: 1, existing: 0 });
+  assert.deepEqual(
+    fresh.calls.filter((c) => !/^find/.test(c.op)).map((c) => [c.model, c.op, c.args]),
+    [["contact", "create", { data: { id: "c-new", fullName: "Brandon Kmiotek", email: "brandon@realty.example", asanaGid: "77", active: true } }]],
+    "one contact row: no portal account, no access, no outbox",
+  );
+
+  // The same plan written again (a retried run): left as it is.
+  const again = fakeTx();
+  const done = withReads(again.tx, "contact", {
+    findUnique: () => ({ asanaGid: "77" }),
+    findMany: () => [{ id: "c-new", asanaGid: "77", email: "brandon@realty.example" }],
+  });
+  assert.deepEqual(await writeNewContacts(done, [brandon]), { created: 0, existing: 1 });
+  assert.ok(!again.calls.some((c) => c.op === "create"));
+
+  // Added some other way since the plan (same gid, or the exact address among a row's emails):
+  // refused, and the message says how to point people.json at that row.
+  for (const row of [
+    { id: "c-hand", asanaGid: null, email: "Brandon@Realty.example; office@realty.example" },
+    { id: "c-hand", asanaGid: "77", email: null },
+  ]) {
+    const raced = fakeTx();
+    let where: unknown;
+    const taken = withReads(raced.tx, "contact", {
+      findUnique: () => null,
+      findMany: (a) => {
+        where = (a as { where: unknown }).where;
+        return [row];
+      },
+    });
+    await assert.rejects(writeNewContacts(taken, [brandon]), (e: unknown) => {
+      assert.ok(e instanceof ContactExistsError);
+      assert.equal(e.contactId, "c-hand");
+      assert.ok(e.message.includes(`put { "contactId": "c-hand" } in people.json under "77"`), e.message);
+      return true;
+    });
+    assert.deepEqual(where, { OR: [{ asanaGid: "77" }, { email: { contains: "brandon@realty.example", mode: "insensitive" } }] });
+    assert.ok(!raced.calls.some((c) => c.op === "create"));
+  }
+
+  // The database's substring search also returns an address that only contains this one. The
+  // plan didn't match it, so the write doesn't either: create, as planned, instead of refusing every run.
+  const near = fakeTx();
+  const notHim = withReads(near.tx, "contact", {
+    findUnique: () => null,
+    findMany: () => [{ id: "c-other", asanaGid: null, email: "xbrandon@realty.example" }],
+  });
+  assert.deepEqual(await writeNewContacts(notHim, [brandon]), { created: 1, existing: 0 });
+  assert.ok(near.calls.some((c) => c.model === "contact" && c.op === "create"));
 });
 
 test("closing a repeating contractor job from Asana creates the next copy without email", async () => {

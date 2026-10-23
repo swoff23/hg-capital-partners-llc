@@ -1,4 +1,5 @@
 import { HG_TIME_ZONE, todayYmdEastern } from "@/lib/dates";
+import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL } from "@/lib/task-scope";
 import { addressLine, firstName, joinNames } from "@/lib/portal/job-view";
@@ -188,14 +189,42 @@ export interface TaskEmail {
   /** The job and where it is. */
   line: string;
   items: string[];
+  /** A contractor's approval thanks them: "Thanks, Zack." */
+  closing?: string;
   buttonLabel: string;
   buttonUrl: string;
+  /** Contractors only: where to answer, so a reply to the email isn't lost. */
+  footnote?: string;
+}
+
+/** True when the email's latest status change is an approval. */
+function endsApproved(items: OutboxItem[]): boolean {
+  const last = items.findLast((i) => i.kind === "STATUS");
+  return !!last && /^approved ".*"$/.test(oneLine(last.summary));
+}
+
+/**
+ * The line under a contractor's button (BCONTRACT-002): "Reply in the job so
+ * Connor and Pieter both see it.", naming the partners who get a
+ * contractor's updates by email (portal/queries.ts staffFirstNames).
+ */
+export function replyLine(staffNames: readonly string[]): string {
+  const names = joinNames([...staffNames]);
+  if (staffNames.length > 2) return `Reply in the job so ${names} all see it.`;
+  if (staffNames.length === 2) return `Reply in the job so ${names} both see it.`;
+  return `Reply in the job so ${names || "HG"} sees it.`;
 }
 
 /**
  * The job line: "Cabinet install, 23 Sherwood St · Upper", the street and
  * unit as My jobs shows them (job-view.ts addressLine), so the email names
  * the same unit whose lockbox code the job page shows (D21).
+ *
+ * A contractor's email ends on the reply line while the job is still open: a
+ * closed job's page is read-only and core.ts addComment refuses a contractor's
+ * comment on it. When its latest status change is an approval, it also thanks
+ * them by first name and the button reads "See job" (BCONTRACT-008): nothing
+ * is left to do, only the record to see.
  */
 export function taskEmail(input: {
   items: OutboxItem[];
@@ -205,15 +234,26 @@ export function taskEmail(input: {
   audience: Audience;
   appUrl: string;
   taskId: string;
+  /** The contractor's name on their contact, for the thanks. */
+  recipientName?: string | null;
+  /** First names of the partners, for a contractor's reply line. */
+  staffNames?: readonly string[];
+  /** The job's status is still active when the email is sent; false drops the reply line. */
+  jobOpen?: boolean;
 }): TaskEmail {
   const street = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
   const where = addressLine(street || null, input.unitLabel ? oneLine(input.unitLabel) : null);
+  const contractor = input.audience === "contractor";
+  const approved = contractor && endsApproved(input.items);
+  const thanksTo = greetingName(input.recipientName);
   return {
     subject: emailSubject(input.items, input.title),
     line: where ? `${oneLine(input.title)}, ${where}` : oneLine(input.title),
     items: itemLines(input.items),
-    buttonLabel: input.audience === "staff" ? "Open task" : "Open job",
+    ...(approved ? { closing: thanksTo ? `Thanks, ${thanksTo}.` : "Thanks." } : {}),
+    buttonLabel: !contractor ? "Open task" : approved ? "See job" : "Open job",
     buttonUrl: openUrl(input.appUrl, input.audience, input.taskId),
+    ...(contractor && input.jobOpen !== false ? { footnote: replyLine(input.staffNames ?? []) } : {}),
   };
 }
 

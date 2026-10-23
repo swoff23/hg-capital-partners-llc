@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, buttonClass } from "@/components/ui";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { firstName } from "@/lib/names";
+import type { PortalAccessState } from "@/lib/portal/access-state";
 import { loginTextBody, smsHref } from "@/lib/portal/login-text";
 import { cn } from "@/lib/utils";
 import { createPortalLogin, removePortalAccess, resetPortalPassword, restorePortalAccess, signOutPortalEverywhere } from "../actions";
@@ -13,17 +14,35 @@ import { createPortalLogin, removePortalAccess, resetPortalPassword, restorePort
 export type PortalAccountView = {
   id: string;
   email: string;
-  active: boolean;
-  /** "Oct 20, 2026, 3:14 PM", or null when they haven't signed in. */
-  lastSignIn: string | null;
+  /** Invited, Active or Access off (src/lib/portal/access-state.ts). */
+  state: PortalAccessState;
+  /** The line under it: "Not signed in yet", "Last seen 2d ago", or null. */
+  line: string | null;
+  /** Access was removed on the login, so Restore access brings it back; otherwise Remove access takes it away. */
+  restorable: boolean;
+  /** The contact is active. Restoring an inactive contact's login doesn't let them sign in yet. */
+  contactActive: boolean;
+};
+
+/**
+ * Gray in every state: each Badge tone is a task status's color, and blue is
+ * Scheduled's on this page's Jobs card. The line under Email ("Last seen 2d
+ * ago") carries Active (decision 22).
+ */
+const BADGE: Record<PortalAccessState, { tone: "gray"; label: string }> = {
+  invited: { tone: "gray", label: "Invited" },
+  active: { tone: "gray", label: "Active" },
+  off: { tone: "gray", label: "Access off" },
 };
 
 /**
  * Portal access (docs/asana-migration-plan.md §5.1, approved batch item 2):
  * create a contractor's login and show the starting password once, with Copy
- * and "Text login details" (an sms: link on this phone). With a login:
- * status, last sign-in, Reset password (a new one, shown once), Sign out
- * everywhere, Remove access and Restore access.
+ * and "Text login details" (an sms: link on this phone). With a login: its
+ * state and one line on it, then Reset password (a new one, shown once), Sign
+ * out everywhere and Remove access, or Restore access once removed. An
+ * inactive contact's login reads Access off and drops Reset password and Sign
+ * out everywhere (decision 22); Remove and Restore access stay.
  */
 export function PortalAccessCard({
   contactId,
@@ -63,7 +82,7 @@ export function PortalAccessCard({
     <Card>
       <CardHeader className="flex items-center justify-between gap-2">
         <CardTitle>Portal access</CardTitle>
-        {account && <Badge tone={account.active ? "green" : "gray"}>{account.active ? "Active" : "Removed"}</Badge>}
+        {account && <Badge tone={BADGE[account.state].tone}>{BADGE[account.state].label}</Badge>}
       </CardHeader>
       <CardBody className="space-y-3">
         {shown && (
@@ -111,51 +130,50 @@ export function PortalAccessCard({
 
         {account && (
           <>
-            <dl className="space-y-1 text-sm">
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="shrink-0 text-xs text-muted">Email</dt>
-                <dd className="min-w-0 truncate">{account.email}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="shrink-0 text-xs text-muted">Last signed in</dt>
-                <dd className="min-w-0 truncate">{account.lastSignIn ?? "Not yet"}</dd>
-              </div>
-            </dl>
-            {account.active ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Button variant="secondary" size="sm" disabled={pending} onClick={() => setConfirm("reset")}>
-                    Reset password
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() =>
-                      act(
-                        () => signOutPortalEverywhere(account.id),
-                        (d) => toast({ message: d.count ? `Signed out of ${d.count} ${d.count === 1 ? "device" : "devices"}` : "No devices were signed in" }),
-                      )
-                    }
-                  >
-                    Sign out everywhere
-                  </Button>
+            <div className="space-y-1">
+              <dl className="text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="shrink-0 text-xs text-muted">Email</dt>
+                  <dd className="min-w-0 truncate">{account.email}</dd>
                 </div>
-                <div className="border-t border-border pt-3">
-                  <Button variant="danger" size="sm" disabled={pending} onClick={() => setConfirm("remove")}>
-                    Remove access
-                  </Button>
-                </div>
-              </>
-            ) : (
+              </dl>
+              {account.line && <p className="truncate text-xs text-muted">{account.line}</p>}
+            </div>
+            {account.state !== "off" && (
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" disabled={pending} onClick={() => setConfirm("reset")}>
+                  Reset password
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() =>
+                    act(
+                      () => signOutPortalEverywhere(account.id),
+                      (d) => toast({ message: d.count ? `Signed out of ${d.count} ${d.count === 1 ? "device" : "devices"}` : "No devices were signed in" }),
+                    )
+                  }
+                >
+                  Sign out everywhere
+                </Button>
+              </div>
+            )}
+            {account.restorable ? (
               <Button
                 variant="secondary"
                 size="sm"
                 disabled={pending}
-                onClick={() => act(() => restorePortalAccess(account.id), () => toast({ message: `${first} can sign in again` }))}
+                onClick={() => act(() => restorePortalAccess(account.id), () => toast({ message: account.contactActive ? `${first} can sign in again` : "Access restored" }))}
               >
                 Restore access
               </Button>
+            ) : (
+              <div className={cn(account.state !== "off" && "border-t border-border pt-3")}>
+                <Button variant="danger" size="sm" disabled={pending} onClick={() => setConfirm("remove")}>
+                  Remove access
+                </Button>
+              </div>
             )}
           </>
         )}

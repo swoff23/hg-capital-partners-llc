@@ -263,7 +263,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
   const active = isActiveStatus(task.status);
   if (!active && (!task.completedAt || task.completedAt < PORTAL_HISTORY_FROM)) return null;
 
-  const [media, updates, lockbox, staff] = await Promise.all([
+  const [media, updates, lockbox, staffNames] = await Promise.all([
     prisma.taskAttachment.findMany({
       where: { taskId, ...visibleFile(p.contactId, ["IMAGE", "VIDEO"]) },
       select: mediaSelect,
@@ -271,7 +271,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     }),
     jobUpdates(p, taskId),
     active && task.assigneeContactId === p.contactId ? readLockboxCode(prisma, task.propertyId, task.unitLabel) : null,
-    prisma.user.findMany({ where: { passwordHash: { not: null } }, select: { name: true, email: true }, orderBy: { createdAt: "asc" } }),
+    staffFirstNames(),
   ]);
 
   return {
@@ -286,8 +286,22 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     media: media.map((a) => toMedia(p, a)),
     updates,
     lockbox,
-    staffNames: staff.map((u) => firstName(u.name || u.email.split("@")[0])),
+    staffNames,
   };
+}
+
+/**
+ * First names of the partners: the staff users who can sign in, the ones a
+ * contractor's updates email (tasks/core.ts notify). The Mark done payoff
+ * and the reply line in job emails name them.
+ */
+export async function staffFirstNames(): Promise<string[]> {
+  const staff = await prisma.user.findMany({
+    where: { passwordHash: { not: null } },
+    select: { name: true, email: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return staff.map((u) => firstName(u.name || u.email.split("@")[0]));
 }
 
 interface UpdateRow {

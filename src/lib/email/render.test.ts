@@ -58,6 +58,15 @@ test("item lines sit between the line and the button, escaped, still one button"
   assert.equal(renderPlainEmail({ ...input, items: [] }).text, renderPlainEmail(input).text);
 });
 
+test("a closing line sits after the items and before the button, escaped", () => {
+  const items = ["Pieter approved it"];
+  const { text, html } = renderPlainEmail({ ...input, items, closing: "Thanks, <Zack>." });
+  assert.ok(text.includes(`${items[0]}\n\nThanks, <Zack>.\n\n${input.buttonLabel}:`));
+  assert.ok(html.indexOf("Pieter approved it") < html.indexOf("Thanks, &lt;Zack&gt;."));
+  assert.ok(html.indexOf("Thanks, &lt;Zack&gt;.") < html.indexOf("<a href="));
+  assert.equal(renderPlainEmail({ ...input, items }).text.includes("Thanks"), false);
+});
+
 test("escapeHtml covers the five specials", () => {
   assert.equal(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
 });

@@ -2,7 +2,18 @@ import type { Prisma } from "@prisma/client";
 import { ymdToDate } from "@/lib/dates";
 import { activeTask } from "@/lib/task-scope";
 import { addEvent, createNextRepeat, grantAssigneeAccess, type Principal, type Tx } from "@/lib/tasks/core";
-import { describeConflict, type AttachmentPlan, type ChecklistPlan, type EventPlan, type Person, type TaskPlan, type TaskWrite, type TemplatePlan } from "./map";
+import {
+  describeConflict,
+  emailsOf,
+  type AttachmentPlan,
+  type ChecklistPlan,
+  type EventPlan,
+  type NewContactPlan,
+  type Person,
+  type TaskPlan,
+  type TaskWrite,
+  type TemplatePlan,
+} from "./map";
 
 /**
  * Writes an ImportPlan (./map.ts) inside the caller's transaction: the
@@ -236,6 +247,51 @@ export async function writeAttachment(tx: Tx, a: AttachmentPlan, stored: StoredF
     await tx.taskEvent.update({ where: { id: onThisTask.id }, data: { data: json({ ...data, attachmentId: att.id }) } });
   }
   return "created";
+}
+
+/** A planned contact that someone else created between the plan and the write. Nothing was created; point people.json at it. */
+export class ContactExistsError extends Error {
+  constructor(
+    readonly fullName: string,
+    readonly contactId: string,
+    readonly asanaGid: string,
+  ) {
+    super(
+      `a contact for ${fullName} already exists (${contactId}); nothing was created. To use it, put { "contactId": "${contactId}" } in people.json under "${asanaGid}" in place of createContact.`,
+    );
+    this.name = "ContactExistsError";
+  }
+}
+
+/**
+ * Create the contacts people.json asked for (createContact), with their
+ * Asana gid, before any task, template or timeline line names them. Only the
+ * name, email and gid: no portal account, no invite, no email. A contact
+ * already written by an earlier run of the same plan is left as it is; one
+ * that appeared some other way since the plan (same gid or email) stops the
+ * write instead of making a second copy.
+ */
+export async function writeNewContacts(tx: Tx, contacts: readonly NewContactPlan[]): Promise<{ created: number; existing: number }> {
+  let created = 0;
+  let existing = 0;
+  for (const c of contacts) {
+    const same = await tx.contact.findUnique({ where: { id: c.id }, select: { asanaGid: true } });
+    if (same?.asanaGid === c.asanaGid) {
+      existing++;
+      continue;
+    }
+    // The database narrows by substring; the hit counts only on the plan's rule
+    // (matchPeople): the same gid, or the exact address among the row's emails.
+    const hits = await tx.contact.findMany({
+      where: { OR: [{ asanaGid: c.asanaGid }, ...(c.email ? [{ email: { contains: c.email, mode: "insensitive" as const } }] : [])] },
+      select: { id: true, asanaGid: true, email: true },
+    });
+    const taken = hits.find((r) => r.asanaGid === c.asanaGid || (c.email !== null && emailsOf(r.email).includes(c.email)));
+    if (same || taken) throw new ContactExistsError(c.fullName, taken?.id ?? c.id, c.asanaGid);
+    await tx.contact.create({ data: { id: c.id, fullName: c.fullName, email: c.email, asanaGid: c.asanaGid, active: true } });
+    created++;
+  }
+  return { created, existing };
 }
 
 /**
