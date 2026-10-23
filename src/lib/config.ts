@@ -46,8 +46,6 @@ export const DEAL_PASS_REASONS = [
 
 export const DEAL_PRIORITIES = ["1 - High", "2 - Medium", "3 - Low", "5 - TBD", "6 - Holding"] as const;
 
-export const TASK_STATUSES = ["OPEN", "DONE"] as const;
-
 export const TASK_BUCKETS = ["Property", "General", "Template", "Unfiled"] as const;
 
 /**

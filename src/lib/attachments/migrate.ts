@@ -47,9 +47,12 @@ async function moveOne(row: Row, update: (id: string, url: string, pathname: str
 export async function migrateDocumentsToPrivate(): Promise<MigrationReport> {
   const report: MigrationReport = { scanned: 0, alreadyPrivate: 0, moved: 0, failed: [] };
 
-  const tasks = await prisma.taskAttachment.findMany({
+  // Links (kind LINK) have no bytes in Blob, so there is nothing to move.
+  const taskRows = await prisma.taskAttachment.findMany({
+    where: { url: { not: null }, pathname: { not: null } },
     select: { id: true, url: true, pathname: true, filename: true, contentType: true },
   });
+  const tasks = taskRows.flatMap((r) => (r.url && r.pathname ? [{ ...r, url: r.url, pathname: r.pathname }] : []));
   const props = await prisma.propertyAttachment.findMany({
     select: { id: true, url: true, pathname: true, filename: true, contentType: true },
   });

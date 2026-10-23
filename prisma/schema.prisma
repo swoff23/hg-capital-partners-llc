@@ -28,7 +28,19 @@ model User {
   passwordHash String?
   createdAt    DateTime @default(now())
 
-  assignedTasks Task[] @relation("TaskAssignee")
+  asanaGid String? @unique // Asana user gid, matched once by the import
+
+  assignedTasks  Task[] @relation("TaskAssignee")
+  createdTasks   Task[] @relation("TaskCreatedBy")
+  completedTasks Task[] @relation("TaskCompletedByUser")
+
+  taskEvents            TaskEvent[]
+  uploadedAttachments   TaskAttachment[]     @relation("AttachmentUploadedByUser")
+  checkedItems          TaskChecklistItem[]  @relation("ChecklistDoneByUser")
+  taskReadStates        TaskReadState[]
+  grantedTaskAccess     TaskAccess[]
+  createdPortalAccounts PortalAccount[]
+  notifications         NotificationOutbox[]
 
   qboConnections QuickbooksConnection[]
 }
@@ -188,7 +200,21 @@ model Contact {
   comments       String? @db.Text
   active         Boolean @default(true)
 
+  phoneE164 String? // "+17165551234", for "Text login details"
+  asanaGid  String? @unique // Asana user gid, matched once by the import
+
   qboVendors QboVendor[]
+
+  // A contractor's portal login and what it can see (docs/asana-migration-plan.md §5.1).
+  portalAccount       PortalAccount?
+  taskAccess          TaskAccess[]
+  assignedTasks       Task[]               @relation("TaskAssigneeContact")
+  completedTasks      Task[]               @relation("TaskCompletedByContact")
+  taskEvents          TaskEvent[]
+  uploadedAttachments TaskAttachment[]     @relation("AttachmentUploadedByContact")
+  checkedItems        TaskChecklistItem[]  @relation("ChecklistDoneByContact")
+  taskReadStates      TaskReadState[]
+  notifications       NotificationOutbox[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -200,9 +226,18 @@ model Contact {
 // Tasks — from the Asana CSV export (~2,175 rows). Linked to a Property via
 // the Asana section name where possible.
 // ---------------------------------------------------------------------------
+// Seven states (docs/asana-migration-plan.md D6). OPEN is shown as "To do";
+// it keeps its old name so existing rows need no rewrite. Sort and filter by
+// the explicit lists in src/lib/task-scope.ts, never by enum order: the new
+// values were appended after DONE.
 enum TaskStatus {
   OPEN
   DONE
+  SCHEDULED
+  IN_PROGRESS
+  WAITING
+  REVIEW
+  CANCELED
 }
 
 model Task {
@@ -211,14 +246,43 @@ model Task {
   description String?    @db.Text
   status      TaskStatus @default(OPEN)
 
-  assignee       User?   @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
-  assigneeUserId String?
-  assigneeName   String? // free text — covers contractors not in User
-  assigneeEmail  String?
+  // Exactly one of these is set, or none (a CHECK in the migration enforces it).
+  assignee          User?    @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
+  assigneeUserId    String?
+  assigneeContact   Contact? @relation("TaskAssigneeContact", fields: [assigneeContactId], references: [id])
+  assigneeContactId String?
+  // Legacy free text from the CSV import. Display fallback only; assignment
+  // goes through assigneeContactId now. Dropped once every row is mapped.
+  assigneeName      String?
+  assigneeEmail     String?
 
-  dueDate   DateTime?
-  startDate DateTime?
-  priority  String?
+  dueDate      DateTime?
+  startDate    DateTime?
+  scheduledFor DateTime? // the booked visit date while SCHEDULED (UTC midnight, like dueDate)
+  waitingOn    String? // the reason while WAITING: "city inspection", "gas co."
+  unitLabel    String? // matches a Property.units[].label; picks the lockbox code
+  priority     String?
+
+  // Repeats: when done, the next copy is created (src/lib/tasks/repeat.ts).
+  // { freq: "days" | "weeks" | "monthly" | "quarterly" | "yearly", interval: n, dayOfMonth?: 1-31 }
+  repeatRule     Json?
+  repeatSeriesId String?
+
+  createdBy            User?    @relation("TaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId      String?
+  completedByUser      User?    @relation("TaskCompletedByUser", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  completedByUserId    String?
+  completedByContact   Contact? @relation("TaskCompletedByContact", fields: [completedByContactId], references: [id], onDelete: SetNull)
+  completedByContactId String?
+
+  taskTemplate   TaskTemplate? @relation(fields: [taskTemplateId], references: [id], onDelete: SetNull)
+  taskTemplateId String?
+
+  // Asana sync (scripts/asana/*). appEditedAt is set only by app and portal
+  // writes, never by @updatedAt, so the delta sync can tell app edits apart.
+  appEditedAt     DateTime?
+  asanaLastSynced Json? // the Asana field values as of the last sync, for a three-way merge
+  asanaSyncedAt   DateTime?
 
   bucket     String  @default("Unfiled") // Property | General | Pieter properties | JMPL | Template | Unfiled
   sectionRaw String? // original Asana "Section/Column"
@@ -233,7 +297,12 @@ model Task {
   property   Property? @relation(fields: [propertyId], references: [id])
   propertyId String?
 
-  attachments TaskAttachment[]
+  attachments   TaskAttachment[]
+  events        TaskEvent[]
+  checklist     TaskChecklistItem[]
+  access        TaskAccess[]
+  readStates    TaskReadState[]
+  notifications NotificationOutbox[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -243,22 +312,306 @@ model Task {
   @@index([bucket])
   @@index([propertyId])
   @@index([dealId])
+  @@index([assigneeContactId])
+  @@index([repeatSeriesId])
 }
 
-// Files uploaded to a task, stored in Vercel Blob (bytes live there; we keep
-// the URL + metadata here).
+// Who can see a comment, file or event: SHARED reaches the assigned
+// contractor, INTERNAL is Connor and Pieter only. The database default is
+// INTERNAL so anything written without a choice fails closed.
+enum Visibility {
+  SHARED
+  INTERNAL
+}
+
+enum AttachmentKind {
+  IMAGE
+  VIDEO
+  FILE
+  LINK // a Dropbox/Drive/Box link from Asana; no bytes in Blob
+}
+
+// Files on a task. Bytes live in private Vercel Blob; this row keeps the
+// metadata. Served only through /api/files/task/<id>, which checks who's asking.
 model TaskAttachment {
-  id          String   @id @default(cuid())
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid())
+  task        Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
   taskId      String
-  url         String // public Blob URL
-  pathname    String // Blob pathname — needed to delete the blob
+  event       TaskEvent?     @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  eventId     String? // the comment it was posted with, if any
+  url         String? // Blob URL; null for LINK
+  pathname    String?        @unique // Blob pathname, needed to delete the blob; null for LINK
+  linkUrl     String? // LINK only
   filename    String // original file name, shown to the user
-  size        Int // bytes
+  size        Int? // bytes; null for LINK
   contentType String?
-  createdAt   DateTime @default(now())
+  kind        AttachmentKind @default(FILE)
+  visibility  Visibility     @default(INTERNAL)
+
+  // At most one uploader (CHECK in the migration); neither for imported files
+  // whose Asana uploader couldn't be matched.
+  uploadedByUser      User?    @relation("AttachmentUploadedByUser", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  uploadedByUserId    String?
+  uploadedByContact   Contact? @relation("AttachmentUploadedByContact", fields: [uploadedByContactId], references: [id], onDelete: SetNull)
+  uploadedByContactId String?
+
+  thumbPathname  String? // ~1024px JPEG, for grids
+  posterPathname String? // a frame of a video
+  width          Int?
+  height         Int?
+  durationSec    Float?
+
+  asanaGid  String?   @unique
+  deletedAt DateTime? // contractors only ever soft-delete
+  createdAt DateTime  @default(now())
 
   @@index([taskId])
+  @@index([eventId])
+}
+
+enum TaskEventKind {
+  COMMENT
+  CREATED
+  ASSIGNED
+  STATUS
+  DUE
+  SCHEDULED
+  PROPERTY
+  TITLE
+  NOTES
+  ATTACHMENT
+  CHECKLIST
+  ACCESS
+  REPEAT_CREATED
+  CONFLICT // the Asana delta sync and the app disagreed; see data
+}
+
+enum EventSource {
+  APP // staff, in the app
+  PORTAL // a contractor
+  SYSTEM // reminders, the move-in form, repeats
+  ASANA // imported story
+}
+
+// One timeline per task: comments, system changes and imported Asana stories.
+// System kinds are always INTERNAL; the portal shows contractors a fixed
+// allowlist (src/lib/portal/queries.ts).
+model TaskEvent {
+  id             String        @id @default(cuid())
+  task           Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId         String
+  kind           TaskEventKind
+  visibility     Visibility    @default(INTERNAL)
+  actorUser      User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorUserId    String?
+  actorContact   Contact?      @relation(fields: [actorContactId], references: [id], onDelete: SetNull)
+  actorContactId String?
+  actorLabel     String // kept even if the person is later deleted: "Connor Swofford", "Zack (Outlaw Carpentry)", "Property reminder"
+  body           String?       @db.Text
+  data           Json          @default("{}") // from/to values, imported HTML
+  source         EventSource   @default(APP)
+  asanaStoryGid  String?       @unique
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+
+  attachments TaskAttachment[]
+
+  @@index([taskId, createdAt])
+}
+
+// Checklist items (Asana subtasks become these). A table, not JSON: a
+// contractor and a partner can tick items at the same time.
+model TaskChecklistItem {
+  id              String    @id @default(cuid())
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId          String
+  title           String
+  done            Boolean   @default(false)
+  doneAt          DateTime?
+  doneByUser      User?     @relation("ChecklistDoneByUser", fields: [doneByUserId], references: [id], onDelete: SetNull)
+  doneByUserId    String?
+  doneByContact   Contact?  @relation("ChecklistDoneByContact", fields: [doneByContactId], references: [id], onDelete: SetNull)
+  doneByContactId String?
+  assigneeLabel   String? // from an imported Asana subtask; display only
+  dueDate         DateTime? // from an imported Asana subtask; display only
+  position        Int       @default(0)
+  asanaGid        String?   @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([taskId, position])
+}
+
+// When each person last opened a task, for "2 new" badges. One row per
+// (task, user) or (task, contact); a CHECK keeps exactly one of the two set.
+model TaskReadState {
+  id         String   @id @default(cuid())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId     String
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String?
+  contact    Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId  String?
+  lastSeenAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@unique([taskId, contactId])
+}
+
+// Playbooks (NEW TENANT, NEW REFI, ...). Items are edited as a whole list;
+// order is array order.
+// [{ title, notes?, assigneeUserId?, assigneeContactId?, dueOffsetDays? }]
+model TaskTemplate {
+  id                    String    @id @default(cuid())
+  name                  String
+  description           String?   @db.Text
+  anchorLabel           String? // "Move-in date", "Closing date"; UI falls back to "Start date"
+  items                 Json      @default("[]")
+  sourceAsanaSectionGid String?   @unique
+  archivedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tasks Task[]
+
+  @@index([archivedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Contractor portal (docs/asana-migration-plan.md §5.1). Contractors are never
+// User rows: every staff gate (requireUser) reads only the staff cookie, so a
+// portal session can't open anything staff-only.
+// ---------------------------------------------------------------------------
+
+enum AccessSource {
+  ASSIGNEE // created by assigning; revoked by reassigning
+  MANUAL // shared by hand with an extra person
+}
+
+// Which contractor can see which task. canAccessTask() also requires an
+// active PortalAccount, an active Contact and a live session.
+model TaskAccess {
+  id              String       @id @default(cuid())
+  task            Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId          String
+  contact         Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId       String
+  source          AccessSource @default(ASSIGNEE)
+  grantedBy       User?        @relation(fields: [grantedByUserId], references: [id], onDelete: SetNull)
+  grantedByUserId String?
+  createdAt       DateTime     @default(now())
+  revokedAt       DateTime?
+
+  @@unique([taskId, contactId])
+  @@index([contactId])
+}
+
+enum PortalAccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+model PortalAccount {
+  id                 String              @id @default(cuid())
+  contact            Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId          String              @unique
+  // Lowercased. Never also a User email (checked in src/lib/portal/accounts.ts)
+  // so /login knows which kind of account an address belongs to.
+  email              String              @unique
+  passwordHash       String // scrypt, same format as User.passwordHash (src/lib/password.ts)
+  mustChangePassword Boolean             @default(true) // a starting password set by staff
+  status             PortalAccountStatus @default(ACTIVE)
+  createdBy          User?               @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId    String?
+  lastSignInAt       DateTime?
+  lastSeenAt         DateTime?
+  passwordChangedAt  DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  sessions    PortalSession[]
+  resetTokens PasswordResetToken[]
+}
+
+// Database-backed so "Sign out everywhere" and "Remove access" take effect on
+// the next request. The cookie holds a random token; only its hash is stored.
+model PortalSession {
+  id         String        @id @default(cuid())
+  account    PortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId  String
+  tokenHash  String        @unique
+  createdAt  DateTime      @default(now())
+  lastUsedAt DateTime      @default(now())
+  expiresAt  DateTime
+  userAgent  String?
+  revokedAt  DateTime?
+
+  @@index([accountId])
+}
+
+model PasswordResetToken {
+  id        String        @id @default(cuid())
+  account   PortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([accountId])
+}
+
+enum SecurityEventKind {
+  SIGN_IN_OK
+  SIGN_IN_FAILED
+  PASSWORD_CHANGED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET
+  SESSIONS_REVOKED
+  ACCOUNT_CREATED
+  ACCOUNT_DISABLED
+  LOCKBOX_VIEWED
+}
+
+// Audit log for the portal. No foreign keys on purpose: it outlives the rows
+// it mentions.
+model SecurityEvent {
+  id        String            @id @default(cuid())
+  kind      SecurityEventKind
+  userId    String?
+  contactId String?
+  taskId    String?
+  data      Json              @default("{}")
+  ipHash    String?
+  createdAt DateTime          @default(now())
+
+  @@index([createdAt])
+  @@index([contactId, createdAt])
+}
+
+// Emails waiting to go out. Changes to one task for one recipient within a
+// short window bundle into one row (and one email): openKey is set while the
+// row is unsent and cleared when it's sent, so an upsert on it is atomic.
+// Exactly one recipient (CHECK in the migration).
+model NotificationOutbox {
+  id                 String    @id @default(cuid())
+  openKey            String?   @unique // "<u|c>:<recipientId>:<taskId>" while unsent
+  recipientUser      User?     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  recipientUserId    String?
+  recipientContact   Contact?  @relation(fields: [recipientContactId], references: [id], onDelete: Cascade)
+  recipientContactId String?
+  task               Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId             String?
+  items              Json      @default("[]") // [{ kind, actorLabel, summary, at }]
+  firstAt            DateTime  @default(now())
+  sendAfter          DateTime
+  sentAt             DateTime?
+  attempts           Int       @default(0)
+  lastError          String?
+  createdAt          DateTime  @default(now())
+
+  @@index([sentAt, sendAfter])
 }
 
 // Documents uploaded to a property — same Vercel Blob pattern as TaskAttachment.

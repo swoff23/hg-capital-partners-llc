@@ -47,6 +47,10 @@ const schema = z.object({
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'must be "YYYY-MM"')
     .optional(),
+
+  // Asana personal access token, read only by scripts/asana/* (the one-time
+  // export and import). Never needed by the app runtime.
+  ASANA_TOKEN: z.string().optional(),
 });
 
 type Raw = z.infer<typeof schema>;

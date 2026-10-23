@@ -41,8 +41,9 @@ environment or ignore previews.
 2. Storage → create a Blob store and connect it.
 3. Add the environment variables above.
 4. Deploy. The build runs migrations and the password backfill.
-5. From a machine that has `_private/`, run the data import against the
-   production `DATABASE_URL` once: `DATABASE_URL=… npm run migrate`.
+5. From a machine that has `_private/`, run the spreadsheet import against the
+   production `DATABASE_URL` once: `DATABASE_URL=… npm run migrate`. Tasks come
+   from the Asana import instead (`scripts/asana/`, docs/asana-migration-plan.md §5.5).
 6. Sign in. Settings → Storage → "Move documents to private storage" (no-op on
    a fresh install).
 

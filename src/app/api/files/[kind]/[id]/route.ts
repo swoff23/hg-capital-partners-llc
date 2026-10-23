@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 async function lookup(kind: string, id: string) {
   if (kind === "task") {
     const a = await prisma.taskAttachment.findUnique({ where: { id } });
-    return a && { url: a.url, filename: a.filename, contentType: a.contentType };
+    // A LINK (Dropbox, Drive) has no bytes here; the UI links straight to it.
+    return a?.url ? { url: a.url, filename: a.filename, contentType: a.contentType } : null;
   }
   if (kind === "property") {
     const a = await prisma.propertyAttachment.findUnique({ where: { id } });

@@ -36,7 +36,8 @@ src/app/api/*          health, search, blob token minting, file delivery, QuickB
 src/lib/<domain>/      services that own every database write: tasks, deals, properties
 src/lib/quickbooks/    pure core (categorize, classify, compute, reconcile, report-parse, months) + sync/queries
 src/lib/*.ts           shared pure helpers: env, dates, money, normalize, secrets, session-token, …
-scripts/migrate/       one-time import of the Master Database xlsx + Asana CSV
+scripts/migrate/       one-time import of the Master Database xlsx
+scripts/asana/         Asana backup (snapshot) and the open-task import
 prisma/                schema + migrations
 ```
 
@@ -83,7 +84,8 @@ npm run dev                   # http://localhost:3000
 | `npm test` | All unit tests |
 | `npm run test:devices` | Device check: every route on phones, iPad and desktop, report in `device-report/` |
 | `npm run test:devices:known` | Same run, rewrites `tests/devices/known-issues.json` (owner's OK first) |
-| `npm run migrate [step]` | Spreadsheet/Asana import (idempotent) |
+| `npm run migrate [step]` | Spreadsheet import (idempotent) |
+| `npm run asana:snapshot` | Full read-only Asana backup to `_private/asana-snapshot/` (needs `ASANA_TOKEN`) |
 | `npm run db:migrate` | Create + apply a new Prisma migration |
 | `npm run db:studio` | Prisma Studio |
 | `npm run db:dev-passwords` | Local only: set each user's password from their `*_PASSWORD` in `.env` |
@@ -100,7 +102,9 @@ or Prisma Studio), redeploy. Locally, just change the var in `.env` and run
 `npm run db:dev-passwords` — it overwrites the local hash and refuses to run
 against a non-localhost `DATABASE_URL`.
 
-**Re-run the import** — safe anytime; idempotent on address / Asana ID.
+**Re-run the spreadsheet import** — safe anytime; idempotent on address. It no
+longer touches tasks: those come from the Asana import in `scripts/asana/`
+(docs/asana-migration-plan.md §5.5).
 
 **Reset the local DB** — `dropdb hg_capital_dev && createdb hg_capital_dev &&
 npx prisma migrate deploy && npm run migrate`.

@@ -6,6 +6,7 @@ import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/comp
 import { initials } from "@/lib/utils";
 import { fmtDay, toYmd } from "@/lib/dates";
 import { propertyStatusTone } from "@/lib/config";
+import { activeTask } from "@/lib/task-scope";
 import { parseBuildingCapex, parseUnits } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { BackLink } from "@/components/back-link";
@@ -43,7 +44,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     where: { id },
     include: {
       tasks: {
-        where: { status: "OPEN" },
+        where: activeTask,
         orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
         include: { assignee: { select: { name: true, email: true } } },
       },
