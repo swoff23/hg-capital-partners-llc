@@ -9,9 +9,27 @@ import {
   propertyUnitCount,
   reconcileUnits,
   renamedLabel,
+  UTILITY_STATUS_FIELDS,
+  UTILITY_STATUS_OPTIONS,
+  utilityStatusChoices,
   withUnitIds,
   type CapexRules,
 } from "./property-types";
+
+test("UTILITY_STATUS_FIELDS: National Grid's LOFL holds account numbers, so it edits as text", () => {
+  assert.equal(UTILITY_STATUS_FIELDS.has("nationalGridLofl"), false);
+  assert.equal(UTILITY_STATUS_FIELDS.has("nationalFuelLofl"), true);
+  assert.equal(UTILITY_STATUS_FIELDS.has("nationalGridAutopay"), true);
+});
+
+test("utilityStatusChoices: a stored value that isn't a status stays selectable", () => {
+  assert.deepEqual(utilityStatusChoices(null), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices(""), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("  "), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("Done"), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("81531-59050"), ["81531-59050", ...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("Yes"), ["Yes", ...UTILITY_STATUS_OPTIONS]);
+});
 
 test("isHouseMeterRow: only the building's own meters, never a real unit", () => {
   assert.equal(isHouseMeterRow({ label: "HSE (house)" }), true);

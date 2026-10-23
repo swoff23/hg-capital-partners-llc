@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
 import { Button, Field, Input, SectionCard, Select, Textarea } from "@/components/ui";
 import { InlineAddressField } from "@/components/inline-address-field";
+import { useToast } from "@/components/toast";
+import { callAction } from "@/lib/action-result";
 import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
 import { fmtMoney } from "@/lib/utils";
 import { fmtDay } from "@/lib/dates";
@@ -10,17 +11,21 @@ import { useSectionSave } from "./use-section-save";
 
 export type EditableProperty = {
   id: string;
-  version: string;
   address: string;
   llcOwner: string | null;
+  attorney: string | null;
   status: string | null;
   strategy: string | null;
+  refiTarget: string | null;
   purchaseDate: string | null;
   purchasePrice: string | null;
+  closingCosts: string | null;
+  rehabAmount: string | null;
   value: string | null;
   refinanceDate: string | null;
   sqft: number | null;
   rentalRegistrationExpiry: string | null;
+  propertyTaxDueDate: string | null;
 };
 
 const L = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -30,40 +35,48 @@ const L = ({ label, children }: { label: string; children: React.ReactNode }) =>
   </label>
 );
 
-/** Page heading, editable in place — shares InlineAddressField with the deal page. */
+/**
+ * The page's h1, edited in place: shares InlineAddressField with the deal page.
+ * Sent with the address it replaces, so a rename someone else saved meanwhile
+ * isn't overwritten; a refused save or a dropped connection shows as a toast.
+ */
 export function PropertyAddressField({ id, value }: { id: string; value: string }) {
+  const { toast } = useToast();
   return (
     <InlineAddressField
       value={value}
+      heading
+      multiline
       onCommit={async (address) => {
-        const fd = new FormData();
-        fd.set("address", address);
-        const r = await patchProperty(id, fd);
-        // No inline message on a heading: a failed save goes to the page's error boundary.
-        if (!r.ok) throw new Error(r.error);
+        const r = await callAction(() => patchProperty(id, { address }, { address: value }));
+        if (!r.ok) toast({ message: r.error });
       }}
     />
   );
 }
 
 export function PropertyDetailsSection({ property: p }: { property: EditableProperty }) {
-  const [editing, setEditing] = useState(false);
-  const { pending, error, onSubmit, clearError } = useSectionSave(patchProperty.bind(null, p.id), () => setEditing(false));
+  const { loaded: f, open, close, pending, error, onSubmit } = useSectionSave(p.id, p);
   const formId = `property-details-${p.id}`;
 
-  if (!editing) {
+  if (!f) {
     return (
-      <SectionCard title="Details" onEdit={() => setEditing(true)}>
+      <SectionCard title="Details" onEdit={open}>
         <dl>
           <Field label="Value">{fmtMoney(p.value)}</Field>
           <Field label="Purchase date">{fmtDay(p.purchaseDate)}</Field>
           <Field label="Purchase price">{fmtMoney(p.purchasePrice)}</Field>
+          <Field label="Closing costs">{fmtMoney(p.closingCosts)}</Field>
+          <Field label="Rehab amount">{fmtMoney(p.rehabAmount)}</Field>
           <Field label="Refinance date">{fmtDay(p.refinanceDate)}</Field>
+          <Field label="Refi target">{p.refiTarget ?? "—"}</Field>
           <Field label="Strategy">{p.strategy ?? "—"}</Field>
           <Field label="Sq ft">{p.sqft?.toLocaleString() ?? "—"}</Field>
           <Field label="Entity">{p.llcOwner ?? "—"}</Field>
+          <Field label="Attorney">{p.attorney ?? "—"}</Field>
           <Field label="Status">{p.status ?? "—"}</Field>
           <Field label="Rental registration expires">{fmtDay(p.rentalRegistrationExpiry)}</Field>
+          <Field label="Property tax due">{fmtDay(p.propertyTaxDueDate)}</Field>
         </dl>
       </SectionCard>
     );
@@ -75,13 +88,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
       editing
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={pending}
-            onClick={() => { setEditing(false); clearError(); }}
-          >
+          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={close}>
             Cancel
           </Button>
           <Button type="submit" form={formId} size="sm" disabled={pending}>
@@ -90,27 +97,31 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
         </div>
       }
     >
-      <form id={formId} key={p.version} onSubmit={onSubmit} className="space-y-3">
-        <L label="Address"><Input name="address" defaultValue={p.address} /></L>
+      <form id={formId} onSubmit={onSubmit} className="space-y-3">
+        <L label="Address"><Input name="address" defaultValue={f.address} /></L>
         <div className="grid grid-cols-2 gap-3">
-          <L label="Value"><Input name="value" defaultValue={p.value ?? ""} /></L>
-          <L label="Purchase date"><Input name="purchaseDate" type="date" defaultValue={p.purchaseDate ?? ""} /></L>
-          <L label="Purchase price"><Input name="purchasePrice" defaultValue={p.purchasePrice ?? ""} /></L>
-          <L label="Refinance date"><Input name="refinanceDate" type="date" defaultValue={p.refinanceDate ?? ""} /></L>
+          <L label="Value"><Input name="value" defaultValue={f.value ?? ""} /></L>
+          <L label="Purchase date"><Input name="purchaseDate" type="date" defaultValue={f.purchaseDate ?? ""} /></L>
+          <L label="Purchase price"><Input name="purchasePrice" defaultValue={f.purchasePrice ?? ""} /></L>
+          <L label="Closing costs"><Input name="closingCosts" defaultValue={f.closingCosts ?? ""} /></L>
+          <L label="Rehab amount"><Input name="rehabAmount" defaultValue={f.rehabAmount ?? ""} /></L>
+          <L label="Refinance date"><Input name="refinanceDate" type="date" defaultValue={f.refinanceDate ?? ""} /></L>
+          <L label="Refi target"><Input name="refiTarget" defaultValue={f.refiTarget ?? ""} /></L>
           <L label="Strategy">
-            <Select name="strategy" defaultValue={p.strategy ?? ""}>
+            <Select name="strategy" defaultValue={f.strategy ?? ""}>
               <option value="">—</option>
-              {[...new Set([p.strategy, ...PROPERTY_STRATEGIES].filter(Boolean))].map((s) => (
+              {[...new Set([f.strategy, ...PROPERTY_STRATEGIES].filter(Boolean))].map((s) => (
                 <option key={s as string}>{s as string}</option>
               ))}
             </Select>
           </L>
-          <L label="Sq ft"><Input name="sqft" type="number" defaultValue={p.sqft ?? ""} /></L>
-          <L label="Entity / LLC"><Input name="llcOwner" defaultValue={p.llcOwner ?? ""} /></L>
+          <L label="Sq ft"><Input name="sqft" type="number" defaultValue={f.sqft ?? ""} /></L>
+          <L label="Entity / LLC"><Input name="llcOwner" defaultValue={f.llcOwner ?? ""} /></L>
+          <L label="Attorney"><Input name="attorney" defaultValue={f.attorney ?? ""} /></L>
           <L label="Status">
-            <Select name="status" defaultValue={p.status ?? ""}>
+            <Select name="status" defaultValue={f.status ?? ""}>
               <option value="">—</option>
-              {[...new Set([p.status, ...PROPERTY_STATUSES].filter(Boolean))].map((s) => (
+              {[...new Set([f.status, ...PROPERTY_STATUSES].filter(Boolean))].map((s) => (
                 <option key={s as string}>{s as string}</option>
               ))}
             </Select>
@@ -119,8 +130,11 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
             <Input
               name="rentalRegistrationExpiry"
               type="date"
-              defaultValue={p.rentalRegistrationExpiry ?? ""}
+              defaultValue={f.rentalRegistrationExpiry ?? ""}
             />
+          </L>
+          <L label="Property tax due">
+            <Input name="propertyTaxDueDate" type="date" defaultValue={f.propertyTaxDueDate ?? ""} />
           </L>
         </div>
         {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -129,22 +143,13 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
   );
 }
 
-export function PropertyNotesSection({
-  id,
-  version,
-  notes,
-}: {
-  id: string;
-  version: string;
-  notes: string | null;
-}) {
-  const [editing, setEditing] = useState(false);
-  const { pending, error, onSubmit, clearError } = useSectionSave(patchProperty.bind(null, id), () => setEditing(false));
+export function PropertyNotesSection({ id, notes }: { id: string; notes: string | null }) {
+  const { loaded: f, open, close, pending, error, onSubmit } = useSectionSave(id, { notes });
   const formId = `property-notes-${id}`;
 
-  if (!editing) {
+  if (!f) {
     return (
-      <SectionCard title="Notes" onEdit={() => setEditing(true)}>
+      <SectionCard title="Notes" onEdit={open}>
         {notes ? (
           <p className="whitespace-pre-wrap text-sm">{notes}</p>
         ) : (
@@ -160,13 +165,7 @@ export function PropertyNotesSection({
       editing
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={pending}
-            onClick={() => { setEditing(false); clearError(); }}
-          >
+          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={close}>
             Cancel
           </Button>
           <Button type="submit" form={formId} size="sm" disabled={pending}>
@@ -175,11 +174,11 @@ export function PropertyNotesSection({
         </div>
       }
     >
-      <form id={formId} key={version} onSubmit={onSubmit} className="space-y-2">
+      <form id={formId} onSubmit={onSubmit} className="space-y-2">
         <Textarea
           name="notes"
           rows={6}
-          defaultValue={notes ?? ""}
+          defaultValue={f.notes ?? ""}
           placeholder="Additional notes on this property…"
         />
         {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}

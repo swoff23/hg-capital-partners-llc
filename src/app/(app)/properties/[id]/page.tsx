@@ -147,30 +147,37 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <PropertyDetailsSection
             property={{
               id: property.id,
-              version: property.updatedAt.toISOString(),
               address: property.address,
               llcOwner: property.llcOwner,
+              attorney: property.attorney,
               status: property.status,
               strategy: property.strategy,
+              refiTarget: property.refiTarget,
               purchaseDate: ymd(property.purchaseDate),
               purchasePrice: d(property.purchasePrice),
+              closingCosts: d(property.closingCosts),
+              rehabAmount: d(property.rehabAmount),
               value: d(property.value),
               refinanceDate: ymd(property.refinanceDate),
               sqft: property.sqft,
               rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
+              propertyTaxDueDate: ymd(property.propertyTaxDueDate),
             }}
           />
 
           <PropertyLoanSection
             loan={{
               id: property.id,
-              version: property.updatedAt.toISOString(),
+              value: d(property.value),
+              currentLoan: d(property.currentLoan),
               lender: property.lender,
               loanServicer: property.loanServicer,
               loanNumber: property.loanNumber,
+              loanType: property.loanType,
               loanOriginalAmount: d(property.loanOriginalAmount),
               loanRate: d(property.loanRate),
               loanPaymentMonthly: d(property.loanPaymentMonthly),
+              loanEscrow: property.loanEscrow,
               loanOriginationDate: ymd(property.loanOriginationDate),
               loanMaturityDate: ymd(property.loanMaturityDate),
             }}
@@ -179,10 +186,12 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <PropertyInsuranceSection
             insurance={{
               id: property.id,
-              version: property.updatedAt.toISOString(),
               insuranceCarrier: property.insuranceCarrier,
               insurancePolicyNo: property.insurancePolicyNo,
               insurancePremium: d(property.insurancePremium),
+              insuranceCoverage: d(property.insuranceCoverage),
+              insuranceDeductible: d(property.insuranceDeductible),
+              insuranceLiability: property.insuranceLiability,
               insuranceRenewalDate: ymd(property.insuranceRenewalDate),
               replacementCost: d(property.replacementCost),
             }}
@@ -245,11 +254,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             attachments={property.attachments.map((a) => ({ id: a.id, filename: a.filename, size: a.size }))}
           />
 
-          <PropertyNotesSection
-            id={property.id}
-            version={property.updatedAt.toISOString()}
-            notes={property.notes}
-          />
+          <PropertyNotesSection id={property.id} notes={property.notes} />
           {property.sourceDeal && (
             <p className="text-xs text-muted">
               From deal{" "}

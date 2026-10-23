@@ -1,17 +1,17 @@
 "use client";
-import { useState } from "react";
 import { Button, Input, SectionCard } from "@/components/ui";
-import { cn, fmtMoney } from "@/lib/utils";
-import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
-import { patchProperty } from "../actions";
+import { fmtMoney } from "@/lib/utils";
+import { KeyDate } from "./key-date";
 import { useSectionSave } from "./use-section-save";
 
 export type EditableInsurance = {
   id: string;
-  version: string;
   insuranceCarrier: string | null;
   insurancePolicyNo: string | null;
   insurancePremium: string | null;
+  insuranceCoverage: string | null;
+  insuranceDeductible: string | null;
+  insuranceLiability: string | null;
   insuranceRenewalDate: string | null;
   replacementCost: string | null;
 };
@@ -32,37 +32,21 @@ const L = ({ label, children }: { label: string; children: React.ReactNode }) =>
 );
 
 export function PropertyInsuranceSection({ insurance: p }: { insurance: EditableInsurance }) {
-  const [editing, setEditing] = useState(false);
-  const { pending, error, onSubmit, clearError } = useSectionSave(patchProperty.bind(null, p.id), () => setEditing(false));
+  const { loaded: f, open, close, pending, error, onSubmit } = useSectionSave(p.id, p);
   const formId = `property-insurance-${p.id}`;
 
-  const renewal = p.insuranceRenewalDate;
-  const overdue = isPastDay(renewal);
-
-  if (!editing) {
+  if (!f) {
     return (
-      <SectionCard title="Insurance" onEdit={() => setEditing(true)}>
-        {renewal && (
-          <div className="mb-3 rounded-lg border border-border bg-background px-3 py-2">
-            <div className="text-xs text-muted">Renewal</div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold">{fmtDay(renewal)}</span>
-              <span
-                className={cn(
-                  "text-xs",
-                  overdue ? "font-medium text-red-600 dark:text-red-400" : "text-muted",
-                )}
-              >
-                {relativeDays(renewal)}
-              </span>
-            </div>
-          </div>
-        )}
+      <SectionCard title="Insurance" onEdit={open}>
+        <KeyDate label="Renewal" date={p.insuranceRenewalDate} onAdd={open} />
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <R label="Carrier">{p.insuranceCarrier ?? "—"}</R>
           <R label="Policy #">{p.insurancePolicyNo ?? "—"}</R>
           <R label="Premium">{fmtMoney(p.insurancePremium)}</R>
           <R label="Replacement cost">{fmtMoney(p.replacementCost)}</R>
+          <R label="Coverage">{fmtMoney(p.insuranceCoverage)}</R>
+          <R label="Deductible">{fmtMoney(p.insuranceDeductible)}</R>
+          <R label="Liability">{p.insuranceLiability ?? "—"}</R>
         </div>
       </SectionCard>
     );
@@ -74,7 +58,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
       editing
       actions={
         <div className="flex items-center gap-2">
-          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { setEditing(false); clearError(); }}>
+          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={close}>
             Cancel
           </Button>
           <Button type="submit" form={formId} size="sm" disabled={pending}>
@@ -83,12 +67,15 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
         </div>
       }
     >
-      <form id={formId} key={p.version} onSubmit={onSubmit} className="grid grid-cols-2 gap-3">
-        <L label="Carrier"><Input name="insuranceCarrier" defaultValue={p.insuranceCarrier ?? ""} /></L>
-        <L label="Policy #"><Input name="insurancePolicyNo" defaultValue={p.insurancePolicyNo ?? ""} /></L>
-        <L label="Premium"><Input name="insurancePremium" defaultValue={p.insurancePremium ?? ""} /></L>
-        <L label="Replacement cost"><Input name="replacementCost" defaultValue={p.replacementCost ?? ""} /></L>
-        <L label="Renewal date"><Input name="insuranceRenewalDate" type="date" defaultValue={p.insuranceRenewalDate ?? ""} /></L>
+      <form id={formId} onSubmit={onSubmit} className="grid grid-cols-2 gap-3">
+        <L label="Carrier"><Input name="insuranceCarrier" defaultValue={f.insuranceCarrier ?? ""} /></L>
+        <L label="Policy #"><Input name="insurancePolicyNo" defaultValue={f.insurancePolicyNo ?? ""} /></L>
+        <L label="Premium"><Input name="insurancePremium" defaultValue={f.insurancePremium ?? ""} /></L>
+        <L label="Replacement cost"><Input name="replacementCost" defaultValue={f.replacementCost ?? ""} /></L>
+        <L label="Coverage"><Input name="insuranceCoverage" defaultValue={f.insuranceCoverage ?? ""} /></L>
+        <L label="Deductible"><Input name="insuranceDeductible" defaultValue={f.insuranceDeductible ?? ""} /></L>
+        <L label="Liability"><Input name="insuranceLiability" defaultValue={f.insuranceLiability ?? ""} /></L>
+        <L label="Renewal date"><Input name="insuranceRenewalDate" type="date" defaultValue={f.insuranceRenewalDate ?? ""} /></L>
         {error && <p role="alert" className="col-span-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </form>
     </SectionCard>
