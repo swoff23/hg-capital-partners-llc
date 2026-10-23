@@ -9,6 +9,7 @@ import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
 import { countUnitRecords, parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
 import { CONFLICT_MESSAGE } from "@/lib/action-result";
+import { isAtVersion, staleFields } from "@/lib/properties/edits";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
 /**
@@ -19,8 +20,10 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  *   - an address that normalizes to an existing property's is a duplicate
  *   - money fields parse through one parser; dates are calendar dates
  *   - editing a key date re-syncs that property's reminder tasks
+ *   - a field save is refused when a field it changes moved after the
+ *     editor loaded it (edits.ts)
  *   - whole-blob saves (units, building CapEx, listings) are guarded by the
- *     Property.updatedAt the editor rendered with
+ *     Property.updatedAt the editor pinned when Edit opened
  */
 
 function revalidateProperty(id: string): void {
@@ -103,7 +106,12 @@ const KEY_DATE_FIELDS = [
  */
 export type PropertyPatch = Partial<Record<string, string | null>>;
 
-export async function patchProperty(id: string, patch: PropertyPatch): Promise<void> {
+/**
+ * `expected` holds, for each field the editor changed, the value it loaded
+ * (edits.ts changedFields). A field whose stored value has moved off that
+ * was saved by someone else meanwhile, and then nothing is written.
+ */
+export async function patchProperty(id: string, patch: PropertyPatch, expected: Record<string, string> = {}): Promise<void> {
   const has = (k: string) => Object.prototype.hasOwnProperty.call(patch, k);
   const s = (k: string) => patch[k]?.trim() || null;
 
@@ -118,6 +126,7 @@ export async function patchProperty(id: string, patch: PropertyPatch): Promise<v
     else bad.push(k);
   }
   for (const k of DATE_FIELDS) if (has(k)) data[k] = ymdToDate(s(k));
+  if (has("loanEscrow")) data.loanEscrow = s("loanEscrow") === "yes";
   if (has("sqft")) {
     const r = readWholeNumber(patch.sqft);
     if (r.ok) data.sqft = r.value;
@@ -126,7 +135,20 @@ export async function patchProperty(id: string, patch: PropertyPatch): Promise<v
   // Nothing is written when a number didn't read: storing null would erase what's there.
   if (bad.length) throw new Error(badNumbersMessage(bad));
 
-  if (Object.keys(data).length > 0) await prisma.property.update({ where: { id }, data });
+  const guarded = Object.keys(expected).filter((k) => k in data);
+  if (guarded.length > 0) {
+    const current = await prisma.property.findUnique({ where: { id } });
+    const edits = {
+      changes: Object.fromEntries(guarded.map((k) => [k, patch[k] ?? ""])),
+      expected: Object.fromEntries(guarded.map((k) => [k, expected[k]])),
+    };
+    if (!current || staleFields(current, edits).length > 0) throw new Error(CONFLICT_MESSAGE);
+    // At the version just read, so a save that lands in between is refused too.
+    const r = await prisma.property.updateMany({ where: { id, updatedAt: current.updatedAt }, data });
+    if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
+  } else if (Object.keys(data).length > 0) {
+    await prisma.property.update({ where: { id }, data });
+  }
   if (KEY_DATE_FIELDS.some((k) => has(k))) await syncPropertyReminders(id);
   revalidateProperty(id);
 }
@@ -236,7 +258,7 @@ export async function replaceUnits(id: string, units: PropertyUnit[], expectedVe
   }));
   const renamed = await prisma.$transaction(async (tx) => {
     const current = await tx.property.findUnique({ where: { id }, select: { units: true, unitCount: true, updatedAt: true } });
-    if (!current || current.updatedAt.getTime() !== versionDate(expectedVersion).getTime()) throw new Error(CONFLICT_MESSAGE);
+    if (!current || !isAtVersion(current.updatedAt, expectedVersion)) throw new Error(CONFLICT_MESSAGE);
     const before = parseUnits(current.units);
     const { units: stored, renames } = reconcileUnits(before, clean, randomUUID);
     // The count is the unit records (propertyUnitCount); store it so the column never disagrees.
@@ -277,7 +299,7 @@ export type BuildingCapexPatch = Record<string, { year?: string | null; type?: s
  */
 export async function mergeBuildingCapex(id: string, patch: BuildingCapexPatch, expectedVersion: string): Promise<void> {
   const current = await prisma.property.findUnique({ where: { id }, select: { buildingCapex: true, updatedAt: true } });
-  if (!current || current.updatedAt.getTime() !== versionDate(expectedVersion).getTime()) throw new Error(CONFLICT_MESSAGE);
+  if (!current || !isAtVersion(current.updatedAt, expectedVersion)) throw new Error(CONFLICT_MESSAGE);
 
   const clean: Record<string, BuildingCapexEntry> = { ...(parseBuildingCapex(current.buildingCapex) as Record<string, BuildingCapexEntry>) };
   for (const [key, v] of Object.entries(patch)) {

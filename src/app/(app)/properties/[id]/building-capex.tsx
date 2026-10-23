@@ -11,6 +11,7 @@ import {
   type CapexRules,
   type EquipmentStatus,
 } from "@/lib/property-types";
+import { callAction } from "@/lib/action-result";
 import { updateBuildingCapex } from "../actions";
 
 const inp =
@@ -58,7 +59,7 @@ export function BuildingCapexSection({
   rules,
 }: {
   propertyId: string;
-  /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
+  /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
   version: string;
   initial: BuildingCapexData;
   rules: CapexRules;
@@ -66,6 +67,9 @@ export function BuildingCapexSection({
   const items = rules.building;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial, items));
+  // The version Edit opened at. A save in another card refreshes the page with a
+  // newer one, and sending that would let this draft overwrite a partner's change.
+  const [editVersion, setEditVersion] = useState(version);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -92,13 +96,21 @@ export function BuildingCapexSection({
     }
     setError(null);
     start(async () => {
-      const r = await updateBuildingCapex(propertyId, payload, version);
+      const r = await callAction(() => updateBuildingCapex(propertyId, payload, editVersion));
       if (!r.ok) {
         setError(r.error);
         return;
       }
       setEditing(false);
     });
+  }
+
+  /** Start from what's saved now, at the version it was saved at. */
+  function edit() {
+    setError(null);
+    setDraft(toDraft(initial, items));
+    setEditVersion(version);
+    setEditing(true);
   }
 
   function cancel() {
@@ -139,7 +151,7 @@ export function BuildingCapexSection({
           </div>
         ) : (
           <button
-            onClick={() => setEditing(true)}
+            onClick={edit}
             className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
           >
             Edit

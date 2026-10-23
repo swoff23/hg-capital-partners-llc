@@ -56,7 +56,7 @@ export function ListingsSection({
   unitLabels,
 }: {
   propertyId: string;
-  /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
+  /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
   version: string;
   initial: EditableListing[];
   /** Unit labels from the Units & access section above — the only valid choices, so the two stay consistent. */
@@ -64,6 +64,9 @@ export function ListingsSection({
 }) {
   const [editing, setEditing] = useState(false);
   const [listings, setListings] = useState<EditableListing[]>(structuredClone(initial));
+  // The version Edit opened at. A save in another card refreshes the page with a
+  // newer one, and sending that would let this draft overwrite a partner's change.
+  const [editVersion, setEditVersion] = useState(version);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -98,7 +101,7 @@ export function ListingsSection({
       return;
     }
     start(async () => {
-      const r = await callAction(() => updatePropertyListings(propertyId, listings, version));
+      const r = await callAction(() => updatePropertyListings(propertyId, listings, editVersion));
       if (!r.ok) {
         setError(r.error);
         setConfirmOpen(false);
@@ -127,7 +130,14 @@ export function ListingsSection({
         <h3 className="text-sm font-semibold">Rentals</h3>
         {!editing ? (
           <button
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              // Start from what's saved now: after a save the page brings each new
+              // listing's id, and a draft still holding a null id would delete that
+              // listing with its photo files and add it back as a new one.
+              setListings(structuredClone(initial));
+              setEditVersion(version);
+              setEditing(true);
+            }}
             className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
           >
             Edit

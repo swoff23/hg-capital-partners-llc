@@ -178,16 +178,29 @@ export const UTILITY_GROUPS: { name: string; fields: [keyof UnitUtilities, strin
   },
 ];
 
-/** These utility fields are a set status, not free text. */
+/**
+ * These utility fields are a set status, not free text. National Grid's LOFL
+ * isn't one: every unit stores an account-style number there ("81531-59050"),
+ * so it edits as text (PROPERTY-V01).
+ */
 export const UTILITY_STATUS_FIELDS = new Set<keyof UnitUtilities>([
   "nationalGridAutopay",
-  "nationalGridLofl",
   "nationalFuelAutopay",
   "nationalFuelLofl",
   "waterAutopay",
 ]);
 
 export const UTILITY_STATUS_OPTIONS = ["Done", "Need to set up", "Call to confirm", "NA"] as const;
+
+/**
+ * What a status select offers: the set statuses, led by the stored value when
+ * it isn't one of them, so the select shows what's there and keeps it unless
+ * someone picks another.
+ */
+export function utilityStatusChoices(stored: string | null | undefined): string[] {
+  const options: string[] = [...UTILITY_STATUS_OPTIONS];
+  return stored?.trim() && !options.includes(stored) ? [stored, ...options] : options;
+}
 
 export function utilityStatusTone(v: string | null | undefined): "green" | "red" | "amber" | "gray" {
   switch ((v ?? "").trim().toLowerCase()) {
