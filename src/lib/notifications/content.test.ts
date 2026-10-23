@@ -56,7 +56,7 @@ test("each change reads as one line without the title", () => {
   assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}" for Thu, Oct 29`)), "assigned you this job for Thu, Oct 29");
   assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}" for Tue, Jan 5, 2027`)), "assigned you this job for Tue, Jan 5, 2027");
   assert.equal(itemText(item("ASSIGNED", `assigned you "Quote \"A\" for B"`)), "assigned you this job");
-  assert.equal(itemText(item("STATUS", `set "${TITLE}" to in progress`)), "started the job");
+  assert.equal(itemText(item("STATUS", `started "${TITLE}"`, "Zack Smith")), "started the job");
   assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
   assert.equal(itemText(item("STATUS", `set "${TITLE}" to open`)), "moved it to To do");
   assert.equal(itemText(item("STATUS", `sent "${TITLE}" back: Level the uppers`)), "sent it back: Level the uppers");
@@ -64,6 +64,49 @@ test("each change reads as one line without the title", () => {
   assert.equal(itemText(item("COMMENT", "added files (+2 files)")), "added 2 files");
   assert.equal(itemText(item("COMMENT", "added files (+1 file)")), "added 1 file");
   assert.equal(itemText(item("ATTACHMENT", "added IMG_0042.jpg")), "added IMG_0042.jpg");
+});
+
+test("Approve says approved, and only the contractor's own Start says started (BCONTRACT-008)", () => {
+  assert.equal(itemLines([item("STATUS", `approved "${TITLE}"`)])[0], "Connor approved it");
+  // A partner moving the job to In progress didn't start the work.
+  assert.equal(itemLines([item("STATUS", `set "${TITLE}" to in progress`)])[0], "Connor moved it to In progress");
+  assert.equal(itemLines([item("STATUS", `started "${TITLE}"`, "Zack Smith")])[0], "Zack started the job");
+  // A title with a quote in it still reads whole.
+  assert.equal(itemText(item("STATUS", `approved "Hang 36" mirror"`)), "approved it");
+});
+
+test("subject: sent back, scheduled and approved say so (BCONTRACT-007)", () => {
+  assert.equal(emailSubject([item("STATUS", `sent "${TITLE}" back: Level the uppers`)], TITLE), "Connor sent back Cabinet install");
+  // The visit date moved again within the same email: the subject gives the new date, or none if it was cleared.
+  const scheduled = item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`);
+  assert.equal(emailSubject([scheduled, item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)], TITLE), "Connor scheduled Cabinet install for Fri, Oct 30");
+  assert.equal(emailSubject([scheduled, item("TARGET", `moved "${TITLE}" to no date`)], TITLE), "Connor updated Cabinet install");
+  assert.equal(emailSubject([item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), scheduled], TITLE), "Connor scheduled Cabinet install for Thu, Oct 29");
+  assert.equal(
+    emailSubject([item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`), item("COMMENT", '"Side door"', "Pieter Hoff")], TITLE),
+    "Connor scheduled Cabinet install for Thu, Oct 29",
+  );
+  assert.equal(emailSubject([item("COMMENT", '"Looks great"'), item("STATUS", `approved "${TITLE}"`, "Pieter Hoff")], TITLE), "Pieter approved Cabinet install");
+  // The latest status change decides: sent back, then approved, reads approved.
+  assert.equal(
+    emailSubject([item("STATUS", `sent "${TITLE}" back`), item("STATUS", `approved "${TITLE}"`)], TITLE),
+    "Connor approved Cabinet install",
+  );
+  // Approved, then reopened: the job isn't approved any more.
+  assert.equal(
+    emailSubject([item("STATUS", `approved "${TITLE}"`), item("STATUS", `set "${TITLE}" to in progress`)], TITLE),
+    "Connor updated Cabinet install",
+  );
+  // Assigned with a visit date: the assignment line already has the date.
+  assert.equal(emailSubject([item("ASSIGNED", `assigned you "${TITLE}" for Thu, Oct 29`)], TITLE), "Connor assigned you Cabinet install");
+});
+
+test("the job line names the unit as My jobs does (BCONTRACT-V03)", () => {
+  const base = { items: [item("NOTES", "updated the notes")], title: "Bathroom tile", audience: "contractor" as const, appUrl: "https://hg.example.com", taskId: "t1" };
+  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: "Upper" }).line, "Bathroom tile, 415 Crescent Ave · Upper");
+  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: " 2 " }).line, "Bathroom tile, 415 Crescent Ave · 2");
+  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: null }).line, "Bathroom tile, 415 Crescent Ave");
+  assert.equal(taskEmail({ ...base, address: null, unitLabel: null }).line, "Bathroom tile");
 });
 
 test("a scheduled job's email gives the visit date", () => {

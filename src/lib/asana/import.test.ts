@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Tx } from "@/lib/tasks/core";
 import { notifyAudience, type NotifyChange } from "@/lib/tasks/rules";
-import { ASANA_PRINCIPAL, deleteCsvRows, StalePlanError, writeAttachment, writeIdentity, writeTask, writeTemplate } from "./import";
+import { ASANA_PRINCIPAL, deleteCsvRows, linkLegacyAssignee, StalePlanError, writeAttachment, writeIdentity, writeTask, writeTemplate } from "./import";
 import { buildPlan, type DbContact, type DbUser, type TaskPlan } from "./map";
 import { buildFixture, DEFAULT_WORLD } from "./__fixtures__/snapshot";
 
@@ -65,6 +65,12 @@ function fakeTx(opts: { appEditedAt?: Date | null; task?: Record<string, unknown
       case "update":
         return { id: `${model}-${calls.length}`, ...(args.data as object) };
       case "updateMany":
+        // The legacy link's compare-and-set: it matches only while the row still has nobody but that name.
+        if (model === "task" && args.where && "assigneeName" in args.where) {
+          const row: Record<string, unknown> = { assigneeUserId: null, assigneeContactId: null, assigneeName: null, ...opts.task };
+          const where = args.where;
+          return { count: ["assigneeUserId", "assigneeContactId", "assigneeName"].every((k) => where[k] === row[k]) ? 1 : 0 };
+        }
         // The writer's compare-and-set: it matches only while appEditedAt is what the plan saw.
         if (model === "task") {
           const want = args.where?.appEditedAt as Date | null | undefined;
@@ -179,6 +185,33 @@ test("closing a repeating contractor job from Asana creates the next copy withou
   const r = await writeTask(tx, tp);
   assert.ok(r.nextRepeatId, "next copy created");
   assert.ok(calls.some((c) => c.model === "portalAccount"), "core checked the contractor's login and still sent nothing");
+});
+
+test("linking a name-only assignee: one compare-and-set, an ASSIGNED line keeping the name, the contractor's access, no email", async () => {
+  const { tx, calls } = fakeTx({ task: { assigneeName: "José Alvarez" } });
+  const now = new Date("2026-10-27T14:00:00Z");
+  assert.equal(await linkLegacyAssignee(tx, { taskId: "t9", name: "José Alvarez", assignee: { contactId: "c-jose" } }, now), true);
+  const set = calls.find((c) => c.model === "task" && c.op === "updateMany")!;
+  assert.deepEqual(set.args, {
+    where: { id: "t9", assigneeUserId: null, assigneeContactId: null, assigneeName: "José Alvarez", status: { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW"] } },
+    // appEditedAt: a load or delta plan made before the link is then stale (StalePlanError) instead of revoking the access.
+    data: { assigneeUserId: null, assigneeContactId: "c-jose", assigneeName: null, assigneeEmail: null, appEditedAt: now },
+  });
+  const ev = calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as { data: { kind: string; source: string; data: { from: { name: string } } } };
+  assert.deepEqual([ev.data.kind, ev.data.source, ev.data.data.from.name], ["ASSIGNED", "ASANA", "José Alvarez"]);
+  assert.ok(calls.some((c) => c.model === "taskAccess" && c.op === "upsert"), "D12: the job reaches him");
+  assert.ok(!calls.some((c) => c.model === "task" && c.op === "update"), "never a read and then a separate write");
+});
+
+test("a name-only task picked in the app since the plan isn't linked over the pick", async () => {
+  // Pieter picked Connor in the app after the plan: the row no longer has only the name.
+  const { tx, calls } = fakeTx({ task: { assigneeUserId: "u-connor", assigneeContactId: null, assigneeName: null } });
+  assert.equal(await linkLegacyAssignee(tx, { taskId: "t9", name: "José Alvarez", assignee: { userId: "u-connor" } }), false);
+  assert.deepEqual(
+    calls.filter((c) => c.op !== "updateMany").map((c) => `${c.model}.${c.op}`),
+    [],
+    "no timeline line, no access change",
+  );
 });
 
 test("a task the app edited after planning is skipped, not overwritten", async () => {

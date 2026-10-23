@@ -22,6 +22,14 @@ test("html version has exactly one button pointing at the link", () => {
   assert.ok(html.includes(">Choose a new password</a>"));
 });
 
+test("html declares its charset and a phone-width viewport, before the body", () => {
+  const { html } = renderPlainEmail(input);
+  const head = html.slice(html.indexOf("<head>"), html.indexOf("</head>"));
+  assert.ok(html.indexOf("</head>") < html.indexOf("<body"));
+  assert.ok(head.includes('<meta charset="utf-8">'));
+  assert.ok(head.includes('<meta name="viewport" content="width=device-width, initial-scale=1">'));
+});
+
 test("user-supplied text is escaped in html", () => {
   const { html } = renderPlainEmail({ ...input, line: `Fix <script>alert("x")</script> & go` });
   assert.ok(!html.includes("<script>"));

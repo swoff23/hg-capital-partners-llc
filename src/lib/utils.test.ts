@@ -20,6 +20,23 @@ test("initials: first letters of the first two words", () => {
   assert.equal(initials("J. Smith"), "JS");
 });
 
+test("initials: letters only, never punctuation or what's in parentheses", () => {
+  assert.equal(initials("Jacob (Jake) hoak"), "JH");
+  assert.equal(initials("Zack (Outlaw Carpentry)"), "Z");
+  assert.equal(initials("Mike Morris (Freedom Electric)"), "MM");
+  assert.equal(initials("Zack(Outlaw"), "Z");
+  assert.equal(initials("Dust 2 Sparkles"), "DS");
+  assert.equal(initials("Richard O'Neil"), "RO");
+  assert.equal(initials("José Álvarez"), "JÁ");
+  assert.equal(initials("(Jake)", "jake@example.com"), "J");
+});
+
+test("initials: a name that is an email address uses its local part", () => {
+  assert.equal(initials("fred.smith@example.com"), "FS");
+  assert.equal(initials("zack+jobs@example.com"), "Z");
+  assert.equal(initials("@example.com", "pieter@example.com"), "P");
+});
+
 test("initials: the email's local part stands in for a missing name", () => {
   assert.equal(initials(null, "zack.smith@example.com"), "ZS");
   assert.equal(initials("", "jacob_m@example.com"), "JM");

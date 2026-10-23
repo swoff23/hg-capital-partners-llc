@@ -489,6 +489,28 @@ test("load: assignees are users, confirmed contacts, or the name as text", () =>
   assert.ok(unmatched.includes("Rae Realtor"));
 });
 
+test("load: someone who gets a Contact after the load is linked on the next run, unless the app reassigned the task", () => {
+  const rows = rowsAfter(plan);
+  const gutter = rows.find((r) => r.title === "Gutter cleaning")!;
+  assert.deepEqual([gutter.assigneeName, gutter.assigneeContactId], ["Rae Realtor", null]);
+  const rae: DbContact = { id: "c-rae", fullName: "Rae Realtor", email: "rae@realty.example", asanaGid: null, active: true };
+
+  const next = buildPlan(inputOf(snap), dbOf({ tasks: rows, contacts: [...CONTACTS, rae] }), opts);
+  const linked = next.tasks.find((t) => t.taskId === gutter.id)!;
+  assert.equal(linked.write.assigneeContactId, "c-rae");
+  assert.equal(linked.write.assigneeName, null);
+  assert.equal(linked.contactId, "c-rae", "her access follows");
+  assert.deepEqual(linked.conflicts, []);
+
+  // Meanwhile Connor took the job in the app: he keeps it, and a conflict line says so.
+  const taken = rows.map((r) =>
+    r.id === gutter.id ? { ...r, assigneeName: null, assigneeEmail: null, assigneeUserId: "u-connor", appEditedAt: new Date("2026-10-24T15:00:00Z") } : r,
+  );
+  const kept = buildPlan(inputOf(snap), dbOf({ tasks: taken, contacts: [...CONTACTS, rae] }), opts).tasks.find((t) => t.taskId === gutter.id)!;
+  assert.equal(kept.write.assigneeContactId, undefined);
+  assert.deepEqual(kept.conflicts.map((c) => c.field), ["assignee"]);
+});
+
 test("load: dates go through dates.ts, created times come from Asana", () => {
   const painted = taskNamed(plan, "Paint the hallway");
   assert.equal(painted.write.dueDate, "2026-10-25"); // due_at at 10:30pm Eastern

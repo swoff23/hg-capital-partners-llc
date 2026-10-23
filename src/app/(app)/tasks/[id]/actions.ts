@@ -27,6 +27,8 @@ const patchSchema = z
     propertyId: id.nullable(),
     unitLabel: z.string().max(100).nullable(),
     assignee,
+    // The assignee the page showed: a reassignment from a stale page is refused.
+    expectedAssignee: assignee,
     waitingOn: z.string().max(300).nullable(),
     repeatRule: repeatRuleSchema.nullable(),
   })

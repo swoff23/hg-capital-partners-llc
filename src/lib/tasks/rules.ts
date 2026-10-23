@@ -31,6 +31,35 @@ export function statusEventVisibility(to: TaskStatus, hasContractor: boolean): V
   return hasContractor && CONTRACTOR_VISIBLE_STATUS.includes(to) ? "SHARED" : "INTERNAL";
 }
 
+/**
+ * Who a staff or system write is addressed to: the contractor assigned when
+ * it's written, or null with none. Stamped on the event and the file
+ * (`audienceContactId`), so a reply to Zack stays Zack's after the job moves
+ * to someone else. Contractor rows already say whose they are, and imported
+ * rows stay visible to the assignee (D17), so neither carries one.
+ */
+export function writeAudience(actor: PrincipalKind, assigneeContactId: string | null): string | null {
+  return actor === "staff" || actor === "system" ? assigneeContactId : null;
+}
+
+/**
+ * Whose rows a contractor sees on a job they can open (docs/asana-migration-plan.md
+ * §5.1, "other contractors are never shown"): their own; imported Asana
+ * history (D17: they could already see it there); and staff or system rows
+ * addressed to them or to nobody in particular. Never another contractor's,
+ * and never staff replies to another contractor. Visibility (Shared) and the
+ * kind allowlist are checked separately. portalEvents and visibleFile in
+ * src/lib/portal/queries.ts apply the same rule in SQL.
+ */
+export function contractorSeesRow(
+  row: { imported: boolean; actorContactId: string | null; audienceContactId: string | null },
+  contactId: string,
+): boolean {
+  if (row.imported) return true;
+  if (row.actorContactId !== null) return row.actorContactId === contactId;
+  return row.audienceContactId === null || row.audienceContactId === contactId;
+}
+
 /** What a contractor sees as "Target": the visit date while Scheduled, otherwise the due date. */
 export function targetDate(t: { status: TaskStatus; scheduledFor: Date | null; dueDate: Date | null }): Date | null {
   return t.status === "SCHEDULED" && t.scheduledFor ? t.scheduledFor : t.dueDate;

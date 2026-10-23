@@ -354,6 +354,12 @@ model TaskAttachment {
   uploadedByUserId    String?
   uploadedByContact   Contact? @relation("AttachmentUploadedByContact", fields: [uploadedByContactId], references: [id], onDelete: SetNull)
   uploadedByContactId String?
+  // A staff upload's contractor: whoever was assigned when it was Shared. The
+  // portal shows it to that contractor only, never to the next one on the
+  // job (src/lib/portal/queries.ts). Null when no contractor was assigned. No
+  // foreign key on purpose: if the contact is deleted the file stays theirs
+  // instead of turning visible to everyone.
+  audienceContactId   String?
 
   thumbPathname  String? // ~1024px JPEG, for grids
   posterPathname String? // a frame of a video
@@ -407,6 +413,11 @@ model TaskEvent {
   actorContact   Contact?      @relation(fields: [actorContactId], references: [id], onDelete: SetNull)
   actorContactId String?
   actorLabel     String // kept even if the person is later deleted: "Connor Swofford", "Zack (Outlaw Carpentry)", "Property reminder"
+  // On a Shared staff or system event: the contractor assigned when it was
+  // written, so a reply to Zack never reaches whoever gets the job next
+  // (src/lib/portal/queries.ts). Null when no contractor was assigned, and on
+  // contractor and imported rows. No foreign key, as on TaskAttachment.
+  audienceContactId String?
   body           String?       @db.Text
   data           Json          @default("{}") // from/to values, imported HTML
   source         EventSource   @default(APP)

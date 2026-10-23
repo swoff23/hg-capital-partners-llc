@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describeRepeat, isUntouchedCopy, nextOccurrence, parseRepeatRule, repeatCreatedCopy, type RepeatCopyTrace } from "./repeat";
+import {
+  describeRepeat,
+  firstOccurrence,
+  isUntouchedCopy,
+  nextOccurrence,
+  parseRepeatRule,
+  repeatCreatedCopy,
+  repeatDue,
+  type RepeatCopyTrace,
+} from "./repeat";
 
 test("parseRepeatRule: valid rules, defaults, junk", () => {
   assert.deepEqual(parseRepeatRule({ freq: "monthly" }), { freq: "monthly", interval: 1 });
@@ -30,6 +39,31 @@ test("nextOccurrence: quarterly and yearly", () => {
   assert.equal(nextOccurrence({ freq: "quarterly", interval: 1, dayOfMonth: 15 }, "2026-10-01"), "2027-01-15");
   assert.equal(nextOccurrence({ freq: "yearly", interval: 1 }, "2028-02-29"), "2029-02-28");
   assert.equal(nextOccurrence({ freq: "yearly", interval: 1 }, "2026-02-15"), "2027-02-15");
+});
+
+test("firstOccurrence: the first day on or after today the rule lands on", () => {
+  const today = "2026-10-23";
+  assert.equal(firstOccurrence({ freq: "weeks", interval: 2 }, today), today);
+  assert.equal(firstOccurrence({ freq: "days", interval: 1 }, today), today);
+  assert.equal(firstOccurrence({ freq: "yearly", interval: 1 }, today), today);
+  assert.equal(firstOccurrence({ freq: "monthly", interval: 1, dayOfMonth: 23 }, today), today);
+  assert.equal(firstOccurrence({ freq: "monthly", interval: 1, dayOfMonth: 28 }, today), "2026-10-28");
+  assert.equal(firstOccurrence({ freq: "monthly", interval: 1, dayOfMonth: 5 }, today), "2026-11-05");
+  assert.equal(firstOccurrence({ freq: "quarterly", interval: 1, dayOfMonth: 1 }, today), "2026-11-01");
+  assert.equal(firstOccurrence({ freq: "monthly", interval: 1, dayOfMonth: 31 }, "2026-11-10"), "2026-11-30", "clamped to a short month");
+  assert.equal(firstOccurrence({ freq: "monthly", interval: 1, dayOfMonth: 31 }, "2027-02-01"), "2027-02-28");
+  assert.equal(firstOccurrence({ freq: "monthly", interval: 1, dayOfMonth: 30 }, "2027-01-31"), "2027-02-28", "passed this month, clamped next");
+  assert.equal(firstOccurrence({ freq: "monthly", interval: 1, dayOfMonth: 15 }, "2026-12-20"), "2027-01-15", "across the year");
+});
+
+test("repeatDue: a repeating task never starts undated", () => {
+  const monthly5 = { freq: "monthly" as const, interval: 1, dayOfMonth: 5 };
+  assert.equal(repeatDue(monthly5, "2026-11-15", "2026-10-23"), "2026-11-15", "a date given is kept");
+  assert.equal(repeatDue(monthly5, null, "2026-10-23"), "2026-11-05");
+  assert.equal(repeatDue(monthly5, "", "2026-10-23"), "2026-11-05");
+  assert.equal(repeatDue({ freq: "weeks", interval: 1 }, undefined, "2026-10-23"), "2026-10-23");
+  assert.equal(repeatDue(null, null, "2026-10-23"), null, "no repeat, no date");
+  assert.equal(repeatDue(undefined, "2026-11-15", "2026-10-23"), "2026-11-15");
 });
 
 test("describeRepeat", () => {

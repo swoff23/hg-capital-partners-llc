@@ -1,7 +1,7 @@
 import { HG_TIME_ZONE, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL } from "@/lib/task-scope";
-import { firstName, joinNames } from "@/lib/portal/job-view";
+import { addressLine, firstName, joinNames } from "@/lib/portal/job-view";
 
 /**
  * What a bundled task email says, who it goes to, and the send rules
@@ -105,8 +105,10 @@ export function itemText(item: OutboxItem): string {
     case "STATUS": {
       const scheduled = /^scheduled ".*" for (.+)$/.exec(s);
       if (scheduled) return `scheduled it for ${scheduled[1]}`;
+      if (/^approved ".*"$/.test(s)) return "approved it";
+      // Only the contractor's own Start reads as starting the job (core.ts statusSummary).
+      if (/^started ".*"$/.test(s)) return "started the job";
       const set = /^set ".*" to (.+)$/.exec(s);
-      if (set?.[1] === "in progress") return "started the job";
       if (set) return `moved it to ${STATUS_BY_WORDS.get(set[1]) ?? set[1]}`;
       if (/^marked ".*" done$/.test(s)) return "marked it done";
       const back = /^sent ".*" back(: .+)?$/.exec(s);
@@ -138,14 +140,45 @@ export function itemLines(items: OutboxItem[]): string[] {
 }
 
 /**
+ * The subject for a status change that tells the recipient where the job
+ * stands, in the same words as its line: "Connor sent back Cabinet install",
+ * "Connor scheduled Cabinet install for Thu, Oct 29", "Connor approved
+ * Cabinet install". Null for any other change.
+ */
+function statusSubject(item: OutboxItem, what: string, laterTarget: OutboxItem | undefined): string | null {
+  const s = oneLine(item.summary);
+  const who = firstName(item.actorLabel) || "HG";
+  if (/^sent ".*" back(: .+)?$/.test(s)) return `${who} sent back ${what}`;
+  const scheduled = /^scheduled ".*" for (.+)$/.exec(s);
+  if (scheduled) {
+    // The visit date moved again in the same email: the subject gives the new
+    // one, since it's often all that's read; a cleared date says "updated".
+    if (laterTarget) {
+      const moved = /^moved ".*" to (.+)$/.exec(oneLine(laterTarget.summary));
+      return moved && moved[1] !== "no date" ? `${who} scheduled ${what} for ${moved[1]}` : null;
+    }
+    return `${who} scheduled ${what} for ${scheduled[1]}`;
+  }
+  if (/^approved ".*"$/.test(s)) return `${who} approved ${what}`;
+  return null;
+}
+
+/**
  * "Connor updated Cabinet install", "Zack marked Fix front steps done",
- * "Connor assigned you Bathroom tile".
+ * "Connor assigned you Bathroom tile". A bundle whose latest status change is
+ * sent back, scheduled or approved says that instead of "updated", so the
+ * inbox shows whether the job needs anything; a later status change (say a
+ * reopen after an approve) falls back to "updated".
  */
 export function emailSubject(items: OutboxItem[], title: string): string {
   const who = joinNames([...new Set(items.map((i) => firstName(i.actorLabel)))]) || "HG";
   const what = oneLine(title) || "a job";
   const single = new Set(items.map((i) => i.actorLabel)).size === 1;
   if (single && items.some((i) => i.kind === "STATUS" && /^marked\b/.test(i.summary))) return `${who} marked ${what} done`;
+  const at = items.findLastIndex((i) => i.kind === "STATUS");
+  const laterTarget = at < 0 ? undefined : items.slice(at + 1).findLast((i) => i.kind === "TARGET");
+  const outcome = at >= 0 && statusSubject(items[at], what, laterTarget);
+  if (outcome) return outcome;
   if (items.length > 0 && items.every((i) => i.kind === "ASSIGNED")) return `${who} assigned you ${what}`;
   return `${who} updated ${what}`;
 }
@@ -159,15 +192,22 @@ export interface TaskEmail {
   buttonUrl: string;
 }
 
+/**
+ * The job line: "Cabinet install, 23 Sherwood St · Upper", the street and
+ * unit as My jobs shows them (job-view.ts addressLine), so the email names
+ * the same unit whose lockbox code the job page shows (D21).
+ */
 export function taskEmail(input: {
   items: OutboxItem[];
   title: string;
   address: string | null;
+  unitLabel?: string | null;
   audience: Audience;
   appUrl: string;
   taskId: string;
 }): TaskEmail {
-  const where = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
+  const street = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
+  const where = addressLine(street || null, input.unitLabel ? oneLine(input.unitLabel) : null);
   return {
     subject: emailSubject(input.items, input.title),
     line: where ? `${oneLine(input.title)}, ${where}` : oneLine(input.title),

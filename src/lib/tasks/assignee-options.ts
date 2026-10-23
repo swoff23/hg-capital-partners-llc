@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { cleanTrades } from "@/lib/contacts";
 import type { AssigneeContractor, AssigneeUser } from "@/components/assignee-picker";
 
 /**
@@ -31,7 +32,7 @@ export async function assigneeOptions(include: (string | null | undefined)[] = [
     contractors: contacts.map((c) => ({
       id: c.id,
       name: c.fullName,
-      trade: c.trades?.trim() || null,
+      trade: cleanTrades(c.trades),
       hasLogin: c.portalAccount?.status === "ACTIVE",
     })),
   };

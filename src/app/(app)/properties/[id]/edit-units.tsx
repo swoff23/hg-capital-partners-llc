@@ -89,7 +89,12 @@ export function UnitsSection({
         <h3 className="text-sm font-semibold">Units &amp; access</h3>
         {!editing ? (
           <button
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              // Start from what's saved now: after a save the page brings each new unit's
+              // id, and a rename only reaches its tasks when the ids it sends are those.
+              setUnits(structuredClone(initial));
+              setEditing(true);
+            }}
             className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
           >
             Edit
@@ -114,7 +119,7 @@ export function UnitsSection({
           <ReadUnits units={initial} rules={rules} />
         ) : (
           units.map((u, i) => (
-            <EditUnitCard key={i} unit={u} index={i} mutate={mutate} rules={rules} />
+            <EditUnitCard key={u.id ?? `new-${i}`} unit={u} index={i} mutate={mutate} rules={rules} />
           ))
         )}
       </div>

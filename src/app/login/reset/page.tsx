@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { getEnv } from "@/lib/env";
 import { PASSWORD_MESSAGES, isPasswordProblem, MIN_PASSWORD_LENGTH } from "@/lib/portal/credentials";
 import { resetTokenIsUsable } from "@/lib/portal/reset";
-import { AuthError, AuthFrame, authButtonClass, authInputClass, authLinkClass } from "../_components/auth-frame";
+import { AuthError, AuthFrame, authInputClass, authLinkClass } from "../_components/auth-frame";
+import { AuthSubmit } from "../_components/auth-submit";
 
 // The token is in the URL, so the page never sends it on as a Referer. The
 // HTTP headers (Referrer-Policy, Cache-Control: no-store) are set for this
@@ -60,9 +61,10 @@ export default async function ResetPasswordPage({ searchParams }: PageProps<"/lo
           required
           className={authInputClass}
         />
-        <button type="submit" className={authButtonClass}>
+        {/* native: a second tap would spend the single-use token again and land on "This link has expired". */}
+        <AuthSubmit native pendingLabel="Saving…">
           Save password
-        </button>
+        </AuthSubmit>
       </form>
     </AuthFrame>
   );

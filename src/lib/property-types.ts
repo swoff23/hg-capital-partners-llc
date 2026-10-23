@@ -17,6 +17,12 @@ export type UnitEquipment = {
 };
 
 export type PropertyUnit = {
+  /**
+   * Stable for the unit's life (G2C-001): written once by the units save
+   * (reconcileUnits) and kept through renames. Units saved before ids
+   * existed have none until their property's next units save.
+   */
+  id?: string | null;
   label?: string | null;
   lockboxCode?: string | null;
   utilities?: UnitUtilities;
@@ -46,6 +52,81 @@ export function parseUnits(json: unknown): PropertyUnit[] {
     ...u,
     equipment: u.equipment?.map(normalizeEquipment),
   }));
+}
+
+/* ---------------- Unit ids and renames (G2C-001) ---------------- */
+
+/**
+ * The id a unit saved before ids existed goes by in the editor: its place in
+ * the stored list. The units save refuses a list that changed since the
+ * editor loaded it (Property.updatedAt), so the place still names the same
+ * unit when the edit comes back.
+ */
+const PLACEHOLDER_ID = "unit-at-";
+
+/** Every unit with an id: its stored one, or a placeholder from its place in the list. */
+export function withUnitIds(units: readonly PropertyUnit[]): PropertyUnit[] {
+  return units.map((u, i) => (u.id ? u : { ...u, id: `${PLACEHOLDER_ID}${i}` }));
+}
+
+/** A unit renamed in one save: its tasks and listings move from `from` to `to`. */
+export type UnitRename = { from: string; to: string };
+
+const cleanLabel = (s: string | null | undefined) => (s ?? "").trim();
+
+/**
+ * Match an edited units list to the stored one by id. Returns the list to
+ * store, each unit with a permanent id (the one it had, or `newId()` for a
+ * new unit, a placeholder, a repeated id or one the stored list never had),
+ * and the renames to carry to the property's tasks and listings, which
+ * point at a unit by its label. A rename is listed only when the old label
+ * named exactly one unit and the new one isn't blank: a unit removed, or
+ * one that shared its label, leaves the tasks alone.
+ */
+export function reconcileUnits(
+  stored: readonly PropertyUnit[],
+  edited: readonly PropertyUnit[],
+  newId: () => string,
+): { units: PropertyUnit[]; renames: UnitRename[] } {
+  const before = withUnitIds(stored);
+  const byId = new Map(before.map((u) => [u.id as string, u]));
+  const labelCount = new Map<string, number>();
+  for (const u of before) {
+    const l = cleanLabel(u.label).toLowerCase();
+    if (l) labelCount.set(l, (labelCount.get(l) ?? 0) + 1);
+  }
+  // A rename onto a label another unit keeps would move this unit's jobs onto
+  // that one, and its lockbox code with them, so only unique labels count.
+  const editedCount = new Map<string, number>();
+  for (const u of edited) {
+    const l = cleanLabel(u.label).toLowerCase();
+    if (l) editedCount.set(l, (editedCount.get(l) ?? 0) + 1);
+  }
+  const claimed = new Set<string>();
+  const renames: UnitRename[] = [];
+  const units = edited.map((u) => {
+    const match = u.id && !claimed.has(u.id) ? byId.get(u.id) : undefined;
+    if (match && u.id) claimed.add(u.id);
+    const from = cleanLabel(match?.label);
+    const to = cleanLabel(u.label);
+    if (match && from && to && from !== to && labelCount.get(from.toLowerCase()) === 1 && editedCount.get(to.toLowerCase()) === 1) {
+      renames.push({ from, to });
+    }
+    const keep = match?.id && !match.id.startsWith(PLACEHOLDER_ID) ? match.id : null;
+    return { ...u, id: keep ?? newId() };
+  });
+  return { units, renames };
+}
+
+/**
+ * Which rename, if any, applies to a row pointing at `label` (case-insensitive,
+ * as the lockbox lookup matches). Every row is matched against the labels as
+ * they were, so two units swapping names swap their rows too.
+ */
+export function renamedLabel(renames: readonly UnitRename[], label: string | null | undefined): string | null {
+  const l = cleanLabel(label).toLowerCase();
+  if (!l) return null;
+  return renames.find((r) => r.from.toLowerCase() === l)?.to ?? null;
 }
 
 /** Utility fields grouped by provider, for a per-utility layout. */

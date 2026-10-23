@@ -7,6 +7,7 @@
  * Idempotent: upserts keyed by a stable slug of the person's name.
  */
 import { prisma } from "../../src/lib/db";
+import { cleanTrades } from "../../src/lib/contacts";
 import { report } from "./_report";
 import {
   readSheet,
@@ -78,7 +79,7 @@ export async function migrateContractors() {
     const newer = (d.updatedAt?.getTime() ?? 0) >= (existing.updatedAt?.getTime() ?? 0);
     existing.fullName = newer && d.fullName ? d.fullName.trim() : existing.fullName;
     existing.company ??= d.company ?? null;
-    existing.trades = [existing.trades, d.trades].filter(Boolean).join(" / ") || null;
+    existing.trades = cleanTrades([existing.trades, d.trades].filter(Boolean).join(" / "));
     existing.tenantFixes ||= d.tenantFixes ?? false;
     existing.phoneDigits ??= d.phoneDigits ?? null;
     existing.email ??= d.email ?? null;
@@ -152,7 +153,7 @@ export async function migrateContractors() {
     if (hit) {
       // merge d into hit
       hit.company ??= d.company;
-      hit.trades = [...new Set([hit.trades, d.trades].filter(Boolean).flatMap((t) => t!.split(" / ")))].join(" / ") || null;
+      hit.trades = cleanTrades([hit.trades, d.trades].filter(Boolean).join(" / "));
       hit.tenantFixes ||= d.tenantFixes;
       hit.phoneDigits ??= d.phoneDigits;
       hit.email ??= d.email;

@@ -1,5 +1,6 @@
 import type { AttachmentKind, TaskStatus, Visibility } from "@prisma/client";
 import { isActiveStatus } from "@/lib/task-scope";
+import { contractorSeesRow } from "@/lib/tasks/rules";
 
 /**
  * The contractor side of task files, as pure rules. The database half (an
@@ -13,16 +14,21 @@ export interface SeeableFile {
   deletedAt: Date | null;
   uploadedByContactId: string | null;
   asanaGid: string | null;
+  audienceContactId: string | null;
 }
 
 /**
  * A contractor sees a file only when it's Shared, not removed, has bytes here
- * (not a LINK), and isn't another contractor's upload unless it was imported
- * from Asana. The same rule as visibleFile in src/lib/portal/queries.ts.
+ * (not a LINK), and is theirs, imported from Asana, or a staff upload
+ * addressed to them or to nobody in particular (tasks/rules.ts
+ * contractorSeesRow). The same rule as visibleFile in src/lib/portal/queries.ts.
  */
 export function contractorMaySee(att: SeeableFile, contactId: string): boolean {
   if (att.visibility !== "SHARED" || att.deletedAt !== null || att.kind === "LINK") return false;
-  return att.uploadedByContactId === null || att.uploadedByContactId === contactId || att.asanaGid !== null;
+  return contractorSeesRow(
+    { imported: att.asanaGid !== null, actorContactId: att.uploadedByContactId, audienceContactId: att.audienceContactId },
+    contactId,
+  );
 }
 
 /**

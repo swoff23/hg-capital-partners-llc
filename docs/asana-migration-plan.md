@@ -176,11 +176,11 @@ Sources: the Asana CSV export, the live Asana API (read-only), a code audit, abo
 **One login page.** The `/login` action:
 1. checks `User` first, then `PortalAccount`;
 2. on success, sets the matching cookie;
-3. sends staff to `/` and contractors to `/p`.
+3. sends staff to `/` and contractors to `/p`, or to the page they asked for (below).
 
-The existing per-email throttle applies to both account types.
+The existing per-email throttle applies to both account types. A wrong password comes back to the form with the email still filled in; it never goes in the URL.
 
-**Back to the page asked for.** A signed-out contractor who opens a `/p` link (an email's "Open job") goes to `/login?next=<that page>`, and after sign-in, and the first-password step if it's due, lands on it. `src/proxy.ts` hands each `/p` request's path to `requirePortalPrincipal()`; `src/lib/portal/next-path.ts` only lets a `/p` path through (no `//`, backslash, control character or dot segment, checked again after one decode, 512 characters at most) and anything else falls back to `/p`. Staff sign-in ignores `next`.
+**Back to the page asked for.** A signed-out contractor who opens a `/p` link (an email's "Open job") goes to `/login?next=<that page>`, and after sign-in, and the first-password step if it's due, lands on it. `src/proxy.ts` hands each `/p` request's path to `requirePortalPrincipal()`; `src/lib/portal/next-path.ts` only lets a `/p` path through (no `//`, backslash, control character or dot segment, checked again after one decode, 512 characters at most) and anything else falls back to `/p`. Staff get the same for their pages (an email's task link): the proxy hands each staff section's path to `requireUser()`, and `src/lib/next-path.ts` only lets Home or a path under one of the `src/app/(app)` sections through, with the same checks. The two never overlap, so a contractor never follows a staff `next` and staff never follow a `/p` one.
 
 **Contractor sessions.** A `PortalSession` row holds a random token (stored hashed), an expiry 30 days after sign-in, the user agent and a revoked-at time. The cookie helper uses `__Host-hg_portal` (Secure) on HTTPS and `hg_portal` on local http, so dev and the device check work. Always HttpOnly, `Path=/`, `SameSite=Lax`. Every request checks the row, so "Sign out everywhere" takes effect immediately.
 

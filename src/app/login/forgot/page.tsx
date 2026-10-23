@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getEnv } from "@/lib/env";
 import { requestPasswordReset } from "../actions";
-import { AuthFrame, AuthNotice, authButtonClass, authInputClass, authLinkClass } from "../_components/auth-frame";
+import { AuthFrame, AuthNotice, authInputClass, authLinkClass } from "../_components/auth-frame";
+import { AuthSubmit } from "../_components/auth-submit";
 
 export const metadata: Metadata = {
   title: "Forgot Password | HG Capital Partners",
@@ -35,9 +36,7 @@ export default async function ForgotPasswordPage({ searchParams }: PageProps<"/l
             autoFocus
             className={authInputClass}
           />
-          <button type="submit" className={authButtonClass}>
-            Email me a link
-          </button>
+          <AuthSubmit pendingLabel="Sending…">Email me a link</AuthSubmit>
         </form>
       )}
 

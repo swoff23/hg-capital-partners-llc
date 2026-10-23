@@ -86,6 +86,22 @@ test("load report: every section of the review is there, and lockbox digits neve
   assert.ok(!/4821|1357/.test(text), "codes are masked everywhere in the report");
 });
 
+test("load report: open titles that kept Asana's [brackets] are listed to rename, closed ones aren't", () => {
+  const s = structuredClone(snap);
+  const open = s.tasks.find((t) => t.gid === gidOf("Replace kitchen faucet"))!;
+  open.name = "Store [Dana] insurance";
+  const done = s.tasks.find((t) => t.gid === gidOf("Mini splits unit 5"))!;
+  Object.assign(done, { name: "Give [Dana] keys", completed: true, completed_at: "2026-10-20T09:00:00.000Z", completed_by: done.assignee });
+  const plan = buildPlan(input(s), db([row({ id: "r-done", asanaId: done.gid, title: "Give [Dana] keys" })]), opts);
+  const text = formatReport(plan, { title: "Asana load (dry run)", names });
+  assert.match(text, /-- Open tasks with \[brackets\] in the title, to rename \(1\)/);
+  assert.match(text, /new\s+Store \[Dana\] insurance/);
+  assert.ok(!/^\s+\S+\s+Give \[Dana\] keys/m.test(text.split("to rename")[1].split("\n-- ")[0]), "a closed task isn't listed");
+
+  const clean = formatReport(buildPlan(input(snap), db(), opts), { title: "Asana load (dry run)", names });
+  assert.ok(!clean.includes("to rename"), "no section when nothing needs a rename");
+});
+
 test("delta report: a skipped task, a conflict and a closed contractor job print without crashing", () => {
   const s = structuredClone(snap);
   const mini = s.tasks.find((t) => t.gid === gidOf("Mini splits unit 5"))!;

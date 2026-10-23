@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type Task, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
+import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
-import { isUntouchedCopy, nextOccurrence, parseRepeatRule, repeatCreatedCopy, type RepeatRule } from "./repeat";
+import { isUntouchedCopy, nextOccurrence, parseRepeatRule, repeatCreatedCopy, repeatDue, type RepeatRule } from "./repeat";
 import {
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
@@ -11,6 +12,7 @@ import {
   notifyAudience,
   statusEventVisibility,
   targetDate,
+  writeAudience,
   type NotifyChange,
   type PrincipalKind,
 } from "./rules";
@@ -63,6 +65,18 @@ export class TaskChangedError extends TaskRuleError {
   }
 }
 
+/**
+ * Someone else changed the assignee since the caller's screen showed it (an
+ * old tab, the other partner), so nothing was written: a stale screen never
+ * takes a job off a contractor. `name` is who has it now, null for nobody.
+ */
+export class AssigneeChangedError extends TaskRuleError {
+  constructor(by: string | null, name: string | null) {
+    super(name ? `${by || "Someone"} assigned this to ${name}.` : `${by || "Someone"} unassigned this.`);
+    this.name = "AssigneeChangedError";
+  }
+}
+
 const kindOf = (p: Principal): PrincipalKind => p.kind;
 
 function actorFields(p: Principal) {
@@ -88,6 +102,8 @@ export interface EventInput {
   data?: Prisma.InputJsonValue;
   createdAt?: Date;
   asanaStoryGid?: string | null;
+  /** The contractor a staff or system line is addressed to (rules.ts writeAudience). */
+  audienceContactId?: string | null;
 }
 
 export function addEvent(tx: Tx, taskId: string, p: Principal, e: EventInput): Promise<TaskEvent> {
@@ -99,6 +115,7 @@ export function addEvent(tx: Tx, taskId: string, p: Principal, e: EventInput): P
       body: e.body ?? null,
       data: e.data ?? {},
       asanaStoryGid: e.asanaStoryGid ?? null,
+      audienceContactId: e.audienceContactId ?? null,
       ...(e.createdAt ? { createdAt: e.createdAt } : {}),
       ...actorFields(p),
     },
@@ -238,6 +255,16 @@ async function logDeal(tx: Tx, dealId: string | null, p: Principal, line: string
 
 export type Assignee = { userId: string } | { contactId: string } | null;
 
+/**
+ * Whether the row is assigned to exactly this person. null means nobody: a
+ * legacy free-text name alone counts as nobody, as the task page shows it.
+ */
+export function isAssignee(row: Pick<Task, "assigneeUserId" | "assigneeContactId">, a: Assignee): boolean {
+  const userId = a && "userId" in a ? a.userId : null;
+  const contactId = a && "contactId" in a ? a.contactId : null;
+  return row.assigneeUserId === userId && row.assigneeContactId === contactId;
+}
+
 export function bucketFor(propertyId: string | null | undefined): string {
   return propertyId ? "Property" : "General";
 }
@@ -277,7 +304,8 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
       title,
       description: input.description?.trim() || null,
       status,
-      dueDate: ymdToDate(input.dueDate),
+      // A repeating task never starts undated: no due date means its first occurrence.
+      dueDate: ymdToDate(repeatDue(input.repeatRule, input.dueDate, todayYmdEastern(now))),
       scheduledFor: ymdToDate(input.scheduledFor),
       waitingOn: status === "WAITING" ? input.waitingOn!.trim() : null,
       propertyId,
@@ -308,6 +336,25 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
 // ---------------------------------------------------------------------------
 // Status
 // ---------------------------------------------------------------------------
+
+/**
+ * The email line for a status change; content.ts itemText reads it back.
+ * Approve (D6b) and the contractor's own Start get their own words. Staff
+ * moving a job to In progress is a plain status change, not "started the
+ * job", which would put the contractor's work in a partner's name.
+ */
+export function statusSummary(
+  c: { title: string; from: TaskStatus; to: TaskStatus; actor: PrincipalKind; note?: string | null; scheduledFor: Date | null },
+  now: Date,
+): string {
+  const t = `"${c.title}"`;
+  if (c.to === "REVIEW" && c.actor === "contractor") return `marked ${t} done`;
+  if (c.from === "REVIEW" && c.to === "IN_PROGRESS") return `sent ${t} back${c.note ? `: ${c.note}` : ""}`;
+  if (c.from === "REVIEW" && c.to === "DONE") return `approved ${t}`;
+  if (c.to === "IN_PROGRESS" && c.actor === "contractor") return `started ${t}`;
+  if (c.to === "SCHEDULED" && c.scheduledFor) return `scheduled ${t} for ${emailDay(c.scheduledFor, now)}`;
+  return `set ${t} to ${c.to.replace("_", " ").toLowerCase()}`;
+}
 
 export interface StatusOptions {
   /** Required for WAITING. */
@@ -379,22 +426,17 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   });
 
   const visibility = statusEventVisibility(to, !!task.assigneeContactId);
+  const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
   await addEvent(tx, taskId, p, {
     kind: "STATUS",
     visibility,
+    audienceContactId,
     data: { from: before.status, to, ...(waitingOn ? { waitingOn } : {}), ...(to === "SCHEDULED" ? { scheduledFor: toYmd(scheduledFor) } : {}) },
   });
   const note = opts.note?.trim();
-  if (note) await addEvent(tx, taskId, p, { kind: "COMMENT", visibility: "SHARED", body: note });
+  if (note) await addEvent(tx, taskId, p, { kind: "COMMENT", visibility: "SHARED", body: note, audienceContactId });
 
-  const summary =
-    to === "REVIEW" && p.kind === "contractor"
-      ? `marked "${task.title}" done`
-      : before.status === "REVIEW" && to === "IN_PROGRESS"
-        ? `sent "${task.title}" back${note ? `: ${note}` : ""}`
-        : to === "SCHEDULED" && scheduledFor
-          ? `scheduled "${task.title}" for ${emailDay(scheduledFor, now)}`
-          : `set "${task.title}" to ${to.replace("_", " ").toLowerCase()}`;
+  const summary = statusSummary({ title: task.title, from: before.status, to, actor: p.kind, note, scheduledFor }, now);
   await notify(tx, task, p, { kind: "STATUS", visibility }, summary, now);
 
   if (to === "DONE" || reopening) {
@@ -531,19 +573,59 @@ export interface TaskPatch {
   propertyId?: string | null;
   unitLabel?: string | null;
   assignee?: Assignee;
+  /**
+   * With `assignee`: the assignee the caller's screen showed. When someone
+   * else has reassigned the task since, nothing changes and
+   * AssigneeChangedError says who has it now (unless it already has the one
+   * asked for).
+   */
+  expectedAssignee?: Assignee;
   waitingOn?: string | null;
   repeatRule?: RepeatRule | null;
+}
+
+/** The refusal for a reassignment from a stale screen: who made the last assignment, and who has the task now. */
+async function assigneeChanged(tx: Tx, t: Task): Promise<AssigneeChangedError> {
+  // Whoever gave it to the person who has it now, not a later line that didn't
+  // (an Asana story kept as a conflict, say), as setStatus filters on `to`.
+  const to = t.assigneeUserId
+    ? { data: { path: ["to", "userId"], equals: t.assigneeUserId } }
+    : t.assigneeContactId
+      ? { data: { path: ["to", "contactId"], equals: t.assigneeContactId } }
+      : {};
+  const last = await tx.taskEvent.findFirst({
+    where: { taskId: t.id, kind: "ASSIGNED", ...to },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { actorLabel: true },
+  });
+  const user = t.assigneeUserId ? await tx.user.findUnique({ where: { id: t.assigneeUserId }, select: { name: true, email: true } }) : null;
+  const contact = t.assigneeContactId ? await tx.contact.findUnique({ where: { id: t.assigneeContactId }, select: { fullName: true } }) : null;
+  // A name-only assignee (an Asana pick the load couldn't match) still has a name.
+  const name = user ? user.name || user.email : (contact?.fullName ?? t.assigneeName ?? null);
+  return new AssigneeChangedError(firstName(last?.actorLabel), name);
 }
 
 /**
  * Field edits. Only keys present are written; null clears. Each changed field
  * adds an internal timeline line; the contractor hears about assignment,
- * notes and a moved Target date.
+ * notes and a moved Target date. A reassignment can carry the assignee the
+ * screen showed (`expectedAssignee`), and is refused when that's out of date.
  */
 export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Principal, now = new Date()): Promise<Task> {
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't edit job details.");
+  // A reassignment locks the row first, as setStatus does, so two at once (both
+  // partners, two tabs) run one after the other and the second sees the first.
+  if (patch.assignee !== undefined) await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
+  if (
+    patch.assignee !== undefined &&
+    patch.expectedAssignee !== undefined &&
+    !isAssignee(before, patch.expectedAssignee) &&
+    !isAssignee(before, patch.assignee)
+  ) {
+    throw await assigneeChanged(tx, before);
+  }
 
   const data: Prisma.TaskUncheckedUpdateInput = {};
   const events: EventInput[] = [];
@@ -562,8 +644,12 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
       events.push({ kind: "NOTES" });
     }
   }
-  if (patch.dueDate !== undefined) {
-    const d = ymdToDate(patch.dueDate);
+  // Setting a repeat on an undated task dates it to the first occurrence, logged like any due change.
+  const dueDate = patch.repeatRule
+    ? repeatDue(patch.repeatRule, patch.dueDate !== undefined ? patch.dueDate : toYmd(before.dueDate), todayYmdEastern(now))
+    : patch.dueDate;
+  if (dueDate !== undefined) {
+    const d = ymdToDate(dueDate);
     if (toYmd(d) !== toYmd(before.dueDate)) {
       data.dueDate = d;
       events.push({ kind: "DUE", data: { from: toYmd(before.dueDate), to: toYmd(d) } });
@@ -638,6 +724,37 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
   return after;
 }
 
+/**
+ * A unit renamed on its property (properties/service.ts replaceUnits): every
+ * task there that names it by its old label (case-insensitive, as the
+ * lockbox lookup matches) moves to the new one, so a job keeps its lockbox
+ * code (D21) and its unit reads the same everywhere. Each goes through
+ * patchTask, so it gets the usual internal unit line. Rows are matched
+ * against the labels as they were, so two units swapping names swap their
+ * tasks. Returns the ids of the tasks it changed.
+ */
+export async function renameTaskUnits(
+  tx: Tx,
+  propertyId: string,
+  renames: readonly UnitRename[],
+  p: Principal,
+  now = new Date(),
+): Promise<string[]> {
+  if (renames.length === 0) return [];
+  const tasks = await tx.task.findMany({
+    where: { propertyId, OR: renames.map((r) => ({ unitLabel: { equals: r.from, mode: "insensitive" as const } })) },
+    select: { id: true, unitLabel: true },
+  });
+  const changed: string[] = [];
+  for (const t of tasks) {
+    const to = renamedLabel(renames, t.unitLabel);
+    if (!to) continue;
+    await patchTask(tx, t.id, { unitLabel: to }, p, now);
+    changed.push(t.id);
+  }
+  return changed;
+}
+
 // ---------------------------------------------------------------------------
 // Comments, files, checklist
 // ---------------------------------------------------------------------------
@@ -660,15 +777,20 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
     if (!isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
   }
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (input.visibility ?? "INTERNAL");
-  const event = await addEvent(tx, taskId, p, { kind: "COMMENT", visibility, body: body || null });
+  const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
+  const event = await addEvent(tx, taskId, p, { kind: "COMMENT", visibility, body: body || null, audienceContactId });
+  let linked = 0;
   if (input.attachmentIds?.length) {
-    await tx.taskAttachment.updateMany({
+    ({ count: linked } = await tx.taskAttachment.updateMany({
       where: { id: { in: input.attachmentIds }, taskId, eventId: null },
-      data: { eventId: event.id, visibility },
-    });
+      data: { eventId: event.id, visibility, audienceContactId },
+    }));
   }
+  // Files only, and another post took them first (two sends of the same held
+  // photos at once): refuse, so the losing side leaves no empty update behind.
+  if (!body && linked === 0) throw new TaskRuleError("Write something or add a photo.");
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
-  const photos = input.attachmentIds?.length ? ` (+${input.attachmentIds.length} file${input.attachmentIds.length > 1 ? "s" : ""})` : "";
+  const photos = linked ? ` (+${linked} file${linked > 1 ? "s" : ""})` : "";
   await notify(tx, task, p, { kind: "COMMENT", visibility }, `${body ? `"${body.slice(0, 140)}"` : "added files"}${photos}`, now);
   return event;
 }
@@ -706,6 +828,7 @@ export async function recordAttachment(
   if (!task) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (opts.visibility ?? "INTERNAL");
+  const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
   const att = await tx.taskAttachment.create({
     data: {
       taskId,
@@ -718,6 +841,7 @@ export async function recordAttachment(
       visibility,
       uploadedByUserId: p.kind === "staff" ? p.userId : null,
       uploadedByContactId: p.kind === "contractor" ? p.contactId : null,
+      audienceContactId,
       width: meta.width ?? null,
       height: meta.height ?? null,
       durationSec: meta.durationSec ?? null,
@@ -726,7 +850,12 @@ export async function recordAttachment(
     },
   });
   if (opts.standalone !== false) {
-    const ev = await addEvent(tx, taskId, p, { kind: "ATTACHMENT", visibility, data: { attachmentId: att.id, filename: att.filename } });
+    const ev = await addEvent(tx, taskId, p, {
+      kind: "ATTACHMENT",
+      visibility,
+      audienceContactId,
+      data: { attachmentId: att.id, filename: att.filename },
+    });
     await tx.taskAttachment.update({ where: { id: att.id }, data: { eventId: ev.id } });
     await notify(tx, task, p, { kind: "ATTACHMENT", visibility }, `added ${att.filename}`, now);
   }

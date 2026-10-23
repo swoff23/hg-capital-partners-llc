@@ -6,6 +6,7 @@ import { formToObject } from "@/lib/forms";
 import type { ActionResult } from "@/lib/action-result";
 import { withLog, withResult } from "@/lib/server-action";
 import * as properties from "@/lib/properties/service";
+import { staffPrincipal } from "@/lib/tasks/service";
 
 /**
  * Thin server actions: authenticate, validate, call the property service,
@@ -70,6 +71,7 @@ export async function deletePropertyAttachment(attachmentId: string) {
 /* ---------------- Whole-blob editors (return an ActionResult) ---------------- */
 
 const unitSchema = z.object({
+  id: z.string().max(100).nullish(),
   label: z.string().nullish(),
   lockboxCode: z.string().nullish(),
   utilities: z.record(z.string(), z.string().nullish()).optional(),
@@ -87,8 +89,9 @@ const unitSchema = z.object({
 
 export async function updatePropertyUnits(id: string, units: unknown, expectedVersion: string): Promise<ActionResult> {
   return withResult("updatePropertyUnits", async () => {
-    await requireUser();
-    await properties.replaceUnits(id, z.array(unitSchema).parse(units), expectedVersion);
+    const me = await requireUser();
+    // Staff, as the actor on any task that follows a unit rename.
+    await properties.replaceUnits(id, z.array(unitSchema).parse(units), expectedVersion, staffPrincipal(me));
   });
 }
 

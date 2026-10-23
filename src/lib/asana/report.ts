@@ -1,3 +1,4 @@
+import { hasOpenTokens } from "@/lib/tasks/template-items";
 import { maskLockbox, type ImportPlan, type Person } from "./map";
 
 /**
@@ -67,6 +68,14 @@ export function formatReport(plan: ImportPlan, ctx: ReportContext): string {
   for (const t of creates.slice(0, plan.mode === "delta" ? 50 : 0)) out.push(`  + ${clip(t.title, 60)}  [${t.sectionName ?? ""}]`);
   for (const t of changed.slice(0, plan.mode === "delta" ? 100 : 0)) {
     out.push(`  ~ ${clip(t.title, 60)}: ${changedFields(t.write).join(", ")}`);
+  }
+
+  // Hand-copied playbook steps kept Asana's brackets around what was typed ("Store [Dana] insurance").
+  // They land at the top of Overdue reading like broken data, so Connor renames them in this review.
+  const bracketed = plan.tasks.filter((t) => !t.closed && hasOpenTokens(t.title));
+  if (bracketed.length) {
+    h(`Open tasks with [brackets] in the title, to rename (${bracketed.length})`);
+    for (const t of bracketed) out.push(`  ${pad(t.op === "update" ? t.taskId : "new", 26)}${clip(t.title, 60)}  [${t.sectionName ?? ""}]`);
   }
 
   h("Timeline events (new / already imported)");

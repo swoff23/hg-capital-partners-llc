@@ -85,6 +85,7 @@ async function lookup(kind: string, id: string, variant: Variant | null, viewer:
         deletedAt: true,
         uploadedByContactId: true,
         asanaGid: true,
+        audienceContactId: true,
         thumbPathname: true,
         posterPathname: true,
       },

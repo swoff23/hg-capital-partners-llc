@@ -68,11 +68,13 @@ export async function createTask(formData: FormData) {
 }
 
 // The inline editors on the task list and detail page send one field at a time.
+// No assignee here: reassigning goes through the task page's updateTask, which
+// sends the assignee the page showed so a stale screen can't take a job off a
+// contractor (core.ts AssigneeChangedError).
 const patchSchema = z
   .object({
     title: z.string(),
     description: z.string().nullable(),
-    assigneeUserId: z.string().nullable(),
     dueDate: z.string().nullable(),
     propertyId: z.string().nullable(),
   })
@@ -91,7 +93,6 @@ export async function patchTask(id: string, data: z.input<typeof patchSchema>) {
         ...(d.description !== undefined ? { description: d.description } : {}),
         ...(d.dueDate !== undefined ? { dueDate: d.dueDate || null } : {}),
         ...(d.propertyId !== undefined ? { propertyId: d.propertyId || null } : {}),
-        ...(d.assigneeUserId !== undefined ? { assignee: d.assigneeUserId ? { userId: d.assigneeUserId } : null } : {}),
       },
       tasks.staffPrincipal(user),
     );

@@ -115,6 +115,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       task: {
         select: {
           title: true,
+          unitLabel: true,
           property: { select: { address: true } },
           // Who can open the job right now (D12), checked again at send time.
           access: { where: { revokedAt: null }, select: { contactId: true } },
@@ -161,6 +162,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       items,
       title: row.task.title,
       address: row.task.property?.address ?? null,
+      unitLabel: row.task.unitLabel,
       audience: delivery.audience,
       appUrl,
       taskId: row.taskId,

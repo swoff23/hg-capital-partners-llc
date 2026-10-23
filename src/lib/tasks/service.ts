@@ -11,6 +11,7 @@ import { TEMPLATE_BUCKET } from "@/lib/config";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { taskPrincipal, type PortalPrincipal } from "@/lib/portal/session";
+import type { UnitRename } from "@/lib/property-types";
 import { activeTask, isActiveStatus } from "@/lib/task-scope";
 import * as core from "./core";
 
@@ -24,7 +25,7 @@ import * as core from "./core";
  */
 
 export type { Principal, NewTaskInput, TaskPatch, StatusOptions } from "./core";
-export { TaskChangedError, TaskRuleError, bucketFor } from "./core";
+export { AssigneeChangedError, TaskChangedError, TaskRuleError, bucketFor } from "./core";
 export { TEMPLATE_BUCKET };
 
 /** The signed-in staff user as the actor on a write. */
@@ -68,12 +69,38 @@ export async function setTaskStatus(id: string, to: TaskStatus, p: core.Principa
   }
 }
 
-/** Field edits. No-op when the task doesn't exist. */
+/**
+ * Field edits. No-op when the task doesn't exist. A refused one (someone
+ * reassigned it first) still refreshes the pages, so the screen that sent it
+ * shows who has the task now.
+ */
 export async function patchTask(id: string, patch: core.TaskPatch, p: core.Principal): Promise<void> {
   const before = await prisma.task.findUnique({ where: { id }, select: { propertyId: true } });
   if (!before) return;
-  const after = await prisma.$transaction((tx) => core.patchTask(tx, id, patch, p));
-  revalidateTask(after, [before.propertyId]);
+  try {
+    const after = await prisma.$transaction((tx) => core.patchTask(tx, id, patch, p));
+    revalidateTask(after, [before.propertyId]);
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateTask({ id });
+    throw err;
+  }
+}
+
+/**
+ * A unit renamed on its property: the tasks that name it follow
+ * (core.renameTaskUnits). Runs inside the property save's transaction, so
+ * the units and their tasks change together; pass the ids it returns to
+ * revalidateTasks once that commits.
+ */
+export function renameTaskUnits(tx: core.Tx, propertyId: string, renames: readonly UnitRename[], p: core.Principal): Promise<string[]> {
+  return core.renameTaskUnits(tx, propertyId, renames, p);
+}
+
+/** Refresh the task lists and these tasks' pages after a write made from another page. */
+export function revalidateTasks(ids: readonly string[]): void {
+  if (ids.length === 0) return;
+  revalidateTask(null);
+  for (const id of ids) revalidatePath(`/tasks/${id}`);
 }
 
 /**

@@ -54,6 +54,25 @@ export function nextOccurrence(rule: RepeatRule, from: Ymd): Ymd {
   }
 }
 
+/**
+ * The first due date for a repeat that has none yet: the first day on or after
+ * `today` the rule lands on. A pinned day of the month is this month's (clamped
+ * to short months) unless it has passed, then next month's; any other rule
+ * starts today.
+ */
+export function firstOccurrence(rule: RepeatRule, today: Ymd): Ymd {
+  if (!rule.dayOfMonth) return today;
+  const [y, m, d] = today.split("-").map(Number);
+  const thisMonth = Math.min(rule.dayOfMonth, daysInMonth(y, m - 1));
+  if (thisMonth >= d) return ymd(y, m - 1, thisMonth);
+  return ymd(y, m, Math.min(rule.dayOfMonth, daysInMonth(y + Math.floor(m / 12), m % 12)));
+}
+
+/** A task's due date as written: the one given, or the first occurrence when it repeats and has none. */
+export function repeatDue(rule: RepeatRule | null | undefined, due: Ymd | null | undefined, today: Ymd): Ymd | null {
+  return due || (rule ? firstOccurrence(rule, today) : null);
+}
+
 function ordinal(n: number): string {
   const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${s}`;

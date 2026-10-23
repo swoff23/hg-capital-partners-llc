@@ -9,6 +9,15 @@ test("firstName takes the first word, before any company in parentheses", () => 
   assert.equal(firstName(null), "");
 });
 
+test("firstName uses the nickname someone goes by, never a company", () => {
+  assert.equal(firstName("Jacob (Jake) hoak"), "Jake");
+  assert.equal(firstName("Jacob(Jake) Hoak"), "Jake");
+  // A company in parentheses, at the end or as more than one word, isn't a nickname.
+  assert.equal(firstName("Zack (Outlaw)"), "Zack");
+  assert.equal(firstName("Zack (Outlaw Carpentry) Reading"), "Zack");
+  assert.equal(firstName("Mike Morris (Freedom Electric)"), "Mike");
+});
+
 test("the login text has the link, email and starting password, from the staff member", () => {
   const body = loginTextBody({
     contactName: "Zack Reading",

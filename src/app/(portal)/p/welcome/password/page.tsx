@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { AuthError, AuthFrame, authButtonClass, authInputClass, authLinkClass } from "@/app/login/_components/auth-frame";
+import { AuthError, AuthFrame, authInputClass, authLinkClass } from "@/app/login/_components/auth-frame";
+import { AuthSubmit } from "@/app/login/_components/auth-submit";
 import { MIN_PASSWORD_LENGTH, PASSWORD_MESSAGES, isPasswordProblem } from "@/lib/portal/credentials";
+import { firstName as greetingName } from "@/lib/portal/job-view";
 import { portalReturnPath } from "@/lib/portal/next-path";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { chooseOwnPassword, signOutPortal } from "../../actions";
@@ -14,7 +16,7 @@ export default async function WelcomePasswordPage({ searchParams }: PageProps<"/
   const principal = await requirePortalPrincipal({ passwordPage: true });
   const { error, next: rawNext } = (await searchParams) as { error?: string; next?: string };
   const next = portalReturnPath(rawNext);
-  const firstName = principal.label.trim().split(/\s+/)[0] || principal.label;
+  const firstName = greetingName(principal.label);
   const message = !isPasswordProblem(error)
     ? null
     : error === "wrong-current"
@@ -61,9 +63,7 @@ export default async function WelcomePasswordPage({ searchParams }: PageProps<"/
           required
           className={authInputClass}
         />
-        <button type="submit" className={authButtonClass}>
-          Save password
-        </button>
+        <AuthSubmit pendingLabel="Saving…">Save password</AuthSubmit>
       </form>
 
       <form action={signOutPortal} className="mt-3">

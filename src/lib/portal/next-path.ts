@@ -6,10 +6,15 @@
  *
  * Only portal paths pass. Anything else (another site, the staff app, a path
  * that only turns into one of those after decoding) falls back to My jobs.
- * Staff sign-in never reads ?next= at all.
+ * The checks every ?next= goes through, and the staff app's own return path,
+ * are in src/lib/next-path.ts.
  *
- * Pure, no imports: src/proxy.ts uses the header name. See next-path.test.ts.
+ * Pure, and imports only that pure file: src/proxy.ts uses the header name.
+ * See next-path.test.ts.
  */
+import { MAX_NEXT_LENGTH, pathOf, safeReturnPath, withNext } from "@/lib/next-path";
+
+export { MAX_NEXT_LENGTH, withNext };
 
 /** My jobs: the default landing, so it's never spelled out as ?next=. */
 export const PORTAL_HOME = "/p";
@@ -24,23 +29,8 @@ export const WELCOME_PASSWORD_PATH = "/p/welcome/password";
  */
 export const PORTAL_PATH_HEADER = "x-hg-portal-path";
 
-export const MAX_NEXT_LENGTH = 512;
-
-// C0 and C1 control characters, which covers CR/LF and the tab and newline
-// that browsers silently strip out of URLs.
-const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
-
-/** "/p/jobs/abc" for "/p/jobs/abc?x=1#y". */
-function pathOf(s: string): string {
-  return s.split(/[?#]/, 1)[0];
-}
-
-function isPortalPathShape(s: string): boolean {
-  if (CONTROL_CHARS.test(s) || s.includes("\\") || s.includes("//")) return false;
-  const path = pathOf(s);
-  if (path !== PORTAL_HOME && !path.startsWith(PORTAL_HOME + "/")) return false;
-  // "/p/../tasks" would leave the portal once the browser resolves it.
-  return !path.split("/").some((segment) => segment === "." || segment === "..");
+function isPortalPath(path: string): boolean {
+  return path === PORTAL_HOME || path.startsWith(PORTAL_HOME + "/");
 }
 
 /**
@@ -51,17 +41,7 @@ function isPortalPathShape(s: string): boolean {
  * that won't decode is refused.
  */
 export function safePortalPath(raw: unknown): string | null {
-  if (typeof raw !== "string" || raw.length === 0 || raw.length > MAX_NEXT_LENGTH) return null;
-  // Only printable ASCII as given. The proxy always hands over a
-  // percent-encoded path, and Node refuses anything else in a Location header.
-  if (/[^\x21-\x7e]/.test(raw)) return null;
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(raw);
-  } catch {
-    return null;
-  }
-  return isPortalPathShape(raw) && isPortalPathShape(decoded) ? raw : null;
+  return safeReturnPath(raw, isPortalPath);
 }
 
 /**
@@ -77,12 +57,6 @@ export function portalReturnPath(raw: unknown): string | null {
     if (safe && pathOf(safe) === WELCOME_PASSWORD_PATH) return null;
   }
   return safe === PORTAL_HOME ? null : safe;
-}
-
-/** `path` with ?next= (or &next=) added when there's a page to return to. */
-export function withNext(path: string, next: string | null): string {
-  if (!next) return path;
-  return `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}`;
 }
 
 /**

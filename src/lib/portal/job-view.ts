@@ -1,5 +1,6 @@
 import type { TaskStatus } from "@prisma/client";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 
 /**
@@ -155,13 +156,17 @@ export function addressLine(address: string | null, unitLabel: string | null, op
  */
 export const PORTAL_STATUS_UPDATES = ["SCHEDULED", "IN_PROGRESS", "REVIEW", "DONE"] as const satisfies readonly TaskStatus[];
 
-/** What a status update says after the person's name: "started the job". */
-export function statusUpdateText(from: string | null, to: string | null): string {
+/**
+ * What a status update says after the person's name: "started the job".
+ * Only a contractor starts the job; staff moving it to In progress is a
+ * status change ("Connor moved it to In progress"), as in the email.
+ */
+export function statusUpdateText(from: string | null, to: string | null, by: { contractor: boolean } = { contractor: true }): string {
   switch (to) {
     case "SCHEDULED":
       return "scheduled the job";
     case "IN_PROGRESS":
-      return from === "REVIEW" ? "sent it back" : "started the job";
+      return from === "REVIEW" ? "sent it back" : by.contractor ? "started the job" : "moved it to In progress";
     case "REVIEW":
       return "marked it done";
     case "DONE":
@@ -178,9 +183,12 @@ export function addedText(kinds: string[]): string {
   return n === 1 ? `added a ${noun}` : `added ${n} ${noun}s`;
 }
 
-/** "Connor" from "Connor Swofford". */
+/**
+ * "Connor" from "Connor Swofford", "Jake" from "Jacob (Jake) Hoak" (names.ts),
+ * or the label as is when there's no first word to take.
+ */
 export function firstName(label: string): string {
-  return label.trim().split(/\s+/)[0] || label;
+  return greetingName(label) || label;
 }
 
 /**

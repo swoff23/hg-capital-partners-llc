@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { ymdToDate } from "@/lib/dates";
+import { activeTask } from "@/lib/task-scope";
 import { addEvent, createNextRepeat, grantAssigneeAccess, type Principal, type Tx } from "@/lib/tasks/core";
 import { describeConflict, type AttachmentPlan, type ChecklistPlan, type EventPlan, type Person, type TaskPlan, type TaskWrite, type TemplatePlan } from "./map";
 
@@ -273,6 +274,38 @@ export async function writeIdentity(tx: Tx, people: readonly Person[]): Promise<
     linked++;
   }
   return { linked, skipped };
+}
+
+/**
+ * Link a task whose assignee is only a name to the person it names
+ * (./legacy.ts planLegacyLinks). Compare-and-set, in one statement: only an
+ * open task that still has nobody but that name, so a pick in the app since
+ * the plan wins. The name moves into the ASSIGNED line, as a pick in the app
+ * does, and the contractor gets the job's access (D12). Returns whether it
+ * linked. It stamps appEditedAt, so a load or delta plan made before the
+ * link fails writeTask's compare-and-set (StalePlanError) and is planned
+ * again, instead of writing its stale null assignee and revoking the access
+ * just granted. Merges are unaffected: a synced row merges against
+ * asanaLastSynced, and mergeFields reads appEdited only without a baseline.
+ */
+export async function linkLegacyAssignee(
+  tx: Tx,
+  link: { taskId: string; name: string; assignee: { userId: string } | { contactId: string } },
+  now = new Date(),
+): Promise<boolean> {
+  const to = "userId" in link.assignee ? { userId: link.assignee.userId, contactId: null } : { userId: null, contactId: link.assignee.contactId };
+  const r = await tx.task.updateMany({
+    where: { id: link.taskId, assigneeUserId: null, assigneeContactId: null, assigneeName: link.name, ...activeTask },
+    data: { assigneeUserId: to.userId, assigneeContactId: to.contactId, assigneeName: null, assigneeEmail: null, appEditedAt: now },
+  });
+  if (r.count !== 1) return false;
+  await addEvent(tx, link.taskId, ASANA_PRINCIPAL, {
+    kind: "ASSIGNED",
+    data: json({ from: { userId: null, contactId: null, name: link.name }, to, linkedFromName: true }),
+    createdAt: now,
+  });
+  if (to.contactId) await grantAssigneeAccess(tx, link.taskId, to.contactId, ASANA_PRINCIPAL, now);
+  return true;
 }
 
 /** A playbook as a template, keyed by its Asana section (D28). An existing one is kept unless `refresh`. */

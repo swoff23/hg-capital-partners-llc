@@ -53,8 +53,14 @@ export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
     ...(input.footnote ? ["", input.footnote] : []),
   ].join("\n");
 
+  // The viewport meta makes iOS Mail and Outlook lay the email out at the
+  // phone's width instead of shrinking a desktop-width page to fit.
   const html = `<!doctype html>
 <html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
 <body style="margin:0;padding:0;background:#f4f4f5;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
 <tr><td align="center">

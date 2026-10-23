@@ -3,6 +3,8 @@ import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { inlineEditCommit } from "@/lib/inline-edit";
 import { cn } from "@/lib/utils";
 
+const supportsFieldSizing = () => typeof CSS !== "undefined" && CSS.supports("field-sizing", "content");
+
 /**
  * Page heading, editable in place: commits on blur / Enter, reverts on Escape,
  * re-syncs when the server value changes. Shared by the deal and property
@@ -38,12 +40,27 @@ export function InlineAddressField({
     setV(value);
   }
 
-  // Grow the textarea to its text.
+  // Grow the textarea to its text where field-sizing:content can't. Where it
+  // can, no inline height is set: one would override it and go stale. The
+  // fallback measures again whenever the width changes (a rotated phone, a
+  // narrower window), or the extra lines would be cut off.
   useLayoutEffect(() => {
     const el = area.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    if (!el || supportsFieldSizing()) return;
+    const fit = () => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    fit();
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      // Only a width change rewraps the text; the height this sets fires it too.
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [v, multiline]);
 
   function commit() {

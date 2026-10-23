@@ -253,19 +253,8 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
     latest.current.onPendingChange?.(pending);
   }, [pending]);
 
-  // Leaving the page cancels whatever is still going up, so the browser asks
-  // first: a reload, closing the tab, a typed URL. In-app links don't fire
-  // beforeunload, and iOS Safari never asks.
-  const busy = pending > 0;
-  useEffect(() => {
-    if (!busy) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = ""; // Older Chrome and Safari still look for this.
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [busy]);
+  // Leaving the page cancels whatever is still going up, so the browser asks first.
+  useLeaveWarning(pending > 0);
 
   const notice = uploadNotice(uploads.filter((u) => u.error).map((u) => ({ name: u.name, reason: u.error! })));
 
@@ -291,6 +280,23 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
     remove,
     inputs,
   };
+}
+
+/**
+ * While `active`, the browser asks before the page goes away: a reload,
+ * closing the tab, a typed URL. In-app links don't fire beforeunload, and iOS
+ * Safari never asks.
+ */
+export function useLeaveWarning(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ""; // Older Chrome and Safari still look for this.
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [active]);
 }
 
 /** Width, height and length when the browser can read them quickly; never blocks an upload for long. */

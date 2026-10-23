@@ -34,17 +34,23 @@ const PORTAL_FILE_KINDS = ["IMAGE", "VIDEO", "FILE"] as const satisfies readonly
  * system-only. A file post counts only while one of its files is still there
  * to show.
  *
- * Whose activity: staff and the system (no contact on the row), their own,
- * and history imported from Asana (D17: they could already see it there).
- * Never another contractor's, such as the previous assignee or someone else
- * shared on the job ("other contractors are never shown"); visibleFile is the
- * same rule for files. Used by both the job page and the "2 new" counts, so
- * they always agree.
+ * Whose activity (tasks/rules.ts contractorSeesRow): their own; history
+ * imported from Asana (D17: they could already see it there); and staff and
+ * system rows addressed to them or to nobody in particular. Never another
+ * contractor's, such as the previous assignee or someone else shared on the
+ * job ("other contractors are never shown"), and never the staff side of that
+ * conversation: a reply written while Zack had the job stays Zack's
+ * (`audienceContactId`). visibleFile is the same rule for files. Used by both
+ * the job page and the "2 new" counts, so they always agree.
  */
 const portalEvents = (contactId: string) => Prisma.sql`(
   e."visibility" = 'SHARED'
   AND e."deletedAt" IS NULL
-  AND (e."actorContactId" IS NULL OR e."actorContactId" = ${contactId} OR e."source" = 'ASANA')
+  AND (
+    e."source" = 'ASANA'
+    OR e."actorContactId" = ${contactId}
+    OR (e."actorContactId" IS NULL AND (e."audienceContactId" IS NULL OR e."audienceContactId" = ${contactId}))
+  )
   AND (
     e."kind" = 'COMMENT'
     OR (e."kind" = 'STATUS' AND e."data"->>'to' IN (${Prisma.join([...PORTAL_STATUS_UPDATES])}))
@@ -52,22 +58,31 @@ const portalEvents = (contactId: string) => Prisma.sql`(
       SELECT 1 FROM "TaskAttachment" t
       WHERE t."eventId" = e."id" AND t."visibility" = 'SHARED' AND t."deletedAt" IS NULL
         AND t."kind"::text IN (${Prisma.join([...PORTAL_FILE_KINDS])})
-        AND (t."uploadedByContactId" IS NULL OR t."uploadedByContactId" = ${contactId} OR t."asanaGid" IS NOT NULL)
+        AND (
+          t."asanaGid" IS NOT NULL
+          OR t."uploadedByContactId" = ${contactId}
+          OR (t."uploadedByContactId" IS NULL AND (t."audienceContactId" IS NULL OR t."audienceContactId" = ${contactId}))
+        )
     ))
   )
 )`;
 
 /**
  * A file this contractor may see: Shared, not removed, with bytes in our
- * store (attachments/access.ts contractorMaySee), and not another
- * contractor's upload unless it was imported (see portalEvents).
+ * store (attachments/access.ts contractorMaySee), and by the same rule as
+ * portalEvents: imported, their own, or a staff upload addressed to them or
+ * to nobody in particular.
  */
 const visibleFile = (contactId: string, kinds: readonly AttachmentKind[]) =>
   ({
     visibility: "SHARED",
     deletedAt: null,
     kind: { in: [...kinds] },
-    OR: [{ uploadedByContactId: null }, { uploadedByContactId: contactId }, { asanaGid: { not: null } }],
+    OR: [
+      { asanaGid: { not: null } },
+      { uploadedByContactId: contactId },
+      { uploadedByContactId: null, OR: [{ audienceContactId: null }, { audienceContactId: contactId }] },
+    ],
   }) satisfies Prisma.TaskAttachmentWhereInput;
 
 /** Jobs this contact can open: an unrevoked access row, and not a playbook template. */
@@ -326,7 +341,7 @@ async function jobUpdates(p: PortalPrincipal, taskId: string): Promise<JobUpdate
       actorLabel: portalActorLabel(p.contactId, { userId: r.actorUserId, contactId: r.actorContactId, label: r.actorLabel }) ?? r.actorLabel,
       body:
         r.kind === "STATUS"
-          ? statusUpdateText(r.statusFrom, r.statusTo)
+          ? statusUpdateText(r.statusFrom, r.statusTo, { contractor: !!r.actorContactId })
           : r.kind === "ATTACHMENT"
             ? addedText(own.map((f) => f.kind))
             : r.body,

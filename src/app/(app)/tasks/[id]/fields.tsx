@@ -83,7 +83,9 @@ export function TaskFields({
           value={v.assignee}
           users={users}
           contractors={contractors}
-          onChange={(assignee) => save({ assignee })}
+          // Sends the assignee this chip showed, so a reassignment from a stale
+          // page is refused instead of taking the job off whoever has it now.
+          onChange={(assignee) => run(() => updateTask(taskId, { assignee, expectedAssignee: v.assignee }), { before: () => setOptimistic({ assignee }) })}
         />
       </Row>
       <Row label="Due">

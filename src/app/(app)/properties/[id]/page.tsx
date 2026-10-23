@@ -3,14 +3,15 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/components/ui";
-import { fmtDay, toYmd } from "@/lib/dates";
+import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { propertyStatusTone } from "@/lib/config";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
-import { byDateThenStatus } from "@/lib/tasks/list";
+import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
+import { cn } from "@/lib/utils";
 import { targetDate } from "@/lib/tasks/rules";
 import { Avatar } from "@/components/avatar";
 import { StatusBadge } from "@/components/status-badge";
-import { parseBuildingCapex, parseUnits } from "@/lib/property-types";
+import { parseBuildingCapex, parseUnits, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { BackLink } from "@/components/back-link";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
@@ -83,8 +84,15 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
 
   // Each task's Target (D7: the visit date while Scheduled, otherwise Due), soonest first, as on Today.
+  // A past Target reads red by Today's rule (isTargetLate: never Waiting or Review); it's
+  // the date this card shows, so it's the date judged.
+  const today = todayYmdEastern();
   const tasks = property.tasks
-    .map((t) => ({ ...t, target: ymd(targetDate(t)) }))
+    .map((t) => ({
+      ...t,
+      target: ymd(targetDate(t)),
+      late: isTargetLate({ status: t.status, scheduledFor: ymd(t.scheduledFor), due: ymd(t.dueDate) }, today),
+    }))
     .sort(byDateThenStatus((t) => t.target));
 
   return (
@@ -119,7 +127,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <UnitsSection
             propertyId={property.id}
             version={property.updatedAt.toISOString()}
-            initial={units}
+            // Every unit with an id, so the save can tell a rename from a remove and an add.
+            initial={withUnitIds(units)}
             rules={capexRules}
           />
 
@@ -212,8 +221,13 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
                             <span className="sr-only">{who.label}</span>
                           </span>
                         )}
-                        <span className="w-24 shrink-0 text-right text-xs text-muted">
-                          {fmtDay(t.target)}
+                        <span
+                          className={cn(
+                            "w-24 shrink-0 text-right text-xs",
+                            t.late ? "text-red-600 dark:text-red-400" : "text-muted",
+                          )}
+                        >
+                          {fmtDay(t.target, { year: "auto", now: today })}
                         </span>
                       </li>
                     );

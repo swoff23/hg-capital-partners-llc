@@ -7,7 +7,7 @@ import { Sheet } from "@/components/sheet";
 import { Button, Input, Select, pickerChip } from "@/components/ui";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { describeRepeat, type RepeatRule } from "@/lib/tasks/repeat";
-import { REPEAT_MODES, choiceFromRule, ruleFromChoice, type RepeatChoice, type RepeatMode } from "@/lib/tasks/repeat-choice";
+import { REPEAT_MODES, choiceFromRule, ruleFromChoice, switchMode, type RepeatChoice, type RepeatMode } from "@/lib/tasks/repeat-choice";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,7 +41,7 @@ export function RepeatPicker({
     if (JSON.stringify(rule) !== JSON.stringify(value)) onChange(rule);
   }
 
-  const panel = <RepeatPanel initial={choiceFromRule(value, defaultDay)} onSave={save} onCancel={() => setOpen(false)} />;
+  const panel = <RepeatPanel initial={choiceFromRule(value, defaultDay)} defaultDay={defaultDay} onSave={save} onCancel={() => setOpen(false)} />;
 
   return (
     <DialogTrigger isOpen={open} onOpenChange={setOpen}>
@@ -66,10 +66,13 @@ export function RepeatPicker({
 
 function RepeatPanel({
   initial,
+  defaultDay,
   onSave,
   onCancel,
 }: {
   initial: RepeatChoice;
+  /** The due date's day (or today's), for a mode that wasn't the stored one. */
+  defaultDay: number;
   onSave: (rule: RepeatRule | null) => void;
   onCancel: () => void;
 }) {
@@ -105,7 +108,7 @@ function RepeatPanel({
         aria-label="How often"
         value={choice.mode}
         autoFocus
-        onChange={(e) => set({ mode: e.target.value as RepeatMode, every: initial.mode === e.target.value ? initial.every : 1 })}
+        onChange={(e) => setChoice(switchMode(initial, e.target.value as RepeatMode, defaultDay))}
       >
         {REPEAT_MODES.map((m) => (
           <option key={m.mode} value={m.mode}>

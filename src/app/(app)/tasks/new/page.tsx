@@ -41,7 +41,7 @@ export default async function NewTaskPage({ searchParams }: PageProps<"/tasks/ne
               users={users}
               contractors={contractors}
               defaultAssignee={{ userId: user.id }}
-              defaultDay={Number(todayYmdEastern().slice(8, 10))}
+              today={todayYmdEastern()}
             />
             {!sp.dealId && (
               <label className="block">

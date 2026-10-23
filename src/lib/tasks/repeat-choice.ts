@@ -1,3 +1,4 @@
+import type { Ymd } from "@/lib/dates";
 import type { RepeatRule } from "./repeat";
 
 /**
@@ -12,7 +13,7 @@ export interface RepeatChoice {
   mode: RepeatMode;
   /** N for days and weeks. Kept from a stored rule for the other modes. */
   every: number;
-  /** Day of the month, for monthly. */
+  /** Day of the month: picked for monthly, the due date's for quarterly. Yearly keeps none. */
   day: number;
 }
 
@@ -44,10 +45,35 @@ export function ruleFromChoice(c: RepeatChoice): RepeatRule | null {
     case "days":
     case "weeks":
       return { freq: c.mode, interval: every };
+    // Month steps pin the day, so a 31st comes back after a short month instead of sliding to the 28th.
     case "monthly":
-      return { freq: "monthly", interval: every, dayOfMonth: clamp(c.day, 1, 31, 1) };
     case "quarterly":
+      return { freq: c.mode, interval: every, dayOfMonth: clamp(c.day, 1, 31, 1) };
+    // Not pinned: the chip has no day for yearly, so a pin would silently undo a moved renewal date.
     case "yearly":
-      return { freq: c.mode, interval: every };
+      return { freq: "yearly", interval: every };
   }
+}
+
+/**
+ * Switching the mode in the editor: back to the stored mode restores its
+ * numbers; any other mode starts at every 1 on the due date's day, not on a
+ * day left over from the mode just left.
+ */
+export function switchMode(initial: RepeatChoice, mode: RepeatMode, defaultDay: number): RepeatChoice {
+  if (initial.mode === mode) return { ...initial };
+  return { mode, every: 1, day: clamp(defaultDay, 1, 31, 1) };
+}
+
+const dayOf = (v: Ymd) => Number(v.slice(8, 10));
+const isYmd = (v: string | null | undefined): v is Ymd => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/**
+ * New task: the due date is the first one, so a pinned day that came from it
+ * moves with it (Due Oct 23, Monthly on the 23rd, then Due Nov 15: Monthly on
+ * the 15th). A day picked apart from the due date stays.
+ */
+export function followDueDay(rule: RepeatRule | null, prevDue: string | null | undefined, nextDue: string | null | undefined): RepeatRule | null {
+  if (!rule?.dayOfMonth || !isYmd(prevDue) || !isYmd(nextDue) || rule.dayOfMonth !== dayOf(prevDue)) return rule;
+  return { ...rule, dayOfMonth: dayOf(nextDue) };
 }

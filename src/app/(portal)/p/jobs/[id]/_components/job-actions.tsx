@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Camera, ImagePlus, Send } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
-import { MediaUploadTray, useMediaUploader } from "@/components/media-uploader";
+import { MediaUploadTray, useLeaveWarning, useMediaUploader } from "@/components/media-uploader";
 import { Sheet } from "@/components/sheet";
 import { useToast, useToastInset } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
@@ -22,6 +22,11 @@ const BAR_PX = 72;
  * Photos picked from the bar post as their own update once they're all up,
  * unless there's text in the composer: then they wait and go with it. While
  * the Mark done sheet is open they go with the Mark done instead.
+ *
+ * A held photo is already on the job, but HG only hears about it (the
+ * timeline line and the email) once it's posted. Leaving the page for
+ * another one in the app posts whatever is still held. A reload or a closed
+ * tab asks first where the browser allows it (iOS Safari never does).
  */
 export function JobActions({
   taskId,
@@ -83,6 +88,24 @@ export function JobActions({
   });
   const { pending } = uploader;
 
+  // The photos a Mark done is sending right now, so leaving mid-send doesn't
+  // post them a second time as an empty update.
+  const finishingIds = useRef<string[]>([]);
+
+  // Moving to another page in the app: post what's still held, as its own
+  // update (any unsent text stays unsent). Read at unmount on purpose, so it's
+  // the latest list; live is the same ref onRecorded reads.
+  useEffect(() => {
+    const latest = live;
+    const inFlight = finishingIds;
+    return () => {
+      const held = latest.current.ready.filter((id) => !inFlight.current.includes(id));
+      // Detached: nothing is left on this page to show a result, and a redirect needs no rethrow here.
+      if (held.length > 0) postJobUpdateAction(taskId, { body: "", attachmentIds: held }).catch(() => {});
+    };
+  }, [taskId]);
+  useLeaveWarning(ready.length > 0);
+
   // Bring the upload tiles into view when uploads start from the bar.
   const trayRef = useRef<HTMLDivElement>(null);
   const hadUploads = useRef(false);
@@ -121,14 +144,19 @@ export function JobActions({
   function finish() {
     startFinishing(async () => {
       const ids = ready;
-      const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: ids }));
-      if (!res.ok) {
-        toast({ message: res.error });
-        return;
+      finishingIds.current = ids;
+      try {
+        const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: ids }));
+        if (!res.ok) {
+          toast({ message: res.error });
+          return;
+        }
+        setReady((r) => r.filter((id) => !ids.includes(id)));
+        setNote("");
+        setSheetState("sent");
+      } finally {
+        finishingIds.current = [];
       }
-      setReady((r) => r.filter((id) => !ids.includes(id)));
-      setNote("");
-      setSheetState("sent");
     });
   }
 

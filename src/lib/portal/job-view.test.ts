@@ -142,6 +142,10 @@ test("status updates read as a short phrase", () => {
   assert.equal(statusUpdateText("OPEN", "DONE"), "closed the job");
   assert.equal(statusUpdateText("OPEN", "SCHEDULED"), "scheduled the job");
   assert.equal(statusUpdateText(null, null), "updated the job");
+  // Only the contractor starts the job; a partner moving it there changed its status.
+  assert.equal(statusUpdateText("SCHEDULED", "IN_PROGRESS", { contractor: false }), "moved it to In progress");
+  assert.equal(statusUpdateText("SCHEDULED", "IN_PROGRESS", { contractor: true }), "started the job");
+  assert.equal(statusUpdateText("REVIEW", "IN_PROGRESS", { contractor: false }), "sent it back");
 });
 
 test("file posts say what was added", () => {
@@ -154,6 +158,10 @@ test("file posts say what was added", () => {
 test("names", () => {
   assert.equal(firstName("Connor Swofford"), "Connor");
   assert.equal(firstName("  Zack (Outlaw Carpentry) "), "Zack");
+  // The greeting, the Mark done payoff and the first-password page use the name he goes by.
+  assert.equal(firstName("Jacob (Jake) hoak"), "Jake");
+  assert.equal(firstName("Zack(Outlaw Carpentry)"), "Zack");
+  assert.equal(firstName("(Asana sync)"), "(Asana sync)");
   assert.equal(joinNames(["Connor"]), "Connor");
   assert.equal(joinNames(["Connor", "Pieter"]), "Connor and Pieter");
   assert.equal(joinNames(["A", "B", "C"]), "A, B and C");

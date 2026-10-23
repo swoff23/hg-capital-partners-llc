@@ -6,13 +6,24 @@ import { DueDatePicker } from "@/components/due-date-picker";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
-import { applyTokens, dueFromOffset, extractTokens, hasOpenTokens, isAddressToken, type TemplateItem } from "@/lib/tasks/template-items";
+import {
+  applyTokens,
+  dueFromOffset,
+  extractTokens,
+  hasOpenTokens,
+  isAddressToken,
+  rowTitle,
+  sameToken,
+  tokenInputType,
+  tokenLabel,
+  type TemplateItem,
+} from "@/lib/tasks/template-items";
 import { cn } from "@/lib/utils";
 import { applyPlaybook } from "../../actions";
 
 type Row = {
   include: boolean;
-  /** Set once the title is edited by hand; tokens stop filling it. */
+  /** Set once the title is edited by hand. Tokens still fill any [Token] the edit kept. */
   title?: string;
   assignee: AssigneeValue;
   /** Set once the date is picked by hand; the anchor date stops moving it. */
@@ -58,7 +69,7 @@ export function ApplyFlow({
   const values = Object.fromEntries(tokens.map((t) => [t, valueOf(t)]));
   const usesAnchor = items.some((i) => i.dueOffsetDays !== undefined);
 
-  const titleOf = (i: number) => rows[i].title ?? applyTokens(items[i].title, values);
+  const titleOf = (i: number) => rowTitle(rows[i].title, items[i].title, values);
   const notesOf = (i: number) => (items[i].notes ? applyTokens(items[i].notes!, values) : null);
   const checklistOf = (i: number) => (items[i].checklist ?? []).map((c) => applyTokens(c, values));
   const dueOf = (i: number) => (rows[i].due !== undefined ? rows[i].due : dueFromOffset(anchor, items[i].dueOffsetDays));
@@ -66,7 +77,9 @@ export function ApplyFlow({
   const count = kept.length;
   // A [Token] still blank in a task that will be created: fill it (or edit the title) first.
   const open = extractTokens(kept.flatMap((i) => [titleOf(i), notesOf(i), ...checklistOf(i)]));
-  const hint = !error && propertyId && open.length > 0 ? `Fill in [${open[0]}] first` : "";
+  // Named as its field reads; brackets typed into a title have no field, so they show as typed.
+  const openField = open.length > 0 ? tokens.find((t) => sameToken(t, open[0])) : undefined;
+  const hint = !error && propertyId && open.length > 0 ? `Fill in ${openField ? tokenLabel(openField) : `[${open[0]}]`} first` : "";
 
   const patchRow = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
 
@@ -120,8 +133,9 @@ export function ApplyFlow({
             <div className="grid gap-4 sm:grid-cols-2">
               {tokens.map((t) => (
                 <label key={t} className="block">
-                  <span className="text-xs font-medium text-muted">{t}</span>
+                  <span className="text-xs font-medium text-muted">{tokenLabel(t)}</span>
                   <Input
+                    type={tokenInputType(t)}
                     value={valueOf(t)}
                     placeholder={isAddressToken(t) ? "Fills from the property" : `Fill in [${t}]`}
                     onChange={(e) => setTyped((v) => ({ ...v, [t]: e.target.value }))}

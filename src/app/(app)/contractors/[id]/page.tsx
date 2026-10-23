@@ -11,6 +11,8 @@ import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { fmtDay } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { isActiveStatus, statusRank } from "@/lib/task-scope";
+import { cleanTrades, docOnFile, mailtoHref, telHref } from "@/lib/contacts";
+import { ContactLink } from "../contact-link";
 import { PortalAccessCard } from "./portal-access-card";
 
 /**
@@ -67,9 +69,13 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             </CardHeader>
             <CardBody>
               <dl>
-                <Field label="Trades">{c.trades ?? "—"}</Field>
-                <Field label="Phone">{c.phone ?? "—"}</Field>
-                <Field label="Email">{c.email ?? "—"}</Field>
+                <Field label="Trades">{cleanTrades(c.trades) ?? "—"}</Field>
+                <Field label="Phone">
+                  <ContactLink href={telHref(c.phoneE164 ?? c.phone)}>{c.phone ?? "—"}</ContactLink>
+                </Field>
+                <Field label="Email">
+                  <ContactLink href={mailtoHref(c.email)}>{c.email ?? "—"}</ContactLink>
+                </Field>
                 <Field label="Mailing address">{c.mailingAddress ?? "—"}</Field>
                 <Field label="Billing">{c.billingInfo ?? "—"}</Field>
                 <Field label="Availability">{c.availability ?? "—"}</Field>
@@ -78,6 +84,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                     <a href={c.w9Url} target="_blank" rel="noreferrer" className="text-primary">
                       View ↗
                     </a>
+                  ) : docOnFile(c.comments, "W-9") ? (
+                    "On file"
                   ) : (
                     "—"
                   )}
@@ -87,6 +95,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                     <a href={c.coiUrl} target="_blank" rel="noreferrer" className="text-primary">
                       View ↗
                     </a>
+                  ) : docOnFile(c.comments, "Insurance") ? (
+                    "On file"
                   ) : (
                     "—"
                   )}

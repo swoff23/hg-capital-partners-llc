@@ -42,22 +42,26 @@ export function fmtDateTime(d: Date | string | null | undefined): string {
 }
 
 /**
- * Up to two initials: "Zack Smith" → "ZS". With no name, the email's local
- * part stands in, split on dots, dashes and underscores: "zack.smith@x.com" →
- * "ZS". "?" when there's neither.
+ * Up to two initials, letters only: "Zack Smith" → "ZS". Anything in
+ * parentheses is a nickname or a company, not part of the name: "Jacob (Jake)
+ * Hoak" → "JH", "Zack (Outlaw Carpentry)" → "Z". A name that is an email
+ * address, as some legacy assignee names are, counts as one. With no name,
+ * the email's local part stands in, split on dots, dashes and underscores:
+ * "zack.smith@x.com" → "ZS". "?" when there's neither.
  */
 export function initials(name: string | null | undefined, email?: string | null): string {
-  const words = (s: string, sep: RegExp) =>
+  const letters = (s: string, sep: RegExp) =>
     s
       .split(sep)
+      .map((w) => w.replace(/[^\p{L}]/gu, ""))
       .filter(Boolean)
       .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase())
+      .map((w) => w.charAt(0).toUpperCase())
       .join("");
-  const fromName = name ? words(name, /\s+/) : "";
-  if (fromName) return fromName;
-  const local = (email ?? "").split("@")[0].replace(/\+.*$/, "");
-  return words(local, /[\s._-]+/) || "?";
+  const fromEmail = (e: string) => letters(e.split("@")[0].replace(/\+.*$/, ""), /[\s._-]+/);
+  const n = (name ?? "").trim();
+  const fromName = n.includes("@") ? fromEmail(n) : letters(n.replace(/\([^)]*\)?/g, " "), /\s+/);
+  return fromName || fromEmail(email ?? "") || "?";
 }
 
 export function formatBytes(bytes: number): string {
