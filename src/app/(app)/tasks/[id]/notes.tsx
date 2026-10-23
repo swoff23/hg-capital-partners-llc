@@ -1,0 +1,55 @@
+"use client";
+import { useLayoutEffect, useRef, useState } from "react";
+import { Eye } from "lucide-react";
+import { updateTask } from "./actions";
+import { useRun } from "./use-run";
+
+/**
+ * The task's notes: a textarea that grows with its text and saves when it
+ * loses focus. Notes are always visible to the assigned contractor (D16), so
+ * the line above says who'll see them.
+ */
+export function NotesField({ taskId, value, visibleTo }: { taskId: string; value: string | null; visibleTo: string | null }) {
+  const { run, pending } = useRun();
+  const [text, setText] = useState(value ?? "");
+  const [seen, setSeen] = useState(value);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  if (value !== seen) {
+    setSeen(value);
+    setText(value ?? "");
+  }
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  function commit() {
+    if (text.trim() === (value ?? "").trim()) return;
+    run(() => updateTask(taskId, { description: text.trim() ? text : null }));
+  }
+
+  return (
+    <div>
+      {visibleTo && (
+        <p className="mb-1 flex items-center gap-1.5 text-xs text-muted">
+          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+          Visible to {visibleTo}
+        </p>
+      )}
+      <textarea
+        ref={ref}
+        aria-label="Notes"
+        value={text}
+        rows={2}
+        placeholder="Add notes"
+        disabled={pending}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        className="-mx-2 block w-[calc(100%+1rem)] resize-none overflow-hidden rounded-md bg-transparent px-2 py-1.5 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20"
+      />
+    </div>
+  );
+}

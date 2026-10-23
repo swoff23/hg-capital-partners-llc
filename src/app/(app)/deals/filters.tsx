@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
-import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/components/segmented-control";
 import { StatusMultiSelect } from "./status-multiselect";
 
 const TABS = [
@@ -59,23 +59,12 @@ export function DealFilters({
         className="h-8 w-64 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none focus:border-primary"
       />
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => set("status", t.key)}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                current.statuses.length === 0 && current.status === t.key
-                  ? "bg-surface text-foreground shadow-sm"
-                  : "text-muted hover:text-foreground",
-              )}
-            >
-              {t.label}
-              <span className="ml-1 opacity-60">{counts[t.key]}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          aria-label="Deal status"
+          options={TABS.map((t) => ({ ...t, count: counts[t.key] }))}
+          value={current.statuses.length === 0 ? (TABS.find((t) => t.key === current.status)?.key ?? null) : null}
+          onChange={(key) => set("status", key)}
+        />
 
         <StatusMultiSelect selected={current.statuses} />
       </div>

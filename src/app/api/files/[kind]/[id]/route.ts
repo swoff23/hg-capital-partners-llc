@@ -83,6 +83,8 @@ async function lookup(kind: string, id: string, variant: Variant | null, viewer:
         contentType: true,
         visibility: true,
         deletedAt: true,
+        uploadedByContactId: true,
+        asanaGid: true,
         thumbPathname: true,
         posterPathname: true,
       },
@@ -90,7 +92,7 @@ async function lookup(kind: string, id: string, variant: Variant | null, viewer:
     if (!a || a.kind === "LINK" || !a.url) return null;
     const isPrivate = !!a.pathname && isPrivateStoreUrl(a.url, storeId, a.pathname);
     if (viewer.kind === "contractor") {
-      if (!contractorMaySee(a) || !isPrivate) return null;
+      if (!contractorMaySee(a, viewer.contactId) || !isPrivate) return null;
       try {
         await assertContractorAccess(prisma, a.taskId, viewer.contactId);
       } catch {

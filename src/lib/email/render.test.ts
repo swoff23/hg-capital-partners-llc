@@ -40,6 +40,16 @@ test("non-http links are refused", () => {
   assert.throws(() => renderPlainEmail({ ...input, buttonUrl: "not a url" }));
 });
 
+test("item lines sit between the line and the button, escaped, still one button", () => {
+  const items = ['Zack: "Uppers in" <b>', "Zack marked it done"];
+  const { text, html } = renderPlainEmail({ ...input, items });
+  assert.ok(text.includes(`${input.line}\n\n${items[0]}\n${items[1]}\n\n${input.buttonLabel}:`));
+  assert.ok(html.includes("Zack: &quot;Uppers in&quot; &lt;b&gt;"));
+  assert.ok(html.indexOf("Zack marked it done") < html.indexOf("<a href="));
+  assert.equal([...html.matchAll(/<a href="/g)].length, 1);
+  assert.equal(renderPlainEmail({ ...input, items: [] }).text, renderPlainEmail(input).text);
+});
+
 test("escapeHtml covers the five specials", () => {
   assert.equal(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
 });

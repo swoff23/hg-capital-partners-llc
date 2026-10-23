@@ -1,36 +1,51 @@
 "use client";
-import { useTransition } from "react";
-import { toggleTask } from "./actions";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export function TaskCheckbox({ id, done }: { id: string; done: boolean }) {
-  const [pending, start] = useTransition();
+/**
+ * The round Done checkbox on task rows. An 18px circle inside a 44px hit
+ * area (negative margins keep the row compact). The caller owns the state,
+ * so a tap shows at once while the save runs.
+ */
+export function TaskCheckbox({
+  checked,
+  onChange,
+  label,
+  disabled,
+  className,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  /** The task's title: screen readers hear "Call plumber, checkbox". */
+  label: string;
+  disabled?: boolean;
+  className?: string;
+}) {
   return (
     <button
       type="button"
-      aria-label={done ? "Mark open" : "Mark done"}
-      aria-pressed={done}
-      disabled={pending}
-      onClick={() => start(() => toggleTask(id))}
-      className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
-        done
-          ? "border-green-600 bg-green-600 text-white"
-          : "border-muted/50 text-muted/40 hover:border-green-600 hover:text-green-600"
-      } ${pending ? "opacity-50" : ""}`}
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "group/check -m-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full outline-none disabled:opacity-50",
+        className,
+      )}
     >
-      {/* Always rendered: solid white when done, a faint hint otherwise so it's
-          clear a click will check it. */}
-      <svg
-        viewBox="0 0 12 12"
-        className="h-3 w-3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
+      <span
+        aria-hidden="true"
+        className={cn(
+          "flex h-[18px] w-[18px] items-center justify-center rounded-full border transition-colors",
+          "group-focus-visible/check:ring-2 group-focus-visible/check:ring-primary/30",
+          checked
+            ? "border-green-600 bg-green-600 text-white"
+            : "border-muted/60 text-transparent group-hover/check:border-green-600 group-hover/check:text-green-600",
+        )}
       >
-        <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
-      </svg>
+        <Check className="h-3 w-3" />
+      </span>
     </button>
   );
 }

@@ -5,6 +5,8 @@ import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
 import { withLog, withResult } from "@/lib/server-action";
+import type { Assignee } from "@/lib/tasks/core";
+import { repeatRuleSchema } from "@/lib/tasks/repeat";
 import * as tasks from "@/lib/tasks/service";
 
 /**
@@ -23,18 +25,34 @@ export async function toggleTask(id: string) {
 const taskSchema = z.object({
   title: z.string().min(2),
   description: z.string().optional(),
+  // The assignee picker: "u:<userId>", "c:<contactId>", or blank for nobody.
+  assignee: z.string().optional(),
   assigneeUserId: z.string().optional(),
   assigneeName: z.string().optional(),
   dueDate: z.string().optional(),
   priority: z.string().optional(),
   propertyId: z.string().optional(),
   dealId: z.string().optional(),
+  status: z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING"]).optional(),
+  waitingOn: z.string().optional(),
+  scheduledFor: z.string().optional(),
+  // JSON from the Repeats editor; blank for Never.
+  repeatRule: z.string().optional(),
 });
+
+function pickedAssignee(v: string | undefined, legacyUserId: string | undefined): Assignee {
+  if (v?.startsWith("u:") && v.length > 2) return { userId: v.slice(2) };
+  if (v?.startsWith("c:") && v.length > 2) return { contactId: v.slice(2) };
+  if (v === undefined && legacyUserId) return { userId: legacyUserId };
+  return null;
+}
 
 export async function createTask(formData: FormData) {
   return withLog("createTask", async () => {
     const user = await requireUser();
     const p = taskSchema.parse(formToObject(formData));
+    const assignee = pickedAssignee(p.assignee, p.assigneeUserId);
+    if (p.status === "SCHEDULED" && !p.scheduledFor) throw new tasks.TaskRuleError("Pick the visit date.");
     const task = await tasks.createTask(
       {
         title: p.title,
@@ -43,8 +61,12 @@ export async function createTask(formData: FormData) {
         priority: p.priority,
         propertyId: p.propertyId,
         dealId: p.dealId,
-        assignee: p.assigneeUserId ? { userId: p.assigneeUserId } : null,
-        assigneeName: p.assigneeUserId ? null : p.assigneeName,
+        assignee,
+        assigneeName: assignee ? null : p.assigneeName,
+        status: p.status,
+        waitingOn: p.waitingOn,
+        scheduledFor: p.status === "SCHEDULED" ? p.scheduledFor : null,
+        repeatRule: p.repeatRule ? repeatRuleSchema.parse(JSON.parse(p.repeatRule)) : null,
       },
       tasks.staffPrincipal(user),
     );
@@ -98,15 +120,20 @@ const uploadedSchema = z
     thumbPathname: z.string().min(1).max(300).nullish(),
     posterPathname: z.string().min(1).max(300).nullish(),
     visibility: z.enum(["SHARED", "INTERNAL"]).default("SHARED"),
+    // false: the file goes out with a comment (the composer links it on Send), so no timeline line of its own.
+    standalone: z.boolean().default(true),
   })
   .strict();
 
-/** After the browser finished uploading straight to Blob. Returns a message instead of throwing, for the uploader to show. */
-export async function recordTaskAttachment(taskId: string, data: z.input<typeof uploadedSchema>): Promise<ActionResult> {
+/**
+ * After the browser finished uploading straight to Blob. Returns the new
+ * attachment's id, or a message instead of throwing, for the uploader to show.
+ */
+export async function recordTaskAttachment(taskId: string, data: z.input<typeof uploadedSchema>): Promise<ActionResult<{ id: string }>> {
   return withResult("recordTaskAttachment", async () => {
     const user = await requireUser();
-    const { visibility, ...file } = uploadedSchema.parse(data);
-    await tasks.recordTaskAttachment(z.string().min(1).parse(taskId), file, tasks.staffPrincipal(user), { visibility });
+    const { visibility, standalone, ...file } = uploadedSchema.parse(data);
+    return tasks.recordTaskAttachment(z.string().min(1).parse(taskId), file, tasks.staffPrincipal(user), { visibility, standalone });
   });
 }
 

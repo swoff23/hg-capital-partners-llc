@@ -39,6 +39,7 @@ export function systemPrincipal(label: string): core.Principal {
 
 function revalidateTask(t: { id: string; propertyId?: string | null; dealId?: string | null } | null, extraPropertyIds: (string | null | undefined)[] = []): void {
   revalidatePath("/tasks");
+  revalidatePath("/tasks/all");
   revalidatePath("/");
   if (!t) return;
   revalidatePath(`/tasks/${t.id}`);
@@ -72,6 +73,42 @@ export async function patchTask(id: string, patch: core.TaskPatch, p: core.Princ
   if (!before) return;
   const after = await prisma.$transaction((tx) => core.patchTask(tx, id, patch, p));
   revalidateTask(after, [before.propertyId]);
+}
+
+/**
+ * Staff only: removes the task for good, with its timeline, checklist,
+ * files, access rows and queued emails (all cascade), then its blobs once
+ * the delete has committed. A task on a deal leaves a line on the deal's
+ * timeline. No-op when the task doesn't exist.
+ */
+export async function deleteTask(id: string, p: core.Principal): Promise<void> {
+  if (p.kind !== "staff") throw new core.TaskRuleError("Only staff can delete a task.");
+  const removed = await prisma.$transaction(async (tx) => {
+    const task = await tx.task.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        propertyId: true,
+        dealId: true,
+        attachments: { select: { url: true, thumbPathname: true, posterPathname: true } },
+      },
+    });
+    if (!task) return null;
+    await tx.task.delete({ where: { id } });
+    if (task.dealId) {
+      await tx.dealNote.create({ data: { dealId: task.dealId, body: `Task deleted: ${task.title}  ·  ${p.label}`, noteDate: new Date(), source: "change" } });
+    }
+    return task;
+  });
+  if (!removed) return;
+  // A LINK has no blob. Older rows may still point at a public blob; del() takes either URL.
+  const blobs = removed.attachments.flatMap((a) => [a.url, a.thumbPathname, a.posterPathname]).filter((x): x is string => !!x);
+  const token = getEnv().BLOB_READ_WRITE_TOKEN;
+  if (blobs.length && token) {
+    await del(blobs, { token }).catch((err) => logError("tasks:delete:blobs", err, { taskId: id, count: blobs.length }));
+  }
+  revalidateTask(removed);
 }
 
 export async function addTaskComment(taskId: string, input: core.CommentInput, p: core.Principal): Promise<void> {

@@ -7,9 +7,22 @@ import { isActiveStatus } from "@/lib/task-scope";
  * these decide the rest. See access.test.ts.
  */
 
-/** A contractor sees a file only when it's Shared, not removed, and has bytes here (not a LINK). */
-export function contractorMaySee(att: { kind: AttachmentKind; visibility: Visibility; deletedAt: Date | null }): boolean {
-  return att.visibility === "SHARED" && att.deletedAt === null && att.kind !== "LINK";
+export interface SeeableFile {
+  kind: AttachmentKind;
+  visibility: Visibility;
+  deletedAt: Date | null;
+  uploadedByContactId: string | null;
+  asanaGid: string | null;
+}
+
+/**
+ * A contractor sees a file only when it's Shared, not removed, has bytes here
+ * (not a LINK), and isn't another contractor's upload unless it was imported
+ * from Asana. The same rule as visibleFile in src/lib/portal/queries.ts.
+ */
+export function contractorMaySee(att: SeeableFile, contactId: string): boolean {
+  if (att.visibility !== "SHARED" || att.deletedAt !== null || att.kind === "LINK") return false;
+  return att.uploadedByContactId === null || att.uploadedByContactId === contactId || att.asanaGid !== null;
 }
 
 /**

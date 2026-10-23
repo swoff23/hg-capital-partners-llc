@@ -6,6 +6,9 @@ const APP_DIR = path.join(__dirname, "../../src/app");
 
 type FindRow = (db: PrismaClient) => Promise<{ id: string } | null>;
 
+/** The "portal" fixture contractor's login (setup.ts), who also gets one job of their own. */
+export const PORTAL_FIXTURE_EMAIL = "device-check@hg.localhost";
+
 // One real row per dynamic segment, keyed "parent/[param]". IDs are cuids from
 // each machine's own import, so tests/devices/setup.ts looks them up in the
 // local DB at the start of every run instead of hard-coding them. A new
@@ -14,9 +17,19 @@ type FindRow = (db: PrismaClient) => Promise<{ id: string } | null>;
 export const SAMPLE_PARAMS: Record<string, FindRow> = {
   "contractors/[id]": (db) => db.contact.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   "deals/[id]": (db) => db.deal.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // The contractor portal's job page: the job setup.ts gives the fixture contractor.
+  "jobs/[id]": (db) =>
+    db.task.findFirst({
+      where: { access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }),
   "properties/[id]": (db) => db.property.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   "tasks/[id]": (db) =>
     db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // Playbooks come from the Asana load (scripts/asana/20-load.ts).
+  "templates/[id]": (db) =>
+    db.taskTemplate.findFirst({ where: { archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } }),
 };
 
 /**

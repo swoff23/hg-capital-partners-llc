@@ -25,6 +25,10 @@ export interface SendResult {
   ok: boolean;
   id?: string;
   error?: string;
+  /** Resend's HTTP status on a refused send, e.g. 429. */
+  status?: number;
+  /** Resend's error name, e.g. "daily_quota_exceeded" or "rate_limit_exceeded". */
+  code?: string;
 }
 
 const RESEND_URL = "https://api.resend.com/emails";
@@ -60,7 +64,7 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
     if (!res.ok) {
       const error = `Resend ${res.status}: ${body.message ?? body.name ?? "request failed"}`;
       logError("email:send", new Error(error), { subject: msg.subject });
-      return { ok: false, error };
+      return { ok: false, error, status: res.status, code: body.name };
     }
     return { ok: true, id: body.id };
   } catch (err) {

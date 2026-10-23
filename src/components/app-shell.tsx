@@ -6,6 +6,7 @@ import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SideNav } from "@/components/nav";
+import { ToastProvider } from "@/components/toast";
 
 export function AppShell({
   children,
@@ -58,7 +59,7 @@ export function AppShell({
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  return (
+  const shell = (
     <div className="min-h-screen">
       <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface px-4">
         <button
@@ -196,4 +197,7 @@ export function AppShell({
       </div>
     </div>
   );
+
+  // One toast region for the app (components/toast.tsx); the portal mounts its own.
+  return <ToastProvider>{shell}</ToastProvider>;
 }

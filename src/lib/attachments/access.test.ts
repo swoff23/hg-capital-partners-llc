@@ -7,10 +7,18 @@ const NOW = new Date("2026-10-30T15:00:00Z");
 const ago = (min: number) => new Date(NOW.getTime() - min * 60_000);
 
 test("contractors see Shared, live, stored files only", () => {
-  assert.equal(contractorMaySee({ kind: "IMAGE", visibility: "SHARED", deletedAt: null }), true);
-  assert.equal(contractorMaySee({ kind: "IMAGE", visibility: "INTERNAL", deletedAt: null }), false);
-  assert.equal(contractorMaySee({ kind: "IMAGE", visibility: "SHARED", deletedAt: ago(1) }), false);
-  assert.equal(contractorMaySee({ kind: "LINK", visibility: "SHARED", deletedAt: null }), false);
+  const file = { kind: "IMAGE", visibility: "SHARED", deletedAt: null, uploadedByContactId: null, asanaGid: null } as const;
+  assert.equal(contractorMaySee(file, ME), true);
+  assert.equal(contractorMaySee({ ...file, visibility: "INTERNAL" }, ME), false);
+  assert.equal(contractorMaySee({ ...file, deletedAt: ago(1) }, ME), false);
+  assert.equal(contractorMaySee({ ...file, kind: "LINK" }, ME), false);
+});
+
+test("another contractor's upload stays hidden unless it came from Asana", () => {
+  const file = { kind: "IMAGE", visibility: "SHARED", deletedAt: null, asanaGid: null } as const;
+  assert.equal(contractorMaySee({ ...file, uploadedByContactId: ME }, ME), true);
+  assert.equal(contractorMaySee({ ...file, uploadedByContactId: "someone-else" }, ME), false);
+  assert.equal(contractorMaySee({ ...file, uploadedByContactId: "someone-else", asanaGid: "1209" }, ME), true);
 });
 
 test("a job still in the contractor's hands takes uploads", () => {

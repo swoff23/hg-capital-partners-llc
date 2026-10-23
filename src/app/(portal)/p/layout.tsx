@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ToastProvider } from "@/components/toast";
 
 export const metadata: Metadata = {
   title: { default: "My Jobs | HG Capital Partners", template: "%s | HG Capital Partners" },
@@ -10,8 +11,13 @@ export const metadata: Metadata = {
  * auth here: every page calls requirePortalPrincipal() itself, because a
  * layout doesn't re-run on client navigation and isn't a security boundary.
  * Code under (portal) never imports staff auth or the properties, deals or
- * QuickBooks modules (src/lib/auth-guard.test.ts).
+ * QuickBooks modules (src/lib/auth-guard.test.ts). The portal has its own
+ * toast region (AppShell holds the app's).
  */
 export default function PortalLayout({ children }: LayoutProps<"/p">) {
-  return <div className="min-h-screen bg-background text-foreground">{children}</div>;
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <ToastProvider>{children}</ToastProvider>
+    </div>
+  );
 }

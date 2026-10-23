@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { daysUntil, dueLabel, fmtDay, isPastDay, relativeDays, todayYmd, todayYmdEastern, toYmd, ymdToDate } from "./dates";
+import { daysUntil, dueLabel, easternDayStart, fmtDay, isPastDay, relativeDays, todayYmd, todayYmdEastern, toYmd, ymdToDate } from "./dates";
 
 // A fixed "now": 2026-03-01 at 03:30 local. The assertions below must hold
 // whatever TZ the test process runs in — that is the point of the module.
@@ -95,4 +95,12 @@ test("helpers accept an explicit today (Ymd) instead of an instant", () => {
   assert.equal(dueLabel("2026-10-19", "2026-10-22"), "3d late");
   assert.equal(fmtDay("2026-12-05", { year: "auto", now: "2026-10-22" }), "Dec 5");
   assert.equal(fmtDay("2027-01-05", { year: "auto", now: "2026-10-22" }), "Jan 5, 2027");
+});
+
+test("easternDayStart: Buffalo midnight in UTC, across daylight time", () => {
+  assert.equal(easternDayStart("2026-10-22").toISOString(), "2026-10-22T04:00:00.000Z");
+  assert.equal(easternDayStart("2026-12-01").toISOString(), "2026-12-01T05:00:00.000Z");
+  // The days the clocks change: midnight is still on the old offset.
+  assert.equal(easternDayStart("2026-03-08").toISOString(), "2026-03-08T05:00:00.000Z");
+  assert.equal(easternDayStart("2026-11-01").toISOString(), "2026-11-01T04:00:00.000Z");
 });

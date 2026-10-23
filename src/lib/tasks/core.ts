@@ -165,13 +165,17 @@ async function enqueue(
   const isUser = "userId" in recipient;
   const recipientId = isUser ? recipient.userId : recipient.contactId;
   const openKey = `${isUser ? "u" : "c"}:${recipientId}:${taskId}`;
-  const quietUntil = new Date(now.getTime() + BUNDLE_QUIET_MS);
+  // The columns are timestamp without time zone, holding UTC. Convert
+  // explicitly, as outbox.ts does, so a Postgres session in local time
+  // doesn't shift them.
+  const at = Prisma.sql`(${now.toISOString()}::timestamptz AT TIME ZONE 'UTC')`;
+  const quietUntil = Prisma.sql`(${new Date(now.getTime() + BUNDLE_QUIET_MS).toISOString()}::timestamptz AT TIME ZONE 'UTC')`;
   await tx.$executeRaw`
     INSERT INTO "NotificationOutbox"
       ("id", "openKey", "recipientUserId", "recipientContactId", "taskId", "items", "firstAt", "sendAfter", "createdAt")
     VALUES (
       ${randomUUID()}, ${openKey}, ${isUser ? recipientId : null}, ${isUser ? null : recipientId}, ${taskId},
-      jsonb_build_array(${JSON.stringify(item)}::jsonb), ${now}, ${quietUntil}, ${now}
+      jsonb_build_array(${JSON.stringify(item)}::jsonb), ${at}, ${quietUntil}, ${at}
     )
     ON CONFLICT ("openKey") DO UPDATE SET
       "items" = "NotificationOutbox"."items" || EXCLUDED."items",

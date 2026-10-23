@@ -21,11 +21,11 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
 
   return (
     <>
-      <PageHeader title="Vendors" subtitle={`${contacts.length} contractors & service providers`} />
+      <PageHeader title="Contractors" subtitle={`${contacts.length} contractors & service providers`} />
       <Card className="overflow-hidden">
         {contacts.length === 0 ? (
           <div className="p-4">
-            <EmptyState>No vendors.</EmptyState>
+            <EmptyState>No contractors.</EmptyState>
           </div>
         ) : (
           <Table>

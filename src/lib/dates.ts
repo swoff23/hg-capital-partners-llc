@@ -82,6 +82,22 @@ export function todayYmdEastern(now: Date = new Date()): Ymd {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/**
+ * The instant a Buffalo calendar day starts, for counting what happened "today"
+ * in a timestamp column (the D30 email cap). Eastern midnight is 04:00 or
+ * 05:00 UTC depending on daylight time; whichever lands on 00:00 that day.
+ */
+export function easternDayStart(v: Ymd): Date {
+  const p = parts(v);
+  if (!p) throw new Error(`Not a date: ${v}`);
+  const clock = new Intl.DateTimeFormat("en-US", { timeZone: HG_TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  for (const h of [4, 5]) {
+    const at = new Date(Date.UTC(p.y, p.m - 1, p.d, h));
+    if (todayYmdEastern(at) === v && clock.format(at) === "00:00") return at;
+  }
+  throw new Error(`No Eastern midnight found for ${v}`);
+}
+
 function epochDays(v: Ymd): number {
   const p = parts(v)!;
   return Date.UTC(p.y, p.m - 1, p.d) / 86_400_000;

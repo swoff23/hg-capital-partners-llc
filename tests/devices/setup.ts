@@ -1,8 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import { todayYmdEastern } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
 import { generateStartingPassword, hashToken, newToken } from "../../src/lib/portal/tokens";
+import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
-import { ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes } from "./routes";
+import * as core from "../../src/lib/tasks/core";
+import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes } from "./routes";
 
 /**
  * Runs once before any test: looks up a real row for every dynamic route,
@@ -13,10 +16,12 @@ import { ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes } from "./routes";
  *
  * Staff data is only read. The portal fixtures are the one write: for each,
  * a Contact, its PortalAccount and a fresh PortalSession, reused across runs
- * by email. Like `npm run db:dev-passwords`, it refuses anything but a
- * localhost DATABASE_URL.
+ * by email, plus one job assigned to the "portal" contractor. Like
+ * `npm run db:dev-passwords`, it refuses anything but a localhost
+ * DATABASE_URL.
  *
- *  - "portal": a contractor who has chosen a password, for every /p page.
+ *  - "portal": a contractor who has chosen a password, for every /p page,
+ *    with a job of its own so My jobs and the job page render with data.
  *  - "portal-welcome": one still on a starting password, for
  *    /p/welcome/password, which sends anyone else on to /p.
  */
@@ -31,7 +36,7 @@ interface PortalFixture {
 }
 
 const PORTAL_FIXTURE: PortalFixture = {
-  email: "device-check@hg.localhost",
+  email: PORTAL_FIXTURE_EMAIL,
   name: "Device Check Contractor",
   mustChangePassword: false,
 };
@@ -53,7 +58,7 @@ function assertLocalDb(): void {
 }
 
 /** Create or reuse a fixture contractor, put it back in its expected state, and mint a session token. */
-async function seedPortalFixture(db: PrismaClient, fixture: PortalFixture): Promise<string> {
+async function seedPortalFixture(db: PrismaClient, fixture: PortalFixture): Promise<{ token: string; contactId: string }> {
   assertLocalDb();
   let account = await db.portalAccount.findUnique({ where: { email: fixture.email }, select: { id: true, contactId: true } });
   if (!account) {
@@ -91,7 +96,66 @@ async function seedPortalFixture(db: PrismaClient, fixture: PortalFixture): Prom
       },
     }),
   ]);
-  return token;
+  return { token, contactId: account.contactId };
+}
+
+/** The fixture job's actor: a system writer, so seeding it never queues an email. */
+const FIXTURE_WRITER: core.Principal = { kind: "system", label: "Device check" };
+
+/**
+ * One job for the "portal" fixture contractor, so /p shows a card and
+ * /p/jobs/[id] renders with real parts: a property and unit with a lockbox
+ * code when the local DB has one, notes, a checklist and two Shared updates.
+ * Written through src/lib/tasks/core.ts like any task (assignment brings the
+ * ASSIGNEE access row). Found again by its assignee, and put back to In
+ * progress with live access on every run.
+ */
+async function seedPortalJob(db: PrismaClient, contactId: string): Promise<void> {
+  assertLocalDb();
+  const existing = await db.task.findFirst({
+    where: { assigneeContactId: contactId },
+    select: { id: true, status: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (existing) {
+    await db.$transaction(async (tx) => {
+      await core.grantAssigneeAccess(tx, existing.id, contactId, FIXTURE_WRITER, new Date());
+      if (existing.status !== "IN_PROGRESS") await core.setStatus(tx, existing.id, "IN_PROGRESS", FIXTURE_WRITER);
+    });
+    return;
+  }
+
+  // A property with a unit that has a lockbox code, so the lockbox card shows.
+  const properties = await db.property.findMany({ select: { id: true, units: true }, orderBy: { createdAt: "asc" }, take: 100 });
+  let propertyId: string | null = null;
+  let unitLabel: string | null = null;
+  for (const p of properties) {
+    const units = Array.isArray(p.units) ? (p.units as { label?: unknown; lockboxCode?: unknown }[]) : [];
+    const unit = units.find((u) => typeof u?.label === "string" && u.label.trim() && typeof u.lockboxCode === "string" && u.lockboxCode.trim());
+    if (unit) {
+      propertyId = p.id;
+      unitLabel = (unit.label as string).trim();
+      break;
+    }
+  }
+
+  await db.$transaction(async (tx) => {
+    const task = await core.createTask(
+      tx,
+      {
+        title: "Cabinet install",
+        description: "Hang the uppers first and check they're level before the lowers go in. Fixture for npm run test:devices.",
+        propertyId,
+        unitLabel,
+        dueDate: addDaysYmd(todayYmdEastern(), 3),
+        assignee: { contactId },
+      },
+      FIXTURE_WRITER,
+    );
+    for (const title of ["Uppers", "Lowers", "Crown molding", "Hardware"]) await core.addChecklistItem(tx, task.id, title, FIXTURE_WRITER);
+    await core.addComment(tx, task.id, { body: "Doors arrive Thursday.", visibility: "SHARED" }, FIXTURE_WRITER);
+    await core.setStatus(tx, task.id, "IN_PROGRESS", FIXTURE_WRITER);
+  });
 }
 
 export default async function setup() {
@@ -118,8 +182,10 @@ export default async function setup() {
       now: Date.now(),
       ttlMs: DAY_MS,
     });
-    process.env.DEVICE_PORTAL_TOKEN = await seedPortalFixture(db, PORTAL_FIXTURE);
-    process.env.DEVICE_PORTAL_WELCOME_TOKEN = await seedPortalFixture(db, PORTAL_WELCOME_FIXTURE);
+    const portal = await seedPortalFixture(db, PORTAL_FIXTURE);
+    await seedPortalJob(db, portal.contactId);
+    process.env.DEVICE_PORTAL_TOKEN = portal.token;
+    process.env.DEVICE_PORTAL_WELCOME_TOKEN = (await seedPortalFixture(db, PORTAL_WELCOME_FIXTURE)).token;
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

@@ -1,25 +1,25 @@
-import { Button, EmptyState, PageHeader } from "@/components/ui";
+import { cookies } from "next/headers";
+import { todayYmdEastern } from "@/lib/dates";
+import { JOBS_GROUP_COOKIE, firstName, parseJobsGroup, parseJobsTab } from "@/lib/portal/job-view";
+import { listMyJobs } from "@/lib/portal/queries";
 import { requirePortalPrincipal } from "@/lib/portal/session";
-import { signOutPortal } from "./actions";
+import { AccountMenu } from "./_components/account-menu";
+import { MyJobs } from "./_components/my-jobs";
 
-// Placeholder until My jobs lands (docs/asana-migration-plan.md §6): the
-// signed-in contractor, and a sign-out. The title comes from the layout.
+// My jobs (docs/asana-migration-plan.md §6, D18, D31). The title comes from the layout.
 export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
   const principal = await requirePortalPrincipal();
-  const { saved } = (await searchParams) as { saved?: string };
-  const firstName = principal.label.trim().split(/\s+/)[0] || principal.label;
+  const { saved, view } = (await searchParams) as { saved?: string; view?: string };
+  const tab = parseJobsTab(view);
+  const group = parseJobsGroup((await cookies()).get(JOBS_GROUP_COOKIE)?.value);
+  const jobs = await listMyJobs(principal, tab);
 
   return (
     <>
-      <header className="flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2 sm:px-6">
-        <span className="shrink-0 text-sm font-semibold tracking-tight">HG Jobs</span>
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm text-muted">{principal.label}</span>
-          <form action={signOutPortal}>
-            <Button type="submit" variant="ghost" className="h-11 sm:h-9">
-              Sign out
-            </Button>
-          </form>
+      <header className="border-b border-border bg-surface">
+        <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4 sm:px-6">
+          <span className="shrink-0 text-sm font-semibold tracking-tight">HG Capital</span>
+          <AccountMenu name={principal.label} email={principal.email} />
         </div>
       </header>
 
@@ -29,8 +29,8 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
             Password saved. Use it next time you sign in.
           </p>
         )}
-        <PageHeader title={`Hi ${firstName}`} />
-        <EmptyState>Your jobs will be listed here soon.</EmptyState>
+        <h1 className="mb-4 text-xl font-semibold tracking-tight">Hi {firstName(principal.label)}</h1>
+        <MyJobs jobs={jobs} tab={tab} initialGroup={group} today={todayYmdEastern()} />
       </main>
     </>
   );

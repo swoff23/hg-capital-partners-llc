@@ -51,16 +51,18 @@ const ALLOWLIST = new Set([
   "/login/reset/submit", // the reset link's form; does nothing without a live single-use token
   "/api/health", // detail behind HEALTH_TOKEN
   "/api/quickbooks/sync", // CRON_SECRET
+  "/api/cron/notifications", // CRON_SECRET, the same check as /api/quickbooks/sync
 ]);
 
 /**
  * Planned public routes that don't exist yet. These excuse nothing: when the
  * route lands, "pending entries" fails until the entry moves to ALLOWLIST,
  * which is the moment to check the route really does verify CRON_SECRET.
+ * Crons are allowlisted one path at a time (the notifications cron moved
+ * over by its own path), so a new one, such as an Asana sync cron, fails the
+ * route check until it's listed with its reason.
  */
-const PENDING = new Set([
-  "/api/cron/*", // the notification outbox and Asana sync crons; CRON_SECRET
-]);
+const PENDING = new Set<string>([]);
 
 const HTTP_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
 
@@ -320,6 +322,8 @@ const STAFF_ONLY = [
   "@/lib/session",
   "@/lib/session-token",
   "@/lib/tasks/service",
+  "@/lib/tasks/queries",
+  "@/lib/tasks/bulk",
   "@/lib/properties",
   "@/lib/deals",
   "@/lib/quickbooks",
@@ -354,16 +358,78 @@ function importsOf(sf: ts.SourceFile): string[] {
   return specs;
 }
 
+/**
+ * The staff-only imports portal code may make, by file, module and name. The
+ * contractor's upload record step (recordPortalAttachment) lives in
+ * tasks/service.ts beside the staff one, because both verify the blob with
+ * the same helpers (§5.3); the portal's job service may call that one
+ * function and nothing else there. Only a plain named import of the listed
+ * names counts: a default, namespace, side-effect or re-export of the module
+ * still fails.
+ */
+const PORTAL_IMPORT_EXCEPTIONS: Record<string, Record<string, readonly string[]>> = {
+  "src/lib/portal/jobs.ts": { "@/lib/tasks/service": ["recordPortalAttachment"] },
+};
+
+/** `import { a, b as c } from "x"` with every imported name in `allowed`, and nothing else in the clause. */
+function isAllowedNamedImport(decl: ts.ImportDeclaration, allowed: readonly string[]): boolean {
+  const clause = decl.importClause;
+  if (!clause || clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) return false;
+  const names = clause.namedBindings.elements;
+  return names.length > 0 && names.every((el) => allowed.includes((el.propertyName ?? el.name).text));
+}
+
+/** Target modules of the import declarations in `sf` that a PORTAL_IMPORT_EXCEPTIONS entry excuses. */
+function excusedImports(sf: ts.SourceFile, file: string): string[] {
+  const allowed = PORTAL_IMPORT_EXCEPTIONS[rel(file)] ?? {};
+  const out: string[] = [];
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    const target = aliasOf(stmt.moduleSpecifier.text, file).replace(SOURCE_EXT, "");
+    if (Object.hasOwn(allowed, target) && isAllowedNamedImport(stmt, allowed[target])) out.push(target);
+  }
+  return out;
+}
+
 test("portal code never imports staff auth, sessions, task reads, pages, properties, deals or QuickBooks", () => {
   assert.ok(portalFiles.some((f) => rel(f) === "src/lib/portal/session.ts"), "portal files not found");
   const bad: string[] = [];
   for (const file of portalFiles) {
-    for (const spec of importsOf(parse(file))) {
+    const sf = parse(file);
+    const excused = excusedImports(sf, file);
+    for (const spec of importsOf(sf)) {
       const target = aliasOf(spec, file).replace(SOURCE_EXT, "");
-      if (isStaffOnly(target)) bad.push(`${rel(file)} imports ${spec}`);
+      if (!isStaffOnly(target)) continue;
+      const i = excused.indexOf(target);
+      if (i >= 0) excused.splice(i, 1);
+      else bad.push(`${rel(file)} imports ${spec}`);
     }
   }
   assert.deepEqual(bad, []);
+});
+
+test("portal import exceptions still match an import", () => {
+  // A stale entry would quietly excuse whatever import takes its place later.
+  const stale = Object.keys(PORTAL_IMPORT_EXCEPTIONS).filter((f) => {
+    const file = path.join(root, f);
+    return !fs.existsSync(file) || excusedImports(parse(file), file).length === 0;
+  });
+  assert.deepEqual(stale, []);
+});
+
+test("the import exception accepts only plain named imports of the listed names", () => {
+  const sf = ts.createSourceFile(
+    "x.ts",
+    `import { recordPortalAttachment } from "a"; import { recordPortalAttachment as r } from "a";
+     import { patchTask } from "a"; import { recordPortalAttachment, patchTask } from "a";
+     import * as svc from "a"; import svc2 from "a"; import "a"; import svc3, { recordPortalAttachment as q } from "a";`,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  assert.deepEqual(
+    sf.statements.filter(ts.isImportDeclaration).map((d) => isAllowedNamedImport(d, ["recordPortalAttachment"])),
+    [true, true, false, false, false, false, false, false],
+  );
 });
 
 test("only access-code.ts in portal code mentions units", () => {
