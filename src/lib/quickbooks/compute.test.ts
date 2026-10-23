@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeNoi, monthsOfData, type ComputeLine } from "./compute";
+import { computeNoi, monthsOfData, signedLineCents, type ComputeLine } from "./compute";
 import type { QboCategory, QboLineTag, QboTreatment } from "@prisma/client";
 
 /**
@@ -146,4 +146,13 @@ test("computeNoi reports monthsOfData / annualization from the lines", () => {
   );
   assert.equal(r.monthsOfData, 8, "Jan..Aug, not just the 2 months with rent");
   assert.equal(r.annualizationFactor, 1.5);
+});
+
+test("signedLineCents: income reads as money in, expense as money out, excluded as neither", () => {
+  assert.equal(signedLineCents("OPERATING_INCOME", 135_000), 135_000); // a $1,350 rent deposit
+  assert.equal(signedLineCents("OPERATING_EXPENSE", 135_000), -135_000); // a $1,350 repair
+  assert.equal(signedLineCents("OPERATING_EXPENSE", -2_500), 2_500); // a refund comes back in
+  assert.equal(signedLineCents("NON_OPERATING", 1_200), 1_200); // bank interest
+  assert.equal(signedLineCents("DEBT_INTEREST", 50_000), -50_000);
+  assert.equal(signedLineCents("EXCLUDED", 75_000), 0); // a transfer is neither
 });

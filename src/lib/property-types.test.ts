@@ -5,6 +5,9 @@ import {
   orphanedEquipmentTypes,
   parseCapexRules,
   capexForecast,
+  capexUndatedNote,
+  parseCapexCost,
+  portfolioCapexForecast,
   isHouseMeterRow,
   propertyUnitCount,
   reconcileUnits,
@@ -158,6 +161,50 @@ test("capexForecast: only rules-covered types are scheduled", () => {
   assert.equal(items.length, 1);
   assert.equal(items[0].type, "Sump Pump");
   assert.equal(items[0].cost, 1200);
+});
+
+test("capexForecast: undated priced assets are counted, not silently dropped", () => {
+  const now = new Date("2026-06-01");
+  const units = [
+    {
+      equipment: [
+        { type: "HVAC", installYear: "Old" },
+        { type: "Oven", installYear: "Newer" },
+        { type: "Dishwasher", installYear: "x" },
+        { type: "Washing Machine", installYear: "" },
+        { type: "HVAC", installYear: "~2012" }, // dated: scheduled, not counted
+        { type: "Doorbell", installYear: "Old" }, // no rule: not tracked at all
+      ],
+    },
+  ];
+  const building = { roof: { year: "Older" }, windows: { year: "" } }; // a blank building year isn't counted
+  const f = capexForecast(units, { years: 5, now, building, rules: DEFAULT_CAPEX_RULES });
+  assert.equal(f.unknownCount, 5);
+
+  const p = portfolioCapexForecast(
+    [
+      { id: "a", address: "1 A St", units, building },
+      { id: "b", address: "2 B St", units: [{ equipment: [{ type: "HVAC" }] }], building: {} },
+    ],
+    { years: 5, now, rules: DEFAULT_CAPEX_RULES },
+  );
+  assert.equal(p.unknownCount, 6);
+});
+
+test("capexUndatedNote: one line naming what the total leaves out, nothing at zero", () => {
+  assert.equal(capexUndatedNote(0), null);
+  assert.equal(capexUndatedNote(1), "Excludes 1 item with no install year");
+  assert.equal(capexUndatedNote(22), "Excludes 22 items with no install year");
+});
+
+test("parseCapexCost: the app's money parser, so 8k is $8,000, not $8", () => {
+  assert.equal(parseCapexCost("8k"), 8_000);
+  assert.equal(parseCapexCost("1.2M"), 1_200_000);
+  assert.equal(parseCapexCost("$27,000"), 27_000);
+  assert.equal(parseCapexCost(" 4500 "), 4_500);
+  for (const raw of ["", "  ", "0", "-500", "about 8k", "8k-10k", null, undefined]) {
+    assert.equal(parseCapexCost(raw), null, String(raw));
+  }
 });
 
 test("orphanedEquipmentTypes: only dropped types that some unit still uses", () => {

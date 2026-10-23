@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { fmtDay } from "@/lib/dates";
+import { signedLineCents } from "@/lib/quickbooks/compute";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { CATEGORY_LABELS } from "../../financials/_components/labels";
 import { fmtCents, MoneyBars, PartialLabel, SourceBadge } from "../../financials/_components/ui";
+
+/** "+$1,350" for money in, "−$1,350" (a true minus sign) for money out. */
+const fmtSignedCents = (cents: number) =>
+  cents === 0 ? fmtCents(0) : (cents > 0 ? "+" : "−") + fmtCents(Math.abs(cents));
 
 /**
  * QuickBooks P&L for this property. Renders nothing when QuickBooks isn't
@@ -45,23 +50,28 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
       <CardBody className="space-y-3">
         <SourceBadge basis={data.basis} syncedAt={data.lastSyncAt} />
 
-        <div className="grid grid-cols-3 gap-2 text-sm">
-          <div>
-            <div className="text-xs text-muted">Income</div>
-            <div className="font-medium tabular-nums">
-              {fmtCents(noi.operatingIncomeCents)}
-              <PartialLabel months={noi.monthsOfData} />
+        {/* Three $0 figures would read as a property that earned nothing; say there's no data instead. */}
+        {data.hasLines ? (
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <div>
+              <div className="text-xs text-muted">Income</div>
+              <div className="font-medium tabular-nums">
+                {fmtCents(noi.operatingIncomeCents)}
+                <PartialLabel months={noi.monthsOfData} />
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-muted">Opex</div>
+              <div className="font-medium tabular-nums">{fmtCents(noi.operatingExpenseCents)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted">NOI</div>
+              <div className="font-medium tabular-nums">{fmtCents(noi.noiCents)}</div>
             </div>
           </div>
-          <div>
-            <div className="text-xs text-muted">Opex</div>
-            <div className="font-medium tabular-nums">{fmtCents(noi.operatingExpenseCents)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted">NOI</div>
-            <div className="font-medium tabular-nums">{fmtCents(noi.noiCents)}</div>
-          </div>
-        </div>
+        ) : (
+          <p className="text-sm text-muted">No QuickBooks activity for this property yet.</p>
+        )}
 
         {data.expenseByCategory.length > 0 && (
           <div>
@@ -79,13 +89,15 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
           <div>
             <div className="mb-1 text-xs text-muted">Recent transactions</div>
             <ul className="divide-y divide-border text-xs">
-              {data.recentLines.slice(0, 8).map((l, i) => (
+              {data.recentLines.map((l, i) => (
                 <li key={i} className="flex items-center gap-2 py-1.5">
                   <span className="w-16 shrink-0 text-muted">{fmtDay(l.txnDate)}</span>
                   <span className="min-w-0 flex-1 truncate" title={l.name ?? l.accountName}>
                     {l.name || l.accountName}
                   </span>
-                  <span className="w-20 shrink-0 text-right tabular-nums">{fmtCents(l.amountCents)}</span>
+                  <span className="w-20 shrink-0 text-right tabular-nums">
+                    {fmtSignedCents(signedLineCents(l.treatment, l.amountCents))}
+                  </span>
                 </li>
               ))}
             </ul>
