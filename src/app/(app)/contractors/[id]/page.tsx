@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { fmtDay } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
-import { isActiveStatus, statusRank } from "@/lib/task-scope";
+import { excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { cleanTrades, docOnFile, mailtoHref, telHref } from "@/lib/contacts";
 import { ContactLink } from "../contact-link";
 import { PortalAccessCard } from "./portal-access-card";
@@ -40,15 +40,19 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   });
   if (!c) notFound();
 
-  // Their jobs: tasks actually assigned to this contact.
-  const tasks = (
-    await prisma.task.findMany({
-      where: { assigneeContactId: c.id },
+  // Their jobs: tasks actually assigned to this contact, never a playbook's
+  // template rows. The list stops at 60; the count is all of them.
+  const jobsWhere = { assigneeContactId: c.id, ...excludeTemplateTasks };
+  const [rows, jobCount] = await Promise.all([
+    prisma.task.findMany({
+      where: jobsWhere,
       orderBy: [{ completedAt: { sort: "desc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }],
       include: { property: { select: { id: true, address: true } } },
       take: 60,
-    })
-  ).sort((a, b) => statusRank(a.status) - statusRank(b.status));
+    }),
+    prisma.task.count({ where: jobsWhere }),
+  ]);
+  const tasks = rows.sort((a, b) => statusRank(a.status) - statusRank(b.status));
 
   return (
     <>
@@ -133,7 +137,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
         <Card className="lg:col-span-2">
           <CardHeader className="flex items-center justify-between">
             <CardTitle>Jobs</CardTitle>
-            {tasks.length > 0 && <span className="text-xs tabular-nums text-muted">{tasks.length}</span>}
+            {jobCount > 0 && <span className="text-xs tabular-nums text-muted">{jobCount}</span>}
           </CardHeader>
           <CardBody className="p-0">
             {tasks.length === 0 ? (

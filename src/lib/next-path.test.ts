@@ -77,7 +77,7 @@ const BAD = [
   "/rentals",
   "/residents/moving-in",
   "/api/search?q=x",
-  "/api/files/task/abc",
+  "/api/files/task/abc/x", // a gated file link is allowed, but only in its exact shape (below)
   "/_next/static/chunk.js",
   "/favicon.ico",
   "/tasksfoo",
@@ -135,6 +135,23 @@ test("the return path: the dashboard itself is the default, and refused paths fa
   assert.equal(staffReturnPath(null), null);
   assert.equal(afterStaffSignIn(null), "/");
   assert.equal(afterStaffSignIn("/deals/abc"), "/deals/abc");
+});
+
+test("a gated file link comes back to the file after sign-in, and nothing else under /api does", () => {
+  assert.equal(staffReturnPath("/api/files/task/cmh2x9k0a0001qz8f3v7w1y2z"), "/api/files/task/cmh2x9k0a0001qz8f3v7w1y2z");
+  assert.equal(staffReturnPath("/api/files/property/abc?v=thumb"), "/api/files/property/abc?v=thumb");
+  for (const bad of [
+    "/api/files/other/abc",
+    "/api/files/task/abc/x",
+    "/api/files/task/",
+    "/api/files/task/../../tasks",
+    "/api/files/task/%2e%2e",
+    "/api/blob/task",
+    "/api/search",
+    "/api/cron/notifications",
+  ]) {
+    assert.equal(staffReturnPath(bad), null, bad);
+  }
 });
 
 test("staff and portal paths never overlap, so each account only follows its own", () => {

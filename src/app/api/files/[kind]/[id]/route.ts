@@ -11,6 +11,7 @@ import {
   singleByteRange,
 } from "@/lib/attachments/headers";
 import { isPrivateStoreUrl, storeIdFromToken } from "@/lib/attachments/paths";
+import { staffReturnPath, withNext } from "@/lib/next-path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
@@ -144,7 +145,15 @@ export async function GET(req: Request, ctx: RouteContext<"/api/files/[kind]/[id
   if (!Object.hasOwn(KIND_VIEWERS, kind)) return fail("Not found", 404);
   const allowed = KIND_VIEWERS[kind];
   const viewer = await currentViewer(allowed);
-  if (!viewer) return fail("Unauthorized", 401);
+  if (!viewer) {
+    // A file link opened in the browser (a pasted link, a tab left open past
+    // the session) goes to sign-in and comes back; a fetch keeps the plain 401.
+    if (req.headers.get("sec-fetch-mode") === "navigate") {
+      const url = new URL(req.url);
+      return NextResponse.redirect(new URL(withNext("/login", staffReturnPath(url.pathname + url.search)), url));
+    }
+    return fail("Unauthorized", 401);
+  }
 
   const v = new URL(req.url).searchParams.get("v");
   if (v !== null && v !== "thumb" && v !== "poster") return fail("Not found", 404);

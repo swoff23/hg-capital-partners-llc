@@ -82,8 +82,11 @@ export const STAFF_SECTIONS = ["contractors", "deals", "financials", "properties
  */
 export const STAFF_PATH_HEADER = "x-hg-app-path";
 
+/** A gated file (src/app/api/files): a signed-out file link comes back to the file after sign-in. */
+const FILE_PATH = /^\/api\/files\/(task|property)\/[A-Za-z0-9_-]{1,64}$/;
+
 function isStaffPath(path: string): boolean {
-  return path === STAFF_HOME || STAFF_SECTIONS.some((section) => path === `/${section}` || path.startsWith(`/${section}/`));
+  return path === STAFF_HOME || FILE_PATH.test(path) || STAFF_SECTIONS.some((section) => path === `/${section}` || path.startsWith(`/${section}/`));
 }
 
 /** `raw` when it's a staff page that's safe to redirect to (safeReturnPath), else null. */
