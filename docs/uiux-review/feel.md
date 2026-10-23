@@ -1,6 +1,6 @@
 # Lens: interaction quality, feedback, states, speed and accessibility
 
-Part of the [UI/UX review](README.md). 32 findings: 1 critical, 7 high, 16 medium, 8 low.
+Part of the [UI/UX review](README.md). 31 findings: 0 critical, 7 high, 16 medium, 8 low.
 
 ## How it should work
 
@@ -45,23 +45,6 @@ Not reached:
 </details>
 
 ## Findings
-
-### FEEL-001
-
-**A typo in a money field silently wipes the stored value**
-
-Critical · Fix · effort S · `Property page: Details, Loan and Insurance editors` · Fix wrong numbers and records first · quick win
-
-- **Today:** The Value, Purchase price, Loan amount, Rate, Payment, Premium and Replacement cost fields are plain text inputs with no validation. I typed "abc" into Value and "-5" into Sq ft and clicked Save, and the form submitted. On the server, patchProperty runs each money field through amountToDecimal(). That returns null for anything it can't parse, and null is written to the column. Sq ft strips every non-digit, so "-5" becomes 5. A typo like "55o,000" erases the $550,000 value with no message.
-- **Why:** Silent data loss on money is the worst kind of bug for a property company's system of record. Stripe and Ramp never write a value they couldn't parse: they block the save and point at the field.
-- **Change:** In service.patchProperty, keep a blank field meaning "clear", but treat a non-blank value that parseAmount can't read as a validation error. Return it through withResult as { ok: false, field, error } instead of writing null. Do the same for sqft: reject negatives and non-numbers. In the editors, show the error under the field ("Enter an amount like 550,000"), keep the form open with the user's input, and focus the bad field.
-- **Desktop, tablet, phone:** Same on every size. On a phone the error line sits under the full-width field, and the form keeps the user's input so nothing has to be retyped.
-- **Reuse:** Extend lib/money.ts parseAmount (it already returns null for invalid input) and switch patchProperty from withLog to withResult (lib/server-action.ts), the pattern updatePropertyUnits already uses. Show errors with the planned Field wrapper (FEEL-022).
-- **References:** 
-  - [Vapi](https://mobbin.com/screens/34766f43-7ba1-44a3-9c42-a20826230325): Amount input with a $ prefix, red border and one-line error; the primary action stays disabled until the value is valid.
-  - [Vercel](https://mobbin.com/screens/0a227055-0e20-4ef1-a4cf-08bd5e0d9c58): Invalid field turns red with an inline message while the other fields keep their values.
-- **Code:** `src/lib/properties/service.ts:112 (MONEY_FIELDS -> amountToDecimal(s(k)) writes null on garbage)`, `src/lib/properties/service.ts:114 (sqft strips non-digits: -5 becomes 5)`, `src/lib/money.ts:16-29 (parseAmount returns null for unparseable input)`, `src/app/(app)/properties/[id]/edit-details.tsx:99-111`, `src/app/(app)/properties/[id]/edit-loan.tsx:97-99`, `src/app/(app)/properties/[id]/edit-insurance.tsx:94-95`
-- **Verification:** confirmed. Reproduced at 320 and 1280: typed "55o,000" into Value, clicked Save, and the form POSTed (blocked) with no client check. service.ts:110-114 writes amountToDecimal() as null for anything parseAmount rejects and strips every non-digit from sqft. When patchProperty moves to withResult, also pass p.version: unlike updatePropertyUnits it has no conflict check (prisma.property.update by id only). References are fine.
 
 ### FEEL-005
 

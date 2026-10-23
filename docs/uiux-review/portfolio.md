@@ -1,6 +1,6 @@
 # Portfolio list and new property
 
-Part of the [UI/UX review](README.md). 36 findings: 2 critical, 2 high, 17 medium, 15 low.
+Part of the [UI/UX review](README.md). 34 findings: 0 critical, 2 high, 17 medium, 15 low.
 
 ## How it should work
 
@@ -42,36 +42,6 @@ Usage is unlimited during beta. If your usage stays at this level, you may need 
 </details>
 
 ## Findings
-
-### PORTFOLIO-001
-
-**Units column disagrees with the property page on 5 of 11 properties**
-
-Critical · Fix · effort S · `/properties` · Fix wrong numbers and records first · quick win
-
-- **Today:** List (unitCount) and property header (units.length || unitCount) disagree on 15 Oxford (3 vs 4), 23 Sherwood (1 vs 2), 415 Crescent (6 vs 7), 765 Prospect (4 vs 2) and 767 Prospect (4 vs 3). Neither source is right everywhere. The header counts the 'HSE (house)' record as a unit on 15 Oxford and 415 Crescent. The list's 4 on both 765 and 767 comes from one combined '765/767 Prospect' SREO line copied onto both rows (scripts/migrate/01-properties.ts:111-131). Evidence: verify-PORTFOLIO/list--desktop-light.png and verify-PORTFOLIO/p415--desktop-light.aria.txt.
-- **Why:** The portfolio overview is the one place figures must be trusted. Two different unit counts for the same building make every derived number (rent per unit, vacancy) suspect, which is the opposite of Stripe-grade confidence.
-- **Change:** Add one helper, propertyUnitCount(p) in src/lib/property-types.ts, returning units.length when the units array is non-empty and unitCount otherwise. Use it on the list (rows and total), on the property header and on Home. Then reconcile the 5 mismatched rows: either fill the units array or correct unitCount, and drop the column once the array is complete.
-- **Desktop, tablet, phone:** Same value at every size; no layout change.
-- **Reuse:** Extend src/lib/property-types.ts (parseUnits already lives there).
-- **Code:** `src/app/(app)/properties/page.tsx:24`, `src/app/(app)/properties/page.tsx:81`, `src/app/(app)/properties/[id]/page.tsx:77`, `src/app/(app)/properties/[id]/page.tsx:75`, `src/app/(app)/properties/[id]/page.tsx:90`, `src/app/(app)/properties/page.tsx:24,80`, `src/app/(app)/properties/[id]/page.tsx:75,90`, `Local DB: unitCount vs units array length: 767 4/3, 765 4/2, 15 Oxford 3/4, 23 Sherwood 1/2, 415 Crescent 6/7`, `src/app/(app)/properties/page.tsx:24,81`, `Scripted comparison across all 11 properties: 5 mismatches`
-- **Also found as:** PROPERTY-008 (Property detail page (future property hub)), PROPERTY-V04 (Property detail page (future property hub)), VISUAL-V10 (Lens: visual design system across every screen), IA-001 (Lens: information architecture and global SaaS patterns), DATA-002 (Lens: tables, numbers, money, charts and status), JOURNEYS-038 (Lens: the core jobs, end to end)
-- **Verification:** partly. The mismatch is real. I fetched each property page and 5 of 11 rows disagree, exactly as the finding says. The proposed helper (units.length when non-empty) would make the list wrong, though. The units arrays hold 'HSE (house)' entries next to the real units: 15 Oxford has Lower, Upper, Attic and HSE; 415 Crescent has Unit 1 to 6 and HSE. units.length therefore counts the house-meter record as a unit, and the property header already shows '415 Crescent ... 7 units' for a 6-unit building. The 765 and 767 rows are a different problem: the import copied one combined SREO line onto both (see PORTFOLIO-V01). The helper must skip house-level records, and 765/767 need splitting. I calibrated to high because these are unit counts, not money, and the totals currently agree.
-
-### PORTFOLIO-V01
-
-**765 and 767 Prospect both carry one combined SREO line, so the totals double-count it**
-
-Critical · Fix · effort S · `/properties` · Fix wrong numbers and records first · quick win
-
-- **Today:** The 765 Prospect and 767 Prospect rows show identical figures: 4 units, $240,000 purchase, $550,000 value, and the same current loan. The importer matches each property to the SREO by house number and street. findSreoLoose accepts a combined '765/767 prospect' key for either number, so both properties got the same line's purchasePrice, currentLoan, value and unitCount. Their own units arrays hold 2 and 3 units. The Total row ($2,644,650 purchase, $4,973,000 value, 31 units) therefore counts the combined building twice. If the SREO line covers both buildings, value is overstated by $550,000 (11%), purchase by $240,000, and any debt total by one loan.
-- **Why:** This is wrong money on the portfolio overview. The proposed Value, Debt and Equity strip (PORTFOLIO-006), the Equity column (PORTFOLIO-026) and the lender export (PORTFOLIO-030) would all inherit it, and a lender-facing figure that is 11% high is the opposite of a trustworthy tool.
-- **Change:** Check the SREO's '765/767 Prospect' line. If it is one combined figure, split purchase, value and loan between the two records (or hold them on one record and mark the other as part of it) and set each unitCount to its real units. Then change the importer so a combined SREO key that matches more than one property is logged for a manual split instead of copied to each.
-- **Desktop, tablet, phone:** No layout impact.
-- **Reuse:** patchProperty in src/lib/properties/service.ts for the one-off correction; numMatches and findSreoLoose in scripts/migrate/01-properties.ts for the importer guard.
-- **Code:** `scripts/migrate/01-properties.ts:111`, `scripts/migrate/01-properties.ts:124-131`, `scripts/migrate/01-properties.ts:191-203`, `src/app/(app)/properties/page.tsx:22-31`, `src/app/(app)/properties/page.tsx:22-30`, `Local DB: both rows have currentLoan 292890.00, sqft 4593, replacementCost 800000.00; one Deal '767 Prospect Avenue' CLOSED!`
-- **Also found as:** PROPERTY-I14 (Property detail page (future property hub))
-- **Verification:** verifier-found
 
 ### PORTFOLIO-004
 

@@ -6,15 +6,15 @@ The interactive version, with filters and the evidence screenshots, is `uiux-rev
 
 ### The short version
 
-HG works, and a lot of it is good: the CapEx model, the approved task and portal designs, the house rules. Next to Linear, Stripe, Mercury and Things 3, though, it reads as pages built one at a time. Three root causes explain most of the 1,082 findings:
+HG works, and a lot of it is good: the CapEx model, the approved task and portal designs, the house rules. Next to Linear, Stripe, Mercury and Things 3, though, it reads as pages built one at a time. Three root causes explain most of the 1,076 findings:
 
 - **No single source for numbers and words.** Money, dates, unit counts and addresses are formatted in different places, and a few are wrong.
 - **No shared way to save.** A failed save replaces the page and loses what was typed. A good save says nothing, and nothing can be undone.
 - **No shared layout.** There are three record layouts, a frame that competes with the work (a hover rail, a gray canvas of stacked shadowed cards, uppercase labels over columns of dashes), and desktop tables squeezed onto phones.
 
-### Fix these first
+### Fixed first
 
-Five critical bugs, all on main and all small:
+The five critical bugs are fixed and live on production (4b9b14f, 3390e7d):
 
 - PORTFOLIO-V01: 765 and 767 Prospect share one SREO line, so portfolio totals count it twice.
 - PORTFOLIO-001: the Portfolio table and the property pages disagree on unit counts for 5 of 11 properties.
@@ -22,7 +22,7 @@ Five critical bugs, all on main and all small:
 - DEALS-001: Esc saves a deal edit instead of discarding it, and the property address heading does the same.
 - PUBLIC-001: a failed move-in submission wipes the resident's whole report.
 
-Another 65 high-severity fixes need no design call. The roadmap's Fix now list routes each one to main or to the migration branch.
+Another 64 high-severity fixes need no design call. The roadmap's Fix now list routes each one to main or to the migration branch.
 
 ### Five moves that change how it feels
 
@@ -32,36 +32,36 @@ Another 65 high-severity fixes need no design call. The roadmap's Fix now list r
 4. **A quiet shell.** A labeled sidebar, ⌘K for search and commands, create sheets that open where you are, and D10's labeled bottom bar on phones (SHELL-002, IA-009, SHELL-006).
 5. **One flat, calm system, fixed in the primitives.** Sections sit flat on white, color means state only, figures are typeset, list rows open records instead of acting as inputs, and every Financials figure opens the QuickBooks lines behind it (VISUAL-009, VISUAL-015, DEALS-008, DATA-I04).
 
-### Decisions waiting on you
+### Decisions
 
-Each one changes a settled decision or house rule, so nothing ships without your yes. The recommendations are in the North star and Roadmap tabs. What's still waiting on Connor for tasks, contractors and the portal is listed in `docs/todo-for-connor.md`.
+Connor's answers on Oct 23:
 
-- Home hosts Today, which merges D10's Home and the Tasks Today view into one screen.
-- Money and KPIs in Geist with tabular figures, keeping Geist Mono for codes. This changes the Geist Mono rule.
-- Dark-mode primary buttons on blue-600, because white on blue-500 fails contrast.
-- Task statuses shown by shape first, so red only means overdue and blue only means act. This changes the approved tone map.
-- Contractor "Mark done" with failed photos: disable it until they're retried (the migration session's pick), "Skip N photos", or stacked buttons.
+- **Fonts and colors:** he deferred to the research and released the old visual rules. New brand guidelines are being drafted (`docs/brand-guidelines.md`), with a preview, before anything in the app changes. That decides how money is set, the dark-mode button blue and status shown by shape first.
+- **Failed photos on Mark done:** option A. Mark done stays disabled until each failed photo is retried or removed. Live in 0ab449b.
+- **Unit count:** it follows the unit records; add or remove a unit to change it. 767 Prospect has two units, and its third record was removed with its details kept in the property notes.
+
+Still open: whether Home hosts Today, merging D10's Home and the Tasks Today view into one screen. Everything else waiting on Connor is in `docs/todo-for-connor.md`.
 
 ### The migration branch
 
-Task, contractor and portal findings were re-checked on `claude/task-management-migration-4c9ddf`. Of those, 83 are already resolved there, including fixes in dd00a9e, 4cf099d, 0148abf, 9f74ea1 and c805e38 that were checked against the code. 208 still apply on the branch, often with a note on what was partly fixed, and 113 changed shape with the rebuild. A fresh review of the branch's new screens added 126 more. All of them are marked "Branch" in the list.
+Task, contractor and portal findings were re-checked on the Asana migration branch, which is now on main. Of those, 89 are already resolved there, including fixes in dd00a9e, 4cf099d, 0148abf, 9f74ea1 and c805e38 that were checked against the code. 208 still apply on the branch, often with a note on what was partly fixed, and 113 changed shape with the rebuild. A fresh review of the branch's new screens added 125 more. All of them are marked "Branch" in the list.
 
 ## In numbers
 
 | | |
 |---|---|
-| Distinct findings | 1082 (1813 raw, 721 duplicates folded in) |
-| Critical / high / medium / low | 5 / 161 / 481 / 435 |
-| Fixes (no design call needed) / design changes / new capabilities | 366 / 471 / 245 |
-| Mobbin references | 1575 |
+| Distinct findings | 1076 (1813 raw, 721 duplicates folded in) |
+| Critical / high / medium / low | 0 / 160 / 481 / 435 |
+| Fixes (no design call needed) / design changes / new capabilities | 360 / 471 / 245 |
+| Mobbin references | 1574 |
 | Areas and lenses reviewed | 28 |
 
 ## Themes
 
 | Theme | What it means | Findings | Critical | High |
 |---|---|---|---|---|
-| **Fix wrong numbers and records first** | Several screens show data that is wrong or contradicts itself: unit counts that differ between Portfolio and the property page, one SREO line counted twice, forecasts that silently drop undated items, jobs matched to the wrong contractor by first name, inputs that save $8 for '8k' or erase stored account numbers, and clocks running on UTC. Stripe and Mercury earn trust by never showing a figure they can't back up, and a calmer layout around a wrong number only makes it more convincing. Most of these are small fixes plus one canonical address format, and they come before any redesign. | 35 | 4 | 10 |
-| **Every save is safe, instant and undoable** | One failed save swaps the whole page for an error card and throws away what was typed, files delete in one tap, double taps create duplicates, ticking a task gives no feedback or Undo, and two people editing the same record overwrite each other. Linear, Superhuman and Vercel's guidelines treat speed and safety as one design: optimistic writes with rollback, Undo toasts instead of confirms, pending states, drafts that survive a reload and conflict notices that name who changed what. Fix it once in shared helpers and primitives rather than editor by editor. | 55 | 1 | 16 |
+| **Fix wrong numbers and records first** | Several screens show data that is wrong or contradicts itself: unit counts that differ between Portfolio and the property page, one SREO line counted twice, forecasts that silently drop undated items, jobs matched to the wrong contractor by first name, inputs that save $8 for '8k' or erase stored account numbers, and clocks running on UTC. Stripe and Mercury earn trust by never showing a figure they can't back up, and a calmer layout around a wrong number only makes it more convincing. Most of these are small fixes plus one canonical address format, and they come before any redesign. | 31 | 0 | 10 |
+| **Every save is safe, instant and undoable** | One failed save swaps the whole page for an error card and throws away what was typed, files delete in one tap, double taps create duplicates, ticking a task gives no feedback or Undo, and two people editing the same record overwrite each other. Linear, Superhuman and Vercel's guidelines treat speed and safety as one design: optimistic writes with rollback, Undo toasts instead of confirms, pending states, drafts that survive a reload and conflict notices that name who changed what. Fix it once in shared helpers and primitives rather than editor by editor. | 54 | 0 | 16 |
 | **Home and Today become one work queue** | Home leads with inventory counts and a 5-year CapEx matrix while the tasks that need you sit below the fold, and the branch's Today, repeats and playbooks still produce undated runs, late copies, a 34-row Unassigned pile and completions that say nothing about what comes next. Things 3, Ramp and Linear open on what needs you now, who acts next and a one-tap finish with Undo. Make the queue the center of the app, with clear handoffs between the two partners, and repeats and playbooks that schedule themselves and report back. | 125 | 0 | 16 |
 | **One record layout for every record** | Properties, deals, tasks and contractors use three different detail layouts, with titles that are clipped text inputs and no heading, stacked uppercase labels over columns of dashes, key dates and the loan balance hidden, and notes buried among system changes. Stripe, Attio and Linear repeat one anatomy: an identity header with the key figure, status and actions, tabs with counts, one timeline in the main column and a facts rail where empty fields read as verbs. Build it first as the D10 property hub, then reuse it for deals, tasks and contractors. | 60 | 0 | 10 |
 | **Lists answer first and stay calm at 675 rows** | The deals list is a sheet of live inputs that scrolls sideways at 1280 and stops at 300 rows, and other lists scroll inside 70vh boxes, can't be bulk-edited and dead-end on empty filters. Attio, Stripe and Shopify keep large lists calm with read-only rows that open the record, grouped stages or a board, footer totals, filters that save as views and a floating bulk bar. The deals pipeline is where to prove the pattern before applying it to Portfolio and Contractors. | 54 | 0 | 8 |
@@ -73,22 +73,16 @@ Task, contractor and portal findings were re-checked on `claude/task-management-
 | **One design system, fixed in the primitives** | Status renders five different ways, red and green each do several jobs, avatars use hashed rainbow colors, emoji stand in for icons, dark mode fails contrast, dialogs ignore Esc and the gray canvas stacks shadowed cards inside cards. Vercel's Geist and Linear give every token one job and keep surfaces flat and neutral, so the few colored marks are found first. Fix these in tokens and shared components so every page inherits the calm, and let the gold accent and real property photos keep it from looking generic. | 90 | 0 | 7 |
 | **Plain, consistent words** | The app still says Vendors, Project and Owner after the agreed renames, deal statuses mix priority with spreadsheet sort numbers, screen readers hear variable names like theirPriceRaw, and internal caveats, footnotes and env var names sit on screen. Monzo, Basecamp and Stripe use one short, specific name per thing and explain only what helps a decision. A one-page glossary and a single sweep of labels and empty states removes most of these. | 53 | 0 | 3 |
 | **Rentals, residents and the public site run one lifecycle** | Listings go public without rent or photos, units appear twice with no tenancy record, the move-in report is a 7,400px form that loses answers on reload and lands as a text dump inside a task, and the public site has no property photography. Zillow Rental Manager, Airbnb and Thumbtack tie listing, tenancy and resident intake to one unit and end every resident flow by saying what happens next. Model the tenancy, gate what goes public, and turn the move-in report into a dated record on the unit. | 146 | 0 | 21 |
-| **Contractor jobs and media close the loop** | Contractors are about to sign in, but the portal shows them a red Review chip, Mark done can skip photos that failed to upload, partners approve without seeing proof, emails don't name the job or accept replies, and files open raw or delete with no Undo. Jobber, Basecamp and Gusto label what each side can see, show the evidence before approval and end each job on a payoff with the next step. Ship the portal with one media system and explicit visibility, and let every job report back to the partners. | 155 | 0 | 12 |
+| **Contractor jobs and media close the loop** | Contractors are about to sign in, but the portal shows them a red Review chip, Mark done can skip photos that failed to upload, partners approve without seeing proof, emails don't name the job or accept replies, and files open raw or delete with no Undo. Jobber, Basecamp and Gusto label what each side can see, show the evidence before approval and end each job on a payoff with the next step. Ship the portal with one media system and explicit visibility, and let every job report back to the partners. | 154 | 0 | 11 |
 
 ## Fix first
 
 Critical findings, then high-severity fixes that need no design approval.
 
-- [DEALS-001](deals.md#deals-001) **Critical**, S: Esc saves the edit instead of reverting it (Deals pipeline, new deal and deal detail)
-- [FEEL-001](feel.md#feel-001) **Critical**, S: A typo in a money field silently wipes the stored value (Lens: interaction quality, feedback, states, speed and accessibility)
-- [PORTFOLIO-001](portfolio.md#portfolio-001) **Critical**, S: Units column disagrees with the property page on 5 of 11 properties (Portfolio list and new property)
-- [PORTFOLIO-V01](portfolio.md#portfolio-v01) **Critical**, S: 765 and 767 Prospect both carry one combined SREO line, so the totals double-count it (Portfolio list and new property)
-- [PUBLIC-001](public.md#public-001) **Critical**, S: A failed move-in submit wipes the whole report and shows 'That page didn't load' (Login and the public site)
 - [ADMIN-002](admin.md#admin-002) **High**, S: '+ Add system' saved a blank 'New system' rule that now shows on every property (Contractors directory, contractor detail and Settings)
 - [ADMIN-004](admin.md#admin-004) **High**, S: Phone numbers and emails aren't tappable (Contractors directory, contractor detail and Settings)
 - [ADMIN-006](admin.md#admin-006) **High**, S: Leaving the Move-in form tab throws away unsaved edits without asking (Contractors directory, contractor detail and Settings)
 - [BPLAY-010](bplay.md#bplay-010) **High**, S: Fill-in fields are raw Asana placeholders: duplicate, lowercase, and hidden (Branch: playbooks, templates and repeats)
-- [BPORTAL-002](bportal.md#bportal-002) **High**, S: Mark done reads 'Skip' and goes ahead when photos failed to upload (Branch: contractor portal and contractor sign-in)
 - [BPORTAL-013](bportal.md#bportal-013) **High**, S: Sign-in forms have no pending state, and a failed submit shows a white framework page (Branch: contractor portal and contractor sign-in)
 - [COPY-004](copy.md#copy-004) **High**, S: Finish the approved rename from 'Vendors' to 'Contractors' (Lens: words on every screen)
 - [COPY-010](copy.md#copy-010) **High**, S: The partial-sync banner says 'mid-update' about a 51-day-old sync (Lens: words on every screen)
@@ -152,11 +146,6 @@ Critical findings, then high-severity fixes that need no design approval.
 
 ## Quick wins
 
-- [DEALS-001](deals.md#deals-001) **Critical**, S: Esc saves the edit instead of reverting it (Deals pipeline, new deal and deal detail)
-- [FEEL-001](feel.md#feel-001) **Critical**, S: A typo in a money field silently wipes the stored value (Lens: interaction quality, feedback, states, speed and accessibility)
-- [PORTFOLIO-001](portfolio.md#portfolio-001) **Critical**, S: Units column disagrees with the property page on 5 of 11 properties (Portfolio list and new property)
-- [PORTFOLIO-V01](portfolio.md#portfolio-v01) **Critical**, S: 765 and 767 Prospect both carry one combined SREO line, so the totals double-count it (Portfolio list and new property)
-- [PUBLIC-001](public.md#public-001) **Critical**, S: A failed move-in submit wipes the whole report and shows 'That page didn't load' (Login and the public site)
 - [DATA-IV02](data.md#data-iv02) **High**, S: 'Unclassified $12,065' adds income and expense together (Lens: tables, numbers, money, charts and status)
 - [DATA-V01](data.md#data-v01) **High**, S: The CapEx forecast silently leaves out 22 undated items, 7 of them HVAC (Lens: tables, numbers, money, charts and status)
 - [DEALS-IV01](deals.md#deals-iv01) **High**, S: Stop clipping the last digit of prices on touch screens (Deals pipeline, new deal and deal detail)
@@ -508,7 +497,7 @@ Routing rule: anything on tasks, contractors, the portal, login or job emails go
 - DATA-IV01 ([ADMIN-017](data.md#data-iv01), [IA-043](data.md#data-iv01)): the branch now matches jobs on the contractor record; backfill legacy Asana assignee names so each contractor gets their history back.
 - G2B-IV01: staff replies to one contractor never reach the next contractor on the job.
 - [G2B-I03](g2b.md#g2b-i03): say who will see a reply, including when the contractor has no login.
-- [BPORTAL-002](bportal.md#bportal-002), [BPORTAL-004](bportal.md#bportal-004), [BPORTAL-003](bportal.md#bportal-003): Mark done can't skip failed photos; uploads survive leaving the page; held photos post and email.
+- BPORTAL-002, [BPORTAL-004](bportal.md#bportal-004), [BPORTAL-003](bportal.md#bportal-003): Mark done can't skip failed photos; uploads survive leaving the page; held photos post and email.
 - [G1A-008](g1a.md#g1a-008): fill the 14 missing contractor emails.
 - [BTASKS-001](btasks.md#btasks-001): link legacy Asana assignee names so their jobs leave Unassigned.
 - [TASKS-006](tasks.md#tasks-006), [G2B-013](g2b.md#g2b-013): picking a partner never erases a contractor; reassigning checks the current assignee.
@@ -527,11 +516,11 @@ Routing rule: anything on tasks, contractors, the portal, login or job emails go
 - G2C-IV02, MOBILE-V02 (G2C-V06): move-in reports get an owner and due date; overdue reads red on the property Tasks card.
 
 **Main (the first six lines are critical: land them by Sun Oct 25, before the Oct 27 production load; the rest go between branch landings)**
-- [PORTFOLIO-V01](portfolio.md#portfolio-v01) ([PROPERTY-I14](portfolio.md#portfolio-v01), [PORTFOLIO-V02](portfolio.md#portfolio-v02)): split the shared 765/767 Prospect line so totals stop double-counting.
-- [PORTFOLIO-001](portfolio.md#portfolio-001) ([IA-001](portfolio.md#portfolio-001), [DATA-002](portfolio.md#portfolio-001), [PROPERTY-V04](portfolio.md#portfolio-001), [G2C-018](g2c.md#g2c-018)): one unit count, house meters excluded.
-- [FEEL-001](feel.md#feel-001) ([DATA-005](data.md#data-005)): money inputs parse '8k' and never blank a stored value.
+- PORTFOLIO-V01 (PROPERTY-I14, [PORTFOLIO-V02](portfolio.md#portfolio-v02)): split the shared 765/767 Prospect line so totals stop double-counting.
+- PORTFOLIO-001 (IA-001, DATA-002, PROPERTY-V04, [G2C-018](g2c.md#g2c-018)): one unit count, house meters excluded.
+- FEEL-001 ([DATA-005](data.md#data-005)): money inputs parse '8k' and never blank a stored value.
 - [PROPERTY-V01](property.md#property-v01) (PROPERTY-IV02): the unit editor stops erasing LOFL account numbers.
-- [DEALS-001](deals.md#deals-001): Esc reverts a deal edit.
+- DEALS-001: Esc reverts a deal edit.
 - [G2B-002](g2b.md#g2b-002), [G2B-003](g2b.md#g2b-003), [G2B-011](g2b.md#g2b-011): property editors pin the version at Edit and send only changed fields.
 - [PROPERTY-002](property.md#property-002) (G1E-IV02), [PROPERTY-007](property.md#property-007): show the loan balance; give the ten stored fields a UI.
 - [DATA-V01](data.md#data-v01) ([COPY-V05](property.md#property-022), [PROPERTY-022](property.md#property-022), [DATA-036](property.md#property-022)), [ADMIN-002](admin.md#admin-002), [ADMIN-016](admin.md#admin-016): the forecast names what it left out; delete the blank and duplicate CapEx rules.
@@ -545,7 +534,7 @@ Routing rule: anything on tasks, contractors, the portal, login or job emails go
 - [DATA-007](data.md#data-007), [FINANCIALS-005](financials.md#financials-005), [COPY-V04](copy.md#copy-v04), G2A-IV06: label sandbox data, rename Cash flow after debt, state gaps in dollars.
 - [G2A-001](g2a.md#g2a-001), G2A-IV01, [G2A-006](g2a.md#g2a-006), [G2A-I02](g2a.md#g2a-i02): newest months survive the cap; connect errors show a reason; expired or stale sync never reads green.
 - [DATA-012](data.md#data-012), [DATA-V07](data.md#data-011), [DATA-I03](data.md#data-i03), [FINANCIALS-002](financials.md#financials-002): no confident $0, every property in By property, 58 Mariner at 50%, one period label.
-- [PUBLIC-001](public.md#public-001), [PUBLIC-002](g2c.md#g2c-i01), PUBLIC-IV01, [G1B-012](g1b.md#g1b-012): failed submits keep the report; /rentals hides incomplete listings; ask the unit; skipped items read Not rated.
+- PUBLIC-001, [PUBLIC-002](g2c.md#g2c-i01), PUBLIC-IV01, [G1B-012](g1b.md#g1b-012): failed submits keep the report; /rentals hides incomplete listings; ask the unit; skipped items read Not rated.
 - [ADMIN-001](g2b.md#g2b-v01), [ADMIN-006](admin.md#admin-006), [FINANCIALS-017](admin.md#admin-i13): Settings saves fail inline, unsaved edits ask first, Disconnect confirms.
 - [G2B-005](g2b.md#g2b-005), [G2B-I13](g2b.md#g2b-i13), [G1E-003](g1e.md#g1e-003), [G1E-007](g1e.md#g1e-007): refresh on focus, survive deploys, print cleanly, fix the vercel.app 500s.
 
@@ -560,18 +549,18 @@ Routing rule: anything on tasks, contractors, the portal, login or job emails go
 ### Quick wins
 
 Ranked by impact per hour. All but the last are in Fix now; do them first.
-1. [PORTFOLIO-V01](portfolio.md#portfolio-v01): portfolio totals stop double-counting.
+1. PORTFOLIO-V01: portfolio totals stop double-counting.
 2. DATA-IV01: legacy jobs come back to the right contractor before Oct 29.
-3. [PUBLIC-001](public.md#public-001): residents never lose a finished report.
-4. [FEEL-001](feel.md#feel-001): a typo can't wipe a stored value.
-5. [DEALS-001](deals.md#deals-001): Esc means cancel.
+3. PUBLIC-001: residents never lose a finished report.
+4. FEEL-001: a typo can't wipe a stored value.
+5. DEALS-001: Esc means cancel.
 6. [PROPERTY-V01](property.md#property-v01): utility account numbers survive an edit.
 7. [G2B-V01](g2b.md#g2b-v01): a failed save keeps the page and the draft.
 8. [G1D-V01](g1d.md#g1d-v01): every file delete confirms or undoes.
 9. [IA-003](ia.md#ia-003): duplicate creates keep what was typed.
 10. DATA-IV02: the Unclassified figure stops adding income to expense.
 11. [G2A-004](g2a.md#g2a-004): Ignore on a class excludes it.
-12. [PORTFOLIO-001](portfolio.md#portfolio-001): one unit count everywhere.
+12. PORTFOLIO-001: one unit count everywhere.
 13. [DATA-V01](data.md#data-v01): the forecast says what it left out.
 14. [PROPERTY-002](property.md#property-002): loan balance visible, so equity and LTV can follow.
 15. [G1A-008](g1a.md#g1a-008): every contractor has an email before invites.
@@ -668,9 +657,9 @@ Design quick wins worth approving the same week: [BTASKS-005](btasks.md#btasks-0
 - No web camera rebuild or before-and-after slider (G1D-I11, G1D-I18).
 - Skip the invite queue, Start job undo, greeting summaries, history picker, rehab health posts and staff lockbox masking (G1A-042, BPORTAL-038, BPORTAL-028, G2A-023, PROPERTY-I16, PROPERTY-046).
 
-## Already resolved on the migration branch
+## Already resolved
 
-Task, contractor and portal findings were re-checked on `claude/task-management-migration-4c9ddf` at 4652abb, and a skeptic confirmed each of these before it was dropped. They need no further work once that branch lands.
+Fixed since the review ran, on main or on the Asana migration branch (now on main). Each was verified against the code before it left the list.
 
 - SHELL-014 (App shell, sidebar, top bar, global search and Home), fixed: Use one due-date vocabulary on Home and Tasks. Home's My open tasks rows now render DueDatePicker (my-tasks-list.tsx:27), the same chip as Today and All, so both surfaces use dueLabel: 'Yesterday', 'Nd late' within a week, then the date ('Aug 28', or with the year if not this year), red when overdue. relativeDays is no longer used on Home. The property Tasks card still uses fmtDay (tracked in PROPERTY-006 and MOBILE-V02).
 - PROPERTY-010 (Property detail page (future property hub)), fixed: The property task query hard-codes status OPEN, so most tasks will vanish after the seven-status migration. The property task query now spreads activeTask and excludeTemplateTasks (page.tsx:53), so Scheduled, In progress, Waiting and Review tasks stay listed. A test fails on any literal status: "OPEN" filter (task-scope.test.ts:48). Rows show a StatusBadge for contractor jobs and any status other than To do, in a fixed spot between the title and the avatar (page.tsx:206-208), e.g. 'In progress' on Cabinet install and 'To do' on contractor jobs at 767 Prospect.
@@ -745,6 +734,7 @@ Task, contractor and portal findings were re-checked on `claude/task-management-
 - BPORTAL-005 (Branch: contractor portal and contractor sign-in), fixed: An 'Open job' link from an email lands on My jobs after sign-in, not on the job. Fixed in 4cf099d (on top of dd00a9e): the proxy hands /p pages their path, and sign-in and the first-password step return there through a strict same-origin validator (src/lib/portal/next-path.ts). Verified in the diff.
 - BCONTRACT-001 (Branch: contractors directory, portal access, Home and emails), fixed: The 'scheduled' email never says when the visit is. Fixed in 4cf099d (on top of dd00a9e): the Scheduled email reads "scheduled it for Thu, Oct 29", also when assigning an already Scheduled job (notifications/content.ts). Verified in the diff.
 - BCONTRACT-003 (Branch: contractors directory, portal access, Home and emails), fixed: A dropped connection on any access action wipes the page, and Create login can lose the only copy of the password. Fixed in 0148abf (on top of 4cf099d): every Portal access card action runs through thenRefresh, which revalidates the contractor page in a finally block, so after a lost Create login response the retry gets "already has a login" back with a fresh card showing Reset password instead of Create. Offline is handled by callAction (4cf099d). Verified in the diff.
+- BPORTAL-002 (Branch: contractor portal and contractor sign-in), fixed: Mark done reads 'Skip' and goes ahead when photos failed to upload. Fixed on main in 0ab449b (Connor deferred the choice; option A): Mark done stays disabled while any photo tile has failed, the tray leads with the count ("2 photos didn't upload: no connection"), and each tile has Retry or Remove. Leaving mid-upload also asks first.
 - G2B-IV01 (Many hands on one record: Pieter's view, handoffs between partners, stale tabs, and the Oct 26 to Nov 1 Asana overlap), fixed: Keep staff replies to one contractor away from the next contractor on the job. Fixed in 9f74ea1: Shared staff and system comments, status lines and files now record the contractor assigned at the time, set in setStatus, addComment and recordAttachment. The portal timeline, the new-update counts, the gallery and the file route all show a staff row only to that contractor, or to anyone when no contractor was assigned. Imported Asana rows stay visible. Rows written before the migration have no audience (no backfill), so staff replies already on a job still show to the next contractor. The assign-toast copy (I04) is a separate finding. The migration session expects no such rows in production (CSV tasks were never linked to contacts, and main had no app-created tasks or attachments as of Oct 22), so no backfill is planned. Production wasn't queried to confirm.
 - BTASKS-037 (Branch: Today, All tasks, new task and the task page), fixed: Initials break on punctuation and email addresses ('J(' for Jacob (Jake) Hoak, 'F' for an email). Fixed in 9f74ea1: initials() now strips non-letters, drops anything in parentheses and reads a name containing '@' as an email's local part, so 'Jacob (Jake) hoak' gives 'JH'. Tests were added. It takes the first two words rather than the first and last, so a three-word name like 'Mary Ann Smith' gives 'MA'. '[email]' still gives 'F' because its local part is one word.
 - G1A-V05 (Contractor loop before the Oct 29 invites: sign-in, first password, My jobs, job page, emails, Approve), fixed: Add a viewport meta to the email template so phones lay it out at screen width. Fixed in 9f74ea1: the one email template now has a <head> with a utf-8 charset meta and a width=device-width viewport meta, and render.test.ts checks for them. The G1A-032 color-scheme metas aren't in the block (that's a separate finding). Nothing in git shows the manual check in iOS Mail, Gmail iOS or Outlook iOS was run.
@@ -755,23 +745,28 @@ Task, contractor and portal findings were re-checked on `claude/task-management-
 - BCONTRACT-V03 (Branch: contractors directory, portal access, Home and emails), fixed: Job emails never name the unit. Fixed in 9f74ea1: the outbox now selects the task's unitLabel, and the job line names the unit the way My jobs does, so 'Bathroom tile' with unit 2 emails as 'Bathroom tile, 415 Crescent Ave · 2'. Two small gaps: a bare number reads '· 2' rather than 'Unit 2', and the suffix is still added when the title already names the unit.
 - TASKS-010 (Tasks list, new task and task detail), fixed: Long titles are cut off on the task page because the title is a one-line input. Fixed in 9f74ea1: where field-sizing:content is supported, the title textarea no longer gets an inline px height, so it re-fits when the width changes. Where it isn't supported, the JS fallback now re-measures through a ResizeObserver whenever the width changes, covering a rotated phone or a narrower window. I read the code but didn't re-run the resize test. The 24px size is still tracked in TASKS-015.
 - G2C-V06 (A unit changing tenants, end to end: notice, turn, listing, move-in report and first rent), fixed: Mark overdue dates red in the property Tasks card, as /tasks already does. Fixed in 9f74ea1: the rebuilt card colors late dates red using isTargetLate, which excludes Review and Waiting, and drops the current year, so 767 Prospect's Mud Drywall reads a red 'Aug 28' as on Today. One small difference: the card uses isTargetLate for staff tasks too, so a staff task in Scheduled is judged by its visit date. For every other status that is the same as isOverdue.
+- PORTFOLIO-V01 (Portfolio list and new property), fixed: 765 and 767 Prospect both carry one combined SREO line, so the totals double-count it. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). The combined 765/767 SREO line is split evenly (Connor's call): $120,000 purchase, $275,000 value and $146,445 loan each. The importer splits combined lines the same way.
+- PORTFOLIO-001 (Portfolio list and new property), fixed: Units column disagrees with the property page on 5 of 11 properties. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). Portfolio, its total and the property header read one count, and house-meter rows never count. Since Oct 23 the count follows the unit records (add or remove a unit to change it), and 767 Prospect's third record was removed (Connor: two units).
+- FEEL-001 (Lens: interaction quality, feedback, states, speed and accessibility), fixed: A typo in a money field silently wipes the stored value. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). A typed number that doesn't read is refused with the field named and nothing is written; blank still clears. Listing rent and sq ft too, and loan rates keep three decimals.
+- DEALS-001 (Deals pipeline, new deal and deal detail), fixed: Esc saves the edit instead of reverting it. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). useInlineEditKeys skips the save after Esc on the address and task title (InlineAddressField), the deal fields and the CapEx rules editor.
+- PUBLIC-001 (Login and the public site), fixed: A failed move-in submit wipes the whole report and shows 'That page didn't load'. Fixed on main and live on production (4b9b14f, 3390e7d; the data migration confirmed in the live database). The move-in submit goes through callAction: a dropped connection shows the offline message and every answer stays.
 
 ## Areas
 
 | Area | Findings | Critical | High |
 |---|---|---|---|
 | [App shell, sidebar, top bar, global search and Home](shell.md) | 40 | 0 | 7 |
-| [Portfolio list and new property](portfolio.md) | 36 | 2 | 2 |
+| [Portfolio list and new property](portfolio.md) | 34 | 0 | 2 |
 | [Property detail page (future property hub)](property.md) | 45 | 0 | 12 |
-| [Deals pipeline, new deal and deal detail](deals.md) | 62 | 1 | 9 |
+| [Deals pipeline, new deal and deal detail](deals.md) | 61 | 0 | 9 |
 | [Tasks list, new task and task detail](tasks.md) | 30 | 0 | 4 |
 | [Financials, rent roll and financial settings](financials.md) | 66 | 0 | 9 |
 | [Contractors directory, contractor detail and Settings](admin.md) | 48 | 0 | 6 |
-| [Login and the public site](public.md) | 55 | 1 | 9 |
+| [Login and the public site](public.md) | 54 | 0 | 9 |
 | [Lens: visual design system across every screen](visual.md) | 59 | 0 | 10 |
 | [Lens: information architecture and global SaaS patterns](ia.md) | 31 | 0 | 6 |
 | [Lens: phone and tablet experience on every route](mobile.md) | 26 | 0 | 6 |
-| [Lens: interaction quality, feedback, states, speed and accessibility](feel.md) | 32 | 1 | 7 |
+| [Lens: interaction quality, feedback, states, speed and accessibility](feel.md) | 31 | 0 | 7 |
 | [Lens: tables, numbers, money, charts and status](data.md) | 27 | 0 | 12 |
 | [Lens: words on every screen](copy.md) | 40 | 0 | 10 |
 | [Lens: the core jobs, end to end](journeys.md) | 15 | 0 | 2 |
@@ -786,7 +781,7 @@ Task, contractor and portal findings were re-checked on `claude/task-management-
 | [Staff sign-in lifecycle: sign out, a 30-day expiry mid-edit, changing a password, and passkeys](g2d.md) | 28 | 0 | 0 |
 | [Branch: Today, All tasks, new task and the task page](btasks.md) | 37 | 0 | 5 |
 | [Branch: playbooks, templates and repeats](bplay.md) | 31 | 0 | 4 |
-| [Branch: contractor portal and contractor sign-in](bportal.md) | 34 | 0 | 4 |
+| [Branch: contractor portal and contractor sign-in](bportal.md) | 33 | 0 | 3 |
 | [Branch: contractors directory, portal access, Home and emails](bcontract.md) | 24 | 0 | 1 |
 
 ## Method
@@ -799,7 +794,7 @@ Overnight on Oct 22 to 23, 2026, about 150 agents ran in four multi-agent workfl
 2. **Teardown of main.** A production build of `main` at ea137a3 ran locally with the real local data, signed in as Connor through a session cookie. Every non-GET request was blocked, so nothing was written. Fifteen reviewers covered eight areas (shell and Home, Portfolio, the property page, Deals, Tasks, Financials, Contractors and Settings, the public site and login) and seven lenses (visual system, information architecture, phone and tablet, feedback and speed, tables and money, words, end-to-end jobs). They used Chromium and WebKit at 1280, 768, 375 and 320 wide, in light and dark, and opened dialogs, menus, edit modes and validation states. A skeptic re-tested every reviewer's findings, confirming, correcting or refuting each one. Two completeness rounds added nine more areas: the contractor loop before the invites, the move-in report on the staff side, repeats and playbooks, photos and documents, what leaves the app (print, PDFs, the Google listing), QuickBooks go-live, many hands on one record, a unit changing tenants, and the staff sign-in lifecycle.
 3. **Inspiration pass.** For each area, an agent studied how the researched products solve the same jobs on Mobbin. It upgraded weak references and added "steal this" findings, each checked against today's app and then verified.
 4. **Migration-branch pass.** Branch 4652abb ran from its own export with a copy of the branch database, with staff and contractor sessions from the branch's own device-check setup. Re-checkers went through the 403 task, contractor and portal findings, and a skeptic had to uphold every "fixed" or "superseded" before a finding was dropped. Four reviewers walked the branch's new screens. Later fixes in dd00a9e, 4cf099d and 0148abf were verified by reading the diffs. Five independent verifiers then checked the 9f74ea1 batch against each finding: 16 fixed, 25 partly fixed and 13 still open. Two follow-ups in c805e38 were verified in the diff.
-5. **Synthesis.** An editor merged 721 duplicates into 1,092 distinct findings and grouped them into 14 themes. Branch fixes since then leave 1,082. A design lead and a product lead wrote the North star and the Roadmap, and I corrected a few figures and one inconsistency between them.
+5. **Synthesis.** An editor merged 721 duplicates into 1,092 distinct findings and grouped them into 14 themes. Branch fixes since then leave 1,076. A design lead and a product lead wrote the North star and the Roadmap, and I corrected a few figures and one inconsistency between them.
 
 ### Numbers
 

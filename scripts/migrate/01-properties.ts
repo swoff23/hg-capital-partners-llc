@@ -9,14 +9,6 @@ import { evenShare } from "../../src/lib/money";
 import { countUnitRecords } from "../../src/lib/property-types";
 import { report } from "./_report";
 
-/**
- * Unit counts Connor confirmed where the SREO sheet is wrong, keyed by house
- * number and street ("23 sherwood"). The stored count is what Portfolio and
- * the property header show, so a re-import must not put these back.
- */
-const UNIT_COUNT_OVERRIDES: Record<string, number> = {
-  "23 sherwood": 2,
-};
 import {
   readSheet,
   normalizeAddress,
@@ -25,6 +17,15 @@ import {
   parseIntOrNull,
   parseMoney,
 } from "./_lib";
+
+/**
+ * Unit records Connor removed in the app, keyed by house number and street
+ * ("767 prospect"), so a re-import doesn't bring them back. The unit count
+ * follows the records, so this also keeps 767 Prospect at two units.
+ */
+const REMOVED_UNIT_RECORDS: Record<string, string[]> = {
+  "767 prospect": ["1st front / lower front"],
+};
 
 const EQUIP_COLS: Array<[type: string, modelCol: string, yearCol: string]> = [
   ["Roof", "T", "U"],
@@ -99,6 +100,7 @@ export async function migrateProperties() {
         );
     }
 
+    const removed = REMOVED_UNIT_RECORDS[key.split(" ").slice(0, 2).join(" ")] ?? [];
     const units: UnitRef[] = rows.map((r) => ({
       label: r["B"]?.replace(/\n/g, " / ").trim() ?? null,
       lockboxCode: r["C"] ?? null,
@@ -117,7 +119,7 @@ export async function migrateProperties() {
         model: r[mc] ?? null,
         installYear: r[yc] ?? null,
       })).filter((e) => e.model || e.installYear),
-    }));
+    })).filter((u) => !removed.includes((u.label ?? "").trim().toLowerCase()));
 
     const exact = sreoByAddr.get(key);
     const loose = exact ? undefined : findSreoLoose(sreoByAddr, key);
@@ -148,10 +150,8 @@ export async function migrateProperties() {
       rehabAmount: dec(share(parseFloatOrNull(s?.["K"]))),
       rehabMonths: dec(parseFloatOrNull(s?.["L"])),
       sqft: share(parseIntOrNull(s?.["E"]), 1),
-      unitCount:
-        UNIT_COUNT_OVERRIDES[key.split(" ").slice(0, 2).join(" ")] ??
-        share(parseIntOrNull(s?.["D"]), 1) ??
-        (countUnitRecords(units) || null),
+      // The count is the unit records; the SREO number only fills in a property without any.
+      unitCount: countUnitRecords(units) || share(parseIntOrNull(s?.["D"]), 1),
       units: units as unknown as object,
     };
 

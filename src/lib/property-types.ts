@@ -61,35 +61,19 @@ export function isHouseMeterRow(u: PropertyUnit): boolean {
 
 /**
  * The one unit count, read by Portfolio, its total and the property header so
- * they can't disagree: the stored count when there is one, otherwise the unit
- * records less house-meter rows.
+ * they can't disagree: the unit records, less house-meter rows. Adding or
+ * removing a unit is how the count changes (Connor, 2026-10-23); there's no
+ * field to type it into. The stored number only stands in for a property
+ * with no unit records yet.
  */
 export function propertyUnitCount(p: { unitCount: number | null; units: unknown }): number | null {
-  if (p.unitCount != null) return p.unitCount;
   const records = countUnitRecords(parseUnits(p.units));
-  return records > 0 ? records : null;
+  return records > 0 ? records : p.unitCount ?? null;
 }
 
 /** Unit records that are rentable units: everything but the house-meter rows. */
 export function countUnitRecords(units: readonly PropertyUnit[]): number {
   return units.filter((u) => !isHouseMeterRow(u)).length;
-}
-
-/**
- * The stored count after a units save, or undefined to leave it. It follows the
- * records only while it agrees with them, so adding a unit moves "2 units" to
- * 3, but a count someone set on purpose (767 Prospect: 2, with 3 records) stays.
- */
-export function syncedUnitCount(
-  stored: number | null,
-  before: readonly PropertyUnit[],
-  after: readonly PropertyUnit[],
-): number | null | undefined {
-  const was = countUnitRecords(before);
-  const now = countUnitRecords(after);
-  if (now === was) return undefined;
-  if (stored != null && stored !== was) return undefined;
-  return now > 0 ? now : null;
 }
 
 /* ---------------- Unit ids and renames (G2C-001) ---------------- */

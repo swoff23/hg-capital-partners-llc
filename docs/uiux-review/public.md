@@ -1,6 +1,6 @@
 # Login and the public site
 
-Part of the [UI/UX review](README.md). 55 findings: 1 critical, 9 high, 28 medium, 17 low.
+Part of the [UI/UX review](README.md). 54 findings: 0 critical, 9 high, 28 medium, 17 low.
 
 ## How it should work
 
@@ -23,23 +23,6 @@ Server on port 3200 was up. Every page was signed out unless noted. Routes and v
 </details>
 
 ## Findings
-
-### PUBLIC-001
-
-**A failed move-in submit wipes the whole report and shows 'That page didn't load'**
-
-Critical · Fix · effort S · `/residents/moving-in` · Every save is safe, instant and undoable · quick win
-
-- **Today:** With every required field filled, a failed submit request takes over the whole page. The harness aborted the POST here; in real life it would be a dropped connection. The page is replaced by the marketing error boundary ('Something went wrong. That page didn't load. Try again') and every rating, comment and name is gone. submit() awaits submitMoveInInspection inside startTransition with no try/catch, so a client-side network error escapes to error.tsx. withResult only catches errors thrown on the server.
-- **Why:** This is the only public write path, and it's a 46-item form usually filled on a phone on day one in an apartment that may not have internet yet. Losing everything on one flaky request is the worst outcome possible, and the error copy blames the page, not the send.
-- **Change:** Catch errors around the action call inside the transition. On failure, keep all state, re-enable the button and show the existing error pill above it: 'Couldn't send. Check your connection and try again.' Never let a submit error reach error.tsx. Pair with draft autosave (PUBLIC-044).
-- **Desktop, tablet, phone:** Same at all sizes. On phone the error sits directly above the submit button, so it's in view where the thumb is.
-- **Reuse:** Existing error pill in move-in-form.tsx:220-224; the withResult pattern on the server stays as is.
-- **References:** 
-  - [Revolut](https://mobbin.com/screens/082268c6-c6b1-42c6-8997-84561d5b9488): A failed submit offers Retry while the entered details stay on the page.
-- **Code:** `src/app/(marketing)/residents/moving-in/move-in-form.tsx:83-109`, `src/app/(marketing)/error.tsx:16-31`, `src/app/(marketing)/residents/moving-in/move-in-form.tsx:105-108`, `src/app/(marketing)/error.tsx`
-- **Also found as:** FEEL-IV05 (Lens: interaction quality, feedback, states, speed and accessibility)
-- **Verification:** confirmed. Reproduced at 375 with a filled form: the aborted POST throws 'TypeError: Failed to fetch' into (marketing)/error.tsx (verify-PUBLIC/movein-submit--after--mobile-light.png). It's worse than reported: clicking 'Try again' (retry) remounts an empty form. Tenant name, property and every rating are gone (movein-retry--after-retry--desktop-light.png). Deploy skew is another plausible trigger, since every push to main deploys while someone may have this 15-minute form open. The cross-reference is off: draft autosave is PUBLIC-043, not PUBLIC-044.
 
 ### PUBLIC-003
 

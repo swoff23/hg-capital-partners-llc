@@ -1,6 +1,6 @@
 # Deals pipeline, new deal and deal detail
 
-Part of the [UI/UX review](README.md). 62 findings: 1 critical, 9 high, 31 medium, 21 low.
+Part of the [UI/UX review](README.md). 61 findings: 0 critical, 9 high, 31 medium, 21 low.
 
 ## How it should work
 
@@ -23,20 +23,6 @@ Production build at http://localhost:3200, signed in as Connor. Routes: /deals (
 </details>
 
 ## Findings
-
-### DEALS-001
-
-**Esc saves the edit instead of reverting it**
-
-Critical · Fix · effort S · `/deals/[id]` · Fix wrong numbers and records first · quick win
-
-- **Today:** On a deal page, I changed Their price from 425k to 999k and pressed Esc. That sent a save: POST /deals/cmtg25yd8002cjphs49ovlvob showed up in blockedWrites. The same happened after adding a character to the address heading and after changing Units. Clicking into a field and pressing Esc without changing anything sent nothing. The Esc handler calls setV(value) and then blur(). Blur runs commit() right away, and commit still sees the typed value.
-- **Why:** Everyone uses Esc to cancel. Here it writes the value the person was trying to throw away, onto money fields of a live deal, and logs it to the timeline as if it were deliberate. InlineAddressField is shared with the property page heading, so property addresses are affected the same way.
-- **Change:** On Esc, set a skip ref, reset the value, then blur, and have onBlur return early while the ref is set. Fix InlineAddressField, TextField and UnitsField together. Then fold them into one InlineTextField, as the Duplicates table in components.md already recommends.
-- **Desktop, tablet, phone:** Behavior only, so the same at every size. Touch keyboards have no Esc key, so blur still saves there, which is the expected behavior.
-- **Reuse:** Generalize src/components/inline-address-field.tsx into InlineTextField (docs/components.md, Duplicates, Inline text edit).
-- **Code:** `src/app/(app)/deals/[id]/deal-detail.tsx:129-151`, `src/app/(app)/deals/[id]/deal-detail.tsx:195-219`, `src/components/inline-address-field.tsx:24-48`
-- **Verification:** confirmed. Reproduced in verify-DEALS/esc--after-esc--desktop-light.png. Typing 999k in Their price and pressing Esc sent POST /deals/cmtg25yd8002cjphs49ovlvob. Typing 7 in Units and pressing Esc also sent a POST. Focusing the field and pressing Esc with no change sent nothing. The same setX-then-blur pattern appears in tasks/task-row.tsx:133, tasks/[id]/task-detail.tsx:92 and settings/capex-rules-editor.tsx:124 and :174, so the shared InlineTextField fix should replace those copies too. docs/components.md:53 also says InlineAddressField 'reverts on Esc', which is wrong today. As a bug fix it needs no reference.
 
 ### DEALS-006
 

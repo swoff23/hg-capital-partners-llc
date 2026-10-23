@@ -1,6 +1,6 @@
 # Branch: contractor portal and contractor sign-in
 
-Part of the [UI/UX review](README.md). 34 findings: 0 critical, 4 high, 19 medium, 11 low.
+Part of the [UI/UX review](README.md). 33 findings: 0 critical, 3 high, 19 medium, 11 low.
 
 ## How it should work
 
@@ -57,23 +57,6 @@ I used 18 Mobbin searches (iOS and web) and cite only screens they returned.
 </details>
 
 ## Findings
-
-### BPORTAL-002
-
-**Mark done reads 'Skip' and goes ahead when photos failed to upload**
-
-High · Fix · effort S · `/p/jobs/[id] Mark done sheet` · Contractor jobs and media close the loop
-
-- **Migration branch:** Found on the migration branch's new screens. Open decision from the migration session: "Mark done without N photos" truncates at 320, 375 and 1280 (109 to 172px). Options: A) disable Mark done until failed tiles are retried or removed (their recommendation); B) "Skip N photos"; C) stack the buttons.
-- **Today:** I added two photos that failed to upload. The sheet showed the red tiles and 'Couldn't add IMG_0412.jpg and 1 more: Load failed', yet the primary button read 'Skip' and was enabled. Tapping it marks the job done without the photos. The label only counts uploads that were already recorded, so failed or removed photos make the main action read 'Skip'. 'Skip' also misnames the button, which marks the job done.
-- **Why:** The finished-work photos are the proof HG reviews against. Losing them silently means a Send back and a second trip.
-- **Change:** The primary always says 'Mark done'. When any upload failed, show '2 photos didn't upload' with Retry above the buttons. The primary then becomes the secondary-style 'Mark done without 2 photos' until the photos are retried or removed. While files are going up, keep 'Finishing 1 upload…'.
-- **Desktop, tablet, phone:** The same sheet on phone (bottom sheet) and tablet or desktop (centered dialog). The failure line stays on one line by using the count, not filenames.
-- **Reuse:** Change finishLabel in job-actions.tsx, and read the failed count from MediaUploaderApi.uploads in src/components/media-uploader.tsx.
-- **References:** 
-  - [OpenPhone](https://mobbin.com/screens/fd44cd6d-3bf9-4be7-bae2-f6e4b25cb27d): A failed item keeps an explicit Retry instead of being dropped.
-- **Code:** `branch: src/app/(portal)/p/jobs/[id]/_components/job-actions.tsx:133,238-240`
-- **Verification:** confirmed. I reproduced it. Two blocked uploads in the Mark done sheet showed red tiles and 'Couldn't add IMG_0412.jpg and 1 more: Load failed', and the primary still read 'Skip' and was enabled (verify-BPORTAL/upload--sheet-failed--mobile-light-webkit.png). 'Skip' is also the primary label every time the sheet opens with no note or photos, on phone and in the desktop dialog. So the main action of a dialog titled 'Mark done' reads 'Skip' (job-actions.tsx:133). The recommendation fixes both.
 
 ### BPORTAL-004
 

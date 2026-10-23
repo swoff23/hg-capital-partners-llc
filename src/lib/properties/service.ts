@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
-import { parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, syncedUnitCount, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
+import { countUnitRecords, parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
 import { CONFLICT_MESSAGE } from "@/lib/action-result";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
@@ -239,14 +239,14 @@ export async function replaceUnits(id: string, units: PropertyUnit[], expectedVe
     if (!current || current.updatedAt.getTime() !== versionDate(expectedVersion).getTime()) throw new Error(CONFLICT_MESSAGE);
     const before = parseUnits(current.units);
     const { units: stored, renames } = reconcileUnits(before, clean, randomUUID);
-    // The stored count is what Portfolio and the header show; keep it in step with the records.
-    const unitCount = syncedUnitCount(current.unitCount, before, stored);
+    // The count is the unit records (propertyUnitCount); store it so the column never disagrees.
+    const unitCount = countUnitRecords(stored) || null;
     const r = await tx.property.updateMany({
       where: { id, updatedAt: current.updatedAt },
-      data: { units: stored as unknown as object, ...(unitCount !== undefined && { unitCount }) },
+      data: { units: stored as unknown as object, unitCount },
     });
     if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
-    const countChanged = unitCount !== undefined;
+    const countChanged = unitCount !== current.unitCount;
     if (renames.length === 0) return { listings: 0, tasks: [], countChanged };
     // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
     const listings = await tx.listing.findMany({ where: { propertyId: id }, select: { id: true, unitLabel: true } });
