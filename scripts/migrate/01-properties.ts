@@ -6,7 +6,17 @@
  */
 import { prisma } from "../../src/lib/db";
 import { evenShare } from "../../src/lib/money";
+import { countUnitRecords } from "../../src/lib/property-types";
 import { report } from "./_report";
+
+/**
+ * Unit counts Connor confirmed where the SREO sheet is wrong, keyed by house
+ * number and street ("23 sherwood"). The stored count is what Portfolio and
+ * the property header show, so a re-import must not put these back.
+ */
+const UNIT_COUNT_OVERRIDES: Record<string, number> = {
+  "23 sherwood": 2,
+};
 import {
   readSheet,
   normalizeAddress,
@@ -138,7 +148,10 @@ export async function migrateProperties() {
       rehabAmount: dec(share(parseFloatOrNull(s?.["K"]))),
       rehabMonths: dec(parseFloatOrNull(s?.["L"])),
       sqft: share(parseIntOrNull(s?.["E"]), 1),
-      unitCount: share(parseIntOrNull(s?.["D"]), 1) ?? units.length,
+      unitCount:
+        UNIT_COUNT_OVERRIDES[key.split(" ").slice(0, 2).join(" ")] ??
+        share(parseIntOrNull(s?.["D"]), 1) ??
+        (countUnitRecords(units) || null),
       units: units as unknown as object,
     };
 
@@ -209,8 +222,11 @@ function findSreoLoose(map: Map<string, Record<string, string | null>>, key: str
   for (const [k, v] of map) {
     const [kn, ks] = k.split(" ");
     if (!numMatches(kn, num) || ks !== street) continue;
+    // Only a property that is one of a combined line's numbers takes a share;
+    // a property whose own number is the whole key ("765/767") gets all of it.
+    if (kn === num) return { row: v, index: 0, parts: 1 };
     const nums = kn.split("/");
-    return { row: v, index: Math.max(nums.indexOf(num), 0), parts: nums.length };
+    return { row: v, index: nums.indexOf(num), parts: nums.length };
   }
   return undefined;
 }

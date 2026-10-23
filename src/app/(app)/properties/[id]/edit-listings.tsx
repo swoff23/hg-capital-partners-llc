@@ -3,6 +3,7 @@ import { useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
 import { Badge, Button, EmptyState, Select } from "@/components/ui";
 import { updatePropertyListings } from "../actions";
+import { callAction } from "@/lib/action-result";
 
 export type EditablePhoto = { url: string; pathname: string };
 
@@ -71,6 +72,7 @@ export function ListingsSection({
   // this is > 0 would silently persist the listings *without* the photo still uploading,
   // with no error to show for it. Save stays disabled until every upload settles.
   const [uploadingCount, setUploadingCount] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
 
   const dirty = JSON.stringify(listings) !== JSON.stringify(initial);
 
@@ -84,8 +86,19 @@ export function ListingsSection({
 
   function save() {
     setError(null);
+    // A number input hands React "" for text it can't read ("1,500", "15oo"), and
+    // the server would store that blank over the rent. Catch it while the typed
+    // text is still in the field.
+    const unreadable = [...(root.current?.querySelectorAll<HTMLInputElement>("input[data-check]") ?? [])].find(
+      (el) => el.validity.badInput,
+    );
+    if (unreadable) {
+      setError(unreadable.dataset.check ?? "Check the numbers.");
+      unreadable.focus();
+      return;
+    }
     start(async () => {
-      const r = await updatePropertyListings(propertyId, listings, version);
+      const r = await callAction(() => updatePropertyListings(propertyId, listings, version));
       if (!r.ok) {
         setError(r.error);
         setConfirmOpen(false);
@@ -109,7 +122,7 @@ export function ListingsSection({
   }
 
   return (
-    <div className="group rounded-xl border border-border bg-surface shadow-sm">
+    <div ref={root} className="group rounded-xl border border-border bg-surface shadow-sm">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold">Rentals</h3>
         {!editing ? (
@@ -169,7 +182,7 @@ export function ListingsSection({
         )}
       </div>
 
-      {error && <p className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p role="alert" className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
       {confirmOpen && (
         <div
@@ -352,6 +365,7 @@ function EditListingCard({
               min="0"
               className={inp}
               value={l.rent}
+              data-check={`Rent for ${l.unitLabel || "Unit"} isn't a number.`}
               onChange={(e) => mutate((x) => (x[i].rent = e.target.value))}
             />
           </label>
@@ -362,6 +376,7 @@ function EditListingCard({
               min="0"
               className={inp}
               value={l.sqft}
+              data-check={`Sq ft for ${l.unitLabel || "Unit"} isn't a whole number.`}
               onChange={(e) => mutate((x) => (x[i].sqft = e.target.value))}
             />
           </label>

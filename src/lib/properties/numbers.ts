@@ -9,12 +9,24 @@ import { parseAmount, toDecimalString } from "@/lib/money";
 
 export type NumberRead<T> = { ok: true; value: T | null } | { ok: false };
 
-/** Money, rates and months: "550,000", "$550k", "7.25%". */
+/** Money and months: "550,000", "$550k". */
 export function readAmount(raw: string | null | undefined): NumberRead<string> {
   const s = raw?.trim();
   if (!s) return { ok: true, value: null };
   const n = parseAmount(s);
   return n == null ? { ok: false } : { ok: true, value: toDecimalString(n) };
+}
+
+/**
+ * An interest rate in percent, kept to three decimals ("6.875", "6.875%") to
+ * match its Decimal(6,3) column. Anything outside 0 to 100 is a typo ("6875"
+ * with the point forgotten), refused rather than overflowing the column.
+ */
+export function readRate(raw: string | null | undefined): NumberRead<string> {
+  const s = raw?.trim();
+  if (!s) return { ok: true, value: null };
+  const n = parseAmount(s);
+  return n == null || n < 0 || n > 100 ? { ok: false } : { ok: true, value: n.toFixed(3) };
 }
 
 /** Whole, non-negative counts such as square feet: "2,300". */
@@ -24,30 +36,34 @@ export function readWholeNumber(raw: string | null | undefined): NumberRead<numb
   return /^\d+$/.test(s) ? { ok: true, value: parseInt(s, 10) } : { ok: false };
 }
 
-const FIELDS: Record<string, { label: string; example: string; whole?: boolean }> = {
-  value: { label: "Value", example: "550,000" },
-  replacementCost: { label: "Replacement cost", example: "800,000" },
-  purchasePrice: { label: "Purchase price", example: "240,000" },
-  closingCosts: { label: "Closing costs", example: "6,500" },
-  rehabAmount: { label: "Rehab amount", example: "45,000" },
-  rehabMonths: { label: "Rehab months", example: "6" },
-  loanOriginalAmount: { label: "Original amount", example: "292,890" },
-  currentLoan: { label: "Current loan", example: "292,890" },
-  loanRate: { label: "Rate", example: "7.25" },
-  loanPaymentMonthly: { label: "Payment / mo", example: "2,150" },
-  insuranceCoverage: { label: "Coverage", example: "800,000" },
-  insuranceDeductible: { label: "Deductible", example: "2,500" },
-  insurancePremium: { label: "Premium", example: "3,200" },
-  sqft: { label: "Sq ft", example: "2,300", whole: true },
+const LABELS: Record<string, string> = {
+  value: "Value",
+  replacementCost: "Replacement cost",
+  purchasePrice: "Purchase price",
+  closingCosts: "Closing costs",
+  rehabAmount: "Rehab amount",
+  rehabMonths: "Rehab months",
+  loanOriginalAmount: "Original amount",
+  currentLoan: "Current loan",
+  loanRate: "Rate",
+  loanPaymentMonthly: "Payment / mo",
+  insuranceCoverage: "Coverage",
+  insuranceDeductible: "Deductible",
+  insurancePremium: "Premium",
+  sqft: "Sq ft",
 };
 
-/** One line naming the fields that didn't read as numbers, for the editor to show. */
+/**
+ * One short line naming the fields that didn't read, for the editor to show.
+ * Short enough to stay on one line in the narrow section cards.
+ */
 export function badNumbersMessage(fields: string[]): string {
-  const known = fields.map((f) => FIELDS[f] ?? { label: f, example: "550,000" });
-  if (known.length === 1) {
-    const [f] = known;
-    return `${f.label} isn't ${f.whole ? "a whole number" : "a number"}. Enter it like ${f.example}.`;
+  if (fields.length === 1) {
+    const [f] = fields;
+    if (f === "loanRate") return "Rate needs a percentage, like 6.875.";
+    if (f === "sqft") return "Sq ft isn't a whole number.";
+    return `${LABELS[f] ?? f} isn't a number.`;
   }
-  const and = (xs: string[]) => `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
-  return `${and(known.map((f) => f.label))} need numbers, like ${and(known.map((f) => f.example))}.`;
+  const labels = fields.map((f) => LABELS[f] ?? f);
+  return `Check ${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}.`;
 }

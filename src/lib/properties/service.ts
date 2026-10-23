@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
 import type { ListingStatus, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { badNumbersMessage, readAmount, readWholeNumber } from "@/lib/properties/numbers";
+import { badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
-import { parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
+import { parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, syncedUnitCount, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
 import { CONFLICT_MESSAGE } from "@/lib/action-result";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
@@ -113,7 +113,7 @@ export async function patchProperty(id: string, patch: PropertyPatch): Promise<v
   for (const k of TEXT_FIELDS) if (has(k)) data[k] = s(k);
   for (const k of MONEY_FIELDS) {
     if (!has(k)) continue;
-    const r = readAmount(patch[k]);
+    const r = k === "loanRate" ? readRate(patch[k]) : readAmount(patch[k]);
     if (r.ok) data[k] = r.value;
     else bad.push(k);
   }
@@ -235,12 +235,19 @@ export async function replaceUnits(id: string, units: PropertyUnit[], expectedVe
       })),
   }));
   const renamed = await prisma.$transaction(async (tx) => {
-    const current = await tx.property.findUnique({ where: { id }, select: { units: true, updatedAt: true } });
+    const current = await tx.property.findUnique({ where: { id }, select: { units: true, unitCount: true, updatedAt: true } });
     if (!current || current.updatedAt.getTime() !== versionDate(expectedVersion).getTime()) throw new Error(CONFLICT_MESSAGE);
-    const { units: stored, renames } = reconcileUnits(parseUnits(current.units), clean, randomUUID);
-    const r = await tx.property.updateMany({ where: { id, updatedAt: current.updatedAt }, data: { units: stored as unknown as object } });
+    const before = parseUnits(current.units);
+    const { units: stored, renames } = reconcileUnits(before, clean, randomUUID);
+    // The stored count is what Portfolio and the header show; keep it in step with the records.
+    const unitCount = syncedUnitCount(current.unitCount, before, stored);
+    const r = await tx.property.updateMany({
+      where: { id, updatedAt: current.updatedAt },
+      data: { units: stored as unknown as object, ...(unitCount !== undefined && { unitCount }) },
+    });
     if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
-    if (renames.length === 0) return { listings: 0, tasks: [] };
+    const countChanged = unitCount !== undefined;
+    if (renames.length === 0) return { listings: 0, tasks: [], countChanged };
     // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
     const listings = await tx.listing.findMany({ where: { propertyId: id }, select: { id: true, unitLabel: true } });
     let listingCount = 0;
@@ -250,9 +257,10 @@ export async function replaceUnits(id: string, units: PropertyUnit[], expectedVe
       await tx.listing.update({ where: { id: l.id }, data: { unitLabel: to } });
       listingCount++;
     }
-    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p) };
+    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p), countChanged };
   }, TX_LIMITS);
   revalidatePath(`/properties/${id}`);
+  if (renamed.countChanged) revalidatePath("/properties");
   if (renamed.listings) revalidatePath("/rentals");
   revalidateTasks(renamed.tasks);
 }
@@ -309,9 +317,9 @@ export async function replaceListings(propertyId: string, listings: ListingInput
   const clean = listings.map((l) => {
     const unitLabel = l.unitLabel.trim() || "Unit";
     const rent = readAmount(l.rent);
-    if (!rent.ok) throw new Error(`Rent for ${unitLabel} isn't a number. Enter it like 1,450.`);
+    if (!rent.ok) throw new Error(`Rent for ${unitLabel} isn't a number.`);
     const sqft = readWholeNumber(l.sqft);
-    if (!sqft.ok) throw new Error(`Sq ft for ${unitLabel} isn't a whole number. Enter it like 850.`);
+    if (!sqft.ok) throw new Error(`Sq ft for ${unitLabel} isn't a whole number.`);
     return {
       id: l.id ?? null,
       unitLabel,

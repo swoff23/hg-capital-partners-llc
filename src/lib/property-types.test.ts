@@ -7,6 +7,7 @@ import {
   capexForecast,
   isHouseMeterRow,
   propertyUnitCount,
+  syncedUnitCount,
   reconcileUnits,
   renamedLabel,
   withUnitIds,
@@ -20,6 +21,18 @@ test("isHouseMeterRow: only the building's own meters, never a real unit", () =>
   for (const label of ["Rear house", "Front", "Unit 1", "1st Rear / Apt #3", "", null, undefined]) {
     assert.equal(isHouseMeterRow({ label }), false, String(label));
   }
+});
+
+test("syncedUnitCount: follows the records only while the stored count agrees with them", () => {
+  const two = [{ label: "Lower" }, { label: "Upper" }];
+  const three = [...two, { label: "Attic" }];
+  assert.equal(syncedUnitCount(2, two, three), 3);
+  assert.equal(syncedUnitCount(null, two, three), 3);
+  assert.equal(syncedUnitCount(3, three, two), 2);
+  assert.equal(syncedUnitCount(2, three, [...three, { label: "Rear" }]), undefined); // set on purpose (767)
+  assert.equal(syncedUnitCount(2, two, [...two, { label: "HSE (house)" }]), undefined); // a meter isn't a unit
+  assert.equal(syncedUnitCount(2, two, two), undefined);
+  assert.equal(syncedUnitCount(1, [{ label: "Only" }], []), null);
 });
 
 test("propertyUnitCount: the stored count wins; else unit records less house meters", () => {

@@ -1,12 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
-import type { ActionResult } from "@/lib/action-result";
+import { callAction, type ActionResult } from "@/lib/action-result";
 
 /**
  * Save handler for a property section editor (details, loan, insurance, notes).
- * Closes the editor on success; when the save is refused, keeps it open with
- * what was typed and the reason. It runs on submit rather than as the form's
- * `action`, because React resets a form's inputs after its action runs.
+ * Closes the editor on success; when the save is refused or the connection
+ * drops, keeps it open with what was typed and the reason. It runs on submit
+ * rather than as the form's `action`, because React resets a form's inputs
+ * after its action runs.
  */
 export function useSectionSave(save: (fd: FormData) => Promise<ActionResult>, onSaved: () => void) {
   const [pending, start] = useTransition();
@@ -17,7 +18,7 @@ export function useSectionSave(save: (fd: FormData) => Promise<ActionResult>, on
     const fd = new FormData(e.currentTarget);
     setError(null);
     start(async () => {
-      const r = await save(fd);
+      const r = await callAction(() => save(fd));
       if (r.ok) onSaved();
       else setError(r.error);
     });
