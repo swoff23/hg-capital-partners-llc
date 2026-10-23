@@ -34,7 +34,7 @@ Another 65 high-severity fixes need no design call. The roadmap's Fix now list r
 
 ### Decisions waiting on you
 
-Each one changes a settled decision or house rule, so nothing ships without your yes. The recommendations are in the North star and Roadmap tabs. The task, contractor and portal decisions are also gathered, with recommendations, in `docs/asana-cutover-decisions.md` on the migration branch.
+Each one changes a settled decision or house rule, so nothing ships without your yes. The recommendations are in the North star and Roadmap tabs. What's still waiting on Connor for tasks, contractors and the portal is listed in `docs/todo-for-connor.md`.
 
 - Home hosts Today, which merges D10's Home and the Tasks Today view into one screen.
 - Money and KPIs in Geist with tabular figures, keeping Geist Mono for codes. This changes the Geist Mono rule.

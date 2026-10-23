@@ -81,7 +81,7 @@ export interface ContactFix {
 }
 
 /**
- * Connor's hand fixes (docs/asana-cutover-decisions.md item 31): a trade
+ * Connor's hand fixes (answered Oct 23; see docs/todo-for-connor.md): a trade
  * typed into Company moves to Trades, and a company typed into the name
  * moves to Company. Each matches one record by its exact current name and
  * company, so it can't reach any other row, and does nothing once applied.
