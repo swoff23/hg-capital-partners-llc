@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addressKey, normalizeAddress, shortAddress } from "./normalize";
+import { addressKey, normalizeAddress, sameStreetAddress, shortAddress, streetKey } from "./normalize";
 
 test("normalizeAddress: lowercase, common street words, punctuation, whitespace", () => {
   assert.equal(normalizeAddress("725 Linwood Avenue, Buffalo, NY 14209"), "725 linwood ave buffalo ny 14209");
@@ -18,6 +18,58 @@ test("addressKey: leading number + street word; combined numbers keep the first"
   assert.equal(addressKey("58 Mariner St"), "58 mariner");
   assert.equal(addressKey("15a Oxford"), "15a oxford");
   assert.equal(addressKey(""), "");
+});
+
+test("streetKey: house number, direction and street name", () => {
+  assert.equal(streetKey("352 Auburn Avenue Buffalo , NY 14213"), "352 auburn");
+  assert.equal(streetKey("352 Auburn Ave Buffalo 14213"), "352 auburn");
+  assert.equal(streetKey("352 Auburn Ave Apt 2"), "352 auburn");
+  assert.equal(streetKey("352 Auburn, Buffalo"), "352 auburn"); // no street type: first word
+  // A direction before the name is kept, spelled or not, so East and West never meet.
+  assert.equal(streetKey("421 W Delavan Ave"), "421 w delavan");
+  assert.equal(streetKey("421 West Delavan Avenue, Buffalo"), "421 w delavan");
+  assert.equal(streetKey("421 E. Delavan"), "421 e delavan");
+  // ...unless it is the name itself.
+  assert.equal(streetKey("971 West Avenue"), "971 west");
+  assert.equal(streetKey("971 W Ave, Buffalo, NY"), "971 west");
+  // Multi-word names run up to the street type.
+  assert.equal(streetKey("1500 Niagara Falls Blvd"), "1500 niagara falls");
+  assert.equal(streetKey("1500 Niagara St"), "1500 niagara");
+  assert.equal(streetKey("893 Columbus Parkway"), "893 columbus");
+  assert.equal(streetKey("893 Columbus Pkwy Buffalo NY 14213"), "893 columbus");
+  // A street-type word that opens the name is the name.
+  assert.equal(streetKey("12 Court St"), "12 court");
+  // Combined numbers keep the first.
+  assert.equal(streetKey("765/767 Prospect Ave"), "765 prospect");
+  assert.equal(streetKey("765-767 Prospect Ave"), "765 prospect");
+  // No leading number: the whole normalized address.
+  assert.equal(streetKey("Lot on Main Street"), "lot on main st");
+  assert.equal(streetKey("12"), "12");
+  assert.equal(streetKey(""), "");
+  assert.equal(streetKey(null), "");
+});
+
+test("sameStreetAddress: one building typed two ways", () => {
+  assert.ok(sameStreetAddress("352 Auburn Avenue Buffalo , NY 14213", "352 Auburn Ave Buffalo 14213"));
+  assert.ok(sameStreetAddress("348 Virginia St", "348 Virginia Street, Buffalo, NY 14201"));
+  assert.ok(sameStreetAddress("421 W Delavan", "421 West Delavan Ave"));
+  assert.ok(sameStreetAddress("971 West Avenue", "971 West Ave, Buffalo, NY 14213"));
+  // Different buildings.
+  assert.equal(sameStreetAddress("421 W Delavan Ave", "421 E Delavan Ave"), false);
+  assert.equal(sameStreetAddress("352 Auburn Ave", "353 Auburn Ave"), false);
+  assert.equal(sameStreetAddress("352 Auburn Ave", "1352 Auburn Ave"), false);
+  assert.equal(sameStreetAddress("1500 Niagara St", "1500 Niagara Falls Blvd"), false);
+  // Two different ZIPs are two places; a missing one doesn't count against.
+  assert.equal(sameStreetAddress("100 Main St, Buffalo, NY 14201", "100 Main St, Williamsville, NY 14221"), false);
+  assert.ok(sameStreetAddress("100 Main St, Buffalo, NY 14201", "100 Main St"));
+  assert.ok(sameStreetAddress("100 Main St 14201-1234", "100 Main St Buffalo 14201"));
+  // A five-digit house number isn't a ZIP.
+  assert.ok(sameStreetAddress("10450 Main St", "10450 Main Street, Clarence"));
+  // No number: only an exact (normalized) match.
+  assert.ok(sameStreetAddress("Lot on Main St.", "lot on main street"));
+  assert.equal(sameStreetAddress("Lot on Main St", "Lot on Main St, Buffalo"), false);
+  assert.equal(sameStreetAddress("", ""), false);
+  assert.equal(sameStreetAddress(null, "352 Auburn Ave"), false);
 });
 
 test("shortAddress strips the city/state tail", () => {

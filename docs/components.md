@@ -41,7 +41,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Popover (anything floating that isn't a menu) | `components/popover.tsx` `Popover`, `PopoverTrigger` | React Aria Popover holding a Dialog: flips at the edge, outside click and Esc close, sized to content. `PopoverSurface` is the bare surface for list boxes. Triggers must be React Aria pressables: a `react-aria-components` `Button`, or wrap our `Button` in `Pressable` |
 | Action menu (⋯) | `components/menu.tsx` `Menu`, `MenuItem`, `MenuSeparator`, `MenuTrigger` | Arrow keys and typeahead. `variant="destructive"` for Delete; `icon` takes a lucide element. 44px rows on touch |
 | Tooltip | `components/tooltip.tsx` `Tooltip` | Fixed position, so it escapes table and card clipping. Hover only (Known gaps) |
-| Checklist popover for a multi-pick filter | `app/(app)/deals/status-multiselect.tsx` `StatusMultiSelect` | Outside click closes; no Esc. Rebuild on `Popover` before a second use |
+| Checklist popover for a multi-pick filter | `app/(app)/deals/status-multiselect.tsx` `StatusMultiSelect` | Built on `Popover`: stays on screen, outside click and Esc close. Deals only; move to `components/` before a second use |
 | Search with a results dropdown | `components/global-search.tsx` `GlobalSearch` | Queries `/api/search`; outside click closes. Below `sm` the results span the header between the page gutters |
 | Pick one from a list in a form | `components/ui.tsx` `Select` | Native `<select>` |
 
@@ -132,6 +132,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Task file URL | `lib/attachments/media.ts` `taskFileUrl` | `/api/files/task/<id>`, with `?v=thumb` or `?v=poster` |
 | File size | `lib/utils.ts` `formatBytes` | |
 | Address | `lib/normalize.ts` `shortAddress`, `normalizeAddress` | |
+| Same building typed two ways | `lib/normalize.ts` `sameStreetAddress`, `streetKey` | House number, direction and street name; two different ZIPs never match. The deal duplicate check |
 
 ## Duplicates
 
@@ -142,8 +143,8 @@ Use the pick; folding a copy into it is welcome when you're already in that file
 | Confirm dialog | `ConfirmDialog`, plus inline copies in `app/(app)/properties/[id]/edit-units.tsx` and `edit-listings.tsx` | `ConfirmDialog` |
 | Segmented control | `BasisToggle` in `app/(app)/financials/settings/controls.tsx` (fills with the primary color) | `components/segmented-control.tsx` `SegmentedControl` (deals and tasks already use it) |
 | Inline text edit | `InlineAddressField` (the task title uses it now), plus hand-rolled edits in `deals/[id]/deal-detail.tsx` (2) and `settings/capex-rules-editor.tsx` (2), all on `useInlineEditKeys` | `InlineAddressField`, generalized to any text |
-| Outside-click popover | `StatusMultiSelect` and `GlobalSearch` each wire their own `mousedown` listener | `components/popover.tsx` `Popover` |
-| Money formatting | `fmtMoney`, plus `priceDisplay` in `deals/deal-row.tsx` and a raw `toLocaleString` in `(marketing)/rentals/page.tsx` | `fmtMoney` |
+| Outside-click popover | `GlobalSearch` wires its own `mousedown` listener | `components/popover.tsx` `Popover` |
+| Money formatting | `fmtMoney`, plus a raw `toLocaleString` in `(marketing)/rentals/page.tsx` | `fmtMoney` |
 | Age in years | `fmtAge` in `properties/[id]/capex-outlook.tsx`, `building-capex.tsx` and `edit-units.tsx`; `fmtYrs` in `settings/capex-rules-editor.tsx` | Move one into `lib/` |
 | Button | `Button` in 20 files; about 50 raw `<button>`s, many icon or link style | `Button`; add a variant before hand-rolling |
 | Text field | `Input`, `Select`, `Textarea` in 9 files; about 60 raw fields (filter bars at `h-8 text-xs`, inline edits, public forms) | `Input` and friends; add a small size for filter bars |
@@ -157,7 +158,7 @@ Jobs nothing covers yet, and holes in the picks. The first feature that needs on
 - **Tap targets.** The primitives are 44px on touch now. Raw `<button>`s and fields outside `ui.tsx` (filter bars at `h-8`, text links in tables) still warn; move them onto the primitives.
 - **Wrapped control rows.** The device check warns that rows of controls wrap on `/deals`, `/login`, `/rentals`, `/residents`, `/residents/moving-in`, `/settings/move-in-form` and `/welcome`. CLAUDE.md says they shouldn't; shorten labels or collapse into a Filters button.
 - **Tooltip on touch.** `Tooltip` opens on hover only, so touch users never see it. Give it a tap path.
-- **Old popovers.** `StatusMultiSelect` and `GlobalSearch` predate `Popover` and don't close on Esc; move them onto it when touched.
+- **Old popovers.** `GlobalSearch` predates `Popover` and doesn't close on Esc; move it onto it when touched.
 - **Inline text edit.** Exists only as feature copies (Duplicates). Extract on the next touch.
 - **Spot art for payoff moments.** None yet; see Personality in CLAUDE.md.
 - **Public site kit.** Public pages hand-style buttons and fields on fixed hex colors; there's no shared public primitive.
