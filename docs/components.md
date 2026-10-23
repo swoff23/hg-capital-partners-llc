@@ -15,28 +15,32 @@ Paths are under `src/`. Last full sweep: 2026-10-22.
 
 | Place | What's there | When to use it |
 |---|---|---|
-| `components/ui.tsx` | `Card` (with `CardHeader`, `CardTitle`, `CardBody`), `SectionCard`, `Button`, `LinkButton`, `Badge`, `Input`, `Textarea`, `Select`, `Table`, `Th`, `Td`, `PageHeader`, `Field`, `EmptyState` | **Home for new primitives** |
-| `components/*.tsx` | App shell and nav, confirm dialog, tooltip, global search, file uploads, inline heading edit, theme toggle, back link | Shared app pieces; new general-purpose components go here |
+| `components/ui.tsx` | `Card` (with `CardHeader`, `CardTitle`, `CardBody`), `SectionCard`, `Button`, `LinkButton`, `buttonClass`, `Badge`, `Input`, `Textarea`, `Select`, `Table`, `Th`, `Td`, `PageHeader`, `Field`, `EmptyState`, `pickerChip` | **Home for new primitives** |
+| `components/*.tsx` | App shell and nav, popover, sheet, menu, toast, date, assignee and repeat pickers, avatar, status badge, segmented control, media uploader, grid and lightbox, activity timeline, confirm dialog, tooltip, global search, file uploads, inline heading edit, theme toggle, back link | Shared app pieces; new general-purpose components go here |
 | `components/public/` | `PublicHeader`, `PublicFooter` | Public site only |
 | `app/(app)/financials/_components/ui.tsx` | `Kpi`, `MoneyBars`, `SourceBadge`, `PartialLabel`, `fmtCents` | Money figures; move a piece to `components/` before reusing it outside Financials |
 | `lib/utils.ts`, `lib/dates.ts`, `lib/money.ts`, `lib/normalize.ts` | Formatting and parsing | All display formatting |
 
-Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the primitives above. The public site (`app/(marketing)`) is hand-styled on fixed hex colors and shares nothing with `ui.tsx` today.
+Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) use the tokens in `app/globals.css` and the primitives above. The public site (`app/(marketing)`) is hand-styled on fixed hex colors and shares nothing with `ui.tsx` today.
 
 ## Overlays
 
 | Job | Use | Notes |
 |---|---|---|
-| Confirm (destructive, or "discard changes?") | `components/confirm-dialog.tsx` `ConfirmDialog` | Backdrop click closes. No Esc, focus trap or portal yet (Known gaps) |
+| Dialog with a form, or a picker on touch | `components/sheet.tsx` `Sheet`, `SheetTrigger` | React Aria Modal: bottom sheet below `md`, centered dialog from `md`. Esc closes one layer, focus trap, scroll lock, focus returns to the trigger. `title` names it; children may be `({ close }) => …` |
+| Confirm (destructive, or "discard changes?") | `components/confirm-dialog.tsx` `ConfirmDialog` | Backdrop click closes. No Esc, focus trap or portal yet; rebuild on `Sheet` (Known gaps) |
+| Photo and video viewer | `components/lightbox.tsx` `Lightbox` | Black stage, "3 / 11", arrows, arrow keys and swipe, Download, who added it and when. Videos play inline. `onDelete` (staff) adds Delete, confirmed in a `Sheet` on top. `MediaGrid` opens it |
 | Mobile nav drawer | `components/app-shell.tsx` `AppShell` | Built into the shell below `lg`; Esc closes |
-| Dialog with a form | Nothing yet | Known gaps |
+| Popover with a mouse, Sheet on touch | `components/use-coarse-pointer.ts` `useCoarsePointer` | Same test as Tailwind's `pointer-coarse:`. False until hydrated |
 
 ## Menus, popovers and tooltips
 
 | Job | Use | Notes |
 |---|---|---|
+| Popover (anything floating that isn't a menu) | `components/popover.tsx` `Popover`, `PopoverTrigger` | React Aria Popover holding a Dialog: flips at the edge, outside click and Esc close, sized to content. `PopoverSurface` is the bare surface for list boxes. Triggers must be React Aria pressables: a `react-aria-components` `Button`, or wrap our `Button` in `Pressable` |
+| Action menu (⋯) | `components/menu.tsx` `Menu`, `MenuItem`, `MenuSeparator`, `MenuTrigger` | Arrow keys and typeahead. `variant="destructive"` for Delete; `icon` takes a lucide element. 44px rows on touch |
 | Tooltip | `components/tooltip.tsx` `Tooltip` | Fixed position, so it escapes table and card clipping. Hover only (Known gaps) |
-| Checklist popover for a multi-pick filter | `app/(app)/deals/status-multiselect.tsx` `StatusMultiSelect` | Outside click closes; no Esc. Move to `components/` before a second use |
+| Checklist popover for a multi-pick filter | `app/(app)/deals/status-multiselect.tsx` `StatusMultiSelect` | Outside click closes; no Esc. Rebuild on `Popover` before a second use |
 | Search with a results dropdown | `components/global-search.tsx` `GlobalSearch` | Queries `/api/search`; outside click closes |
 | Pick one from a list in a form | `components/ui.tsx` `Select` | Native `<select>` |
 
@@ -44,16 +48,21 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 
 | Job | Use | Notes |
 |---|---|---|
-| Text field | `components/ui.tsx` `Input` | 14px text with a mouse; every field gets 16px on touch screens (`app/globals.css`) so iOS doesn't zoom on focus |
+| Text field | `components/ui.tsx` `Input` | 14px text with a mouse; every field gets 16px on touch screens (`app/globals.css`) so iOS doesn't zoom on focus. At least 44px tall on touch |
 | Multi-line text | `components/ui.tsx` `Textarea` | |
 | Select | `components/ui.tsx` `Select` | |
-| Button | `components/ui.tsx` `Button` (primary, secondary, ghost, danger; sm, md) | `LinkButton` for navigation styled as a button |
-| Pending action | `useTransition`, a disabled `Button` and a label swap ("Saving…") | See `app/(app)/settings/move-in-form/move-in-form-editor.tsx`, `financials/_components/refresh-button.tsx` |
+| Button | `components/ui.tsx` `Button` (primary, secondary, ghost, danger; sm, md) | `LinkButton` for navigation styled as a button; `buttonClass()` for a plain `<a>` (an `sms:` or `mailto:` link). `Button`, `LinkButton`, `Input`, `Select` and `Textarea` are at least 44px tall on touch (`pointer-coarse:min-h-11`); a mouse keeps the compact sizes |
+| Pending action | `useTransition`, a disabled `Button` and a label swap ("Saving…") | See `app/(app)/settings/move-in-form/move-in-form-editor.tsx`, `financials/_components/refresh-button.tsx`. The sign-in screens use `app/login/_components/auth-submit.tsx` `AuthSubmit` (`useFormStatus`; `native` for a form that posts to a URL) |
 | Section with view and edit modes | `components/ui.tsx` `SectionCard` | Edit link shows on hover, always on phones; `actions` slot holds Cancel and Save |
-| Edit a heading in place | `components/inline-address-field.tsx` `InlineAddressField` | Commits on blur or Enter, reverts on Esc. The base for any inline text edit |
-| Save on blur, cancel on Esc | `components/use-inline-edit-keys.ts` `useInlineEditKeys` | Enter saves, Esc reverts without saving. Every field that saves on blur uses it, so Esc never saves what it threw away |
-| File upload with drag and drop | `components/attachments.tsx` `Attachments` | Private Vercel Blob uploads; `kind` picks task or property |
-| Done checkbox | `app/(app)/tasks/task-checkbox.tsx` `TaskCheckbox` | Tasks only |
+| Edit a heading in place | `components/inline-address-field.tsx` `InlineAddressField` | Commits on blur or Enter, reverts on Esc. The base for any inline text edit: `label` names it, `minLength` reverts anything shorter, `multiline` lets a long heading wrap (the task title). Only a real edit saves (`lib/inline-edit.ts`), so focus and blur never rewrite a stored value |
+| Save on blur, cancel on Esc | `components/use-inline-edit-keys.ts` `useInlineEditKeys` | Enter saves, Esc reverts without saving. `InlineAddressField` (so the task title too), the deal page fields and the CapEx rules editor use it; use it for any field that saves on blur |
+| File upload with drag and drop | `components/attachments.tsx` `Attachments` | Documents. Private Vercel Blob uploads; `kind` picks task or property |
+| Task photos and videos upload | `components/media-uploader.tsx` `MediaUploader`, `useMediaUploader`, `MediaUploadTray` | "Take photo or video" (camera, touch only by default) and "Choose files", which offers what `allowed` lets in (documents too with `"file"`). Checks type and size first, 3 at a time, multipart over 100 MB, 56px tiles with progress ring, Retry and Remove. `pending` holds "Mark done"; `onRecorded(ids)` when the queue drains. `useLeaveWarning(active)` is the browser's leave prompt the uploader raises while files go up; reuse it for anything else a reload would lose |
+| Due date | `components/due-date-picker.tsx` `DueDatePicker` | Date chip with `dueLabel()`, red when `overdue`. Quick picks (Today, Tomorrow, Monday, Next week, No date; keys 1 to 5) over a calendar. Popover with a mouse, Sheet on touch. `"YYYY-MM-DD"` or null. `prefix` puts a word before the date where no label sits beside the chip ("Visit Thu") |
+| Repeats | `components/repeat-picker.tsx` `RepeatPicker` | Chip with the rule ("Every 2 weeks") that opens a small editor: Never, every N days, every N weeks, monthly on a day, quarterly, yearly. Popover with a mouse, Sheet on touch. `RepeatRule` or null |
+| Assignee | `components/assignee-picker.tsx` `AssigneePicker` | Unassigned, Team, Contractors (trade, "Has login"). Type to filter by name or trade. Popover with a mouse, Sheet on touch. Value `{userId}`, `{contactId}` or null |
+| Picker trigger chip | `components/ui.tsx` `pickerChip` | Class string shared by the date and assignee chips; 44px hit area on touch without growing |
+| Done checkbox | `app/(app)/tasks/task-checkbox.tsx` `TaskCheckbox` | Tasks only. 18px circle in a 44px hit area; the caller owns the state, so a tap shows at once |
 
 ## Feedback and empty states
 
@@ -61,10 +70,10 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 |---|---|---|
 | Empty list or page section | `components/ui.tsx` `EmptyState` | Dashed card. Inside a card that already frames the list, a muted one-line "No open tasks." is enough |
 | Inline save error | A `text-xs text-red-600 dark:text-red-400` line under the section | Pattern in `properties/[id]/edit-units.tsx` and `edit-listings.tsx`; no component yet |
-| Page crash | `app/(app)/error.tsx`, `app/(marketing)/error.tsx` | Route error boundaries |
-| Not found | `app/not-found.tsx`, `app/(app)/not-found.tsx` | |
-| Sent screen | Thank-you state in `app/(marketing)/residents/moving-in/move-in-form.tsx` | The only payoff moment today |
-| Toast | Nothing yet | Known gaps |
+| Page crash | `app/(app)/error.tsx`, `app/(marketing)/error.tsx`, `app/login/error.tsx` | Route error boundaries. The sign-in screens (and the contractor's first-password page, `app/(portal)/p/welcome/error.tsx`) show `app/login/_components/auth-crash.tsx` `AuthCrash` in the sign-in frame, with the offline line when there's no signal |
+| Not found | `app/not-found.tsx`, `app/(app)/not-found.tsx`, `app/(portal)/p/jobs/[id]/not-found.tsx` | The portal one is a job the contractor can't open: one line and "Back to my jobs" |
+| Sent screen | Thank-you state in `app/(marketing)/residents/moving-in/move-in-form.tsx`; the contractor's Mark done payoff in `app/(portal)/p/jobs/[id]/_components/job-actions.tsx` | Warm heading, who it went to, the next step. Feature-only so far; move to `components/` on a third use |
+| Toast, with Undo | `components/toast.tsx` `useToast`, `ToastProvider` | `toast({ message, action: { label: "Undo", onAction } })`. Bottom-left on a computer, full width on a phone; `useToastInset(px)` lifts it above a sticky bottom bar. About 5s, held on hover or focus. `role="status"`. `AppShell` mounts the provider; the portal layout mounts its own |
 
 ## Navigation and tabs
 
@@ -72,8 +81,8 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 |---|---|---|
 | App sidebar | `components/nav.tsx` `SideNav` inside `components/app-shell.tsx` `AppShell` | Pinned state lives in a cookie (`lib/sidebar.ts`) |
 | Page sections that are separate routes | `components/nav.tsx` `TopTabs` | Underline tabs. Financials and Settings layouts |
-| Views and filters inside a page | Segmented control in `app/(app)/deals/filters.tsx` | The selected fill alone marks the pick. Copied elsewhere (Duplicates) |
-| Back to the list | `components/back-link.tsx` `BackLink` | Returns to the exact previous page, filters and scroll intact, when it can |
+| Views and filters inside a page | `components/segmented-control.tsx` `SegmentedControl` | Pill toggles with `aria-pressed`, styled from the attribute; one weight for both states. `sm` for filter bars (deals), `md` for a page's main switch (44px on touch). `count` shows dimmed after a label |
+| Back to the list | `components/back-link.tsx` `BackLink` | Returns to the exact previous page, filters and scroll intact, when it can. `className` sizes it, e.g. the 44px "My jobs" link in the portal header |
 | Page title row | `components/ui.tsx` `PageHeader` | Title, subtitle, actions slot |
 | Public site header and footer | `components/public/header.tsx` `PublicHeader`, `footer.tsx` `PublicFooter` | |
 | Light and dark switch | `components/theme-toggle.tsx` `ThemeToggle` | App only. `THEME_SCRIPT` sets the theme before paint |
@@ -83,10 +92,14 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 | Job | Use | Notes |
 |---|---|---|
 | Table | `components/ui.tsx` `Table`, `Th`, `Td` | Scrolls inside its own box; sticky header row |
-| Sortable column header | `app/(app)/deals/sort-header.tsx` `SortHeader` | Ascending, descending, clear; state in the URL. Copied in tasks (Duplicates) |
+| Sortable column header | `app/(app)/deals/sort-header.tsx` `SortHeader` | Ascending, descending, clear; state in the URL |
 | Resizable columns | `app/(app)/deals/column-widths.tsx` | Widths remembered per browser |
 | Label and value | `components/ui.tsx` `Field` | `dt` and `dd`; shows "—" when empty |
 | Status chip | `components/ui.tsx` `Badge` | Tones gray, blue, green, amber, red, purple. Each status keeps one tone |
+| Task status chip | `components/status-badge.tsx` `StatusBadge`, `STATUS_TONE` | To do gray, Scheduled blue, In progress purple, Waiting amber, Review red, Done green, Canceled gray struck through. Labels from `STATUS_LABEL` |
+| Person | `components/avatar.tsx` `Avatar` | Initials from the name or the email's local part. Sizes 20, 24, 32. Stone neutrals, never a status tone; `outline` for contractors |
+| Task photos and videos | `components/media-grid.tsx` `MediaGrid` | Square tiles: 3 columns on a phone, 6 of 88px from `sm`, two rows until "Show all". `?v=thumb` when there's a thumbnail; videos show poster, play mark and length. `internal` items get a small lock (staff only). Opens `Lightbox`; `onDelete` passes through |
+| Timeline | `components/activity-timeline.tsx` `ActivityTimeline`, `ActivityItem`, `ActivityDay` | Hairline down the left, one dot per entry: primary for what a person wrote, muted for a recorded change. `ActivityDay` heads a day. The deal page and the task page's Activity |
 | Card | `components/ui.tsx` `Card` with `CardHeader`, `CardTitle`, `CardBody` | |
 | Money figure | `app/(app)/financials/_components/ui.tsx` `Kpi` | Takes cents; red when negative; partial-year label |
 | Horizontal bars | `app/(app)/financials/_components/ui.tsx` `MoneyBars` | Same idiom as `app/(app)/portfolio-capex.tsx` |
@@ -97,7 +110,7 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 
 | Job | Use | Notes |
 |---|---|---|
-| Any icon | `lucide-react` | Installed but not used yet. Its single-color line style matches the house look; use it for new icons |
+| Any icon | `lucide-react` | At its default stroke width, sized with `h-4 w-4` (or the parent's `[&_svg]` size). Single-color line style matches the house look; use it for new icons |
 | Existing icons | Inline `<svg aria-hidden="true">` | 26 hand-drawn across 12 files. Swap for `lucide-react` as you touch them |
 
 ## Formatting helpers
@@ -109,9 +122,12 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 | Money in cents | `app/(app)/financials/_components/ui.tsx` `fmtCents` | Wraps `fmtMoney` |
 | Parse a money input | `lib/money.ts` `parseAmount`, `amountToDecimal` | |
 | Calendar date (due, maturity, renewal) | `lib/dates.ts` `fmtDay` | Never shifts by timezone |
-| Instant (created, updated, synced) | `lib/utils.ts` `fmtDate`, `fmtDateTime` | |
+| Instant (created, updated, synced) | `lib/utils.ts` `fmtDate`, `fmtDateTime` | `fmtDateTime` shows Buffalo time wherever it renders |
 | Relative day and due label | `lib/dates.ts` `relativeDays`, `dueLabel`, `daysUntil`, `isPastDay` | |
-| Initials | `lib/utils.ts` `initials` | |
+| Initials | `lib/utils.ts` `initials` | Falls back to the email's local part: `initials(null, "zack.smith@x.com")` is "ZS" |
+| Date quick picks | `lib/quick-dates.ts` `quickPicks`, `addDaysYmd`, `mondayPick` | Calendar dates only. Monday is the next Monday; a week out on a Monday, 8 days out on a Sunday so it never repeats Tomorrow |
+| Video length | `lib/attachments/media.ts` `fmtDuration` | "0:42", "1:02:03" |
+| Task file URL | `lib/attachments/media.ts` `taskFileUrl` | `/api/files/task/<id>`, with `?v=thumb` or `?v=poster` |
 | File size | `lib/utils.ts` `formatBytes` | |
 | Address | `lib/normalize.ts` `shortAddress`, `normalizeAddress` | |
 
@@ -122,10 +138,9 @@ Use the pick; folding a copy into it is welcome when you're already in that file
 | Job | Copies today | Use |
 |---|---|---|
 | Confirm dialog | `ConfirmDialog`, plus inline copies in `app/(app)/properties/[id]/edit-units.tsx` and `edit-listings.tsx` | `ConfirmDialog` |
-| Segmented control | `app/(app)/deals/filters.tsx`, `app/(app)/tasks/filters.tsx`, and `BasisToggle` in `app/(app)/financials/settings/controls.tsx` (fills with the primary color) | The `deals/filters.tsx` one, extracted to `components/` as `SegmentedControl` |
-| Sortable header | `app/(app)/deals/sort-header.tsx`, `app/(app)/tasks/sort-header.tsx` | The deals one, with the field type as a generic |
-| Inline text edit | `InlineAddressField`, plus hand-rolled edits in `tasks/task-row.tsx`, `tasks/[id]/task-detail.tsx`, `deals/[id]/deal-detail.tsx` (2) and `settings/capex-rules-editor.tsx` (2). All but the two task ones take their keys from `useInlineEditKeys` | `InlineAddressField`, generalized to any text |
-| Outside-click popover | `StatusMultiSelect` and `GlobalSearch` each wire their own `mousedown` listener | A shared popover hook (Known gaps) |
+| Segmented control | `BasisToggle` in `app/(app)/financials/settings/controls.tsx` (fills with the primary color) | `components/segmented-control.tsx` `SegmentedControl` (deals and tasks already use it) |
+| Inline text edit | `InlineAddressField` (the task title uses it now), plus hand-rolled edits in `deals/[id]/deal-detail.tsx` (2) and `settings/capex-rules-editor.tsx` (2), all on `useInlineEditKeys` | `InlineAddressField`, generalized to any text |
+| Outside-click popover | `StatusMultiSelect` and `GlobalSearch` each wire their own `mousedown` listener | `components/popover.tsx` `Popover` |
 | Money formatting | `fmtMoney`, plus `priceDisplay` in `deals/deal-row.tsx` and a raw `toLocaleString` in `(marketing)/rentals/page.tsx` | `fmtMoney` |
 | Age in years | `fmtAge` in `properties/[id]/capex-outlook.tsx`, `building-capex.tsx` and `edit-units.tsx`; `fmtYrs` in `settings/capex-rules-editor.tsx` | Move one into `lib/` |
 | Button | `Button` in 20 files; about 50 raw `<button>`s, many icon or link style | `Button`; add a variant before hand-rolling |
@@ -135,14 +150,13 @@ Use the pick; folding a copy into it is welcome when you're already in that file
 
 Jobs nothing covers yet, and holes in the picks. The first feature that needs one does the Mobbin research, builds it in `src/components/`, and adds a row above.
 
-- **Dialog shell.** Nothing for a dialog with a form. `ConfirmDialog` has no Esc, focus trap, portal or scroll lock; grow it into a `Dialog` shell instead of adding a third inline copy.
-- **Toast.** No toast or saved confirmation; saves only show inline errors.
+- **ConfirmDialog.** Still has no Esc, focus trap, portal or scroll lock. Rebuild it on `Sheet` instead of adding a third inline copy.
 - **Form field layout.** No shared label, helper text and error wrapper.
-- **Tap targets.** The device check warns on every page about controls under 44px tall on touch screens (`h-8` and `h-9` buttons and fields, text links in tables). Raise them in the primitives, not per page.
-- **Wrapped control rows.** The device check warns that rows of controls wrap on `/deals`, `/tasks`, `/login`, `/rentals`, `/residents`, `/residents/moving-in`, `/settings/move-in-form` and `/welcome`. CLAUDE.md says they shouldn't; shorten labels or collapse into a Filters button.
+- **Tap targets.** The primitives are 44px on touch now. Raw `<button>`s and fields outside `ui.tsx` (filter bars at `h-8`, text links in tables) still warn; move them onto the primitives.
+- **Wrapped control rows.** The device check warns that rows of controls wrap on `/deals`, `/login`, `/rentals`, `/residents`, `/residents/moving-in`, `/settings/move-in-form` and `/welcome`. CLAUDE.md says they shouldn't; shorten labels or collapse into a Filters button.
 - **Tooltip on touch.** `Tooltip` opens on hover only, so touch users never see it. Give it a tap path.
-- **Popover hook.** No shared open, outside-click and Esc logic, and neither current popover closes on Esc.
-- **Segmented control, sortable header, inline text edit.** Exist only as feature copies (Duplicates). Extract on the next touch.
+- **Old popovers.** `StatusMultiSelect` and `GlobalSearch` predate `Popover` and don't close on Esc; move them onto it when touched.
+- **Inline text edit.** Exists only as feature copies (Duplicates). Extract on the next touch.
 - **Spot art for payoff moments.** None yet; see Personality in CLAUDE.md.
 - **Public site kit.** Public pages hand-style buttons and fields on fixed hex colors; there's no shared public primitive.
 - **Loading state.** No spinner or skeleton. Pending actions dim or relabel.

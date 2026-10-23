@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BUNDLE_MAX_MS, BUNDLE_QUIET_MS, bundleSendAfter, canSetStatus, notifyAudience, statusEventVisibility, targetDate } from "./rules";
+import {
+  BUNDLE_MAX_MS,
+  BUNDLE_QUIET_MS,
+  bundleSendAfter,
+  canSetStatus,
+  contractorSeesRow,
+  notifyAudience,
+  statusEventVisibility,
+  targetDate,
+  writeAudience,
+} from "./rules";
 
 test("staff can make any status change; nobody can 'change' to the same status", () => {
   assert.equal(canSetStatus("staff", "REVIEW", "DONE"), true);
@@ -29,6 +39,30 @@ test("status events reach contractors only for the states they care about", () =
   assert.equal(statusEventVisibility("WAITING", true), "INTERNAL");
   assert.equal(statusEventVisibility("CANCELED", true), "INTERNAL");
   assert.equal(statusEventVisibility("DONE", false), "INTERNAL");
+});
+
+test("staff and system writes are addressed to the contractor assigned at the time", () => {
+  assert.equal(writeAudience("staff", "zack"), "zack");
+  assert.equal(writeAudience("system", "zack"), "zack");
+  assert.equal(writeAudience("staff", null), null);
+  // A contractor's own row says whose it is; imported history stays open to the assignee (D17).
+  assert.equal(writeAudience("contractor", "zack"), null);
+  assert.equal(writeAudience("asana", "zack"), null);
+});
+
+test("a staff reply to one contractor never reaches the next one on the job", () => {
+  const staff = { imported: false, actorContactId: null };
+  // Written to Zack: Zack sees it, Jose (who got the job next) doesn't.
+  assert.equal(contractorSeesRow({ ...staff, audienceContactId: "zack" }, "zack"), true);
+  assert.equal(contractorSeesRow({ ...staff, audienceContactId: "zack" }, "jose"), false);
+  // Written while no contractor had the job: whoever gets it sees it.
+  assert.equal(contractorSeesRow({ ...staff, audienceContactId: null }, "jose"), true);
+  // Their own rows only, never another contractor's.
+  assert.equal(contractorSeesRow({ imported: false, actorContactId: "jose", audienceContactId: null }, "jose"), true);
+  assert.equal(contractorSeesRow({ imported: false, actorContactId: "zack", audienceContactId: null }, "jose"), false);
+  // Imported Asana history stays visible, whoever wrote it (D17).
+  assert.equal(contractorSeesRow({ imported: true, actorContactId: "zack", audienceContactId: null }, "jose"), true);
+  assert.equal(contractorSeesRow({ imported: true, actorContactId: null, audienceContactId: null }, "jose"), true);
 });
 
 test("targetDate: visit date while Scheduled, otherwise due", () => {

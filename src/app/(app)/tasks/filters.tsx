@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/components/segmented-control";
+import { Input, Select } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
 
 const STATUS_TABS = [
@@ -10,15 +11,23 @@ const STATUS_TABS = [
   { key: "done", label: "Done" },
 ] as const;
 
-type Owner = { value: string; label: string };
+type Option = { value: string; label: string };
 
+const field = "h-8 text-xs";
+
+/**
+ * The All tab's filters: title search, status, assignee (team, contractors
+ * as c:<contactId>, and legacy free-text names), property. State lives in
+ * the URL. On a phone the search sits above a row of controls that shrink
+ * to fit rather than wrap.
+ */
 export function TaskFilters({
   current,
   owners,
   properties,
 }: {
   current: { status: string; owner: string; q: string; property: string };
-  owners: { users: Owner[]; external: Owner[] };
+  owners: { users: Option[]; contacts: Option[]; external: Option[] };
   properties: { id: string; address: string }[];
 }) {
   const router = useRouter();
@@ -29,8 +38,9 @@ export function TaskFilters({
     const isDefault = (key === "status" && value === "open") || !value;
     if (isDefault) next.delete(key);
     else next.set(key, value);
-    if (key === "owner") next.delete("assignee"); // supersedes the legacy shortcut
-    const url = `/tasks?${next.toString()}`;
+    if (key === "owner") next.delete("assignee"); // supersedes the legacy ?assignee=me shortcut
+    const qs = next.toString();
+    const url = qs ? `/tasks/all?${qs}` : "/tasks/all";
     if (replace) router.replace(url);
     else router.push(url);
   }
@@ -45,42 +55,49 @@ export function TaskFilters({
   }, [q, current.q]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Filter by title…"
-        className="h-8 w-64 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none focus:border-primary"
-      />
+    // Phone: search and status on one row, the two pickers on the next. From sm,
+    // all in one row; the search and pickers shrink to fit, so it never scrolls sideways.
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 items-center gap-2 sm:contents">
+        <Input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Filter by title…"
+          aria-label="Filter by title"
+          className={`${field} min-w-0 flex-1 sm:max-w-64`}
+        />
+        <SegmentedControl
+          aria-label="Status"
+          size="md"
+          options={STATUS_TABS}
+          value={STATUS_TABS.some((t) => t.key === current.status) ? (current.status as (typeof STATUS_TABS)[number]["key"]) : "open"}
+          onChange={(k) => set("status", k)}
+          className="sm:ml-auto"
+        />
+      </div>
 
-      <div className="ml-auto flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5">
-          {STATUS_TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => set("status", t.key)}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                current.status === t.key
-                  ? "bg-surface text-foreground shadow-sm"
-                  : "text-muted hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        <select
+      <div className="flex min-w-0 items-center gap-2 sm:contents">
+        <Select
           value={current.owner}
           onChange={(e) => set("owner", e.target.value)}
-          className="h-8 max-w-[180px] rounded-lg border border-border bg-surface px-2 text-xs"
+          aria-label="Assignee"
+          className={`${field} w-auto min-w-0 flex-1 sm:max-w-[180px]`}
         >
-          <option value="">All owners</option>
+          <option value="">All assignees</option>
           <option value="none">Unassigned</option>
           {owners.users.length > 0 && (
             <optgroup label="Team">
               {owners.users.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {owners.contacts.length > 0 && (
+            <optgroup label="Contractors">
+              {owners.contacts.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -96,12 +113,13 @@ export function TaskFilters({
               ))}
             </optgroup>
           )}
-        </select>
+        </Select>
 
-        <select
+        <Select
           value={current.property}
           onChange={(e) => set("property", e.target.value)}
-          className="h-8 max-w-[180px] rounded-lg border border-border bg-surface px-2 text-xs"
+          aria-label="Property"
+          className={`${field} w-auto min-w-0 flex-1 sm:max-w-[180px]`}
         >
           <option value="">All properties</option>
           {properties.map((p) => (
@@ -109,7 +127,7 @@ export function TaskFilters({
               {shortAddress(p.address)}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
   );

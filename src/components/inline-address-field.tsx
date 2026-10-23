@@ -1,30 +1,73 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
+import { inlineEditCommit } from "@/lib/inline-edit";
+import { cn } from "@/lib/utils";
 import { useInlineEditKeys } from "./use-inline-edit-keys";
+
+const supportsFieldSizing = () => typeof CSS !== "undefined" && CSS.supports("field-sizing", "content");
 
 /**
  * Page heading, editable in place: commits on blur / Enter, reverts on Escape,
  * re-syncs when the server value changes. Shared by the deal and property
- * detail pages; `onCommit` is whatever server action applies the change.
+ * detail pages (an address) and the task page (its title); `onCommit` is
+ * whatever server action applies the change. A value shorter than
+ * `minLength` reverts instead of saving. `multiline` lets a long heading wrap
+ * (a textarea that grows with it); Enter still commits, so it stays one line
+ * of text.
  */
 export function InlineAddressField({
   value,
   onCommit,
+  label = "Address",
+  minLength = 1,
+  multiline = false,
+  className,
 }: {
   value: string;
-  onCommit: (address: string) => Promise<unknown> | void;
+  onCommit: (value: string) => Promise<unknown> | void;
+  /** The field's accessible name. */
+  label?: string;
+  minLength?: number;
+  multiline?: boolean;
+  /** Extra classes for the field, e.g. a struck-through closed task. */
+  className?: string;
 }) {
   const [v, setV] = useState(value);
   const [seen, setSeen] = useState(value);
   const [pending, start] = useTransition();
+  const area = useRef<HTMLTextAreaElement>(null);
   if (value !== seen) {
     setSeen(value);
     setV(value);
   }
 
+  // Grow the textarea to its text where field-sizing:content can't. Where it
+  // can, no inline height is set: one would override it and go stale. The
+  // fallback measures again whenever the width changes (a rotated phone, a
+  // narrower window), or the extra lines would be cut off.
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (!el || supportsFieldSizing()) return;
+    const fit = () => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    fit();
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      // Only a width change rewraps the text; the height this sets fires it too.
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [v, multiline]);
+
   function commit() {
-    const trimmed = v.trim();
-    if (!trimmed || trimmed === value) {
+    // Only a real edit saves: focus and blur alone never rewrite the stored value.
+    const trimmed = inlineEditCommit(v, value, minLength);
+    if (trimmed === null) {
       setV(value);
       return;
     }
@@ -34,21 +77,35 @@ export function InlineAddressField({
   }
   const keys = useInlineEditKeys(() => setV(value), commit);
 
+  const props = {
+    "aria-label": label,
+    value: v,
+    disabled: pending,
+    // Enter commits and Esc reverts without saving (see useInlineEditKeys).
+    onBlur: keys.onBlur,
+    onKeyDown: keys.onKeyDown,
+    className: cn(
+      "w-full rounded-md bg-transparent px-2 py-1 pr-6 text-xl font-semibold tracking-tight text-foreground outline-none transition-colors hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 disabled:opacity-40",
+      // field-sizing gets the height right before hydration where it's supported; the effect covers the rest.
+      multiline && "block resize-none overflow-hidden [field-sizing:content]",
+      className,
+    ),
+  };
+
   return (
     <div className="group/addr relative -mx-2">
-      <input
-        aria-label="Address"
-        value={v}
-        disabled={pending}
-        onChange={(e) => setV(e.target.value)}
-        onBlur={keys.onBlur}
-        onKeyDown={keys.onKeyDown}
-        className="w-full rounded-md bg-transparent px-2 py-1 pr-6 text-xl font-semibold tracking-tight text-foreground outline-none transition-colors hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 disabled:opacity-40"
-      />
+      {multiline ? (
+        <textarea ref={area} rows={1} onChange={(e) => setV(e.target.value)} {...props} />
+      ) : (
+        <input onChange={(e) => setV(e.target.value)} {...props} />
+      )}
       <svg
         aria-hidden
         viewBox="0 0 16 16"
-        className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted opacity-0 transition-opacity group-hover/addr:opacity-100"
+        className={cn(
+          "pointer-events-none absolute right-2 h-4 w-4 text-muted opacity-0 transition-opacity group-hover/addr:opacity-100",
+          multiline ? "top-2.5" : "top-1/2 -translate-y-1/2",
+        )}
         fill="none"
         stroke="currentColor"
         strokeWidth="1.3"

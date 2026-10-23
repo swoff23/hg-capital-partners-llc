@@ -7,6 +7,9 @@ import {
   capexForecast,
   isHouseMeterRow,
   propertyUnitCount,
+  reconcileUnits,
+  renamedLabel,
+  withUnitIds,
   type CapexRules,
 } from "./property-types";
 
@@ -151,4 +154,101 @@ test("orphanedEquipmentTypes: only dropped types that some unit still uses", () 
   ]);
   assert.deepEqual(orphanedEquipmentTypes(prev, prev, props), []);
   assert.deepEqual(orphanedEquipmentTypes(prev, next, []), []);
+});
+
+/* ---------------- Unit ids and renames (G2C-001) ---------------- */
+
+const ids = () => {
+  let n = 0;
+  return () => `new${++n}`;
+};
+
+test("units saved before ids existed get placeholders by place, then permanent ids on save", () => {
+  const stored = [{ label: "Upper" }, { id: "u2", label: "Lower" }];
+  const loaded = withUnitIds(stored);
+  assert.deepEqual(loaded.map((u) => u.id), ["unit-at-0", "u2"]);
+  // Saved unchanged: the placeholder becomes a real id, a real id stays, nothing is renamed.
+  const { units, renames } = reconcileUnits(stored, loaded, ids());
+  assert.deepEqual(units.map((u) => u.id), ["new1", "u2"]);
+  assert.deepEqual(renames, []);
+});
+
+test("a renamed unit keeps its id and lists the rename; add and remove don't", () => {
+  const stored = [
+    { id: "a", label: "Rear" },
+    { id: "b", label: "Front" },
+    { id: "c", label: "Attic" },
+  ];
+  const edited = [
+    { id: "a", label: "Unit 3" }, // renamed
+    { id: "c", label: "Attic" }, // kept; "Front" removed
+    { label: "Basement" }, // added
+  ];
+  const { units, renames } = reconcileUnits(stored, edited, ids());
+  assert.deepEqual(units.map((u) => [u.id, u.label]), [["a", "Unit 3"], ["c", "Attic"], ["new1", "Basement"]]);
+  assert.deepEqual(renames, [{ from: "Rear", to: "Unit 3" }]);
+});
+
+test("a rename by placeholder works the first time a legacy list is saved", () => {
+  const stored = [{ label: "Floor 1" }, { label: "Floor 2" }];
+  const edited = withUnitIds(stored).map((u) => (u.label === "Floor 1" ? { ...u, label: "1st Floor" } : u));
+  // Remove the second one too: the first still matches by place.
+  const { units, renames } = reconcileUnits(stored, edited.slice(0, 1), ids());
+  assert.deepEqual(units.map((u) => [u.id, u.label]), [["new1", "1st Floor"]]);
+  assert.deepEqual(renames, [{ from: "Floor 1", to: "1st Floor" }]);
+});
+
+test("ids it never stored, and repeats, are new units; blank or shared labels aren't renames", () => {
+  const stored = [
+    { id: "a", label: "2" },
+    { id: "b", label: "Same" },
+    { id: "c", label: "same" },
+  ];
+  const edited = [
+    { id: "zzz", label: "2B" }, // not one of ours: a new unit, so "2" was removed
+    { id: "a", label: "" }, // label blanked: not a rename
+    { id: "b", label: "Upper" }, // "Same" named two units: ambiguous
+    { id: "b", label: "Copy" }, // a repeated id is a new unit
+  ];
+  const { units, renames } = reconcileUnits(stored, edited, ids());
+  assert.deepEqual(units.map((u) => u.id), ["new1", "a", "b", "new2"]);
+  assert.deepEqual(renames, []);
+});
+
+test("a rename onto a label another unit keeps is no rename, so its jobs don't take the other unit's code", () => {
+  const stored = [
+    { id: "a", label: "Rear" },
+    { id: "b", label: "Front" },
+  ];
+  assert.deepEqual(reconcileUnits(stored, [{ id: "a", label: "Front" }, { id: "b", label: "Front" }], ids()).renames, []);
+  assert.deepEqual(reconcileUnits(stored, [{ id: "a", label: "front" }, { id: "b", label: "Front" }], ids()).renames, [], "case-only match too");
+  // A swap keeps each new label unique, so it still counts.
+  assert.deepEqual(reconcileUnits(stored, [{ id: "a", label: "Front" }, { id: "b", label: "Rear" }], ids()).renames, [
+    { from: "Rear", to: "Front" },
+    { from: "Front", to: "Rear" },
+  ]);
+});
+
+test("rows follow renames by their old label, so a swap swaps", () => {
+  const renames = [
+    { from: "1", to: "2" },
+    { from: "2", to: "1" },
+  ];
+  assert.equal(renamedLabel(renames, "1"), "2");
+  assert.equal(renamedLabel(renames, " 2 "), "1");
+  assert.equal(renamedLabel([{ from: "Rear", to: "Unit 3" }], "rear"), "Unit 3");
+  assert.equal(renamedLabel(renames, "3"), null);
+  assert.equal(renamedLabel(renames, null), null);
+  const { renames: swap } = reconcileUnits(
+    [
+      { id: "a", label: "1" },
+      { id: "b", label: "2" },
+    ],
+    [
+      { id: "a", label: "2" },
+      { id: "b", label: "1" },
+    ],
+    ids(),
+  );
+  assert.deepEqual(swap, renames);
 });

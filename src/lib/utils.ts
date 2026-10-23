@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { HG_TIME_ZONE } from "./dates";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -25,11 +26,13 @@ export function fmtDate(d: Date | string | null | undefined): string {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+/** An instant with its time, in Buffalo time wherever it renders (Vercel runs in UTC). */
 export function fmtDateTime(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString("en-US", {
+    timeZone: HG_TIME_ZONE,
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -38,14 +41,27 @@ export function fmtDateTime(d: Date | string | null | undefined): string {
   });
 }
 
-export function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
+/**
+ * Up to two initials, letters only: "Zack Smith" → "ZS". Anything in
+ * parentheses is a nickname or a company, not part of the name: "Jacob (Jake)
+ * Hoak" → "JH", "Zack (Outlaw Carpentry)" → "Z". A name that is an email
+ * address, as some legacy assignee names are, counts as one. With no name,
+ * the email's local part stands in, split on dots, dashes and underscores:
+ * "zack.smith@x.com" → "ZS". "?" when there's neither.
+ */
+export function initials(name: string | null | undefined, email?: string | null): string {
+  const letters = (s: string, sep: RegExp) =>
+    s
+      .split(sep)
+      .map((w) => w.replace(/[^\p{L}]/gu, ""))
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w.charAt(0).toUpperCase())
+      .join("");
+  const fromEmail = (e: string) => letters(e.split("@")[0].replace(/\+.*$/, ""), /[\s._-]+/);
+  const n = (name ?? "").trim();
+  const fromName = n.includes("@") ? fromEmail(n) : letters(n.replace(/\([^)]*\)?/g, " "), /\s+/);
+  return fromName || fromEmail(email ?? "") || "?";
 }
 
 export function formatBytes(bytes: number): string {

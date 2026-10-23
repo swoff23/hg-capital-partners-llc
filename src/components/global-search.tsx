@@ -42,7 +42,7 @@ export function GlobalSearch() {
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        placeholder="Search addresses, vendors, tasks…"
+        placeholder="Search addresses, contractors, tasks…"
         className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
       />
       {open && results.length > 0 && (

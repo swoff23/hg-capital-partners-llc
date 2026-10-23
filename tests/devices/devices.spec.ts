@@ -4,12 +4,17 @@ import { expect, test, type Page } from "@playwright/test";
 import { KIND_LABEL, SEVERITY, scanPage, type Finding, type FindingKind } from "./checks";
 import { listRoutes, routeUrl } from "./routes";
 import { REPORT_DIR, UPDATE_KNOWN_ISSUES, loadKnownIssues, type DeviceMeta } from "./config";
+import { PORTAL_COOKIE_HTTP } from "../../src/lib/portal/cookie";
 
 const known = loadKnownIssues();
 
 // Mirrors SESSION_COOKIE in src/lib/session.ts, which is server-only and can't
 // be imported here. setup.ts signs the value.
 const SESSION_COOKIE = "hgos_session";
+// The run's server is plain http on localhost, so the portal cookie goes by
+// its non-__Host- name, PORTAL_COOKIE_HTTP. setup.ts seeds both fixtures'
+// sessions.
+const PORTAL_TOKEN_ENV = { portal: "DEVICE_PORTAL_TOKEN", "portal-welcome": "DEVICE_PORTAL_WELCOME_TOKEN" } as const;
 
 // Every width from the responsiveness rule, including both sides of each
 // breakpoint edge (639/640, 767/768, 1023/1024, 1279/1280).
@@ -60,8 +65,11 @@ for (const route of listRoutes()) {
     const findings = new Findings();
     let width = page.viewportSize()!.width;
 
-    if (route.signedIn) {
+    if (route.session === "staff") {
       await page.context().addCookies([{ name: SESSION_COOKIE, value: process.env.DEVICE_SESSION_TOKEN!, url: origin }]);
+    } else if (route.session === "portal" || route.session === "portal-welcome") {
+      const value = process.env[PORTAL_TOKEN_ENV[route.session]]!;
+      await page.context().addCookies([{ name: PORTAL_COOKIE_HTTP, value, url: origin }]);
     }
 
     page.on("pageerror", (err) => findings.add("page-error", "page", err.message.split("\n")[0], width));
@@ -90,8 +98,14 @@ for (const route of listRoutes()) {
       findings.add("page-error", target.url, `HTTP ${res?.status() ?? "no response"}`, width);
     }
     // A signed-in page that lands on /login means the session didn't take.
-    if (route.signedIn && new URL(page.url()).pathname === "/login") {
-      findings.add("page-error", target.url, "Redirected to /login: the device session wasn't accepted", width);
+    const landed = new URL(page.url()).pathname;
+    if (route.session !== "none" && landed === "/login") {
+      const which = route.session === "staff" ? "the device session" : `the ${route.session} fixture's session`;
+      findings.add("page-error", target.url, `Redirected to /login: ${which} wasn't accepted`, width);
+    } else if (route.session.startsWith("portal") && landed !== new URL(target.url, origin).pathname) {
+      // Portal pages redirect only on the account's state (the starting
+      // password rule), so this page wasn't the one checked.
+      findings.add("page-error", target.url, `Redirected to ${landed}: the ${route.session} fixture isn't in the state this page needs`, width);
     }
     await settle(page, 500);
 

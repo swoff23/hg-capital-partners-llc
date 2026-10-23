@@ -82,6 +82,22 @@ export function todayYmdEastern(now: Date = new Date()): Ymd {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/**
+ * The instant a Buffalo calendar day starts, for counting what happened "today"
+ * in a timestamp column (the D30 email cap). Eastern midnight is 04:00 or
+ * 05:00 UTC depending on daylight time; whichever lands on 00:00 that day.
+ */
+export function easternDayStart(v: Ymd): Date {
+  const p = parts(v);
+  if (!p) throw new Error(`Not a date: ${v}`);
+  const clock = new Intl.DateTimeFormat("en-US", { timeZone: HG_TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  for (const h of [4, 5]) {
+    const at = new Date(Date.UTC(p.y, p.m - 1, p.d, h));
+    if (todayYmdEastern(at) === v && clock.format(at) === "00:00") return at;
+  }
+  throw new Error(`No Eastern midnight found for ${v}`);
+}
+
 function epochDays(v: Ymd): number {
   const p = parts(v)!;
   return Date.UTC(p.y, p.m - 1, p.d) / 86_400_000;
@@ -107,10 +123,13 @@ export function isPastDay(v: Date | string | null | undefined, now: Now = new Da
   return d != null && d < 0;
 }
 
-/** "Mar 1, 2026" — never shifts by timezone. "—" for blank/invalid. */
+/**
+ * "Mar 1, 2026", or "Sun, Mar 1, 2026" with `weekday`. Never shifts by
+ * timezone. "—" for blank/invalid.
+ */
 export function fmtDay(
   v: Date | string | null | undefined,
-  opts: { year?: "always" | "auto"; now?: Now } = {},
+  opts: { year?: "always" | "auto"; now?: Now; weekday?: boolean } = {},
 ): string {
   const y = toYmd(v);
   if (!y) return "—";
@@ -118,6 +137,7 @@ export function fmtDay(
   const showYear = opts.year !== "auto" || p.y !== Number(todayOf(opts.now ?? new Date()).slice(0, 4));
   return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", {
     timeZone: "UTC",
+    ...(opts.weekday ? { weekday: "short" } : {}),
     month: "short",
     day: "numeric",
     ...(showYear ? { year: "numeric" } : {}),

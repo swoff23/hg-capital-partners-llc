@@ -3,11 +3,15 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/components/ui";
-import { initials } from "@/lib/utils";
-import { fmtDay, toYmd } from "@/lib/dates";
+import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { propertyStatusTone } from "@/lib/config";
-import { activeTask } from "@/lib/task-scope";
-import { parseBuildingCapex, parseUnits, propertyUnitCount } from "@/lib/property-types";
+import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
+import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
+import { cn } from "@/lib/utils";
+import { targetDate } from "@/lib/tasks/rules";
+import { Avatar } from "@/components/avatar";
+import { StatusBadge } from "@/components/status-badge";
+import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { BackLink } from "@/components/back-link";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
@@ -26,15 +30,18 @@ function d(v: unknown): string | null {
   return v == null ? null : (v as { toString(): string }).toString();
 }
 
-/** Who a task is assigned to: full label + initials, or null if unassigned. */
+/** Who a task is assigned to, for the row's avatar: null if unassigned. */
 function taskAssignee(t: {
   assigneeName: string | null;
+  assigneeContactId: string | null;
   assignee: { name: string | null; email: string } | null;
-}): { label: string; initials: string } | null {
-  const label = t.assignee?.name ?? t.assignee?.email ?? t.assigneeName;
+  assigneeContact: { fullName: string } | null;
+}): { label: string; name: string | null; email: string | null; contractor: boolean } | null {
+  const name = t.assignee ? t.assignee.name : (t.assigneeContact?.fullName ?? t.assigneeName);
+  const email = t.assignee?.email ?? null;
+  const label = name ?? email;
   if (!label) return null;
-  const forInitials = label.includes("@") ? label.split("@")[0].replace(/[._-]+/g, " ") : label;
-  return { label, initials: initials(forInitials) };
+  return { label, name, email, contractor: !!t.assigneeContactId };
 }
 
 export default async function PropertyPage({ params }: PageProps<"/properties/[id]">) {
@@ -44,9 +51,9 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     where: { id },
     include: {
       tasks: {
-        where: activeTask,
+        where: { ...activeTask, ...excludeTemplateTasks },
         orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
-        include: { assignee: { select: { name: true, email: true } } },
+        include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
       },
       attachments: { orderBy: { createdAt: "asc" } },
       sourceDeal: { select: { id: true, address: true } },
@@ -75,6 +82,18 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
   const unitCount = propertyUnitCount(property) ?? 0;
   const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
+
+  // Each task's Target (D7: the visit date while Scheduled, otherwise Due), soonest first, as on Today.
+  // A past Target reads red by Today's rule (isTargetLate: never Waiting or Review); it's
+  // the date this card shows, so it's the date judged.
+  const today = todayYmdEastern();
+  const tasks = property.tasks
+    .map((t) => ({
+      ...t,
+      target: ymd(targetDate(t)),
+      late: isTargetLate({ status: t.status, scheduledFor: ymd(t.scheduledFor), due: ymd(t.dueDate) }, today),
+    }))
+    .sort(byDateThenStatus((t) => t.target));
 
   return (
     <>
@@ -108,7 +127,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <UnitsSection
             propertyId={property.id}
             version={property.updatedAt.toISOString()}
-            initial={units}
+            // Every unit with an id, so the save can tell a rename from a remove and an add.
+            initial={withUnitIds(units)}
             rules={capexRules}
           />
 
@@ -168,16 +188,21 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <Card>
             <CardHeader className="flex items-center justify-between">
               <CardTitle>Tasks</CardTitle>
-              <LinkButton href={`/tasks/new?propertyId=${property.id}`} size="sm">
-                + Task
-              </LinkButton>
+              <div className="flex shrink-0 items-center gap-2">
+                <LinkButton href={`/templates?property=${property.id}`} size="sm">
+                  Apply playbook
+                </LinkButton>
+                <LinkButton href={`/tasks/new?propertyId=${property.id}`} size="sm">
+                  + Task
+                </LinkButton>
+              </div>
             </CardHeader>
             <CardBody className="p-0">
-              {property.tasks.length === 0 ? (
+              {tasks.length === 0 ? (
                 <p className="p-4 text-sm text-muted">No open tasks.</p>
               ) : (
                 <ul className="max-h-[420px] divide-y divide-border overflow-y-auto">
-                  {property.tasks.map((t) => {
+                  {tasks.map((t) => {
                     const who = taskAssignee(t);
                     return (
                       <li key={t.id} className="flex items-center gap-2 px-4 py-2 text-sm">
@@ -187,16 +212,22 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
                         >
                           {t.title}
                         </Link>
+                        {(t.assigneeContactId || t.status !== "OPEN") && (
+                          <StatusBadge status={t.status} className="shrink-0" />
+                        )}
                         {who && (
-                          <span
-                            title={who.label}
-                            className="flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded bg-accent px-1 text-[10px] font-semibold text-primary"
-                          >
-                            {who.initials}
+                          <span title={who.label} className="flex shrink-0">
+                            <Avatar name={who.name} email={who.email} size={20} outline={who.contractor} />
+                            <span className="sr-only">{who.label}</span>
                           </span>
                         )}
-                        <span className="w-24 shrink-0 text-right text-xs text-muted">
-                          {fmtDay(t.dueDate)}
+                        <span
+                          className={cn(
+                            "w-24 shrink-0 text-right text-xs",
+                            t.late ? "text-red-600 dark:text-red-400" : "text-muted",
+                          )}
+                        >
+                          {fmtDay(t.target, { year: "auto", now: today })}
                         </span>
                       </li>
                     );

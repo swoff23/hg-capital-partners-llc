@@ -59,6 +59,12 @@ export function SectionCard({
   );
 }
 
+/**
+ * Touch screens get 44px tap targets; a mouse keeps the compact sizes. A
+ * minimum, so a caller's own height still applies wherever it's taller.
+ */
+const TOUCH_HEIGHT = "pointer-coarse:min-h-11";
+
 /* ---------------- Button ---------------- */
 type BtnProps = React.ComponentProps<"button"> & {
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -76,11 +82,22 @@ export function Button({ className, variant = "primary", size = "md", ...props }
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-50",
         size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-sm",
+        TOUCH_HEIGHT,
         btnStyles[variant],
         className,
       )}
       {...props}
     />
+  );
+}
+
+/** Button looks for an element that isn't a button or a Link: an sms:, tel: or mailto: anchor. */
+export function buttonClass({ variant = "secondary", size = "md" }: { variant?: keyof typeof btnStyles; size?: "sm" | "md" } = {}) {
+  return cn(
+    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors",
+    size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-sm",
+    TOUCH_HEIGHT,
+    btnStyles[variant],
   );
 }
 
@@ -90,17 +107,7 @@ export function LinkButton({
   size = "md",
   ...props
 }: React.ComponentProps<typeof Link> & { variant?: keyof typeof btnStyles; size?: "sm" | "md" }) {
-  return (
-    <Link
-      className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors",
-        size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-sm",
-        btnStyles[variant],
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <Link className={cn(buttonClass({ variant, size }), className)} {...props} />;
 }
 
 /* ---------------- Badge ---------------- */
@@ -130,12 +137,26 @@ export function Badge({
   );
 }
 
+/**
+ * A compact bordered chip that opens a picker (due date, assignee), so a row
+ * of them reads as one set. 28px with a mouse; on touch the hit area reaches
+ * 44px without the chip growing. Give the element `relative`-friendly room:
+ * the hit area is an ::after.
+ */
+export const pickerChip = cn(
+  "relative inline-flex h-7 max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-surface px-2 text-xs font-medium text-foreground",
+  "outline-none transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/30 data-pressed:bg-background",
+  "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2",
+  "disabled:opacity-50 data-disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
+);
+
 /* ---------------- Inputs ---------------- */
 export function Input({ className, ...props }: React.ComponentProps<"input">) {
   return (
     <input
       className={cn(
         "h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20",
+        TOUCH_HEIGHT,
         className,
       )}
       {...props}
@@ -147,6 +168,7 @@ export function Textarea({ className, ...props }: React.ComponentProps<"textarea
     <textarea
       className={cn(
         "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20",
+        TOUCH_HEIGHT,
         className,
       )}
       {...props}
@@ -158,6 +180,7 @@ export function Select({ className, ...props }: React.ComponentProps<"select">) 
     <select
       className={cn(
         "h-9 w-full rounded-lg border border-border bg-surface px-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20",
+        TOUCH_HEIGHT,
         className,
       )}
       {...props}

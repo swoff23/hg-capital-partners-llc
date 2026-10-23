@@ -22,12 +22,14 @@ export default defineConfig({
   webServer: {
     // A production build in its own folder, so it never touches `npm run dev`
     // (.next/dev) or a regular build (.next). Calls next directly to skip
-    // scripts/prebuild.mjs, which applies migrations: this run only reads the
-    // local DB.
+    // scripts/prebuild.mjs, which applies migrations: this run never changes
+    // the local schema (setup.ts writes only the portal fixture's rows).
     command: `npx next build && npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: false,
     timeout: 600_000,
-    env: { NEXT_DIST_DIR: ".next-devices", SESSION_SECRET: process.env.DEVICE_SESSION_SECRET },
+    // PORTAL_ENABLED so the (portal) pages and the reset pages render instead
+    // of 404ing; tests/devices/setup.ts seeds their fixture contractor.
+    env: { NEXT_DIST_DIR: ".next-devices", SESSION_SECRET: process.env.DEVICE_SESSION_SECRET, PORTAL_ENABLED: "1" },
   },
 });

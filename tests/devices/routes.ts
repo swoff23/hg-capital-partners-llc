@@ -6,6 +6,9 @@ const APP_DIR = path.join(__dirname, "../../src/app");
 
 type FindRow = (db: PrismaClient) => Promise<{ id: string } | null>;
 
+/** The "portal" fixture contractor's login (setup.ts), who also gets one job of their own. */
+export const PORTAL_FIXTURE_EMAIL = "device-check@hg.localhost";
+
 // One real row per dynamic segment, keyed "parent/[param]". IDs are cuids from
 // each machine's own import, so tests/devices/setup.ts looks them up in the
 // local DB at the start of every run instead of hard-coding them. A new
@@ -14,19 +17,47 @@ type FindRow = (db: PrismaClient) => Promise<{ id: string } | null>;
 export const SAMPLE_PARAMS: Record<string, FindRow> = {
   "contractors/[id]": (db) => db.contact.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   "deals/[id]": (db) => db.deal.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // The contractor portal's job page: the job setup.ts gives the fixture contractor.
+  "jobs/[id]": (db) =>
+    db.task.findFirst({
+      where: { access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }),
   "properties/[id]": (db) => db.property.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   "tasks/[id]": (db) =>
     db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // Playbooks come from the Asana load (scripts/asana/20-load.ts).
+  "templates/[id]": (db) =>
+    db.taskTemplate.findFirst({ where: { archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } }),
 };
+
+/**
+ * Which session a route loads with: "staff" for (app) pages, "portal" (the
+ * fixture contractor from setup.ts) for (portal) pages. Public pages and
+ * /login load signed out. "portal-welcome" is the second fixture, still on
+ * its starting password, for the one page only it can see.
+ */
+export type RouteSession = "none" | "staff" | "portal" | "portal-welcome";
 
 export interface Route {
   /** The URL pattern, e.g. /deals/[id] */
   pattern: string;
   /** SAMPLE_PARAMS keys for its dynamic segments, in order */
   params: string[];
-  /** Under (app), so it needs a session. Public pages and /login load signed out. */
-  signedIn: boolean;
+  session: RouteSession;
 }
+
+const SESSION_BY_GROUP: Record<string, RouteSession> = { "(app)": "staff", "(portal)": "portal" };
+
+/**
+ * Pages that need a different session from their group's, by URL pattern.
+ * "Choose your own password" sends anyone who already chose one on to /p, so
+ * it's checked as the fixture that hasn't. setup.ts fails on a stale key.
+ */
+export const ROUTE_SESSION_OVERRIDE: Record<string, RouteSession> = {
+  "/p/welcome/password": "portal-welcome",
+};
 
 function findPages(dir: string, segments: string[] = []): string[][] {
   const found: string[][] = [];
@@ -51,7 +82,9 @@ export function listRoutes(): Route[] {
       const params = visible
         .map((seg, i) => (seg.startsWith("[") ? `${visible[i - 1] ?? ""}/${seg}` : null))
         .filter((k): k is string => k !== null);
-      return { pattern: "/" + visible.join("/"), params, signedIn: segments[0] === "(app)" };
+      const pattern = "/" + visible.join("/");
+      const session = ROUTE_SESSION_OVERRIDE[pattern] ?? SESSION_BY_GROUP[segments[0]] ?? "none";
+      return { pattern, params, session };
     })
     .sort((a, b) => a.pattern.localeCompare(b.pattern));
 }

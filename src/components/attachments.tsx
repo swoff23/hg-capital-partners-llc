@@ -1,6 +1,9 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
+import type { ActionResult } from "@/lib/action-result";
+import { MULTIPART_THRESHOLD, UPLOAD_RULES, fileKindForType, filenameForType, uploadContentType } from "@/lib/attachments/content-types";
+import { safeUploadName } from "@/lib/attachments/paths";
 import { cn, formatBytes } from "@/lib/utils";
 
 export type AttachmentItem = { id: string; filename: string; size: number };
@@ -8,7 +11,8 @@ export type AttachmentItem = { id: string; filename: string; size: number };
 /** Which table the rows live in — decides the download route and the upload endpoint. */
 export type AttachmentKind = "task" | "property";
 
-type RecordData = {
+/** Property documents: the browser reports the blob it made, as before. */
+type PropertyRecordData = {
   url: string;
   pathname: string;
   filename: string;
@@ -16,65 +20,134 @@ type RecordData = {
   contentType: string | null;
 };
 
+/** Task files: only where the file went and its name. The server asks Blob for the rest. */
+export type TaskRecordData = { pathname: string; filename: string };
+
+/** A record action either throws or reports failure as an ActionResult. */
+type RecordOutcome = Promise<void | ActionResult<unknown>>;
+
+type AttachmentsProps = {
+  items: AttachmentItem[];
+  /** "tasks/<taskId>" or "properties/<propertyId>". */
+  uploadPathPrefix: string;
+  /** JSON naming the parent row, e.g. {"taskId": "..."}. */
+  clientPayload: string;
+  onDelete: (id: string) => Promise<void>;
+} & (
+  | { kind: "task"; onRecord: (data: TaskRecordData) => RecordOutcome }
+  | { kind: "property"; onRecord: (data: PropertyRecordData) => RecordOutcome }
+);
+
+/** Task uploads at once: a batch finishes in a third of the time without a burst of token requests. */
+const CONCURRENCY = 3;
+const MB = 1024 * 1024;
+
+/** The record step's message when no Blob store is connected (tasks/service.ts, blobAuth). */
+const NO_BLOB_STORE = /not configured|Blob store/i;
+
+/**
+ * @vercel/blob's upload() throws "Failed to retrieve the client token" for
+ * any refusal from /api/blob (session expired, path or type refused, job
+ * closed), so the route's own reason never reaches the browser.
+ */
+const TOKEN_REFUSED = /client token/i;
+
+type Failure = { name: string; reason: string };
+
+const shownReason = (reason: string) => (TOKEN_REFUSED.test(reason) ? "the upload was refused. Reload the page and try again" : reason);
+
+/** One line for a batch, however many files failed. */
+function failureNotice(failures: Failure[]): string {
+  if (failures.some((f) => NO_BLOB_STORE.test(f.reason))) return "Connect a Blob store in Vercel (Storage tab) to turn on file uploads.";
+  const [first, ...rest] = failures;
+  const reason = shownReason(first.reason);
+  const why = reason ? `: ${reason}` : "";
+  if (rest.length === 0) return `Couldn't upload ${first.name}${why}`;
+  if (rest.every((f) => shownReason(f.reason) === reason)) return `Couldn't upload ${first.name} and ${rest.length} more${why}`;
+  return `Couldn't upload ${failures.length} files. ${first.name}${why}`;
+}
+
 /**
  * Drag-or-click file uploader backed by Vercel Blob. The browser uploads
  * straight to Blob (no serverless body limit) as a PRIVATE blob; `onRecord`
  * writes the DB row and `onDelete` removes it. Links open through the
  * session-gated /api/files route, never the raw blob URL. Shared by task
  * attachments and property documents.
+ *
+ * Task files go to tasks/<taskId>/orig/<safe name> with a `fileKind`, so the
+ * token route can hold them to that kind's types and size (and the record
+ * step checks again with head()); too-big or refused types are caught here
+ * first, before any bytes move. Property documents upload as they always have.
  */
-export function Attachments({
-  kind,
-  items,
-  uploadPathPrefix,
-  clientPayload,
-  onRecord,
-  onDelete,
-}: {
-  kind: AttachmentKind;
-  items: AttachmentItem[];
-  uploadPathPrefix: string;
-  clientPayload: string;
-  onRecord: (data: RecordData) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-}) {
+export function Attachments(props: AttachmentsProps) {
+  const { kind, items, uploadPathPrefix, clientPayload, onDelete } = props;
   const [, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState<string[]>([]);
+  const [busy, setBusy] = useState<{ key: string; name: string }[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** Upload and record one file; throws with a message to show. */
+  async function uploadOne(file: File): Promise<void> {
+    if (props.kind === "property") {
+      const blob = await upload(`${uploadPathPrefix}/${file.name}`, file, {
+        access: "private",
+        handleUploadUrl: "/api/blob/property-upload",
+        clientPayload,
+      });
+      const res = await props.onRecord({
+        url: blob.url,
+        pathname: blob.pathname,
+        filename: file.name,
+        size: file.size,
+        contentType: file.type || null,
+      });
+      if (res && !res.ok) throw new Error(res.error);
+      return;
+    }
+
+    const contentType = uploadContentType(file.name, file.type);
+    const fileKind = fileKindForType(contentType);
+    if (!contentType || !fileKind) throw new Error("that type of file can't be attached");
+    const cap = UPLOAD_RULES[fileKind].maxBytes;
+    if (file.size > cap) throw new Error(`it's over the ${Math.round(cap / MB)} MB limit`);
+    // The path's extension agrees with the type, or the token route refuses it.
+    const blob = await upload(`${uploadPathPrefix}/orig/${safeUploadName(filenameForType(file.name, contentType))}`, file, {
+      access: "private",
+      handleUploadUrl: "/api/blob/task-upload",
+      clientPayload: JSON.stringify({ ...(JSON.parse(clientPayload) as object), fileKind }),
+      contentType,
+      multipart: file.size > MULTIPART_THRESHOLD,
+    });
+    const res = await props.onRecord({ pathname: blob.pathname, filename: file.name });
+    if (res && !res.ok) throw new Error(res.error);
+  }
 
   async function uploadFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
-    const names = Array.from(files).map((f) => f.name);
-    setBusy((b) => [...b, ...names]);
+    const batch = Array.from(files).map((file, i) => ({ file, key: `${Date.now()}-${i}-${file.name}` }));
+    setBusy((b) => [...b, ...batch.map(({ key, file }) => ({ key, name: file.name }))]);
 
-    for (const file of Array.from(files)) {
-      try {
-        const blob = await upload(`${uploadPathPrefix}/${file.name}`, file, {
-          access: "private",
-          handleUploadUrl: `/api/blob/${kind}-upload`,
-          clientPayload,
-        });
-        await onRecord({
-          url: blob.url,
-          pathname: blob.pathname,
-          filename: file.name,
-          size: file.size,
-          contentType: file.type || null,
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "";
-        setError(
-          /client token|not configured|Blob store/i.test(msg)
-            ? "Connect a Blob store in Vercel (Storage tab) to turn on file uploads."
-            : `Couldn't upload ${file.name}${msg ? `: ${msg}` : ""}`,
-        );
+    const failures: Failure[] = [];
+    let next = 0;
+    async function worker() {
+      while (next < batch.length) {
+        const { file, key } = batch[next++];
+        try {
+          await uploadOne(file);
+        } catch (e) {
+          // Keep going: one bad file shouldn't stop the rest of the batch.
+          failures.push({ name: file.name, reason: e instanceof Error ? e.message : "" });
+        } finally {
+          setBusy((b) => b.filter((x) => x.key !== key));
+        }
       }
     }
-
-    setBusy((b) => b.filter((n) => !names.includes(n)));
+    // Property documents still go one at a time, as they always have.
+    const workers = props.kind === "property" ? 1 : Math.min(CONCURRENCY, batch.length);
+    await Promise.all(Array.from({ length: workers }, worker));
+    if (failures.length > 0) setError(failureNotice(failures));
   }
 
   return (
@@ -106,9 +179,9 @@ export function Attachments({
         </ul>
       )}
 
-      {busy.map((name) => (
+      {busy.map(({ key, name }) => (
         <div
-          key={name}
+          key={key}
           className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-muted"
         >
           <FileIcon />

@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
 import type { ListingStatus, Property } from "@prisma/client";
@@ -6,9 +7,9 @@ import { prisma } from "@/lib/db";
 import { badNumbersMessage, readAmount, readWholeNumber } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
-import { parseBuildingCapex, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
+import { parseBuildingCapex, parseUnits, reconcileUnits, renamedLabel, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
 import { CONFLICT_MESSAGE } from "@/lib/action-result";
-import { cancelOpenAutoTask, upsertAutoTask } from "@/lib/tasks/service";
+import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
 /**
  * Property domain: every write to Property / PropertyAttachment / Listing
@@ -209,8 +210,18 @@ export async function deletePropertyAttachment(attachmentId: string): Promise<vo
 
 /* ---------------- Units (JSON, whole-array replace) ---------------- */
 
-export async function replaceUnits(id: string, units: PropertyUnit[], expectedVersion: string): Promise<void> {
+/** A rename can touch every task at the property; Prisma's 5s default is tight for that. */
+const TX_LIMITS = { timeout: 20_000, maxWait: 10_000 };
+
+/**
+ * Save the whole units list. Each unit keeps a stable id (reconcileUnits),
+ * so a renamed unit is told apart from a removed one and an added one: the
+ * property's tasks and listings, which name a unit by its label, follow the
+ * rename in the same transaction (G2C-001).
+ */
+export async function replaceUnits(id: string, units: PropertyUnit[], expectedVersion: string, p: TaskPrincipal): Promise<void> {
   const clean: PropertyUnit[] = units.map((u) => ({
+    id: u.id?.trim() || null,
     label: u.label?.trim() || null,
     lockboxCode: u.lockboxCode?.trim() || null,
     utilities: Object.fromEntries(Object.entries(u.utilities ?? {}).map(([k, v]) => [k, v?.trim() || null])),
@@ -223,8 +234,27 @@ export async function replaceUnits(id: string, units: PropertyUnit[], expectedVe
         comment: e.comment?.trim() || null,
       })),
   }));
-  await updateAtVersion(id, expectedVersion, { units: clean as unknown as object });
+  const renamed = await prisma.$transaction(async (tx) => {
+    const current = await tx.property.findUnique({ where: { id }, select: { units: true, updatedAt: true } });
+    if (!current || current.updatedAt.getTime() !== versionDate(expectedVersion).getTime()) throw new Error(CONFLICT_MESSAGE);
+    const { units: stored, renames } = reconcileUnits(parseUnits(current.units), clean, randomUUID);
+    const r = await tx.property.updateMany({ where: { id, updatedAt: current.updatedAt }, data: { units: stored as unknown as object } });
+    if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
+    if (renames.length === 0) return { listings: 0, tasks: [] };
+    // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
+    const listings = await tx.listing.findMany({ where: { propertyId: id }, select: { id: true, unitLabel: true } });
+    let listingCount = 0;
+    for (const l of listings) {
+      const to = renamedLabel(renames, l.unitLabel);
+      if (!to) continue;
+      await tx.listing.update({ where: { id: l.id }, data: { unitLabel: to } });
+      listingCount++;
+    }
+    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p) };
+  }, TX_LIMITS);
   revalidatePath(`/properties/${id}`);
+  if (renamed.listings) revalidatePath("/rentals");
+  revalidateTasks(renamed.tasks);
 }
 
 /* ---------------- Building CapEx (JSON, merge by key) ---------------- */

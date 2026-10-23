@@ -61,6 +61,49 @@ test("QBO_ENVIRONMENT and QBO_HISTORY_START are validated", () => {
   assert.equal(parseEnv({ ...base, QBO_ENVIRONMENT: "production", QBO_HISTORY_START: "2025-07" }).QBO_HISTORY_START, "2025-07");
 });
 
+test("portalEnabled is on only for 1 or true", () => {
+  assert.equal(parseEnv(base).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "" }).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "0" }).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "false" }).portalEnabled, false);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "1" }).portalEnabled, true);
+  assert.equal(parseEnv({ ...base, PORTAL_ENABLED: "TRUE" }).portalEnabled, true);
+  assert.throws(() => parseEnv({ ...base, PORTAL_ENABLED: "yes" }), EnvError);
+});
+
+test("email is null unless both Resend keys are present", () => {
+  assert.equal(parseEnv({ ...base, RESEND_API_KEY: "re_x" }).email, null);
+  assert.equal(parseEnv({ ...base, EMAIL_FROM: "HG <a@b.c>" }).email, null);
+  assert.deepEqual(parseEnv({ ...base, RESEND_API_KEY: "re_x", EMAIL_FROM: "HG <a@b.c>" }).email, {
+    apiKey: "re_x",
+    from: "HG <a@b.c>",
+    replyTo: null,
+  });
+});
+
+test("EMAIL_REPLY_TO is optional, rides along in the email config, and must be an address", () => {
+  const resend = { ...base, RESEND_API_KEY: "re_x", EMAIL_FROM: "HG <jobs@mail.hg.com>" };
+  assert.equal(parseEnv(resend).email?.replyTo, null);
+  assert.equal(parseEnv({ ...resend, EMAIL_REPLY_TO: "" }).email?.replyTo, null);
+  assert.deepEqual(parseEnv({ ...resend, EMAIL_REPLY_TO: "office@hg.com" }).email, {
+    apiKey: "re_x",
+    from: "HG <jobs@mail.hg.com>",
+    replyTo: "office@hg.com",
+  });
+  // Without Resend there's no email config to carry it.
+  assert.equal(parseEnv({ ...base, EMAIL_REPLY_TO: "office@hg.com" }).email, null);
+  assert.throws(() => parseEnv({ ...resend, EMAIL_REPLY_TO: "office" }), EnvError);
+  assert.throws(() => parseEnv({ ...resend, EMAIL_REPLY_TO: "HG <office@hg.com>" }), EnvError);
+  assert.throws(() => parseEnv({ ...resend, EMAIL_REPLY_TO: "office@hg.com, pieter@hg.com" }), EnvError);
+});
+
+test("appUrl defaults to localhost in dev, is required in production, drops a trailing slash", () => {
+  assert.equal(parseEnv({ NODE_ENV: "development" }).appUrl, "http://localhost:3000");
+  assert.throws(() => parseEnv(base).appUrl, EnvError);
+  assert.equal(parseEnv({ ...base, APP_URL: "https://hg.example.com/" }).appUrl, "https://hg.example.com");
+  assert.throws(() => parseEnv({ ...base, APP_URL: "hg.example.com" }), EnvError);
+});
+
 test("NODE_ENV defaults to development", () => {
   const env = parseEnv({});
   assert.equal(env.NODE_ENV, "development");

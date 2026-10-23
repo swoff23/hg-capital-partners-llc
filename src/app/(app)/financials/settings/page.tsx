@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getConnection } from "@/lib/quickbooks/client";
 import { qbo } from "@/lib/quickbooks/config";
@@ -13,6 +14,7 @@ import { BasisToggle, DisconnectButton } from "./controls";
 export const dynamic = "force-dynamic";
 
 export default async function FinancialsSettingsPage() {
+  await requireUser(); // here as well as in the layout, which doesn't gate every render
   const conn = await getConnection();
 
   if (!conn || conn.status === "REVOKED") {

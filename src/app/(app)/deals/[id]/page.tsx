@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { BackLink } from "@/components/back-link";
+import { ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
 import { addDealNote } from "../actions";
 import {
   AddressField,
@@ -103,16 +104,11 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
               Add
             </Button>
           </form>
-          <ol className="relative max-h-[520px] space-y-2.5 overflow-y-auto border-l border-border pl-4">
+          <ActivityTimeline className="max-h-[520px] overflow-y-auto">
             {deal.notes.map((n) => {
               const isChange = n.source === "change";
               return (
-                <li key={n.id} className="relative">
-                  <span
-                    className={`absolute -left-[21px] top-1.5 h-1.5 w-1.5 rounded-full ${
-                      isChange ? "bg-border" : "bg-primary"
-                    }`}
-                  />
+                <ActivityItem key={n.id} marker={isChange ? "muted" : "primary"}>
                   <div className="text-[11px] text-muted">
                     {n.noteDate ? fmtDate(n.noteDate) : fmtDateTime(n.createdAt)}
                     {n.source === "manual" && <span className="ml-1">· note</span>}
@@ -125,11 +121,11 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
                   >
                     {n.body}
                   </p>
-                </li>
+                </ActivityItem>
               );
             })}
             {deal.notes.length === 0 && <li className="text-sm text-muted">No activity yet.</li>}
-          </ol>
+          </ActivityTimeline>
         </CardBody>
       </Card>
     </div>

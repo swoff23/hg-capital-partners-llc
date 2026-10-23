@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { QboBasis } from "@prisma/client";
+import { requireUser } from "@/lib/auth";
 import { Card, CardBody, CardHeader, CardTitle, EmptyState, Table, Td, Th } from "@/components/ui";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
 import { qbo } from "@/lib/quickbooks/config";
@@ -16,6 +17,9 @@ function pct(n: number | null): string {
 export default async function FinancialsOverviewPage({
   searchParams,
 }: PageProps<"/financials">) {
+  // Checked here as well as in the layout: a layout doesn't run for every
+  // render of the pages under it (docs/asana-migration-plan.md §5.1).
+  await requireUser();
   const sp = await searchParams;
   const basis: QboBasis = sp.basis === "accrual" ? "ACCRUAL" : "CASH";
   const data = await getFinancialsOverview(basis);

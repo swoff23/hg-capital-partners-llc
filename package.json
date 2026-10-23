@@ -17,9 +17,13 @@
     "db:dev-passwords": "tsx --env-file=.env scripts/dev-reset-passwords.ts",
     "migrate": "tsx scripts/migrate/run.ts",
     "asana:snapshot": "tsx --env-file=.env scripts/asana/10-snapshot.ts",
+    "asana:load": "tsx --env-file=.env scripts/asana/20-load.ts",
+    "asana:delta": "tsx --env-file=.env scripts/asana/30-delta.ts",
+    "asana:fixture": "tsx --env-file=.env scripts/asana/fixtures/make-fixture.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@internationalized/date": "^3.12.4",
     "@prisma/client": "^6.19.3",
     "@tanstack/react-table": "^9.2.4",
     "@vercel/blob": "^2.8.0",
@@ -29,6 +33,7 @@
     "lucide-react": "^1.37.0",
     "next": "16.3.3",
     "react": "19.2.8",
+    "react-aria-components": "1.21.1",
     "react-dom": "19.2.8",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.5.4"

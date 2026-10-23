@@ -5,7 +5,8 @@ import { useRef } from "react";
  * Keys for a field that saves on blur: Enter saves, Esc cancels. Esc resets the
  * value and blurs, but the blur handler still sees the typed text until the
  * next render, so it used to save exactly what the person was throwing away.
- * The returned onBlur skips the save once after Esc.
+ * The returned onBlur skips the save once after Esc. Enter doesn't insert a
+ * newline or submit a surrounding form; it only commits.
  *
  *   const keys = useInlineEditKeys(() => setV(value), commit);
  *   <input onBlur={keys.onBlur} onKeyDown={keys.onKeyDown} ... />
@@ -13,8 +14,11 @@ import { useRef } from "react";
 export function useInlineEditKeys(onCancel: () => void, onSave: () => void) {
   const cancelled = useRef(false);
   return {
-    onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-      if (e.key === "Enter") e.currentTarget.blur();
+    onKeyDown(e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.currentTarget.blur();
+      }
       if (e.key === "Escape") {
         cancelled.current = true;
         onCancel();

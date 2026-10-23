@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, PageHeader, Table, Td, Th, EmptyState } from "@/components/ui";
+import { cleanTrades, telHref } from "@/lib/contacts";
+import { ContactLink } from "./contact-link";
 
 export default async function ContractorsPage({ searchParams }: PageProps<"/contractors">) {
   await requireUser();
@@ -21,11 +23,11 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
 
   return (
     <>
-      <PageHeader title="Vendors" subtitle={`${contacts.length} contractors & service providers`} />
+      <PageHeader title="Contractors" subtitle={`${contacts.length} contractors & service providers`} />
       <Card className="overflow-hidden">
         {contacts.length === 0 ? (
           <div className="p-4">
-            <EmptyState>No vendors.</EmptyState>
+            <EmptyState>No contractors.</EmptyState>
           </div>
         ) : (
           <Table>
@@ -49,8 +51,10 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                     {!c.active && <Badge tone="gray" className="ml-2">inactive</Badge>}
                   </Td>
                   <Td className="text-xs text-muted">{c.company ?? "—"}</Td>
-                  <Td className="max-w-xs text-xs">{c.trades ?? "—"}</Td>
-                  <Td className="whitespace-nowrap text-xs">{c.phone ?? "—"}</Td>
+                  <Td className="max-w-xs text-xs">{cleanTrades(c.trades) ?? "—"}</Td>
+                  <Td className="whitespace-nowrap text-xs">
+                    <ContactLink href={telHref(c.phoneE164 ?? c.phone)}>{c.phone ?? "—"}</ContactLink>
+                  </Td>
                   <Td className="text-xs">
                     {c.w9Url && <a href={c.w9Url} target="_blank" rel="noreferrer" className="text-primary">W-9</a>}
                     {c.w9Url && c.coiUrl && " · "}

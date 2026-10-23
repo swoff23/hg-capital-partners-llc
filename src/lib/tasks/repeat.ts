@@ -54,6 +54,25 @@ export function nextOccurrence(rule: RepeatRule, from: Ymd): Ymd {
   }
 }
 
+/**
+ * The first due date for a repeat that has none yet: the first day on or after
+ * `today` the rule lands on. A pinned day of the month is this month's (clamped
+ * to short months) unless it has passed, then next month's; any other rule
+ * starts today.
+ */
+export function firstOccurrence(rule: RepeatRule, today: Ymd): Ymd {
+  if (!rule.dayOfMonth) return today;
+  const [y, m, d] = today.split("-").map(Number);
+  const thisMonth = Math.min(rule.dayOfMonth, daysInMonth(y, m - 1));
+  if (thisMonth >= d) return ymd(y, m - 1, thisMonth);
+  return ymd(y, m, Math.min(rule.dayOfMonth, daysInMonth(y + Math.floor(m / 12), m % 12)));
+}
+
+/** A task's due date as written: the one given, or the first occurrence when it repeats and has none. */
+export function repeatDue(rule: RepeatRule | null | undefined, due: Ymd | null | undefined, today: Ymd): Ymd | null {
+  return due || (rule ? firstOccurrence(rule, today) : null);
+}
+
 function ordinal(n: number): string {
   const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${s}`;
@@ -75,4 +94,57 @@ export function describeRepeat(rule: RepeatRule): string {
     case "yearly":
       return n === 1 ? "Yearly" : `Every ${n} years`;
   }
+}
+
+// ---------------------------------------------------------------------------
+// One copy per finish (core.ts createNextRepeat and setStatus)
+// ---------------------------------------------------------------------------
+
+/**
+ * The copy a REPEAT_CREATED event points at, from its stored data. Null for
+ * data that doesn't name one. `madeInAsana` marks Asana's own copy, which the
+ * importer joined to the series (src/lib/asana/import.ts joinSeries).
+ */
+export function repeatCreatedCopy(data: unknown): { next: string; madeInAsana: boolean } | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const d = data as Record<string, unknown>;
+  if (typeof d.next !== "string" || !d.next) return null;
+  return { next: d.next, madeInAsana: d.madeInAsana === true };
+}
+
+/** What a repeat copy carries, read just before reopening the task whose finish made it. */
+export interface RepeatCopyTrace {
+  status: string;
+  appEditedAt: Date | null;
+  /** Set when the row mirrors an Asana task: deleting it here wouldn't delete it there. */
+  asanaId: string | null;
+  /** Every TaskEvent on the copy, deleted ones included. */
+  eventKinds: readonly string[];
+  /** TaskAttachment rows, deleted ones included. */
+  attachments: number;
+  checkedItems: number;
+  readStates: number;
+  /** Its NotificationOutbox rows. */
+  emails: readonly { sentAt: Date | null; attempts: number }[];
+}
+
+/**
+ * True when nobody has touched the copy since finishing its task made it, so
+ * reopening that task can take it back and leave no trace: still To do, never
+ * edited here, nothing on its timeline but its own CREATED line, no files, no
+ * checked items, never opened in the portal, and no email that went out or
+ * that a send run has already taken (it may be on its way).
+ */
+export function isUntouchedCopy(c: RepeatCopyTrace): boolean {
+  return (
+    c.status === "OPEN" &&
+    c.appEditedAt === null &&
+    c.asanaId === null &&
+    c.eventKinds.length === 1 &&
+    c.eventKinds[0] === "CREATED" &&
+    c.attachments === 0 &&
+    c.checkedItems === 0 &&
+    c.readStates === 0 &&
+    c.emails.every((e) => e.sentAt === null && e.attempts === 0)
+  );
 }

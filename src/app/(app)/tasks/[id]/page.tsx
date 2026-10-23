@@ -1,107 +1,244 @@
 import { notFound } from "next/navigation";
+import type { TaskStatus } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
-import { BackLink } from "@/components/back-link";
-import { toYmd } from "@/lib/dates";
-import {
-  AssigneeControl,
-  AttachmentsSection,
-  CompleteButton,
-  DescriptionField,
-  DueDateControl,
-  PropertyControl,
-  TitleField,
-} from "./task-detail";
+import type { MediaItem } from "@/components/media-grid";
+import { taskFileUrl } from "@/lib/attachments/media";
+import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
+import { firstName } from "@/lib/names";
+import { shortAddress } from "@/lib/normalize";
+import { parseUnits } from "@/lib/property-types";
+import { buildActivity, dayLabel, easternDay, fmtAgo, type ActivityEvent } from "@/lib/tasks/activity";
+import { assigneeOptions } from "@/lib/tasks/assignee-options";
+import { lockboxState } from "@/lib/tasks/lockbox";
+import { parseRepeatRule } from "@/lib/tasks/repeat";
+import { OVERDUE_ELIGIBLE, isActiveStatus } from "@/lib/task-scope";
+import type { ActivityRow } from "./activity";
+import type { FileLink } from "./files-list";
+import { TaskPageView } from "./view";
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-[2.75rem] items-center gap-4 border-b border-border/60 last:border-0">
-      <dt className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted">
-        {label}
-      </dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
-    </div>
-  );
-}
-
+/**
+ * The staff task page: loads the task and shapes it for TaskPageView
+ * (./view.tsx), which lays it out. Lockbox codes and password hashes never
+ * reach the client; only unit labels and a lockbox state do.
+ */
 export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
-  const [task, users, properties] = await Promise.all([
-    prisma.task.findUnique({
-      where: { id },
-      include: {
-        assignee: { select: { name: true, email: true } },
-        attachments: { orderBy: { createdAt: "asc" } },
+
+  const task = await prisma.task.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      dueDate: true,
+      scheduledFor: true,
+      waitingOn: true,
+      unitLabel: true,
+      repeatRule: true,
+      createdAt: true,
+      propertyId: true,
+      assigneeUserId: true,
+      assigneeContactId: true,
+      assigneeName: true,
+      createdBy: { select: { name: true, email: true } },
+      assigneeContact: { select: { id: true, fullName: true } },
+      checklist: { orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { id: true, title: true, done: true } },
+      attachments: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          kind: true,
+          filename: true,
+          size: true,
+          linkUrl: true,
+          visibility: true,
+          thumbPathname: true,
+          posterPathname: true,
+          durationSec: true,
+          eventId: true,
+          asanaGid: true,
+          createdAt: true,
+          uploadedByUserId: true,
+          uploadedByContactId: true,
+          uploadedByUser: { select: { name: true, email: true } },
+          uploadedByContact: { select: { fullName: true } },
+        },
       },
-    }),
-    prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
-    prisma.property.findMany({ select: { id: true, address: true }, orderBy: { address: "asc" } }),
-  ]);
+      events: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          kind: true,
+          visibility: true,
+          actorLabel: true,
+          actorUserId: true,
+          actorContactId: true,
+          body: true,
+          data: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
   if (!task) notFound();
 
-  const done = task.status === "DONE";
-  const assigneeLabel =
-    task.assignee?.name ?? task.assignee?.email ?? task.assigneeName ?? null;
+  const [{ users, contractors }, staff, properties] = await Promise.all([
+    assigneeOptions([task.assigneeContactId]),
+    // Who can sign in as staff: the people an Internal note is for.
+    prisma.user.findMany({ where: { passwordHash: { not: null } }, orderBy: { name: "asc" }, select: { name: true, email: true } }),
+    prisma.property.findMany({ orderBy: { address: "asc" }, select: { id: true, address: true, units: true } }),
+  ]);
+
+  const now = new Date();
+  const today = todayYmdEastern(now);
+  const active = isActiveStatus(task.status);
+  const due = toYmd(task.dueDate);
+  const overdue = (OVERDUE_ELIGIBLE as readonly TaskStatus[]).includes(task.status) && (daysUntil(due, today) ?? 0) < 0;
+  const contractor = task.assigneeContact;
+  const contractorFirst = contractor ? firstName(contractor.fullName) || contractor.fullName : null;
+  const property = properties.find((p) => p.id === task.propertyId) ?? null;
+
+  // Unit labels only: lockbox codes never leave the server (D21).
+  const propertyOptions = properties.map((p) => ({
+    id: p.id,
+    label: shortAddress(p.address),
+    units: [...new Set(parseUnits(p.units).map((u) => u.label?.trim()).filter((l): l is string => !!l))],
+  }));
+  const lockbox = (() => {
+    if (!contractorFirst || !property || !active) return null;
+    const state = lockboxState(parseUnits(property.units), task.unitLabel);
+    return state === "none" ? null : { state, contractor: contractorFirst };
+  })();
+
+  const userName = (u: { name: string | null; email: string }) => u.name || u.email;
+  const staffFirstNames = staff.map((u) => firstName(userName(u)));
+  const staffNames = staffFirstNames.length ? staffFirstNames.join(" and ") : "staff";
+
+  /* ---------------- Files ---------------- */
+
+  type Att = (typeof task.attachments)[number];
+  const uploaderOf = (a: Att) => (a.uploadedByUser ? userName(a.uploadedByUser) : (a.uploadedByContact?.fullName ?? null));
+  const asMedia = (a: Att): MediaItem => ({
+    id: a.id,
+    kind: a.kind as "IMAGE" | "VIDEO",
+    filename: a.filename,
+    hasThumb: !!a.thumbPathname,
+    hasPoster: !!a.posterPathname,
+    durationSec: a.durationSec,
+    uploadedBy: uploaderOf(a),
+    createdAt: a.createdAt,
+    internal: a.visibility === "INTERNAL",
+  });
+  const asFile = (a: Att): FileLink | null => {
+    if (a.kind === "LINK") return a.linkUrl ? { id: a.id, kind: "LINK", filename: a.filename, href: a.linkUrl, size: null, internal: a.visibility === "INTERNAL" } : null;
+    return { id: a.id, kind: "FILE", filename: a.filename, href: taskFileUrl(a.id), size: a.size, internal: a.visibility === "INTERNAL" };
+  };
+  const isMedia = (a: Att) => a.kind === "IMAGE" || a.kind === "VIDEO";
+  // A staff upload still waiting in someone's composer: not on any comment
+  // yet, and Internal until Send. It shows only in that person's composer,
+  // so a reload or another visit picks it back up instead of orphaning it.
+  const isDraft = (a: Att) => a.eventId === null && a.asanaGid === null && a.uploadedByUserId !== null;
+  const posted = task.attachments.filter((a) => !isDraft(a));
+  const drafts = task.attachments.filter((a) => isDraft(a) && a.uploadedByUserId === user.id).map((a) => ({ id: a.id, filename: a.filename }));
+  const media = posted.filter(isMedia).map(asMedia);
+  const files = posted.filter((a) => !isMedia(a)).map(asFile).filter((f): f is FileLink => !!f);
+  const byEvent = new Map<string, Att[]>();
+  for (const a of task.attachments) if (a.eventId) byEvent.set(a.eventId, [...(byEvent.get(a.eventId) ?? []), a]);
+
+  /* ---------------- Activity ---------------- */
+
+  const names = {
+    users: Object.fromEntries(users.map((u) => [u.id, userName(u)])),
+    contacts: Object.fromEntries(contractors.map((c) => [c.id, c.name])),
+    properties: Object.fromEntries(properties.map((p) => [p.id, shortAddress(p.address)])),
+  };
+  const events: ActivityEvent[] = task.events;
+  const rows: ActivityRow[] = buildActivity(events, names, today).map((entry): ActivityRow => {
+    const day = easternDay(entry.at);
+    const ago = fmtAgo(entry.at, now);
+    if (entry.type === "due-run") return { type: "due-run", id: entry.id, day, ago, text: entry.text };
+    const atts = byEvent.get(entry.event.id) ?? [];
+    const own = {
+      media: atts.filter(isMedia).map(asMedia),
+      files: atts.filter((a) => !isMedia(a)).map(asFile).filter((f): f is FileLink => !!f),
+    };
+    if (entry.type === "line") return { type: "line", id: entry.id, day, ago, text: entry.text, href: entry.href ?? null, ...own };
+    const e = entry.event;
+    const data = (e.data ?? {}) as { fromChecklistItem?: { title?: string } };
+    return {
+      type: "comment",
+      id: e.id,
+      day,
+      ago,
+      author: e.actorLabel,
+      isContractor: !!e.actorContactId,
+      internal: e.visibility === "INTERNAL",
+      onItem: data.fromChecklistItem?.title ?? null,
+      body: e.body,
+      ...own,
+    };
+  });
+  const dayLabels = Object.fromEntries([...new Set(rows.map((r) => r.day))].map((d) => [d, dayLabel(d, today)]));
+
+  /* ---------------- Review ---------------- */
+
+  const review = (() => {
+    if (task.status !== "REVIEW") return null;
+    const marked = [...task.events].reverse().find((e) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "REVIEW");
+    const fullName = marked?.actorLabel ?? contractor?.fullName ?? "Someone";
+    const contactId = marked?.actorContactId ?? (marked ? null : (contractor?.id ?? null));
+    const photos = contactId ? task.attachments.filter((a) => isMedia(a) && a.uploadedByContactId === contactId).length : 0;
+    return { fullName, name: firstName(fullName) || fullName, isContractor: !!contactId, photos };
+  })();
+
+  const createdBy = task.createdBy ? firstName(userName(task.createdBy)) || userName(task.createdBy) : null;
+  const created = [createdBy, fmtDay(easternDay(task.createdAt), { year: "auto", now: today })].filter(Boolean).join(" \u00b7 ");
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-3">
-        <BackLink fallback="/tasks" label="Tasks" />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CompleteButton id={task.id} done={done} />
-        </CardHeader>
-
-        <CardBody className="space-y-4">
-          <TitleField id={task.id} value={task.title} done={done} />
-
-          <dl className="rounded-lg border border-border px-3">
-            <Row label="Assignee">
-              <AssigneeControl
-                id={task.id}
-                value={task.assigneeUserId}
-                label={assigneeLabel}
-                users={users}
-              />
-            </Row>
-            <Row label="Due date">
-              <DueDateControl
-                id={task.id}
-                value={toYmd(task.dueDate)}
-              />
-            </Row>
-            <Row label="Project">
-              <PropertyControl id={task.id} value={task.propertyId} properties={properties} />
-            </Row>
-          </dl>
-        </CardBody>
-      </Card>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>Description</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <DescriptionField id={task.id} value={task.description} />
-        </CardBody>
-      </Card>
-
-      <Card className="mt-4">
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle>Attachments</CardTitle>
-          {task.attachments.length > 0 && (
-            <span className="text-xs text-muted">{task.attachments.length}</span>
-          )}
-        </CardHeader>
-        <CardBody>
-          <AttachmentsSection taskId={task.id} attachments={task.attachments} />
-        </CardBody>
-      </Card>
-    </div>
+    <TaskPageView
+      task={{
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        waitingOn: task.waitingOn,
+        legacyAssignee: !task.assigneeUserId && !task.assigneeContactId ? task.assigneeName : null,
+      }}
+      today={today}
+      active={active}
+      overdue={overdue}
+      values={{
+        assignee: task.assigneeUserId
+          ? { userId: task.assigneeUserId }
+          : task.assigneeContactId
+            ? { contactId: task.assigneeContactId }
+            : null,
+        dueDate: due,
+        scheduledFor: toYmd(task.scheduledFor),
+        propertyId: task.propertyId,
+        unitLabel: task.unitLabel,
+        repeatRule: parseRepeatRule(task.repeatRule),
+      }}
+      users={users}
+      contractors={contractors}
+      properties={propertyOptions}
+      lockbox={lockbox}
+      created={created}
+      contractorFirst={contractorFirst}
+      staffNames={staffNames}
+      review={review}
+      checklist={task.checklist}
+      media={media}
+      files={files}
+      rows={rows}
+      dayLabels={dayLabels}
+      drafts={drafts}
+    />
   );
 }
 
