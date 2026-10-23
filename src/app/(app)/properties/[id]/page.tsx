@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton, TextLink } from "@/components/ui";
 import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
-import { propertyStatusTone } from "@/lib/config";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
@@ -106,7 +105,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             (property.status === "Refinanced" ? (
               <span className="text-sm text-muted">{property.status}</span>
             ) : (
-              <Badge tone={propertyStatusTone(property.status)}>{property.status}</Badge>
+              <Badge>{property.status}</Badge>
             ))}
           {unitCount > 0 && <span className="text-sm text-muted">{unitCount} units</span>}
         </div>
@@ -143,7 +142,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           />
         </div>
 
-        <div className="min-w-0 space-y-4">
+        {/* Sections sit 32px apart, 24 on touch (brand guidelines, section 5). */}
+        <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
           <PropertyDetailsSection
             property={{
               id: property.id,

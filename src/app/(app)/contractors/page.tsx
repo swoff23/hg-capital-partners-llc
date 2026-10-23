@@ -24,7 +24,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
   return (
     <>
       <PageHeader title="Contractors" subtitle={`${contacts.length} contractor${contacts.length === 1 ? "" : "s"}`} />
-      <Card className="overflow-hidden">
+      <Card className="overflow-clip">
         {contacts.length === 0 ? (
           <div className="p-4">
             <EmptyState>No contractors.</EmptyState>
@@ -47,8 +47,8 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                     <Link href={`/contractors/${c.id}`} className="font-medium hover:underline">
                       {c.fullName}
                     </Link>
-                    {c.tenantFixes && <Badge tone="green" className="ml-2">tenant fixes</Badge>}
-                    {!c.active && <Badge tone="gray" className="ml-2">inactive</Badge>}
+                    {c.tenantFixes && <Badge className="ml-2">tenant fixes</Badge>}
+                    {!c.active && <Badge tone="neutral" className="ml-2">inactive</Badge>}
                   </Td>
                   <Td className="text-xs text-muted">{c.company ?? "—"}</Td>
                   <Td className="max-w-xs text-xs">{cleanTrades(c.trades) ?? "—"}</Td>

@@ -68,7 +68,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold tracking-tight">{c.fullName}</h1>
           {c.company && <span className="text-sm text-muted">{c.company}</span>}
-          {c.tenantFixes && <Badge tone="green">tenant fixes</Badge>}
+          {c.tenantFixes && <Badge>tenant fixes</Badge>}
         </div>
       </div>
 

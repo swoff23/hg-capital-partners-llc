@@ -1,8 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import { InlineAddressField } from "@/components/inline-address-field";
+import { badgeToneClass } from "@/components/ui";
 import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
-import { DEAL_STATUSES, DEAL_PASS_REASONS, dealStatusTone, toneClass } from "@/lib/config";
+import { DEAL_STATUSES, DEAL_PASS_REASONS, dealStatusTone } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { patchDeal } from "../actions";
 
@@ -52,8 +53,9 @@ export function StatusControl({ id, status }: { id: string; status: string }) {
         disabled={pending}
         onChange={(e) => start(() => patchDeal(id, { status: e.target.value }))}
         className={cn(
-          "max-w-full appearance-none rounded-md py-1 pl-2.5 pr-7 text-sm font-medium outline-none ring-1 ring-inset transition-opacity",
-          toneClass(dealStatusTone(status)),
+          // The field edge, so the stage reads as a control on its tone ground.
+          "max-w-full appearance-none rounded-sm py-1 pl-2.5 pr-7 text-sm font-medium ring-1 ring-inset ring-line-control transition-opacity",
+          badgeToneClass(dealStatusTone(status)),
           pending && "opacity-60",
         )}
       >

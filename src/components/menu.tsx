@@ -1,5 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
+import { Check } from "lucide-react";
 import {
   Menu as AriaMenu,
   MenuItem as AriaMenuItem,
@@ -44,6 +45,7 @@ export function Menu<T extends object>({
 export function MenuItem({
   variant = "default",
   icon,
+  checked,
   className,
   children,
   ...props
@@ -51,6 +53,11 @@ export function MenuItem({
   variant?: "default" | "destructive";
   /** A lucide icon element, sized by the item. */
   icon?: ReactNode;
+  /**
+   * Set on every item of a pick-one menu: the chosen one carries a Check at
+   * its trailing edge, so the pick never rests on the highlight fill.
+   */
+  checked?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -58,22 +65,29 @@ export function MenuItem({
     <AriaMenuItem
       textValue={typeof children === "string" ? children : undefined}
       className={cn(
-        "flex h-8 cursor-default select-none items-center gap-2 whitespace-nowrap rounded-md px-2 text-sm outline-none pointer-coarse:h-11",
-        "[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
-        variant === "destructive"
-          ? "text-red-600 data-focused:bg-red-500/10 dark:text-red-400 [&_svg]:text-current"
-          : "text-foreground data-focused:bg-fill-2 [&_svg]:text-muted",
+        "flex h-8 cursor-default select-none items-center gap-2 whitespace-nowrap rounded-sm px-2 text-body outline-none pointer-coarse:h-11",
+        variant === "destructive" ? "text-danger data-focused:bg-danger-tint" : "text-fg-1 data-focused:bg-fill-2",
         "data-disabled:opacity-50",
         className,
       )}
       {...props}
     >
-      {icon}
+      {icon && (
+        <span
+          aria-hidden="true"
+          className={cn("flex shrink-0 [&_svg]:h-4 [&_svg]:w-4", variant === "destructive" ? "text-current" : "text-fg-3")}
+        >
+          {icon}
+        </span>
+      )}
       {children}
+      {checked !== undefined && (
+        <Check aria-hidden="true" className={cn("ml-auto h-4 w-4 shrink-0 text-fg-1", !checked && "invisible")} />
+      )}
     </AriaMenuItem>
   );
 }
 
 export function MenuSeparator() {
-  return <Separator className="-mx-1 my-1 border-t border-border" />;
+  return <Separator className="-mx-1 my-1 border-t border-line" />;
 }

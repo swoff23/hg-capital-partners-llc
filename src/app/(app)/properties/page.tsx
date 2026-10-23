@@ -3,7 +3,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, LinkButton, PageHeader, Table, Td, Th, EmptyState } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
-import { propertyStatusTone } from "@/lib/config";
 import { activeTask } from "@/lib/task-scope";
 import { propertyUnitCount } from "@/lib/property-types";
 
@@ -43,7 +42,7 @@ export default async function PropertiesPage() {
           </LinkButton>
         }
       />
-      <Card className="overflow-hidden">
+      <Card className="overflow-clip">
         {properties.length === 0 ? (
           <div className="p-4">
             <EmptyState>No properties.</EmptyState>
@@ -74,7 +73,7 @@ export default async function PropertiesPage() {
                     {p.status === "Refinanced" ? (
                       p.status
                     ) : p.status ? (
-                      <Badge tone={propertyStatusTone(p.status)}>{p.status}</Badge>
+                      <Badge>{p.status}</Badge>
                     ) : (
                       "—"
                     )}

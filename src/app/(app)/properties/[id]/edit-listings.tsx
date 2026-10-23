@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge, Button, EmptyState, Select } from "@/components/ui";
 import { updatePropertyListings } from "../actions";
 import { callAction } from "@/lib/action-result";
@@ -23,11 +24,7 @@ export type EditableListing = {
 const inp =
   "w-full rounded border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary";
 
-const STATUS_TONE: Record<EditableListing["status"], "green" | "gray" | "amber"> = {
-  AVAILABLE: "green",
-  LEASED: "gray",
-  HIDDEN: "amber",
-};
+// A listing's status is a label, not a state, so its badge stays neutral.
 const STATUS_LABEL: Record<EditableListing["status"], string> = {
   AVAILABLE: "Available",
   LEASED: "Leased",
@@ -195,21 +192,12 @@ export function ListingsSection({
       {error && <p role="alert" className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
       {confirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setConfirmOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="w-full max-w-sm rounded-xl border border-border bg-raised p-5 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 className="text-sm font-semibold">Discard unsaved changes?</h4>
-            <p className="mt-1 text-xs text-muted">
-              You have unsaved changes to Rentals. Save them, or discard and exit.
-            </p>
-            <div className="mt-4 flex items-center justify-end gap-2">
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          body="You have unsaved changes to Rentals. Save them, or discard and exit."
+          onClose={() => setConfirmOpen(false)}
+          actions={
+            <>
               <Button size="sm" variant="secondary" onClick={() => setConfirmOpen(false)}>
                 Keep editing
               </Button>
@@ -224,9 +212,9 @@ export function ListingsSection({
               >
                 {pending ? "Saving…" : uploadingCount > 0 ? "Uploading…" : "Save changes"}
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
       )}
     </div>
   );
@@ -247,7 +235,7 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">{l.unitLabel || "Unlabeled unit"}</span>
-              <Badge tone={STATUS_TONE[l.status]}>{STATUS_LABEL[l.status]}</Badge>
+              <Badge>{STATUS_LABEL[l.status]}</Badge>
               {l.photos.length > 1 && (
                 <span className="text-xs text-muted">{l.photos.length} photos</span>
               )}

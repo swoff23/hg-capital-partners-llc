@@ -172,8 +172,8 @@ export function UnitsSection({
               <Button size="sm" variant="secondary" onClick={() => setRemoving(null)}>
                 Keep it
               </Button>
-              <Button size="sm" variant="danger" onClick={confirmRemove}>
-                Remove
+              <Button size="sm" variant="destructive" onClick={confirmRemove}>
+                Remove unit
               </Button>
             </>
           }
@@ -181,21 +181,12 @@ export function UnitsSection({
       )}
 
       {confirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setConfirmOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="w-full max-w-sm rounded-xl border border-border bg-raised p-5 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 className="text-sm font-semibold">Discard unsaved changes?</h4>
-            <p className="mt-1 text-xs text-muted">
-              You have unsaved changes to units &amp; access. Save them, or discard and exit.
-            </p>
-            <div className="mt-4 flex items-center justify-end gap-2">
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          body={<>You have unsaved changes to units &amp; access. Save them, or discard and exit.</>}
+          onClose={() => setConfirmOpen(false)}
+          actions={
+            <>
               <Button size="sm" variant="secondary" onClick={() => setConfirmOpen(false)}>
                 Keep editing
               </Button>
@@ -205,9 +196,9 @@ export function UnitsSection({
               <Button size="sm" onClick={save} disabled={pending}>
                 {pending ? "Saving…" : "Save changes"}
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
       )}
     </div>
   );
@@ -317,11 +308,11 @@ function ReadUnits({ units, rules }: { units: PropertyUnit[]; rules: CapexRules 
                           <td className="text-muted">{e.type}</td>
                           <td className="font-medium">{e.model || "—"}</td>
                           <td className="min-w-[160px] text-muted">{e.comment || "—"}</td>
-                          <td className="font-medium">{e.installYear || "—"}</td>
-                          <td className="font-medium">{fmtAge(equipmentAge(e.installYear))}</td>
+                          <td className="num font-medium">{e.installYear || "—"}</td>
+                          <td className="num font-medium">{fmtAge(equipmentAge(e.installYear))}</td>
                           <td>
                             {status === "Replace" ? (
-                              <Badge tone="red">Replace</Badge>
+                              <Badge tone="danger">Replace</Badge>
                             ) : status ? (
                               <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>
                                 {status}
@@ -474,7 +465,7 @@ function EditUnitCard({
                   </span>
                   <span className="text-xs">
                     {status === "Replace" ? (
-                      <Badge tone="red">Replace</Badge>
+                      <Badge tone="danger">Replace</Badge>
                     ) : status ? (
                       <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>
                         {status}

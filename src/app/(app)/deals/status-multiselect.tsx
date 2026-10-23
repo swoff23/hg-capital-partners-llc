@@ -2,7 +2,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button as AriaButton } from "react-aria-components";
 import { Popover, PopoverTrigger } from "@/components/popover";
-import { DEAL_STATUSES, dealStatusTone, toneClass } from "@/lib/config";
+import { badgeToneClass } from "@/components/ui";
+import { DEAL_STATUSES, dealStatusTone } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 /**
@@ -62,8 +63,8 @@ export function StatusMultiSelect({ selected }: { selected: string[] }) {
             />
             <span
               className={cn(
-                "truncate rounded px-1.5 py-0.5 ring-1 ring-inset",
-                toneClass(dealStatusTone(s)),
+                "truncate rounded-sm px-1.5 py-0.5",
+                badgeToneClass(dealStatusTone(s)),
               )}
             >
               {s}

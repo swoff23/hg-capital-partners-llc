@@ -65,69 +65,67 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
           </CardBody>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Property</Th>
-                  {roll.months.map((m) => (
-                    <Th key={m} className="text-right">
-                      {m.slice(2)}
-                    </Th>
-                  ))}
-                  <Th className="text-right">Total</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {roll.rows.map((r) => (
-                  <tr key={r.propertyId} className="hover:bg-background">
-                    <Td>
-                      <Link
-                        href={`/properties/${r.propertyId}`}
-                        className="font-medium hover:underline"
-                      >
-                        {r.address}
-                      </Link>
-                      <PartialLabel months={r.monthsOfData} />
-                      {(r.subsidyCents > 0 || r.ownerFundedCents > 0) && (
-                        <div className="text-[11px] text-muted">
-                          {r.subsidyCents > 0 && <>voucher {fmtCents(r.subsidyCents)}</>}
-                          {r.subsidyCents > 0 && r.ownerFundedCents > 0 && " · "}
-                          {r.ownerFundedCents > 0 && (
-                            <span className="text-amber-700 dark:text-amber-500">
-                              owner-funded {fmtCents(r.ownerFundedCents)} (excl.)
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </Td>
-                    {roll.months.map((m) => (
-                      <Td key={m} className="text-right tabular-nums">
-                        {r.byMonth[m] ? fmtCents(r.byMonth[m]) : <span className="text-muted">—</span>}
-                      </Td>
-                    ))}
-                    <Td className="text-right font-medium tabular-nums">{fmtCents(r.totalCents)}</Td>
-                  </tr>
+        <Card className="overflow-clip">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Property</Th>
+                {roll.months.map((m) => (
+                  <Th key={m} numeric>
+                    {m.slice(2)}
+                  </Th>
                 ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-border font-semibold">
-                  <Td>Portfolio</Td>
-                  {roll.months.map((m) => (
-                    <Td key={m} className="text-right tabular-nums">
-                      {fmtCents(roll.portfolioByMonth[m] ?? 0)}
-                    </Td>
-                  ))}
-                  <Td className="text-right tabular-nums">
-                    {fmtCents(
-                      Object.values(roll.portfolioByMonth).reduce((a, b) => a + b, 0),
+                <Th numeric>Total</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {roll.rows.map((r) => (
+                <tr key={r.propertyId} className="hover:bg-background">
+                  <Td>
+                    <Link
+                      href={`/properties/${r.propertyId}`}
+                      className="font-medium hover:underline"
+                    >
+                      {r.address}
+                    </Link>
+                    <PartialLabel months={r.monthsOfData} />
+                    {(r.subsidyCents > 0 || r.ownerFundedCents > 0) && (
+                      <div className="text-[11px] text-muted">
+                        {r.subsidyCents > 0 && <>voucher {fmtCents(r.subsidyCents)}</>}
+                        {r.subsidyCents > 0 && r.ownerFundedCents > 0 && " · "}
+                        {r.ownerFundedCents > 0 && (
+                          <span className="text-amber-700 dark:text-amber-500">
+                            owner-funded {fmtCents(r.ownerFundedCents)} (excl.)
+                          </span>
+                        )}
+                      </div>
                     )}
                   </Td>
+                  {roll.months.map((m) => (
+                    <Td key={m} numeric>
+                      {r.byMonth[m] ? fmtCents(r.byMonth[m]) : <span className="text-muted">—</span>}
+                    </Td>
+                  ))}
+                  <Td numeric className="font-medium">{fmtCents(r.totalCents)}</Td>
                 </tr>
-              </tfoot>
-            </Table>
-          </div>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border font-semibold">
+                <Td>Portfolio</Td>
+                {roll.months.map((m) => (
+                  <Td key={m} numeric>
+                    {fmtCents(roll.portfolioByMonth[m] ?? 0)}
+                  </Td>
+                ))}
+                <Td numeric>
+                  {fmtCents(
+                    Object.values(roll.portfolioByMonth).reduce((a, b) => a + b, 0),
+                  )}
+                </Td>
+              </tr>
+            </tfoot>
+          </Table>
         </Card>
       )}
     </div>

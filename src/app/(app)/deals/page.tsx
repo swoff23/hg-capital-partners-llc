@@ -106,7 +106,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
         current={{ status: statusFilter, statuses: selectedStatuses, q: sp.q ?? "" }}
       />
 
-      <Card className="mt-4 overflow-hidden">
+      <Card className="mt-4 overflow-clip">
         {deals.length === 0 ? (
           <div className="p-4">
             <EmptyState>No deals match.</EmptyState>
@@ -122,7 +122,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                   <SortHeader label="Units" field="units" resizeKey="units" />
                   <SortHeader label="Their price" field="theirPrice" resizeKey="theirPrice" />
                   <SortHeader label="Our price" field="ourPrice" resizeKey="ourPrice" />
-                  <Th className="relative">
+                  <Th>
                     Latest note
                     <ResizeHandle columnKey="latestNote" />
                   </Th>

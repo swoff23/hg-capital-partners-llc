@@ -112,8 +112,8 @@ export function MoreMenu({
               <Button variant="secondary" size="sm" disabled={deleting} onClick={() => setConfirming(false)}>
                 Keep it
               </Button>
-              <Button variant="danger" size="sm" disabled={deleting} onClick={remove}>
-                {deleting ? "Deleting…" : "Delete"}
+              <Button variant="destructive" size="sm" disabled={deleting} onClick={remove}>
+                {deleting ? "Deleting…" : "Delete task"}
               </Button>
             </>
           }

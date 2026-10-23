@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type Result = { type: string; id: string; label: string; href: string };
@@ -98,7 +99,7 @@ export function GlobalSearch() {
   // and names keep their room. From sm up they sit under the box.
   return (
     <div ref={boxRef} className="w-full sm:relative">
-      <input
+      <Input
         ref={inputRef}
         value={q}
         onChange={(e) => {
@@ -115,7 +116,6 @@ export function GlobalSearch() {
         aria-activedescendant={showList ? optionId(active) : undefined}
         autoComplete="off"
         placeholder="Search addresses, contractors, tasks…"
-        className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
       />
       {showList && (
         <div
@@ -124,7 +124,7 @@ export function GlobalSearch() {
           aria-label="Search results"
           // Keep focus in the input so the keys keep working after a click.
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute z-20 mt-1 overflow-hidden rounded-lg border border-border bg-raised shadow-lg max-sm:inset-x-4 max-sm:top-full sm:w-full"
+          className="absolute z-20 mt-1 overflow-hidden rounded-lg border border-line-float bg-raised p-1 shadow-float max-sm:inset-x-4 max-sm:top-full sm:w-full"
         >
           {results.map((r, i) => (
             <button
@@ -137,12 +137,12 @@ export function GlobalSearch() {
               onMouseMove={() => setActive(i)}
               onClick={() => go(r)}
               className={cn(
-                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm",
+                "flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-body",
                 i === active && "bg-fill-2",
               )}
             >
-              {/* Wide enough for CONTRACTOR, the longest type (81px in Geist), at every width. */}
-              <span className="w-22 shrink-0 text-xs font-medium uppercase text-muted">{r.type}</span>
+              {/* Wide enough for Contractor, the longest type, at every width. */}
+              <span className="w-22 shrink-0 text-meta font-medium text-fg-3">{r.type}</span>
               <span className="truncate">{r.label}</span>
             </button>
           ))}

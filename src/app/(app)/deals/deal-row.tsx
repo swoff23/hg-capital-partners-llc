@@ -1,9 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Td } from "@/components/ui";
+import { Td, badgeToneClass } from "@/components/ui";
 import { Tooltip } from "@/components/tooltip";
-import { DEAL_STATUSES, dealStatusTone, toneClass } from "@/lib/config";
+import { DEAL_STATUSES, dealStatusTone } from "@/lib/config";
 import { fmtDate, fmtMoney } from "@/lib/utils";
 import { patchDeal } from "./actions";
 
@@ -104,7 +104,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         <select
           defaultValue={deal.status}
           onChange={(e) => save({ status: e.target.value }, deal.status, e.target.value)}
-          className={`rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${toneClass(dealStatusTone(deal.status))}`}
+          className={`rounded-sm px-1.5 py-0.5 text-micro ring-1 ring-inset ring-line-control ${badgeToneClass(dealStatusTone(deal.status))}`}
         >
           {statusOptions.map((s) => (
             <option key={s} value={s}>

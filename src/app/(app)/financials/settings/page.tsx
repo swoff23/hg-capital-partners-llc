@@ -92,7 +92,7 @@ export default async function FinancialsSettingsPage({
             />
           )}
           <Row label="Status">
-            <Badge tone={conn.status === "ACTIVE" ? "green" : "red"}>{conn.status}</Badge>
+            <Badge tone={conn.status === "ACTIVE" ? "ok" : "danger"}>{conn.status}</Badge>
             {conn.status === "EXPIRED" && (
               <a href="/api/quickbooks/connect" className={`ml-2 ${textLinkClass}`}>
                 Reconnect
@@ -194,7 +194,7 @@ export default async function FinancialsSettingsPage({
         </Card>
       )}
 
-      <Card id="class-mapping" className="overflow-hidden">
+      <Card id="class-mapping" className="overflow-clip">
         <CardHeader>
           <CardTitle>Class → property mapping</CardTitle>
         </CardHeader>
@@ -213,7 +213,7 @@ export default async function FinancialsSettingsPage({
         />
       </Card>
 
-      <Card id="account-categories" className="overflow-hidden">
+      <Card id="account-categories" className="overflow-clip">
         <CardHeader>
           <CardTitle>Account categories</CardTitle>
         </CardHeader>

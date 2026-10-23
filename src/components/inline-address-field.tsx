@@ -1,12 +1,15 @@
 "use client";
 import { useLayoutEffect, useRef, useState, useTransition } from "react";
+import { Pencil } from "lucide-react";
 import { inlineEditCommit } from "@/lib/inline-edit";
 import { cn } from "@/lib/utils";
 import { useInlineEditKeys } from "./use-inline-edit-keys";
 
 const supportsFieldSizing = () => typeof CSS !== "undefined" && CSS.supports("field-sizing", "content");
 
-const text = "rounded-md px-2 py-1 pr-6 text-xl font-semibold tracking-tight text-foreground";
+// The page's h1 on the title token, editable or not. font-semibold repeats
+// the token's weight so a caller's size override (the task title) keeps it.
+const text = "rounded-md px-2 py-1 pr-6 text-title font-semibold text-fg-1";
 
 /**
  * Page heading, editable in place: commits on blur / Enter, reverts on Escape,
@@ -94,20 +97,16 @@ export function InlineAddressField({
   }
   const keys = useInlineEditKeys(() => setV(value), commit);
 
+  // A desktop hover cue only; touch has no hover, and a tap opens the field.
   const pencil = (
-    <svg
-      aria-hidden
-      viewBox="0 0 16 16"
+    <Pencil
+      aria-hidden="true"
+      strokeWidth={1.5}
       className={cn(
-        "pointer-events-none absolute right-2 h-4 w-4 text-muted opacity-0 transition-opacity group-hover/addr:opacity-100",
-        multiline || heading ? "top-2.5" : "top-1/2 -translate-y-1/2",
+        "pointer-events-none absolute right-2 h-4 w-4 text-fg-3 opacity-0 transition-opacity group-hover/addr:opacity-100",
+        multiline || heading ? "top-3" : "top-1/2 -translate-y-1/2",
       )}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-    >
-      <path d="M11.3 2.3a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-7.2 7.2-3 .8.8-3 7.2-7.2Z" strokeLinejoin="round" />
-    </svg>
+    />
   );
 
   if (!editing) {
@@ -119,7 +118,7 @@ export function InlineAddressField({
           onClick={() => setEditing(true)}
           className={cn(
             text,
-            "text-left outline-none transition-colors [overflow-wrap:anywhere] hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/20 disabled:opacity-40",
+            "text-balance text-left transition-colors [overflow-wrap:anywhere] hover:bg-fill-1 disabled:opacity-40",
             className,
           )}
         >
@@ -142,7 +141,8 @@ export function InlineAddressField({
     onKeyDown: keys.onKeyDown,
     className: cn(
       text,
-      "w-full bg-transparent outline-none transition-colors hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 disabled:opacity-40",
+      // Editing reads as a field: --surface with the focus edge (an --act ring, 2px inside).
+      "w-full bg-transparent outline-none transition-colors hover:bg-fill-1 focus:bg-surface focus:ring-2 focus:ring-inset focus:ring-act disabled:opacity-40",
       // field-sizing gets the height right before hydration where it's supported; the effect covers the rest.
       multiline && "block resize-none overflow-hidden [field-sizing:content]",
       className,

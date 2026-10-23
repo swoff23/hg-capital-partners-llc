@@ -23,10 +23,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function fmtMoney(v: unknown, opts: { compact?: boolean } = {}): string {
-  if (v == null || v === "") return "—";
+/** The number in a money value (a number, a numeric string or a Prisma Decimal), or null when it's empty or unreadable. */
+export function toMoneyNumber(v: unknown): number | null {
+  if (v == null || v === "") return null;
   const n = typeof v === "object" && "toNumber" in (v as object) ? (v as { toNumber(): number }).toNumber() : Number(v);
-  if (!Number.isFinite(n)) return "—";
+  return Number.isFinite(n) ? n : null;
+}
+
+export function fmtMoney(v: unknown, opts: { compact?: boolean } = {}): string {
+  const n = toMoneyNumber(v);
+  if (n === null) return "—";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",

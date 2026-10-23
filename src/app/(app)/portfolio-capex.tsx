@@ -297,7 +297,7 @@ export function PortfolioCapexForecastCard({
       {tip && (
         <div
           className={
-            "pointer-events-none fixed z-50 w-[336px] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-border bg-raised p-3 text-xs shadow-lg " +
+            "pointer-events-none fixed z-50 w-[336px] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-line-float bg-raised p-3 text-xs shadow-float " +
             (tip.flip ? "-translate-y-full" : "")
           }
           style={{ left: tip.x, top: tip.top }}

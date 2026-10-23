@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
  * md) and a centered dialog from md up. Esc closes this one layer, focus is
  * trapped inside and returns to the trigger, and the page behind doesn't
  * scroll. Tapping the dimmed backdrop closes it unless `isDismissable` is off.
+ * The Overlay level (docs/brand-guidelines.md, section 5): --raised, the
+ * overlay shadow over the scrim, rounded-xl (the top corners on a phone).
  *
  *   <SheetTrigger>
  *     <AriaButton>Due</AriaButton>
@@ -54,15 +56,15 @@ export function Sheet({
       onOpenChange={onOpenChange}
       isDismissable={isDismissable}
       className={cn(
-        "fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center md:p-4",
+        "fixed inset-0 z-50 flex items-end justify-center bg-scrim md:items-center md:p-4",
         "data-entering:animate-fade-in data-exiting:animate-fade-out motion-reduce:animate-none",
       )}
     >
       <Modal
         className={cn(
-          "flex max-h-[90dvh] w-full flex-col overflow-hidden bg-raised text-foreground shadow-xl outline-none",
-          "rounded-t-2xl pb-[env(safe-area-inset-bottom)]",
-          "md:max-h-[85dvh] md:w-auto md:min-w-80 md:max-w-lg md:rounded-xl md:border md:border-border md:pb-0",
+          "flex max-h-[90dvh] w-full flex-col overflow-hidden bg-raised text-fg-1 shadow-overlay outline-none",
+          "rounded-t-xl pb-[env(safe-area-inset-bottom)]",
+          "md:max-h-[85dvh] md:w-auto md:min-w-80 md:max-w-lg md:rounded-xl md:border md:border-line-float md:pb-0",
           "data-entering:animate-sheet-in data-exiting:animate-sheet-out md:data-entering:animate-pop-in md:data-exiting:animate-pop-out motion-reduce:animate-none",
           className,
         )}
@@ -91,14 +93,14 @@ function SheetHeader({ title, hidden, onClose }: { title: string; hidden: boolea
     );
   }
   return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border py-1.5 pl-4 pr-1.5">
-      <Heading slot="title" className="truncate text-sm font-semibold">
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line py-1.5 pl-4 pr-1.5">
+      <Heading slot="title" className="truncate text-section">
         {title}
       </Heading>
       <AriaButton
         onPress={onClose}
         aria-label="Close"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted outline-none transition-colors hover:bg-fill-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:h-11 pointer-coarse:w-11"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:h-11 pointer-coarse:w-11"
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </AriaButton>

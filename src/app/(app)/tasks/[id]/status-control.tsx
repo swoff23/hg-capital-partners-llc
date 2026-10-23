@@ -1,6 +1,6 @@
 "use client";
 import { useOptimistic, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import type { TaskStatus } from "@prisma/client";
 import { DueDatePicker } from "@/components/due-date-picker";
@@ -63,11 +63,8 @@ export function StatusControl({
         </AriaButton>
         <Menu placement="bottom start" onAction={(key) => choose(key as TaskStatus)}>
           {STATUS_ORDER.map((s) => (
-            <MenuItem key={s} id={s} textValue={STATUS_LABEL[s]}>
-              <span className="flex-1">
-                <StatusBadge status={s} />
-              </span>
-              <Check className={cn(s !== shown && "invisible")} aria-hidden="true" />
+            <MenuItem key={s} id={s} textValue={STATUS_LABEL[s]} checked={s === shown}>
+              <StatusBadge status={s} />
             </MenuItem>
           ))}
         </Menu>

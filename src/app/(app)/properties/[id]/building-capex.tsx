@@ -47,7 +47,7 @@ function toDraft(data: BuildingCapexData, items: BuildingRule[]): Draft {
 }
 
 function StatusCell({ status }: { status: EquipmentStatus }) {
-  if (status === "Replace") return <Badge tone="red">Replace</Badge>;
+  if (status === "Replace") return <Badge tone="danger">Replace</Badge>;
   return (
     <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>{status}</span>
   );

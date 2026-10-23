@@ -181,7 +181,7 @@ export default async function FinancialsOverviewPage({
         </Card>
       </div>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-clip">
         <CardHeader>
           <CardTitle>By property</CardTitle>
         </CardHeader>

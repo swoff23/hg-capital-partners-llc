@@ -114,7 +114,7 @@ export function SourceBadge({
 }) {
   const h = hoursSince(syncedAt);
   const stale = h == null || h > 36;
-  const tone = status === "PARTIAL" || stale ? "amber" : "green";
+  const tone = status === "PARTIAL" || stale ? "warn" : "ok";
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted">
       <Badge tone={tone}>QuickBooks</Badge>

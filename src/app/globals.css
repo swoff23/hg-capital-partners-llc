@@ -67,6 +67,15 @@
   --on-photo: #ece9e4;
   --pub-faint: #858991;
   --pub-gold-hi: #d8ba7e;
+  /* The lightbox stage: the photo scrim's ink at full strength. */
+  --photo-stage: rgb(10 14 23);
+
+  /* Edges that only show on dark grounds (section 5). Each is built from
+     another token and redefined in the dark block below, so no component
+     needs a dark: override. In light they match what they sit on. */
+  --line-float: var(--line);
+  --toast-edge: var(--toast-bg);
+  --tile-edge: var(--ink-tile);
 
   /* Motion (section 7). Easing for each lives in the animation that uses it. */
   --dur-0: 0ms;
@@ -76,6 +85,10 @@
   --dur-sheet: 260ms;
   --dur-photo: 200ms;
   --dur-check: 180ms;
+
+  /* The fixed app bar's height (h-14 in components/app-shell.tsx). A sticky
+     table header holds just under it. */
+  --app-bar-h: 3.5rem;
 }
 
 /* ---------------- Color: dark, and the public site ---------------- */
@@ -120,6 +133,11 @@
   --elev-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.7);
   --elev-photo-edge: inset 0 0 0 1px rgb(236 233 228 / 0.08);
   --scrim: rgb(0 0 0 / 0.6);
+
+  /* Floating layers, the toast and the monogram tile take an edge here. */
+  --line-float: var(--line-strong);
+  --toast-edge: var(--line-strong);
+  --tile-edge: var(--line);
 }
 
 /* Tokens built from other tokens. A var() resolves where it's declared, so
@@ -152,6 +170,7 @@
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-line-control: var(--line-control);
+  --color-line-float: var(--line-float);
   --color-fg-1: var(--fg-1);
   --color-fg-2: var(--fg-2);
   --color-fg-3: var(--fg-3);
@@ -173,8 +192,10 @@
   --color-gold: var(--gold);
   --color-gold-deep: var(--gold-deep);
   --color-ink-tile: var(--ink-tile);
+  --color-tile-edge: var(--tile-edge);
 
   --color-toast-bg: var(--toast-bg);
+  --color-toast-edge: var(--toast-edge);
   --color-toast-fg: var(--toast-fg);
   --color-toast-fg-2: var(--toast-fg-2);
   --color-toast-hover: var(--toast-hover);
@@ -185,6 +206,7 @@
   --color-pill-fg: var(--pill-fg);
   --color-photo-scrim: var(--photo-scrim);
   --color-on-photo: var(--on-photo);
+  --color-photo-stage: var(--photo-stage);
   --color-pub-faint: var(--pub-faint);
   --color-pub-gold-hi: var(--pub-gold-hi);
   --color-scrim: var(--scrim);
@@ -202,6 +224,10 @@
   --shadow-float: var(--elev-float);
   --shadow-overlay: var(--elev-overlay);
   --inset-shadow-photo-edge: var(--elev-photo-edge);
+  /* inset-shadow-rule: a table header's --line-strong rule, drawn inside the
+     cell. A collapsed table's borders stay put when a sticky header moves, so
+     a border-b would leave the stuck header with no rule under it. */
+  --inset-shadow-rule: inset 0 -1px 0 var(--line-strong);
 
   /* Motion: duration-fast, duration-base and the rest */
   --transition-duration-0: var(--dur-0);
@@ -383,6 +409,13 @@ body {
   .text-figure-l,
   .text-figure-m {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Native checkboxes and radios check in ink, like every other checked
+     control (section 9). */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--act);
   }
 
   /* Cents on a single transaction line or a bill's key figure, lifted to the

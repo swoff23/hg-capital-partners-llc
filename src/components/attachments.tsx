@@ -153,7 +153,7 @@ export function Attachments(props: AttachmentsProps) {
   return (
     <div className="space-y-3">
       {items.length > 0 && (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul className="divide-y divide-line rounded-lg border border-line">
           {items.map((a) => (
             <li key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <FileIcon />
@@ -170,7 +170,7 @@ export function Attachments(props: AttachmentsProps) {
               <button
                 type="button"
                 onClick={() => start(() => onDelete(a.id))}
-                className="shrink-0 text-xs text-muted transition-colors hover:text-red-600"
+                className="shrink-0 text-xs text-fg-3 transition-colors hover:text-danger"
               >
                 Remove
               </button>
@@ -182,7 +182,7 @@ export function Attachments(props: AttachmentsProps) {
       {busy.map(({ key, name }) => (
         <div
           key={key}
-          className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-muted"
+          className="flex items-center gap-3 rounded-lg border border-line px-3 py-2 text-sm text-fg-3"
         >
           <FileIcon />
           <span className="min-w-0 flex-1 truncate">{name}</span>
@@ -208,8 +208,8 @@ export function Attachments(props: AttachmentsProps) {
           void uploadFiles(e.dataTransfer.files);
         }}
         className={cn(
-          "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-6 text-center text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/30",
-          dragOver ? "border-primary bg-primary/5" : "border-border hover:bg-background",
+          "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-6 text-center text-sm transition-colors",
+          dragOver ? "border-act bg-fill-1" : "border-line-strong hover:bg-fill-1",
         )}
       >
         <svg
@@ -237,7 +237,7 @@ export function Attachments(props: AttachmentsProps) {
         }}
       />
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }

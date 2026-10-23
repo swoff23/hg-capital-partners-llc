@@ -63,7 +63,7 @@ export function MediaGrid({
           type="button"
           onClick={() => setExpanded(true)}
           className={cn(
-            "mt-2 rounded-md text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:min-h-11",
+            "mt-2 rounded-md text-xs font-medium text-fg-1 hover:underline pointer-coarse:min-h-11",
             items.length <= wideCap && "sm:hidden",
           )}
         >
@@ -86,10 +86,7 @@ function Tile({ item, onOpen }: { item: MediaItem; onOpen: () => void }) {
       type="button"
       onClick={onOpen}
       aria-label={`${video ? `Play video ${item.filename}${length ? `, ${length}` : ""}` : `Open photo ${item.filename}`}${item.internal ? ", internal" : ""}`}
-      className={cn(
-        "relative block aspect-square w-full overflow-hidden rounded-lg outline-none ring-1 ring-inset ring-black/5 focus-visible:ring-2 focus-visible:ring-primary dark:ring-white/10",
-        video ? "bg-zinc-900" : "bg-zinc-100 dark:bg-zinc-800",
-      )}
+      className={cn("relative block aspect-square w-full overflow-hidden rounded-lg", video ? "bg-photo-stage" : "bg-fill-1")}
     >
       {src && !broken ? (
         // Gated, session-checked route; next/image would cache it publicly.
@@ -105,22 +102,24 @@ function Tile({ item, onOpen }: { item: MediaItem; onOpen: () => void }) {
         />
       ) : (
         !video && (
-          <span className="absolute inset-0 flex items-center justify-center text-muted">
+          <span className="absolute inset-0 flex items-center justify-center text-fg-3">
             <ImageOff className="h-5 w-5" aria-hidden="true" />
           </span>
         )
       )}
       {video && (
-        <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded bg-black/60 px-1 py-0.5 text-[11px] font-medium leading-none tabular-nums text-white">
+        <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded-sm bg-photo-scrim px-1 py-0.5 text-micro tabular-nums text-on-photo">
           <Play className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
           {length}
         </span>
       )}
       {item.internal && (
-        <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded bg-black/60 text-white">
+        <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-sm bg-photo-scrim text-on-photo">
           <Lock className="h-2.5 w-2.5" aria-hidden="true" />
         </span>
       )}
+      {/* The photo edge sits over the image, so a pale facade doesn't bleed into the page. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg inset-shadow-photo-edge" />
     </button>
   );
 }

@@ -120,10 +120,11 @@ export function AssigneePicker({
 }
 
 const itemClass = cn(
-  "flex min-h-9 cursor-default items-center gap-2.5 rounded-md px-3 py-1 text-sm outline-none pointer-coarse:min-h-11",
+  "flex min-h-9 cursor-default items-center gap-2.5 rounded-sm px-3 py-1 text-sm outline-none pointer-coarse:min-h-11",
   "data-focused:bg-fill-2 data-pressed:bg-fill-2",
 );
-const headerClass = "px-3 pb-1 pt-2.5 text-xs font-medium uppercase tracking-wide text-muted";
+// Sentence case: no uppercase in the app.
+const headerClass = "px-3 pb-1 pt-2.5 text-meta font-medium text-fg-3";
 
 function AssigneeList({
   users,
@@ -205,7 +206,7 @@ function AssigneeList({
                       <span className="flex items-center gap-1.5">
                         <span className="truncate">{c.name}</span>
                         {c.hasLogin && (
-                          <span className="shrink-0 rounded px-1 text-[10px] font-medium leading-4 text-muted ring-1 ring-inset ring-border">
+                          <span className="inline-flex h-5.5 shrink-0 items-center rounded-sm px-2 text-micro text-fg-2 ring-1 ring-inset ring-line-strong">
                             Has login
                           </span>
                         )}
@@ -225,5 +226,5 @@ function AssigneeList({
 }
 
 function Selected({ on }: { on: boolean }) {
-  return <Check className={cn("h-4 w-4 shrink-0 text-primary", !on && "invisible")} aria-hidden="true" />;
+  return <Check className={cn("h-4 w-4 shrink-0 text-fg-1", !on && "invisible")} aria-hidden="true" />;
 }

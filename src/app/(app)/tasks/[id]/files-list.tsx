@@ -99,7 +99,7 @@ export function FilesList({
                 Keep it
               </Button>
               <Button
-                variant="danger"
+                variant="destructive"
                 size="sm"
                 disabled={pending}
                 onClick={() =>
@@ -111,7 +111,7 @@ export function FilesList({
                   })
                 }
               >
-                {pending ? "Deleting…" : "Delete"}
+                {pending ? "Deleting…" : target.kind === "LINK" ? "Delete link" : "Delete file"}
               </Button>
             </>
           }
