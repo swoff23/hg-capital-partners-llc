@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type Task, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
-import { isActiveStatus } from "@/lib/task-scope";
+import { firstName } from "@/lib/names";
+import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { nextOccurrence, parseRepeatRule, type RepeatRule } from "./repeat";
 import {
   BUNDLE_MAX_MS,
@@ -43,6 +44,21 @@ export class TaskRuleError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "TaskRuleError";
+  }
+}
+
+/**
+ * The task moved on since the caller's screen showed it (another tab, the
+ * other partner, the contractor), so nothing was written. `current` is where
+ * it is now; the message says who moved it there.
+ */
+export class TaskChangedError extends TaskRuleError {
+  constructor(
+    readonly current: TaskStatus,
+    by: string | null,
+  ) {
+    super(`${by || "Someone"} moved this to ${STATUS_LABEL[current]}.`);
+    this.name = "TaskChangedError";
   }
 }
 
@@ -289,6 +305,11 @@ export interface StatusOptions {
   scheduledFor?: Ymd | null;
   /** A shared note to the contractor, e.g. why a job was sent back from Review. */
   note?: string | null;
+  /**
+   * The status the caller's screen showed. When the task has moved on since,
+   * nothing changes and TaskChangedError says who moved it.
+   */
+  expected?: TaskStatus;
 }
 
 export interface StatusResult {
@@ -298,12 +319,27 @@ export interface StatusResult {
 }
 
 export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Principal, opts: StatusOptions = {}, now = new Date()): Promise<StatusResult> {
+  // Lock the row, so two changes at once (a double tap, both partners, the
+  // contractor) run one after the other and the second sees the first. NO KEY
+  // UPDATE is the lock the update below takes anyway: unlike FOR UPDATE it
+  // doesn't wait on the key-share locks that inserting a comment, file or
+  // email row takes, which could deadlock a Mark done that posts a note.
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
+  if (opts.expected && before.status !== opts.expected) {
+    // Whoever moved it to where it is now, not a later change that didn't.
+    const last = await tx.taskEvent.findFirst({
+      where: { taskId, kind: "STATUS", data: { path: ["to"], equals: before.status } },
+      orderBy: { createdAt: "desc" },
+      select: { actorLabel: true },
+    });
+    throw new TaskChangedError(before.status, firstName(last?.actorLabel));
+  }
   if (!canSetStatus(kindOf(p), before.status, to)) {
     throw new TaskRuleError(p.kind === "contractor" ? "You can start a job or mark it done." : "That status change isn't allowed.");
   }
-  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
 
   const waitingOn = opts.waitingOn?.trim() || null;
   if (to === "WAITING" && !waitingOn) throw new TaskRuleError("Say what it's waiting on.");
@@ -353,11 +389,6 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   }
   const nextTaskId = to === "DONE" && before.status !== "DONE" ? await createNextRepeat(tx, task, p, now) : null;
   return { task, nextTaskId };
-}
-
-/** The list checkbox: anything but DONE becomes DONE; DONE reopens to OPEN. */
-export function toggleDone(tx: Tx, task: Pick<Task, "id" | "status">, p: Principal, now = new Date()): Promise<StatusResult> {
-  return setStatus(tx, task.id, task.status === "DONE" ? "OPEN" : "DONE", p, {}, now);
 }
 
 // ---------------------------------------------------------------------------

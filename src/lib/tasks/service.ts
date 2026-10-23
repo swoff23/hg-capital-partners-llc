@@ -24,7 +24,7 @@ import * as core from "./core";
  */
 
 export type { Principal, NewTaskInput, TaskPatch, StatusOptions } from "./core";
-export { TaskRuleError, bucketFor } from "./core";
+export { TaskChangedError, TaskRuleError, bucketFor } from "./core";
 export { TEMPLATE_BUCKET };
 
 /** The signed-in staff user as the actor on a write. */
@@ -53,18 +53,19 @@ export async function createTask(input: core.NewTaskInput, p: core.Principal): P
   return task;
 }
 
+/**
+ * Any status change. A refused one (the task moved on, or is gone) still
+ * refreshes the pages, so the screen that sent it shows where the task is.
+ */
 export async function setTaskStatus(id: string, to: TaskStatus, p: core.Principal, opts: core.StatusOptions = {}): Promise<core.StatusResult> {
-  const result = await prisma.$transaction((tx) => core.setStatus(tx, id, to, p, opts));
-  revalidateTask(result.task);
-  return result;
-}
-
-/** The checkbox. No-op when the task doesn't exist. */
-export async function toggleTask(id: string, p: core.Principal): Promise<void> {
-  const t = await prisma.task.findUnique({ where: { id }, select: { id: true, status: true } });
-  if (!t) return;
-  const result = await prisma.$transaction((tx) => core.toggleDone(tx, t, p));
-  revalidateTask(result.task);
+  try {
+    const result = await prisma.$transaction((tx) => core.setStatus(tx, id, to, p, opts));
+    revalidateTask(result.task);
+    return result;
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateTask({ id });
+    throw err;
+  }
 }
 
 /** Field edits. No-op when the task doesn't exist. */

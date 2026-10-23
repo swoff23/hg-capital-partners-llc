@@ -15,13 +15,6 @@ import * as tasks from "@/lib/tasks/service";
  * wraps core.ts, where the rules are).
  */
 
-export async function toggleTask(id: string) {
-  return withLog("toggleTask", async () => {
-    const user = await requireUser();
-    await tasks.toggleTask(z.string().min(1).parse(id), tasks.staffPrincipal(user));
-  });
-}
-
 const taskSchema = z.object({
   title: z.string().min(2),
   description: z.string().optional(),
@@ -134,12 +127,5 @@ export async function recordTaskAttachment(taskId: string, data: z.input<typeof 
     const user = await requireUser();
     const { visibility, standalone, ...file } = uploadedSchema.parse(data);
     return tasks.recordTaskAttachment(z.string().min(1).parse(taskId), file, tasks.staffPrincipal(user), { visibility, standalone });
-  });
-}
-
-export async function deleteTaskAttachment(attachmentId: string) {
-  return withLog("deleteTaskAttachment", async () => {
-    await requireUser();
-    await tasks.deleteTaskAttachment(z.string().min(1).parse(attachmentId));
   });
 }

@@ -1,12 +1,11 @@
 "use server";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
+import { isActiveStatus } from "@/lib/task-scope";
 import { withResult } from "@/lib/server-action";
 import { moveTaskDates, restoreTaskDates } from "@/lib/tasks/bulk";
 import type { DateChange } from "@/lib/tasks/list";
-import { taskStatus } from "@/lib/tasks/queries";
 import * as tasks from "@/lib/tasks/service";
 
 /**
@@ -16,6 +15,7 @@ import * as tasks from "@/lib/tasks/service";
  */
 
 const taskId = z.string().min(1).max(64);
+const status = z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW", "DONE", "CANCELED"]);
 const ymd = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -27,18 +27,6 @@ const dateChanges = z
       .strict(),
   )
   .max(500);
-
-/**
- * Refresh the lists without a write. For a change the server skips or refuses
- * because the row on screen is out of date (the other partner already ticked
- * it, or already approved it): the optimistic edit rolls back onto fresh rows
- * instead of the stale ones.
- */
-function refreshLists(): void {
-  revalidatePath("/tasks");
-  revalidatePath("/tasks/all");
-  revalidatePath("/");
-}
 
 /**
  * Move one or more tasks to a date (null clears it). `which` is "due" for
@@ -66,39 +54,30 @@ export async function undoReschedule(changes: DateChange[]): Promise<ActionResul
 }
 
 /**
- * The checkbox: Done, or back to To do (service.toggleTask). Says which way
- * it should end up, so a tap on a row the other partner already ticked
- * doesn't flip it back.
+ * The checkbox: Done, or back to To do. Sends the status the row showed, so
+ * a tap on a stale row changes nothing (the service refreshes the lists). If
+ * the task already ended up where the tap wanted (the other partner ticked
+ * it, or reopened it), that's a quiet success; otherwise, Canceled included,
+ * the toast says who moved it.
  */
-export async function setTaskDone(id: string, done: boolean): Promise<ActionResult> {
+export async function setTaskDone(id: string, done: boolean, expected: string): Promise<ActionResult> {
   return withResult("setTaskDone", async () => {
     const user = await requireUser();
-    const tid = taskId.parse(id);
-    const status = await taskStatus(tid);
     const want = z.boolean().parse(done);
-    if (!status || want === (status === "DONE")) {
-      refreshLists();
-      if (!status) throw new tasks.TaskRuleError("That task no longer exists.");
-      return;
+    try {
+      await tasks.setTaskStatus(taskId.parse(id), want ? "DONE" : "OPEN", tasks.staffPrincipal(user), { expected: status.parse(expected) });
+    } catch (err) {
+      if (err instanceof tasks.TaskChangedError && (want ? err.current === "DONE" : isActiveStatus(err.current))) return;
+      throw err;
     }
-    await tasks.toggleTask(tid, tasks.staffPrincipal(user));
   });
-}
-
-async function assertInReview(id: string): Promise<void> {
-  const status = await taskStatus(id);
-  if (status === "REVIEW") return;
-  refreshLists();
-  throw new tasks.TaskRuleError(status ? "This job isn't waiting on review anymore." : "That job no longer exists.");
 }
 
 /** Needs review: Approve makes the job Done (D6b). */
 export async function approveTask(id: string): Promise<ActionResult> {
   return withResult("approveTask", async () => {
     const user = await requireUser();
-    const tid = taskId.parse(id);
-    await assertInReview(tid);
-    await tasks.setTaskStatus(tid, "DONE", tasks.staffPrincipal(user));
+    await tasks.setTaskStatus(taskId.parse(id), "DONE", tasks.staffPrincipal(user), { expected: "REVIEW" });
   });
 }
 
@@ -108,7 +87,6 @@ export async function sendBackTask(id: string, note: string): Promise<ActionResu
     const user = await requireUser();
     const tid = taskId.parse(id);
     const body = z.string().trim().min(1, "Add a short note for the contractor.").max(2000).parse(note);
-    await assertInReview(tid);
-    await tasks.setTaskStatus(tid, "IN_PROGRESS", tasks.staffPrincipal(user), { note: body });
+    await tasks.setTaskStatus(tid, "IN_PROGRESS", tasks.staffPrincipal(user), { note: body, expected: "REVIEW" });
   });
 }

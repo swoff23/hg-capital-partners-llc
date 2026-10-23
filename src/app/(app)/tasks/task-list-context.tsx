@@ -92,7 +92,12 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
       );
     },
     setDone(task, done) {
-      run({ kind: "check", id: task.id, checked: done }, () => setTaskDone(task.id, done));
+      // The status the row shows. While an earlier tap is still saving, the
+      // optimistic tick and the server's status disagree, and the row shows
+      // where that tap is heading.
+      const settled = task.checked === (task.status === "DONE");
+      const shown = settled ? task.status : task.checked ? "DONE" : "OPEN";
+      run({ kind: "check", id: task.id, checked: done }, () => setTaskDone(task.id, done, shown));
     },
     approve(task) {
       run({ kind: "status", id: task.id, status: "DONE" }, () => approveTask(task.id), () => toast({ message: `Approved: ${task.title}` }));

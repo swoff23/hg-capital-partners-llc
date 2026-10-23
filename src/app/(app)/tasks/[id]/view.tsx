@@ -14,6 +14,7 @@ import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
 import { ReviewBanner } from "./review-banner";
 import { StatusControl, WaitingReason } from "./status-control";
+import { StatusRunProvider } from "./status-run";
 
 export interface TaskPageViewProps {
   task: {
@@ -58,92 +59,94 @@ export interface TaskPageViewProps {
 export function TaskPageView(p: TaskPageViewProps) {
   const { task } = p;
   return (
-    <div
-      className={
-        "grid gap-x-8 [grid-template-areas:'head'_'fields'_'main'] " +
-        "lg:grid-cols-[minmax(0,1fr)_18rem] lg:[grid-template-areas:'head_fields'_'main_fields']"
-      }
-    >
-      <header
+    <StatusRunProvider>
+      <div
         className={
-          "grid min-w-0 items-center gap-x-2 gap-y-1 [grid-area:head] " +
-          "grid-cols-[minmax(0,1fr)_auto_auto] [grid-template-areas:'back_status_more'_'title_title_title'_'reason_reason_reason'] " +
-          "md:grid-cols-[auto_minmax(0,1fr)_auto] md:[grid-template-areas:'back_back_back'_'status_title_more'_'._reason_.']"
+          "grid gap-x-8 [grid-template-areas:'head'_'fields'_'main'] " +
+          "lg:grid-cols-[minmax(0,1fr)_18rem] lg:[grid-template-areas:'head_fields'_'main_fields']"
         }
       >
-        <div className="[grid-area:back]">
-          <BackLink fallback="/tasks" label="Tasks" />
-        </div>
-        <div className="flex min-w-0 items-center gap-2 [grid-area:status] md:self-start md:pt-2">
-          <StatusControl
-            taskId={task.id}
-            status={task.status}
-            waitingOn={task.waitingOn}
-            scheduledFor={p.values.scheduledFor}
-            dueDate={p.values.dueDate}
-            today={p.today}
-          />
-        </div>
-        <div className="min-w-0 [grid-area:title]">
-          <TitleField taskId={task.id} title={task.title} closed={!p.active} />
-        </div>
-        <div className="[grid-area:more] md:self-start md:pt-1">
-          <MoreMenu taskId={task.id} title={task.title} active={p.active} status={task.status} waitingOn={task.waitingOn} />
-        </div>
-        {task.status === "WAITING" && task.waitingOn && (
-          <div className="min-w-0 [grid-area:reason]">
-            <WaitingReason taskId={task.id} waitingOn={task.waitingOn} />
+        <header
+          className={
+            "grid min-w-0 items-center gap-x-2 gap-y-1 [grid-area:head] " +
+            "grid-cols-[minmax(0,1fr)_auto_auto] [grid-template-areas:'back_status_more'_'title_title_title'_'reason_reason_reason'] " +
+            "md:grid-cols-[auto_minmax(0,1fr)_auto] md:[grid-template-areas:'back_back_back'_'status_title_more'_'._reason_.']"
+          }
+        >
+          <div className="[grid-area:back]">
+            <BackLink fallback="/tasks" label="Tasks" />
           </div>
-        )}
-      </header>
-
-      <aside aria-label="Task details" className="min-w-0 [grid-area:fields] lg:sticky lg:top-20 lg:self-start">
-        <TaskFields
-          taskId={task.id}
-          today={p.today}
-          status={task.status}
-          overdue={p.overdue}
-          values={p.values}
-          users={p.users}
-          contractors={p.contractors}
-          properties={p.properties}
-          lockbox={p.lockbox}
-          created={p.created}
-        />
-      </aside>
-
-      <div className="min-w-0 space-y-4 pt-2 [grid-area:main] lg:pt-4">
-        {p.review && <ReviewBanner taskId={task.id} {...p.review} />}
-
-        <Card className="divide-y divide-border">
-          <div className="p-4">
-            {task.legacyAssignee && <p className="mb-2 text-xs text-muted">Assigned in Asana to {task.legacyAssignee}</p>}
-            <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} />
+          <div className="flex min-w-0 items-center gap-2 [grid-area:status] md:self-start md:pt-2">
+            <StatusControl
+              taskId={task.id}
+              status={task.status}
+              waitingOn={task.waitingOn}
+              scheduledFor={p.values.scheduledFor}
+              dueDate={p.values.dueDate}
+              today={p.today}
+            />
           </div>
-          <div className="p-4">
-            <Checklist taskId={task.id} items={p.checklist} />
+          <div className="min-w-0 [grid-area:title]">
+            <TitleField taskId={task.id} title={task.title} closed={!p.active} />
           </div>
-          {(p.media.length > 0 || p.files.length > 0) && (
-            <section aria-labelledby="files-heading" className="space-y-3 p-4">
-              <h2 id="files-heading" className="text-sm font-semibold">
-                {p.media.length > 0 ? "Photos" : "Files"}
-                {p.media.length > 0 && <span className="ml-1.5 text-xs font-normal tabular-nums text-muted">{p.media.length}</span>}
-              </h2>
-              <MediaGrid items={p.media} onDelete={deleteTaskFile} />
-              <FilesList files={p.files} onDelete={deleteTaskFile} />
-            </section>
+          <div className="[grid-area:more] md:self-start md:pt-1">
+            <MoreMenu taskId={task.id} title={task.title} active={p.active} status={task.status} waitingOn={task.waitingOn} />
+          </div>
+          {task.status === "WAITING" && task.waitingOn && (
+            <div className="min-w-0 [grid-area:reason]">
+              <WaitingReason taskId={task.id} waitingOn={task.waitingOn} />
+            </div>
           )}
-        </Card>
+        </header>
 
-        <section aria-labelledby="activity-heading" className="space-y-3 pt-2">
-          <h2 id="activity-heading" className="text-sm font-semibold">
-            Activity
-          </h2>
-          <TaskActivity rows={p.rows} dayLabels={p.dayLabels} />
-        </section>
+        <aside aria-label="Task details" className="min-w-0 [grid-area:fields] lg:sticky lg:top-20 lg:self-start">
+          <TaskFields
+            taskId={task.id}
+            today={p.today}
+            status={task.status}
+            overdue={p.overdue}
+            values={p.values}
+            users={p.users}
+            contractors={p.contractors}
+            properties={p.properties}
+            lockbox={p.lockbox}
+            created={p.created}
+          />
+        </aside>
 
-        <Composer taskId={task.id} contractorFirstName={p.contractorFirst} staffNames={p.staffNames} drafts={p.drafts} />
+        <div className="min-w-0 space-y-4 pt-2 [grid-area:main] lg:pt-4">
+          {p.review && <ReviewBanner taskId={task.id} {...p.review} />}
+
+          <Card className="divide-y divide-border">
+            <div className="p-4">
+              {task.legacyAssignee && <p className="mb-2 text-xs text-muted">Assigned in Asana to {task.legacyAssignee}</p>}
+              <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} />
+            </div>
+            <div className="p-4">
+              <Checklist taskId={task.id} items={p.checklist} />
+            </div>
+            {(p.media.length > 0 || p.files.length > 0) && (
+              <section aria-labelledby="files-heading" className="space-y-3 p-4">
+                <h2 id="files-heading" className="text-sm font-semibold">
+                  {p.media.length > 0 ? "Photos" : "Files"}
+                  {p.media.length > 0 && <span className="ml-1.5 text-xs font-normal tabular-nums text-muted">{p.media.length}</span>}
+                </h2>
+                <MediaGrid items={p.media} onDelete={deleteTaskFile} />
+                <FilesList files={p.files} onDelete={deleteTaskFile} />
+              </section>
+            )}
+          </Card>
+
+          <section aria-labelledby="activity-heading" className="space-y-3 pt-2">
+            <h2 id="activity-heading" className="text-sm font-semibold">
+              Activity
+            </h2>
+            <TaskActivity rows={p.rows} dayLabels={p.dayLabels} />
+          </section>
+
+          <Composer taskId={task.id} contractorFirstName={p.contractorFirst} staffNames={p.staffNames} drafts={p.drafts} />
+        </div>
       </div>
-    </div>
+    </StatusRunProvider>
   );
 }

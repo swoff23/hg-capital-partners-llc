@@ -46,6 +46,8 @@ const statusOptsSchema = z
     waitingOn: z.string().max(300).nullable(),
     scheduledFor: ymd.nullable(),
     note: z.string().max(5000).nullable(),
+    // The status the page showed: a change from a stale page is refused.
+    expected: statusSchema,
   })
   .partial()
   .strict();

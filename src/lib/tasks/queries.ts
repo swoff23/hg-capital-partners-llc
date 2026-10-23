@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma, TaskStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { addDaysYmd } from "@/lib/quick-dates";
 import { activeTask, closedTask, excludeTemplateTasks } from "@/lib/task-scope";
@@ -114,12 +114,6 @@ export async function listFilterOptions() {
     legacyNames: legacyNames.map((t) => t.assigneeName).filter((n): n is string => !!n),
     properties,
   };
-}
-
-/** A task's status right now, for actions that only make sense from one status. */
-export async function taskStatus(id: string): Promise<TaskStatus | null> {
-  const t = await prisma.task.findUnique({ where: { id }, select: { status: true } });
-  return t?.status ?? null;
 }
 
 /**

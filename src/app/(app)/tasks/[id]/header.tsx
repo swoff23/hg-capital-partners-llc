@@ -9,6 +9,7 @@ import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { deleteTask, setTaskStatus, updateTask } from "./actions";
+import { useStatusRun } from "./status-run";
 import { useRun } from "./use-run";
 
 /** The title, edited in place. Long titles wrap. */
@@ -43,7 +44,7 @@ export function MoreMenu({
   status: TaskStatus;
   waitingOn: string | null;
 }) {
-  const { run, toast } = useRun();
+  const { run, pending, toast } = useStatusRun();
   const [confirming, setConfirming] = useState(false);
   const [deleting, startDelete] = useTransition();
 
@@ -72,10 +73,11 @@ export function MoreMenu({
           {active && (
             <MenuItem
               icon={<Ban />}
+              isDisabled={pending}
               onAction={() =>
-                run(() => setTaskStatus(taskId, "CANCELED"), {
+                run(() => setTaskStatus(taskId, "CANCELED", { expected: status }), {
                   done: "Task canceled",
-                  undo: () => setTaskStatus(taskId, status, status === "WAITING" ? { waitingOn } : {}),
+                  undo: () => setTaskStatus(taskId, status, { expected: "CANCELED", ...(status === "WAITING" ? { waitingOn } : {}) }),
                 })
               }
             >

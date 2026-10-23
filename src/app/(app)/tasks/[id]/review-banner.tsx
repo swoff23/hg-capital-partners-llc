@@ -4,7 +4,7 @@ import { Avatar } from "@/components/avatar";
 import { Sheet } from "@/components/sheet";
 import { Button, Textarea } from "@/components/ui";
 import { setTaskStatus } from "./actions";
-import { useRun } from "./use-run";
+import { useStatusRun } from "./status-run";
 
 /**
  * A job waiting on staff (D6b): "Zack marked this done · 4 photos" with
@@ -26,7 +26,7 @@ export function ReviewBanner({
   isContractor: boolean;
   photos: number;
 }) {
-  const { run, pending } = useRun();
+  const { run, pending } = useStatusRun();
   const [sendingBack, setSendingBack] = useState(false);
 
   return (
@@ -39,7 +39,7 @@ export function ReviewBanner({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Button size="sm" disabled={pending} onClick={() => run(() => setTaskStatus(taskId, "DONE"), { done: "Approved" })}>
+        <Button size="sm" disabled={pending} onClick={() => run(() => setTaskStatus(taskId, "DONE", { expected: "REVIEW" }), { done: "Approved" })}>
           Approve
         </Button>
         <Button size="sm" variant="secondary" disabled={pending} onClick={() => setSendingBack(true)}>
@@ -51,7 +51,7 @@ export function ReviewBanner({
           <SendBackForm
             onSend={(note) => {
               close();
-              run(() => setTaskStatus(taskId, "IN_PROGRESS", { note }), { done: `Sent back to ${name}` });
+              run(() => setTaskStatus(taskId, "IN_PROGRESS", { note, expected: "REVIEW" }), { done: `Sent back to ${name}` });
             }}
           />
         )}

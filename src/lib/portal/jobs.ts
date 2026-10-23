@@ -89,8 +89,18 @@ async function logLockboxView(p: PortalPrincipal, taskId: string, ipHash: string
 /** Start job: To do, Scheduled or Waiting becomes In progress. */
 export async function startJob(taskId: string): Promise<void> {
   const p = await requirePortalPrincipal();
-  await prisma.$transaction((tx) => core.setStatus(tx, taskId, "IN_PROGRESS", taskPrincipal(p)));
+  await refreshOnRefusal(taskId, () => prisma.$transaction((tx) => core.setStatus(tx, taskId, "IN_PROGRESS", taskPrincipal(p))));
   revalidateJob(taskId);
+}
+
+/** A refused change (the job moved on, or closed) still refreshes the page, so it shows where the job is now. */
+async function refreshOnRefusal<T>(taskId: string, write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateJob(taskId);
+    throw err;
+  }
 }
 
 export interface JobUpdateInput {
@@ -131,13 +141,15 @@ export async function postJobUpdate(taskId: string, input: JobUpdateInput): Prom
 export async function markJobDone(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
   const principal = taskPrincipal(p);
-  await prisma.$transaction(async (tx) => {
-    const attachmentIds = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
-    if (input.body.trim() || attachmentIds.length) {
-      await core.addComment(tx, taskId, { body: input.body, attachmentIds }, principal);
-    }
-    await core.setStatus(tx, taskId, "REVIEW", principal);
-  });
+  await refreshOnRefusal(taskId, () =>
+    prisma.$transaction(async (tx) => {
+      const attachmentIds = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
+      if (input.body.trim() || attachmentIds.length) {
+        await core.addComment(tx, taskId, { body: input.body, attachmentIds }, principal);
+      }
+      await core.setStatus(tx, taskId, "REVIEW", principal);
+    }),
+  );
   revalidateJob(taskId);
 }
 

@@ -12,6 +12,7 @@ import type { Ymd } from "@/lib/dates";
 import { STATUS_LABEL, STATUS_ORDER } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { setTaskStatus, updateTask } from "./actions";
+import { useStatusRun } from "./status-run";
 import { useRun } from "./use-run";
 
 /**
@@ -34,7 +35,7 @@ export function StatusControl({
   dueDate: Ymd | null;
   today: Ymd;
 }) {
-  const { run, pending } = useRun();
+  const { run, pending } = useStatusRun();
   const [shown, setShown] = useOptimistic(status);
   const [sheet, setSheet] = useState<"waiting" | "scheduled" | null>(null);
 
@@ -42,7 +43,7 @@ export function StatusControl({
     if (to === shown) return;
     if (to === "WAITING") return setSheet("waiting");
     if (to === "SCHEDULED") return setSheet("scheduled");
-    run(() => setTaskStatus(taskId, to), { before: () => setShown(to) });
+    run(() => setTaskStatus(taskId, to, { expected: status }), { before: () => setShown(to) });
   }
 
   return (
@@ -80,7 +81,7 @@ export function StatusControl({
             onSave={(reason) => {
               close();
               if (shown === "WAITING") run(() => updateTask(taskId, { waitingOn: reason }));
-              else run(() => setTaskStatus(taskId, "WAITING", { waitingOn: reason }), { before: () => setShown("WAITING") });
+              else run(() => setTaskStatus(taskId, "WAITING", { waitingOn: reason, expected: status }), { before: () => setShown("WAITING") });
             }}
           />
         )}
@@ -93,7 +94,7 @@ export function StatusControl({
             today={today}
             onSave={(date) => {
               close();
-              run(() => setTaskStatus(taskId, "SCHEDULED", { scheduledFor: date }), { before: () => setShown("SCHEDULED") });
+              run(() => setTaskStatus(taskId, "SCHEDULED", { scheduledFor: date, expected: status }), { before: () => setShown("SCHEDULED") });
             }}
           />
         )}
