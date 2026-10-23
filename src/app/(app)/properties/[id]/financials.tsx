@@ -4,7 +4,13 @@ import { fmtDay } from "@/lib/dates";
 import { signedLineCents } from "@/lib/quickbooks/compute";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { CATEGORY_LABELS } from "../../financials/_components/labels";
-import { fmtCents, MoneyBars, PartialLabel, SourceBadge } from "../../financials/_components/ui";
+import {
+  fmtCents,
+  MoneyBars,
+  PartialLabel,
+  SandboxNotice,
+  SourceBadge,
+} from "../../financials/_components/ui";
 
 /** "+$1,350" for money in, "−$1,350" (a true minus sign) for money out. */
 const fmtSignedCents = (cents: number) =>
@@ -17,7 +23,7 @@ const fmtSignedCents = (cents: number) =>
  * a card (so the gap is visible) with a link to fix the mapping.
  */
 export async function PropertyFinancialsCard({ propertyId }: { propertyId: string }) {
-  const data = await getPropertyFinancials(propertyId, "CASH");
+  const data = await getPropertyFinancials(propertyId); // the basis chosen in Financials → Settings
   if (!data || !data.connected) return null;
 
   if (!data.mapped) {
@@ -49,6 +55,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
       </CardHeader>
       <CardBody className="space-y-3">
         <SourceBadge basis={data.basis} syncedAt={data.lastSyncAt} />
+        {data.sandbox && <SandboxNotice />}
 
         {/* Three $0 figures would read as a property that earned nothing; say there's no data instead. */}
         {data.hasLines ? (

@@ -17,9 +17,9 @@ import type { QboCategory, QboLineTag, QboTreatment } from "@prisma/client";
  * transfer $750.00 mis-booked to Rents. So:
  *   operating income  126,806.97
  *   NOI                88,259.49
- *   cash flow a/d      14,611.35
+ *   NOI after interest 14,611.35
  * And the identity holds:
- *   71,255.43 = cashFlowAfterDebt + bankInterest + excluded(suspense+transfer) + ownerFunded
+ *   71,255.43 = noiAfterInterest + bankInterest + excluded(suspense+transfer) + ownerFunded
  */
 
 const QBO_NET_INCOME_CENTS = 7_125_543;
@@ -72,13 +72,13 @@ test("portfolio operating income, expense, NOI tie to the real P&L", () => {
   assert.equal(r.operatingExpenseCents, 3_854_748, "operating expense $38,547.48 (= QBO Total Expenses)");
   assert.equal(r.noiCents, 8_825_949, "NOI $88,259.49");
   assert.equal(r.debtInterestCents, 7_364_814);
-  assert.equal(r.cashFlowAfterDebtCents, 1_461_135, "cash flow after debt $14,611.35");
+  assert.equal(r.noiAfterInterestCents, 1_461_135, "NOI after interest $14,611.35");
 });
 
 test("the net-income reconciliation identity holds to the cent", () => {
   const r = computeNoi(PORTFOLIO);
   const identity =
-    r.cashFlowAfterDebtCents + r.nonOperatingIncomeCents + r.excludedCents + r.ownerFundedCents;
+    r.noiAfterInterestCents + r.nonOperatingIncomeCents + r.excludedCents + r.ownerFundedCents;
   assert.equal(identity, QBO_NET_INCOME_CENTS, "= QBO Net Income $71,255.43");
 });
 

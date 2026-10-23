@@ -1,23 +1,32 @@
 import "server-only";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, QboBasis } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { looksLikeProperty } from "./mapping";
+import { inOutCents } from "./rollup";
 import { UNCLASSED } from "./types";
 
 /**
- * The data-quality punch list — computed each sync into QboSyncRun.stats, and
- * recomputed live for /financials/settings. Everything is Cash basis (the
- * default view). Amounts in cents.
+ * The data-quality punch list — computed each sync into QboSyncRun.stats
+ * (Cash basis), and recomputed live on /financials and /financials/settings
+ * for the basis on screen. Lines on an IGNORE class are left out of every
+ * figure except `ignored`, which says how much was left out. Amounts in cents.
  */
 
+/** Line count plus money in and money out, kept apart (see inOutCents). */
+export interface LineSplit {
+  lineCount: number;
+  inCents: number;
+  outCents: number;
+}
+
 export interface DataQualityReport {
-  basis: "CASH";
-  unclassed: { cents: number; lineCount: number };
+  basis: QboBasis;
+  unclassed: LineSplit;
+  /** lines on classes set to Ignore, left out of every total */
+  ignored: LineSplit;
   suspenseCents: number;
   uncategorizedCents: number;
   negativeReclass: { grossCents: number; lineCount: number };
-  /** entity / "General" / no-class activity — real cost, not attributable to a property. */
-  unattributed: { netCents: number; incomeCents: number; expenseCents: number };
   ownerFundedCents: number;
   subsidyCents: number;
   /** UNMAPPED classes whose name still contains a known property token. */
@@ -28,15 +37,36 @@ export interface DataQualityReport {
 const d2c = (v: Prisma.Decimal | null | undefined): number =>
   v == null ? 0 : Math.round(Number(v) * 100);
 
+const COUNTED = { classRole: { not: "IGNORE" } } satisfies Prisma.LedgerLineWhereInput;
+
 async function sumWhere(where: Prisma.LedgerLineWhereInput): Promise<number> {
   const r = await prisma.ledgerLine.aggregate({ where, _sum: { amount: true } });
   return d2c(r._sum.amount);
 }
 
-async function netIncomeCents(realmId: string, basis: "CASH" | "ACCRUAL"): Promise<number> {
+async function splitWhere(where: Prisma.LedgerLineWhereInput): Promise<LineSplit> {
+  const groups = await prisma.ledgerLine.groupBy({
+    by: ["classification", "treatment"],
+    where,
+    _sum: { amount: true },
+    _count: { _all: true },
+  });
+  return {
+    lineCount: groups.reduce((n, g) => n + g._count._all, 0),
+    ...inOutCents(
+      groups.map((g) => ({
+        classification: g.classification,
+        treatment: g.treatment,
+        cents: d2c(g._sum.amount),
+      })),
+    ),
+  };
+}
+
+async function netIncomeCents(realmId: string, basis: QboBasis): Promise<number> {
   const rows = await prisma.ledgerLine.groupBy({
     by: ["treatment"],
-    where: { realmId, basis },
+    where: { realmId, basis, ...COUNTED },
     _sum: { amount: true },
   });
   let net = 0;
@@ -53,28 +83,24 @@ async function netIncomeCents(realmId: string, basis: "CASH" | "ACCRUAL"): Promi
 export async function buildDataQuality(
   realmId: string,
   propTokens: Set<string>,
+  basis: QboBasis = "CASH",
 ): Promise<DataQualityReport> {
-  const basis = "CASH" as const;
-  const base = { realmId, basis };
+  const base = { realmId, basis, ...COUNTED };
 
   const [
-    unclassedAgg,
+    unclassed,
+    ignored,
     suspenseCents,
     uncategorizedCents,
     negAgg,
     ownerFundedCents,
     subsidyCents,
-    unattrIncome,
-    unattrExpense,
     unmappedClasses,
     cashNet,
     accrualNet,
   ] = await Promise.all([
-    prisma.ledgerLine.aggregate({
-      where: { ...base, classKey: UNCLASSED },
-      _sum: { amount: true },
-      _count: true,
-    }),
+    splitWhere({ ...base, classKey: UNCLASSED }),
+    splitWhere({ realmId, basis, classRole: "IGNORE" }),
     sumWhere({ ...base, category: "SUSPENSE" }),
     sumWhere({ ...base, category: "UNCATEGORIZED" }),
     prisma.ledgerLine.aggregate({
@@ -84,16 +110,6 @@ export async function buildDataQuality(
     }),
     sumWhere({ ...base, lineTags: { has: "OWNER_FUNDED" } }),
     sumWhere({ ...base, lineTags: { has: "SUBSIDY" } }),
-    sumWhere({
-      ...base,
-      OR: [{ classRole: "OVERHEAD" }, { classRole: "ENTITY" }, { classKey: UNCLASSED }],
-      treatment: { in: ["OPERATING_INCOME", "NON_OPERATING"] },
-    }),
-    sumWhere({
-      ...base,
-      OR: [{ classRole: "OVERHEAD" }, { classRole: "ENTITY" }, { classKey: UNCLASSED }],
-      treatment: { in: ["OPERATING_EXPENSE", "DEBT_INTEREST"] },
-    }),
     prisma.qboClass.findMany({
       where: { realmId, role: "UNMAPPED" },
       select: { qboId: true, fullyQualifiedName: true },
@@ -104,15 +120,11 @@ export async function buildDataQuality(
 
   return {
     basis,
-    unclassed: { cents: d2c(unclassedAgg._sum.amount), lineCount: unclassedAgg._count },
+    unclassed,
+    ignored,
     suspenseCents,
     uncategorizedCents,
     negativeReclass: { grossCents: d2c(negAgg._sum.amount), lineCount: negAgg._count },
-    unattributed: {
-      netCents: unattrIncome - unattrExpense,
-      incomeCents: unattrIncome,
-      expenseCents: unattrExpense,
-    },
     ownerFundedCents,
     subsidyCents,
     unmappedPropertyLikeClasses: unmappedClasses.filter((c) =>
