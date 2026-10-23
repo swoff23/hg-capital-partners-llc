@@ -10,7 +10,7 @@ Everything that's waiting on you, in one list. None of it blocks using the app d
   - `RESEND_API_KEY` and `EMAIL_FROM`: from Resend
   - `EMAIL_REPLY_TO` (optional): an inbox you and Pieter both read
 
-Until then, no emails go out. The email job knocks every minute and is turned away, which is harmless.
+Until then, no emails go out. The email job knocks every minute and is turned away, which is harmless. `APP_URL` also makes "Forgot password" work on the contractor portal; until it's set, that page errors. Before email goes on, Claude clears anything your test contractor queued, so Pieter doesn't get test emails.
 
 ## Asana import
 
@@ -26,7 +26,10 @@ Claude runs the official Asana backup itself; nothing needed from you for that.
 
 ## Before inviting contractors
 
-Invites are on hold until you say go.
+Invites are on hold until you say go. The portal is on, but only your test contractor can use it.
+
+- [ ] Create your test login: on Contractors, open "Connor Test Contractor", tap Create login, sign in at /login with the starting password it shows, and pick your own password. Three "Test:" jobs are waiting (To do, Scheduled and In progress).
+- [ ] When you're done testing, tell Claude to delete the test contractor and its "Test:" jobs.
 
 - [ ] Add emails for the 14 contractors who have none: Alison Hurtado, David Waryk, Dust 2 Sparkles, Fox Pest, Jeremiah Anderson, Jon Oconnel, Kim Lockett, Kyle Griffin, Mark Kreuder, Melvin Miles, Nick, Richard ONeil, Scott Anderson, Steve Cristiano. You could also mark the ones who'll never use the portal.
 - [ ] Put a person's name on "Dust 2 Sparkles" and "Fox Pest", so the portal and emails don't greet them as "Dust" and "Fox".
@@ -48,6 +51,7 @@ Invites are on hold until you say go.
 ## Done
 
 - Oct 23: Vercel Pro.
+- Oct 23: the contractor portal is on (`PORTAL_ENABLED=1`), with a test contractor and three test jobs.
 - Oct 23: answered the open questions:
   - contractors stay uninvited until you say;
   - ignore 933 Lafayette;
