@@ -124,7 +124,7 @@ export function UnitsSection({
               setEditVersion(version);
               setEditing(true);
             }}
-            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
+            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
           >
             Edit
           </button>
