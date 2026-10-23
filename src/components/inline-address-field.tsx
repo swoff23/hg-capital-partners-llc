@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useInlineEditKeys } from "./use-inline-edit-keys";
 
 /**
  * Page heading, editable in place: commits on blur / Enter, reverts on Escape,
@@ -31,6 +32,7 @@ export function InlineAddressField({
       await onCommit(trimmed);
     });
   }
+  const keys = useInlineEditKeys(() => setV(value), commit);
 
   return (
     <div className="group/addr relative -mx-2">
@@ -39,14 +41,8 @@ export function InlineAddressField({
         value={v}
         disabled={pending}
         onChange={(e) => setV(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") {
-            setV(value);
-            e.currentTarget.blur();
-          }
-        }}
+        onBlur={keys.onBlur}
+        onKeyDown={keys.onKeyDown}
         className="w-full rounded-md bg-transparent px-2 py-1 pr-6 text-xl font-semibold tracking-tight text-foreground outline-none transition-colors hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 disabled:opacity-40"
       />
       <svg

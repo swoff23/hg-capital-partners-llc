@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
 import type { ListingStatus, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { amountToDecimal } from "@/lib/money";
+import { badNumbersMessage, readAmount, readWholeNumber } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { normalizeAddress } from "@/lib/normalize";
 import { parseBuildingCapex, type BuildingCapexEntry, type PropertyUnit } from "@/lib/property-types";
@@ -107,11 +107,23 @@ export async function patchProperty(id: string, patch: PropertyPatch): Promise<v
   const s = (k: string) => patch[k]?.trim() || null;
 
   const data: Record<string, unknown> = {};
+  const bad: string[] = [];
   if (has("address") && s("address")) data.address = s("address");
   for (const k of TEXT_FIELDS) if (has(k)) data[k] = s(k);
-  for (const k of MONEY_FIELDS) if (has(k)) data[k] = amountToDecimal(s(k));
+  for (const k of MONEY_FIELDS) {
+    if (!has(k)) continue;
+    const r = readAmount(patch[k]);
+    if (r.ok) data[k] = r.value;
+    else bad.push(k);
+  }
   for (const k of DATE_FIELDS) if (has(k)) data[k] = ymdToDate(s(k));
-  if (has("sqft")) data.sqft = s("sqft") ? parseInt(s("sqft")!.replace(/\D/g, ""), 10) || null : null;
+  if (has("sqft")) {
+    const r = readWholeNumber(patch.sqft);
+    if (r.ok) data.sqft = r.value;
+    else bad.push("sqft");
+  }
+  // Nothing is written when a number didn't read: storing null would erase what's there.
+  if (bad.length) throw new Error(badNumbersMessage(bad));
 
   if (Object.keys(data).length > 0) await prisma.property.update({ where: { id }, data });
   if (KEY_DATE_FIELDS.some((k) => has(k))) await syncPropertyReminders(id);
@@ -264,20 +276,27 @@ export interface ListingInput {
  * orphaned photo blobs are deleted only after the commit.
  */
 export async function replaceListings(propertyId: string, listings: ListingInput[], expectedVersion: string): Promise<void> {
-  const clean = listings.map((l) => ({
-    id: l.id ?? null,
-    unitLabel: l.unitLabel.trim() || "Unit",
-    zillowUrl: l.zillowUrl.trim() || null,
-    rent: amountToDecimal(l.rent.trim() || null),
-    beds: l.beds.trim() || null,
-    baths: l.baths.trim() || null,
-    sqft: l.sqft.trim() ? Math.max(0, Math.trunc(Number(l.sqft))) || null : null,
-    availableDate: ymdToDate(l.availableDate.trim() || null),
-    status: l.status,
-    photos: l.photos
-      .filter((p) => p.url.trim() && p.pathname.trim())
-      .map((p, sortOrder) => ({ url: p.url.trim(), pathname: p.pathname.trim(), sortOrder })),
-  }));
+  const clean = listings.map((l) => {
+    const unitLabel = l.unitLabel.trim() || "Unit";
+    const rent = readAmount(l.rent);
+    if (!rent.ok) throw new Error(`Rent for ${unitLabel} isn't a number. Enter it like 1,450.`);
+    const sqft = readWholeNumber(l.sqft);
+    if (!sqft.ok) throw new Error(`Sq ft for ${unitLabel} isn't a whole number. Enter it like 850.`);
+    return {
+      id: l.id ?? null,
+      unitLabel,
+      zillowUrl: l.zillowUrl.trim() || null,
+      rent: rent.value,
+      beds: l.beds.trim() || null,
+      baths: l.baths.trim() || null,
+      sqft: sqft.value,
+      availableDate: ymdToDate(l.availableDate.trim() || null),
+      status: l.status,
+      photos: l.photos
+        .filter((p) => p.url.trim() && p.pathname.trim())
+        .map((p, sortOrder) => ({ url: p.url.trim(), pathname: p.pathname.trim(), sortOrder })),
+    };
+  });
 
   const existing = await prisma.listing.findMany({ where: { propertyId }, select: { id: true, photos: { select: { url: true } } } });
   const existingById = new Map(existing.map((e) => [e.id, e]));

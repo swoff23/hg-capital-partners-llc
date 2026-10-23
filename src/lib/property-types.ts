@@ -48,6 +48,22 @@ export function parseUnits(json: unknown): PropertyUnit[] {
   }));
 }
 
+/** A building's own meters ("HSE (house)") sit in the units list but aren't a rentable unit. */
+export function isHouseMeterRow(u: PropertyUnit): boolean {
+  return /^\s*hse\b|\(house\)/i.test(u.label ?? "");
+}
+
+/**
+ * The one unit count, read by Portfolio, its total and the property header so
+ * they can't disagree: the stored count when there is one, otherwise the unit
+ * records less house-meter rows.
+ */
+export function propertyUnitCount(p: { unitCount: number | null; units: unknown }): number | null {
+  if (p.unitCount != null) return p.unitCount;
+  const records = parseUnits(p.units).filter((u) => !isHouseMeterRow(u)).length;
+  return records > 0 ? records : null;
+}
+
 /** Utility fields grouped by provider, for a per-utility layout. */
 export const UTILITY_GROUPS: { name: string; fields: [keyof UnitUtilities, string][] }[] = [
   {

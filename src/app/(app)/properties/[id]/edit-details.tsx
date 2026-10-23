@@ -1,11 +1,12 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button, Field, Input, SectionCard, Select, Textarea } from "@/components/ui";
 import { InlineAddressField } from "@/components/inline-address-field";
 import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
 import { fmtMoney } from "@/lib/utils";
 import { fmtDay } from "@/lib/dates";
 import { patchProperty } from "../actions";
+import { useSectionSave } from "./use-section-save";
 
 export type EditableProperty = {
   id: string;
@@ -34,10 +35,12 @@ export function PropertyAddressField({ id, value }: { id: string; value: string 
   return (
     <InlineAddressField
       value={value}
-      onCommit={(address) => {
+      onCommit={async (address) => {
         const fd = new FormData();
         fd.set("address", address);
-        return patchProperty(id, fd);
+        const r = await patchProperty(id, fd);
+        // No inline message on a heading: a failed save goes to the page's error boundary.
+        if (!r.ok) throw new Error(r.error);
       }}
     />
   );
@@ -45,8 +48,7 @@ export function PropertyAddressField({ id, value }: { id: string; value: string 
 
 export function PropertyDetailsSection({ property: p }: { property: EditableProperty }) {
   const [editing, setEditing] = useState(false);
-  const [pending, start] = useTransition();
-  const save = patchProperty.bind(null, p.id);
+  const { pending, error, onSubmit, clearError } = useSectionSave(patchProperty.bind(null, p.id), () => setEditing(false));
   const formId = `property-details-${p.id}`;
 
   if (!editing) {
@@ -78,7 +80,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
             variant="secondary"
             size="sm"
             disabled={pending}
-            onClick={() => setEditing(false)}
+            onClick={() => { setEditing(false); clearError(); }}
           >
             Cancel
           </Button>
@@ -88,12 +90,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
         </div>
       }
     >
-      <form
-        id={formId}
-        key={p.version}
-        action={(fd) => start(async () => { await save(fd); setEditing(false); })}
-        className="space-y-3"
-      >
+      <form id={formId} key={p.version} onSubmit={onSubmit} className="space-y-3">
         <L label="Address"><Input name="address" defaultValue={p.address} /></L>
         <div className="grid grid-cols-2 gap-3">
           <L label="Value"><Input name="value" defaultValue={p.value ?? ""} /></L>
@@ -126,6 +123,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
             />
           </L>
         </div>
+        {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </form>
     </SectionCard>
   );
@@ -141,8 +139,7 @@ export function PropertyNotesSection({
   notes: string | null;
 }) {
   const [editing, setEditing] = useState(false);
-  const [pending, start] = useTransition();
-  const save = patchProperty.bind(null, id);
+  const { pending, error, onSubmit, clearError } = useSectionSave(patchProperty.bind(null, id), () => setEditing(false));
   const formId = `property-notes-${id}`;
 
   if (!editing) {
@@ -168,7 +165,7 @@ export function PropertyNotesSection({
             variant="secondary"
             size="sm"
             disabled={pending}
-            onClick={() => setEditing(false)}
+            onClick={() => { setEditing(false); clearError(); }}
           >
             Cancel
           </Button>
@@ -178,17 +175,14 @@ export function PropertyNotesSection({
         </div>
       }
     >
-      <form
-        id={formId}
-        key={version}
-        action={(fd) => start(async () => { await save(fd); setEditing(false); })}
-      >
+      <form id={formId} key={version} onSubmit={onSubmit} className="space-y-2">
         <Textarea
           name="notes"
           rows={6}
           defaultValue={notes ?? ""}
           placeholder="Additional notes on this property…"
         />
+        {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </form>
     </SectionCard>
   );

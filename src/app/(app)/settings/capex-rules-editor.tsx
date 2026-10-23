@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { Button, PageHeader, SectionCard } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
 import { fmtMoney } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
 import { DEFAULT_CAPEX_RULES, type BuildingRule, type CapexRules } from "@/lib/property-types";
@@ -100,6 +101,18 @@ function InlineNumber({
 }) {
   const format = (n: number) => (kind === "money" ? fmtMoney(n) : fmtYrs(n));
   const [text, setText] = useState(() => format(value));
+  const keys = useInlineEditKeys(
+    () => setText(format(value)),
+    () => {
+      const n = Math.round(parseNum(text));
+      if (Number.isFinite(n) && n >= 0 && n <= max) {
+        const accepted = n === value || onCommit(n);
+        setText(format(accepted ? n : value));
+      } else {
+        setText(format(value));
+      }
+    },
+  );
   return (
     <input
       className={quiet}
@@ -110,22 +123,8 @@ function InlineNumber({
         e.currentTarget.select();
       }}
       onChange={(e) => setText(e.target.value)}
-      onBlur={() => {
-        const n = Math.round(parseNum(text));
-        if (Number.isFinite(n) && n >= 0 && n <= max) {
-          const accepted = n === value || onCommit(n);
-          setText(format(accepted ? n : value));
-        } else {
-          setText(format(value));
-        }
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") {
-          setText(format(value));
-          e.currentTarget.blur();
-        }
-      }}
+      onBlur={keys.onBlur}
+      onKeyDown={keys.onKeyDown}
     />
   );
 }
@@ -151,31 +150,29 @@ function ComboField({
   placeholder?: string;
 }) {
   const [text, setText] = useState(value);
+  const keys = useInlineEditKeys(
+    () => setText(value),
+    () => {
+      const v = text.trim();
+      if (!v || v === value) {
+        setText(value);
+        return;
+      }
+      if (!freeText && !options.includes(v)) {
+        setText(value);
+        return;
+      }
+      if (!onCommit(v)) setText(value);
+    },
+  );
   return (
     <input
       className={quiet}
       placeholder={placeholder}
       value={text}
       onChange={(e) => setText(e.target.value)}
-      onBlur={() => {
-        const v = text.trim();
-        if (!v || v === value) {
-          setText(value);
-          return;
-        }
-        if (!freeText && !options.includes(v)) {
-          setText(value);
-          return;
-        }
-        if (!onCommit(v)) setText(value);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") {
-          setText(value);
-          e.currentTarget.blur();
-        }
-      }}
+      onBlur={keys.onBlur}
+      onKeyDown={keys.onKeyDown}
     />
   );
 }

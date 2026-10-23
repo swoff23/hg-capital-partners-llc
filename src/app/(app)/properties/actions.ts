@@ -36,9 +36,13 @@ function formToPatch(formData: FormData): properties.PropertyPatch {
   return patch;
 }
 
-/** Edit the property's scalar detail fields (details, loan, insurance, notes, inline address). */
-export async function patchProperty(id: string, formData: FormData) {
-  return withLog("patchProperty", async () => {
+/**
+ * Edit the property's scalar detail fields (details, loan, insurance, notes,
+ * inline address). A number that doesn't read comes back as the error, and
+ * nothing is saved; the editor keeps what was typed.
+ */
+export async function patchProperty(id: string, formData: FormData): Promise<ActionResult> {
+  return withResult("patchProperty", async () => {
     await requireUser();
     await properties.patchProperty(id, formToPatch(formData));
   });

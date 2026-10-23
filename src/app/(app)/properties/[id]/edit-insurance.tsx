@@ -1,9 +1,10 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button, Input, SectionCard } from "@/components/ui";
 import { cn, fmtMoney } from "@/lib/utils";
 import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
 import { patchProperty } from "../actions";
+import { useSectionSave } from "./use-section-save";
 
 export type EditableInsurance = {
   id: string;
@@ -32,8 +33,7 @@ const L = ({ label, children }: { label: string; children: React.ReactNode }) =>
 
 export function PropertyInsuranceSection({ insurance: p }: { insurance: EditableInsurance }) {
   const [editing, setEditing] = useState(false);
-  const [pending, start] = useTransition();
-  const save = patchProperty.bind(null, p.id);
+  const { pending, error, onSubmit, clearError } = useSectionSave(patchProperty.bind(null, p.id), () => setEditing(false));
   const formId = `property-insurance-${p.id}`;
 
   const renewal = p.insuranceRenewalDate;
@@ -74,7 +74,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
       editing
       actions={
         <div className="flex items-center gap-2">
-          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => setEditing(false)}>
+          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { setEditing(false); clearError(); }}>
             Cancel
           </Button>
           <Button type="submit" form={formId} size="sm" disabled={pending}>
@@ -83,17 +83,13 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
         </div>
       }
     >
-      <form
-        id={formId}
-        key={p.version}
-        action={(fd) => start(async () => { await save(fd); setEditing(false); })}
-        className="grid grid-cols-2 gap-3"
-      >
+      <form id={formId} key={p.version} onSubmit={onSubmit} className="grid grid-cols-2 gap-3">
         <L label="Carrier"><Input name="insuranceCarrier" defaultValue={p.insuranceCarrier ?? ""} /></L>
         <L label="Policy #"><Input name="insurancePolicyNo" defaultValue={p.insurancePolicyNo ?? ""} /></L>
         <L label="Premium"><Input name="insurancePremium" defaultValue={p.insurancePremium ?? ""} /></L>
         <L label="Replacement cost"><Input name="replacementCost" defaultValue={p.replacementCost ?? ""} /></L>
         <L label="Renewal date"><Input name="insuranceRenewalDate" type="date" defaultValue={p.insuranceRenewalDate ?? ""} /></L>
+        {error && <p role="alert" className="col-span-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </form>
     </SectionCard>
   );

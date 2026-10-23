@@ -51,6 +51,7 @@ Two surfaces: the app (`app/(app)`) uses the tokens in `app/globals.css` and the
 | Pending action | `useTransition`, a disabled `Button` and a label swap ("Saving…") | See `app/(app)/settings/move-in-form/move-in-form-editor.tsx`, `financials/_components/refresh-button.tsx` |
 | Section with view and edit modes | `components/ui.tsx` `SectionCard` | Edit link shows on hover, always on phones; `actions` slot holds Cancel and Save |
 | Edit a heading in place | `components/inline-address-field.tsx` `InlineAddressField` | Commits on blur or Enter, reverts on Esc. The base for any inline text edit |
+| Save on blur, cancel on Esc | `components/use-inline-edit-keys.ts` `useInlineEditKeys` | Enter saves, Esc reverts without saving. Every field that saves on blur uses it, so Esc never saves what it threw away |
 | File upload with drag and drop | `components/attachments.tsx` `Attachments` | Private Vercel Blob uploads; `kind` picks task or property |
 | Done checkbox | `app/(app)/tasks/task-checkbox.tsx` `TaskCheckbox` | Tasks only |
 
@@ -123,7 +124,7 @@ Use the pick; folding a copy into it is welcome when you're already in that file
 | Confirm dialog | `ConfirmDialog`, plus inline copies in `app/(app)/properties/[id]/edit-units.tsx` and `edit-listings.tsx` | `ConfirmDialog` |
 | Segmented control | `app/(app)/deals/filters.tsx`, `app/(app)/tasks/filters.tsx`, and `BasisToggle` in `app/(app)/financials/settings/controls.tsx` (fills with the primary color) | The `deals/filters.tsx` one, extracted to `components/` as `SegmentedControl` |
 | Sortable header | `app/(app)/deals/sort-header.tsx`, `app/(app)/tasks/sort-header.tsx` | The deals one, with the field type as a generic |
-| Inline text edit | `InlineAddressField`, plus hand-rolled edits with their own Esc handling in `tasks/task-row.tsx`, `tasks/[id]/task-detail.tsx`, `deals/[id]/deal-detail.tsx` (2) and `settings/capex-rules-editor.tsx` (2) | `InlineAddressField`, generalized to any text |
+| Inline text edit | `InlineAddressField`, plus hand-rolled edits in `tasks/task-row.tsx`, `tasks/[id]/task-detail.tsx`, `deals/[id]/deal-detail.tsx` (2) and `settings/capex-rules-editor.tsx` (2). All but the two task ones take their keys from `useInlineEditKeys` | `InlineAddressField`, generalized to any text |
 | Outside-click popover | `StatusMultiSelect` and `GlobalSearch` each wire their own `mousedown` listener | A shared popover hook (Known gaps) |
 | Money formatting | `fmtMoney`, plus `priceDisplay` in `deals/deal-row.tsx` and a raw `toLocaleString` in `(marketing)/rentals/page.tsx` | `fmtMoney` |
 | Age in years | `fmtAge` in `properties/[id]/capex-outlook.tsx`, `building-capex.tsx` and `edit-units.tsx`; `fmtYrs` in `settings/capex-rules-editor.tsx` | Move one into `lib/` |

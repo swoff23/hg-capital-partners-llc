@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { InlineAddressField } from "@/components/inline-address-field";
+import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
 import { DEAL_STATUSES, DEAL_PASS_REASONS, dealStatusTone, toneClass } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { patchDeal } from "../actions";
@@ -132,6 +133,7 @@ function TextField({
     const patch = { [patchKey]: trimmed || null } as Parameters<typeof patchDeal>[1];
     start(() => patchDeal(id, patch));
   }
+  const keys = useInlineEditKeys(() => setV(value), commit);
 
   return (
     <input
@@ -141,14 +143,8 @@ function TextField({
       disabled={pending}
       placeholder={placeholder}
       onChange={(e) => setV(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") {
-          setV(value);
-          e.currentTarget.blur();
-        }
-      }}
+      onBlur={keys.onBlur}
+      onKeyDown={keys.onKeyDown}
       className={cn(quiet, !v && "text-muted")}
     />
   );
@@ -199,6 +195,7 @@ export function UnitsField({ id, value }: { id: string; value: number | null }) 
     if (next !== value) start(() => patchDeal(id, { units: next }));
     setV(next?.toString() ?? "");
   }
+  const keys = useInlineEditKeys(() => setV(value?.toString() ?? ""), commit);
 
   return (
     <input
@@ -209,14 +206,8 @@ export function UnitsField({ id, value }: { id: string; value: number | null }) 
       disabled={pending}
       placeholder="—"
       onChange={(e) => setV(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") {
-          setV(value?.toString() ?? "");
-          e.currentTarget.blur();
-        }
-      }}
+      onBlur={keys.onBlur}
+      onKeyDown={keys.onKeyDown}
       className={cn(quiet, !v && "text-muted")}
     />
   );

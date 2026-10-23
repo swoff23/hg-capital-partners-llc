@@ -7,7 +7,7 @@ import { initials } from "@/lib/utils";
 import { fmtDay, toYmd } from "@/lib/dates";
 import { propertyStatusTone } from "@/lib/config";
 import { activeTask } from "@/lib/task-scope";
-import { parseBuildingCapex, parseUnits } from "@/lib/property-types";
+import { parseBuildingCapex, parseUnits, propertyUnitCount } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { BackLink } from "@/components/back-link";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
@@ -73,7 +73,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     photos: l.photos.map((p) => ({ url: p.url, pathname: p.pathname })),
   }));
 
-  const unitCount = units.length || property.unitCount || 0;
+  const unitCount = propertyUnitCount(property) ?? 0;
   const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
 
   return (
