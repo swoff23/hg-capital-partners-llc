@@ -42,7 +42,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Action menu (⋯) | `components/menu.tsx` `Menu`, `MenuItem`, `MenuSeparator`, `MenuTrigger` | Arrow keys and typeahead. `variant="destructive"` for Delete; `icon` takes a lucide element. 44px rows on touch |
 | Tooltip | `components/tooltip.tsx` `Tooltip` | Fixed position, so it escapes table and card clipping. Hover only (Known gaps) |
 | Checklist popover for a multi-pick filter | `app/(app)/deals/status-multiselect.tsx` `StatusMultiSelect` | Outside click closes; no Esc. Rebuild on `Popover` before a second use |
-| Search with a results dropdown | `components/global-search.tsx` `GlobalSearch` | Queries `/api/search`; outside click closes. Below `sm` the results span the header between the page gutters |
+| Search with a results dropdown | `components/global-search.tsx` `GlobalSearch` | Combobox over `/api/search` (`lib/search.ts`: every word must match, in any order, "Avenue" finds "Ave."). Arrows move the highlight, Enter opens it, Esc closes the list and then clears the text; outside click closes. Below `sm` the results span the header between the page gutters |
 | Pick one from a list in a form | `components/ui.tsx` `Select` | Native `<select>` |
 
 ## Forms
@@ -157,7 +157,7 @@ Jobs nothing covers yet, and holes in the picks. The first feature that needs on
 - **Tap targets.** The primitives are 44px on touch now. Raw `<button>`s and fields outside `ui.tsx` (filter bars at `h-8`, text links in tables) still warn; move them onto the primitives.
 - **Wrapped control rows.** The device check warns that rows of controls wrap on `/deals`, `/login`, `/rentals`, `/residents`, `/residents/moving-in`, `/settings/move-in-form` and `/welcome`. CLAUDE.md says they shouldn't; shorten labels or collapse into a Filters button.
 - **Tooltip on touch.** `Tooltip` opens on hover only, so touch users never see it. Give it a tap path.
-- **Old popovers.** `StatusMultiSelect` and `GlobalSearch` predate `Popover` and don't close on Esc; move them onto it when touched.
+- **Old popovers.** `StatusMultiSelect` and `GlobalSearch` predate `Popover` and wire their own outside click; `StatusMultiSelect` doesn't close on Esc. Move them onto it when touched.
 - **Inline text edit.** Exists only as feature copies (Duplicates). Extract on the next touch.
 - **Spot art for payoff moments.** None yet; see Personality in CLAUDE.md.
 - **Public site kit.** Public pages hand-style buttons and fields on fixed hex colors; there's no shared public primitive.

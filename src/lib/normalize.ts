@@ -1,13 +1,16 @@
+/** Street words and the short form normalizeAddress writes them as. */
+export const STREET_WORDS = [
+  ["avenue", "ave"],
+  ["street", "st"],
+  ["drive", "dr"],
+  ["road", "rd"],
+] as const;
+
 export function normalizeAddress(raw: string | null | undefined): string {
   if (!raw) return "";
-  return raw
-    .toString()
-    .toLowerCase()
-    .replace(/\n/g, " ")
-    .replace(/\bavenue\b/g, "ave")
-    .replace(/\bstreet\b/g, "st")
-    .replace(/\bdrive\b/g, "dr")
-    .replace(/\broad\b/g, "rd")
+  let s = raw.toString().toLowerCase().replace(/\n/g, " ");
+  for (const [long, short] of STREET_WORDS) s = s.replace(new RegExp(`\\b${long}\\b`, "g"), short);
+  return s
     .replace(/[.,#]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
