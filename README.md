@@ -53,6 +53,9 @@ Rules of the road:
   the two settings blobs send the `updatedAt` they rendered with and refuse to
   overwrite a newer row.
 - **`process.env` is read in exactly one place**, `src/lib/env.ts`.
+- **Don't hard-code what another business would set differently** (names,
+  time zone, branding, senders). We may offer the app to other businesses
+  later; see [docs/other-businesses-later.md](docs/other-businesses-later.md).
 - **A migration that adds a table must enable RLS on it**
   (`ALTER TABLE "Foo" ENABLE ROW LEVEL SECURITY;`); `src/lib/db-rls.test.ts`
   fails otherwise. Never `FORCE ROW LEVEL SECURITY`.
