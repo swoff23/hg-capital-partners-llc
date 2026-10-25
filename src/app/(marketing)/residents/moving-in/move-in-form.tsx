@@ -1,20 +1,29 @@
 "use client";
 import { useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import type { MoveInFormSchema, MoveInSection } from "@/lib/move-in-form-types";
 import { submitMoveInInspection } from "./actions";
 import { todayYmd } from "@/lib/dates";
 import { callAction } from "@/lib/action-result";
+import { publicCtaClass, publicType } from "@/components/public/ui";
+import { SegmentedControl } from "@/components/segmented-control";
+import { SpotArt } from "@/components/spot-art";
+import { Button, Input, Section, Select, Textarea } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 const RATINGS = ["Good", "Fair", "Poor", "N/A"] as const;
 type Rating = (typeof RATINGS)[number] | "";
+const RATING_OPTIONS = RATINGS.map((r) => ({ key: r, label: r }));
 
 type ItemAnswer = { rating: Rating; comment: string };
 type Instance = { location: string; items: Record<string, ItemAnswer> };
 type SectionAnswers = Record<string, Instance[]>; // sectionKey -> instances
 
-const inputClass =
-  "h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none";
-const labelClass = "text-xs font-medium uppercase tracking-wider text-[#767d8a]";
+// The app's own fields (ui.tsx), which the public wrapper's tokens draw in the
+// dark material, with the public site's placeholder color. Labels sit 6px
+// above in text-meta 500, sentence case.
+const fieldClass = "mt-1.5 placeholder:text-pub-faint";
+const labelClass = "text-meta font-medium text-fg-2";
 
 function blankInstance(section: MoveInSection): Instance {
   return {
@@ -119,20 +128,24 @@ export function MoveInForm({
     });
   }
 
+  // The payoff: the move-in line art, a warm heading and what happens next.
   if (done) {
     return (
-      <div className="rounded-2xl border border-white/15 p-8 text-center">
-        <p className="text-sm font-medium text-[#e8eaee]">Thanks! Your move-in report is in.</p>
-        <p className="mt-2 text-sm leading-relaxed text-[#767d8a]">
-          We&rsquo;ve received it and will follow up if anything needs attention.
-        </p>
+      <div role="status" className="flex flex-col items-start gap-5 border-t border-line pt-8">
+        <SpotArt name="move-in-sent" />
+        <div>
+          <p className={cn(publicType.heading, "text-fg-1")}>Thanks! Your move-in report is in.</p>
+          <p className={cn(publicType.meta, "mt-2 text-fg-3")}>
+            We&rsquo;ve received it and will follow up if anything needs attention.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <form onSubmit={submit} className="space-y-8 text-left">
-      {/* Honeypot — invisible and unreachable by tab order for real users. */}
+      {/* Honeypot: invisible and unreachable by tab order for real users. */}
       <input
         type="text"
         name="company"
@@ -147,62 +160,52 @@ export function MoveInForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className={labelClass}>Tenant name</span>
-          <input
-            required
-            value={tenantName}
-            onChange={(e) => setTenantName(e.target.value)}
-            className={`mt-1.5 ${inputClass}`}
-          />
+          <Input required value={tenantName} onChange={(e) => setTenantName(e.target.value)} className={fieldClass} />
         </label>
         <label className="block">
           <span className={labelClass}>Date of inspection</span>
-          <input
+          <Input
             required
             type="date"
             value={inspectionDate}
             onChange={(e) => setInspectionDate(e.target.value)}
-            className={`mt-1.5 ${inputClass}`}
+            className={fieldClass}
           />
         </label>
         <label className="block sm:col-span-2">
           <span className={labelClass}>Property</span>
-          <select
+          <Select
             required
             value={propertyId}
             onChange={(e) => {
               setPropertyId(e.target.value);
               setUnitLabel("");
             }}
-            className={`mt-1.5 ${inputClass}`}
+            className={fieldClass}
           >
-            <option value="" disabled className="bg-[#0d0f13]">
+            <option value="" disabled>
               Select your property
             </option>
             {properties.map((p) => (
-              <option key={p.id} value={p.id} className="bg-[#0d0f13]">
+              <option key={p.id} value={p.id}>
                 {p.address}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         {units.length > 1 && (
           <label className="block sm:col-span-2">
             <span className={labelClass}>Unit</span>
-            <select
-              required
-              value={unitLabel}
-              onChange={(e) => setUnitLabel(e.target.value)}
-              className={`mt-1.5 ${inputClass}`}
-            >
-              <option value="" disabled className="bg-[#0d0f13]">
+            <Select required value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} className={fieldClass}>
+              <option value="" disabled>
                 Select your unit
               </option>
               {units.map((u) => (
-                <option key={u} value={u} className="bg-[#0d0f13]">
+                <option key={u} value={u}>
                   {u}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
       </div>
@@ -221,53 +224,54 @@ export function MoveInForm({
 
       <label className="block">
         <span className={labelClass}>Additional comments</span>
-        <textarea
+        <Textarea
           value={additionalComments}
           onChange={(e) => setAdditionalComments(e.target.value)}
           rows={3}
-          className={`mt-1.5 block w-full resize-y rounded-lg border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none`}
+          className={cn(fieldClass, "block resize-y")}
         />
       </label>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className={labelClass}>Your name</span>
-          <input
+          <Input
             required
             value={submitterName}
             onChange={(e) => setSubmitterName(e.target.value)}
-            className={`mt-1.5 ${inputClass}`}
+            className={fieldClass}
           />
         </label>
         <label className="block">
           <span className={labelClass}>Your email</span>
-          <input
+          <Input
             required
             type="email"
             value={submitterEmail}
             onChange={(e) => setSubmitterEmail(e.target.value)}
-            className={`mt-1.5 ${inputClass}`}
+            className={fieldClass}
           />
         </label>
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg border border-[#e0796a]/25 bg-[#e0796a]/[0.08] px-3 py-2 text-xs text-[#e5a99b]">
+        <p role="alert" className="text-meta text-danger">
           {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-full bg-[#e8eaee] px-7 py-3 text-[0.8125rem] font-medium tracking-wide text-[#08090b] transition-colors duration-200 hover:bg-[#c8a765] disabled:cursor-not-allowed disabled:opacity-60"
-      >
+      <button type="submit" disabled={pending} className={cn(publicCtaClass, "w-full")}>
         {pending ? "Submitting…" : "Submit move-in report"}
       </button>
     </form>
   );
 }
 
+/**
+ * One room of the report: a Section (heading over a hairline, "Add another"
+ * at its right end for a repeatable room), then each instance's items, each
+ * with a Good / Fair / Poor / N/A segmented control and an optional comment.
+ */
 function SectionBlock({
   section,
   instances,
@@ -284,71 +288,79 @@ function SectionBlock({
   onRemove: (index: number) => void;
 }) {
   return (
-    <div>
-      <div className="flex items-center justify-between gap-2 border-b border-white/15 pb-2">
-        <h3 className="text-sm font-medium text-[#e8eaee]">
+    <Section
+      as="h3"
+      title={
+        <>
           {section.label}
-          {section.minCount === 0 && <span className="ml-2 text-xs text-[#5b6576]">(optional)</span>}
-        </h3>
-        {section.repeatable && instances.length < section.maxCount && (
-          <button type="button" onClick={onAdd} className="text-xs font-medium text-[#c8a765] hover:underline">
-            + Add another {section.label.toLowerCase()}
-          </button>
-        )}
-      </div>
-
-      <div className="mt-4 space-y-6">
+          {section.minCount === 0 && <span className="ml-2 text-meta font-normal text-fg-3">(optional)</span>}
+        </>
+      }
+      actions={
+        section.repeatable &&
+        instances.length < section.maxCount && (
+          // The room stays in the accessible name; the visible label is short, so
+          // the header fits at 320 whatever the room is called in /settings.
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onAdd}
+            aria-label={`Add another ${section.label.toLowerCase()}`}
+          >
+            <Plus aria-hidden="true" className="size-4 stroke-[1.5]" />
+            Add another
+          </Button>
+        )
+      }
+    >
+      <div className="space-y-4">
         {instances.map((inst, i) => (
-          <div key={i} className="rounded-2xl border border-white/10 p-4">
+          <div key={i} className={cn(i > 0 && "border-t border-line pt-4")}>
             {section.hasLocation && (
-              <div className="mb-3 flex items-center gap-2">
-                <input
+              <div className="mb-1 flex items-center gap-2">
+                <Input
                   value={inst.location}
                   onChange={(e) => onLocationChange(i, e.target.value)}
                   placeholder={`${section.label} ${i + 1} (e.g. "Upstairs")`}
-                  className={`${inputClass} h-9`}
+                  aria-label={`${section.label} ${i + 1} location`}
+                  className="placeholder:text-pub-faint"
                 />
                 {i > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onRemove(i)}
-                    className="shrink-0 text-xs text-[#767d8a] hover:text-red-400"
-                  >
+                  <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(i)} className="shrink-0">
                     Remove
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
-            <div className="divide-y divide-white/[0.06]">
+            <div className="divide-y divide-line">
               {section.items.map((item) => {
                 const answer = inst.items[item.key] ?? { rating: "", comment: "" };
                 return (
                   <div key={item.key} className="py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm text-[#e8eaee]">{item.label}</span>
-                      <div className="flex gap-1">
-                        {RATINGS.map((r) => (
-                          <button
-                            key={r}
-                            type="button"
-                            onClick={() => onItemChange(i, item.key, { rating: answer.rating === r ? "" : r })}
-                            className={
-                              "rounded-full border px-2.5 py-1 text-[0.6875rem] font-medium transition-colors " +
-                              (answer.rating === r
-                                ? "border-[#c8a765] bg-[#c8a765]/10 text-[#c8a765]"
-                                : "border-white/15 text-[#767d8a] hover:border-white/30")
-                            }
-                          >
-                            {r}
-                          </button>
-                        ))}
-                      </div>
+                    {/* Below 640 every item's control sits under its label, from 640 beside it:
+                        the width decides, not the label's length, so the controls line up. */}
+                    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                      <span className="text-body text-fg-1">{item.label}</span>
+                      <SegmentedControl
+                        aria-label={`${item.label} condition`}
+                        options={RATING_OPTIONS}
+                        size="md"
+                        value={answer.rating || null}
+                        // Picking the chosen rating again clears it.
+                        onChange={(r) => onItemChange(i, item.key, { rating: answer.rating === r ? "" : r })}
+                      />
                     </div>
+                    {/* A quiet field: its text lines up with the item's label, and its edge shows on hover and focus. */}
                     <input
                       value={answer.comment}
                       onChange={(e) => onItemChange(i, item.key, { comment: e.target.value })}
                       placeholder="Comment (optional)"
-                      className="mt-2 h-8 w-full rounded-md border border-transparent bg-transparent px-2 text-xs text-[#e8eaee] placeholder:text-[#4c525c] hover:border-white/10 focus:border-[#c8a765]/40 focus:bg-white/[0.03] focus:outline-none"
+                      aria-label={`${item.label} comment`}
+                      className={cn(
+                        "-mx-2 mt-2 block h-8 w-[calc(100%+1rem)] rounded-md border border-transparent bg-transparent px-1.75 text-meta text-fg-1 outline-none placeholder:text-pub-faint pointer-coarse:min-h-11",
+                        "hover:border-line focus:border-act focus:bg-surface focus:ring-1 focus:ring-inset focus:ring-act",
+                      )}
                     />
                   </div>
                 );
@@ -357,6 +369,6 @@ function SectionBlock({
           </div>
         ))}
       </div>
-    </div>
+    </Section>
   );
 }

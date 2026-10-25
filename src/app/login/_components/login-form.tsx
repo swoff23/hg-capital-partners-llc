@@ -2,6 +2,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { login } from "../actions";
 import { LOGIN_MESSAGES, LOGIN_START } from "../login-state";
+import { Input } from "@/components/ui";
 import { AuthError, AuthNotice, authInputClass } from "./auth-frame";
 import { AuthSubmit } from "./auth-submit";
 import { PasswordField } from "./password-field";
@@ -44,7 +45,7 @@ export function LoginForm({ next, passwordChanged }: { next: string | null; pass
         className="mt-8 space-y-3 text-left"
       >
         {next && <input type="hidden" name="next" value={next} />}
-        <input
+        <Input
           name="email"
           type="email"
           placeholder="Email"
