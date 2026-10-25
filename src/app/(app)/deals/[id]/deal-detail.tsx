@@ -1,234 +1,77 @@
 "use client";
 import { useState, useTransition } from "react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { InlineAddressField } from "@/components/inline-address-field";
-import { badgeToneClass } from "@/components/ui";
-import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
-import { DEAL_STATUSES, DEAL_PASS_REASONS, dealStatusTone } from "@/lib/config";
+import { chromeIconClass } from "@/components/nav";
+import { Select, buttonClass } from "@/components/ui";
+import { DEAL_PASS_REASONS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { patchDeal } from "../actions";
-
-/** Quiet inline control: no border at rest, fills on hover/focus. */
-const quiet =
-  "-mx-2 w-full rounded-md bg-transparent px-2 py-1.5 text-sm text-foreground outline-none transition-colors hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 disabled:opacity-40";
-
-function Chevron() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 12 12"
-      className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M3 4.5L6 7.5l3-3" />
-    </svg>
-  );
-}
+import { DealTextField } from "../deal-fields";
 
 /* ------------------------------------------------------------------ *
- * Address — page heading, editable in place
+ * Address: the page's h1, edited in place
  * ------------------------------------------------------------------ */
 
 export function AddressField({ id, value }: { id: string; value: string }) {
-  return <InlineAddressField value={value} onCommit={(address) => patchDeal(id, { address })} />;
+  return <InlineAddressField heading value={value} onCommit={(address) => patchDeal(id, { address })} />;
 }
 
 /* ------------------------------------------------------------------ *
- * Status — the primary workflow control, styled like a colored badge
- * ------------------------------------------------------------------ */
-
-export function StatusControl({ id, status }: { id: string; status: string }) {
-  const [pending, start] = useTransition();
-  // Normally just DEAL_STATUSES in pipeline order. Only prepend `status` when it's a legacy
-  // value no longer in that list, so it still shows up as selected.
-  const statusOptions: readonly string[] = (DEAL_STATUSES as readonly string[]).includes(status)
-    ? DEAL_STATUSES
-    : [status, ...DEAL_STATUSES];
-  return (
-    <div className="relative inline-block max-w-full">
-      <select
-        aria-label="Status"
-        value={status}
-        disabled={pending}
-        onChange={(e) => start(() => patchDeal(id, { status: e.target.value }))}
-        className={cn(
-          // The field edge, so the stage reads as a control on its tone ground.
-          "max-w-full appearance-none rounded-sm py-1 pl-2.5 pr-7 text-sm font-medium ring-1 ring-inset ring-line-control transition-opacity",
-          badgeToneClass(dealStatusTone(status)),
-          pending && "opacity-60",
-        )}
-      >
-        {statusOptions.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
-      <svg
-        aria-hidden
-        viewBox="0 0 12 12"
-        className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path d="M3 4.5L6 7.5l3-3" />
-      </svg>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Pass reason — only rendered by the page when status is "Pass"
+ * Pass reason: only rendered by the page when the stage is Pass
  * ------------------------------------------------------------------ */
 
 export function PassReasonControl({ id, value }: { id: string; value: string | null }) {
   const [pending, start] = useTransition();
+  const [shown, setShown] = useState(value ?? "");
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setShown(value ?? "");
+  }
+
+  // Dims while the save runs but stays enabled, so a keyboard user keeps focus (as DealStageField does).
   return (
-    <div className="relative">
-      <select
+    <div className={cn("relative min-w-0 transition-opacity", pending && "opacity-50")}>
+      <Select
         aria-label="Pass reason"
-        value={value ?? ""}
-        disabled={pending}
-        onChange={(e) => start(() => patchDeal(id, { passReason: e.target.value || null }))}
-        className={cn(quiet, "appearance-none pr-7", !value && "text-muted")}
+        value={shown}
+        aria-busy={pending || undefined}
+        onChange={(e) => {
+          setShown(e.target.value);
+          start(() => patchDeal(id, { passReason: e.target.value || null }));
+        }}
+        className={cn("h-8 appearance-none truncate pr-7", !shown && "text-fg-3")}
       >
         <option value="">—</option>
         {DEAL_PASS_REASONS.map((r) => (
           <option key={r}>{r}</option>
         ))}
-      </select>
-      <Chevron />
+      </Select>
+      <ChevronDown
+        aria-hidden="true"
+        className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-fg-3"
+      />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ *
- * Text field — shared by price / next action / units / listing URL
- * ------------------------------------------------------------------ */
-
-function TextField({
-  id,
-  value,
-  placeholder,
-  patchKey,
-  type = "text",
-}: {
-  id: string;
-  value: string;
-  placeholder?: string;
-  patchKey: "theirPriceRaw" | "ourPriceRaw" | "nextAction" | "sourceUrl";
-  type?: string;
-}) {
-  const [v, setV] = useState(value);
-  const [seen, setSeen] = useState(value);
-  const [pending, start] = useTransition();
-  if (value !== seen) {
-    setSeen(value);
-    setV(value);
-  }
-
-  function commit() {
-    const trimmed = v.trim();
-    if (trimmed === value.trim()) return;
-    const patch = { [patchKey]: trimmed || null } as Parameters<typeof patchDeal>[1];
-    start(() => patchDeal(id, patch));
-  }
-  const keys = useInlineEditKeys(() => setV(value), commit);
-
-  return (
-    <input
-      aria-label={patchKey}
-      type={type}
-      value={v}
-      disabled={pending}
-      placeholder={placeholder}
-      onChange={(e) => setV(e.target.value)}
-      onBlur={keys.onBlur}
-      onKeyDown={keys.onKeyDown}
-      className={cn(quiet, !v && "text-muted")}
-    />
-  );
-}
-
-export function PriceField({
-  id,
-  value,
-  which,
-}: {
-  id: string;
-  value: string | null;
-  which: "their" | "our";
-}) {
-  return (
-    <TextField
-      id={id}
-      value={value ?? ""}
-      placeholder="—"
-      patchKey={which === "their" ? "theirPriceRaw" : "ourPriceRaw"}
-    />
-  );
-}
-
-export function NextActionField({ id, value }: { id: string; value: string | null }) {
-  return (
-    <TextField id={id} value={value ?? ""} placeholder="What's next?" patchKey="nextAction" />
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Units — plain integer field
- * ------------------------------------------------------------------ */
-
-export function UnitsField({ id, value }: { id: string; value: number | null }) {
-  const [v, setV] = useState(value?.toString() ?? "");
-  const [seen, setSeen] = useState(value);
-  const [pending, start] = useTransition();
-  if (value !== seen) {
-    setSeen(value);
-    setV(value?.toString() ?? "");
-  }
-
-  function commit() {
-    const trimmed = v.trim();
-    const parsed = trimmed === "" ? null : Number.parseInt(trimmed, 10);
-    const next = parsed != null && Number.isNaN(parsed) ? value : parsed;
-    if (next !== value) start(() => patchDeal(id, { units: next }));
-    setV(next?.toString() ?? "");
-  }
-  const keys = useInlineEditKeys(() => setV(value?.toString() ?? ""), commit);
-
-  return (
-    <input
-      aria-label="Units"
-      type="number"
-      min={0}
-      value={v}
-      disabled={pending}
-      placeholder="—"
-      onChange={(e) => setV(e.target.value)}
-      onBlur={keys.onBlur}
-      onKeyDown={keys.onKeyDown}
-      className={cn(quiet, !v && "text-muted")}
-    />
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Listing URL — editable, plus an "open" affordance when set
+ * Listing URL: edited in place, with a button that opens it
  * ------------------------------------------------------------------ */
 
 export function ListingUrlField({ id, value }: { id: string; value: string | null }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       <div className="min-w-0 flex-1">
-        <TextField
+        <DealTextField
           id={id}
-          value={value ?? ""}
-          placeholder="Paste a listing URL…"
+          value={value}
           patchKey="sourceUrl"
+          label="Listing URL"
+          placeholder="Paste a listing URL…"
           type="url"
+          className="h-8"
         />
       </div>
       {value && (
@@ -236,10 +79,11 @@ export function ListingUrlField({ id, value }: { id: string; value: string | nul
           href={value}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Open the listing"
           title={`Open ${value}`}
-          className="shrink-0 rounded border border-border px-1.5 py-1 text-xs text-primary hover:bg-background"
+          className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3")}
         >
-          Open ↗
+          <ExternalLink aria-hidden="true" className={chromeIconClass} />
         </a>
       )}
     </div>

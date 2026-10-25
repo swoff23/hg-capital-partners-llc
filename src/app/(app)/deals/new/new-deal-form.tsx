@@ -1,10 +1,22 @@
 "use client";
-import { useState, useTransition, type FormEvent } from "react";
-import { Button, Input, Select, TextLink } from "@/components/ui";
+import { useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { Button, Input, TextLink } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
-import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "@/lib/config";
+import { DEFAULT_DEAL_STATUS } from "@/lib/config";
 import { shortAddress } from "@/lib/normalize";
+import { cn } from "@/lib/utils";
 import { createDeal, type ExistingDeal } from "../actions";
+import { StageSelect } from "../stage-select";
+
+/** A label over its field: text-meta 500 in --fg-2, 6px above it (section 9, Inputs). */
+function Label({ text, className, children }: { text: string; className?: string; children: ReactNode }) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="block text-meta font-medium text-fg-2">{text}</span>
+      <span className="mt-1.5 block">{children}</span>
+    </label>
+  );
+}
 
 /**
  * Posts without a page load, so a refusal keeps every field as typed: an
@@ -30,18 +42,18 @@ export function NewDealForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Address *</span>
+        <Label text="Address *">
           <Input
             name="address"
             required
             placeholder="123 Main St, Buffalo, NY 14201"
+            aria-invalid={existing ? true : undefined}
+            aria-describedby={existing ? "new-deal-existing" : undefined}
             onChange={() => setExisting(null)}
-            className="mt-1"
           />
-        </label>
+        </Label>
         {existing && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+          <p id="new-deal-existing" className="mt-1.5 text-meta text-danger">
             Already in Deals: {shortAddress(existing.address)} · {existing.status}.{" "}
             <TextLink href={`/deals/${existing.id}`} className="font-medium">
               Open it
@@ -49,40 +61,33 @@ export function NewDealForm() {
           </p>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Status</span>
-          <Select name="status" defaultValue={DEFAULT_DEAL_STATUS} className="mt-1">
-            {DEAL_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Units</span>
-          <Input name="units" type="number" min="1" className="mt-1" />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Their price</span>
-          <Input name="theirPriceRaw" placeholder="425k" className="mt-1" />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Our price (target/max)</span>
-          <Input name="ourPriceRaw" placeholder="380k" className="mt-1" />
-        </label>
+      {/* Two to a row from sm; one below, so no label wraps at 320. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+        <Label text="Status">
+          <StageSelect name="status" defaultValue={DEFAULT_DEAL_STATUS} />
+        </Label>
+        <Label text="Units">
+          <Input name="units" type="number" inputMode="numeric" min="1" />
+        </Label>
+        <Label text="Their price">
+          <Input name="theirPriceRaw" placeholder="425k" />
+        </Label>
+        <Label text="Our price (target/max)">
+          <Input name="ourPriceRaw" placeholder="380k" />
+        </Label>
       </div>
-      <label className="block">
-        <span className="text-xs font-medium text-muted">Listing URL</span>
-        <Input name="sourceUrl" type="url" placeholder="https://…" className="mt-1" />
-      </label>
-      <label className="block">
-        <span className="text-xs font-medium text-muted">Next action</span>
-        <Input name="nextAction" placeholder="Run comps, schedule tour…" className="mt-1" />
-      </label>
-      <Button type="submit" disabled={pending}>
-        {pending ? "Creating…" : "Create deal"}
-      </Button>
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      <Label text="Listing URL">
+        <Input name="sourceUrl" type="url" placeholder="https://…" />
+      </Label>
+      <Label text="Next action">
+        <Input name="nextAction" placeholder="Run comps, schedule tour…" />
+      </Label>
+      <div className="space-y-1.5">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Creating…" : "Create deal"}
+        </Button>
+        {error && <p className="text-meta text-danger">{error}</p>}
+      </div>
     </form>
   );
 }

@@ -1,11 +1,14 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { Td, badgeToneClass } from "@/components/ui";
+import { ExternalLink } from "lucide-react";
+import { Money } from "@/components/money";
+import { Td } from "@/components/ui";
 import { Tooltip } from "@/components/tooltip";
-import { DEAL_STATUSES, dealStatusTone } from "@/lib/config";
-import { fmtDate, fmtMoney } from "@/lib/utils";
-import { patchDeal } from "./actions";
+import { cn } from "@/lib/utils";
+import { COLUMN_DROP } from "./columns";
+import { DealPriceField, DealStageField, DealTextField, DealUnitsField } from "./deal-fields";
+import { DealStage } from "./stage-select";
 
 export type DealRow = {
   id: string;
@@ -18,139 +21,121 @@ export type DealRow = {
   ourPriceRaw: string | null;
   nextAction: string | null;
   sourceUrl: string | null;
-  updatedAt: string;
-  /** Most recent notes (typed or imported, never change entries), newest first: 0, 1, or 2. `date` is null for an undated imported line. */
-  latestNotes: { body: string; date: string | null }[];
+  /** The day it last changed, worked out on the server ("Oct 20"). */
+  updated: string;
+  /** Most recent notes (typed or imported, never change entries), newest first: 0, 1, or 2. `day` is null for an undated imported line. */
+  latestNotes: { body: string; day: string | null }[];
 };
 
-function priceDisplay(n: number | null, raw: string | null): string {
-  return n != null ? fmtMoney(n) : (raw ?? "");
-}
-
-const cell =
-  "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-border focus:border-primary focus:bg-surface";
+/**
+ * A cell holding a field. Its 3px side inset, the field's 1px edge and its
+ * 8px padding put the field's text 12px in from the cell's edge, where the
+ * header's label and a plain cell's text sit. The 28px field (44px on touch)
+ * keeps the row at 40px (48px on touch) with its text on the same line as
+ * the plain cells'.
+ */
+const fieldCell = "px-0.75 py-1.5 pointer-coarse:py-px";
+const field = "h-7";
 
 /**
- * A price field. Touch screens give every field 16px text (globals.css) so
- * iOS doesn't zoom on focus, and at 16px a six-figure price no longer fits
- * the column. So on touch the figure is drawn at the list's size over the
- * field, and the field's own text shows only while it's being edited. A
- * mouse sees the plain field.
+ * One deal in the list. Where the list is narrower than 520px (a phone),
+ * only the address column shows and the row is two lines, 60px on touch:
+ * the address, then the stage and their price (docs/brand-guidelines.md,
+ * section 5, Density), and the whole row opens the deal, where its fields
+ * are edited. Wider, each field edits in place (COLUMN_DROP in columns.ts
+ * says which columns show).
  */
-function PriceCell({ value, onSave }: { value: string; onSave: (next: string) => void }) {
-  const [typed, setTyped] = useState(value);
-  return (
-    <div className="relative">
-      <input
-        defaultValue={value}
-        onChange={(e) => setTyped(e.target.value)}
-        onBlur={(e) => onSave(e.target.value)}
-        placeholder="—"
-        className={`${cell} peer tabular-nums pointer-coarse:text-transparent pointer-coarse:focus:text-foreground`}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 hidden items-center overflow-hidden border border-transparent px-1 text-xs tabular-nums pointer-coarse:flex pointer-coarse:peer-focus:hidden"
-      >
-        <span className={typed ? "truncate" : "truncate text-muted"}>{typed || "—"}</span>
-      </span>
-    </div>
-  );
-}
-
 export function DealRowEditable({ deal }: { deal: DealRow }) {
-  const [pending, start] = useTransition();
+  // A short ok-tint flash on the row once a save lands.
   const [flash, setFlash] = useState(false);
-
-  function save(patch: Parameters<typeof patchDeal>[1], prev: unknown, nextVal: unknown) {
-    if (String(prev ?? "") === String(nextVal ?? "")) return;
-    start(async () => {
-      await patchDeal(deal.id, patch);
-      setFlash(true);
-      setTimeout(() => setFlash(false), 700);
-    });
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  function saved() {
+    clearTimeout(timer.current);
+    setFlash(true);
+    timer.current = setTimeout(() => setFlash(false), 700);
   }
 
-  // Normally the dropdown is just DEAL_STATUSES in pipeline order. Only prepend deal.status
-  // when it's a legacy value no longer in that list, so it still shows up as selected.
-  const statusOptions: readonly string[] = (DEAL_STATUSES as readonly string[]).includes(deal.status)
-    ? DEAL_STATUSES
-    : [deal.status, ...DEAL_STATUSES];
-  const theirPrice = priceDisplay(deal.theirPrice, deal.theirPriceRaw);
-  const ourPrice = priceDisplay(deal.ourPrice, deal.ourPriceRaw);
+  // Text that isn't one number shows as typed, as it does in the price field.
+  const price =
+    deal.theirPrice != null ? (
+      <Money value={deal.theirPrice} />
+    ) : deal.theirPriceRaw ? (
+      <span className="min-w-0 truncate">{deal.theirPriceRaw}</span>
+    ) : null;
 
   return (
-    <tr className={`hover:bg-background ${pending ? "opacity-60" : ""} ${flash ? "bg-green-500/10" : ""}`}>
-      <Td>
-        <div className="group/addr flex items-center gap-1.5">
-          <Link href={`/deals/${deal.id}`} className="font-medium hover:underline">
+    <tr className={cn("group/row transition-colors", flash ? "bg-ok-tint" : "hover:bg-fill-1")}>
+      {/* The first cell starts on the page gutter, under the title (section 5). */}
+      <Td className="relative pl-0 @max-[32.5rem]:py-2 @max-[32.5rem]:pointer-coarse:py-2">
+        <div className="flex items-start gap-1.5">
+          <Link
+            href={`/deals/${deal.id}`}
+            className="min-w-0 font-medium text-fg-1 hover:underline @max-[32.5rem]:truncate @max-[32.5rem]:after:absolute @max-[32.5rem]:after:inset-0"
+          >
             {deal.address}
           </Link>
+          {/* A mouse sees it on the row's hover; touch, and the phone row, open the listing from the deal page. */}
           {deal.sourceUrl && (
             <a
               href={deal.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Open the listing"
               title={`Open ${deal.sourceUrl}`}
-              className="shrink-0 rounded border border-border px-1 text-[11px] leading-4 text-primary opacity-0 transition-opacity hover:bg-background focus-visible:opacity-100 group-hover/addr:opacity-100"
+              className="mt-0.5 shrink-0 rounded-sm text-fg-3 opacity-0 transition-opacity hover:text-fg-1 focus-visible:opacity-100 group-hover/row:opacity-100 pointer-coarse:hidden @max-[32.5rem]:hidden"
             >
-              ↗
+              <ExternalLink aria-hidden="true" className="size-4 stroke-[1.5]" />
             </a>
+          )}
+        </div>
+        {/* The phone row's subline: the stage leads it in its tone (section 9), then their price. */}
+        <div className="mt-0.5 hidden min-w-0 items-center gap-1.5 text-meta text-fg-3 @max-[32.5rem]:flex">
+          <DealStage stage={deal.status} className="shrink-0" />
+          {price && (
+            <>
+              <span aria-hidden="true">·</span>
+              {price}
+            </>
           )}
         </div>
       </Td>
 
-      <Td>
-        <select
-          defaultValue={deal.status}
-          onChange={(e) => save({ status: e.target.value }, deal.status, e.target.value)}
-          className={`rounded-sm px-1.5 py-0.5 text-micro ring-1 ring-inset ring-line-control ${badgeToneClass(dealStatusTone(deal.status))}`}
-        >
-          {statusOptions.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+      <Td className={cn(fieldCell, COLUMN_DROP.status)}>
+        <DealStageField id={deal.id} status={deal.status} fieldSize="cell" onSaved={saved} />
       </Td>
 
-      <Td>
-        <input
-          key={`u-${deal.units}`}
-          type="number"
-          min={0}
-          defaultValue={deal.units ?? ""}
-          onBlur={(e) => {
-            const raw = e.target.value.trim();
-            const parsed = raw === "" ? null : Number.parseInt(raw, 10);
-            const next = parsed != null && Number.isNaN(parsed) ? deal.units : parsed;
-            save({ units: next }, deal.units, next);
-          }}
-          placeholder="—"
-          className={`${cell} tabular-nums`}
+      <Td numeric className={cn(fieldCell, COLUMN_DROP.units)}>
+        <DealUnitsField id={deal.id} value={deal.units} align="right" className={field} onSaved={saved} />
+      </Td>
+
+      <Td numeric className={cn(fieldCell, COLUMN_DROP.theirPrice)}>
+        <DealPriceField
+          id={deal.id}
+          which="their"
+          raw={deal.theirPriceRaw}
+          amount={deal.theirPrice}
+          align="right"
+          className={field}
+          onSaved={saved}
+        />
+      </Td>
+      <Td numeric className={cn(fieldCell, COLUMN_DROP.ourPrice)}>
+        <DealPriceField
+          id={deal.id}
+          which="our"
+          raw={deal.ourPriceRaw}
+          amount={deal.ourPrice}
+          align="right"
+          className={field}
+          onSaved={saved}
         />
       </Td>
 
-      <Td>
-        <PriceCell
-          key={`tp-${deal.theirPrice}-${deal.theirPriceRaw}`}
-          value={theirPrice}
-          onSave={(next) => save({ theirPriceRaw: next }, theirPrice, next)}
-        />
-      </Td>
-      <Td>
-        <PriceCell
-          key={`op-${deal.ourPrice}-${deal.ourPriceRaw}`}
-          value={ourPrice}
-          onSave={(next) => save({ ourPriceRaw: next }, ourPrice, next)}
-        />
-      </Td>
-
-      <Td className="text-xs text-muted">
+      <Td className={cn("text-meta text-fg-3", COLUMN_DROP.latestNote)}>
         {deal.latestNotes.length > 0 && (
           <div className="space-y-0.5">
             {deal.latestNotes.map((n, i) => (
-              <Tooltip key={i} label={n.date ? `${n.body} (${fmtDate(n.date)})` : n.body} className="block truncate">
+              <Tooltip key={i} label={n.day ? `${n.body} (${n.day})` : n.body} className="block truncate">
                 <span className="truncate">{n.body}</span>
               </Tooltip>
             ))}
@@ -158,18 +143,19 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         )}
       </Td>
 
-      <Td>
-        <input
-          defaultValue={deal.nextAction ?? ""}
-          onBlur={(e) => save({ nextAction: e.target.value }, deal.nextAction, e.target.value)}
+      <Td className={cn(fieldCell, COLUMN_DROP.nextAction)}>
+        <DealTextField
+          id={deal.id}
+          value={deal.nextAction}
+          patchKey="nextAction"
+          label="Next action"
           placeholder="Add next action…"
-          className={cell}
+          className={field}
+          onSaved={saved}
         />
       </Td>
 
-      <Td className="num overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted">
-        {fmtDate(deal.updatedAt)}
-      </Td>
+      <Td className={cn("num truncate pr-0 text-meta text-fg-3", COLUMN_DROP.updated)}>{deal.updated}</Td>
     </tr>
   );
 }

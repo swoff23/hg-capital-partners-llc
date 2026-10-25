@@ -1,12 +1,17 @@
 import type { Prisma } from "@prisma/client";
+import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Card, LinkButton, PageHeader, Table, Th, EmptyState } from "@/components/ui";
+import { chromeIconClass } from "@/components/nav";
+import { LinkButton, PageHeader, Table, Th, EmptyState } from "@/components/ui";
 import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES } from "@/lib/config";
+import { todayYmdEastern } from "@/lib/dates";
 import { DealFilters } from "./filters";
 import { DealRowEditable } from "./deal-row";
 import { SortHeader } from "./sort-header";
 import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
+import { COLUMN_DROP } from "./columns";
+import { easternDay, noteDay } from "./format";
 
 type SP = { status?: string; statuses?: string; q?: string; sort?: string };
 
@@ -65,7 +70,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   const sortField = (sortDesc ? sortRaw.slice(1) : sortRaw) || "status";
 
   // Sorting by status happens in memory (see sortByStatus), so that fetch can't be `take`-limited
-  // up front — limiting by DB order first would silently drop whole status groups before the
+  // up front: limiting by DB order first would silently drop whole status groups before the
   // real sort ever runs. Every other sort is a plain DB order, so it can take the cap directly.
   const [dealsRaw, filteredCount, statusCounts] = await Promise.all([
     prisma.deal.findMany({
@@ -89,6 +94,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   const sorted = sortField === "status" ? sortByStatus(dealsRaw, sortDesc) : dealsRaw;
   const deals = sorted.slice(0, 300);
   const truncated = filteredCount > 300;
+  const today = todayYmdEastern();
 
   return (
     <>
@@ -96,7 +102,8 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
         title="Deals"
         actions={
           <LinkButton href="/deals/new" variant="primary">
-            + New deal
+            <Plus aria-hidden="true" className={chromeIconClass} />
+            New deal
           </LinkButton>
         }
       />
@@ -106,31 +113,54 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
         current={{ status: statusFilter, statuses: selectedStatuses, q: sp.q ?? "" }}
       />
 
-      <Card className="mt-4 overflow-clip">
+      {/* Flat on the page: the header's rule and the row hairlines are its only lines (section 5).
+          A size container, so columns drop by the list's own width (COLUMN_DROP in columns.ts). */}
+      <div className="mt-4 @container">
         {deals.length === 0 ? (
-          <div className="p-4">
-            <EmptyState>No deals match.</EmptyState>
-          </div>
+          <EmptyState>No deals match.</EmptyState>
         ) : (
           <ColumnWidthsProvider>
             <Table style={{ tableLayout: "fixed" }}>
               <Cols />
               <thead>
                 <tr>
-                  <SortHeader label="Address" field="address" resizeKey="address" />
-                  <SortHeader label="Status" field="status" resizeKey="status" />
-                  <SortHeader label="Units" field="units" resizeKey="units" />
-                  <SortHeader label="Their price" field="theirPrice" resizeKey="theirPrice" />
-                  <SortHeader label="Our price" field="ourPrice" resizeKey="ourPrice" />
-                  <Th>
+                  {/* Column one starts on the page gutter, under the title (section 5). */}
+                  <SortHeader label="Address" field="address" resizeKey="address" className="pl-0" />
+                  <SortHeader label="Status" field="status" resizeKey="status" className={COLUMN_DROP.status} />
+                  <SortHeader label="Units" field="units" resizeKey="units" numeric className={COLUMN_DROP.units} />
+                  <SortHeader
+                    label="Their price"
+                    field="theirPrice"
+                    resizeKey="theirPrice"
+                    numeric
+                    className={COLUMN_DROP.theirPrice}
+                  />
+                  <SortHeader
+                    label="Our price"
+                    field="ourPrice"
+                    resizeKey="ourPrice"
+                    numeric
+                    className={COLUMN_DROP.ourPrice}
+                  />
+                  <Th className={COLUMN_DROP.latestNote}>
                     Latest note
                     <ResizeHandle columnKey="latestNote" />
                   </Th>
-                  <SortHeader label="Next action" field="nextAction" resizeKey="nextAction" />
-                  <SortHeader label="Updated" field="updated" resizeKey="updated" />
+                  <SortHeader
+                    label="Next action"
+                    field="nextAction"
+                    resizeKey="nextAction"
+                    className={COLUMN_DROP.nextAction}
+                  />
+                  <SortHeader
+                    label="Updated"
+                    field="updated"
+                    resizeKey="updated"
+                    className={`pr-0 ${COLUMN_DROP.updated}`}
+                  />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-line">
                 {deals.map((d) => (
                   <DealRowEditable
                     key={d.id}
@@ -145,11 +175,11 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                       ourPriceRaw: d.ourPriceRaw,
                       nextAction: d.nextAction,
                       sourceUrl: d.sourceUrl,
-                      updatedAt: d.updatedAt.toISOString(),
-                      // An undated imported line has no date of its own; its createdAt is the import run.
+                      updated: easternDay(d.updatedAt, today),
+                      // An undated imported line has no day of its own; its createdAt is the import run.
                       latestNotes: d.notes.map((n) => ({
                         body: n.body,
-                        date: n.noteDate?.toISOString() ?? null,
+                        day: n.noteDate ? noteDay({ noteDate: n.noteDate, source: n.source }, today) : null,
                       })),
                     }}
                   />
@@ -158,9 +188,9 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
             </Table>
           </ColumnWidthsProvider>
         )}
-      </Card>
+      </div>
       {truncated && (
-        <p className="mt-2 text-xs text-muted">Showing first 300. Use the address filter to narrow.</p>
+        <p className="mt-2 text-meta text-fg-3">Showing first 300. Use the address filter to narrow.</p>
       )}
     </>
   );
