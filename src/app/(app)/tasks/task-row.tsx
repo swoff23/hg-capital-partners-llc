@@ -21,8 +21,9 @@ import { useTaskList } from "./task-list-context";
  * 50rem, and on rows with actions: the title with the date chip top right,
  * then the place with the avatar bottom right; the title truncates before
  * the date and the place before the avatar. A row with actions (Needs
- * review) has them at its right edge, so its date ends the place line,
- * leaving the title its line beside them. One line on a wide desktop
+ * review) has them beside those two lines from a 480px list up; below that
+ * the title, the date and Approve and Send back can't share a line, so the
+ * actions take a line of their own under them. One line on a wide desktop
  * list: the title, then fixed columns for the property, the person and the
  * date, so they line up row to row. 50rem keeps the fixed columns
  * (about 500px of them) from squeezing the title: Today's two columns top
@@ -97,10 +98,9 @@ export function TaskRow({
 
   // The place line: the status lead below a 480px list, the place, the avatar.
   // With none of them the row is the title and its date alone.
-  const placeLine = Boolean(narrow || place || who || actions);
+  const placeLine = Boolean(narrow || place || who);
 
-  // Top right on the title's line. A row with actions keeps its title line for the title, since
-  // Approve and Send back hold the right edge there, so its date ends the place line instead.
+  // Top right on the title's line, on every row; a one-line row puts it last.
   const dateChip = (
     <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[50rem]:order-last lg:@min-[50rem]:w-28 lg:@min-[50rem]:justify-end")}>
       <DueDatePicker
@@ -117,8 +117,8 @@ export function TaskRow({
   return (
     // 40px one-line rows with a mouse (docs/brand-guidelines.md, section 5, Density). Two-line
     // rows are 62px, against the section's 60: the 28px date chip sets the title's line, and
-    // the place line under it is 20.
-    <li className={cn("group/row relative flex items-start gap-3 py-1.5", oneLine && "lg:@min-[50rem]:items-center")}>
+    // the place line under it is 20. Below a 480px list a row's actions wrap to a line of their own.
+    <li className={cn("group/row relative flex items-start gap-3 py-1.5", oneLine && "lg:@min-[50rem]:items-center", actions && "flex-wrap")}>
       <Link href={`/tasks/${task.id}`} className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1">
         <span className="sr-only">{task.title}</span>
       </Link>
@@ -148,7 +148,7 @@ export function TaskRow({
           {statusColumn && (
             <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[50rem]:w-44")}>{wide}</span>
           )}
-          {!actions && dateChip}
+          {dateChip}
         </div>
         <div className={cn("mt-0.5 flex min-w-0 items-center gap-2", !placeLine && "hidden", oneLine && "lg:@min-[50rem]:contents")}>
           {narrow && (
@@ -166,43 +166,47 @@ export function TaskRow({
               // Grows so the avatar sits at the right edge; shrinks alongside a Waiting reason.
               "min-w-0 grow truncate text-meta text-fg-3",
               oneLine && "lg:@min-[50rem]:block lg:@min-[50rem]:w-36 lg:@min-[50rem]:flex-none",
-              // Beside Approve and Send back on a 320px phone it would be a sliver of an ellipsis.
-              actions && "@max-[20rem]:hidden",
               !place && "hidden",
             )}
           >
             {place}
           </span>
           {avatar && (
-            // The full name shows on hover with a mouse. On touch a tap here opens the row like
-            // anywhere else on it, and the task page names the person. Beside Approve and Send
-            // back on a 320px phone there's only room for the date, so the avatar and the place step aside.
+            // Bottom right, under the date. The full name shows on hover with a mouse. On touch a
+            // tap here opens the row like anywhere else on it, and the task page names the person.
             <span
               title={who ?? undefined}
               className={cn(
-                "ml-auto items-center gap-1.5 pointer-fine:pointer-events-auto",
-                first ? "hidden min-w-5 shrink @min-[20rem]:flex" : "flex w-5 shrink-0",
+                "ml-auto flex items-center gap-1.5 pointer-fine:pointer-events-auto",
+                // With a name: it truncates first, and anything still too wide spills off the left, so the avatar holds the edge.
+                first ? "min-w-5 shrink justify-end overflow-hidden" : "w-5 shrink-0",
               )}
             >
               {who && (
                 <>
-                  <Avatar name={who} size={20} outline={job} />
-                  {/* Where the list has room beside Approve and Send back; phones keep the avatar alone. */}
+                  {/* Where the list has room beside Approve and Send back; phones keep the avatar alone.
+                      Before the avatar, so the avatar keeps the corner. */}
                   {first && (
                     <span aria-hidden="true" className="hidden truncate text-meta text-fg-3 @min-[28rem]:block">
                       {first}
                     </span>
                   )}
+                  <Avatar name={who} size={20} outline={job} />
                   <span className="sr-only">{who}</span>
                 </>
               )}
             </span>
           )}
-          {actions && dateChip}
         </div>
       </div>
 
-      {actions && <div className="relative flex shrink-0 items-center gap-1.5 self-center">{actions}</div>}
+      {actions && (
+        // Beside the two lines from a 480px list up; below that a full-width line, ending at the
+        // right edge the date and the avatar share.
+        <div className="relative flex w-full shrink-0 items-center justify-end gap-1.5 @min-[30rem]:w-auto @min-[30rem]:self-center">
+          {actions}
+        </div>
+      )}
     </li>
   );
 }

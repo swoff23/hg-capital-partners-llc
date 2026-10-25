@@ -27,8 +27,10 @@ export type PropertyTask = {
  * the mark and its word in one fixed column, and the whole row opens the
  * task (docs/brand-guidelines.md, section 9). Waiting with a reason reads
  * "Waiting on Zack's quote" there in --fg-3, truncated, as in TaskRow. In a
- * list under 30rem (the rail, a phone) a row keeps two lines: the title,
- * then the status word in its tone and the date.
+ * list under 30rem (the rail, a phone) a row keeps two lines, with the date
+ * top right and the avatar bottom right (docs/brand-guidelines.md, section
+ * 5, Task rows): the title and its date, then the status word in its tone
+ * and the avatar.
  */
 export function PropertyTasksSection({
   propertyId,
@@ -92,21 +94,16 @@ export function PropertyTasksSection({
                   )}
                 </span>
 
-                <div className="pointer-events-none min-w-0">
-                  <p className="truncate text-body text-fg-1 underline-offset-3 group-hover:underline">{t.title}</p>
-                  <p className="truncate text-meta text-fg-3 @min-[30rem]:hidden">
-                    <span className={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>
-                    {date && (
-                      <>
-                        {" · "}
-                        <span className={cn("num", t.late && "text-danger")}>{date}</span>
-                      </>
-                    )}
+                {/* In a narrow list its two lines are cells of the row's grid, so the date and the avatar share the right edge. */}
+                <div className="pointer-events-none contents min-w-0 @min-[30rem]:block">
+                  <p className="col-start-2 row-start-1 truncate text-body text-fg-1 underline-offset-3 group-hover:underline">{t.title}</p>
+                  <p className={cn("col-start-2 row-start-2 truncate text-meta @min-[30rem]:hidden", STATUS_TONE[t.status])}>
+                    {STATUS_LABEL[t.status]}
                   </p>
                 </div>
 
                 {/* Under the row's link like the rest of the row, so a click on it opens the task; the task page names the person. */}
-                <span className="pointer-events-none flex w-5 justify-center">
+                <span className="pointer-events-none col-start-3 row-start-2 flex w-5 justify-center justify-self-end @min-[30rem]:col-start-auto @min-[30rem]:row-start-auto">
                   {t.who && (
                     <>
                       <Avatar name={t.who.name} email={t.who.email} size={20} outline={t.who.contractor} />
@@ -117,7 +114,7 @@ export function PropertyTasksSection({
 
                 <span
                   className={cn(
-                    "num pointer-events-none hidden whitespace-nowrap text-right text-meta @min-[30rem]:block",
+                    "num pointer-events-none col-start-3 row-start-1 whitespace-nowrap text-right text-meta @min-[30rem]:col-start-auto @min-[30rem]:row-start-auto",
                     t.late ? "text-danger" : date ? "text-fg-2" : "text-fg-3",
                   )}
                 >
