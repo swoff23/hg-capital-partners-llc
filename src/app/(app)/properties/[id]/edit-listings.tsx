@@ -1,10 +1,18 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
+import { Button as AriaButton } from "react-aria-components";
+import { ChevronLeft, ChevronRight, ExternalLink, ImagePlus, MoreHorizontal, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Badge, Button, EmptyState, Select } from "@/components/ui";
+import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
+import { Money } from "@/components/money";
+import { PhotoThumb } from "@/components/photo-thumb";
+import { Badge, Button, SectionCard, buttonClass, fieldClass, textLinkClass } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { updatePropertyListings } from "../actions";
 import { callAction } from "@/lib/action-result";
+import { LabeledField } from "../labeled-field";
+import { AddRow, SaveError } from "./record-ui";
 
 export type EditablePhoto = { url: string; pathname: string };
 
@@ -21,8 +29,8 @@ export type EditableListing = {
   photos: EditablePhoto[]; // order = display/carousel order
 };
 
-const inp =
-  "w-full rounded border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary";
+/** A field in a dense editor row: 32px with a mouse, 44 on touch. */
+const inp = cn(fieldClass, "h-8");
 
 // A listing's status is a label, not a state, so its badge stays neutral.
 const STATUS_LABEL: Record<EditableListing["status"], string> = {
@@ -56,7 +64,7 @@ export function ListingsSection({
   /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
   version: string;
   initial: EditableListing[];
-  /** Unit labels from the Units & access section above — the only valid choices, so the two stay consistent. */
+  /** Unit labels from the Units & access section above: the only valid choices, so the two stay consistent. */
   unitLabels: string[];
 }) {
   const [editing, setEditing] = useState(false);
@@ -68,13 +76,14 @@ export function ListingsSection({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   // How many photo uploads are currently in flight, across every listing card. A photo
-  // isn't in `listings` state until its upload resolves and calls onAdd — saving while
+  // isn't in `listings` state until its upload resolves and calls onAdd: saving while
   // this is > 0 would silently persist the listings *without* the photo still uploading,
   // with no error to show for it. Save stays disabled until every upload settles.
   const [uploadingCount, setUploadingCount] = useState(0);
   const root = useRef<HTMLDivElement>(null);
 
   const dirty = JSON.stringify(listings) !== JSON.stringify(initial);
+  const noUnits = unitLabels.length === 0;
 
   function mutate(fn: (l: EditableListing[]) => void) {
     setListings((prev) => {
@@ -82,6 +91,18 @@ export function ListingsSection({
       fn(next);
       return next;
     });
+  }
+
+  /**
+   * Start from what's saved now: after a save the page brings each new
+   * listing's id, and a draft still holding a null id would delete that
+   * listing with its photo files and add it back as a new one.
+   */
+  function edit(withNew = false) {
+    setError(null);
+    setListings(withNew ? [...structuredClone(initial), blankListing()] : structuredClone(initial));
+    setEditVersion(version);
+    setEditing(true);
   }
 
   function save() {
@@ -121,75 +142,64 @@ export function ListingsSection({
     else discard();
   }
 
+  const saveLabel = pending ? "Saving…" : uploadingCount > 0 ? "Uploading…" : null;
+
   return (
-    <div ref={root} className="group rounded-xl border border-border bg-surface shadow-sm">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h3 className="text-sm font-semibold">Rentals</h3>
-        {!editing ? (
-          <button
-            onClick={() => {
-              // Start from what's saved now: after a save the page brings each new
-              // listing's id, and a draft still holding a null id would delete that
-              // listing with its photo files and add it back as a new one.
-              setListings(structuredClone(initial));
-              setEditVersion(version);
-              setEditing(true);
-            }}
-            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
-          >
-            Edit
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={unitLabels.length === 0}
-              title={unitLabels.length === 0 ? "Add a unit in Units & access above first" : undefined}
-              onClick={() => mutate((x) => x.push(blankListing()))}
-            >
-              + Add listing
-            </Button>
-            <Button
-              size="sm"
-              onClick={save}
-              disabled={pending || uploadingCount > 0}
-              title={uploadingCount > 0 ? "Wait for photo uploads to finish first" : undefined}
-            >
-              {pending ? "Saving…" : uploadingCount > 0 ? "Uploading…" : "Save"}
-            </Button>
+    <div ref={root}>
+      <SectionCard
+        title="Rentals"
+        onEdit={() => edit()}
+        editing={editing}
+        actions={
+          <>
             <Button size="sm" variant="secondary" onClick={cancel}>
               Cancel
             </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-3 p-4">
+            {/* Waits for every photo upload: the label says so while one is going up. */}
+            <Button size="sm" onClick={save} disabled={pending || uploadingCount > 0}>
+              {saveLabel ?? "Save"}
+            </Button>
+          </>
+        }
+      >
         {!editing ? (
-          <ReadListings listings={initial} />
-        ) : listings.length === 0 ? (
-          unitLabels.length === 0 ? (
-            <EmptyState>Add at least one unit in Units &amp; access above before creating a listing.</EmptyState>
-          ) : (
-            <EmptyState>No listings yet.</EmptyState>
-          )
+          <>
+            {initial.length === 0 ? (
+              <p className="pb-2 text-body text-fg-3">No listings yet.</p>
+            ) : (
+              <ReadListings listings={initial} />
+            )}
+            <AddRow onClick={() => edit(true)} disabled={noUnits}>
+              Add listing
+            </AddRow>
+            {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
+          </>
         ) : (
-          listings.map((l, i) => (
-            <EditListingCard
-              key={l.id ?? `new-${i}`}
-              listing={l}
-              index={i}
-              propertyId={propertyId}
-              unitLabels={unitLabels}
-              mutate={mutate}
-              onUploadBusyChange={(busy) => setUploadingCount((c) => c + (busy ? 1 : -1))}
-            />
-          ))
+          <>
+            {listings.length > 0 && (
+              <ul className="divide-y divide-line">
+                {listings.map((l, i) => (
+                  <EditListing
+                    key={l.id ?? `new-${i}`}
+                    listing={l}
+                    index={i}
+                    propertyId={propertyId}
+                    unitLabels={unitLabels}
+                    mutate={mutate}
+                    onUploadBusyChange={(busy) => setUploadingCount((c) => c + (busy ? 1 : -1))}
+                  />
+                ))}
+              </ul>
+            )}
+            <AddRow onClick={() => mutate((x) => x.push(blankListing()))} disabled={noUnits}>
+              Add listing
+            </AddRow>
+            {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
+          </>
         )}
-      </div>
 
-      {error && <p role="alert" className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && <SaveError className="mt-2">{error}</SaveError>}
+      </SectionCard>
 
       {confirmOpen && (
         <ConfirmDialog
@@ -202,13 +212,8 @@ export function ListingsSection({
               <Button size="sm" variant="secondary" onClick={discard}>
                 Discard
               </Button>
-              <Button
-                size="sm"
-                onClick={save}
-                disabled={pending || uploadingCount > 0}
-                title={uploadingCount > 0 ? "Wait for photo uploads to finish first" : undefined}
-              >
-                {pending ? "Saving…" : uploadingCount > 0 ? "Uploading…" : "Save changes"}
+              <Button size="sm" onClick={save} disabled={pending || uploadingCount > 0}>
+                {saveLabel ?? "Save changes"}
               </Button>
             </>
           }
@@ -219,53 +224,54 @@ export function ListingsSection({
 }
 
 function ReadListings({ listings }: { listings: EditableListing[] }) {
-  if (listings.length === 0) return <EmptyState>No listings yet.</EmptyState>;
   return (
-    <div className="space-y-2">
-      {listings.map((l, i) => (
-        <div key={l.id ?? i} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
-          {l.photos[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element -- small admin thumbnail, not the public page
-            <img src={l.photos[0].url} alt="" className="h-10 w-14 shrink-0 rounded object-cover" />
-          ) : (
-            <div className="h-10 w-14 shrink-0 rounded bg-background" />
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{l.unitLabel || "Unlabeled unit"}</span>
-              <Badge>{STATUS_LABEL[l.status]}</Badge>
-              {l.photos.length > 1 && (
-                <span className="text-xs text-muted">{l.photos.length} photos</span>
-              )}
+    <ul className="divide-y divide-line">
+      {listings.map((l, i) => {
+        const facts = [l.beds && `${l.beds} bd`, l.baths && `${l.baths} ba`, l.sqft && `${l.sqft} sq ft`].filter(Boolean);
+        const name = l.unitLabel || "Unlabeled unit";
+        return (
+          <li key={l.id ?? i} className="flex min-h-14 items-center gap-3 py-2">
+            <PhotoThumb src={l.photos[0]?.url} alt={`${name} listing photo`} size={48} />
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-body text-fg-1">{name}</span>
+                <Badge className="shrink-0">{STATUS_LABEL[l.status]}</Badge>
+              </div>
+              <p className="truncate text-meta text-fg-3">
+                {/* Below 480 the secondary clauses drop rather than wrap (section 5 Density). */}
+                {l.rent ? (
+                  <>
+                    <Money value={l.rent} className="text-fg-2" />
+                    <span className="max-[480px]:hidden">/mo</span>
+                    {facts.length > 0 && <span className="max-[480px]:hidden"> · {facts.join(" · ")}</span>}
+                  </>
+                ) : facts.length > 0 ? (
+                  facts.join(" · ")
+                ) : (
+                  "No details yet"
+                )}
+                {l.photos.length > 1 && <span className="max-[480px]:hidden"> · {l.photos.length} photos</span>}
+              </p>
             </div>
-            <div className="mt-0.5 text-xs text-muted">
-              {[
-                l.rent && `$${l.rent}/mo`,
-                l.beds && `${l.beds} bd`,
-                l.baths && `${l.baths} ba`,
-                l.sqft && `${l.sqft} sqft`,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "No details yet"}
-            </div>
-          </div>
-          {l.zillowUrl && (
-            <a
-              href={l.zillowUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 text-xs text-primary hover:underline"
-            >
-              Zillow ↗
-            </a>
-          )}
-        </div>
-      ))}
-    </div>
+            {l.zillowUrl && (
+              <a
+                href={l.zillowUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(textLinkClass, "inline-flex shrink-0 items-center gap-1 text-meta pointer-coarse:min-h-11")}
+              >
+                Zillow
+                <ExternalLink aria-hidden="true" strokeWidth={1.5} className="h-3.5 w-3.5 text-fg-3" />
+              </a>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-function EditListingCard({
+function EditListing({
   listing: l,
   index: i,
   propertyId,
@@ -283,12 +289,15 @@ function EditListingCard({
   // Include the listing's current label even if it's since been renamed/removed
   // from Units & access, so an existing pick never silently disappears.
   const options = l.unitLabel && !unitLabels.includes(l.unitLabel) ? [l.unitLabel, ...unitLabels] : unitLabels;
+  const name = l.unitLabel || "New listing";
 
   return (
-    <div className="rounded-lg border border-border">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2">
-        <Select
-          className="h-7 w-auto max-w-[180px] py-0 text-xs"
+    <li className="space-y-3 py-4 first:pt-1">
+      {/* One row at every width: the unit takes what the status and the menu leave. */}
+      <div className="flex items-center gap-2">
+        <select
+          className={cn(inp, "min-w-0 flex-1 sm:max-w-48")}
+          aria-label="Unit"
           value={l.unitLabel}
           onChange={(e) => mutate((x) => (x[i].unitLabel = e.target.value))}
         >
@@ -300,109 +309,118 @@ function EditListingCard({
               {label}
             </option>
           ))}
-        </Select>
-        <Select
-          className="h-7 w-auto py-0 text-xs"
+        </select>
+        <select
+          className={cn(inp, "w-32 shrink-0")}
+          aria-label="Status"
           value={l.status}
           onChange={(e) => mutate((x) => (x[i].status = e.target.value as EditableListing["status"]))}
         >
           <option value="HIDDEN">Hidden</option>
           <option value="AVAILABLE">Available</option>
           <option value="LEASED">Leased</option>
-        </Select>
-        <button
-          onClick={() => mutate((x) => x.splice(i, 1))}
-          className="ml-auto text-xs text-red-500 hover:underline"
-        >
-          Remove listing
-        </button>
+        </select>
+        <span className="ml-auto shrink-0">
+          <MenuTrigger>
+            <AriaButton aria-label={`${name} actions`} className={buttonClass({ variant: "ghost", size: "sm", icon: true })}>
+              <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
+            </AriaButton>
+            <Menu>
+              <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => mutate((x) => void x.splice(i, 1))}>
+                Delete listing
+              </MenuItem>
+            </Menu>
+          </MenuTrigger>
+        </span>
       </div>
 
-      <div className="space-y-3 p-3">
-        <PhotoGallery
-          propertyId={propertyId}
-          photos={l.photos}
-          onAdd={(photo) => mutate((x) => void x[i].photos.push(photo))}
-          onRemove={(j) => mutate((x) => void x[i].photos.splice(j, 1))}
-          onMove={(j, dir) =>
-            mutate((x) => {
-              const arr = x[i].photos;
-              const target = j + dir;
-              if (target < 0 || target >= arr.length) return;
-              [arr[j], arr[target]] = [arr[target], arr[j]];
-            })
-          }
-          onBusyChange={onUploadBusyChange}
-        />
+      <PhotoGallery
+        propertyId={propertyId}
+        name={name}
+        photos={l.photos}
+        onAdd={(photo) => mutate((x) => void x[i].photos.push(photo))}
+        onRemove={(j) => mutate((x) => void x[i].photos.splice(j, 1))}
+        onMove={(j, dir) =>
+          mutate((x) => {
+            const arr = x[i].photos;
+            const target = j + dir;
+            if (target < 0 || target >= arr.length) return;
+            [arr[j], arr[target]] = [arr[target], arr[j]];
+          })
+        }
+        onBusyChange={onUploadBusyChange}
+      />
 
-        <div className="grid gap-2 sm:grid-cols-3">
-          <label className="text-xs">
-            <span className="mb-1 block text-muted">Zillow link</span>
+      <div className="@container">
+        <div className="grid grid-cols-2 gap-3 @min-[30rem]:grid-cols-3">
+          <LabeledField label="Zillow link" className="col-span-2 @min-[30rem]:col-span-1">
             <input
               className={inp}
               placeholder="https://www.zillow.com/…"
               value={l.zillowUrl}
               onChange={(e) => mutate((x) => (x[i].zillowUrl = e.target.value))}
             />
-          </label>
-          <label className="text-xs">
-            <span className="mb-1 block text-muted">Available</span>
+          </LabeledField>
+          <LabeledField label="Available">
             <input
               type="date"
               className={inp}
               value={l.availableDate}
               onChange={(e) => mutate((x) => (x[i].availableDate = e.target.value))}
             />
-          </label>
-          <label className="text-xs">
-            <span className="mb-1 block text-muted">Rent / month</span>
+          </LabeledField>
+          <LabeledField label="Rent / month">
             <input
               type="number"
               min="0"
-              className={inp}
+              className={cn(inp, "num")}
               value={l.rent}
               data-check={`Rent for ${l.unitLabel || "Unit"} isn't a number.`}
               onChange={(e) => mutate((x) => (x[i].rent = e.target.value))}
             />
-          </label>
-          <label className="text-xs">
-            <span className="mb-1 block text-muted">Sqft</span>
+          </LabeledField>
+          <LabeledField label="Sq ft">
             <input
               type="number"
               min="0"
-              className={inp}
+              className={cn(inp, "num")}
               value={l.sqft}
               data-check={`Sq ft for ${l.unitLabel || "Unit"} isn't a whole number.`}
               onChange={(e) => mutate((x) => (x[i].sqft = e.target.value))}
             />
-          </label>
-          <label className="text-xs">
-            <span className="mb-1 block text-muted">Beds</span>
+          </LabeledField>
+          <LabeledField label="Beds">
             <input
               className={inp}
               placeholder="2"
               value={l.beds}
               onChange={(e) => mutate((x) => (x[i].beds = e.target.value))}
             />
-          </label>
-          <label className="text-xs">
-            <span className="mb-1 block text-muted">Baths</span>
+          </LabeledField>
+          <LabeledField label="Baths">
             <input
               className={inp}
               placeholder="1"
               value={l.baths}
               onChange={(e) => mutate((x) => (x[i].baths = e.target.value))}
             />
-          </label>
+          </LabeledField>
         </div>
       </div>
-    </div>
+    </li>
   );
 }
 
-/** Horizontal strip of photo thumbnails — add, remove, and left/right reorder. */
+/** A round control on a photo, on the photo tokens: 24px, with a 44px hit area on touch. */
+const onPhotoButton = cn(
+  "relative flex h-6 w-6 items-center justify-center rounded-full bg-photo-scrim text-on-photo transition-opacity disabled:opacity-30",
+  "pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5",
+);
+
+/** Horizontal strip of photo thumbnails: add, remove, and left/right reorder. */
 function PhotoGallery({
   propertyId,
+  name,
   photos,
   onAdd,
   onRemove,
@@ -410,6 +428,8 @@ function PhotoGallery({
   onBusyChange,
 }: {
   propertyId: string;
+  /** The listing's unit, for the photos' alt text. */
+  name: string;
   photos: EditablePhoto[];
   onAdd: (photo: EditablePhoto) => void;
   onRemove: (index: number) => void;
@@ -431,7 +451,7 @@ function PhotoGallery({
     }
     if (/too large|exceeds the maximum/i.test(msg)) return "file is too large (25MB max)";
     // @vercel/blob's client always uses this exact generic wording when the request
-    // for an upload token itself fails (auth, missing property, etc.) — it discards
+    // for an upload token itself fails (auth, missing property, etc.): it discards
     // whatever specific reason the server actually sent back. A stale session is the
     // most common real cause, so that's the fix worth suggesting.
     if (/retrieve the client token/i.test(msg)) {
@@ -448,7 +468,7 @@ function PhotoGallery({
     onBusyChange(true);
     const failures: string[] = [];
     try {
-      // A few uploads at once instead of one at a time — each file was paying its own
+      // A few uploads at once instead of one at a time: each file was paying its own
       // full round-trip (mint a token, then the transfer) in strict sequence, so five
       // photos took ~5x one photo's time. Capped (not fully parallel) so a big batch
       // doesn't fire a burst of concurrent token requests at the DB all at once.
@@ -465,7 +485,7 @@ function PhotoGallery({
             });
             onAdd({ url: blob.url, pathname: blob.pathname });
           } catch (e) {
-            // Keep going — one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
+            // Keep going: one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
             failures.push(`${file.name}: ${describeUploadError(e)}`);
           }
         }
@@ -482,39 +502,41 @@ function PhotoGallery({
     <div>
       <div className="flex flex-wrap gap-2">
         {photos.map((p, j) => (
-          <div key={p.pathname} className="group/photo relative h-20 w-28 shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element -- admin preview, not the public page */}
-            <img src={p.url} alt="" className="h-full w-full rounded-lg border border-border object-cover" />
-            <button
-              type="button"
-              onClick={() => onRemove(j)}
-              aria-label="Remove photo"
-              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white opacity-0 transition-opacity group-hover/photo:opacity-100"
-            >
-              ✕
-            </button>
-            <div className="absolute inset-x-1 bottom-1 flex justify-between opacity-0 transition-opacity group-hover/photo:opacity-100">
+          // The controls show on hover or focus with a mouse; touch has no hover, so they stay.
+          <div key={p.pathname} className="group/photo relative shrink-0">
+            <PhotoThumb src={p.url} alt={`${name} photo ${j + 1}`} size={96} />
+            <div className="absolute inset-0 transition-opacity pointer-fine:opacity-0 pointer-fine:group-focus-within/photo:opacity-100 pointer-fine:group-hover/photo:opacity-100">
+              <button
+                type="button"
+                onClick={() => onRemove(j)}
+                aria-label={`Remove photo ${j + 1}`}
+                className={cn(onPhotoButton, "absolute right-1 top-1")}
+              >
+                <X aria-hidden="true" strokeWidth={1.75} className="h-3.5 w-3.5" />
+              </button>
               <button
                 type="button"
                 onClick={() => onMove(j, -1)}
                 disabled={j === 0}
-                aria-label="Move left"
-                className="flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white disabled:opacity-30"
+                aria-label={`Move photo ${j + 1} left`}
+                className={cn(onPhotoButton, "absolute bottom-1 left-1")}
               >
-                ‹
+                <ChevronLeft aria-hidden="true" strokeWidth={1.75} className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => onMove(j, 1)}
                 disabled={j === photos.length - 1}
-                aria-label="Move right"
-                className="flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white disabled:opacity-30"
+                aria-label={`Move photo ${j + 1} right`}
+                className={cn(onPhotoButton, "absolute bottom-1 right-1")}
               >
-                ›
+                <ChevronRight aria-hidden="true" strokeWidth={1.75} className="h-3.5 w-3.5" />
               </button>
             </div>
             {j === 0 && (
-              <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[9px] text-white">Cover</span>
+              <span className="pointer-events-none absolute left-1 top-1 inline-flex h-5 items-center rounded-full bg-photo-scrim px-1.5 text-micro text-on-photo">
+                Cover
+              </span>
             )}
           </div>
         ))}
@@ -523,9 +545,10 @@ function PhotoGallery({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-background text-center text-[10px] text-muted hover:border-primary disabled:opacity-60"
+          className="flex h-18 w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg bg-fill-1 text-meta text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-60"
         >
-          {busy ? "Uploading…" : "+ Add photo"}
+          <ImagePlus aria-hidden="true" strokeWidth={1.5} className="h-4 w-4 text-fg-3" />
+          {busy ? "Uploading…" : "Add photo"}
         </button>
         <input
           ref={inputRef}
@@ -539,7 +562,7 @@ function PhotoGallery({
           }}
         />
       </div>
-      {error && <p className="mt-1 text-[10px] text-red-600">{error}</p>}
+      {error && <SaveError className="mt-1.5">{error}</SaveError>}
     </div>
   );
 }

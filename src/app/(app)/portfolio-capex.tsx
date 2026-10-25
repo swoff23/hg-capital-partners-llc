@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
-import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle, textLinkClass } from "@/components/ui";
-import { fmtMoney } from "@/lib/utils";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Section, Table, Td, Th, TextLink, textLinkClass } from "@/components/ui";
+import { Money } from "@/components/money";
+import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/normalize";
 import {
   capexUndatedNote,
@@ -11,29 +11,42 @@ import {
   type CapexRules,
   type PortfolioCapexProperty,
 } from "@/lib/property-types";
+import { ForecastYearBars, grandTotalCell } from "./properties/capex-ui";
 
-type Tip = {
+type TipContent = {
+  /** Which value opened it, so a second tap on the same value closes it. */
+  key: string;
   title: string;
   items: CapexForecastItem[];
-  /** Prefix each line with its due year (for cells that span more than one year). */
+  /** Prefix each line with its due year (for values that span more than one year). */
   showYear: boolean;
-  x: number;
-  top: number;
-  flip: boolean;
 };
 
-const TIP_HALF = 172; // ~half of the tooltip width, for clamping it to the viewport
+type Tip = TipContent & { x: number; top: number; flip: boolean };
 
+const TIP_HALF = 172; // ~half of the panel's width, for clamping it to the viewport
+
+/**
+ * The portfolio's 5-year CapEx forecast: the total, spend by year (pick a
+ * year to spotlight its column), and a property by year table that totals
+ * like a statement. A value's assets show in a small panel: on hover with a
+ * mouse, on keyboard focus, and on a tap on touch, since touch has no hover.
+ * Lives on /properties, under the property table, at #capex.
+ */
 export function PortfolioCapexForecastCard({
   properties,
   rules,
+  id,
+  className,
 }: {
   properties: PortfolioCapexProperty[];
   rules: CapexRules;
+  /** The section's anchor ("capex", so Home can link to /properties#capex). */
+  id?: string;
+  className?: string;
 }) {
   const f = portfolioCapexForecast(properties, { years: 5, rules });
   const undatedNote = capexUndatedNote(f.unknownCount);
-  const maxYear = Math.max(1, ...f.perYear);
   const rows = f.rows.filter((r) => r.total > 0);
   const lastYear = f.years[f.years.length - 1];
 
@@ -41,268 +54,202 @@ export function PortfolioCapexForecastCard({
   const [selYear, setSelYear] = useState<number | null>(null);
   const selIdx = selYear == null ? -1 : f.years.indexOf(selYear);
 
-  // Hover a table value to see the assets behind it.
   const [tip, setTip] = useState<Tip | null>(null);
 
-  function openTip(
-    e: React.MouseEvent<HTMLElement>,
-    title: string,
-    items: CapexForecastItem[],
-    showYear: boolean,
-  ) {
-    if (items.length === 0) return;
-    const r = e.currentTarget.getBoundingClientRect();
+  function openTip(el: HTMLElement, content: TipContent) {
+    const r = el.getBoundingClientRect();
     const flip = r.bottom + 220 > window.innerHeight;
     setTip({
-      title,
-      items,
-      showYear,
+      ...content,
       x: Math.min(Math.max(r.left + r.width / 2, TIP_HALF), window.innerWidth - TIP_HALF),
       top: flip ? r.top - 6 : r.bottom + 6,
       flip,
     });
   }
-  const closeTip = () => setTip(null);
-  const tipOn = (title: string, items: CapexForecastItem[], showYear: boolean) => ({
-    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => openTip(e, title, items, showYear),
-    onMouseLeave: closeTip,
-  });
 
-  const itemsForYear = (year: number) =>
-    f.rows.flatMap((row) => row.items.filter((it) => it.dueYear === year));
+  // The panel is fixed where its value was, so a scroll closes it; so do Esc
+  // and a tap anywhere but that value.
+  const openKey = tip?.key ?? null;
+  useEffect(() => {
+    if (openKey == null) return;
+    const close = () => setTip(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    const onDown = (e: PointerEvent) => {
+      const at = e.target instanceof Element ? e.target.closest("[data-tip]")?.getAttribute("data-tip") : null;
+      if (at !== openKey) close();
+    };
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+    };
+  }, [openKey]);
+
+  const breakdown = (content: TipContent, children: ReactNode) => (
+    <Breakdown
+      content={content}
+      open={openKey === content.key}
+      onOpen={(el) => openTip(el, content)}
+      onClose={() => setTip(null)}
+    >
+      {children}
+    </Breakdown>
+  );
+
+  const itemsForYear = (year: number) => f.rows.flatMap((row) => row.items.filter((it) => it.dueYear === year));
   const allItems = f.rows.flatMap((row) => row.items);
 
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle>5-year CapEx forecast</CardTitle>
-        <span className="text-xs text-muted">
-          {f.fromYear}–{lastYear}
-        </span>
-      </CardHeader>
-      <CardBody className="space-y-4">
-        <div>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-2xl font-semibold tabular-nums">
-              {fmtMoney(selIdx >= 0 ? f.perYear[selIdx] : f.total)}
-            </span>
-            {selIdx >= 0 ? (
-              <span className="text-xs font-medium text-muted">
-                {selYear} spend ·{" "}
-                <button
-                  type="button"
-                  onClick={() => setSelYear(null)}
-                  className={textLinkClass}
-                >
-                  show all 5 years
-                </button>
-              </span>
-            ) : (
-              f.dueNowTotal > 0 && (
-                <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                  {fmtMoney(f.dueNowTotal)} due soon
+    <div id={id} className={cn("scroll-mt-[calc(var(--app-bar-h)+1.5rem)]", className)}>
+      <Section
+        title="5-year CapEx forecast"
+        actions={
+          <span className="num text-meta text-fg-3">
+            {f.fromYear} to {lastYear}
+          </span>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <Money value={selIdx >= 0 ? f.perYear[selIdx] : f.total} className="text-figure-m text-fg-1" />
+              {selIdx >= 0 ? (
+                <span className="text-meta text-fg-3">
+                  <span className="num">{selYear}</span> spend ·{" "}
+                  <button type="button" onClick={() => setSelYear(null)} className={textLinkClass}>
+                    show all 5 years
+                  </button>
                 </span>
-              )
-            )}
+              ) : (
+                f.dueNowTotal > 0 && (
+                  <span className="text-meta text-danger">
+                    <Money value={f.dueNowTotal} /> due soon
+                  </span>
+                )
+              )}
+            </div>
+            {undatedNote && <p className="mt-1 text-meta text-fg-3">{undatedNote}</p>}
           </div>
-          {undatedNote && <p className="mt-1 text-xs text-muted">{undatedNote}</p>}
-        </div>
 
-        {/* Clickable per-year chart — selecting a year spotlights it in the table */}
-        <div className="space-y-1">
-          {f.years.map((year, i) => {
-            const active = selYear === year;
-            const clickable = f.perYear[i] > 0;
-            return (
-              <button
-                key={year}
-                type="button"
-                disabled={!clickable}
-                onClick={() => setSelYear((cur) => (cur === year ? null : year))}
-                aria-pressed={active}
-                className={
-                  "flex w-full items-center gap-3 rounded-md px-2 py-1 text-left text-xs transition-all " +
-                  (clickable ? "cursor-pointer hover:bg-background " : "cursor-default ") +
-                  (active
-                    ? "bg-primary/10 ring-2 ring-inset ring-primary "
-                    : selYear != null
-                      ? "opacity-40 "
-                      : "")
-                }
-              >
-                <span
-                  className={
-                    "w-10 shrink-0 tabular-nums " +
-                    (active ? "font-semibold text-primary" : "text-muted")
-                  }
-                >
-                  {year}
-                </span>
-                <span className="h-4 flex-1 overflow-hidden rounded bg-background">
-                  <span
-                    className={
-                      "block h-full rounded " +
-                      (active
-                        ? "bg-chart-1"
-                        : i === 0
-                          ? "bg-red-500/70 dark:bg-red-500/60"
-                          : "bg-chart-1/50")
-                    }
-                    style={{ width: `${(f.perYear[i] / maxYear) * 100}%` }}
-                  />
-                </span>
-                <span
-                  className={
-                    "w-20 shrink-0 text-right tabular-nums " +
-                    (active ? "font-semibold text-primary" : "font-medium")
-                  }
-                >
-                  {f.perYear[i] ? fmtMoney(f.perYear[i]) : "—"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          {/* Spend by year: picking one spotlights its column in the table. */}
+          <ForecastYearBars
+            years={f.years.map((year, i) => ({ year, total: f.perYear[i] }))}
+            selected={selYear}
+            onSelect={(year) => setSelYear((cur) => (cur === year ? null : year))}
+          />
 
-        {/* Property × year matrix */}
-        {rows.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-xs">
+          {/* Property by year */}
+          {rows.length > 0 ? (
+            <Table className="min-w-140">
               <thead>
-                <tr className="text-left text-muted [&>th]:pb-1 [&>th]:pr-3 [&>th]:font-medium">
-                  <th>Property</th>
+                <tr>
+                  <Th className="pl-0">Property</Th>
                   {f.years.map((y) => (
-                    <th
+                    <Th
                       key={y}
-                      className={
-                        "text-right tabular-nums transition-opacity " +
-                        (selYear != null && selYear !== y ? "opacity-30" : "")
-                      }
+                      numeric
+                      className={cn("transition-opacity duration-fast", selYear != null && selYear !== y && "opacity-30")}
                     >
                       {y}
-                    </th>
+                    </Th>
                   ))}
-                  <th
-                    className={
-                      "text-right transition-opacity " + (selYear != null ? "opacity-30" : "")
-                    }
-                  >
+                  <Th numeric className={cn("pr-0 transition-opacity duration-fast", selYear != null && "opacity-30")}>
                     5-yr
-                  </th>
+                  </Th>
                 </tr>
               </thead>
-              <tbody className="[&>tr>td]:py-0.5 [&>tr>td]:pr-3">
+              <tbody className="divide-y divide-line">
                 {rows.map((r) => {
                   const rowActive = selIdx < 0 || r.perYear[selIdx] > 0;
+                  const name = shortAddress(r.address);
                   return (
-                    <tr
-                      key={r.id}
-                      className={"transition-opacity " + (rowActive ? "" : "opacity-30")}
-                    >
-                      <td className="max-w-[220px] truncate">
-                        <Link href={`/properties/${r.id}`} className="hover:underline">
-                          {shortAddress(r.address)}
-                        </Link>
-                      </td>
+                    <tr key={r.id} className={cn("transition-opacity duration-fast", !rowActive && "opacity-30")}>
+                      <Td className="max-w-56 truncate pl-0">
+                        <TextLink href={`/properties/${r.id}`}>{name}</TextLink>
+                      </Td>
                       {r.perYear.map((v, i) => {
                         const year = f.years[i];
                         const items = r.items.filter((it) => it.dueYear === year);
                         const faded = selYear != null && selYear !== year;
-                        const hot = selYear === year && v > 0;
                         return (
-                          <td
+                          <Td
                             key={i}
-                            {...tipOn(`${shortAddress(r.address)} · ${year}`, items, false)}
-                            className={
-                              "text-right tabular-nums transition-opacity " +
-                              (items.length > 0 ? "cursor-help " : "") +
-                              (faded ? "opacity-30 " : "") +
-                              (v === 0
-                                ? "text-muted"
-                                : hot
-                                  ? "font-semibold " +
-                                    (i === 0 ? "text-red-600 dark:text-red-400" : "text-primary")
-                                  : i === 0
-                                    ? "text-red-600 dark:text-red-400"
-                                    : "")
-                            }
+                            numeric
+                            className={cn(
+                              "transition-opacity duration-fast",
+                              faded && "opacity-30",
+                              // This year's spend is what's due now or already past its replacement age.
+                              v === 0 ? "text-fg-3" : i === 0 ? "text-danger" : "text-fg-1",
+                            )}
                           >
-                            {v ? fmtMoney(v) : "—"}
-                          </td>
+                            {breakdown(
+                              { key: `${r.id}-${year}`, title: `${name} · ${year}`, items, showYear: false },
+                              v ? <Money value={v} /> : "—",
+                            )}
+                          </Td>
                         );
                       })}
-                      <td
-                        {...tipOn(
-                          `${shortAddress(r.address)} · ${f.fromYear}–${lastYear}`,
-                          r.items,
-                          true,
+                      <Td numeric className={cn("pr-0 transition-opacity duration-fast", selYear != null && "opacity-30")}>
+                        {breakdown(
+                          { key: `${r.id}-all`, title: `${name} · ${f.fromYear} to ${lastYear}`, items: r.items, showYear: true },
+                          <Money value={r.total} />,
                         )}
-                        className={
-                          "!pr-0 text-right font-medium tabular-nums transition-opacity " +
-                          (r.items.length > 0 ? "cursor-help " : "") +
-                          (selYear != null ? "opacity-30" : "")
-                        }
-                      >
-                        {fmtMoney(r.total)}
-                      </td>
+                      </Td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t border-border font-semibold [&>td]:pt-1 [&>td]:pr-3">
-                  <td>Total</td>
+                <tr>
+                  <Td className={cn("pl-0", grandTotalCell)}>Total</Td>
                   {f.perYear.map((v, i) => {
                     const year = f.years[i];
-                    const yearItems = itemsForYear(year);
                     const faded = selYear != null && selYear !== year;
                     return (
-                      <td
-                        key={i}
-                        {...tipOn(`Portfolio · ${year}`, yearItems, false)}
-                        className={
-                          "text-right tabular-nums transition-opacity " +
-                          (yearItems.length > 0 ? "cursor-help " : "") +
-                          (faded ? "opacity-30 " : selYear === year ? "text-primary " : "")
-                        }
-                      >
-                        {v ? fmtMoney(v) : "—"}
-                      </td>
+                      <Td key={i} numeric className={cn(grandTotalCell, "transition-opacity duration-fast", faded && "opacity-30")}>
+                        {breakdown(
+                          { key: `all-${year}`, title: `Portfolio · ${year}`, items: itemsForYear(year), showYear: false },
+                          v ? <Money value={v} /> : "—",
+                        )}
+                      </Td>
                     );
                   })}
-                  <td
-                    {...tipOn(`Portfolio · ${f.fromYear}–${lastYear}`, allItems, true)}
-                    className={
-                      "!pr-0 text-right tabular-nums transition-opacity " +
-                      (allItems.length > 0 ? "cursor-help " : "") +
-                      (selYear != null ? "opacity-30" : "")
-                    }
+                  <Td
+                    numeric
+                    className={cn(grandTotalCell, "pr-0 transition-opacity duration-fast", selYear != null && "opacity-30")}
                   >
-                    {fmtMoney(f.total)}
-                  </td>
+                    {breakdown(
+                      { key: "all-all", title: `Portfolio · ${f.fromYear} to ${lastYear}`, items: allItems, showYear: true },
+                      <Money value={f.total} />,
+                    )}
+                  </Td>
                 </tr>
               </tfoot>
-            </table>
-          </div>
-        )}
-
-        {rows.length === 0 && (
-          <p className="text-sm text-muted">
-            No projected CapEx in the next 5 years. Add install years to unit equipment and building
-            systems to build the forecast.
-          </p>
-        )}
-      </CardBody>
+            </Table>
+          ) : (
+            <p className="text-body text-fg-3">
+              No projected CapEx in the next 5 years. Add install years to unit equipment and building systems to
+              build the forecast.
+            </p>
+          )}
+        </div>
+      </Section>
 
       {tip && (
         <div
-          className={
-            "pointer-events-none fixed z-50 w-[336px] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-line-float bg-raised p-3 text-xs shadow-float " +
-            (tip.flip ? "-translate-y-full" : "")
-          }
+          role="tooltip"
+          className={cn(
+            "pointer-events-none fixed z-50 w-84 max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-line-float bg-raised p-3 text-meta text-fg-1 shadow-float",
+            tip.flip && "-translate-y-full",
+          )}
           style={{ left: tip.x, top: tip.top }}
         >
-          <div className="mb-2 font-semibold">{tip.title}</div>
+          <p className="mb-2 font-semibold">{tip.title}</p>
           <div className="space-y-1.5">
             {[...tip.items]
               .sort((a, b) => a.dueYear - b.dueYear || b.cost - a.cost)
@@ -310,33 +257,78 @@ export function PortfolioCapexForecastCard({
                 <div key={idx} className="flex items-start justify-between gap-3">
                   <span className="min-w-0">
                     {tip.showYear && (
-                      <span
-                        className={
-                          "mr-1 tabular-nums " +
-                          (it.overdue ? "text-red-600 dark:text-red-400" : "text-muted")
-                        }
-                      >
+                      <span className={cn("num mr-1", it.overdue ? "text-danger" : "text-fg-3")}>
                         {it.overdue ? "now" : it.dueYear}
                       </span>
                     )}
                     <span className="font-medium">{it.type}</span>
-                    <span className="text-muted"> · {it.unitLabel}</span>
+                    <span className="text-fg-3"> · {it.unitLabel}</span>
                   </span>
-                  <span className="shrink-0 whitespace-nowrap font-medium tabular-nums">
-                    {fmtMoney(it.cost)}
-                  </span>
+                  <Money value={it.cost} className="shrink-0" />
                 </div>
               ))}
           </div>
-          <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-border pt-1.5 font-semibold">
+          <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-1.5 font-semibold">
             <span>Total</span>
-            <span className="tabular-nums">
-              {fmtMoney(tip.items.reduce((s, it) => s + it.cost, 0))}
-            </span>
+            <Money value={tip.items.reduce((s, it) => s + it.cost, 0)} />
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
+/**
+ * A table value that opens its assets: hover with a mouse, keyboard focus,
+ * or a tap, which toggles it. Plain text when there are none.
+ */
+function Breakdown({
+  content,
+  open,
+  onOpen,
+  onClose,
+  children,
+}: {
+  content: TipContent;
+  open: boolean;
+  onOpen: (el: HTMLElement) => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const pointer = useRef("mouse");
+  if (content.items.length === 0) return <>{children}</>;
+  return (
+    <button
+      type="button"
+      data-tip={content.key}
+      aria-expanded={open}
+      onPointerDown={(e) => {
+        pointer.current = e.pointerType;
+      }}
+      onPointerEnter={(e) => {
+        if (e.pointerType === "mouse") onOpen(e.currentTarget);
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === "mouse") onClose();
+      }}
+      onFocus={(e) => {
+        // Keyboard focus only: a click or a tap focuses the button too, and a tap toggles below.
+        if (e.currentTarget.matches(":focus-visible")) onOpen(e.currentTarget);
+      }}
+      onBlur={onClose}
+      onClick={(e) => {
+        // A mouse opened it on hover; a tap (or Enter after one) toggles it.
+        if (pointer.current === "mouse") return;
+        if (open) onClose();
+        else onOpen(e.currentTarget);
+      }}
+      className={cn(
+        "relative -mx-1 rounded-sm px-1 underline decoration-line-strong decoration-dotted underline-offset-3 pointer-fine:cursor-help",
+        // A 44px hit area on touch without the row growing.
+        "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3",
+      )}
+    >
+      {children}
+    </button>
+  );
+}

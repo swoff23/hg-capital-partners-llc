@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { callAction } from "@/lib/action-result";
 import { changedFields } from "@/lib/properties/edits";
 import { patchProperty } from "../actions";
@@ -15,13 +15,29 @@ import { patchProperty } from "../actions";
  * drops, keeps the form open with what was typed and the reason. It runs on
  * submit rather than as the form's `action`, because React resets a form's
  * inputs after its action runs.
+ *
+ * `open("lender")` also puts the caret in that field, for an empty fact's
+ * verb ("Add lender"); the form takes `formRef`.
  */
 export function useSectionSave<T extends Record<string, unknown>>(id: string, current: T) {
   const [loaded, setLoaded] = useState<T | null>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const focusName = useRef<string | null>(null);
 
-  function open() {
+  // Once the form is up, focus the field the verb named.
+  useEffect(() => {
+    const name = focusName.current;
+    if (!loaded || !name) return;
+    focusName.current = null;
+    const el = formRef.current?.elements.namedItem(name);
+    if (el instanceof HTMLElement) el.focus();
+  }, [loaded]);
+
+  function open(field?: string) {
+    // Passed straight to onClick, it gets the click event: only a name counts.
+    focusName.current = typeof field === "string" ? field : null;
     setError(null);
     setLoaded(current);
   }
@@ -46,5 +62,5 @@ export function useSectionSave<T extends Record<string, unknown>>(id: string, cu
     });
   }
 
-  return { loaded, open, close, pending, error, onSubmit };
+  return { loaded, open, close, pending, error, onSubmit, formRef };
 }

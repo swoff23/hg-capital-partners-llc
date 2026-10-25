@@ -1,8 +1,13 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
+import { Button as AriaButton } from "react-aria-components";
+import { ChevronRight, MoreHorizontal, Plus, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Badge, Button, EmptyState } from "@/components/ui";
-import type { CapexRules, PropertyUnit } from "@/lib/property-types";
+import { Code } from "@/components/code";
+import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
+import { Money } from "@/components/money";
+import { Button, SectionCard, Table, Td, Th, buttonClass, fieldClass } from "@/components/ui";
+import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
 import {
   UTILITY_GROUPS,
   UTILITY_STATUS_FIELDS,
@@ -10,36 +15,47 @@ import {
   utilityStatusTone,
   equipmentAge,
   equipmentStatus,
-  equipmentStatusTone,
   equipmentReplacementCost,
 } from "@/lib/property-types";
 import { removeUnitQuestion, unitRefKey, type UnitRefs } from "@/lib/properties/unit-refs";
-import { fmtMoney } from "@/lib/utils";
+import { shortAddress } from "@/lib/normalize";
+import { cn } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
 import { callAction } from "@/lib/action-result";
 import { updatePropertyUnits } from "../actions";
+import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
+import { AddRow, SaveError } from "./record-ui";
 
-const inp =
-  "w-full rounded border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary";
+/** A field in a dense editor row: 32px with a mouse, 44 on touch. */
+const inp = cn(fieldClass, "h-8");
 
-const fmtAge = (n: number | null) => (n == null ? "—" : `${n} yr${n === 1 ? "" : "s"}`);
+/** The account-number fields, read as codes and masked to their last four. */
+const isAccountField = (k: keyof UnitUtilities) => k.endsWith("Acct");
 
-/** Text colour for a status tone — used instead of a pill to keep the tables quiet. */
-const toneText: Record<string, string> = {
-  green: "text-green-700 dark:text-green-400",
-  amber: "text-amber-700 dark:text-amber-400",
-  red: "text-red-600 dark:text-red-400",
-  gray: "",
-};
+/** What a unit goes by in a row or a dialog: its label, or its place in the list. */
+const unitName = (u: PropertyUnit, i: number) => u.label?.trim() || `Unit ${i + 1}`;
 
+type Removing = { index: number; title: string; body: string; saved: boolean };
+
+/**
+ * The property's units, one row each (docs/brand-guidelines.md, section 9
+ * Counted lists): Add unit is the last row and Delete sits in each row's ⋯
+ * menu, so the count shown on the record is always the rows here. Edit opens
+ * every unit's access, utilities and equipment at once; adding a unit opens
+ * the same editor with a blank one at the end. A Delete from the list saves
+ * at once, after its confirm; one inside the editor waits for Save.
+ */
 export function UnitsSection({
   propertyId,
+  address,
   version,
   initial,
   rules,
   unitRefs,
 }: {
   propertyId: string;
+  /** The property's address, to name a unit in the Delete confirm. */
+  address: string;
   /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
   version: string;
   initial: PropertyUnit[];
@@ -53,7 +69,7 @@ export function UnitsSection({
   // newer one, and sending that would let this draft overwrite a partner's change.
   const [editVersion, setEditVersion] = useState(version);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [removing, setRemoving] = useState<{ index: number; title: string; body: string } | null>(null);
+  const [removing, setRemoving] = useState<Removing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -65,6 +81,17 @@ export function UnitsSection({
       fn(next);
       return next;
     });
+  }
+
+  /**
+   * Start from what's saved now: after a save the page brings each new unit's
+   * id, and a rename only reaches its tasks when the ids it sends are those.
+   */
+  function edit(withNew = false) {
+    setError(null);
+    setUnits(withNew ? [...structuredClone(initial), blankUnit()] : structuredClone(initial));
+    setEditVersion(version);
+    setEditing(true);
   }
 
   function save() {
@@ -93,74 +120,112 @@ export function UnitsSection({
     else discard();
   }
 
-  // Tasks and listings name a unit by its saved label, so a unit they point at
-  // asks first (decision 19), unless another unit keeps that label.
-  function removeUnit(i: number) {
-    const saved = initial.find((u) => u.id && u.id === units[i].id)?.label ?? "";
+  /**
+   * The Delete confirm for unit `i` of `list`. Tasks and listings name a unit
+   * by its saved label, so the body says what still names it (decision 19),
+   * unless another unit in the list keeps that label.
+   */
+  function deleteQuestion(list: PropertyUnit[], i: number): { title: string; body: string | null } {
+    const saved = initial.find((u) => u.id && u.id === list[i].id)?.label ?? "";
     const key = unitRefKey(saved);
-    const kept = units.some((u, j) => j !== i && unitRefKey(u.label) === key);
+    const kept = list.some((u, j) => j !== i && unitRefKey(u.label) === key);
     const question = key && !kept ? removeUnitQuestion(saved, unitRefs[key]) : null;
-    if (question) setRemoving({ index: i, ...question });
+    return {
+      title: `Delete ${unitName(list[i], i)} at ${shortAddress(address)}`,
+      body: question?.body ?? null,
+    };
+  }
+
+  // From the list: always confirm, since it saves at once.
+  function askDeleteSaved(i: number) {
+    setError(null);
+    const q = deleteQuestion(initial, i);
+    setRemoving({
+      index: i,
+      saved: true,
+      title: q.title,
+      body: q.body ?? "Its lockbox code, utilities and equipment go with it.",
+    });
+  }
+
+  // In the editor: a unit something still names asks first; anything else goes from the draft.
+  function removeFromDraft(i: number) {
+    const q = deleteQuestion(units, i);
+    if (q.body) setRemoving({ index: i, saved: false, title: q.title, body: q.body });
     else mutate((x) => x.splice(i, 1));
   }
 
   function confirmRemove() {
     if (!removing) return;
-    const { index } = removing;
-    mutate((x) => x.splice(index, 1));
-    setRemoving(null);
+    const { index, saved } = removing;
+    if (!saved) {
+      mutate((x) => x.splice(index, 1));
+      setRemoving(null);
+      return;
+    }
+    const next = initial.filter((_, j) => j !== index);
+    start(async () => {
+      const r = await callAction(() => updatePropertyUnits(propertyId, next, version));
+      if (!r.ok) setError(r.error);
+      setRemoving(null);
+    });
   }
 
   return (
-    <div className="group rounded-xl border border-border bg-surface shadow-sm">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h3 className="text-sm font-semibold">Units &amp; access</h3>
-        {!editing ? (
-          <button
-            onClick={() => {
-              // Start from what's saved now: after a save the page brings each new unit's
-              // id, and a rename only reaches its tasks when the ids it sends are those.
-              setUnits(structuredClone(initial));
-              setEditVersion(version);
-              setEditing(true);
-            }}
-            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
-          >
-            Edit
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => mutate((x) => x.push(blankUnit()))}>
-              + Add unit
-            </Button>
-            <Button size="sm" onClick={save} disabled={pending}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={cancel}>
-              Cancel
-            </Button>
-          </div>
-        )}
-      </div>
+    <SectionCard
+      title="Units & access"
+      onEdit={() => edit()}
+      editing={editing}
+      actions={
+        <>
+          <Button size="sm" variant="secondary" onClick={cancel}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={save} disabled={pending}>
+            {pending ? "Saving…" : "Save"}
+          </Button>
+        </>
+      }
+    >
+      {!editing ? (
+        <>
+          {initial.length === 0 ? (
+            <p className="pb-2 text-body text-fg-3">Add each unit to keep its lockbox code, utilities and equipment here.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {initial.map((u, i) => (
+                <ReadUnit
+                  key={u.id ?? i}
+                  unit={u}
+                  name={unitName(u, i)}
+                  rules={rules}
+                  onDelete={() => askDeleteSaved(i)}
+                />
+              ))}
+            </ul>
+          )}
+          <AddRow onClick={() => edit(true)}>Add unit</AddRow>
+        </>
+      ) : (
+        <>
+          <ul className="divide-y divide-line">
+            {units.map((u, i) => (
+              <EditUnit
+                key={u.id ?? `new-${i}`}
+                unit={u}
+                index={i}
+                name={unitName(u, i)}
+                mutate={mutate}
+                rules={rules}
+                onRemove={() => removeFromDraft(i)}
+              />
+            ))}
+          </ul>
+          <AddRow onClick={() => mutate((x) => x.push(blankUnit()))}>Add unit</AddRow>
+        </>
+      )}
 
-      <div className="space-y-4 p-4">
-        {!editing ? (
-          <ReadUnits units={initial} rules={rules} />
-        ) : (
-          units.map((u, i) => (
-            <EditUnitCard
-              key={u.id ?? `new-${i}`}
-              unit={u}
-              index={i}
-              mutate={mutate}
-              rules={rules}
-              onRemove={() => removeUnit(i)}
-            />
-          ))
-        )}
-      </div>
-
-      {error && <p className="px-4 pb-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <SaveError className="mt-2">{error}</SaveError>}
 
       {removing && (
         <ConfirmDialog
@@ -168,9 +233,10 @@ export function UnitsSection({
           body={removing.body}
           onClose={() => setRemoving(null)}
           cancelLabel="Keep it"
+          busy={removing.saved && pending}
           actions={
-            <Button size="sm" variant="destructive" onClick={confirmRemove}>
-              Remove unit
+            <Button size="sm" variant="destructive" onClick={confirmRemove} disabled={removing.saved && pending}>
+              {removing.saved && pending ? "Deleting…" : "Delete unit"}
             </Button>
           }
         />
@@ -194,219 +260,227 @@ export function UnitsSection({
           }
         />
       )}
-    </div>
+    </SectionCard>
   );
 }
 
-function Accordion({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
+/** A unit's ⋯ menu: Delete, the one thing a row does besides opening its details. */
+function UnitMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
   return (
-    <details open={defaultOpen} className="group border-t border-border">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">
-        <svg
-          className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90"
-          viewBox="0 0 12 12"
-          fill="none"
-          aria-hidden
-        >
-          <path
-            d="M4.5 3l3 3-3 3"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+    <MenuTrigger>
+      <AriaButton aria-label={`${name} actions`} className={buttonClass({ variant: "ghost", size: "sm", icon: true })}>
+        <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
+      </AriaButton>
+      <Menu>
+        <MenuItem variant="destructive" icon={<Trash2 />} onAction={onDelete}>
+          Delete unit
+        </MenuItem>
+      </Menu>
+    </MenuTrigger>
+  );
+}
+
+/** A unit's utilities or equipment, folded under its row. */
+function Disclosure({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <details className="group/d">
+      <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center gap-1.5 text-meta font-medium text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          aria-hidden="true"
+          strokeWidth={1.5}
+          className="h-3.5 w-3.5 shrink-0 text-fg-3 transition-transform duration-fast group-open/d:rotate-90 motion-reduce:transition-none"
+        />
         {title}
       </summary>
-      <div className="px-3 pb-3">{children}</div>
+      <div className="pb-3 pl-5">{children}</div>
     </details>
   );
 }
 
-function ReadUnits({ units, rules }: { units: PropertyUnit[]; rules: CapexRules }) {
-  if (units.length === 0) return <EmptyState>No unit-level records.</EmptyState>;
+function ReadUnit({
+  unit: u,
+  name,
+  rules,
+  onDelete,
+}: {
+  unit: PropertyUnit;
+  name: string;
+  rules: CapexRules;
+  onDelete: () => void;
+}) {
+  const hasUtilities = UTILITY_GROUPS.some((g) => g.fields.some(([k]) => u.utilities?.[k]));
+  const equipment = u.equipment ?? [];
   return (
-    <>
-      {units.map((u, i) => {
-        const hasUtilities = UTILITY_GROUPS.some((g) => g.fields.some(([k]) => u.utilities?.[k]));
-        const equipment = u.equipment ?? [];
-        return (
-        <div key={i} className="rounded-lg border border-border">
-          <div className="flex items-baseline gap-2 border-b border-border bg-background px-3 py-2">
-            <span className="text-sm font-medium">{u.label || `Unit ${i + 1}`}</span>
-            {u.lockboxCode && (
-              <span className="text-xs text-muted">🔒 {u.lockboxCode}</span>
-            )}
-          </div>
-          {hasUtilities && (
-            <Accordion title="Utilities">
-              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-                {UTILITY_GROUPS.map((g) => {
-                  const rows = g.fields.filter(([k]) => u.utilities?.[k]);
-                  if (rows.length === 0) return null;
-                  return (
-                    <div key={g.name}>
-                      <div className="mb-1 text-xs font-semibold">{g.name}</div>
-                      <div className="space-y-1">
-                        {rows.map(([k, label]) => (
-                          <div key={k} className="flex items-center justify-between gap-2 text-xs">
-                            <span className="text-muted">{label}</span>
-                            <span
-                              className={
-                                "font-medium " +
-                                (UTILITY_STATUS_FIELDS.has(k)
-                                  ? toneText[utilityStatusTone(u.utilities![k])]
-                                  : "")
-                              }
-                            >
-                              {u.utilities![k]}
-                            </span>
+    <li className="py-1.5">
+      <div className="flex min-h-8 items-center gap-3">
+        <p className="min-w-0 flex-1 truncate text-body text-fg-1">{name}</p>
+        {u.lockboxCode && (
+          <span className="flex shrink-0 items-center gap-1.5">
+            <span className="text-meta text-fg-3 max-[480px]:hidden">Lockbox</span>
+            <Code value={u.lockboxCode} label="Lockbox code" />
+          </span>
+        )}
+        <UnitMenu name={name} onDelete={onDelete} />
+      </div>
+      {hasUtilities && (
+        <Disclosure title="Utilities">
+          <div className="@container">
+            <div className="grid gap-x-6 gap-y-3 @min-[36rem]:grid-cols-3">
+              {UTILITY_GROUPS.map((g) => {
+                const rows = g.fields.filter(([k]) => u.utilities?.[k]);
+                if (rows.length === 0) return null;
+                return (
+                  <div key={g.name}>
+                    <p className="mb-1 text-meta font-medium text-fg-1">{g.name}</p>
+                    <dl className="space-y-1">
+                      {rows.map(([k, label]) => {
+                        const v = u.utilities![k]!;
+                        return (
+                          <div key={k} className="flex min-h-6 items-center justify-between gap-2 text-meta">
+                            <dt className="text-fg-3">{label}</dt>
+                            <dd className={cn("min-w-0", UTILITY_STATUS_FIELDS.has(k) ? utilityToneClass(utilityStatusTone(v)) : "text-fg-1")}>
+                              {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} mask /> : v}
+                            </dd>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Accordion>
-          )}
-          {equipment.length > 0 && (
-            <Accordion title="Equipment">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-xs">
-                  <thead>
-                    <tr className="text-left text-muted [&>th]:pb-1 [&>th]:pr-3 [&>th]:font-medium">
-                      <th>Type</th>
-                      <th>Model #</th>
-                      <th>Comments</th>
-                      <th>Year</th>
-                      <th>Age</th>
-                      <th>Status</th>
-                      <th className="text-right">Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody className="align-top [&>tr>td]:py-0.5 [&>tr>td]:pr-3">
-                    {equipment.map((e, j) => {
-                      const status = equipmentStatus(e.type, e.installYear, rules);
-                      const cost = equipmentReplacementCost(e.type, rules);
-                      return (
-                        <tr key={j}>
-                          <td className="text-muted">{e.type}</td>
-                          <td className="font-medium">{e.model || "—"}</td>
-                          <td className="min-w-[160px] text-muted">{e.comment || "—"}</td>
-                          <td className="num font-medium">{e.installYear || "—"}</td>
-                          <td className="num font-medium">{fmtAge(equipmentAge(e.installYear))}</td>
-                          <td>
-                            {status === "Replace" ? (
-                              <Badge tone="danger">Replace</Badge>
-                            ) : status ? (
-                              <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>
-                                {status}
-                              </span>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td className="!pr-0 text-right font-semibold tabular-nums text-red-600 dark:text-red-400">
-                            {status === "Replace" && cost != null ? fmtMoney(cost) : ""}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Accordion>
-          )}
-        </div>
-        );
-      })}
-    </>
+                        );
+                      })}
+                    </dl>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Disclosure>
+      )}
+      {equipment.length > 0 && (
+        <Disclosure title="Equipment">
+          <Table className="min-w-160">
+            <thead>
+              <tr>
+                <Th className="pl-0">Type</Th>
+                <Th>Model #</Th>
+                <Th>Comments</Th>
+                <Th>Year</Th>
+                <Th>Age</Th>
+                <Th>Status</Th>
+                <Th numeric className="pr-0">
+                  Cost
+                </Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {equipment.map((e, j) => {
+                const status = equipmentStatus(e.type, e.installYear, rules);
+                const cost = equipmentReplacementCost(e.type, rules);
+                return (
+                  <tr key={j}>
+                    <Td className="pl-0 text-fg-2">{e.type}</Td>
+                    <Td className="text-fg-1">{e.model || <span className="text-fg-3">—</span>}</Td>
+                    <Td className="min-w-40 text-fg-2">{e.comment || <span className="text-fg-3">—</span>}</Td>
+                    <Td className="num">{e.installYear || <span className="text-fg-3">—</span>}</Td>
+                    <Td className="num whitespace-nowrap">{fmtAge(equipmentAge(e.installYear))}</Td>
+                    <Td className="whitespace-nowrap">
+                      <EquipmentStatusText status={status} />
+                    </Td>
+                    <Td numeric className="pr-0">
+                      {status === "Replace" && cost != null ? <Money value={cost} /> : null}
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </Disclosure>
+      )}
+    </li>
   );
 }
 
-function EditUnitCard({
+const EQUIPMENT_COLS =
+  "grid grid-cols-[140px_minmax(100px,1fr)_minmax(140px,1.3fr)_78px_52px_112px_72px_44px] items-center gap-2";
+
+function EditUnit({
   unit: u,
   index: i,
+  name,
   mutate,
   rules,
   onRemove,
 }: {
   unit: PropertyUnit;
   index: number;
+  name: string;
   mutate: (fn: (u: PropertyUnit[]) => void) => void;
   rules: CapexRules;
   onRemove: () => void;
 }) {
+  const equipment = u.equipment ?? [];
   return (
-    <div className="rounded-lg border border-border">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2">
+    <li className="space-y-4 py-4 first:pt-1">
+      {/* One row at every width: the name takes what the lockbox and the menu leave. */}
+      <div className="flex items-center gap-2">
         <input
-          className={inp + " max-w-[200px]"}
+          className={cn(inp, "min-w-0 flex-1 sm:max-w-56")}
+          aria-label="Unit name"
           placeholder="Unit name"
+          // A unit just added (no id yet) opens with the caret in its name.
+          autoFocus={!u.id}
           value={u.label ?? ""}
           onChange={(e) => mutate((x) => (x[i].label = e.target.value))}
         />
-        <span className="text-xs text-muted">Lockbox</span>
-        <input
-          className={inp + " max-w-[120px]"}
-          value={u.lockboxCode ?? ""}
-          onChange={(e) => mutate((x) => (x[i].lockboxCode = e.target.value))}
-        />
-        <button onClick={onRemove} className="ml-auto text-xs text-red-500 hover:underline">
-          Remove unit
-        </button>
+        <label className="flex shrink-0 items-center gap-2">
+          <span className="text-meta text-fg-3 max-[480px]:sr-only">Lockbox</span>
+          <input
+            className={cn(inp, "w-24 font-mono")}
+            placeholder="Code"
+            value={u.lockboxCode ?? ""}
+            onChange={(e) => mutate((x) => (x[i].lockboxCode = e.target.value))}
+          />
+        </label>
+        <span className="ml-auto shrink-0">
+          <UnitMenu name={name} onDelete={onRemove} />
+        </span>
       </div>
 
-      <div className="grid gap-x-6 gap-y-4 px-3 py-3 sm:grid-cols-3">
-        {UTILITY_GROUPS.map((g) => (
-          <div key={g.name} className="space-y-1.5">
-            <div className="text-xs font-semibold">{g.name}</div>
-            {g.fields.map(([k, label]) => (
-              <label key={k} className="flex items-center gap-2 text-xs">
-                <span className="w-16 shrink-0 text-muted">{label}</span>
-                {UTILITY_STATUS_FIELDS.has(k) ? (
-                  <select
-                    className={inp}
-                    value={u.utilities?.[k] ?? ""}
-                    onChange={(e) =>
-                      mutate((x) => (x[i].utilities = { ...x[i].utilities, [k]: e.target.value }))
-                    }
-                  >
-                    <option value="">—</option>
-                    {utilityStatusChoices(u.utilities?.[k]).map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    className={inp}
-                    value={u.utilities?.[k] ?? ""}
-                    onChange={(e) =>
-                      mutate((x) => (x[i].utilities = { ...x[i].utilities, [k]: e.target.value }))
-                    }
-                  />
-                )}
-              </label>
-            ))}
-          </div>
-        ))}
+      <div className="@container">
+        <div className="grid gap-x-6 gap-y-4 @min-[36rem]:grid-cols-3">
+          {UTILITY_GROUPS.map((g) => (
+            <div key={g.name} className="space-y-1.5">
+              <p className="text-meta font-medium text-fg-1">{g.name}</p>
+              {g.fields.map(([k, label]) => (
+                <label key={k} className="flex items-center gap-2">
+                  <span className="w-16 shrink-0 text-meta text-fg-3">{label}</span>
+                  {UTILITY_STATUS_FIELDS.has(k) ? (
+                    <select
+                      className={inp}
+                      value={u.utilities?.[k] ?? ""}
+                      onChange={(e) => mutate((x) => (x[i].utilities = { ...x[i].utilities, [k]: e.target.value }))}
+                    >
+                      <option value="">—</option>
+                      {utilityStatusChoices(u.utilities?.[k]).map((o) => (
+                        <option key={o}>{o}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className={cn(inp, isAccountField(k) && "font-mono")}
+                      value={u.utilities?.[k] ?? ""}
+                      onChange={(e) => mutate((x) => (x[i].utilities = { ...x[i].utilities, [k]: e.target.value }))}
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="border-t border-border px-3 py-2">
-        <div className="mb-1 text-xs font-semibold">Equipment</div>
-        <div className="overflow-x-auto">
-          <div className="min-w-[760px] space-y-1">
-            {(u.equipment ?? []).length > 0 && (
-              <div className="grid grid-cols-[140px_minmax(100px,1fr)_minmax(140px,1.3fr)_78px_52px_112px_68px_16px] items-center gap-2 text-xs font-medium text-muted">
+      <div>
+        <p className="mb-1.5 text-meta font-medium text-fg-1">Equipment</p>
+        {equipment.length > 0 && (
+          <div className="overflow-x-auto">
+            <div className="min-w-200 space-y-1">
+              <div className={cn(EQUIPMENT_COLS, "text-meta font-medium text-fg-3")}>
                 <span>Type</span>
                 <span>Model #</span>
                 <span>Comments</span>
@@ -416,73 +490,70 @@ function EditUnitCard({
                 <span className="text-right">Cost</span>
                 <span />
               </div>
-            )}
-            {(u.equipment ?? []).map((e, j) => {
-              const status = equipmentStatus(e.type, e.installYear, rules);
-              const cost = equipmentReplacementCost(e.type, rules);
-              return (
-                <div
-                  key={j}
-                  className="grid grid-cols-[140px_minmax(100px,1fr)_minmax(140px,1.3fr)_78px_52px_112px_68px_16px] items-center gap-2"
-                >
-                  <select
-                    className={inp}
-                    value={e.type}
-                    onChange={(ev) => mutate((x) => (x[i].equipment![j].type = ev.target.value))}
-                  >
-                    {[...new Set([e.type, ...EQUIPMENT_TYPES])].map((t) => (
-                      <option key={t}>{t}</option>
-                    ))}
-                  </select>
-                  <input
-                    className={inp}
-                    placeholder="Model #"
-                    value={e.model ?? ""}
-                    onChange={(ev) => mutate((x) => (x[i].equipment![j].model = ev.target.value))}
-                  />
-                  <input
-                    className={inp}
-                    placeholder="Comments"
-                    value={e.comment ?? ""}
-                    onChange={(ev) => mutate((x) => (x[i].equipment![j].comment = ev.target.value))}
-                  />
-                  <input
-                    className={inp}
-                    placeholder="Year"
-                    value={e.installYear ?? ""}
-                    onChange={(ev) =>
-                      mutate((x) => (x[i].equipment![j].installYear = ev.target.value))
-                    }
-                  />
-                  <span className="text-xs tabular-nums text-muted">
-                    {fmtAge(equipmentAge(e.installYear))}
-                  </span>
-                  <span className="text-xs">
-                    {status === "Replace" ? (
-                      <Badge tone="danger">Replace</Badge>
-                    ) : status ? (
-                      <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>
-                        {status}
-                      </span>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </span>
-                  <span className="text-right text-xs font-semibold tabular-nums text-red-600 dark:text-red-400">
-                    {status === "Replace" && cost != null ? fmtMoney(cost) : ""}
-                  </span>
-                  <button
-                    onClick={() => mutate((x) => x[i].equipment!.splice(j, 1))}
-                    className="shrink-0 text-xs text-red-500 hover:underline"
-                  >
-                    ✕
-                  </button>
-                </div>
-              );
-            })}
+              {equipment.map((e, j) => {
+                const status = equipmentStatus(e.type, e.installYear, rules);
+                const cost = equipmentReplacementCost(e.type, rules);
+                return (
+                  <div key={j} className={EQUIPMENT_COLS}>
+                    <select
+                      className={inp}
+                      aria-label="Type"
+                      value={e.type}
+                      onChange={(ev) => mutate((x) => (x[i].equipment![j].type = ev.target.value))}
+                    >
+                      {[...new Set([e.type, ...EQUIPMENT_TYPES])].map((t) => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </select>
+                    <input
+                      className={inp}
+                      aria-label="Model #"
+                      placeholder="Model #"
+                      value={e.model ?? ""}
+                      onChange={(ev) => mutate((x) => (x[i].equipment![j].model = ev.target.value))}
+                    />
+                    <input
+                      className={inp}
+                      aria-label="Comments"
+                      placeholder="Comments"
+                      value={e.comment ?? ""}
+                      onChange={(ev) => mutate((x) => (x[i].equipment![j].comment = ev.target.value))}
+                    />
+                    <input
+                      className={inp}
+                      aria-label="Year"
+                      placeholder="Year"
+                      value={e.installYear ?? ""}
+                      onChange={(ev) => mutate((x) => (x[i].equipment![j].installYear = ev.target.value))}
+                    />
+                    <span className="num text-meta text-fg-2">{fmtAge(equipmentAge(e.installYear))}</span>
+                    <span className="text-meta">
+                      <EquipmentStatusText status={status} />
+                    </span>
+                    <span className="text-right text-meta text-fg-1">
+                      {status === "Replace" && cost != null ? <Money value={cost} /> : null}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      icon
+                      aria-label={`Remove ${e.type || "equipment"}`}
+                      onClick={() => mutate((x) => x[i].equipment!.splice(j, 1))}
+                    >
+                      <X aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-        <button
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="-ml-2.5 mt-1"
           onClick={() =>
             mutate((x) => {
               x[i].equipment = [
@@ -491,12 +562,12 @@ function EditUnitCard({
               ];
             })
           }
-          className="mt-1.5 text-xs text-primary hover:underline"
         >
-          + Add equipment
-        </button>
+          <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+          Add equipment
+        </Button>
       </div>
-    </div>
+    </li>
   );
 }
 

@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { Card, CardBody, CardHeader, CardTitle, textLinkClass } from "@/components/ui";
-import { fmtMoney } from "@/lib/utils";
+import { Section, Table, Td, Th, textLinkClass } from "@/components/ui";
+import { Money } from "@/components/money";
+import { cn } from "@/lib/utils";
 import {
   capexForecast,
   capexUndatedNote,
@@ -9,8 +10,7 @@ import {
   type CapexRules,
   type PropertyUnit,
 } from "@/lib/property-types";
-
-const fmtAge = (n: number | null) => (n == null ? "—" : `${n} yr${n === 1 ? "" : "s"}`);
+import { fmtAge, ForecastYearBars, grandTotalCell } from "../capex-ui";
 
 export function CapexForecastCard({
   units,
@@ -23,176 +23,121 @@ export function CapexForecastCard({
 }) {
   const f = capexForecast(units, { years: 5, building, rules });
   const undatedNote = capexUndatedNote(f.unknownCount);
-  const maxYear = Math.max(1, ...f.years.map((y) => y.total));
   const lastYear = f.fromYear + f.horizonYears - 1;
 
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const toggleYear = (year: number) =>
-    setSelectedYear((cur) => (cur === year ? null : year));
+  const toggleYear = (year: number) => setSelectedYear((cur) => (cur === year ? null : year));
 
   // The table always shows every item, in a fixed order, so it never reflows on click.
   // Selecting a year just emphasises the matching rows and swaps the footer total.
   const allRows = f.years.flatMap((y) => y.items);
   const selectedTotal =
-    selectedYear == null
-      ? f.total
-      : (f.years.find((y) => y.year === selectedYear)?.total ?? 0);
+    selectedYear == null ? f.total : (f.years.find((y) => y.year === selectedYear)?.total ?? 0);
+  const totalLabel = selectedYear == null ? `${f.horizonYears}-year total` : `${selectedYear} total`;
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle>5-year CapEx forecast</CardTitle>
-        <span className="text-xs text-muted">
-          {f.fromYear}–{lastYear}
+    <Section
+      as="h3"
+      title="5-year CapEx forecast"
+      actions={
+        // As tall as an Edit button, so this heading lines up with the rail's beside it.
+        <span className="num flex h-8 items-center text-meta text-fg-3">
+          {f.fromYear} to {lastYear}
         </span>
-      </CardHeader>
-      <CardBody className="space-y-4">
+      }
+    >
+      <div className="space-y-4">
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-2xl font-semibold tabular-nums">{fmtMoney(f.total)}</span>
+            <Money value={f.total} className="text-figure-m text-fg-1" />
             {f.dueNowCount > 0 && (
-              <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                {fmtMoney(f.dueNowTotal)} due soon
+              <span className="text-meta text-danger">
+                <Money value={f.dueNowTotal} /> due soon
               </span>
             )}
           </div>
-          {undatedNote && <p className="mt-1 text-xs text-muted">{undatedNote}</p>}
+          {undatedNote && <p className="mt-1 text-meta text-fg-3">{undatedNote}</p>}
         </div>
 
-        {/* Year-by-year bars — click to filter the list below */}
-        <div className="space-y-1">
-          {f.years.map((y) => {
-            const active = selectedYear === y.year;
-            const clickable = y.count > 0;
-            return (
-              <button
-                key={y.year}
-                type="button"
-                disabled={!clickable}
-                onClick={() => toggleYear(y.year)}
-                aria-pressed={active}
-                className={
-                  "flex w-full items-center gap-3 rounded-md px-2 py-1 text-left text-xs transition-all " +
-                  (clickable ? "hover:bg-background " : "cursor-default ") +
-                  (active
-                    ? "bg-primary/10 ring-2 ring-inset ring-primary "
-                    : selectedYear != null
-                      ? "opacity-40 "
-                      : "")
-                }
-              >
-                <span
-                  className={
-                    "w-10 shrink-0 tabular-nums " +
-                    (active ? "font-semibold text-primary" : "text-muted")
-                  }
-                >
-                  {y.year}
-                </span>
-                <span className="h-4 flex-1 overflow-hidden rounded bg-background">
-                  <span
-                    className={
-                      "block h-full rounded " +
-                      (active
-                        ? "bg-chart-1"
-                        : y.year === f.fromYear
-                          ? "bg-red-500/70 dark:bg-red-500/60"
-                          : "bg-chart-1/50")
-                    }
-                    style={{ width: `${(y.total / maxYear) * 100}%` }}
-                  />
-                </span>
-                <span
-                  className={
-                    "w-16 shrink-0 text-right tabular-nums " +
-                    (active ? "font-semibold text-primary" : "font-medium")
-                  }
-                >
-                  {y.total ? fmtMoney(y.total) : "—"}
-                </span>
-                <span
-                  className={
-                    "w-14 shrink-0 text-right " +
-                    (active ? "font-semibold text-primary" : "text-muted")
-                  }
-                >
-                  {y.count ? `${y.count} item${y.count === 1 ? "" : "s"}` : ""}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Year by year: pick one to spotlight its items below. */}
+        <ForecastYearBars
+          years={f.years.map((y) => ({ year: y.year, total: y.total, count: y.count }))}
+          selected={selectedYear}
+          onSelect={toggleYear}
+          showCount
+        />
 
-        {/* Line items — full list, always. Selecting a year emphasises its rows. */}
+        {/* Line items: the full list, always. Selecting a year emphasises its rows. */}
         {allRows.length > 0 && (
           <div className="space-y-1">
-            <div className="flex h-4 items-center gap-2 text-xs text-muted">
+            <div className="flex min-h-5 items-center gap-2 text-meta text-fg-3">
               {selectedYear == null ? (
                 <span>All {f.horizonYears} years</span>
               ) : (
                 <>
                   <span>
-                    Highlighting <span className="font-medium text-foreground">{selectedYear}</span>
+                    Highlighting <span className="num text-fg-1">{selectedYear}</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedYear(null)}
-                    className={`font-medium ${textLinkClass}`}
-                  >
+                  <button type="button" onClick={() => setSelectedYear(null)} className={textLinkClass}>
                     clear
                   </button>
                 </>
               )}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-xs">
-                <thead>
-                  <tr className="text-left text-muted [&>th]:pb-1 [&>th]:pr-3 [&>th]:font-medium">
-                    <th>Location</th>
-                    <th>Asset</th>
-                    <th>Age</th>
-                    <th>Due</th>
-                    <th className="text-right">Cost</th>
-                  </tr>
-                </thead>
-                <tbody className="[&>tr>td]:py-0.5 [&>tr>td]:pr-3">
-                  {allRows.map((l, idx) => {
-                    const dimmed = selectedYear != null && l.dueYear !== selectedYear;
-                    return (
-                      <tr key={idx} className={dimmed ? "opacity-30" : ""}>
-                        <td className={l.scope === "building" ? "font-medium" : "text-muted"}>
-                          {l.unitLabel}
-                        </td>
-                        <td className="font-medium">{l.type}</td>
-                        <td className="tabular-nums">{fmtAge(l.age)}</td>
-                        <td
-                          className={
-                            "tabular-nums " +
-                            (l.dueYear === f.fromYear
-                              ? "font-medium text-red-600 dark:text-red-400"
-                              : "text-muted")
-                          }
-                        >
-                          {l.dueYear === f.fromYear ? "Due soon" : l.dueYear}
-                        </td>
-                        <td className="!pr-0 text-right font-medium tabular-nums">{fmtMoney(l.cost)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-border font-semibold [&>td]:pt-1">
-                    <td colSpan={4}>
-                      {selectedYear == null ? `${f.horizonYears}-year total` : `${selectedYear} total`}
-                    </td>
-                    <td className="!pr-0 text-right tabular-nums">{fmtMoney(selectedTotal)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            {/* Below 480 the location moves under the asset and the age drops, so cost stays on screen. */}
+            <Table>
+              <thead>
+                <tr>
+                  <Th className="pl-0 max-[480px]:hidden">Location</Th>
+                  <Th className="max-[480px]:pl-0">Asset</Th>
+                  <Th className="max-[480px]:hidden">Age</Th>
+                  <Th>Due</Th>
+                  <Th numeric className="pr-0">
+                    Cost
+                  </Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {allRows.map((l, idx) => {
+                  const dimmed = selectedYear != null && l.dueYear !== selectedYear;
+                  const dueNow = l.dueYear === f.fromYear;
+                  const where = l.scope === "building" ? "text-fg-1" : "text-fg-2";
+                  return (
+                    <tr key={idx} className={cn("transition-opacity duration-fast", dimmed && "opacity-30")}>
+                      <Td className={cn("pl-0 max-[480px]:hidden", where)}>{l.unitLabel}</Td>
+                      <Td className="text-fg-1 max-[480px]:pl-0">
+                        {l.type}
+                        <span className={cn("block text-meta min-[480px]:hidden", where)}>{l.unitLabel}</span>
+                      </Td>
+                      <Td className="num whitespace-nowrap text-fg-2 max-[480px]:hidden">{fmtAge(l.age)}</Td>
+                      <Td className={cn("num whitespace-nowrap", dueNow ? "text-danger" : "text-fg-2")}>
+                        {dueNow ? "Due soon" : l.dueYear}
+                      </Td>
+                      <Td numeric className="pr-0">
+                        <Money value={l.cost} />
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                {/* One cell per column, so the hidden ones drop out of the row the same way. */}
+                <tr>
+                  <Td className={cn("whitespace-nowrap pl-0 max-[480px]:hidden", grandTotalCell)}>{totalLabel}</Td>
+                  <Td className={cn("max-[480px]:pl-0", grandTotalCell)}>
+                    <span className="whitespace-nowrap min-[480px]:hidden">{totalLabel}</span>
+                  </Td>
+                  <Td className={cn("max-[480px]:hidden", grandTotalCell)} />
+                  <Td className={grandTotalCell} />
+                  <Td numeric className={cn("pr-0", grandTotalCell)}>
+                    <Money value={selectedTotal} />
+                  </Td>
+                </tr>
+              </tfoot>
+            </Table>
           </div>
         )}
-      </CardBody>
-    </Card>
+      </div>
+    </Section>
   );
 }

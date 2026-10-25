@@ -1,34 +1,25 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Badge, Button } from "@/components/ui";
+import { Button, SectionCard, Table, Td, Th, fieldClass } from "@/components/ui";
+import { Money } from "@/components/money";
 import { callAction } from "@/lib/action-result";
-import { fmtMoney } from "@/lib/utils";
+import { cn, fmtMoney } from "@/lib/utils";
 import {
-  equipmentStatusTone,
   lifecycleStatus,
   parseCapexCost,
   parseInstallYear,
   type BuildingCapexData,
   type BuildingRule,
   type CapexRules,
-  type EquipmentStatus,
 } from "@/lib/property-types";
 import { updateBuildingCapex } from "../actions";
+import { EquipmentStatusText, fmtAge } from "../capex-ui";
+import { SaveError } from "./record-ui";
 
-const inp =
-  "w-full rounded border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary";
-const cols =
-  "grid grid-cols-[minmax(104px,1.25fr)_minmax(78px,1fr)_52px_44px_72px_66px] items-center gap-2";
-
-const toneText: Record<string, string> = {
-  green: "text-green-700 dark:text-green-400",
-  amber: "text-amber-700 dark:text-amber-400",
-  red: "text-red-600 dark:text-red-400",
-  gray: "text-muted",
-};
+/** A field inside a table row: 32px with a mouse, so the row keeps its height. */
+const cellField = cn(fieldClass, "h-8");
 
 const NOW = new Date().getFullYear();
-const fmtAge = (n: number | null) => (n == null ? "—" : `${n} yr${n === 1 ? "" : "s"}`);
 
 type DraftEntry = { type: string; year: string; cost: string };
 type Draft = Record<string, DraftEntry>;
@@ -44,13 +35,6 @@ function toDraft(data: BuildingCapexData, items: BuildingRule[]): Draft {
     };
   }
   return d;
-}
-
-function StatusCell({ status }: { status: EquipmentStatus }) {
-  if (status === "Replace") return <Badge tone="danger">Replace</Badge>;
-  return (
-    <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>{status}</span>
-  );
 }
 
 export function BuildingCapexSection({
@@ -74,18 +58,14 @@ export function BuildingCapexSection({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const datedCount = items.filter(
-    (item) => parseInstallYear(initial[item.key]?.year) != null,
-  ).length;
+  const phoneHidden = editing ? undefined : "max-[480px]:hidden";
+  const datedCount = items.filter((item) => parseInstallYear(initial[item.key]?.year) != null).length;
 
   const setCell = (key: string, field: keyof DraftEntry, value: string) =>
     setDraft((d) => ({ ...d, [key]: { ...d[key], [field]: value } }));
 
   function save() {
-    const payload: Record<
-      string,
-      { type: string | null; year: string | null; costOverride: number | null }
-    > = {};
+    const payload: Record<string, { type: string | null; year: string | null; costOverride: number | null }> = {};
     for (const item of items) {
       const c = draft[item.key];
       payload[item.key] = {
@@ -132,105 +112,95 @@ export function BuildingCapexSection({
   };
 
   return (
-    <div className="group rounded-xl border border-border bg-surface shadow-sm">
-      <div className="flex min-h-[3.25rem] items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <div className="flex items-baseline gap-2">
-          <h3 className="shrink-0 text-sm font-semibold">Building CapEx</h3>
-          <span className="text-xs text-muted">
-            {datedCount} / {items.length} systems dated
-          </span>
-        </div>
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={cancel}>
-              Cancel
-            </Button>
-            <Button type="button" size="sm" disabled={pending} onClick={save}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        ) : (
-          <button
-            onClick={edit}
-            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
-          >
-            Edit
-          </button>
-        )}
-      </div>
+    <SectionCard
+      title="Building CapEx"
+      onEdit={edit}
+      editing={editing}
+      actions={
+        <>
+          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={cancel}>
+            Cancel
+          </Button>
+          <Button type="button" size="sm" disabled={pending} onClick={save}>
+            {pending ? "Saving…" : "Save"}
+          </Button>
+        </>
+      }
+    >
+      <p className="num text-meta text-fg-3">
+        {datedCount} of {items.length} systems dated
+      </p>
+      {error && <SaveError className="mt-2">{error}</SaveError>}
 
-      {error && <p className="px-4 pt-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {/* Reading on a phone, the type and age drop so the cost stays on screen; editing keeps
+          every field and scrolls sideways in the table's own box. */}
+      <Table className={cn("mt-2", editing && "min-w-105")}>
+        <thead>
+          <tr>
+            <Th className="pl-0">Component</Th>
+            <Th className={phoneHidden}>Type</Th>
+            <Th>Year</Th>
+            <Th className={phoneHidden}>Age</Th>
+            <Th>Status</Th>
+            <Th numeric className="pr-0">
+              Cost
+            </Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {items.map((item) => {
+            const d = draft[item.key];
+            const stored = initial[item.key];
+            const src = editing
+              ? { type: d.type, year: d.year, costOverride: parseCapexCost(d.cost) }
+              : { type: stored?.type ?? "", year: stored?.year ?? "", costOverride: stored?.costOverride ?? null };
+            const rs = rowFor(item, src);
+            const showCost = rs.status === "Monitor" || rs.status === "Replace";
+            // Inputs sit in the row: 4px above and below a 32px field keeps it at 40px.
+            const cell = editing ? "py-1 pointer-coarse:py-1" : undefined;
 
-      <div className="p-4">
-        <div className="overflow-x-auto">
-          <div className="min-w-[420px] space-y-1.5">
-            <div className={cols + " text-[11px] font-medium text-muted"}>
-              <span>Component</span>
-              <span>Type</span>
-              <span>Year</span>
-              <span>Age</span>
-              <span>Status</span>
-              <span>Cost</span>
-            </div>
-
-            {items.map((item) => {
-              const d = draft[item.key];
-              const stored = initial[item.key];
-              const src = editing
-                ? {
-                    type: d.type,
-                    year: d.year,
-                    costOverride: parseCapexCost(d.cost),
-                  }
-                : {
-                    type: stored?.type ?? "",
-                    year: stored?.year ?? "",
-                    costOverride: stored?.costOverride ?? null,
-                  };
-              const rs = rowFor(item, src);
-              const showCost = rs.status === "Monitor" || rs.status === "Replace";
-              const costClass =
-                "tabular-nums " +
-                (rs.status === "Replace"
-                  ? "font-semibold text-red-600 dark:text-red-400"
-                  : rs.status === "Monitor"
-                    ? "font-semibold text-amber-700 dark:text-amber-400"
-                    : "text-muted");
-
-              return (
-                <div key={item.key} className={cols}>
-                  <span className="text-xs">{item.label}</span>
-
+            return (
+              <tr key={item.key}>
+                <Td className={cn("pl-0 text-fg-1 align-middle", editing ? "whitespace-nowrap" : "min-[480px]:whitespace-nowrap", cell)}>
+                  {item.label}
+                </Td>
+                <Td className={cn("align-middle", phoneHidden, cell)}>
                   {editing ? (
                     <input
-                      className={inp}
+                      className={cn(cellField, "w-32")}
+                      aria-label={`${item.label} type`}
                       placeholder="e.g. Shingle"
                       value={d.type}
                       onChange={(e) => setCell(item.key, "type", e.target.value)}
                     />
+                  ) : src.type ? (
+                    <span className="text-fg-2">{src.type}</span>
                   ) : (
-                    <span className="truncate text-xs text-muted">{src.type || "—"}</span>
+                    <span className="text-fg-3">—</span>
                   )}
-
+                </Td>
+                <Td className={cn("num align-middle", cell)}>
                   {editing ? (
                     <input
-                      className={inp}
+                      className={cn(cellField, "w-20")}
+                      aria-label={`${item.label} year`}
                       placeholder="Year"
                       value={d.year}
                       onChange={(e) => setCell(item.key, "year", e.target.value)}
                     />
                   ) : (
-                    <span className="text-xs">{src.year || "—"}</span>
+                    src.year || <span className="text-fg-3">—</span>
                   )}
-
-                  <span className="text-xs tabular-nums text-muted">{fmtAge(rs.age)}</span>
-                  <span className="text-[11px]">
-                    <StatusCell status={rs.status} />
-                  </span>
-
+                </Td>
+                <Td className={cn("num whitespace-nowrap align-middle text-fg-2", phoneHidden, cell)}>{fmtAge(rs.age)}</Td>
+                <Td className={cn("whitespace-nowrap align-middle", cell)}>
+                  <EquipmentStatusText status={rs.status} />
+                </Td>
+                <Td numeric className={cn("pr-0 align-middle", cell)}>
                   {editing ? (
                     <input
-                      className={inp}
+                      className={cn(cellField, "w-24 text-right")}
+                      aria-label={`${item.label} cost`}
                       placeholder={fmtMoney(item.defaultCost)}
                       value={d.cost}
                       onChange={(e) => setCell(item.key, "cost", e.target.value)}
@@ -241,21 +211,20 @@ export function BuildingCapexSection({
                         setCell(item.key, "cost", n == null ? "" : fmtMoney(n));
                       }}
                     />
-                  ) : (
-                    <span className={"text-xs " + costClass}>
-                      {showCost ? fmtMoney(rs.cost) : ""}
-                      {showCost && rs.overridden && (
-                        <span className="font-normal text-muted"> *</span>
+                  ) : showCost ? (
+                    <>
+                      <Money value={rs.cost} />
+                      {rs.overridden && (
+                        <span className="text-fg-3"> *</span>
                       )}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-
-          </div>
-        </div>
-      </div>
-    </div>
+                    </>
+                  ) : null}
+                </Td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Table>
+    </SectionCard>
   );
 }
