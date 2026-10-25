@@ -2,14 +2,15 @@
 import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { Sheet } from "@/components/sheet";
-import { Button, Textarea } from "@/components/ui";
+import { Button, Card, Textarea } from "@/components/ui";
 import { setTaskStatus } from "./actions";
 import { useStatusRun } from "./status-run";
 
 /**
  * A job waiting on staff (D6b): "Zack marked this done · 4 photos" with
  * Approve (Done) and Send back (In progress, with a note the contractor
- * sees as a comment).
+ * sees as a comment). A flat card, no shadow; Approve is the one primary
+ * (ink), Send back secondary.
  */
 export function ReviewBanner({
   taskId,
@@ -32,12 +33,12 @@ export function ReviewBanner({
   const [draft, setDraft] = useState("");
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm sm:flex-row sm:items-center">
+    <Card className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <Avatar name={fullName} size={24} outline={isContractor} />
-        <p className="min-w-0 truncate text-sm">
+        <p className="min-w-0 truncate text-body text-fg-1">
           <span className="font-medium">{name}</span> marked this done
-          {photos > 0 && <span className="text-muted">{` · ${photos} ${photos === 1 ? "photo" : "photos"}`}</span>}
+          {photos > 0 && <span className="text-fg-3">{` · ${photos} ${photos === 1 ? "photo" : "photos"}`}</span>}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -63,7 +64,7 @@ export function ReviewBanner({
           />
         )}
       </Sheet>
-    </div>
+    </Card>
   );
 }
 
@@ -79,8 +80,8 @@ function SendBackForm({ initial, onSend }: { initial: string; onSend: (note: str
       }}
     >
       <label className="block">
-        <span className="text-xs font-medium text-muted">What needs another look?</span>
-        <Textarea value={note} rows={3} autoFocus required maxLength={5000} onChange={(e) => setNote(e.target.value)} className="mt-1" />
+        <span className="text-meta font-medium text-fg-2">What needs another look?</span>
+        <Textarea value={note} rows={3} autoFocus required maxLength={5000} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
       </label>
       <div className="flex justify-end">
         <Button type="submit" disabled={!ok}>

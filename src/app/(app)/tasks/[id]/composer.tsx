@@ -4,7 +4,7 @@ import { Camera, FileText, ImagePlus, Lock, Play, X } from "lucide-react";
 import { MediaUploadTray, useMediaUploader } from "@/components/media-uploader";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useToast, useToastInset } from "@/components/toast";
-import { Button } from "@/components/ui";
+import { Button, Kbd, buttonClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
@@ -48,6 +48,13 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
+/* ---------------- The send keys ---------------- */
+
+// Apple keyboards print ⌘ for the key that sends; everyone else presses Ctrl.
+// The server render prints ⌘ and the client corrects it after hydration.
+const neverChanges = () => () => {};
+const onApple = () => /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+
 /* ---------------- Composer ---------------- */
 
 /** A file that's uploaded and waiting to go out with the message. */
@@ -56,12 +63,14 @@ export type ComposerDraft = { id: string; filename: string };
 /**
  * Reply on a task: text, photos and videos, documents. Shared by default
  * (D15); on the job of a contractor with a login the Shared side reads
- * "Reply to Zack", and Internal turns the box amber. Files upload as
- * they're picked or dropped and go out with the message; Send waits for
- * them. Until Send they're Internal whichever side is picked
- * (core.addComment gives them the message's visibility), and the page hands
- * back any left from an earlier visit as `drafts`. Cmd or Ctrl+Enter sends.
- * On a phone it sits on the bottom edge, and its tools show while you write.
+ * "Reply to Zack", and Internal turns the box --fill-1 under a Lock line
+ * (docs/brand-guidelines.md, section 9). Files upload as they're picked or
+ * dropped and go out with the message; Send waits for them. Until Send
+ * they're Internal whichever side is picked (core.addComment gives them the
+ * message's visibility), and the page hands back any left from an earlier
+ * visit as `drafts`. Cmd or Ctrl+Enter sends, printed beside Send for a
+ * mouse. On a phone it sits on the bottom edge, and its tools show while you
+ * write.
  */
 export function Composer({
   taskId,
@@ -83,6 +92,7 @@ export function Composer({
     () => readDraft(taskId),
     () => "",
   );
+  const apple = useSyncExternalStore(neverChanges, onApple, () => true);
   const [visibility, setVisibility] = useState<Visibility>("SHARED");
   // Recorded here but not yet in `drafts` (the page catches up after the
   // refresh), and ids sent or removed, which a stale `drafts` mustn't bring back.
@@ -191,19 +201,18 @@ export function Composer({
       className={cn(
         "group/composer border transition-colors",
         "max-md:sticky max-md:bottom-0 max-md:z-20 max-md:-mx-4 max-md:-mb-4 max-md:border-x-0 max-md:border-b-0 max-md:pb-[env(safe-area-inset-bottom)]",
-        "md:rounded-xl md:shadow-sm",
-        // Opaque in dark mode too: on a phone it sits over the page.
-        internal
-          ? "border-amber-300 bg-amber-50 dark:border-amber-900/70 dark:bg-[color-mix(in_oklab,var(--color-amber-950)_45%,var(--surface))]"
-          : "border-border bg-surface",
+        // Flat, like every field and bar: an edge, no shadow.
+        "md:rounded-lg",
+        // Both grounds are opaque: on a phone it sits over the page.
+        internal ? "border-line bg-fill-1" : "border-line bg-surface",
         // Same drop cue as the Attachments box.
-        dragging && "border-primary dark:border-primary",
+        dragging && "border-act",
       )}
     >
       {uploader.inputs}
       {internal && (
-        <p className="flex items-center gap-1.5 px-3 pt-2 text-xs font-medium text-amber-800 dark:text-amber-300">
-          <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
+        <p className="flex items-center gap-1.5 px-3 pt-2 text-meta font-medium text-fg-2">
+          <Lock className="size-3.5 shrink-0" aria-hidden="true" />
           Only {staffNames} see this
         </p>
       )}
@@ -238,7 +247,7 @@ export function Composer({
               uploader.addFiles(e.clipboardData.files);
             }
           }}
-          className="max-h-48 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-sm leading-5 outline-none placeholder:text-muted md:min-h-12 md:px-1"
+          className="max-h-48 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-body text-fg-1 outline-none placeholder:text-fg-3 md:min-h-12 md:px-1"
         />
         {sendButton("mb-0.5 md:hidden")}
       </div>
@@ -262,6 +271,10 @@ export function Composer({
             { key: "INTERNAL", label: "Internal" },
           ]}
         />
+        {/* The keys that send from the text box, printed for a mouse; Kbd hides on touch. */}
+        <Kbd aria-hidden="true" className="ml-1 max-md:hidden">
+          {apple ? "⌘↵" : "Ctrl ↵"}
+        </Kbd>
         {sendButton("hidden md:inline-flex")}
       </div>
     </div>
@@ -285,41 +298,44 @@ function IconButton({
       aria-label={label}
       title={label}
       onClick={onPress}
-      className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted outline-none transition-colors hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:h-11 pointer-coarse:w-11 [&_svg]:h-[18px] [&_svg]:w-[18px]",
-        className,
-      )}
+      // A ghost icon button with its icon idle in --fg-3, --fg-1 on hover.
+      className={cn(buttonClass({ variant: "ghost", icon: true }), "text-fg-3 [&_svg]:size-4.5", className)}
     >
       {children}
     </button>
   );
 }
 
-/** A file that's uploaded and waiting to go out with the message. */
+/**
+ * A file that's uploaded and waiting to go out with the message. The same
+ * 56px tile as the upload tray's (components/media-uploader.tsx): --fill-1
+ * under the photo, the photo edge on top, an ink Remove badge.
+ */
 function ReadyTile({ item, onRemove }: { item: ComposerDraft; onRemove: () => void }) {
   const kind = fileKindForType(uploadContentType(item.filename, ""));
   return (
-    <li className="relative h-14 w-14 shrink-0 rounded-lg bg-zinc-100 dark:bg-zinc-800" title={item.filename}>
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg ring-1 ring-inset ring-black/5 dark:ring-white/10">
+    <li className="relative h-14 w-14 shrink-0 rounded-lg bg-fill-1" title={item.filename}>
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg">
         {kind === "image" ? (
           // Gated, session-checked route; next/image would cache it publicly.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={taskFileUrl(item.id)} alt="" className="h-full w-full object-cover" />
         ) : kind === "video" ? (
-          <span className="flex h-full w-full items-center justify-center bg-zinc-900">
-            <Play className="h-4 w-4 fill-white text-white" aria-hidden="true" />
+          <span className="flex h-full w-full items-center justify-center bg-photo-stage">
+            <Play className="size-4 fill-on-photo text-on-photo" aria-hidden="true" />
           </span>
         ) : (
-          <FileText className="h-5 w-5 text-muted" aria-hidden="true" />
+          <FileText className="size-5 text-fg-3" aria-hidden="true" />
         )}
+        <div className="pointer-events-none absolute inset-0 rounded-lg inset-shadow-photo-edge" />
       </div>
       <button
         type="button"
         onClick={onRemove}
         aria-label={`Remove ${item.filename}`}
-        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-white shadow outline-none ring-2 ring-surface after:absolute after:-inset-3 focus-visible:ring-primary dark:bg-zinc-700 pointer-fine:after:-inset-1"
+        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-act text-on-act ring-2 ring-surface after:absolute after:-inset-3 pointer-fine:after:-inset-1"
       >
-        <X className="h-3 w-3" aria-hidden="true" />
+        <X className="size-3" aria-hidden="true" />
       </button>
     </li>
   );

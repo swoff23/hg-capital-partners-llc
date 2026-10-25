@@ -35,7 +35,7 @@ export function ReviewActions({ task }: { task: ListTask }) {
       </Button>
       <Sheet isOpen={open} onOpenChange={setOpen} title={first ? `Send back to ${first}` : "Send back"}>
         <form onSubmit={submit} className="space-y-3 p-4 md:w-96">
-          <p className="truncate text-sm text-muted">{task.title}</p>
+          <p className="truncate text-body text-fg-3">{task.title}</p>
           <Textarea
             autoFocus
             rows={3}
@@ -46,7 +46,7 @@ export function ReviewActions({ task }: { task: ListTask }) {
             maxLength={2000}
           />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={!note.trim()}>

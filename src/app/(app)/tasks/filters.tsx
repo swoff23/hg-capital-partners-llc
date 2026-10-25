@@ -13,13 +13,15 @@ const STATUS_TABS = [
 
 type Option = { value: string; label: string };
 
-const field = "h-8 text-xs";
+// The fields match the status switch's height: 36px with a mouse, 48 on touch
+// (its 44px segments in a 2px track), so the row lines up at every width.
+const field = "pointer-coarse:h-12";
 
 /**
  * The All tab's filters: title search, status, assignee (team, contractors
  * as c:<contactId>, and legacy free-text names), property. State lives in
- * the URL. On a phone the search sits above a row of controls that shrink
- * to fit rather than wrap.
+ * the URL. On a phone the search and status share a row over the two
+ * pickers; every control shrinks to fit rather than wrap, down to 320.
  */
 export function TaskFilters({
   current,
@@ -82,7 +84,7 @@ export function TaskFilters({
           value={current.owner}
           onChange={(e) => set("owner", e.target.value)}
           aria-label="Assignee"
-          className={`${field} w-auto min-w-0 flex-1 sm:max-w-[180px]`}
+          className={`${field} w-auto min-w-0 flex-1 sm:max-w-45`}
         >
           <option value="">All assignees</option>
           <option value="none">Unassigned</option>
@@ -119,7 +121,7 @@ export function TaskFilters({
           value={current.property}
           onChange={(e) => set("property", e.target.value)}
           aria-label="Property"
-          className={`${field} w-auto min-w-0 flex-1 sm:max-w-[180px]`}
+          className={`${field} w-auto min-w-0 flex-1 sm:max-w-45`}
         >
           <option value="">All properties</option>
           {properties.map((p) => (

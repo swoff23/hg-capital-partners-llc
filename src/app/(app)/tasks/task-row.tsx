@@ -12,12 +12,20 @@ import { useTaskList } from "./task-list-context";
 
 /**
  * One task in a list (Today, All). The whole row opens the task; the
- * checkbox, the date chip and any actions sit above that link.
+ * checkbox, the date chip and any actions sit above that link. Rows sit flat
+ * over hairlines, flush with their section's heading; the hover fill reaches
+ * 8px past each side.
  *
- * Two lines (title, then property · status · date) on phones and tablets,
- * in any list narrower than 34rem, and on rows with actions. One line on a
- * wide desktop list: the title with its status chip, then fixed columns for
- * the property, the person and the date, so they line up row to row.
+ * Two lines (title, then property and date) on phones and tablets, in any
+ * list narrower than 34rem, and on rows with actions. One line on a wide
+ * desktop list: the title, then fixed columns for the property, the person
+ * and the date, so they line up row to row.
+ *
+ * The status is its mark and one word in a fixed column at the title's end,
+ * from a 480px list up. Below that it leads the second line ("Review · 56
+ * Tamarack St"), in its tone (docs/brand-guidelines.md, section 9). Red is
+ * the overdue date's alone. A canceled title is struck through in --fg-3,
+ * like a done one.
  *
  * A contractor's job always shows its status and its Target (D7: the visit
  * date while Scheduled, otherwise Due). Staff tasks show status only when
@@ -39,7 +47,7 @@ export function TaskRow({
   avatar?: boolean;
   /** With the avatar, their first name too, where the row is about that person (Needs review). */
   name?: boolean;
-  /** In the Waiting section: show what it's waiting on in place of the status. */
+  /** In the Waiting section, under its heading: the pause ring and just what it's waiting on. */
   reason?: boolean;
   /** False where the section already says it (Needs review). */
   status?: boolean;
@@ -55,30 +63,33 @@ export function TaskRow({
   const first = name ? who?.split(" ")[0] : null;
   const place = [task.place, task.unitLabel].filter(Boolean).join(" · ");
   const oneLine = !actions;
-  // The status, or in the Waiting section the pause ring and what it's waiting
-  // on, in --fg-3 so amber stays a partner's decision (brand guidelines, section 9).
-  const waitingOn = reason && task.status === "WAITING" && !!task.waitingOn;
-  const state =
-    waitingOn ? (
-      <span title={`Waiting on ${task.waitingOn}`} className="inline-flex min-w-0 max-w-40 items-center gap-1.5 text-meta text-fg-3">
-        <StatusMark status="WAITING" />
-        <span className="truncate">Waiting on {task.waitingOn}</span>
+  const struck = task.checked || task.status === "CANCELED";
+  // Waiting with a reason: the pause ring and the reason in --fg-3, so amber
+  // stays a partner's decision. Under the Waiting heading the reason alone
+  // ("National Fuel"), at every width. Anywhere else the column reads
+  // "Waiting on National Fuel"; below 480 the second line has no room for it,
+  // so the word leads it like any status and the reason drops.
+  const waitingOn = task.status === "WAITING" && task.waitingOn ? task.waitingOn : null;
+  const statusColumn = status || reason;
+  const badge = status && (job || task.status !== "OPEN") ? <StatusBadge status={task.status} /> : null;
+  const waiting = (text: string, label?: string) => (
+    <span title={`Waiting on ${waitingOn}`} className="inline-flex min-w-0 items-center gap-1.5 text-meta text-fg-3">
+      <StatusMark status="WAITING" />
+      <span aria-hidden={label ? true : undefined} className="truncate">
+        {text}
       </span>
-    ) : status && (job || task.status !== "OPEN") ? (
-      <StatusBadge status={task.status} />
-    ) : null;
+      {label && <span className="sr-only">{label}</span>}
+    </span>
+  );
+  const reasonOnly = waitingOn && reason ? waiting(waitingOn, `Waiting on ${waitingOn}`) : null;
+  // The status column, from a 480px list up; and the second line's lead below that.
+  const wide = reasonOnly ?? (waitingOn && status ? waiting(`Waiting on ${waitingOn}`) : badge);
+  const narrow = reasonOnly ?? badge;
 
   return (
-    <li
-      className={cn(
-        "relative flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-background",
-        oneLine && "lg:@min-[34rem]:items-center",
-      )}
-    >
-      <Link
-        href={`/tasks/${task.id}`}
-        className="absolute inset-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
-      >
+    // 40px one-line rows with a mouse (docs/brand-guidelines.md, section 5, Density).
+    <li className={cn("group/row relative flex items-start gap-3 py-2", oneLine && "lg:@min-[34rem]:items-center lg:@min-[34rem]:py-1.5")}>
+      <Link href={`/tasks/${task.id}`} className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1">
         <span className="sr-only">{task.title}</span>
       </Link>
 
@@ -97,32 +108,46 @@ export function TaskRow({
           oneLine && "lg:@min-[34rem]:flex lg:@min-[34rem]:items-center lg:@min-[34rem]:gap-3",
         )}
       >
-        <div className={cn("flex min-w-0 items-center gap-2", oneLine && "lg:@min-[34rem]:flex-1")}>
-          <p className={cn("min-w-0 flex-1 truncate text-sm", task.checked ? "text-muted line-through" : "text-foreground")}>{task.title}</p>
-          {state && oneLine && <span className="hidden shrink-0 lg:@min-[34rem]:flex">{state}</span>}
+        <div className={cn("flex min-w-0 items-center gap-3", oneLine && "lg:@min-[34rem]:flex-1")}>
+          <p className={cn("min-w-0 flex-1 truncate text-body", struck ? "text-fg-3 line-through" : "text-fg-1")}>{task.title}</p>
+          {/* The status column: the same width on every row of the list, empty for a staff
+              To do. 144px, so "Waiting on" keeps a word of its reason, and 176 on a wide
+              one-line list. */}
+          {statusColumn && (
+            <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[34rem]:w-44")}>{wide}</span>
+          )}
         </div>
         <div
           className={cn(
-            "mt-1.5 flex min-w-0 items-center gap-2",
+            "mt-1 flex min-w-0 items-center gap-2",
             oneLine && "lg:@min-[34rem]:mt-0 lg:@min-[34rem]:shrink-0",
           )}
         >
+          {narrow && (
+            <span className={cn("flex items-center gap-2 @min-[30rem]:hidden", reasonOnly ? "min-w-0 shrink" : "shrink-0")}>
+              {narrow}
+              {place && (
+                <span aria-hidden="true" className="text-meta text-fg-3">
+                  ·
+                </span>
+              )}
+            </span>
+          )}
           <span
             className={cn(
-              "min-w-0 truncate text-xs text-muted",
+              "min-w-0 truncate text-meta text-fg-3",
               oneLine && "lg:@min-[34rem]:block lg:@min-[34rem]:w-36",
+              // Beside Approve and Send back on a 320px phone it would be a sliver of an ellipsis.
+              actions && "@max-[20rem]:hidden",
               !place && "hidden",
             )}
           >
             {place}
           </span>
-          {state && (
-            <span className={cn("flex", waitingOn ? "min-w-0 shrink" : "shrink-0", oneLine && "lg:@min-[34rem]:hidden")}>{state}</span>
-          )}
           {avatar && (
             // The full name shows on hover with a mouse. On touch a tap here opens the row like
             // anywhere else on it, and the task page names the person. Beside Approve and Send
-            // back on a 320px phone there's only room for the date, so the avatar steps aside.
+            // back on a 320px phone there's only room for the date, so the avatar and the place step aside.
             <span
               title={who ?? undefined}
               className={cn(
@@ -135,7 +160,7 @@ export function TaskRow({
                   <Avatar name={who} size={20} outline={job} />
                   {/* Where the list has room beside Approve and Send back; phones keep the avatar alone. */}
                   {first && (
-                    <span aria-hidden="true" className="hidden truncate text-xs text-muted @min-[28rem]:block">
+                    <span aria-hidden="true" className="hidden truncate text-meta text-fg-3 @min-[28rem]:block">
                       {first}
                     </span>
                   )}

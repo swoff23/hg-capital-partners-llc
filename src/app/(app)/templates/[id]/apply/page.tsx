@@ -28,8 +28,9 @@ export default async function ApplyPlaybookPage({ params, searchParams }: PagePr
   ]);
   const initialProperty = properties.some((p) => p.id === sp.property) ? sp.property! : null;
 
+  // A form, anchored to the sidebar like every page, at a width its rows read well at.
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <div className="mb-1">
         <BackLink fallback={`/templates${initialProperty ? `?property=${initialProperty}` : ""}`} label="Playbooks" />
       </div>

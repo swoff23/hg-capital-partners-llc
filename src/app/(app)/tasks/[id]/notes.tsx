@@ -45,8 +45,8 @@ export function NotesField({
   return (
     <div>
       {visibleTo && (
-        <p className="mb-1 flex items-center gap-1.5 text-xs text-muted">
-          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+        <p className="mb-1 flex items-center gap-1.5 text-meta text-fg-3">
+          <Eye className="size-3.5 shrink-0" aria-hidden="true" />
           {hasLogin ? `Visible to ${visibleTo}` : `${visibleTo} sees notes after signing in`}
         </p>
       )}
@@ -59,7 +59,8 @@ export function NotesField({
         disabled={pending}
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
-        className="-mx-2 block w-[calc(100%+1rem)] resize-none overflow-hidden rounded-md bg-transparent px-2 py-1.5 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20"
+        // Reads as text until it's touched, then as a field, like the title: --fill-1 on hover, --surface with the 2px --act edge inside on focus.
+        className="-mx-2 block w-[calc(100%+1rem)] resize-none overflow-hidden rounded-md bg-transparent px-2 py-1.5 text-body text-fg-1 outline-none transition-colors placeholder:text-fg-3 hover:bg-fill-1 focus:bg-surface focus:ring-2 focus:ring-inset focus:ring-act"
       />
     </div>
   );

@@ -1,13 +1,19 @@
 "use client";
 import { useOptimistic, useRef, useState } from "react";
 import { Check, Plus } from "lucide-react";
+import { Section } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { addChecklistItem, setChecklistItem } from "./actions";
 import { useRun } from "./use-run";
 
 export type ChecklistRow = { id: string; title: string; done: boolean };
 
-/** "Checklist 2/5" with a thin progress bar, tick-off rows, and "Add item". */
+/**
+ * "Checklist 2/5" over a hairline, a thin progress bar, tick-off rows, and
+ * "Add item". The boxes are round, on a --line-control edge; ticked, they
+ * fill with ink (--act), as every checked control does
+ * (docs/brand-guidelines.md, section 9).
+ */
 export function Checklist({ taskId, items }: { taskId: string; items: ChecklistRow[] }) {
   const { run } = useRun();
   const [rows, setRow] = useOptimistic(items, (cur, p: { id: string; done: boolean }) =>
@@ -16,20 +22,21 @@ export function Checklist({ taskId, items }: { taskId: string; items: ChecklistR
   const done = rows.filter((r) => r.done).length;
 
   return (
-    <section aria-labelledby="checklist-heading">
-      <div className="flex items-baseline gap-1.5">
-        <h2 id="checklist-heading" className="text-sm font-semibold">
+    <Section
+      title={
+        <>
           Checklist
-        </h2>
-        {rows.length > 0 && (
-          <span className="text-xs tabular-nums text-muted">
-            {done}/{rows.length}
-          </span>
-        )}
-      </div>
+          {rows.length > 0 && (
+            <span className="ml-1.5 font-normal tabular-nums text-fg-3">
+              {done}/{rows.length}
+            </span>
+          )}
+        </>
+      }
+    >
       {rows.length > 0 && (
         <div
-          className="mt-2 h-0.5 overflow-hidden rounded-full bg-border"
+          className="mb-1 h-0.5 overflow-hidden rounded-full bg-fill-1"
           role="progressbar"
           aria-label="Checklist progress"
           aria-valuemin={0}
@@ -37,12 +44,13 @@ export function Checklist({ taskId, items }: { taskId: string; items: ChecklistR
           aria-valuenow={done}
         >
           <div
-            className="h-full rounded-full bg-green-600 transition-[width] duration-300 motion-reduce:transition-none"
+            // It moves with the tick: the check's spring.
+            className="h-full rounded-full bg-act transition-[width] duration-check ease-spring motion-reduce:transition-none"
             style={{ width: `${(done / rows.length) * 100}%` }}
           />
         </div>
       )}
-      <ul className="mt-1">
+      <ul>
         {rows.map((r) => (
           <li key={r.id} className="flex min-h-9 items-center gap-2.5 pointer-coarse:min-h-11">
             <button
@@ -52,19 +60,21 @@ export function Checklist({ taskId, items }: { taskId: string; items: ChecklistR
               aria-label={r.title}
               onClick={() => run(() => setChecklistItem(r.id, !r.done), { before: () => setRow({ id: r.id, done: !r.done }) })}
               className={cn(
-                "relative flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/30",
+                "relative flex size-4.5 shrink-0 items-center justify-center rounded-full border transition-colors",
                 "after:absolute after:-inset-2.5 pointer-coarse:after:-inset-3.5",
-                r.done ? "border-green-600 bg-green-600 text-white" : "border-muted/50 text-transparent hover:border-green-600 hover:text-green-600",
+                r.done ? "border-act bg-act text-on-act" : "border-line-control text-transparent hover:border-fg-1",
               )}
             >
-              <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+              <Check className="size-3" strokeWidth={3} aria-hidden="true" />
             </button>
-            <span className={cn("min-w-0 flex-1 break-words text-sm", r.done && "text-muted line-through")}>{r.title}</span>
+            <span className={cn("min-w-0 flex-1 break-words text-body", r.done ? "text-fg-3 line-through" : "text-fg-1")}>
+              {r.title}
+            </span>
           </li>
         ))}
       </ul>
       <AddItem taskId={taskId} />
-    </section>
+    </Section>
   );
 }
 
@@ -82,9 +92,9 @@ function AddItem({ taskId }: { taskId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="-ml-1 mt-0.5 inline-flex h-8 items-center gap-1.5 rounded-md px-1 text-sm text-muted outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:h-11"
+        className="-ml-1 mt-0.5 inline-flex h-8 items-center gap-1.5 rounded-md px-1 text-label text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:h-11"
       >
-        <Plus className="h-4 w-4" aria-hidden="true" />
+        <Plus className="size-4" aria-hidden="true" />
         Add item
       </button>
     );
@@ -101,7 +111,7 @@ function AddItem({ taskId }: { taskId: string }) {
 
   return (
     <div className="mt-0.5 flex min-h-9 items-center gap-2.5 pointer-coarse:min-h-11">
-      <span className="h-[18px] w-[18px] shrink-0 rounded-full border border-dashed border-muted/50" aria-hidden="true" />
+      <span className="size-4.5 shrink-0 rounded-full border border-dashed border-line-control" aria-hidden="true" />
       <input
         ref={input}
         autoFocus
@@ -125,7 +135,7 @@ function AddItem({ taskId }: { taskId: string }) {
           cancelled.current = false;
           setOpen(false);
         }}
-        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+        className="min-w-0 flex-1 bg-transparent text-body text-fg-1 outline-none placeholder:text-fg-3"
       />
     </div>
   );

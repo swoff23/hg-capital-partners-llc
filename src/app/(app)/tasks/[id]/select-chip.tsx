@@ -40,15 +40,16 @@ export function SelectChip({
     <span
       className={cn(
         pickerChip,
-        "has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-primary/30",
-        !text && "text-muted",
+        // The select is invisible, so the chip shows its keyboard focus: the global 2px --act outline.
+        "has-[select:focus-visible]:outline-solid has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-act",
+        !text && "text-fg-3",
         disabled && "opacity-50",
         className,
       )}
     >
       {icon}
       <span className="truncate">{text || placeholder}</span>
-      <ChevronDown className="text-muted" aria-hidden="true" />
+      <ChevronDown className="text-fg-3" aria-hidden="true" />
       <select
         aria-label={label}
         value={value ?? ""}
