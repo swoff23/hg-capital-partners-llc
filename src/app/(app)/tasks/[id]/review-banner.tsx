@@ -33,7 +33,7 @@ export function ReviewBanner({
   const [draft, setDraft] = useState("");
 
   return (
-    <Card className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+    <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <Avatar name={fullName} size={24} outline={isContractor} />
         <p className="min-w-0 truncate text-body text-fg-1">

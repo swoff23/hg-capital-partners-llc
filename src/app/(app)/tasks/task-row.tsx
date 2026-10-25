@@ -14,12 +14,15 @@ import { useTaskList } from "./task-list-context";
  * One task in a list (Today, All). The whole row opens the task; the
  * checkbox, the date chip and any actions sit above that link. Rows sit flat
  * over hairlines, flush with their section's heading; the hover fill reaches
- * 8px past each side.
+ * 8px past each side. In a Card, `inset` keeps them 16px in from its edges.
  *
  * Two lines (title, then property and date) on phones and tablets, in any
- * list narrower than 34rem, and on rows with actions. One line on a wide
+ * list narrower than 50rem, and on rows with actions. One line on a wide
  * desktop list: the title, then fixed columns for the property, the person
- * and the date, so they line up row to row.
+ * and the date, so they line up row to row. 50rem keeps the fixed columns
+ * (about 500px of them) from squeezing the title: Today's two columns top
+ * out under it, so they always keep two lines, and only a full-width list
+ * like All goes to one.
  *
  * The status is its mark and one word in a fixed column at the title's end,
  * from a 480px list up. Below that it leads the second line ("Review · 56
@@ -39,6 +42,7 @@ export function TaskRow({
   name = false,
   reason = false,
   status = true,
+  inset = false,
   actions,
 }: {
   task: ListTask;
@@ -51,6 +55,11 @@ export function TaskRow({
   reason?: boolean;
   /** False where the section already says it (Needs review). */
   status?: boolean;
+  /**
+   * In a Card (All): 16px in from its edges, with the hover filling the row and the
+   * focus ring drawn inside, so the card's clip cuts neither.
+   */
+  inset?: boolean;
   /** Buttons at the row's end, e.g. Approve and Send back. */
   actions?: ReactNode;
 }) {
@@ -73,7 +82,8 @@ export function TaskRow({
   const statusColumn = status || reason;
   const badge = status && (job || task.status !== "OPEN") ? <StatusBadge status={task.status} /> : null;
   const waiting = (text: string, label?: string) => (
-    <span title={`Waiting on ${waitingOn}`} className="inline-flex min-w-0 items-center gap-1.5 text-meta text-fg-3">
+    // Hit-testable with a mouse, as the avatar is, so the full reason shows on hover above the row's link.
+    <span title={`Waiting on ${waitingOn}`} className="inline-flex min-w-0 items-center gap-1.5 text-meta text-fg-3 pointer-fine:pointer-events-auto">
       <StatusMark status="WAITING" />
       <span aria-hidden={label ? true : undefined} className="truncate">
         {text}
@@ -87,9 +97,17 @@ export function TaskRow({
   const narrow = reasonOnly ?? badge;
 
   return (
-    // 40px one-line rows with a mouse (docs/brand-guidelines.md, section 5, Density).
-    <li className={cn("group/row relative flex items-start gap-3 py-2", oneLine && "lg:@min-[34rem]:items-center lg:@min-[34rem]:py-1.5")}>
-      <Link href={`/tasks/${task.id}`} className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1">
+    // 40px one-line rows with a mouse (docs/brand-guidelines.md, section 5, Density). Two-line
+    // rows are 62px, 64 on touch, against the section's 60: under a 22px title the 28px date
+    // chip leaves 10px for the padding and the gap between the lines.
+    <li className={cn("group/row relative flex items-start gap-3 py-1.5", inset && "px-4", oneLine && "lg:@min-[50rem]:items-center")}>
+      <Link
+        href={`/tasks/${task.id}`}
+        className={cn(
+          "absolute inset-y-0 transition-colors group-hover/row:bg-fill-1",
+          inset ? "inset-x-0 -outline-offset-2" : "-inset-x-2 rounded-md",
+        )}
+      >
         <span className="sr-only">{task.title}</span>
       </Link>
 
@@ -105,22 +123,22 @@ export function TaskRow({
       <div
         className={cn(
           "pointer-events-none relative min-w-0 flex-1",
-          oneLine && "lg:@min-[34rem]:flex lg:@min-[34rem]:items-center lg:@min-[34rem]:gap-3",
+          oneLine && "lg:@min-[50rem]:flex lg:@min-[50rem]:items-center lg:@min-[50rem]:gap-3",
         )}
       >
-        <div className={cn("flex min-w-0 items-center gap-3", oneLine && "lg:@min-[34rem]:flex-1")}>
+        <div className={cn("flex min-w-0 items-center gap-3", oneLine && "lg:@min-[50rem]:flex-1")}>
           <p className={cn("min-w-0 flex-1 truncate text-body", struck ? "text-fg-3 line-through" : "text-fg-1")}>{task.title}</p>
           {/* The status column: the same width on every row of the list, empty for a staff
               To do. 144px, so "Waiting on" keeps a word of its reason, and 176 on a wide
               one-line list. */}
           {statusColumn && (
-            <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[34rem]:w-44")}>{wide}</span>
+            <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[50rem]:w-44")}>{wide}</span>
           )}
         </div>
         <div
           className={cn(
-            "mt-1 flex min-w-0 items-center gap-2",
-            oneLine && "lg:@min-[34rem]:mt-0 lg:@min-[34rem]:shrink-0",
+            "mt-0.5 flex min-w-0 items-center gap-2",
+            oneLine && "lg:@min-[50rem]:mt-0 lg:@min-[50rem]:shrink-0",
           )}
         >
           {narrow && (
@@ -136,7 +154,7 @@ export function TaskRow({
           <span
             className={cn(
               "min-w-0 truncate text-meta text-fg-3",
-              oneLine && "lg:@min-[34rem]:block lg:@min-[34rem]:w-36",
+              oneLine && "lg:@min-[50rem]:block lg:@min-[50rem]:w-36",
               // Beside Approve and Send back on a 320px phone it would be a sliver of an ellipsis.
               actions && "@max-[20rem]:hidden",
               !place && "hidden",
@@ -169,7 +187,7 @@ export function TaskRow({
               )}
             </span>
           )}
-          <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[34rem]:w-28 lg:@min-[34rem]:justify-end")}>
+          <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[50rem]:w-28 lg:@min-[50rem]:justify-end")}>
             <DueDatePicker
               value={date}
               today={today}

@@ -27,10 +27,13 @@ export type FileLink = {
 export function FilesList({
   files,
   className,
+  onFill = false,
   onDelete,
 }: {
   files: FileLink[];
   className?: string;
+  /** On a --fill-1 ground (an internal comment), where that hover would vanish: rows hover in --fill-2. */
+  onFill?: boolean;
   /** Removes a file for good; a server action can be passed as is. */
   onDelete?: (id: string) => Promise<ActionResult<unknown>>;
 }) {
@@ -60,7 +63,10 @@ export function FilesList({
                 target="_blank"
                 rel="noreferrer"
                 // The focus outline drawn inside, where the list's rounded clip can't cut it.
-                className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 px-3 text-body text-fg-1 transition-colors hover:bg-fill-1 focus-visible:-outline-offset-2 pointer-coarse:min-h-11"
+                className={cn(
+                  "flex min-h-10 min-w-0 flex-1 items-center gap-2.5 px-3 text-body text-fg-1 transition-colors focus-visible:-outline-offset-2 pointer-coarse:min-h-11",
+                  onFill ? "hover:bg-fill-2" : "hover:bg-fill-1",
+                )}
               >
                 <Icon className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate">{f.filename}</span>

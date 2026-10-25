@@ -89,7 +89,7 @@ function Row({ row }: { row: ActivityRow }) {
           {row.onItem && <p className="mt-1 truncate text-meta text-fg-3">On checklist item: {row.onItem}</p>}
           {row.body && <p className="mt-1 whitespace-pre-wrap break-words text-body text-fg-1">{row.body}</p>}
           {row.media.length > 0 && <MediaGrid items={row.media} className="mt-2" />}
-          <FilesList files={row.files} className="mt-2" />
+          <FilesList files={row.files} onFill={row.internal} className="mt-2" />
         </div>
       </ActivityItem>
     );

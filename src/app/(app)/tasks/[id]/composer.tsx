@@ -225,7 +225,7 @@ export function Composer({
       )}
       <MediaUploadTray uploader={uploader} className="px-3 pt-2.5" />
       <div className="flex items-end gap-1 px-1.5 py-1.5 md:px-2">
-        <IconButton label="Take photo or video" onPress={uploader.takePhoto} className="pointer-fine:hidden">
+        <IconButton label="Take photo or video" onPress={uploader.takePhoto} onFill={internal} className="pointer-fine:hidden">
           <Camera />
         </IconButton>
         <textarea
@@ -258,12 +258,13 @@ export function Composer({
         onMouseDown={(e) => e.preventDefault()}
         className="hidden items-center gap-1 px-1.5 pb-1.5 group-data-[active]/composer:flex group-focus-within/composer:flex md:flex md:px-2 md:pb-2"
       >
-        <IconButton label="Add photos, videos or files" onPress={uploader.chooseFiles}>
+        <IconButton label="Add photos, videos or files" onPress={uploader.chooseFiles} onFill={internal}>
           <ImagePlus />
         </IconButton>
         <SegmentedControl
           aria-label="Who sees this"
-          className="ml-auto"
+          // On the internal note's --fill-1 ground the track steps up to --fill-2, or it vanishes.
+          className={cn("ml-auto", internal && "bg-fill-2")}
           value={visibility}
           onChange={setVisibility}
           options={[
@@ -284,11 +285,14 @@ export function Composer({
 function IconButton({
   label,
   onPress,
+  onFill = false,
   className,
   children,
 }: {
   label: string;
   onPress: () => void;
+  /** On the internal note's --fill-1 ground, where the ghost hover would vanish: it steps up to --fill-2. */
+  onFill?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -299,7 +303,12 @@ function IconButton({
       title={label}
       onClick={onPress}
       // A ghost icon button with its icon idle in --fg-3, --fg-1 on hover.
-      className={cn(buttonClass({ variant: "ghost", icon: true }), "text-fg-3 [&_svg]:size-4.5", className)}
+      className={cn(
+        buttonClass({ variant: "ghost", icon: true }),
+        "text-fg-3 [&_svg]:size-4.5",
+        onFill && "not-disabled:hover:bg-fill-2",
+        className,
+      )}
     >
       {children}
     </button>
