@@ -28,7 +28,7 @@ export function AccountMenu({ name, email }: { name: string; email: string }) {
     <MenuTrigger>
       <AriaButton
         aria-label={`Account, ${name}`}
-        className="-mr-1.5 flex h-11 w-11 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary/30 data-pressed:opacity-80"
+        className="-mr-1.5 flex h-11 w-11 items-center justify-center rounded-md data-pressed:opacity-80"
       >
         <Avatar name={name} email={email} size={32} outline />
       </AriaButton>

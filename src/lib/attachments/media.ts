@@ -96,13 +96,16 @@ export function uploadFailureReason(e: unknown): string {
  * One line for however many files failed, count first so the reason fits on
  * a phone: "2 photos didn't upload: no connection". Nouns as addedText words
  * them (a mix is "files"); the names are on each tile. Empty when none did.
+ * `reason: false` is the count alone, "2 photos didn't upload", for a line
+ * that carries its own Retry (the contractor's Mark done).
  */
-export function uploadNotice(failures: UploadFailure[]): string {
+export function uploadNotice(failures: UploadFailure[], { reason: withReason = true }: { reason?: boolean } = {}): string {
   if (failures.length === 0) return "";
   if (failures.some((f) => NO_BLOB_STORE.test(f.reason))) return "File uploads aren't set up yet.";
   const kinds = failures.map((f) => f.kind ?? fileKindForType(contentTypeForName(f.name)));
   const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
   const count = `${failures.length} ${noun}${failures.length === 1 ? "" : "s"} didn't upload`;
+  if (!withReason) return count;
   const reason = shownReason(failures[0].reason);
   // Different reasons can't share one line; each tile's label has its own.
   const same = failures.every((f) => shownReason(f.reason) === reason);

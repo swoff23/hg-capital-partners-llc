@@ -9,6 +9,7 @@ import { AccountMenu } from "./_components/account-menu";
 import { MyJobs } from "./_components/my-jobs";
 
 // My jobs (docs/asana-migration-plan.md §6, D18, D31). The title comes from the layout.
+// A list, so it runs full width to 1600 with the 16 / 24 / 32 gutters (docs/brand-guidelines.md, section 5).
 export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
   const principal = await requirePortalPrincipal();
   const { saved, view } = (await searchParams) as { saved?: string; view?: string };
@@ -19,7 +20,7 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
   return (
     <>
       <header className="border-b border-line bg-canvas">
-        <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-400 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1">
             <Monogram size={32} />
             {BRAND.portal}
@@ -28,13 +29,13 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-400 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {saved === "1" && (
-          <p role="status" className="mb-4 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+          <p role="status" className="mb-4 w-fit max-w-full rounded-md border border-line bg-surface px-3 py-2 text-meta text-fg-1">
             Password saved. Use it next time you sign in.
           </p>
         )}
-        <h1 className="mb-4 text-xl font-semibold tracking-tight">Hi {firstName(principal.label)}</h1>
+        <h1 className="mb-4 text-title text-balance text-fg-1">Hi {firstName(principal.label)}</h1>
         <MyJobs jobs={jobs} tab={tab} initialGroup={group} today={todayYmdEastern()} />
       </main>
     </>

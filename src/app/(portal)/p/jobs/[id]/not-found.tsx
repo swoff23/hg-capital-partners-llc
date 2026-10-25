@@ -13,8 +13,8 @@ import { getEnv } from "@/lib/env";
 export default function JobNotFound() {
   if (!getEnv().portalEnabled) return <RootNotFound />;
   return (
-    <main className="mx-auto flex max-w-2xl flex-col items-center px-4 py-20 text-center sm:px-6">
-      <h1 className="text-base font-semibold tracking-tight">This job isn&apos;t available</h1>
+    <main className="mx-auto flex max-w-2xl flex-col items-center px-4 py-20 text-center sm:px-6 lg:px-8">
+      <h1 className="text-title text-balance text-fg-1">This job isn&apos;t available</h1>
       <LinkButton href="/p" variant="primary" className="mt-5">
         Back to my jobs
       </LinkButton>

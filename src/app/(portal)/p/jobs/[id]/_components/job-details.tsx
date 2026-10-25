@@ -1,8 +1,9 @@
 "use client";
 import { useOptimistic, useTransition } from "react";
-import { Copy, KeyRound, Navigation } from "lucide-react";
+import { Copy, Navigation } from "lucide-react";
+import { Code } from "@/components/code";
 import { useToast } from "@/components/toast";
-import { Button, LinkButton } from "@/components/ui";
+import { Button, LinkButton, Section } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { setChecklistItemAction } from "../actions";
@@ -20,7 +21,11 @@ function useCopy() {
   };
 }
 
-/** Directions (Apple Maps; other phones get the web map) and Copy address. */
+/**
+ * Directions (Apple Maps; other phones get the web map) and Copy address.
+ * On a phone the two share the row, so at 320 neither runs into the gutter;
+ * below 360 Copy address shortens to Copy, its name staying whole.
+ */
 export function AddressActions({ address }: { address: string }) {
   const copy = useCopy();
   return (
@@ -29,37 +34,59 @@ export function AddressActions({ address }: { address: string }) {
         href={`https://maps.apple.com/?daddr=${encodeURIComponent(address)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0"
+        className="min-w-0 flex-1 whitespace-nowrap sm:flex-none"
       >
         <Navigation className="h-4 w-4" aria-hidden="true" />
         Directions
       </LinkButton>
-      <Button variant="secondary" className="shrink-0" onClick={() => copy(address, "Address copied")}>
+      <Button
+        variant="secondary"
+        aria-label="Copy address"
+        className="min-w-0 flex-1 whitespace-nowrap sm:flex-none"
+        onClick={() => copy(address, "Address copied")}
+      >
         <Copy className="h-4 w-4" aria-hidden="true" />
-        Copy address
+        {/* Tailwind's max-[360px] is width < 360, so the pair meets at 360 without both showing. */}
+        <span className="max-[360px]:hidden">Copy address</span>
+        <span className="min-[360px]:hidden">Copy</span>
       </Button>
     </div>
   );
 }
 
-/** D21: the lockbox code, large, the whole card copies it. */
-export function LockboxCard({ code }: { code: string }) {
+/**
+ * D21: the lockbox code, large, through Code: a tap on the code or on Copy
+ * copies it. A failed copy from Copy says the code, as the old card did. The
+ * heading carries the code for screen readers, since Code names its button
+ * for the action. A long code scrolls in its own box rather than the page.
+ */
+export function LockboxSection({ code }: { code: string }) {
   const copy = useCopy();
-  // The code sits inside a button, which iOS won't let anyone select, so a failed copy says the code instead.
   return (
-    <button
-      type="button"
-      onClick={() => copy(code, "Lockbox code copied", `Couldn't copy. The code is ${code}.`)}
-      aria-label={`Lockbox code ${code}. Copy`}
-      className="mt-5 flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left shadow-sm outline-none transition-colors hover:border-zinc-300 focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:border-zinc-600"
+    <Section
+      title={
+        <>
+          Lockbox<span className="sr-only"> {code}</span>
+        </>
+      }
     >
-      <KeyRound className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs text-muted">Lockbox</span>
-        <span className="block break-words font-mono text-lg font-semibold tracking-wider">{code}</span>
-      </span>
-      <Copy className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-    </button>
+      {/* Copy sits at the row's end on a phone, beside the code on a wider screen.
+          overflow-x-auto alone would make the box scroll up and down too, by the
+          part of Code's touch hit area past py-1; 36 + 8 keeps that area at 44. */}
+      <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
+        <div className="-mx-1 min-w-0 overflow-x-auto overflow-y-hidden px-1 py-1">
+          <Code value={code} label="Lockbox code" size="lg" />
+        </div>
+        <Button
+          variant="secondary"
+          className="shrink-0"
+          onClick={() => copy(code, "Lockbox code copied", `Couldn't copy. The code is ${code}.`)}
+        >
+          <Copy className="h-4 w-4" aria-hidden="true" />
+          Copy
+        </Button>
+      </div>
+    </Section>
   );
 }
 
@@ -83,11 +110,15 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
     });
 
   return (
-    <section className="mt-7" aria-labelledby="checklist-heading">
-      <h2 id="checklist-heading" className="mb-1 text-sm font-semibold">
-        Checklist <span className="ml-1 font-normal tabular-nums text-muted">{`${doneCount}/${shown.length}`}</span>
-      </h2>
-      <ul>
+    <Section
+      title={
+        <>
+          Checklist <span className="ml-1 font-normal tabular-nums text-fg-3">{`${doneCount}/${shown.length}`}</span>
+        </>
+      }
+    >
+      {/* The 44px rows already pad each line, so the list starts a little higher. */}
+      <ul className="-mt-2">
         {shown.map((item) => (
           <li key={item.id}>
             <label className={cn("flex min-h-11 items-center gap-3 py-1", editable ? "cursor-pointer" : "cursor-default")}>
@@ -96,13 +127,13 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
                 checked={item.done}
                 disabled={!editable}
                 onChange={(e) => toggle(item.id, e.target.checked)}
-                className="h-5 w-5 shrink-0 cursor-[inherit] rounded accent-primary disabled:opacity-60"
+                className="h-5 w-5 shrink-0 cursor-[inherit] rounded-sm disabled:opacity-60"
               />
-              <span className={cn("text-sm", item.done && "text-muted line-through")}>{item.title}</span>
+              <span className={cn("text-body", item.done ? "text-fg-3 line-through" : "text-fg-1")}>{item.title}</span>
             </label>
           </li>
         ))}
       </ul>
-    </section>
+    </Section>
   );
 }
