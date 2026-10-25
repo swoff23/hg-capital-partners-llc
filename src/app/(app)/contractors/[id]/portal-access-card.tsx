@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { Copy, MessageSquareText } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, buttonClass, type BadgeTone } from "@/components/ui";
+import { Badge, Button, Input, Section, buttonClass } from "@/components/ui";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { firstName } from "@/lib/names";
 import type { PortalAccessState } from "@/lib/portal/access-state";
@@ -25,15 +25,19 @@ export type PortalAccountView = {
 };
 
 /**
- * Gray in every state: each Badge tone is a task status's color, and blue is
- * Scheduled's on this page's Jobs card. The line under Email ("Last seen 2d
- * ago") carries Active (decision 22).
+ * A neutral pill in every state. Badge tones are state (docs/brand-guidelines.md,
+ * section 4): danger is late or failed, warn a partner's decision, ok done or
+ * money in, and none of the three login states is one of those. The line
+ * under Email ("Last seen 2d ago") carries Active (decision 22).
  */
-const BADGE: Record<PortalAccessState, { tone: BadgeTone; label: string }> = {
-  invited: { tone: "neutral", label: "Invited" },
-  active: { tone: "neutral", label: "Active" },
-  off: { tone: "neutral", label: "Access off" },
+const BADGE: Record<PortalAccessState, string> = {
+  invited: "Invited",
+  active: "Active",
+  off: "Access off",
 };
+
+/** A fact beside its label, on the same 112px label column (96 on phones) as the Contact rail above. */
+const detailRow = "grid grid-cols-[6rem_minmax(0,1fr)] items-baseline gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]";
 
 /**
  * Portal access (docs/asana-migration-plan.md §5.1, approved batch item 2):
@@ -79,12 +83,8 @@ export function PortalAccessCard({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between gap-2">
-        <CardTitle>Portal access</CardTitle>
-        {account && <Badge tone={BADGE[account.state].tone}>{BADGE[account.state].label}</Badge>}
-      </CardHeader>
-      <CardBody className="space-y-3">
+    <Section title="Portal access" actions={account && <Badge>{BADGE[account.state]}</Badge>} className="@container">
+      <div className="space-y-3">
         {shown && (
           <StartingPassword
             email={shown.email}
@@ -111,7 +111,7 @@ export function PortalAccessCard({
             }}
           >
             <label className="block">
-              <span className="text-xs font-medium text-muted">Email</span>
+              <span className="text-meta font-medium text-fg-2">Email</span>
               <Input
                 type="email"
                 required
@@ -119,7 +119,7 @@ export function PortalAccessCard({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={`${first.toLowerCase() || "name"}@example.com`}
-                className="mt-1"
+                className="mt-1.5"
               />
             </label>
             <Button type="submit" disabled={pending || !email.trim()}>
@@ -130,17 +130,17 @@ export function PortalAccessCard({
 
         {account && (
           <>
-            <div className="space-y-1">
-              <dl className="text-sm">
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="shrink-0 text-xs text-muted">Email</dt>
-                  <dd className="min-w-0 truncate">{account.email}</dd>
-                </div>
-              </dl>
-              {account.line && <p className="truncate text-xs text-muted">{account.line}</p>}
-            </div>
+            <dl className={detailRow}>
+              <dt className="text-meta text-fg-3">Email</dt>
+              <dd className="min-w-0">
+                <p className="truncate text-body text-fg-1">{account.email}</p>
+                {account.line && <p className="truncate text-meta text-fg-3">{account.line}</p>}
+              </dd>
+            </dl>
             {account.state !== "off" && (
-              <div className="flex items-center gap-2">
+              // Side by side where they fit; stacked full width in a column
+              // narrower than 320, so neither label wraps (a 320 phone).
+              <div className="flex flex-col gap-2 @xs:flex-row @xs:items-center">
                 <Button variant="secondary" size="sm" disabled={pending} onClick={() => setConfirm("reset")}>
                   Reset password
                 </Button>
@@ -169,7 +169,7 @@ export function PortalAccessCard({
                 Restore access
               </Button>
             ) : (
-              <div className={cn(account.state !== "off" && "border-t border-border pt-3")}>
+              <div className={cn(account.state !== "off" && "border-t border-line pt-3")}>
                 <Button variant="danger" size="sm" disabled={pending} onClick={() => setConfirm("remove")}>
                   Remove access
                 </Button>
@@ -178,8 +178,8 @@ export function PortalAccessCard({
           </>
         )}
 
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-      </CardBody>
+        {error && <p className="text-meta text-danger">{error}</p>}
+      </div>
 
       {account && confirm === "reset" && (
         <ConfirmDialog
@@ -221,7 +221,7 @@ export function PortalAccessCard({
           }
         />
       )}
-    </Card>
+    </Section>
   );
 }
 
@@ -240,12 +240,13 @@ function StartingPassword({
   onCopy: () => void;
 }) {
   return (
-    <div className="space-y-2.5 rounded-lg border border-border bg-background p-3">
-      <p className="truncate text-xs text-muted">Starting password for {email}</p>
+    <div className="space-y-2.5 rounded-md bg-fill-1 p-3">
+      <p className="truncate text-meta text-fg-3">Starting password for {email}</p>
       <div className="flex items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-md bg-surface px-2.5 py-1.5 font-mono text-sm ring-1 ring-inset ring-border">
-          {password}
-        </code>
+        {/* Read character by character, so set like a code: Geist Mono in --fg-2, never
+            wrapped (section 3). Straight on the panel's fill: a --surface box inside it
+            would be a darker well in dark. */}
+        <code className="min-w-0 flex-1 whitespace-nowrap font-mono text-code text-fg-2">{password}</code>
         <Button variant="secondary" size="sm" onClick={onCopy} aria-label="Copy password">
           <Copy className="h-3.5 w-3.5" aria-hidden="true" />
           Copy
@@ -255,7 +256,7 @@ function StartingPassword({
         <MessageSquareText className="h-4 w-4" aria-hidden="true" />
         Text login details
       </a>
-      <p className="text-xs text-muted">Shown once. {first} picks their own at first sign-in.</p>
+      <p className="text-meta text-fg-3">Shown once. {first} picks their own at first sign-in.</p>
     </div>
   );
 }

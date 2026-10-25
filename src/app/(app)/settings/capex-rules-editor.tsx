@@ -1,12 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, PageHeader, SectionCard } from "@/components/ui";
+import { Button, PageHeader, Section } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
-import { fmtMoney } from "@/lib/utils";
+import { cn, fmtMoney } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
 import { DEFAULT_CAPEX_RULES, type BuildingRule, type CapexRules } from "@/lib/property-types";
 import { saveCapexRules } from "./actions";
+import { AddButton, RemoveButton, quietField } from "./editor-controls";
 
 /**
  * Local editor state widens BuildingRule.key to allow `null` — a system just
@@ -24,11 +25,10 @@ type EditableCapexRules = Omit<CapexRules, "building"> & { building: EditableBui
  */
 const BUILDING_LIKE_EQUIPMENT = new Set(["Roof", "Furnace", "Boiler", "HVAC", "Water Heater"]);
 
-const quiet =
-  "w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-xs outline-none hover:border-border focus:border-primary focus:bg-surface";
-const rowGrid = "grid grid-cols-[minmax(160px,1fr)_4.5rem_4.5rem_6.5rem_1.5rem] items-center gap-1";
-const addLink =
-  "text-xs font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline disabled:hover:no-underline";
+/* The name, then three right-aligned figures (monitor and replace in years,
+   cost in whole dollars), then the row's delete, 44px wide on touch. */
+const rowGrid =
+  "grid grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_1.5rem] items-center gap-1 pointer-coarse:grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_2.75rem]";
 
 const fmtYrs = (n: number) => `${n} yr${n === 1 ? "" : "s"}`;
 const parseNum = (s: string) => {
@@ -36,50 +36,33 @@ const parseNum = (s: string) => {
   return t === "" ? NaN : Number(t);
 };
 
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden>
-      <path
-        d="M2.5 4h9M5.5 4V2.8c0-.44.36-.8.8-.8h1.4c.44 0 .8.36.8.8V4M8.7 4v7.2c0 .44-.36.8-.8.8H6.1c-.44 0-.8-.36-.8-.8V4M3.8 4l.35 7.25c.03.53.46.95.99.95h3.72c.53 0 .96-.42.99-.95L10.2 4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 /**
- * One row of the rules table. Hover state is tracked in React (not CSS
- * `group-hover`) so the delete icon reliably shows for only the row the
- * pointer is actually over.
+ * One row of the rules table, on a --line divider. Its delete shows under the
+ * pointer with a mouse (a named group, so only this row's, not every row in
+ * the section), on keyboard focus, and always on touch, where there's no
+ * hover to find it.
  */
 function RuleRow({
+  label,
   onRemove,
   canRemove,
   children,
 }: {
+  /** What the row is, for the delete's label: "Remove Dishwasher". */
+  label: string;
   onRemove: () => void;
   canRemove: boolean;
   children: React.ReactNode;
 }) {
-  const [hovered, setHovered] = useState(false);
   return (
-    <div
-      className={rowGrid + " rounded px-1 py-0.5 " + (hovered ? "bg-background" : "")}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className={cn(rowGrid, "group/row py-1.25 transition-colors hover:bg-fill-1 pointer-coarse:py-0.5")}>
       {children}
-      {hovered && canRemove ? (
-        <button
-          type="button"
+      {canRemove ? (
+        <RemoveButton
           onClick={onRemove}
-          aria-label="Remove"
-          title="Remove"
-          className="justify-self-end rounded p-1 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-        >
-          <TrashIcon />
-        </button>
+          aria-label={`Remove ${label || "this row"}`}
+          className="justify-self-end opacity-0 transition-[opacity,color] group-hover/row:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+        />
       ) : (
         <span />
       )}
@@ -87,42 +70,49 @@ function RuleRow({
   );
 }
 
-/** Blends in as plain text; click/focus reveals the raw value; commits onBlur/Enter, reverts onEscape. */
+/**
+ * Blends in as plain text; click/focus reveals the raw value; commits onBlur/Enter, reverts onEscape.
+ * Only an edit in progress is local (`draft`). Otherwise the field shows `value`, so it follows
+ * Reset to defaults and a failed save's revert instead of keeping the text it started with.
+ */
 function InlineNumber({
   value,
   kind,
   max,
+  label,
   onCommit,
 }: {
   value: number;
   kind: "yrs" | "money";
   max: number;
+  /** Names the field for a screen reader: "Dishwasher replace years". */
+  label: string;
   onCommit: (n: number) => boolean;
 }) {
   const format = (n: number) => (kind === "money" ? fmtMoney(n) : fmtYrs(n));
-  const [text, setText] = useState(() => format(value));
+  const [draft, setDraft] = useState<string | null>(null);
   const keys = useInlineEditKeys(
-    () => setText(format(value)),
+    () => setDraft(null),
     () => {
-      const n = Math.round(parseNum(text));
-      if (Number.isFinite(n) && n >= 0 && n <= max) {
-        const accepted = n === value || onCommit(n);
-        setText(format(accepted ? n : value));
-      } else {
-        setText(format(value));
-      }
+      if (draft === null) return;
+      const n = Math.round(parseNum(draft));
+      // A rejected value (replace under monitor) just shows `value` again.
+      if (Number.isFinite(n) && n >= 0 && n <= max && n !== value) onCommit(n);
+      setDraft(null);
     },
   );
   return (
     <input
-      className={quiet}
+      // Figures right-aligned and tabular; money in whole dollars (section 3).
+      className={cn(quietField, "text-right tabular-nums")}
       inputMode="numeric"
-      value={text}
+      aria-label={label}
+      value={draft ?? format(value)}
       onFocus={(e) => {
-        setText(String(value));
+        setDraft(String(value));
         e.currentTarget.select();
       }}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => setDraft(e.target.value)}
       onBlur={keys.onBlur}
       onKeyDown={keys.onKeyDown}
     />
@@ -134,7 +124,7 @@ function InlineNumber({
  * `freeText` allows any typed value (building systems); otherwise a committed
  * value must be one of `options` (equipment types are a fixed vocabulary — a
  * made-up type would never match a unit's actual equipment) and an invalid
- * value just reverts. Use the "+ Add …" buttons to discover other options.
+ * value just reverts. Use the Add buttons to discover other options.
  */
 function ComboField({
   value,
@@ -142,48 +132,50 @@ function ComboField({
   onCommit,
   freeText = false,
   placeholder,
+  label,
 }: {
   value: string;
   options: string[];
   onCommit: (v: string) => boolean;
   freeText?: boolean;
   placeholder?: string;
+  /** Names the field for a screen reader: "Appliance", "System". */
+  label: string;
 }) {
-  const [text, setText] = useState(value);
+  // As in InlineNumber: local only while editing, so a revert or a reset shows through.
+  const [draft, setDraft] = useState<string | null>(null);
   const keys = useInlineEditKeys(
-    () => setText(value),
+    () => setDraft(null),
     () => {
-      const v = text.trim();
-      if (!v || v === value) {
-        setText(value);
-        return;
-      }
-      if (!freeText && !options.includes(v)) {
-        setText(value);
-        return;
-      }
-      if (!onCommit(v)) setText(value);
+      const v = (draft ?? value).trim();
+      setDraft(null);
+      // An empty, unchanged or (for a fixed vocabulary) unknown value just shows `value` again.
+      if (!v || v === value || (!freeText && !options.includes(v))) return;
+      onCommit(v);
     },
   );
   return (
     <input
-      className={quiet}
+      className={quietField}
+      aria-label={label}
       placeholder={placeholder}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
+      value={draft ?? value}
+      onChange={(e) => setDraft(e.target.value)}
       onBlur={keys.onBlur}
       onKeyDown={keys.onKeyDown}
     />
   );
 }
 
-
+/* A table header's look (Th): sentence case at text-meta 500 in --fg-3 over a
+   --line-strong rule. Each label sits 7px in, on its field's text (the
+   field's 6px padding and 1px edge). */
 const headerRow = (first: string) => (
-  <div className={rowGrid + " px-1 text-[10px] font-medium uppercase tracking-wide text-muted"}>
-    <span>{first}</span>
-    <span>Monitor</span>
-    <span>Replace</span>
-    <span>Cost</span>
+  <div className={cn(rowGrid, "border-b border-line-strong pb-2 text-meta font-medium text-fg-3")}>
+    <span className="px-1.75">{first}</span>
+    <span className="px-1.75 text-right">Monitor</span>
+    <span className="px-1.75 text-right">Replace</span>
+    <span className="px-1.75 text-right">Cost</span>
     <span />
   </div>
 );
@@ -305,89 +297,139 @@ export function CapexRulesEditor({
         }
       />
 
-      {error && <p className="text-xs font-medium text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-meta text-danger">{error}</p>}
 
-      <SectionCard
+      <Section
         title="Appliances"
-        editing
         actions={
-          <button type="button" onClick={addAppliance} disabled={availableApplianceTypes.length === 0} className={addLink}>
-            + Add appliance
-          </button>
+          <AddButton onClick={addAppliance} disabled={availableApplianceTypes.length === 0}>
+            Add appliance
+          </AddButton>
         }
       >
+        {/* Narrower than its columns (460px, 480 on touch), the table scrolls sideways in its own box, never the page. */}
         <div className="overflow-x-auto">
-          <div className="min-w-[420px]">
+          <div className="min-w-115 pointer-coarse:min-w-120">
             {headerRow("Appliance")}
-            <div className="mt-1 space-y-0.5">
+            <div className="divide-y divide-line">
               {appliances.map((r) => (
-                <RuleRow key={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
+                <RuleRow key={r.type} label={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
                   <ComboField
                     value={r.type}
+                    label="Appliance"
                     options={availableApplianceTypes}
                     onCommit={(t) => changeEqType(r.type, t)}
                   />
-                  <InlineNumber value={r.monitor} kind="yrs" max={200} onCommit={(n) => commitEqField(r.type, "monitor", n)} />
-                  <InlineNumber value={r.replace} kind="yrs" max={200} onCommit={(n) => commitEqField(r.type, "replace", n)} />
-                  <InlineNumber value={r.cost} kind="money" max={10_000_000} onCommit={(n) => commitEqField(r.type, "cost", n)} />
+                  <InlineNumber
+                    value={r.monitor}
+                    kind="yrs"
+                    max={200}
+                    label={`${r.type} monitor years`}
+                    onCommit={(n) => commitEqField(r.type, "monitor", n)}
+                  />
+                  <InlineNumber
+                    value={r.replace}
+                    kind="yrs"
+                    max={200}
+                    label={`${r.type} replace years`}
+                    onCommit={(n) => commitEqField(r.type, "replace", n)}
+                  />
+                  <InlineNumber
+                    value={r.cost}
+                    kind="money"
+                    max={10_000_000}
+                    label={`${r.type} cost`}
+                    onCommit={(n) => commitEqField(r.type, "cost", n)}
+                  />
                 </RuleRow>
               ))}
-              {appliances.length === 0 && <p className="px-1 py-1 text-xs text-muted">No appliance rules.</p>}
+              {appliances.length === 0 && <p className="px-1.75 py-2.5 text-body text-fg-3">No appliance rules.</p>}
             </div>
           </div>
         </div>
-      </SectionCard>
+      </Section>
 
-      <SectionCard
+      <Section
         title="Building systems"
-        editing
         actions={
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={addBuildingSystem} className={addLink}>
-              + Add system
-            </button>
-            {missingCoreTypes.length > 0 && (
-              <button type="button" onClick={addCoreSystem} className={addLink}>
-                + Add {missingCoreTypes[0]}
-              </button>
-            )}
+          <div className="flex items-center gap-4">
+            <AddButton onClick={addBuildingSystem}>Add system</AddButton>
+            {missingCoreTypes.length > 0 && <AddButton onClick={addCoreSystem}>Add {missingCoreTypes[0]}</AddButton>}
           </div>
         }
       >
         <div className="overflow-x-auto">
-          <div className="min-w-[420px]">
+          <div className="min-w-115 pointer-coarse:min-w-120">
             {headerRow("System")}
-            <div className="mt-1 space-y-0.5">
+            <div className="divide-y divide-line">
               {coreSystems.map((r) => (
-                <RuleRow key={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
+                <RuleRow key={r.type} label={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
                   <ComboField
                     value={r.type}
+                    label="System"
                     options={missingCoreTypes}
                     onCommit={(t) => changeEqType(r.type, t)}
                   />
-                  <InlineNumber value={r.monitor} kind="yrs" max={200} onCommit={(n) => commitEqField(r.type, "monitor", n)} />
-                  <InlineNumber value={r.replace} kind="yrs" max={200} onCommit={(n) => commitEqField(r.type, "replace", n)} />
-                  <InlineNumber value={r.cost} kind="money" max={10_000_000} onCommit={(n) => commitEqField(r.type, "cost", n)} />
+                  <InlineNumber
+                    value={r.monitor}
+                    kind="yrs"
+                    max={200}
+                    label={`${r.type} monitor years`}
+                    onCommit={(n) => commitEqField(r.type, "monitor", n)}
+                  />
+                  <InlineNumber
+                    value={r.replace}
+                    kind="yrs"
+                    max={200}
+                    label={`${r.type} replace years`}
+                    onCommit={(n) => commitEqField(r.type, "replace", n)}
+                  />
+                  <InlineNumber
+                    value={r.cost}
+                    kind="money"
+                    max={10_000_000}
+                    label={`${r.type} cost`}
+                    onCommit={(n) => commitEqField(r.type, "cost", n)}
+                  />
                 </RuleRow>
               ))}
               {rules.building.map((r, i) => (
-                <RuleRow key={r.key ?? `new-${i}`} onRemove={() => removeB(i)} canRemove={rules.building.length > 1}>
+                <RuleRow key={r.key ?? `new-${i}`} label={r.label} onRemove={() => removeB(i)} canRemove={rules.building.length > 1}>
                   <ComboField
                     value={r.label}
+                    label="System"
                     options={buildingSuggestions}
                     onCommit={(label) => renameB(i, label)}
                     freeText
                     placeholder="System name"
                   />
-                  <InlineNumber value={r.monitor} kind="yrs" max={200} onCommit={(n) => commitBField(i, "monitor", n)} />
-                  <InlineNumber value={r.replace} kind="yrs" max={200} onCommit={(n) => commitBField(i, "replace", n)} />
-                  <InlineNumber value={r.defaultCost} kind="money" max={10_000_000} onCommit={(n) => commitBField(i, "cost", n)} />
+                  <InlineNumber
+                    value={r.monitor}
+                    kind="yrs"
+                    max={200}
+                    label={`${r.label} monitor years`}
+                    onCommit={(n) => commitBField(i, "monitor", n)}
+                  />
+                  <InlineNumber
+                    value={r.replace}
+                    kind="yrs"
+                    max={200}
+                    label={`${r.label} replace years`}
+                    onCommit={(n) => commitBField(i, "replace", n)}
+                  />
+                  <InlineNumber
+                    value={r.defaultCost}
+                    kind="money"
+                    max={10_000_000}
+                    label={`${r.label} cost`}
+                    onCommit={(n) => commitBField(i, "cost", n)}
+                  />
                 </RuleRow>
               ))}
             </div>
           </div>
         </div>
-      </SectionCard>
+      </Section>
 
       {confirmReset && (
         <ConfirmDialog

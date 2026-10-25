@@ -1,11 +1,15 @@
 "use client";
 import { useEffect } from "react";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 /**
  * Error boundary for every signed-in page. Uncaught exceptions from a page or
  * a fire-and-forget server action land here instead of Next's blank
  * "Application error" screen. `retry` re-renders the segment.
+ *
+ * A plain sentence and one action, flat on the page (docs/brand-guidelines.md,
+ * section 9, Empty and payoff states). The digest matches the server log, so
+ * it stays, quietly, for whoever looks into it.
  */
 export default function AppError({
   error,
@@ -19,29 +23,17 @@ export default function AppError({
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-lg py-10">
-      <Card>
-        <CardHeader>
-          <CardTitle>Something went wrong</CardTitle>
-        </CardHeader>
-        <CardBody className="space-y-3 text-sm">
-          <p className="text-muted">
-            The last action didn&apos;t complete. Your other changes are safe; try again, and if it
-            keeps failing, reload the page.
-          </p>
-          {error.digest && (
-            <p className="font-mono text-[11px] text-muted">ref {error.digest}</p>
-          )}
-          <div className="flex gap-2">
-            <Button size="sm" onClick={() => retry()}>
-              Try again
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => window.location.reload()}>
-              Reload
-            </Button>
-          </div>
-        </CardBody>
-      </Card>
+    <div className="max-w-prose py-8">
+      <h1 className="text-title text-balance text-fg-1">Something went wrong</h1>
+      <p className="mt-1 text-pretty text-body text-fg-2">The last action didn&apos;t complete, and your other changes are safe.</p>
+      <Button className="mt-4" onClick={() => retry()}>
+        Try again
+      </Button>
+      {error.digest && (
+        <p className="mt-6 text-meta text-fg-3">
+          Ref <span className="font-mono">{error.digest}</span>
+        </p>
+      )}
     </div>
   );
 }
