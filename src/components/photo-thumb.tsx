@@ -98,20 +98,31 @@ export function PhotoThumb({
           {status}
         </span>
       )}
-      {failed && onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className={cn(
-            "absolute bottom-2 left-1/2 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-pill-bg px-3 text-meta font-medium text-pill-fg",
-            // A 44px hit area around the 32px pill.
-            "after:absolute after:-inset-1.5",
-          )}
-        >
-          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-          Retry
-        </button>
-      )}
+      {failed && onRetry && <RetryPill onClick={onRetry} />}
     </span>
+  );
+}
+
+/**
+ * The Retry pill on a failed photo (docs/brand-guidelines.md, section 9
+ * Photos): 32px, 8px above the bottom center of the nearest positioned box,
+ * with a 44px hit area. PhotoThumb's `onRetry` shows it; the upload grid uses
+ * it on its own tiles. `label` names the file when several can fail.
+ */
+export function RetryPill({ onClick, label }: { onClick: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={cn(
+        "absolute bottom-2 left-1/2 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-pill-bg px-3 text-meta font-medium text-pill-fg",
+        // A 44px hit area around the 32px pill.
+        "after:absolute after:-inset-1.5",
+      )}
+    >
+      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+      Retry
+    </button>
   );
 }

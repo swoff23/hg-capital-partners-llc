@@ -96,6 +96,21 @@ test("uploadNotice: one line however many failed, count first", () => {
   );
   assert.equal(uploadNotice([{ name: "a.jpg", kind: "image", reason: "" }]), "1 photo didn't upload");
   assert.equal(uploadNotice([{ name: "a.jpg", kind: "image", reason: "File uploads need a Blob store" }]), "File uploads aren't set up yet.");
+  // The count alone, for a line with its own Retry; a missing Blob store still says so.
+  assert.equal(
+    uploadNotice(
+      [
+        { name: "a.jpg", kind: "image", reason: "no connection" },
+        { name: "b.jpg", kind: "image", reason: "no connection" },
+      ],
+      { reason: false },
+    ),
+    "2 photos didn't upload",
+  );
+  assert.equal(
+    uploadNotice([{ name: "a.jpg", kind: "image", reason: "File uploads need a Blob store" }], { reason: false }),
+    "File uploads aren't set up yet.",
+  );
 });
 
 test("uploadFailureReason: a dropped connection reads no connection, single PUT or multipart", () => {

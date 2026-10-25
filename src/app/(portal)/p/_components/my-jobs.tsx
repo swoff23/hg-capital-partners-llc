@@ -24,12 +24,13 @@ const TABS = [
 ] as const;
 
 // The narrowest phones (320) get the short labels so the row never wraps.
+// Tailwind's max-[N] is width < N, so each pair in this file uses the same N.
 const GROUPS = [
   {
     key: "date",
     label: (
       <>
-        <span className="max-[359px]:hidden">By date</span>
+        <span className="max-[360px]:hidden">By date</span>
         <span className="min-[360px]:hidden">Date</span>
       </>
     ),
@@ -38,7 +39,7 @@ const GROUPS = [
     key: "property",
     label: (
       <>
-        <span className="max-[359px]:hidden">By property</span>
+        <span className="max-[360px]:hidden">By property</span>
         <span className="min-[360px]:hidden">Property</span>
       </>
     ),
@@ -90,7 +91,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
               <ul className="-mt-3 divide-y divide-line">
                 {g.jobs.map((job) => (
                   <li key={job.id}>
-                    <JobRow job={job} today={today} group={group} />
+                    <JobRow job={job} today={today} />
                   </li>
                 ))}
               </ul>
@@ -108,15 +109,14 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
  * exist), the title with the "2 new" mark, then the address and unit and the
  * Target, with the status as its mark and word in one fixed column. Below
  * 480 the column drops and the status leads the subline instead, in its
- * tone. The subline leads with what the group's heading doesn't say (the
- * place By date, the Target By property), so on a narrow phone it's the
- * repeated clause that runs out of room. A finished job's Target is only its
- * old due date, so Done rows leave it out, as the job page does.
+ * tone. The subline is status, place and date in both groupings (section 5
+ * Density). A finished job's Target is only its old due date, so Done rows
+ * leave it out, as the job page does.
  */
-function JobRow({ job, today, group }: { job: JobCard; today: Ymd; group: JobsGroup }) {
+function JobRow({ job, today }: { job: JobCard; today: Ymd }) {
   const where = addressLine(job.address, job.unitLabel, { short: true });
   const target = job.target && isActiveStatus(job.status) ? targetLabel(job.target, today) : null;
-  const subline = (group === "property" ? [target, where] : [where, target]).filter(Boolean).join(" · ");
+  const subline = [where, target].filter(Boolean).join(" · ");
   const street = job.address ? addressLine(job.address, null, { short: true }) : null;
 
   return (
@@ -146,7 +146,7 @@ function JobRow({ job, today, group }: { job: JobCard; today: Ymd; group: JobsGr
           {subline && <span className="min-w-0 truncate">{subline}</span>}
         </span>
       </span>
-      <StatusBadge status={job.status} className="w-28 shrink-0 max-[479px]:hidden" />
+      <StatusBadge status={job.status} className="w-28 shrink-0 max-[480px]:hidden" />
     </Link>
   );
 }

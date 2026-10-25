@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { upload } from "@vercel/blob/client";
-import { Camera, ImagePlus, Play, RotateCcw, RotateCw, TriangleAlert, X } from "lucide-react";
+import { Camera, ImagePlus, Play, RotateCw, TriangleAlert, X } from "lucide-react";
+import { RetryPill } from "@/components/photo-thumb";
 import { Button } from "@/components/ui";
 import { isOfflineError } from "@/lib/action-result";
 import { usesMultipart, type FileKind } from "@/lib/attachments/content-types";
@@ -79,6 +80,8 @@ export type MediaUploaderApi = {
   failed: number;
   /** One line about what failed, or "". */
   notice: string;
+  /** The notice's count alone ("2 photos didn't upload"), for a line with its own Retry; each tile's label keeps the reason. */
+  failedLine: string;
   /** Opens the camera on a phone ("Take photo or video"). */
   takePhoto: () => void;
   /** Opens the file picker, several at once ("Choose files"). */
@@ -282,7 +285,9 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
   // Leaving the page cancels whatever is still going up, so the browser asks first.
   useLeaveWarning(pending > 0);
 
-  const notice = uploadNotice(uploads.filter((u) => u.error).map((u) => ({ name: u.name, kind: u.kind, reason: u.error! })));
+  const failures = uploads.filter((u) => u.error).map((u) => ({ name: u.name, kind: u.kind, reason: u.error! }));
+  const notice = uploadNotice(failures);
+  const failedLine = uploadNotice(failures, { reason: false });
 
   const onPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(e.target.files);
@@ -300,6 +305,7 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
     pending,
     failed,
     notice,
+    failedLine,
     takePhoto: () => cameraRef.current?.click(),
     chooseFiles: () => filesRef.current?.click(),
     addFiles,
@@ -394,9 +400,11 @@ export function MediaUploader({
  * line about failures. `layout="row"` is 56px tiles in a wrapping row (the
  * staff composer). `layout="grid"` is square tiles at least 88px wide in a
  * fluid grid, where a failed photo keeps its picture inside the danger ring
- * with a Retry pill near its bottom (docs/brand-guidelines.md, section 9
- * Photos). `notice={false}` leaves the red line to the caller, for a screen
- * that shows it under its own button (the contractor's Mark done).
+ * with PhotoThumb's RetryPill near its bottom (docs/brand-guidelines.md,
+ * section 9 Photos), and Remove sits inside the tile's corner.
+ * `notice={false}` leaves the red line to the caller, for a screen that
+ * shows it under its own button (the contractor's Mark done, from
+ * `failedLine`).
  */
 export function MediaUploadTray({
   uploader,
@@ -490,19 +498,7 @@ function UploadTile({
       </div>
       {u.status === "failed" &&
         (grid ? (
-          // The pill from PhotoThumb: 32px, 8px above the bottom center, a 44px hit area.
-          <button
-            type="button"
-            onClick={onRetry}
-            aria-label={`Retry ${u.name}`}
-            className={cn(
-              "absolute bottom-2 left-1/2 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-pill-bg px-3 text-meta font-medium text-pill-fg",
-              "after:absolute after:-inset-1.5",
-            )}
-          >
-            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-            Retry
-          </button>
+          <RetryPill onClick={onRetry} label={`Retry ${u.name}`} />
         ) : (
           <button
             type="button"
@@ -518,7 +514,11 @@ function UploadTile({
         onClick={onRemove}
         aria-label={`Remove ${u.name}`}
         className={cn(
-          "absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-act text-on-act ring-2 ring-surface",
+          "absolute flex h-5 w-5 items-center justify-center rounded-full bg-act text-on-act ring-2 ring-surface",
+          // On the corner of a 56px tile. A grid tile runs to the tray's edge, so its X sits inside: the 44px
+          // touch area then reaches 8px out, short of Send in the gap beside it and of the Retry pill on the
+          // tile above (gap 6px; the pill's area stops 2px above its tile's bottom).
+          grid ? "right-1 top-1" : "-right-1.5 -top-1.5",
           "after:absolute after:-inset-3 pointer-fine:after:-inset-1",
         )}
       >

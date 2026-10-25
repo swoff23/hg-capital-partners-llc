@@ -234,12 +234,12 @@ export function JobActions({
           <div className="mx-auto max-w-300 space-y-2 px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-3 lg:justify-end">
               {/* Photos can still go up while HG reviews; only the next step waits. */}
-              <Button variant="secondary" className={cn(barButton, "max-[359px]:px-2")} onClick={uploader.chooseFiles}>
-                <Camera className="h-4 w-4 shrink-0 max-[359px]:hidden" aria-hidden="true" />
+              <Button variant="secondary" className={cn(barButton, "max-[360px]:px-2")} onClick={uploader.chooseFiles}>
+                <Camera className="h-4 w-4 shrink-0 max-[360px]:hidden" aria-hidden="true" />
                 Add photo/video
               </Button>
               {step === "review" ? (
-                <Button variant="secondary" disabled className={cn(barButton, "text-fg-3 disabled:opacity-100 max-[359px]:px-2")}>
+                <Button variant="secondary" disabled className={cn(barButton, "text-fg-3 disabled:opacity-100 max-[360px]:px-2")}>
                   {/* Half the bar on a phone: the short label there, so it never truncates. */}
                   <span className="truncate sm:hidden">Waiting for review</span>
                   <span className="truncate max-sm:hidden">Waiting for HG to review</span>
@@ -250,7 +250,7 @@ export function JobActions({
                 </Button>
               ) : (
                 // Off while anything is still going up or failed; the line under the bar says which.
-                <Button className={cn(barButton, "max-[359px]:px-2")} disabled={pending > 0 || failed > 0} onClick={openMarkDone}>
+                <Button className={cn(barButton, "max-[360px]:px-2")} disabled={pending > 0 || failed > 0} onClick={openMarkDone}>
                   <span className="truncate">{pending > 0 ? finishingLabel(pending) : "Mark done"}</span>
                 </Button>
               )}
@@ -320,14 +320,18 @@ export function JobActions({
 
 /**
  * Under Mark done while any photo didn't upload (docs/brand-guidelines.md,
- * section 9 Photos): the uploader's one line, "2 photos didn't upload: no
- * connection", then Retry for every tile that can go again. A file the check
- * refused (too big, wrong type) can only be removed, so it gets no Retry.
+ * section 9 Photos): "2 photos didn't upload · Retry", Retry going for every
+ * tile that can go again. Each tile's label keeps its reason. A file the check
+ * refused (too big, wrong type) can only be removed, so it gets no Retry; with
+ * nothing to retry, the line keeps the reason ("1 photo didn't upload: over
+ * the 25 MB photo limit"), since it's the only place a sighted user sees why.
  */
 function FailedUploadsLine({ uploader, className }: { uploader: MediaUploaderApi; className?: string }) {
   if (uploader.failed === 0) return null;
   const retryable = uploader.uploads.filter((u) => u.status === "failed");
-  const line = uploader.notice || `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
+  const line =
+    (retryable.length > 0 ? uploader.failedLine : uploader.notice) ||
+    `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
   return (
     <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-danger", className)}>
       <span className="truncate">{line}</span>

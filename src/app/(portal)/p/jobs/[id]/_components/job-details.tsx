@@ -46,7 +46,8 @@ export function AddressActions({ address }: { address: string }) {
         onClick={() => copy(address, "Address copied")}
       >
         <Copy className="h-4 w-4" aria-hidden="true" />
-        <span className="max-[359px]:hidden">Copy address</span>
+        {/* Tailwind's max-[360px] is width < 360, so the pair meets at 360 without both showing. */}
+        <span className="max-[360px]:hidden">Copy address</span>
         <span className="min-[360px]:hidden">Copy</span>
       </Button>
     </div>
@@ -69,9 +70,11 @@ export function LockboxSection({ code }: { code: string }) {
         </>
       }
     >
-      {/* Copy sits at the row's end on a phone, beside the code on a wider screen. */}
+      {/* Copy sits at the row's end on a phone, beside the code on a wider screen.
+          overflow-x-auto alone would make the box scroll up and down too, by the
+          part of Code's touch hit area past py-1; 36 + 8 keeps that area at 44. */}
       <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
-        <div className="-mx-1 min-w-0 overflow-x-auto px-1 py-1">
+        <div className="-mx-1 min-w-0 overflow-x-auto overflow-y-hidden px-1 py-1">
           <Code value={code} label="Lockbox code" size="lg" />
         </div>
         <Button
