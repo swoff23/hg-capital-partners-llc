@@ -1,13 +1,28 @@
-import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { Card, CardBody, CardHeader, CardTitle, EmptyState, Table, Td, Th, TextLink } from "@/components/ui";
+import { buttonClass, Card, CardBody, CardHeader, EmptyState, Section, Table, Td, Th, TextLink } from "@/components/ui";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
 import { qbo } from "@/lib/quickbooks/config";
 import { partialSyncLine, reconcileGap } from "@/lib/quickbooks/notices";
 import { basisFromParam } from "@/lib/quickbooks/rollup";
-import { fmtDate } from "@/lib/utils";
+import { todayYmdEastern } from "@/lib/dates";
+import { cn, fmtDate } from "@/lib/utils";
 import { CATEGORY_LABELS } from "./_components/labels";
-import { fmtCents, Kpi, MoneyBars, PartialLabel, SandboxNotice, SourceBadge } from "./_components/ui";
+import { periodOf } from "./_components/period";
+import {
+  flushTable,
+  grandTotalRow,
+  IncomeExpenseBars,
+  Kpi,
+  MoneyBars,
+  MoneyCents,
+  Notice,
+  PartialLabel,
+  SandboxNotice,
+  SourceLine,
+  Strip,
+  WarnMark,
+} from "./_components/ui";
 import { RefreshButton } from "./_components/refresh-button";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +30,21 @@ export const dynamic = "force-dynamic";
 function pct(n: number | null): string {
   return n == null ? "—" : `${(n * 100).toFixed(1)}%`;
 }
+
+const lines = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "line" : "lines"}`;
+
+/* By property drops columns as the screen narrows, so the table never
+   scrolls sideways on a phone: Margin and Debt interest go below sm, Income
+   and Opex below 480px, and NOI stays. A hidden cell still counts as the
+   row's last child, so NOI sets its own flush edge where it ends the row. */
+const fromSm = "max-sm:hidden";
+const from480 = "max-[30rem]:hidden";
+const noiCol = "max-sm:pr-0";
+
+/* A module's heading with its period at the end; a long title pushes the
+   period onto its own line rather than squeezing either. */
+const moduleHeader = "flex flex-wrap items-baseline justify-between gap-x-3";
+const periodNote = "whitespace-nowrap text-meta text-fg-3";
 
 export default async function FinancialsOverviewPage({
   searchParams,
@@ -28,24 +58,24 @@ export default async function FinancialsOverviewPage({
 
   if (!data) {
     return (
-      <Card>
-        <CardBody className="space-y-3">
-          <EmptyState>QuickBooks isn&apos;t connected yet.</EmptyState>
-          {qbo.isConfigured() ? (
-            <a
-              href="/api/quickbooks/connect"
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
+      <EmptyState
+        action={
+          qbo.isConfigured() ? (
+            <a href="/api/quickbooks/connect" className={buttonClass({ variant: "primary" })}>
               Connect QuickBooks
             </a>
           ) : (
-            <p className="text-sm text-muted">
-              Set <code>QBO_CLIENT_ID</code> / <code>QBO_CLIENT_SECRET</code> /{" "}
-              <code>QBO_REDIRECT_URI</code> / <code>QBO_TOKEN_SECRET</code> to enable the connection.
+            <p className="text-body text-fg-3">
+              Set <code className="font-mono text-code text-fg-2">QBO_CLIENT_ID</code> /{" "}
+              <code className="font-mono text-code text-fg-2">QBO_CLIENT_SECRET</code> /{" "}
+              <code className="font-mono text-code text-fg-2">QBO_REDIRECT_URI</code> /{" "}
+              <code className="font-mono text-code text-fg-2">QBO_TOKEN_SECRET</code> to enable the connection.
             </p>
-          )}
-        </CardBody>
-      </Card>
+          )
+        }
+      >
+        QuickBooks isn&apos;t connected yet.
+      </EmptyState>
     );
   }
 
@@ -53,6 +83,14 @@ export default async function FinancialsOverviewPage({
   const dq = data.dataQuality;
   const basis = data.basis;
   const other = basis === "CASH" ? "accrual" : "cash";
+  const thisYear = Number(todayYmdEastern().slice(0, 4));
+  // The totals add up every synced line, so the period is the span of months with lines.
+  const period = periodOf(data.monthlyTrend.map((m) => m.periodMonth));
+  // Every synced line lands in a month, so no months means no lines: a first sync
+  // that failed or hasn't finished, or an expired connection that never synced.
+  // Six $0 KPIs and a $0 Portfolio would read as a portfolio that earned nothing,
+  // so the totals give way to a sentence (section 3: a missing feed is a sentence).
+  const hasLines = data.monthlyTrend.length > 0;
   // a PARTIAL run can still tie on the basis on screen; only say what's off for this one
   const syncNotice =
     data.lastSync?.status === "PARTIAL"
@@ -63,195 +101,253 @@ export default async function FinancialsOverviewPage({
       : null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SourceBadge
-          basis={basis}
-          syncedAt={data.lastSync?.at ?? null}
-          status={syncNotice ? data.lastSync?.status : null}
-        />
-        <div className="flex items-center gap-2">
-          <TextLink href={`/financials?basis=${other}`} className="text-xs" prefetch={false}>
-            Show {other} basis
-          </TextLink>
-          <RefreshButton />
+    <div className="space-y-8 pointer-coarse:space-y-6">
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SourceLine
+            period={period}
+            basis={basis}
+            syncedAt={data.lastSync?.at ?? null}
+            status={syncNotice ? data.lastSync?.status : null}
+          />
+          <div className="flex shrink-0 items-center gap-3">
+            <TextLink
+              href={`/financials?basis=${other}`}
+              className="inline-flex items-center whitespace-nowrap text-meta pointer-coarse:min-h-11"
+              prefetch={false}
+            >
+              Show {other} basis
+            </TextLink>
+            <RefreshButton />
+          </div>
         </div>
-      </div>
 
-      {data.sandbox && <SandboxNotice />}
+        {data.sandbox && <SandboxNotice />}
 
-      {syncNotice && (
-        <div className="rounded-lg border border-amber-300 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:text-amber-500">
-          {syncNotice}{" "}
-          <Link href="/financials/settings#cleanup" className="underline">
-            Review
-          </Link>
-        </div>
-      )}
-
-      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Kpi label="Operating income" cents={p.operatingIncomeCents} months={p.monthsOfData} strong />
-        <Kpi label="Operating expense" cents={p.operatingExpenseCents} months={p.monthsOfData} strong />
-        <Kpi label="NOI" cents={p.noiCents} months={p.monthsOfData} hint={pct(p.noiMargin)} strong />
-        <Kpi label="Debt interest" cents={p.debtInterestCents} months={p.monthsOfData} />
-        <Kpi label="NOI after interest" cents={p.noiAfterInterestCents} months={p.monthsOfData} strong />
-        <Kpi label="Bank interest (memo)" cents={p.nonOperatingIncomeCents} />
-      </div>
-
-      {dq && (
-        <div className="grid gap-2 sm:grid-cols-3">
-          <DqStat
-            label="Unclassified in QuickBooks"
-            value={`${dq.unclassed.lineCount} lines`}
-            sub={`${fmtCents(dq.unclassed.inCents)} in · ${fmtCents(dq.unclassed.outCents)} out`}
-            bad={
-              Math.abs(dq.unclassed.inCents) + Math.abs(dq.unclassed.outCents) > 50_000 ||
-              dq.unclassed.lineCount > 3
+        {syncNotice && (
+          <Notice
+            icon={
+              <TriangleAlert
+                aria-hidden="true"
+                strokeWidth={2}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn pointer-coarse:h-4 pointer-coarse:w-4"
+              />
             }
-          />
-          <DqStat
-            label="Suspense / clearing (excluded)"
-            value={fmtCents(dq.suspenseCents)}
-            sub="not counted as income"
-            bad={dq.suspenseCents !== 0}
-          />
-          {/* the same figure as the By property row below, computed once in queries.ts */}
-          <DqStat
-            label="Not assigned to a property"
-            value={fmtCents(data.unassigned.noiCents)}
-            sub={`${fmtCents(data.unassigned.incomeCents)} in · ${fmtCents(data.unassigned.expenseCents)} out`}
-            bad={false}
-          />
-        </div>
-      )}
+          >
+            {syncNotice} <TextLink href="/financials/settings#cleanup">Review</TextLink>
+          </Notice>
+        )}
 
+        {hasLines ? (
+          <Strip className="grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
+            <Kpi label="Operating income" cents={p.operatingIncomeCents} />
+            <Kpi label="Operating expense" cents={p.operatingExpenseCents} />
+            <Kpi
+              label="NOI"
+              cents={p.noiCents}
+              hint={p.noiMargin == null ? undefined : `${pct(p.noiMargin)} margin`}
+            />
+            <Kpi label="Debt interest" cents={p.debtInterestCents} />
+            <Kpi label="NOI after interest" cents={p.noiAfterInterestCents} />
+            <Kpi
+              label={
+                <>
+                  {/* "(memo)" drops at 320 so the label keeps one line */}
+                  Bank interest<span className="max-[22.5rem]:hidden"> (memo)</span>
+                </>
+              }
+              cents={p.nonOperatingIncomeCents}
+            />
+          </Strip>
+        ) : (
+          <p className="text-body text-fg-3">No QuickBooks activity yet.</p>
+        )}
+
+        {dq && (
+          <Strip className="md:grid-cols-3">
+            <DqStat
+              label="Unclassified in QuickBooks"
+              value={lines(dq.unclassed.lineCount)}
+              sub={
+                <>
+                  <MoneyCents cents={dq.unclassed.inCents} /> in · <MoneyCents cents={dq.unclassed.outCents} /> out
+                </>
+              }
+              bad={
+                Math.abs(dq.unclassed.inCents) + Math.abs(dq.unclassed.outCents) > 50_000 ||
+                dq.unclassed.lineCount > 3
+              }
+            />
+            <DqStat
+              label="Suspense / clearing (excluded)"
+              value={<MoneyCents cents={dq.suspenseCents} />}
+              sub="Not counted as income"
+              bad={dq.suspenseCents !== 0}
+            />
+            {/* the same figure as the By property row below, computed once in queries.ts */}
+            <DqStat
+              label="Not assigned to a property"
+              value={<MoneyCents cents={data.unassigned.noiCents} />}
+              sub={
+                <>
+                  <MoneyCents cents={data.unassigned.incomeCents} /> in ·{" "}
+                  <MoneyCents cents={data.unassigned.expenseCents} /> out
+                </>
+              }
+              bad={false}
+            />
+          </Strip>
+        )}
+      </div>
+
+      {/* Overview modules: flat cards (docs/brand-guidelines.md, section 9). Each
+          figure block states its period at the heading's end (section 3); the
+          source line above carries the source, basis and sync. */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Operating expense by category</CardTitle>
+          <CardHeader className={moduleHeader}>
+            <h2 className="min-w-0 text-section text-fg-1">Operating expense by category</h2>
+            {period && <span className={periodNote}>{period}</span>}
           </CardHeader>
           <CardBody>
             <MoneyBars
-              rows={Object.entries(p.expenseByCategoryCents).map(([c, cents]) => ({
-                label: CATEGORY_LABELS[c] ?? c,
-                cents: cents ?? 0,
-              }))}
+              rows={Object.entries(p.expenseByCategoryCents)
+                .map(([c, cents]) => ({ label: CATEGORY_LABELS[c] ?? c, cents: cents ?? 0 }))
+                .sort((a, b) => b.cents - a.cents)}
             />
           </CardBody>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Monthly income vs expense</CardTitle>
+          <CardHeader className={moduleHeader}>
+            <h2 className="min-w-0 text-section text-fg-1">Monthly income vs expense</h2>
+            {period && <span className={periodNote}>{period}</span>}
           </CardHeader>
-          <CardBody className="space-y-1.5">
-            {data.monthlyTrend.map((m) => {
-              const max = Math.max(
-                ...data.monthlyTrend.flatMap((x) => [x.incomeCents, x.expenseCents]),
-                1,
-              );
-              return (
-                <div key={m.periodMonth} className="flex items-center gap-2 text-xs">
-                  <span className="w-16 shrink-0 tabular-nums text-muted">{m.periodMonth}</span>
-                  <div className="flex-1 space-y-0.5">
-                    <span className="block h-2.5 overflow-hidden rounded bg-background">
-                      <span
-                        className="block h-full rounded bg-chart-1/60"
-                        style={{ width: `${(m.incomeCents / max) * 100}%` }}
-                      />
-                    </span>
-                    <span className="block h-2.5 overflow-hidden rounded bg-background">
-                      <span
-                        className="block h-full rounded bg-amber-500/60"
-                        style={{ width: `${(m.expenseCents / max) * 100}%` }}
-                      />
-                    </span>
-                  </div>
-                  <span className="w-20 shrink-0 text-right tabular-nums">{fmtCents(m.noiCents)}</span>
-                </div>
-              );
-            })}
-            <p className="pt-1 text-[11px] text-muted">
-              <span className="inline-block h-2 w-2 rounded-sm bg-chart-1/60 align-middle" /> income
-              &nbsp;·&nbsp;
-              <span className="inline-block h-2 w-2 rounded-sm bg-amber-500/60 align-middle" /> expense
-              &nbsp;·&nbsp; right column = NOI
-            </p>
+          <CardBody>
+            <IncomeExpenseBars months={data.monthlyTrend} thisYear={thisYear} />
           </CardBody>
         </Card>
       </div>
 
-      <Card className="overflow-clip">
-        <CardHeader>
-          <CardTitle>By property</CardTitle>
-        </CardHeader>
-        <Table>
-          <thead>
-            <tr>
-              <Th>Property</Th>
-              <Th>Income</Th>
-              <Th>Opex</Th>
-              <Th>NOI</Th>
-              <Th>Margin</Th>
-              <Th>Debt int.</Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {data.byProperty.map((row) => {
-              // a mapped property with no lines shows "—", not $0
-              const money = (cents: number) => (row.hasActivity ? fmtCents(cents) : "—");
-              return (
-                <tr key={row.propertyId} className="hover:bg-background">
-                  <Td>
-                    <Link href={`/properties/${row.propertyId}`} className="font-medium hover:underline">
-                      {row.address}
-                    </Link>
-                    {row.hasActivity ? (
-                      <PartialLabel months={row.noi.monthsOfData} />
-                    ) : (
-                      <span className="ml-1 text-[11px] font-normal text-muted">No activity</span>
-                    )}
+      {/* With no lines and no mapped property there's nothing to list; the sentence above says so. */}
+      {(hasLines || data.byProperty.length > 0) && (
+        <Section title="By property" actions={period && <span className={periodNote}>{period}</span>}>
+          <Table className={flushTable}>
+            <thead>
+              <tr>
+                <Th>Property</Th>
+                <Th numeric className={from480}>
+                  Income
+                </Th>
+                <Th numeric className={from480}>
+                  Opex
+                </Th>
+                <Th numeric className={noiCol}>
+                  NOI
+                </Th>
+                <Th numeric className={fromSm}>
+                  Margin
+                </Th>
+                <Th numeric className={fromSm}>
+                  Debt int.
+                </Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {data.byProperty.map((row) => {
+                // a mapped property with no lines shows the dash, not $0
+                const money = (cents: number) =>
+                  row.hasActivity ? <MoneyCents cents={cents} /> : <span className="text-fg-3">—</span>;
+                return (
+                  <tr key={row.propertyId} className="hover:bg-fill-1">
+                    <Td>
+                      <TextLink href={`/properties/${row.propertyId}`}>{row.address}</TextLink>
+                      {row.hasActivity ? (
+                        <PartialLabel months={row.noi.monthsOfData} className="max-sm:block sm:ml-2" />
+                      ) : (
+                        <span className="whitespace-nowrap text-meta text-fg-3 max-sm:block sm:ml-2">No activity</span>
+                      )}
+                    </Td>
+                    <Td numeric className={from480}>
+                      {money(row.noi.operatingIncomeCents)}
+                    </Td>
+                    <Td numeric className={from480}>
+                      {money(row.noi.operatingExpenseCents)}
+                    </Td>
+                    <Td numeric className={noiCol}>
+                      {money(row.noi.noiCents)}
+                    </Td>
+                    <Td numeric className={cn("text-fg-2", fromSm)}>
+                      {row.hasActivity && row.noi.noiMargin != null ? (
+                        pct(row.noi.noiMargin)
+                      ) : (
+                        <span className="text-fg-3">—</span>
+                      )}
+                    </Td>
+                    <Td numeric className={cn("text-fg-2", fromSm)}>
+                      {money(row.noi.debtInterestCents)}
+                    </Td>
+                  </tr>
+                );
+              })}
+              {/* the unassigned remainder and the Portfolio total only mean something once lines exist */}
+              {hasLines && (
+                <tr className="hover:bg-fill-1">
+                  <Td className="text-fg-2">
+                    Not assigned to a property{" "}
+                    <TextLink href="/financials/settings#class-mapping" className="whitespace-nowrap">
+                      Map classes
+                    </TextLink>
                   </Td>
-                  <Td className="whitespace-nowrap tabular-nums">{money(row.noi.operatingIncomeCents)}</Td>
-                  <Td className="whitespace-nowrap tabular-nums">{money(row.noi.operatingExpenseCents)}</Td>
-                  <Td className="whitespace-nowrap tabular-nums font-medium">{money(row.noi.noiCents)}</Td>
-                  <Td className="whitespace-nowrap tabular-nums text-muted">{pct(row.noi.noiMargin)}</Td>
-                  <Td className="whitespace-nowrap tabular-nums text-muted">{money(row.noi.debtInterestCents)}</Td>
+                  <Td numeric className={cn("text-fg-2", from480)}>
+                    <MoneyCents cents={data.unassigned.incomeCents} />
+                  </Td>
+                  <Td numeric className={cn("text-fg-2", from480)}>
+                    <MoneyCents cents={data.unassigned.expenseCents} />
+                  </Td>
+                  <Td numeric className={cn("text-fg-2", noiCol)}>
+                    <MoneyCents cents={data.unassigned.noiCents} />
+                  </Td>
+                  <Td className={fromSm} />
+                  <Td className={fromSm} />
                 </tr>
-              );
-            })}
-            <tr className="bg-background/50 text-muted">
-              <Td className="italic">
-                Not assigned to a property{" "}
-                <TextLink href="/financials/settings#class-mapping">Map classes</TextLink>
-              </Td>
-              <Td className="whitespace-nowrap tabular-nums">{fmtCents(data.unassigned.incomeCents)}</Td>
-              <Td className="whitespace-nowrap tabular-nums">{fmtCents(data.unassigned.expenseCents)}</Td>
-              <Td className="whitespace-nowrap tabular-nums">{fmtCents(data.unassigned.noiCents)}</Td>
-              <Td />
-              <Td />
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-border font-semibold">
-              <Td>Portfolio</Td>
-              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.operatingIncomeCents)}</Td>
-              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.operatingExpenseCents)}</Td>
-              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.noiCents)}</Td>
-              <Td className="whitespace-nowrap tabular-nums">{pct(p.noiMargin)}</Td>
-              <Td className="whitespace-nowrap tabular-nums">{fmtCents(p.debtInterestCents)}</Td>
-            </tr>
-          </tfoot>
-        </Table>
-        <CardBody className="border-t border-border text-[11px] text-muted">
-          Per-property figures use directly-classed lines only. Portfolio NOI is the sum of the rows
-          above.
-        </CardBody>
-      </Card>
+              )}
+            </tbody>
+            {hasLines && (
+              <tfoot>
+                <tr className={grandTotalRow}>
+                  <Td>Portfolio</Td>
+                  <Td numeric className={from480}>
+                    <MoneyCents cents={p.operatingIncomeCents} />
+                  </Td>
+                  <Td numeric className={from480}>
+                    <MoneyCents cents={p.operatingExpenseCents} />
+                  </Td>
+                  <Td numeric className={noiCol}>
+                    <MoneyCents cents={p.noiCents} />
+                  </Td>
+                  <Td numeric className={fromSm}>
+                    {p.noiMargin == null ? <span className="font-normal text-fg-3">—</span> : pct(p.noiMargin)}
+                  </Td>
+                  <Td numeric className={fromSm}>
+                    <MoneyCents cents={p.debtInterestCents} />
+                  </Td>
+                </tr>
+              </tfoot>
+            )}
+          </Table>
+          {hasLines && (
+            <p className="mt-3 text-meta text-fg-3">
+              Per-property figures use directly-classed lines only. Portfolio NOI is the sum of the rows above.
+            </p>
+          )}
+        </Section>
+      )}
     </div>
   );
 }
 
+/** One data-quality figure in the strip. A figure that needs a look leads with the warn mark. */
 function DqStat({
   label,
   value,
@@ -259,22 +355,17 @@ function DqStat({
   bad,
 }: {
   label: string;
-  value: string;
-  sub: string;
+  value: React.ReactNode;
+  sub: React.ReactNode;
   bad: boolean;
 }) {
   return (
-    <div
-      className={
-        "rounded-lg border px-3 py-2 text-sm " +
-        (bad
-          ? "border-amber-300 bg-amber-500/10 dark:border-amber-900"
-          : "border-border bg-background")
-      }
-    >
-      <div className="text-xs text-muted">{label}</div>
-      <div className="mt-0.5 font-medium tabular-nums">{value}</div>
-      <div className="text-[11px] text-muted">{sub}</div>
+    <div>
+      <p className="text-meta">
+        {bad ? <WarnMark>{label}</WarnMark> : <span className="text-fg-3">{label}</span>}
+      </p>
+      <p className="text-figure-m text-fg-1">{value}</p>
+      <p className="text-meta text-fg-3">{sub}</p>
     </div>
   );
 }

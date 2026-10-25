@@ -1,9 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { Lock } from "lucide-react";
 import { Badge, Select, Table, Td, Th } from "@/components/ui";
+import { Tooltip } from "@/components/tooltip";
+import { cn } from "@/lib/utils";
 import { CATEGORY_LABELS, ROLE_LABELS } from "../_components/labels";
+import { flushTable } from "../_components/ui";
+import { useSettingsAction } from "./controls";
 import {
   mapClassToProperty,
   setAccountCategory,
@@ -13,6 +16,12 @@ import {
 
 const ROLES = ["UNMAPPED", "PROPERTY", "ENTITY", "OVERHEAD", "IGNORE"];
 const CATEGORIES = Object.keys(CATEGORY_LABELS);
+
+/* A row that holds a select keeps the 40px row with a mouse (48 on touch):
+   the select drops to the 32px sm control size, and the cell's padding
+   shrinks around it. Text cells center on the same line. */
+const cell = "py-1 align-middle pointer-coarse:py-0.5";
+const rowSelect = "h-8";
 
 export function ClassMappingTable({
   classes,
@@ -31,12 +40,10 @@ export function ClassMappingTable({
   properties: { id: string; address: string }[];
   entities: { id: string; name: string }[];
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const run = (fn: () => Promise<unknown>) => start(() => fn().then(() => router.refresh()));
+  const [pending, run] = useSettingsAction();
 
   return (
-    <Table>
+    <Table className={flushTable}>
       <thead>
         <tr>
           <Th>Class</Th>
@@ -45,24 +52,32 @@ export function ClassMappingTable({
           <Th>Entity</Th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-border">
+      <tbody className="divide-y divide-line">
         {classes.map((c) => (
-          <tr key={c.id} className={pending ? "opacity-60" : "hover:bg-background"}>
-            <Td>
-              <span className="font-mono text-xs">{c.fqn}</span>
-              {c.role === "UNMAPPED" && (
-                <Badge tone="danger" className="ml-2">
-                  needs mapping
-                </Badge>
-              )}
-              {c.autoMatched && c.role !== "UNMAPPED" && (
-                <Badge tone="neutral" className="ml-2" title={c.note ?? undefined}>
-                  auto
-                </Badge>
-              )}
+          <tr key={c.id} className={pending ? "opacity-60" : "hover:bg-fill-1"}>
+            <Td className={cell}>
+              <span className="mr-2">{c.fqn}</span>
+              {c.role === "UNMAPPED" && <Badge tone="warn">Needs mapping</Badge>}
+              {c.autoMatched &&
+                c.role !== "UNMAPPED" &&
+                (c.note ? (
+                  <Tooltip label={c.note}>
+                    <Badge>Auto</Badge>
+                  </Tooltip>
+                ) : (
+                  <Badge>Auto</Badge>
+                ))}
             </Td>
-            <Td>
-              <Select value={c.role} onChange={(e) => run(() => setClassRole(c.id, e.target.value))}>
+            <Td className={cell}>
+              <Select
+                aria-label={`Role of ${c.fqn}`}
+                className={rowSelect}
+                value={c.role}
+                onChange={(e) => {
+                  const role = e.target.value;
+                  run(() => setClassRole(c.id, role));
+                }}
+              >
                 {ROLES.map((r) => (
                   <option key={r} value={r}>
                     {ROLE_LABELS[r]}
@@ -70,11 +85,16 @@ export function ClassMappingTable({
                 ))}
               </Select>
             </Td>
-            <Td>
+            <Td className={cell}>
               <Select
+                aria-label={`Property of ${c.fqn}`}
+                className={cn(rowSelect, "disabled:opacity-50")}
                 value={c.propertyId ?? ""}
                 disabled={c.role !== "PROPERTY"}
-                onChange={(e) => run(() => mapClassToProperty(c.id, e.target.value || null))}
+                onChange={(e) => {
+                  const propertyId = e.target.value || null;
+                  run(() => mapClassToProperty(c.id, propertyId));
+                }}
               >
                 <option value="">—</option>
                 {properties.map((p) => (
@@ -84,10 +104,15 @@ export function ClassMappingTable({
                 ))}
               </Select>
             </Td>
-            <Td>
+            <Td className={cell}>
               <Select
+                aria-label={`Entity of ${c.fqn}`}
+                className={rowSelect}
                 value={c.entityId ?? ""}
-                onChange={(e) => run(() => setClassEntity(c.id, e.target.value || null))}
+                onChange={(e) => {
+                  const entityId = e.target.value || null;
+                  run(() => setClassEntity(c.id, entityId));
+                }}
               >
                 <option value="">—</option>
                 {entities.map((en) => (
@@ -116,11 +141,10 @@ export function AccountCategoryTable({
     locked: boolean;
   }[];
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, run] = useSettingsAction();
 
   return (
-    <Table>
+    <Table className={flushTable}>
       <thead>
         <tr>
           <Th>Account</Th>
@@ -128,26 +152,29 @@ export function AccountCategoryTable({
           <Th>Category</Th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-border">
+      <tbody className="divide-y divide-line">
         {accounts.map((a) => (
-          <tr key={a.id} className={pending ? "opacity-60" : "hover:bg-background"}>
-            <Td>
-              <span className="font-mono text-xs">{a.fqn}</span>
-              {a.locked && (
-                <span className="ml-2 text-[11px] text-muted" title="pinned">
-                  🔒
-                </span>
-              )}
+          <tr key={a.id} className={pending ? "opacity-60" : "hover:bg-fill-1"}>
+            <Td className={cell}>
+              <span className="inline-flex items-center gap-1.5">
+                {a.fqn}
+                {a.locked && (
+                  <Tooltip label="Category set by you">
+                    <Lock role="img" aria-label="Category set by you" className="h-3.5 w-3.5 shrink-0 text-fg-3" />
+                  </Tooltip>
+                )}
+              </span>
             </Td>
-            <Td className="text-xs text-muted">{a.acctType || a.classification}</Td>
-            <Td>
+            <Td className={cn(cell, "text-fg-2")}>{a.acctType || a.classification}</Td>
+            <Td className={cell}>
               <Select
+                aria-label={`Category of ${a.fqn}`}
+                className={rowSelect}
                 value={a.category}
-                onChange={(e) =>
-                  start(() =>
-                    setAccountCategory(a.id, e.target.value).then(() => router.refresh()),
-                  )
-                }
+                onChange={(e) => {
+                  const category = e.target.value;
+                  run(() => setAccountCategory(a.id, category));
+                }}
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
