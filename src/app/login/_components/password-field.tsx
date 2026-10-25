@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { authInputClass } from "./auth-frame";
 
 /**
@@ -24,7 +25,7 @@ export function PasswordField(props: Omit<React.ComponentProps<"input">, "type" 
         autoCorrect="off"
         spellCheck={false}
         // Edge draws its own reveal eye in a password field; this one replaces it.
-        className={`${authInputClass} pr-11 [&::-ms-reveal]:hidden`}
+        className={cn(authInputClass, "pr-11 [&::-ms-reveal]:hidden")}
       />
       <button
         type="button"
@@ -33,9 +34,9 @@ export function PasswordField(props: Omit<React.ComponentProps<"input">, "type" 
         onMouseDown={(e) => e.preventDefault()}
         aria-pressed={shown}
         aria-label={shown ? "Hide password" : "Show password"}
-        className="group absolute top-1/2 right-0 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-[#767d8a] outline-none transition-colors hover:text-[#e8eaee]"
+        className="group absolute top-1/2 right-0 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-fg-3 outline-none transition-colors hover:text-fg-1"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-md group-focus-visible:ring-2 group-focus-visible:ring-[#c8a765]/50">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md group-focus-visible:ring-2 group-focus-visible:ring-act">
           {shown ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
         </span>
       </button>

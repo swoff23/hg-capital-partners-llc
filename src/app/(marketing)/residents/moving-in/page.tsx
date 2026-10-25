@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Eyebrow, publicContainer, publicTextLinkClass, publicType } from "@/components/public/ui";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { rentableUnitLabels } from "@/lib/property-types";
+import { cn } from "@/lib/utils";
 import { MoveInForm } from "./move-in-form";
 
 export const metadata: Metadata = {
@@ -30,11 +32,11 @@ const CHECKLIST = [
     body: (
       <>
         Call{" "}
-        <a href="https://www.nationalgridus.com/" target="_blank" rel="noopener noreferrer" className="text-[#c8a765] hover:underline">
+        <a href="https://www.nationalgridus.com/" target="_blank" rel="noopener noreferrer" className={publicTextLinkClass}>
           National Grid
         </a>{" "}
         and{" "}
-        <a href="https://www.nationalfuel.com/" target="_blank" rel="noopener noreferrer" className="text-[#c8a765] hover:underline">
+        <a href="https://www.nationalfuel.com/" target="_blank" rel="noopener noreferrer" className={publicTextLinkClass}>
           National Fuel
         </a>{" "}
         to open an account in your name, starting on your lease date. It&rsquo;s required before
@@ -48,7 +50,7 @@ const CHECKLIST = [
     body: (
       <>
         Required. Covers your belongings and adds liability protection. Many tenants use{" "}
-        <a href="https://www.lemonade.com/" target="_blank" rel="noopener noreferrer" className="text-[#c8a765] hover:underline">
+        <a href="https://www.lemonade.com/" target="_blank" rel="noopener noreferrer" className={publicTextLinkClass}>
           Lemonade
         </a>
         , but any provider works. Email us a copy of your policy.
@@ -86,45 +88,38 @@ export default async function MovingInPage() {
   const properties = rows.map((p) => ({ id: p.id, address: p.address, units: rentableUnitLabels(p.units) }));
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-16 sm:px-10">
-      <div className="w-full max-w-2xl">
-        <div className="text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Residents</p>
-          <div className="my-7 h-px w-14 bg-[#c8a765]/40 mx-auto" />
-          <h1 className="text-[1.375rem] font-normal leading-snug text-[#e8eaee] sm:text-2xl">
-            Moving in
-          </h1>
-        </div>
+    <main className={cn(publicContainer, "py-10 sm:py-12")}>
+      <div className="max-w-2xl">
+        <Eyebrow>Residents</Eyebrow>
+        <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>Moving in</h1>
 
-        <ul className="mt-10 space-y-5">
+        <ul className="mt-8 border-t border-line">
           {CHECKLIST.map((c) => (
-            <li key={c.title} className="rounded-2xl border border-white/15 p-5">
-              <p className="text-[0.625rem] font-medium uppercase tracking-wider text-[#c8a765]">{c.timing}</p>
-              <h2 className="mt-1.5 text-sm font-medium text-[#e8eaee]">{c.title}</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-[#767d8a]">{c.body}</p>
+            <li key={c.title} className="border-b border-line py-4">
+              <p className={cn(publicType.meta, "text-fg-3")}>{c.timing}</p>
+              <h2 className={cn(publicType.title, "mt-1 text-fg-1")}>{c.title}</h2>
+              <p className={cn(publicType.meta, "mt-1 text-pretty text-fg-3")}>{c.body}</p>
             </li>
           ))}
         </ul>
 
-        <div className="mt-14 text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Move-in report</p>
-          <div className="my-7 h-px w-14 bg-[#c8a765]/40 mx-auto" />
-          <h2 className="text-[1.375rem] font-normal leading-snug text-[#e8eaee] sm:text-2xl">
+        <section aria-labelledby="move-in-report" className="mt-12">
+          <p className={cn(publicType.meta, "text-fg-3")}>Move-in report</p>
+          <h2 id="move-in-report" className={cn(publicType.heading, "mt-1 text-fg-1")}>
             Tell us how everything looks.
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#767d8a]">
-            Complete this within 2 days of move-in. Not completing it means there are no
-            issues with the home.
+          <p className={cn(publicType.meta, "mt-2 text-pretty text-fg-3")}>
+            Complete this within 2 days of move-in. Not completing it means there are no issues with the home.
           </p>
-        </div>
 
-        <div className="mt-8">
-          <MoveInForm schema={schema} properties={properties} />
-        </div>
+          <div className="mt-8">
+            <MoveInForm schema={schema} properties={properties} />
+          </div>
+        </section>
 
-        <p className="mt-10 text-center text-sm leading-relaxed text-[#767d8a]">
+        <p className={cn(publicType.meta, "mt-10 text-fg-3")}>
           Already a resident with a different question?{" "}
-          <Link href="/residents" className="text-[#c8a765] hover:underline">
+          <Link href="/residents" className={publicTextLinkClass}>
             Back to Residents
           </Link>
           .

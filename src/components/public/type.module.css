@@ -1,0 +1,94 @@
+/*
+ * The public site's type roles (docs/brand-guidelines.md, section 10): the
+ * same Geist as the app, set lighter and larger. The screen's width sets
+ * these, not the pointer, so they sit here rather than among the app's type
+ * tokens in globals.css, whose sizes swap for touch. Phones below 640px,
+ * tablets from 640 and laptops from 1024 (Tailwind's sm and lg, the steps the
+ * public pages' gutters and grids use).
+ *
+ * Size, line height, weight and tracking only: color comes from the token
+ * utilities beside a role (text-fg-1, text-fg-3, text-gold). Unlayered, so a
+ * role wins over a Tailwind text size or weight on the same element; don't
+ * pair them.
+ */
+
+/* Hero headline; its second clause in --fg-3. 34 / 40, 44 / 48, 56 / 60. */
+.display {
+  font-size: 2.125rem;
+  line-height: 2.5rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* Page h1 on Rentals and Residents. 24 / 30, then 28 / 34. */
+.heading {
+  font-size: 1.5rem;
+  line-height: 1.875rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* One paragraph at most, in --fg-3. 16 / 24, then 18 / 28. */
+.lead {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+  text-wrap: pretty;
+}
+
+/* One per page, in --gold, carrying a real fact: "Rentals · 2 available". 12 / 16. */
+.eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* "HG CAPITAL PARTNERS" in the header. 13 / 16. */
+.wordmark {
+  font-size: 0.8125rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* A listing's street and rent, a resident tile's name. 16 / 24. */
+.title {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 500;
+}
+
+/* Card meta ("2 bd · 1 ba · 950 sq ft"), body copy and the header's links. 14 / 20. */
+.meta {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+@media (width >= 40rem) {
+  .display {
+    font-size: 2.75rem;
+    line-height: 3rem;
+  }
+  .heading {
+    font-size: 1.75rem;
+    line-height: 2.125rem;
+  }
+  .lead {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+}
+
+@media (width >= 64rem) {
+  .display {
+    font-size: 3.5rem;
+    line-height: 3.75rem;
+  }
+}

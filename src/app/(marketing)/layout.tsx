@@ -7,14 +7,17 @@ import { brandTokensDark } from "@/lib/brand-tokens";
 export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
 
 /**
- * Public-facing pages (landing, rentals, residents, about — and later the
- * tenant portal). Deliberately outside the (app) shell: no sidebar, no auth,
- * and a fixed dark palette that ignores the in-app theme toggle — this is
- * the front door, it should look the same for everyone.
+ * Public-facing pages (landing, rentals, residents, and later the tenant
+ * portal). Outside the (app) shell on purpose: no sidebar, no auth. The front
+ * door looks the same for everyone, so it is the app's dark theme, fixed:
+ * data-surface="public" takes the dark tokens whatever the theme toggle says
+ * (docs/brand-guidelines.md, section 4). Overlays opened here portal to
+ * <body>, outside this wrapper, so each puts data-surface="public" on its own
+ * root (the header's phone menu does).
  */
 export default function MarketingLayout({ children }: LayoutProps<"/">) {
   return (
-    <div data-surface="public" className="flex min-h-screen flex-col bg-[#080b12] text-[#f2f4f7]">
+    <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-fg-1">
       <PublicHeader />
       <div className="flex flex-1 flex-col">{children}</div>
       <PublicFooter />

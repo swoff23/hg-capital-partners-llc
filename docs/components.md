@@ -17,7 +17,7 @@ Paths are under `src/`. Last full sweep: 2026-10-23.
 |---|---|---|
 | `components/ui.tsx` | `Card` (with `CardHeader`, `CardTitle`, `CardBody`), `Section`, `SectionCard`, `Button`, `LinkButton`, `buttonClass`, `TextLink`, `textLinkClass`, `Kbd`, `Badge`, `badgeToneClass`, `Input`, `Textarea`, `Select`, `fieldClass`, `Table`, `Th`, `Td`, `thClass`, `PageHeader`, `Field`, `EmptyState`, `pickerChip` | **Home for new primitives** |
 | `components/*.tsx` | App shell and nav, popover, sheet, menu, toast, date, assignee and repeat pickers, avatar, status badge and mark, segmented control, media uploader, grid and lightbox, activity timeline, confirm dialog, tooltip, global search, file uploads, inline heading edit, theme toggle, back link, money, code, photo thumb, monogram, spot art | Shared app pieces; new general-purpose components go here |
-| `components/public/` | `PublicHeader`, `PublicFooter` | Public site only |
+| `components/public/` | `PublicHeader`, `PublicFooter`; in `ui.tsx` `publicContainer`, `publicCtaClass`, `publicSecondaryClass`, `publicTextLinkClass`, `publicLinkHover`, `Eyebrow` and `publicType` (the public type roles in `type.module.css`) | Public site and the sign-in screens only |
 | `app/(app)/financials/_components/ui.tsx` | `Kpi`, `MoneyBars`, `SourceBadge`, `PartialLabel`, `fmtCents` | Money figures; move a piece to `components/` before reusing it outside Financials |
 | `lib/utils.ts`, `lib/dates.ts`, `lib/money.ts`, `lib/normalize.ts` | Formatting and parsing | All display formatting |
 | `app/globals.css` | Color, type, elevation and motion tokens ([brand guidelines](brand-guidelines.md)) | Every color, size and shadow. Utilities read them: `text-fg-2`, `bg-canvas`, `border-line-control`, `text-body`, `shadow-float`, `duration-fast` |
@@ -25,7 +25,7 @@ Paths are under `src/`. Last full sweep: 2026-10-23.
 | `lib/brand.ts` | `BRAND`: "HG", "HG Capital", "HG Jobs", "HG Capital Partners" | Every new use of a brand word, so a re-brand is one edit. The shell's lockup, page titles and email read it |
 | `lib/monogram-art.ts`, `lib/monogram-image.tsx` | The monogram as outlines: `MONOGRAM_GLYPHS`, `monogramRadius(px)` (22% rounded to whole pixels), `monogramSvg()` and `monogramImage(px)` | `Monogram` draws the glyphs. The rest is for where it can't render: `app/icon.svg` (the favicon; a test fails when it drifts from the tokens), `app/apple-icon.tsx` (180, full bleed) and `app/icon1.tsx` (512) |
 
-Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) use the tokens in `app/globals.css` and the primitives above. The public site (`app/(marketing)`) is hand-styled on fixed hex colors and shares nothing with `ui.tsx` today.
+Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) use the tokens in `app/globals.css` and the primitives above. The public site (`app/(marketing)`, plus the sign-in screens and the root not-found page) is the app's dark theme, fixed: its wrapper sets `data-surface="public"`, so the same tokens and `ui.tsx` primitives draw it dark, and an overlay opened there puts `data-surface="public"` on its own root. `components/public/` holds only what it does differently.
 
 ## Overlays
 
@@ -54,7 +54,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Job | Use | Notes |
 |---|---|---|
 | Text field | `components/ui.tsx` `Input` | `--surface` on a `--line-control` edge; focus turns the edge `--act` with a 1px inset ring, `aria-invalid` turns it `--danger`. `text-body`, so 14px with a mouse and 16px on touch (iOS doesn't zoom on focus). At least 44px tall on touch. `fieldClass` is the look for a field that can't be `Input` |
-| Password with show and hide | `app/login/_components/password-field.tsx` `PasswordField` | Sign-in screens only (public palette): /login, the reset link, the contractor's first password. Eye button inside the field's right edge, 44px at every width, `aria-pressed`. Shown as text it still doesn't capitalize or autocorrect |
+| Password with show and hide | `app/login/_components/password-field.tsx` `PasswordField` | Sign-in screens only (public material): /login, the reset link, the contractor's first password. Eye button inside the field's right edge, 44px at every width, `aria-pressed`. Shown as text it still doesn't capitalize or autocorrect |
 | Multi-line text | `components/ui.tsx` `Textarea` | |
 | Select | `components/ui.tsx` `Select` | |
 | Button | `components/ui.tsx` `Button` (primary, secondary, ghost, danger, destructive; sm 32px, md 36px; `icon` for a square icon-only button) | One `primary` per view: the next step. `secondary` for everything else, `ghost` in toolbars and rows, `danger` for the first step of a destructive action, `destructive` only for the confirm that names what goes. `LinkButton` for navigation styled as a button; `buttonClass()` for a plain `<a>` (an `sms:` or `mailto:` link). `Button`, `LinkButton`, `Input`, `Select` and `Textarea` are at least 44px tall on touch (`TOUCH_HEIGHT`, `pointer-coarse:min-h-11`, exported for other controls); a mouse keeps the compact sizes. No hover fill on a disabled button |
@@ -95,7 +95,9 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Back to the list | `components/back-link.tsx` `BackLink` | Returns to the exact previous page, filters and scroll intact, when it can. `className` sizes it, e.g. the 44px "My jobs" link in the portal header. Inside a `LeaveGuard` it asks first while the page is held |
 | Page title row | `components/ui.tsx` `PageHeader` | Title on `text-title`, subtitle, actions slot |
 | Printed shortcut | `components/ui.tsx` `Kbd` | Geist Mono keycap, 20px, `--fill-1` on a `--line-strong` edge: "Esc", "⌘K". Hidden on touch, where the same action is a visible button |
-| Public site header and footer | `components/public/header.tsx` `PublicHeader`, `footer.tsx` `PublicFooter` | |
+| Public site header and footer | `components/public/header.tsx` `PublicHeader`, `footer.tsx` `PublicFooter` | Header 64px over a `--line` rule: the wordmark (`BRAND.company`), then Rentals and Residents in `--fg-3` and HG Login in `--pub-faint`, the current page `--fg-1` with `aria-current`. Below 600px the links fold into a 44px menu button; its menu carries `data-surface="public"`. Footer: the legal line (`BRAND.company`) and Contact us in `--pub-faint`. Both sit in `publicContainer`, so their edges match the page's |
+| Public call to action | `components/public/ui.tsx` `publicCtaClass`, `publicSecondaryClass` | The primary `Button` in limestone at 40px (48 on touch), gold on hover; one per view. `publicSecondaryClass` is the secondary `Button` at the same height, for the action beside it |
+| Public eyebrow | `components/public/ui.tsx` `Eyebrow` | Gold, 12px caps at 0.28em, one per page and carrying a real fact ("Rentals · 2 available"). `as="h1"` when it's the page's only heading |
 | Light and dark switch | `components/theme-toggle.tsx` `ThemeToggle` | App only, 44px on touch, with chrome icons (`chromeIconClass`). `THEME_SCRIPT` sets the theme before paint and keeps the browser's theme-color on the app's theme, not the OS's; pages with one fixed `themeColor` keep it |
 | HG mark | `components/monogram.tsx` `Monogram` | "HG" (`BRAND.mark`) in Geist 600, drawn from the favicon's outlines so the letters center on their cap height, `--gold` on the `--ink-tile` square, radius 22% in whole pixels (5 at 24, 7 at 32), a `--line` edge on dark grounds. `size` 16 to 512 (24 in the app bar, 32 in the portal header). Decorative unless `title` is set. The favicon and home-screen icons are `lib/monogram-art.ts` |
 
@@ -119,7 +121,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Property photo | `components/photo-thumb.tsx` `PhotoThumb` | `size` 32 (square, search and Home rows), 48 (48x36, Portfolio rows), 96 (96x72, record header) or `full` (16:9). `next/image` over `--fill-1` with a 200ms fade and the photo edge on top; no photo is the `House` fallback tile. `status` pill top-left; `failed` rings it in `--danger`, and `onRetry` adds a Retry pill. An `/api/files/` route is always unoptimized (the optimizer sends no cookies); `unoptimized` for any other session-checked route. Public Blob photos from our store are allowed in `next.config.ts`. `preload` for the one photo above the fold. `alt` names the place |
 | Horizontal bars | `app/(app)/financials/_components/ui.tsx` `MoneyBars` | Same idiom as `app/(app)/portfolio-capex.tsx` |
 | Data source and freshness | `app/(app)/financials/_components/ui.tsx` `SourceBadge` | QuickBooks basis and last sync |
-| Listing photos | `app/(marketing)/rentals/photo-carousel.tsx` `PhotoCarousel` | Public site |
+| Listing photos | `app/(marketing)/rentals/photo-carousel.tsx` `PhotoCarousel` | Public site. A borderless 4:3 strip, `rounded-lg`: scroll-snap swipe on touch, arrows on hover or focus with a mouse, a "1 / 8" counter and a `status` pill on the photo tokens, the `House` tile when there are no photos |
 
 ## Icons
 
@@ -160,10 +162,9 @@ Use the pick; folding a copy into it is welcome when you're already in that file
 | Table header look | `Th`, plus `SortHeader` in `app/(app)/deals/sort-header.tsx` | `SortHeader` reads `thClass`, so the two match |
 | Inline text edit | `InlineAddressField` (the task title uses it now), plus hand-rolled edits in `deals/[id]/deal-detail.tsx` (2) and `settings/capex-rules-editor.tsx` (2), all on `useInlineEditKeys` | `InlineAddressField`, generalized to any text |
 | Outside-click popover | `GlobalSearch` wires its own `mousedown` listener | `components/popover.tsx` `Popover` |
-| Money formatting | `fmtMoney`, plus a raw `toLocaleString` in `(marketing)/rentals/page.tsx` | `fmtMoney` |
 | Age in years | `fmtAge` in `properties/[id]/capex-outlook.tsx`, `building-capex.tsx` and `edit-units.tsx`; `fmtYrs` in `settings/capex-rules-editor.tsx` | Move one into `lib/` |
 | Button | `Button` in 20 files; about 50 raw `<button>`s, many icon or link style | `Button`; add a variant before hand-rolling |
-| Text field | `Input`, `Select`, `Textarea` in 9 files; about 60 raw fields (filter bars at `h-8 text-xs`, inline edits, public forms) | `Input` and friends; add a small size for filter bars |
+| Text field | `Input`, `Select`, `Textarea` in 9 files; about 60 raw fields (filter bars at `h-8 text-xs`, inline edits) | `Input` and friends; add a small size for filter bars |
 | Section card with an Edit link | `SectionCard`, plus hand-rolled boxed headers in `app/(app)/properties/[id]/edit-units.tsx`, `edit-listings.tsx` and `building-capex.tsx` (same `pointer-coarse:` reveal for Edit; still boxed until slice 4) | `SectionCard`, or `Section` without edit mode |
 
 ## Known gaps
@@ -176,5 +177,4 @@ Jobs nothing covers yet, and holes in the picks. The first feature that needs on
 - **Old popovers.** `GlobalSearch` predates `Popover` and wires its own outside click; move it onto it when touched.
 - **Inline text edit.** Exists only as feature copies (Duplicates). Extract on the next touch.
 - **Sticky headers on wide tables.** A table wider than its column scrolls sideways in its own box, and a header can't stick to the page from inside a scroll container, so there `Th` scrolls away with the page. Sticking it needs a header synced to the box's scroll.
-- **Public site kit.** Public pages hand-style buttons and fields on fixed hex colors; there's no shared public primitive.
 - **Loading state.** No spinner or skeleton. Pending actions dim or relabel.

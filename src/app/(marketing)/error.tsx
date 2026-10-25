@@ -1,7 +1,9 @@
 "use client";
 import { useEffect } from "react";
+import { publicContainer, publicCtaClass, publicType } from "@/components/public/ui";
+import { cn } from "@/lib/utils";
 
-/** Error boundary for the public pages — same understated dark treatment as the rest of the front door. */
+/** Error boundary for the public pages, in the same dark material as the rest of the front door. */
 export default function MarketingError({
   error,
   retry,
@@ -14,17 +16,12 @@ export default function MarketingError({
   }, [error]);
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-      <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Something went wrong</p>
-      <div className="my-7 h-px w-14 bg-[#c8a765]/40" />
-      <p className="max-w-sm text-sm leading-relaxed text-[#767d8a]">
+    <main className={cn(publicContainer, "flex flex-1 flex-col items-center justify-center py-16 text-center")}>
+      <h1 className={cn(publicType.heading, "text-fg-1")}>Something went wrong</h1>
+      <p className={cn(publicType.lead, "mt-3 max-w-sm text-fg-3")}>
         That page didn&rsquo;t load. Please try again in a moment.
       </p>
-      <button
-        type="button"
-        onClick={() => retry()}
-        className="mt-8 rounded-full bg-[#e8eaee] px-7 py-2.5 text-[0.8125rem] font-medium tracking-wide text-[#08090b] transition-colors duration-200 hover:bg-[#c8a765]"
-      >
+      <button type="button" onClick={() => retry()} className={cn(publicCtaClass, "mt-8")}>
         Try again
       </button>
     </main>

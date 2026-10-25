@@ -1,36 +1,37 @@
 import { PublicHeader } from "@/components/public/header";
 import { PublicFooter } from "@/components/public/footer";
+import { Eyebrow, publicContainer, publicCtaClass, publicLinkHover, publicType } from "@/components/public/ui";
+import { fieldClass } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 /**
  * The sign-in screens' shared frame: /login, forgot password, the reset link
- * and the contractor's first-password page. Public palette (CLAUDE.md,
- * Personality), fixed dark, ignores the theme toggle. Feature-only, so it
- * lives beside the login page rather than in src/components.
+ * and the contractor's first-password page. The public site's material
+ * (docs/brand-guidelines.md, sections 4 and 10): the app's dark theme, fixed,
+ * whatever the theme toggle says. Feature-only, so it lives beside the login
+ * page rather than in src/components.
  */
 export function AuthFrame({
   title,
   subtitle,
   children,
 }: {
-  /** One short heading under the HG Login mark. /login itself has none. */
+  /** One short heading under the HG Login eyebrow. /login itself has none, so the eyebrow is its h1. */
   title?: string;
   /** One line under the heading. */
   subtitle?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div data-surface="public" className="flex min-h-screen flex-col bg-[#080b12] text-[#f2f4f7]">
+    <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-fg-1">
       <PublicHeader />
 
-      <main className="relative isolate flex flex-1 items-center justify-center px-6 py-16">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_38%,rgba(150,165,195,0.08),transparent_70%)]" />
+      <main className={cn(publicContainer, "flex flex-1 flex-col items-center justify-center py-16")}>
+        <div className="w-full max-w-sm text-center">
+          <Eyebrow as={title ? "p" : "h1"}>HG Login</Eyebrow>
 
-        <div className="w-full max-w-xs text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">HG Login</p>
-          <div className="my-7 h-px w-14 bg-[#c8a765]/40 mx-auto" />
-
-          {title && <h1 className="text-lg font-medium tracking-tight text-[#e8eaee]">{title}</h1>}
-          {subtitle && <p className="mt-1.5 text-xs text-[#767d8a]">{subtitle}</p>}
+          {title && <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>{title}</h1>}
+          {subtitle && <p className="mt-1.5 text-meta text-fg-3">{subtitle}</p>}
 
           {children}
         </div>
@@ -41,34 +42,28 @@ export function AuthFrame({
   );
 }
 
-export const authInputClass =
-  "h-10 w-full rounded-lg border border-white/15 bg-white/[0.03] px-3 text-sm text-[#e8eaee] placeholder:text-[#4c525c] focus:border-[#c8a765]/60 focus:outline-none";
+/** The app's field in the public material: 40px to match the CTA, placeholders in --pub-faint. */
+export const authInputClass = cn(fieldClass, "h-10 placeholder:text-pub-faint");
 
-export const authButtonClass =
-  "mt-1 h-10 w-full rounded-full bg-[#e8eaee] text-[0.8125rem] font-medium tracking-wide text-[#08090b] transition-colors duration-200 hover:bg-[#c8a765]";
+/** The public CTA, full width. */
+export const authButtonClass = cn(publicCtaClass, "mt-1 w-full");
 
 /** Quiet text link under a form ("Forgot password?", "Back to sign in"), with a 44px tap height. */
-export const authLinkClass =
-  "inline-flex min-h-11 items-center text-xs tracking-wide text-[#767d8a] transition-colors hover:text-[#c8a765]";
+export const authLinkClass = cn("inline-flex min-h-11 items-center text-meta text-fg-3", publicLinkHover);
 
+/** A form-level error ("Wrong email or password."): the notice box with the line in --danger. */
 export function AuthError({ children }: { children: React.ReactNode }) {
   return (
-    <p
-      role="alert"
-      className="mt-6 rounded-lg border border-[#e0796a]/25 bg-[#e0796a]/[0.08] px-3 py-2 text-xs text-[#e5a99b]"
-    >
+    <p role="alert" className="mt-6 rounded-md border border-line bg-surface px-3 py-2 text-meta text-danger">
       {children}
     </p>
   );
 }
 
-/** A neutral confirmation ("Password changed."), in the gold accent. */
+/** A neutral confirmation ("Password changed."): --surface on a --line edge in --fg-1. Gold never marks state. */
 export function AuthNotice({ children }: { children: React.ReactNode }) {
   return (
-    <p
-      role="status"
-      className="mt-6 rounded-lg border border-[#c8a765]/25 bg-[#c8a765]/[0.08] px-3 py-2 text-xs text-[#dcc28f]"
-    >
+    <p role="status" className="mt-6 rounded-md border border-line bg-surface px-3 py-2 text-meta text-fg-1">
       {children}
     </p>
   );

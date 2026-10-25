@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
+import { ArrowUpRight } from "lucide-react";
+import { Money } from "@/components/money";
+import { Eyebrow, publicContainer, publicLinkHover, publicType } from "@/components/public/ui";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/db";
+import { daysUntil, fmtDay, todayYmdEastern } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 import { PhotoCarousel } from "./photo-carousel";
 
 export const metadata: Metadata = {
@@ -16,12 +21,19 @@ type ListingCardData = {
   address: string;
   zillowUrl: string | null;
   rent: string | null;
-  beds: string | null;
-  baths: string | null;
-  sqft: number | null;
+  facts: string;
   photos: string[];
   leased: boolean;
+  /** The photo pill: "Leased", or "Available Nov 1" while the move-in date is ahead. */
+  status?: string;
 };
+
+/** "2 bd", but a word the editor typed ("Studio") stays as it is. */
+function count(value: string | null, unit: string): string | null {
+  const v = value?.trim();
+  if (!v) return null;
+  return /^\d+(\.\d+)?$/.test(v) ? `${v} ${unit}` : v;
+}
 
 export default async function RentalsPage() {
   const rows = await prisma.listing.findMany({
@@ -33,124 +45,99 @@ export default async function RentalsPage() {
     },
   });
 
-  const listings: ListingCardData[] = rows.map((l) => ({
-    id: l.id,
-    unitLabel: l.unitLabel,
-    address: l.property.address,
-    zillowUrl: l.zillowUrl,
-    rent: l.rent?.toString() ?? null,
-    beds: l.beds,
-    baths: l.baths,
-    sqft: l.sqft,
-    photos: l.photos.map((p) => p.url),
-    leased: l.status === "LEASED",
-  }));
+  const today = todayYmdEastern();
+  const listings: ListingCardData[] = rows.map((l) => {
+    const leased = l.status === "LEASED";
+    const ahead = (daysUntil(l.availableDate, today) ?? 0) > 0;
+    return {
+      id: l.id,
+      unitLabel: l.unitLabel,
+      address: l.property.address,
+      zillowUrl: l.zillowUrl,
+      rent: l.rent?.toString() ?? null,
+      facts: [count(l.beds, "bd"), count(l.baths, "ba"), l.sqft && `${l.sqft.toLocaleString("en-US")} sq ft`]
+        .filter(Boolean)
+        .join(" · "),
+      photos: l.photos.map((p) => p.url),
+      leased,
+      status: leased
+        ? "Leased"
+        : ahead
+          ? `Available ${fmtDay(l.availableDate, { year: "auto", now: today })}`
+          : undefined,
+    };
+  });
 
-  const available = listings.filter((l) => !l.leased);
-  const leased = listings.filter((l) => l.leased);
+  const available = listings.filter((l) => !l.leased).length;
 
+  // Available first, then the ones already leased, in one grid: the photo's
+  // Leased pill marks them.
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-16 sm:px-10">
-      <div className="w-full max-w-5xl">
-        <div className="text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Rentals</p>
-          <div className="my-7 h-px w-14 bg-[#c8a765]/40 mx-auto" />
-          <h1 className="text-[1.375rem] font-normal leading-snug text-[#e8eaee] sm:text-2xl">
-            Available apartments in Buffalo.
-          </h1>
+    <main className={cn(publicContainer, "py-10 sm:py-12")}>
+      <Eyebrow>{available > 0 ? `Rentals · ${available} available` : "Rentals · None available"}</Eyebrow>
+      <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>Available apartments in Buffalo.</h1>
+
+      {available === 0 && (
+        <p className={cn(publicType.lead, "mt-3 max-w-xl text-fg-3")}>
+          No openings right now. Check back soon, or see our listings on Zillow.
+        </p>
+      )}
+
+      {listings.length > 0 && (
+        <div className="mt-8 grid gap-x-6 gap-y-7 sm:grid-cols-2 sm:gap-y-8 lg:grid-cols-3">
+          {listings.map((l) => (
+            <ListingCard key={l.id} listing={l} />
+          ))}
         </div>
-
-        {available.length > 0 ? (
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {available.map((l) => (
-              <ListingCard key={l.id} listing={l} />
-            ))}
-          </div>
-        ) : (
-          <p className="mx-auto mt-12 max-w-sm text-center text-sm leading-relaxed text-[#767d8a]">
-            No openings right now. Check back soon, or see our listings on Zillow.
-          </p>
-        )}
-
-        {leased.length > 0 && (
-          <div className="mt-16">
-            <p className="text-center text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">
-              Previously Leased
-            </p>
-            <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {leased.map((l) => (
-                <ListingCard key={l.id} listing={l} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </main>
   );
 }
 
+/**
+ * A borderless 4:3 photo card: the photo, then the street with the rent
+ * right-aligned ("/mo" in --fg-3), the unit, and the facts line
+ * (docs/brand-guidelines.md, section 10).
+ */
 function ListingCard({ listing: l }: { listing: ListingCardData }) {
   return (
-    <div
-      className={
-        "group overflow-hidden rounded-2xl border transition-colors duration-200 " +
-        (l.leased ? "border-white/[0.08] opacity-70" : "border-white/15 hover:border-[#c8a765]/60")
-      }
-    >
-      <div className="relative aspect-[4/3] bg-white/[0.03]">
-        <PhotoCarousel photos={l.photos} />
-        {l.leased && (
-          <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-[#08090b]/80 px-2.5 py-1 text-[0.625rem] font-medium uppercase tracking-wider text-[#e8eaee]">
-            Leased
-          </span>
-        )}
-      </div>
+    <article className="flex min-w-0 flex-col gap-3">
+      <PhotoCarousel photos={l.photos} label={l.address} status={l.status} />
 
-      <div className="p-5">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium text-[#e8eaee]">{l.address}</h2>
+      <div className="grid gap-0.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className={cn(publicType.title, "min-w-0 text-fg-1")}>{l.address}</h2>
           {!l.leased && (
-            <span className="shrink-0 text-sm font-medium text-[#e8eaee]">
+            <p className={cn(publicType.title, "shrink-0 text-right text-fg-1")}>
               {l.rent ? (
                 <>
-                  ${Number(l.rent).toLocaleString()}
-                  <span className="text-[#767d8a]">/mo</span>
+                  <Money value={l.rent} />
+                  <span className="font-normal text-fg-3">/mo</span>
                 </>
               ) : (
-                <span className="text-[#767d8a]">Price on request</span>
+                <span className="font-normal text-fg-3">Price on request</span>
               )}
-            </span>
+            </p>
           )}
         </div>
-        <p className="mt-0.5 text-xs text-[#767d8a]">{l.unitLabel}</p>
-        <p className="mt-2 text-xs text-[#767d8a]">
-          {[l.beds && `${l.beds} bd`, l.baths && `${l.baths} ba`, l.sqft && `${l.sqft} sqft`]
-            .filter(Boolean)
-            .join(" · ") || "Details on request"}
-        </p>
+        <p className={cn(publicType.meta, "text-fg-3")}>{l.unitLabel}</p>
+        <p className={cn(publicType.meta, "num text-fg-3")}>{l.facts || "Details on request"}</p>
         {l.zillowUrl && !l.leased && (
           <a
             href={l.zillowUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 flex items-center gap-1.5 text-xs font-medium text-[#c8a765] hover:underline"
+            className={cn(
+              publicType.meta,
+              "mt-2 inline-flex w-fit items-center gap-1 text-fg-1 pointer-coarse:min-h-11",
+              publicLinkHover,
+            )}
           >
             View on Zillow
-            <svg
-              viewBox="0 0 24 24"
-              className="h-3 w-3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M7 17 17 7M7 7h10v10" />
-            </svg>
+            <ArrowUpRight aria-hidden="true" className="size-4 stroke-[1.5]" />
           </a>
         )}
       </div>
-    </div>
+    </article>
   );
 }
