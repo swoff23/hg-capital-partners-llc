@@ -68,10 +68,10 @@ export function LeaveGuard({ children }: { children: ReactNode }) {
         <div className="p-4">
           {/* Same row as the Mark done sheet: the way out on the left, the main button on the right. */}
           <div className="flex items-center gap-3">
-            <Button variant="secondary" className="h-12 min-w-0 flex-1 whitespace-nowrap max-[359px]:px-2" onClick={leaveAnyway}>
+            <Button variant="secondary" className="h-12 min-w-0 flex-1 whitespace-nowrap max-[360px]:px-2" onClick={leaveAnyway}>
               Leave anyway
             </Button>
-            <Button className="h-12 min-w-0 flex-1 whitespace-nowrap max-[359px]:px-2" onClick={() => setAsking(false)}>
+            <Button className="h-12 min-w-0 flex-1 whitespace-nowrap max-[360px]:px-2" onClick={() => setAsking(false)}>
               <span className="truncate">{words?.stay}</span>
             </Button>
           </div>

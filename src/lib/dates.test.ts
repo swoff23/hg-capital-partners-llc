@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { daysUntil, dueLabel, easternDayStart, fmtDay, isPastDay, relativeDays, todayYmd, todayYmdEastern, toYmd, ymdToDate } from "./dates";
+import { dayLabel, daysUntil, dueLabel, easternDayStart, fmtDay, isPastDay, relativeDays, todayYmd, todayYmdEastern, toYmd, ymdToDate } from "./dates";
 
 // A fixed "now": 2026-03-01 at 03:30 local. The assertions below must hold
 // whatever TZ the test process runs in — that is the point of the module.
@@ -110,4 +110,21 @@ test("easternDayStart: Buffalo midnight in UTC, across daylight time", () => {
   // The days the clocks change: midnight is still on the old offset.
   assert.equal(easternDayStart("2026-03-08").toISOString(), "2026-03-08T05:00:00.000Z");
   assert.equal(easternDayStart("2026-11-01").toISOString(), "2026-11-01T04:00:00.000Z");
+});
+
+const SUNDAY = "2026-10-25";
+
+test("dayLabel: Today, Tomorrow, a weekday within six days, then the date", () => {
+  assert.equal(dayLabel("2026-10-25", SUNDAY), "Today");
+  assert.equal(dayLabel("2026-10-26", SUNDAY), "Tomorrow");
+  assert.equal(dayLabel("2026-10-27", SUNDAY), "Tue");
+  assert.equal(dayLabel("2026-10-31", SUNDAY), "Sat");
+  assert.equal(dayLabel("2026-11-01", SUNDAY), "Nov 1");
+  assert.equal(dayLabel("2027-01-05", SUNDAY), "Jan 5, 2027");
+});
+
+test("dayLabel: a past date is the real date, never a weekday", () => {
+  assert.equal(dayLabel("2026-10-24", SUNDAY), "Oct 24");
+  assert.equal(dayLabel("2026-10-19", SUNDAY), "Oct 19");
+  assert.equal(dayLabel("2025-12-30", SUNDAY), "Dec 30, 2025");
 });

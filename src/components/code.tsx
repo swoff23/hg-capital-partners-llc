@@ -46,7 +46,8 @@ export function Code({
       <button
         type="button"
         onClick={copy}
-        aria-label={`Copy ${label.toLowerCase()}`}
+        // Names the code itself, not only the action: "Lockbox code 4521, copy".
+        aria-label={`${label} ${shown ? value : `ending ${value.slice(-4)}`}, copy`}
         className={cn(
           "group relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm font-mono text-fg-2 transition-colors hover:text-fg-1",
           size === "lg" ? "text-code-l" : "text-code",

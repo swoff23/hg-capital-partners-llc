@@ -1,6 +1,6 @@
 "use client";
 import { Moon, Sun } from "lucide-react";
-import { chromeIconClass } from "@/components/nav";
+import { chromeIconClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**

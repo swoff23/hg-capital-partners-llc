@@ -17,8 +17,8 @@ import {
 import { approveTask, rescheduleTasks, sendBackTask, setTaskDone, undoDone, undoReschedule } from "./list-actions";
 
 /**
- * The rows a task list shows and the edits it makes, shared by Today, All
- * and Home's card. Each edit shows at once (useOptimistic), then the server
+ * The rows a task list shows and the edits it makes, shared by Today (on
+ * Home) and All. Each edit shows at once (useOptimistic), then the server
  * action runs; its revalidation brings the real rows back. A failure puts
  * the row back as it was and says why in a toast. Reschedules toast with an
  * Undo that restores the old dates; a tick toasts with an Undo that puts the

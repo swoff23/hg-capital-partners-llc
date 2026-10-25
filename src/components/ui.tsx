@@ -25,7 +25,8 @@ export function CardBody({ className, ...props }: React.ComponentProps<"div">) {
 
 /* ---------------- Section ----------------
    A heading and its actions over a --line rule, with the content 12px under
-   it. No box and no title bar (Stripe's customer page). */
+   it. No box and no title bar (Stripe's customer page). The heading names
+   the <section>, so it's a region screen readers can jump to. */
 export function Section({
   title,
   actions,
@@ -41,10 +42,13 @@ export function Section({
   as?: "h2" | "h3";
   className?: string;
 }) {
+  const headingId = React.useId();
   return (
-    <section className={className}>
+    <section aria-labelledby={headingId} className={className}>
       <div className="flex min-h-8 items-center justify-between gap-3 border-b border-line pb-2">
-        <Heading className="min-w-0 text-section text-fg-1">{title}</Heading>
+        <Heading id={headingId} className="min-w-0 text-section text-fg-1">
+          {title}
+        </Heading>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
       <div className="pt-3">{children}</div>
@@ -64,16 +68,19 @@ export function SectionCard({
   onEdit,
   editing,
   actions,
+  as = "h2",
 }: {
   title: string;
   children: React.ReactNode;
   onEdit?: () => void;
   editing?: boolean;
   actions?: React.ReactNode;
+  /** The heading level; h2 for a record's sections under its h1. */
+  as?: "h2" | "h3";
 }) {
   return (
     <Section
-      as="h3"
+      as={as}
       title={title}
       className="group"
       actions={
@@ -167,9 +174,9 @@ export function LinkButton({
    label it could pass for (a table cell, a field value, a card header slot).
    Body ink (--fg-1), whatever the sentence's color, with a 1px underline at a
    3px offset, 2px on hover, so it never rests on color alone (WCAG 1.4.1).
-   Standalone links known by position or a glyph (breadcrumbs, "Portfolio →",
-   "+ Add", Edit) don't use it; they underline on hover. textLinkClass is for
-   an <a> or a <button>. */
+   Standalone links known by position or an icon (breadcrumbs, Portfolio with
+   its arrow, Add with its plus, Edit) don't use it; they underline on hover.
+   textLinkClass is for an <a> or a <button>. */
 export const textLinkClass = "text-fg-1 underline decoration-1 underline-offset-3 hover:decoration-2";
 
 export function TextLink({ className, ...props }: React.ComponentProps<typeof Link>) {
@@ -224,6 +231,14 @@ export function Badge({
 }
 
 /**
+ * A chrome icon (nav items, the shell's buttons, toolbar icons): 16px at a
+ * 1.5 stroke with a mouse, 20px at 1.75 on touch (docs/brand-guidelines.md,
+ * section 6). Here rather than in nav.tsx, a client module, so server
+ * components get the string too.
+ */
+export const chromeIconClass = "size-4 shrink-0 stroke-[1.5] pointer-coarse:size-5 pointer-coarse:stroke-[1.75]";
+
+/**
  * A compact bordered chip that opens a picker (due date, assignee), so a row
  * of them reads as one set. 28px with a mouse; on touch the hit area reaches
  * 44px without the chip growing. Give the element `relative`-friendly room:
@@ -253,8 +268,11 @@ export function Input({ className, ...props }: React.ComponentProps<"input">) {
 export function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return <textarea className={cn(fieldClass, "py-2", className)} {...props} />;
 }
+/** WebKit ignores min-height on a native select, so the select sets its 44px touch height outright. */
+export const selectTouchHeight = "pointer-coarse:h-11";
+
 export function Select({ className, ...props }: React.ComponentProps<"select">) {
-  return <select className={cn(fieldClass, "h-9", className)} {...props} />;
+  return <select className={cn(fieldClass, "h-9", selectTouchHeight, className)} {...props} />;
 }
 
 /* ---------------- Table ----------------

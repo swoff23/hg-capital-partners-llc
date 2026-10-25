@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Section, Table, Td, TextLink } from "@/components/ui";
+import { ArrowRight } from "lucide-react";
+import { Section, Table, Td, TextLink, chromeIconClass } from "@/components/ui";
 import { Money } from "@/components/money";
 import { fmtDay } from "@/lib/dates";
 import { signedLineCents } from "@/lib/quickbooks/compute";
@@ -36,11 +37,13 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
     <Section
       title="Financials"
       actions={
+        // As tall as the rail's Edit button (32px, 44 on touch), so this heading lines up with Details beside it.
         <Link
           href="/financials"
-          className="inline-flex items-center text-label text-fg-1 hover:underline pointer-coarse:min-h-11"
+          className="inline-flex min-h-8 items-center gap-1.5 text-label text-fg-1 hover:underline pointer-coarse:min-h-11"
         >
-          Portfolio →
+          Portfolio
+          <ArrowRight aria-hidden="true" className={chromeIconClass} />
         </Link>
       }
     >

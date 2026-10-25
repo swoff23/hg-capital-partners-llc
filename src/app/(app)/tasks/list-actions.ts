@@ -9,7 +9,7 @@ import type { DateChange, TickResult } from "@/lib/tasks/list";
 import * as tasks from "@/lib/tasks/service";
 
 /**
- * Actions behind the task lists (Today, All, Home's card). Each returns a
+ * Actions behind the task lists (Today on Home, and All). Each returns a
  * result instead of throwing, so a failed save shows a toast and puts the
  * row back rather than sending the page to its error boundary.
  */

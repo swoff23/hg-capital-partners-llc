@@ -10,10 +10,10 @@ export interface SegmentOption<K extends string> {
 }
 
 const SIZES = {
-  // The deals filter bar: compact, a 32px control beside h-8 fields with a
-  // mouse, 44px on touch. Still 12px type: at text-label the deals filters
-  // run past a 320px screen, so the type waits on that bar's layout.
-  sm: "h-7 px-2.5 text-xs font-medium pointer-coarse:h-10",
+  // Filter bars (deals) and toolbars: compact, a 32px control beside h-8
+  // fields with a mouse, 44px on touch. Segments are text-label at every
+  // size (docs/brand-guidelines.md, section 3).
+  sm: "h-7 px-2.5 text-label pointer-coarse:h-10",
   // A page's main switch (Mine | Contractors): a 36px control, a 44px target on touch.
   md: "h-8 px-3 text-label pointer-coarse:h-11",
 };

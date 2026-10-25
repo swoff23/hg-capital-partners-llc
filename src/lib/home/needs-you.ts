@@ -1,4 +1,4 @@
-import { daysUntil, fmtDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { dayLabel, daysUntil, fmtDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 
 /**
@@ -40,21 +40,6 @@ export const PHONE_ROWS = 3;
 /** How many rows hide behind "N more" on a phone. */
 export function moreCount(total: number): number {
   return Math.max(0, total - PHONE_ROWS);
-}
-
-/**
- * A calendar date the way the brand writes one (docs/brand-guidelines.md,
- * section 3): Today, Tomorrow, a weekday within six days, then "Oct 30",
- * with the year only when it isn't this year. A past date is the real date.
- */
-export function dayLabel(date: Ymd, today: Ymd): string {
-  const d = daysUntil(date, today);
-  if (d === 0) return "Today";
-  if (d === 1) return "Tomorrow";
-  if (d != null && d > 1 && d <= 6) {
-    return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short" });
-  }
-  return fmtDay(date, { year: "auto", now: today });
 }
 
 // ---------------------------------------------------------------------------

@@ -2,9 +2,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
-import { chromeIconClass } from "@/components/nav";
 import { Popover, PopoverTrigger } from "@/components/popover";
-import { buttonClass } from "@/components/ui";
+import { buttonClass, chromeIconClass } from "@/components/ui";
 import { DEAL_STATUSES } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { DealStageMark } from "./stage-select";

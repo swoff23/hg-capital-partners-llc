@@ -9,7 +9,8 @@ import { Avatar } from "@/components/avatar";
 import { GlobalSearch } from "@/components/global-search";
 import { Monogram } from "@/components/monogram";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SideNav, chromeIconClass } from "@/components/nav";
+import { SideNav } from "@/components/nav";
+import { chromeIconClass } from "@/components/ui";
 import { ToastProvider } from "@/components/toast";
 
 /** The shell's icon buttons: 32px with a mouse, 44px on touch; idle --fg-3, --fg-1 on hover. */

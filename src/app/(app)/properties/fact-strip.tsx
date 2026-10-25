@@ -9,7 +9,7 @@ export type Fact = {
 };
 
 /** The key figure's size: 28px, and 20 at 320, where a seven-figure value wouldn't fit half the row. */
-const KEY_FIGURE = "text-figure-l max-[359px]:text-figure-m";
+const KEY_FIGURE = "text-figure-l max-[360px]:text-figure-m";
 
 /**
  * Four facts in one row, split by --line rules and 16px in from each rule;

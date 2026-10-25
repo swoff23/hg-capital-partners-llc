@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { Card, CardHeader, CardTitle, EmptyState, TextLink } from "@/components/ui";
+import { EmptyState, Section, TextLink } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { allTasks, listFilterOptions } from "@/lib/tasks/queries";
-import { AllList } from "./all/all-list";
+import { AllList } from "./all-list";
 import { TaskFilters } from "./filters";
 import { TaskListProvider } from "./task-list-context";
 import { TasksHeader } from "./tasks-header";
@@ -53,18 +53,19 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
           <EmptyState>No tasks match.</EmptyState>
         </div>
       ) : (
-        <Card className="mt-4 overflow-hidden">
-          {scopedProperty && (
-            <CardHeader>
-              <CardTitle>
-                <TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>
-              </CardTitle>
-            </CardHeader>
-          )}
+        <div className="mt-4">
           <TaskListProvider tasks={tasks} today={todayYmdEastern()}>
-            <AllList />
+            {scopedProperty ? (
+              <Section
+                title={<TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>}
+              >
+                <AllList />
+              </Section>
+            ) : (
+              <AllList />
+            )}
           </TaskListProvider>
-        </Card>
+        </div>
       )}
       {total > PAGE && (
         <p className="mt-2 text-meta text-fg-3">

@@ -42,7 +42,7 @@ export function TaskFilters({
     else next.set(key, value);
     if (key === "owner") next.delete("assignee"); // supersedes the legacy ?assignee=me shortcut
     const qs = next.toString();
-    const url = qs ? `/tasks/all?${qs}` : "/tasks/all";
+    const url = qs ? `/tasks?${qs}` : "/tasks";
     if (replace) router.replace(url);
     else router.push(url);
   }

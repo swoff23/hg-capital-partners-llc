@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Building2,
   ChartColumn,
@@ -11,7 +11,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { TOUCH_HEIGHT } from "@/components/ui";
+import { TOUCH_HEIGHT, chromeIconClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
@@ -23,12 +23,6 @@ const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/contractors", label: "Contractors", icon: Wrench },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
-
-/**
- * A chrome icon (nav items, the shell's buttons): 16px at a 1.5 stroke with
- * a mouse, 20px at 1.75 on touch (docs/brand-guidelines.md, section 6).
- */
-export const chromeIconClass = "size-4 shrink-0 stroke-[1.5] pointer-coarse:size-5 pointer-coarse:stroke-[1.75]";
 
 /**
  * The app's sections, in the sidebar and the phone drawer. Items are 32px
@@ -85,14 +79,23 @@ export function SideNav({
  * underline tabs over a --line divider (docs/brand-guidelines.md, section 9).
  * Idle --fg-2, selected --fg-1 with the 2px --act underline, one weight for
  * both; the state is `aria-selected` and the styles read it. 44px on touch.
+ * `keep` names query params that hold across the tabs (Financials' ?basis=).
  */
-export function TopTabs({ tabs, base }: { tabs: { href: string; label: string }[]; base: string }) {
+export function TopTabs({ tabs, base, keep = [] }: { tabs: { href: string; label: string }[]; base: string; keep?: string[] }) {
   const pathname = usePathname();
+  const params = useSearchParams();
+  const carried = new URLSearchParams();
+  for (const key of keep) {
+    const value = params.get(key);
+    if (value) carried.set(key, value);
+  }
+  const query = carried.toString();
   return (
     <div role="tablist" className="flex gap-1 border-b border-line">
       {tabs.map((t) => {
-        const href = `${base}${t.href}`;
-        const active = pathname === href || (t.href === "" && pathname === base);
+        const path = `${base}${t.href}`;
+        const href = query ? `${path}?${query}` : path;
+        const active = pathname === path || (t.href === "" && pathname === base);
         return (
           <Link
             key={t.href}

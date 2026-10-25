@@ -13,6 +13,8 @@ export type PropertyTask = {
   id: string;
   title: string;
   status: TaskStatus;
+  /** What a Waiting task waits on ("Zack's quote"), or null. */
+  waitingOn: string | null;
   /** The task's Target (D7: the visit date while Scheduled, otherwise Due). */
   target: string | null;
   /** A past Target by Today's rule (isTargetLate). */
@@ -23,9 +25,10 @@ export type PropertyTask = {
 /**
  * The property's open tasks, soonest first. Every row shows its status as
  * the mark and its word in one fixed column, and the whole row opens the
- * task (docs/brand-guidelines.md, section 9). In a list under 30rem (the
- * rail, a phone) a row keeps two lines: the title, then the status word in
- * its tone and the date.
+ * task (docs/brand-guidelines.md, section 9). Waiting with a reason reads
+ * "Waiting on Zack's quote" there in --fg-3, truncated, as in TaskRow. In a
+ * list under 30rem (the rail, a phone) a row keeps two lines: the title,
+ * then the status word in its tone and the date.
  */
 export function PropertyTasksSection({
   propertyId,
@@ -38,13 +41,12 @@ export function PropertyTasksSection({
 }) {
   return (
     <Section
-      as="h3"
       title={
         // One line at 320, where the two buttons leave the heading about 50px: the count
         // drops there (the fact strip above carries the same number) and the word truncates.
         <span className="block truncate">
           Tasks
-          {tasks.length > 0 && <Count n={tasks.length} className="max-[359px]:hidden" />}
+          {tasks.length > 0 && <Count n={tasks.length} className="max-[360px]:hidden" />}
         </span>
       }
       actions={
@@ -78,9 +80,16 @@ export function PropertyTasksSection({
                 </Link>
 
                 {/* The status column: the mark alone in a narrow list, the mark and its word from 30rem. */}
-                <span className="pointer-events-none flex self-start pt-0.5 @min-[30rem]:self-center @min-[30rem]:pt-0">
+                <span className="pointer-events-none flex min-w-0 self-start pt-0.5 @min-[30rem]:self-center @min-[30rem]:pt-0">
                   <StatusMark status={t.status} className="@min-[30rem]:hidden" />
-                  <StatusBadge status={t.status} className="hidden @min-[30rem]:inline-flex" />
+                  {t.waitingOn ? (
+                    <span className="hidden min-w-0 items-center gap-1.5 text-meta text-fg-3 @min-[30rem]:inline-flex">
+                      <StatusMark status="WAITING" />
+                      <span className="truncate">Waiting on {t.waitingOn}</span>
+                    </span>
+                  ) : (
+                    <StatusBadge status={t.status} className="hidden @min-[30rem]:inline-flex" />
+                  )}
                 </span>
 
                 <div className="pointer-events-none min-w-0">

@@ -2,9 +2,8 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, FileBadge, Hammer, Landmark, RefreshCw, ShieldCheck, Unplug, type LucideIcon } from "lucide-react";
-import { chromeIconClass } from "@/components/nav";
 import { Money } from "@/components/money";
-import { Section } from "@/components/ui";
+import { Section, chromeIconClass } from "@/components/ui";
 import { PHONE_ROWS, moreCount, type NeedsYouItem, type NeedsYouKind } from "@/lib/home/needs-you";
 import { cn } from "@/lib/utils";
 

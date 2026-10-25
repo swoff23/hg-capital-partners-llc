@@ -10,7 +10,7 @@ import { Badge, Section, textLinkClass } from "@/components/ui";
 import { BackLink } from "@/components/back-link";
 import { STATUS_TONE, StatusBadge, StatusMark } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
-import { daysUntil, fmtDay, toYmd, todayYmdEastern, ymdToDate, type Ymd } from "@/lib/dates";
+import { dayLabel, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { portalAccess } from "@/lib/portal/access-state";
 import { STATUS_LABEL, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
@@ -31,21 +31,6 @@ async function signInOrigin(): Promise<string> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   return host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : env.appUrl;
-}
-
-/**
- * A row's date (docs/brand-guidelines.md, section 3): Today, Tomorrow, a
- * weekday within six days, then "Oct 30", with the year only when it isn't
- * this year.
- */
-function dayLabel(day: Ymd, today: Ymd): string {
-  const d = daysUntil(day, today);
-  if (d === 0) return "Today";
-  if (d === 1) return "Tomorrow";
-  if (d != null && d > 1 && d < 7) {
-    return ymdToDate(day)!.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short" });
-  }
-  return fmtDay(day, { year: "auto", now: today });
 }
 
 /**

@@ -37,7 +37,6 @@ export function CapexForecastCard({
 
   return (
     <Section
-      as="h3"
       title="5-year CapEx forecast"
       actions={
         // As tall as an Edit button, so this heading lines up with the rail's beside it.

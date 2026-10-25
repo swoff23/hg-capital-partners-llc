@@ -225,6 +225,7 @@ Two tokens are public-only.
 **Density.**
 - Rows 40px with a mouse, 48px on touch; two-line phone rows 60px.
 - Below 480px a row keeps two lines: its trailing button drops (the whole row opens the item), and the subline keeps status, place and date. Secondary clauses ("Luis marked it done · 4 photos", "2 bd · 1 ba", "/mo" on unit rows) drop rather than wrap.
+- **Task rows** (Connor, Oct 25): the date always sits at the right edge. On a two-line row the date chip is top right on the title's line and the assignee avatar bottom right on the place line; the title truncates before the date and the place before the avatar. On a one-line row (wide All list) the avatar sits just before the date at the right edge. An undated row's "Due date" chip takes the same slot, so every row's date lines up.
 - Photo rows: Portfolio 56px (48x36 photo); contractor job cards 72px.
 - Record fact strip: four facts in one row split by `--line` rules, 16px in from each rule; a 2 by 2 grid on phones so no label wraps.
 - Detail rails: a 112px label column, 96px on phones.

@@ -59,11 +59,12 @@ export function ActivityDay({
   markerClassName?: string;
 }) {
   return (
-    <li className={cn("group relative pt-2 text-xs font-medium text-muted first:pt-0", className)}>
+    <li className={cn("group relative pt-2 text-meta font-medium text-fg-3 first:pt-0", className)}>
+      {/* Centered on the heading's line: 18px with a mouse, 20 on touch. */}
       <span
         aria-hidden="true"
         className={cn(
-          "absolute -left-[22px] top-3 h-2 w-2 rounded-full border border-line-strong bg-surface group-first:top-1",
+          "absolute -left-[22px] top-3.25 h-2 w-2 rounded-full border border-line-strong bg-surface group-first:top-1.25 pointer-coarse:top-3.5 pointer-coarse:group-first:top-1.5",
           markerClassName,
         )}
       />

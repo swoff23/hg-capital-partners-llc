@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Code } from "@/components/code";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
-import { Button, SectionCard, Table, Td, Th, buttonClass, fieldClass } from "@/components/ui";
+import { Button, SectionCard, Table, Td, Th, buttonClass, fieldClass, selectTouchHeight } from "@/components/ui";
 import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
 import {
   UTILITY_GROUPS,
@@ -453,7 +453,7 @@ function EditUnit({
                   <span className="w-16 shrink-0 text-meta text-fg-3">{label}</span>
                   {UTILITY_STATUS_FIELDS.has(k) ? (
                     <select
-                      className={inp}
+                      className={cn(inp, selectTouchHeight)}
                       value={u.utilities?.[k] ?? ""}
                       onChange={(e) => mutate((x) => (x[i].utilities = { ...x[i].utilities, [k]: e.target.value }))}
                     >
@@ -497,7 +497,7 @@ function EditUnit({
                 return (
                   <div key={j} className={EQUIPMENT_COLS}>
                     <select
-                      className={inp}
+                      className={cn(inp, selectTouchHeight)}
                       aria-label="Type"
                       value={e.type}
                       onChange={(ev) => mutate((x) => (x[i].equipment![j].type = ev.target.value))}

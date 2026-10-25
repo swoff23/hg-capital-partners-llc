@@ -1,8 +1,9 @@
 import { MailWarning } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, chromeIconClass } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
 import { needsYou } from "@/lib/home/queries";
+import { cn } from "@/lib/utils";
 import { greetingLine, summaryLine } from "@/lib/home/summary";
 import { groupMine } from "@/lib/tasks/list";
 import { emailCapReached, todayTasks } from "@/lib/tasks/queries";
@@ -36,8 +37,7 @@ export default async function HomePage() {
 
       {capped && (
         <p role="status" className="mb-4 flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-body text-fg-1">
-          {/* chromeIconClass spelled out: nav.tsx is a client module, so this server page would get a reference, not the string. */}
-          <MailWarning className="size-4 shrink-0 stroke-[1.5] text-fg-3 pointer-coarse:size-5 pointer-coarse:stroke-[1.75]" aria-hidden="true" />
+          <MailWarning className={cn(chromeIconClass, "text-fg-3")} aria-hidden="true" />
           {/* One line at every width: phones get the first sentence only. */}
           <span>
             Email limit reached today.<span className="max-sm:hidden"> Some updates are waiting to send.</span>

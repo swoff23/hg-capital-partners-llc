@@ -427,7 +427,7 @@ export function MediaUploadTray({
           <UploadTile key={u.key} upload={u} grid={grid} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
         ))}
       </ul>
-      {showNotice && notice && <p className="truncate text-xs text-danger">{notice}</p>}
+      {showNotice && notice && <p className="truncate text-meta text-danger">{notice}</p>}
     </div>
   );
 }

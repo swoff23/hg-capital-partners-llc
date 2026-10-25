@@ -40,7 +40,6 @@ export function systemPrincipal(label: string): core.Principal {
 
 function revalidateTask(t: { id: string; propertyId?: string | null; dealId?: string | null } | null, extraPropertyIds: (string | null | undefined)[] = []): void {
   revalidatePath("/tasks");
-  revalidatePath("/tasks/all");
   revalidatePath("/");
   if (!t) return;
   revalidatePath(`/tasks/${t.id}`);

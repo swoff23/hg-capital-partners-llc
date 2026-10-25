@@ -101,6 +101,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       id: t.id,
       title: t.title,
       status: t.status,
+      waitingOn: t.status === "WAITING" ? t.waitingOn?.trim() || null : null,
       createdAt: t.createdAt,
       target: ymd(targetDate(t)),
       late: isTargetLate({ status: t.status, scheduledFor: ymd(t.scheduledFor), due: ymd(t.dueDate) }, today),
@@ -119,7 +120,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
   return (
     <div className="max-w-300">
-      <BackLink fallback="/properties" label="Portfolio" className="text-meta font-medium text-fg-2 pointer-coarse:min-h-11" />
+      <BackLink fallback="/properties" label="Portfolio" />
 
       {/* Identity: the building's photo (the fallback tile until it's taken), status, address, entity and units. */}
       <header className="mt-3 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">

@@ -14,7 +14,6 @@ export function PropertyDocumentsSection({
 }) {
   return (
     <Section
-      as="h3"
       title={
         <>
           Documents

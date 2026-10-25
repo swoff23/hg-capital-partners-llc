@@ -9,6 +9,7 @@ export default async function FinancialsLayout({ children }: LayoutProps<"/finan
       <PageHeader title="Financials" subtitle="Read-only from QuickBooks. QuickBooks stays the system of record." />
       <TopTabs
         base="/financials"
+        keep={["basis"]}
         tabs={[
           { href: "", label: "Overview" },
           { href: "/rent-roll", label: "Rent roll" },

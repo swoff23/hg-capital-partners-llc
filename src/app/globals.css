@@ -391,6 +391,15 @@ body {
   font-family: var(--font-sans);
 }
 
+/* The public site under iOS overscroll: body is --surface on :root, so in the
+   light theme it would flash white above and below the dark public pages.
+   #0a0e17 is the dark --canvas, the public ground; body can't read it, since
+   the public tokens sit on the wrapper inside it. A rule of its own, so a
+   browser without :has() drops only this. */
+body:has([data-surface="public"]) {
+  background: #0a0e17;
+}
+
 ::selection {
   background-color: var(--select);
   color: var(--fg-1);

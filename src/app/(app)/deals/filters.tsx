@@ -3,10 +3,9 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Search, SlidersHorizontal } from "lucide-react";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
-import { chromeIconClass } from "@/components/nav";
 import { SegmentedControl } from "@/components/segmented-control";
 import { Sheet } from "@/components/sheet";
-import { Badge, Button, Input } from "@/components/ui";
+import { Badge, Button, Input, chromeIconClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { StatusChecklist, StatusMultiSelect, filterRowClass, useApplyStatuses } from "./status-multiselect";
 

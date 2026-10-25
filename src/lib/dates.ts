@@ -144,6 +144,23 @@ export function fmtDay(
   });
 }
 
+/**
+ * A calendar date the way the brand writes one in a row (docs/brand-guidelines.md,
+ * section 3): Today, Tomorrow, a weekday within six days, then "Oct 30", with
+ * the year only when it isn't this year. A past date is the real date. Pass
+ * Buffalo's today (todayYmdEastern) so every row agrees.
+ */
+export function dayLabel(day: Ymd, today: Ymd): string {
+  const d = daysUntil(day, today);
+  if (d === 0) return "Today";
+  if (d === 1) return "Tomorrow";
+  if (d != null && d > 1 && d <= 6) {
+    const p = parts(day)!;
+    return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short" });
+  }
+  return fmtDay(day, { year: "auto", now: today });
+}
+
 /** "today" / "tomorrow" / "yesterday" / "3d ago" / "in 3d". "" for blank/invalid. */
 export function relativeDays(v: Date | string | null | undefined, now: Now = new Date()): string {
   const days = daysUntil(v, now);

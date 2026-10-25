@@ -4,7 +4,6 @@ import {
   PHONE_ROWS,
   STALE_SYNC_MS,
   capexItem,
-  dayLabel,
   keyDateItems,
   moreCount,
   needsYouList,
@@ -24,21 +23,6 @@ const property = (over: Partial<KeyDateProperty> = {}): KeyDateProperty => ({
 });
 
 const utc = (ymd: string) => new Date(`${ymd}T00:00:00Z`);
-
-test("dayLabel: Today, Tomorrow, a weekday within six days, then the date", () => {
-  assert.equal(dayLabel("2026-10-25", TODAY), "Today");
-  assert.equal(dayLabel("2026-10-26", TODAY), "Tomorrow");
-  assert.equal(dayLabel("2026-10-27", TODAY), "Tue");
-  assert.equal(dayLabel("2026-10-31", TODAY), "Sat");
-  assert.equal(dayLabel("2026-11-01", TODAY), "Nov 1");
-  assert.equal(dayLabel("2027-01-05", TODAY), "Jan 5, 2027");
-});
-
-test("dayLabel: a past date is the real date, never a weekday", () => {
-  assert.equal(dayLabel("2026-10-24", TODAY), "Oct 24");
-  assert.equal(dayLabel("2026-10-19", TODAY), "Oct 19");
-  assert.equal(dayLabel("2025-12-30", TODAY), "Dec 30, 2025");
-});
 
 test("key dates: a loan shows within 90 days, insurance and registration within 60", () => {
   const items = keyDateItems(

@@ -1,5 +1,4 @@
-/** Editable lists that drive dropdowns + badge colors. Safe to adjust anytime. */
-import type { BadgeTone } from "@/components/ui";
+/** Editable lists that drive dropdowns. Safe to adjust anytime. */
 
 // HG's working pipeline (from the "Priority" column of the master spreadsheet).
 export const DEAL_STATUSES = [
@@ -88,14 +87,3 @@ export const EQUIPMENT_TYPES = [
   "Sump Pump",
   "Other",
 ] as const;
-
-/**
- * The badge tone for a deal stage, picked from the one tone map in
- * components/ui.tsx (Badge, badgeToneClass). A pipeline rank is a label, not
- * a state, so every stage is neutral except a closed deal, which is done
- * (ok). Property statuses are plain neutral badges for the same reason. The
- * status ring replaces both badges (docs/brand-guidelines.md, section 9).
- */
-export function dealStatusTone(s: string | null): BadgeTone {
-  return s === "CLOSED!" ? "ok" : "neutral";
-}

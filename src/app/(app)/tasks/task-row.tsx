@@ -14,12 +14,17 @@ import { useTaskList } from "./task-list-context";
  * One task in a list (Today, All). The whole row opens the task; the
  * checkbox, the date chip and any actions sit above that link. Rows sit flat
  * over hairlines, flush with their section's heading; the hover fill reaches
- * 8px past each side. In a Card, `inset` keeps them 16px in from its edges.
+ * 8px past each side.
  *
- * Two lines (title, then property and date) on phones and tablets, in any
- * list narrower than 50rem, and on rows with actions. One line on a wide
- * desktop list: the title, then fixed columns for the property, the person
- * and the date, so they line up row to row. 50rem keeps the fixed columns
+ * The date always sits at the right edge (docs/brand-guidelines.md, section
+ * 5, Task rows). Two lines on phones and tablets, in any list narrower than
+ * 50rem, and on rows with actions: the title with the date chip top right,
+ * then the place with the avatar bottom right; the title truncates before
+ * the date and the place before the avatar. A row with actions (Needs
+ * review) has them at its right edge, so its date ends the place line,
+ * leaving the title its line beside them. One line on a wide desktop
+ * list: the title, then fixed columns for the property, the person and the
+ * date, so they line up row to row. 50rem keeps the fixed columns
  * (about 500px of them) from squeezing the title: Today's two columns top
  * out under it, so they always keep two lines, and only a full-width list
  * like All goes to one.
@@ -42,7 +47,6 @@ export function TaskRow({
   name = false,
   reason = false,
   status = true,
-  inset = false,
   actions,
 }: {
   task: ListTask;
@@ -55,11 +59,6 @@ export function TaskRow({
   reason?: boolean;
   /** False where the section already says it (Needs review). */
   status?: boolean;
-  /**
-   * In a Card (All): 16px in from its edges, with the hover filling the row and the
-   * focus ring drawn inside, so the card's clip cuts neither.
-   */
-  inset?: boolean;
   /** Buttons at the row's end, e.g. Approve and Send back. */
   actions?: ReactNode;
 }) {
@@ -96,18 +95,31 @@ export function TaskRow({
   const wide = reasonOnly ?? (waitingOn && status ? waiting(`Waiting on ${waitingOn}`) : badge);
   const narrow = reasonOnly ?? badge;
 
+  // The place line: the status lead below a 480px list, the place, the avatar.
+  // With none of them the row is the title and its date alone.
+  const placeLine = Boolean(narrow || place || who || actions);
+
+  // Top right on the title's line. A row with actions keeps its title line for the title, since
+  // Approve and Send back hold the right edge there, so its date ends the place line instead.
+  const dateChip = (
+    <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[50rem]:order-last lg:@min-[50rem]:w-28 lg:@min-[50rem]:justify-end")}>
+      <DueDatePicker
+        value={date}
+        today={today}
+        overdue={late}
+        label={visit ? "Visit date" : "Due date"}
+        isDisabled={!isActiveStatus(task.status)}
+        onChange={(to) => reschedule(task, to, job ? "target" : "due")}
+      />
+    </span>
+  );
+
   return (
     // 40px one-line rows with a mouse (docs/brand-guidelines.md, section 5, Density). Two-line
-    // rows are 62px, 64 on touch, against the section's 60: under a 22px title the 28px date
-    // chip leaves 10px for the padding and the gap between the lines.
-    <li className={cn("group/row relative flex items-start gap-3 py-1.5", inset && "px-4", oneLine && "lg:@min-[50rem]:items-center")}>
-      <Link
-        href={`/tasks/${task.id}`}
-        className={cn(
-          "absolute inset-y-0 transition-colors group-hover/row:bg-fill-1",
-          inset ? "inset-x-0 -outline-offset-2" : "-inset-x-2 rounded-md",
-        )}
-      >
+    // rows are 62px, against the section's 60: the 28px date chip sets the title's line, and
+    // the place line under it is 20.
+    <li className={cn("group/row relative flex items-start gap-3 py-1.5", oneLine && "lg:@min-[50rem]:items-center")}>
+      <Link href={`/tasks/${task.id}`} className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1">
         <span className="sr-only">{task.title}</span>
       </Link>
 
@@ -116,7 +128,8 @@ export function TaskRow({
           checked={task.checked}
           onChange={(done) => setDone(task, done)}
           label={task.title}
-          className="relative"
+          // Centered on the title's 28px line; a one-line row centers everything.
+          className={cn("relative -mt-2", oneLine && "lg:@min-[50rem]:-mt-3")}
         />
       )}
 
@@ -126,7 +139,8 @@ export function TaskRow({
           oneLine && "lg:@min-[50rem]:flex lg:@min-[50rem]:items-center lg:@min-[50rem]:gap-3",
         )}
       >
-        <div className={cn("flex min-w-0 items-center gap-3", oneLine && "lg:@min-[50rem]:flex-1")}>
+        {/* The title's line. On a one-line row its pieces join the row, and the date goes last. */}
+        <div className={cn("flex min-w-0 items-center gap-3", oneLine && "lg:@min-[50rem]:contents")}>
           <p className={cn("min-w-0 flex-1 truncate text-body", struck ? "text-fg-3 line-through" : "text-fg-1")}>{task.title}</p>
           {/* The status column: the same width on every row of the list, empty for a staff
               To do. 144px, so "Waiting on" keeps a word of its reason, and 176 on a wide
@@ -134,13 +148,9 @@ export function TaskRow({
           {statusColumn && (
             <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[50rem]:w-44")}>{wide}</span>
           )}
+          {!actions && dateChip}
         </div>
-        <div
-          className={cn(
-            "mt-0.5 flex min-w-0 items-center gap-2",
-            oneLine && "lg:@min-[50rem]:mt-0 lg:@min-[50rem]:shrink-0",
-          )}
-        >
+        <div className={cn("mt-0.5 flex min-w-0 items-center gap-2", !placeLine && "hidden", oneLine && "lg:@min-[50rem]:contents")}>
           {narrow && (
             <span className={cn("flex items-center gap-2 @min-[30rem]:hidden", reasonOnly ? "min-w-0 shrink" : "shrink-0")}>
               {narrow}
@@ -153,8 +163,9 @@ export function TaskRow({
           )}
           <span
             className={cn(
-              "min-w-0 truncate text-meta text-fg-3",
-              oneLine && "lg:@min-[50rem]:block lg:@min-[50rem]:w-36",
+              // Grows so the avatar sits at the right edge; shrinks alongside a Waiting reason.
+              "min-w-0 grow truncate text-meta text-fg-3",
+              oneLine && "lg:@min-[50rem]:block lg:@min-[50rem]:w-36 lg:@min-[50rem]:flex-none",
               // Beside Approve and Send back on a 320px phone it would be a sliver of an ellipsis.
               actions && "@max-[20rem]:hidden",
               !place && "hidden",
@@ -169,7 +180,7 @@ export function TaskRow({
             <span
               title={who ?? undefined}
               className={cn(
-                "items-center gap-1.5 pointer-fine:pointer-events-auto",
+                "ml-auto items-center gap-1.5 pointer-fine:pointer-events-auto",
                 first ? "hidden min-w-5 shrink @min-[20rem]:flex" : "flex w-5 shrink-0",
               )}
             >
@@ -187,16 +198,7 @@ export function TaskRow({
               )}
             </span>
           )}
-          <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[50rem]:w-28 lg:@min-[50rem]:justify-end")}>
-            <DueDatePicker
-              value={date}
-              today={today}
-              overdue={late}
-              label={visit ? "Visit date" : "Due date"}
-              isDisabled={!isActiveStatus(task.status)}
-              onChange={(to) => reschedule(task, to, job ? "target" : "due")}
-            />
-          </span>
+          {actions && dateChip}
         </div>
       </div>
 

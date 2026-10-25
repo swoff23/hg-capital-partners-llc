@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
-import { Button, SectionCard, buttonClass, fieldClass, textLinkClass } from "@/components/ui";
+import { Button, SectionCard, buttonClass, fieldClass, selectTouchHeight, textLinkClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { updatePropertyListings } from "../actions";
 import { callAction } from "@/lib/action-result";
@@ -305,7 +305,7 @@ function EditListing({
       {/* One row at every width: the unit takes what the status and the menu leave. */}
       <div className="flex items-center gap-2">
         <select
-          className={cn(inp, "min-w-0 flex-1 sm:max-w-48")}
+          className={cn(inp, selectTouchHeight, "min-w-0 flex-1 sm:max-w-48")}
           aria-label="Unit"
           value={l.unitLabel}
           onChange={(e) => mutate((x) => (x[i].unitLabel = e.target.value))}
@@ -320,7 +320,7 @@ function EditListing({
           ))}
         </select>
         <select
-          className={cn(inp, "w-32 shrink-0")}
+          className={cn(inp, selectTouchHeight, "w-32 shrink-0")}
           aria-label="Status"
           value={l.status}
           onChange={(e) => mutate((x) => (x[i].status = e.target.value as EditableListing["status"]))}

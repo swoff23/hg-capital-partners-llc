@@ -24,7 +24,9 @@ function cameFromApp(): boolean {
 /**
  * Back navigation: returns to the exact previous page (filters + scroll intact) when we
  * arrived from within the app, otherwise falls back to the section root.
- * `className` adjusts size, e.g. a 44px target in a phone header. Inside a
+ * A standalone link known by its place above the title: text-meta 500 in
+ * --fg-2, underlined on hover, 44px tall on touch (docs/brand-guidelines.md,
+ * section 9). `className` adjusts it, e.g. the portal header's. Inside a
  * LeaveGuard it asks first while something holds the page (photos still
  * uploading on the contractor's job).
  */
@@ -41,7 +43,10 @@ export function BackLink({ fallback, label, className }: { fallback: string; lab
     <button
       type="button"
       onClick={() => guard(goBack)}
-      className={cn("inline-flex items-center gap-1 text-xs text-fg-3 hover:text-fg-1 hover:underline print:hidden", className)}
+      className={cn(
+        "inline-flex items-center gap-1 text-meta font-medium text-fg-2 hover:text-fg-1 hover:underline pointer-coarse:min-h-11 print:hidden",
+        className,
+      )}
     >
       <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {label}

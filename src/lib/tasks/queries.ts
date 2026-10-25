@@ -7,7 +7,7 @@ import { easternDayStart, type Ymd } from "@/lib/dates";
 import { EMAIL_DAILY_CAP, toListTask, type ListTask } from "./list";
 
 /**
- * Staff read queries for the task lists: Today, All, Home's card. Staff only;
+ * Staff read queries for the task lists: Today (on Home) and All. Staff only;
  * the portal has its own queries in src/lib/portal (auth-guard.test.ts keeps
  * portal code out of here). Every list leaves out Template rows.
  */
@@ -40,17 +40,6 @@ export async function todayTasks(userId: string): Promise<ListTask[]> {
       ...excludeTemplateTasks,
       OR: [{ assigneeUserId: userId }, { assigneeContactId: { not: null } }, { assigneeUserId: null, assigneeContactId: null }],
     },
-    select: LIST_SELECT,
-  });
-  return rows.map(toListTask);
-}
-
-/** Home's "My open tasks": the signed-in partner's active tasks, soonest first. */
-export async function myOpenTasks(userId: string, take: number): Promise<ListTask[]> {
-  const rows = await prisma.task.findMany({
-    where: { assigneeUserId: userId, ...activeTask, ...excludeTemplateTasks },
-    orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
-    take,
     select: LIST_SELECT,
   });
   return rows.map(toListTask);

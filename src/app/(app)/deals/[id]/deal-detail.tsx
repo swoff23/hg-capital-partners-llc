@@ -2,8 +2,7 @@
 import { useState, useTransition } from "react";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { InlineAddressField } from "@/components/inline-address-field";
-import { chromeIconClass } from "@/components/nav";
-import { Select, buttonClass } from "@/components/ui";
+import { Select, buttonClass, chromeIconClass } from "@/components/ui";
 import { DEAL_PASS_REASONS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { patchDeal } from "../actions";

@@ -56,20 +56,14 @@ export function AddressActions({ address }: { address: string }) {
 
 /**
  * D21: the lockbox code, large, through Code: a tap on the code or on Copy
- * copies it. A failed copy from Copy says the code, as the old card did. The
- * heading carries the code for screen readers, since Code names its button
- * for the action. A long code scrolls in its own box rather than the page.
+ * copies it. A failed copy from Copy says the code, as the old card did.
+ * Code's button names the code for screen readers. A long code scrolls in
+ * its own box rather than the page.
  */
 export function LockboxSection({ code }: { code: string }) {
   const copy = useCopy();
   return (
-    <Section
-      title={
-        <>
-          Lockbox<span className="sr-only"> {code}</span>
-        </>
-      }
-    >
+    <Section title="Lockbox">
       {/* Copy sits at the row's end on a phone, beside the code on a wider screen.
           overflow-x-auto alone would make the box scroll up and down too, by the
           part of Code's touch hit area past py-1; 36 + 8 keeps that area at 44. */}

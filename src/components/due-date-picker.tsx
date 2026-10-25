@@ -17,7 +17,7 @@ import { Popover } from "@/components/popover";
 import { Sheet } from "@/components/sheet";
 import { Kbd, pickerChip } from "@/components/ui";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
-import { dueLabel, fmtDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { dueLabel, fmtDay, isPastDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { quickPickForKey, quickPicks, type QuickPickKey } from "@/lib/quick-dates";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +68,12 @@ export function DueDatePicker({
   const [open, setOpen] = useState(false);
   const day = toYmd(today ?? todayYmdEastern())!;
   const current = toYmd(value);
-  const text = current ? capitalize(dueLabel(current, day)) : placeholder;
+  // A finished task (the chip is disabled) is never "5d late": a past date reads as the date.
+  const text = current
+    ? isDisabled && isPastDay(current, day)
+      ? fmtDay(current, { year: "auto", now: day })
+      : capitalize(dueLabel(current, day))
+    : placeholder;
 
   function pick(next: Ymd | null) {
     setOpen(false);
@@ -84,7 +89,7 @@ export function DueDatePicker({
         aria-label={`${label}: ${current ? fmtDay(current) : "none"}`}
         className={cn(
           pickerChip,
-          !current && "text-muted",
+          !current && "text-fg-3",
           current && overdue && "text-danger",
           className,
         )}
