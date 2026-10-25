@@ -1,16 +1,12 @@
 import { requireUser } from "@/lib/auth";
 import { TopTabs } from "@/components/nav";
+import { PageHeader } from "@/components/ui";
 
 export default async function FinancialsLayout({ children }: LayoutProps<"/financials">) {
   await requireUser();
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Financials</h1>
-        <p className="mt-0.5 text-sm text-muted">
-          Read-only from QuickBooks. QuickBooks stays the system of record.
-        </p>
-      </div>
+    <div>
+      <PageHeader title="Financials" subtitle="Read-only from QuickBooks. QuickBooks stays the system of record." />
       <TopTabs
         base="/financials"
         tabs={[
@@ -19,7 +15,7 @@ export default async function FinancialsLayout({ children }: LayoutProps<"/finan
           { href: "/settings", label: "Settings" },
         ]}
       />
-      {children}
+      <div className="pt-6">{children}</div>
     </div>
   );
 }
