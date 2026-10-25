@@ -38,6 +38,7 @@ Invites are on hold until you say go.
 - [ ] Playbook timing: for NEW TENANT, NEW MOVE OUT and NEW REFI, when each step is due relative to the start date ("collect the deposit 3 days before move-in"). Until then you set dates on the review screen when you apply a playbook.
 - [ ] Look at the new screens on a computer: Today, All, the task page, playbooks and a contractor's page.
 - [ ] The UI/UX review session will send you brand guidelines (fonts, colors, status colors) to approve before anything changes.
+- [ ] Contractor invoices: confirm or correct the 11 defaults in [docs/contractor-invoices-plan.md](contractor-invoices-plan.md), then say "build it" after the cutover. Its section 9 lists the API key and DNS steps that come before the inbox.
 
 ## Small calls (no rush)
 
