@@ -25,9 +25,9 @@ export function MigrateButton({ disabled }: { disabled: boolean }) {
       >
         {pending ? "Moving…" : "Move documents to private storage"}
       </Button>
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-meta text-danger">{error}</p>}
       {report && (
-        <p className="text-xs text-muted">
+        <p className="text-meta text-fg-3">
           Scanned {report.scanned} · already private {report.alreadyPrivate} · moved {report.moved}
           {report.failed.length > 0 && (
             <>
