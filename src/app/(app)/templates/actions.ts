@@ -28,6 +28,6 @@ export async function applyPlaybook(templateId: string, input: z.input<typeof ap
     const user = await requireUser();
     const data = applySchema.parse(input);
     await applyPlaybookService(id.parse(templateId), data, staffPrincipal(user));
-    redirect(`/tasks/all?property=${encodeURIComponent(data.propertyId)}`);
+    redirect(`/tasks?property=${encodeURIComponent(data.propertyId)}`);
   });
 }

@@ -1,43 +1,76 @@
 import { redirect } from "next/navigation";
-import { MailWarning } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { Card, CardHeader, CardTitle, EmptyState, TextLink } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
-import { emailCapReached, todayTasks } from "@/lib/tasks/queries";
+import { shortAddress } from "@/lib/normalize";
+import { allTasks, listFilterOptions } from "@/lib/tasks/queries";
+import { AllList } from "./all/all-list";
+import { TaskFilters } from "./filters";
 import { TaskListProvider } from "./task-list-context";
 import { TasksHeader } from "./tasks-header";
-import { TodayView } from "./today-view";
 
-/** Filters that belong to the All tab. Old links to /tasks?status=done land there. */
-const ALL_PARAMS = ["status", "owner", "assignee", "q", "property"];
+const PAGE = 400;
 
-export default async function TodayPage({ searchParams }: PageProps<"/tasks">) {
+const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
+
+/**
+ * Tasks: every task, filtered, Done included. Today lives on Home now
+ * (docs/home-as-today.md), so this opens on the open tasks, and the filters
+ * old links carry (?status=done, ?property=…, ?assignee=me) are served here.
+ */
+export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const user = await requireUser();
   const sp = await searchParams;
-  if (ALL_PARAMS.some((k) => typeof sp[k] === "string")) {
-    const qs = new URLSearchParams();
-    for (const k of ALL_PARAMS) if (typeof sp[k] === "string") qs.set(k, sp[k]);
-    redirect(`/tasks/all?${qs.toString()}`);
-  }
 
-  // Buffalo's today, decided once on the server so every section and label agrees.
-  const today = todayYmdEastern();
-  const [tasks, capped] = await Promise.all([todayTasks(user.id), emailCapReached(today)]);
+  // Today's Contractors column moved to Home with the rest of Today.
+  if (sp.view === "contractors") redirect("/?view=contractors");
+
+  // ?assignee=me is the old shortcut for "assigned to me".
+  const owner = str(sp.owner) || (sp.assignee === "me" ? `u:${user.id}` : "");
+  const current = { status: str(sp.status) || "open", owner, q: str(sp.q), property: str(sp.property) };
+
+  const [{ tasks, total }, options] = await Promise.all([allTasks(current, PAGE), listFilterOptions()]);
+
+  const owners = {
+    users: options.users
+      .slice()
+      .sort((a, b) => (a.id === user.id ? -1 : b.id === user.id ? 1 : (a.name ?? a.email).localeCompare(b.name ?? b.email)))
+      .map((u) => ({ value: `u:${u.id}`, label: (u.name ?? u.email) + (u.id === user.id ? " (me)" : "") })),
+    contacts: options.contacts.map((c) => ({ value: `c:${c.id}`, label: c.fullName })),
+    external: options.legacyNames.map((n) => ({ value: `n:${n}`, label: n })),
+  };
+
+  // Scoped to one property: name it above the list.
+  const scopedProperty = current.property ? (options.properties.find((p) => p.id === current.property) ?? null) : null;
 
   return (
     <>
       <TasksHeader />
-      {capped && (
-        <p role="status" className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-          <MailWarning className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-          {/* One line at every width: phones get the first sentence only. */}
-          <span>
-            Email limit reached today.<span className="max-sm:hidden"> Some updates are waiting to send.</span>
-          </span>
+      <TaskFilters current={current} owners={owners} properties={options.properties} />
+
+      {tasks.length === 0 ? (
+        <div className="mt-4">
+          <EmptyState>No tasks match.</EmptyState>
+        </div>
+      ) : (
+        <Card className="mt-4 overflow-hidden">
+          {scopedProperty && (
+            <CardHeader>
+              <CardTitle>
+                <TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>
+              </CardTitle>
+            </CardHeader>
+          )}
+          <TaskListProvider tasks={tasks} today={todayYmdEastern()}>
+            <AllList />
+          </TaskListProvider>
+        </Card>
+      )}
+      {total > PAGE && (
+        <p className="mt-2 text-meta text-fg-3">
+          Showing first {PAGE} of {total}. Narrow the filters to see the rest.
         </p>
       )}
-      <TaskListProvider tasks={tasks} today={today}>
-        <TodayView userId={user.id} />
-      </TaskListProvider>
     </>
   );
 }

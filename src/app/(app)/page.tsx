@@ -1,94 +1,51 @@
-import Link from "next/link";
+import { MailWarning } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { Card, CardBody, CardHeader, CardTitle, PageHeader, EmptyState, TextLink } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
-import { parseUnits, parseBuildingCapex } from "@/lib/property-types";
-import { getCapexRules } from "@/lib/capex-rules";
-import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
-import { myOpenTasks } from "@/lib/tasks/queries";
-import { PortfolioCapexForecastCard } from "./portfolio-capex";
-import { MyTasksList } from "./tasks/my-tasks-list";
+import { needsYou } from "@/lib/home/queries";
+import { greetingLine, summaryLine } from "@/lib/home/summary";
+import { groupMine } from "@/lib/tasks/list";
+import { emailCapReached, todayTasks } from "@/lib/tasks/queries";
+import { NeedsYou } from "./needs-you";
 import { TaskListProvider } from "./tasks/task-list-context";
+import { TodayView } from "./tasks/today-view";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Home is Today (docs/home-as-today.md): the greeting and one line that
+ * answers the page, the Needs you list, then Today's Mine | Contractors
+ * columns. Capped at 1200 so the two columns don't stretch to 1600. Home's
+ * own query params never use `view`, which TodayView keeps for its column
+ * pick below lg.
+ */
 export default async function HomePage() {
   const user = await requireUser();
-
-  const [myTasks, counts, capexProps, capexRules] = await Promise.all([
-    myOpenTasks(user.id, 12),
-    Promise.all([
-      prisma.deal.count({ where: { status: { in: ACTIVE_DEAL_STATUSES } } }),
-      prisma.property.count(),
-      prisma.task.count({ where: { ...activeTask, ...excludeTemplateTasks } }),
-    ]),
-    prisma.property.findMany({
-      select: { id: true, address: true, units: true, buildingCapex: true },
-    }),
-    getCapexRules(),
-  ]);
-
-  const [activeDeals, properties, openTasks] = counts;
-  const capexProperties = capexProps.map((p) => ({
-    id: p.id,
-    address: p.address,
-    units: parseUnits(p.units),
-    building: parseBuildingCapex(p.buildingCapex),
-  }));
+  const now = new Date();
+  // Buffalo's today, decided once on the server so every section and label agrees.
+  const today = todayYmdEastern(now);
+  const [tasks, capped, items] = await Promise.all([todayTasks(user.id), emailCapReached(today), needsYou(today, now)]);
+  // The Overdue section of the partner's own Mine column.
+  const late = groupMine(tasks, user.id, today).overdue.length;
 
   return (
-    <>
-      <PageHeader title={`Good ${greeting()}, ${user.name?.split(" ")[0] ?? "there"}`} subtitle="What needs attention" />
+    <div className="max-w-300">
+      <PageHeader title={greetingLine(user.name, now)} subtitle={summaryLine(items.length, late) ?? undefined} />
 
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <Stat label="Active deals" value={activeDeals} href="/deals" />
-        <Stat label="Properties" value={properties} href="/properties" />
-        <Stat label="Open tasks" value={openTasks} href="/tasks/all" />
-      </div>
+      {items.length > 0 && <NeedsYou items={items} className="mb-8 pointer-coarse:mb-6" />}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PortfolioCapexForecastCard properties={capexProperties} rules={capexRules} />
-
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex items-center justify-between">
-            <CardTitle>My open tasks</CardTitle>
-            <TextLink href="/tasks" className="text-xs">
-              Today
-            </TextLink>
-          </CardHeader>
-          <CardBody className="p-0">
-            {myTasks.length === 0 ? (
-              <div className="p-4">
-                <EmptyState>Nothing assigned to you. Nice.</EmptyState>
-              </div>
-            ) : (
-              <TaskListProvider tasks={myTasks} today={todayYmdEastern()}>
-                <MyTasksList />
-              </TaskListProvider>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    </>
+      {capped && (
+        <p role="status" className="mb-4 flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-body text-fg-1">
+          <MailWarning className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+          {/* One line at every width: phones get the first sentence only. */}
+          <span>
+            Email limit reached today.<span className="max-sm:hidden"> Some updates are waiting to send.</span>
+          </span>
+        </p>
+      )}
+      <TaskListProvider tasks={tasks} today={today}>
+        <TodayView userId={user.id} />
+      </TaskListProvider>
+    </div>
   );
-}
-
-function Stat({ label, value, href }: { label: string; value: number; href: string }) {
-  return (
-    <Link href={href}>
-      <Card className="transition-colors hover:border-primary/40">
-        <CardBody className="p-3">
-          <div className="text-2xl font-semibold tabular-nums">{value}</div>
-          <div className="text-xs text-muted">{label}</div>
-        </CardBody>
-      </Card>
-    </Link>
-  );
-}
-
-function greeting() {
-  const h = new Date().getHours();
-  return h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
 }

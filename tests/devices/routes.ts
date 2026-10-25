@@ -59,6 +59,12 @@ export const ROUTE_SESSION_OVERRIDE: Record<string, RouteSession> = {
   "/p/welcome/password": "portal-welcome",
 };
 
+/**
+ * Pages that only redirect, so there's nothing of their own to check. Their
+ * target is checked in its own right: /tasks/all sends its filters on to /tasks.
+ */
+const REDIRECT_ONLY = new Set(["/tasks/all"]);
+
 function findPages(dir: string, segments: string[] = []): string[][] {
   const found: string[][] = [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -86,6 +92,7 @@ export function listRoutes(): Route[] {
       const session = ROUTE_SESSION_OVERRIDE[pattern] ?? SESSION_BY_GROUP[segments[0]] ?? "none";
       return { pattern, params, session };
     })
+    .filter((r) => !REDIRECT_ONLY.has(r.pattern))
     .sort((a, b) => a.pattern.localeCompare(b.pattern));
 }
 

@@ -19,7 +19,6 @@ const TX = { timeout: 20_000, maxWait: 10_000 };
 
 function revalidate(rows: { id: string; propertyId: string | null; dealId: string | null }[]): void {
   revalidatePath("/tasks");
-  revalidatePath("/tasks/all");
   revalidatePath("/");
   for (const r of rows) revalidatePath(`/tasks/${r.id}`);
   for (const p of new Set(rows.map((r) => r.propertyId))) if (p) revalidatePath(`/properties/${p}`);
