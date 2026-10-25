@@ -11,6 +11,7 @@ import {
   PartialLabel,
   SandboxNotice,
   SourceLine,
+  WarnMark,
 } from "../_components/ui";
 
 export const dynamic = "force-dynamic";
@@ -93,10 +94,13 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
                         </>
                       )}
                       {r.subsidyCents > 0 && r.ownerFundedCents > 0 && " · "}
+                      {/* glyph plus word, as on Settings: warn alone is too close to danger */}
                       {r.ownerFundedCents > 0 && (
-                        <span className="text-warn">
-                          Owner-funded <MoneyCents cents={r.ownerFundedCents} /> (excl.)
-                        </span>
+                        <WarnMark>
+                          <span>
+                            Owner-funded <MoneyCents cents={r.ownerFundedCents} /> (excl.)
+                          </span>
+                        </WarnMark>
                       )}
                     </div>
                   )}

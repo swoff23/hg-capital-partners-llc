@@ -92,12 +92,25 @@ export function Strip({ className, children }: { className?: string; children: R
   );
 }
 
-/** A KPI in a Strip: label over the figure in text-figure-l, an optional line under it. */
-export function Kpi({ label, cents, hint }: { label: ReactNode; cents: number; hint?: string }) {
+/**
+ * A KPI in a Strip: label over the figure, an optional line under it. The KPI
+ * strip takes text-figure-l; a summary or record fact strip passes size "m".
+ */
+export function Kpi({
+  label,
+  cents,
+  hint,
+  size = "l",
+}: {
+  label: ReactNode;
+  cents: number;
+  hint?: string;
+  size?: "l" | "m";
+}) {
   return (
     <div>
       <p className="truncate text-meta text-fg-3">{label}</p>
-      <p className="text-figure-l text-fg-1">
+      <p className={cn(size === "l" ? "text-figure-l" : "text-figure-m", "text-fg-1")}>
         <MoneyCents cents={cents} />
       </p>
       {hint && <p className="text-meta text-fg-3">{hint}</p>}
@@ -144,13 +157,36 @@ export function MoneyBars({
   );
 }
 
-/** A bar's share of the largest figure, as a CSS width. Never below zero: a net refund month has no bar. */
-const share = (cents: number, max: number) => `${(Math.max(0, cents) / max) * 100}%`;
+const incomeBar = "bg-chart-1";
+const expenseBar = "border-[1.5px] border-dashed border-chart-ref";
+
+/**
+ * One bar with its figure at its head. The bar scales within its line less
+ * 5rem kept for the figure, so the largest bar and its figure still fit. A
+ * net refund month (zero or below) has no bar, only the figure.
+ */
+function HeadBar({ cents, max, look }: { cents: number; max: number; look: string }) {
+  return (
+    <span className="flex h-3.5 items-center gap-1.5">
+      {cents > 0 && (
+        <span
+          className={cn("block h-2 min-w-0 rounded-xs", look)}
+          style={{ width: `calc((100% - 5rem) * ${cents / max})` }}
+        />
+      )}
+      <span className="shrink-0 text-meta leading-none text-fg-3">
+        <MoneyCents cents={cents} />
+      </span>
+    </span>
+  );
+}
 
 /**
  * Income against expense by month: income is the series in --chart-1, expense
- * the dashed --chart-ref reference under it, labeled at the head of the bars;
- * NOI on the right (section 4). No color beyond those two.
+ * the dashed --chart-ref reference under it, each figure at the head of its
+ * bar; NOI on the right (section 4). No color beyond those two. The legend
+ * has its own line over the rows. On phones the month and NOI share a line
+ * over full-width bars, as in MoneyBars.
  */
 export function IncomeExpenseBars({
   months,
@@ -161,47 +197,39 @@ export function IncomeExpenseBars({
 }) {
   if (months.length === 0) return <p className="text-body text-fg-3">No income or expense in QuickBooks yet.</p>;
   const max = Math.max(...months.flatMap((m) => [m.incomeCents, m.expenseCents]), 1);
-  const cols = "grid grid-cols-[4.5rem_minmax(0,1fr)_6rem] items-center gap-x-3";
   return (
     <div>
-      <div aria-hidden="true" className={cn(cols, "mb-2 text-meta text-fg-3")}>
-        <span />
+      <div aria-hidden="true" className="mb-2 flex items-center justify-between gap-3 text-meta text-fg-3">
         <span className="flex items-center gap-4">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-3 rounded-xs bg-chart-1" />
+            <span className={cn("h-2 w-3 rounded-xs", incomeBar)} />
             Income
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-3 rounded-xs border-[1.5px] border-dashed border-chart-ref" />
+            <span className={cn("h-2 w-3 rounded-xs", expenseBar)} />
             Expense
           </span>
         </span>
-        <span className="text-right">NOI</span>
+        <span>NOI</span>
       </div>
       <ul className="space-y-2 pointer-coarse:space-y-3">
         {months.map((m) => (
-          <li key={m.periodMonth} className={cols}>
-            <span className="num text-meta text-fg-3">{fmtMonth(m.periodMonth, thisYear)}</span>
-            <span className="space-y-0.5">
+          <li
+            key={m.periodMonth}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[4.5rem_minmax(0,1fr)_6rem]"
+          >
+            <span className="num text-meta text-fg-3">
+              {fmtMonth(m.periodMonth, thisYear)}
               <span className="sr-only">
-                Income {fmtCents(m.incomeCents)}, expense {fmtCents(m.expenseCents)}, NOI
-              </span>
-              <span aria-hidden="true" className="block h-2">
-                {m.incomeCents > 0 && (
-                  <span className="block h-full rounded-xs bg-chart-1" style={{ width: share(m.incomeCents, max) }} />
-                )}
-              </span>
-              <span aria-hidden="true" className="block h-2">
-                {m.expenseCents > 0 && (
-                  <span
-                    className="block h-full rounded-xs border-[1.5px] border-dashed border-chart-ref"
-                    style={{ width: share(m.expenseCents, max) }}
-                  />
-                )}
+                : income {fmtCents(m.incomeCents)}, expense {fmtCents(m.expenseCents)}, NOI {fmtCents(m.noiCents)}
               </span>
             </span>
-            <span className="text-right text-body text-fg-1">
+            <span aria-hidden="true" className="text-right text-body text-fg-1 sm:order-last">
               <MoneyCents cents={m.noiCents} />
+            </span>
+            <span aria-hidden="true" className="col-span-2 space-y-0.5 sm:col-span-1">
+              <HeadBar cents={m.incomeCents} max={max} look={incomeBar} />
+              <HeadBar cents={m.expenseCents} max={max} look={expenseBar} />
             </span>
           </li>
         ))}

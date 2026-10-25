@@ -41,6 +41,11 @@ const fromSm = "max-sm:hidden";
 const from480 = "max-[30rem]:hidden";
 const noiCol = "max-sm:pr-0";
 
+/* A module's heading with its period at the end; a long title pushes the
+   period onto its own line rather than squeezing either. */
+const moduleHeader = "flex flex-wrap items-baseline justify-between gap-x-3";
+const periodNote = "whitespace-nowrap text-meta text-fg-3";
+
 export default async function FinancialsOverviewPage({
   searchParams,
 }: PageProps<"/financials">) {
@@ -81,6 +86,11 @@ export default async function FinancialsOverviewPage({
   const thisYear = Number(todayYmdEastern().slice(0, 4));
   // The totals add up every synced line, so the period is the span of months with lines.
   const period = periodOf(data.monthlyTrend.map((m) => m.periodMonth));
+  // Every synced line lands in a month, so no months means no lines: a first sync
+  // that failed or hasn't finished, or an expired connection that never synced.
+  // Six $0 KPIs and a $0 Portfolio would read as a portfolio that earned nothing,
+  // so the totals give way to a sentence (section 3: a missing feed is a sentence).
+  const hasLines = data.monthlyTrend.length > 0;
   // a PARTIAL run can still tie on the basis on screen; only say what's off for this one
   const syncNotice =
     data.lastSync?.status === "PARTIAL"
@@ -128,26 +138,30 @@ export default async function FinancialsOverviewPage({
           </Notice>
         )}
 
-        <Strip className="grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
-          <Kpi label="Operating income" cents={p.operatingIncomeCents} />
-          <Kpi label="Operating expense" cents={p.operatingExpenseCents} />
-          <Kpi
-            label="NOI"
-            cents={p.noiCents}
-            hint={p.noiMargin == null ? undefined : `${pct(p.noiMargin)} margin`}
-          />
-          <Kpi label="Debt interest" cents={p.debtInterestCents} />
-          <Kpi label="NOI after interest" cents={p.noiAfterInterestCents} />
-          <Kpi
-            label={
-              <>
-                {/* "(memo)" drops at 320 so the label keeps one line */}
-                Bank interest<span className="max-[22.5rem]:hidden"> (memo)</span>
-              </>
-            }
-            cents={p.nonOperatingIncomeCents}
-          />
-        </Strip>
+        {hasLines ? (
+          <Strip className="grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
+            <Kpi label="Operating income" cents={p.operatingIncomeCents} />
+            <Kpi label="Operating expense" cents={p.operatingExpenseCents} />
+            <Kpi
+              label="NOI"
+              cents={p.noiCents}
+              hint={p.noiMargin == null ? undefined : `${pct(p.noiMargin)} margin`}
+            />
+            <Kpi label="Debt interest" cents={p.debtInterestCents} />
+            <Kpi label="NOI after interest" cents={p.noiAfterInterestCents} />
+            <Kpi
+              label={
+                <>
+                  {/* "(memo)" drops at 320 so the label keeps one line */}
+                  Bank interest<span className="max-[22.5rem]:hidden"> (memo)</span>
+                </>
+              }
+              cents={p.nonOperatingIncomeCents}
+            />
+          </Strip>
+        ) : (
+          <p className="text-body text-fg-3">No QuickBooks activity yet.</p>
+        )}
 
         {dq && (
           <Strip className="md:grid-cols-3">
@@ -186,11 +200,14 @@ export default async function FinancialsOverviewPage({
         )}
       </div>
 
-      {/* Overview modules: flat cards (docs/brand-guidelines.md, section 9). */}
+      {/* Overview modules: flat cards (docs/brand-guidelines.md, section 9). Each
+          figure block states its period at the heading's end (section 3); the
+          source line above carries the source, basis and sync. */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <h2 className="text-section text-fg-1">Operating expense by category</h2>
+          <CardHeader className={moduleHeader}>
+            <h2 className="min-w-0 text-section text-fg-1">Operating expense by category</h2>
+            {period && <span className={periodNote}>{period}</span>}
           </CardHeader>
           <CardBody>
             <MoneyBars
@@ -202,8 +219,9 @@ export default async function FinancialsOverviewPage({
         </Card>
 
         <Card>
-          <CardHeader>
-            <h2 className="text-section text-fg-1">Monthly income vs expense</h2>
+          <CardHeader className={moduleHeader}>
+            <h2 className="min-w-0 text-section text-fg-1">Monthly income vs expense</h2>
+            {period && <span className={periodNote}>{period}</span>}
           </CardHeader>
           <CardBody>
             <IncomeExpenseBars months={data.monthlyTrend} thisYear={thisYear} />
@@ -211,110 +229,120 @@ export default async function FinancialsOverviewPage({
         </Card>
       </div>
 
-      <Section title="By property">
-        <Table className={flushTable}>
-          <thead>
-            <tr>
-              <Th>Property</Th>
-              <Th numeric className={from480}>
-                Income
-              </Th>
-              <Th numeric className={from480}>
-                Opex
-              </Th>
-              <Th numeric className={noiCol}>
-                NOI
-              </Th>
-              <Th numeric className={fromSm}>
-                Margin
-              </Th>
-              <Th numeric className={fromSm}>
-                Debt int.
-              </Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {data.byProperty.map((row) => {
-              // a mapped property with no lines shows the dash, not $0
-              const money = (cents: number) =>
-                row.hasActivity ? <MoneyCents cents={cents} /> : <span className="text-fg-3">—</span>;
-              return (
-                <tr key={row.propertyId} className="hover:bg-fill-1">
-                  <Td>
-                    <TextLink href={`/properties/${row.propertyId}`}>{row.address}</TextLink>
-                    {row.hasActivity ? (
-                      <PartialLabel months={row.noi.monthsOfData} className="max-sm:block sm:ml-2" />
-                    ) : (
-                      <span className="whitespace-nowrap text-meta text-fg-3 max-sm:block sm:ml-2">No activity</span>
-                    )}
+      {/* With no lines and no mapped property there's nothing to list; the sentence above says so. */}
+      {(hasLines || data.byProperty.length > 0) && (
+        <Section title="By property" actions={period && <span className={periodNote}>{period}</span>}>
+          <Table className={flushTable}>
+            <thead>
+              <tr>
+                <Th>Property</Th>
+                <Th numeric className={from480}>
+                  Income
+                </Th>
+                <Th numeric className={from480}>
+                  Opex
+                </Th>
+                <Th numeric className={noiCol}>
+                  NOI
+                </Th>
+                <Th numeric className={fromSm}>
+                  Margin
+                </Th>
+                <Th numeric className={fromSm}>
+                  Debt int.
+                </Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {data.byProperty.map((row) => {
+                // a mapped property with no lines shows the dash, not $0
+                const money = (cents: number) =>
+                  row.hasActivity ? <MoneyCents cents={cents} /> : <span className="text-fg-3">—</span>;
+                return (
+                  <tr key={row.propertyId} className="hover:bg-fill-1">
+                    <Td>
+                      <TextLink href={`/properties/${row.propertyId}`}>{row.address}</TextLink>
+                      {row.hasActivity ? (
+                        <PartialLabel months={row.noi.monthsOfData} className="max-sm:block sm:ml-2" />
+                      ) : (
+                        <span className="whitespace-nowrap text-meta text-fg-3 max-sm:block sm:ml-2">No activity</span>
+                      )}
+                    </Td>
+                    <Td numeric className={from480}>
+                      {money(row.noi.operatingIncomeCents)}
+                    </Td>
+                    <Td numeric className={from480}>
+                      {money(row.noi.operatingExpenseCents)}
+                    </Td>
+                    <Td numeric className={noiCol}>
+                      {money(row.noi.noiCents)}
+                    </Td>
+                    <Td numeric className={cn("text-fg-2", fromSm)}>
+                      {row.hasActivity && row.noi.noiMargin != null ? (
+                        pct(row.noi.noiMargin)
+                      ) : (
+                        <span className="text-fg-3">—</span>
+                      )}
+                    </Td>
+                    <Td numeric className={cn("text-fg-2", fromSm)}>
+                      {money(row.noi.debtInterestCents)}
+                    </Td>
+                  </tr>
+                );
+              })}
+              {/* the unassigned remainder and the Portfolio total only mean something once lines exist */}
+              {hasLines && (
+                <tr className="hover:bg-fill-1">
+                  <Td className="text-fg-2">
+                    Not assigned to a property{" "}
+                    <TextLink href="/financials/settings#class-mapping" className="whitespace-nowrap">
+                      Map classes
+                    </TextLink>
+                  </Td>
+                  <Td numeric className={cn("text-fg-2", from480)}>
+                    <MoneyCents cents={data.unassigned.incomeCents} />
+                  </Td>
+                  <Td numeric className={cn("text-fg-2", from480)}>
+                    <MoneyCents cents={data.unassigned.expenseCents} />
+                  </Td>
+                  <Td numeric className={cn("text-fg-2", noiCol)}>
+                    <MoneyCents cents={data.unassigned.noiCents} />
+                  </Td>
+                  <Td className={fromSm} />
+                  <Td className={fromSm} />
+                </tr>
+              )}
+            </tbody>
+            {hasLines && (
+              <tfoot>
+                <tr className={grandTotalRow}>
+                  <Td>Portfolio</Td>
+                  <Td numeric className={from480}>
+                    <MoneyCents cents={p.operatingIncomeCents} />
                   </Td>
                   <Td numeric className={from480}>
-                    {money(row.noi.operatingIncomeCents)}
-                  </Td>
-                  <Td numeric className={from480}>
-                    {money(row.noi.operatingExpenseCents)}
+                    <MoneyCents cents={p.operatingExpenseCents} />
                   </Td>
                   <Td numeric className={noiCol}>
-                    {money(row.noi.noiCents)}
+                    <MoneyCents cents={p.noiCents} />
                   </Td>
-                  <Td numeric className={cn("text-fg-2", fromSm)}>
-                    {row.hasActivity && row.noi.noiMargin != null ? (
-                      pct(row.noi.noiMargin)
-                    ) : (
-                      <span className="text-fg-3">—</span>
-                    )}
+                  <Td numeric className={fromSm}>
+                    {p.noiMargin == null ? <span className="font-normal text-fg-3">—</span> : pct(p.noiMargin)}
                   </Td>
-                  <Td numeric className={cn("text-fg-2", fromSm)}>
-                    {money(row.noi.debtInterestCents)}
+                  <Td numeric className={fromSm}>
+                    <MoneyCents cents={p.debtInterestCents} />
                   </Td>
                 </tr>
-              );
-            })}
-            <tr className="hover:bg-fill-1">
-              <Td className="text-fg-2">
-                Not assigned to a property{" "}
-                <TextLink href="/financials/settings#class-mapping" className="whitespace-nowrap">
-                  Map classes
-                </TextLink>
-              </Td>
-              <Td numeric className={cn("text-fg-2", from480)}>
-                <MoneyCents cents={data.unassigned.incomeCents} />
-              </Td>
-              <Td numeric className={cn("text-fg-2", from480)}>
-                <MoneyCents cents={data.unassigned.expenseCents} />
-              </Td>
-              <Td numeric className={cn("text-fg-2", noiCol)}>
-                <MoneyCents cents={data.unassigned.noiCents} />
-              </Td>
-              <Td className={fromSm} />
-              <Td className={fromSm} />
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr className={grandTotalRow}>
-              <Td>Portfolio</Td>
-              <Td numeric className={from480}>
-                <MoneyCents cents={p.operatingIncomeCents} />
-              </Td>
-              <Td numeric className={from480}>
-                <MoneyCents cents={p.operatingExpenseCents} />
-              </Td>
-              <Td numeric className={noiCol}>
-                <MoneyCents cents={p.noiCents} />
-              </Td>
-              <Td numeric className={fromSm}>
-                {p.noiMargin == null ? <span className="font-normal text-fg-3">—</span> : pct(p.noiMargin)}
-              </Td>
-              <Td numeric className={fromSm}>
-                <MoneyCents cents={p.debtInterestCents} />
-              </Td>
-            </tr>
-          </tfoot>
-        </Table>
-        <p className="mt-3 text-meta text-fg-3">
-          Per-property figures use directly-classed lines only. Portfolio NOI is the sum of the rows above.
-        </p>
-      </Section>
+              </tfoot>
+            )}
+          </Table>
+          {hasLines && (
+            <p className="mt-3 text-meta text-fg-3">
+              Per-property figures use directly-classed lines only. Portfolio NOI is the sum of the rows above.
+            </p>
+          )}
+        </Section>
+      )}
     </div>
   );
 }

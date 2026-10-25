@@ -23,10 +23,12 @@ export function RefreshButton() {
   const [pending, start] = useTransition();
 
   return (
+    // The label stays put while it syncs (section 7); the disabled button dims instead.
     <Button
       size="sm"
       variant="secondary"
       disabled={pending}
+      aria-busy={pending}
       onClick={() =>
         start(async () => {
           try {
@@ -48,14 +50,8 @@ export function RefreshButton() {
         })
       }
     >
-      {pending ? (
-        "Syncing…"
-      ) : (
-        <>
-          <span className="sm:hidden">Refresh</span>
-          <span className="max-sm:hidden">Refresh from QuickBooks</span>
-        </>
-      )}
+      <span className="sm:hidden">Refresh</span>
+      <span className="max-sm:hidden">Refresh from QuickBooks</span>
     </Button>
   );
 }

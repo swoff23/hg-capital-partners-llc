@@ -6,26 +6,7 @@ import { signedLineCents } from "@/lib/quickbooks/compute";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { CATEGORY_LABELS } from "../../financials/_components/labels";
 import { periodOf } from "../../financials/_components/period";
-import {
-  flushTable,
-  MoneyBars,
-  MoneyCents,
-  SandboxNotice,
-  SourceLine,
-  Strip,
-} from "../../financials/_components/ui";
-
-/** A figure in the strip: label over the figure in text-figure-m. */
-function Fact({ label, cents }: { label: string; cents: number }) {
-  return (
-    <div>
-      <p className="truncate text-meta text-fg-3">{label}</p>
-      <p className="text-figure-m text-fg-1">
-        <MoneyCents cents={cents} />
-      </p>
-    </div>
-  );
-}
+import { flushTable, Kpi, MoneyBars, SandboxNotice, SourceLine, Strip } from "../../financials/_components/ui";
 
 /**
  * QuickBooks P&L for this property, as a Section of the record. Renders
@@ -70,9 +51,9 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
           {/* Three $0 figures would read as a property that earned nothing; say there's no data instead. */}
           {data.hasLines ? (
             <Strip className="grid-cols-3">
-              <Fact label="Income" cents={noi.operatingIncomeCents} />
-              <Fact label="Opex" cents={noi.operatingExpenseCents} />
-              <Fact label="NOI" cents={noi.noiCents} />
+              <Kpi size="m" label="Income" cents={noi.operatingIncomeCents} />
+              <Kpi size="m" label="Opex" cents={noi.operatingExpenseCents} />
+              <Kpi size="m" label="NOI" cents={noi.noiCents} />
             </Strip>
           ) : (
             <p className="text-body text-fg-3">No QuickBooks activity for this property yet.</p>
@@ -109,8 +90,12 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
                       <Td className="num w-px whitespace-nowrap align-middle text-meta text-fg-3">
                         {fmtDay(l.txnDate, { year: "auto" })}
                       </Td>
-                      {/* max-w-0 lets the name take what's left and truncate there */}
-                      <Td className="w-full max-w-0 truncate align-middle" title={l.name ?? l.accountName}>
+                      {/* max-w-0 lets the name take what's left and truncate there. Touch has
+                          no hover to show the title, so there the name wraps instead. */}
+                      <Td
+                        className="w-full max-w-0 truncate align-middle pointer-coarse:whitespace-normal pointer-coarse:break-words"
+                        title={l.name || l.accountName}
+                      >
                         {l.name || l.accountName}
                       </Td>
                       <Td numeric className="align-middle">
