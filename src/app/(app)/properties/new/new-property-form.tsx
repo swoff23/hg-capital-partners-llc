@@ -5,6 +5,7 @@ import { callAction } from "@/lib/action-result";
 import { PROPERTY_STATUSES } from "@/lib/config";
 import { shortAddress } from "@/lib/normalize";
 import { createProperty, type ExistingProperty } from "../actions";
+import { LabeledField } from "../labeled-field";
 
 /**
  * Posts without a page load, so a refusal keeps every field as typed: an
@@ -30,18 +31,19 @@ export function NewPropertyForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Address *</span>
+        <LabeledField label="Address *">
           <Input
             name="address"
             required
             placeholder="123 Main St, Buffalo, NY 14201"
+            // A taken address is the field's error: its --danger edge, and the line under it says which property.
+            aria-invalid={existing ? true : undefined}
+            aria-describedby={existing ? "address-taken" : undefined}
             onChange={() => setExisting(null)}
-            className="mt-1"
           />
-        </label>
+        </LabeledField>
         {existing && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+          <p id="address-taken" className="mt-1.5 text-meta text-danger">
             Already in Properties: {shortAddress(existing.address)}.{" "}
             <TextLink href={`/properties/${existing.id}`} className="font-medium">
               Open it
@@ -50,24 +52,26 @@ export function NewPropertyForm() {
         )}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Status</span>
-          <Select name="status" defaultValue="" className="mt-1">
+        <LabeledField label="Status">
+          <Select name="status" defaultValue="">
             <option value="">None</option>
             {PROPERTY_STATUSES.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </Select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-muted">Entity</span>
-          <Input name="llcOwner" placeholder="LLC owner" className="mt-1" />
-        </label>
+        </LabeledField>
+        <LabeledField label="Entity">
+          <Input name="llcOwner" placeholder="LLC owner" />
+        </LabeledField>
       </div>
       <Button type="submit" disabled={pending}>
         {pending ? "Creating…" : "Create property"}
       </Button>
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && (
+        <p role="alert" className="text-meta text-danger">
+          {error}
+        </p>
+      )}
     </form>
   );
 }

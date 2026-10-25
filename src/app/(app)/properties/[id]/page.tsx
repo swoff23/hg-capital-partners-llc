@@ -1,19 +1,20 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton, TextLink } from "@/components/ui";
-import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
+import { TextLink } from "@/components/ui";
+import { Money } from "@/components/money";
+import { PhotoThumb } from "@/components/photo-thumb";
+import { toYmd, todayYmdEastern } from "@/lib/dates";
+import { shortAddress } from "@/lib/normalize";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
-import { cn } from "@/lib/utils";
 import { targetDate } from "@/lib/tasks/rules";
-import { Avatar } from "@/components/avatar";
-import { StatusBadge } from "@/components/status-badge";
+import { loanPosition } from "@/lib/properties/figures";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
+import { FactStrip } from "../fact-strip";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { PropertyDocumentsSection } from "./edit-documents";
 import { PropertyLoanSection } from "./edit-loan";
@@ -23,6 +24,7 @@ import { ListingsSection, type EditableListing } from "./edit-listings";
 import { BuildingCapexSection } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
 import { PropertyFinancialsCard } from "./financials";
+import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
 
 const ymd = toYmd;
 
@@ -36,7 +38,7 @@ function taskAssignee(t: {
   assigneeContactId: string | null;
   assignee: { name: string | null; email: string } | null;
   assigneeContact: { fullName: string } | null;
-}): { label: string; name: string | null; email: string | null; contractor: boolean } | null {
+}): PropertyTask["who"] {
   const name = t.assignee ? t.assignee.name : (t.assigneeContact?.fullName ?? t.assigneeName);
   const email = t.assignee?.email ?? null;
   const label = name ?? email;
@@ -44,6 +46,13 @@ function taskAssignee(t: {
   return { label, name, email, contractor: !!t.assigneeContactId };
 }
 
+/**
+ * A property's record (docs/brand-guidelines.md, sections 5 and 9): capped at
+ * 1200 with a 320 rail from lg. The identity header (photo, status, the
+ * address as the h1, entity and units), the four-fact strip, then the work
+ * (financials, CapEx, units, rentals) beside the facts rail (details, loan,
+ * insurance) and the property's tasks, documents and notes.
+ */
 export default async function PropertyPage({ params }: PageProps<"/properties/[id]">) {
   await requireUser();
   const { id } = await params;
@@ -85,48 +94,67 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
   // Each task's Target (D7: the visit date while Scheduled, otherwise Due), soonest first, as on Today.
   // A past Target reads red by Today's rule (isTargetLate: never Waiting or Review); it's
-  // the date this card shows, so it's the date judged.
+  // the date this list shows, so it's the date judged.
   const today = todayYmdEastern();
   const tasks = property.tasks
     .map((t) => ({
-      ...t,
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      createdAt: t.createdAt,
       target: ymd(targetDate(t)),
       late: isTargetLate({ status: t.status, scheduledFor: ymd(t.scheduledFor), due: ymd(t.dueDate) }, today),
+      who: taskAssignee(t),
     }))
     .sort(byDateThenStatus((t) => t.target));
 
-  return (
-    <>
-      <div className="mb-4">
-        <BackLink fallback="/properties" label="Portfolio" />
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <PropertyAddressField id={property.id} value={property.address} />
-          {property.status &&
-            (property.status === "Refinanced" ? (
-              <span className="text-sm text-muted">{property.status}</span>
-            ) : (
-              <Badge>{property.status}</Badge>
-            ))}
-          {unitCount > 0 && <span className="text-sm text-muted">{unitCount} units</span>}
-        </div>
-      </div>
+  const value = d(property.value);
+  const balance = d(property.currentLoan);
+  const position = loanPosition(value, balance);
+  const place = shortAddress(property.address) || property.address;
+  const subline = [property.llcOwner?.trim(), unitCount > 0 && `${unitCount} ${unitCount === 1 ? "unit" : "units"}`]
+    .filter(Boolean)
+    .join(" · ");
+  const version = property.updatedAt.toISOString();
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="min-w-0 space-y-4 lg:col-span-2">
+  return (
+    <div className="max-w-300">
+      <BackLink fallback="/properties" label="Portfolio" className="text-meta font-medium text-fg-2 pointer-coarse:min-h-11" />
+
+      {/* Identity: the building's photo (the fallback tile until it's taken), status, address, entity and units. */}
+      <header className="mt-3 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+        {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. */}
+        <PhotoThumb size="full" alt={`Front of ${place}`} className="sm:hidden" />
+        <PhotoThumb size={96} alt={`Front of ${place}`} className="max-sm:hidden" />
+        <div className="min-w-0">
+          {property.status && <p className="text-meta font-medium text-fg-2">{property.status}</p>}
+          <PropertyAddressField id={property.id} value={property.address} />
+          {subline && <p className="text-meta text-fg-3">{subline}</p>}
+        </div>
+      </header>
+
+      <FactStrip
+        className="mt-6"
+        facts={[
+          { label: "Value", value: <Money value={value} />, key: true },
+          { label: "Loan balance", value: <Money value={balance} /> },
+          { label: "Equity", value: <Money value={position.equity} /> },
+          { label: "Open tasks", value: tasks.length },
+        ]}
+      />
+
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10 pointer-coarse:mt-6">
+        <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
           <PropertyFinancialsCard propertyId={property.id} />
 
           <CapexForecastCard units={units} building={buildingCapex} rules={capexRules} />
 
-          <BuildingCapexSection
-            propertyId={property.id}
-            version={property.updatedAt.toISOString()}
-            initial={buildingCapex}
-            rules={capexRules}
-          />
+          <BuildingCapexSection propertyId={property.id} version={version} initial={buildingCapex} rules={capexRules} />
 
           <UnitsSection
             propertyId={property.id}
-            version={property.updatedAt.toISOString()}
+            address={property.address}
+            version={version}
             // Every unit with an id, so the save can tell a rename from a remove and an add.
             initial={withUnitIds(units)}
             rules={capexRules}
@@ -134,15 +162,10 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             unitRefs={countUnitRefs(property.tasks, property.listings)}
           />
 
-          <ListingsSection
-            propertyId={property.id}
-            version={property.updatedAt.toISOString()}
-            initial={listings}
-            unitLabels={unitLabels}
-          />
+          <ListingsSection propertyId={property.id} version={version} initial={listings} unitLabels={unitLabels} />
         </div>
 
-        {/* Sections sit 32px apart, 24 on touch (brand guidelines, section 5). */}
+        {/* The facts rail, then the property's tasks, documents and notes. Sections sit 32px apart, 24 on touch. */}
         <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
           <PropertyDetailsSection
             property={{
@@ -157,7 +180,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               purchasePrice: d(property.purchasePrice),
               closingCosts: d(property.closingCosts),
               rehabAmount: d(property.rehabAmount),
-              value: d(property.value),
+              value,
               refinanceDate: ymd(property.refinanceDate),
               sqft: property.sqft,
               rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
@@ -168,8 +191,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <PropertyLoanSection
             loan={{
               id: property.id,
-              value: d(property.value),
-              currentLoan: d(property.currentLoan),
+              value,
+              currentLoan: balance,
               lender: property.lender,
               loanServicer: property.loanServicer,
               loanNumber: property.loanNumber,
@@ -197,57 +220,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             }}
           />
 
-          <Card>
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle>Tasks</CardTitle>
-              <div className="flex shrink-0 items-center gap-2">
-                <LinkButton href={`/templates?property=${property.id}`} size="sm">
-                  Apply playbook
-                </LinkButton>
-                <LinkButton href={`/tasks/new?propertyId=${property.id}`} size="sm">
-                  + Task
-                </LinkButton>
-              </div>
-            </CardHeader>
-            <CardBody className="p-0">
-              {tasks.length === 0 ? (
-                <p className="p-4 text-sm text-muted">No open tasks.</p>
-              ) : (
-                <ul className="max-h-[420px] divide-y divide-border overflow-y-auto">
-                  {tasks.map((t) => {
-                    const who = taskAssignee(t);
-                    return (
-                      <li key={t.id} className="flex items-center gap-2 px-4 py-2 text-sm">
-                        <Link
-                          href={`/tasks/${t.id}`}
-                          className="min-w-0 flex-1 truncate hover:underline"
-                        >
-                          {t.title}
-                        </Link>
-                        {(t.assigneeContactId || t.status !== "OPEN") && (
-                          <StatusBadge status={t.status} className="shrink-0" />
-                        )}
-                        {who && (
-                          <span title={who.label} className="flex shrink-0">
-                            <Avatar name={who.name} email={who.email} size={20} outline={who.contractor} />
-                            <span className="sr-only">{who.label}</span>
-                          </span>
-                        )}
-                        <span
-                          className={cn(
-                            "w-24 shrink-0 text-right text-xs",
-                            t.late ? "text-red-600 dark:text-red-400" : "text-muted",
-                          )}
-                        >
-                          {fmtDay(t.target, { year: "auto", now: today })}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
+          <PropertyTasksSection propertyId={property.id} tasks={tasks} today={today} />
 
           <PropertyDocumentsSection
             propertyId={property.id}
@@ -256,14 +229,13 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
           <PropertyNotesSection id={property.id} notes={property.notes} />
           {property.sourceDeal && (
-            <p className="text-xs text-muted">
-              From deal{" "}
-              <TextLink href={`/deals/${property.sourceDeal.id}`}>{property.sourceDeal.address}</TextLink>
+            <p className="text-meta text-fg-3">
+              From deal <TextLink href={`/deals/${property.sourceDeal.id}`}>{property.sourceDeal.address}</TextLink>
             </p>
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

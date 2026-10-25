@@ -1,9 +1,10 @@
 "use client";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Section } from "@/components/ui";
 import { Attachments, type AttachmentItem } from "@/components/attachments";
 import { recordPropertyAttachment, deletePropertyAttachment } from "../actions";
+import { Count } from "./record-ui";
 
-/** Documents for a property — file uploads (Vercel Blob), same as task attachments. */
+/** Documents for a property: file uploads (Vercel Blob), same as task attachments. */
 export function PropertyDocumentsSection({
   propertyId,
   attachments,
@@ -12,23 +13,23 @@ export function PropertyDocumentsSection({
   attachments: AttachmentItem[];
 }) {
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle>Documents</CardTitle>
-        {attachments.length > 0 && (
-          <span className="text-xs text-muted">{attachments.length}</span>
-        )}
-      </CardHeader>
-      <CardBody>
-        <Attachments
-          kind="property"
-          items={attachments}
-          uploadPathPrefix={`properties/${propertyId}`}
-          clientPayload={JSON.stringify({ propertyId })}
-          onRecord={(data) => recordPropertyAttachment(propertyId, data)}
-          onDelete={(id) => deletePropertyAttachment(id)}
-        />
-      </CardBody>
-    </Card>
+    <Section
+      as="h3"
+      title={
+        <>
+          Documents
+          {attachments.length > 0 && <Count n={attachments.length} />}
+        </>
+      }
+    >
+      <Attachments
+        kind="property"
+        items={attachments}
+        uploadPathPrefix={`properties/${propertyId}`}
+        clientPayload={JSON.stringify({ propertyId })}
+        onRecord={(data) => recordPropertyAttachment(propertyId, data)}
+        onDelete={(id) => deletePropertyAttachment(id)}
+      />
+    </Section>
   );
 }
