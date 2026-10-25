@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
-import { Badge, Button, SectionCard, buttonClass, fieldClass, textLinkClass } from "@/components/ui";
+import { Button, SectionCard, buttonClass, fieldClass, textLinkClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { updatePropertyListings } from "../actions";
 import { callAction } from "@/lib/action-result";
@@ -32,7 +32,7 @@ export type EditableListing = {
 /** A field in a dense editor row: 32px with a mouse, 44 on touch. */
 const inp = cn(fieldClass, "h-8");
 
-// A listing's status is a label, not a state, so its badge stays neutral.
+// A listing's status is a label, not a state, so its word stays neutral (fg-2, as on Portfolio).
 const STATUS_LABEL: Record<EditableListing["status"], string> = {
   AVAILABLE: "Available",
   LEASED: "Leased",
@@ -52,6 +52,11 @@ function blankListing(): EditableListing {
     status: "HIDDEN",
     photos: [],
   };
+}
+
+/** A listing added in this draft (no id yet) that's still exactly blank. */
+function isUntouchedNew(l: EditableListing): boolean {
+  return l.id === null && JSON.stringify(l) === JSON.stringify(blankListing());
 }
 
 export function ListingsSection({
@@ -82,7 +87,8 @@ export function ListingsSection({
   const [uploadingCount, setUploadingCount] = useState(0);
   const root = useRef<HTMLDivElement>(null);
 
-  const dirty = JSON.stringify(listings) !== JSON.stringify(initial);
+  // A listing Add listing opened and nobody touched isn't a change, so Cancel doesn't ask about it.
+  const dirty = JSON.stringify(listings.filter((l) => !isUntouchedNew(l))) !== JSON.stringify(initial);
   const noUnits = unitLabels.length === 0;
 
   function mutate(fn: (l: EditableListing[]) => void) {
@@ -233,11 +239,10 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
           <li key={l.id ?? i} className="flex min-h-14 items-center gap-3 py-2">
             <PhotoThumb src={l.photos[0]?.url} alt={`${name} listing photo`} size={48} />
             <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-body text-fg-1">{name}</span>
-                <Badge className="shrink-0">{STATUS_LABEL[l.status]}</Badge>
-              </div>
+              <p className="truncate text-body text-fg-1">{name}</p>
               <p className="truncate text-meta text-fg-3">
+                {/* The status column drops below 480, so its word leads the subline. */}
+                <span className="font-medium text-fg-2 min-[480px]:hidden">{STATUS_LABEL[l.status]} · </span>
                 {/* Below 480 the secondary clauses drop rather than wrap (section 5 Density). */}
                 {l.rent ? (
                   <>
@@ -264,6 +269,10 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
                 <ExternalLink aria-hidden="true" strokeWidth={1.5} className="h-3.5 w-3.5 text-fg-3" />
               </a>
             )}
+            {/* The status in one fixed column at the row's end, whether or not a Zillow link sits before it. */}
+            <span className="w-20 shrink-0 whitespace-nowrap text-meta font-medium text-fg-2 max-[480px]:hidden">
+              {STATUS_LABEL[l.status]}
+            </span>
           </li>
         );
       })}

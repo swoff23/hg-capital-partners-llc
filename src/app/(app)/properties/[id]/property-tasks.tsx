@@ -40,10 +40,12 @@ export function PropertyTasksSection({
     <Section
       as="h3"
       title={
-        <>
+        // One line at 320, where the two buttons leave the heading about 50px: the count
+        // drops there (the fact strip above carries the same number) and the word truncates.
+        <span className="block truncate">
           Tasks
-          {tasks.length > 0 && <Count n={tasks.length} />}
-        </>
+          {tasks.length > 0 && <Count n={tasks.length} className="max-[359px]:hidden" />}
+        </span>
       }
       actions={
         <>
@@ -66,7 +68,7 @@ export function PropertyTasksSection({
             return (
               <li
                 key={t.id}
-                className="group relative grid min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 pointer-coarse:min-h-12 @min-[30rem]:grid-cols-[7.5rem_minmax(0,1fr)_auto_4.5rem]"
+                className="group relative grid min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 pointer-coarse:min-h-12 @min-[30rem]:grid-cols-[7.5rem_minmax(0,1fr)_auto_6rem]"
               >
                 <Link
                   href={`/tasks/${t.id}`}
@@ -94,8 +96,8 @@ export function PropertyTasksSection({
                   </p>
                 </div>
 
-                {/* Above the row's link, so the full name shows on hover with a mouse; on touch a tap opens the row, and the task page names the person. */}
-                <span className="pointer-events-none relative flex w-5 justify-center pointer-fine:pointer-events-auto" title={t.who?.label}>
+                {/* Under the row's link like the rest of the row, so a click on it opens the task; the task page names the person. */}
+                <span className="pointer-events-none flex w-5 justify-center">
                   {t.who && (
                     <>
                       <Avatar name={t.who.name} email={t.who.email} size={20} outline={t.who.contractor} />
@@ -106,7 +108,7 @@ export function PropertyTasksSection({
 
                 <span
                   className={cn(
-                    "num pointer-events-none hidden text-right text-meta @min-[30rem]:block",
+                    "num pointer-events-none hidden whitespace-nowrap text-right text-meta @min-[30rem]:block",
                     t.late ? "text-danger" : date ? "text-fg-2" : "text-fg-3",
                   )}
                 >

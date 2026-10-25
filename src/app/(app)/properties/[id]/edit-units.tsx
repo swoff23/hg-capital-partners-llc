@@ -73,7 +73,8 @@ export function UnitsSection({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const dirty = JSON.stringify(units) !== JSON.stringify(initial);
+  // A unit Add unit opened and nobody typed into isn't a change, so Cancel doesn't ask about it.
+  const dirty = JSON.stringify(units.filter((u) => !isUntouchedNew(u))) !== JSON.stringify(initial);
 
   function mutate(fn: (u: PropertyUnit[]) => void) {
     setUnits((prev) => {
@@ -573,4 +574,15 @@ function EditUnit({
 
 function blankUnit(): PropertyUnit {
   return { label: "", lockboxCode: "", utilities: {}, equipment: [] };
+}
+
+/** A unit added in this draft (no id yet) with nothing typed into it. */
+function isUntouchedNew(u: PropertyUnit): boolean {
+  return (
+    !u.id &&
+    !u.label?.trim() &&
+    !u.lockboxCode?.trim() &&
+    !Object.values(u.utilities ?? {}).some((v) => v?.trim()) &&
+    (u.equipment?.length ?? 0) === 0
+  );
 }

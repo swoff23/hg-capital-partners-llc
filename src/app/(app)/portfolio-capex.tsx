@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Section, Table, Td, Th, TextLink, textLinkClass } from "@/components/ui";
 import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,8 @@ export function PortfolioCapexForecastCard({
   const selIdx = selYear == null ? -1 : f.years.indexOf(selYear);
 
   const [tip, setTip] = useState<Tip | null>(null);
+  // The open panel's id, so its value's button can point at it.
+  const tipId = useId();
 
   function openTip(el: HTMLElement, content: TipContent) {
     const r = el.getBoundingClientRect();
@@ -94,6 +96,7 @@ export function PortfolioCapexForecastCard({
     <Breakdown
       content={content}
       open={openKey === content.key}
+      tipId={tipId}
       onOpen={(el) => openTip(el, content)}
       onClose={() => setTip(null)}
     >
@@ -214,7 +217,8 @@ export function PortfolioCapexForecastCard({
                       <Td key={i} numeric className={cn(grandTotalCell, "transition-opacity duration-fast", faded && "opacity-30")}>
                         {breakdown(
                           { key: `all-${year}`, title: `Portfolio · ${year}`, items: itemsForYear(year), showYear: false },
-                          v ? <Money value={v} /> : "—",
+                          // An empty year is the dash in fg-3, not the total row's fg-1 at 600 (section 3).
+                          v ? <Money value={v} /> : <span className="font-normal text-fg-3">—</span>,
                         )}
                       </Td>
                     );
@@ -242,6 +246,7 @@ export function PortfolioCapexForecastCard({
 
       {tip && (
         <div
+          id={tipId}
           role="tooltip"
           className={cn(
             "pointer-events-none fixed z-50 w-84 max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-line-float bg-raised p-3 text-meta text-fg-1 shadow-float",
@@ -280,17 +285,21 @@ export function PortfolioCapexForecastCard({
 
 /**
  * A table value that opens its assets: hover with a mouse, keyboard focus,
- * or a tap, which toggles it. Plain text when there are none.
+ * or a tap, which toggles it. Plain text when there are none. While it's
+ * open the button names the panel (`tipId`), which renders after the
+ * section, so a screen reader reads the assets as its description.
  */
 function Breakdown({
   content,
   open,
+  tipId,
   onOpen,
   onClose,
   children,
 }: {
   content: TipContent;
   open: boolean;
+  tipId: string;
   onOpen: (el: HTMLElement) => void;
   onClose: () => void;
   children: ReactNode;
@@ -302,6 +311,8 @@ function Breakdown({
       type="button"
       data-tip={content.key}
       aria-expanded={open}
+      aria-controls={open ? tipId : undefined}
+      aria-describedby={open ? tipId : undefined}
       onPointerDown={(e) => {
         pointer.current = e.pointerType;
       }}

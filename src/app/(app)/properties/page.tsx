@@ -124,7 +124,10 @@ export default async function PropertiesPage() {
                   <tr key={r.id} className="transition-colors duration-fast hover:bg-fill-1">
                     {/* The address column takes the room the others leave, so a long address truncates instead of widening the table. */}
                     <RowCell href={href} first cell="w-full max-w-0" className="pl-0">
-                      <PhotoThumb size={48} alt={`Front of ${r.name}`} />
+                      {/* Decorative inside the link, which the address already names. */}
+                      <span aria-hidden="true" className="shrink-0">
+                        <PhotoThumb size={48} alt="" />
+                      </span>
                       <span className="min-w-0">
                         <span className="block truncate text-body text-fg-1">{r.name}</span>
                         {(r.entity || r.status) && (
@@ -180,7 +183,12 @@ export default async function PropertiesPage() {
             </tfoot>
           </Table>
 
-          <PortfolioCapexForecastCard id="capex" className="mt-10" properties={capexProperties} rules={capexRules} />
+          <PortfolioCapexForecastCard
+            id="capex"
+            className="mt-8 pointer-coarse:mt-6"
+            properties={capexProperties}
+            rules={capexRules}
+          />
         </>
       )}
     </>
@@ -189,12 +197,15 @@ export default async function PropertiesPage() {
 
 /**
  * One cell of a property's row, all of it a link to the property, so the
- * whole row opens it. Only the first cell's link takes focus and names the
- * row; the rest are the same link for a mouse or a tap. A single link
- * stretched over the row would need the row as its containing block, which
- * not every engine gives a table row. 56px with a mouse, 60 on touch
- * (section 5 Density). `cell` styles the cell (when it drops); `className`
- * its content, with pl-0 and pr-0 putting the edge cells on the gutter.
+ * whole row opens it. The first cell's link wraps its content, takes focus
+ * and names the row. Every other cell keeps its value outside the link and
+ * lays the same link over itself, out of the tab order and hidden from
+ * screen readers, so a mouse or a tap anywhere opens the row and the value
+ * still reads. A single link stretched over the row would need the row as
+ * its containing block, which not every engine gives a table row; a cell
+ * is one. 56px with a mouse, 60 on touch (section 5 Density). `cell` styles
+ * the cell (when it drops); `className` its content, with pl-0 and pr-0
+ * putting the edge cells on the gutter.
  */
 function RowCell({
   href,
@@ -212,20 +223,26 @@ function RowCell({
   className?: string;
   children: React.ReactNode;
 }) {
+  const content = cn(
+    "flex min-h-14 items-center gap-3 px-3 pointer-coarse:min-h-15",
+    numeric && "justify-end",
+    className,
+  );
   return (
-    <Td numeric={numeric} className={cn("p-0 align-middle pointer-coarse:h-auto pointer-coarse:p-0", cell)}>
-      <Link
-        href={href}
-        tabIndex={first ? undefined : -1}
-        aria-hidden={first ? undefined : true}
-        className={cn(
-          "flex min-h-14 items-center gap-3 px-3 -outline-offset-2 pointer-coarse:min-h-15",
-          numeric && "justify-end",
-          className,
-        )}
-      >
-        {children}
-      </Link>
+    <Td
+      numeric={numeric}
+      className={cn("p-0 align-middle pointer-coarse:h-auto pointer-coarse:p-0", !first && "relative", cell)}
+    >
+      {first ? (
+        <Link href={href} className={cn(content, "-outline-offset-2")}>
+          {children}
+        </Link>
+      ) : (
+        <>
+          <div className={content}>{children}</div>
+          <Link href={href} tabIndex={-1} aria-hidden="true" className="absolute inset-0" />
+        </>
+      )}
     </Td>
   );
 }

@@ -99,8 +99,8 @@ export function AddRow({
 }
 
 /** A section heading's count, in --fg-3 at the body weight. */
-export function Count({ n }: { n: number }) {
-  return <span className="num ml-1.5 font-normal text-fg-3">{n}</span>;
+export function Count({ n, className }: { n: number; className?: string }) {
+  return <span className={cn("num ml-1.5 font-normal text-fg-3", className)}>{n}</span>;
 }
 
 /** An inline save error under a section's form or list. */
