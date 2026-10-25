@@ -6,7 +6,7 @@ import type { CapexRules, PropertyUnit } from "@/lib/property-types";
 import {
   UTILITY_GROUPS,
   UTILITY_STATUS_FIELDS,
-  UTILITY_STATUS_OPTIONS,
+  utilityStatusChoices,
   utilityStatusTone,
   equipmentAge,
   equipmentStatus,
@@ -16,6 +16,7 @@ import {
 import { removeUnitQuestion, unitRefKey, type UnitRefs } from "@/lib/properties/unit-refs";
 import { fmtMoney } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
+import { callAction } from "@/lib/action-result";
 import { updatePropertyUnits } from "../actions";
 
 const inp =
@@ -39,7 +40,7 @@ export function UnitsSection({
   unitRefs,
 }: {
   propertyId: string;
-  /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
+  /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
   version: string;
   initial: PropertyUnit[];
   rules: CapexRules;
@@ -48,6 +49,9 @@ export function UnitsSection({
 }) {
   const [editing, setEditing] = useState(false);
   const [units, setUnits] = useState<PropertyUnit[]>(structuredClone(initial));
+  // The version Edit opened at. A save in another card refreshes the page with a
+  // newer one, and sending that would let this draft overwrite a partner's change.
+  const [editVersion, setEditVersion] = useState(version);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [removing, setRemoving] = useState<{ index: number; title: string; body: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +70,7 @@ export function UnitsSection({
   function save() {
     setError(null);
     start(async () => {
-      const r = await updatePropertyUnits(propertyId, units, version);
+      const r = await callAction(() => updatePropertyUnits(propertyId, units, editVersion));
       if (!r.ok) {
         setError(r.error);
         setConfirmOpen(false);
@@ -117,9 +121,10 @@ export function UnitsSection({
               // Start from what's saved now: after a save the page brings each new unit's
               // id, and a rename only reaches its tasks when the ids it sends are those.
               setUnits(structuredClone(initial));
+              setEditVersion(version);
               setEditing(true);
             }}
-            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
+            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
           >
             Edit
           </button>
@@ -167,8 +172,8 @@ export function UnitsSection({
               <Button size="sm" variant="secondary" onClick={() => setRemoving(null)}>
                 Keep it
               </Button>
-              <Button size="sm" variant="danger" onClick={confirmRemove}>
-                Remove
+              <Button size="sm" variant="destructive" onClick={confirmRemove}>
+                Remove unit
               </Button>
             </>
           }
@@ -176,21 +181,12 @@ export function UnitsSection({
       )}
 
       {confirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setConfirmOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 className="text-sm font-semibold">Discard unsaved changes?</h4>
-            <p className="mt-1 text-xs text-muted">
-              You have unsaved changes to units &amp; access. Save them, or discard and exit.
-            </p>
-            <div className="mt-4 flex items-center justify-end gap-2">
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          body={<>You have unsaved changes to units &amp; access. Save them, or discard and exit.</>}
+          onClose={() => setConfirmOpen(false)}
+          actions={
+            <>
               <Button size="sm" variant="secondary" onClick={() => setConfirmOpen(false)}>
                 Keep editing
               </Button>
@@ -200,9 +196,9 @@ export function UnitsSection({
               <Button size="sm" onClick={save} disabled={pending}>
                 {pending ? "Saving…" : "Save changes"}
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
       )}
     </div>
   );
@@ -312,11 +308,11 @@ function ReadUnits({ units, rules }: { units: PropertyUnit[]; rules: CapexRules 
                           <td className="text-muted">{e.type}</td>
                           <td className="font-medium">{e.model || "—"}</td>
                           <td className="min-w-[160px] text-muted">{e.comment || "—"}</td>
-                          <td className="font-medium">{e.installYear || "—"}</td>
-                          <td className="font-medium">{fmtAge(equipmentAge(e.installYear))}</td>
+                          <td className="num font-medium">{e.installYear || "—"}</td>
+                          <td className="num font-medium">{fmtAge(equipmentAge(e.installYear))}</td>
                           <td>
                             {status === "Replace" ? (
-                              <Badge tone="red">Replace</Badge>
+                              <Badge tone="danger">Replace</Badge>
                             ) : status ? (
                               <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>
                                 {status}
@@ -392,7 +388,7 @@ function EditUnitCard({
                     }
                   >
                     <option value="">—</option>
-                    {UTILITY_STATUS_OPTIONS.map((o) => (
+                    {utilityStatusChoices(u.utilities?.[k]).map((o) => (
                       <option key={o}>{o}</option>
                     ))}
                   </select>
@@ -469,7 +465,7 @@ function EditUnitCard({
                   </span>
                   <span className="text-xs">
                     {status === "Replace" ? (
-                      <Badge tone="red">Replace</Badge>
+                      <Badge tone="danger">Replace</Badge>
                     ) : status ? (
                       <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>
                         {status}

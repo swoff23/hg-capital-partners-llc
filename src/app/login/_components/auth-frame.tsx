@@ -19,7 +19,7 @@ export function AuthFrame({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[#080b12] text-[#f2f4f7]">
+    <div data-surface="public" className="flex min-h-screen flex-col bg-[#080b12] text-[#f2f4f7]">
       <PublicHeader />
 
       <main className="relative isolate flex flex-1 items-center justify-center px-6 py-16">

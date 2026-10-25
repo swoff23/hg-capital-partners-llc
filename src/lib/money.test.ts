@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { amountToDecimal, evenShare, parseAmount, toDecimalString } from "./money";
+import { amountToDecimal, evenShare, moneyParts, parseAmount, toDecimalString } from "./money";
 
 test("parseAmount: the shapes people actually type", () => {
   assert.equal(parseAmount("425000"), 425000);
@@ -49,4 +49,18 @@ test("evenShare: the 765/767 Prospect split, and shares always sum to the total"
     const sum = Array.from({ length: parts }, (_, i) => evenShare(total, parts, i, step)).reduce((a, b) => a + b, 0);
     assert.equal(Math.round(sum * 100), Math.round(total * 100));
   }
+});
+
+test("moneyParts: whole dollars round once, cents stay exact", () => {
+  assert.deepEqual(moneyParts(425000, false), { negative: false, dollars: 425000, cents: 0 });
+  assert.deepEqual(moneyParts(1450.5, false), { negative: false, dollars: 1451, cents: 0 });
+  assert.deepEqual(moneyParts(-1450.5, true), { negative: true, dollars: 1450, cents: 50 });
+  assert.deepEqual(moneyParts(0.29, true), { negative: false, dollars: 0, cents: 29 });
+  assert.deepEqual(moneyParts(19.999, true), { negative: false, dollars: 20, cents: 0 });
+});
+
+test("moneyParts: an amount that rounds to zero has no minus", () => {
+  assert.deepEqual(moneyParts(-0.4, false), { negative: false, dollars: 0, cents: 0 });
+  assert.deepEqual(moneyParts(-0.004, true), { negative: false, dollars: 0, cents: 0 });
+  assert.equal(moneyParts(-0.6, false).negative, true);
 });

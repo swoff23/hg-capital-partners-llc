@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, PageHeader, Table, Td, Th, EmptyState } from "@/components/ui";
+import { Badge, Card, PageHeader, Table, Td, Th, EmptyState, textLinkClass } from "@/components/ui";
 import { cleanTrades, telHref } from "@/lib/contacts";
 import { ContactLink } from "./contact-link";
 
@@ -24,7 +24,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
   return (
     <>
       <PageHeader title="Contractors" subtitle={`${contacts.length} contractor${contacts.length === 1 ? "" : "s"}`} />
-      <Card className="overflow-hidden">
+      <Card className="overflow-clip">
         {contacts.length === 0 ? (
           <div className="p-4">
             <EmptyState>No contractors.</EmptyState>
@@ -47,8 +47,8 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                     <Link href={`/contractors/${c.id}`} className="font-medium hover:underline">
                       {c.fullName}
                     </Link>
-                    {c.tenantFixes && <Badge tone="green" className="ml-2">tenant fixes</Badge>}
-                    {!c.active && <Badge tone="gray" className="ml-2">inactive</Badge>}
+                    {c.tenantFixes && <Badge className="ml-2">tenant fixes</Badge>}
+                    {!c.active && <Badge tone="neutral" className="ml-2">inactive</Badge>}
                   </Td>
                   <Td className="text-xs text-muted">{c.company ?? "—"}</Td>
                   <Td className="max-w-xs text-xs">{cleanTrades(c.trades) ?? "—"}</Td>
@@ -56,9 +56,9 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                     <ContactLink href={telHref(c.phoneE164 ?? c.phone)}>{c.phone ?? "—"}</ContactLink>
                   </Td>
                   <Td className="text-xs">
-                    {c.w9Url && <a href={c.w9Url} target="_blank" rel="noreferrer" className="text-primary">W-9</a>}
+                    {c.w9Url && <a href={c.w9Url} target="_blank" rel="noreferrer" className={textLinkClass}>W-9</a>}
                     {c.w9Url && c.coiUrl && " · "}
-                    {c.coiUrl && <a href={c.coiUrl} target="_blank" rel="noreferrer" className="text-primary">COI</a>}
+                    {c.coiUrl && <a href={c.coiUrl} target="_blank" rel="noreferrer" className={textLinkClass}>COI</a>}
                     {!c.w9Url && !c.coiUrl && "—"}
                   </Td>
                 </tr>

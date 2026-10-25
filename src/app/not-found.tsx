@@ -5,7 +5,7 @@ import { PublicFooter } from "@/components/public/footer";
 /** Unmatched URLs (no route at all). Uses the public shell since we can't know if the visitor is signed in. */
 export default function RootNotFound() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#080b12] text-[#f2f4f7]">
+    <div data-surface="public" className="flex min-h-screen flex-col bg-[#080b12] text-[#f2f4f7]">
       <PublicHeader />
       <main className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <p className="text-xs font-medium uppercase tracking-[0.32em] text-[#c8a765]">Page not found</p>

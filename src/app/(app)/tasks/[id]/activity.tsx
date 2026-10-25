@@ -1,10 +1,10 @@
 "use client";
 import { Fragment, useState } from "react";
-import Link from "next/link";
 import { Lock } from "lucide-react";
 import { ActivityDay, ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
 import { Avatar } from "@/components/avatar";
 import { MediaGrid, type MediaItem } from "@/components/media-grid";
+import { TextLink } from "@/components/ui";
 import { groupByDay, splitEarlier } from "@/lib/tasks/activity";
 import { cn } from "@/lib/utils";
 import { FilesList, type FileLink } from "./files-list";
@@ -104,9 +104,7 @@ function Row({ row }: { row: ActivityRow }) {
   }
   const text =
     row.type === "line" && row.href ? (
-      <Link href={row.href} className="text-primary hover:underline">
-        {row.text}
-      </Link>
+      <TextLink href={row.href}>{row.text}</TextLink>
     ) : (
       row.text
     );

@@ -20,32 +20,41 @@ const propertySchema = z.object({
   status: z.string().optional(),
 });
 
-export async function createProperty(formData: FormData) {
-  return withLog("createProperty", async () => {
+/** The property an address already belongs to, for the New property form to point at. */
+export type ExistingProperty = { id: string; address: string };
+
+/**
+ * Creates the property and opens it. When the address is already a property,
+ * nothing is saved and that property comes back, so the form keeps what was typed.
+ */
+export async function createProperty(formData: FormData): Promise<ActionResult<{ duplicateOf: ExistingProperty }>> {
+  return withResult("createProperty", async () => {
     await requireUser();
     const p = propertySchema.parse(formToObject(formData));
     const r = await properties.createProperty(p);
-    if (r.duplicateOf) redirect(`/properties/${r.duplicateOf.id}?dup=1`);
+    if (r.duplicateOf) return { duplicateOf: { id: r.duplicateOf.id, address: r.duplicateOf.address } };
     redirect(`/properties/${r.property.id}`);
   });
 }
 
-/** Every field the form posts is written; "" clears. Unknown names are ignored by the service. */
-function formToPatch(formData: FormData): properties.PropertyPatch {
-  const patch: properties.PropertyPatch = {};
-  for (const [k, v] of formData.entries()) patch[k] = typeof v === "string" ? v : null;
-  return patch;
-}
+const fieldsSchema = z.record(z.string(), z.string());
 
 /**
  * Edit the property's scalar detail fields (details, loan, insurance, notes,
- * inline address). A number that doesn't read comes back as the error, and
- * nothing is saved; the editor keeps what was typed.
+ * inline address). `changes` holds only the fields the editor changed ("" clears
+ * one; unknown names are ignored by the service), and `expected` what it loaded
+ * for each, so a field someone else saved meanwhile refuses the save. A number
+ * that doesn't read comes back as the error, and nothing is saved; the editor
+ * keeps what was typed.
  */
-export async function patchProperty(id: string, formData: FormData): Promise<ActionResult> {
+export async function patchProperty(
+  id: string,
+  changes: Record<string, string>,
+  expected: Record<string, string>,
+): Promise<ActionResult> {
   return withResult("patchProperty", async () => {
     await requireUser();
-    await properties.patchProperty(id, formToPatch(formData));
+    await properties.patchProperty(id, fieldsSchema.parse(changes), fieldsSchema.parse(expected));
   });
 }
 

@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, textLinkClass } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import { shortAddress } from "@/lib/normalize";
 import {
+  capexUndatedNote,
   portfolioCapexForecast,
   type CapexForecastItem,
   type CapexRules,
@@ -31,6 +32,7 @@ export function PortfolioCapexForecastCard({
   rules: CapexRules;
 }) {
   const f = portfolioCapexForecast(properties, { years: 5, rules });
+  const undatedNote = capexUndatedNote(f.unknownCount);
   const maxYear = Math.max(1, ...f.perYear);
   const rows = f.rows.filter((r) => r.total > 0);
   const lastYear = f.years[f.years.length - 1];
@@ -79,28 +81,31 @@ export function PortfolioCapexForecastCard({
         </span>
       </CardHeader>
       <CardBody className="space-y-4">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-2xl font-semibold tabular-nums">
-            {fmtMoney(selIdx >= 0 ? f.perYear[selIdx] : f.total)}
-          </span>
-          {selIdx >= 0 ? (
-            <span className="text-xs font-medium text-muted">
-              {selYear} spend ·{" "}
-              <button
-                type="button"
-                onClick={() => setSelYear(null)}
-                className="text-primary hover:underline"
-              >
-                show all 5 years
-              </button>
+        <div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-2xl font-semibold tabular-nums">
+              {fmtMoney(selIdx >= 0 ? f.perYear[selIdx] : f.total)}
             </span>
-          ) : (
-            f.dueNowTotal > 0 && (
-              <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                {fmtMoney(f.dueNowTotal)} due soon
+            {selIdx >= 0 ? (
+              <span className="text-xs font-medium text-muted">
+                {selYear} spend ·{" "}
+                <button
+                  type="button"
+                  onClick={() => setSelYear(null)}
+                  className={textLinkClass}
+                >
+                  show all 5 years
+                </button>
               </span>
-            )
-          )}
+            ) : (
+              f.dueNowTotal > 0 && (
+                <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                  {fmtMoney(f.dueNowTotal)} due soon
+                </span>
+              )
+            )}
+          </div>
+          {undatedNote && <p className="mt-1 text-xs text-muted">{undatedNote}</p>}
         </div>
 
         {/* Clickable per-year chart — selecting a year spotlights it in the table */}
@@ -138,10 +143,10 @@ export function PortfolioCapexForecastCard({
                     className={
                       "block h-full rounded " +
                       (active
-                        ? "bg-primary"
+                        ? "bg-chart-1"
                         : i === 0
                           ? "bg-red-500/70 dark:bg-red-500/60"
-                          : "bg-primary/50")
+                          : "bg-chart-1/50")
                     }
                     style={{ width: `${(f.perYear[i] / maxYear) * 100}%` }}
                   />
@@ -292,7 +297,7 @@ export function PortfolioCapexForecastCard({
       {tip && (
         <div
           className={
-            "pointer-events-none fixed z-50 w-[336px] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-border bg-surface p-3 text-xs shadow-lg " +
+            "pointer-events-none fixed z-50 w-[336px] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-line-float bg-raised p-3 text-xs shadow-float " +
             (tip.flip ? "-translate-y-full" : "")
           }
           style={{ left: tip.x, top: tip.top }}

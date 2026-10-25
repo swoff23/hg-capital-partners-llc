@@ -1,54 +1,341 @@
 @import "tailwindcss";
 
-/* Dark mode is driven by [data-theme="dark"] on <html> (set by the theme toggle). */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* Ink and Limestone (docs/brand-guidelines.md). Every brand value lives in a
+   token here, so a re-brand is a token swap. Light is :root; dark is
+   [data-theme="dark"] on <html> (set before paint by THEME_SCRIPT in
+   components/theme-toggle.tsx), and the public site's [data-surface="public"]
+   wrapper always takes the dark values, whatever the toggle says.
 
+   The `dark:` variant matches the public surface too, so a `dark:` override
+   and the token it sits beside never disagree there. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-surface="public"], [data-surface="public"] *));
+
+/* ---------------- Color: light ---------------- */
 :root {
-  --background: #f7f7f8;
+  color-scheme: light;
+
+  /* Neutrals (limestone grounds, ink type) */
+  --canvas: #f8f7f3;
   --surface: #ffffff;
-  --foreground: #18181b;
-  --muted: #6b7280;
-  --border: #e4e4e7;
-  --primary: #1d4ed8;
-  --primary-foreground: #ffffff;
-  --accent: #eef2ff;
+  --raised: #ffffff;
+  --fill-1: #f2f0ec;
+  --fill-2: #e7e5e0;
+  --select: #e4e9f0;
+  --line: #e7e5e0;
+  --line-strong: #d5d1ca;
+  --line-control: #84817a;
+  --fg-3: #5b6576;
+  --fg-2: #424e61;
+  --fg-1: #152133;
+
+  /* Act (ink) */
+  --act: #152133;
+  --on-act: #ffffff;
+  --act-hover: #28364d;
+
+  /* Status */
+  --danger: #b91c1c;
+  --danger-tint: #fff2f1;
+  --danger-fill: #b91c1c;
+  --danger-fill-hover: #a31818;
+  --on-danger: #ffffff;
+  --warn: #a54e09;
+  --warn-tint: #fff5ec;
+  --ok: #1d7038;
+  --ok-tint: #eff9f1;
+
+  /* Toast and chart */
+  --toast-bg: #152133;
+  --toast-fg: #ffffff;
+  --toast-fg-2: #c0bdb7;
+  --toast-hover: rgb(255 255 255 / 0.1);
+  --chart-1: #384e6e;
+
+  /* Elevation (section 5). Shadow color is ink, not black. */
+  --elev-float: 0 8px 24px -4px rgb(21 33 51 / 0.14);
+  --elev-overlay: 0 24px 64px -12px rgb(21 33 51 / 0.28);
+  --elev-photo-edge: inset 0 0 0 1px rgb(21 33 51 / 0.08);
+  --scrim: rgb(10 14 23 / 0.45);
+
+  /* Fixed in both themes: brand, photo marks and the public-only pair. */
+  --gold: #c8a765;
+  --gold-deep: #86662c;
+  --ink-tile: #152133;
+  --pill-bg: rgb(255 255 255 / 0.94);
+  --pill-fg: #152133;
+  --photo-scrim: rgb(10 14 23 / 0.72);
+  --on-photo: #ece9e4;
+  --pub-faint: #858991;
+  --pub-gold-hi: #d8ba7e;
+  /* The lightbox stage: the photo scrim's ink at full strength. */
+  --photo-stage: rgb(10 14 23);
+
+  /* Edges that only show on dark grounds (section 5). Each is built from
+     another token and redefined in the dark block below, so no component
+     needs a dark: override. In light they match what they sit on. */
+  --line-float: var(--line);
+  --toast-edge: var(--toast-bg);
+  --tile-edge: var(--ink-tile);
+
+  /* Motion (section 7). Easing for each lives in the animation that uses it. */
+  --dur-0: 0ms;
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --dur-toast: 220ms;
+  --dur-sheet: 260ms;
+  --dur-photo: 200ms;
+  --dur-check: 180ms;
+
+  /* The fixed app bar's height (h-14 in components/app-shell.tsx). A sticky
+     table header holds just under it. */
+  --app-bar-h: 3.5rem;
 }
 
-:root[data-theme="dark"] {
-  --background: #0b0c0e;
-  --surface: #161819;
-  --foreground: #e8e8ea;
-  --muted: #8b8f96;
-  --border: #2a2d31;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --accent: #1e293b;
+/* ---------------- Color: dark, and the public site ---------------- */
+:root[data-theme="dark"],
+[data-surface="public"] {
+  color-scheme: dark;
+
+  --canvas: #0a0e17;
+  --surface: #0f141e;
+  --raised: #161d28;
+  --fill-1: #181e2a;
+  --fill-2: #212835;
+  --select: #2a3548;
+  --line: #212835;
+  --line-strong: #323947;
+  --line-control: #6e7684;
+  --fg-3: #a19e98;
+  --fg-2: #c0bdb7;
+  --fg-1: #ece9e4;
+
+  --act: #ece9e4;
+  --on-act: #0f141e;
+  --act-hover: #d3d1cb;
+
+  --danger: #f47b76;
+  --danger-tint: #341817;
+  --danger-fill: #c92f33;
+  --danger-fill-hover: #b3292d;
+  --on-danger: #ffffff;
+  --warn: #f7a059;
+  --warn-tint: #321f0f;
+  --ok: #6ad18a;
+  --ok-tint: #142619;
+
+  --toast-bg: #212835;
+  --toast-fg: #ece9e4;
+  --toast-fg-2: #c0bdb7;
+  --toast-hover: rgb(255 255 255 / 0.1);
+  --chart-1: #d7d0c3;
+
+  --elev-float: 0 8px 24px -6px rgb(0 0 0 / 0.5);
+  --elev-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.7);
+  --elev-photo-edge: inset 0 0 0 1px rgb(236 233 228 / 0.08);
+  --scrim: rgb(0 0 0 / 0.6);
+
+  /* Floating layers, the toast and the monogram tile take an edge here. */
+  --line-float: var(--line-strong);
+  --toast-edge: var(--line-strong);
+  --tile-edge: var(--line);
 }
 
+/* Tokens built from other tokens. A var() resolves where it's declared, so
+   these sit on every element that redefines the base tokens; declared on
+   :root alone, the public wrapper would inherit the light values. */
+:root,
+[data-surface="public"] {
+  --chart-ref: var(--line-control);
+
+  /* One-release aliases (section 11) so today's utilities keep working.
+     Slice 6 codemods the call sites to the new names and deletes these. */
+  --background: var(--fill-1);
+  --foreground: var(--fg-1);
+  --muted: var(--fg-3);
+  --border: var(--line);
+  --primary: var(--act);
+  --primary-foreground: var(--on-act);
+  --accent: var(--fill-2);
+}
+
+/* Utilities read the variables, so text-fg-2, bg-canvas, border-line-control,
+   bg-danger-tint and friends follow the theme. */
 @theme inline {
-  --color-background: var(--background);
+  --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-fill-1: var(--fill-1);
+  --color-fill-2: var(--fill-2);
+  --color-select: var(--select);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-line-control: var(--line-control);
+  --color-line-float: var(--line-float);
+  --color-fg-1: var(--fg-1);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+
+  --color-act: var(--act);
+  --color-on-act: var(--on-act);
+  --color-act-hover: var(--act-hover);
+
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-danger-fill: var(--danger-fill);
+  --color-danger-fill-hover: var(--danger-fill-hover);
+  --color-on-danger: var(--on-danger);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-ok: var(--ok);
+  --color-ok-tint: var(--ok-tint);
+
+  --color-gold: var(--gold);
+  --color-gold-deep: var(--gold-deep);
+  --color-ink-tile: var(--ink-tile);
+  --color-tile-edge: var(--tile-edge);
+
+  --color-toast-bg: var(--toast-bg);
+  --color-toast-edge: var(--toast-edge);
+  --color-toast-fg: var(--toast-fg);
+  --color-toast-fg-2: var(--toast-fg-2);
+  --color-toast-hover: var(--toast-hover);
+  --color-chart-1: var(--chart-1);
+  --color-chart-ref: var(--chart-ref);
+
+  --color-pill-bg: var(--pill-bg);
+  --color-pill-fg: var(--pill-fg);
+  --color-photo-scrim: var(--photo-scrim);
+  --color-on-photo: var(--on-photo);
+  --color-photo-stage: var(--photo-stage);
+  --color-pub-faint: var(--pub-faint);
+  --color-pub-gold-hi: var(--pub-gold-hi);
+  --color-scrim: var(--scrim);
+
+  /* Aliases, one release */
+  --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
+
+  /* Elevation: shadow-float, shadow-overlay, inset-shadow-photo-edge */
+  --shadow-float: var(--elev-float);
+  --shadow-overlay: var(--elev-overlay);
+  --inset-shadow-photo-edge: var(--elev-photo-edge);
+  /* inset-shadow-rule: a table header's --line-strong rule, drawn inside the
+     cell. A collapsed table's borders stay put when a sticky header moves, so
+     a border-b would leave the stuck header with no rule under it. */
+  --inset-shadow-rule: inset 0 -1px 0 var(--line-strong);
+
+  /* Motion: duration-fast, duration-base and the rest */
+  --transition-duration-0: var(--dur-0);
+  --transition-duration-fast: var(--dur-fast);
+  --transition-duration-base: var(--dur-base);
+  --transition-duration-toast: var(--dur-toast);
+  --transition-duration-sheet: var(--dur-sheet);
+  --transition-duration-photo: var(--dur-photo);
+  --transition-duration-check: var(--dur-check);
+
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-/* Overlay motion (popover, sheet, menu, toast, lightbox). React Aria keeps an
-   overlay mounted until its exit animation ends, so exits are animations too.
-   Callers pair each with motion-reduce:animate-none. */
+/* ---------------- Type scale (section 3) ----------------
+   In @theme, not @theme inline: each text-* utility reads these variables, so
+   the one pointer: coarse block below reaches every call site. A token carries
+   size, line height, weight and tracking; text-code and text-code-l pair with
+   font-mono. */
 @theme {
-  --animate-fade-in: fade-in 150ms ease-out;
-  --animate-fade-out: fade-out 120ms ease-in forwards;
-  --animate-pop-in: pop-in 160ms cubic-bezier(0.32, 0.72, 0, 1);
-  --animate-pop-out: pop-out 120ms ease-in forwards;
-  --animate-sheet-in: sheet-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
-  --animate-sheet-out: sheet-out 200ms ease-in forwards;
-  --animate-toast-in: toast-in 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.015em;
+
+  --text-section: 1rem;
+  --text-section--line-height: 1.5rem;
+  --text-section--font-weight: 600;
+  --text-section--letter-spacing: -0.005em;
+
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-body--font-weight: 400;
+  --text-body--letter-spacing: 0em;
+
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.25rem;
+  --text-label--font-weight: 500;
+  --text-label--letter-spacing: 0em;
+
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.125rem;
+  --text-meta--font-weight: 400;
+  --text-meta--letter-spacing: 0em;
+
+  --text-micro: 0.75rem;
+  --text-micro--line-height: 1rem;
+  --text-micro--font-weight: 500;
+  --text-micro--letter-spacing: 0.01em;
+
+  --text-figure-l: 1.75rem;
+  --text-figure-l--line-height: 2.25rem;
+  --text-figure-l--font-weight: 500;
+  --text-figure-l--letter-spacing: -0.02em;
+
+  --text-figure-m: 1.25rem;
+  --text-figure-m--line-height: 1.75rem;
+  --text-figure-m--font-weight: 500;
+  --text-figure-m--letter-spacing: -0.01em;
+
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.25rem;
+  --text-code--font-weight: 400;
+  --text-code--letter-spacing: 0em;
+
+  --text-code-l: 1.75rem;
+  --text-code-l--line-height: 2.25rem;
+  --text-code-l--font-weight: 500;
+  --text-code-l--letter-spacing: 0.06em;
+}
+
+/* Touch (phones and tablets) swaps the sizes once, here, so no call site
+   needs a pointer-coarse: variant. Roles left out keep their desktop values. */
+@media (pointer: coarse) {
+  :root {
+    --text-title: 1.75rem;
+    --text-title--line-height: 2.125rem;
+    --text-section: 1.0625rem;
+    --text-body: 1rem;
+    --text-body--line-height: 1.375rem;
+    --text-label: 1rem;
+    --text-label--line-height: 1.375rem;
+    --text-meta: 0.875rem;
+    --text-meta--line-height: 1.25rem;
+    --text-code: 0.9375rem;
+  }
+}
+
+/* Motion (section 7). Hover, press, color changes and every exit run at
+   --dur-fast ease-out, so a bare `transition` or `transition-colors` does too.
+   React Aria keeps an overlay mounted until its exit animation ends, so exits
+   are animations as well. Callers pair each with motion-reduce:animate-none.
+   fade-in is a scrim or lightbox ground appearing: an opacity change, so
+   --dur-fast. */
+@theme {
+  --default-transition-duration: var(--dur-fast);
+  --default-transition-timing-function: ease-out;
+
+  /* Today's overlay curve, kept: ease-spring */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-fade-in: fade-in var(--dur-fast) ease-out;
+  --animate-fade-out: fade-out var(--dur-fast) ease-out forwards;
+  --animate-pop-in: pop-in var(--dur-base) var(--ease-spring);
+  --animate-pop-out: pop-out var(--dur-fast) ease-out forwards;
+  --animate-sheet-in: sheet-in var(--dur-sheet) var(--ease-spring);
+  --animate-sheet-out: sheet-out var(--dur-fast) ease-out forwards;
+  --animate-toast-in: toast-in var(--dur-toast) var(--ease-spring);
 
   @keyframes fade-in {
     from {
@@ -90,14 +377,73 @@
   }
 }
 
+/* ---------------- Globals ---------------- */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface);
+  color: var(--fg-1);
   font-family: var(--font-sans);
+}
+
+::selection {
+  background-color: var(--select);
+  color: var(--fg-1);
 }
 
 * {
   scrollbar-width: thin;
+}
+
+/* In the base layer, so a component's own focus style (outline-none plus a
+   ring, as fields do) still wins. Inside the ink toast the outline is
+   --toast-fg, set by the toast itself. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--act);
+    outline-offset: 2px;
+  }
+
+  /* Tabular figures by default, so column alignment never hangs on a utility. */
+  td,
+  th,
+  .num,
+  .text-figure-l,
+  .text-figure-m {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Native checkboxes and radios check in ink, like every other checked
+     control (section 9). */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--act);
+  }
+
+  /* Cents on a single transaction line or a bill's key figure, lifted to the
+     cap line in the figure's own color. */
+  .cents {
+    font-size: 0.62em;
+    vertical-align: 0.27em;
+  }
+}
+
+/* Reduced motion turns every movement into an opacity change of 120ms or less.
+   The overlay animations swap to fades; transitions finish at once (0.01ms, so
+   transitionend still fires); smooth scrolling stops. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --animate-fade-in: fade-in var(--dur-fast) ease-out;
+    --animate-pop-in: fade-in var(--dur-fast) ease-out;
+    --animate-pop-out: fade-out var(--dur-fast) ease-out forwards;
+    --animate-sheet-in: fade-in var(--dur-fast) ease-out;
+    --animate-sheet-out: fade-out var(--dur-fast) ease-out forwards;
+    --animate-toast-in: fade-in var(--dur-fast) ease-out;
+  }
+  *,
+  ::before,
+  ::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* iOS Safari zooms the whole page when a focused field's text is under 16px.
@@ -108,5 +454,23 @@ body {
   select,
   textarea {
     font-size: max(16px, 1em);
+  }
+}
+
+/* Print the page, not the app around it. The app shell's header and sidebar
+   (components/app-shell.tsx) are position: fixed, so they would print at the
+   top of every sheet, over its first lines; the shell's padding only makes
+   room for them. Keyed off that fixed header, so pages outside the shell
+   print as they are. Unlayered, so it wins over the shell's utilities. */
+@media print {
+  header.fixed,
+  header.fixed ~ aside,
+  header.fixed ~ button {
+    display: none;
+  }
+  header.fixed ~ div,
+  header.fixed ~ div > main {
+    min-height: 0;
+    padding: 0;
   }
 }

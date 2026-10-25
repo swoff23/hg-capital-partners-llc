@@ -99,8 +99,11 @@ export function SideNav({
             title={collapsed ? l.label : undefined}
             aria-label={l.label}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              active ? "bg-accent text-primary" : "text-foreground hover:bg-background",
+              "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              // The current item's ink notch is its 3:1 mark; the fill alone is about 1.2:1.
+              active
+                ? "bg-accent text-primary before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:bg-act"
+                : "text-foreground hover:bg-background",
             )}
           >
             <svg

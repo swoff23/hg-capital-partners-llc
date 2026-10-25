@@ -24,9 +24,13 @@ import { cn } from "@/lib/utils";
 /** Opens its Popover (or Sheet) from the first pressable child. Re-export of React Aria's DialogTrigger. */
 export const PopoverTrigger = DialogTrigger;
 
-/** The floating surface, shared by Popover and Menu. */
+/**
+ * The floating surface, shared by Popover and Menu: the Float level
+ * (docs/brand-guidelines.md, section 5). --raised on a --line edge with the
+ * ink float shadow; in dark the edge is --line-strong (--line-float).
+ */
 export const popoverSurface = cn(
-  "overflow-auto rounded-xl border border-border bg-surface text-foreground shadow-lg outline-none",
+  "overflow-auto rounded-lg border border-line-float bg-raised text-fg-1 shadow-float outline-none",
   "data-[placement=bottom]:origin-top data-[placement=top]:origin-bottom",
   "data-entering:animate-pop-in data-exiting:animate-pop-out motion-reduce:animate-none",
 );

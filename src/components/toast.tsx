@@ -84,8 +84,8 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
         if (!e.currentTarget.contains(e.relatedTarget)) setHeld(false);
       }}
       className={cn(
-        "pointer-events-auto flex min-h-10 items-center gap-2 rounded-lg bg-zinc-900 py-1 pl-3.5 pr-1 text-sm text-white shadow-lg",
-        "dark:bg-zinc-800 dark:ring-1 dark:ring-white/10",
+        // The ink pill on the toast tokens, at the Float level. Its edge only shows in dark (--toast-edge).
+        "pointer-events-auto flex min-h-10 items-center gap-2 rounded-lg border border-toast-edge bg-toast-bg py-1 pl-3.5 pr-1 text-body text-toast-fg shadow-float",
         "animate-toast-in motion-reduce:animate-none",
       )}
     >
@@ -97,7 +97,7 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
             item.action!.onAction();
             onDismiss();
           }}
-          className="shrink-0 rounded-md px-2 py-1.5 font-medium text-blue-300 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/40 pointer-coarse:min-h-11"
+          className="shrink-0 rounded-md px-2 py-1.5 font-medium text-toast-fg underline decoration-1 underline-offset-3 transition-colors hover:bg-toast-hover focus-visible:outline-toast-fg pointer-coarse:min-h-11"
         >
           {item.action.label}
         </button>
@@ -106,7 +106,7 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
         type="button"
         aria-label="Dismiss"
         onClick={onDismiss}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/60 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/40 pointer-coarse:h-11 pointer-coarse:w-11"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-toast-fg-2 transition-colors hover:bg-toast-hover hover:text-toast-fg focus-visible:outline-toast-fg pointer-coarse:h-11 pointer-coarse:w-11"
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>

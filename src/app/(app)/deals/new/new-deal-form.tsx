@@ -1,0 +1,88 @@
+"use client";
+import { useState, useTransition, type FormEvent } from "react";
+import { Button, Input, Select, TextLink } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
+import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "@/lib/config";
+import { shortAddress } from "@/lib/normalize";
+import { createDeal, type ExistingDeal } from "../actions";
+
+/**
+ * Posts without a page load, so a refusal keeps every field as typed: an
+ * address that's already a deal says which one and links to it.
+ */
+export function NewDealForm() {
+  const [pending, start] = useTransition();
+  const [existing, setExisting] = useState<ExistingDeal | null>(null);
+  const [error, setError] = useState("");
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    setError("");
+    start(async () => {
+      const res = await callAction(() => createDeal(data));
+      // A new deal redirects to its page (callAction lets it through); only a refusal comes back.
+      if (!res.ok) setError(res.error);
+      else setExisting(res.data.duplicateOf);
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div>
+        <label className="block">
+          <span className="text-xs font-medium text-muted">Address *</span>
+          <Input
+            name="address"
+            required
+            placeholder="123 Main St, Buffalo, NY 14201"
+            onChange={() => setExisting(null)}
+            className="mt-1"
+          />
+        </label>
+        {existing && (
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+            Already in Deals: {shortAddress(existing.address)} · {existing.status}.{" "}
+            <TextLink href={`/deals/${existing.id}`} className="font-medium">
+              Open it
+            </TextLink>
+          </p>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="text-xs font-medium text-muted">Status</span>
+          <Select name="status" defaultValue={DEFAULT_DEAL_STATUS} className="mt-1">
+            {DEAL_STATUSES.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </Select>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-muted">Units</span>
+          <Input name="units" type="number" min="1" className="mt-1" />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-muted">Their price</span>
+          <Input name="theirPriceRaw" placeholder="425k" className="mt-1" />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-muted">Our price (target/max)</span>
+          <Input name="ourPriceRaw" placeholder="380k" className="mt-1" />
+        </label>
+      </div>
+      <label className="block">
+        <span className="text-xs font-medium text-muted">Listing URL</span>
+        <Input name="sourceUrl" type="url" placeholder="https://…" className="mt-1" />
+      </label>
+      <label className="block">
+        <span className="text-xs font-medium text-muted">Next action</span>
+        <Input name="nextAction" placeholder="Run comps, schedule tour…" className="mt-1" />
+      </label>
+      <Button type="submit" disabled={pending}>
+        {pending ? "Creating…" : "Create deal"}
+      </Button>
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+    </form>
+  );
+}

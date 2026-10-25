@@ -1,21 +1,33 @@
 import "server-only";
-import type { QboBasis, QboCategory } from "@prisma/client";
+import type { QboBasis, QboCategory, QboTreatment } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getConnection } from "./client";
 import { computeNoi, type ComputeLine, type NoiResult } from "./compute";
 import { buildDataQuality, type DataQualityReport } from "./data-quality";
 import { propertyTokens } from "./mapping";
 import { currentMonth } from "./months";
+import { comparePropertyRows, splitByProperty } from "./rollup";
 
-/** Read layer for /financials. All amounts in cents. */
+/**
+ * Read layer for /financials. All amounts in cents.
+ *
+ * Each reader takes an optional basis: pass one for a one-off `?basis=`
+ * override, or leave it out to use the basis chosen in Settings
+ * (QuickbooksConnection.accountingMethod). Lines on a class set to Ignore are
+ * left out everywhere; data-quality.ts reports how much that was.
+ */
 
 const d2c = (v: unknown): number => (v == null ? 0 : Math.round(Number(v) * 100));
 
 const thisMonth = currentMonth;
 
+const COUNTED = { classRole: { not: "IGNORE" } } as const;
+
+const sandboxOf = (conn: { environment: string }) => conn.environment === "sandbox";
+
 async function loadLines(realmId: string, basis: QboBasis, propertyId?: string) {
   const rows = await prisma.ledgerLine.findMany({
-    where: { realmId, basis, ...(propertyId ? { propertyId } : {}) },
+    where: { realmId, basis, ...COUNTED, ...(propertyId ? { propertyId } : {}) },
     select: {
       treatment: true,
       category: true,
@@ -42,6 +54,8 @@ function toComputeLines(rows: Awaited<ReturnType<typeof loadLines>>): ComputeLin
 export interface PropertyFinancialRow {
   propertyId: string;
   address: string;
+  /** false for a mapped property with no lines in this basis */
+  hasActivity: boolean;
   noi: NoiResult;
 }
 
@@ -55,28 +69,38 @@ export interface MonthlyTrendPoint {
 export interface FinancialsOverview {
   connected: boolean;
   basis: QboBasis;
+  /** the connected company is Intuit's sandbox: test data, not the real books */
+  sandbox: boolean;
   companyName: string | null;
   lastSync: {
     at: Date | null;
+    /** when the last SUCCESS / PARTIAL run finished */
+    runAt: Date | null;
     status: string | null;
     reconciled: boolean;
     reconcileSummary: unknown;
   } | null;
   portfolio: NoiResult;
+  /** every property with a mapped class, with or without lines */
   byProperty: PropertyFinancialRow[];
-  /** entity / overhead / no-class — the reconciling remainder */
-  unattributed: { incomeCents: number; expenseCents: number; noiCents: number };
+  /** entity, overhead, unmapped and no-class lines: the rest of the portfolio */
+  unassigned: { incomeCents: number; expenseCents: number; noiCents: number };
   monthlyTrend: MonthlyTrendPoint[];
   dataQuality: DataQualityReport | null;
 }
 
-export async function getFinancialsOverview(basis: QboBasis): Promise<FinancialsOverview | null> {
+export async function getFinancialsOverview(basisOverride?: QboBasis): Promise<FinancialsOverview | null> {
   const conn = await getConnection();
   if (!conn || conn.status === "REVOKED") return null;
+  const basis = basisOverride ?? conn.accountingMethod;
 
-  const [allRows, properties, lastRun] = await Promise.all([
+  const [allRows, properties, mappedClasses, lastRun] = await Promise.all([
     loadLines(conn.realmId, basis),
     prisma.property.findMany({ select: { id: true, address: true, purchaseDate: true } }),
+    prisma.qboClass.findMany({
+      where: { realmId: conn.realmId, role: "PROPERTY", propertyId: { not: null } },
+      select: { propertyId: true },
+    }),
     prisma.qboSyncRun.findFirst({
       where: { realmId: conn.realmId, status: { in: ["SUCCESS", "PARTIAL"] } },
       orderBy: { startedAt: "desc" },
@@ -87,17 +111,10 @@ export async function getFinancialsOverview(basis: QboBasis): Promise<Financials
   const portfolio = computeNoi(toComputeLines(allRows), { currentMonth: cm });
 
   const propById = new Map(properties.map((p) => [p.id, p]));
-  const byPropMap = new Map<string, typeof allRows>();
-  const unattributedRows: typeof allRows = [];
-  for (const r of allRows) {
-    if (r.propertyId && r.classRole === "PROPERTY") {
-      const arr = byPropMap.get(r.propertyId) ?? [];
-      arr.push(r);
-      byPropMap.set(r.propertyId, arr);
-    } else {
-      unattributedRows.push(r);
-    }
-  }
+  const { byProperty: byPropMap, unassigned: unassignedRows } = splitByProperty(
+    allRows,
+    mappedClasses.flatMap((c) => (c.propertyId && propById.has(c.propertyId) ? [c.propertyId] : [])),
+  );
 
   const byProperty: PropertyFinancialRow[] = [...byPropMap.entries()]
     .map(([pid, rows]) => {
@@ -105,6 +122,7 @@ export async function getFinancialsOverview(basis: QboBasis): Promise<Financials
       return {
         propertyId: pid,
         address: p?.address ?? "(unknown)",
+        hasActivity: rows.length > 0,
         noi: computeNoi(toComputeLines(rows), {
           currentMonth: cm,
           ownershipStartMonth: p?.purchaseDate
@@ -113,9 +131,14 @@ export async function getFinancialsOverview(basis: QboBasis): Promise<Financials
         }),
       };
     })
-    .sort((a, b) => b.noi.noiCents - a.noi.noiCents);
+    .sort((a, b) =>
+      comparePropertyRows(
+        { hasActivity: a.hasActivity, noiCents: a.noi.noiCents, address: a.address },
+        { hasActivity: b.hasActivity, noiCents: b.noi.noiCents, address: b.address },
+      ),
+    );
 
-  const unattr = computeNoi(toComputeLines(unattributedRows), { currentMonth: cm });
+  const unassigned = computeNoi(toComputeLines(unassignedRows), { currentMonth: cm });
 
   // monthly trend
   const byMonth = new Map<string, { income: number; expense: number }>();
@@ -143,25 +166,27 @@ export async function getFinancialsOverview(basis: QboBasis): Promise<Financials
 
   let dataQuality: DataQualityReport | null = null;
   if (allRows.length > 0) {
-    dataQuality = await buildDataQuality(conn.realmId, propertyTokens(properties));
+    dataQuality = await buildDataQuality(conn.realmId, propertyTokens(properties), basis);
   }
 
   return {
     connected: conn.status === "ACTIVE",
     basis,
+    sandbox: sandboxOf(conn),
     companyName: conn.companyName,
     lastSync: {
       at: conn.lastSuccessfulSyncAt,
+      runAt: lastRun?.finishedAt ?? lastRun?.startedAt ?? null,
       status: lastRun?.status ?? null,
       reconciled,
       reconcileSummary: reconStats,
     },
     portfolio,
     byProperty,
-    unattributed: {
-      incomeCents: unattr.operatingIncomeCents,
-      expenseCents: unattr.operatingExpenseCents,
-      noiCents: unattr.noiCents,
+    unassigned: {
+      incomeCents: unassigned.operatingIncomeCents,
+      expenseCents: unassigned.operatingExpenseCents,
+      noiCents: unassigned.noiCents,
     },
     monthlyTrend,
     dataQuality,
@@ -173,16 +198,21 @@ export async function getFinancialsOverview(basis: QboBasis): Promise<Financials
 export interface PropertyFinancials {
   connected: boolean;
   basis: QboBasis;
+  sandbox: boolean;
   mapped: boolean;
+  /** Any synced line at all is classed to this property (false: the figures would all be $0). */
+  hasLines: boolean;
   noi: NoiResult;
   expenseByCategory: { category: QboCategory; cents: number }[];
   monthly: { periodMonth: string; incomeCents: number; expenseCents: number }[];
+  /** The 8 latest money-in or money-out lines; EXCLUDED ones (transfers, principal) are left out. */
   recentLines: {
     txnDate: Date;
     txnType: string;
     name: string | null;
     accountName: string;
     className: string | null;
+    treatment: QboTreatment;
     amountCents: number;
   }[];
   lastSyncAt: Date | null;
@@ -190,25 +220,27 @@ export interface PropertyFinancials {
 
 export async function getPropertyFinancials(
   propertyId: string,
-  basis: QboBasis,
+  basisOverride?: QboBasis,
 ): Promise<PropertyFinancials | null> {
   const conn = await getConnection();
   if (!conn || conn.status === "REVOKED") return null;
+  const basis = basisOverride ?? conn.accountingMethod;
 
   const [rows, mappedClass, property, recent] = await Promise.all([
     loadLines(conn.realmId, basis, propertyId),
     prisma.qboClass.findFirst({ where: { realmId: conn.realmId, propertyId, role: "PROPERTY" } }),
     prisma.property.findUnique({ where: { id: propertyId }, select: { purchaseDate: true } }),
     prisma.ledgerLine.findMany({
-      where: { realmId: conn.realmId, basis, propertyId },
+      where: { realmId: conn.realmId, basis, propertyId, treatment: { not: "EXCLUDED" }, ...COUNTED },
       orderBy: { txnDate: "desc" },
-      take: 15,
+      take: 8,
       select: {
         txnDate: true,
         txnType: true,
         name: true,
         accountName: true,
         className: true,
+        treatment: true,
         amount: true,
       },
     }),
@@ -242,7 +274,9 @@ export async function getPropertyFinancials(
   return {
     connected: conn.status === "ACTIVE",
     basis,
+    sandbox: sandboxOf(conn),
     mapped: !!mappedClass,
+    hasLines: rows.length > 0,
     noi,
     expenseByCategory,
     monthly,
@@ -256,6 +290,8 @@ export async function getPropertyFinancials(
 export interface RentRoll {
   connected: boolean;
   basis: QboBasis;
+  sandbox: boolean;
+  /** every month with rent in the books, assigned to a property or not */
   months: string[];
   rows: {
     propertyId: string;
@@ -270,13 +306,14 @@ export interface RentRoll {
   lastSyncAt: Date | null;
 }
 
-export async function getRentRoll(basis: QboBasis): Promise<RentRoll | null> {
+export async function getRentRoll(basisOverride?: QboBasis): Promise<RentRoll | null> {
   const conn = await getConnection();
   if (!conn || conn.status === "REVOKED") return null;
+  const basis = basisOverride ?? conn.accountingMethod;
 
   const [rentRows, properties] = await Promise.all([
     prisma.ledgerLine.findMany({
-      where: { realmId: conn.realmId, basis, category: "RENT" },
+      where: { realmId: conn.realmId, basis, category: "RENT", ...COUNTED },
       select: {
         propertyId: true,
         periodMonth: true,
@@ -344,6 +381,7 @@ export async function getRentRoll(basis: QboBasis): Promise<RentRoll | null> {
   return {
     connected: conn.status === "ACTIVE",
     basis,
+    sandbox: sandboxOf(conn),
     months,
     rows,
     portfolioByMonth: Object.fromEntries(portfolioByMonth),

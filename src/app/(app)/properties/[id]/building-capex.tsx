@@ -1,10 +1,12 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Badge, Button } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import { fmtMoney } from "@/lib/utils";
 import {
   equipmentStatusTone,
   lifecycleStatus,
+  parseCapexCost,
   parseInstallYear,
   type BuildingCapexData,
   type BuildingRule,
@@ -45,7 +47,7 @@ function toDraft(data: BuildingCapexData, items: BuildingRule[]): Draft {
 }
 
 function StatusCell({ status }: { status: EquipmentStatus }) {
-  if (status === "Replace") return <Badge tone="red">Replace</Badge>;
+  if (status === "Replace") return <Badge tone="danger">Replace</Badge>;
   return (
     <span className={"font-medium " + toneText[equipmentStatusTone(status)]}>{status}</span>
   );
@@ -58,7 +60,7 @@ export function BuildingCapexSection({
   rules,
 }: {
   propertyId: string;
-  /** Property.updatedAt the page rendered with; the save refuses to overwrite a newer row. */
+  /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
   version: string;
   initial: BuildingCapexData;
   rules: CapexRules;
@@ -66,6 +68,9 @@ export function BuildingCapexSection({
   const items = rules.building;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial, items));
+  // The version Edit opened at. A save in another card refreshes the page with a
+  // newer one, and sending that would let this draft overwrite a partner's change.
+  const [editVersion, setEditVersion] = useState(version);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -83,22 +88,29 @@ export function BuildingCapexSection({
     > = {};
     for (const item of items) {
       const c = draft[item.key];
-      const costNum = parseFloat(c.cost.replace(/[$,\s]/g, ""));
       payload[item.key] = {
         type: c.type.trim() || null,
         year: c.year.trim() || null,
-        costOverride: Number.isFinite(costNum) && costNum > 0 ? costNum : null,
+        costOverride: parseCapexCost(c.cost),
       };
     }
     setError(null);
     start(async () => {
-      const r = await updateBuildingCapex(propertyId, payload, version);
+      const r = await callAction(() => updateBuildingCapex(propertyId, payload, editVersion));
       if (!r.ok) {
         setError(r.error);
         return;
       }
       setEditing(false);
     });
+  }
+
+  /** Start from what's saved now, at the version it was saved at. */
+  function edit() {
+    setError(null);
+    setDraft(toDraft(initial, items));
+    setEditVersion(version);
+    setEditing(true);
   }
 
   function cancel() {
@@ -139,8 +151,8 @@ export function BuildingCapexSection({
           </div>
         ) : (
           <button
-            onClick={() => setEditing(true)}
-            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
+            onClick={edit}
+            className="text-xs font-medium text-primary opacity-0 transition-opacity hover:underline focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
           >
             Edit
           </button>
@@ -168,10 +180,7 @@ export function BuildingCapexSection({
                 ? {
                     type: d.type,
                     year: d.year,
-                    costOverride: (() => {
-                      const n = parseFloat(d.cost.replace(/[$,\s]/g, ""));
-                      return Number.isFinite(n) && n > 0 ? n : null;
-                    })(),
+                    costOverride: parseCapexCost(d.cost),
                   }
                 : {
                     type: stored?.type ?? "",
@@ -225,6 +234,12 @@ export function BuildingCapexSection({
                       placeholder={fmtMoney(item.defaultCost)}
                       value={d.cost}
                       onChange={(e) => setCell(item.key, "cost", e.target.value)}
+                      // Show what will be stored: "8k" becomes "$8,000"; anything that
+                      // isn't one clean amount clears back to the default cost.
+                      onBlur={(e) => {
+                        const n = parseCapexCost(e.target.value);
+                        setCell(item.key, "cost", n == null ? "" : fmtMoney(n));
+                      }}
                     />
                   ) : (
                     <span className={"text-xs " + costClass}>

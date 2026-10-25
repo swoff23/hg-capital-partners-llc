@@ -3,8 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { DueDatePicker } from "@/components/due-date-picker";
-import { StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui";
+import { StatusBadge, StatusMark } from "@/components/status-badge";
 import { isActiveStatus } from "@/lib/task-scope";
 import { assigneeName, isContractorJob, isOverdue, isTargetLate, targetField, targetOf, type ListTask } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
@@ -56,13 +55,15 @@ export function TaskRow({
   const first = name ? who?.split(" ")[0] : null;
   const place = [task.place, task.unitLabel].filter(Boolean).join(" · ");
   const oneLine = !actions;
-  // The status chip, or in the Waiting section what it's waiting on.
+  // The status, or in the Waiting section the pause ring and what it's waiting
+  // on, in --fg-3 so amber stays a partner's decision (brand guidelines, section 9).
   const waitingOn = reason && task.status === "WAITING" && !!task.waitingOn;
   const state =
     waitingOn ? (
-      <Badge tone="amber" title={`Waiting on ${task.waitingOn}`} className="block max-w-40 truncate">
-        {task.waitingOn}
-      </Badge>
+      <span title={`Waiting on ${task.waitingOn}`} className="inline-flex min-w-0 max-w-40 items-center gap-1.5 text-meta text-fg-3">
+        <StatusMark status="WAITING" />
+        <span className="truncate">Waiting on {task.waitingOn}</span>
+      </span>
     ) : status && (job || task.status !== "OPEN") ? (
       <StatusBadge status={task.status} />
     ) : null;

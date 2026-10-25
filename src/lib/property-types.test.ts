@@ -5,13 +5,35 @@ import {
   orphanedEquipmentTypes,
   parseCapexRules,
   capexForecast,
+  capexUndatedNote,
+  parseCapexCost,
+  portfolioCapexForecast,
   isHouseMeterRow,
   propertyUnitCount,
+  rentableUnitLabels,
   reconcileUnits,
   renamedLabel,
+  UTILITY_STATUS_FIELDS,
+  UTILITY_STATUS_OPTIONS,
+  utilityStatusChoices,
   withUnitIds,
   type CapexRules,
 } from "./property-types";
+
+test("UTILITY_STATUS_FIELDS: National Grid's LOFL holds account numbers, so it edits as text", () => {
+  assert.equal(UTILITY_STATUS_FIELDS.has("nationalGridLofl"), false);
+  assert.equal(UTILITY_STATUS_FIELDS.has("nationalFuelLofl"), true);
+  assert.equal(UTILITY_STATUS_FIELDS.has("nationalGridAutopay"), true);
+});
+
+test("utilityStatusChoices: a stored value that isn't a status stays selectable", () => {
+  assert.deepEqual(utilityStatusChoices(null), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices(""), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("  "), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("Done"), [...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("81531-59050"), ["81531-59050", ...UTILITY_STATUS_OPTIONS]);
+  assert.deepEqual(utilityStatusChoices("Yes"), ["Yes", ...UTILITY_STATUS_OPTIONS]);
+});
 
 test("isHouseMeterRow: only the building's own meters, never a real unit", () => {
   assert.equal(isHouseMeterRow({ label: "HSE (house)" }), true);
@@ -20,6 +42,15 @@ test("isHouseMeterRow: only the building's own meters, never a real unit", () =>
   for (const label of ["Rear house", "Front", "Unit 1", "1st Rear / Apt #3", "", null, undefined]) {
     assert.equal(isHouseMeterRow({ label }), false, String(label));
   }
+});
+
+test("rentableUnitLabels: rentable units only, trimmed, each once", () => {
+  assert.deepEqual(
+    rentableUnitLabels([{ label: " Lower " }, { label: "Upper" }, { label: "HSE (house)" }, { label: "" }, { label: null }, { label: "Upper" }]),
+    ["Lower", "Upper"],
+  );
+  assert.deepEqual(rentableUnitLabels(null), []);
+  assert.deepEqual(rentableUnitLabels("junk"), []);
 });
 
 test("propertyUnitCount: the unit records, less house meters; the stored number only without records", () => {
@@ -140,6 +171,50 @@ test("capexForecast: only rules-covered types are scheduled", () => {
   assert.equal(items.length, 1);
   assert.equal(items[0].type, "Sump Pump");
   assert.equal(items[0].cost, 1200);
+});
+
+test("capexForecast: undated priced assets are counted, not silently dropped", () => {
+  const now = new Date("2026-06-01");
+  const units = [
+    {
+      equipment: [
+        { type: "HVAC", installYear: "Old" },
+        { type: "Oven", installYear: "Newer" },
+        { type: "Dishwasher", installYear: "x" },
+        { type: "Washing Machine", installYear: "" },
+        { type: "HVAC", installYear: "~2012" }, // dated: scheduled, not counted
+        { type: "Doorbell", installYear: "Old" }, // no rule: not tracked at all
+      ],
+    },
+  ];
+  const building = { roof: { year: "Older" }, windows: { year: "" } }; // a blank building year isn't counted
+  const f = capexForecast(units, { years: 5, now, building, rules: DEFAULT_CAPEX_RULES });
+  assert.equal(f.unknownCount, 5);
+
+  const p = portfolioCapexForecast(
+    [
+      { id: "a", address: "1 A St", units, building },
+      { id: "b", address: "2 B St", units: [{ equipment: [{ type: "HVAC" }] }], building: {} },
+    ],
+    { years: 5, now, rules: DEFAULT_CAPEX_RULES },
+  );
+  assert.equal(p.unknownCount, 6);
+});
+
+test("capexUndatedNote: one line naming what the total leaves out, nothing at zero", () => {
+  assert.equal(capexUndatedNote(0), null);
+  assert.equal(capexUndatedNote(1), "Excludes 1 item with no install year");
+  assert.equal(capexUndatedNote(22), "Excludes 22 items with no install year");
+});
+
+test("parseCapexCost: the app's money parser, so 8k is $8,000, not $8", () => {
+  assert.equal(parseCapexCost("8k"), 8_000);
+  assert.equal(parseCapexCost("1.2M"), 1_200_000);
+  assert.equal(parseCapexCost("$27,000"), 27_000);
+  assert.equal(parseCapexCost(" 4500 "), 4_500);
+  for (const raw of ["", "  ", "0", "-500", "about 8k", "8k-10k", null, undefined]) {
+    assert.equal(parseCapexCost(raw), null, String(raw));
+  }
 });
 
 test("orphanedEquipmentTypes: only dropped types that some unit still uses", () => {

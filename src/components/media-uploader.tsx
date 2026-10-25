@@ -400,7 +400,7 @@ export function MediaUploadTray({ uploader, className }: { uploader: MediaUpload
           <UploadTile key={u.key} upload={u} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
         ))}
       </ul>
-      {notice && <p className="truncate text-xs text-red-600 dark:text-red-400">{notice}</p>}
+      {notice && <p className="truncate text-xs text-danger">{notice}</p>}
     </div>
   );
 }
@@ -420,7 +420,7 @@ function UploadTile({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onR
   return (
     <li
       aria-label={`${u.name}, ${state}`}
-      className="relative h-14 w-14 shrink-0 rounded-lg bg-zinc-100 dark:bg-zinc-800"
+      className="relative h-14 w-14 shrink-0 rounded-lg bg-fill-1"
     >
       <div className="absolute inset-0 overflow-hidden rounded-lg">
         {u.previewUrl && !broken && u.kind === "image" && (
@@ -439,23 +439,23 @@ function UploadTile({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onR
           />
         )}
         {u.kind === "video" && (
-          <Play className="absolute bottom-1 left-1 h-3 w-3 fill-white text-white drop-shadow" aria-hidden="true" />
+          <Play className="absolute bottom-1 left-1 h-3 w-3 fill-on-photo text-on-photo drop-shadow" aria-hidden="true" />
         )}
         {u.status !== "invalid" && u.status !== "failed" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+          <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/50">
             <ProgressRing value={u.status === "queued" ? 0 : u.progress} />
           </div>
         )}
         {u.status === "invalid" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/45">
-            <TriangleAlert className="h-5 w-5 text-white" aria-hidden="true" />
+          <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/60">
+            <TriangleAlert className="h-5 w-5 text-on-photo" aria-hidden="true" />
           </div>
         )}
         {/* The edge sits over the preview, so a failed tile's red ring shows on a photo too. */}
         <div
           className={cn(
-            "pointer-events-none absolute inset-0 rounded-lg ring-inset",
-            failed ? "ring-2 ring-red-500" : "ring-1 ring-black/5 dark:ring-white/10",
+            "pointer-events-none absolute inset-0 rounded-lg",
+            failed ? "ring-2 ring-inset ring-danger" : "inset-shadow-photo-edge",
           )}
         />
       </div>
@@ -464,7 +464,7 @@ function UploadTile({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onR
           type="button"
           onClick={onRetry}
           aria-label={`Retry ${u.name}`}
-          className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/45 text-white outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="absolute inset-0 flex items-center justify-center rounded-lg bg-photo-scrim/60 text-on-photo"
         >
           <RotateCw className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -474,8 +474,7 @@ function UploadTile({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onR
         onClick={onRemove}
         aria-label={`Remove ${u.name}`}
         className={cn(
-          "absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-white shadow ring-2 ring-surface outline-none",
-          "focus-visible:ring-primary dark:bg-zinc-700",
+          "absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-act text-on-act ring-2 ring-surface",
           "after:absolute after:-inset-3 pointer-fine:after:-inset-1",
         )}
       >
@@ -491,7 +490,7 @@ function ProgressRing({ value }: { value: number }) {
   const c = 2 * Math.PI * r;
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6 -rotate-90" aria-hidden="true">
-      <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white/30" />
+      <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-on-photo/30" />
       <circle
         cx="12"
         cy="12"
@@ -502,7 +501,7 @@ function ProgressRing({ value }: { value: number }) {
         strokeLinecap="round"
         strokeDasharray={c}
         strokeDashoffset={c * (1 - value)}
-        className="text-white transition-[stroke-dashoffset] duration-200 motion-reduce:transition-none"
+        className="text-on-photo transition-[stroke-dashoffset] duration-200 motion-reduce:transition-none"
       />
     </svg>
   );

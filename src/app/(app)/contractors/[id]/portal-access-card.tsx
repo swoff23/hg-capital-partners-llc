@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { Copy, MessageSquareText } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, buttonClass } from "@/components/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, buttonClass, type BadgeTone } from "@/components/ui";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { firstName } from "@/lib/names";
 import type { PortalAccessState } from "@/lib/portal/access-state";
@@ -29,10 +29,10 @@ export type PortalAccountView = {
  * Scheduled's on this page's Jobs card. The line under Email ("Last seen 2d
  * ago") carries Active (decision 22).
  */
-const BADGE: Record<PortalAccessState, { tone: "gray"; label: string }> = {
-  invited: { tone: "gray", label: "Invited" },
-  active: { tone: "gray", label: "Active" },
-  off: { tone: "gray", label: "Access off" },
+const BADGE: Record<PortalAccessState, { tone: BadgeTone; label: string }> = {
+  invited: { tone: "neutral", label: "Invited" },
+  active: { tone: "neutral", label: "Active" },
+  off: { tone: "neutral", label: "Access off" },
 };
 
 /**
@@ -216,7 +216,7 @@ export function PortalAccessCard({
                 Cancel
               </Button>
               <Button
-                variant="danger"
+                variant="destructive"
                 size="sm"
                 disabled={pending}
                 onClick={() => {

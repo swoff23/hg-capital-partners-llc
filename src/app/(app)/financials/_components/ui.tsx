@@ -6,10 +6,22 @@ export function fmtCents(cents: number, opts: { compact?: boolean } = {}): strin
   return fmtMoney(cents / 100, opts);
 }
 
-/** "(8 mo)" pill shown next to any figure derived from < 12 months of data. */
+/**
+ * "(8 mo)" pill: how many months a figure covers. Shown at 12 and up too,
+ * since the totals have no date window and keep adding months.
+ */
 export function PartialLabel({ months }: { months: number }) {
-  if (months <= 0 || months >= 12) return null;
+  if (months <= 0) return null;
   return <span className="ml-1 text-[11px] font-normal text-muted">({months} mo)</span>;
+}
+
+/** One gray line above the figures while the connected company is Intuit's sandbox. */
+export function SandboxNotice() {
+  return (
+    <p className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted">
+      Sandbox test data, not the real books.
+    </p>
+  );
 }
 
 export function Kpi({
@@ -63,7 +75,7 @@ export function MoneyBars({
           </span>
           <span className="h-4 flex-1 overflow-hidden rounded bg-background">
             <span
-              className={cn("block h-full rounded", r.cents < 0 ? "bg-amber-500/70" : "bg-primary/50")}
+              className={cn("block h-full rounded", r.cents < 0 ? "bg-amber-500/70" : "bg-chart-1/50")}
               style={{ width: `${(Math.abs(r.cents) / max) * 100}%` }}
             />
           </span>
@@ -102,7 +114,7 @@ export function SourceBadge({
 }) {
   const h = hoursSince(syncedAt);
   const stale = h == null || h > 36;
-  const tone = status === "PARTIAL" || stale ? "amber" : "green";
+  const tone = status === "PARTIAL" || stale ? "warn" : "ok";
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted">
       <Badge tone={tone}>QuickBooks</Badge>

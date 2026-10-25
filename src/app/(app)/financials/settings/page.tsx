@@ -1,26 +1,36 @@
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getConnection } from "@/lib/quickbooks/client";
 import { qbo } from "@/lib/quickbooks/config";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
-import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState } from "@/components/ui";
+import type { QboBasis } from "@prisma/client";
+import { oauthReturnLine, reconcileGap, reconcileLine } from "@/lib/quickbooks/notices";
+import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState, TextLink, textLinkClass } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { fmtCents } from "../_components/ui";
 import { RefreshButton } from "../_components/refresh-button";
 import { ClassMappingTable, AccountCategoryTable } from "./tables";
-import { BasisToggle, DisconnectButton } from "./controls";
+import { BasisToggle, DisconnectButton, OAuthReturnNotice } from "./controls";
 
 export const dynamic = "force-dynamic";
 
-export default async function FinancialsSettingsPage() {
+const split = (s: { lineCount: number; inCents: number; outCents: number }) =>
+  `${s.lineCount} lines · ${fmtCents(s.inCents)} in · ${fmtCents(s.outCents)} out`;
+
+export default async function FinancialsSettingsPage({
+  searchParams,
+}: PageProps<"/financials/settings">) {
   await requireUser(); // here as well as in the layout, which doesn't gate every render
-  const conn = await getConnection();
+  const [conn, sp] = await Promise.all([getConnection(), searchParams]);
+  // /api/quickbooks/callback lands here with ?connected=1 or ?error=<code>
+  const oauth = oauthReturnLine({ connected: sp.connected, error: sp.error });
 
   if (!conn || conn.status === "REVOKED") {
     return (
       <Card>
         <CardBody className="space-y-3">
+          {/* the Connect button below is the retry */}
+          {oauth && <OAuthReturnNotice tone={oauth.tone} text={oauth.text} retryHref={null} />}
           <EmptyState>QuickBooks isn&apos;t connected.</EmptyState>
           {qbo.isConfigured() ? (
             <a
@@ -74,10 +84,17 @@ export default async function FinancialsSettingsPage() {
           <RefreshButton />
         </CardHeader>
         <CardBody className="space-y-2 text-sm">
+          {oauth && (
+            <OAuthReturnNotice
+              tone={oauth.tone}
+              text={oauth.text}
+              retryHref={oauth.retry && qbo.isConfigured() ? "/api/quickbooks/connect" : null}
+            />
+          )}
           <Row label="Status">
-            <Badge tone={conn.status === "ACTIVE" ? "green" : "red"}>{conn.status}</Badge>
+            <Badge tone={conn.status === "ACTIVE" ? "ok" : "danger"}>{conn.status}</Badge>
             {conn.status === "EXPIRED" && (
-              <a href="/api/quickbooks/connect" className="ml-2 text-primary hover:underline">
+              <a href="/api/quickbooks/connect" className={`ml-2 ${textLinkClass}`}>
                 Reconnect
               </a>
             )}
@@ -101,16 +118,19 @@ export default async function FinancialsSettingsPage() {
         </CardBody>
       </Card>
 
-      {dq && (
-        <Card>
+      {dq && overview && (
+        <Card id="cleanup">
           <CardHeader>
             <CardTitle>QuickBooks cleanup list</CardTitle>
           </CardHeader>
           <CardBody className="space-y-1.5 text-sm">
             <DqRow
               label="Unclassified lines"
-              value={`${fmtCents(dq.unclassed.cents)} · ${dq.unclassed.lineCount} lines`}
-              bad={Math.abs(dq.unclassed.cents) > 50_000 || dq.unclassed.lineCount > 3}
+              value={split(dq.unclassed)}
+              bad={
+                Math.abs(dq.unclassed.inCents) + Math.abs(dq.unclassed.outCents) > 50_000 ||
+                dq.unclassed.lineCount > 3
+              }
               note="assign a class in QuickBooks"
             />
             <DqRow
@@ -129,12 +149,21 @@ export default async function FinancialsSettingsPage() {
               value={`${fmtCents(dq.negativeReclass.grossCents)} · ${dq.negativeReclass.lineCount} lines`}
               bad={dq.negativeReclass.lineCount > 5}
             />
+            {/* the same figure as the Overview's "Not assigned to a property" row */}
             <DqRow
-              label="Unattributed (entity / General / no class)"
-              value={`${fmtCents(dq.unattributed.netCents)} net · +${fmtCents(dq.unattributed.incomeCents)} / −${fmtCents(dq.unattributed.expenseCents)}`}
+              label="Not assigned to a property"
+              value={`${fmtCents(overview.unassigned.incomeCents)} in · ${fmtCents(overview.unassigned.expenseCents)} out`}
               bad={false}
-              note="real cost, not attributable to a property"
+              note="map classes below"
             />
+            {dq.ignored.lineCount > 0 && (
+              <DqRow
+                label="Ignored classes"
+                value={split(dq.ignored)}
+                bad={false}
+                note="left out of every total"
+              />
+            )}
             <DqRow
               label="Owner-funded rent (P2P)"
               value={fmtCents(dq.ownerFundedCents)}
@@ -160,12 +189,12 @@ export default async function FinancialsSettingsPage() {
                 note="map these below or that property's income is dropped"
               />
             )}
-            {lastRun?.stats != null && <ReconSummary stats={lastRun.stats} />}
+            {lastRun?.stats != null && <ReconSummary stats={lastRun.stats} basis={conn.accountingMethod} />}
           </CardBody>
         </Card>
       )}
 
-      <Card className="overflow-hidden">
+      <Card id="class-mapping" className="overflow-clip">
         <CardHeader>
           <CardTitle>Class → property mapping</CardTitle>
         </CardHeader>
@@ -184,7 +213,7 @@ export default async function FinancialsSettingsPage() {
         />
       </Card>
 
-      <Card className="overflow-hidden">
+      <Card id="account-categories" className="overflow-clip">
         <CardHeader>
           <CardTitle>Account categories</CardTitle>
         </CardHeader>
@@ -202,13 +231,9 @@ export default async function FinancialsSettingsPage() {
 
       <p className="text-xs text-muted">
         Reconciliation target: our numbers tie to QuickBooks&apos; own{" "}
-        <Link
-          href="https://qbo.intuit.com"
-          className="text-primary hover:underline"
-          target="_blank"
-        >
+        <TextLink href="https://qbo.intuit.com" target="_blank">
           Profit &amp; Loss by Class
-        </Link>{" "}
+        </TextLink>{" "}
         report. Independent check: per-property rent vs the old rent spreadsheet.
       </p>
     </div>
@@ -246,21 +271,21 @@ function DqRow({
   );
 }
 
-function ReconSummary({ stats }: { stats: unknown }) {
+/**
+ * The basis these figures are on comes first. The other basis shows only when
+ * it doesn't tie, so a ?basis= override banner on the Overview is explained too.
+ */
+function ReconSummary({ stats, basis }: { stats: unknown; basis: QboBasis }) {
   const recon =
-    typeof stats === "object" && stats
-      ? ((stats as Record<string, unknown>).reconciliation as Record<string, unknown> | undefined)
-      : undefined;
-  const cash = recon?.CASH as
-    | { sumToWhole?: { ok?: boolean; deltaCents?: number }; noiVsQbo?: { ok?: boolean; residualCents?: number }; cellMismatches?: unknown[] }
-    | undefined;
-  if (!cash) return null;
-  return (
-    <div className="pt-1 text-[11px] text-muted">
-      Cash reconciliation: sum-to-whole {cash.sumToWhole?.ok ? "✓" : `off by ${fmtCents(cash.sumToWhole?.deltaCents ?? 0)}`}
-      {" · "}NOI vs QBO {cash.noiVsQbo?.ok ? "✓" : `off by ${fmtCents(cash.noiVsQbo?.residualCents ?? 0)}`}
-      {" · "}
-      {(cash.cellMismatches?.length ?? 0) === 0 ? "no cell mismatches" : `${cash.cellMismatches?.length} cell mismatches`}
+    typeof stats === "object" && stats ? (stats as Record<string, unknown>).reconciliation : undefined;
+  const other: QboBasis = basis === "CASH" ? "ACCRUAL" : "CASH";
+  const lines = [
+    reconcileLine(recon, basis),
+    reconcileGap(recon, other).kind === "ok" ? null : reconcileLine(recon, other),
+  ].filter((l): l is string => l != null);
+  return lines.map((line) => (
+    <div key={line} className="pt-1 text-[11px] text-muted">
+      {line}
     </div>
-  );
+  ));
 }

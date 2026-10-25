@@ -12,9 +12,9 @@ import type { QboCategory, QboLineTag, QboTreatment } from "@prisma/client";
  *   operating income  = RENT (incl. SUBSIDY, EXCL. OWNER_FUNDED) + other operating income
  *   operating expense = the 12 opex buckets, negatives netted, UNCATEGORIZED included
  *   NOI               = operating income − operating expense
- *   cash flow a/d     = NOI − debt interest        (principal is balance-sheet, not here)
+ *   NOI after interest = NOI − debt interest       (not cash flow: principal is balance-sheet, not here)
  *
- * "Unattributed" (entity / overhead / no-class) activity is included in the
+ * Activity not assigned to a property (entity / overhead / unmapped / no-class) is included in the
  * portfolio scope and excluded per-property; the caller filters by `propertyId`.
  */
 
@@ -35,7 +35,8 @@ export interface NoiResult {
   noiCents: number;
   noiMargin: number | null; // null when operating income ≤ 0
   debtInterestCents: number;
-  cashFlowAfterDebtCents: number;
+  /** NOI − mortgage interest. Principal isn't in the P&L, so this is not cash flow after debt service. */
+  noiAfterInterestCents: number;
 
   // memo — shown, never folded into NOI
   nonOperatingIncomeCents: number; // bank interest
@@ -93,6 +94,26 @@ export function monthsOfData(months: string[], opts: MonthsOfDataOpts = {}) {
   const last = opts.currentMonth ? prevMonth(opts.currentMonth) : lastPresent;
   if (first > last) return { n: 1, first, last: first };
   return { n: monthDiff(first, last) + 1, first, last };
+}
+
+/**
+ * A line's amount as money in (positive) or money out (negative). Stored
+ * amounts are positive for both income and expense, so a $1,350 rent deposit
+ * and a $1,350 repair look the same until the treatment signs them. A negative
+ * expense (a refund or reclass) comes out positive: money back in. EXCLUDED
+ * lines (transfers, principal, suspense) aren't money in or out, so they're 0.
+ */
+export function signedLineCents(treatment: QboTreatment, amountCents: number): number {
+  switch (treatment) {
+    case "OPERATING_INCOME":
+    case "NON_OPERATING":
+      return amountCents;
+    case "OPERATING_EXPENSE":
+    case "DEBT_INTEREST":
+      return -amountCents;
+    default:
+      return 0;
+  }
 }
 
 export function computeNoi(lines: ComputeLine[], opts: MonthsOfDataOpts = {}): NoiResult {
@@ -154,7 +175,7 @@ export function computeNoi(lines: ComputeLine[], opts: MonthsOfDataOpts = {}): N
     noiCents: noi,
     noiMargin: operatingIncome > 0 ? noi / operatingIncome : null,
     debtInterestCents: debtInterest,
-    cashFlowAfterDebtCents: noi - debtInterest,
+    noiAfterInterestCents: noi - debtInterest,
     nonOperatingIncomeCents: nonOperatingIncome,
     ownerFundedCents: ownerFunded,
     subsidyCents: subsidy,

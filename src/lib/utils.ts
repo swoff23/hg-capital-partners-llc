@@ -1,15 +1,38 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
 import { HG_TIME_ZONE } from "./dates";
+
+/* tailwind-merge reads any unknown text-*, shadow-* or ease-* as a color, so
+   cn("text-fg-2", "text-body") would drop the color. It learns the token names
+   from app/globals.css here: the type scale, elevation and motion. */
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      text: ["title", "section", "body", "label", "meta", "micro", "figure-l", "figure-m", "code", "code-l"],
+      shadow: ["float", "overlay"],
+      "inset-shadow": ["photo-edge"],
+      ease: ["spring"],
+    },
+    classGroups: {
+      duration: [{ duration: ["0", "fast", "base", "toast", "sheet", "photo", "check"] }],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function fmtMoney(v: unknown, opts: { compact?: boolean } = {}): string {
-  if (v == null || v === "") return "—";
+/** The number in a money value (a number, a numeric string or a Prisma Decimal), or null when it's empty or unreadable. */
+export function toMoneyNumber(v: unknown): number | null {
+  if (v == null || v === "") return null;
   const n = typeof v === "object" && "toNumber" in (v as object) ? (v as { toNumber(): number }).toNumber() : Number(v);
-  if (!Number.isFinite(n)) return "—";
+  return Number.isFinite(n) ? n : null;
+}
+
+export function fmtMoney(v: unknown, opts: { compact?: boolean } = {}): string {
+  const n = toMoneyNumber(v);
+  if (n === null) return "—";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",

@@ -2,9 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton } from "@/components/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, LinkButton, TextLink } from "@/components/ui";
 import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
-import { propertyStatusTone } from "@/lib/config";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
@@ -106,7 +105,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             (property.status === "Refinanced" ? (
               <span className="text-sm text-muted">{property.status}</span>
             ) : (
-              <Badge tone={propertyStatusTone(property.status)}>{property.status}</Badge>
+              <Badge>{property.status}</Badge>
             ))}
           {unitCount > 0 && <span className="text-sm text-muted">{unitCount} units</span>}
         </div>
@@ -143,34 +142,42 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           />
         </div>
 
-        <div className="min-w-0 space-y-4">
+        {/* Sections sit 32px apart, 24 on touch (brand guidelines, section 5). */}
+        <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
           <PropertyDetailsSection
             property={{
               id: property.id,
-              version: property.updatedAt.toISOString(),
               address: property.address,
               llcOwner: property.llcOwner,
+              attorney: property.attorney,
               status: property.status,
               strategy: property.strategy,
+              refiTarget: property.refiTarget,
               purchaseDate: ymd(property.purchaseDate),
               purchasePrice: d(property.purchasePrice),
+              closingCosts: d(property.closingCosts),
+              rehabAmount: d(property.rehabAmount),
               value: d(property.value),
               refinanceDate: ymd(property.refinanceDate),
               sqft: property.sqft,
               rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
+              propertyTaxDueDate: ymd(property.propertyTaxDueDate),
             }}
           />
 
           <PropertyLoanSection
             loan={{
               id: property.id,
-              version: property.updatedAt.toISOString(),
+              value: d(property.value),
+              currentLoan: d(property.currentLoan),
               lender: property.lender,
               loanServicer: property.loanServicer,
               loanNumber: property.loanNumber,
+              loanType: property.loanType,
               loanOriginalAmount: d(property.loanOriginalAmount),
               loanRate: d(property.loanRate),
               loanPaymentMonthly: d(property.loanPaymentMonthly),
+              loanEscrow: property.loanEscrow,
               loanOriginationDate: ymd(property.loanOriginationDate),
               loanMaturityDate: ymd(property.loanMaturityDate),
             }}
@@ -179,10 +186,12 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <PropertyInsuranceSection
             insurance={{
               id: property.id,
-              version: property.updatedAt.toISOString(),
               insuranceCarrier: property.insuranceCarrier,
               insurancePolicyNo: property.insurancePolicyNo,
               insurancePremium: d(property.insurancePremium),
+              insuranceCoverage: d(property.insuranceCoverage),
+              insuranceDeductible: d(property.insuranceDeductible),
+              insuranceLiability: property.insuranceLiability,
               insuranceRenewalDate: ymd(property.insuranceRenewalDate),
               replacementCost: d(property.replacementCost),
             }}
@@ -245,17 +254,11 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             attachments={property.attachments.map((a) => ({ id: a.id, filename: a.filename, size: a.size }))}
           />
 
-          <PropertyNotesSection
-            id={property.id}
-            version={property.updatedAt.toISOString()}
-            notes={property.notes}
-          />
+          <PropertyNotesSection id={property.id} notes={property.notes} />
           {property.sourceDeal && (
             <p className="text-xs text-muted">
               From deal{" "}
-              <Link href={`/deals/${property.sourceDeal.id}`} className="text-primary hover:underline">
-                {property.sourceDeal.address}
-              </Link>
+              <TextLink href={`/deals/${property.sourceDeal.id}`}>{property.sourceDeal.address}</TextLink>
             </p>
           )}
         </div>

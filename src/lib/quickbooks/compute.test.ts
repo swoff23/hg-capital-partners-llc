@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeNoi, monthsOfData, type ComputeLine } from "./compute";
+import { computeNoi, monthsOfData, signedLineCents, type ComputeLine } from "./compute";
 import type { QboCategory, QboLineTag, QboTreatment } from "@prisma/client";
 
 /**
@@ -17,9 +17,9 @@ import type { QboCategory, QboLineTag, QboTreatment } from "@prisma/client";
  * transfer $750.00 mis-booked to Rents. So:
  *   operating income  126,806.97
  *   NOI                88,259.49
- *   cash flow a/d      14,611.35
+ *   NOI after interest 14,611.35
  * And the identity holds:
- *   71,255.43 = cashFlowAfterDebt + bankInterest + excluded(suspense+transfer) + ownerFunded
+ *   71,255.43 = noiAfterInterest + bankInterest + excluded(suspense+transfer) + ownerFunded
  */
 
 const QBO_NET_INCOME_CENTS = 7_125_543;
@@ -72,13 +72,13 @@ test("portfolio operating income, expense, NOI tie to the real P&L", () => {
   assert.equal(r.operatingExpenseCents, 3_854_748, "operating expense $38,547.48 (= QBO Total Expenses)");
   assert.equal(r.noiCents, 8_825_949, "NOI $88,259.49");
   assert.equal(r.debtInterestCents, 7_364_814);
-  assert.equal(r.cashFlowAfterDebtCents, 1_461_135, "cash flow after debt $14,611.35");
+  assert.equal(r.noiAfterInterestCents, 1_461_135, "NOI after interest $14,611.35");
 });
 
 test("the net-income reconciliation identity holds to the cent", () => {
   const r = computeNoi(PORTFOLIO);
   const identity =
-    r.cashFlowAfterDebtCents + r.nonOperatingIncomeCents + r.excludedCents + r.ownerFundedCents;
+    r.noiAfterInterestCents + r.nonOperatingIncomeCents + r.excludedCents + r.ownerFundedCents;
   assert.equal(identity, QBO_NET_INCOME_CENTS, "= QBO Net Income $71,255.43");
 });
 
@@ -146,4 +146,13 @@ test("computeNoi reports monthsOfData / annualization from the lines", () => {
   );
   assert.equal(r.monthsOfData, 8, "Jan..Aug, not just the 2 months with rent");
   assert.equal(r.annualizationFactor, 1.5);
+});
+
+test("signedLineCents: income reads as money in, expense as money out, excluded as neither", () => {
+  assert.equal(signedLineCents("OPERATING_INCOME", 135_000), 135_000); // a $1,350 rent deposit
+  assert.equal(signedLineCents("OPERATING_EXPENSE", 135_000), -135_000); // a $1,350 repair
+  assert.equal(signedLineCents("OPERATING_EXPENSE", -2_500), 2_500); // a refund comes back in
+  assert.equal(signedLineCents("NON_OPERATING", 1_200), 1_200); // bank interest
+  assert.equal(signedLineCents("DEBT_INTEREST", 50_000), -50_000);
+  assert.equal(signedLineCents("EXCLUDED", 75_000), 0); // a transfer is neither
 });

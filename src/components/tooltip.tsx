@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Small hover label. Renders itself `position: fixed` so it escapes any
- * `overflow` clipping from scroll containers (tables, cards).
+ * `overflow` clipping from scroll containers (tables, cards). The ink label
+ * on the toast tokens, at the Float level.
  */
 export function Tooltip({
   label,
@@ -44,11 +45,11 @@ export function Tooltip({
       {at && label && (
         <span
           role="tooltip"
-          className="pointer-events-none fixed z-[60] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white shadow-lg dark:bg-zinc-700"
+          className="pointer-events-none fixed z-[60] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-toast-edge bg-toast-bg px-2 py-1 text-micro text-toast-fg shadow-float"
           style={{ left: at.x, top: at.y - 8 }}
         >
           {label}
-          <span className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-zinc-900 dark:border-t-zinc-700" />
+          <span className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-toast-bg" />
         </span>
       )}
     </span>

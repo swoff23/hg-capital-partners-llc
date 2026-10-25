@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { useLeaveGuard } from "@/components/leave-guard";
 import { cn } from "@/lib/utils";
 
@@ -38,10 +39,12 @@ export function BackLink({ fallback, label, className }: { fallback: string; lab
 
   return (
     <button
+      type="button"
       onClick={() => guard(goBack)}
-      className={cn("inline-flex items-center gap-1 text-xs text-muted hover:text-foreground hover:underline", className)}
+      className={cn("inline-flex items-center gap-1 text-xs text-fg-3 hover:text-fg-1 hover:underline print:hidden", className)}
     >
-      <span aria-hidden>←</span> {label}
+      <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {label}
     </button>
   );
 }

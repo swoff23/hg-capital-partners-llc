@@ -1,17 +1,17 @@
 import Link from "next/link";
-import type { QboBasis } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
-import { Card, CardBody, EmptyState, Table, Td, Th } from "@/components/ui";
+import { Card, CardBody, EmptyState, Table, Td, Th, TextLink } from "@/components/ui";
 import { getRentRoll } from "@/lib/quickbooks/queries";
-import { fmtCents, PartialLabel, SourceBadge } from "../_components/ui";
+import { basisFromParam } from "@/lib/quickbooks/rollup";
+import { fmtCents, PartialLabel, SandboxNotice, SourceBadge } from "../_components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function RentRollPage({ searchParams }: PageProps<"/financials/rent-roll">) {
   await requireUser(); // here as well as in the layout, which doesn't gate every render
   const sp = await searchParams;
-  const basis: QboBasis = sp.basis === "accrual" ? "ACCRUAL" : "CASH";
-  const roll = await getRentRoll(basis);
+  // ?basis= is a one-off override; without it the basis chosen in Settings applies
+  const roll = await getRentRoll(basisFromParam(sp.basis));
 
   if (!roll || !roll.connected) {
     return (
@@ -25,27 +25,57 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
 
   return (
     <div className="space-y-3">
-      <SourceBadge basis={basis} syncedAt={roll.lastSyncAt} />
+      <SourceBadge basis={roll.basis} syncedAt={roll.lastSyncAt} />
+
+      {roll.sandbox && <SandboxNotice />}
 
       <p className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted">
-        Cash rent <strong>received</strong> by month, summed across every class mapped to the
-        property so an entity transfer on refinance shows no gap. No lease data yet, so
-        scheduled/market rent, delinquency, and vacancy are out of scope. Section-8 / voucher rent is
-        included; owner P2P deposits mis-booked to Rents are excluded and shown separately.
+        {roll.basis === "CASH" ? (
+          <>
+            Cash rent <strong>received</strong>
+          </>
+        ) : (
+          <>
+            Rent <strong>earned</strong>
+          </>
+        )}{" "}
+        by month, summed across every class mapped to the property so an entity transfer on
+        refinance shows no gap. No lease data yet, so scheduled/market rent, delinquency, and
+        vacancy are out of scope. Section-8 / voucher rent is included; owner P2P deposits
+        mis-booked to Rents are excluded and shown separately.
       </p>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+      {roll.rows.length === 0 ? (
+        // never a $0 Portfolio total over zero rows
+        <Card>
+          <CardBody>
+            <EmptyState>
+              {roll.months.length > 0 ? (
+                <>
+                  No rent is matched to a property yet.{" "}
+                  <TextLink href="/financials/settings#class-mapping">Map QuickBooks classes</TextLink>
+                </>
+              ) : (
+                <>
+                  No rent in the synced QuickBooks data.{" "}
+                  <TextLink href="/financials/settings#account-categories">Check account categories</TextLink>
+                </>
+              )}
+            </EmptyState>
+          </CardBody>
+        </Card>
+      ) : (
+        <Card className="overflow-clip">
           <Table>
             <thead>
               <tr>
                 <Th>Property</Th>
                 {roll.months.map((m) => (
-                  <Th key={m} className="text-right">
+                  <Th key={m} numeric>
                     {m.slice(2)}
                   </Th>
                 ))}
-                <Th className="text-right">Total</Th>
+                <Th numeric>Total</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -72,11 +102,11 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
                     )}
                   </Td>
                   {roll.months.map((m) => (
-                    <Td key={m} className="text-right tabular-nums">
+                    <Td key={m} numeric>
                       {r.byMonth[m] ? fmtCents(r.byMonth[m]) : <span className="text-muted">—</span>}
                     </Td>
                   ))}
-                  <Td className="text-right font-medium tabular-nums">{fmtCents(r.totalCents)}</Td>
+                  <Td numeric className="font-medium">{fmtCents(r.totalCents)}</Td>
                 </tr>
               ))}
             </tbody>
@@ -84,11 +114,11 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
               <tr className="border-t-2 border-border font-semibold">
                 <Td>Portfolio</Td>
                 {roll.months.map((m) => (
-                  <Td key={m} className="text-right tabular-nums">
+                  <Td key={m} numeric>
                     {fmtCents(roll.portfolioByMonth[m] ?? 0)}
                   </Td>
                 ))}
-                <Td className="text-right tabular-nums">
+                <Td numeric>
                   {fmtCents(
                     Object.values(roll.portfolioByMonth).reduce((a, b) => a + b, 0),
                   )}
@@ -96,8 +126,8 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
               </tr>
             </tfoot>
           </Table>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

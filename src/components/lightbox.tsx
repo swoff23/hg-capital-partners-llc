@@ -28,7 +28,7 @@ export type MediaItem = {
 const SWIPE_PX = 50;
 
 /**
- * Full-screen viewer for task photos and videos on a black stage: "3 / 11",
+ * Full-screen viewer for task photos and videos on the dark photo stage: "3 / 11",
  * arrows and arrow keys, swipe on touch, Esc closes, Download, and who added
  * it when. Videos play inline (`playsInline`) from /api/files/task/<id>, which
  * redirects to a short-lived signed URL so iPhones can stream them.
@@ -86,19 +86,19 @@ export function Lightbox({
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       isDismissable
-      className="fixed inset-0 z-50 bg-black data-entering:animate-fade-in data-exiting:animate-fade-out motion-reduce:animate-none"
+      className="fixed inset-0 z-50 bg-photo-stage data-entering:animate-fade-in data-exiting:animate-fade-out motion-reduce:animate-none"
     >
       <Modal className="h-full w-full outline-none">
-        <Dialog aria-label="Photos and videos" className="flex h-full flex-col text-white outline-none">
+        <Dialog aria-label="Photos and videos" className="flex h-full flex-col text-on-photo outline-none">
           <header className="flex shrink-0 items-center gap-2 pl-4 pr-1.5 pt-[env(safe-area-inset-top)]">
             <div className="min-w-0 flex-1 py-2">
               <Heading slot="title" className="truncate text-sm font-medium">
                 {item.filename}
               </Heading>
-              {byline && <p className="truncate text-xs text-white/60">{byline}</p>}
+              {byline && <p className="truncate text-xs text-on-photo/70">{byline}</p>}
             </div>
             {count > 1 && (
-              <span className="shrink-0 px-2 text-sm tabular-nums text-white/70">
+              <span className="shrink-0 px-2 text-sm tabular-nums text-on-photo/70">
                 <span aria-hidden="true">
                   {i + 1} / {count}
                 </span>
@@ -185,16 +185,16 @@ function ConfirmDelete({
   const [error, setError] = useState("");
   return (
     <div className="space-y-4 p-4 md:w-96">
-      <p className="text-sm text-muted">
+      <p className="text-sm text-fg-2">
         <span className="break-all">“{item.filename}”</span> goes for good.
       </p>
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" size="sm" disabled={pending} onClick={onDone}>
           Keep it
         </Button>
         <Button
-          variant="danger"
+          variant="destructive"
           size="sm"
           disabled={pending}
           onClick={() =>
@@ -206,17 +206,18 @@ function ConfirmDelete({
             })
           }
         >
-          {pending ? "Deleting…" : "Delete"}
+          {pending ? "Deleting…" : item.kind === "VIDEO" ? "Delete video" : "Delete photo"}
         </Button>
       </div>
     </div>
   );
 }
 
+// On the fixed photo tokens, so the stage reads the same in either theme.
 const stageButton =
-  "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/80 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50 data-focus-visible:ring-2 data-focus-visible:ring-white/50";
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-photo/80 transition-colors hover:bg-on-photo/10 hover:text-on-photo focus-visible:outline-on-photo";
 // Touch screens swipe instead.
-const arrow = "absolute top-1/2 -translate-y-1/2 bg-black/40 pointer-coarse:hidden";
+const arrow = "absolute top-1/2 -translate-y-1/2 bg-photo-scrim pointer-coarse:hidden";
 
 /** One photo or video, centered and fit to the stage. */
 function Stage({ item }: { item: MediaItem }) {
@@ -236,7 +237,7 @@ function Stage({ item }: { item: MediaItem }) {
   }
   if (!src) {
     return (
-      <p className="flex items-center gap-2 text-sm text-white/70">
+      <p className="flex items-center gap-2 text-sm text-on-photo/70">
         <ImageOff className="h-5 w-5" aria-hidden="true" />
         This photo can&apos;t be shown here. Download it to view.
       </p>

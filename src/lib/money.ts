@@ -49,3 +49,13 @@ export function evenShare(total: number, parts: number, index: number, step = 0.
   const share = Math.floor(whole / parts) + (index < whole % parts ? 1 : 0);
   return share / scale;
 }
+
+/**
+ * How a dollar amount is shown (components/money.tsx): its sign, whole
+ * dollars and, with `withCents`, the cents. Rounded once to what's shown, so
+ * an amount that rounds to zero never carries a minus.
+ */
+export function moneyParts(n: number, withCents: boolean): { negative: boolean; dollars: number; cents: number } {
+  const shown = withCents ? Math.round(Math.abs(n) * 100) : Math.round(Math.abs(n)) * 100;
+  return { negative: n < 0 && shown > 0, dollars: Math.floor(shown / 100), cents: shown % 100 };
+}

@@ -44,7 +44,7 @@ const LABELS: Record<string, string> = {
   rehabAmount: "Rehab amount",
   rehabMonths: "Rehab months",
   loanOriginalAmount: "Original amount",
-  currentLoan: "Current loan",
+  currentLoan: "Balance",
   loanRate: "Rate",
   loanPaymentMonthly: "Payment / mo",
   insuranceCoverage: "Coverage",

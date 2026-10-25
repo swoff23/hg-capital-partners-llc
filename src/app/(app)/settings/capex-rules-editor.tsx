@@ -294,7 +294,7 @@ export function CapexRulesEditor({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8 pointer-coarse:space-y-6">
       <PageHeader
         title="Settings"
         subtitle="CapEx planning rules"
@@ -399,8 +399,8 @@ export function CapexRulesEditor({
               <Button size="sm" variant="secondary" onClick={() => setConfirmReset(false)}>
                 Cancel
               </Button>
-              <Button size="sm" variant="danger" onClick={resetToDefaults}>
-                Reset
+              <Button size="sm" variant="destructive" onClick={resetToDefaults}>
+                Reset rules
               </Button>
             </>
           }

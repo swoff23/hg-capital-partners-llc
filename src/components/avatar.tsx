@@ -9,8 +9,9 @@ const SIZES = {
 export type AvatarSize = keyof typeof SIZES;
 
 /**
- * A person's initials in a circle. Warm stone neutrals, never a status tone
- * (STATUS_TONE in status-badge.tsx), so an avatar never reads as a state.
+ * A person's initials in a circle, on the --fill-2 avatar ground. Never a
+ * status tone (STATUS_TONE in status-badge.tsx), so an avatar never reads as
+ * a state.
  * `outline` marks a contractor: same initials, ringed instead of filled.
  * Initials come from the name, or the email's local part when there's no name.
  */
@@ -34,8 +35,8 @@ export function Avatar({
         "inline-flex shrink-0 select-none items-center justify-center rounded-full font-semibold leading-none tracking-tight",
         SIZES[size],
         outline
-          ? "bg-surface text-stone-600 ring-1 ring-inset ring-stone-300 dark:text-stone-300 dark:ring-stone-600"
-          : "bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-100",
+          ? "bg-surface text-fg-2 ring-1 ring-inset ring-line-strong"
+          : "bg-fill-2 text-fg-2",
         className,
       )}
     >

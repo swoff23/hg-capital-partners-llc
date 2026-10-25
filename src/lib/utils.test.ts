@@ -1,6 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fmtDateTime, initials } from "./utils";
+import { cn, fmtDateTime, initials } from "./utils";
+
+test("cn: the type, elevation and motion tokens are sizes and shadows, not colors", () => {
+  assert.equal(cn("text-fg-2", "text-body"), "text-fg-2 text-body");
+  assert.equal(cn("text-sm text-muted", "text-meta"), "text-muted text-meta");
+  assert.equal(cn("text-body", "text-micro"), "text-micro");
+  assert.equal(cn("shadow-sm", "shadow-float"), "shadow-float");
+  assert.equal(cn("shadow-float", "shadow-line"), "shadow-float shadow-line");
+  assert.equal(cn("inset-shadow-photo-edge", "inset-shadow-none"), "inset-shadow-none");
+  assert.equal(cn("ease-out", "ease-spring"), "ease-spring");
+  assert.equal(cn("duration-150", "duration-fast"), "duration-fast");
+});
 
 test("fmtDateTime: Buffalo time, whatever the server's zone", () => {
   // Some ICU builds put a narrow no-break space before AM/PM.

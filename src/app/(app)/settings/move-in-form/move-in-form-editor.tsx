@@ -151,7 +151,7 @@ export function MoveInFormEditor({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8 pointer-coarse:space-y-6">
       <PageHeader
         title="Settings"
         subtitle="Rooms and items tenants rate on the move-in inspection"
@@ -187,8 +187,8 @@ export function MoveInFormEditor({
               <Button size="sm" variant="secondary" onClick={() => setConfirmOpen(false)}>
                 Keep editing
               </Button>
-              <Button size="sm" variant="danger" onClick={discard}>
-                Discard
+              <Button size="sm" variant="destructive" onClick={discard}>
+                Discard changes
               </Button>
             </>
           }

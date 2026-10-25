@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, textLinkClass } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import {
   capexForecast,
+  capexUndatedNote,
   type BuildingCapexData,
   type CapexRules,
   type PropertyUnit,
@@ -21,6 +22,7 @@ export function CapexForecastCard({
   rules: CapexRules;
 }) {
   const f = capexForecast(units, { years: 5, building, rules });
+  const undatedNote = capexUndatedNote(f.unknownCount);
   const maxYear = Math.max(1, ...f.years.map((y) => y.total));
   const lastYear = f.fromYear + f.horizonYears - 1;
 
@@ -45,13 +47,16 @@ export function CapexForecastCard({
         </span>
       </CardHeader>
       <CardBody className="space-y-4">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-2xl font-semibold tabular-nums">{fmtMoney(f.total)}</span>
-          {f.dueNowCount > 0 && (
-            <span className="text-xs font-medium text-red-600 dark:text-red-400">
-              {fmtMoney(f.dueNowTotal)} due soon
-            </span>
-          )}
+        <div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-2xl font-semibold tabular-nums">{fmtMoney(f.total)}</span>
+            {f.dueNowCount > 0 && (
+              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                {fmtMoney(f.dueNowTotal)} due soon
+              </span>
+            )}
+          </div>
+          {undatedNote && <p className="mt-1 text-xs text-muted">{undatedNote}</p>}
         </div>
 
         {/* Year-by-year bars — click to filter the list below */}
@@ -89,10 +94,10 @@ export function CapexForecastCard({
                     className={
                       "block h-full rounded " +
                       (active
-                        ? "bg-primary"
+                        ? "bg-chart-1"
                         : y.year === f.fromYear
                           ? "bg-red-500/70 dark:bg-red-500/60"
-                          : "bg-primary/50")
+                          : "bg-chart-1/50")
                     }
                     style={{ width: `${(y.total / maxYear) * 100}%` }}
                   />
@@ -132,7 +137,7 @@ export function CapexForecastCard({
                   <button
                     type="button"
                     onClick={() => setSelectedYear(null)}
-                    className="font-medium text-primary hover:underline"
+                    className={`font-medium ${textLinkClass}`}
                   >
                     clear
                   </button>

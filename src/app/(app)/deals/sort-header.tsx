@@ -1,5 +1,6 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { thClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ResizeHandle, type ColumnKey } from "./column-widths";
 
@@ -8,8 +9,6 @@ export type SortField = "address" | "status" | "units" | "theirPrice" | "ourPric
 // No ?sort param means "grouped by pipeline status" — same default as the DB query in page.tsx.
 const DEFAULT_SORT = "status";
 
-const TH_BASE =
-  "sticky top-0 z-10 whitespace-nowrap border-b border-border bg-background px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted";
 
 /** A clickable table header: 1st click sorts ascending, 2nd descending, 3rd clears. */
 export function SortHeader({
@@ -60,14 +59,14 @@ export function SortHeader({
   return (
     <th
       aria-sort={active ? (desc ? "descending" : "ascending") : "none"}
-      className={cn(TH_BASE, "relative", align === "right" ? "text-right" : "text-left", className)}
+      className={cn(thClass, align === "right" ? "text-right" : "text-left", className)}
     >
       <button
         type="button"
         onClick={toggle}
         className={cn(
-          "group inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-foreground",
-          active && "text-foreground",
+          "group inline-flex items-center gap-1 transition-colors hover:text-fg-1",
+          active && "text-fg-1",
         )}
       >
         {label}

@@ -85,7 +85,7 @@ export function DueDatePicker({
         className={cn(
           pickerChip,
           !current && "text-muted",
-          current && overdue && "text-red-600 dark:text-red-400",
+          current && overdue && "text-danger",
           className,
         )}
       >
@@ -154,8 +154,8 @@ function DuePanel({
               onPress={() => onPick(p.value)}
               aria-keyshortcuts={String(i + 1)}
               className={cn(
-                "flex h-8 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm outline-none transition-colors",
-                "hover:bg-background data-focus-visible:bg-background data-pressed:bg-background pointer-coarse:h-11",
+                "flex h-8 w-full items-center gap-2.5 rounded-sm px-3 text-left text-sm outline-none transition-colors",
+                "hover:bg-fill-2 data-focus-visible:bg-fill-2 data-pressed:bg-fill-2 pointer-coarse:h-11",
               )}
             >
               <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
@@ -173,7 +173,7 @@ function DuePanel({
 }
 
 const navButton =
-  "flex h-7 w-7 items-center justify-center rounded-md text-muted outline-none transition-colors hover:bg-background hover:text-foreground data-focus-visible:ring-2 data-focus-visible:ring-primary/30 pointer-coarse:h-11 pointer-coarse:w-11";
+  "flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-fill-2 hover:text-foreground pointer-coarse:h-11 pointer-coarse:w-11";
 
 function MonthCalendar({
   value,
@@ -217,10 +217,11 @@ function MonthCalendar({
                 cn(
                   "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm tabular-nums outline-none transition-colors pointer-coarse:h-11 pointer-coarse:w-11",
                   isOutsideMonth && "invisible",
+                  // One weight for every day: today is its ring, the pick is the --act fill.
                   isSelected
-                    ? "bg-primary font-semibold text-primary-foreground"
-                    : cn("hover:bg-background data-pressed:bg-background", date.toString() === today && "font-semibold text-primary"),
-                  isFocusVisible && "ring-2 ring-primary/40",
+                    ? "bg-act text-on-act"
+                    : cn("hover:bg-fill-2 data-pressed:bg-fill-2", date.toString() === today && "ring-1 ring-inset ring-line-control"),
+                  isFocusVisible && "outline-solid outline-2 outline-offset-2 outline-act",
                 )
               }
             />

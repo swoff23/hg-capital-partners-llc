@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
-import { Badge, Card, CardBody, CardHeader, CardTitle, Field } from "@/components/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, Field, textLinkClass } from "@/components/ui";
 import { BackLink } from "@/components/back-link";
 import { StatusBadge } from "@/components/status-badge";
 import { fmtDate } from "@/lib/utils";
@@ -68,7 +68,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold tracking-tight">{c.fullName}</h1>
           {c.company && <span className="text-sm text-muted">{c.company}</span>}
-          {c.tenantFixes && <Badge tone="green">tenant fixes</Badge>}
+          {c.tenantFixes && <Badge>tenant fixes</Badge>}
         </div>
       </div>
 
@@ -88,7 +88,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                     <ContactLink
                       href={sms}
                       aria-label={`Text ${firstName(c.fullName) || c.fullName}`}
-                      className="relative ml-3 text-primary after:absolute after:-inset-x-2.5 after:-inset-y-3.5 pointer-fine:hidden"
+                      className={`relative ml-3 ${textLinkClass} after:absolute after:-inset-x-2.5 after:-inset-y-3.5 pointer-fine:hidden`}
                     >
                       Text
                     </ContactLink>
@@ -106,7 +106,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                 <Field label="Availability">{c.availability ?? "—"}</Field>
                 <Field label="W-9">
                   {c.w9Url ? (
-                    <a href={c.w9Url} target="_blank" rel="noreferrer" className="text-primary">
+                    <a href={c.w9Url} target="_blank" rel="noreferrer" className={textLinkClass}>
                       View ↗
                     </a>
                   ) : docOnFile(c.comments, "W-9") ? (
@@ -117,7 +117,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                 </Field>
                 <Field label="Insurance (COI)">
                   {c.coiUrl ? (
-                    <a href={c.coiUrl} target="_blank" rel="noreferrer" className="text-primary">
+                    <a href={c.coiUrl} target="_blank" rel="noreferrer" className={textLinkClass}>
                       View ↗
                     </a>
                   ) : docOnFile(c.comments, "Insurance") ? (
