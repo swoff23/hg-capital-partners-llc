@@ -30,17 +30,18 @@ export function PassReasonControl({ id, value }: { id: string; value: string | n
     setShown(value ?? "");
   }
 
+  // Dims while the save runs but stays enabled, so a keyboard user keeps focus (as DealStageField does).
   return (
-    <div className="relative min-w-0">
+    <div className={cn("relative min-w-0 transition-opacity", pending && "opacity-50")}>
       <Select
         aria-label="Pass reason"
         value={shown}
-        disabled={pending}
+        aria-busy={pending || undefined}
         onChange={(e) => {
           setShown(e.target.value);
           start(() => patchDeal(id, { passReason: e.target.value || null }));
         }}
-        className={cn("h-8 appearance-none truncate pr-7 disabled:opacity-50", !shown && "text-fg-3")}
+        className={cn("h-8 appearance-none truncate pr-7", !shown && "text-fg-3")}
       >
         <option value="">—</option>
         {DEAL_PASS_REASONS.map((r) => (

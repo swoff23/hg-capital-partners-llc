@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { COLUMN_DROP, DEFAULT_COLUMN_WIDTHS, type ColumnKey } from "./columns";
 
 /* v2: v1 saved every column whenever one was dragged, which pinned the old
    defaults for anyone who had resized anything. v2 saves only the columns
@@ -7,26 +8,6 @@ import { createContext, useContext, useRef, useSyncExternalStore, type ReactNode
 const STORAGE_KEY = "hgos-deals-col-widths-v2";
 const MIN_WIDTH = 60;
 
-/**
- * Default widths, in px. They add up to 1140, so the table fits the 1152px
- * column a 1280 laptop gives it beside the collapsed sidebar, and the header
- * stays stuck under the app bar (a table wider than its column scrolls
- * sideways in its own box, where a header can't stick to the page). Status
- * fits "4 - To Schedule" in its picker, the prices fit "$1,250,000" and
- * Updated fits "Sep 30, 2025", with a mouse and on touch.
- */
-export const DEFAULT_COLUMN_WIDTHS = {
-  address: 208,
-  status: 192,
-  units: 72,
-  theirPrice: 120,
-  ourPrice: 120,
-  latestNote: 160,
-  nextAction: 168,
-  updated: 100,
-} as const;
-
-export type ColumnKey = keyof typeof DEFAULT_COLUMN_WIDTHS;
 type Widths = Record<ColumnKey, number>;
 
 /* ------------------------------------------------------------------ *
@@ -92,13 +73,16 @@ function useColumnWidths() {
   return ctx;
 }
 
-/** Drives each column's actual rendered width; the table needs `style={{ tableLayout: "fixed" }}`. */
+/**
+ * Drives each column's actual rendered width; the table needs `style={{ tableLayout: "fixed" }}`.
+ * A dropped column's col drops with it, so the widths stay on the columns that show.
+ */
 export function Cols() {
   const { widths } = useColumnWidths();
   return (
     <colgroup>
       {(Object.keys(DEFAULT_COLUMN_WIDTHS) as ColumnKey[]).map((key) => (
-        <col key={key} style={{ width: widths[key] }} />
+        <col key={key} className={COLUMN_DROP[key] || undefined} style={{ width: widths[key] }} />
       ))}
     </colgroup>
   );

@@ -10,6 +10,7 @@ import { DealFilters } from "./filters";
 import { DealRowEditable } from "./deal-row";
 import { SortHeader } from "./sort-header";
 import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
+import { COLUMN_DROP } from "./columns";
 import { easternDay, noteDay } from "./format";
 
 type SP = { status?: string; statuses?: string; q?: string; sort?: string };
@@ -112,8 +113,9 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
         current={{ status: statusFilter, statuses: selectedStatuses, q: sp.q ?? "" }}
       />
 
-      {/* Flat on the page: the header's rule and the row hairlines are its only lines (section 5). */}
-      <div className="mt-4">
+      {/* Flat on the page: the header's rule and the row hairlines are its only lines (section 5).
+          A size container, so columns drop by the list's own width (COLUMN_DROP in columns.ts). */}
+      <div className="mt-4 @container">
         {deals.length === 0 ? (
           <EmptyState>No deals match.</EmptyState>
         ) : (
@@ -124,16 +126,38 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                 <tr>
                   {/* Column one starts on the page gutter, under the title (section 5). */}
                   <SortHeader label="Address" field="address" resizeKey="address" className="pl-0" />
-                  <SortHeader label="Status" field="status" resizeKey="status" />
-                  <SortHeader label="Units" field="units" resizeKey="units" numeric />
-                  <SortHeader label="Their price" field="theirPrice" resizeKey="theirPrice" numeric />
-                  <SortHeader label="Our price" field="ourPrice" resizeKey="ourPrice" numeric />
-                  <Th>
+                  <SortHeader label="Status" field="status" resizeKey="status" className={COLUMN_DROP.status} />
+                  <SortHeader label="Units" field="units" resizeKey="units" numeric className={COLUMN_DROP.units} />
+                  <SortHeader
+                    label="Their price"
+                    field="theirPrice"
+                    resizeKey="theirPrice"
+                    numeric
+                    className={COLUMN_DROP.theirPrice}
+                  />
+                  <SortHeader
+                    label="Our price"
+                    field="ourPrice"
+                    resizeKey="ourPrice"
+                    numeric
+                    className={COLUMN_DROP.ourPrice}
+                  />
+                  <Th className={COLUMN_DROP.latestNote}>
                     Latest note
                     <ResizeHandle columnKey="latestNote" />
                   </Th>
-                  <SortHeader label="Next action" field="nextAction" resizeKey="nextAction" />
-                  <SortHeader label="Updated" field="updated" resizeKey="updated" className="pr-0" />
+                  <SortHeader
+                    label="Next action"
+                    field="nextAction"
+                    resizeKey="nextAction"
+                    className={COLUMN_DROP.nextAction}
+                  />
+                  <SortHeader
+                    label="Updated"
+                    field="updated"
+                    resizeKey="updated"
+                    className={`pr-0 ${COLUMN_DROP.updated}`}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

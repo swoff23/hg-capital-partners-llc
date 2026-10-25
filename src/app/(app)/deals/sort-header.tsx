@@ -3,7 +3,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronUp } from "lucide-react";
 import { thClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { ResizeHandle, type ColumnKey } from "./column-widths";
+import { ResizeHandle } from "./column-widths";
+import type { ColumnKey } from "./columns";
 
 export type SortField = "address" | "status" | "units" | "theirPrice" | "ourPrice" | "nextAction" | "updated";
 
@@ -14,7 +15,8 @@ const DEFAULT_SORT = "status";
  * A clickable table header on the Th look (thClass): 1st click sorts
  * ascending, 2nd descending, 3rd clears. `numeric` right-aligns it over a
  * money or count column, with the caret ahead of the label so the label's
- * end lines up with the figures under it.
+ * end lines up with the figures under it. The label sits 12px in from the
+ * cell's edge, as a plain cell's text and a field cell's text do (deal-row.tsx).
  */
 export function SortHeader({
   label,

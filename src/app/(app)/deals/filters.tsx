@@ -82,7 +82,7 @@ export function DealFilters({
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter by address…"
+          placeholder="Find a deal"
           aria-label="Filter by address"
           className="h-8 pl-8 pointer-coarse:pl-9"
         />

@@ -2,10 +2,13 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
+import { Money } from "@/components/money";
 import { Td } from "@/components/ui";
 import { Tooltip } from "@/components/tooltip";
 import { cn } from "@/lib/utils";
+import { COLUMN_DROP } from "./columns";
 import { DealPriceField, DealStageField, DealTextField, DealUnitsField } from "./deal-fields";
+import { DealStage } from "./stage-select";
 
 export type DealRow = {
   id: string;
@@ -25,12 +28,23 @@ export type DealRow = {
 };
 
 /**
- * A cell holding a field. The 28px field (44px on touch) keeps the row at
- * 40px (48px on touch) with its text on the same line as the plain cells'.
+ * A cell holding a field. Its 3px side inset, the field's 1px edge and its
+ * 8px padding put the field's text 12px in from the cell's edge, where the
+ * header's label and a plain cell's text sit. The 28px field (44px on touch)
+ * keeps the row at 40px (48px on touch) with its text on the same line as
+ * the plain cells'.
  */
-const fieldCell = "py-1.5 pointer-coarse:py-px";
+const fieldCell = "px-0.75 py-1.5 pointer-coarse:py-px";
 const field = "h-7";
 
+/**
+ * One deal in the list. Where the list is narrower than 520px (a phone),
+ * only the address column shows and the row is two lines, 60px on touch:
+ * the address, then the stage and their price (docs/brand-guidelines.md,
+ * section 5, Density), and the whole row opens the deal, where its fields
+ * are edited. Wider, each field edits in place (COLUMN_DROP in columns.ts
+ * says which columns show).
+ */
 export function DealRowEditable({ deal }: { deal: DealRow }) {
   // A short ok-tint flash on the row once a save lands.
   const [flash, setFlash] = useState(false);
@@ -41,15 +55,26 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
     timer.current = setTimeout(() => setFlash(false), 700);
   }
 
+  // Text that isn't one number shows as typed, as it does in the price field.
+  const price =
+    deal.theirPrice != null ? (
+      <Money value={deal.theirPrice} />
+    ) : deal.theirPriceRaw ? (
+      <span className="min-w-0 truncate">{deal.theirPriceRaw}</span>
+    ) : null;
+
   return (
     <tr className={cn("group/row transition-colors", flash ? "bg-ok-tint" : "hover:bg-fill-1")}>
       {/* The first cell starts on the page gutter, under the title (section 5). */}
-      <Td className="pl-0">
+      <Td className="relative pl-0 @max-[32.5rem]:py-2 @max-[32.5rem]:pointer-coarse:py-2">
         <div className="flex items-start gap-1.5">
-          <Link href={`/deals/${deal.id}`} className="font-medium text-fg-1 hover:underline">
+          <Link
+            href={`/deals/${deal.id}`}
+            className="min-w-0 font-medium text-fg-1 hover:underline @max-[32.5rem]:truncate @max-[32.5rem]:after:absolute @max-[32.5rem]:after:inset-0"
+          >
             {deal.address}
           </Link>
-          {/* A mouse sees it on the row's hover; touch opens the listing from the deal page. */}
+          {/* A mouse sees it on the row's hover; touch, and the phone row, open the listing from the deal page. */}
           {deal.sourceUrl && (
             <a
               href={deal.sourceUrl}
@@ -57,23 +82,33 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
               rel="noopener noreferrer"
               aria-label="Open the listing"
               title={`Open ${deal.sourceUrl}`}
-              className="mt-0.5 shrink-0 rounded-sm text-fg-3 opacity-0 transition-opacity hover:text-fg-1 focus-visible:opacity-100 group-hover/row:opacity-100 pointer-coarse:hidden"
+              className="mt-0.5 shrink-0 rounded-sm text-fg-3 opacity-0 transition-opacity hover:text-fg-1 focus-visible:opacity-100 group-hover/row:opacity-100 pointer-coarse:hidden @max-[32.5rem]:hidden"
             >
               <ExternalLink aria-hidden="true" className="size-4 stroke-[1.5]" />
             </a>
           )}
         </div>
+        {/* The phone row's subline: the stage leads it in its tone (section 9), then their price. */}
+        <div className="mt-0.5 hidden min-w-0 items-center gap-1.5 text-meta text-fg-3 @max-[32.5rem]:flex">
+          <DealStage stage={deal.status} className="shrink-0" />
+          {price && (
+            <>
+              <span aria-hidden="true">·</span>
+              {price}
+            </>
+          )}
+        </div>
       </Td>
 
-      <Td className={fieldCell}>
+      <Td className={cn(fieldCell, COLUMN_DROP.status)}>
         <DealStageField id={deal.id} status={deal.status} fieldSize="cell" onSaved={saved} />
       </Td>
 
-      <Td numeric className={fieldCell}>
+      <Td numeric className={cn(fieldCell, COLUMN_DROP.units)}>
         <DealUnitsField id={deal.id} value={deal.units} align="right" className={field} onSaved={saved} />
       </Td>
 
-      <Td numeric className={fieldCell}>
+      <Td numeric className={cn(fieldCell, COLUMN_DROP.theirPrice)}>
         <DealPriceField
           id={deal.id}
           which="their"
@@ -84,7 +119,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
           onSaved={saved}
         />
       </Td>
-      <Td numeric className={fieldCell}>
+      <Td numeric className={cn(fieldCell, COLUMN_DROP.ourPrice)}>
         <DealPriceField
           id={deal.id}
           which="our"
@@ -96,7 +131,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         />
       </Td>
 
-      <Td className="text-meta text-fg-3">
+      <Td className={cn("text-meta text-fg-3", COLUMN_DROP.latestNote)}>
         {deal.latestNotes.length > 0 && (
           <div className="space-y-0.5">
             {deal.latestNotes.map((n, i) => (
@@ -108,7 +143,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         )}
       </Td>
 
-      <Td className={fieldCell}>
+      <Td className={cn(fieldCell, COLUMN_DROP.nextAction)}>
         <DealTextField
           id={deal.id}
           value={deal.nextAction}
@@ -120,7 +155,7 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         />
       </Td>
 
-      <Td className="num truncate pr-0 text-meta text-fg-3">{deal.updated}</Td>
+      <Td className={cn("num truncate pr-0 text-meta text-fg-3", COLUMN_DROP.updated)}>{deal.updated}</Td>
     </tr>
   );
 }

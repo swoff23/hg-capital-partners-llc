@@ -26,7 +26,12 @@ function usePatch(id: string, onSaved?: () => void) {
   return { pending, run };
 }
 
-/** The stage, as a StageSelect. It shows the pick at once while the save runs. */
+/**
+ * The stage, as a StageSelect. It shows the pick at once and dims while the
+ * save runs, but stays enabled: a focused control that turns disabled drops
+ * focus to the page, which would lose a keyboard user's place in the list
+ * after every pick. A second pick queues behind the first.
+ */
 export function DealStageField({
   id,
   status,
@@ -52,9 +57,9 @@ export function DealStageField({
     <StageSelect
       aria-label="Status"
       value={shown}
-      disabled={pending}
+      aria-busy={pending || undefined}
       fieldSize={fieldSize}
-      className={className}
+      className={cn(pending && "opacity-50", className)}
       onChange={(e) => {
         setShown(e.target.value);
         run({ status: e.target.value });
