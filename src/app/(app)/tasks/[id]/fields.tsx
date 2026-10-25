@@ -28,7 +28,9 @@ export interface TaskFieldValues {
 /**
  * The task's fields: a sticky rail of label and chip rows on a computer
  * (lg up), a row of chips under the title below that, scrolling sideways on
- * a phone. One set of controls; CSS moves them.
+ * a phone. One set of controls; CSS moves them. In the rail, rows sit flat on
+ * hairlines with a 112px label column (docs/brand-guidelines.md, section 5);
+ * the page puts the Details heading over them.
  */
 export function TaskFields({
   taskId,
@@ -76,7 +78,7 @@ export function TaskFields({
       className={cn(
         // Below lg: one row of chips. The vertical padding keeps the chips' 44px touch area inside the scroller.
         "-mx-4 flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none]! md:-mx-6 md:px-6 [&::-webkit-scrollbar]:hidden",
-        "lg:mx-0 lg:block lg:overflow-visible lg:rounded-xl lg:border lg:border-border lg:bg-surface lg:px-4 lg:py-1 lg:shadow-sm",
+        "lg:mx-0 lg:block lg:overflow-visible lg:p-0",
         className,
       )}
     >
@@ -108,7 +110,7 @@ export function TaskFields({
           <DueDatePicker
             label="Visit date"
             placeholder="Pick a date"
-            prefix={<span className="text-muted lg:hidden">Visit</span>}
+            prefix={<span className="text-fg-3 lg:hidden">Visit</span>}
             value={v.scheduledFor}
             today={today}
             onChange={(scheduledFor) => {
@@ -164,7 +166,7 @@ export function TaskFields({
       {lockbox && (
         <Row label="Lockbox">
           {/* relative: the sr-only text is absolute, and must stay inside the phone chip row's scroller, not widen the page. */}
-          <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-xs text-muted lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-px">
+          <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-fg-3 lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-0.5">
             <KeyRound aria-hidden="true" />
             {/* Short so each stays one line in the rail; the full sentence is what's read out. */}
             {lockbox.state === "shown" ? (
@@ -186,16 +188,22 @@ export function TaskFields({
         </Row>
       )}
       <Row label="Created" className="hidden lg:flex">
-        <span className="block truncate text-xs text-muted">{created}</span>
+        <span className="block truncate text-meta text-fg-3">{created}</span>
       </Row>
     </div>
   );
 }
 
+/** One field: in the rail, a 112px label in --fg-3 and the chip, over a hairline; 40px rows, 48 on touch. */
 function Row({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex shrink-0 items-center lg:min-h-11 lg:gap-3 lg:border-b lg:border-border/60 lg:last:border-0", className)}>
-      <span className="hidden w-[4.5rem] shrink-0 text-xs text-muted lg:block">{label}</span>
+    <div
+      className={cn(
+        "flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-line lg:last:border-0 lg:pointer-coarse:min-h-12",
+        className,
+      )}
+    >
+      <span className="hidden w-28 shrink-0 text-meta text-fg-3 lg:block">{label}</span>
       <div className="min-w-0 lg:flex-1">{children}</div>
     </div>
   );

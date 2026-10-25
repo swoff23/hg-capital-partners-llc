@@ -61,21 +61,21 @@ export function NewTaskFields({
     <>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <span className="text-xs font-medium text-muted">Assignee</span>
-          <div className="mt-1 flex h-9 items-center pointer-coarse:h-11">
+          <span className="text-meta font-medium text-fg-2">Assignee</span>
+          <div className="mt-1.5 flex h-9 items-center pointer-coarse:h-11">
             <AssigneePicker value={assignee} users={users} contractors={contractors} onChange={setAssignee} />
           </div>
           <input type="hidden" name="assignee" value={encode(assignee)} />
         </div>
         <label className="block">
-          <span className="text-xs font-medium text-muted">Due date</span>
-          <Input name="dueDate" type="date" value={due} onChange={(e) => changeDue(e.target.value)} className="mt-1" />
+          <span className="text-meta font-medium text-fg-2">Due date</span>
+          <Input name="dueDate" type="date" value={due} onChange={(e) => changeDue(e.target.value)} className="mt-1.5" />
         </label>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-muted">Status</span>
-          <Select name="status" value={status} onChange={(e) => setStatus(e.target.value as NewStatus)} className="mt-1">
+          <span className="text-meta font-medium text-fg-2">Status</span>
+          <Select name="status" value={status} onChange={(e) => setStatus(e.target.value as NewStatus)} className="mt-1.5">
             {NEW_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {STATUS_LABEL[s]}
@@ -84,8 +84,8 @@ export function NewTaskFields({
           </Select>
         </label>
         <div>
-          <span className="text-xs font-medium text-muted">Repeats</span>
-          <div className="mt-1 flex h-9 items-center pointer-coarse:h-11">
+          <span className="text-meta font-medium text-fg-2">Repeats</span>
+          <div className="mt-1.5 flex h-9 items-center pointer-coarse:h-11">
             <RepeatPicker
               value={repeat}
               onChange={changeRepeat}
@@ -98,14 +98,14 @@ export function NewTaskFields({
       </div>
       {status === "WAITING" && (
         <label className="block">
-          <span className="text-xs font-medium text-muted">What&apos;s it waiting on?</span>
-          <Input name="waitingOn" required maxLength={300} placeholder="City inspection, parts, the tenant" className="mt-1" />
+          <span className="text-meta font-medium text-fg-2">What&apos;s it waiting on?</span>
+          <Input name="waitingOn" required maxLength={300} placeholder="City inspection, parts, the tenant" className="mt-1.5" />
         </label>
       )}
       {status === "SCHEDULED" && (
         <label className="block">
-          <span className="text-xs font-medium text-muted">Visit date</span>
-          <Input name="scheduledFor" type="date" required className="mt-1" />
+          <span className="text-meta font-medium text-fg-2">Visit date</span>
+          <Input name="scheduledFor" type="date" required className="mt-1.5" />
         </label>
       )}
     </>

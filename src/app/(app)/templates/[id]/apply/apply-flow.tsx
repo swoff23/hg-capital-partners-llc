@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { ListChecks } from "lucide-react";
 import { AssigneePicker, type AssigneeContractor, type AssigneeUser, type AssigneeValue } from "@/components/assignee-picker";
 import { DueDatePicker } from "@/components/due-date-picker";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@/components/ui";
+import { Button, Input, Section, Select } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
 import {
@@ -35,7 +35,9 @@ type Row = {
 /**
  * Apply a playbook (D28): pick the property, the anchor date and the token
  * values ([Tenant]; [Address] fills from the property), review the tasks
- * (untick, rename, reassign, redate), then create them all at once.
+ * (untick, rename, reassign, redate), then create them all at once. The
+ * fields sit flat under the title and the tasks are a Section over a
+ * hairline, no boxes (docs/brand-guidelines.md, section 9).
  */
 export function ApplyFlow({
   templateId,
@@ -110,71 +112,70 @@ export function ApplyFlow({
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardBody className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-xs font-medium text-muted">Property</span>
-              <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)} className="mt-1" required>
-                <option value="">Pick a property</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            {usesAnchor && (
-              <div>
-                <span className="text-xs font-medium text-muted">{anchorLabel}</span>
-                <div className="mt-1 flex h-9 items-center pointer-coarse:h-11">
-                  <DueDatePicker label={anchorLabel} placeholder="Pick a date" value={anchor} today={today} onChange={setAnchor} />
-                </div>
-              </div>
-            )}
-          </div>
-          {tokens.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {tokens.map((t) => (
-                <label key={t} className="block">
-                  <span className="text-xs font-medium text-muted">
-                    {tokenLabel(t)}
-                    {isOptional(t) && <span className="ml-2 font-normal">{" (optional)"}</span>}
-                  </span>
-                  <Input
-                    type={tokenInputType(t)}
-                    value={valueOf(t)}
-                    placeholder={isAddressToken(t) ? "Fills from the property" : `Fill in [${t}]`}
-                    onChange={(e) => setTyped((v) => ({ ...v, [t]: e.target.value }))}
-                    className="mt-1"
-                  />
-                </label>
+    <div className="space-y-8 pointer-coarse:space-y-6">
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-meta font-medium text-fg-2">Property</span>
+            <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)} className="mt-1.5" required>
+              <option value="">Pick a property</option>
+              {properties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
               ))}
+            </Select>
+          </label>
+          {usesAnchor && (
+            <div>
+              <span className="text-meta font-medium text-fg-2">{anchorLabel}</span>
+              <div className="mt-1.5 flex h-9 items-center pointer-coarse:h-11">
+                <DueDatePicker label={anchorLabel} placeholder="Pick a date" value={anchor} today={today} onChange={setAnchor} />
+              </div>
             </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+        {tokens.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {tokens.map((t) => (
+              <label key={t} className="block">
+                <span className="text-meta font-medium text-fg-2">
+                  {tokenLabel(t)}
+                  {isOptional(t) && <span className="font-normal text-fg-3">{" (optional)"}</span>}
+                </span>
+                <Input
+                  type={tokenInputType(t)}
+                  value={valueOf(t)}
+                  placeholder={isAddressToken(t) ? "Fills from the property" : `Fill in [${t}]`}
+                  onChange={(e) => setTyped((v) => ({ ...v, [t]: e.target.value }))}
+                  className="mt-1.5"
+                />
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <Card>
-        <CardHeader className="flex items-center justify-between gap-3">
-          <CardTitle>Tasks</CardTitle>
-          <span className="text-xs tabular-nums text-muted">
+      <Section
+        title="Tasks"
+        actions={
+          <span className="text-meta tabular-nums text-fg-3">
             {count} of {items.length}
           </span>
-        </CardHeader>
-        <ul className="divide-y divide-border">
+        }
+      >
+        <ul className="divide-y divide-line">
           {items.map((item, i) => {
             const r = rows[i];
             return (
-              <li key={i} className={cn("flex items-start gap-3 px-4 py-3", !r.include && "opacity-60")}>
+              <li key={i} className={cn("flex items-start gap-3 py-3", !r.include && "opacity-60")}>
                 <label className="-m-2.5 flex shrink-0 cursor-pointer items-center justify-center p-2.5 pointer-coarse:-m-3.5 pointer-coarse:p-3.5">
                   <input
                     type="checkbox"
                     checked={r.include}
                     onChange={(e) => patchRow(i, { include: e.target.checked })}
                     aria-label={`Include ${titleOf(i)}`}
-                    className="mt-2.5 h-4 w-4 accent-[var(--primary)] pointer-coarse:mt-3.5"
+                    className="mt-2.5 size-4 pointer-coarse:mt-3.5"
                   />
                 </label>
                 <div className="min-w-0 flex-1 space-y-2">
@@ -184,7 +185,6 @@ export function ApplyFlow({
                     disabled={!r.include}
                     aria-invalid={r.include && !!propertyId && hasOpenTokens(titleOf(i))}
                     onChange={(e) => patchRow(i, { title: e.target.value })}
-                    className="aria-invalid:border-red-300 dark:aria-invalid:border-red-900"
                   />
                   <div className="-my-2 flex items-center gap-2 overflow-x-auto py-2 [scrollbar-width:none]! [&::-webkit-scrollbar]:hidden">
                     <AssigneePicker
@@ -201,8 +201,8 @@ export function ApplyFlow({
                       onChange={(due) => patchRow(i, { due })}
                     />
                     {item.checklist && item.checklist.length > 0 && (
-                      <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-muted">
-                        <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-meta text-fg-3">
+                        <ListChecks className="size-3.5" aria-hidden="true" />
                         {item.checklist.length} checklist {item.checklist.length === 1 ? "item" : "items"}
                       </span>
                     )}
@@ -212,10 +212,10 @@ export function ApplyFlow({
             );
           })}
         </ul>
-      </Card>
+      </Section>
 
       <div className="flex items-center justify-end gap-3">
-        {(error || hint) && <p className="min-w-0 truncate text-xs text-red-600 dark:text-red-400">{error || hint}</p>}
+        {(error || hint) && <p className="min-w-0 truncate text-meta text-danger">{error || hint}</p>}
         <Button type="button" onClick={submit} disabled={pending || !propertyId || count === 0 || open.length > 0} className="shrink-0">
           {pending ? "Creating…" : `Create ${count} ${count === 1 ? "task" : "tasks"}`}
         </Button>

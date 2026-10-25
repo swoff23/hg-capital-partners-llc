@@ -53,13 +53,13 @@ export function StatusControl({
           aria-label={`Status: ${STATUS_LABEL[shown]}. Change status`}
           isDisabled={pending}
           className={cn(
-            "relative inline-flex shrink-0 items-center gap-1 rounded-md outline-none data-focus-visible:ring-2 data-focus-visible:ring-primary/30",
+            "relative inline-flex shrink-0 items-center gap-1 rounded-sm",
             // The 20px badge reaches 44px on touch.
             "pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2 pointer-coarse:after:-inset-y-3",
           )}
         >
           <StatusBadge status={shown} />
-          <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+          <ChevronDown className="size-3.5 text-fg-3" aria-hidden="true" />
         </AriaButton>
         <Menu placement="bottom start" onAction={(key) => choose(key as TaskStatus)}>
           {STATUS_ORDER.map((s) => (
@@ -109,7 +109,7 @@ export function WaitingReason({ taskId, waitingOn }: { taskId: string; waitingOn
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="max-w-full truncate rounded-md text-left text-sm text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:min-h-11"
+        className="max-w-full truncate rounded-sm text-left text-body text-fg-3 transition-colors hover:text-fg-1 pointer-coarse:min-h-11"
       >
         Waiting on {waitingOn}
       </button>

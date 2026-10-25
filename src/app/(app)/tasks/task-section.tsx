@@ -1,12 +1,14 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import { Section } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
- * A titled group of rows inside a list card: "Overdue 2 [Move all to today]",
- * "Zack Reading 3". `collapsible` sections start closed and open from the
- * header (No date). Rows go in as <li>s.
+ * A titled group of rows: "Overdue 2 [Move all to today]", "Zack Reading 3".
+ * A Section: the heading and its count in --fg-3 over a hairline, the rows
+ * flat under it. `collapsible` sections start closed and open from the
+ * heading (No date). Rows go in as <li>s.
  */
 export function TaskSection({
   title,
@@ -30,32 +32,36 @@ export function TaskSection({
     <>
       {icon}
       <span className="truncate">{title}</span>
-      <span className="font-normal tabular-nums text-muted">{count}</span>
+      <span className="font-normal tabular-nums text-fg-3">{count}</span>
     </>
   );
 
   return (
-    <section className="border-t border-border first:border-t-0">
-      <div className="flex min-h-11 items-center gap-2 px-4 py-1.5">
-        {collapsible ? (
+    <Section
+      as="h3"
+      // Closed, the rows' slot is empty: drop it so no gap hangs under the rule.
+      className="[&>div:empty]:hidden"
+      actions={action}
+      title={
+        collapsible ? (
           <button
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="-ml-1.5 flex min-h-8 min-w-0 items-center gap-2 rounded-md px-1.5 text-sm font-semibold outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/30 pointer-coarse:min-h-11"
+            className="-ml-1.5 flex min-h-8 min-w-0 items-center gap-2 rounded-md px-1.5 transition-colors hover:bg-fill-1 pointer-coarse:min-h-11"
           >
             <ChevronRight
               aria-hidden="true"
-              className={cn("h-4 w-4 shrink-0 text-muted transition-transform motion-reduce:transition-none", open && "rotate-90")}
+              className={cn("size-4 shrink-0 text-fg-3 transition-transform motion-reduce:transition-none", open && "rotate-90")}
             />
             {heading}
           </button>
         ) : (
-          <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold">{heading}</h3>
-        )}
-        {action && <div className="ml-auto shrink-0">{action}</div>}
-      </div>
-      {open && <ul className="@container divide-y divide-border border-t border-border">{children}</ul>}
-    </section>
+          <span className="flex min-w-0 items-center gap-2">{heading}</span>
+        )
+      }
+    >
+      {open && <ul className="@container divide-y divide-line">{children}</ul>}
+    </Section>
   );
 }

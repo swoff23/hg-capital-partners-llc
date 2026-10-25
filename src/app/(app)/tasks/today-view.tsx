@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { SegmentedControl } from "@/components/segmented-control";
-import { Button, Card } from "@/components/ui";
+import { SpotArt } from "@/components/spot-art";
+import { Button, EmptyState } from "@/components/ui";
 import { groupContractors, groupMine } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
 import { ReviewActions } from "./review-actions";
@@ -20,10 +21,12 @@ const COLUMNS = [
 
 /**
  * Today (docs/asana-migration-plan.md §6, D31). From 1024px: Mine on the
- * left, Contractors on the right. Below that, a Mine | Contractors switch
- * shows one column at a time. The pick is read from the URL
- * (?view=contractors), not kept in state: Back from a task restores the
- * page from the router's cache, and only the URL comes back with it.
+ * left, Contractors on the right, each under its label. Below that, a Mine |
+ * Contractors switch shows one column at a time. The pick is read from the
+ * URL (?view=contractors), not kept in state: Back from a task restores the
+ * page from the router's cache, and only the URL comes back with it. Each
+ * group is a flat Section over a hairline (docs/brand-guidelines.md,
+ * section 9); an empty Mine is the all-clear moment, so it gets the art.
  */
 export function TodayView({ userId }: { userId: string }) {
   const { tasks, today, moveAllToToday } = useTaskList();
@@ -53,9 +56,14 @@ export function TodayView({ userId }: { userId: string }) {
         onChange={pick}
         className="mb-4 lg:hidden"
       />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start">
         <Column title="Mine" hidden={column !== "mine"}>
-          {mineEmpty && <Empty>Nothing due today.</Empty>}
+          {mineEmpty && (
+            <div className="flex flex-col items-center pt-8">
+              <SpotArt name="all-clear" />
+              <EmptyState className="pt-3">Nothing due today.</EmptyState>
+            </div>
+          )}
           {mine.unassigned.length > 0 && (
             <TaskSection title="Unassigned" count={mine.unassigned.length}>
               {mine.unassigned.map((t) => (
@@ -102,7 +110,7 @@ export function TodayView({ userId }: { userId: string }) {
         </Column>
 
         <Column title="Contractors" hidden={column !== "contractors"}>
-          {crew.review.length === 0 && crew.groups.length === 0 && <Empty>No open contractor jobs.</Empty>}
+          {crew.review.length === 0 && crew.groups.length === 0 && <EmptyState>No open contractor jobs.</EmptyState>}
           {crew.review.length > 0 && (
             <TaskSection title="Needs review" count={crew.review.length}>
               {crew.review.map((t) => (
@@ -128,15 +136,12 @@ export function TodayView({ userId }: { userId: string }) {
   );
 }
 
+/** One column's groups, 32px apart (24 on touch). Its label shows from lg, where the switch is gone. */
 function Column({ title, hidden, children }: { title: string; hidden: boolean; children: ReactNode }) {
   return (
     <section aria-label={title} className={cn("min-w-0", hidden && "max-lg:hidden")}>
-      <h2 className="mb-2 hidden text-xs font-semibold uppercase tracking-wide text-muted lg:block">{title}</h2>
-      <Card className="overflow-hidden">{children}</Card>
+      <h2 className="mb-2 hidden text-meta font-medium text-fg-2 lg:block">{title}</h2>
+      <div className="space-y-8 pointer-coarse:space-y-6">{children}</div>
     </section>
   );
-}
-
-function Empty({ children }: { children: ReactNode }) {
-  return <p className="px-4 py-6 text-sm text-muted">{children}</p>;
 }

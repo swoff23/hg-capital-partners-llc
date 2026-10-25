@@ -6,14 +6,18 @@ import type { TaskStatus } from "@prisma/client";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { InlineAddressField } from "@/components/inline-address-field";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
-import { Button } from "@/components/ui";
+import { Button, buttonClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { deleteTask, setTaskStatus, updateTask } from "./actions";
 import { useStatusRun } from "./status-run";
 import { useRun } from "./use-run";
 
-/** The title, edited in place. Long titles wrap. */
+/**
+ * The title on the page title token, edited in place. Long titles wrap. Done
+ * and Canceled strike it through in --fg-3, since the status chip carries no
+ * strike (docs/brand-guidelines.md, section 9).
+ */
 export function TitleField({ taskId, title, closed }: { taskId: string; title: string; closed: boolean }) {
   const { toast } = useRun();
   return (
@@ -22,7 +26,7 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
       value={title}
       minLength={2}
       multiline
-      className={cn("text-xl sm:text-2xl", closed && "text-muted line-through")}
+      className={cn(closed && "text-fg-3 line-through")}
       onCommit={async (next) => {
         const res = await callAction(() => updateTask(taskId, { title: next }));
         if (!res.ok) toast({ message: res.error });
@@ -74,9 +78,9 @@ export function MoreMenu({
       <MenuTrigger>
         <AriaButton
           aria-label="More actions"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted outline-none transition-colors hover:bg-surface hover:text-foreground data-focus-visible:ring-2 data-focus-visible:ring-primary/30 data-pressed:bg-surface pointer-coarse:h-11 pointer-coarse:w-11"
+          className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3 data-pressed:bg-fill-1")}
         >
-          <Ellipsis className="h-4 w-4" aria-hidden="true" />
+          <Ellipsis className="size-4" aria-hidden="true" />
         </AriaButton>
         <Menu>
           <MenuItem icon={<Link2 />} onAction={copyLink}>
