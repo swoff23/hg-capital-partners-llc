@@ -35,8 +35,9 @@ export default async function HomePage() {
       {items.length > 0 && <NeedsYou items={items} className="mb-8 pointer-coarse:mb-6" />}
 
       {capped && (
-        <p role="status" className="mb-4 flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-body text-fg-1">
-          <MailWarning className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+        <p role="status" className="mb-4 flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-body text-fg-1">
+          {/* chromeIconClass spelled out: nav.tsx is a client module, so this server page would get a reference, not the string. */}
+          <MailWarning className="size-4 shrink-0 stroke-[1.5] text-fg-3 pointer-coarse:size-5 pointer-coarse:stroke-[1.75]" aria-hidden="true" />
           {/* One line at every width: phones get the first sentence only. */}
           <span>
             Email limit reached today.<span className="max-sm:hidden"> Some updates are waiting to send.</span>

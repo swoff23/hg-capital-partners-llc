@@ -75,7 +75,7 @@ const KEY_DATES = [
   { field: "rentalRegistrationExpiry", kind: "registration", title: "Rental registration", withinDays: 60 },
 ] as const;
 
-/** Every key date within its window or already past, soonest (latest past) first. */
+/** Every key date within its window or already past, oldest past first, then soonest. */
 export function keyDateItems(properties: KeyDateProperty[], today: Ymd): NeedsYouItem[] {
   const items: NeedsYouItem[] = [];
   for (const p of properties) {

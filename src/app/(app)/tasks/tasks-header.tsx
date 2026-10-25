@@ -8,7 +8,7 @@ export function TasksHeader() {
       title="Tasks"
       actions={
         <LinkButton href="/tasks/new" variant="primary">
-          <Plus className="h-4 w-4" aria-hidden="true" />
+          <Plus className="size-4 stroke-[1.5]" aria-hidden="true" />
           New task
         </LinkButton>
       }
