@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import { Moon, Sun } from "lucide-react";
 import { chromeIconClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -15,9 +16,31 @@ import { cn } from "@/lib/utils";
  * recognizes Next's metas when it hydrates and replaces them on navigation;
  * the observer picks up the ones it inserts. A page that sets one fixed
  * themeColor (public and sign-in pages, #0a0e17) emits a meta without media,
- * which this leaves alone.
+ * which this leaves alone. A page drawn on the public material without its
+ * own themeColor (the root not-found page) counts as dark, so its bar is the
+ * dark canvas too; the body isn't parsed when this first runs, so it syncs
+ * again once the document is.
  */
-export const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var t=localStorage.getItem('hgos-theme');if(!t){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}d.setAttribute('data-theme',t);}catch(e){}try{var sync=function(){var dark=d.getAttribute('data-theme')==='dark',m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++){var s=m[i].getAttribute('data-scheme');if(!s){var q=m[i].getAttribute('media')||'';s=q.indexOf('prefers-color-scheme: dark')>-1?'dark':q.indexOf('prefers-color-scheme: light')>-1?'light':'';if(!s)continue;m[i].setAttribute('data-scheme',s);}var want=(s==='dark')===dark?'all':'not all';if(m[i].getAttribute('media')!==want)m[i].setAttribute('media',want);}};sync();var o=new MutationObserver(sync);o.observe(d,{attributes:true,attributeFilter:['data-theme']});o.observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['media']});}catch(e){}})();`;
+export const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var t=localStorage.getItem('hgos-theme');if(!t){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}d.setAttribute('data-theme',t);}catch(e){}try{var sync=function(){var dark=d.getAttribute('data-theme')==='dark'||!!document.querySelector('[data-surface="public"]'),m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++){var s=m[i].getAttribute('data-scheme');if(!s){var q=m[i].getAttribute('media')||'';s=q.indexOf('prefers-color-scheme: dark')>-1?'dark':q.indexOf('prefers-color-scheme: light')>-1?'light':'';if(!s)continue;m[i].setAttribute('data-scheme',s);}var want=(s==='dark')===dark?'all':'not all';if(m[i].getAttribute('media')!==want)m[i].setAttribute('media',want);}};sync();var o=new MutationObserver(sync);o.observe(d,{attributes:true,attributeFilter:['data-theme']});o.observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['media']});document.addEventListener('DOMContentLoaded',sync);}catch(e){}})();`;
+
+/**
+ * Runs THEME_SCRIPT once more on a page that arrived without it. When a page
+ * calls notFound(), Next answers with its error shell (an empty <html> with
+ * no <head> of ours) and draws the not-found page in the browser, where a
+ * script React inserts never runs, so data-theme would stay unset and a dark
+ * theme would land on a white page. A script element made here does run.
+ * Mounted once, in the root layout.
+ */
+export function ThemeFallback() {
+  useLayoutEffect(() => {
+    if (document.documentElement.hasAttribute("data-theme")) return;
+    const s = document.createElement("script");
+    s.textContent = THEME_SCRIPT;
+    document.head.appendChild(s);
+    s.remove();
+  }, []);
+  return null;
+}
 
 export function ThemeToggle() {
   // Setting data-theme is enough: THEME_SCRIPT's observer moves the browser's bar with it.

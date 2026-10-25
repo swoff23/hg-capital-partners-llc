@@ -1,13 +1,14 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Button, PageHeader, Section } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
+import { callAction } from "@/lib/action-result";
 import { cn, fmtMoney } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
 import { DEFAULT_CAPEX_RULES, type BuildingRule, type CapexRules } from "@/lib/property-types";
 import { saveCapexRules } from "./actions";
-import { AddButton, RemoveButton, quietField } from "./editor-controls";
+import { AddButton, RevealRemoveButton, editorBleed, quietField, revealRow } from "./editor-controls";
 
 /**
  * Local editor state widens BuildingRule.key to allow `null` — a system just
@@ -26,9 +27,22 @@ type EditableCapexRules = Omit<CapexRules, "building"> & { building: EditableBui
 const BUILDING_LIKE_EQUIPMENT = new Set(["Roof", "Furnace", "Boiler", "HVAC", "Water Heater"]);
 
 /* The name, then three right-aligned figures (monitor and replace in years,
-   cost in whole dollars), then the row's delete, 44px wide on touch. */
-const rowGrid =
-  "grid grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_1.5rem] items-center gap-1 pointer-coarse:grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_2.75rem]";
+   cost in whole dollars), then the row's delete, 44px wide on touch. Below
+   480px a row takes two lines, so the cost and the delete never sit off
+   screen: the name and the delete, then the three figures in thirds under
+   the header's Monitor, Replace and Cost. */
+const rowGrid = cn(
+  "grid grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_1.5rem] items-center gap-1 pointer-coarse:grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_2.75rem]",
+  "max-[480px]:grid-cols-[repeat(3,minmax(0,1fr))_2.75rem] max-[480px]:pointer-coarse:grid-cols-[repeat(3,minmax(0,1fr))_2.75rem]",
+);
+/** The name on a phone: the first line, beside the delete. */
+const phoneName = "max-[480px]:col-span-3";
+
+/** The table's width from 480px; below that the two-line rows fit the screen. */
+const tableMin = "min-[481px]:min-w-115 min-[481px]:pointer-coarse:min-w-120";
+
+/** A group's label inside Building systems, on the field text's 7px inset. */
+const subhead = "px-1.75 pb-1 pt-3 text-meta font-medium text-fg-2";
 
 const fmtYrs = (n: number) => `${n} yr${n === 1 ? "" : "s"}`;
 const parseNum = (s: string) => {
@@ -37,11 +51,9 @@ const parseNum = (s: string) => {
 };
 
 /**
- * One row of the rules table, on a --line divider. Its delete shows under the
- * pointer with a mouse (a named group, so only this row's, not every row in
- * the section) and while focus is anywhere in the row: a keyboard tabbing
- * through it, or a tap into one of its fields on touch, where there's no
- * hover. Touch is tap to reveal, never a trash on every row.
+ * One row of the rules table, on a --line divider. Its delete is
+ * RevealRemoveButton: under the pointer with a mouse, and while focus is in
+ * the row, so touch is tap to reveal, never a trash on every row.
  */
 function RuleRow({
   label,
@@ -55,32 +67,14 @@ function RuleRow({
   canRemove: boolean;
   children: React.ReactNode;
 }) {
-  const rowRef = useRef<HTMLDivElement>(null);
-  // The hidden delete still takes taps (opacity keeps its 44px slot), so a touch
-  // or pen press on it while nothing in the row has focus only reveals it, and a
-  // stray tap at a row's end can't delete a rule. Read at pointerdown, before the
-  // press moves focus.
-  const revealOnly = useRef(false);
+  const slot = "justify-self-end max-[480px]:col-start-4 max-[480px]:row-start-1";
   return (
-    <div ref={rowRef} className={cn(rowGrid, "group/row py-1.25 transition-colors hover:bg-fill-1 pointer-coarse:py-0.5")}>
+    <div data-reveal-row className={cn(rowGrid, revealRow, "py-1.25 transition-colors hover:bg-fill-1 pointer-coarse:py-0.5")}>
       {children}
       {canRemove ? (
-        <RemoveButton
-          onPointerDown={(e) => {
-            revealOnly.current = e.pointerType !== "mouse" && !rowRef.current?.matches(":focus-within");
-          }}
-          onClick={(e) => {
-            // A keyboard's click (detail 0) always deletes: it can only reach a shown button.
-            const reveal = revealOnly.current && e.detail > 0;
-            revealOnly.current = false;
-            if (reveal) e.currentTarget.focus();
-            else onRemove();
-          }}
-          aria-label={`Remove ${label || "this row"}`}
-          className="justify-self-end opacity-0 transition-[opacity,color] group-focus-within/row:opacity-100 group-hover/row:opacity-100"
-        />
+        <RevealRemoveButton onRemove={onRemove} aria-label={`Remove ${label || "this row"}`} className={slot} />
       ) : (
-        <span />
+        <span className={slot} />
       )}
     </div>
   );
@@ -149,6 +143,7 @@ function ComboField({
   freeText = false,
   placeholder,
   label,
+  className,
 }: {
   value: string;
   options: string[];
@@ -157,6 +152,7 @@ function ComboField({
   placeholder?: string;
   /** Names the field for a screen reader: "Appliance", "System". */
   label: string;
+  className?: string;
 }) {
   // As in InlineNumber: local only while editing, so a revert or a reset shows through.
   const [draft, setDraft] = useState<string | null>(null);
@@ -172,7 +168,7 @@ function ComboField({
   );
   return (
     <input
-      className={quietField}
+      className={cn(quietField, className)}
       aria-label={label}
       placeholder={placeholder}
       value={draft ?? value}
@@ -188,7 +184,8 @@ function ComboField({
    field's 6px padding and 1px edge). */
 const headerRow = (first: string) => (
   <div className={cn(rowGrid, "border-b border-line-strong pb-2 text-meta font-medium text-fg-3")}>
-    <span className="px-1.75">{first}</span>
+    {/* On a phone the section's title names the first column; the labels head the figures' line. */}
+    <span className="px-1.75 max-[480px]:hidden">{first}</span>
     <span className="px-1.75 text-right">Monitor</span>
     <span className="px-1.75 text-right">Replace</span>
     <span className="px-1.75 text-right">Cost</span>
@@ -216,7 +213,8 @@ export function CapexRulesEditor({
     setRules(next);
     setError(null);
     start(async () => {
-      const r = await saveCapexRules(next, version);
+      // A dropped connection comes back as a refusal, so the row reverts with the message instead of the page crashing.
+      const r = await callAction(() => saveCapexRules(next, version));
       if (r.ok) {
         setRules(r.data.rules);
         setVersion(r.data.version);
@@ -323,14 +321,16 @@ export function CapexRulesEditor({
           </AddButton>
         }
       >
-        {/* Narrower than its columns (460px, 480 on touch), the table scrolls sideways in its own box, never the page. */}
-        <div className="overflow-x-auto">
-          <div className="min-w-115 pointer-coarse:min-w-120">
+        {/* From 480px, narrower than its columns (460px, 480 on touch), the table scrolls sideways in
+            its own box, never the page; below that each row takes two lines and fits. */}
+        <div className={cn("overflow-x-auto", editorBleed)}>
+          <div className={tableMin}>
             {headerRow("Appliance")}
             <div className="divide-y divide-line">
               {appliances.map((r) => (
                 <RuleRow key={r.type} label={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
                   <ComboField
+                    className={phoneName}
                     value={r.type}
                     label="Appliance"
                     options={availableApplianceTypes}
@@ -368,10 +368,11 @@ export function CapexRulesEditor({
       <Section
         title="Building systems"
         actions={
-          // Below sm the pair drops its Plus icons and sits 12px apart, so at 320
-          // "Building systems" keeps room for its longest word beside "Add Water Heater".
+          // Below sm a pair drops its Plus icons and sits 12px apart, so at 320 "Building
+          // systems" keeps room for its longest word beside "Add Water Heater". Alone, Add
+          // system keeps its Plus, which is what marks it as an action.
           <div className="flex items-center gap-3 sm:gap-4">
-            <AddButton tight onClick={addBuildingSystem}>
+            <AddButton tight={missingCoreTypes.length > 0} onClick={addBuildingSystem}>
               Add system
             </AddButton>
             {missingCoreTypes.length > 0 && (
@@ -382,13 +383,17 @@ export function CapexRulesEditor({
           </div>
         }
       >
-        <div className="overflow-x-auto">
-          <div className="min-w-115 pointer-coarse:min-w-120">
+        <div className={cn("overflow-x-auto", editorBleed)}>
+          <div className={tableMin}>
             {headerRow("System")}
             <div className="divide-y divide-line">
+              {/* Roof, furnace and the rest are kept per unit, and a building can carry its own roof
+                  too: the subheads say which a figure is, so two Roof rows never read as one rule. */}
+              {coreSystems.length > 0 && <p className={subhead}>Per unit</p>}
               {coreSystems.map((r) => (
                 <RuleRow key={r.type} label={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
                   <ComboField
+                    className={phoneName}
                     value={r.type}
                     label="System"
                     options={missingCoreTypes}
@@ -417,9 +422,11 @@ export function CapexRulesEditor({
                   />
                 </RuleRow>
               ))}
+              {rules.building.length > 0 && <p className={subhead}>Per building</p>}
               {rules.building.map((r, i) => (
                 <RuleRow key={r.key ?? `new-${i}`} label={r.label} onRemove={() => removeB(i)} canRemove={rules.building.length > 1}>
                   <ComboField
+                    className={phoneName}
                     value={r.label}
                     label="System"
                     options={buildingSuggestions}

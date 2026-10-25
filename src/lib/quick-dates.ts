@@ -9,7 +9,8 @@ import { toYmd, type Ymd } from "./dates";
  *
  * Monday is the first Monday after today. On a Monday that's a week out,
  * never today. On a Sunday the first Monday is tomorrow, which Tomorrow
- * already offers, so it's the Monday after (8 days out).
+ * already offers, so it's the Monday after (8 days out): then it reads
+ * "Next Monday" and sits after Next week, so the picks stay in date order.
  */
 
 export type QuickPickKey = "today" | "tomorrow" | "monday" | "next-week" | "none";
@@ -62,11 +63,24 @@ export function quickPicks(today: Ymd): QuickPick[] {
   const tomorrow = addDaysYmd(t, 1)!;
   const monday = mondayPick(t);
   const nextWeek = addDaysYmd(t, 7)!;
+  const sunday = weekdayOf(t) === 0;
+  const mondayPickOf: QuickPick = {
+    key: "monday",
+    label: sunday ? "Next Monday" : "Monday",
+    value: monday,
+    hint: fmt(monday, { month: "short", day: "numeric" }),
+  };
+  const nextWeekPick: QuickPick = {
+    key: "next-week",
+    label: "Next week",
+    value: nextWeek,
+    hint: fmt(nextWeek, { weekday: "short", month: "short", day: "numeric" }),
+  };
   return [
     { key: "today", label: "Today", value: t, hint: fmt(t, { weekday: "short" }) },
     { key: "tomorrow", label: "Tomorrow", value: tomorrow, hint: fmt(tomorrow, { weekday: "short" }) },
-    { key: "monday", label: "Monday", value: monday, hint: fmt(monday, { month: "short", day: "numeric" }) },
-    { key: "next-week", label: "Next week", value: nextWeek, hint: fmt(nextWeek, { weekday: "short", month: "short", day: "numeric" }) },
+    // Date order: on a Sunday next week (Sun) comes before the Monday after it.
+    ...(sunday ? [nextWeekPick, mondayPickOf] : [mondayPickOf, nextWeekPick]),
     { key: "none", label: "No date", value: null, hint: "" },
   ];
 }

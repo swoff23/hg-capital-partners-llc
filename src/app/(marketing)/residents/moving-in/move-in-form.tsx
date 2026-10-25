@@ -24,6 +24,8 @@ type SectionAnswers = Record<string, Instance[]>; // sectionKey -> instances
 // above in text-meta 500, sentence case.
 const fieldClass = "mt-1.5 placeholder:text-pub-faint";
 const labelClass = "text-meta font-medium text-fg-2";
+/** A required select's empty prompt reads as a placeholder; its options keep --fg-1. */
+const promptSelect = "invalid:text-pub-faint [&>option]:text-fg-1";
 
 function blankInstance(section: MoveInSection): Instance {
   return {
@@ -181,7 +183,9 @@ export function MoveInForm({
               setPropertyId(e.target.value);
               setUnitLabel("");
             }}
-            className={fieldClass}
+            // Required with an empty disabled first option, so it's :invalid until something is
+            // picked: the prompt reads as a placeholder (--pub-faint), the picks in --fg-1.
+            className={cn(fieldClass, promptSelect)}
           >
             <option value="" disabled>
               Select your property
@@ -196,7 +200,7 @@ export function MoveInForm({
         {units.length > 1 && (
           <label className="block sm:col-span-2">
             <span className={labelClass}>Unit</span>
-            <Select required value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} className={fieldClass}>
+            <Select required value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} className={cn(fieldClass, promptSelect)}>
               <option value="" disabled>
                 Select your unit
               </option>
@@ -322,7 +326,8 @@ function SectionBlock({
                 <Input
                   value={inst.location}
                   onChange={(e) => onLocationChange(i, e.target.value)}
-                  placeholder={`${section.label} ${i + 1} (e.g. "Upstairs")`}
+                  // The section's heading names the room; the aria-label keeps its name and number.
+                  placeholder="e.g. Upstairs"
                   aria-label={`${section.label} ${i + 1} location`}
                   className="placeholder:text-pub-faint"
                 />

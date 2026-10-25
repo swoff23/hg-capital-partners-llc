@@ -191,7 +191,10 @@ export function JobActions({
   const done = markDoneButton({ pending, failed, sending: finishing, hasContent: ready.length > 0 || note.trim() !== "" });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
-  const barButton = "h-12 min-w-0 flex-1 whitespace-nowrap lg:w-60 lg:flex-none";
+  // 48px on touch, a mouse's 36px control height otherwise (section 5).
+  const barButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 lg:w-60 lg:flex-none";
+  // The Mark done sheet's pair: half each on a phone, sized to their labels at the dialog's end from md.
+  const sheetButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 md:flex-none";
 
   return (
     <>
@@ -251,10 +254,14 @@ export function JobActions({
               ) : (
                 // Off while anything is still going up or failed; the line under the bar says which.
                 <Button className={cn(barButton, "max-[360px]:px-2")} disabled={pending > 0 || failed > 0} onClick={openMarkDone}>
-                  <span className="truncate">{pending > 0 ? finishingLabel(pending) : "Mark done"}</span>
+                  Mark done
                 </Button>
               )}
             </div>
+            {/* The disabled Mark done's one-line reason: uploads still going up, or the red Retry line. */}
+            {step !== "start" && step !== "review" && pending > 0 && failed === 0 && (
+              <p className="text-center text-meta text-fg-3 lg:text-right">{finishingLabel(pending)}</p>
+            )}
             <FailedUploadsLine uploader={uploader} className="lg:justify-end" />
           </div>
         </div>
@@ -271,6 +278,26 @@ export function JobActions({
         title={sheetState === "sent" ? "Sent for review" : "Mark done"}
         hideTitle={sheetState === "sent"}
         className="md:w-[28rem]"
+        // Pinned under the photos and the note, so on a short phone the primary and why it's off stay in view.
+        footer={
+          sheetState === "ask" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 md:justify-end">
+                {/* The picker, not the camera alone: on a phone it offers Take Photo and the library, so shots taken
+                    earlier in the Camera app can go too. */}
+                <Button variant="secondary" className={sheetButton} disabled={finishing} onClick={uploader.chooseFiles}>
+                  <ImagePlus className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Add photos
+                </Button>
+                {/* Off while a photo failed to upload: the red line under it says which (decision 13). */}
+                <Button className={sheetButton} disabled={!done.enabled} onClick={finish}>
+                  <span className="truncate">{done.label}</span>
+                </Button>
+              </div>
+              <FailedUploadsLine uploader={uploader} className="md:justify-end" />
+            </div>
+          )
+        }
       >
         {sheetState === "ask" ? (
           <div className="space-y-4 p-4">
@@ -293,21 +320,6 @@ export function JobActions({
                 placeholder="Add a note (optional)"
                 className="resize-none"
               />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                {/* The picker, not the camera alone: on a phone it offers Take Photo and the library, so shots taken
-                    earlier in the Camera app can go too. */}
-                <Button variant="secondary" className="h-12 min-w-0 flex-1 whitespace-nowrap" disabled={finishing} onClick={uploader.chooseFiles}>
-                  <ImagePlus className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  Add photos
-                </Button>
-                {/* Off while a photo failed to upload: the red line under it says which (decision 13). */}
-                <Button className="h-12 min-w-0 flex-1 whitespace-nowrap" disabled={!done.enabled} onClick={finish}>
-                  <span className="truncate">{done.label}</span>
-                </Button>
-              </div>
-              <FailedUploadsLine uploader={uploader} />
             </div>
           </div>
         ) : (

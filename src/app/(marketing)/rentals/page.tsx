@@ -5,6 +5,7 @@ import { Eyebrow, publicContainer, publicLinkHover, publicType } from "@/compone
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { daysUntil, fmtDay, todayYmdEastern } from "@/lib/dates";
+import { shortAddress } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import { PhotoCarousel } from "./photo-carousel";
 
@@ -18,7 +19,10 @@ export const dynamic = "force-dynamic";
 type ListingCardData = {
   id: string;
   unitLabel: string;
+  /** The full address: the photos' alt text. */
   address: string;
+  /** The card's title: the street alone, so it stays on one line (section 10, Caption). */
+  street: string;
   zillowUrl: string | null;
   rent: string | null;
   facts: string;
@@ -53,6 +57,7 @@ export default async function RentalsPage() {
       id: l.id,
       unitLabel: l.unitLabel,
       address: l.property.address,
+      street: shortAddress(l.property.address) || l.property.address,
       zillowUrl: l.zillowUrl,
       rent: l.rent?.toString() ?? null,
       facts: [count(l.beds, "bd"), count(l.baths, "ba"), l.sqft && `${l.sqft.toLocaleString("en-US")} sq ft`]
@@ -79,7 +84,7 @@ export default async function RentalsPage() {
 
       {available === 0 && (
         <p className={cn(publicType.lead, "mt-3 max-w-xl text-fg-3")}>
-          No openings right now. Check back soon, or see our listings on Zillow.
+          No openings right now. Check back soon.
         </p>
       )}
 
@@ -96,8 +101,9 @@ export default async function RentalsPage() {
 
 /**
  * A borderless 4:3 photo card: the photo, then the street with the rent
- * right-aligned ("/mo" in --fg-3), the unit, and the facts line
- * (docs/brand-guidelines.md, section 10).
+ * right-aligned ("/mo" in --fg-3), the unit, and the facts line when there
+ * are facts (docs/brand-guidelines.md, section 10). The city is the page's
+ * heading, so the card leaves it out.
  */
 function ListingCard({ listing: l }: { listing: ListingCardData }) {
   return (
@@ -106,7 +112,7 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
 
       <div className="grid gap-0.5">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className={cn(publicType.title, "min-w-0 text-fg-1")}>{l.address}</h2>
+          <h2 className={cn(publicType.title, "min-w-0 text-fg-1")}>{l.street}</h2>
           {!l.leased && (
             <p className={cn(publicType.title, "shrink-0 text-right text-fg-1")}>
               {l.rent ? (
@@ -121,7 +127,8 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
           )}
         </div>
         <p className={cn(publicType.meta, "text-fg-3")}>{l.unitLabel}</p>
-        <p className={cn(publicType.meta, "num text-fg-3")}>{l.facts || "Details on request"}</p>
+        {/* No facts yet: nothing, since "Price on request" above already says to ask. */}
+        {l.facts && <p className={cn(publicType.meta, "num text-fg-3")}>{l.facts}</p>}
         {l.zillowUrl && !l.leased && (
           <a
             href={l.zillowUrl}

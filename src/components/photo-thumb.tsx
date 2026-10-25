@@ -83,7 +83,9 @@ export function PhotoThumb({
         />
       ) : (
         <span role="img" aria-label={alt} className="absolute inset-0 flex items-center justify-center text-fg-3">
-          <House aria-hidden="true" strokeWidth={1.5} className="aspect-square h-2/5 w-auto" />
+          {/* absoluteStrokeWidth: a 1.5px line at any tile size, like the rest of the drawn set (a scaled
+              stroke would be 5px on the phone's full-width header). */}
+          <House aria-hidden="true" strokeWidth={1.5} absoluteStrokeWidth className="aspect-square h-2/5 w-auto" />
         </span>
       )}
       <span

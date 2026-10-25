@@ -50,11 +50,12 @@ export function TaskSection({
             onClick={() => setOpen(!open)}
             className="-ml-1.5 flex min-h-8 min-w-0 items-center gap-2 rounded-md px-1.5 transition-colors hover:bg-fill-1 pointer-coarse:min-h-11"
           >
+            {/* After the count, so this title shares the left edge every other section's does. */}
+            {heading}
             <ChevronRight
               aria-hidden="true"
               className={cn("size-4 shrink-0 text-fg-3 transition-transform motion-reduce:transition-none", open && "rotate-90")}
             />
-            {heading}
           </button>
         ) : (
           <span className="flex min-w-0 items-center gap-2">{heading}</span>

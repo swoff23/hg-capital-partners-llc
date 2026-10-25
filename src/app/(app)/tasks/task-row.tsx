@@ -11,6 +11,16 @@ import { TaskCheckbox } from "./task-checkbox";
 import { useTaskList } from "./task-list-context";
 
 /**
+ * Whether a row shows anything in the status column: a badge (any job, any
+ * staff task that isn't To do) or a Waiting reason. A list keeps the column
+ * when any of its rows does, so the marks line up; with none it drops.
+ */
+export function hasStatusColumn(task: ListTask, { status = true, reason = false }: { status?: boolean; reason?: boolean } = {}): boolean {
+  if (task.status === "WAITING" && task.waitingOn && (status || reason)) return true;
+  return status && (isContractorJob(task) || task.status !== "OPEN");
+}
+
+/**
  * One task in a list (Today, All). The whole row opens the task; the
  * checkbox, the date chip and any actions sit above that link. Rows sit flat
  * over hairlines, flush with their section's heading; the hover fill reaches
@@ -38,7 +48,10 @@ import { useTaskList } from "./task-list-context";
  *
  * A contractor's job always shows its status and its Target (D7: the visit
  * date while Scheduled, otherwise Due). Staff tasks show status only when
- * it isn't To do, and their Due date. Must sit inside a TaskListProvider and
+ * it isn't To do, and their Due date. The status column is the same width
+ * on every row of a list, so its marks line up; a list where no row shows a
+ * status (staff To dos) passes `statusColumn={false}` (see hasStatusColumn)
+ * and its titles get the width back. Must sit inside a TaskListProvider and
  * an `@container` list.
  */
 export function TaskRow({
@@ -48,6 +61,8 @@ export function TaskRow({
   name = false,
   reason = false,
   status = true,
+  statusColumn: listHasStatus = true,
+  street = true,
   actions,
 }: {
   task: ListTask;
@@ -60,6 +75,10 @@ export function TaskRow({
   reason?: boolean;
   /** False where the section already says it (Needs review). */
   status?: boolean;
+  /** False when no row in the list shows a status, so the empty column drops (hasStatusColumn). */
+  statusColumn?: boolean;
+  /** False in a list scoped to one property, whose heading names the street: the place is the unit alone. */
+  street?: boolean;
   /** Buttons at the row's end, e.g. Approve and Send back. */
   actions?: ReactNode;
 }) {
@@ -70,7 +89,7 @@ export function TaskRow({
   const visit = job && targetField(task) === "scheduledFor";
   const who = avatar ? assigneeName(task.assignee) : null;
   const first = name ? who?.split(" ")[0] : null;
-  const place = [task.place, task.unitLabel].filter(Boolean).join(" · ");
+  const place = [street && task.place, task.unitLabel].filter(Boolean).join(" · ");
   const oneLine = !actions;
   const struck = task.checked || task.status === "CANCELED";
   // Waiting with a reason: the pause ring and the reason in --fg-3, so amber
@@ -79,7 +98,7 @@ export function TaskRow({
   // "Waiting on National Fuel"; below 480 the second line has no room for it,
   // so the word leads it like any status and the reason drops.
   const waitingOn = task.status === "WAITING" && task.waitingOn ? task.waitingOn : null;
-  const statusColumn = status || reason;
+  const statusColumn = (status || reason) && listHasStatus;
   const badge = status && (job || task.status !== "OPEN") ? <StatusBadge status={task.status} /> : null;
   const waiting = (text: string, label?: string) => (
     // Hit-testable with a mouse, as the avatar is, so the full reason shows on hover above the row's link.
@@ -99,10 +118,13 @@ export function TaskRow({
   // The place line: the status lead below a 480px list, the place, the avatar.
   // With none of them the row is the title and its date alone.
   const placeLine = Boolean(narrow || place || who);
+  // A second line at every width; the status lead alone shows only below a 480px list.
+  const secondLine = Boolean(place || who);
 
   // Top right on the title's line, on every row; a one-line row puts it last.
   const dateChip = (
-    <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[50rem]:order-last lg:@min-[50rem]:w-28 lg:@min-[50rem]:justify-end")}>
+    // 120px on a one-line row: the widest date, "May 20, 2025", with its padding.
+    <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[50rem]:order-last lg:@min-[50rem]:w-30 lg:@min-[50rem]:justify-end")}>
       <DueDatePicker
         value={date}
         today={today}
@@ -115,10 +137,18 @@ export function TaskRow({
   );
 
   return (
-    // 40px one-line rows with a mouse (docs/brand-guidelines.md, section 5, Density). Two-line
+    // 40px one-line rows with a mouse, 48 on touch (docs/brand-guidelines.md, section 5,
+    // Density): a title-and-date row takes 10px above and below its 28px line there. Two-line
     // rows are 62px, against the section's 60: the 28px date chip sets the title's line, and
     // the place line under it is 20. Below a 480px list a row's actions wrap to a line of their own.
-    <li className={cn("group/row relative flex items-start gap-3 py-1.5", oneLine && "lg:@min-[50rem]:items-center", actions && "flex-wrap")}>
+    <li
+      className={cn(
+        "group/row relative flex items-start gap-3 py-1.5 pointer-coarse:min-h-12",
+        !secondLine && (narrow ? "@min-[30rem]:pointer-coarse:py-2.5" : "pointer-coarse:py-2.5"),
+        oneLine && "lg:@min-[50rem]:items-center",
+        actions && "flex-wrap",
+      )}
+    >
       <Link href={`/tasks/${task.id}`} className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1">
         <span className="sr-only">{task.title}</span>
       </Link>
@@ -128,6 +158,8 @@ export function TaskRow({
           checked={task.checked}
           onChange={(done) => setDone(task, done)}
           label={task.title}
+          // A canceled task isn't To do: its ring dims beside the slashed Canceled mark.
+          disabled={task.status === "CANCELED"}
           // Centered on the title's 28px line; a one-line row centers everything.
           className={cn("relative -mt-2", oneLine && "lg:@min-[50rem]:-mt-3")}
         />
@@ -150,7 +182,8 @@ export function TaskRow({
           )}
           {dateChip}
         </div>
-        <div className={cn("mt-0.5 flex min-w-0 items-center gap-2", !placeLine && "hidden", oneLine && "lg:@min-[50rem]:contents")}>
+        {/* 20px tall with or without the avatar, so every two-line row is the same height. */}
+        <div className={cn("mt-0.5 flex min-w-0 items-center gap-2", secondLine && "min-h-5", !placeLine && "hidden", oneLine && "lg:@min-[50rem]:contents")}>
           {narrow && (
             <span className={cn("flex items-center gap-2 @min-[30rem]:hidden", reasonOnly ? "min-w-0 shrink" : "shrink-0")}>
               {narrow}

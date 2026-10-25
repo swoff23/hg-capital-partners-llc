@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { THEME_SCRIPT } from "@/components/theme-toggle";
+import { THEME_SCRIPT, ThemeFallback } from "@/components/theme-toggle";
 import { BRAND } from "@/lib/brand";
 import { brandTokens, brandTokensDark } from "@/lib/brand-tokens";
 import "./globals.css";
@@ -34,7 +34,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <ThemeFallback />
+        {children}
+      </body>
     </html>
   );
 }

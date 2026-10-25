@@ -24,7 +24,17 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
       select: { id: true },
       orderBy: { createdAt: "asc" },
     }),
-  "properties/[id]": (db) => db.property.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // The property whose units hold the longest lockbox value ("4857 (back left corner of the
+  // house)"), so a long code or note on a phone is checked too; the first one without any.
+  "properties/[id]": async (db) => {
+    const all = await db.property.findMany({ select: { id: true, units: true }, orderBy: { createdAt: "asc" } });
+    const longest = (units: unknown) =>
+      Array.isArray(units)
+        ? Math.max(0, ...units.map((u) => (typeof u?.lockboxCode === "string" ? u.lockboxCode.length : 0)))
+        : 0;
+    const pick = all.reduce<(typeof all)[number] | null>((best, p) => (!best || longest(p.units) > longest(best.units) ? p : best), null);
+    return pick ? { id: pick.id } : null;
+  },
   "tasks/[id]": (db) =>
     db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
   // Playbooks come from the Asana load (scripts/asana/20-load.ts).

@@ -14,5 +14,6 @@ export const LOGIN_START: LoginState = { error: null, email: "" };
 
 export const LOGIN_MESSAGES: Record<LoginError, string> = {
   bad: "Wrong email or password.",
-  locked: "Too many failed attempts. Try again in 15 minutes.",
+  // One line at 320: shorter words, not a smaller font.
+  locked: "Too many tries. Wait 15 minutes.",
 };

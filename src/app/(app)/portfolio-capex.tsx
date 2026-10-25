@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Section, Table, Td, Th, TextLink, textLinkClass } from "@/components/ui";
 import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
@@ -22,16 +22,26 @@ type TipContent = {
   showYear: boolean;
 };
 
+/** `x` is the value's center; the panel clamps itself to the page gutter once it knows its width. */
 type Tip = TipContent & { x: number; top: number; flip: boolean };
 
-const TIP_HALF = 172; // ~half of the panel's width, for clamping it to the viewport
+/** The page gutter the panel keeps from the viewport's edges: 16 on phones, 24 on tablets, 32 on desktops. */
+const gutter = (width: number) => (width < 640 ? 16 : width < 1024 ? 24 : 32);
+
+/** Fades a cell's content, not the cell, so the header and total rules run unbroken. */
+function Fade({ faded, children }: { faded: boolean; children: ReactNode }) {
+  return <span className={cn("transition-opacity duration-fast", faded && "opacity-30")}>{children}</span>;
+}
 
 /**
  * The portfolio's 5-year CapEx forecast: the total, spend by year (pick a
  * year to spotlight its column), and a property by year table that totals
  * like a statement. A value's assets show in a small panel: on hover with a
  * mouse, on keyboard focus, and on a tap on touch, since touch has no hover.
- * Lives on /properties, under the property table, at #capex.
+ * This year's spend is "Due now"; only what's past its replacement age
+ * reads in --danger. Below sm the table keeps Property, one year (this one,
+ * or the year picked in the chart) and the 5-year total, so nothing scrolls
+ * out of sight. Lives on /properties, under the property table, at #capex.
  */
 export function PortfolioCapexForecastCard({
   properties,
@@ -53,6 +63,9 @@ export function PortfolioCapexForecastCard({
   // Click a year in the chart to spotlight that year's column in the table below.
   const [selYear, setSelYear] = useState<number | null>(null);
   const selIdx = selYear == null ? -1 : f.years.indexOf(selYear);
+  // The one year column a phone shows: the picked year, or this one.
+  const phoneIdx = selIdx >= 0 ? selIdx : 0;
+  const pastDue = f.rows.some((r) => r.items.some((it) => it.pastDue));
 
   const [tip, setTip] = useState<Tip | null>(null);
   // The open panel's id, so its value's button can point at it.
@@ -61,13 +74,21 @@ export function PortfolioCapexForecastCard({
   function openTip(el: HTMLElement, content: TipContent) {
     const r = el.getBoundingClientRect();
     const flip = r.bottom + 220 > window.innerHeight;
-    setTip({
-      ...content,
-      x: Math.min(Math.max(r.left + r.width / 2, TIP_HALF), window.innerWidth - TIP_HALF),
-      top: flip ? r.top - 6 : r.bottom + 6,
-      flip,
-    });
+    setTip({ ...content, x: r.left + r.width / 2, top: flip ? r.top - 6 : r.bottom + 6, flip });
   }
+
+  // Centered on its value, then held inside the page gutter by its own measured width.
+  // It renders hidden at the left edge, so it can be measured, and shows once placed.
+  const tipRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = tipRef.current;
+    if (!tip || !el) return;
+    const vw = document.documentElement.clientWidth;
+    const g = gutter(vw);
+    const w = el.offsetWidth;
+    el.style.left = `${Math.max(g, Math.min(tip.x - w / 2, vw - g - w))}px`;
+    el.style.visibility = "visible";
+  }, [tip]);
 
   // The panel is fixed where its value was, so a scroll closes it; so do Esc
   // and a tap anywhere but that value.
@@ -130,8 +151,8 @@ export function PortfolioCapexForecastCard({
                 </span>
               ) : (
                 f.dueNowTotal > 0 && (
-                  <span className="text-meta text-danger">
-                    <Money value={f.dueNowTotal} /> due soon
+                  <span className={cn("text-meta", pastDue ? "text-danger" : "text-fg-2")}>
+                    <Money value={f.dueNowTotal} /> due now
                   </span>
                 )
               )}
@@ -148,21 +169,17 @@ export function PortfolioCapexForecastCard({
 
           {/* Property by year */}
           {rows.length > 0 ? (
-            <Table className="min-w-140">
+            <Table className="sm:min-w-140">
               <thead>
                 <tr>
                   <Th className="pl-0">Property</Th>
-                  {f.years.map((y) => (
-                    <Th
-                      key={y}
-                      numeric
-                      className={cn("transition-opacity duration-fast", selYear != null && selYear !== y && "opacity-30")}
-                    >
-                      {y}
+                  {f.years.map((y, i) => (
+                    <Th key={y} numeric className={cn(i !== phoneIdx && "max-sm:hidden")}>
+                      <Fade faded={selYear != null && selYear !== y}>{y}</Fade>
                     </Th>
                   ))}
-                  <Th numeric className={cn("pr-0 transition-opacity duration-fast", selYear != null && "opacity-30")}>
-                    5-yr
+                  <Th numeric className="pr-0">
+                    <Fade faded={selYear != null}>5-yr</Fade>
                   </Th>
                 </tr>
               </thead>
@@ -184,24 +201,27 @@ export function PortfolioCapexForecastCard({
                             key={i}
                             numeric
                             className={cn(
-                              "transition-opacity duration-fast",
-                              faded && "opacity-30",
-                              // This year's spend is what's due now or already past its replacement age.
-                              v === 0 ? "text-fg-3" : i === 0 ? "text-danger" : "text-fg-1",
+                              i !== phoneIdx && "max-sm:hidden",
+                              // This year's spend is due now; red only when some of it is past its replacement age.
+                              v === 0 ? "text-fg-3" : items.some((it) => it.pastDue) ? "text-danger" : "text-fg-1",
                             )}
                           >
-                            {breakdown(
-                              { key: `${r.id}-${year}`, title: `${name} · ${year}`, items, showYear: false },
-                              v ? <Money value={v} /> : "—",
-                            )}
+                            <Fade faded={faded}>
+                              {breakdown(
+                                { key: `${r.id}-${year}`, title: `${name} · ${year}`, items, showYear: false },
+                                v ? <Money value={v} /> : "—",
+                              )}
+                            </Fade>
                           </Td>
                         );
                       })}
-                      <Td numeric className={cn("pr-0 transition-opacity duration-fast", selYear != null && "opacity-30")}>
-                        {breakdown(
-                          { key: `${r.id}-all`, title: `${name} · ${f.fromYear} to ${lastYear}`, items: r.items, showYear: true },
-                          <Money value={r.total} />,
-                        )}
+                      <Td numeric className="pr-0">
+                        <Fade faded={selYear != null}>
+                          {breakdown(
+                            { key: `${r.id}-all`, title: `${name} · ${f.fromYear} to ${lastYear}`, items: r.items, showYear: true },
+                            <Money value={r.total} />,
+                          )}
+                        </Fade>
                       </Td>
                     </tr>
                   );
@@ -214,23 +234,24 @@ export function PortfolioCapexForecastCard({
                     const year = f.years[i];
                     const faded = selYear != null && selYear !== year;
                     return (
-                      <Td key={i} numeric className={cn(grandTotalCell, "transition-opacity duration-fast", faded && "opacity-30")}>
-                        {breakdown(
-                          { key: `all-${year}`, title: `Portfolio · ${year}`, items: itemsForYear(year), showYear: false },
-                          // An empty year is the dash in fg-3, not the total row's fg-1 at 600 (section 3).
-                          v ? <Money value={v} /> : <span className="font-normal text-fg-3">—</span>,
-                        )}
+                      <Td key={i} numeric className={cn(grandTotalCell, i !== phoneIdx && "max-sm:hidden")}>
+                        <Fade faded={faded}>
+                          {breakdown(
+                            { key: `all-${year}`, title: `Portfolio · ${year}`, items: itemsForYear(year), showYear: false },
+                            // An empty year is the dash in fg-3, not the total row's fg-1 at 600 (section 3).
+                            v ? <Money value={v} /> : <span className="font-normal text-fg-3">—</span>,
+                          )}
+                        </Fade>
                       </Td>
                     );
                   })}
-                  <Td
-                    numeric
-                    className={cn(grandTotalCell, "pr-0 transition-opacity duration-fast", selYear != null && "opacity-30")}
-                  >
-                    {breakdown(
-                      { key: "all-all", title: `Portfolio · ${f.fromYear} to ${lastYear}`, items: allItems, showYear: true },
-                      <Money value={f.total} />,
-                    )}
+                  <Td numeric className={cn(grandTotalCell, "pr-0")}>
+                    <Fade faded={selYear != null}>
+                      {breakdown(
+                        { key: "all-all", title: `Portfolio · ${f.fromYear} to ${lastYear}`, items: allItems, showYear: true },
+                        <Money value={f.total} />,
+                      )}
+                    </Fade>
                   </Td>
                 </tr>
               </tfoot>
@@ -246,13 +267,15 @@ export function PortfolioCapexForecastCard({
 
       {tip && (
         <div
+          ref={tipRef}
           id={tipId}
           role="tooltip"
           className={cn(
-            "pointer-events-none fixed z-50 w-84 max-w-[calc(100vw-16px)] -translate-x-1/2 rounded-lg border border-line-float bg-raised p-3 text-meta text-fg-1 shadow-float",
+            // As wide as its lines, up to 336px, and never past the page gutter (32px on a phone's two sides).
+            "pointer-events-none fixed z-50 w-max max-w-[min(21rem,calc(100vw-2rem))] rounded-lg border border-line-float bg-raised p-3 text-meta text-fg-1 shadow-float",
             tip.flip && "-translate-y-full",
           )}
-          style={{ left: tip.x, top: tip.top }}
+          style={{ left: 0, top: tip.top, visibility: "hidden" }}
         >
           <p className="mb-2 font-semibold">{tip.title}</p>
           <div className="space-y-1.5">
@@ -262,8 +285,8 @@ export function PortfolioCapexForecastCard({
                 <div key={idx} className="flex items-start justify-between gap-3">
                   <span className="min-w-0">
                     {tip.showYear && (
-                      <span className={cn("num mr-1", it.overdue ? "text-danger" : "text-fg-3")}>
-                        {it.overdue ? "now" : it.dueYear}
+                      <span className={cn("num mr-1", it.pastDue ? "text-danger" : "text-fg-3")}>
+                        {it.dueYear === f.fromYear ? "Due now" : it.dueYear}
                       </span>
                     )}
                     <span className="font-medium">{it.type}</span>

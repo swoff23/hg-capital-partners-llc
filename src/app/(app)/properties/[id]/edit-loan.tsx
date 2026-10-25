@@ -65,7 +65,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
           <RailFact label="Loan type" empty="Add loan type" onAdd={() => open("loanType")}>
             {textFact(p.loanType)}
           </RailFact>
-          <RailFact label="Original amount" empty="Add original amount" onAdd={() => open("loanOriginalAmount")}>
+          <RailFact label="Original loan" empty="Add original amount" onAdd={() => open("loanOriginalAmount")}>
             {moneyFact(p.loanOriginalAmount)}
           </RailFact>
           <RailFact label="Rate" empty="Add rate" onAdd={() => open("loanRate")}>

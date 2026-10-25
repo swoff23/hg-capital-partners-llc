@@ -107,14 +107,11 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
           <RailFact label="Status" empty="Add status" onAdd={() => open("status")}>
             {textFact(p.status)}
           </RailFact>
-          <RailFact
-            label="Rental registration expires"
-            empty="Add expiry"
-            onAdd={() => open("rentalRegistrationExpiry")}
-          >
+          {/* Rail labels fit 96px on a phone on one line: shorter words, not a smaller font. */}
+          <RailFact label="Registration" empty="Add expiry" onAdd={() => open("rentalRegistrationExpiry")}>
             {dayFact(p.rentalRegistrationExpiry)}
           </RailFact>
-          <RailFact label="Property tax due" empty="Add due date" onAdd={() => open("propertyTaxDueDate")}>
+          <RailFact label="Tax due" empty="Add due date" onAdd={() => open("propertyTaxDueDate")}>
             {dayFact(p.propertyTaxDueDate)}
           </RailFact>
         </RailList>

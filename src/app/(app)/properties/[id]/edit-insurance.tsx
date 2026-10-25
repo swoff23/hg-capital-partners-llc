@@ -43,7 +43,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
           <RailFact label="Premium" empty="Add premium" onAdd={() => open("insurancePremium")}>
             {moneyFact(p.insurancePremium)}
           </RailFact>
-          <RailFact label="Replacement cost" empty="Add replacement cost" onAdd={() => open("replacementCost")}>
+          <RailFact label="Replacement" empty="Add replacement cost" onAdd={() => open("replacementCost")}>
             {moneyFact(p.replacementCost)}
           </RailFact>
           <RailFact label="Coverage" empty="Add coverage" onAdd={() => open("insuranceCoverage")}>

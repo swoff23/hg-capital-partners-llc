@@ -24,8 +24,8 @@ export const CONFLICT_MESSAGE =
 
 export const GENERIC_ERROR = "Something went wrong saving that. Try again; if it keeps happening, reload the page.";
 
-/** A server action call that never reached the server, or whose answer never came back. */
-export const OFFLINE_ERROR = "No connection. Try again when you have signal.";
+/** A server action call that never reached the server, or whose answer never came back. One line at 320. */
+export const OFFLINE_ERROR = "No connection. Try again.";
 
 // What fetch rejects with when the network is down or drops mid-request:
 // Chrome, Firefox, Safari (old and new), and Node's undici.

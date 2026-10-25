@@ -15,8 +15,12 @@ const DEFAULT_SORT = "status";
  * A clickable table header on the Th look (thClass): 1st click sorts
  * ascending, 2nd descending, 3rd clears. `numeric` right-aligns it over a
  * money or count column, with the caret ahead of the label so the label's
- * end lines up with the figures under it. The label sits 12px in from the
- * cell's edge, as a plain cell's text and a field cell's text do (deal-row.tsx).
+ * end lines up with the figures under it. There the caret hangs outside the
+ * label's box, into the room the column leaves (or the cell's padding), so a
+ * hidden caret never costs the label its width ("Units" in 72px) and the
+ * label sets the button's baseline, level with the other headers. The label
+ * sits 12px in from the cell's edge, as a plain cell's text and a field
+ * cell's text do (deal-row.tsx).
  */
 export function SortHeader({
   label,
@@ -58,7 +62,6 @@ export function SortHeader({
           "group relative inline-flex max-w-full items-center gap-1 transition-colors hover:text-fg-1",
           // A 44px target on touch without growing the header row.
           "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3",
-          numeric && "flex-row-reverse",
           active && "text-fg-1",
         )}
       >
@@ -67,6 +70,7 @@ export function SortHeader({
           aria-hidden="true"
           className={cn(
             "size-3.5 shrink-0 transition-opacity",
+            numeric && "absolute right-full top-1/2 mr-1 -translate-y-1/2",
             active ? "opacity-100" : "opacity-0 group-hover:opacity-60",
             desc && "rotate-180",
           )}

@@ -13,7 +13,8 @@ import { DealTextField } from "../deal-fields";
  * ------------------------------------------------------------------ */
 
 export function AddressField({ id, value }: { id: string; value: string }) {
-  return <InlineAddressField heading value={value} onCommit={(address) => patchDeal(id, { address })} />;
+  // multiline: a two-line address keeps its lines while it's edited, as on the property page.
+  return <InlineAddressField heading multiline value={value} onCommit={(address) => patchDeal(id, { address })} />;
 }
 
 /* ------------------------------------------------------------------ *
@@ -42,7 +43,8 @@ export function PassReasonControl({ id, value }: { id: string; value: string | n
         }}
         className={cn("h-8 appearance-none truncate pr-7", !shown && "text-fg-3")}
       >
-        <option value="">—</option>
+        {/* An empty rail fact is a verb (section 3). */}
+        <option value="">Pick a reason</option>
         {DEAL_PASS_REASONS.map((r) => (
           <option key={r}>{r}</option>
         ))}
@@ -68,7 +70,7 @@ export function ListingUrlField({ id, value }: { id: string; value: string | nul
           value={value}
           patchKey="sourceUrl"
           label="Listing URL"
-          placeholder="Paste a listing URL…"
+          placeholder="Add listing URL"
           type="url"
           className="h-8"
         />

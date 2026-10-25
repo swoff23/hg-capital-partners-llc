@@ -209,8 +209,8 @@ export function ListingsSection({
 
       {confirmOpen && (
         <ConfirmDialog
-          title="Discard unsaved changes?"
-          body="You have unsaved changes to Rentals. Save them, or discard and exit."
+          title="Discard your Rentals edits?"
+          body="Your changes to these listings won't be saved."
           onClose={() => setConfirmOpen(false)}
           cancelLabel="Keep editing"
           actions={
@@ -311,7 +311,7 @@ function EditListing({
           onChange={(e) => mutate((x) => (x[i].unitLabel = e.target.value))}
         >
           <option value="" disabled>
-            Select unit…
+            Unit
           </option>
           {options.map((label) => (
             <option key={label} value={label}>
@@ -320,7 +320,8 @@ function EditListing({
           ))}
         </select>
         <select
-          className={cn(inp, selectTouchHeight, "w-32 shrink-0")}
+          // Sized to "Available", so the unit beside it keeps its room at 320.
+          className={cn(inp, selectTouchHeight, "w-28 shrink-0")}
           aria-label="Status"
           value={l.status}
           onChange={(e) => mutate((x) => (x[i].status = e.target.value as EditableListing["status"]))}

@@ -75,6 +75,7 @@ export function DealPriceField({
   raw,
   amount,
   align,
+  emptyLabel,
   className,
   onSaved,
 }: {
@@ -83,6 +84,8 @@ export function DealPriceField({
   raw: string | null;
   amount: number | null;
   align?: "left" | "right";
+  /** What it reads empty: the dash (a list cell), or a verb (the deal's rail). */
+  emptyLabel?: string;
   className?: string;
   onSaved?: () => void;
 }) {
@@ -94,6 +97,7 @@ export function DealPriceField({
       label={which === "their" ? "Their price" : "Our price"}
       align={align}
       disabled={pending}
+      emptyLabel={emptyLabel}
       className={className}
       onCommit={(next) => run(which === "their" ? { theirPriceRaw: next || null } : { ourPriceRaw: next || null })}
     />
@@ -105,12 +109,15 @@ export function DealUnitsField({
   id,
   value,
   align = "left",
+  emptyLabel = "—",
   className,
   onSaved,
 }: {
   id: string;
   value: number | null;
   align?: "left" | "right";
+  /** What it reads empty: the dash (a list cell), or a verb (the deal's rail). */
+  emptyLabel?: string;
   className?: string;
   onSaved?: () => void;
 }) {
@@ -140,7 +147,7 @@ export function DealUnitsField({
       min={1}
       value={v}
       disabled={pending}
-      placeholder="—"
+      placeholder={emptyLabel}
       onChange={(e) => setV(e.target.value)}
       onBlur={keys.onBlur}
       onKeyDown={keys.onKeyDown}

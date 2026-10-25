@@ -14,7 +14,8 @@ import { flushTable, Kpi, MoneyBars, SandboxNotice, SourceLine, Strip } from "..
  * nothing when QuickBooks isn't connected — no point cluttering the page with
  * an empty section until there's something to show. Once connected, an
  * unmapped property still gets the section (so the gap is visible) with a
- * link to fix the mapping.
+ * link to fix the mapping. Its action says where it goes ("All financials"),
+ * since "Portfolio" on this page is the property list.
  */
 export async function PropertyFinancialsCard({ propertyId }: { propertyId: string }) {
   const data = await getPropertyFinancials(propertyId); // the basis chosen in Financials → Settings
@@ -42,7 +43,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
           href="/financials"
           className="inline-flex min-h-8 items-center gap-1.5 text-label text-fg-1 hover:underline pointer-coarse:min-h-11"
         >
-          Portfolio
+          All financials
           <ArrowRight aria-hidden="true" className={chromeIconClass} />
         </Link>
       }
@@ -112,10 +113,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
           </div>
         )}
 
-        <p className="text-meta text-fg-3">
-          Direct-classed lines only. Entity and overhead costs show in the{" "}
-          <TextLink href="/financials">portfolio view</TextLink>.
-        </p>
+        {data.hasLines && <p className="text-meta text-fg-3">Lines classed to this property only, without entity overhead.</p>}
       </div>
     </Section>
   );

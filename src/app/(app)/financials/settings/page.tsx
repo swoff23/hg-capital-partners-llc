@@ -4,8 +4,8 @@ import { getConnection } from "@/lib/quickbooks/client";
 import { qbo } from "@/lib/quickbooks/config";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
 import type { QboBasis } from "@prisma/client";
-import { oauthReturnLine, reconcileGap, reconcileLine } from "@/lib/quickbooks/notices";
-import { Badge, buttonClass, EmptyState, Section, TextLink, textLinkClass } from "@/components/ui";
+import { oauthReturnLine, reconcileGap, reconcileRow } from "@/lib/quickbooks/notices";
+import { Badge, buttonClass, EmptyState, Section, textLinkClass } from "@/components/ui";
 import { Code } from "@/components/code";
 import { fmtDate } from "@/lib/utils";
 import { periodLabel, periodOf } from "../_components/period";
@@ -57,15 +57,11 @@ export default async function FinancialsSettingsPage({
               <a href="/api/quickbooks/connect" className={buttonClass({ variant: "primary" })}>
                 Connect QuickBooks
               </a>
-            ) : (
-              <p className="text-body text-fg-3">
-                Set the <code className="font-mono text-code text-fg-2">QBO_*</code> environment variables to
-                connect QuickBooks.
-              </p>
-            )
+            ) : null
           }
         >
-          QuickBooks isn&apos;t connected.
+          {/* Without its QBO_* environment variables (README, QuickBooks) there's no Connect to offer. */}
+          {qbo.isConfigured() ? "QuickBooks isn't connected." : "QuickBooks isn't set up yet."}
         </EmptyState>
       </div>
     );
@@ -125,7 +121,7 @@ export default async function FinancialsSettingsPage({
           <Row label="Basis">
             <BasisToggle current={conn.accountingMethod} />
           </Row>
-          <Row label="Last successful sync">
+          <Row label="Last synced">
             {conn.lastSuccessfulSyncAt ? fmtDate(conn.lastSuccessfulSyncAt) : "Not yet"}
             {/* a failed run is a danger badge, not a red word: danger and warn are too close in color alone */}
             {lastRun &&
@@ -135,7 +131,7 @@ export default async function FinancialsSettingsPage({
                 <span className="text-meta text-fg-3">({RUN_WORD[lastRun.status] ?? lastRun.status})</span>
               ))}
           </Row>
-          <Row label="Reconnect before">
+          <Row label="Reconnect by">
             {conn.refreshTokenExpiresAt ? fmtDate(conn.refreshTokenExpiresAt) : dash}
           </Row>
           <Row label="History from">{periodLabel(conn.historyStart, conn.historyStart) ?? dash}</Row>
@@ -155,6 +151,8 @@ export default async function FinancialsSettingsPage({
               syncedAt={overview.lastSync?.at ?? null}
             />
             <dl>
+              {/* First, so the Overview's "NOI is $2,916 off · Review" lands on the gap it named. */}
+              {lastRun?.stats != null && <ReconRows stats={lastRun.stats} basis={conn.accountingMethod} />}
               <DqRow
                 label="Unclassified lines"
                 value={split(dq.unclassed)}
@@ -230,7 +228,6 @@ export default async function FinancialsSettingsPage({
                 />
               )}
             </dl>
-            {lastRun?.stats != null && <ReconSummary stats={lastRun.stats} basis={conn.accountingMethod} />}
           </Section>
         </div>
       )}
@@ -268,21 +265,16 @@ export default async function FinancialsSettingsPage({
         </Section>
       </div>
 
-      <p className="text-meta text-fg-3">
-        Reconciliation target: our numbers tie to QuickBooks&apos; own{" "}
-        <TextLink href="https://qbo.intuit.com" target="_blank" rel="noopener noreferrer">
-          Profit &amp; Loss by Class
-        </TextLink>{" "}
-        report. Independent check: per-property rent vs the old rent spreadsheet.
-      </p>
+      {/* Reconciliation target: these figures tie to QuickBooks' own Profit & Loss by Class report;
+          the independent check is per-property rent against the old rent spreadsheet. */}
     </div>
   );
 }
 
 /**
  * A label and its value in the Connection rail: 112px labels, 96px on phones
- * (section 5, detail rails). "Last successful sync" fits 112 with a mouse and
- * takes two lines on touch, where the row grows to fit.
+ * (section 5, detail rails). Every label fits 96px on one line ("Last
+ * synced", "Reconnect by"): shorter words, not a smaller font.
  */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -317,20 +309,16 @@ function DqRow({
 }
 
 /**
- * The basis these figures are on comes first. The other basis shows only when
- * it doesn't tie, so a ?basis= override banner on the Overview is explained too.
+ * The reconciliation, one cleanup row per basis: the basis these figures are
+ * on first; the other only when it doesn't tie, so a ?basis= override banner
+ * on the Overview is explained too. A check that's off leads with the warn mark.
  */
-function ReconSummary({ stats, basis }: { stats: unknown; basis: QboBasis }) {
+function ReconRows({ stats, basis }: { stats: unknown; basis: QboBasis }) {
   const recon =
     typeof stats === "object" && stats ? (stats as Record<string, unknown>).reconciliation : undefined;
   const other: QboBasis = basis === "CASH" ? "ACCRUAL" : "CASH";
-  const lines = [
-    reconcileLine(recon, basis),
-    reconcileGap(recon, other).kind === "ok" ? null : reconcileLine(recon, other),
-  ].filter((l): l is string => l != null);
-  return lines.map((line) => (
-    <p key={line} className="pt-2 text-meta text-fg-3">
-      {line}
-    </p>
-  ));
+  const rows = [reconcileRow(recon, basis), reconcileGap(recon, other).kind === "ok" ? null : reconcileRow(recon, other)].filter(
+    (r): r is NonNullable<typeof r> => r != null,
+  );
+  return rows.map((r) => <DqRow key={r.label} label={r.label} value={r.text} bad={!r.ok} />);
 }

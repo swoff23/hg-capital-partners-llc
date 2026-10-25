@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
-import { EmptyState, Table, Td, Th, TextLink } from "@/components/ui";
+import { EmptyState, Table, Td, Th, TextLink, buttonClass } from "@/components/ui";
+import { qbo } from "@/lib/quickbooks/config";
 import { getRentRoll } from "@/lib/quickbooks/queries";
 import { basisFromParam } from "@/lib/quickbooks/rollup";
 import { todayYmdEastern } from "@/lib/dates";
@@ -25,7 +26,20 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
   const roll = await getRentRoll(basisFromParam(sp.basis));
 
   if (!roll || !roll.connected) {
-    return <EmptyState>Connect QuickBooks to see the rent roll.</EmptyState>;
+    // One sentence and one action, as the Overview's empty state has.
+    return qbo.isConfigured() ? (
+      <EmptyState
+        action={
+          <a href="/api/quickbooks/connect" className={buttonClass({ variant: "primary" })}>
+            Connect QuickBooks
+          </a>
+        }
+      >
+        Connect QuickBooks to see the rent roll.
+      </EmptyState>
+    ) : (
+      <EmptyState>QuickBooks isn&apos;t set up yet.</EmptyState>
+    );
   }
 
   const thisYear = Number(todayYmdEastern().slice(0, 4));
@@ -36,21 +50,11 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
 
       {roll.sandbox && <SandboxNotice />}
 
-      <p className="max-w-prose text-pretty text-meta text-fg-3">
-        {roll.basis === "CASH" ? (
-          <>
-            Cash rent <strong className="font-medium text-fg-2">received</strong>
-          </>
-        ) : (
-          <>
-            Rent <strong className="font-medium text-fg-2">earned</strong>
-          </>
-        )}{" "}
-        by month, summed across every class mapped to the property so an entity transfer on
-        refinance shows no gap. No lease data yet, so scheduled/market rent, delinquency, and
-        vacancy are out of scope. Section-8 / voucher rent is included; owner P2P deposits
-        mis-booked to Rents are excluded and shown separately.
-      </p>
+      {/* Summed across every class mapped to the property, so an entity transfer on refinance
+          shows no gap. No lease data yet: scheduled and market rent, delinquency and vacancy are
+          out of scope. Section-8 and voucher rent is included; owner P2P deposits mis-booked to
+          Rents are left out and shown separately (Settings, cleanup list). */}
+      <p className="text-meta text-fg-3">{roll.basis === "CASH" ? "Cash rent received by month" : "Rent earned by month"}</p>
 
       {roll.rows.length === 0 ? (
         // never a $0 Portfolio total over zero rows

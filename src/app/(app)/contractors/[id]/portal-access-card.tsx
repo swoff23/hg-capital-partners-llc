@@ -133,7 +133,8 @@ export function PortalAccessCard({
             <dl className={detailRow}>
               <dt className="text-meta text-fg-3">Email</dt>
               <dd className="min-w-0">
-                <p className="truncate text-body text-fg-1">{account.email}</p>
+                {/* The address they sign in with wraps rather than truncating, as the Contact rail's values do. */}
+                <p className="text-body text-fg-1 wrap-anywhere">{account.email}</p>
                 {account.line && <p className="truncate text-meta text-fg-3">{account.line}</p>}
               </dd>
             </dl>
@@ -243,7 +244,7 @@ function StartingPassword({
 }) {
   return (
     <div className="space-y-2.5 rounded-md bg-fill-1 p-3">
-      <p className="truncate text-meta text-fg-3">Starting password for {email}</p>
+      <p className="text-meta text-fg-3 wrap-anywhere">Starting password for {email}</p>
       <div className="flex items-center gap-2">
         {/* Read character by character, so set like a code: Geist Mono in --fg-2, never
             wrapped (section 3). Straight on the panel's fill: a --surface box inside it

@@ -38,7 +38,7 @@ export function FactStrip({ facts, className }: { facts: Fact[]; className?: str
             key={f.label}
             className={cn(
               "grid min-w-0 content-start gap-0.5 sm:contents",
-              i % 2 === 1 && "max-sm:border-l max-sm:border-line max-sm:pl-3",
+              i % 2 === 1 && "max-sm:border-l max-sm:border-line max-sm:pl-4",
             )}
           >
             <dt className={cn(cell, "text-meta text-fg-3 sm:pb-0.5")}>{f.label}</dt>

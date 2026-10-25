@@ -2,12 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { TriangleAlert } from "lucide-react";
 import { Button, textLinkClass } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useToast } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
+import { Notice } from "../_components/ui";
 import { disconnectQuickbooks, setAccountingMethod } from "./actions";
 
 /**
@@ -56,17 +58,35 @@ export function OAuthReturnNotice({
     url.searchParams.delete("error");
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
+  const retry = retryHref && (
+    <>
+      {" "}
+      <a href={retryHref} className={textLinkClass}>
+        Connect again
+      </a>
+    </>
+  );
+  // A failed sign-in is a status: its glyph and its words in a Notice, as the Overview's sync notice is.
+  if (tone === "error") {
+    return (
+      <Notice
+        icon={
+          <TriangleAlert
+            aria-hidden="true"
+            strokeWidth={2}
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger pointer-coarse:h-4 pointer-coarse:w-4"
+          />
+        }
+      >
+        {text}
+        {retry}
+      </Notice>
+    );
+  }
   return (
-    <p className={cn("text-meta", tone === "error" ? "text-danger" : "text-fg-3")}>
+    <p className="text-meta text-fg-3">
       {text}
-      {retryHref && (
-        <>
-          {" "}
-          <a href={retryHref} className={textLinkClass}>
-            Connect again
-          </a>
-        </>
-      )}
+      {retry}
     </p>
   );
 }

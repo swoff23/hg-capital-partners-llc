@@ -51,7 +51,7 @@ function Tile({ title, body, href }: { title: string; body: string; href?: strin
           external && <ArrowUpRight aria-hidden="true" className="mt-1 size-4 shrink-0 stroke-[1.5] text-fg-3" />
         )}
       </div>
-      <p className={cn(publicType.meta, "mt-1 text-fg-3")}>{body}</p>
+      <p className={cn(publicType.meta, "mt-1 text-pretty text-fg-3")}>{body}</p>
     </Card>
   );
 

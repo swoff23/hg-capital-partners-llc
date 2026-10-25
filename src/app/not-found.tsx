@@ -4,7 +4,13 @@ import { PublicFooter } from "@/components/public/footer";
 import { publicContainer, publicCtaClass, publicType } from "@/components/public/ui";
 import { cn } from "@/lib/utils";
 
-/** Unmatched URLs (no route at all). Uses the public shell since we can't know if the visitor is signed in. */
+/**
+ * Unmatched URLs (no route at all). Uses the public shell since we can't know
+ * if the visitor is signed in. The browser bar takes the public material's
+ * dark canvas through THEME_SCRIPT, which counts [data-surface="public"] as
+ * dark. Its tab title stays the root layout's default: a plain not-found
+ * can't export metadata, and a <title> rendered here lands after Next's.
+ */
 export default function RootNotFound() {
   return (
     <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-fg-1">

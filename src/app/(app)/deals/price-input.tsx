@@ -20,6 +20,7 @@ export function PriceInput({
   label,
   align = "left",
   disabled = false,
+  emptyLabel = "—",
   className,
 }: {
   /** The stored text, or null. */
@@ -33,6 +34,8 @@ export function PriceInput({
   align?: "left" | "right";
   /** While a save is on its way. */
   disabled?: boolean;
+  /** What an empty field reads at rest: the dash in a list, a verb in the deal's rail ("Add their price"). */
+  emptyLabel?: string;
   /** Height and any extras for the field. */
   className?: string;
 }) {
@@ -82,7 +85,7 @@ export function PriceInput({
         ) : v ? (
           <span className="min-w-0 truncate">{v}</span>
         ) : (
-          <span className="text-fg-3">—</span>
+          <span className="min-w-0 truncate text-fg-3">{emptyLabel}</span>
         )}
       </span>
     </div>

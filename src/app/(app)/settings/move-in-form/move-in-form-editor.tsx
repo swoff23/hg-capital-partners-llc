@@ -1,15 +1,23 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, Input, PageHeader, Section } from "@/components/ui";
+import { Button, Checkbox, Input, PageHeader, Section } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { MoveInFormSchema, MoveInSection } from "@/lib/move-in-form-types";
+import { callAction } from "@/lib/action-result";
+import { cn } from "@/lib/utils";
 import { saveMoveInFormSchema } from "./actions";
-import { AddButton, RemoveButton, quietField } from "../editor-controls";
+import { AddButton, RevealRemoveButton, editorBleed, quietField, revealRow } from "../editor-controls";
 
 function newItemKey(): string {
   return `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/**
+ * One room: its Required switch, then its items, each a quiet field whose
+ * delete shows on hover or focus (tap to reveal on touch, as the CapEx rules
+ * do). Add item puts a row at the end and moves focus into it, which scrolls
+ * it into view, so a tap at the top of a long room shows where the row went.
+ */
 function SectionEditor({
   section,
   onChange,
@@ -17,12 +25,14 @@ function SectionEditor({
   section: MoveInSection;
   onChange: (fn: (s: MoveInSection) => void) => void;
 }) {
+  const [added, setAdded] = useState<string | null>(null);
+  function addItem() {
+    const key = newItemKey();
+    onChange((s) => void s.items.push({ key, label: "" }));
+    setAdded(key);
+  }
   return (
-    <Section
-      title={section.label}
-      className="@container"
-      actions={<AddButton onClick={() => onChange((s) => void s.items.push({ key: newItemKey(), label: "" }))}>Add item</AddButton>}
-    >
+    <Section title={section.label} className="@container" actions={<AddButton onClick={addItem}>Add item</AddButton>}>
       <div className="space-y-3">
         {/* One row where both fit; on a phone each control takes its own line, so neither row wraps. */}
         <div className="flex flex-col items-start gap-2 border-b border-line pb-3 @md:flex-row @md:items-center @md:gap-4">
@@ -46,9 +56,7 @@ function SectionEditor({
             </label>
           )}
           <label className="flex items-center gap-2 pointer-coarse:min-h-11">
-            <input
-              type="checkbox"
-              className="size-4"
+            <Checkbox
               checked={section.minCount >= 1}
               onChange={(e) => onChange((s) => void (s.minCount = e.target.checked ? 1 : 0))}
             />
@@ -56,18 +64,20 @@ function SectionEditor({
           </label>
         </div>
 
-        <div className="divide-y divide-line">
+        <div className={cn("divide-y divide-line", editorBleed)}>
           {section.items.map((it, ii) => (
-            <div key={it.key} className="flex items-center gap-2 py-1 pointer-coarse:py-0.5">
+            <div key={it.key} data-reveal-row className={cn(revealRow, "flex items-center gap-2 py-1 pointer-coarse:py-0.5")}>
               <input
                 value={it.label}
                 onChange={(e) => onChange((s) => void (s.items[ii].label = e.target.value))}
                 placeholder="Item name"
                 aria-label="Item name"
+                // The row Add item just made: focused, so it scrolls into view with the caret in it.
+                autoFocus={it.key === added}
                 className={quietField}
               />
-              <RemoveButton
-                onClick={() => onChange((s) => void s.items.splice(ii, 1))}
+              <RevealRemoveButton
+                onRemove={() => onChange((s) => void s.items.splice(ii, 1))}
                 disabled={section.items.length <= 1}
                 aria-label={`Remove ${it.label || "item"}`}
               />
@@ -106,7 +116,8 @@ export function MoveInFormEditor({
   function save() {
     setError(null);
     start(async () => {
-      const r = await saveMoveInFormSchema(schema, version);
+      // A dropped connection comes back as a refusal: the edits stay on screen with the message.
+      const r = await callAction(() => saveMoveInFormSchema(schema, version));
       if (r.ok) {
         setSchema(r.data.schema);
         setVersion(r.data.version);
@@ -128,16 +139,19 @@ export function MoveInFormEditor({
     <div className="space-y-8 pointer-coarse:space-y-6">
       <PageHeader
         title="Settings"
-        subtitle="Rooms and items tenants rate on the move-in inspection"
+        subtitle="What tenants rate at move-in"
         actions={
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={save} disabled={pending || !dirty}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={cancel} disabled={pending}>
-              Cancel
-            </Button>
-          </div>
+          // Only once there's something to save, Cancel first and the primary last, as in a dialog.
+          (dirty || pending) && (
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={cancel} disabled={pending}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={save} disabled={pending}>
+                {pending ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          )
         }
       />
 

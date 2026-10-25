@@ -3,7 +3,7 @@ import { useOptimistic, useTransition } from "react";
 import { Copy, Navigation } from "lucide-react";
 import { Code } from "@/components/code";
 import { useToast } from "@/components/toast";
-import { Button, LinkButton, Section } from "@/components/ui";
+import { Button, Checkbox, LinkButton, Section } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { setChecklistItemAction } from "../actions";
@@ -69,7 +69,8 @@ export function LockboxSection({ code }: { code: string }) {
           part of Code's touch hit area past py-1; 36 + 8 keeps that area at 44. */}
       <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
         <div className="-mx-1 min-w-0 overflow-x-auto overflow-y-hidden px-1 py-1">
-          <Code value={code} label="Lockbox code" size="lg" />
+          {/* Its own Copy button sits beside it, so the code drops the hover copy icon. */}
+          <Code value={code} label="Lockbox code" size="lg" copyIcon={false} />
         </div>
         <Button
           variant="secondary"
@@ -116,13 +117,8 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
         {shown.map((item) => (
           <li key={item.id}>
             <label className={cn("flex min-h-11 items-center gap-3 py-1", editable ? "cursor-pointer" : "cursor-default")}>
-              <input
-                type="checkbox"
-                checked={item.done}
-                disabled={!editable}
-                onChange={(e) => toggle(item.id, e.target.checked)}
-                className="h-5 w-5 shrink-0 cursor-[inherit] rounded-sm disabled:opacity-60"
-              />
+              {/* Drawn from the tokens, so the box is the same in every engine and in dark. */}
+              <Checkbox large checked={item.done} disabled={!editable} onChange={(e) => toggle(item.id, e.target.checked)} />
               <span className={cn("text-body", item.done ? "text-fg-3 line-through" : "text-fg-1")}>{item.title}</span>
             </label>
           </li>

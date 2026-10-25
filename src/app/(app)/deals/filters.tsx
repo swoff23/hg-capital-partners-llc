@@ -138,7 +138,8 @@ export function DealFilters({
                 </ul>
               </section>
               <section aria-labelledby="deal-filters-statuses">
-                <div className="flex min-h-6 items-center justify-between gap-3 px-2 pb-1">
+                {/* As tall as Clear on touch before Clear appears, so ticking a status never moves the list. */}
+                <div className="flex min-h-6 items-center justify-between gap-3 px-2 pb-1 pointer-coarse:min-h-11">
                   <h3 id="deal-filters-statuses" className="text-meta font-medium text-fg-2">
                     Statuses
                   </h3>

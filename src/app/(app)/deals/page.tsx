@@ -64,6 +64,20 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     ...(sp.q ? { address: { contains: sp.q, mode: "insensitive" as const } } : {}),
   };
 
+  // The empty list's one line names what narrowed it ("No deals at "zzz" in Active."), and its
+  // action clears the search and the statuses.
+  const VIEW_LABEL: Record<string, string> = { all: "", active: "Active", "5 - TBD": "TBD" };
+  const scope =
+    selectedStatuses.length > 1
+      ? `${selectedStatuses.length} statuses`
+      : selectedStatuses.length === 1
+        ? selectedStatuses[0]
+        : (VIEW_LABEL[statusFilter] ?? statusFilter);
+  const narrowed = Boolean(sp.q) || scope !== "";
+  const emptyLine = !narrowed
+    ? "No deals yet. New ones show up here."
+    : `No deals ${sp.q ? `at “${sp.q}” ` : ""}${scope ? `in ${scope}` : ""}`.trim() + ".";
+
   const sortRaw = sp.sort || "status";
   const sortDesc = sortRaw.startsWith("-");
   const sortField = (sortDesc ? sortRaw.slice(1) : sortRaw) || "status";
@@ -116,7 +130,17 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           A size container, so columns drop by the list's own width (COLUMN_DROP in columns.ts). */}
       <div className="mt-4 @container">
         {deals.length === 0 ? (
-          <EmptyState>No deals match.</EmptyState>
+          <EmptyState
+            action={
+              narrowed && (
+                <LinkButton href="/deals?status=all" variant="secondary" size="sm">
+                  Show all deals
+                </LinkButton>
+              )
+            }
+          >
+            {emptyLine}
+          </EmptyState>
         ) : (
           <ColumnWidthsProvider>
             <Table style={{ tableLayout: "fixed" }}>

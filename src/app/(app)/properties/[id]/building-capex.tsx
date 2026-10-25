@@ -59,6 +59,8 @@ export function BuildingCapexSection({
   const [pending, start] = useTransition();
 
   const phoneHidden = editing ? undefined : "max-[480px]:hidden";
+  // Type also drops where the record's main column is narrowest (536px at 1024, beside the rail).
+  const typeHidden = editing ? undefined : "max-[480px]:hidden lg:max-xl:hidden";
   const datedCount = items.filter((item) => parseInstallYear(initial[item.key]?.year) != null).length;
 
   const setCell = (key: string, field: keyof DraftEntry, value: string) =>
@@ -138,7 +140,7 @@ export function BuildingCapexSection({
         <thead>
           <tr>
             <Th className="pl-0">Component</Th>
-            <Th className={phoneHidden}>Type</Th>
+            <Th className={typeHidden}>Type</Th>
             <Th>Year</Th>
             <Th className={phoneHidden}>Age</Th>
             <Th>Status</Th>
@@ -164,7 +166,7 @@ export function BuildingCapexSection({
                 <Td className={cn("pl-0 text-fg-1 align-middle", editing ? "whitespace-nowrap" : "min-[480px]:whitespace-nowrap", cell)}>
                   {item.label}
                 </Td>
-                <Td className={cn("align-middle", phoneHidden, cell)}>
+                <Td className={cn("align-middle", typeHidden, cell)}>
                   {editing ? (
                     <input
                       className={cn(cellField, "w-32")}
@@ -218,7 +220,10 @@ export function BuildingCapexSection({
                         <span className="text-fg-3"> *</span>
                       )}
                     </>
-                  ) : null}
+                  ) : (
+                    // Nothing to spend yet (Good or Unknown): the empty-cell dash, so the column never reads unfinished.
+                    <span className="text-fg-3">—</span>
+                  )}
                 </Td>
               </tr>
             );

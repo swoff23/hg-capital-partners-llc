@@ -465,8 +465,11 @@ export type CapexForecastItem = {
   dueYear: number;
   /** Years from now until dueYear (0 = due this year, including already-overdue assets). */
   yearsOut: number;
-  /** Already past its replace threshold. */
-  overdue: boolean;
+  /**
+   * Past its replacement age before this year: late, so it reads in --danger.
+   * An asset reaching that age this year is due now, but not late.
+   */
+  pastDue: boolean;
   cost: number;
 };
 
@@ -531,7 +534,7 @@ export function capexForecast(
       age: Math.max(0, fromYear - installY),
       dueYear,
       yearsOut: dueYear - fromYear,
-      overdue: projected <= fromYear,
+      pastDue: projected < fromYear,
       cost,
     });
     total += cost;

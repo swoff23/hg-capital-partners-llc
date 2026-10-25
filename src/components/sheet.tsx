@@ -26,6 +26,9 @@ import { cn } from "@/lib/utils";
  *   </SheetTrigger>
  *
  * Or controlled, with no trigger: <Sheet isOpen={open} onOpenChange={setOpen} title="…">.
+ * `footer` pins the primary (and its one-line reason) under the scrolling
+ * content, over a --line rule and above the safe area, so a long sheet on a
+ * short phone never hides its next step (docs/brand-guidelines.md, section 9).
  */
 
 /** Opens its Sheet from the first pressable child. Re-export of React Aria's DialogTrigger. */
@@ -38,6 +41,7 @@ export function Sheet({
   isOpen,
   onOpenChange,
   isDismissable = true,
+  footer,
   className,
 }: {
   /** The heading, and the dialog's accessible name. */
@@ -48,6 +52,8 @@ export function Sheet({
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   isDismissable?: boolean;
+  /** Pinned under the scrolling content: the sheet's primary action. */
+  footer?: ReactNode;
   className?: string;
 }) {
   return (
@@ -76,6 +82,7 @@ export function Sheet({
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {typeof children === "function" ? children(renderProps) : (children as ReactNode)}
               </div>
+              {footer && <div className="shrink-0 border-t border-line p-4">{footer}</div>}
             </>
           )}
         </Dialog>

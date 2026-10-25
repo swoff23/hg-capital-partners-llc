@@ -9,17 +9,25 @@ import { LabeledField } from "../labeled-field";
 
 /**
  * Posts without a page load, so a refusal keeps every field as typed: an
- * address that's already a property says which one and links to it.
+ * address that's already a property says which one and links to it. An
+ * empty address is the field's own error (its --danger edge and one line),
+ * not the browser's bubble.
  */
 export function NewPropertyForm() {
   const [pending, start] = useTransition();
   const [existing, setExisting] = useState<ExistingProperty | null>(null);
   const [error, setError] = useState("");
+  const [missing, setMissing] = useState(false);
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     setError("");
+    if (!String(data.get("address") ?? "").trim()) {
+      setMissing(true);
+      e.currentTarget.querySelector<HTMLInputElement>('input[name="address"]')?.focus();
+      return;
+    }
     start(async () => {
       const res = await callAction(() => createProperty(data));
       // A new property redirects to its page (callAction lets it through); only a refusal comes back.
@@ -29,7 +37,7 @@ export function NewPropertyForm() {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} noValidate className="space-y-4">
       <div>
         <LabeledField label="Address *">
           <Input
@@ -37,11 +45,19 @@ export function NewPropertyForm() {
             required
             placeholder="123 Main St, Buffalo, NY 14201"
             // A taken address is the field's error: its --danger edge, and the line under it says which property.
-            aria-invalid={existing ? true : undefined}
-            aria-describedby={existing ? "address-taken" : undefined}
-            onChange={() => setExisting(null)}
+            aria-invalid={existing || missing ? true : undefined}
+            aria-describedby={existing ? "address-taken" : missing ? "address-missing" : undefined}
+            onChange={() => {
+              setExisting(null);
+              setMissing(false);
+            }}
           />
         </LabeledField>
+        {missing && (
+          <p id="address-missing" className="mt-1.5 text-meta text-danger">
+            Add the address
+          </p>
+        )}
         {existing && (
           <p id="address-taken" className="mt-1.5 text-meta text-danger">
             Already in Properties: {shortAddress(existing.address)}.{" "}

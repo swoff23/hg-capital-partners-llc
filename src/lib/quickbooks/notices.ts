@@ -49,26 +49,28 @@ export function reconcileGap(reconciliation: unknown, basis: QboBasis): Reconcil
   return { kind: "ok" };
 }
 
-function offBy(what: string, cents: number, asOf: string): string {
-  if (Math.abs(cents) < 100) return `${what} doesn't tie to QuickBooks to the cent as of ${asOf}.`;
-  return `${what} is ${fmtMoney(Math.abs(cents) / 100)} off from QuickBooks as of ${asOf}.`;
+function offBy(what: string, cents: number): string {
+  if (Math.abs(cents) < 100) return `${what} doesn't tie to QuickBooks to the cent.`;
+  return `${what} is ${fmtMoney(Math.abs(cents) / 100)} off from QuickBooks.`;
 }
 
-/** The banner line for a PARTIAL sync, or null when the basis on screen ties. `asOf` is a formatted date. */
-export function partialSyncLine(gap: ReconcileGap, asOf: string): string | null {
+/**
+ * The banner line for a PARTIAL sync, or null when the basis on screen ties.
+ * One line on a phone: no date, since the source line above it already says
+ * when the last sync ran.
+ */
+export function partialSyncLine(gap: ReconcileGap): string | null {
   switch (gap.kind) {
     case "ok":
       return null;
     case "incomplete":
       return "The last sync didn't finish, so these figures may not match QuickBooks.";
     case "noi":
-      return offBy("NOI", gap.cents, asOf);
+      return offBy("NOI", gap.cents);
     case "net":
-      return offBy("Net income", gap.cents, asOf);
+      return offBy("Net income", gap.cents);
     case "cells":
-      return gap.count === 1
-        ? `1 account total doesn't match QuickBooks as of ${asOf}.`
-        : `${gap.count} account totals don't match QuickBooks as of ${asOf}.`;
+      return gap.count === 1 ? "1 account total doesn't match QuickBooks." : `${gap.count} account totals don't match QuickBooks.`;
   }
 }
 
@@ -78,12 +80,17 @@ const offByShort = (cents: number) =>
   Math.abs(cents) < 100 ? "off by under $1" : `off by ${fmtMoney(Math.abs(cents) / 100)}`;
 
 /**
- * The reconciliation line on Settings for one basis. It names the same three
- * checks as the Overview banner (NOI, net income, account totals), so the
- * banner's Review link lands on the gap it named. null when the run has no
- * reconciliation for this basis.
+ * The reconciliation row at the top of Settings' cleanup list, for one basis.
+ * It names the same three checks as the Overview banner (NOI, net income,
+ * account totals), so the banner's Review link lands on the gap it named, in
+ * plain words ("ties", "off by $2,916"); `ok` is false when any is off, and
+ * the row leads with the warn mark. null when the run has no reconciliation
+ * for this basis.
  */
-export function reconcileLine(reconciliation: unknown, basis: QboBasis): string | null {
+export function reconcileRow(
+  reconciliation: unknown,
+  basis: QboBasis,
+): { label: string; text: string; ok: boolean } | null {
   const r =
     reconciliation && typeof reconciliation === "object"
       ? (reconciliation as Record<string, unknown>)[basis]
@@ -98,16 +105,21 @@ export function reconcileLine(reconciliation: unknown, basis: QboBasis): string 
     whole?.ok === false ? (whole.deltaCents ?? 0) : identity?.ok === false ? (identity.deltaCents ?? 0) : null;
   const cells = Array.isArray(rc.cellMismatches) ? rc.cellMismatches.length : 0;
 
+  const noiOff = noi?.ok === false;
   const parts = [
-    noi?.ok === false ? `NOI ${offByShort(noi.residualCents ?? 0)}` : "NOI ✓",
-    netOff == null ? "net income ✓" : `net income ${offByShort(netOff)}`,
+    noiOff ? `NOI ${offByShort(noi.residualCents ?? 0)}` : "NOI ties",
+    netOff == null ? "net income ties" : `net income ${offByShort(netOff)}`,
     cells === 0
-      ? "account totals ✓"
+      ? "account totals tie"
       : cells === 1
         ? "1 account total doesn't match"
         : `${cells} account totals don't match`,
   ];
-  return `${BASIS_LABEL[basis]} reconciliation: ${parts.join(" · ")}`;
+  return {
+    label: `${BASIS_LABEL[basis]} reconciliation`,
+    text: parts.join(" · "),
+    ok: !noiOff && netOff == null && cells === 0,
+  };
 }
 
 export interface OAuthReturnLine {

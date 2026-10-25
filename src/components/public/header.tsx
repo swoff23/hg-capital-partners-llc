@@ -80,7 +80,8 @@ function PhoneMenu({ pathname }: { pathname: string }) {
         >
           <MenuIcon aria-hidden="true" className="size-4 shrink-0 stroke-[1.5] pointer-coarse:size-5 pointer-coarse:stroke-[1.75]" />
         </AriaButton>
-        <PopoverSurface placement="bottom end" data-surface="public" className="min-w-44">
+        {/* containerPadding: its right edge lands on the 16px page gutter, not React Aria's 12. */}
+        <PopoverSurface placement="bottom end" containerPadding={16} data-surface="public" className="min-w-44">
           <AriaMenu aria-label="Public site" className="p-1 outline-none">
             {LINKS.map((l) => (
               <MenuItem key={l.href} id={l.href} href={l.href} checked={isCurrent(pathname, l.href)}>

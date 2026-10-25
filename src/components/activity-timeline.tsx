@@ -37,7 +37,8 @@ export function ActivityItem({
         <span
           aria-hidden="true"
           className={cn(
-            "absolute -left-[21px] top-1.5 h-1.5 w-1.5 rounded-full",
+            // 7px, centered on the 1px rule 16.5px to the left (the list's 16px padding and half the rule).
+            "absolute -left-5 top-1.5 size-1.75 rounded-full",
             marker === "primary" ? "bg-act" : "bg-line-strong",
             markerClassName,
           )}

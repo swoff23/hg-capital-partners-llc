@@ -173,22 +173,22 @@ export function relativeDays(v: Date | string | null | undefined, now: Now = new
 }
 
 /**
- * Due-date label. Overdue: "yesterday", then "3d late" up to a week, then the
- * calendar date (so a task 40 days late doesn't read like one a day late).
- * Due today → "today"; within the next week → the weekday name; further out →
- * the calendar date (year shown only when it isn't the current one). "" for
- * blank/invalid.
+ * Due-date label (docs/brand-guidelines.md, section 3, Dates): "today",
+ * "tomorrow", the weekday name within six days, then the calendar date, with
+ * the year only when it isn't this one. A past date is the real date, so a
+ * task 40 days late doesn't read like one a day late, and a row that isn't
+ * counted late (Review, Waiting) never says "late"; the chip's --danger is
+ * the caller's call. "" for blank/invalid.
  */
 export function dueLabel(v: Date | string | null | undefined, now: Now = new Date()): string {
   const y = toYmd(v);
   if (!y) return "";
   const today = todayOf(now);
   const days = daysUntil(y, today)!;
-  if (days === -1) return "yesterday";
-  if (days < 0 && days > -7) return `${-days}d late`;
   if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
   const p = parts(y)!;
-  if (days > 0 && days < 7) {
+  if (days > 1 && days < 7) {
     return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", {
       timeZone: "UTC",
       weekday: "long",

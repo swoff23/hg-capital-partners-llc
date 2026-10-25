@@ -3,7 +3,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { Popover, PopoverTrigger } from "@/components/popover";
-import { buttonClass, chromeIconClass } from "@/components/ui";
+import { Checkbox, buttonClass, chromeIconClass } from "@/components/ui";
 import { DEAL_STATUSES } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { DealStageMark } from "./stage-select";
@@ -47,12 +47,7 @@ export function StatusChecklist({ selected, onToggle }: { selected: string[]; on
       {DEAL_STATUSES.map((s) => (
         <li key={s}>
           <label className={filterRowClass}>
-            <input
-              type="checkbox"
-              checked={selected.includes(s)}
-              onChange={() => onToggle(s)}
-              className="size-4 shrink-0"
-            />
+            <Checkbox checked={selected.includes(s)} onChange={() => onToggle(s)} />
             <span className="inline-flex h-5.5 items-center gap-1 whitespace-nowrap rounded-sm border border-line-strong px-2 text-micro text-fg-2">
               <DealStageMark stage={s} />
               {s}

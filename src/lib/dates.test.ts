@@ -65,14 +65,15 @@ test("relativeDays", () => {
 });
 
 test("dueLabel", () => {
-  assert.equal(dueLabel("2026-02-28", now), "yesterday");
-  assert.equal(dueLabel("2026-02-26", now), "3d late");
-  assert.equal(dueLabel("2026-02-23", now), "6d late");
-  assert.equal(dueLabel("2026-02-22", now), "Feb 22"); // a week or more late: the date
+  // A past date is the real date, however recent: "late" is the chip's color, not its words.
+  assert.equal(dueLabel("2026-02-28", now), "Feb 28");
+  assert.equal(dueLabel("2026-02-26", now), "Feb 26");
+  assert.equal(dueLabel("2026-02-22", now), "Feb 22");
   assert.equal(dueLabel("2026-02-01", now), "Feb 1");
   assert.equal(dueLabel("2025-12-30", now), "Dec 30, 2025");
   assert.equal(dueLabel("2026-03-01", now), "today");
-  assert.equal(dueLabel("2026-03-02", now), "Monday"); // 2026-03-02 is a Monday
+  assert.equal(dueLabel("2026-03-02", now), "tomorrow"); // 2026-03-02 is a Monday
+  assert.equal(dueLabel("2026-03-03", now), "Tuesday");
   assert.equal(dueLabel("2026-03-07", now), "Saturday");
   assert.equal(dueLabel("2026-03-08", now), "Mar 8");
   assert.equal(dueLabel("2027-01-05", now), "Jan 5, 2027");
@@ -92,7 +93,8 @@ test("helpers accept an explicit today (Ymd) instead of an instant", () => {
   assert.equal(daysUntil("2026-10-25", "2026-10-22"), 3);
   assert.equal(isPastDay("2026-10-21", "2026-10-22"), true);
   assert.equal(relativeDays("2026-10-21", "2026-10-22"), "yesterday");
-  assert.equal(dueLabel("2026-10-19", "2026-10-22"), "3d late");
+  assert.equal(dueLabel("2026-10-19", "2026-10-22"), "Oct 19");
+  assert.equal(dueLabel("2026-10-23", "2026-10-22"), "tomorrow");
   assert.equal(fmtDay("2026-12-05", { year: "auto", now: "2026-10-22" }), "Dec 5");
   assert.equal(fmtDay("2027-01-05", { year: "auto", now: "2026-10-22" }), "Jan 5, 2027");
 });

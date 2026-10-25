@@ -9,7 +9,7 @@ import { groupContractors, groupMine } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
 import { ReviewActions } from "./review-actions";
 import { useTaskList } from "./task-list-context";
-import { TaskRow } from "./task-row";
+import { TaskRow, hasStatusColumn } from "./task-row";
 import { TaskSection } from "./task-section";
 
 export type TodayColumn = "mine" | "contractors";
@@ -45,6 +45,9 @@ export function TodayView({ userId }: { userId: string }) {
   }
 
   const mineEmpty = Object.values(mine).every((list) => list.length === 0);
+  // A section keeps the status column only when one of its rows fills it; a section of
+  // staff To dos drops it, so the titles run to the date.
+  const hasColumn = (list: typeof tasks, opts?: { reason?: boolean }) => list.some((t) => hasStatusColumn(t, opts));
 
   return (
     <>
@@ -67,7 +70,7 @@ export function TodayView({ userId }: { userId: string }) {
           {mine.unassigned.length > 0 && (
             <TaskSection title="Unassigned" count={mine.unassigned.length}>
               {mine.unassigned.map((t) => (
-                <TaskRow key={t.id} task={t} avatar />
+                <TaskRow key={t.id} task={t} avatar statusColumn={hasColumn(mine.unassigned)} />
               ))}
             </TaskSection>
           )}
@@ -82,28 +85,28 @@ export function TodayView({ userId }: { userId: string }) {
               }
             >
               {mine.overdue.map((t) => (
-                <TaskRow key={t.id} task={t} />
+                <TaskRow key={t.id} task={t} statusColumn={hasColumn(mine.overdue)} />
               ))}
             </TaskSection>
           )}
           {mine.today.length > 0 && (
             <TaskSection title="Today" count={mine.today.length}>
               {mine.today.map((t) => (
-                <TaskRow key={t.id} task={t} />
+                <TaskRow key={t.id} task={t} statusColumn={hasColumn(mine.today)} />
               ))}
             </TaskSection>
           )}
           {mine.waiting.length > 0 && (
             <TaskSection title="Waiting" count={mine.waiting.length}>
               {mine.waiting.map((t) => (
-                <TaskRow key={t.id} task={t} reason />
+                <TaskRow key={t.id} task={t} reason statusColumn={hasColumn(mine.waiting, { reason: true })} />
               ))}
             </TaskSection>
           )}
           {mine.noDate.length > 0 && (
             <TaskSection title="No date" count={mine.noDate.length} collapsible>
               {mine.noDate.map((t) => (
-                <TaskRow key={t.id} task={t} />
+                <TaskRow key={t.id} task={t} statusColumn={hasColumn(mine.noDate)} />
               ))}
             </TaskSection>
           )}

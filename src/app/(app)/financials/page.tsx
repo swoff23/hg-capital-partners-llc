@@ -6,7 +6,7 @@ import { qbo } from "@/lib/quickbooks/config";
 import { partialSyncLine, reconcileGap } from "@/lib/quickbooks/notices";
 import { basisFromParam } from "@/lib/quickbooks/rollup";
 import { todayYmdEastern } from "@/lib/dates";
-import { cn, fmtDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { CATEGORY_LABELS } from "./_components/labels";
 import { periodOf } from "./_components/period";
 import {
@@ -27,8 +27,11 @@ import { RefreshButton } from "./_components/refresh-button";
 
 export const dynamic = "force-dynamic";
 
+/** "37.5%", and a loss with a true minus (U+2212), like the money beside it (section 3). */
 function pct(n: number | null): string {
-  return n == null ? "—" : `${(n * 100).toFixed(1)}%`;
+  if (n == null) return "—";
+  const v = (Math.abs(n) * 100).toFixed(1);
+  return n < 0 && v !== "0.0" ? `\u2212${v}%` : `${v}%`;
 }
 
 const lines = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "line" : "lines"}`;
@@ -64,17 +67,11 @@ export default async function FinancialsOverviewPage({
             <a href="/api/quickbooks/connect" className={buttonClass({ variant: "primary" })}>
               Connect QuickBooks
             </a>
-          ) : (
-            <p className="text-body text-fg-3">
-              Set <code className="font-mono text-code text-fg-2">QBO_CLIENT_ID</code> /{" "}
-              <code className="font-mono text-code text-fg-2">QBO_CLIENT_SECRET</code> /{" "}
-              <code className="font-mono text-code text-fg-2">QBO_REDIRECT_URI</code> /{" "}
-              <code className="font-mono text-code text-fg-2">QBO_TOKEN_SECRET</code> to enable the connection.
-            </p>
-          )
+          ) : null
         }
       >
-        QuickBooks isn&apos;t connected yet.
+        {/* Connecting needs QBO_CLIENT_ID, QBO_CLIENT_SECRET, QBO_REDIRECT_URI and QBO_TOKEN_SECRET (README). */}
+        {qbo.isConfigured() ? "QuickBooks isn't connected yet." : "QuickBooks isn't set up yet."}
       </EmptyState>
     );
   }
@@ -94,22 +91,16 @@ export default async function FinancialsOverviewPage({
   // a PARTIAL run can still tie on the basis on screen; only say what's off for this one
   const syncNotice =
     data.lastSync?.status === "PARTIAL"
-      ? partialSyncLine(
-          reconcileGap(data.lastSync.reconcileSummary, basis),
-          fmtDate(data.lastSync.runAt ?? data.lastSync.at),
-        )
+      ? partialSyncLine(reconcileGap(data.lastSync.reconcileSummary, basis))
       : null;
 
   return (
     <div className="space-y-8 pointer-coarse:space-y-6">
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <SourceLine
-            period={period}
-            basis={basis}
-            syncedAt={data.lastSync?.at ?? null}
-            status={syncNotice ? data.lastSync?.status : null}
-          />
+        {/* The controls sit beside the source line from lg; under it below, so it keeps one line. The
+            notice under them says what's off, so the line doesn't say it again. */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <SourceLine period={period} basis={basis} syncedAt={data.lastSync?.at ?? null} />
           <div className="flex shrink-0 items-center gap-3">
             <TextLink
               href={`/financials?basis=${other}`}
@@ -292,7 +283,7 @@ export default async function FinancialsOverviewPage({
               })}
               {/* the unassigned remainder and the Portfolio total only mean something once lines exist */}
               {hasLines && (
-                <tr className="hover:bg-fill-1">
+                <tr>
                   <Td className="text-fg-2">
                     Not assigned to a property{" "}
                     <TextLink href="/financials/settings#class-mapping" className="whitespace-nowrap">
@@ -308,8 +299,13 @@ export default async function FinancialsOverviewPage({
                   <Td numeric className={cn("text-fg-2", noiCol)}>
                     <MoneyCents cents={data.unassigned.noiCents} />
                   </Td>
-                  <Td className={fromSm} />
-                  <Td className={fromSm} />
+                  {/* No margin or debt interest of its own: the empty-cell dash, as on the rows above. */}
+                  <Td numeric className={cn("text-fg-3", fromSm)}>
+                    —
+                  </Td>
+                  <Td numeric className={cn("text-fg-3", fromSm)}>
+                    —
+                  </Td>
                 </tr>
               )}
             </tbody>
@@ -337,9 +333,7 @@ export default async function FinancialsOverviewPage({
             )}
           </Table>
           {hasLines && (
-            <p className="mt-3 text-meta text-fg-3">
-              Per-property figures use directly-classed lines only. Portfolio NOI is the sum of the rows above.
-            </p>
+            <p className="mt-3 text-meta text-fg-3">Each row counts only the lines classed to it.</p>
           )}
         </Section>
       )}

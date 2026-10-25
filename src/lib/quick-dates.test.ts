@@ -51,11 +51,27 @@ test("quickPicks: five picks in order with their resolved hints", () => {
 test("quickPicks: Monday and Tomorrow never collide", () => {
   for (let i = 0; i < 14; i++) {
     const today = addDaysYmd("2026-10-18", i)!;
-    const [, tomorrow, monday] = quickPicks(today);
+    const picks = quickPicks(today);
+    const tomorrow = picks.find((p) => p.key === "tomorrow")!;
+    const monday = picks.find((p) => p.key === "monday")!;
     assert.notEqual(monday.value, tomorrow.value, today);
     assert.notEqual(monday.value, today, today);
     assert.equal(weekdayOf(monday.value!), 1, today);
   }
+});
+
+test("quickPicks: on a Sunday the picks stay in date order, and Monday reads Next Monday", () => {
+  const picks = quickPicks("2026-10-25");
+  assert.deepEqual(
+    picks.map((p) => [p.key, p.label, p.value]),
+    [
+      ["today", "Today", "2026-10-25"],
+      ["tomorrow", "Tomorrow", "2026-10-26"],
+      ["next-week", "Next week", "2026-11-01"],
+      ["monday", "Next Monday", "2026-11-02"],
+      ["none", "No date", null],
+    ],
+  );
 });
 
 test("quickPicks: an invalid today throws instead of offering wrong dates", () => {

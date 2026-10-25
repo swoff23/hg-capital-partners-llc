@@ -17,7 +17,7 @@ export const PASSWORD_MESSAGES: Record<PasswordProblem, string> = {
   same: "Pick a new password, not the current one.",
   mismatch: "The two new passwords don't match.",
   "wrong-current": "Current password is wrong.",
-  locked: "Too many failed attempts. Try again in 15 minutes.",
+  locked: "Too many tries. Wait 15 minutes.",
 };
 
 export function isPasswordProblem(code: unknown): code is PasswordProblem {

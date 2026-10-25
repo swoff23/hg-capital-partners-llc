@@ -92,7 +92,8 @@ export function SectionCard({
                 variant="ghost"
                 size="sm"
                 onClick={onEdit}
-                className="opacity-0 transition-[opacity,background-color,color] focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+                // Pulled out by its padding, so the word ends on the section's edge like every other action.
+                className="-mr-2.5 opacity-0 transition-[opacity,background-color,color] focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
               >
                 Edit
               </Button>
@@ -142,7 +143,8 @@ type ButtonLook = {
 /** The Button look for an element that isn't a button or a Link: an sms:, tel: or mailto: anchor. */
 export function buttonClass({ variant = "secondary", size = "md", icon = false }: ButtonLook = {}) {
   return cn(
-    "inline-flex items-center justify-center gap-1.5 rounded-md text-label transition-colors disabled:opacity-50 [&_svg]:shrink-0",
+    // A label never wraps: shorten the words, or let the layout give it room.
+    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-label transition-colors disabled:opacity-50 [&_svg]:shrink-0",
     icon ? cn(btnSizes[size].icon, "px-0 pointer-coarse:min-w-11") : btnSizes[size].text,
     TOUCH_HEIGHT,
     btnStyles[variant],
@@ -270,6 +272,50 @@ export function Textarea({ className, ...props }: React.ComponentProps<"textarea
 }
 /** WebKit ignores min-height on a native select, so the select sets its 44px touch height outright. */
 export const selectTouchHeight = "pointer-coarse:h-11";
+
+/**
+ * A checkbox drawn from the tokens (docs/brand-guidelines.md, section 9): a
+ * 16px `rounded-sm` box, `--surface` on a `--line-control` edge; checked, the
+ * `--act` fill and edge with an `--on-act` check. A native input underneath
+ * (appearance none), so labels, forms and keyboard work as usual, and the box
+ * looks the same in every engine and theme instead of the browser's own gray.
+ * `large` is 20px, for a checklist worked through on a job site. `className`
+ * goes on the wrapper, e.g. a margin.
+ */
+export function Checkbox({
+  className,
+  large = false,
+  ...props
+}: Omit<React.ComponentProps<"input">, "type"> & { large?: boolean }) {
+  return (
+    // Disabled, the box and its check dim together.
+    <span className={cn("inline-grid shrink-0 place-items-center has-disabled:opacity-50", large ? "size-5" : "size-4", className)}>
+      <input
+        type="checkbox"
+        className={cn(
+          "peer col-start-1 row-start-1 m-0 cursor-pointer appearance-none rounded-sm border border-line-control bg-surface transition-colors checked:border-act checked:bg-act disabled:cursor-default",
+          large ? "size-5" : "size-4",
+        )}
+        {...props}
+      />
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(
+          "pointer-events-none col-start-1 row-start-1 text-on-act opacity-0 peer-checked:opacity-100",
+          large ? "size-3.5" : "size-3",
+        )}
+      >
+        <path d="m3.5 8.25 3 3 6-6.5" />
+      </svg>
+    </span>
+  );
+}
 
 export function Select({ className, ...props }: React.ComponentProps<"select">) {
   return <select className={cn(fieldClass, "h-9", selectTouchHeight, className)} {...props} />;

@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { Button, Kbd } from "@/components/ui";
 
@@ -17,7 +17,9 @@ import { Button, Kbd } from "@/components/ui";
  * Button that names what goes ("Delete task"). Below sm the actions stack
  * full width with the primary on top, however many there are, as Apple's
  * alerts do when labels don't fit side by side, so no label wraps at 320.
- * `busy` holds it open, Cancel disabled, while the action runs.
+ * `busy` holds it open, Cancel disabled, while the action runs. With two
+ * actions after Cancel (Keep data, Delete everything) it's 448px wide, not
+ * 384, so the three sit on one row from sm.
  */
 export function ConfirmDialog({
   title,
@@ -36,6 +38,8 @@ export function ConfirmDialog({
   cancelLabel?: string;
   busy?: boolean;
 }) {
+  const several =
+    isValidElement<{ children?: ReactNode }>(actions) && actions.type === Fragment && Children.count(actions.props.children) > 1;
   return (
     <ModalOverlay
       isOpen
@@ -46,9 +50,9 @@ export function ConfirmDialog({
       isKeyboardDismissDisabled={busy}
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 data-entering:animate-fade-in motion-reduce:animate-none"
     >
-      <Modal className="w-full max-w-sm rounded-xl border border-line-float bg-raised p-5 text-fg-1 shadow-overlay outline-none data-entering:animate-pop-in motion-reduce:animate-none">
+      <Modal className={`w-full ${several ? "max-w-md" : "max-w-sm"} rounded-xl border border-line-float bg-raised p-5 text-fg-1 shadow-overlay outline-none data-entering:animate-pop-in motion-reduce:animate-none`}>
         <Dialog role="alertdialog" className="outline-none">
-          <Heading slot="title" className="text-section text-fg-1">
+          <Heading slot="title" className="text-balance text-section text-fg-1">
             {title}
           </Heading>
           {body && <div className="mt-1 text-body text-fg-2">{body}</div>}

@@ -30,7 +30,7 @@ const PICK_ICON: Record<QuickPickKey, LucideIcon> = {
 };
 
 /**
- * The due date chip (D7). Shows dueLabel(): "Today", "Friday", "3d late",
+ * The due date chip (D7). Shows dueLabel(): "Today", "Tomorrow", "Friday",
  * "Mar 1"; red when the caller says it's overdue (overdue is the caller's
  * call: Waiting and Review tasks never are). Opens quick picks with the date
  * each one lands on, then a calendar: a Popover with a mouse, a Sheet on

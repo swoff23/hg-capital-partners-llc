@@ -4,9 +4,10 @@ import type { Metadata, Viewport } from "next";
 import { brandTokensDark } from "@/lib/brand-tokens";
 import { BRAND } from "@/lib/brand";
 import { getEnv } from "@/lib/env";
+import { cn } from "@/lib/utils";
 import { PASSWORD_MESSAGES, isPasswordProblem, MIN_PASSWORD_LENGTH } from "@/lib/portal/credentials";
 import { resetTokenIsUsable } from "@/lib/portal/reset";
-import { AuthError, AuthFrame, authLinkClass } from "../_components/auth-frame";
+import { AuthError, AuthFrame, authButtonClass, authLinkClass } from "../_components/auth-frame";
 import { AuthSubmit } from "../_components/auth-submit";
 import { PasswordField } from "../_components/password-field";
 
@@ -30,9 +31,13 @@ export default async function ResetPasswordPage({ searchParams }: PageProps<"/lo
     return (
       <AuthFrame title="This link has expired">
         <AuthError>Reset links work once, for 30 minutes.</AuthError>
+        {/* The one way forward is the frame's CTA; signing in is the quiet link under it, as on Forgot. */}
+        <Link href="/login/forgot" className={cn(authButtonClass, "mt-4")}>
+          Get a new link
+        </Link>
         <p className="mt-3">
-          <Link href="/login/forgot" className={authLinkClass}>
-            Get a new link
+          <Link href="/login" className={authLinkClass}>
+            Back to sign in
           </Link>
         </p>
       </AuthFrame>

@@ -59,7 +59,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
               <Section
                 title={<TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>}
               >
-                <AllList />
+                <AllList scoped />
               </Section>
             ) : (
               <AllList />

@@ -12,6 +12,13 @@ import {
 } from "@/lib/property-types";
 import { fmtAge, ForecastYearBars, grandTotalCell } from "../capex-ui";
 
+/**
+ * A property's 5-year CapEx forecast: the total, spend by year and every
+ * line item. Picking a year spotlights its rows and swaps the figure to that
+ * year's spend, with "show all 5 years" beside it, as Portfolio's does. This
+ * year's items are "Due now"; only one past its replacement age reads in
+ * --danger.
+ */
 export function CapexForecastCard({
   units,
   building,
@@ -34,6 +41,7 @@ export function CapexForecastCard({
   const selectedTotal =
     selectedYear == null ? f.total : (f.years.find((y) => y.year === selectedYear)?.total ?? 0);
   const totalLabel = selectedYear == null ? `${f.horizonYears}-year total` : `${selectedYear} total`;
+  const pastDue = f.years[0]?.items.some((it) => it.pastDue) ?? false;
 
   return (
     <Section
@@ -48,11 +56,20 @@ export function CapexForecastCard({
       <div className="space-y-4">
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <Money value={f.total} className="text-figure-m text-fg-1" />
-            {f.dueNowCount > 0 && (
-              <span className="text-meta text-danger">
-                <Money value={f.dueNowTotal} /> due soon
+            <Money value={selectedTotal} className="text-figure-m text-fg-1" />
+            {selectedYear != null ? (
+              <span className="text-meta text-fg-3">
+                <span className="num">{selectedYear}</span> spend ·{" "}
+                <button type="button" onClick={() => setSelectedYear(null)} className={textLinkClass}>
+                  show all {f.horizonYears} years
+                </button>
               </span>
+            ) : (
+              f.dueNowCount > 0 && (
+                <span className={cn("text-meta", pastDue ? "text-danger" : "text-fg-2")}>
+                  <Money value={f.dueNowTotal} /> due now
+                </span>
+              )
             )}
           </div>
           {undatedNote && <p className="mt-1 text-meta text-fg-3">{undatedNote}</p>}
@@ -68,21 +85,7 @@ export function CapexForecastCard({
 
         {/* Line items: the full list, always. Selecting a year emphasises its rows. */}
         {allRows.length > 0 && (
-          <div className="space-y-1">
-            <div className="flex min-h-5 items-center gap-2 text-meta text-fg-3">
-              {selectedYear == null ? (
-                <span>All {f.horizonYears} years</span>
-              ) : (
-                <>
-                  <span>
-                    Highlighting <span className="num text-fg-1">{selectedYear}</span>
-                  </span>
-                  <button type="button" onClick={() => setSelectedYear(null)} className={textLinkClass}>
-                    clear
-                  </button>
-                </>
-              )}
-            </div>
+          <div>
             {/* Below 480 the location moves under the asset and the age drops, so cost stays on screen. */}
             <Table>
               <thead>
@@ -100,6 +103,7 @@ export function CapexForecastCard({
                 {allRows.map((l, idx) => {
                   const dimmed = selectedYear != null && l.dueYear !== selectedYear;
                   const dueNow = l.dueYear === f.fromYear;
+                  const late = l.pastDue;
                   const where = l.scope === "building" ? "text-fg-1" : "text-fg-2";
                   return (
                     <tr key={idx} className={cn("transition-opacity duration-fast", dimmed && "opacity-30")}>
@@ -109,8 +113,8 @@ export function CapexForecastCard({
                         <span className={cn("block text-meta min-[480px]:hidden", where)}>{l.unitLabel}</span>
                       </Td>
                       <Td className="num whitespace-nowrap text-fg-2 max-[480px]:hidden">{fmtAge(l.age)}</Td>
-                      <Td className={cn("num whitespace-nowrap", dueNow ? "text-danger" : "text-fg-2")}>
-                        {dueNow ? "Due soon" : l.dueYear}
+                      <Td className={cn("num whitespace-nowrap", late ? "text-danger" : dueNow ? "text-fg-1" : "text-fg-2")}>
+                        {dueNow ? "Due now" : l.dueYear}
                       </Td>
                       <Td numeric className="pr-0">
                         <Money value={l.cost} />

@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
  * names what was copied ("Lockbox code copied"). `mask` shows only the last
  * four ("•• 2502") with a button to reveal the rest; a copy is always the
  * whole code. `size="lg"` is the lockbox code on the job page and in Access.
+ * `copyIcon={false}` drops the hover copy icon where a Copy button sits
+ * beside the code, so the two don't double up (the job page's lockbox).
  *
  * Needs a ToastProvider above it (AppShell and the portal layout mount one).
  */
@@ -19,6 +21,7 @@ export function Code({
   label,
   mask = false,
   size = "md",
+  copyIcon = true,
   className,
 }: {
   value: string;
@@ -26,6 +29,8 @@ export function Code({
   label: string;
   mask?: boolean;
   size?: "md" | "lg";
+  /** The copy icon that shows on hover; off where a Copy button is beside the code. */
+  copyIcon?: boolean;
   className?: string;
 }) {
   const { toast } = useToast();
@@ -57,10 +62,12 @@ export function Code({
       >
         {/* Never truncated: a code is read character by character, so the cell gives it room. */}
         <span>{text}</span>
-        <Copy
-          aria-hidden="true"
-          className="h-3.5 w-3.5 shrink-0 text-fg-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:hidden"
-        />
+        {copyIcon && (
+          <Copy
+            aria-hidden="true"
+            className="h-3.5 w-3.5 shrink-0 text-fg-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:hidden"
+          />
+        )}
       </button>
       {mask && (
         <button

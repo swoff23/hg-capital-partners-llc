@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui";
+import { callAction } from "@/lib/action-result";
 import type { MigrationReport } from "@/lib/attachments/migrate";
 import { moveDocumentsToPrivate } from "./actions";
 
@@ -17,7 +18,8 @@ export function MigrateButton({ disabled }: { disabled: boolean }) {
         onClick={() =>
           start(async () => {
             setError(null);
-            const r = await moveDocumentsToPrivate();
+            // A dropped connection comes back as a refusal and shows under the button, not as the error page.
+            const r = await callAction(() => moveDocumentsToPrivate());
             if (r.ok) setReport(r.data);
             else setError(r.error);
           })

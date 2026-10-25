@@ -66,7 +66,8 @@ function Row({ item }: { item: NeedsYouItem }) {
     <Link
       href={item.href}
       className={cn(
-        "grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 py-2 transition-colors hover:bg-fill-1 pointer-coarse:min-h-12",
+        // The hover fill reaches 8px past each side, rounded, as on the task rows beside it.
+        "-mx-2 grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 rounded-md px-2 py-2 transition-colors hover:bg-fill-1 pointer-coarse:min-h-12",
         "@min-[30rem]:grid-cols-[7rem_minmax(0,1fr)_auto_auto] @min-[30rem]:items-center",
       )}
     >

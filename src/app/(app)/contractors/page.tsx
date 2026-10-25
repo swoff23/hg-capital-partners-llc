@@ -58,20 +58,21 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                 </>
               );
               // A doc on file only by filename (the import's notes) still counts,
-              // as it does on the contractor's page; it just has no link.
+              // as it does on the contractor's page; it just has no link, so it
+              // reads in --fg-3 and a link always looks different from plain text.
               const w9 = c.w9Url ? (
                 <a href={c.w9Url} target="_blank" rel="noreferrer" className={docLink}>
                   W-9
                 </a>
               ) : docOnFile(c.comments, "W-9") ? (
-                "W-9"
+                <span className="text-fg-3">W-9</span>
               ) : null;
               const coi = c.coiUrl ? (
                 <a href={c.coiUrl} target="_blank" rel="noreferrer" className={docLink}>
                   COI
                 </a>
               ) : docOnFile(c.comments, "Insurance") ? (
-                "COI"
+                <span className="text-fg-3">COI</span>
               ) : null;
               return (
                 // The whole row opens the contractor, as TaskRow does: one link
@@ -81,8 +82,10 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                     <Link href={`/contractors/${c.id}`} className="absolute inset-0 -outline-offset-2">
                       <span className="sr-only">{c.fullName}</span>
                     </Link>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="min-w-0 text-fg-1 max-sm:truncate">{c.fullName}</span>
+                    {/* From sm the name keeps its longest word and the badges drop under it when the
+                        column is narrow (a tablet), so a badge never sits on the name. */}
+                    <div className="flex min-w-0 items-center gap-x-2 gap-y-1 sm:flex-wrap">
+                      <span className="text-fg-1 max-sm:min-w-0 max-sm:truncate">{c.fullName}</span>
                       {badges && <span className="hidden shrink-0 items-center gap-2 sm:flex">{badges}</span>}
                     </div>
                     {/* On a phone the name keeps the first line; the badges lead the subline. */}

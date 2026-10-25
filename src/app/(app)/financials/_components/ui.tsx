@@ -58,7 +58,8 @@ export function SandboxNotice() {
 /**
  * A word a partner should act on, with the lucide icon of the thing at the
  * status mark's size in --warn (section 9): RefreshCw plus "Stale" for a sync.
- * Glyph plus word, so color is never the only signal.
+ * Glyph plus word, so color is never the only signal. The word sets the
+ * baseline (the icon centers on it), so it sits level in a sentence.
  */
 export function WarnMark({
   icon: Icon = TriangleAlert,
@@ -70,8 +71,8 @@ export function WarnMark({
   className?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 text-warn", className)}>
-      <Icon aria-hidden="true" strokeWidth={2} className="h-3.5 w-3.5 shrink-0 pointer-coarse:h-4 pointer-coarse:w-4" />
+    <span className={cn("inline-flex items-baseline gap-1 text-warn", className)}>
+      <Icon aria-hidden="true" strokeWidth={2} className="h-3.5 w-3.5 shrink-0 self-center pointer-coarse:h-4 pointer-coarse:w-4" />
       {children}
     </span>
   );
@@ -139,7 +140,8 @@ export function MoneyBars({
       {shown.map((r) => (
         <li
           key={r.label}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[9rem_minmax(0,1fr)_6rem]"
+          // 10rem: the longest category, "Repairs & maintenance", whole at touch's 14px.
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[10rem_minmax(0,1fr)_6rem]"
         >
           <span className="truncate text-meta text-fg-2">{r.label}</span>
           <span className="text-right text-body text-fg-1 sm:order-last">
@@ -253,10 +255,12 @@ function ago(h: number): string {
 
 /**
  * Period and source for a figure block (section 3): "Jan to Sep 2026 ·
- * QuickBooks, cash basis, synced 6h ago", in text-meta --fg-3. Phones drop
- * the basis clause so it stays one line. A sync over 36 hours old reads
- * Stale, and a PARTIAL run whose basis on screen doesn't tie reads
- * Reconciliation off, each as a warn mark.
+ * QuickBooks, cash basis, synced 6h ago", in text-meta --fg-3. It stays one
+ * line: phones drop the basis clause, and below 480 the source's name too
+ * ("Jan to Sep 2026 · synced 6h ago"), since the page is QuickBooks' figures.
+ * A sync over 36 hours old reads Stale, and a PARTIAL run whose basis on
+ * screen doesn't tie reads Reconciliation off, each as a warn mark; a page
+ * whose notice already says what's off passes no `status`.
  */
 export function SourceLine({
   period,
@@ -275,13 +279,13 @@ export function SourceLine({
   return (
     <p className={cn("text-meta text-fg-3", className)}>
       {period && <>{period} · </>}
-      QuickBooks<span className="max-sm:hidden">, {basis === "CASH" ? "cash" : "accrual"} basis</span>
+      <span className="max-[480px]:hidden">
+        QuickBooks<span className="max-sm:hidden">, {basis === "CASH" ? "cash" : "accrual"} basis</span>,{" "}
+      </span>
       {h == null ? (
-        <>
-          , <WarnMark icon={RefreshCw}>not synced yet</WarnMark>
-        </>
+        <WarnMark icon={RefreshCw}>not synced yet</WarnMark>
       ) : (
-        <>, synced {ago(h)}</>
+        <span className="whitespace-nowrap">synced {ago(h)}</span>
       )}
       {h != null && h > 36 && (
         <>

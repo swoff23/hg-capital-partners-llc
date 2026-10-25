@@ -14,9 +14,10 @@ import { useStatusRun } from "./status-run";
 import { useRun } from "./use-run";
 
 /**
- * The title on the page title token, edited in place. Long titles wrap. Done
- * and Canceled strike it through in --fg-3, since the status chip carries no
- * strike (docs/brand-guidelines.md, section 9).
+ * The title on the page title token, edited in place. At rest it's the
+ * page's h1; a click or a tap swaps in the field, as on the property page.
+ * Long titles wrap. Done and Canceled strike it through in --fg-3, since the
+ * status chip carries no strike (docs/brand-guidelines.md, section 9).
  */
 export function TitleField({ taskId, title, closed }: { taskId: string; title: string; closed: boolean }) {
   const { toast } = useRun();
@@ -25,6 +26,7 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
       label="Task title"
       value={title}
       minLength={2}
+      heading
       multiline
       className={cn(closed && "text-fg-3 line-through")}
       onCommit={async (next) => {

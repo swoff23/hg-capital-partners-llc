@@ -15,6 +15,7 @@ import { getCapexRules } from "@/lib/capex-rules";
 import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
 import { FactStrip } from "../fact-strip";
+import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { PropertyDocumentsSection } from "./edit-documents";
 import { PropertyLoanSection } from "./edit-loan";
@@ -128,7 +129,11 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
         <PhotoThumb size="full" alt={`Front of ${place}`} className="sm:hidden" />
         <PhotoThumb size={96} alt={`Front of ${place}`} className="max-sm:hidden" />
         <div className="min-w-0">
-          {property.status && <p className="text-meta font-medium text-fg-2">{property.status}</p>}
+          {property.status && (
+            <p className="text-meta">
+              <PropertyStatus status={property.status} />
+            </p>
+          )}
           <PropertyAddressField id={property.id} value={property.address} />
           {subline && <p className="text-meta text-fg-3">{subline}</p>}
         </div>

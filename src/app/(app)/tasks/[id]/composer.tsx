@@ -69,14 +69,16 @@ export type ComposerDraft = { id: string; filename: string };
  * they're Internal whichever side is picked (core.addComment gives them the
  * message's visibility), and the page hands back any left from an earlier
  * visit as `drafts`. Cmd or Ctrl+Enter sends, printed beside Send for a
- * mouse. On a phone it sits on the bottom edge, and its tools show while you
- * write.
+ * mouse. On a phone it sits on the bottom edge, its contents on the 16px
+ * page gutter, and its tools show while you write. `quietSend` makes Send
+ * secondary while the Review banner's Approve is the page's next step.
  */
 export function Composer({
   taskId,
   contractorFirstName,
   staffNames,
   drafts,
+  quietSend = false,
 }: {
   taskId: string;
   /** Set when the assigned contractor has a portal login, so a reply reaches them (G2B-I03). */
@@ -85,6 +87,8 @@ export function Composer({
   staffNames: string;
   /** My uploads on this task not yet sent with a message, oldest first. */
   drafts: ComposerDraft[];
+  /** Send as a secondary button, so it never competes with Approve. */
+  quietSend?: boolean;
 }) {
   const { toast } = useToast();
   const text = useSyncExternalStore(
@@ -175,7 +179,7 @@ export function Composer({
   const active = text.length > 0 || ready.length > 0 || uploader.uploads.length > 0 || internal;
 
   const sendButton = (className: string) => (
-    <Button type="button" size="sm" disabled={!canSend} onClick={send} className={className}>
+    <Button type="button" variant={quietSend ? "secondary" : "primary"} size="sm" disabled={!canSend} onClick={send} className={className}>
       {sending ? "Sending…" : "Send"}
     </Button>
   );
@@ -211,20 +215,21 @@ export function Composer({
     >
       {uploader.inputs}
       {internal && (
-        <p className="flex items-center gap-1.5 px-3 pt-2 text-meta font-medium text-fg-2">
+        <p className="flex items-center gap-1.5 px-4 pt-2 text-meta font-medium text-fg-2 md:px-3">
           <Lock className="size-3.5 shrink-0" aria-hidden="true" />
           Only {staffNames} see this
         </p>
       )}
       {ready.length > 0 && (
-        <ul className="flex flex-wrap gap-2 px-3 pt-2.5">
+        <ul className="flex flex-wrap gap-2 px-4 pt-2.5 md:px-3">
           {ready.map((r) => (
             <ReadyTile key={r.id} item={r} onRemove={() => unready(r)} />
           ))}
         </ul>
       )}
-      <MediaUploadTray uploader={uploader} className="px-3 pt-2.5" />
-      <div className="flex items-end gap-1 px-1.5 py-1.5 md:px-2">
+      <MediaUploadTray uploader={uploader} className="px-4 pt-2.5 md:px-3" />
+      {/* On a phone Send ends on the 16px gutter, under the chips and rules above it. */}
+      <div className="flex items-end gap-1 py-1.5 pl-1.5 pr-4 md:px-2">
         <IconButton label="Take photo or video" onPress={uploader.takePhoto} onFill={internal} className="pointer-fine:hidden">
           <Camera />
         </IconButton>
@@ -256,7 +261,7 @@ export function Composer({
           still reaches each control. */}
       <div
         onMouseDown={(e) => e.preventDefault()}
-        className="hidden items-center gap-1 px-1.5 pb-1.5 group-data-[active]/composer:flex group-focus-within/composer:flex md:flex md:px-2 md:pb-2"
+        className="hidden items-center gap-1 pb-1.5 pl-1.5 pr-4 group-data-[active]/composer:flex group-focus-within/composer:flex md:flex md:px-2 md:pb-2"
       >
         <IconButton label="Add photos, videos or files" onPress={uploader.chooseFiles} onFill={internal}>
           <ImagePlus />

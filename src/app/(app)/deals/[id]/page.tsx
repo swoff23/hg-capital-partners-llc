@@ -68,6 +68,7 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
                   which="their"
                   raw={deal.theirPriceRaw}
                   amount={deal.theirPrice ? Number(deal.theirPrice) : null}
+                  emptyLabel="Add their price"
                   className={field}
                 />
               </DetailRow>
@@ -77,11 +78,12 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
                   which="our"
                   raw={deal.ourPriceRaw}
                   amount={deal.ourPrice ? Number(deal.ourPrice) : null}
+                  emptyLabel="Add our price"
                   className={field}
                 />
               </DetailRow>
               <DetailRow label="Units">
-                <DealUnitsField id={deal.id} value={deal.units} className={field} />
+                <DealUnitsField id={deal.id} value={deal.units} emptyLabel="Add units" className={field} />
               </DetailRow>
               <DetailRow label="Next action">
                 <DealTextField
@@ -89,7 +91,7 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
                   value={deal.nextAction}
                   patchKey="nextAction"
                   label="Next action"
-                  placeholder="What's next?"
+                  placeholder="Add next action"
                   className={field}
                 />
               </DetailRow>

@@ -23,15 +23,17 @@ const TABS = [
   { key: "done", label: "Done" },
 ] as const;
 
-// The narrowest phones (320) get the short labels so the row never wraps.
-// Tailwind's max-[N] is width < N, so each pair in this file uses the same N.
+// Phones under 375 (360, 320) get the short labels, and under 360 the segments
+// tighten to 10px sides, so the row fits the content width and ends on the
+// edge the rules and notices share. Tailwind's max-[N] is width < N, so each
+// pair in this file uses the same N.
 const GROUPS = [
   {
     key: "date",
     label: (
       <>
-        <span className="max-[360px]:hidden">By date</span>
-        <span className="min-[360px]:hidden">Date</span>
+        <span className="max-[375px]:hidden">By date</span>
+        <span className="min-[375px]:hidden">Date</span>
       </>
     ),
   },
@@ -39,12 +41,14 @@ const GROUPS = [
     key: "property",
     label: (
       <>
-        <span className="max-[360px]:hidden">By property</span>
-        <span className="min-[360px]:hidden">Property</span>
+        <span className="max-[375px]:hidden">By property</span>
+        <span className="min-[375px]:hidden">Property</span>
       </>
     ),
   },
 ] as const;
+
+const tightAt320 = "max-[360px]:[&>button]:px-2.5";
 
 /**
  * My jobs (§6, D31): Open | Done, and By date | By property with By date
@@ -77,12 +81,27 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
   return (
     <>
       <div className="mb-5 flex items-center justify-between gap-2">
-        <SegmentedControl aria-label="Open or done" size="md" options={TABS} value={shownTab} onChange={chooseTab} />
-        <SegmentedControl aria-label="Group jobs" size="md" options={GROUPS} value={group} onChange={chooseGroup} />
+        <SegmentedControl
+          aria-label="Open or done"
+          size="md"
+          options={TABS}
+          value={shownTab}
+          onChange={chooseTab}
+          className={tightAt320}
+        />
+        <SegmentedControl
+          aria-label="Group jobs"
+          size="md"
+          options={GROUPS}
+          value={group}
+          onChange={chooseGroup}
+          className={tightAt320}
+        />
       </div>
 
       {jobs.length === 0 ? (
-        <EmptyState>{tab === "open" ? "No open jobs right now." : "No finished jobs yet."}</EmptyState>
+        // What happens next, in one line (docs/brand-guidelines.md, section 9, Empty).
+        <EmptyState>{tab === "open" ? "New jobs from HG show up here." : "Jobs you mark done show up here."}</EmptyState>
       ) : (
         <div className="space-y-8 pointer-coarse:space-y-6">
           {groups.map((g) => (
@@ -91,7 +110,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
               <ul className="-mt-3 divide-y divide-line">
                 {g.jobs.map((job) => (
                   <li key={job.id}>
-                    <JobRow job={job} today={today} />
+                    <JobRow job={job} today={today} byProperty={group === "property"} />
                   </li>
                 ))}
               </ul>
@@ -109,14 +128,15 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
  * exist), the title with the "2 new" mark, then the address and unit and the
  * Target, with the status as its mark and word in one fixed column. Below
  * 480 the column drops and the status leads the subline instead, in its
- * tone. The subline is status, place and date in both groupings (section 5
- * Density). A finished job's Target is only its old due date, so Done rows
- * leave it out, as the job page does.
+ * tone. The subline is status, date and place (section 5 Density): the date
+ * before the place, so on a narrow phone the place is what truncates and the
+ * date always shows. By property the group's heading names the street, so
+ * the place is the unit alone. A finished job's Target is only its old due
+ * date, so Done rows leave it out, as the job page does.
  */
-function JobRow({ job, today }: { job: JobCard; today: Ymd }) {
-  const where = addressLine(job.address, job.unitLabel, { short: true });
+function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProperty: boolean }) {
+  const where = byProperty ? job.unitLabel?.trim() || null : addressLine(job.address, job.unitLabel, { short: true });
   const target = job.target && isActiveStatus(job.status) ? targetLabel(job.target, today) : null;
-  const subline = [where, target].filter(Boolean).join(" · ");
   const street = job.address ? addressLine(job.address, null, { short: true }) : null;
 
   return (
@@ -141,9 +161,15 @@ function JobRow({ job, today }: { job: JobCard; today: Ymd }) {
         <span className="mt-0.5 flex min-w-0 items-center gap-1 text-meta text-fg-3">
           <span className="flex shrink-0 items-center gap-1 min-[480px]:hidden">
             <StatusBadge status={job.status} />
-            {subline && <span aria-hidden="true">·</span>}
+            {(target || where) && <span aria-hidden="true">·</span>}
           </span>
-          {subline && <span className="min-w-0 truncate">{subline}</span>}
+          {target && (
+            <span className="shrink-0 whitespace-nowrap">
+              {target}
+              {where && <span aria-hidden="true"> ·</span>}
+            </span>
+          )}
+          {where && <span className="min-w-0 truncate">{where}</span>}
         </span>
       </span>
       <StatusBadge status={job.status} className="w-28 shrink-0 max-[480px]:hidden" />

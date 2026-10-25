@@ -9,6 +9,7 @@ import { Money } from "@/components/money";
 import { Button, SectionCard, Table, Td, Th, buttonClass, fieldClass, selectTouchHeight } from "@/components/ui";
 import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
 import {
+  isHouseMeterRow,
   UTILITY_GROUPS,
   UTILITY_STATUS_FIELDS,
   utilityStatusChoices,
@@ -34,6 +35,17 @@ const isAccountField = (k: keyof UnitUtilities) => k.endsWith("Acct");
 
 /** What a unit goes by in a row or a dialog: its label, or its place in the list. */
 const unitName = (u: PropertyUnit, i: number) => u.label?.trim() || `Unit ${i + 1}`;
+
+/**
+ * A stored lockbox value split into the code and its note: "4857 (back left
+ * corner of the house)" is the code 4857 and where the box is. The code is
+ * read and copied character by character, so the note never shares its token.
+ */
+function splitLockbox(value: string): { code: string; note: string | null } {
+  const m = /^(.*?)\s*\((.+)\)\s*$/.exec(value.trim());
+  if (!m || !m[1]) return { code: value.trim(), note: null };
+  return { code: m[1], note: m[2].trim() || null };
+}
 
 type Removing = { index: number; title: string; body: string; saved: boolean };
 
@@ -72,6 +84,11 @@ export function UnitsSection({
   const [removing, setRemoving] = useState<Removing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  // The counted rows (the record's "3 units") and the house-meter rows, each with its place in the list.
+  const indexed = initial.map((u, i) => ({ u, i }));
+  const rentable = indexed.filter(({ u }) => !isHouseMeterRow(u));
+  const meters = indexed.filter(({ u }) => isHouseMeterRow(u));
 
   // A unit Add unit opened and nobody typed into isn't a change, so Cancel doesn't ask about it.
   const dirty = JSON.stringify(units.filter((u) => !isUntouchedNew(u))) !== JSON.stringify(initial);
@@ -190,11 +207,11 @@ export function UnitsSection({
     >
       {!editing ? (
         <>
-          {initial.length === 0 ? (
+          {rentable.length === 0 ? (
             <p className="pb-2 text-body text-fg-3">Add each unit to keep its lockbox code, utilities and equipment here.</p>
           ) : (
             <ul className="divide-y divide-line">
-              {initial.map((u, i) => (
+              {rentable.map(({ u, i }) => (
                 <ReadUnit
                   key={u.id ?? i}
                   unit={u}
@@ -206,6 +223,23 @@ export function UnitsSection({
             </ul>
           )}
           <AddRow onClick={() => edit(true)}>Add unit</AddRow>
+          {/* The building's own meters aren't units, so they sit under the counted list, apart from it. */}
+          {meters.length > 0 && (
+            <div className="pt-4">
+              <p className="text-meta font-medium text-fg-2">House meters</p>
+              <ul className="divide-y divide-line">
+                {meters.map(({ u, i }) => (
+                  <ReadUnit
+                    key={u.id ?? i}
+                    unit={u}
+                    name={unitName(u, i)}
+                    rules={rules}
+                    onDelete={() => askDeleteSaved(i)}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -245,8 +279,8 @@ export function UnitsSection({
 
       {confirmOpen && (
         <ConfirmDialog
-          title="Discard unsaved changes?"
-          body={<>You have unsaved changes to units &amp; access. Save them, or discard and exit.</>}
+          title="Discard your Units & access edits?"
+          body="Your changes to these units won't be saved."
           onClose={() => setConfirmOpen(false)}
           cancelLabel="Keep editing"
           actions={
@@ -311,18 +345,25 @@ function ReadUnit({
 }) {
   const hasUtilities = UTILITY_GROUPS.some((g) => g.fields.some(([k]) => u.utilities?.[k]));
   const equipment = u.equipment ?? [];
+  const lockbox = u.lockboxCode?.trim() ? splitLockbox(u.lockboxCode) : null;
   return (
     <li className="py-1.5">
       <div className="flex min-h-8 items-center gap-3">
         <p className="min-w-0 flex-1 truncate text-body text-fg-1">{name}</p>
-        {u.lockboxCode && (
+        {lockbox && (
           <span className="flex shrink-0 items-center gap-1.5">
             <span className="text-meta text-fg-3 max-[480px]:hidden">Lockbox</span>
-            <Code value={u.lockboxCode} label="Lockbox code" />
+            <Code value={lockbox.code} label="Lockbox code" />
           </span>
         )}
         <UnitMenu name={name} onDelete={onDelete} />
       </div>
+      {/* Where the box is: its own line, so a long note never pushes the code or the menu off screen. */}
+      {lockbox?.note && (
+        <p title={lockbox.note} className="-mt-1 truncate pb-1 text-meta text-fg-3">
+          Lockbox at {lockbox.note}
+        </p>
+      )}
       {hasUtilities && (
         <Disclosure title="Utilities">
           <div className="@container">
@@ -397,8 +438,10 @@ function ReadUnit({
   );
 }
 
+// 772px with its gaps, so it fits the record's 792px main column at 1280 without a sideways
+// scroll, and Model # keeps 152px: a model number (RF24BB66000APAA) reads whole.
 const EQUIPMENT_COLS =
-  "grid grid-cols-[140px_minmax(100px,1fr)_minmax(140px,1.3fr)_78px_52px_112px_72px_44px] items-center gap-2";
+  "grid grid-cols-[140px_minmax(152px,1.2fr)_minmax(96px,1fr)_64px_48px_100px_72px_44px] items-center gap-2";
 
 function EditUnit({
   unit: u,
@@ -480,7 +523,7 @@ function EditUnit({
         <p className="mb-1.5 text-meta font-medium text-fg-1">Equipment</p>
         {equipment.length > 0 && (
           <div className="overflow-x-auto">
-            <div className="min-w-200 space-y-1">
+            <div className="min-w-193 space-y-1">
               <div className={cn(EQUIPMENT_COLS, "text-meta font-medium text-fg-3")}>
                 <span>Type</span>
                 <span>Model #</span>

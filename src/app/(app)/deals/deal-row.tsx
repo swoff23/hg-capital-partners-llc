@@ -131,8 +131,11 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         />
       </Td>
 
+      {/* An empty cell is the dash in --fg-3, like units and prices (section 3). */}
       <Td className={cn("text-meta text-fg-3", COLUMN_DROP.latestNote)}>
-        {deal.latestNotes.length > 0 && (
+        {deal.latestNotes.length === 0 ? (
+          <span aria-label="No notes">—</span>
+        ) : (
           <div className="space-y-0.5">
             {deal.latestNotes.map((n, i) => (
               <Tooltip key={i} label={n.day ? `${n.body} (${n.day})` : n.body} className="block truncate">
@@ -149,7 +152,8 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
           value={deal.nextAction}
           patchKey="nextAction"
           label="Next action"
-          placeholder="Add next action…"
+          // The list's empty cell is the dash; it still opens on a click or tap. The deal page keeps the verb.
+          placeholder="—"
           className={field}
           onSaved={saved}
         />

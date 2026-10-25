@@ -400,6 +400,14 @@ body:has([data-surface="public"]) {
   background: #0a0e17;
 }
 
+/* The viewport's scrollbar follows the root's color-scheme, not body's: on a
+   public page it's dark too, or a light track runs down the dark site in the
+   light app theme. Only color-scheme changes here; the light tokens on :root
+   stay. A rule of its own for the same :has() reason. */
+:root:has([data-surface="public"]) {
+  color-scheme: dark;
+}
+
 ::selection {
   background-color: var(--select);
   color: var(--fg-1);
@@ -470,6 +478,12 @@ body:has([data-surface="public"]) {
   select,
   textarea {
     font-size: max(16px, 1em);
+  }
+  /* A field on the title token (a task title, an address being renamed) is
+     already past 16px: it keeps its own size, or 1em (the parent's 16px)
+     would shrink it to body size under the title's line height. */
+  :is(input, textarea).text-title {
+    font-size: var(--text-title);
   }
 }
 

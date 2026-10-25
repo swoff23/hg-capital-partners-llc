@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
+import { FileText, Upload } from "lucide-react";
 import type { ActionResult } from "@/lib/action-result";
 import { UPLOAD_RULES, fileKindForType, filenameForType, uploadContentType, usesMultipart } from "@/lib/attachments/content-types";
 import { safeUploadName } from "@/lib/attachments/paths";
@@ -68,7 +69,10 @@ function failureNotice(failures: Failure[]): string {
 }
 
 /**
- * Drag-or-click file uploader backed by Vercel Blob. The browser uploads
+ * File uploader backed by Vercel Blob. "Add document" is the list's last row,
+ * as Add unit is (docs/brand-guidelines.md, section 9: no dashed box); with a
+ * mouse, files dropped anywhere on the list upload too, and the row says so.
+ * Touch can't drag, so there it's the row alone. The browser uploads
  * straight to Blob (no serverless body limit) as a PRIVATE blob; `onRecord`
  * writes the DB row and `onDelete` removes it. Links open through the
  * session-gated /api/files route, never the raw blob URL. Shared by task
@@ -150,12 +154,28 @@ export function Attachments(props: AttachmentsProps) {
     if (failures.length > 0) setError(failureNotice(failures));
   }
 
+  const onDrop = {
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      setDragOver(true);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      void uploadFiles(e.dataTransfer.files);
+    },
+  };
+
   return (
-    <div className="space-y-3">
+    <div {...onDrop} className={cn("rounded-md transition-colors", dragOver && "bg-fill-1 ring-1 ring-act")}>
       {items.length > 0 && (
-        <ul className="divide-y divide-line rounded-lg border border-line">
+        <ul className="divide-y divide-line">
           {items.map((a) => (
-            <li key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <li key={a.id} className="flex min-h-10 items-center gap-3 py-2 text-body pointer-coarse:min-h-12">
               <FileIcon />
               <a
                 href={`/api/files/${kind}/${a.id}`}
@@ -166,11 +186,11 @@ export function Attachments(props: AttachmentsProps) {
               >
                 {a.filename}
               </a>
-              <span className="shrink-0 text-xs text-muted">{formatBytes(a.size)}</span>
+              <span className="num shrink-0 text-meta text-fg-3">{formatBytes(a.size)}</span>
               <button
                 type="button"
                 onClick={() => start(() => onDelete(a.id))}
-                className="shrink-0 text-xs text-fg-3 transition-colors hover:text-danger"
+                className="relative shrink-0 text-meta text-fg-3 transition-colors hover:text-danger pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
               >
                 Remove
               </button>
@@ -180,52 +200,27 @@ export function Attachments(props: AttachmentsProps) {
       )}
 
       {busy.map(({ key, name }) => (
-        <div
-          key={key}
-          className="flex items-center gap-3 rounded-lg border border-line px-3 py-2 text-sm text-fg-3"
-        >
+        <div key={key} className="flex min-h-10 items-center gap-3 border-t border-line py-2 text-body text-fg-3 first:border-t-0">
           <FileIcon />
           <span className="min-w-0 flex-1 truncate">{name}</span>
-          <span className="shrink-0 text-xs">Uploading…</span>
+          <span className="shrink-0 text-meta">Uploading…</span>
         </div>
       ))}
 
-      <div
-        role="button"
-        tabIndex={0}
+      {/* The last row, like Add unit: it adds one more row. */}
+      <button
+        type="button"
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          void uploadFiles(e.dataTransfer.files);
-        }}
         className={cn(
-          "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-6 text-center text-sm transition-colors",
-          dragOver ? "border-act bg-fill-1" : "border-line-strong hover:bg-fill-1",
+          "flex min-h-10 w-full items-center gap-2 py-2 text-left text-label text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:min-h-12",
+          // Under rows it takes a divider; alone, the section's own rule is enough.
+          (items.length > 0 || busy.length > 0) && "border-t border-line",
         )}
       >
-        <svg
-          aria-hidden
-          viewBox="0 0 24 24"
-          className="h-5 w-5 text-muted"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        >
-          <path d="M12 16V4m0 0l-4 4m4-4l4 4M5 20h14" />
-        </svg>
-        <span className="text-muted">
-          <span className="font-medium text-foreground">Click to upload</span> or drag files here
-        </span>
-      </div>
+        <Upload aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+        Add document
+        <span className="text-meta font-normal text-fg-3 pointer-coarse:hidden">or drop files here</span>
+      </button>
       <input
         ref={inputRef}
         type="file"
@@ -237,23 +232,11 @@ export function Attachments(props: AttachmentsProps) {
         }}
       />
 
-      {error && <p className="text-xs text-danger">{error}</p>}
+      {error && <p className="pt-1 text-meta text-danger">{error}</p>}
     </div>
   );
 }
 
 function FileIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 16 16"
-      className="h-4 w-4 shrink-0 text-muted"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M9 1.5H4.5A1.5 1.5 0 003 3v10a1.5 1.5 0 001.5 1.5h7A1.5 1.5 0 0013 13V5.5L9 1.5z" />
-      <path d="M9 1.5V5.5H13" />
-    </svg>
-  );
+  return <FileText aria-hidden="true" strokeWidth={1.5} className="h-4 w-4 shrink-0 text-fg-3" />;
 }

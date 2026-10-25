@@ -159,6 +159,8 @@ export function TaskPageView(p: TaskPageViewProps) {
             contractorFirstName={p.contractorHasLogin ? p.contractorFirst : null}
             staffNames={p.staffNames}
             drafts={p.drafts}
+            // While the Review banner shows, Approve is the page's one primary.
+            quietSend={!!p.review}
           />
         </div>
       </div>

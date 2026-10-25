@@ -1,9 +1,8 @@
 "use client";
-import { useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { Button, Input, TextLink } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { DEFAULT_DEAL_STATUS } from "@/lib/config";
-import { shortAddress } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import { createDeal, type ExistingDeal } from "../actions";
 import { StageSelect } from "../stage-select";
@@ -20,12 +19,20 @@ function Label({ text, className, children }: { text: string; className?: string
 
 /**
  * Posts without a page load, so a refusal keeps every field as typed: an
- * address that's already a deal says which one and links to it.
+ * address that's already a deal says so on one line under the field and
+ * links to it, and focus moves to the field, so someone who just tapped
+ * Create deal at the bottom of a phone screen is taken to it (and a screen
+ * reader reads the line, through aria-describedby).
  */
 export function NewDealForm() {
   const [pending, start] = useTransition();
   const [existing, setExisting] = useState<ExistingDeal | null>(null);
   const [error, setError] = useState("");
+  const address = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (existing) address.current?.focus();
+  }, [existing]);
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -44,6 +51,7 @@ export function NewDealForm() {
       <div>
         <Label text="Address *">
           <Input
+            ref={address}
             name="address"
             required
             placeholder="123 Main St, Buffalo, NY 14201"
@@ -53,16 +61,17 @@ export function NewDealForm() {
           />
         </Label>
         {existing && (
+          // One line at 320: the field above already shows the address.
           <p id="new-deal-existing" className="mt-1.5 text-meta text-danger">
-            Already in Deals: {shortAddress(existing.address)} · {existing.status}.{" "}
-            <TextLink href={`/deals/${existing.id}`} className="font-medium">
+            Already a deal · {existing.status}.{" "}
+            <TextLink href={`/deals/${existing.id}`} className="whitespace-nowrap font-medium">
               Open it
             </TextLink>
           </p>
         )}
       </div>
       {/* Two to a row from sm; one below, so no label wraps at 320. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-x-3">
         <Label text="Status">
           <StageSelect name="status" defaultValue={DEFAULT_DEAL_STATUS} />
         </Label>

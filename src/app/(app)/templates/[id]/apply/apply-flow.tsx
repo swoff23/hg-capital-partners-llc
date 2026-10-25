@@ -86,7 +86,16 @@ export function ApplyFlow({
   const open = extractTokens(kept.flatMap((i) => [titleOf(i), notesOf(i), ...checklistOf(i)]));
   // Named as its field reads; brackets typed into a title have no field, so they show as typed.
   const openField = open.length > 0 ? tokens.find((t) => sameToken(t, open[0])) : undefined;
-  const hint = !error && propertyId && open.length > 0 ? `Fill in ${openField ? tokenLabel(openField) : `[${open[0]}]`} first` : "";
+  // Why Create is off, one line in --fg-3 beside it; --danger is for a refused submit alone.
+  const hint = error
+    ? ""
+    : !propertyId
+      ? "Pick a property first"
+      : count === 0
+        ? "Include a task first"
+        : open.length > 0
+          ? `Fill in ${openField ? tokenLabel(openField) : `[${open[0]}]`} first`
+          : "";
 
   const patchRow = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
 
@@ -215,7 +224,7 @@ export function ApplyFlow({
       </Section>
 
       <div className="flex items-center justify-end gap-3">
-        {(error || hint) && <p className="min-w-0 truncate text-meta text-danger">{error || hint}</p>}
+        {(error || hint) && <p className={cn("min-w-0 truncate text-meta", error ? "text-danger" : "text-fg-3")}>{error || hint}</p>}
         <Button type="button" onClick={submit} disabled={pending || !propertyId || count === 0 || open.length > 0} className="shrink-0">
           {pending ? "Creating…" : `Create ${count} ${count === 1 ? "task" : "tasks"}`}
         </Button>

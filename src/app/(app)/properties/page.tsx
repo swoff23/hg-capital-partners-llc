@@ -12,12 +12,14 @@ import { getCapexRules } from "@/lib/capex-rules";
 import { cn, toMoneyNumber } from "@/lib/utils";
 import { PortfolioCapexForecastCard } from "../portfolio-capex";
 import { FactStrip } from "./fact-strip";
+import { PropertyStatus } from "./property-status";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
- * Portfolio (docs/brand-guidelines.md, sections 5 and 9): a summary strip,
- * then one 56px row per property with its photo (the fallback tile until
+ * Portfolio (docs/brand-guidelines.md, sections 5 and 9): a summary strip
+ * of what the table doesn't total (the debt and what's left over), then one
+ * 56px row per property with its photo (the fallback tile until
  * it's taken), money right-aligned and tabular, and a footer row that counts
  * and sums. The whole row opens the property. Below sm the status leads the
  * row's subline and the secondary columns drop. The 5-year CapEx forecast
@@ -89,12 +91,15 @@ export default async function PropertiesPage() {
         <EmptyState>Add your first property to track its loan, units and tasks here.</EmptyState>
       ) : (
         <>
+          {/* Value, purchase price, units and open tasks are the footer's sums; the strip carries the rest. */}
           <FactStrip
             facts={[
-              { label: "Value", value: <Money value={totals.value} /> },
-              { label: "Purchase price", value: <Money value={totals.purchase} /> },
+              { label: "Equity", value: <Money value={totals.value - totals.loan} /> },
               { label: "Loan balance", value: <Money value={totals.loan} /> },
-              { label: "Open tasks", value: totals.openTasks },
+              {
+                label: "LTV",
+                value: totals.value > 0 ? `${Math.round((totals.loan / totals.value) * 100)}%` : <span className="text-fg-3">—</span>,
+              },
             ]}
           />
 
@@ -134,8 +139,8 @@ export default async function PropertiesPage() {
                           <span className={cn("block truncate text-meta text-fg-3", !r.entity && "sm:hidden")}>
                             {/* The status column drops below sm, so its word leads the subline. */}
                             {r.status && (
-                              <span className="text-fg-2 sm:hidden">
-                                {r.status}
+                              <span className="sm:hidden">
+                                <PropertyStatus status={r.status} />
                                 {r.entity && " · "}
                               </span>
                             )}
@@ -156,8 +161,8 @@ export default async function PropertiesPage() {
                     <RowCell href={href} numeric className="max-sm:pr-0">
                       <Money value={r.value} />
                     </RowCell>
-                    <RowCell href={href} cell="max-sm:hidden" className="whitespace-nowrap pr-0 text-meta font-medium text-fg-2">
-                      {r.status ?? <span className="font-normal text-fg-3">—</span>}
+                    <RowCell href={href} cell="max-sm:hidden" className="whitespace-nowrap pr-0 text-meta">
+                      {r.status ? <PropertyStatus status={r.status} /> : <span className="text-fg-3">—</span>}
                     </RowCell>
                   </tr>
                 );
