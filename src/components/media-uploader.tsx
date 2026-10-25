@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { upload } from "@vercel/blob/client";
-import { Camera, ImagePlus, Play, RotateCw, TriangleAlert, X } from "lucide-react";
+import { Camera, ImagePlus, Play, RotateCcw, RotateCw, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { isOfflineError } from "@/lib/action-result";
 import { usesMultipart, type FileKind } from "@/lib/attachments/content-types";
@@ -389,23 +389,52 @@ export function MediaUploader({
   );
 }
 
-/** The 56px thumbnails of files in flight, with progress, Retry and Remove, and one line about failures. */
-export function MediaUploadTray({ uploader, className }: { uploader: MediaUploaderApi; className?: string }) {
+/**
+ * The thumbnails of files in flight, with progress, Retry and Remove, and one
+ * line about failures. `layout="row"` is 56px tiles in a wrapping row (the
+ * staff composer). `layout="grid"` is square tiles at least 88px wide in a
+ * fluid grid, where a failed photo keeps its picture inside the danger ring
+ * with a Retry pill near its bottom (docs/brand-guidelines.md, section 9
+ * Photos). `notice={false}` leaves the red line to the caller, for a screen
+ * that shows it under its own button (the contractor's Mark done).
+ */
+export function MediaUploadTray({
+  uploader,
+  layout = "row",
+  notice: showNotice = true,
+  className,
+}: {
+  uploader: MediaUploaderApi;
+  layout?: "row" | "grid";
+  notice?: boolean;
+  className?: string;
+}) {
   const { uploads, notice, retry, remove } = uploader;
   if (uploads.length === 0) return null;
+  const grid = layout === "grid";
   return (
     <div className={cn("space-y-1.5", className)}>
-      <ul className="flex flex-wrap gap-2">
+      <ul className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5 sm:gap-2" : "flex flex-wrap gap-2"}>
         {uploads.map((u) => (
-          <UploadTile key={u.key} upload={u} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
+          <UploadTile key={u.key} upload={u} grid={grid} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
         ))}
       </ul>
-      {notice && <p className="truncate text-xs text-danger">{notice}</p>}
+      {showNotice && notice && <p className="truncate text-xs text-danger">{notice}</p>}
     </div>
   );
 }
 
-function UploadTile({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onRetry: () => void; onRemove: () => void }) {
+function UploadTile({
+  upload: u,
+  grid,
+  onRetry,
+  onRemove,
+}: {
+  upload: MediaUpload;
+  grid: boolean;
+  onRetry: () => void;
+  onRemove: () => void;
+}) {
   const [broken, setBroken] = useState(false);
   const failed = u.status === "failed" || u.status === "invalid";
   const state =
@@ -420,7 +449,7 @@ function UploadTile({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onR
   return (
     <li
       aria-label={`${u.name}, ${state}`}
-      className="relative h-14 w-14 shrink-0 rounded-lg bg-fill-1"
+      className={cn("relative rounded-lg bg-fill-1", grid ? "aspect-square w-full" : "h-14 w-14 shrink-0")}
     >
       <div className="absolute inset-0 overflow-hidden rounded-lg">
         {u.previewUrl && !broken && u.kind === "image" && (
@@ -459,16 +488,31 @@ function UploadTile({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onR
           )}
         />
       </div>
-      {u.status === "failed" && (
-        <button
-          type="button"
-          onClick={onRetry}
-          aria-label={`Retry ${u.name}`}
-          className="absolute inset-0 flex items-center justify-center rounded-lg bg-photo-scrim/60 text-on-photo"
-        >
-          <RotateCw className="h-5 w-5" aria-hidden="true" />
-        </button>
-      )}
+      {u.status === "failed" &&
+        (grid ? (
+          // The pill from PhotoThumb: 32px, 8px above the bottom center, a 44px hit area.
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-label={`Retry ${u.name}`}
+            className={cn(
+              "absolute bottom-2 left-1/2 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-pill-bg px-3 text-meta font-medium text-pill-fg",
+              "after:absolute after:-inset-1.5",
+            )}
+          >
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+            Retry
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-label={`Retry ${u.name}`}
+            className="absolute inset-0 flex items-center justify-center rounded-lg bg-photo-scrim/60 text-on-photo"
+          >
+            <RotateCw className="h-5 w-5" aria-hidden="true" />
+          </button>
+        ))}
       <button
         type="button"
         onClick={onRemove}

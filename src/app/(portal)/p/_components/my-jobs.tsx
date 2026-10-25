@@ -2,9 +2,10 @@
 import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { SegmentedControl } from "@/components/segmented-control";
 import { StatusBadge } from "@/components/status-badge";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
 import {
   JOBS_GROUP_COOKIE,
@@ -82,20 +83,18 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
       {jobs.length === 0 ? (
         <EmptyState>{tab === "open" ? "No open jobs right now." : "No finished jobs yet."}</EmptyState>
       ) : (
-        <div className="space-y-6">
-          {groups.map((g, i) => (
-            <section key={g.key} aria-labelledby={`jobs-group-${i}`}>
-              <h2 id={`jobs-group-${i}`} className="mb-2 truncate text-xs font-medium text-muted">
-                {g.label}
-              </h2>
-              <ul className="space-y-2">
+        <div className="space-y-8 pointer-coarse:space-y-6">
+          {groups.map((g) => (
+            <Section key={g.key} title={<span className="block truncate">{g.label}</span>}>
+              {/* The rows sit on hairlines; the heading's rule is the first one. */}
+              <ul className="-mt-3 divide-y divide-line">
                 {g.jobs.map((job) => (
                   <li key={job.id}>
-                    <JobCardLink job={job} today={today} />
+                    <JobRow job={job} today={today} group={group} />
                   </li>
                 ))}
               </ul>
-            </section>
+            </Section>
           ))}
         </div>
       )}
@@ -104,33 +103,50 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
 }
 
 /**
- * The whole card opens the job (§6): the title with the "2 new" mark, then
- * the address and unit, then the Target, with the status in the same corner
- * on every card. A finished job's Target is only its old due date, so Done
- * cards leave it out, as the job page does.
+ * One job, 72px (docs/brand-guidelines.md, section 5 Density), the whole row
+ * opening it (§6): the property's photo (the fallback tile until HG's photos
+ * exist), the title with the "2 new" mark, then the address and unit and the
+ * Target, with the status as its mark and word in one fixed column. Below
+ * 480 the column drops and the status leads the subline instead, in its
+ * tone. The subline leads with what the group's heading doesn't say (the
+ * place By date, the Target By property), so on a narrow phone it's the
+ * repeated clause that runs out of room. A finished job's Target is only its
+ * old due date, so Done rows leave it out, as the job page does.
  */
-function JobCardLink({ job, today }: { job: JobCard; today: Ymd }) {
+function JobRow({ job, today, group }: { job: JobCard; today: Ymd; group: JobsGroup }) {
   const where = addressLine(job.address, job.unitLabel, { short: true });
   const target = job.target && isActiveStatus(job.status) ? targetLabel(job.target, today) : null;
+  const subline = (group === "property" ? [target, where] : [where, target]).filter(Boolean).join(" · ");
+  const street = job.address ? addressLine(job.address, null, { short: true }) : null;
 
   return (
     <Link
       href={`/p/jobs/${job.id}`}
-      className="block min-h-16 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm outline-none transition-colors hover:border-zinc-300 focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:border-zinc-600"
+      className="flex min-h-18 items-center gap-3 py-2.5 transition-colors hover:bg-fill-1 focus-visible:-outline-offset-2"
     >
-      <div className="flex items-start gap-3">
-        <p className="min-w-0 flex-1 truncate text-sm font-medium">{job.title}</p>
-        {job.newCount > 0 && (
-          <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium leading-4 text-primary-foreground">
-            {job.newCount} new
+      {/* The row's text names the place, so the photo is decoration here. */}
+      <span aria-hidden="true" className="shrink-0">
+        <PhotoThumb size={48} alt={street ? `Front of ${street}` : "No property"} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="min-w-0 truncate text-body font-medium text-fg-1">{job.title}</span>
+          {job.newCount > 0 && (
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-meta font-medium text-fg-1">
+              <span aria-hidden="true" className="size-2 rounded-full bg-act" />
+              {job.newCount} new
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 flex min-w-0 items-center gap-1 text-meta text-fg-3">
+          <span className="flex shrink-0 items-center gap-1 min-[480px]:hidden">
+            <StatusBadge status={job.status} />
+            {subline && <span aria-hidden="true">·</span>}
           </span>
-        )}
-      </div>
-      {where && <p className="mt-1 truncate text-xs text-muted">{where}</p>}
-      <div className="mt-1.5 flex items-center gap-3">
-        <p className="min-w-0 flex-1 truncate text-xs text-muted">{target}</p>
-        <StatusBadge status={job.status} className="shrink-0" />
-      </div>
+          {subline && <span className="min-w-0 truncate">{subline}</span>}
+        </span>
+      </span>
+      <StatusBadge status={job.status} className="w-28 shrink-0 max-[479px]:hidden" />
     </Link>
   );
 }
