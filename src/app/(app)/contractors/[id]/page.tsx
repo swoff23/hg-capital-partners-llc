@@ -50,9 +50,10 @@ function dayLabel(day: Ymd, today: Ymd): string {
 
 /**
  * One fact in the rail: a 112px label column (96 on phones) beside the value,
- * on a --line divider (section 5). An empty value is the dash in --fg-3.
+ * on a --line divider (section 5). An empty value is the dash in --fg-3. A
+ * label stays on one line, so a long one gets a shorter phone form.
  */
-function Detail({ label, children }: { label: string; children?: ReactNode }) {
+function Detail({ label, children }: { label: ReactNode; children?: ReactNode }) {
   return (
     <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-baseline gap-3 border-b border-line py-2.5 last:border-b-0 sm:grid-cols-[7rem_minmax(0,1fr)] pointer-coarse:py-3">
       <dt className="text-meta text-fg-3">{label}</dt>
@@ -111,6 +112,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
     // A record: capped at 1200, with a 320 rail beside the jobs once the page
     // is wide enough (docs/brand-guidelines.md, section 5). The rail comes
     // first in the markup, so a phone shows how to reach them before the jobs.
+    // The trade-off: beside Jobs, keyboard and screen reader order runs
+    // through the right-hand rail before the left-hand list.
     <div className="@container max-w-300">
       <BackLink fallback="/contractors" label="Contractors" />
       <div className="mt-2 mb-6">
@@ -150,7 +153,14 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               <Detail label="Email">
                 {c.email ? <ContactLink href={mailtoHref(c.email)}>{c.email}</ContactLink> : null}
               </Detail>
-              <Detail label="Mailing address">
+              <Detail
+                label={
+                  <>
+                    <span className="sm:hidden">Address</span>
+                    <span className="max-sm:hidden">Mailing address</span>
+                  </>
+                }
+              >
                 {c.mailingAddress ? (
                   <ContactLink href={mapsHref(c.mailingAddress)} newTab>
                     {c.mailingAddress}
@@ -160,7 +170,15 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               <Detail label="Billing">{c.billingInfo}</Detail>
               <Detail label="Availability">{c.availability}</Detail>
               <Detail label="W-9">{c.w9Url ? <DocLink href={c.w9Url} /> : w9OnFile ? "On file" : null}</Detail>
-              <Detail label="Insurance (COI)">{c.coiUrl ? <DocLink href={c.coiUrl} /> : coiOnFile ? "On file" : null}</Detail>
+              <Detail
+                label={
+                  <>
+                    Insurance<span className="max-sm:hidden"> (COI)</span>
+                  </>
+                }
+              >
+                {c.coiUrl ? <DocLink href={c.coiUrl} /> : coiOnFile ? "On file" : null}
+              </Detail>
             </dl>
             {c.comments && (
               <p className="whitespace-pre-wrap border-t border-line pt-3 text-meta text-fg-3">{c.comments}</p>
@@ -247,8 +265,12 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                             </Link>
                           </>
                         )}
+                        {/* Red belongs to the late date alone, not its separator. */}
                         {date && (
-                          <span className={cn("num @min-[30rem]:hidden", late && "text-danger")}> · {date}</span>
+                          <span className="num @min-[30rem]:hidden">
+                            {" · "}
+                            <span className={cn(late && "text-danger")}>{date}</span>
+                          </span>
                         )}
                       </p>
                     </div>

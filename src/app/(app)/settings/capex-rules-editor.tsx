@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button, PageHeader, Section } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
@@ -39,8 +39,9 @@ const parseNum = (s: string) => {
 /**
  * One row of the rules table, on a --line divider. Its delete shows under the
  * pointer with a mouse (a named group, so only this row's, not every row in
- * the section), on keyboard focus, and always on touch, where there's no
- * hover to find it.
+ * the section) and while focus is anywhere in the row: a keyboard tabbing
+ * through it, or a tap into one of its fields on touch, where there's no
+ * hover. Touch is tap to reveal, never a trash on every row.
  */
 function RuleRow({
   label,
@@ -54,14 +55,29 @@ function RuleRow({
   canRemove: boolean;
   children: React.ReactNode;
 }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  // The hidden delete still takes taps (opacity keeps its 44px slot), so a touch
+  // or pen press on it while nothing in the row has focus only reveals it, and a
+  // stray tap at a row's end can't delete a rule. Read at pointerdown, before the
+  // press moves focus.
+  const revealOnly = useRef(false);
   return (
-    <div className={cn(rowGrid, "group/row py-1.25 transition-colors hover:bg-fill-1 pointer-coarse:py-0.5")}>
+    <div ref={rowRef} className={cn(rowGrid, "group/row py-1.25 transition-colors hover:bg-fill-1 pointer-coarse:py-0.5")}>
       {children}
       {canRemove ? (
         <RemoveButton
-          onClick={onRemove}
+          onPointerDown={(e) => {
+            revealOnly.current = e.pointerType !== "mouse" && !rowRef.current?.matches(":focus-within");
+          }}
+          onClick={(e) => {
+            // A keyboard's click (detail 0) always deletes: it can only reach a shown button.
+            const reveal = revealOnly.current && e.detail > 0;
+            revealOnly.current = false;
+            if (reveal) e.currentTarget.focus();
+            else onRemove();
+          }}
           aria-label={`Remove ${label || "this row"}`}
-          className="justify-self-end opacity-0 transition-[opacity,color] group-hover/row:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+          className="justify-self-end opacity-0 transition-[opacity,color] group-focus-within/row:opacity-100 group-hover/row:opacity-100"
         />
       ) : (
         <span />
@@ -352,9 +368,17 @@ export function CapexRulesEditor({
       <Section
         title="Building systems"
         actions={
-          <div className="flex items-center gap-4">
-            <AddButton onClick={addBuildingSystem}>Add system</AddButton>
-            {missingCoreTypes.length > 0 && <AddButton onClick={addCoreSystem}>Add {missingCoreTypes[0]}</AddButton>}
+          // Below sm the pair drops its Plus icons and sits 12px apart, so at 320
+          // "Building systems" keeps room for its longest word beside "Add Water Heater".
+          <div className="flex items-center gap-3 sm:gap-4">
+            <AddButton tight onClick={addBuildingSystem}>
+              Add system
+            </AddButton>
+            {missingCoreTypes.length > 0 && (
+              <AddButton tight onClick={addCoreSystem}>
+                Add {missingCoreTypes[0]}
+              </AddButton>
+            )}
           </div>
         }
       >

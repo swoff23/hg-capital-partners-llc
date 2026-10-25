@@ -138,9 +138,11 @@ export function PortalAccessCard({
               </dd>
             </dl>
             {account.state !== "off" && (
-              // Side by side where they fit; stacked full width in a column
-              // narrower than 320, so neither label wraps (a 320 phone).
-              <div className="flex flex-col gap-2 @xs:flex-row @xs:items-center">
+              // Side by side where they fit, stacked full width where they don't,
+              // so neither label wraps. At touch sizes the pair needs 326px, so
+              // the 320 rail beside Jobs on an iPad stacks them; a mouse's
+              // smaller pair (292px) fits from 320.
+              <div className="flex flex-col gap-2 @xs:pointer-fine:flex-row @xs:pointer-fine:items-center @min-[21rem]:flex-row @min-[21rem]:items-center">
                 <Button variant="secondary" size="sm" disabled={pending} onClick={() => setConfirm("reset")}>
                   Reset password
                 </Button>

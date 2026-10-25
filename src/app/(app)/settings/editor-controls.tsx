@@ -21,9 +21,16 @@ export const quietField = cn(
 
 /**
  * "Add item" in a section's heading: a standalone action known by its Plus,
- * in ink, underlined on hover. 44px tall on touch.
+ * in ink, underlined on hover. 44px tall on touch. `tight` drops the Plus
+ * below sm, for two adds sharing a heading: at 320 the pair would otherwise
+ * squeeze the title narrower than its longest word.
  */
-export function AddButton({ className, children, ...props }: ComponentProps<"button">) {
+export function AddButton({
+  className,
+  children,
+  tight = false,
+  ...props
+}: ComponentProps<"button"> & { tight?: boolean }) {
   return (
     <button
       type="button"
@@ -34,7 +41,7 @@ export function AddButton({ className, children, ...props }: ComponentProps<"but
       )}
       {...props}
     >
-      <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <Plus className={cn("h-4 w-4 shrink-0", tight && "max-sm:hidden")} aria-hidden="true" />
       {children}
     </button>
   );

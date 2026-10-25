@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { Button } from "@/components/ui";
+import { Code } from "@/components/code";
 
 /**
  * Error boundary for every signed-in page. Uncaught exceptions from a page or
@@ -29,9 +30,10 @@ export default function AppError({
       <Button className="mt-4" onClick={() => retry()}>
         Try again
       </Button>
+      {/* A code read character by character, so Code: one tap copies it for support. */}
       {error.digest && (
         <p className="mt-6 text-meta text-fg-3">
-          Ref <span className="font-mono">{error.digest}</span>
+          Ref <Code value={error.digest} label="Error reference" />
         </p>
       )}
     </div>
