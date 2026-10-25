@@ -10,7 +10,7 @@ import { PhotoCarousel } from "./photo-carousel";
 
 export const metadata: Metadata = {
   title: { absolute: `Rentals | ${BRAND.company}` },
-  description: "Available apartments in Buffalo, New York.",
+  description: "Apartments for rent in Buffalo, New York.",
 };
 
 export const dynamic = "force-dynamic";
@@ -75,7 +75,7 @@ export default async function RentalsPage() {
   return (
     <main className={cn(publicContainer, "py-10 sm:py-12")}>
       <Eyebrow>{available > 0 ? `Rentals · ${available} available` : "Rentals · None available"}</Eyebrow>
-      <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>Available apartments in Buffalo.</h1>
+      <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>Apartments in Buffalo.</h1>
 
       {available === 0 && (
         <p className={cn(publicType.lead, "mt-3 max-w-xl text-fg-3")}>

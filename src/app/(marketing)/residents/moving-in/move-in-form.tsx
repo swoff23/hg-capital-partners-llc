@@ -299,9 +299,17 @@ function SectionBlock({
       actions={
         section.repeatable &&
         instances.length < section.maxCount && (
-          <Button type="button" variant="ghost" size="sm" onClick={onAdd}>
+          // The room stays in the accessible name; the visible label is short, so
+          // the header fits at 320 whatever the room is called in /settings.
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onAdd}
+            aria-label={`Add another ${section.label.toLowerCase()}`}
+          >
             <Plus aria-hidden="true" className="size-4 stroke-[1.5]" />
-            Add another {section.label.toLowerCase()}
+            Add another
           </Button>
         )
       }
@@ -330,12 +338,14 @@ function SectionBlock({
                 const answer = inst.items[item.key] ?? { rating: "", comment: "" };
                 return (
                   <div key={item.key} className="py-3">
-                    {/* On a narrow phone the control drops under its label: two lines, never a wrapped control. */}
-                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                    {/* Below 640 every item's control sits under its label, from 640 beside it:
+                        the width decides, not the label's length, so the controls line up. */}
+                    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                       <span className="text-body text-fg-1">{item.label}</span>
                       <SegmentedControl
                         aria-label={`${item.label} condition`}
                         options={RATING_OPTIONS}
+                        size="md"
                         value={answer.rating || null}
                         // Picking the chosen rating again clears it.
                         onChange={(r) => onItemChange(i, item.key, { rating: answer.rating === r ? "" : r })}

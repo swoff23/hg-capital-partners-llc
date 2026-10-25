@@ -33,7 +33,10 @@ export function PublicHeader() {
   return (
     <header className="border-b border-line">
       <div className={cn(publicContainer, "flex h-16 items-center justify-between gap-4")}>
-        <Link href="/" className={cn(publicType.wordmark, "text-fg-1", publicLinkHover)}>
+        <Link
+          href="/"
+          className={cn(publicType.wordmark, "inline-flex items-center text-fg-1 pointer-coarse:min-h-11", publicLinkHover)}
+        >
           {BRAND.company}
         </Link>
 

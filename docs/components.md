@@ -121,7 +121,7 @@ Two surfaces: the app (`app/(app)`) and the contractor portal (`app/(portal)`) u
 | Property photo | `components/photo-thumb.tsx` `PhotoThumb` | `size` 32 (square, search and Home rows), 48 (48x36, Portfolio rows), 96 (96x72, record header) or `full` (16:9). `next/image` over `--fill-1` with a 200ms fade and the photo edge on top; no photo is the `House` fallback tile. `status` pill top-left; `failed` rings it in `--danger`, and `onRetry` adds a Retry pill. An `/api/files/` route is always unoptimized (the optimizer sends no cookies); `unoptimized` for any other session-checked route. Public Blob photos from our store are allowed in `next.config.ts`. `preload` for the one photo above the fold. `alt` names the place |
 | Horizontal bars | `app/(app)/financials/_components/ui.tsx` `MoneyBars` | Same idiom as `app/(app)/portfolio-capex.tsx` |
 | Data source and freshness | `app/(app)/financials/_components/ui.tsx` `SourceBadge` | QuickBooks basis and last sync |
-| Listing photos | `app/(marketing)/rentals/photo-carousel.tsx` `PhotoCarousel` | Public site. A borderless 4:3 strip, `rounded-lg`: scroll-snap swipe on touch, arrows on hover or focus with a mouse, a "1 / 8" counter and a `status` pill on the photo tokens, the `House` tile when there are no photos |
+| Listing photos | `app/(marketing)/rentals/photo-carousel.tsx` `PhotoCarousel` | Public site. A borderless 4:3 strip, `rounded-lg`: scroll-snap swipe on touch, arrows on hover or focus with a mouse, a "1 / 8" counter and a `status` pill on the photo tokens. Each photo fades in over `--fill-1`; no photos, or one that won't load, is the `House` tile |
 
 ## Icons
 
@@ -164,7 +164,7 @@ Use the pick; folding a copy into it is welcome when you're already in that file
 | Outside-click popover | `GlobalSearch` wires its own `mousedown` listener | `components/popover.tsx` `Popover` |
 | Age in years | `fmtAge` in `properties/[id]/capex-outlook.tsx`, `building-capex.tsx` and `edit-units.tsx`; `fmtYrs` in `settings/capex-rules-editor.tsx` | Move one into `lib/` |
 | Button | `Button` in 20 files; about 50 raw `<button>`s, many icon or link style | `Button`; add a variant before hand-rolling |
-| Text field | `Input`, `Select`, `Textarea` in 9 files; about 60 raw fields (filter bars at `h-8 text-xs`, inline edits) | `Input` and friends; add a small size for filter bars |
+| Text field | `Input`, `Select`, `Textarea` in 9 files; about 60 raw fields (filter bars at `h-8 text-xs`, inline edits, the quiet comment field on each move-in report item) | `Input` and friends; add a small size for filter bars |
 | Section card with an Edit link | `SectionCard`, plus hand-rolled boxed headers in `app/(app)/properties/[id]/edit-units.tsx`, `edit-listings.tsx` and `building-capex.tsx` (same `pointer-coarse:` reveal for Edit; still boxed until slice 4) | `SectionCard`, or `Section` without edit mode |
 
 ## Known gaps

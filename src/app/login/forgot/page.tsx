@@ -5,6 +5,7 @@ import { brandTokensDark } from "@/lib/brand-tokens";
 import { BRAND } from "@/lib/brand";
 import { getEnv } from "@/lib/env";
 import { requestPasswordReset } from "../actions";
+import { Input } from "@/components/ui";
 import { AuthFrame, AuthNotice, authInputClass, authLinkClass } from "../_components/auth-frame";
 import { AuthSubmit } from "../_components/auth-submit";
 
@@ -31,7 +32,7 @@ export default async function ForgotPasswordPage({ searchParams }: PageProps<"/l
         <AuthNotice>If that email has a login, a link is on its way.</AuthNotice>
       ) : (
         <form action={requestPasswordReset} className="mt-8 space-y-3 text-left">
-          <input
+          <Input
             name="email"
             type="email"
             placeholder="Email"

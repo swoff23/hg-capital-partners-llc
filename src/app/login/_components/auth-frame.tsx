@@ -1,7 +1,6 @@
 import { PublicHeader } from "@/components/public/header";
 import { PublicFooter } from "@/components/public/footer";
 import { Eyebrow, publicContainer, publicCtaClass, publicLinkHover, publicType } from "@/components/public/ui";
-import { fieldClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,8 +41,8 @@ export function AuthFrame({
   );
 }
 
-/** The app's field in the public material: 40px to match the CTA, placeholders in --pub-faint. */
-export const authInputClass = cn(fieldClass, "h-10 placeholder:text-pub-faint");
+/** For the app's `Input` in the public material: 40px to match the CTA, placeholders in --pub-faint. */
+export const authInputClass = "h-10 placeholder:text-pub-faint";
 
 /** The public CTA, full width. */
 export const authButtonClass = cn(publicCtaClass, "mt-1 w-full");

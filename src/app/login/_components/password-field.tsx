@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { authInputClass } from "./auth-frame";
 
@@ -18,7 +19,7 @@ export function PasswordField(props: Omit<React.ComponentProps<"input">, "type" 
   const [shown, setShown] = useState(false);
   return (
     <div className="relative">
-      <input
+      <Input
         {...props}
         type={shown ? "text" : "password"}
         autoCapitalize="none"
