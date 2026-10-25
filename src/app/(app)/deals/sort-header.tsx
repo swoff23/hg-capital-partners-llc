@@ -1,27 +1,32 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronUp } from "lucide-react";
 import { thClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ResizeHandle, type ColumnKey } from "./column-widths";
 
 export type SortField = "address" | "status" | "units" | "theirPrice" | "ourPrice" | "nextAction" | "updated";
 
-// No ?sort param means "grouped by pipeline status" — same default as the DB query in page.tsx.
+// No ?sort param means "grouped by pipeline status", the same default as the DB query in page.tsx.
 const DEFAULT_SORT = "status";
 
-
-/** A clickable table header: 1st click sorts ascending, 2nd descending, 3rd clears. */
+/**
+ * A clickable table header on the Th look (thClass): 1st click sorts
+ * ascending, 2nd descending, 3rd clears. `numeric` right-aligns it over a
+ * money or count column, with the caret ahead of the label so the label's
+ * end lines up with the figures under it.
+ */
 export function SortHeader({
   label,
   field,
   className,
-  align = "left",
+  numeric = false,
   resizeKey,
 }: {
   label: string;
   field: SortField;
   className?: string;
-  align?: "left" | "right";
+  numeric?: boolean;
   resizeKey?: ColumnKey;
 }) {
   const router = useRouter();
@@ -39,38 +44,31 @@ export function SortHeader({
     router.push(`/deals?${next.toString()}`);
   }
 
-  const caret = (
-    <svg
-      viewBox="0 0 12 12"
-      className={cn(
-        "h-3 w-3 transition-opacity",
-        active ? "opacity-100" : "opacity-0 group-hover:opacity-40",
-        desc && "rotate-180",
-      )}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      aria-hidden
-    >
-      <path d="M3 7.5l3-3 3 3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-
   return (
     <th
       aria-sort={active ? (desc ? "descending" : "ascending") : "none"}
-      className={cn(thClass, align === "right" ? "text-right" : "text-left", className)}
+      className={cn(thClass, numeric && "text-right", className)}
     >
       <button
         type="button"
         onClick={toggle}
         className={cn(
-          "group inline-flex items-center gap-1 transition-colors hover:text-fg-1",
+          "group relative inline-flex max-w-full items-center gap-1 transition-colors hover:text-fg-1",
+          // A 44px target on touch without growing the header row.
+          "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3",
+          numeric && "flex-row-reverse",
           active && "text-fg-1",
         )}
       >
-        {label}
-        {caret}
+        <span className="truncate">{label}</span>
+        <ChevronUp
+          aria-hidden="true"
+          className={cn(
+            "size-3.5 shrink-0 transition-opacity",
+            active ? "opacity-100" : "opacity-0 group-hover:opacity-60",
+            desc && "rotate-180",
+          )}
+        />
       </button>
       {resizeKey && <ResizeHandle columnKey={resizeKey} />}
     </th>

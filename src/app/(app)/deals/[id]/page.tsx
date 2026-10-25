@@ -1,28 +1,22 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Button, Card, CardBody, CardHeader, CardTitle, Textarea, TextLink } from "@/components/ui";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { Button, Section, Textarea, TextLink } from "@/components/ui";
+import { cn, fmtDateTime } from "@/lib/utils";
+import { todayYmdEastern } from "@/lib/dates";
 import { BackLink } from "@/components/back-link";
 import { ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
 import { addDealNote } from "../actions";
-import {
-  AddressField,
-  StatusControl,
-  PassReasonControl,
-  PriceField,
-  UnitsField,
-  NextActionField,
-  ListingUrlField,
-} from "./deal-detail";
+import { DealPriceField, DealStageField, DealTextField, DealUnitsField } from "../deal-fields";
+import { noteDay } from "../format";
+import { AddressField, ListingUrlField, PassReasonControl } from "./deal-detail";
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** A details row: a 112px label column (96px on phones) beside the value, on a hairline (section 5). */
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-[2.75rem] items-center gap-4 border-b border-border/60 last:border-0">
-      <dt className="w-32 shrink-0 text-xs font-medium uppercase tracking-wide text-muted">
-        {label}
-      </dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
+    <div className="grid min-h-10 grid-cols-[6rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-1 last:border-0 sm:grid-cols-[7rem_minmax(0,1fr)] pointer-coarse:min-h-12">
+      <dt className="text-meta text-fg-3">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
     </div>
   );
 }
@@ -33,98 +27,125 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
   const deal = await prisma.deal.findUnique({
     where: { id },
     include: {
-      notes: { orderBy: [{ noteDate: "desc" }, { createdAt: "desc" }] },
+      // Undated imported lines go last, as on the list; Postgres would put them first.
+      notes: { orderBy: [{ noteDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }] },
       convertedProperty: { select: { id: true, address: true } },
     },
   });
   if (!deal) notFound();
 
   const addNote = addDealNote.bind(null, deal.id);
+  const today = todayYmdEastern();
+  const field = "h-8";
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-4">
+    // A record: 1200 wide at most, with the details in a 320 rail from lg (section 5).
+    <div className="max-w-300">
+      <div className="mb-8 pointer-coarse:mb-6">
         <BackLink fallback="/deals" label="Deals" />
         <div className="mt-1">
           <AddressField id={deal.id} value={deal.address} />
         </div>
         {deal.convertedProperty && (
-          <p className="mt-1 text-xs text-muted">
-            Converted →{" "}
+          <p className="mt-1 text-meta text-fg-3">
+            Converted to{" "}
             <TextLink href={`/properties/${deal.convertedProperty.id}`}>{deal.convertedProperty.address}</TextLink>
           </p>
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Deal</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <dl className="rounded-lg border border-border px-3">
-            <Row label="Status">
-              <StatusControl id={deal.id} status={deal.status} />
-            </Row>
-            <Row label="Their price">
-              <PriceField id={deal.id} value={deal.theirPriceRaw} which="their" />
-            </Row>
-            <Row label="Our price">
-              <PriceField id={deal.id} value={deal.ourPriceRaw} which="our" />
-            </Row>
-            <Row label="Units">
-              <UnitsField id={deal.id} value={deal.units} />
-            </Row>
-            <Row label="Next action">
-              <NextActionField id={deal.id} value={deal.nextAction} />
-            </Row>
-            <Row label="Listing URL">
-              <ListingUrlField id={deal.id} value={deal.sourceUrl} />
-            </Row>
-            {deal.status === "Pass" && (
-              <Row label="Pass reason">
-                <PassReasonControl id={deal.id} value={deal.passReason} />
-              </Row>
-            )}
-          </dl>
-        </CardBody>
-      </Card>
+      <div className="grid grid-cols-1 gap-8 pointer-coarse:gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10">
+        {/* First in reading order, so a phone shows the deal before its history; the rail from lg. */}
+        <aside className="min-w-0 lg:col-start-2 lg:row-start-1">
+          <Section title="Details">
+            <dl>
+              <DetailRow label="Status">
+                <DealStageField id={deal.id} status={deal.status} fieldSize="sm" />
+              </DetailRow>
+              <DetailRow label="Their price">
+                <DealPriceField
+                  id={deal.id}
+                  which="their"
+                  raw={deal.theirPriceRaw}
+                  amount={deal.theirPrice ? Number(deal.theirPrice) : null}
+                  className={field}
+                />
+              </DetailRow>
+              <DetailRow label="Our price">
+                <DealPriceField
+                  id={deal.id}
+                  which="our"
+                  raw={deal.ourPriceRaw}
+                  amount={deal.ourPrice ? Number(deal.ourPrice) : null}
+                  className={field}
+                />
+              </DetailRow>
+              <DetailRow label="Units">
+                <DealUnitsField id={deal.id} value={deal.units} className={field} />
+              </DetailRow>
+              <DetailRow label="Next action">
+                <DealTextField
+                  id={deal.id}
+                  value={deal.nextAction}
+                  patchKey="nextAction"
+                  label="Next action"
+                  placeholder="What's next?"
+                  className={field}
+                />
+              </DetailRow>
+              <DetailRow label="Listing URL">
+                <ListingUrlField id={deal.id} value={deal.sourceUrl} />
+              </DetailRow>
+              {deal.status === "Pass" && (
+                <DetailRow label="Pass reason">
+                  <PassReasonControl id={deal.id} value={deal.passReason} />
+                </DetailRow>
+              )}
+            </dl>
+          </Section>
+        </aside>
 
-      <Card className="mt-4">
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle>Activity timeline</CardTitle>
-          <span className="text-xs text-muted">{deal.notes.length} entries</span>
-        </CardHeader>
-        <CardBody className="space-y-4">
-          <form action={addNote} className="flex gap-2">
-            <Textarea name="body" rows={2} placeholder="Add a note…" className="flex-1" />
-            <Button type="submit" className="self-end">
-              Add
-            </Button>
-          </form>
-          <ActivityTimeline className="max-h-[520px] overflow-y-auto">
-            {deal.notes.map((n) => {
-              const isChange = n.source === "change";
-              return (
-                <ActivityItem key={n.id} marker={isChange ? "muted" : "primary"}>
-                  <div className="text-[11px] text-muted">
-                    {n.noteDate ? fmtDate(n.noteDate) : fmtDateTime(n.createdAt)}
-                    {n.source === "manual" && <span className="ml-1">· note</span>}
-                    {n.source === "migration" && <span className="ml-1">· imported</span>}
-                  </div>
-                  <p
-                    className={
-                      isChange ? "whitespace-pre-wrap text-xs text-muted" : "whitespace-pre-wrap text-sm"
-                    }
-                  >
-                    {n.body}
-                  </p>
-                </ActivityItem>
-              );
-            })}
-            {deal.notes.length === 0 && <li className="text-sm text-muted">No activity yet.</li>}
-          </ActivityTimeline>
-        </CardBody>
-      </Card>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <Section
+            title={
+              <>
+                Activity
+                <span className="num ml-1.5 text-meta text-fg-3">{deal.notes.length}</span>
+              </>
+            }
+          >
+            <form action={addNote} className="flex items-end gap-2">
+              <Textarea name="body" rows={2} placeholder="Add a note…" aria-label="Add a note" className="flex-1" />
+              <Button type="submit">Add</Button>
+            </form>
+            <ActivityTimeline className="mt-4">
+              {deal.notes.map((n) => {
+                const isChange = n.source === "change";
+                return (
+                  <ActivityItem key={n.id} marker={isChange ? "muted" : "primary"}>
+                    <div className="num text-meta text-fg-3">
+                      {n.noteDate
+                        ? noteDay({ noteDate: n.noteDate, source: n.source }, today)
+                        : fmtDateTime(n.createdAt)}
+                      {n.source === "manual" && " · note"}
+                      {n.source === "migration" && " · imported"}
+                    </div>
+                    <p
+                      className={cn(
+                        "whitespace-pre-wrap text-pretty [overflow-wrap:anywhere]",
+                        isChange ? "text-meta text-fg-2" : "text-body text-fg-1",
+                      )}
+                    >
+                      {n.body}
+                    </p>
+                  </ActivityItem>
+                );
+              })}
+              {deal.notes.length === 0 && <li className="text-body text-fg-3">No activity yet.</li>}
+            </ActivityTimeline>
+          </Section>
+        </div>
+      </div>
     </div>
   );
 }
