@@ -15,7 +15,7 @@ import {
 } from "react-aria-components";
 import { Popover } from "@/components/popover";
 import { Sheet } from "@/components/sheet";
-import { pickerChip } from "@/components/ui";
+import { Kbd, pickerChip } from "@/components/ui";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { dueLabel, fmtDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { quickPickForKey, quickPicks, type QuickPickKey } from "@/lib/quick-dates";
@@ -161,6 +161,8 @@ function DuePanel({
               <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
               <span className="flex-1">{p.label}</span>
               {p.hint && <span className="whitespace-nowrap pl-6 text-xs text-muted">{p.hint}</span>}
+              {/* Its key, printed for a mouse; Kbd hides on touch. */}
+              <Kbd aria-hidden="true">{i + 1}</Kbd>
             </AriaButton>
           );
         })}

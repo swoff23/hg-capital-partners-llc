@@ -79,7 +79,9 @@ export function AppShell({
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
-          className={cn(chromeButtonClass, "-ml-2 pointer-coarse:-ml-3 lg:hidden")}
+          // Its icon centers on the drawer's icon column (x 32): the 32px button
+          // starts at the 16px gutter, the 44px touch one 6px before it.
+          className={cn(chromeButtonClass, "pointer-coarse:-ml-1.5 lg:hidden")}
         >
           <Menu aria-hidden="true" className={chromeIconClass} />
         </button>
@@ -114,7 +116,10 @@ export function AppShell({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={cn(
-          "fixed bottom-0 left-0 top-(--app-bar-h) z-40 flex flex-col overflow-hidden border-r border-line bg-canvas p-2",
+          // Below lg the drawer scrolls, so a phone held sideways still reaches
+          // every item and the footer. Across it stays clipped, which is how
+          // the collapsed rail hides its labels.
+          "fixed bottom-0 left-0 top-(--app-bar-h) z-40 flex flex-col overflow-hidden border-r border-line bg-canvas p-2 max-lg:overflow-y-auto max-lg:overscroll-contain",
           "w-64 transition-transform duration-sheet ease-spring lg:transition-[width]",
           // The phone drawer is the Overlay level; the rail, opened by hover over the page, floats.
           mobileOpen ? "translate-x-0 shadow-overlay" : "-translate-x-full lg:translate-x-0",
@@ -150,7 +155,7 @@ export function AppShell({
         <SideNav collapsed={!expanded && !mobileOpen} onNavigate={() => setMobileOpen(false)} />
 
         <div className="mt-auto border-t border-line pt-2">
-          <div className="flex items-center justify-between px-2 py-1.5 lg:hidden">
+          <div className="flex items-center justify-between px-2 py-1.5 lg:hidden pointer-coarse:py-0">
             <span className="text-meta font-medium text-fg-2">Appearance</span>
             <ThemeToggle />
           </div>
@@ -160,7 +165,11 @@ export function AppShell({
             <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
               <div className="truncate text-meta font-medium text-fg-1">{userLabel}</div>
               <form action={signOutAction}>
-                <button className="text-meta text-fg-3 transition-colors hover:text-fg-1" type="submit">
+                {/* A 44px target on touch, like every control in the drawer. */}
+                <button
+                  className="flex w-fit items-center text-meta text-fg-3 transition-colors hover:text-fg-1 pointer-coarse:min-h-11"
+                  type="submit"
+                >
                   Sign out
                 </button>
               </form>
@@ -175,8 +184,11 @@ export function AppShell({
           pinned ? "lg:pl-60" : "lg:pl-16",
         )}
       >
-        <main className="min-h-[calc(100vh-var(--app-bar-h))] p-4 md:p-6">
-          <div className="mx-auto max-w-6xl">{children}</div>
+        {/* Page gutters 16 / 24 / 32 (phone, tablet, desktop). Lists run full
+            width to 1600, anchored to the sidebar; a record page sets its own
+            1200 cap (docs/brand-guidelines.md, section 5). */}
+        <main className="min-h-[calc(100vh-var(--app-bar-h))] p-4 md:p-6 lg:p-8">
+          <div className="max-w-400">{children}</div>
         </main>
       </div>
     </div>

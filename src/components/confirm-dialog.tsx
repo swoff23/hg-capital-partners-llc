@@ -14,9 +14,10 @@ import { Button, Kbd } from "@/components/ui";
  * dialog draws the Cancel button itself (`cancelLabel`: "Keep it", "Keep
  * editing"), with its Esc key printed beside it for a mouse. `actions` holds
  * the rest, the primary last: a destructive confirm is a `destructive`
- * Button that names what goes ("Delete task"). Below sm, three actions stack
- * full width with the primary on top, as Apple's alerts do. `busy` holds it
- * open, Cancel disabled, while the action runs.
+ * Button that names what goes ("Delete task"). Below sm the actions stack
+ * full width with the primary on top, however many there are, as Apple's
+ * alerts do when labels don't fit side by side, so no label wraps at 320.
+ * `busy` holds it open, Cancel disabled, while the action runs.
  */
 export function ConfirmDialog({
   title,
@@ -51,7 +52,7 @@ export function ConfirmDialog({
             {title}
           </Heading>
           {body && <div className="mt-1 text-body text-fg-2">{body}</div>}
-          <div className="mt-4 flex items-center justify-end gap-2 max-sm:[&:has(>:nth-child(3))]:flex-col-reverse max-sm:[&:has(>:nth-child(3))]:items-stretch">
+          <div className="mt-4 flex items-center justify-end gap-2 max-sm:flex-col-reverse max-sm:items-stretch">
             <Button size="sm" variant="secondary" disabled={busy} onClick={onClose} aria-keyshortcuts="Escape">
               {cancelLabel}
               {/* With a mouse only, and from sm, where the footer has room for it. */}

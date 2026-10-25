@@ -8,7 +8,7 @@ import { monogramSvg } from "@/lib/monogram-art";
  * tokens. Built once at build time, like any static icon route.
  */
 export function monogramImage(px: number, { bleed = false }: { bleed?: boolean } = {}): ImageResponse {
-  const src = "data:image/svg+xml," + encodeURIComponent(monogramSvg({ bleed, darkEdge: false }));
+  const src = "data:image/svg+xml," + encodeURIComponent(monogramSvg({ bleed, darkEdge: false, px }));
   return new ImageResponse(
     // The image renderer (Satori) takes a plain <img>; next/image doesn't apply here.
     // eslint-disable-next-line @next/next/no-img-element

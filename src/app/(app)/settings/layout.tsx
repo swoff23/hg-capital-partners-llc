@@ -9,8 +9,10 @@ import { TopTabs } from "@/components/nav";
  */
 export default async function SettingsLayout({ children }: LayoutProps<"/settings">) {
   await requireUser();
+  // Capped at 1200 (docs/brand-guidelines.md, section 5, records): its rows
+  // pair a label with a control at the far edge, which drift apart at 1600.
   return (
-    <div className="space-y-4">
+    <div className="max-w-300 space-y-4">
       <TopTabs
         base="/settings"
         tabs={[

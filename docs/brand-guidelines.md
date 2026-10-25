@@ -61,7 +61,7 @@ One token per role. Desktop is `pointer: fine`; touch is `pointer: coarse` (phon
 
 - Type tokens go in `@theme`, not `@theme inline`, so each utility reads the variable and the one `pointer: coarse` block reaches every call site.
 - A `--text-*` token carries size, line height, weight and tracking only. `text-code` and `text-code-l` pair with `font-mono` (the `Code` component sets both), and the figure tokens get tabular figures from the plain rule above.
-- The phone title collapse: once the page h1 scrolls under the 52px phone top bar, the bar shows the title at 17 / 22, 600.
+- No phone title collapse in this rollout: the 52px phone top bar's middle holds search. If search ever moves to an icon there, the bar shows the page title at 17 / 22, 600 once the h1 scrolls under it.
 - Nothing under 12px anywhere. Touch inputs stay 16px (the existing iOS guard in `globals.css`).
 - Weight carries hierarchy, never state. Figures get hierarchy from size and position, not weight, as Mercury does.
 - No uppercase in the app. Table headers and field labels are sentence case at `text-meta`.
@@ -252,7 +252,7 @@ Two tokens are public-only.
 
 ### HG monogram and wordmarks
 
-- **Monogram.** "HG" in Geist 600 at -0.04em, `--gold` on an `--ink-tile` square. Radius 22% of the size (6px at 24, 7px at 32); full bleed at 180 for `apple-icon`, where iOS masks it.
+- **Monogram.** "HG" in Geist 600 at -0.04em, `--gold` on an `--ink-tile` square. Radius 22% of the size, rounded to whole pixels (5px at 24, 7px at 32), with the letters centered on cap height, not the line box; full bleed at 180 for `apple-icon`, where iOS masks it.
 - **Sizes.** 16 favicon (the minimum), 24 sidebar and phone top bar, 32 portal header and emails, 180 `apple-icon`, 512 home-screen icon. Clear space is 25% of the tile on every side.
 - **On dark grounds** the tile keeps its ink and adds a 1px `--line` edge. It is never redrawn as gold letters alone ([Mercury tile](https://mobbin.com/screens/d575358b-679b-4d52-aa98-5026970291b3)).
 - **Wordmarks.** App: tile plus "HG Capital" in `text-label` 600 `--fg-1`; on phones the words drop. Portal: "HG Jobs". Public: "HG CAPITAL PARTNERS" in Geist 500, 13px caps at 0.28em. Emails and PDFs: tile plus "HG Capital Partners" over a 1px `--gold-deep` rule. Never "HG Capital OS".
@@ -338,10 +338,11 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 - **Segmented control:** `--fill-1` track, `rounded-md`, 2px padding and 2px between segments; segments are `rounded-sm` and 4px shorter than the control. The selected segment is `--surface` with a `--line-control` edge (3.42 / 3.65 vs the track), same weight, `aria-pressed`.
 - **Menus and listboxes:** hover and keyboard focus use `--fill-2`; the chosen option carries a lucide `Check` in `--fg-1` at its trailing edge, so the pick never rests on a fill.
 - **Calendar:** today carries a 1px inset `--line-control` ring at the same weight as other days; the picked day is the `--act` fill ([Material date picker](https://m3.material.io/components/date-pickers/guidelines)).
-- **Avatar:** `--surface` ground with a 1px `--line-strong` edge and `--fg-2` initials, so it holds on any fill, including a highlighted listbox row. 20 and 24px avatars show one initial at 12px; 28px and up show two.
+- **Avatar:** `--surface` ground with a 1px `--line-strong` edge and `--fg-2` initials at 12px, so it holds on any fill, including a highlighted listbox row. 20px avatars show one initial; 24px and up show two, so two people who share a first letter stay apart. Team members are round; contractors are `rounded-sm` squares, so who's in-house reads without color (GitHub draws people round and organizations square).
 - **Tabs** (`TopTabs`): idle `--fg-2`, selected `--fg-1` with a 2px `--act` underline, both 500, counts in `--fg-3`; `role="tab"` and `aria-selected`. The row clips at a `--line` divider.
 - **Sidebar:** `--canvas`. Items 32px, `rounded-md`. Idle label `--fg-2`, icon `--fg-3`, hover `--fill-1`. Current item: `--fill-2`, label and icon `--fg-1`, and a 2px by 16px `--act` notch at the left edge (12.86 / 12.22). The notch is invented: references select with a fill alone at about 1.2:1.
-- **Phone tab bar:** `--canvas` with a `--line` rule above. 20px `--fg-3` icons over 12 / 16 500 labels in `--fg-2`. The current tab is `--fg-1` with a 16 by 2px `--act` notch on the bar's top edge.
+- **Desktop header** (from `lg`): `--surface` with a `--line` rule, part of the work area, as Mercury's is; the sidebar beside it is `--canvas`.
+- **Phone navigation:** the drawer from the 52px top bar, on `--canvas`, with the sidebar's item styles at 44px. It scrolls when the screen is short (a phone held sideways), and every control in it, Sign out and Appearance included, is 44px on touch. A bottom tab bar is not part of this rollout; if one comes later it is `--canvas` with a `--line` rule above, 20px `--fg-3` icons over 12 / 16 500 `--fg-2` labels, and the current tab `--fg-1` with a 16 by 2px `--act` notch on its top edge.
 - **TextLink** (**new**, `ui.tsx`): inherits `--fg-1`, solid 1px underline at a 3px offset, 2px on hover. Required for every link in a sentence. Standalone links (breadcrumbs, "See all") are known by position and underline on hover.
 - **Kbd** (**new**, `ui.tsx`): Geist Mono 12px, 20px tall, 20px minimum width, `rounded-sm`, `--fill-1` with a `--line-strong` edge, `--fg-3` glyph (5.17 / 6.25). Printed in menus, the command palette, Find (⌘K) and dialog footers ("Cancel Esc", "Create task ⌘↵") ([Linear menu](https://mobbin.com/screens/83e65fd8-259c-4568-8fa6-5a2269ed4123), [Vercel switcher](https://mobbin.com/screens/63496168-dbae-470d-9039-6883d8d1e479)). Hidden under `pointer: coarse`; touch gets the same actions as visible buttons.
 
@@ -366,7 +367,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 - A system item in Needs you (a stale sync, a missing key fact) takes the lucide icon of the thing at the mark's size, 2 stroke, in `--warn`: `RefreshCw` plus "Stale" for a sync.
 - Deal stages and the property lifecycle reuse the ring, filling by stage in `--fg-2`; Closed is `--ok`, Passed is the slashed ring.
 - **Badge:** `rounded-sm`, `text-micro`, 20px tall, no ring. Tones: `neutral` (`--fg-2` on `--fill-2`, 6.69 / 7.89, so it still shows inside a raised layer in dark), `danger`, `warn`, `ok` (tint grounds). Blue and purple are retired.
-- **Tags:** no fill, a `--line-strong` edge, `--fg-2` text, `rounded-sm`, `text-micro`, 22px tall with 8px side padding.
+- **Tags:** no fill, a `--line-strong` edge, `--fg-2` text, `rounded-sm`, `text-micro`, 22px tall with 8px side padding. A neutral chip inside a menu or listbox row takes the Tag look, since the row's `--fill-2` hover would swallow a filled badge.
 - **Unread dot:** 8px `--act`, 12px in from a card's top and right edges. It means new and nothing else.
 
 ### Tables and money
@@ -398,7 +399,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 - **Dialog:** `--raised`, `rounded-xl`, overlay shadow and scrim. The title names the object; the body is one sentence of consequence.
 - Cancel and the primary sit bottom right with their keys. A destructive confirm uses `destructive` and names what goes ([Relume](https://mobbin.com/screens/4bc93d85-683e-4461-8e1a-fd1b519f240d)).
-- Esc closes the dialog, focus stays inside it while open and returns to the trigger after, and it portals to `<body>`. Below `sm` a dialog with three actions stacks them full width with the primary on top, as Apple's alerts do ([HIG alerts](https://developer.apple.com/design/human-interface-guidelines/alerts)).
+- Esc closes the dialog, focus stays inside it while open and returns to the trigger after, and it portals to `<body>`. Below `sm` a dialog's actions stack full width with the primary on top, as Apple's alerts do when labels don't fit side by side ([HIG alerts](https://developer.apple.com/design/human-interface-guidelines/alerts)), so no label wraps at 320.
 - **Sheet (phone):** `rounded-xl` top corners, title, content, and the primary pinned above the safe area. Esc closes one layer.
 
 ### Toasts

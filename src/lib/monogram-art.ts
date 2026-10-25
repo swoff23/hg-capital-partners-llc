@@ -2,11 +2,12 @@ import { BRAND } from "@/lib/brand";
 import { brandTokens, brandTokensDark } from "@/lib/brand-tokens";
 
 /**
- * The HG monogram as vector art, for the places that can't render the
- * Monogram component: the favicon (src/app/icon.svg) and the generated
- * apple-icon and home-screen icon. Same drawing as Monogram
- * (docs/brand-guidelines.md, section 6): the letters in Geist 600 at -0.04em
- * and 42% of the tile, --gold on the --ink-tile square, radius 22%.
+ * The HG monogram as vector art (docs/brand-guidelines.md, section 6): the
+ * letters in Geist 600 at -0.04em and 42% of the tile, --gold on the
+ * --ink-tile square, radius 22% rounded to whole pixels, the letters centered
+ * on the ink across and the cap height up and down. The Monogram component
+ * draws these glyphs; monogramSvg() is the favicon (src/app/icon.svg) and the
+ * generated apple-icon and home-screen icon.
  *
  * The letters are outlines, so they render the same where no web font loads
  * (a browser tab, a home screen). They were taken from Geist's variable font
@@ -25,6 +26,11 @@ export const MONOGRAM_GLYPHS = [
 export const MONOGRAM_VIEWBOX = "0 0 100 100";
 export const MONOGRAM_RADIUS = 22;
 
+/** The tile's corner radius at `px`: 22% rounded to whole pixels, so 5 at 24, 7 at 32. */
+export function monogramRadius(px: number): number {
+  return Math.round((px * MONOGRAM_RADIUS) / 100);
+}
+
 // The pair's ink runs from 80 to 1340.6 units across and 0 to -710 up (the
 // cap height), so this puts the letters' center on the tile's center.
 const SCALE = 0.042;
@@ -39,15 +45,25 @@ function round(n: number): number {
 /**
  * The monogram as an SVG document. The default is the favicon: the rounded
  * tile, with a 1px --line edge when the browser is dark, so the ink tile
- * never vanishes into a dark tab strip. `bleed` is the full square for
- * apple-icon, which iOS masks itself. `darkEdge: false` drops the edge, for
- * a PNG, which has no dark mode.
+ * never vanishes into a dark tab strip. The edge is a 2px stroke on the
+ * tile's outline clipped to the tile, so exactly 1px lands inside on every
+ * side, corners included. `bleed` is the full square for apple-icon, which
+ * iOS masks itself. `darkEdge: false` drops the edge, for a PNG, which has no
+ * dark mode. `px` rounds the radius to whole pixels for a raster at that
+ * size; without it the radius stays 22%, since icon.svg is drawn at whatever
+ * size the browser picks.
  */
-export function monogramSvg({ bleed = false, darkEdge = !bleed }: { bleed?: boolean; darkEdge?: boolean } = {}): string {
-  const rx = bleed ? "" : ` rx="${MONOGRAM_RADIUS}"`;
+export function monogramSvg({
+  bleed = false,
+  darkEdge = !bleed,
+  px,
+}: { bleed?: boolean; darkEdge?: boolean; px?: number } = {}): string {
+  const radius = px ? round((monogramRadius(px) * 100) / px) : MONOGRAM_RADIUS;
+  const rx = bleed ? "" : ` rx="${radius}"`;
   const edge = darkEdge
-    ? `<style>.edge{stroke:none}@media (prefers-color-scheme:dark){.edge{stroke:${brandTokensDark.line}}}</style>` +
-      `<rect class="edge" width="100" height="100"${rx} fill="none" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+    ? `<defs><clipPath id="tile"><rect width="100" height="100"${rx}/></clipPath></defs>` +
+      `<style>.edge{stroke:none}@media (prefers-color-scheme:dark){.edge{stroke:${brandTokensDark.line}}}</style>` +
+      `<rect class="edge" width="100" height="100"${rx} fill="none" stroke-width="2" vector-effect="non-scaling-stroke" clip-path="url(#tile)"/>`
     : "";
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MONOGRAM_VIEWBOX}" role="img" aria-label="${BRAND.mark}">` +

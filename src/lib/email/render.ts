@@ -1,5 +1,6 @@
 import { BRAND } from "@/lib/brand";
 import { brandTokens as t } from "@/lib/brand-tokens";
+import { monogramRadius } from "@/lib/monogram-art";
 
 /**
  * The one email layout (docs/asana-migration-plan.md §6, screen 7): the
@@ -35,9 +36,16 @@ export interface RenderedEmail {
 
 const FONT = "Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 
-/** The monogram tile at 32px (radius 22%, letters at 42%) and the name beside it. */
+/**
+ * The monogram tile at 32px (radius 22% in whole pixels, letters at 42%) and
+ * the name beside it. The letters are live text in the reader's font, so they
+ * can't center on their cap height exactly as the app's outlines do. The -1px
+ * indent takes back the trailing -0.04em tracking and the system font's side
+ * bearings; measured in Chromium and WebKit with the system font, the pair
+ * then sits on center across and within 0.4px up and down.
+ */
 const LETTERHEAD = `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-<td width="32" height="32" align="center" valign="middle" style="width:32px;height:32px;background:${t.inkTile};border-radius:7px;color:${t.gold};font-size:13px;font-weight:600;letter-spacing:-0.04em;line-height:32px;">${BRAND.mark}</td>
+<td width="32" height="32" align="center" valign="middle" style="width:32px;height:32px;background:${t.inkTile};border-radius:${monogramRadius(32)}px;color:${t.gold};font-size:13px;font-weight:600;letter-spacing:-0.04em;line-height:32px;text-indent:-1px;">${BRAND.mark}</td>
 <td style="padding-left:10px;font-size:15px;line-height:20px;font-weight:600;color:${t.fg1};">${BRAND.company}</td>
 </tr></table>`;
 

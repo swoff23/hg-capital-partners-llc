@@ -23,6 +23,18 @@ const nextConfig: NextConfig = {
   // process.env directly rather than through src/lib/env.ts.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   images: { remotePatterns: blobImagePatterns() },
+  async redirects() {
+    return [
+      {
+        // There's no favicon.ico (the icons are app/icon.svg and its PNGs), but
+        // crawlers and old browsers still ask for it: send them to the SVG
+        // instead of the HTML 404.
+        source: "/favicon.ico",
+        destination: "/icon.svg",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

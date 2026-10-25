@@ -80,10 +80,16 @@ export function SideNav({
   );
 }
 
+/**
+ * Page sections that are separate routes (CLAUDE.md, One switch per job):
+ * underline tabs over a --line divider (docs/brand-guidelines.md, section 9).
+ * Idle --fg-2, selected --fg-1 with the 2px --act underline, one weight for
+ * both; the state is `aria-selected` and the styles read it. 44px on touch.
+ */
 export function TopTabs({ tabs, base }: { tabs: { href: string; label: string }[]; base: string }) {
   const pathname = usePathname();
   return (
-    <div className="flex gap-1 border-b border-border">
+    <div role="tablist" className="flex gap-1 border-b border-line">
       {tabs.map((t) => {
         const href = `${base}${t.href}`;
         const active = pathname === href || (t.href === "" && pathname === base);
@@ -91,11 +97,13 @@ export function TopTabs({ tabs, base }: { tabs: { href: string; label: string }[
           <Link
             key={t.href}
             href={href}
+            role="tab"
+            aria-selected={active}
             className={cn(
-              "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
-              active
-                ? "border-primary text-primary"
-                : "border-transparent text-muted hover:text-foreground",
+              // 8px sides below sm, so Settings' three tabs keep one line at 320.
+              "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-fg-1 sm:px-3",
+              "aria-selected:border-act aria-selected:text-fg-1",
+              TOUCH_HEIGHT,
             )}
           >
             {t.label}
