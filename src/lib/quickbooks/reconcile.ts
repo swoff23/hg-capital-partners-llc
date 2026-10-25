@@ -12,7 +12,7 @@ export const DEFAULT_RECONCILE_TOLERANCE_CENTS = 1;
  *     income. Independent of our category/treatment logic; catches parse bugs,
  *     dropped rows, class-split leakage.
  *  2. net-income identity — computeNoi's decomposition ties to plain net income:
- *     noiAfterInterest + nonOpIncome + excluded + ownerFunded == netIncome.
+ *     noiAfterInterest + nonOpIncome − nonOpExpense + excluded + ownerFunded == netIncome.
  *  3. per-cell — Σ ledger (account × class) == the by-class report cell.
  */
 
@@ -86,7 +86,8 @@ export function checkReconciliation(input: ReconcileInput): ReconcileResult {
 
   const computed =
     input.noi.noiAfterInterestCents +
-    input.noi.nonOperatingIncomeCents +
+    input.noi.nonOperatingIncomeCents -
+    input.noi.nonOperatingExpenseCents +
     input.noi.excludedCents +
     input.noi.ownerFundedCents;
   const idDelta = computed - input.plainNetIncomeCents;

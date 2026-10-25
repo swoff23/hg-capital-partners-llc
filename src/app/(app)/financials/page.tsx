@@ -83,6 +83,9 @@ export default async function FinancialsOverviewPage({
   const thisYear = Number(todayYmdEastern().slice(0, 4));
   // The totals add up every synced line, so the period is the span of months with lines.
   const period = periodOf(data.monthlyTrend.map((m) => m.periodMonth));
+  // The monthly chart is the latest 12 months, and its heading says which.
+  const trend = data.monthlyTrend.slice(-12);
+  const trendPeriod = periodOf(trend.map((m) => m.periodMonth));
   // Every synced line lands in a month, so no months means no lines: a first sync
   // that failed or hasn't finished, or an expired connection that never synced.
   // Six $0 KPIs and a $0 Portfolio would read as a portfolio that earned nothing,
@@ -154,8 +157,9 @@ export default async function FinancialsOverviewPage({
           <p className="text-body text-fg-3">No QuickBooks activity yet.</p>
         )}
 
+        {/* Not assigned to a property shows once, as the By property table's last row. */}
         {dq && (
-          <Strip className="md:grid-cols-3">
+          <Strip className="md:grid-cols-2">
             <DqStat
               label="Unclassified in QuickBooks"
               value={lines(dq.unclassed.lineCount)}
@@ -175,18 +179,6 @@ export default async function FinancialsOverviewPage({
               sub="Not counted as income"
               bad={dq.suspenseCents !== 0}
             />
-            {/* the same figure as the By property row below, computed once in queries.ts */}
-            <DqStat
-              label="Not assigned to a property"
-              value={<MoneyCents cents={data.unassigned.noiCents} />}
-              sub={
-                <>
-                  <MoneyCents cents={data.unassigned.incomeCents} /> in ·{" "}
-                  <MoneyCents cents={data.unassigned.expenseCents} /> out
-                </>
-              }
-              bad={false}
-            />
           </Strip>
         )}
       </div>
@@ -194,7 +186,8 @@ export default async function FinancialsOverviewPage({
       {/* Overview modules: flat cards (docs/brand-guidelines.md, section 9). Each
           figure block states its period at the heading's end (section 3); the
           source line above carries the source, basis and sync. */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Each card keeps its own height side by side. */}
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <Card>
           <CardHeader className={moduleHeader}>
             <h2 className="min-w-0 text-section text-fg-1">Operating expense by category</h2>
@@ -212,10 +205,10 @@ export default async function FinancialsOverviewPage({
         <Card>
           <CardHeader className={moduleHeader}>
             <h2 className="min-w-0 text-section text-fg-1">Monthly income vs expense</h2>
-            {period && <span className={periodNote}>{period}</span>}
+            {trendPeriod && <span className={periodNote}>{trendPeriod}</span>}
           </CardHeader>
           <CardBody>
-            <IncomeExpenseBars months={data.monthlyTrend} thisYear={thisYear} />
+            <IncomeExpenseBars months={trend} thisYear={thisYear} />
           </CardBody>
         </Card>
       </div>

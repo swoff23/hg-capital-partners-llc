@@ -1,5 +1,5 @@
 import type { TaskStatus } from "@prisma/client";
-import { StatusMark } from "@/components/status-badge";
+import { StatusMark, type StageFill } from "@/components/status-badge";
 import type { PROPERTY_STATUSES } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
@@ -7,25 +7,26 @@ type PropertyStatusName = (typeof PROPERTY_STATUSES)[number];
 
 /*
  * The property lifecycle on the status ring (docs/brand-guidelines.md,
- * section 9), as deal stages do it (deals/stage-select.tsx): the ring fills
- * by stage in --fg-2 and Sold is the filled ring in --ok. StatusMark draws
- * the task glyphs only, so each stage borrows the nearest one and sets its
- * own tone. Rehabbing is the half ring, Refinancing three-quarters, and a
- * finished refinance or a stabilized building the full ring; Hold is the
- * pause bars and Flip the clock hands, since a flip is on a timetable.
+ * section 9), as deal stages do it (deals/stage-select.tsx): StatusMark's
+ * stage variant fills the ring in lifecycle order, in --fg-2. Rehabbing is a
+ * quarter, Refinancing half, Refinanced three-quarters and Stabilized full;
+ * Sold is the check in --ok. Hold is the pause bars and Flip the clock hands,
+ * since a flip is on a timetable.
  */
-const STATUS_MARK: Record<PropertyStatusName, { glyph: TaskStatus; tone: string }> = {
-  Rehabbing: { glyph: "IN_PROGRESS", tone: "text-fg-2" },
-  Refinancing: { glyph: "REVIEW", tone: "text-fg-2" },
-  Refinanced: { glyph: "DONE", tone: "text-fg-2" },
-  Stabilized: { glyph: "DONE", tone: "text-fg-2" },
+type Mark = { stage: StageFill } | { glyph: TaskStatus; tone: string };
+
+const STATUS_MARK: Record<PropertyStatusName, Mark> = {
+  Rehabbing: { stage: "quarter" },
+  Refinancing: { stage: "half" },
+  Refinanced: { stage: "three-quarter" },
+  Stabilized: { stage: "full" },
   Hold: { glyph: "WAITING", tone: "text-fg-2" },
   Flip: { glyph: "SCHEDULED", tone: "text-fg-2" },
   Sold: { glyph: "DONE", tone: "text-ok" },
 };
 
 /** A status typed before the list existed: the empty ring. */
-const UNKNOWN = { glyph: "OPEN", tone: "text-fg-2" } as const;
+const UNKNOWN: Mark = { stage: "empty" };
 
 const markOf = (status: string) => STATUS_MARK[status as PropertyStatusName] ?? UNKNOWN;
 
@@ -35,10 +36,15 @@ const markOf = (status: string) => STATUS_MARK[status as PropertyStatusName] ?? 
  * sentence like any word.
  */
 export function PropertyStatus({ status, className }: { status: string; className?: string }) {
-  const { glyph, tone } = markOf(status);
+  const mark = markOf(status);
+  const tone = "tone" in mark ? mark.tone : "text-fg-2";
   return (
     <span className={cn("inline-flex min-w-0 items-baseline gap-1.5", tone, className)}>
-      <StatusMark status={glyph} className={cn("self-center", tone)} />
+      {"stage" in mark ? (
+        <StatusMark stage={mark.stage} className="self-center" />
+      ) : (
+        <StatusMark status={mark.glyph} className={cn("self-center", tone)} />
+      )}
       <span className="truncate">{status}</span>
     </span>
   );

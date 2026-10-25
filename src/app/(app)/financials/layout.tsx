@@ -6,7 +6,8 @@ export default async function FinancialsLayout({ children }: LayoutProps<"/finan
   await requireUser();
   return (
     <div>
-      <PageHeader title="Financials" subtitle="Read-only from QuickBooks. QuickBooks stays the system of record." />
+      {/* One line on a phone; QuickBooks stays the system of record. */}
+      <PageHeader title="Financials" subtitle="Read-only from QuickBooks." />
       <TopTabs
         base="/financials"
         keep={["basis"]}

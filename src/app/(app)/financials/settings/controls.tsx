@@ -140,7 +140,7 @@ export function DisconnectButton() {
                 disabled={pending}
                 onClick={() => run(() => disconnectQuickbooks(true))}
               >
-                Delete everything
+                Delete synced data
               </Button>
             </>
           }

@@ -32,7 +32,7 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
       <main className="mx-auto max-w-400 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {saved === "1" && (
           <p role="status" className="mb-4 w-fit max-w-full rounded-md border border-line bg-surface px-3 py-2 text-meta text-fg-1">
-            Password saved for next time.
+            Password saved for next sign-in.
           </p>
         )}
         <h1 className="mb-4 text-title text-balance text-fg-1">Hi {firstName(principal.label)}</h1>

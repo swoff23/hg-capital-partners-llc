@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { AssigneePicker, type AssigneeContractor, type AssigneeUser, type AssigneeValue } from "@/components/assignee-picker";
+import { DueDatePicker } from "@/components/due-date-picker";
 import { RepeatPicker } from "@/components/repeat-picker";
 import { Input, Select } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
@@ -16,20 +17,25 @@ const encode = (v: AssigneeValue) => (!v ? "" : "userId" in v ? `u:${v.userId}` 
 
 /**
  * The new task form's assignee, due date, status and Repeats: the same
- * pickers as the task page, posting through hidden fields. Waiting asks what
- * it's waiting on; Scheduled asks for the visit date. Repeats reads its day
- * and weekday from the due date, and a repeat picked with no due date fills in the first
- * one, so a repeating task never starts undated.
+ * pickers as the task page, at field height (their `trigger="field"`), so
+ * the grid is one control height beside Status, posting through hidden
+ * fields. Waiting asks what it's waiting on; Scheduled asks for the visit
+ * date. Repeats reads its day and weekday from the due date, and a repeat
+ * picked with no due date fills in the first one, so a repeating task never
+ * starts undated.
  */
 export function NewTaskFields({
   users,
   contractors,
   defaultAssignee,
+  meId,
   today,
 }: {
   users: AssigneeUser[];
   contractors: AssigneeContractor[];
   defaultAssignee: AssigneeValue;
+  /** The signed-in user, so a phone's assignee reads "Connor (me)". */
+  meId: string;
   today: Ymd;
 }) {
   const [assignee, setAssignee] = useState<AssigneeValue>(defaultAssignee);
@@ -60,17 +66,33 @@ export function NewTaskFields({
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div className="min-w-0">
           <span className="text-meta font-medium text-fg-2">Assignee</span>
-          <div className="mt-1.5 flex h-9 items-center pointer-coarse:h-11">
-            <AssigneePicker value={assignee} users={users} contractors={contractors} onChange={setAssignee} />
+          <div className="mt-1.5">
+            <AssigneePicker
+              value={assignee}
+              users={users}
+              contractors={contractors}
+              onChange={setAssignee}
+              meId={meId}
+              trigger="field"
+            />
           </div>
           <input type="hidden" name="assignee" value={encode(assignee)} />
         </div>
-        <label className="block">
+        <div className="min-w-0">
           <span className="text-meta font-medium text-fg-2">Due date</span>
-          <Input name="dueDate" type="date" value={due} onChange={(e) => changeDue(e.target.value)} className="mt-1.5" />
-        </label>
+          <div className="mt-1.5">
+            <DueDatePicker
+              value={due || null}
+              today={today}
+              placeholder="No date"
+              onChange={(next) => changeDue(next ?? "")}
+              trigger="field"
+            />
+          </div>
+          <input type="hidden" name="dueDate" value={due} />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
@@ -83,14 +105,15 @@ export function NewTaskFields({
             ))}
           </Select>
         </label>
-        <div>
+        <div className="min-w-0">
           <span className="text-meta font-medium text-fg-2">Repeats</span>
-          <div className="mt-1.5 flex h-9 items-center pointer-coarse:h-11">
+          <div className="mt-1.5">
             <RepeatPicker
               value={repeat}
               onChange={changeRepeat}
               defaultDay={Number((due || today).slice(8, 10))}
               defaultWeekday={weekdayOf(due || today)}
+              trigger="field"
             />
           </div>
           <input type="hidden" name="repeatRule" value={repeat ? JSON.stringify(repeat) : ""} />

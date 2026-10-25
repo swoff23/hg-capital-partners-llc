@@ -40,6 +40,7 @@ export default async function NewTaskPage({ searchParams }: PageProps<"/tasks/ne
           users={users}
           contractors={contractors}
           defaultAssignee={{ userId: user.id }}
+          meId={user.id}
           today={todayYmdEastern()}
         />
         {!sp.dealId && (

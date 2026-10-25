@@ -83,7 +83,7 @@ const offByShort = (cents: number) =>
  * The reconciliation row at the top of Settings' cleanup list, for one basis.
  * It names the same three checks as the Overview banner (NOI, net income,
  * account totals), so the banner's Review link lands on the gap it named, in
- * plain words ("ties", "off by $2,916"); `ok` is false when any is off, and
+ * plain words ("matches", "off by $2,916"); `ok` is false when any is off, and
  * the row leads with the warn mark. null when the run has no reconciliation
  * for this basis.
  */
@@ -107,10 +107,10 @@ export function reconcileRow(
 
   const noiOff = noi?.ok === false;
   const parts = [
-    noiOff ? `NOI ${offByShort(noi.residualCents ?? 0)}` : "NOI ties",
-    netOff == null ? "net income ties" : `net income ${offByShort(netOff)}`,
+    noiOff ? `NOI ${offByShort(noi.residualCents ?? 0)}` : "NOI matches",
+    netOff == null ? "net income matches" : `net income ${offByShort(netOff)}`,
     cells === 0
-      ? "account totals tie"
+      ? "account totals match"
       : cells === 1
         ? "1 account total doesn't match"
         : `${cells} account totals don't match`,

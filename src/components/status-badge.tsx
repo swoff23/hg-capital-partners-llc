@@ -71,12 +71,43 @@ const GLYPH: Record<TaskStatus, ReactNode> = {
   ),
 };
 
+/** How far along a stage is: the ring's inner pie, empty to full. */
+export type StageFill = "empty" | "quarter" | "half" | "three-quarter" | "full";
+
+/* The stage variant: the same ring, its pie filled clockwise from 12 o'clock. */
+const STAGE_GLYPH: Record<StageFill, ReactNode> = {
+  empty: RING,
+  quarter: (
+    <>
+      {RING}
+      <path d="M12 12V7a5 5 0 0 1 5 5z" fill="currentColor" stroke="none" />
+    </>
+  ),
+  half: GLYPH.IN_PROGRESS,
+  "three-quarter": GLYPH.REVIEW,
+  full: (
+    <>
+      {RING}
+      <circle cx="12" cy="12" r="5" fill="currentColor" stroke="none" />
+    </>
+  ),
+};
+
 /**
  * A task status's glyph: 14px with a mouse, 16px on touch, in the status's
  * tone. The stroke is a fixed 1.5px at every size (non-scaling), so a ring
  * still reads in sunlight on a job site (docs/brand-guidelines.md, section 9).
+ *
+ * `stage` draws the stage variant instead, for a pipeline that fills by step
+ * (deal priority, the property lifecycle): the ring with its pie empty, a
+ * quarter, half, three-quarters or full, in --fg-2 unless `className` sets a
+ * tone. A finished stage (Closed, Sold) is the `DONE` check in --ok and a
+ * dropped one (Pass) the `CANCELED` slash, so those pass `status`.
  */
-export function StatusMark({ status, className }: { status: TaskStatus; className?: string }) {
+export function StatusMark(
+  props: ({ status: TaskStatus; stage?: never } | { stage: StageFill; status?: never }) & { className?: string },
+) {
+  const { className } = props;
   return (
     <svg
       viewBox="0 0 24 24"
@@ -89,11 +120,11 @@ export function StatusMark({ status, className }: { status: TaskStatus; classNam
       className={cn(
         // vector-effect isn't inherited, so it goes on every shape.
         "size-3.5 shrink-0 pointer-coarse:size-4 [&_*]:[vector-effect:non-scaling-stroke]",
-        STATUS_TONE[status],
+        props.stage ? "text-fg-2" : STATUS_TONE[props.status],
         className,
       )}
     >
-      {GLYPH[status]}
+      {props.stage ? STAGE_GLYPH[props.stage] : GLYPH[props.status]}
     </svg>
   );
 }

@@ -1,10 +1,10 @@
 "use client";
 import { useState, type ReactNode } from "react";
-import { Repeat } from "lucide-react";
+import { ChevronDown, Repeat } from "lucide-react";
 import { Button as AriaButton, DialogTrigger } from "react-aria-components";
 import { Popover } from "@/components/popover";
 import { Sheet } from "@/components/sheet";
-import { Button, Input, Select, pickerChip } from "@/components/ui";
+import { Button, Input, Select, pickerChip, pickerField, pickerFieldChevron } from "@/components/ui";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { describeRepeat, type RepeatRule } from "@/lib/tasks/repeat";
 import { REPEAT_MODES, choiceFromRule, ruleFromChoice, switchMode, type RepeatChoice, type RepeatMode } from "@/lib/tasks/repeat-choice";
@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
  * rather than spill in a narrow column) that opens a small editor. Never,
  * every N days, every N weeks, monthly on a day, quarterly, yearly. Weekly
  * takes the due date's weekday, as quarterly takes its day. A Popover with a
- * mouse, a Sheet on touch, like the other picker chips.
+ * mouse, a Sheet on touch, like the other picker chips. `trigger="field"`
+ * is the field-height trigger (pickerField) for a form grid.
  */
 export function RepeatPicker({
   value,
@@ -24,6 +25,7 @@ export function RepeatPicker({
   defaultDay,
   defaultWeekday,
   placeholder = "Never",
+  trigger = "chip",
   isDisabled,
   className,
 }: {
@@ -35,6 +37,8 @@ export function RepeatPicker({
   defaultWeekday: number;
   /** The chip's text when it doesn't repeat. */
   placeholder?: ReactNode;
+  /** "chip" in a row of chips; "field" at field height in a form. */
+  trigger?: "chip" | "field";
   isDisabled?: boolean;
   className?: string;
 }) {
@@ -61,10 +65,17 @@ export function RepeatPicker({
       <AriaButton
         isDisabled={isDisabled}
         aria-label={`Repeats: ${value ? describeRepeat(value) : "never"}`}
-        className={cn(pickerChip, !value && "text-muted", className)}
+        className={cn(
+          trigger === "field" ? pickerField : pickerChip,
+          !value && (trigger === "field" ? "text-fg-3" : "text-muted"),
+          className,
+        )}
       >
-        <Repeat aria-hidden="true" />
-        <span className="min-w-0 truncate">{value ? describeRepeat(value, { short: true }) : placeholder}</span>
+        <Repeat aria-hidden="true" className={cn(trigger === "field" && "text-fg-3")} />
+        <span className={cn("min-w-0 truncate", trigger === "field" && "flex-1")}>
+          {value ? describeRepeat(value, { short: true }) : placeholder}
+        </span>
+        {trigger === "field" && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
       </AriaButton>
       {touch ? (
         <Sheet title="Repeats">{panel}</Sheet>

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeNoi, monthsOfData, signedLineCents, type ComputeLine } from "./compute";
+import { computeNoi, isNonOperatingExpense, monthsOfData, signedLineCents, type ComputeLine } from "./compute";
 import type { QboCategory, QboLineTag, QboTreatment } from "@prisma/client";
 
 /**
@@ -78,8 +78,57 @@ test("portfolio operating income, expense, NOI tie to the real P&L", () => {
 test("the net-income reconciliation identity holds to the cent", () => {
   const r = computeNoi(PORTFOLIO);
   const identity =
-    r.noiAfterInterestCents + r.nonOperatingIncomeCents + r.excludedCents + r.ownerFundedCents;
+    r.noiAfterInterestCents +
+    r.nonOperatingIncomeCents -
+    r.nonOperatingExpenseCents +
+    r.excludedCents +
+    r.ownerFundedCents;
   assert.equal(identity, QBO_NET_INCOME_CENTS, "= QBO Net Income $71,255.43");
+  assert.equal(r.nonOperatingExpenseCents, 0, "HG's real P&L has no Other Expense besides interest");
+});
+
+/**
+ * QuickBooks' sample company carries Depreciation, Miscellaneous and Penalties &
+ * Settlements as Other Expense: below its Net Operating Income. Here as
+ * categorize.ts seeds them (OTHER, NON_OPERATING), added to the real P&L.
+ */
+const DEPRECIATION = line("NON_OPERATING", "OTHER", 291_600); // $2,916.00, the sandbox's Miscellaneous total
+const PENALTY = line("NON_OPERATING", "OTHER", 12_500);
+
+test("a depreciation line doesn't lower NOI", () => {
+  const before = computeNoi(PORTFOLIO);
+  const after = computeNoi([...PORTFOLIO, DEPRECIATION, PENALTY]);
+  assert.equal(after.operatingIncomeCents, before.operatingIncomeCents);
+  assert.equal(after.operatingExpenseCents, before.operatingExpenseCents, "not in operating expense");
+  assert.equal(after.noiCents, before.noiCents, "NOI $88,259.49 either way");
+  assert.equal(after.noiAfterInterestCents, before.noiAfterInterestCents, "nor in NOI after interest");
+  assert.equal(after.debtInterestCents, before.debtInterestCents, "nor in debt interest");
+  assert.equal(after.expenseByCategoryCents.OTHER, undefined, "nor in the operating expense bars");
+  assert.equal(after.nonOperatingIncomeCents, before.nonOperatingIncomeCents, "nor in bank interest");
+  assert.equal(after.nonOperatingExpenseCents, 291_600 + 12_500);
+});
+
+test("a depreciation line still lowers net income", () => {
+  const netIncome = (r: ReturnType<typeof computeNoi>) =>
+    r.noiAfterInterestCents + r.nonOperatingIncomeCents - r.nonOperatingExpenseCents + r.excludedCents + r.ownerFundedCents;
+  const before = computeNoi(PORTFOLIO);
+  const after = computeNoi([...PORTFOLIO, DEPRECIATION]);
+  assert.equal(netIncome(before), QBO_NET_INCOME_CENTS);
+  assert.equal(netIncome(after), QBO_NET_INCOME_CENTS - 291_600, "net income $68,339.43");
+});
+
+test("the old seed counted depreciation inside NOI", () => {
+  // Before the fix: OTHER_OPEX / OPERATING_EXPENSE, so NOI fell by the full amount.
+  const old = computeNoi([...PORTFOLIO, line("OPERATING_EXPENSE", "OTHER_OPEX", 291_600)]);
+  assert.equal(old.noiCents, computeNoi(PORTFOLIO).noiCents - 291_600);
+});
+
+test("isNonOperatingExpense: only a NON_OPERATING line outside rent and other income", () => {
+  assert.equal(isNonOperatingExpense("NON_OPERATING", "OTHER"), true); // depreciation
+  assert.equal(isNonOperatingExpense("NON_OPERATING", "OTHER_INCOME"), false); // bank interest
+  assert.equal(isNonOperatingExpense("NON_OPERATING", "RENT"), false); // owner-funded "rent"
+  assert.equal(isNonOperatingExpense("OPERATING_EXPENSE", "OTHER_OPEX"), false);
+  assert.equal(isNonOperatingExpense("DEBT_INTEREST", "DEBT_INTEREST"), false);
 });
 
 test("owner-funded and internal-transfer are memo-only, not in NOI", () => {
@@ -149,10 +198,11 @@ test("computeNoi reports monthsOfData / annualization from the lines", () => {
 });
 
 test("signedLineCents: income reads as money in, expense as money out, excluded as neither", () => {
-  assert.equal(signedLineCents("OPERATING_INCOME", 135_000), 135_000); // a $1,350 rent deposit
-  assert.equal(signedLineCents("OPERATING_EXPENSE", 135_000), -135_000); // a $1,350 repair
-  assert.equal(signedLineCents("OPERATING_EXPENSE", -2_500), 2_500); // a refund comes back in
-  assert.equal(signedLineCents("NON_OPERATING", 1_200), 1_200); // bank interest
-  assert.equal(signedLineCents("DEBT_INTEREST", 50_000), -50_000);
-  assert.equal(signedLineCents("EXCLUDED", 75_000), 0); // a transfer is neither
+  assert.equal(signedLineCents("OPERATING_INCOME", 135_000, "RENT"), 135_000); // a $1,350 rent deposit
+  assert.equal(signedLineCents("OPERATING_EXPENSE", 135_000, "REPAIRS"), -135_000); // a $1,350 repair
+  assert.equal(signedLineCents("OPERATING_EXPENSE", -2_500, "REPAIRS"), 2_500); // a refund comes back in
+  assert.equal(signedLineCents("NON_OPERATING", 1_200, "OTHER_INCOME"), 1_200); // bank interest
+  assert.equal(signedLineCents("NON_OPERATING", 291_600, "OTHER"), -291_600); // depreciation is money out
+  assert.equal(signedLineCents("DEBT_INTEREST", 50_000, "DEBT_INTEREST"), -50_000);
+  assert.equal(signedLineCents("EXCLUDED", 75_000, "RENT"), 0); // a transfer is neither
 });

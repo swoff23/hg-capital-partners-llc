@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Eyebrow, publicContainer, publicTextLinkClass, publicType } from "@/components/public/ui";
+import { publicContainer, publicTextLinkClass, publicType } from "@/components/public/ui";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
@@ -90,8 +90,7 @@ export default async function MovingInPage() {
   return (
     <main className={cn(publicContainer, "py-10 sm:py-12")}>
       <div className="max-w-2xl">
-        <Eyebrow>Residents</Eyebrow>
-        <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>Moving in</h1>
+        <h1 className={cn(publicType.heading, "text-fg-1")}>Moving in</h1>
 
         <ul className="mt-8 border-t border-line">
           {CHECKLIST.map((c) => (

@@ -72,35 +72,17 @@ export function RailVerb({ children, onClick, tone }: { children: ReactNode; onC
 }
 
 /**
- * The last row of a counted list ("Add unit"): it adds one more row, so the
- * count is always the rows above it (docs/brand-guidelines.md, section 9
- * Counted lists).
+ * A section heading's count, in --fg-3 at the body weight. The space before
+ * it keeps the heading's name "Tasks 29", not "Tasks29" (as in the task
+ * page's Checklist heading).
  */
-export function AddRow({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12"
-    >
-      <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
-      {children}
-    </button>
-  );
-}
-
-/** A section heading's count, in --fg-3 at the body weight. */
 export function Count({ n, className }: { n: number; className?: string }) {
-  return <span className={cn("num ml-1.5 font-normal text-fg-3", className)}>{n}</span>;
+  return (
+    <>
+      {" "}
+      <span className={cn("num ml-1 font-normal text-fg-3", className)}>{n}</span>
+    </>
+  );
 }
 
 /** An inline save error under a section's form or list. */

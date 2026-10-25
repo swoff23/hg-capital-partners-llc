@@ -7,12 +7,12 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
-import { Button, SectionCard, buttonClass, fieldClass, selectTouchHeight, textLinkClass } from "@/components/ui";
+import { AddRow, Button, SectionCard, buttonClass, fieldClass, selectTouchHeight, textLinkClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { updatePropertyListings } from "../actions";
 import { callAction } from "@/lib/action-result";
 import { LabeledField } from "../labeled-field";
-import { AddRow, SaveError } from "./record-ui";
+import { SaveError } from "./record-ui";
 
 export type EditablePhoto = { url: string; pathname: string };
 

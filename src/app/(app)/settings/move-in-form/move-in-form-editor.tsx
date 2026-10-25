@@ -1,6 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
-import { Button, Checkbox, Input, PageHeader, Section } from "@/components/ui";
+import { useId, useState, useTransition } from "react";
+import { Button, Checkbox, Input, Section } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { MoveInFormSchema, MoveInSection } from "@/lib/move-in-form-types";
 import { callAction } from "@/lib/action-result";
@@ -104,6 +104,10 @@ export function MoveInFormEditor({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const dirty = JSON.stringify(schema) !== JSON.stringify(initial);
+  // The server refuses an unnamed item, so Save says so instead of failing.
+  const unnamed = schema.sections.some((sec) => sec.items.some((it) => !it.label.trim()));
+  const reason = dirty && unnamed ? "Name every item first" : null;
+  const reasonId = useId();
 
   function mutate(fn: (s: MoveInFormSchema) => void) {
     setSchema((prev) => {
@@ -137,25 +141,27 @@ export function MoveInFormEditor({
 
   return (
     <div className="space-y-8 pointer-coarse:space-y-6">
-      <PageHeader
-        title="Settings"
-        subtitle="What tenants rate at move-in"
-        actions={
-          // Only once there's something to save, Cancel first and the primary last, as in a dialog.
-          (dirty || pending) && (
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={cancel} disabled={pending}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={save} disabled={pending}>
-                {pending ? "Saving…" : "Save"}
-              </Button>
-            </div>
-          )
-        }
-      />
-
-      {error && <p className="text-meta text-danger">{error}</p>}
+      {/* The tab's actions at the top right of its content, Cancel first and the primary last, as in a
+          dialog, like CapEx rules' Reset to defaults. Always there, so the rooms never shift down when an
+          edit starts; off until there's an edit. A Save that can't go yet says why in one line under it,
+          set in the gap above the first room (22px in a 24px gap at the least), so it takes no line of
+          its own and moves nothing when it appears. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-meta text-danger">{error}</p>
+        <div className="relative flex shrink-0 items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={cancel} disabled={pending || !dirty}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={save} disabled={pending || !dirty || !!reason} aria-describedby={reason ? reasonId : undefined}>
+            {pending ? "Saving…" : "Save"}
+          </Button>
+          {reason && (
+            <p id={reasonId} className="absolute top-full right-0 mt-1 whitespace-nowrap text-meta text-fg-3">
+              {reason}
+            </p>
+          )}
+        </div>
+      </div>
 
       {schema.sections.map((section, si) => (
         <SectionEditor

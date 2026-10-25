@@ -53,8 +53,8 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
       {/* Summed across every class mapped to the property, so an entity transfer on refinance
           shows no gap. No lease data yet: scheduled and market rent, delinquency and vacancy are
           out of scope. Section-8 and voucher rent is included; owner P2P deposits mis-booked to
-          Rents are left out and shown separately (Settings, cleanup list). */}
-      <p className="text-meta text-fg-3">{roll.basis === "CASH" ? "Cash rent received by month" : "Rent earned by month"}</p>
+          Rents are left out and shown separately (Settings, cleanup list). The Total column says
+          what the figures are on the basis on screen: rent received on cash, rent billed on accrual. */}
 
       {roll.rows.length === 0 ? (
         // never a $0 Portfolio total over zero rows
@@ -81,7 +81,9 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
                   {fmtMonth(m, thisYear)}
                 </Th>
               ))}
-              <Th numeric>Total</Th>
+              <Th numeric className="whitespace-nowrap">
+                {roll.basis === "CASH" ? "Rent received" : "Rent billed"}
+              </Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">

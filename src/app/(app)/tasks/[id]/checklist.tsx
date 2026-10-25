@@ -26,8 +26,10 @@ export function Checklist({ taskId, items }: { taskId: string; items: ChecklistR
       title={
         <>
           Checklist
+          {/* The space keeps the heading's name "Checklist 2/5", not "Checklist2/5". */}
+          {rows.length > 0 && " "}
           {rows.length > 0 && (
-            <span className="ml-1.5 font-normal tabular-nums text-fg-3">
+            <span className="ml-1 font-normal tabular-nums text-fg-3">
               {done}/{rows.length}
             </span>
           )}

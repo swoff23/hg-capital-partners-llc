@@ -42,6 +42,8 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - [ ] Look at the new screens on a computer: Today, All, the task page, playbooks and a contractor's page.
 - [ ] Look at the brand proposal ([preview](https://claude.ai/artifact/XKYY2B8qpQ1amVDBwDPbQa), [docs/brand-guidelines.md](brand-guidelines.md)) and [Home as Today](home-as-today.md), then say "build it" or what to change. Nothing changes until you do.
 
+- [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
+- [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
 - [ ] In Vercel, turn on Skew Protection (Project Settings, Advanced). Now that you're on Pro, it keeps a page that was open during a deploy talking to the version it loaded, instead of failing its next save.
 
 ## Small calls (no rush)

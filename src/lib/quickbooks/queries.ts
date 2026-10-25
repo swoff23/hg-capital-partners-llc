@@ -2,7 +2,7 @@ import "server-only";
 import type { QboBasis, QboCategory, QboTreatment } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getConnection } from "./client";
-import { computeNoi, type ComputeLine, type NoiResult } from "./compute";
+import { computeNoi, monthsOfData, type ComputeLine, type NoiResult } from "./compute";
 import { buildDataQuality, type DataQualityReport } from "./data-quality";
 import { propertyTokens } from "./mapping";
 import { currentMonth } from "./months";
@@ -213,6 +213,8 @@ export interface PropertyFinancials {
     accountName: string;
     className: string | null;
     treatment: QboTreatment;
+    /** With the treatment, signs a below-NOI line (signedLineCents). */
+    category: QboCategory;
     amountCents: number;
   }[];
   lastSyncAt: Date | null;
@@ -241,6 +243,7 @@ export async function getPropertyFinancials(
         accountName: true,
         className: true,
         treatment: true,
+        category: true,
         amount: true,
       },
     }),
@@ -365,7 +368,16 @@ export async function getRentRoll(basisOverride?: QboBasis): Promise<RentRoll | 
         byMonth[m] = c;
         total += c;
       }
-      const dataMonths = [...agg.byMonth.keys()].filter((m) => m < cm);
+      // Months covered, the Overview's meaning of "N mo": from the first rent (or ownership) to
+      // the last complete month, a month with no rent included. The Overview starts at a
+      // property's first line of any kind, so an expense booked before the first rent makes
+      // its N higher there; this tab covers rent.
+      const covered = monthsOfData([...agg.byMonth.keys()], {
+        currentMonth: cm,
+        ownershipStartMonth: prop?.purchaseDate
+          ? `${prop.purchaseDate.getUTCFullYear()}-${String(prop.purchaseDate.getUTCMonth() + 1).padStart(2, "0")}`
+          : null,
+      });
       return {
         propertyId,
         address: prop?.address ?? "(unknown)",
@@ -373,7 +385,7 @@ export async function getRentRoll(basisOverride?: QboBasis): Promise<RentRoll | 
         totalCents: total,
         subsidyCents: agg.subsidy,
         ownerFundedCents: agg.ownerFunded,
-        monthsOfData: dataMonths.length,
+        monthsOfData: covered.n,
       };
     })
     .sort((a, b) => a.address.localeCompare(b.address));

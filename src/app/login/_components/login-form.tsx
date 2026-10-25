@@ -3,7 +3,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { login } from "../actions";
 import { LOGIN_MESSAGES, LOGIN_START } from "../login-state";
 import { Input } from "@/components/ui";
-import { AuthError, AuthNotice, authInputClass } from "./auth-frame";
+import { AuthError, AuthLabel, AuthNotice, authInputClass } from "./auth-frame";
 import { AuthSubmit } from "./auth-submit";
 import { PasswordField } from "./password-field";
 
@@ -42,29 +42,33 @@ export function LoginForm({ next, passwordChanged }: { next: string | null; pass
         onSubmit={(e) => {
           lastTyped.email = String(new FormData(e.currentTarget).get("email") ?? "").trim();
         }}
-        className="mt-8 space-y-3 text-left"
+        className="mt-8 space-y-4 text-left"
       >
         {next && <input type="hidden" name="next" value={next} />}
-        <Input
-          name="email"
-          type="email"
-          placeholder="Email"
-          aria-label="Email"
-          autoComplete="username"
-          required
-          autoFocus={!email}
-          defaultValue={email}
-          className={authInputClass}
-        />
-        <PasswordField
-          ref={passwordRef}
-          name="password"
-          placeholder="Password"
-          aria-label="Password"
-          autoComplete="current-password"
-          required
-          autoFocus={!!email}
-        />
+        <div>
+          <AuthLabel htmlFor="login-email">Email</AuthLabel>
+          <Input
+            id="login-email"
+            name="email"
+            type="email"
+            autoComplete="username"
+            required
+            autoFocus={!email}
+            defaultValue={email}
+            className={authInputClass}
+          />
+        </div>
+        <div>
+          <AuthLabel htmlFor="login-password">Password</AuthLabel>
+          <PasswordField
+            ref={passwordRef}
+            id="login-password"
+            name="password"
+            autoComplete="current-password"
+            required
+            autoFocus={!!email}
+          />
+        </div>
         <AuthSubmit pendingLabel="Signing in…">Sign in</AuthSubmit>
       </form>
     </>

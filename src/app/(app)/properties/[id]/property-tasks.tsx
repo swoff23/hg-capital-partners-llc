@@ -30,8 +30,11 @@ export type PropertyTask = {
  * list under 30rem (the rail, a phone) a row keeps two lines, with the date
  * top right and the avatar bottom right (docs/brand-guidelines.md, section
  * 5, Task rows): the title and its date, then the status word in its tone
- * and the avatar.
+ * and the avatar. The rail shows the first 8; "See all 19" opens the rest on
+ * Tasks, filtered to the property.
  */
+const SHOWN = 8;
+
 export function PropertyTasksSection({
   propertyId,
   tasks,
@@ -54,7 +57,9 @@ export function PropertyTasksSection({
       actions={
         <>
           <LinkButton href={`/templates?property=${propertyId}`} size="sm">
-            Apply playbook
+            {/* Below 360 the two buttons leave the heading no room, so the label shortens rather than truncates. */}
+            <span className="max-[360px]:hidden">Apply playbook</span>
+            <span className="min-[360px]:hidden">Playbook</span>
           </LinkButton>
           <LinkButton href={`/tasks/new?propertyId=${propertyId}`} size="sm">
             <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
@@ -67,7 +72,7 @@ export function PropertyTasksSection({
         <p className="text-body text-fg-3">No open tasks.</p>
       ) : (
         <ul className="@container divide-y divide-line">
-          {tasks.map((t) => {
+          {tasks.slice(0, SHOWN).map((t) => {
             const date = t.target ? fmtDay(t.target, { year: "auto", now: today }) : null;
             return (
               <li
@@ -123,6 +128,17 @@ export function PropertyTasksSection({
               </li>
             );
           })}
+          {tasks.length > SHOWN && (
+            // The last row, on the list's own hairline, as Home's "N more" ends Needs you.
+            <li>
+              <Link
+                href={`/tasks?property=${propertyId}`}
+                className="flex min-h-10 items-center text-label text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:min-h-12"
+              >
+                See all {tasks.length}
+              </Link>
+            </li>
+          )}
         </ul>
       )}
     </Section>

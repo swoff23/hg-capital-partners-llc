@@ -123,4 +123,41 @@ test("treatmentForCategory sanity", () => {
   assert.equal(treatmentForCategory("UTILITIES", "Expense"), "OPERATING_EXPENSE");
   assert.equal(treatmentForCategory("OTHER", "Revenue"), "OPERATING_INCOME");
   assert.equal(treatmentForCategory("OTHER", "Asset"), "EXCLUDED");
+  assert.equal(treatmentForCategory("OTHER", null), "EXCLUDED"); // a line whose account the sync doesn't know
+});
+
+test("an Other Expense account moved into NOI from Settings can go back below it", () => {
+  // Settings (setAccountCategory) stores treatmentForCategory(picked category, the account's classification).
+  const seeded = seedCategory(acct({ name: "Depreciation", acctType: "Other Expense", acctSubType: "Depreciation" }));
+  assert.equal(seeded.treatment, "NON_OPERATING");
+  assert.equal(treatmentForCategory("OTHER_OPEX", "Expense"), "OPERATING_EXPENSE"); // "Other operating": inside NOI
+  assert.equal(treatmentForCategory(seeded.category, "Expense"), seeded.treatment); // "Other" again: below NOI, as seeded
+});
+
+test("Other Expense accounts seed below NOI, unlocked", () => {
+  // QuickBooks' sample company, as the sandbox sync stored them.
+  for (const [name, acctSubType] of [
+    ["Depreciation", "Depreciation"],
+    ["Miscellaneous", "OtherMiscellaneousExpense"],
+    ["Penalties & Settlements", "PenaltiesSettlements"],
+  ]) {
+    const s = seedCategory(acct({ name, acctType: "Other Expense", acctSubType }));
+    assert.deepEqual(
+      { c: s.category, t: s.treatment, locked: s.locked, source: s.source },
+      { c: "OTHER", t: "NON_OPERATING", locked: false, source: "subtype" },
+      name,
+    );
+  }
+  // An expense account named for depreciation, with no subtype to go on.
+  const named = seedCategory(acct({ name: "Depreciation Expense", fullyQualifiedName: "Other G&A:Depreciation Expense" }));
+  assert.deepEqual({ c: named.category, t: named.treatment }, { c: "OTHER", t: "NON_OPERATING" });
+  // The balance-sheet side of depreciation stays excluded.
+  const accumulated = seedCategory(
+    acct({ name: "Depreciation", fullyQualifiedName: "Truck:Depreciation", acctType: "Fixed Asset", acctSubType: "AccumulatedDepreciation", classification: "Asset" }),
+  );
+  assert.equal(accumulated.treatment, "EXCLUDED");
+  // Interest keeps its own bucket, and an operating expense named "Miscellaneous" stays in NOI.
+  assert.equal(seedCategory(acct({ name: "Interest expense", acctType: "Other Expense" })).treatment, "DEBT_INTEREST");
+  const service = seedCategory(acct({ name: "Commissions & fees", acctSubType: "OtherMiscellaneousServiceCost" }));
+  assert.deepEqual({ c: service.category, t: service.treatment }, { c: "OTHER_OPEX", t: "OPERATING_EXPENSE" });
 });

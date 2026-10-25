@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { CircleDashed, Check, Search } from "lucide-react";
+import { ChevronDown, CircleDashed, Check, Search } from "lucide-react";
 import {
   Autocomplete,
   Button as AriaButton,
@@ -17,7 +17,7 @@ import {
 import { Avatar } from "@/components/avatar";
 import { Popover } from "@/components/popover";
 import { Sheet } from "@/components/sheet";
-import { pickerChip } from "@/components/ui";
+import { pickerChip, pickerField, pickerFieldChevron } from "@/components/ui";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +51,11 @@ function valueOf(key: string): AssigneeValue {
  * Built as React Aria's searchable list (Autocomplete: a search field acting
  * as the combobox over a ListBox), because the trigger is a chip, not a
  * text field.
+ *
+ * `meId` is the signed-in user: below sm the trigger then shows first names,
+ * "Connor (me)" for them and "Zack" for anyone else, so a narrow column keeps
+ * the name whole. Only the label changes; the value stays `{ userId }`.
+ * `trigger="field"` is the field-height trigger (pickerField) for a form grid.
  */
 export function AssigneePicker({
   value,
@@ -58,6 +63,8 @@ export function AssigneePicker({
   contractors,
   onChange,
   label = "Assignee",
+  meId,
+  trigger = "chip",
   isDisabled,
   className,
 }: {
@@ -66,6 +73,10 @@ export function AssigneePicker({
   contractors: AssigneeContractor[];
   onChange: (value: AssigneeValue) => void;
   label?: string;
+  /** The signed-in user's id, for the short "First (me)" label below sm. */
+  meId?: string;
+  /** "chip" in a row of chips; "field" at field height in a form. */
+  trigger?: "chip" | "field";
   isDisabled?: boolean;
   className?: string;
 }) {
@@ -75,6 +86,10 @@ export function AssigneePicker({
   const user = value && "userId" in value ? users.find((u) => u.id === value.userId) : undefined;
   const contractor = value && "contactId" in value ? contractors.find((c) => c.id === value.contactId) : undefined;
   const name = user ? user.name || user.email : contractor?.name;
+  // Below sm, with meId: first names, and "(me)" for the signed-in user.
+  const first = name?.trim().split(/\s+/)[0];
+  const short = meId && first ? (user?.id === meId ? `${first} (me)` : first) : null;
+  const field = trigger === "field";
 
   function pick(key: string | null) {
     setOpen(false);
@@ -96,17 +111,32 @@ export function AssigneePicker({
     <DialogTrigger isOpen={open} onOpenChange={setOpen}>
       <AriaButton
         isDisabled={isDisabled}
-        aria-label={`${label}: ${name ?? "Unassigned"}`}
-        className={cn(pickerChip, "pl-1", !name && "pl-2 text-muted", className)}
+        className={cn(
+          field ? pickerField : pickerChip,
+          field ? name && "pl-2" : cn("pl-1", !name && "pl-2"),
+          !name && (field ? "text-fg-3" : "text-muted"),
+          className,
+        )}
       >
+        {/* The name comes from the text shown, so it holds what's on screen at every width
+            ("Assignee: Connor (me)" below sm), for voice control (WCAG 2.5.3). */}
+        <span className="sr-only">{`${label}: `}</span>
         {user ? (
           <Avatar name={user.name} email={user.email} size={20} />
         ) : contractor ? (
           <Avatar name={contractor.name} size={20} outline />
         ) : (
-          <CircleDashed aria-hidden="true" />
+          <CircleDashed aria-hidden="true" className={cn(field && "text-fg-3")} />
         )}
-        <span className="truncate">{name ?? "Unassigned"}</span>
+        {short ? (
+          <>
+            <span className={cn("truncate sm:hidden", field && "flex-1")}>{short}</span>
+            <span className={cn("truncate max-sm:hidden", field && "flex-1")}>{name}</span>
+          </>
+        ) : (
+          <span className={cn("truncate", field && "flex-1")}>{name ?? "Unassigned"}</span>
+        )}
+        {field && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
       </AriaButton>
       {touch ? (
         <Sheet title={label}>{panel}</Sheet>

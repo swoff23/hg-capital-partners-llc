@@ -88,7 +88,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
               <tbody className="divide-y divide-line">
                 {data.recentLines.map((l, i) => {
                   // Signed from the treatment: money in reads in --ok, money out takes the minus.
-                  const cents = signedLineCents(l.treatment, l.amountCents);
+                  const cents = signedLineCents(l.treatment, l.amountCents, l.category);
                   return (
                     <tr key={i}>
                       <Td className="num w-px whitespace-nowrap align-middle text-meta text-fg-3">

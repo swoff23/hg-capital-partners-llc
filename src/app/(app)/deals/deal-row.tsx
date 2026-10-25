@@ -131,18 +131,18 @@ export function DealRowEditable({ deal }: { deal: DealRow }) {
         />
       </Td>
 
-      {/* An empty cell is the dash in --fg-3, like units and prices (section 3). */}
+      {/* An empty cell is the dash in --fg-3, like units and prices (section 3). The latest note
+          alone, so the row stays 40px; its tooltip carries both, newest first, a line each. */}
       <Td className={cn("text-meta text-fg-3", COLUMN_DROP.latestNote)}>
         {deal.latestNotes.length === 0 ? (
           <span aria-label="No notes">—</span>
         ) : (
-          <div className="space-y-0.5">
-            {deal.latestNotes.map((n, i) => (
-              <Tooltip key={i} label={n.day ? `${n.body} (${n.day})` : n.body} className="block truncate">
-                <span className="truncate">{n.body}</span>
-              </Tooltip>
-            ))}
-          </div>
+          <Tooltip
+            label={deal.latestNotes.map((n) => (n.day ? `${n.body} (${n.day})` : n.body)).join("\n")}
+            className="block truncate"
+          >
+            <span className="truncate">{deal.latestNotes[0].body}</span>
+          </Tooltip>
         )}
       </Td>
 

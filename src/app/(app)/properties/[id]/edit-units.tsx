@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Code } from "@/components/code";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
-import { Button, SectionCard, Table, Td, Th, buttonClass, fieldClass, selectTouchHeight } from "@/components/ui";
+import { AddRow, Button, SectionCard, Table, Td, Th, buttonClass, fieldClass, selectTouchHeight } from "@/components/ui";
 import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
 import {
   isHouseMeterRow,
@@ -25,7 +25,7 @@ import { EQUIPMENT_TYPES } from "@/lib/config";
 import { callAction } from "@/lib/action-result";
 import { updatePropertyUnits } from "../actions";
 import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
-import { AddRow, SaveError } from "./record-ui";
+import { SaveError } from "./record-ui";
 
 /** A field in a dense editor row: 32px with a mouse, 44 on touch. */
 const inp = cn(fieldClass, "h-8");

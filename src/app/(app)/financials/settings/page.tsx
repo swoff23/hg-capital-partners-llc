@@ -182,7 +182,9 @@ export default async function FinancialsSettingsPage({
                 }
                 bad={dq.negativeReclass.lineCount > 5}
               />
-              {/* the same figure as the Overview's "Not assigned to a property" row */}
+              {/* The same figures as the Overview's "Not assigned to a property" row: operating
+                  income and expense, the lines inside NOI. The rows above count every line's money in
+                  and out, below-NOI expense and interest too, so the note says which this is. */}
               <DqRow
                 label="Not assigned to a property"
                 value={
@@ -192,7 +194,7 @@ export default async function FinancialsSettingsPage({
                   </>
                 }
                 bad={false}
-                note="Map classes below"
+                note="Operating lines only. Map classes below"
               />
               {dq.ignored.lineCount > 0 && (
                 <DqRow

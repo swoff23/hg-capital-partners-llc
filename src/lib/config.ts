@@ -14,6 +14,17 @@ export const DEAL_STATUSES = [
 
 export type DealStatus = (typeof DEAL_STATUSES)[number];
 
+/**
+ * How a stage reads on screen where the stored value doesn't: the spreadsheet's
+ * "CLOSED!" is "Closed". The stored value, the filters and the URL keep it.
+ */
+const DEAL_STATUS_LABEL: Partial<Record<DealStatus, string>> = { "CLOSED!": "Closed" };
+
+/** A deal stage's display label: "Closed" for "CLOSED!", anything else as stored. */
+export function dealStatusLabel(status: string): string {
+  return DEAL_STATUS_LABEL[status as DealStatus] ?? status;
+}
+
 export function isDealStatus(s: unknown): s is DealStatus {
   return typeof s === "string" && (DEAL_STATUSES as readonly string[]).includes(s);
 }

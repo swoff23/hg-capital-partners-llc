@@ -18,7 +18,7 @@ import { Button, Kbd } from "@/components/ui";
  * full width with the primary on top, however many there are, as Apple's
  * alerts do when labels don't fit side by side, so no label wraps at 320.
  * `busy` holds it open, Cancel disabled, while the action runs. With two
- * actions after Cancel (Keep data, Delete everything) it's 448px wide, not
+ * actions after Cancel (Keep data, Delete synced data) it's 448px wide, not
  * 384, so the three sit on one row from sm.
  */
 export function ConfirmDialog({

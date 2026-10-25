@@ -150,7 +150,8 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <span className="min-w-0 truncate text-body font-medium text-fg-1">{job.title}</span>
+          {/* flex-1, so the "2 new" mark holds the row's top-right corner on every card. */}
+          <span className="min-w-0 flex-1 truncate text-body font-medium text-fg-1">{job.title}</span>
           {job.newCount > 0 && (
             <span className="inline-flex shrink-0 items-center gap-1.5 text-meta font-medium text-fg-1">
               <span aria-hidden="true" className="size-2 rounded-full bg-act" />

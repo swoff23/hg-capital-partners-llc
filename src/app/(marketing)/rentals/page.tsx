@@ -83,8 +83,9 @@ export default async function RentalsPage() {
       <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>Apartments in Buffalo.</h1>
 
       {available === 0 && (
+        // No link until there's a Zillow profile URL (docs/todo-for-connor.md).
         <p className={cn(publicType.lead, "mt-3 max-w-xl text-fg-3")}>
-          No openings right now. Check back soon.
+          No openings right now. Check back soon. Our homes are also listed on Zillow.
         </p>
       )}
 

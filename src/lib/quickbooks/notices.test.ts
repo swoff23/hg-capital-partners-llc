@@ -94,29 +94,29 @@ test("reconcileRow: the review's case, Accrual NOI $50 off while Cash ties", () 
   const rec = { CASH: tied, ACCRUAL: { ...tied, noiVsQbo: { ok: false, residualCents: -5_000 } } };
   assert.deepEqual(reconcileRow(rec, "ACCRUAL"), {
     label: "Accrual reconciliation",
-    text: "NOI off by $50 · net income ties · account totals tie",
+    text: "NOI off by $50 · net income matches · account totals match",
     ok: false,
   });
   assert.deepEqual(reconcileRow(rec, "CASH"), {
     label: "Cash reconciliation",
-    text: "NOI ties · net income ties · account totals tie",
+    text: "NOI matches · net income matches · account totals match",
     ok: true,
   });
 });
 
 test("reconcileRow: names what the banner names, net income from either check", () => {
   const whole = { CASH: { ...tied, sumToWhole: { ok: false, deltaCents: 12_345 } } };
-  assert.equal(reconcileRow(whole, "CASH")?.text, "NOI ties · net income off by $123 · account totals tie");
+  assert.equal(reconcileRow(whole, "CASH")?.text, "NOI matches · net income off by $123 · account totals match");
   assert.equal(reconcileRow(whole, "CASH")?.ok, false);
   const identity = { CASH: { ...tied, netIncomeIdentity: { ok: false, deltaCents: -40 } } };
-  assert.equal(reconcileRow(identity, "CASH")?.text, "NOI ties · net income off by under $1 · account totals tie");
+  assert.equal(reconcileRow(identity, "CASH")?.text, "NOI matches · net income off by under $1 · account totals match");
   assert.equal(
     reconcileRow({ CASH: { ...tied, cellMismatches: [{}] } }, "CASH")?.text,
-    "NOI ties · net income ties · 1 account total doesn't match",
+    "NOI matches · net income matches · 1 account total doesn't match",
   );
   assert.equal(
     reconcileRow({ CASH: { ...tied, cellMismatches: [{}, {}, {}] } }, "CASH")?.text,
-    "NOI ties · net income ties · 3 account totals don't match",
+    "NOI matches · net income matches · 3 account totals don't match",
   );
 });
 

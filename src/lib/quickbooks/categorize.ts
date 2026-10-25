@@ -7,7 +7,8 @@ import type { QboCategory, QboTreatment } from "@prisma/client";
  *   category  = the human-facing bucket (drives the expense-by-category bars)
  *   treatment = the coarse bucket the NOI math groups by
  *
- * Order: explicit per-account override -> Intuit acctSubType -> name regex ->
+ * Order: explicit per-account override -> below NOI (depreciation and the
+ * other non-operating expenses) -> Intuit acctSubType -> name regex ->
  * acctType fallback.
  */
 
@@ -59,6 +60,14 @@ export function treatmentForCategory(
     case "OTHER_OPEX":
     case "UNCATEGORIZED":
       return "OPERATING_EXPENSE";
+    case "OTHER":
+      // "Other" on an expense account is below NOI, where the seed puts
+      // depreciation and penalties (see below NOI), so picking it in Settings
+      // means the same thing as the seed: out of NOI, still in net income.
+      // "Other operating" (OTHER_OPEX) is the one inside NOI.
+      if (classification === "Expense") return "NON_OPERATING";
+      if (classification === "Revenue") return "OPERATING_INCOME";
+      return "EXCLUDED";
     default:
       if (classification === "Revenue") return "OPERATING_INCOME";
       if (classification === "Expense") return "OPERATING_EXPENSE";
@@ -138,6 +147,34 @@ export const ACCOUNT_OVERRIDES: Record<string, Override> = {
   "Short-term business loans": { category: "EXCLUDED", treatment: "EXCLUDED" },
   "Long-term business loans": { category: "EXCLUDED", treatment: "EXCLUDED" },
 };
+
+// --- below NOI -----------------------------------------------------------------
+// Expenses that aren't the cost of running the buildings: depreciation and
+// amortization (no cash goes out), penalties and settlements, and QuickBooks'
+// "Miscellaneous" Other Expense. QuickBooks reports them under Other Expense,
+// below its own Net Operating Income, so they stay out of our NOI too and still
+// lower net income: category OTHER, treatment NON_OPERATING (compute.ts signs
+// them as money out). Unlocked, like any seeded default, so a partner can move
+// one into NOI from Settings ("Other operating") and back out ("Other", which
+// treatmentForCategory puts below NOI for an expense account). Interest expense
+// has its own bucket above.
+// Matched on the Intuit subtype, and on the name for an account without one.
+
+const BELOW_NOI_SUBTYPES = new Set([
+  "Depreciation",
+  "Amortization",
+  "PenaltiesSettlements",
+  "OtherMiscellaneousExpense",
+]);
+
+const BELOW_NOI_NAME = /\bdepreciat|\bamortiz/i;
+
+function isBelowNoiExpense(a: AccountInput): "subtype" | "regex" | null {
+  if (a.classification !== "Expense") return null;
+  if (a.acctSubType && BELOW_NOI_SUBTYPES.has(a.acctSubType)) return "subtype";
+  if (BELOW_NOI_NAME.test(a.name) || BELOW_NOI_NAME.test(a.fullyQualifiedName)) return "regex";
+  return null;
+}
 
 // --- Intuit acctSubType map (only the reliable ones) -----------------------
 
@@ -232,6 +269,9 @@ export function seedCategory(a: AccountInput): Seeded {
       source: "override",
     };
   }
+
+  const belowNoi = isBelowNoiExpense(a);
+  if (belowNoi) return { category: "OTHER", treatment: "NON_OPERATING", locked: false, source: belowNoi };
 
   const bySub = a.acctSubType ? SUBTYPE_BUCKET[a.acctSubType] : undefined;
   if (bySub) return finalize(bySub, a, "subtype");

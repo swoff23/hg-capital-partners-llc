@@ -7,7 +7,7 @@ import { getEnv } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { PASSWORD_MESSAGES, isPasswordProblem, MIN_PASSWORD_LENGTH } from "@/lib/portal/credentials";
 import { resetTokenIsUsable } from "@/lib/portal/reset";
-import { AuthError, AuthFrame, authButtonClass, authLinkClass } from "../_components/auth-frame";
+import { AuthError, AuthFrame, AuthLabel, authButtonClass, authLinkClass } from "../_components/auth-frame";
 import { AuthSubmit } from "../_components/auth-submit";
 import { PasswordField } from "../_components/password-field";
 
@@ -49,25 +49,29 @@ export default async function ResetPasswordPage({ searchParams }: PageProps<"/lo
       {isPasswordProblem(error) && <AuthError>{PASSWORD_MESSAGES[error]}</AuthError>}
 
       {/* A plain POST to a route handler, not a server action: see submit/route.ts. */}
-      <form method="post" action="/login/reset/submit" className="mt-8 space-y-3 text-left">
+      <form method="post" action="/login/reset/submit" className="mt-8 space-y-4 text-left">
         <input type="hidden" name="token" value={token} />
-        <PasswordField
-          name="password"
-          placeholder="New password"
-          aria-label="New password"
-          autoComplete="new-password"
-          minLength={MIN_PASSWORD_LENGTH}
-          required
-          autoFocus
-        />
-        <PasswordField
-          name="confirm"
-          placeholder="New password again"
-          aria-label="New password again"
-          autoComplete="new-password"
-          minLength={MIN_PASSWORD_LENGTH}
-          required
-        />
+        <div>
+          <AuthLabel htmlFor="reset-password">New password</AuthLabel>
+          <PasswordField
+            id="reset-password"
+            name="password"
+            autoComplete="new-password"
+            minLength={MIN_PASSWORD_LENGTH}
+            required
+            autoFocus
+          />
+        </div>
+        <div>
+          <AuthLabel htmlFor="reset-confirm">New password again</AuthLabel>
+          <PasswordField
+            id="reset-confirm"
+            name="confirm"
+            autoComplete="new-password"
+            minLength={MIN_PASSWORD_LENGTH}
+            required
+          />
+        </div>
         {/* native: a second tap would spend the single-use token again and land on "This link has expired". */}
         <AuthSubmit native pendingLabel="Saving…">
           Save password

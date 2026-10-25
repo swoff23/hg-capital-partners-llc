@@ -356,14 +356,14 @@ function SectionBlock({
                         onChange={(r) => onItemChange(i, item.key, { rating: answer.rating === r ? "" : r })}
                       />
                     </div>
-                    {/* A quiet field: its text lines up with the item's label, and its edge shows on hover and focus. */}
+                    {/* A quiet field inside the column, so its edge, shown on hover and focus, lines up with the fields and rules around it. */}
                     <input
                       value={answer.comment}
                       onChange={(e) => onItemChange(i, item.key, { comment: e.target.value })}
                       placeholder="Comment (optional)"
                       aria-label={`${item.label} comment`}
                       className={cn(
-                        "-mx-2 mt-2 block h-8 w-[calc(100%+1rem)] rounded-md border border-transparent bg-transparent px-1.75 text-meta text-fg-1 outline-none placeholder:text-pub-faint pointer-coarse:min-h-11",
+                        "mt-2 block h-8 w-full rounded-md border border-transparent bg-transparent px-1.75 text-meta text-fg-1 outline-none placeholder:text-pub-faint pointer-coarse:min-h-11",
                         "hover:border-line focus:border-act focus:bg-surface focus:ring-1 focus:ring-inset focus:ring-act",
                       )}
                     />

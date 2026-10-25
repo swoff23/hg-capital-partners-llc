@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils";
  * whole code. `size="lg"` is the lockbox code on the job page and in Access.
  * `copyIcon={false}` drops the hover copy icon where a Copy button sits
  * beside the code, so the two don't double up (the job page's lockbox).
+ * `wrap` lets a long code break onto more lines inside its column instead
+ * of running past it: imported lockbox codes are free text ("4857 (back
+ * door)"), and a large one is about 13 characters wide at 375.
  *
  * Needs a ToastProvider above it (AppShell and the portal layout mount one).
  */
@@ -22,6 +25,7 @@ export function Code({
   mask = false,
   size = "md",
   copyIcon = true,
+  wrap = false,
   className,
 }: {
   value: string;
@@ -31,6 +35,8 @@ export function Code({
   size?: "md" | "lg";
   /** The copy icon that shows on hover; off where a Copy button is beside the code. */
   copyIcon?: boolean;
+  /** Wrap a long code inside its column (the job page's lockbox) rather than keep it on one line. */
+  wrap?: boolean;
   className?: string;
 }) {
   const { toast } = useToast();
@@ -47,21 +53,23 @@ export function Code({
   }
 
   return (
-    <span className={cn("inline-flex items-center gap-1 align-middle", className)}>
+    <span className={cn("inline-flex items-center gap-1 align-middle", wrap && "max-w-full", className)}>
       <button
         type="button"
         onClick={copy}
         // Names the code itself, not only the action: "Lockbox code 4521, copy".
         aria-label={`${label} ${shown ? value : `ending ${value.slice(-4)}`}, copy`}
         className={cn(
-          "group relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm font-mono text-fg-2 transition-colors hover:text-fg-1",
+          "group relative inline-flex items-center gap-1.5 rounded-sm font-mono text-fg-2 transition-colors hover:text-fg-1",
+          wrap ? "min-w-0 whitespace-normal text-left" : "shrink-0 whitespace-nowrap",
           size === "lg" ? "text-code-l" : "text-code",
           // A 44px hit area on touch without the code growing.
           "pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-3",
         )}
       >
-        {/* Never truncated: a code is read character by character, so the cell gives it room. */}
-        <span>{text}</span>
+        {/* Never truncated: a code is read character by character, so the cell gives it room. A wrapping
+            code breaks at its spaces, and inside a token only when that token alone is wider than the column. */}
+        <span className={cn(wrap && "min-w-0 break-words")}>{text}</span>
         {copyIcon && (
           <Copy
             aria-hidden="true"

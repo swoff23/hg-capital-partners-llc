@@ -1,6 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, PageHeader, Section } from "@/components/ui";
+import { MoreHorizontal, Trash2 } from "lucide-react";
+import { Button as AriaButton } from "react-aria-components";
+import { AddRow, Button, Section, buttonClass } from "@/components/ui";
+import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
 import { callAction } from "@/lib/action-result";
@@ -8,7 +11,7 @@ import { cn, fmtMoney } from "@/lib/utils";
 import { EQUIPMENT_TYPES } from "@/lib/config";
 import { DEFAULT_CAPEX_RULES, type BuildingRule, type CapexRules } from "@/lib/property-types";
 import { saveCapexRules } from "./actions";
-import { AddButton, RevealRemoveButton, editorBleed, quietField, revealRow } from "./editor-controls";
+import { RevealRemoveButton, editorBleed, quietField, revealRow } from "./editor-controls";
 
 /**
  * Local editor state widens BuildingRule.key to allow `null` — a system just
@@ -41,6 +44,9 @@ const phoneName = "max-[480px]:col-span-3";
 /** The table's width from 480px; below that the two-line rows fit the screen. */
 const tableMin = "min-[481px]:min-w-115 min-[481px]:pointer-coarse:min-w-120";
 
+/** An add-row at a table's foot: its rule spans the rows' dividers, its text on the gutter like theirs. */
+const addRowBleed = "-mx-1.75 w-[calc(100%+0.875rem)] px-1.75";
+
 /** A group's label inside Building systems, on the field text's 7px inset. */
 const subhead = "px-1.75 pb-1 pt-3 text-meta font-medium text-fg-2";
 
@@ -51,9 +57,10 @@ const parseNum = (s: string) => {
 };
 
 /**
- * One row of the rules table, on a --line divider. Its delete is
- * RevealRemoveButton: under the pointer with a mouse, and while focus is in
- * the row, so touch is tap to reveal, never a trash on every row.
+ * One row of the rules table, on a --line divider. With a mouse its delete is
+ * RevealRemoveButton, under the pointer and while focus is in the row. Touch
+ * has no hover, so there the row ends in a ⋯ menu with Delete, as the
+ * property's Units rows do: never a trash on every row.
  */
 function RuleRow({
   label,
@@ -72,7 +79,24 @@ function RuleRow({
     <div data-reveal-row className={cn(rowGrid, revealRow, "py-1.25 transition-colors hover:bg-fill-1 pointer-coarse:py-0.5")}>
       {children}
       {canRemove ? (
-        <RevealRemoveButton onRemove={onRemove} aria-label={`Remove ${label || "this row"}`} className={slot} />
+        <span className={cn("flex", slot)}>
+          <RevealRemoveButton onRemove={onRemove} aria-label={`Remove ${label || "this row"}`} className="pointer-coarse:hidden" />
+          <span className="pointer-fine:hidden">
+            <MenuTrigger>
+              <AriaButton
+                aria-label={`${label || "This row"} actions`}
+                className={buttonClass({ variant: "ghost", size: "sm", icon: true })}
+              >
+                <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
+              </AriaButton>
+              <Menu>
+                <MenuItem variant="destructive" icon={<Trash2 />} onAction={onRemove}>
+                  Delete
+                </MenuItem>
+              </Menu>
+            </MenuTrigger>
+          </span>
+        </span>
       ) : (
         <span className={slot} />
       )}
@@ -258,14 +282,14 @@ export function CapexRulesEditor({
     if (availableApplianceTypes.length === 0) return;
     persist({
       ...rules,
-      equipment: [{ type: availableApplianceTypes[0], monitor: 0, replace: 0, cost: 0 }, ...rules.equipment],
+      equipment: [...rules.equipment, { type: availableApplianceTypes[0], monitor: 0, replace: 0, cost: 0 }],
     });
   }
   function addCoreSystem() {
     if (missingCoreTypes.length === 0) return;
     persist({
       ...rules,
-      equipment: [{ type: missingCoreTypes[0], monitor: 0, replace: 0, cost: 0 }, ...rules.equipment],
+      equipment: [...rules.equipment, { type: missingCoreTypes[0], monitor: 0, replace: 0, cost: 0 }],
     });
   }
 
@@ -292,7 +316,7 @@ export function CapexRulesEditor({
     let label = base;
     let n = 2;
     while (buildingLabelsLc.includes(label.toLowerCase())) label = `${base} ${n++}`;
-    persist({ ...rules, building: [{ key: null, label, monitor: 0, replace: 0, defaultCost: 0 }, ...rules.building] });
+    persist({ ...rules, building: [...rules.building, { key: null, label, monitor: 0, replace: 0, defaultCost: 0 }] });
   }
   function resetToDefaults() {
     setConfirmReset(false);
@@ -301,26 +325,15 @@ export function CapexRulesEditor({
 
   return (
     <div className="space-y-8 pointer-coarse:space-y-6">
-      <PageHeader
-        title="Settings"
-        subtitle="CapEx planning rules"
-        actions={
-          <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmReset(true)}>
-            Reset to defaults
-          </Button>
-        }
-      />
+      {/* The tab's one action, at the top right of its content; a refused save's line beside it. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-meta text-danger">{error}</p>
+        <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={() => setConfirmReset(true)}>
+          Reset to defaults
+        </Button>
+      </div>
 
-      {error && <p className="text-meta text-danger">{error}</p>}
-
-      <Section
-        title="Appliances"
-        actions={
-          <AddButton onClick={addAppliance} disabled={availableApplianceTypes.length === 0}>
-            Add appliance
-          </AddButton>
-        }
-      >
+      <Section title="Appliances">
         {/* From 480px, narrower than its columns (460px, 480 on touch), the table scrolls sideways in
             its own box, never the page; below that each row takes two lines and fits. */}
         <div className={cn("overflow-x-auto", editorBleed)}>
@@ -363,26 +376,13 @@ export function CapexRulesEditor({
             </div>
           </div>
         </div>
+        {/* The list's last row adds one more, as Add unit ends the Units list; it's off once every type has a rule. */}
+        <AddRow onClick={addAppliance} disabled={availableApplianceTypes.length === 0} className={addRowBleed}>
+          Add appliance
+        </AddRow>
       </Section>
 
-      <Section
-        title="Building systems"
-        actions={
-          // Below sm a pair drops its Plus icons and sits 12px apart, so at 320 "Building
-          // systems" keeps room for its longest word beside "Add Water Heater". Alone, Add
-          // system keeps its Plus, which is what marks it as an action.
-          <div className="flex items-center gap-3 sm:gap-4">
-            <AddButton tight={missingCoreTypes.length > 0} onClick={addBuildingSystem}>
-              Add system
-            </AddButton>
-            {missingCoreTypes.length > 0 && (
-              <AddButton tight onClick={addCoreSystem}>
-                Add {missingCoreTypes[0]}
-              </AddButton>
-            )}
-          </div>
-        }
-      >
+      <Section title="Building systems">
         <div className={cn("overflow-x-auto", editorBleed)}>
           <div className={tableMin}>
             {headerRow("System")}
@@ -460,6 +460,16 @@ export function CapexRulesEditor({
             </div>
           </div>
         </div>
+        {/* Each group's add at the list's foot: a deleted per-unit system comes back by name, and Add
+            system starts a per-building one. */}
+        {missingCoreTypes.length > 0 && (
+          <AddRow onClick={addCoreSystem} className={addRowBleed}>
+            Add {missingCoreTypes[0]}
+          </AddRow>
+        )}
+        <AddRow onClick={addBuildingSystem} className={addRowBleed}>
+          Add system
+        </AddRow>
       </Section>
 
       {confirmReset && (

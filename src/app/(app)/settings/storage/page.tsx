@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { attachmentCounts } from "@/lib/attachments/migrate";
-import { PageHeader, Section } from "@/components/ui";
+import { Section } from "@/components/ui";
 import { MigrateButton } from "./migrate-button";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,6 @@ export default async function StorageSettingsPage() {
 
   return (
     <div className="space-y-8 pointer-coarse:space-y-6">
-      <PageHeader title="Settings" subtitle="Where uploaded documents live" />
       <Section title="Documents">
         <div className="max-w-prose space-y-3 text-pretty text-body">
           {/* Private blobs are served to signed-in users through /api/files; listing photos stay public for the public site. */}

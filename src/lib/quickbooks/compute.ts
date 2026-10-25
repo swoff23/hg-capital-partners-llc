@@ -14,6 +14,13 @@ import type { QboCategory, QboLineTag, QboTreatment } from "@prisma/client";
  *   NOI               = operating income − operating expense
  *   NOI after interest = NOI − debt interest       (not cash flow: principal is balance-sheet, not here)
  *
+ * NON_OPERATING is below NOI in both directions: bank interest and owner-funded
+ * "rent" are money in, and an expense account seeded there (depreciation,
+ * penalties and settlements, miscellaneous: QuickBooks' Other Expense, under its
+ * own Net Operating Income) is money out. The category says which: RENT and
+ * OTHER_INCOME are income, anything else on a NON_OPERATING line is an expense.
+ * Neither direction touches NOI; both reach net income.
+ *
  * Activity not assigned to a property (entity / overhead / unmapped / no-class) is included in the
  * portfolio scope and excluded per-property; the caller filters by `propertyId`.
  */
@@ -40,6 +47,7 @@ export interface NoiResult {
 
   // memo — shown, never folded into NOI
   nonOperatingIncomeCents: number; // bank interest
+  nonOperatingExpenseCents: number; // depreciation, penalties, other expense below NOI
   ownerFundedCents: number; // "rent" that was an owner P2P
   subsidyCents: number; // Section-8 (a subset of rent, informational)
   excludedCents: number; // suspense, transfers, everything EXCLUDED
@@ -96,18 +104,29 @@ export function monthsOfData(months: string[], opts: MonthsOfDataOpts = {}) {
   return { n: monthDiff(first, last) + 1, first, last };
 }
 
+/** The categories that are money in on a NON_OPERATING line: owner-funded rent and bank interest. */
+const NON_OPERATING_INCOME = new Set<QboCategory>(["RENT", "OTHER_INCOME"]);
+
+/** A below-NOI expense: a NON_OPERATING line whose category isn't income (depreciation, penalties). */
+export function isNonOperatingExpense(treatment: QboTreatment, category: QboCategory): boolean {
+  return treatment === "NON_OPERATING" && !NON_OPERATING_INCOME.has(category);
+}
+
 /**
  * A line's amount as money in (positive) or money out (negative). Stored
  * amounts are positive for both income and expense, so a $1,350 rent deposit
  * and a $1,350 repair look the same until the treatment signs them. A negative
  * expense (a refund or reclass) comes out positive: money back in. EXCLUDED
  * lines (transfers, principal, suspense) aren't money in or out, so they're 0.
+ * A NON_OPERATING line is money in unless its category makes it a below-NOI
+ * expense (isNonOperatingExpense).
  */
-export function signedLineCents(treatment: QboTreatment, amountCents: number): number {
+export function signedLineCents(treatment: QboTreatment, amountCents: number, category: QboCategory): number {
   switch (treatment) {
     case "OPERATING_INCOME":
-    case "NON_OPERATING":
       return amountCents;
+    case "NON_OPERATING":
+      return isNonOperatingExpense(treatment, category) ? -amountCents : amountCents;
     case "OPERATING_EXPENSE":
     case "DEBT_INTEREST":
       return -amountCents;
@@ -122,6 +141,7 @@ export function computeNoi(lines: ComputeLine[], opts: MonthsOfDataOpts = {}): N
   let operatingExpense = 0;
   let debtInterest = 0;
   let nonOperatingIncome = 0;
+  let nonOperatingExpense = 0;
   let ownerFunded = 0;
   let subsidy = 0;
   let excluded = 0;
@@ -153,6 +173,7 @@ export function computeNoi(lines: ComputeLine[], opts: MonthsOfDataOpts = {}): N
         break;
       case "NON_OPERATING":
         if (l.category === "RENT") ownerFunded += l.amountCents;
+        else if (isNonOperatingExpense(l.treatment, l.category)) nonOperatingExpense += l.amountCents;
         else nonOperatingIncome += l.amountCents;
         break;
       case "EXCLUDED":
@@ -177,6 +198,7 @@ export function computeNoi(lines: ComputeLine[], opts: MonthsOfDataOpts = {}): N
     debtInterestCents: debtInterest,
     noiAfterInterestCents: noi - debtInterest,
     nonOperatingIncomeCents: nonOperatingIncome,
+    nonOperatingExpenseCents: nonOperatingExpense,
     ownerFundedCents: ownerFunded,
     subsidyCents: subsidy,
     excludedCents: excluded,

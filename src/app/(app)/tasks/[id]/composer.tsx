@@ -203,7 +203,8 @@ export function Composer({
         uploader.addFiles(e.dataTransfer.files);
       }}
       className={cn(
-        "group/composer border transition-colors",
+        // A container, so the tools row can drop the keycap when the column is narrow (lg with the sidebar pinned).
+        "group/composer @container/composer border transition-colors",
         "max-md:sticky max-md:bottom-0 max-md:z-20 max-md:-mx-4 max-md:-mb-4 max-md:border-x-0 max-md:border-b-0 max-md:pb-[env(safe-area-inset-bottom)]",
         // Flat, like every field and bar: an edge, no shadow.
         "md:rounded-lg",
@@ -278,7 +279,7 @@ export function Composer({
           ]}
         />
         {/* The keys that send from the text box, printed for a mouse; Kbd hides on touch. */}
-        <Kbd aria-hidden="true" className="ml-1 max-md:hidden">
+        <Kbd aria-hidden="true" className="ml-1 shrink-0 whitespace-nowrap max-md:hidden @max-md/composer:hidden">
           {apple ? "⌘↵" : "Ctrl ↵"}
         </Kbd>
         {sendButton("hidden md:inline-flex")}
@@ -310,7 +311,7 @@ function IconButton({
       // A ghost icon button with its icon idle in --fg-3, --fg-1 on hover.
       className={cn(
         buttonClass({ variant: "ghost", icon: true }),
-        "text-fg-3 [&_svg]:size-4.5",
+        "shrink-0 text-fg-3 [&_svg]:size-4.5",
         onFill && "not-disabled:hover:bg-fill-2",
         className,
       )}

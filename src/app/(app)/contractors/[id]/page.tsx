@@ -20,6 +20,9 @@ import { firstName } from "@/lib/names";
 import { ContactLink } from "../contact-link";
 import { PortalAccessCard } from "./portal-access-card";
 
+/** The Jobs list's length; the heading's count is every job. */
+const JOBS_SHOWN = 60;
+
 /**
  * The origin for the sign-in link in the login text: APP_URL, or this
  * request's own origin until APP_URL is set (getEnv().appUrl throws in
@@ -78,14 +81,14 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   const coiOnFile = docOnFile(c.comments, "Insurance");
 
   // Their jobs: tasks actually assigned to this contact, never a playbook's
-  // template rows. The list stops at 60; the count is all of them.
+  // template rows. The list stops at JOBS_SHOWN and says so; the count is all of them.
   const jobsWhere = { assigneeContactId: c.id, ...excludeTemplateTasks };
   const [rows, jobCount] = await Promise.all([
     prisma.task.findMany({
       where: jobsWhere,
       orderBy: [{ completedAt: { sort: "desc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }],
       include: { property: { select: { id: true, address: true } } },
-      take: 60,
+      take: JOBS_SHOWN,
     }),
     prisma.task.count({ where: jobsWhere }),
   ]);
@@ -272,6 +275,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               })}
             </ul>
           )}
+          {jobCount > tasks.length && <p className="mt-3 text-meta text-fg-3">Showing the latest {JOBS_SHOWN}</p>}
         </Section>
       </div>
     </div>

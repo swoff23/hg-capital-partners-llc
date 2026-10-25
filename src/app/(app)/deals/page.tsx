@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { LinkButton, PageHeader, Table, Th, EmptyState, chromeIconClass } from "@/components/ui";
-import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES } from "@/lib/config";
+import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES, dealStatusLabel } from "@/lib/config";
 import { todayYmdEastern } from "@/lib/dates";
 import { DealFilters } from "./filters";
 import { DealRowEditable } from "./deal-row";
@@ -71,8 +71,8 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     selectedStatuses.length > 1
       ? `${selectedStatuses.length} statuses`
       : selectedStatuses.length === 1
-        ? selectedStatuses[0]
-        : (VIEW_LABEL[statusFilter] ?? statusFilter);
+        ? dealStatusLabel(selectedStatuses[0])
+        : (VIEW_LABEL[statusFilter] ?? dealStatusLabel(statusFilter));
   const narrowed = Boolean(sp.q) || scope !== "";
   const emptyLine = !narrowed
     ? "No deals yet. New ones show up here."

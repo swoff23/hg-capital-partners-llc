@@ -1,7 +1,6 @@
 "use client";
 import { Button, Input, SectionCard, Select } from "@/components/ui";
 import { Code } from "@/components/code";
-import { Money } from "@/components/money";
 import { loanPosition } from "@/lib/properties/figures";
 import { LabeledField as L } from "../labeled-field";
 import { dayFact, moneyFact, textFact } from "./fact-values";
@@ -11,7 +10,7 @@ import { useSectionSave } from "./use-section-save";
 
 export type EditableLoan = {
   id: string;
-  /** The property's value, for equity and LTV; edited under Details. */
+  /** The property's value, for LTV; edited under Details. */
   value: string | null;
   currentLoan: string | null;
   lender: string | null;
@@ -50,8 +49,8 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
           <RailFact label="Balance" empty="Add balance" onAdd={() => open("currentLoan")}>
             {moneyFact(p.currentLoan)}
           </RailFact>
-          {/* Derived from value and balance: nothing to add here, so an empty one is the dash. */}
-          <RailFact label="Equity">{position.equity == null ? null : <Money value={position.equity} />}</RailFact>
+          {/* Derived from value and balance: nothing to add here, so an empty one is the dash. Equity isn't
+              repeated here, since the fact strip over the record shows it; each figure shows once. */}
           <RailFact label="LTV">{position.ltv && <span className="num">{position.ltv}</span>}</RailFact>
           <RailFact label="Lender" empty="Add lender" onAdd={() => open("lender")}>
             {textFact(p.lender)}

@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma, QboBasis } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { isNonOperatingExpense } from "./compute";
 import { looksLikeProperty } from "./mapping";
 import { inOutCents } from "./rollup";
 import { UNCLASSED } from "./types";
@@ -65,16 +66,22 @@ async function splitWhere(where: Prisma.LedgerLineWhereInput): Promise<LineSplit
 
 async function netIncomeCents(realmId: string, basis: QboBasis): Promise<number> {
   const rows = await prisma.ledgerLine.groupBy({
-    by: ["treatment"],
+    by: ["treatment", "category"],
     where: { realmId, basis, ...COUNTED },
     _sum: { amount: true },
   });
   let net = 0;
   for (const row of rows) {
     const c = d2c(row._sum.amount);
-    // income treatments add, expense treatments subtract; EXCLUDED lines are
-    // below the P&L line but QBO's "Net Income" still nets them, so include all
-    if (row.treatment === "OPERATING_EXPENSE" || row.treatment === "DEBT_INTEREST") net -= c;
+    // income treatments add, expense treatments subtract (a below-NOI expense
+    // too); EXCLUDED lines are below the P&L line but QBO's "Net Income" still
+    // nets them, so include all
+    if (
+      row.treatment === "OPERATING_EXPENSE" ||
+      row.treatment === "DEBT_INTEREST" ||
+      isNonOperatingExpense(row.treatment, row.category)
+    )
+      net -= c;
     else net += c;
   }
   return net;

@@ -2,47 +2,53 @@
 import { useState, type ComponentProps } from "react";
 import { ChevronDown } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
-import { StatusMark } from "@/components/status-badge";
+import { StatusMark, type StageFill } from "@/components/status-badge";
 import { fieldClass } from "@/components/ui";
-import { DEAL_STATUSES, type DealStatus } from "@/lib/config";
+import { DEAL_STATUSES, dealStatusLabel, type DealStatus } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 /*
  * Deal stages on the status ring (docs/brand-guidelines.md, section 9): the
- * ring fills by stage in --fg-2, Closed is the filled ring in --ok and Pass is
- * the slashed ring. StatusMark draws the task glyphs only, so each stage
- * borrows the nearest one and sets its own tone instead of drawing a second
- * copy of the ring. 3 - Low shares the empty ring with TBD until StatusMark
- * has a quarter fill; the stage's name tells them apart.
+ * ring fills by priority through StatusMark's stage variant, in --fg-2. High
+ * is the full ring, Medium three-quarters, Low half, To Schedule a quarter
+ * and TBD empty. Holding is the pause bars, Closed the check in --ok and Pass
+ * the slash, as the task marks draw them.
  */
-const STAGE_MARK: Record<DealStatus, { glyph: TaskStatus; tone: string }> = {
-  "1 - High": { glyph: "REVIEW", tone: "text-fg-2" }, // three-quarter ring
-  "2 - Medium": { glyph: "IN_PROGRESS", tone: "text-fg-2" }, // half ring
-  "3 - Low": { glyph: "OPEN", tone: "text-fg-2" }, // empty ring
-  "4 - To Schedule": { glyph: "SCHEDULED", tone: "text-fg-2" }, // clock hands
-  "5 - TBD": { glyph: "OPEN", tone: "text-fg-2" },
+type Mark = { stage: StageFill } | { glyph: TaskStatus; tone: string };
+
+const STAGE_MARK: Record<DealStatus, Mark> = {
+  "1 - High": { stage: "full" },
+  "2 - Medium": { stage: "three-quarter" },
+  "3 - Low": { stage: "half" },
+  "4 - To Schedule": { stage: "quarter" },
+  "5 - TBD": { stage: "empty" },
   "6 - Holding": { glyph: "WAITING", tone: "text-fg-2" }, // pause bars
   "CLOSED!": { glyph: "DONE", tone: "text-ok" },
   Pass: { glyph: "CANCELED", tone: "text-fg-2" },
 };
 
 /** A legacy stage no longer in DEAL_STATUSES (the column's old "Active" default). */
-const UNKNOWN_STAGE = { glyph: "OPEN", tone: "text-fg-2" } as const;
+const UNKNOWN_STAGE: Mark = { stage: "empty" };
 
 const stageMark = (stage: string) => STAGE_MARK[stage as DealStatus] ?? UNKNOWN_STAGE;
+const toneOf = (mark: Mark) => ("tone" in mark ? mark.tone : "text-fg-2");
 
 /** A deal stage's ring: 14px with a mouse, 16px on touch, in the stage's tone. */
 export function DealStageMark({ stage, className }: { stage: string; className?: string }) {
-  const { glyph, tone } = stageMark(stage);
-  return <StatusMark status={glyph} className={cn(tone, className)} />;
+  const mark = stageMark(stage);
+  return "stage" in mark ? (
+    <StatusMark stage={mark.stage} className={className} />
+  ) : (
+    <StatusMark status={mark.glyph} className={cn(mark.tone, className)} />
+  );
 }
 
 /** A deal's stage as its ring and its name, both in the stage's tone. The phone row's subline leads with it. */
 export function DealStage({ stage, className }: { stage: string; className?: string }) {
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-1.5", stageMark(stage).tone, className)}>
+    <span className={cn("inline-flex min-w-0 items-center gap-1.5", toneOf(stageMark(stage)), className)}>
       <DealStageMark stage={stage} />
-      <span className="truncate">{stage}</span>
+      <span className="truncate">{dealStatusLabel(stage)}</span>
     </span>
   );
 }
@@ -105,7 +111,7 @@ export function StageSelect({
       >
         {stages.map((s) => (
           <option key={s} value={s}>
-            {s}
+            {dealStatusLabel(s)}
           </option>
         ))}
       </select>

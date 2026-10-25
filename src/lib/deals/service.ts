@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
 import { initials } from "@/lib/utils";
-import { isDealStatus, type DealStatus } from "@/lib/config";
+import { dealStatusLabel, isDealStatus, type DealStatus } from "@/lib/config";
 import { logDealChanges } from "./log";
 
 /**
@@ -78,7 +78,7 @@ export async function createDeal(
       nextAction: input.nextAction || null,
     },
   });
-  await logDealChanges(deal.id, actor, [`Deal created (status ${deal.status})`]);
+  await logDealChanges(deal.id, actor, [`Deal created (status ${dealStatusLabel(deal.status)})`]);
   revalidatePath("/deals");
   return { deal };
 }
@@ -102,7 +102,7 @@ const val = (v: string | null | undefined) => (v == null || v === "" ? "—" : v
 export function diffDeal(before: Deal, data: Record<string, unknown>): string[] {
   const lines: string[] = [];
   if ("status" in data && data.status !== before.status)
-    lines.push(`Status: ${val(before.status)} → ${val(data.status as string)}`);
+    lines.push(`Status: ${val(dealStatusLabel(before.status))} → ${val(dealStatusLabel(data.status as string))}`);
   if ("priority" in data && (data.priority ?? null) !== before.priority)
     lines.push(`Priority: ${val(before.priority)} → ${val(data.priority as string)}`);
   if ("passReason" in data && (data.passReason ?? null) !== before.passReason)

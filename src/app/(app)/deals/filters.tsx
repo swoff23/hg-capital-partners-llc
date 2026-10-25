@@ -21,9 +21,11 @@ type TabKey = (typeof TABS)[number]["key"];
 /**
  * The deals filter bar: the address search, the quick views and the status
  * checklist, all in the URL. From sm the bar holds all three on one row; the
- * search gives up width first, so the row never wraps. Below sm the search
- * keeps the row and the views and statuses sit behind one Filters button
- * that opens a sheet, its count showing how many filters narrow the list.
+ * search gives up width first, so the row never wraps. Below sm, and on touch
+ * through md (where the 44px controls leave the search too little room from
+ * 640 to 740), the search keeps the row and the views and statuses sit behind
+ * one Filters button that opens a sheet, its count showing how many filters
+ * narrow the list.
  */
 export function DealFilters({
   statusCounts,
@@ -73,7 +75,7 @@ export function DealFilters({
 
   return (
     <div className="flex items-center gap-2">
-      <div className="relative min-w-0 flex-1 sm:max-w-64">
+      <div className="relative min-w-0 flex-1 sm:max-w-64 pointer-coarse:max-md:max-w-none">
         <Search
           aria-hidden="true"
           className={cn(chromeIconClass, "pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3")}
@@ -87,7 +89,7 @@ export function DealFilters({
         />
       </div>
 
-      <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
+      <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex pointer-coarse:max-md:hidden">
         <SegmentedControl
           aria-label="Deal status"
           options={TABS.map((t) => ({ ...t, count: counts[t.key] }))}
@@ -102,7 +104,7 @@ export function DealFilters({
         variant="secondary"
         size="sm"
         onClick={() => setSheetOpen(true)}
-        className="shrink-0 sm:hidden"
+        className="shrink-0 sm:hidden pointer-coarse:max-md:inline-flex"
       >
         <SlidersHorizontal aria-hidden="true" className={chromeIconClass} />
         Filters

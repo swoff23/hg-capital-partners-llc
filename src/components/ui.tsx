@@ -1,5 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TableFrame } from "@/components/table-frame";
 
@@ -26,7 +27,10 @@ export function CardBody({ className, ...props }: React.ComponentProps<"div">) {
 /* ---------------- Section ----------------
    A heading and its actions over a --line rule, with the content 12px under
    it. No box and no title bar (Stripe's customer page). The heading names
-   the <section>, so it's a region screen readers can jump to. */
+   the <section>, so it's a region screen readers can jump to. The header
+   row is 41px with or without a 32px button in it (the button, the 8px under
+   it and the 1px rule), so headings side by side line up; on touch a 44px
+   button sets its own height. */
 export function Section({
   title,
   actions,
@@ -45,7 +49,7 @@ export function Section({
   const headingId = React.useId();
   return (
     <section aria-labelledby={headingId} className={className}>
-      <div className="flex min-h-8 items-center justify-between gap-3 border-b border-line pb-2">
+      <div className="flex min-h-[2.5625rem] items-center justify-between gap-3 border-b border-line pb-2">
         <Heading id={headingId} className="min-w-0 text-section text-fg-1">
           {title}
         </Heading>
@@ -185,6 +189,40 @@ export function TextLink({ className, ...props }: React.ComponentProps<typeof Li
   return <Link className={cn(textLinkClass, className)} {...props} />;
 }
 
+/**
+ * The last row of a counted list or an editor's table ("Add unit", "Add
+ * appliance"): it adds one more row, so the count is always the rows above
+ * it (docs/brand-guidelines.md, section 9 Counted lists). A Plus in --fg-3,
+ * the label in --fg-2 at text-label, over the list's --line rule; 40px, 48 on
+ * touch. `className` adjusts it, e.g. an inset to line up with a table's text.
+ */
+export function AddRow({
+  children,
+  onClick,
+  disabled,
+  className,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12",
+        className,
+      )}
+    >
+      <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+      {children}
+    </button>
+  );
+}
+
 /* ---------------- Kbd ----------------
    A printed shortcut: "Esc", "⌘K". Touch screens get the same actions as
    visible buttons, so the keycap hides there. */
@@ -252,6 +290,24 @@ export const pickerChip = cn(
   "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2",
   "disabled:opacity-50 data-disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
 );
+
+/**
+ * A picker's trigger at field height, for a form where pickers share a grid
+ * with inputs and selects (New task): the field look, --surface on a
+ * --line-control edge, 36px with a mouse and 44 on touch, so the grid is one
+ * control height. Its text is text-body, the value's icon or avatar leads it
+ * and a chevron (`pickerFieldChevron`) ends it in --fg-3, dropped below 360px
+ * so a two-column form keeps the value whole ("Connor (me)" at 320). Keyboard
+ * focus draws the field's --act edge and inset ring. `pickerChip` is the same
+ * trigger in a row of chips.
+ */
+export const pickerField = cn(
+  "relative flex h-9 w-full min-w-0 items-center gap-2 whitespace-nowrap rounded-md border border-line-control bg-surface px-2.5 text-left text-body text-fg-1 outline-none",
+  "transition-colors hover:bg-fill-1 data-pressed:bg-fill-1",
+  "data-focus-visible:border-act data-focus-visible:ring-1 data-focus-visible:ring-inset data-focus-visible:ring-act",
+  "pointer-coarse:h-11 disabled:opacity-50 data-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+);
+export const pickerFieldChevron = "text-fg-3 max-[360px]:hidden";
 
 /* ---------------- Inputs ----------------
    --surface on a --line-control edge. Focus turns the edge --act and adds a

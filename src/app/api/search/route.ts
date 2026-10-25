@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
+import { dealStatusLabel } from "@/lib/config";
 import { prisma } from "@/lib/db";
 import { everyTermMatches, searchTerms } from "@/lib/search";
 
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     results: [
       ...properties.map((p) => ({ type: "Property", id: p.id, label: p.address, href: `/properties/${p.id}` })),
-      ...deals.map((d) => ({ type: "Deal", id: d.id, label: `${d.address} · ${d.status}`, href: `/deals/${d.id}` })),
+      ...deals.map((d) => ({ type: "Deal", id: d.id, label: `${d.address} · ${dealStatusLabel(d.status)}`, href: `/deals/${d.id}` })),
       ...contacts.map((c) => ({
         type: "Contractor",
         id: c.id,

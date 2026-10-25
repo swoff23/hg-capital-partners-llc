@@ -6,7 +6,7 @@ import { BRAND } from "@/lib/brand";
 import { getEnv } from "@/lib/env";
 import { requestPasswordReset } from "../actions";
 import { Input } from "@/components/ui";
-import { AuthFrame, AuthNotice, authInputClass, authLinkClass } from "../_components/auth-frame";
+import { AuthFrame, AuthLabel, AuthNotice, authInputClass, authLinkClass } from "../_components/auth-frame";
 import { AuthSubmit } from "../_components/auth-submit";
 
 export const metadata: Metadata = {
@@ -31,17 +31,19 @@ export default async function ForgotPasswordPage({ searchParams }: PageProps<"/l
       {sent ? (
         <AuthNotice>If that email has a login, a link is on its way.</AuthNotice>
       ) : (
-        <form action={requestPasswordReset} className="mt-8 space-y-3 text-left">
-          <Input
-            name="email"
-            type="email"
-            placeholder="Email"
-            aria-label="Email"
-            autoComplete="username"
-            required
-            autoFocus
-            className={authInputClass}
-          />
+        <form action={requestPasswordReset} className="mt-8 space-y-4 text-left">
+          <div>
+            <AuthLabel htmlFor="forgot-email">Email</AuthLabel>
+            <Input
+              id="forgot-email"
+              name="email"
+              type="email"
+              autoComplete="username"
+              required
+              autoFocus
+              className={authInputClass}
+            />
+          </div>
           <AuthSubmit pendingLabel="Sending…">Email me a link</AuthSubmit>
         </form>
       )}

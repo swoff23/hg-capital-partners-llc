@@ -109,3 +109,47 @@ test("a ledger cell with no matching report cell is flagged", () => {
   const r = checkReconciliation(input({ ledgerCellSums: ledger }));
   assert.ok(r.cellMismatches.some((m) => m.accountQboId === "acc_ghost"));
 });
+
+/**
+ * QuickBooks' sample company: Depreciation, Miscellaneous ($2,916.00) and
+ * Penalties & Settlements are Other Expense, below QuickBooks' Net Operating
+ * Income. The last sync before the fix read "NOI $2,916 off" for exactly this.
+ */
+const OTHER_EXPENSE_CELLS: PnlByClassCell[] = [
+  ...CELLS,
+  { accountQboId: "acc_dep", accountName: "Depreciation", classQboId: "clsA", className: "A", section: "OtherExpenses", amountCents: 50_000 },
+  { accountQboId: "acc_misc", accountName: "Miscellaneous", classQboId: "clsB", className: "B", section: "OtherExpenses", amountCents: 291_600 },
+];
+const OTHER_EXPENSE_LEDGER = new Map([...LEDGER, ["acc_dep::clsA", 50_000], ["acc_misc::clsB", 291_600]]);
+const withOtherExpense = (treatment: "NON_OPERATING" | "OPERATING_EXPENSE"): ComputeLine[] => [
+  ...LINES,
+  { treatment, category: treatment === "NON_OPERATING" ? "OTHER" : "OTHER_OPEX", amountCents: 50_000, lineTags: [], periodMonth: "2026-03" },
+  { treatment, category: treatment === "NON_OPERATING" ? "OTHER" : "OTHER_OPEX", amountCents: 291_600, lineTags: [], periodMonth: "2026-03" },
+];
+const otherExpenseInput = (lines: ComputeLine[]): ReconcileInput =>
+  input({
+    byClassCells: OTHER_EXPENSE_CELLS,
+    // net income falls by both; QuickBooks' NOI doesn't move
+    plainNetIncomeCents: PLAIN_NET_INCOME - 50_000 - 291_600,
+    ledgerCellSums: OTHER_EXPENSE_LEDGER,
+    noi: computeNoi(lines),
+  });
+
+test("depreciation below NOI: NOI, net income and every check tie", () => {
+  const r = checkReconciliation(otherExpenseInput(withOtherExpense("NON_OPERATING")));
+  assert.equal(r.noiVsQbo.ourNoiCents, QBO_NET_OPERATING_INCOME, "our NOI is QuickBooks' Net Operating Income");
+  assert.ok(r.noiVsQbo.ok, JSON.stringify(r.noiVsQbo));
+  assert.ok(r.netIncomeIdentity.ok, JSON.stringify(r.netIncomeIdentity));
+  assert.equal(r.netIncomeIdentity.computedCents, PLAIN_NET_INCOME - 341_600);
+  assert.ok(r.sumToWhole.ok, JSON.stringify(r.sumToWhole));
+  assert.equal(r.cellMismatches.length, 0);
+  assert.ok(r.ok);
+});
+
+test("depreciation counted in NOI, as the old seed did, reads NOI off by its amount", () => {
+  const r = checkReconciliation(otherExpenseInput(withOtherExpense("OPERATING_EXPENSE")));
+  assert.equal(r.noiVsQbo.ok, false);
+  assert.equal(r.noiVsQbo.residualCents, -341_600);
+  // net income still ties either way: only where the line sits changed
+  assert.ok(r.netIncomeIdentity.ok, JSON.stringify(r.netIncomeIdentity));
+});

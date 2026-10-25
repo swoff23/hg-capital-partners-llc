@@ -31,9 +31,9 @@ export function hasStatusColumn(task: ListTask, { status = true, reason = false 
  * 50rem, and on rows with actions: the title with the date chip top right,
  * then the place with the avatar bottom right; the title truncates before
  * the date and the place before the avatar. A row with actions (Needs
- * review) has them beside those two lines from a 480px list up; below that
- * the title, the date and Approve and Send back can't share a line, so the
- * actions take a line of their own under them. One line on a wide desktop
+ * review) puts them on a line of their own under those two, at every width,
+ * right-aligned to the edge the date and the avatar share, so the date stays
+ * top right on every row of a list. One line on a wide desktop
  * list: the title, then fixed columns for the property, the person and the
  * date, so they line up row to row. 50rem keeps the fixed columns
  * (about 500px of them) from squeezing the title: Today's two columns top
@@ -101,8 +101,9 @@ export function TaskRow({
   const statusColumn = (status || reason) && listHasStatus;
   const badge = status && (job || task.status !== "OPEN") ? <StatusBadge status={task.status} /> : null;
   const waiting = (text: string, label?: string) => (
-    // Hit-testable with a mouse, as the avatar is, so the full reason shows on hover above the row's link.
-    <span title={`Waiting on ${waitingOn}`} className="inline-flex min-w-0 items-center gap-1.5 text-meta text-fg-3 pointer-fine:pointer-events-auto">
+    // Under the row's link like the rest of the row, so a click on it opens the task; the link's
+    // title carries the full reason on hover. Capped at 160px, so a long one never squeezes out the place.
+    <span className="inline-flex min-w-0 max-w-40 items-center gap-1.5 text-meta text-fg-3">
       <StatusMark status="WAITING" />
       <span aria-hidden={label ? true : undefined} className="truncate">
         {text}
@@ -140,7 +141,7 @@ export function TaskRow({
     // 40px one-line rows with a mouse, 48 on touch (docs/brand-guidelines.md, section 5,
     // Density): a title-and-date row takes 10px above and below its 28px line there. Two-line
     // rows are 62px, against the section's 60: the 28px date chip sets the title's line, and
-    // the place line under it is 20. Below a 480px list a row's actions wrap to a line of their own.
+    // the place line under it is 20. A row's actions wrap to a line of their own under both.
     <li
       className={cn(
         "group/row relative flex items-start gap-3 py-1.5 pointer-coarse:min-h-12",
@@ -149,7 +150,11 @@ export function TaskRow({
         actions && "flex-wrap",
       )}
     >
-      <Link href={`/tasks/${task.id}`} className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1">
+      <Link
+        href={`/tasks/${task.id}`}
+        title={waitingOn ? `Waiting on ${waitingOn}` : undefined}
+        className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1"
+      >
         <span className="sr-only">{task.title}</span>
       </Link>
 
@@ -217,8 +222,8 @@ export function TaskRow({
             >
               {who && (
                 <>
-                  {/* Where the list has room beside Approve and Send back; phones keep the avatar alone.
-                      Before the avatar, so the avatar keeps the corner. */}
+                  {/* Where the list has room for it; phones keep the avatar alone. Before the avatar,
+                      so the avatar keeps the corner. */}
                   {first && (
                     <span aria-hidden="true" className="hidden truncate text-meta text-fg-3 @min-[28rem]:block">
                       {first}
@@ -234,11 +239,8 @@ export function TaskRow({
       </div>
 
       {actions && (
-        // Beside the two lines from a 480px list up; below that a full-width line, ending at the
-        // right edge the date and the avatar share.
-        <div className="relative flex w-full shrink-0 items-center justify-end gap-1.5 @min-[30rem]:w-auto @min-[30rem]:self-center">
-          {actions}
-        </div>
+        // A full-width line under the two, ending at the right edge the date and the avatar share.
+        <div className="relative flex w-full shrink-0 items-center justify-end gap-1.5">{actions}</div>
       )}
     </li>
   );

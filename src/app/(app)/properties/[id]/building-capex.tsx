@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { Button, SectionCard, Table, Td, Th, fieldClass } from "@/components/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Money } from "@/components/money";
 import { callAction } from "@/lib/action-result";
 import { cn, fmtMoney } from "@/lib/utils";
@@ -56,7 +57,14 @@ export function BuildingCapexSection({
   // newer one, and sending that would let this draft overwrite a partner's change.
   const [editVersion, setEditVersion] = useState(version);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, start] = useTransition();
+
+  // A Cancel with edits asks first, as the Units & access and Rentals tables do. Compared as
+  // they'd save, so a cost the field only reformatted ("8000" to "$8,000") isn't an edit.
+  const asSaved = (d: Draft) =>
+    JSON.stringify(items.map((item) => [d[item.key].type.trim(), d[item.key].year.trim(), parseCapexCost(d[item.key].cost)]));
+  const dirty = editing && asSaved(draft) !== asSaved(toDraft(initial, items));
 
   const phoneHidden = editing ? undefined : "max-[480px]:hidden";
   // Type also drops where the record's main column is narrowest (536px at 1024, beside the rail).
@@ -80,9 +88,11 @@ export function BuildingCapexSection({
     start(async () => {
       const r = await callAction(() => updateBuildingCapex(propertyId, payload, editVersion));
       if (!r.ok) {
+        setConfirmOpen(false);
         setError(r.error);
         return;
       }
+      setConfirmOpen(false);
       setEditing(false);
     });
   }
@@ -95,10 +105,16 @@ export function BuildingCapexSection({
     setEditing(true);
   }
 
-  function cancel() {
+  function discard() {
     setError(null);
     setDraft(toDraft(initial, items));
+    setConfirmOpen(false);
     setEditing(false);
+  }
+
+  function cancel() {
+    if (dirty) setConfirmOpen(true);
+    else discard();
   }
 
   /** Row state from a source (draft in edit mode, stored data in read mode). */
@@ -230,6 +246,25 @@ export function BuildingCapexSection({
           })}
         </tbody>
       </Table>
+
+      {confirmOpen && (
+        <ConfirmDialog
+          title="Discard your Building CapEx edits?"
+          body="Your changes to these systems won't be saved."
+          onClose={() => setConfirmOpen(false)}
+          cancelLabel="Keep editing"
+          actions={
+            <>
+              <Button size="sm" variant="secondary" onClick={discard}>
+                Discard
+              </Button>
+              <Button size="sm" onClick={save} disabled={pending}>
+                {pending ? "Saving…" : "Save changes"}
+              </Button>
+            </>
+          }
+        />
+      )}
     </SectionCard>
   );
 }

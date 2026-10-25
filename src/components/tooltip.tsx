@@ -11,7 +11,8 @@ const EDGE = 8;
  * it and a second tap, a tap anywhere else, a scroll or Esc closes it.
  * It renders `position: fixed`, so it escapes any `overflow` clipping from
  * scroll containers (tables, cards), and it stays inside the viewport; a long
- * label wraps. The ink label on the toast tokens, at the Float level.
+ * label wraps, and a "\n" in it starts a new line. The ink label on the toast
+ * tokens, at the Float level.
  */
 export function Tooltip({
   label,
@@ -98,7 +99,7 @@ export function Tooltip({
         <span
           ref={tipRef}
           role="tooltip"
-          className="pointer-events-none fixed z-[60] w-max max-w-[min(20rem,calc(100vw-1rem))] -translate-x-1/2 -translate-y-full whitespace-normal text-pretty rounded-md border border-toast-edge bg-toast-bg px-2 py-1 text-micro text-toast-fg shadow-float"
+          className="pointer-events-none fixed z-[60] w-max max-w-[min(20rem,calc(100vw-1rem))] -translate-x-1/2 -translate-y-full whitespace-pre-line text-pretty rounded-md border border-toast-edge bg-toast-bg px-2 py-1 text-micro text-toast-fg shadow-float"
           style={{ left: at.x, top: at.y - 8 }}
         >
           {label}

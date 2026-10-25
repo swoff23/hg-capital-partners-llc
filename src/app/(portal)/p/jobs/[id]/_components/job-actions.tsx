@@ -22,8 +22,8 @@ import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJob
 
 /** Height of the sticky bar above the safe area: 48px buttons plus 12px padding each side. */
 const BAR_PX = 72;
-/** What the failed-upload line adds under the bar's buttons: an 8px gap and a 20px line. */
-const FAILED_LINE_PX = 28;
+/** What the failed-upload line adds under the bar's buttons: a 12px gap and a 20px line. */
+const FAILED_LINE_PX = 32;
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -234,7 +234,8 @@ export function JobActions({
       {showBar && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           {/* Same width and gutters as the page, so the buttons line up with the content. */}
-          <div className="mx-auto max-w-300 space-y-2 px-4 sm:px-6 lg:px-8">
+          {/* 12px between the lines, so Retry's 44px touch area (12px past its line) never reaches the buttons. */}
+          <div className="mx-auto max-w-300 space-y-3 px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-3 lg:justify-end">
               {/* Photos can still go up while HG reviews; only the next step waits. */}
               <Button variant="secondary" className={cn(barButton, "max-[360px]:px-2")} onClick={uploader.chooseFiles}>
@@ -281,7 +282,7 @@ export function JobActions({
         // Pinned under the photos and the note, so on a short phone the primary and why it's off stay in view.
         footer={
           sheetState === "ask" && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center gap-3 md:justify-end">
                 {/* The picker, not the camera alone: on a phone it offers Take Photo and the library, so shots taken
                     earlier in the Camera app can go too. */}

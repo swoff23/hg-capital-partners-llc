@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { brandTokensDark } from "@/lib/brand-tokens";
-import { AuthError, AuthFrame, authLinkClass } from "@/app/login/_components/auth-frame";
+import { AuthError, AuthFrame, AuthLabel, authLinkClass } from "@/app/login/_components/auth-frame";
 import { AuthSubmit } from "@/app/login/_components/auth-submit";
 import { PasswordField } from "@/app/login/_components/password-field";
 import { MIN_PASSWORD_LENGTH, PASSWORD_MESSAGES, isPasswordProblem } from "@/lib/portal/credentials";
@@ -34,34 +34,34 @@ export default async function WelcomePasswordPage({ searchParams }: PageProps<"/
     <AuthFrame title="Choose your own password" subtitle={`Hi ${firstName}. At least ${MIN_PASSWORD_LENGTH} characters.`}>
       {message && <AuthError>{message}</AuthError>}
 
-      <form action={chooseOwnPassword} className="mt-8 space-y-3 text-left">
+      <form action={chooseOwnPassword} className="mt-8 space-y-4 text-left">
         {next && <input type="hidden" name="next" value={next} />}
         {/* Lets password managers file the new password under the right login. */}
         <input type="email" name="username" value={principal.email} autoComplete="username" readOnly hidden />
-        <PasswordField
-          name="current"
-          placeholder="Starting password"
-          aria-label="Starting password"
-          autoComplete="current-password"
-          required
-          autoFocus
-        />
-        <PasswordField
-          name="password"
-          placeholder="New password"
-          aria-label="New password"
-          autoComplete="new-password"
-          minLength={MIN_PASSWORD_LENGTH}
-          required
-        />
-        <PasswordField
-          name="confirm"
-          placeholder="New password again"
-          aria-label="New password again"
-          autoComplete="new-password"
-          minLength={MIN_PASSWORD_LENGTH}
-          required
-        />
+        <div>
+          <AuthLabel htmlFor="welcome-current">Starting password</AuthLabel>
+          <PasswordField id="welcome-current" name="current" autoComplete="current-password" required autoFocus />
+        </div>
+        <div>
+          <AuthLabel htmlFor="welcome-password">New password</AuthLabel>
+          <PasswordField
+            id="welcome-password"
+            name="password"
+            autoComplete="new-password"
+            minLength={MIN_PASSWORD_LENGTH}
+            required
+          />
+        </div>
+        <div>
+          <AuthLabel htmlFor="welcome-confirm">New password again</AuthLabel>
+          <PasswordField
+            id="welcome-confirm"
+            name="confirm"
+            autoComplete="new-password"
+            minLength={MIN_PASSWORD_LENGTH}
+            required
+          />
+        </div>
         <AuthSubmit pendingLabel="Saving…">Save password</AuthSubmit>
       </form>
 

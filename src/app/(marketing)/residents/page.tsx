@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowUpRight } from "lucide-react";
-import { Eyebrow, publicContainer, publicType } from "@/components/public/ui";
+import { publicContainer, publicType } from "@/components/public/ui";
 import { Badge, Card } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
@@ -21,8 +21,7 @@ const BASELANE_URL: string | null = "https://tenant.baselane.com/login";
 export default function ResidentsPage() {
   return (
     <main className={cn(publicContainer, "py-10 sm:py-12")}>
-      <Eyebrow>Residents</Eyebrow>
-      <h1 className={cn(publicType.heading, "mt-3 max-w-2xl text-fg-1")}>
+      <h1 className={cn(publicType.heading, "max-w-2xl text-fg-1")}>
         Everything you need as an HG Capital resident.
       </h1>
 

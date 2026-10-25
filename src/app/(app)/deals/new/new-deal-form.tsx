@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { Button, Input, TextLink } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
-import { DEFAULT_DEAL_STATUS } from "@/lib/config";
+import { DEFAULT_DEAL_STATUS, dealStatusLabel } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { createDeal, type ExistingDeal } from "../actions";
 import { StageSelect } from "../stage-select";
@@ -63,7 +63,7 @@ export function NewDealForm() {
         {existing && (
           // One line at 320: the field above already shows the address.
           <p id="new-deal-existing" className="mt-1.5 text-meta text-danger">
-            Already a deal · {existing.status}.{" "}
+            Already a deal · {dealStatusLabel(existing.status)}.{" "}
             <TextLink href={`/deals/${existing.id}`} className="whitespace-nowrap font-medium">
               Open it
             </TextLink>

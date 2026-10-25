@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { Popover, PopoverTrigger } from "@/components/popover";
 import { Checkbox, buttonClass, chromeIconClass } from "@/components/ui";
-import { DEAL_STATUSES } from "@/lib/config";
+import { DEAL_STATUSES, dealStatusLabel } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { DealStageMark } from "./stage-select";
 
@@ -50,7 +50,7 @@ export function StatusChecklist({ selected, onToggle }: { selected: string[]; on
             <Checkbox checked={selected.includes(s)} onChange={() => onToggle(s)} />
             <span className="inline-flex h-5.5 items-center gap-1 whitespace-nowrap rounded-sm border border-line-strong px-2 text-micro text-fg-2">
               <DealStageMark stage={s} />
-              {s}
+              {dealStatusLabel(s)}
             </span>
           </label>
         </li>
@@ -69,7 +69,7 @@ export function StatusMultiSelect({ selected }: { selected: string[] }) {
   const toggle = (s: string) => apply(selected.includes(s) ? selected.filter((x) => x !== s) : [...selected, s]);
 
   const label =
-    selected.length === 0 ? "All statuses" : selected.length === 1 ? selected[0] : `${selected.length} statuses`;
+    selected.length === 0 ? "All statuses" : selected.length === 1 ? dealStatusLabel(selected[0]) : `${selected.length} statuses`;
 
   return (
     <PopoverTrigger>

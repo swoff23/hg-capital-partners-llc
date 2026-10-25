@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { parseDate } from "@internationalized/date";
-import { CalendarArrowUp, CalendarDays, CalendarX2, ChevronLeft, ChevronRight, Sun, Sunrise, type LucideIcon } from "lucide-react";
+import { CalendarArrowUp, CalendarDays, CalendarX2, ChevronDown, ChevronLeft, ChevronRight, Sun, Sunrise, type LucideIcon } from "lucide-react";
 import {
   Button as AriaButton,
   Calendar,
@@ -15,7 +15,7 @@ import {
 } from "react-aria-components";
 import { Popover } from "@/components/popover";
 import { Sheet } from "@/components/sheet";
-import { Kbd, pickerChip } from "@/components/ui";
+import { Kbd, pickerChip, pickerField, pickerFieldChevron } from "@/components/ui";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { dueLabel, fmtDay, isPastDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { quickPickForKey, quickPicks, type QuickPickKey } from "@/lib/quick-dates";
@@ -39,6 +39,7 @@ const PICK_ICON: Record<QuickPickKey, LucideIcon> = {
  *
  * Pass `today` from the server (todayYmdEastern()) so the label and the picks
  * agree with the server's idea of today; it defaults to the same thing.
+ * `trigger="field"` is the field-height trigger (pickerField) for a form grid.
  */
 export function DueDatePicker({
   value,
@@ -50,6 +51,7 @@ export function DueDatePicker({
   isDisabled,
   className,
   prefix,
+  trigger = "chip",
 }: {
   value: Ymd | null;
   onChange: (value: Ymd | null) => void;
@@ -61,6 +63,8 @@ export function DueDatePicker({
   placeholder?: string;
   /** Shown before the date inside the chip, e.g. "Visit" where no label sits beside it. */
   prefix?: ReactNode;
+  /** "chip" in a row of chips; "field" at field height in a form. */
+  trigger?: "chip" | "field";
   isDisabled?: boolean;
   className?: string;
 }) {
@@ -88,15 +92,16 @@ export function DueDatePicker({
         isDisabled={isDisabled}
         aria-label={`${label}: ${current ? fmtDay(current) : "none"}`}
         className={cn(
-          pickerChip,
+          trigger === "field" ? pickerField : pickerChip,
           !current && "text-fg-3",
           current && overdue && "text-danger",
           className,
         )}
       >
-        <CalendarDays aria-hidden="true" />
+        <CalendarDays aria-hidden="true" className={cn(trigger === "field" && "text-fg-3")} />
         {prefix}
-        {text}
+        {trigger === "field" ? <span className="min-w-0 flex-1 truncate">{text}</span> : text}
+        {trigger === "field" && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
       </AriaButton>
       {touch ? (
         <Sheet title={label}>{panel}</Sheet>
