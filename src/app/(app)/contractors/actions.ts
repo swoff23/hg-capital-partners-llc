@@ -3,16 +3,35 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
+import * as contractors from "@/lib/contractors/service";
 import * as accounts from "@/lib/portal/accounts";
 import { withResult } from "@/lib/server-action";
 
 /**
- * The Portal access card on a contractor's page (docs/asana-migration-plan.md
- * §5.1). Staff only. A starting password comes back exactly once, to show
- * and text; nothing here ever returns a password hash.
+ * A contractor's page: the Contact section's Edit, and the Portal access card
+ * (docs/asana-migration-plan.md §5.1). Staff only. A starting password comes
+ * back exactly once, to show and text; nothing here ever returns a password
+ * hash.
  */
 
 const id = z.string().min(1);
+
+const fieldsSchema = z.record(z.string(), z.string().max(20_000));
+
+/**
+ * Save the Contact section's edits. `changes` holds only the fields the
+ * editor changed ("" clears one), and `expected` what it loaded for each, so
+ * a field someone else saved meanwhile refuses the save. The service checks
+ * each field (src/lib/contractors/contact-fields.ts) and refreshes every page
+ * that shows the contractor; a refusal comes back as the error, and the
+ * editor keeps what was typed.
+ */
+export async function patchContact(contactId: string, changes: Record<string, string>, expected: Record<string, string>): Promise<ActionResult> {
+  return withResult("patchContact", async () => {
+    await requireUser();
+    await contractors.patchContact(id.parse(contactId), fieldsSchema.parse(changes), fieldsSchema.parse(expected));
+  });
+}
 
 /** Every contractor page shows its card's state; the account ids don't say which page that is. */
 const refresh = () => revalidatePath("/contractors/[id]", "page");

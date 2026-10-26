@@ -64,7 +64,9 @@ export function Section({
  * A Section with view and edit modes. In view mode an Edit button (when
  * `onEdit` is set), revealed on hover with a mouse and always shown on touch
  * screens; in edit mode the `actions` slot (Cancel / Save).
- * Used by the property edit sections and the /settings editors.
+ * Used by the property edit sections, a contractor's Contact and the
+ * /settings editors. The Edit carries `data-section-edit`, where
+ * useSectionSave returns focus when the form closes.
  */
 export function SectionCard({
   title,
@@ -96,6 +98,8 @@ export function SectionCard({
                 variant="ghost"
                 size="sm"
                 onClick={onEdit}
+                // useSectionSave puts focus back here when the form closes.
+                data-section-edit=""
                 // Pulled out by its padding, so the word ends on the section's edge like every other action.
                 className="-mr-2.5 opacity-0 transition-[opacity,background-color,color] focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
               >
@@ -375,6 +379,19 @@ export function Checkbox({
 
 export function Select({ className, ...props }: React.ComponentProps<"select">) {
   return <select className={cn(fieldClass, "h-9", selectTouchHeight, className)} {...props} />;
+}
+
+/**
+ * An inline save error: one text-meta --danger line under a section's form or
+ * list, or under the field it belongs to (pass its `id` to the field's
+ * `aria-describedby`). `role="alert"`, so it's read out when it appears.
+ */
+export function SaveError({ children, className, id }: { children: React.ReactNode; className?: string; id?: string }) {
+  return (
+    <p id={id} role="alert" className={cn("text-meta text-danger", className)}>
+      {children}
+    </p>
+  );
 }
 
 /* ---------------- Table ----------------

@@ -8,6 +8,7 @@
  */
 import { prisma } from "../../src/lib/db";
 import { cleanTrades } from "../../src/lib/contacts";
+import { readPhone } from "../../src/lib/contractors/contact-fields";
 import { report } from "./_report";
 import {
   readSheet,
@@ -178,12 +179,15 @@ export async function migrateContractors() {
   let created = 0;
   let updated = 0;
   for (const d of finalDrafts) {
+    const phone = formatPhone(d.phoneDigits);
     const data = {
       fullName: d.fullName,
       company: d.company,
       trades: d.trades,
       tenantFixes: d.tenantFixes,
-      phone: formatPhone(d.phoneDigits),
+      phone,
+      // Written with `phone`, as the Contact edit does, so the Call and Text links never dial an older number.
+      phoneE164: phone ? (readPhone(phone)?.phoneE164 ?? null) : null,
       email: d.email,
       mailingAddress: d.mailingAddress,
       billingInfo: d.billingInfo,

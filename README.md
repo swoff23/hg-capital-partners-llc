@@ -33,7 +33,7 @@ The working rules (planning, reuse, design references, copy, device check, landi
 src/app/(app)/*        signed-in pages; each area has a thin actions.ts
 src/app/(marketing)/*  public pages
 src/app/api/*          health, search, blob token minting, file delivery, QuickBooks OAuth + cron
-src/lib/<domain>/      services that own every database write: tasks, deals, properties
+src/lib/<domain>/      services that own every database write: tasks, deals, properties, contractors
 src/lib/quickbooks/    pure core (categorize, classify, compute, reconcile, report-parse, months) + sync/queries
 src/lib/*.ts           shared pure helpers: env, dates, money, normalize, secrets, session-token, …
 scripts/migrate/       one-time import of the Master Database xlsx

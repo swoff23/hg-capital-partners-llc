@@ -85,11 +85,5 @@ export function Count({ n, className }: { n: number; className?: string }) {
   );
 }
 
-/** An inline save error under a section's form or list. */
-export function SaveError({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <p role="alert" className={cn("text-meta text-danger", className)}>
-      {children}
-    </p>
-  );
-}
+/** The inline save error lives in components/ui.tsx now; the property editors import it from here. */
+export { SaveError } from "@/components/ui";

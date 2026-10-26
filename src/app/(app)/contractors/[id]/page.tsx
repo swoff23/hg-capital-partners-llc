@@ -18,6 +18,7 @@ import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { cleanTrades, docOnFile, mailtoHref, mapsHref, telHref, textHref } from "@/lib/contacts";
 import { firstName } from "@/lib/names";
 import { ContactLink } from "../contact-link";
+import { ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
 
 /** The Jobs list's length; the heading's count is every job. */
@@ -116,7 +117,21 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
 
       <div className="grid grid-cols-1 gap-8 pointer-coarse:gap-6 @4xl:grid-cols-[minmax(0,1fr)_20rem] @4xl:gap-10">
         <aside className="min-w-0 space-y-8 pointer-coarse:space-y-6 @4xl:col-start-2 @4xl:row-start-1">
-          <Section title="Contact">
+          <ContactSection
+            contact={{
+              id: c.id,
+              fullName: c.fullName,
+              company: c.company,
+              trades: c.trades,
+              phone: c.phone,
+              email: c.email,
+              mailingAddress: c.mailingAddress,
+              billingInfo: c.billingInfo,
+              availability: c.availability,
+              tenantFixes: c.tenantFixes,
+              comments: c.comments,
+            }}
+          >
             <dl>
               <Detail label="Trades">{trades}</Detail>
               <Detail label="Phone">
@@ -171,7 +186,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             {c.comments && (
               <p className="whitespace-pre-wrap border-t border-line pt-3 text-meta text-fg-3">{c.comments}</p>
             )}
-          </Section>
+          </ContactSection>
 
           <PortalAccessCard
             contactId={c.id}
