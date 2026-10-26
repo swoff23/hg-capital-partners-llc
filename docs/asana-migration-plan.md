@@ -342,6 +342,7 @@ It stores head()'s values. Uploads still finishing after a contractor taps Mark 
 *Structure*
 - **Subtasks** become checklist items. Their comments and files move to the parent, labeled "on checklist item: …". Project tasks that have a parent are skipped.
 - **Playbooks** become `TaskTemplate` rows, keyed by section.
+- **Playbook runs already under way** get `taskTemplateId`, so applying the playbook to that building again says what's still open (BPLAY-V01). A task on a building whose title is one of a playbook's items is linked to it, with fill-ins like "[Tenant]" matching what was typed. Items completed in the playbook since still count, since older runs have them open. A title two playbooks share ("Update SREO" is in NEW REFI and NEW PROPERTY) goes to the one with more of its items on that building, and a tie links nothing. A link is written once and never replaced. The Oct 26 snapshot links 42: the NEW REFI runs on 118 Congress (10), 765 Prospect (9) and 767 Prospect (10), NEW PROPERTY leftovers on five buildings (12) and one NEW TENANT task on 725 Linwood. Every dry run, load or delta, lists the new links by playbook and section.
 
 *Reconciling with the CSV rows already in production*
 
