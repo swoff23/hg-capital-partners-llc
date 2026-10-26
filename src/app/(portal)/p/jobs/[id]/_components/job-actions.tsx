@@ -146,7 +146,10 @@ export function JobActions({
   }, [uploader.uploads.length, sheetOpen]);
 
   const showBar = step !== null;
-  useToastInset(showBar ? BAR_PX + (failed > 0 ? FAILED_LINE_PX : 0) : 0);
+  // The bar grows by one line for the red Retry line or the "Finishing N uploads" line
+  // (never both); the toast sits above whichever shows.
+  const finishingLine = step !== "start" && step !== "review" && pending > 0 && failed === 0;
+  useToastInset(showBar ? BAR_PX + (failed > 0 || finishingLine ? FAILED_LINE_PX : 0) : 0);
 
   function send() {
     const text = body.trim();
@@ -260,7 +263,7 @@ export function JobActions({
               )}
             </div>
             {/* The disabled Mark done's one-line reason: uploads still going up, or the red Retry line. */}
-            {step !== "start" && step !== "review" && pending > 0 && failed === 0 && (
+            {finishingLine && (
               <p className="text-center text-meta text-fg-3 lg:text-right">{finishingLabel(pending)}</p>
             )}
             <FailedUploadsLine uploader={uploader} className="lg:justify-end" />

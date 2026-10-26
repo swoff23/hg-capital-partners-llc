@@ -138,7 +138,8 @@ export function TaskPageView(p: TaskPageViewProps) {
               title={
                 <>
                   {p.media.length > 0 ? "Photos" : "Files"}
-                  {p.media.length > 0 && <span className="ml-1.5 font-normal tabular-nums text-fg-3">{p.media.length}</span>}
+                  {p.media.length > 0 && " "}
+                  {p.media.length > 0 && <span className="ml-1 font-normal tabular-nums text-fg-3">{p.media.length}</span>}
                 </>
               }
             >

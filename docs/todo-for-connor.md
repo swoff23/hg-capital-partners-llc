@@ -40,7 +40,8 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 
 - [ ] Playbook timing: for NEW TENANT, NEW MOVE OUT and NEW REFI, when each step is due relative to the start date ("collect the deposit 3 days before move-in"). Until then you set dates on the review screen when you apply a playbook.
 - [ ] Look at the new screens on a computer: Today, All, the task page, playbooks and a contractor's page.
-- [ ] Look at the brand proposal ([preview](https://claude.ai/artifact/XKYY2B8qpQ1amVDBwDPbQa), [docs/brand-guidelines.md](brand-guidelines.md)) and [Home as Today](home-as-today.md), then say "build it" or what to change. Nothing changes until you do.
+- [ ] Pick a provider for address suggestions (Google Places, Mapbox or Smarty) and get its API key. Until then, suggestions come from your own properties and deals.
+- [ ] To give old deal notes their author, Claude needs a way to write to the production database (the same `.env.prod-write` the Asana import needs). Until then, old notes keep the author in their text, as today.
 
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
 - [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
@@ -54,6 +55,8 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 
 ## Done
 
+- Oct 25: the Ink and Limestone brand and Home as Today, built and landed. The guidelines are in [brand-guidelines.md](brand-guidelines.md).
+- Oct 25: approved the six component specs with every recommendation. "Our price" on deals means the target offer. They build in seven chunks.
 - Oct 23: Vercel Pro.
 - Oct 23: the contractor portal is on (`PORTAL_ENABLED=1`), with a test contractor and three test jobs.
 - Oct 23: answered the open questions:

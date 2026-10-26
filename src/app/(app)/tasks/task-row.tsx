@@ -163,10 +163,10 @@ export function TaskRow({
           checked={task.checked}
           onChange={(done) => setDone(task, done)}
           label={task.title}
-          // A canceled task isn't To do: its ring dims beside the slashed Canceled mark.
-          disabled={task.status === "CANCELED"}
-          // Centered on the title's 28px line; a one-line row centers everything.
-          className={cn("relative -mt-2", oneLine && "lg:@min-[50rem]:-mt-3")}
+          // Centered on the title's 28px line; a one-line row centers everything. A
+          // canceled task's ring dims beside its slashed mark but stays tickable:
+          // ticking moves it to Done, with Undo back to Canceled (list-actions.ts).
+          className={cn("relative -mt-2", oneLine && "lg:@min-[50rem]:-mt-3", task.status === "CANCELED" && "opacity-50")}
         />
       )}
 

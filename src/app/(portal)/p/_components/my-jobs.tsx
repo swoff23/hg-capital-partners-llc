@@ -165,12 +165,12 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
             {(target || where) && <span aria-hidden="true">·</span>}
           </span>
           {target && (
-            <span className="shrink-0 whitespace-nowrap">
+            <span className="min-w-0 truncate">
               {target}
               {where && <span aria-hidden="true"> ·</span>}
             </span>
           )}
-          {where && <span className="min-w-0 truncate">{where}</span>}
+          {where && <span className="min-w-0 shrink-999 truncate">{where}</span>}
         </span>
       </span>
       <StatusBadge status={job.status} className="w-28 shrink-0 max-[480px]:hidden" />

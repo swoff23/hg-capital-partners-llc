@@ -560,5 +560,40 @@
   "id": "PUBLIC-003",
   "status": "fixed",
   "note": "Fixed on main in 1d02d46: the move-in form asks for the unit when the property has two or more rentable units (house meters left out), a one-unit property sends its unit, and the action matches it against the property's own labels before it goes into the task title, description and unitLabel."
+ },
+ {
+  "id": "TASKS-001",
+  "status": "fixed",
+  "note": "Fixed. Since 2d64a7e (brand rollout, Oct 25), dueLabel follows brand guidelines section 3: \"today\", \"tomorrow\", the weekday within six days, then the calendar date, and any past date shows as the real date (\"Oct 20\") with the danger color decided by the row, so a task 40 days late never reads like one a day late and Review or Waiting rows never say \"late\". Earlier fixes used \"yesterday\", then \"Nd late\"."
+ },
+ {
+  "id": "TASKS-IV01",
+  "status": "fixed",
+  "note": "Fixed. Since 2d64a7e (brand rollout, Oct 25), dueLabel follows brand guidelines section 3: \"today\", \"tomorrow\", the weekday within six days, then the calendar date, and any past date shows as the real date (\"Oct 20\") with the danger color decided by the row, so a task 40 days late never reads like one a day late and Review or Waiting rows never say \"late\". Earlier fixes used \"yesterday\", then \"Nd late\"."
+ },
+ {
+  "id": "VISUAL-IV02",
+  "status": "fixed",
+  "note": "Fixed. Since 2d64a7e (brand rollout, Oct 25), dueLabel follows brand guidelines section 3: \"today\", \"tomorrow\", the weekday within six days, then the calendar date, and any past date shows as the real date (\"Oct 20\") with the danger color decided by the row, so a task 40 days late never reads like one a day late and Review or Waiting rows never say \"late\". Earlier fixes used \"yesterday\", then \"Nd late\"."
+ },
+ {
+  "id": "FEEL-IV01",
+  "status": "fixed",
+  "note": "Fixed. Since 2d64a7e (brand rollout, Oct 25), dueLabel follows brand guidelines section 3: \"today\", \"tomorrow\", the weekday within six days, then the calendar date, and any past date shows as the real date (\"Oct 20\") with the danger color decided by the row, so a task 40 days late never reads like one a day late and Review or Waiting rows never say \"late\". Earlier fixes used \"yesterday\", then \"Nd late\"."
+ },
+ {
+  "id": "DATA-001",
+  "status": "fixed",
+  "note": "Fixed. Since 2d64a7e (brand rollout, Oct 25), dueLabel follows brand guidelines section 3: \"today\", \"tomorrow\", the weekday within six days, then the calendar date, and any past date shows as the real date (\"Oct 20\") with the danger color decided by the row, so a task 40 days late never reads like one a day late and Review or Waiting rows never say \"late\". Earlier fixes used \"yesterday\", then \"Nd late\"."
+ },
+ {
+  "id": "COPY-001",
+  "status": "fixed",
+  "note": "Fixed. Since 2d64a7e (brand rollout, Oct 25), dueLabel follows brand guidelines section 3: \"today\", \"tomorrow\", the weekday within six days, then the calendar date, and any past date shows as the real date (\"Oct 20\") with the danger color decided by the row, so a task 40 days late never reads like one a day late and Review or Waiting rows never say \"late\". Earlier fixes used \"yesterday\", then \"Nd late\"."
+ },
+ {
+  "id": "G2B-V03",
+  "status": "fixed",
+  "note": "Fixed. Since 2d64a7e (brand rollout, Oct 25), dueLabel follows brand guidelines section 3: \"today\", \"tomorrow\", the weekday within six days, then the calendar date, and any past date shows as the real date (\"Oct 20\") with the danger color decided by the row, so a task 40 days late never reads like one a day late and Review or Waiting rows never say \"late\". Earlier fixes used \"yesterday\", then \"Nd late\"."
  }
 ]
