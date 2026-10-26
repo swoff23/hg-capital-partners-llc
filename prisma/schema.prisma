@@ -41,6 +41,7 @@ model User {
   grantedTaskAccess     TaskAccess[]
   createdPortalAccounts PortalAccount[]
   notifications         NotificationOutbox[]
+  recentViews           RecentView[]
 
   qboConnections QuickbooksConnection[]
 }
@@ -695,6 +696,34 @@ model ListingPhoto {
   createdAt DateTime @default(now())
 
   @@index([listingId])
+}
+
+// ---------------------------------------------------------------------------
+// Recently viewed records, for Recent in the command palette (docs/specs/
+// search.md 2.5 and 2.10). Kept on the server so a laptop and a phone share
+// one list. One row per (user, kind, record): opening it again bumps
+// viewedAt. src/lib/recent-views.ts is the only writer and keeps the newest
+// 20 per user and kind. recordId has no foreign key (it points at a
+// Property, Deal, Task or Contact by kind), so readers skip records deleted
+// since. Apart from TaskReadState, which means unread, not recent.
+// ---------------------------------------------------------------------------
+enum RecentKind {
+  PROPERTY
+  DEAL
+  TASK
+  CONTACT // a contractor
+}
+
+model RecentView {
+  id       String     @id @default(cuid())
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  kind     RecentKind
+  recordId String
+  viewedAt DateTime   @default(now())
+
+  @@unique([userId, kind, recordId])
+  @@index([userId, viewedAt])
 }
 
 // ---------------------------------------------------------------------------
