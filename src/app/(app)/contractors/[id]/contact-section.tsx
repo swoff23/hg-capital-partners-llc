@@ -90,7 +90,16 @@ function LineField({ value, ...props }: FieldProps & { value: string | null; aut
  * before it drops the changes. W-9, insurance and the portal login aren't
  * edited here.
  */
-export function ContactSection({ contact, children }: { contact: EditableContact; children: ReactNode }) {
+export function ContactSection({
+  contact,
+  portalEmail,
+  children,
+}: {
+  contact: EditableContact;
+  /** The portal sign-in email, which this form doesn't change; null without a login. */
+  portalEmail: string | null;
+  children: ReactNode;
+}) {
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const { loaded: f, open, close, pending, error, invalid, onSubmit, onInput, formRef, isDirty } = useSectionSave(contact.id, contact, {
@@ -160,7 +169,7 @@ export function ContactSection({ contact, children }: { contact: EditableContact
         <Row name="phone" label="Phone" {...row}>
           {(p) => <Input type="tel" defaultValue={f.phone ?? ""} {...p} />}
         </Row>
-        <Row name="email" label="Email" {...row}>
+        <Row name="email" label="Email" helper={portalEmail ? `Portal sign-in stays ${portalEmail}` : undefined} {...row}>
           {(p) => (
             <Input type="email" defaultValue={f.email ?? ""} autoCapitalize="none" autoCorrect="off" spellCheck={false} {...p} />
           )}

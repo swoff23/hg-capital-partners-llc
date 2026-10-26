@@ -45,6 +45,29 @@ export function docOnFile(comments: string | null | undefined, doc: "W-9" | "Ins
   return null;
 }
 
+const DOC_LINE = /^\s*(W-9|Insurance) on file:/i;
+
+/**
+ * The notes split from the import's "W-9 on file:" and "Insurance on file:"
+ * lines, which docOnFile reads. The Notes editor shows and saves only
+ * `notes`, so editing notes can't drop a document's "On file" by accident;
+ * joinDocLines puts the lines back on save.
+ */
+export function splitDocLines(comments: string | null | undefined): { notes: string | null; docLines: string[] } {
+  const lines = (comments ?? "").split("\n");
+  const notes = lines
+    .filter((l) => !DOC_LINE.test(l))
+    .join("\n")
+    .trim();
+  return { notes: notes || null, docLines: lines.filter((l) => DOC_LINE.test(l)).map((l) => l.trim()) };
+}
+
+/** Notes and the document lines back into one comments value; null when both are empty. */
+export function joinDocLines(notes: string | null | undefined, docLines: string[]): string | null {
+  const parts = [notes?.trim(), ...docLines].filter((p): p is string => !!p);
+  return parts.length ? parts.join("\n") : null;
+}
+
 /**
  * Trades with the repeats the import's merge left in ("HVAC / HVAC",
  * "Demo/Framing/Trim / Framing/General/Tile/Drywall/Trim"): split on "/",

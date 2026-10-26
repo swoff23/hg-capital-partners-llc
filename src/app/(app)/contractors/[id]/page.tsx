@@ -15,7 +15,7 @@ import { shortAddress } from "@/lib/normalize";
 import { portalAccess } from "@/lib/portal/access-state";
 import { STATUS_LABEL, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
-import { cleanTrades, docOnFile, mailtoHref, mapsHref, telHref, textHref } from "@/lib/contacts";
+import { cleanTrades, docOnFile, mailtoHref, mapsHref, splitDocLines, telHref, textHref } from "@/lib/contacts";
 import { firstName } from "@/lib/names";
 import { ContactLink } from "../contact-link";
 import { ContactSection } from "./contact-section";
@@ -80,6 +80,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   const trades = cleanTrades(c.trades);
   const w9OnFile = docOnFile(c.comments, "W-9");
   const coiOnFile = docOnFile(c.comments, "Insurance");
+  // The import's "W-9 on file:" lines show as the W-9 and Insurance rows, not as notes.
+  const { notes } = splitDocLines(c.comments);
 
   // Their jobs: tasks actually assigned to this contact, never a playbook's
   // template rows. The list stops at JOBS_SHOWN and says so; the count is all of them.
@@ -129,8 +131,9 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               billingInfo: c.billingInfo,
               availability: c.availability,
               tenantFixes: c.tenantFixes,
-              comments: c.comments,
+              comments: notes,
             }}
+            portalEmail={c.portalAccount?.email ?? null}
           >
             <dl>
               <Detail label="Trades">{trades}</Detail>
@@ -165,7 +168,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                 }
               >
                 {c.mailingAddress ? (
-                  <ContactLink href={mapsHref(c.mailingAddress)} newTab>
+                  <ContactLink href={mapsHref(c.mailingAddress)} newTab className="whitespace-pre-line">
                     {c.mailingAddress}
                   </ContactLink>
                 ) : null}
@@ -183,9 +186,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                 {c.coiUrl ? <DocLink href={c.coiUrl} /> : coiOnFile ? "On file" : null}
               </Detail>
             </dl>
-            {c.comments && (
-              <p className="whitespace-pre-wrap border-t border-line pt-3 text-meta text-fg-3">{c.comments}</p>
-            )}
+            {notes && <p className="whitespace-pre-wrap border-t border-line pt-3 text-meta text-fg-3">{notes}</p>}
           </ContactSection>
 
           <PortalAccessCard

@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { CONFLICT_MESSAGE } from "@/lib/action-result";
 import { staleFields } from "@/lib/properties/edits";
+import { joinDocLines, splitDocLines } from "@/lib/contacts";
 import { CONTACT_FIELDS, readContactPatch } from "./contact-fields";
 
 /**
@@ -54,9 +55,14 @@ export async function patchContact(id: string, patch: Record<string, string>, ex
     changes: Object.fromEntries(guarded.map((k) => [k, patch[k] ?? ""])),
     expected: Object.fromEntries(guarded.map((k) => [k, expected[k]])),
   };
-  if (!current || staleFields(current, edits).length > 0) throw new Error(CONFLICT_MESSAGE);
+  if (!current) throw new Error(CONFLICT_MESSAGE);
+  // The editor never sees the import's "W-9 on file:" lines, so compare and
+  // save notes without them, then put them back.
+  const { notes, docLines } = splitDocLines(current.comments);
+  if (staleFields({ ...current, comments: notes }, edits).length > 0) throw new Error(CONFLICT_MESSAGE);
+  const data = "comments" in read.data ? { ...read.data, comments: joinDocLines(read.data.comments, docLines) } : read.data;
   // At the version just read, so a save that lands in between is refused too.
-  const r = await prisma.contact.updateMany({ where: { id, updatedAt: current.updatedAt }, data: read.data });
+  const r = await prisma.contact.updateMany({ where: { id, updatedAt: current.updatedAt }, data });
   if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
   revalidateContact(id);
 }

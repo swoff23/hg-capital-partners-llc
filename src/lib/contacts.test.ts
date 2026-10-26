@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { capitalizedName, cleanTrades, docOnFile, mailtoHref, mapsHref, planContactFixes, telHref, textHref } from "./contacts";
+import { capitalizedName, cleanTrades, docOnFile, joinDocLines, mailtoHref, mapsHref, planContactFixes, splitDocLines, telHref, textHref } from "./contacts";
 
 test("phone numbers and emails become tel: and mailto: links (ADMIN-004)", () => {
   assert.equal(telHref("716-555-1234"), "tel:7165551234");
@@ -123,4 +123,22 @@ test("Connor's three hand fixes: trades out of Company, the company out of a nam
   );
   // A caller that didn't read Company changes no company.
   assert.deepEqual(planContactFixes([{ id: "kim", fullName: "Kim Lockett", trades: null }]), []);
+});
+
+test("splitDocLines keeps the import's document lines apart from the notes", () => {
+  const stored = "Prefers texts\nW-9 on file: w9-2024.pdf\n\nInsurance on file: coi.pdf\nGate code with Pieter";
+  const { notes, docLines } = splitDocLines(stored);
+  assert.equal(notes, "Prefers texts\n\nGate code with Pieter");
+  assert.deepEqual(docLines, ["W-9 on file: w9-2024.pdf", "Insurance on file: coi.pdf"]);
+  assert.deepEqual(splitDocLines(null), { notes: null, docLines: [] });
+  assert.deepEqual(splitDocLines("W-9 on file: a.pdf"), { notes: null, docLines: ["W-9 on file: a.pdf"] });
+});
+
+test("joinDocLines puts edited notes back with the document lines", () => {
+  assert.equal(joinDocLines("New note", ["W-9 on file: a.pdf"]), "New note\nW-9 on file: a.pdf");
+  assert.equal(joinDocLines(null, ["W-9 on file: a.pdf"]), "W-9 on file: a.pdf");
+  assert.equal(joinDocLines("  ", []), null);
+  // Round trip: what docOnFile reads survives an edit of the notes.
+  const saved = joinDocLines("Edited", splitDocLines("Old\nInsurance on file: coi.pdf").docLines);
+  assert.equal(docOnFile(saved, "Insurance"), "coi.pdf");
 });
