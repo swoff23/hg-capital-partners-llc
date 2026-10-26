@@ -153,16 +153,6 @@
 :root,
 [data-surface="public"] {
   --chart-ref: var(--line-control);
-
-  /* One-release aliases (section 11) so today's utilities keep working.
-     Slice 6 codemods the call sites to the new names and deletes these. */
-  --background: var(--fill-1);
-  --foreground: var(--fg-1);
-  --muted: var(--fg-3);
-  --border: var(--line);
-  --primary: var(--act);
-  --primary-foreground: var(--on-act);
-  --accent: var(--fill-2);
 }
 
 /* Utilities read the variables, so text-fg-2, bg-canvas, border-line-control,
@@ -217,15 +207,6 @@
   --color-pub-faint: var(--pub-faint);
   --color-pub-gold-hi: var(--pub-gold-hi);
   --color-scrim: var(--scrim);
-
-  /* Aliases, one release */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-border: var(--border);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-accent: var(--accent);
 
   /* Elevation: shadow-float, shadow-overlay, inset-shadow-photo-edge */
   --shadow-float: var(--elev-float);

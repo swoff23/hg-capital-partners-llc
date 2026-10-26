@@ -114,7 +114,7 @@ export function AssigneePicker({
         className={cn(
           field ? pickerField : pickerChip,
           field ? name && "pl-2" : cn("pl-1", !name && "pl-2"),
-          !name && (field ? "text-fg-3" : "text-muted"),
+          !name && "text-fg-3",
           className,
         )}
       >
@@ -150,7 +150,7 @@ export function AssigneePicker({
 }
 
 const itemClass = cn(
-  "flex min-h-9 cursor-default items-center gap-2.5 rounded-sm px-3 py-1 text-sm outline-none pointer-coarse:min-h-11",
+  "flex min-h-9 cursor-default items-center gap-2.5 rounded-sm px-3 py-1 text-body outline-none pointer-coarse:min-h-11",
   "data-focused:bg-fill-2 data-pressed:bg-fill-2",
 );
 // Sentence case: no uppercase in the app.
@@ -182,12 +182,12 @@ function AssigneeList({
 
   return (
     <Autocomplete filter={contains}>
-      <SearchField aria-label="Search people" autoFocus={autoFocus} className="border-b border-border p-1">
+      <SearchField aria-label="Search people" autoFocus={autoFocus} className="border-b border-line p-1">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-3" aria-hidden="true" />
           <Input
             placeholder="Search"
-            className="h-8 w-full rounded-md bg-transparent pl-9 pr-3 text-sm outline-none placeholder:text-muted pointer-coarse:h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-8 w-full rounded-md bg-transparent pl-9 pr-3 text-body outline-none placeholder:text-fg-3 pointer-coarse:h-11 [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
       </SearchField>
@@ -196,14 +196,14 @@ function AssigneeList({
         selectionMode="single"
         selectedKeys={[selectedKey]}
         onSelectionChange={onSelectionChange}
-        renderEmptyState={() => <p className="px-3 py-3 text-sm text-muted">No one matches.</p>}
+        renderEmptyState={() => <p className="px-3 py-3 text-body text-fg-3">No one matches.</p>}
         className={cn("overflow-y-auto p-1 outline-none", inSheet ? "max-h-[60dvh]" : "max-h-72")}
       >
         <ListBoxItem id={NONE} textValue="Unassigned" className={itemClass}>
           {({ isSelected }) => (
             <>
-              <CircleDashed className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
-              <span className="flex-1 text-muted">Unassigned</span>
+              <CircleDashed className="h-5 w-5 shrink-0 text-fg-3" aria-hidden="true" />
+              <span className="flex-1 text-fg-3">Unassigned</span>
               <Selected on={isSelected} />
             </>
           )}
@@ -241,7 +241,7 @@ function AssigneeList({
                           </span>
                         )}
                       </span>
-                      {c.trade && <span className="block truncate text-xs text-muted">{c.trade}</span>}
+                      {c.trade && <span className="block truncate text-meta text-fg-3">{c.trade}</span>}
                     </span>
                     <Selected on={isSelected} />
                   </>

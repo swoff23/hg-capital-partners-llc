@@ -63,7 +63,7 @@ export function MediaGrid({
           type="button"
           onClick={() => setExpanded(true)}
           className={cn(
-            "mt-2 rounded-md text-xs font-medium text-fg-1 hover:underline pointer-coarse:min-h-11",
+            "mt-2 rounded-md text-meta font-medium text-fg-1 hover:underline pointer-coarse:min-h-11",
             items.length <= wideCap && "sm:hidden",
           )}
         >

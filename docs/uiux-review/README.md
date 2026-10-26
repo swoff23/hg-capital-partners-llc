@@ -4,6 +4,8 @@ October 2026. A screen-by-screen teardown of the whole app, benchmarked against 
 
 The interactive version, with filters and the evidence screenshots, is `uiux-review/index.html` at the repo root. It is gitignored, like the device report, because the screenshots show real tenant, loan and P&L figures. Here, contractor phone numbers and emails are replaced with [phone] and [email].
 
+`overrides.json` holds the status overrides and notes these docs are rebuilt from, so keep it when they change.
+
 ### The short version
 
 HG works, and a lot of it is good: the CapEx model, the approved task and portal designs, the house rules. Next to Linear, Stripe, Mercury and Things 3, though, it reads as pages built one at a time. Three root causes explain most of the 1,076 findings:

@@ -164,20 +164,20 @@ function DuePanel({
               onPress={() => onPick(p.value)}
               aria-keyshortcuts={String(i + 1)}
               className={cn(
-                "flex h-8 w-full items-center gap-2.5 rounded-sm px-3 text-left text-sm outline-none transition-colors",
+                "flex h-8 w-full items-center gap-2.5 rounded-sm px-3 text-left text-body outline-none transition-colors",
                 "hover:bg-fill-2 data-focus-visible:bg-fill-2 data-pressed:bg-fill-2 pointer-coarse:h-11",
               )}
             >
-              <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+              <Icon className="h-4 w-4 shrink-0 text-fg-3" aria-hidden="true" />
               <span className="flex-1">{p.label}</span>
-              {p.hint && <span className="whitespace-nowrap pl-6 text-xs text-muted">{p.hint}</span>}
+              {p.hint && <span className="whitespace-nowrap pl-6 text-meta text-fg-3">{p.hint}</span>}
               {/* Its key, printed for a mouse; Kbd hides on touch. */}
               <Kbd aria-hidden="true">{i + 1}</Kbd>
             </AriaButton>
           );
         })}
       </div>
-      <div className="border-t border-border px-3 pb-3 pt-2">
+      <div className="border-t border-line px-3 pb-3 pt-2">
         <MonthCalendar value={value} today={today} label={label} onPick={onPick} />
       </div>
     </div>
@@ -185,7 +185,7 @@ function DuePanel({
 }
 
 const navButton =
-  "flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-fill-2 hover:text-foreground pointer-coarse:h-11 pointer-coarse:w-11";
+  "flex h-7 w-7 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:h-11 pointer-coarse:w-11";
 
 function MonthCalendar({
   value,
@@ -207,7 +207,7 @@ function MonthCalendar({
       className="w-full"
     >
       <header className="flex items-center justify-between pb-1">
-        <Heading className="pl-1 text-sm font-semibold" />
+        <Heading className="pl-1 text-body font-semibold" />
         <div className="flex items-center">
           <AriaButton slot="previous" className={navButton}>
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -219,7 +219,7 @@ function MonthCalendar({
       </header>
       <CalendarGrid weekdayStyle="narrow" className="w-full border-separate border-spacing-0">
         <CalendarGridHeader>
-          {(d) => <CalendarHeaderCell className="pb-1 text-xs font-medium text-muted">{d}</CalendarHeaderCell>}
+          {(d) => <CalendarHeaderCell className="pb-1 text-meta font-medium text-fg-3">{d}</CalendarHeaderCell>}
         </CalendarGridHeader>
         <CalendarGridBody>
           {(date) => (
@@ -227,7 +227,7 @@ function MonthCalendar({
               date={date}
               className={({ isSelected, isOutsideMonth, isFocusVisible }) =>
                 cn(
-                  "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm tabular-nums outline-none transition-colors pointer-coarse:h-11 pointer-coarse:w-11",
+                  "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-body tabular-nums outline-none transition-colors pointer-coarse:h-11 pointer-coarse:w-11",
                   isOutsideMonth && "invisible",
                   // One weight for every day: today is its ring, the pick is the --act fill.
                   isSelected

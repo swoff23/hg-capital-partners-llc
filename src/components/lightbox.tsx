@@ -92,13 +92,13 @@ export function Lightbox({
         <Dialog aria-label="Photos and videos" className="flex h-full flex-col text-on-photo outline-none">
           <header className="flex shrink-0 items-center gap-2 pl-4 pr-1.5 pt-[env(safe-area-inset-top)]">
             <div className="min-w-0 flex-1 py-2">
-              <Heading slot="title" className="truncate text-sm font-medium">
+              <Heading slot="title" className="truncate text-label">
                 {item.filename}
               </Heading>
-              {byline && <p className="truncate text-xs text-on-photo/70">{byline}</p>}
+              {byline && <p className="truncate text-meta text-on-photo/70">{byline}</p>}
             </div>
             {count > 1 && (
-              <span className="shrink-0 px-2 text-sm tabular-nums text-on-photo/70">
+              <span className="num shrink-0 px-2 text-micro text-on-photo/70">
                 <span aria-hidden="true">
                   {i + 1} / {count}
                 </span>
@@ -185,10 +185,10 @@ function ConfirmDelete({
   const [error, setError] = useState("");
   return (
     <div className="space-y-4 p-4 md:w-96">
-      <p className="text-sm text-fg-2">
+      <p className="text-body text-fg-2">
         <span className="break-all">“{item.filename}”</span> goes for good.
       </p>
-      {error && <p className="text-xs text-danger">{error}</p>}
+      {error && <p className="text-meta text-danger">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" size="sm" disabled={pending} onClick={onDone}>
           Keep it
@@ -237,7 +237,7 @@ function Stage({ item }: { item: MediaItem }) {
   }
   if (!src) {
     return (
-      <p className="flex items-center gap-2 text-sm text-on-photo/70">
+      <p className="flex items-center gap-2 text-body text-on-photo/70">
         <ImageOff className="h-5 w-5" aria-hidden="true" />
         This photo can&apos;t be shown here. Download it to view.
       </p>

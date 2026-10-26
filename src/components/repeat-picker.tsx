@@ -67,7 +67,7 @@ export function RepeatPicker({
         aria-label={`Repeats: ${value ? describeRepeat(value) : "never"}`}
         className={cn(
           trigger === "field" ? pickerField : pickerChip,
-          !value && (trigger === "field" ? "text-fg-3" : "text-muted"),
+          !value && "text-fg-3",
           className,
         )}
       >
@@ -106,7 +106,7 @@ function RepeatPanel({
   const [choice, setChoice] = useState(initial);
   const set = (patch: Partial<RepeatChoice>) => setChoice((c) => ({ ...c, ...patch }));
   const numberField = (key: "every" | "day", max: number, before: string, after: string) => (
-    <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+    <label className="flex items-center gap-2 whitespace-nowrap text-body">
       {before}
       <Input
         type="number"

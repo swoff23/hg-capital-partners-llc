@@ -8,8 +8,9 @@ const EM_DASH_MESSAGE =
   "Em dash in copy. Don't swap it for a period or comma: rewrite the sentence, or ask Connor. See CLAUDE.md, Copy.";
 
 // Brand values come from the tokens in src/app/globals.css, so a re-brand is a
-// token swap (docs/brand-guidelines.md, section 11). Warnings until slice 6 of
-// the rollout moves the call sites over, then errors.
+// token swap (docs/brand-guidelines.md, section 11). A value the tokens can't
+// carry (a fixed size the guidelines name) takes an eslint-disable-next-line
+// comment saying why.
 const DESIGN_VALUE_RULES = [
   {
     pattern: /-\[#/,
@@ -23,6 +24,17 @@ const DESIGN_VALUE_RULES = [
     pattern: /\b(?:zinc|blue|red|amber|green|purple)-\d{2,3}\b/,
     message:
       "Raw palette color. Use a token from globals.css: fg-*, fill-*, line-* for neutrals; danger, warn, ok for status.",
+  },
+  {
+    pattern: /\btext-(?:xs|sm|base|lg|[2-9]?xl)\b/,
+    message: "Tailwind text size. Use the type token for the role: text-body, text-label, text-meta or text-micro (section 3).",
+  },
+  {
+    // The aliases are gone from globals.css, so one of these would draw nothing.
+    pattern:
+      /\b(?:text|bg|border(?:-[trblxyse])?|divide|ring|outline|fill|stroke|decoration)-(?:muted|foreground|background|border|primary(?:-foreground)?|accent)\b/,
+    message:
+      "Retired alias. text-muted is text-fg-3, text-foreground text-fg-1, bg-background bg-fill-1, border-border border-line, bg-accent bg-fill-2, primary the act tokens.",
   },
 ];
 
@@ -64,7 +76,7 @@ const eslintConfig = defineConfig([
         { selector: "Literal[value=/—/]:not([value='—'])", message: EM_DASH_MESSAGE },
         { selector: "TemplateElement[value.raw=/—/]", message: EM_DASH_MESSAGE },
       ],
-      "hg/design-tokens": "warn",
+      "hg/design-tokens": "error",
     },
   },
   // Override default ignores of eslint-config-next.

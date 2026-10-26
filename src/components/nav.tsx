@@ -103,7 +103,9 @@ export function TopTabs({ tabs, base, keep = [] }: { tabs: { href: string; label
             role="tab"
             aria-selected={active}
             className={cn(
-              // 8px sides below sm, so Settings' three tabs keep one line at 320.
+              // 8px sides below sm, so Settings' three tabs keep one line at 320. A fixed
+              // 14 / 20 at every size: text-label grows to 16 on touch (section 9).
+              // eslint-disable-next-line hg/design-tokens -- the tab size is fixed
               "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-fg-1 sm:px-3",
               "aria-selected:border-act aria-selected:text-fg-1",
               TOUCH_HEIGHT,
