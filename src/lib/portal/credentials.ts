@@ -47,6 +47,16 @@ export function checkNewPassword(
   return null;
 }
 
+/**
+ * Whether a starting password someone sent is a try at all. An empty one is
+ * the form posted unfilled (no script, or a skipped check), not a guess, so
+ * it is refused before the sign-in throttle and never spends one of the
+ * strikes that lock the account for everyone, /login included.
+ */
+export function isStartingPasswordTry(current: string): boolean {
+  return current.length > 0;
+}
+
 export function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
@@ -54,4 +64,16 @@ export function normalizeEmail(raw: string): string {
 /** Loose on purpose: one @, something either side, a dot in the domain, no spaces. */
 export function looksLikeEmail(email: string): boolean {
   return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * What the reset link's form posted. It has one password field, so the
+ * password stands as its own confirmation: a `confirm` that is missing or
+ * empty falls back to the password, and only a different, non-empty one is a
+ * mismatch. (A form posted before the page hydrated, or without script, can
+ * carry an empty one, which must not read as a second, different password.)
+ */
+export function readResetForm(form: FormData): { token: string; password: string; confirm: string } {
+  const password = String(form.get("password") ?? "");
+  return { token: String(form.get("token") ?? ""), password, confirm: String(form.get("confirm") ?? "") || password };
 }

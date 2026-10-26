@@ -10,14 +10,15 @@ import { PasswordField } from "../_components/password-field";
  * the rule as its helper, "At least 10 characters.". The rule is checked
  * before anything is posted, so a short password never costs a round trip
  * (and never spends the single-use token). The post stays a plain POST to
- * /login/reset/submit (see its route for why); the one password also goes as
- * `confirm`, the second copy the old form asked for, which the server still
- * compares. `refusal` is the server's reason when it sent the person back.
+ * /login/reset/submit (see its route for why), which treats the one password
+ * as its own confirmation. The field is uncontrolled and read from the form
+ * on submit, so text typed before the page hydrates, or while the error
+ * re-renders, is never wiped. `refusal` is the server's reason when it sent
+ * the person back.
  */
 export function ResetForm({ token, refusal }: { token: string; refusal?: string }) {
   const [shownRefusal, setRefusal] = useState(refusal);
   const [problem, setProblem] = useState<string | undefined>();
-  const [password, setPassword] = useState("");
   const field = useRef<HTMLInputElement>(null);
   const line = problem ?? shownRefusal;
 
@@ -28,7 +29,7 @@ export function ResetForm({ token, refusal }: { token: string; refusal?: string 
       action="/login/reset/submit"
       noValidate
       onSubmit={(e) => {
-        const code = checkNewPassword(password);
+        const code = checkNewPassword(String(new FormData(e.currentTarget).get("password") ?? ""));
         if (code) {
           // Stopped here: nothing is posted, so the link isn't spent.
           e.preventDefault();
@@ -39,7 +40,6 @@ export function ResetForm({ token, refusal }: { token: string; refusal?: string 
       className="mt-8 space-y-4 text-left"
     >
       <input type="hidden" name="token" value={token} />
-      <input type="hidden" name="confirm" value={password} />
       <FormField label="New password" required helper={`At least ${MIN_PASSWORD_LENGTH} characters.`} error={line}>
         {(p) => (
           <PasswordField
@@ -48,9 +48,7 @@ export function ResetForm({ token, refusal }: { token: string; refusal?: string 
             name="password"
             autoComplete="new-password"
             autoFocus
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
+            onChange={() => {
               setProblem(undefined);
               setRefusal(undefined);
             }}

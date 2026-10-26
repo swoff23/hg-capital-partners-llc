@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
@@ -16,6 +16,7 @@ import { offersUnits, type PropertyOption } from "@/lib/picker-options-shape";
 import { firstOccurrence, type RepeatRule } from "@/lib/tasks/repeat";
 import { followDueDay } from "@/lib/tasks/repeat-choice";
 import { fmtShortDay } from "@/lib/tasks/activity";
+import { afterCreate, isStillOnNewTask, newTaskDraftKey } from "@/lib/tasks/new-task";
 import { cn } from "@/lib/utils";
 import { createTask, type CreatedTask } from "./actions";
 
@@ -100,6 +101,14 @@ export function NewTaskForm({
   const [tagOn, setTagOn] = useState(context !== null);
   // The last date Due held, so a pinned day follows it even when the field passes through empty.
   const [lastDue, setLastDue] = useState<Ymd | "">("");
+  // False once the form is gone (Back or a swipe while Create was in flight), so a late success doesn't navigate again.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const set = (patch: Partial<Values>) => setValues((v) => ({ ...v, ...patch }));
 
   const property = properties.find((p) => p.id === values.propertyId);
@@ -187,8 +196,12 @@ export function NewTaskForm({
         // A draft of a task about nothing keeps the Property chip it had.
         setTagOn(context !== null && (draft.propertyId === context.id || draft.dealId === context.id));
       }}
-      onReset={() => setValues(blank(tagOn ? context : null, meId))}
-      draftKey={`new-task:${context ? `${context.kind}:${context.id}` : "none"}`}
+      onReset={() => {
+        // Back to how it opened, Tag and all: Clear on a draft that had the Tag removed would otherwise lose the context for good.
+        setValues(blank(context, meId));
+        setTagOn(context !== null);
+      }}
+      draftKey={newTaskDraftKey(meId, context)}
       fields={["title", "description"]}
       check={(data) => {
         const title = String(data.get("title") ?? "").trim();
@@ -200,14 +213,16 @@ export function NewTaskForm({
       onCreated={(task, more) => {
         // Forms spec 4.4 (TASKS-034), approved by Connor: from the sheet you stay where
         // you were and the toast opens the task; from a pasted link or a reload there's
-        // nowhere to go back to, so the page lands on the new task.
-        if (more || variant === "sheet") {
-          toast({ message: "Task created", action: { label: "Open", onAction: () => router.push(`/tasks/${task.id}`) } });
-          if (!more) router.back();
+        // nowhere to go back to, so the page lands on the new task. If the person already
+        // left while Create was in flight, nothing navigates; the toast still opens the task.
+        const next = afterCreate(variant, more, isStillOnNewTask(mounted.current, window.location.pathname));
+        if (next === "replace") {
+          toast({ message: "Task created" });
+          router.replace(`/tasks/${task.id}`);
           return;
         }
-        toast({ message: "Task created" });
-        router.replace(`/tasks/${task.id}`);
+        toast({ message: "Task created", action: { label: "Open", onAction: () => router.push(`/tasks/${task.id}`) } });
+        if (next === "back") router.back();
       }}
     >
       {({ errors, clear }) => (

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyDraftKey,
   applyProblems,
   applyTokens,
   createTasksLabel,
@@ -223,4 +224,17 @@ test("a playbook's version changes with its tasks, so an old draft never lands o
   assert.notEqual(itemsVersion(a), itemsVersion([{ title: "Give keys" }, { title: "Collect deposit" }]));
   assert.notEqual(itemsVersion(a), itemsVersion([...a, { title: "Walk the unit" }]));
   assert.match(itemsVersion(a), /^2-/);
+});
+
+test("an application's draft is kept per building it was opened for, so it never replaces another building's page", () => {
+  const items = [{ title: "Collect deposit" }, { title: "Give keys" }];
+  const forA = applyDraftKey("t1", items, "prop_A");
+  const forB = applyDraftKey("t1", items, "prop_B");
+  const none = applyDraftKey("t1", items, null);
+  assert.equal(forA, applyDraftKey("t1", items, "prop_A"), "the same page finds its own draft again");
+  assert.equal(new Set([forA, forB, none]).size, 3);
+  // Still per playbook and per version of its tasks.
+  assert.notEqual(forA, applyDraftKey("t2", items, "prop_A"));
+  assert.notEqual(forA, applyDraftKey("t1", [...items, { title: "Walk the unit" }], "prop_A"));
+  assert.ok(forA.startsWith(`apply:t1:${itemsVersion(items)}:`));
 });

@@ -18,6 +18,7 @@ import { stableJson } from "@/lib/drafts";
 import { inlineEditCommit } from "@/lib/inline-edit";
 import { offersUnits, type PropertyOption } from "@/lib/picker-options-shape";
 import {
+  applyDraftKey,
   applyProblems,
   applyTokens,
   createTasksLabel,
@@ -26,7 +27,6 @@ import {
   fillNotes,
   hasApplyProblems,
   isAddressToken,
-  itemsVersion,
   notesOnlyTokens,
   rowTitle,
   sameToken,
@@ -112,8 +112,8 @@ export function ApplyFlow({
   const [focusTick, setFocusTick] = useState(0);
   const form = useRef<HTMLDivElement>(null);
 
-  // The draft: kept in this browser per playbook version, put back after a reload.
-  const { restored, clear: clearDraft } = useDraft(`apply:${templateId}:${itemsVersion(items)}`, s);
+  // The draft: kept in this browser per playbook version and per building the page was opened for, put back after a reload.
+  const { restored, clear: clearDraft } = useDraft(applyDraftKey(templateId, items, initialPropertyId), s);
   const baseline = stableJson(initial);
   const dirty = stableJson(s) !== baseline;
   useHoldLeave(dirty ? { title: "Leave before creating tasks?", stay: "Keep editing" } : null);
@@ -231,7 +231,7 @@ export function ApplyFlow({
               }}
             />
           </PickField>
-          {property && offersUnits(property.units, null) && (
+          {property && offersUnits(property.units, s.unitLabel) && (
             <PickField label="Unit">
               <UnitPicker value={s.unitLabel} units={property.units} trigger="field" onChange={(unitLabel) => patch({ unitLabel })} />
             </PickField>

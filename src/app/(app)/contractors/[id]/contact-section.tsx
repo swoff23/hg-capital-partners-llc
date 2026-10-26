@@ -16,6 +16,8 @@ export type EditableContact = {
   company: string | null;
   trades: string | null;
   phone: string | null;
+  /** The number Call and Text dial: the digits only, without an extension or a note like "cell". */
+  phoneE164: string | null;
   email: string | null;
   mailingAddress: string | null;
   billingInfo: string | null;
@@ -91,7 +93,10 @@ export function ContactSection({
 }) {
   const phone = contact.phone?.trim() || null;
   const first = firstName(contact.fullName) || contact.fullName;
-  const sms = textHref(phone);
+  // Call and Text dial the clean number; a typed extension would otherwise run into the digits.
+  const dial = contact.phoneE164 ?? phone;
+  const tel = telHref(dial);
+  const sms = textHref(dial);
   return (
     <Section title="Contact">
       <RailList>
@@ -115,8 +120,8 @@ export function ContactSection({
           trailing={
             phone && (
               <>
-                {telHref(phone) && (
-                  <a href={telHref(phone)!} aria-label={`Call ${first}`} title={`Call ${phone}`} className={actionLink}>
+                {tel && (
+                  <a href={tel} aria-label={`Call ${first}`} title={`Call ${phone}`} className={actionLink}>
                     <Phone aria-hidden="true" className="size-4" />
                   </a>
                 )}

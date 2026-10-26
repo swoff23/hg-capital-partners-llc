@@ -1,7 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { changeOwnPassword } from "@/lib/portal/accounts";
-import { checkNewPassword, type PasswordProblem } from "@/lib/portal/credentials";
+import { checkNewPassword, isStartingPasswordTry, type PasswordProblem } from "@/lib/portal/credentials";
 import { portalReturnPath } from "@/lib/portal/next-path";
 import { endPortalSession, getPortalPrincipal, requirePortalPrincipal } from "@/lib/portal/session";
 
@@ -39,6 +39,8 @@ export async function chooseOwnPassword(_prev: FirstPasswordState, formData: For
 
   const problem = checkNewPassword(password);
   if (problem) return { error: problem };
+  // An empty starting password is no try: refused here, before the throttle can count a strike.
+  if (!isStartingPasswordTry(current)) return { error: "wrong-current" };
 
   const result = await changeOwnPassword(principal, current, password);
   if (!result.ok) return { error: result.error };
