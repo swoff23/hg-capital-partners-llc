@@ -22,7 +22,7 @@ Asana access ends around **Nov 1**, so these need doing by about **Thu Oct 29**.
   - deletes the 1,993 old spreadsheet rows (already approved);
   - tidies the three contractor records.
 
-Claude runs the official Asana backup itself; nothing needed from you for that.
+The official Asana backup is done (Mon Oct 26: every task, history entry and file, 1.5 GB, saved privately on your Mac), with Brandon and Kenneth set up in it for the import.
 
 ## Before inviting contractors
 
