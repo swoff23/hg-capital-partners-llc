@@ -42,6 +42,7 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - [ ] Look at the new screens on a computer: Today, All, the task page, playbooks and a contractor's page.
 - [ ] Pick a provider for address suggestions (Google Places, Mapbox or Smarty) and get its API key. Until then, suggestions come from your own properties and deals.
 - [ ] To give old deal notes their author, Claude needs a way to write to the production database (the same `.env.prod-write` the Asana import needs). Until then, old notes keep the author in their text, as today.
+- [ ] Contractor invoices: confirm or correct the 11 defaults in [docs/contractor-invoices-plan.md](contractor-invoices-plan.md), then say "build it" after the cutover. Its section 9 lists the API key and DNS steps that come before the inbox.
 
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
 - [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
