@@ -1,6 +1,7 @@
 "use server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { countQuery } from "@/lib/list-count";
 import { dealsWhere, parseDealFilters } from "./query";
 
 /**
@@ -10,6 +11,6 @@ import { dealsWhere, parseDealFilters } from "./query";
  */
 export async function countDealsAction(query: string): Promise<number> {
   await requireUser();
-  const filters = parseDealFilters(Object.fromEntries(new URLSearchParams(query)));
+  const filters = parseDealFilters(Object.fromEntries(new URLSearchParams(countQuery.parse(query))));
   return prisma.deal.count({ where: dealsWhere(filters) });
 }

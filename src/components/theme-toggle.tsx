@@ -71,19 +71,34 @@ function readPref(): ThemePref {
   }
 }
 
+/**
+ * Sets [data-theme] for a pick, "system" meaning the device's. Setting it is
+ * enough: THEME_SCRIPT's observer moves the browser's bar with it.
+ */
+function applyPref(pref: ThemePref) {
+  const dark = pref === "dark" || (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+}
+
 function subscribe(onChange: () => void) {
+  // A pick made in another tab (a null key is its storage being cleared): this page takes the
+  // theme too, not only the menu's tick, since the other tab's setThemePref ran there.
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== null && e.key !== STORAGE_KEY) return;
+    applyPref(readPref());
+    onChange();
+  };
   window.addEventListener(CHANGED, onChange);
-  window.addEventListener("storage", onChange);
+  window.addEventListener("storage", onStorage);
   return () => {
     window.removeEventListener(CHANGED, onChange);
-    window.removeEventListener("storage", onChange);
+    window.removeEventListener("storage", onStorage);
   };
 }
 
 /**
  * Makes a pick: stored (System removes the key, so the device decides) and
- * applied at once. Setting data-theme is enough: THEME_SCRIPT's observer
- * moves the browser's bar with it.
+ * applied at once.
  */
 export function setThemePref(pref: ThemePref) {
   held = null;
@@ -93,8 +108,7 @@ export function setThemePref(pref: ThemePref) {
   } catch {
     held = pref;
   }
-  const dark = pref === "dark" || (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  applyPref(pref);
   window.dispatchEvent(new Event(CHANGED));
 }
 

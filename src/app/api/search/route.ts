@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { dealStatusLabel } from "@/lib/config";
 import { prisma } from "@/lib/db";
 import { everyTermMatches, searchTerms } from "@/lib/search";
+import { paletteTaskWhere } from "@/lib/tasks/list-query";
 
 export async function GET(request: NextRequest) {
   if (!(await getCurrentUser())) return NextResponse.json({ results: [] }, { status: 401 });
@@ -32,17 +33,9 @@ export async function GET(request: NextRequest) {
       select: { id: true, fullName: true, company: true },
       take: 6,
     }),
-    // A task matches on its own title or on what it's linked to: the property
-    // or deal address, and whoever it's assigned to.
+    // The Tasks page's search (paletteTaskWhere): the same words over the same fields, Template rows left out on both.
     prisma.task.findMany({
-      where: everyTermMatches<Prisma.TaskWhereInput>(terms, (t) => [
-        { title: t },
-        { property: { address: t } },
-        { deal: { address: t } },
-        { assignee: { name: t } },
-        { assigneeContact: { fullName: t } },
-        { assigneeName: t },
-      ]),
+      where: paletteTaskWhere(q),
       select: { id: true, title: true, status: true },
       take: 6,
     }),

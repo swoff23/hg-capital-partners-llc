@@ -1,5 +1,6 @@
 "use server";
 import { requireUser } from "@/lib/auth";
+import { countQuery } from "@/lib/list-count";
 import { parseAllFilters } from "@/lib/tasks/list-query";
 import { countAllTasks, legacyNamesFor } from "@/lib/tasks/queries";
 
@@ -9,7 +10,7 @@ import { countAllTasks, legacyNamesFor } from "@/lib/tasks/queries";
  * the page reads the URL.
  */
 export async function countTasksAction(query: string): Promise<number> {
-  const user = await requireUser();
-  const filters = parseAllFilters(Object.fromEntries(new URLSearchParams(query)), user.id);
+  await requireUser();
+  const filters = parseAllFilters(Object.fromEntries(new URLSearchParams(countQuery.parse(query))));
   return countAllTasks(filters, await legacyNamesFor(filters.owner));
 }

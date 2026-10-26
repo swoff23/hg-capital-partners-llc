@@ -33,7 +33,7 @@ export const LIST_COOKIES: Record<ListKey, string> = {
 export type ListHrefs = Record<ListKey, string>;
 
 /** Longer than this and a cookie isn't worth keeping: the list opens plain. */
-const MAX_QUERY = 1500;
+export const MAX_QUERY = 1500;
 
 /** A query string as stored: parsed and written back, so only well-formed `a=b&c=d` survives. */
 export function cleanQuery(query: string | null | undefined): string {

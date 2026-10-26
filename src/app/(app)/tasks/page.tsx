@@ -6,7 +6,7 @@ import { todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { propertyOptions } from "@/lib/picker-options";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
-import { NONE, parseAllFilters, personRefs } from "@/lib/tasks/list-query";
+import { NONE, parseAllFilters, personRefs, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
 import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
 import { AllList } from "./all-list";
 import { TaskFilters } from "./filters";
@@ -18,7 +18,9 @@ const PAGE = 400;
 /**
  * Tasks: every task, filtered, Done included. Today lives on Home now
  * (docs/home-as-today.md), so this opens on the open tasks, and the filters
- * old links carry (?status=done, ?property=…, ?assignee=me) are served here.
+ * old links carry (?status=done, ?property=…) are served here. Two old picks
+ * are rewritten to the person's key first, so the bar shows them and can
+ * clear them: ?assignee=me, and ?owner=n:<name> once that name is a person.
  * The bar is components/filter-bar.tsx; its state is the URL, with
  * comma-joined picks for the assignee and property filters.
  */
@@ -29,12 +31,17 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   // Today's Contractors column moved to Home with the rest of Today.
   if (sp.view === "contractors") redirect("/?view=contractors");
 
-  const filters = parseAllFilters(sp, user.id);
+  const mine = withoutAssigneeShortcut(sp, user.id);
+  if (mine) redirect(`/tasks?${mine}`);
+
+  const filters = parseAllFilters(sp);
   const { users, contractors } = await assigneeOptions(
     filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)),
   );
   // Imported names that are a person on offer count for that person; the rest list once as "Others".
   const legacy = await legacyAssignees(personRefs(users, contractors));
+  const merged = withMergedOwners(sp, legacy.merged);
+  if (merged) redirect(`/tasks?${merged}`);
 
   const searching = filters.q !== "";
   const [{ tasks, total }, counts, properties, viewCounts] = await Promise.all([

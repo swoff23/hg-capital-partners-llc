@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { parseFacet } from "@/lib/list-memory";
+import { joinFacet, parseFacet } from "@/lib/list-memory";
 import { everyTermMatches, searchTerms } from "@/lib/search";
 import { activeTask, closedTask, excludeTemplateTasks } from "@/lib/task-scope";
 import type { PersonRef } from "./assignee-people";
@@ -37,24 +37,81 @@ type Params = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 
 /**
- * The filters in the URL. `?assignee=me` is the old "assigned to me"
- * shortcut and `?owner=` supersedes it. A `status` that isn't one of the three
- * is Open.
+ * The filters in the URL. A `status` that isn't one of the three is Open.
+ * Old links carry `?assignee=me` and `?owner=n:<name>`; the page turns those
+ * into the person's key before it gets here (`withoutAssigneeShortcut`,
+ * `withMergedOwners`), so the bar always shows the pick and can clear it.
  */
-export function parseAllFilters(sp: Params, meId: string): AllFilters {
+export function parseAllFilters(sp: Params): AllFilters {
   const status = str(sp.status);
-  const owner = parseFacet(str(sp.owner));
   return {
     status: (TASK_VIEWS as readonly string[]).includes(status) ? (status as TaskView) : "open",
-    owner: owner.length > 0 ? owner : sp.assignee === "me" ? [`u:${meId}`] : [],
+    owner: parseFacet(str(sp.owner)),
     property: parseFacet(str(sp.property)),
     repeats: str(sp.repeats) === "1",
     q: str(sp.q).trim(),
   };
 }
 
+/** Every value of every param, a repeated one kept, as a query to put back in a link. */
+export function toQuery(sp: Params): URLSearchParams {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(sp)) {
+    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) qs.append(key, v);
+  }
+  return qs;
+}
+
+/**
+ * The query for an old `?assignee=me` link ("assigned to me"), with every
+ * other param kept: `owner=u:<meId>` in its place, or just dropped when the
+ * link already has an `owner` (which supersedes it). Null when the link has no
+ * `assignee=me`, so there's nothing to redirect.
+ */
+export function withoutAssigneeShortcut(sp: Params, meId: string): string | null {
+  const asked = Array.isArray(sp.assignee) ? sp.assignee : [sp.assignee];
+  if (!asked.includes("me")) return null;
+  const qs = toQuery(sp);
+  qs.delete("assignee");
+  if (parseFacet(str(sp.owner)).length === 0) qs.set("owner", `u:${meId}`);
+  return qs.toString();
+}
+
 /** Legacy free-text names that stand for a person (mergeLegacyNames): the person's key to the names. */
 export type LegacyNames = ReadonlyMap<string, readonly string[]>;
+
+/** The other way round: each legacy name to the key of the person it stands for. */
+export function personOfLegacyName(legacy: LegacyNames): Map<string, string> {
+  const people = new Map<string, string>();
+  for (const [key, names] of legacy) for (const n of names) people.set(n, key);
+  return people;
+}
+
+/**
+ * The query for an old link that picks a legacy name which now stands for a
+ * person (`owner=n:Brandon Zarbo` once Brandon is a contractor): that pick
+ * becomes the person's key, once, and every other param stays. Without it the
+ * bar would show the raw key and couldn't untick it, since the name no longer
+ * has a row of its own. Null when no pick is a merged name.
+ */
+export function withMergedOwners(sp: Params, legacy: LegacyNames): string | null {
+  const people = new Map<string, string>();
+  for (const [name, key] of personOfLegacyName(legacy)) {
+    // The key was made from the trimmed name, and the stored one may carry spaces.
+    people.set(name, key);
+    if (!people.has(name.trim())) people.set(name.trim(), key);
+  }
+  let changed = false;
+  const owner = parseFacet(str(sp.owner)).map((pick) => {
+    const person = pick.startsWith("n:") ? people.get(pick.slice(2)) : undefined;
+    if (person) changed = true;
+    return person ?? pick;
+  });
+  if (!changed) return null;
+  const qs = toQuery(sp);
+  qs.set("owner", joinFacet([...new Set(owner)]));
+  return qs.toString();
+}
 
 /** Which of the facets a count leaves out, so a facet's rows count what picking each would show. */
 export type OmitFacet = "owner" | "property";
@@ -81,6 +138,15 @@ export function searchWhere(q: string): Prisma.TaskWhereInput {
     { assigneeContact: { fullName: t } },
     { assigneeName: t },
   ]);
+}
+
+/**
+ * The palette's task search: the Tasks page's words over the same fields, on
+ * the same rows. Template rows are playbooks, not work, so neither one finds
+ * them.
+ */
+export function paletteTaskWhere(q: string): Prisma.TaskWhereInput {
+  return { AND: [excludeTemplateTasks, searchWhere(q)] };
 }
 
 /**
@@ -169,8 +235,7 @@ export interface OwnerCountRow {
  * counts under Unassigned, as the filter treats them.
  */
 export function ownerCounts(rows: readonly OwnerCountRow[], legacy: LegacyNames = new Map()): Map<string, number> {
-  const personOfName = new Map<string, string>();
-  for (const [key, names] of legacy) for (const n of names) personOfName.set(n, key);
+  const personOfName = personOfLegacyName(legacy);
   const counts = new Map<string, number>();
   const add = (key: string, n: number) => counts.set(key, (counts.get(key) ?? 0) + n);
   for (const r of rows) {

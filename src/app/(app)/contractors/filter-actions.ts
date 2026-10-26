@@ -1,6 +1,7 @@
 "use server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { countQuery } from "@/lib/list-count";
 import { contractorsWhere, matchesNeedsW9, matchesTrades, parseContractorFilters } from "./query";
 
 /**
@@ -10,7 +11,7 @@ import { contractorsWhere, matchesNeedsW9, matchesTrades, parseContractorFilters
  */
 export async function countContractorsAction(query: string): Promise<number> {
   await requireUser();
-  const filters = parseContractorFilters(Object.fromEntries(new URLSearchParams(query)));
+  const filters = parseContractorFilters(Object.fromEntries(new URLSearchParams(countQuery.parse(query))));
   const rows = await prisma.contact.findMany({ where: contractorsWhere(filters), select: { trades: true, w9Url: true, comments: true } });
   return rows.filter((r) => matchesNeedsW9(r, filters) && matchesTrades(r.trades, filters.trades)).length;
 }

@@ -26,12 +26,17 @@ import {
   allTasksWhere,
   ownerCounts,
   ownerWhere,
+  paletteTaskWhere,
   parseAllFilters,
+  personOfLegacyName,
   personRefs,
   propertyCounts,
   propertyWhere,
   searchWhere,
+  toQuery,
   viewScopeWhere,
+  withMergedOwners,
+  withoutAssigneeShortcut,
   type AllFilters,
   type LegacyNames,
 } from "./list-query";
@@ -358,17 +363,109 @@ const found = (f: Partial<AllFilters>, legacy: LegacyNames = new Map()) =>
     (t) => t.id,
   );
 
-test("parseAllFilters: open by default, picks comma-joined, the old shortcuts still served", () => {
-  assert.deepEqual(parseAllFilters({}, "u-me"), { status: "open", owner: [], property: [], repeats: false, q: "" });
-  assert.equal(parseAllFilters({ status: "done" }, "u-me").status, "done");
-  assert.equal(parseAllFilters({ status: "nonsense" }, "u-me").status, "open");
-  assert.deepEqual(parseAllFilters({ owner: "u:a,c:b,none" }, "u-me").owner, ["u:a", "c:b", "none"]);
-  assert.deepEqual(parseAllFilters({ assignee: "me" }, "u-me").owner, ["u:u-me"], "?assignee=me is still 'mine'");
-  assert.deepEqual(parseAllFilters({ assignee: "me", owner: "c:z" }, "u-me").owner, ["c:z"], "?owner= supersedes it");
-  assert.deepEqual(parseAllFilters({ property: "p1,none" }, "u-me").property, ["p1", "none"]);
-  assert.equal(parseAllFilters({ repeats: "1" }, "u-me").repeats, true);
-  assert.equal(parseAllFilters({ repeats: "0" }, "u-me").repeats, false);
-  assert.equal(parseAllFilters({ q: "  roof " }, "u-me").q, "roof");
+test("parseAllFilters: open by default, picks comma-joined", () => {
+  assert.deepEqual(parseAllFilters({}), { status: "open", owner: [], property: [], repeats: false, q: "" });
+  assert.equal(parseAllFilters({ status: "done" }).status, "done");
+  assert.equal(parseAllFilters({ status: "nonsense" }).status, "open");
+  assert.deepEqual(parseAllFilters({ owner: "u:a,c:b,none" }).owner, ["u:a", "c:b", "none"]);
+  assert.deepEqual(parseAllFilters({ property: "p1,none" }).property, ["p1", "none"]);
+  assert.equal(parseAllFilters({ repeats: "1" }).repeats, true);
+  assert.equal(parseAllFilters({ repeats: "0" }).repeats, false);
+  assert.equal(parseAllFilters({ q: "  roof " }).q, "roof");
+});
+
+test("parseAllFilters: ?assignee=me is not read here, so a pick can only be the bar's own", () => {
+  // The page redirects it to owner=u:<id> first (withoutAssigneeShortcut); an unread param can't filter unseen.
+  assert.deepEqual(parseAllFilters({ assignee: "me" }).owner, []);
+});
+
+test("?assignee=me becomes the owner pick, every other param kept", () => {
+  const qs = (sp: Parameters<typeof withoutAssigneeShortcut>[0]) => {
+    const out = withoutAssigneeShortcut(sp, "u-me");
+    return out === null ? null : Object.fromEntries(new URLSearchParams(out));
+  };
+  assert.deepEqual(qs({ assignee: "me" }), { owner: "u:u-me" });
+  assert.deepEqual(qs({ assignee: "me", status: "done", property: "p1,none", q: "roof", repeats: "1" }), {
+    status: "done",
+    property: "p1,none",
+    q: "roof",
+    repeats: "1",
+    owner: "u:u-me",
+  });
+  // The redirect lands on a pick the bar reads and can clear: no assignee param left, and a second pass has nothing to do.
+  const landed = withoutAssigneeShortcut({ assignee: "me", status: "all" }, "u-me")!;
+  assert.equal(new URLSearchParams(landed).has("assignee"), false);
+  assert.deepEqual(parseAllFilters(Object.fromEntries(new URLSearchParams(landed))).owner, ["u:u-me"]);
+  assert.equal(withoutAssigneeShortcut(Object.fromEntries(new URLSearchParams(landed)), "u-me"), null);
+});
+
+test("?assignee=me: an owner already in the link wins; anything else is left alone", () => {
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(withoutAssigneeShortcut({ assignee: "me", owner: "c:z" }, "u-me")!)), {
+    owner: "c:z",
+  });
+  // An empty owner is no pick, so it gives way to "mine".
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(withoutAssigneeShortcut({ assignee: "me", owner: "" }, "u-me")!)), {
+    owner: "u:u-me",
+  });
+  assert.equal(withoutAssigneeShortcut({}, "u-me"), null);
+  assert.equal(withoutAssigneeShortcut({ status: "done" }, "u-me"), null);
+  assert.equal(withoutAssigneeShortcut({ assignee: "someone" }, "u-me"), null, "only 'me' was ever served");
+  assert.equal(withoutAssigneeShortcut({ assignee: ["me", "x"], status: "done" }, "u-me")!.includes("owner=u%3Au-me"), true);
+});
+
+test("toQuery keeps every value of a repeated param and skips an undefined one", () => {
+  const qs = toQuery({ status: "done", property: ["p1", "p2"], q: undefined, owner: "u:a" });
+  assert.deepEqual(qs.getAll("property"), ["p1", "p2"]);
+  assert.equal(qs.get("status"), "done");
+  assert.equal(qs.get("owner"), "u:a");
+  assert.equal(qs.has("q"), false);
+  assert.equal(toQuery({}).toString(), "");
+});
+
+test("?owner=n:<name> becomes the person's key once that name stands for a person", () => {
+  const legacy: LegacyNames = new Map([
+    ["c:c-brandon", ["Brandon Zarbo"]],
+    ["c:c-zack", ["Zack Reading", "Zack R. "]],
+  ]);
+  const qs = (sp: Parameters<typeof withMergedOwners>[0]) => {
+    const out = withMergedOwners(sp, legacy);
+    return out === null ? null : Object.fromEntries(new URLSearchParams(out));
+  };
+  assert.deepEqual(qs({ owner: "n:Brandon Zarbo" }), { owner: "c:c-brandon" });
+  assert.deepEqual(qs({ owner: "n:Brandon Zarbo", status: "all", property: "p1", q: "roof", repeats: "1" }), {
+    owner: "c:c-brandon",
+    status: "all",
+    property: "p1",
+    q: "roof",
+    repeats: "1",
+  });
+  // Several picks: only the merged name changes; a name that stands for nobody stays; a repeat of the person folds in.
+  assert.deepEqual(qs({ owner: "u:u-me,n:Brandon Zarbo,n:Bob Smith" }), { owner: "u:u-me,c:c-brandon,n:Bob Smith" });
+  assert.deepEqual(qs({ owner: "c:c-brandon,n:Brandon Zarbo" }), { owner: "c:c-brandon" });
+  // The key is made from the trimmed name; the stored one may have kept a space.
+  assert.deepEqual(qs({ owner: "n:Zack R." }), { owner: "c:c-zack" });
+  // A name that holds a comma rides escaped, and stays escaped when it isn't merged.
+  const comma = withMergedOwners({ owner: "n:Brandon Zarbo,n:Smith%2C Bob" }, legacy)!;
+  assert.equal(new URLSearchParams(comma).get("owner"), "c:c-brandon,n:Smith%2C Bob");
+  // Nothing to rewrite: no owner, no n: pick, or an n: pick that is still its own row.
+  assert.equal(qs({}), null);
+  assert.equal(qs({ status: "done" }), null);
+  assert.equal(qs({ owner: "u:u-me,c:c-zack,none" }), null);
+  assert.equal(qs({ owner: "n:Bob Smith" }), null);
+  assert.equal(withMergedOwners({ owner: "n:Brandon Zarbo" }, new Map()), null);
+});
+
+test("?owner=n:<name>: after the rewrite the bar's pick is a person and a second pass has nothing to do", () => {
+  const legacy: LegacyNames = new Map([["c:c-brandon", ["Brandon Zarbo"]]]);
+  const landed = Object.fromEntries(new URLSearchParams(withMergedOwners({ owner: "n:Brandon Zarbo", status: "done" }, legacy)!));
+  assert.deepEqual(parseAllFilters(landed).owner, ["c:c-brandon"]);
+  assert.equal(parseAllFilters(landed).status, "done");
+  assert.equal(withMergedOwners(landed, legacy), null);
+  // The rows are the same ones: the person's key finds the imported rows under their name.
+  assert.deepEqual(found({ owner: ["n:Zack Reading"] }), ["legacy-zack"]);
+  const zack: LegacyNames = new Map([["c:c-zack", ["Zack Reading"]]]);
+  assert.deepEqual(found({ owner: ["c:c-zack"] }, zack), ["roof", "legacy-zack"], "his own jobs too, which the old bookmark didn't show");
+  assert.deepEqual([...personOfLegacyName(zack)], [["Zack Reading", "c:c-zack"]]);
 });
 
 test("/tasks leaves out Template rows and finished work in the Open view", () => {
@@ -392,6 +489,19 @@ test("/tasks search matches the title, the property, the deal and the assignee",
 test("/tasks search runs on the words the palette's does: abbreviations and accents", () => {
   assert.deepEqual(found({ q: "118 congress street" }), ["gutters", "legacy-zack"]);
   assert.deepEqual(found({ q: "Tamarack St" }), ["roof"]);
+});
+
+test("the palette's task search finds what the Tasks page does, and never a Template row", () => {
+  const palette = (q: string) => TASKS.filter((t) => matches(t, paletteTaskWhere(q) as Row)).map((t) => t.id);
+  // Same words, same fields, same rows as /tasks in the All view.
+  for (const q of ["roof", "tamarack", "prospect avenue", "pieter", "zack", "congress gutters", "zzzz"]) {
+    assert.deepEqual(palette(q), found({ status: "all", q }), q);
+  }
+  // A playbook is not work: its title finds nothing, here or on the page.
+  assert.deepEqual(palette("move-in checklist"), []);
+  assert.deepEqual(found({ status: "all", q: "move-in checklist" }), []);
+  // Finished work still comes up, as it does on the page.
+  assert.deepEqual(palette("fence"), ["done"]);
 });
 
 test("owner: several picks are any of them; Unassigned is no real person", () => {

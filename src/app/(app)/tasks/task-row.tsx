@@ -199,7 +199,7 @@ export function TaskRow({
           {narrow && (
             <span className={cn("flex items-center gap-2 @min-[30rem]:hidden", reasonOnly ? "min-w-0 shrink" : "shrink-0")}>
               {narrow}
-              {place && (
+              {(place || cadence) && (
                 <span aria-hidden="true" className="text-meta text-fg-3">
                   ·
                 </span>
@@ -207,8 +207,9 @@ export function TaskRow({
             </span>
           )}
           {cadence && (
-            <span className="flex shrink-0 items-center gap-2 text-meta text-fg-3">
-              {cadence}
+            // Shrinks, its words truncating, so a long rule never pushes the avatar off a narrow row.
+            <span className="flex min-w-0 shrink items-center gap-2 text-meta text-fg-3">
+              <span className="truncate">{cadence}</span>
               {place && <span aria-hidden="true">·</span>}
             </span>
           )}
