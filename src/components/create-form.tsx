@@ -77,9 +77,9 @@ export type CreateFormProps<V, R> = {
   /**
    * The action succeeded. Toast and, unless `more` (Create more is on),
    * leave: `router.back()` to stay where you were, or `router.replace(href)`
-   * to open the record (New task does, from the sheet and the page, as the
-   * server redirect it replaced did). With `more` the form has already
-   * started over, and the toast is the way to the record.
+   * to open the record (New task's page does; its sheet keeps you where you
+   * were with "Task created · Open", forms spec 4.4). With `more` the form
+   * has already started over, and the toast is the way to the record.
    */
   onCreated: (data: R, more: boolean) => void;
   /** Offer "Create more" in the sheet's footer. */
