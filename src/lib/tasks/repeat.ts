@@ -143,27 +143,82 @@ function ordinal(n: number): string {
 }
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
 /**
- * "Every day", "Every 2 weeks on Monday", "Monthly on the 5th", "Quarterly",
- * "Every 2 years". `short` gives the weekday in three letters ("Every week on
- * Mon") for the Repeats chip.
+ * "Every day", "Every 2 weeks on Monday", "Every month on the 5th", "Every
+ * quarter on the 30th", "Every 2 years": one string per rule wherever it
+ * shows (the menu, the rail line, a row's subline; docs/specs/selectors.md
+ * 3.9). `short` gives the weekday in three letters ("Every week on Mon").
+ * `from` is the date the rule is read against: a yearly rule has no day of
+ * its own, so with it a yearly rule says "Every year on Oct 30".
  */
-export function describeRepeat(rule: RepeatRule, { short = false }: { short?: boolean } = {}): string {
+export function describeRepeat(rule: RepeatRule, { short = false, from }: { short?: boolean; from?: Ymd | null } = {}): string {
   const n = rule.interval;
   const on = rule.dayOfMonth ? ` on the ${ordinal(rule.dayOfMonth)}` : "";
+  const date = toYmd(from);
   switch (rule.freq) {
     case "days":
       return n === 1 ? "Every day" : `Every ${n} days`;
     case "weeks":
       return (n === 1 ? "Every week" : `Every ${n} weeks`) + (rule.weekday !== undefined ? ` on ${short ? WEEKDAYS[rule.weekday].slice(0, 3) : WEEKDAYS[rule.weekday]}` : "");
     case "monthly":
-      return (n === 1 ? "Monthly" : `Every ${n} months`) + on;
+      return (n === 1 ? "Every month" : `Every ${n} months`) + on;
     case "quarterly":
-      return (n === 1 ? "Quarterly" : `Every ${n} quarters`) + on;
-    case "yearly":
-      return n === 1 ? "Yearly" : `Every ${n} years`;
+      return (n === 1 ? "Every quarter" : `Every ${n} quarters`) + on;
+    case "yearly": {
+      const day = date ? ` on ${MONTHS[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}` : "";
+      return (n === 1 ? "Every year" : `Every ${n} years`) + day;
+    }
   }
+}
+
+/** The same rule, however Postgres ordered its keys or left a missing pin out: for comparing two rules. */
+export function ruleKey(rule: RepeatRule | null): string {
+  return rule ? [rule.freq, rule.interval, rule.dayOfMonth ?? "", rule.weekday ?? ""].join("|") : "none";
+}
+
+/** One row of the repeat menu: a rule (null is "Doesn't repeat") and what it says and does from a date. */
+export interface RepeatPreset {
+  key: "none" | "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly";
+  rule: RepeatRule | null;
+  label: string;
+  /** The date the next copy gets, for the "Next: Fri, Nov 6" line. Null for "Doesn't repeat". */
+  next: Ymd | null;
+}
+
+/**
+ * The presets, read from a date (the task's due date, or today when it has
+ * none): the weekday and the day of the month come from it, so "Every week
+ * on Fri" is the due date's own Friday. A repeat menu lists these in order,
+ * then Custom (selectors 3.9). Yearly isn't pinned, as the editor never
+ * pinned it: a pin would undo a renewal date someone moved. Each `next` is the
+ * date finishing the task would give the copy (`nextRepeatDue`): with a due
+ * date that is already late, pass `today` so it is never a day gone by.
+ */
+export function repeatPresets(from: Ymd, today: Ymd = from): RepeatPreset[] {
+  const weekday = weekdayOf(from);
+  const dayOfMonth = Number(from.slice(8, 10));
+  const rules: Pick<RepeatPreset, "key" | "rule">[] = [
+    { key: "none", rule: null },
+    { key: "weekly", rule: { freq: "weeks", interval: 1, weekday } },
+    { key: "biweekly", rule: { freq: "weeks", interval: 2, weekday } },
+    { key: "monthly", rule: { freq: "monthly", interval: 1, dayOfMonth } },
+    { key: "quarterly", rule: { freq: "quarterly", interval: 1, dayOfMonth } },
+    { key: "yearly", rule: { freq: "yearly", interval: 1 } },
+  ];
+  return rules.map(({ key, rule }) => ({
+    key,
+    rule,
+    label: rule ? describeRepeat(rule, { short: true, from }) : "Doesn't repeat",
+    next: rule ? nextRepeatDue(rule, from, today) : null,
+  }));
+}
+
+/** The preset a stored rule is, or null when it matches none ("Every 3 days", "Every 2 months", a weekday off the due date's). */
+export function matchPreset(rule: RepeatRule | null, presets: readonly RepeatPreset[]): RepeatPreset | null {
+  const key = ruleKey(rule);
+  return presets.find((p) => ruleKey(p.rule) === key) ?? null;
 }
 
 // ---------------------------------------------------------------------------

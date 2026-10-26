@@ -39,12 +39,17 @@ export function DealStageMark({ stage, className }: { stage: string; className?:
   );
 }
 
-/** A deal's stage as its ring and its name, both in the stage's tone. The phone row's subline leads with it. */
-export function DealStage({ stage, className }: { stage: string; className?: string }) {
+/**
+ * A deal's stage as its ring and its name, both in the stage's tone. The phone
+ * row's subline leads with it. The name is today's (`dealStatusLabel`) unless
+ * `label` says otherwise: the stage menu passes `dealStageLabel(stage)`
+ * ("High", not "1 - High") until each surface moves to those words.
+ */
+export function DealStage({ stage, label, className }: { stage: string; label?: string; className?: string }) {
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-1.5", toneOf(stageMark(stage)), className)}>
       <DealStageMark stage={stage} />
-      <span className="truncate">{dealStatusLabel(stage)}</span>
+      <span className="truncate">{label ?? dealStatusLabel(stage)}</span>
     </span>
   );
 }

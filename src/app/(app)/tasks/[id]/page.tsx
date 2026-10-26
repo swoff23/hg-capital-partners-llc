@@ -6,7 +6,7 @@ import type { MediaItem } from "@/components/media-grid";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
-import { shortAddress } from "@/lib/normalize";
+import { propertyOptions } from "@/lib/picker-options";
 import { parseUnits } from "@/lib/property-types";
 import { buildActivity, dayLabel, easternDay, fmtAgo, type ActivityEvent } from "@/lib/tasks/activity";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
@@ -87,11 +87,15 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   });
   if (!task) notFound();
 
-  const [{ users, contractors }, staff, properties] = await Promise.all([
-    assigneeOptions([task.assigneeContactId]),
+  const [{ users, contractors, recent }, staff, properties, propertyRow] = await Promise.all([
+    // Recent: the people this viewer assigned last, for the assignee picker.
+    assigneeOptions([task.assigneeContactId], user.id),
     // Who can sign in as staff: the people an Internal note is for.
     prisma.user.findMany({ where: { passwordHash: { not: null } }, orderBy: { name: "asc" }, select: { name: true, email: true } }),
-    prisma.property.findMany({ orderBy: { address: "asc" }, select: { id: true, address: true, units: true } }),
+    // Every building as the pickers offer it: unit labels only, in street order.
+    propertyOptions(),
+    // The lockbox state reads this task's own property's units, which stay on the server.
+    task.propertyId ? prisma.property.findUnique({ where: { id: task.propertyId }, select: { units: true } }) : null,
   ]);
 
   const now = new Date();
@@ -106,14 +110,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   // contact is active, since sign-in refuses an inactive one (the card's Access
   // off). Nothing else about the account is read.
   const contractorHasLogin = !!contractor?.active && contractors.some((c) => c.id === contractor.id && c.hasLogin);
-  const property = properties.find((p) => p.id === task.propertyId) ?? null;
+  const property = propertyRow;
 
-  // Unit labels only: lockbox codes never leave the server (D21).
-  const propertyOptions = properties.map((p) => ({
-    id: p.id,
-    label: shortAddress(p.address),
-    units: [...new Set(parseUnits(p.units).map((u) => u.label?.trim()).filter((l): l is string => !!l))],
-  }));
   const lockbox = (() => {
     if (!contractorFirst || !property || !active) return null;
     const state = lockboxState(parseUnits(property.units), task.unitLabel);
@@ -160,7 +158,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   const names = {
     users: Object.fromEntries(users.map((u) => [u.id, userName(u)])),
     contacts: Object.fromEntries(contractors.map((c) => [c.id, c.name])),
-    properties: Object.fromEntries(properties.map((p) => [p.id, shortAddress(p.address)])),
+    properties: Object.fromEntries(properties.map((p) => [p.id, p.label])),
   };
   const events: ActivityEvent[] = task.events;
   const rows: ActivityRow[] = buildActivity(events, names, today).map((entry): ActivityRow => {
@@ -231,7 +229,9 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       }}
       users={users}
       contractors={contractors}
-      properties={propertyOptions}
+      properties={properties}
+      meId={user.id}
+      recent={recent}
       lockbox={lockbox}
       created={created}
       contractorFirst={contractorFirst}

@@ -1,5 +1,5 @@
 import type { TaskStatus } from "@prisma/client";
-import type { AssigneeContractor, AssigneeUser } from "@/components/assignee-picker";
+import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { BackLink } from "@/components/back-link";
 import { MediaGrid, type MediaItem } from "@/components/media-grid";
 import { Section } from "@/components/ui";
@@ -33,6 +33,10 @@ export interface TaskPageViewProps {
   users: AssigneeUser[];
   contractors: AssigneeContractor[];
   properties: PropertyOption[];
+  /** The signed-in user, for "(you)" and the short names below sm. */
+  meId: string;
+  /** The people the viewer assigned last, for the assignee picker's Recent rows. */
+  recent: AssigneeValue[];
   lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
   created: string;
   /** First name of the assigned contractor. */
@@ -80,15 +84,15 @@ export function TaskPageView(p: TaskPageViewProps) {
           <div className="[grid-area:back]">
             <BackLink fallback="/tasks" label="Tasks" />
           </div>
-          {/* Centered on the title's first line. */}
-          <div className="flex min-w-0 items-center gap-2 [grid-area:status] md:self-start md:pt-2.5">
+          {/* Centered on the title's first line: the 32px menu button, not a 20px badge. */}
+          <div className="flex min-w-0 items-center gap-2 [grid-area:status] md:self-start md:pt-1">
             <StatusControl
               taskId={task.id}
               status={task.status}
               waitingOn={task.waitingOn}
               scheduledFor={p.values.scheduledFor}
-              dueDate={p.values.dueDate}
               today={p.today}
+              hasContractor={!!p.values.assignee && "contactId" in p.values.assignee}
             />
           </div>
           <div className="min-w-0 [grid-area:title]">
@@ -117,6 +121,8 @@ export function TaskPageView(p: TaskPageViewProps) {
               users={p.users}
               contractors={p.contractors}
               properties={p.properties}
+              meId={p.meId}
+              recent={p.recent}
               lockbox={p.lockbox}
               created={p.created}
             />

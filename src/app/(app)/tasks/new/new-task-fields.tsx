@@ -5,7 +5,6 @@ import { DueDatePicker } from "@/components/due-date-picker";
 import { RepeatPicker } from "@/components/repeat-picker";
 import { Input, Select } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
-import { weekdayOf } from "@/lib/quick-dates";
 import { firstOccurrence, type RepeatRule } from "@/lib/tasks/repeat";
 import { followDueDay } from "@/lib/tasks/repeat-choice";
 import { STATUS_LABEL } from "@/lib/task-scope";
@@ -111,8 +110,8 @@ export function NewTaskFields({
             <RepeatPicker
               value={repeat}
               onChange={changeRepeat}
-              defaultDay={Number((due || today).slice(8, 10))}
-              defaultWeekday={weekdayOf(due || today)}
+              from={due || today}
+              today={today}
               trigger="field"
             />
           </div>

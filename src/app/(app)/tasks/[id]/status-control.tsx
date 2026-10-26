@@ -1,102 +1,114 @@
 "use client";
 import { useOptimistic, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { Button as AriaButton } from "react-aria-components";
 import type { TaskStatus } from "@prisma/client";
-import { DueDatePicker } from "@/components/due-date-picker";
-import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
+import { DatePanel } from "@/components/due-date-picker";
+import type { MenuFollowUp } from "@/components/menu";
 import { Sheet } from "@/components/sheet";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusMenu } from "@/components/status-menu";
 import { Button, Input } from "@/components/ui";
+import { useRun } from "@/components/use-run";
 import type { Ymd } from "@/lib/dates";
-import { STATUS_LABEL, STATUS_ORDER } from "@/lib/task-scope";
+import { STATUS_LABEL } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { setTaskStatus, updateTask } from "./actions";
 import { useStatusRun } from "./status-run";
-import { useRun } from "@/components/use-run";
 
 /**
- * The status chip at the top of the task page: a menu of all seven (D6,
- * D6c). Waiting asks what it's waiting on first; Scheduled asks for the
- * visit date. While Waiting, WaitingReason shows the reason under the title.
+ * The status chip at the top of the task page: a menu of the statuses (D6,
+ * D6c), `StatusMenu` with its number keys and, on a phone, a titled sheet.
+ * Waiting asks what it's waiting on first and Scheduled asks for the visit
+ * date, each as a step in the same layer: the status commits only when the
+ * question is answered, and Back or Esc leaves it as it was. Every change
+ * toasts with Undo. Review is offered only when a contractor is assigned or
+ * the task is already in Review (BTASKS-041). While Waiting, WaitingReason
+ * shows the reason under the title.
  */
 export function StatusControl({
   taskId,
   status,
   waitingOn,
   scheduledFor,
-  dueDate,
   today,
+  hasContractor,
 }: {
   taskId: string;
   status: TaskStatus;
   waitingOn: string | null;
   scheduledFor: Ymd | null;
-  dueDate: Ymd | null;
   today: Ymd;
+  /** A contractor is assigned, so Review (their "done, please look") means something. */
+  hasContractor: boolean;
 }) {
   const { run, pending } = useStatusRun();
   const [shown, setShown] = useOptimistic(status);
-  const [sheet, setSheet] = useState<"waiting" | "scheduled" | null>(null);
 
-  function choose(to: TaskStatus) {
-    if (to === shown) return;
-    if (to === "WAITING") return setSheet("waiting");
-    if (to === "SCHEDULED") return setSheet("scheduled");
-    run(() => setTaskStatus(taskId, to, { expected: status }), { before: () => setShown(to) });
+  /** Sends the change with the status this page showed, so a stale page is refused; toasts it with Undo. */
+  function commit(to: TaskStatus, extra: { waitingOn?: string; scheduledFor?: Ymd } = {}) {
+    run(() => setTaskStatus(taskId, to, { ...extra, expected: status }), {
+      before: () => setShown(to),
+      done: `Status set to ${STATUS_LABEL[to]}`,
+      key: `task:${taskId}:status`,
+      // Back to what it was, if nothing has moved it since. Waiting needs its reason again, and a visit date this change set goes with it.
+      undo: () =>
+        setTaskStatus(taskId, status, {
+          expected: to,
+          ...(status === "WAITING" ? { waitingOn } : {}),
+          ...(extra.scheduledFor !== undefined ? { scheduledFor } : {}),
+        }),
+    });
+  }
+
+  function followUp(to: TaskStatus): MenuFollowUp | null {
+    if (to === "WAITING") {
+      return {
+        title: "What's it waiting on?",
+        content: ({ close, container }) => (
+          <WaitingForm
+            className={container === "popover" ? "w-80" : undefined}
+            initial={waitingOn ?? ""}
+            already={false}
+            onSave={(reason) => {
+              close();
+              commit("WAITING", { waitingOn: reason });
+            }}
+          />
+        ),
+      };
+    }
+    if (to === "SCHEDULED") {
+      return {
+        title: "Visit date",
+        content: ({ close, container }) => (
+          <DatePanel
+            // Only a real visit date is the current value: the due date is not a visit.
+            value={scheduledFor}
+            today={today}
+            label="Visit date"
+            layout={container === "sheet" ? "steps" : "together"}
+            // A scheduled job needs a visit date: "No date" is never offered.
+            allowNone={false}
+            onPick={(date) => {
+              close();
+              if (date) commit("SCHEDULED", { scheduledFor: date });
+            }}
+          />
+        ),
+      };
+    }
+    return null;
   }
 
   return (
-    <>
-      <MenuTrigger>
-        <AriaButton
-          aria-label={`Status: ${STATUS_LABEL[shown]}. Change status`}
-          isDisabled={pending}
-          className={cn(
-            "relative inline-flex shrink-0 items-center gap-1 rounded-sm",
-            // The 20px badge reaches 44px on touch.
-            "pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2 pointer-coarse:after:-inset-y-3",
-          )}
-        >
-          <StatusBadge status={shown} />
-          <ChevronDown className="size-3.5 text-fg-3" aria-hidden="true" />
-        </AriaButton>
-        <Menu placement="bottom start" onAction={(key) => choose(key as TaskStatus)}>
-          {STATUS_ORDER.map((s) => (
-            <MenuItem key={s} id={s} textValue={STATUS_LABEL[s]} checked={s === shown}>
-              <StatusBadge status={s} />
-            </MenuItem>
-          ))}
-        </Menu>
-      </MenuTrigger>
-
-      <Sheet title="What's it waiting on?" isOpen={sheet === "waiting"} onOpenChange={(o) => !o && setSheet(null)}>
-        {({ close }) => (
-          <WaitingForm
-            initial={waitingOn ?? ""}
-            already={shown === "WAITING"}
-            onSave={(reason) => {
-              close();
-              if (shown === "WAITING") run(() => updateTask(taskId, { waitingOn: reason }));
-              else run(() => setTaskStatus(taskId, "WAITING", { waitingOn: reason, expected: status }), { before: () => setShown("WAITING") });
-            }}
-          />
-        )}
-      </Sheet>
-
-      <Sheet title="Visit date" isOpen={sheet === "scheduled"} onOpenChange={(o) => !o && setSheet(null)}>
-        {({ close }) => (
-          <ScheduleForm
-            initial={scheduledFor ?? dueDate}
-            today={today}
-            onSave={(date) => {
-              close();
-              run(() => setTaskStatus(taskId, "SCHEDULED", { scheduledFor: date, expected: status }), { before: () => setShown("SCHEDULED") });
-            }}
-          />
-        )}
-      </Sheet>
-    </>
+    <StatusMenu
+      kind="task"
+      value={shown}
+      isDisabled={pending}
+      hidden={hasContractor ? [] : ["REVIEW"]}
+      onChange={(to) => commit(to)}
+      followUp={followUp}
+      // The mark and word sit on the page's edge; the hover fill reaches past it.
+      className="-ml-2.5"
+    />
   );
 }
 
@@ -116,6 +128,7 @@ export function WaitingReason({ taskId, waitingOn }: { taskId: string; waitingOn
       <Sheet title="What's it waiting on?" isOpen={open} onOpenChange={setOpen}>
         {({ close }) => (
           <WaitingForm
+            className="md:w-96"
             initial={waitingOn}
             already
             onSave={(reason) => {
@@ -129,12 +142,22 @@ export function WaitingReason({ taskId, waitingOn }: { taskId: string; waitingOn
   );
 }
 
-function WaitingForm({ initial, already, onSave }: { initial: string; already: boolean; onSave: (reason: string) => void }) {
+function WaitingForm({
+  initial,
+  already,
+  onSave,
+  className,
+}: {
+  initial: string;
+  already: boolean;
+  onSave: (reason: string) => void;
+  className?: string;
+}) {
   const [reason, setReason] = useState(initial);
   const ok = reason.trim().length > 0;
   return (
     <form
-      className="space-y-3 p-4 md:w-96"
+      className={cn("space-y-3 p-4", className)}
       onSubmit={(e) => {
         e.preventDefault();
         if (ok) onSave(reason.trim());
@@ -152,26 +175,6 @@ function WaitingForm({ initial, already, onSave }: { initial: string; already: b
       <div className="flex justify-end">
         <Button type="submit" disabled={!ok}>
           {already ? "Save" : "Set to Waiting"}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-function ScheduleForm({ initial, today, onSave }: { initial: Ymd | null; today: Ymd; onSave: (date: Ymd) => void }) {
-  const [date, setDate] = useState<Ymd | null>(initial);
-  return (
-    <form
-      className="space-y-3 p-4 md:w-96"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (date) onSave(date);
-      }}
-    >
-      <DueDatePicker label="Visit date" placeholder="Pick a date" value={date} today={today} onChange={setDate} />
-      <div className="flex justify-end">
-        <Button type="submit" disabled={!date}>
-          Set to Scheduled
         </Button>
       </div>
     </form>

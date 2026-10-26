@@ -3,9 +3,11 @@ import { weekdayOf } from "@/lib/quick-dates";
 import type { RepeatRule } from "./repeat";
 
 /**
- * The Repeats editor's state and the stored rule, both ways (D27): Never,
+ * The repeat editor's state and the stored rule, both ways (D27): Never,
  * every N days, every N weeks on the due date's weekday, monthly on day D,
- * quarterly, yearly. Pure; see repeat-choice.test.ts.
+ * quarterly, yearly. The repeat menu's presets (repeat.ts repeatPresets) cover
+ * the common rules; this is Custom's side, a count of days, weeks or months.
+ * Pure; see repeat-choice.test.ts.
  */
 
 export type RepeatMode = "never" | "days" | "weeks" | "monthly" | "quarterly" | "yearly";
@@ -20,14 +22,14 @@ export interface RepeatChoice {
   weekday: number;
 }
 
-export const REPEAT_MODES: readonly { mode: RepeatMode; label: string }[] = [
-  { mode: "never", label: "Never" },
-  { mode: "days", label: "Every N days" },
-  { mode: "weeks", label: "Every N weeks" },
-  { mode: "monthly", label: "Monthly" },
-  { mode: "quarterly", label: "Quarterly" },
-  { mode: "yearly", label: "Yearly" },
-];
+/** What Custom counts in: quarterly and yearly are presets, and a count of months covers them. */
+export const CUSTOM_UNITS = [
+  { mode: "days", label: "Days" },
+  { mode: "weeks", label: "Weeks" },
+  { mode: "monthly", label: "Months" },
+] as const satisfies readonly { mode: RepeatMode; label: string }[];
+
+export type CustomUnit = (typeof CUSTOM_UNITS)[number]["mode"];
 
 const clamp = (n: number, lo: number, hi: number, fallback: number) =>
   Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.trunc(n))) : fallback;
@@ -90,4 +92,44 @@ export function followDueDay(rule: RepeatRule | null, prevDue: string | null | u
   if (rule.dayOfMonth && rule.dayOfMonth === dayOf(prevDue)) return { ...rule, dayOfMonth: dayOf(nextDue) };
   if (rule.freq === "weeks" && rule.weekday !== undefined && rule.weekday === weekdayOf(prevDue)) return { ...rule, weekday: weekdayOf(nextDue) };
   return rule;
+}
+
+const isCustomUnit = (m: RepeatMode): m is CustomUnit => m === "days" || m === "weeks" || m === "monthly";
+
+/**
+ * Custom's starting state. A stored rule opens as itself, with a quarterly or
+ * yearly one counted in months (every quarter is every 3 months, every 2 years
+ * every 24); no rule starts at every 2 weeks, the first thing a person
+ * reaching for Custom usually wants.
+ */
+export function customFromRule(rule: RepeatRule | null, defaultDay: number, defaultWeekday: number): RepeatChoice {
+  const base = choiceFromRule(rule, defaultDay, defaultWeekday);
+  if (!rule) return { ...base, mode: "weeks", every: 2 };
+  if (rule.freq === "quarterly") return { ...base, mode: "monthly", every: clamp(rule.interval * 3, 1, 365, 3) };
+  if (rule.freq === "yearly") return { ...base, mode: "monthly", every: clamp(rule.interval * 12, 1, 365, 12), day: defaultDay };
+  return base;
+}
+
+/**
+ * Custom's unit changed: the count stays ("Every 2 weeks" to "Every 2
+ * months"), and the new unit pins the due date's day or weekday, not one left
+ * over from the unit just left.
+ */
+export function switchCustomUnit(choice: RepeatChoice, mode: CustomUnit, defaultDay: number, defaultWeekday: number): RepeatChoice {
+  if (choice.mode === mode) return { ...choice };
+  return { mode, every: choice.every, day: clamp(defaultDay, 1, 31, 1), weekday: clamp(defaultWeekday, 0, 6, 1) };
+}
+
+const UNIT_WORD: Record<CustomUnit, string> = { days: "days", weeks: "weeks", monthly: "months" };
+
+/**
+ * The line under Custom's count when it can't be saved: an empty or
+ * unreadable count asks for one ("Enter how many weeks.") instead of saving
+ * NaN as "Every day" (BPLAY-030). Null when the count is a whole number from
+ * 1 to 365, what the stored rule allows.
+ */
+export function customCountError(mode: RepeatMode, every: number): string | null {
+  if (Number.isInteger(every) && every >= 1 && every <= 365) return null;
+  const unit = isCustomUnit(mode) ? UNIT_WORD[mode] : "times";
+  return Number.isFinite(every) && every > 365 ? `Use 365 ${unit} or fewer.` : `Enter how many ${unit}.`;
 }

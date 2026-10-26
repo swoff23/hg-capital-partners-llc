@@ -47,3 +47,24 @@ export function sheetEscape(top: SheetViewEntry | undefined, asksBeforeClosing: 
   if (top?.escape === "back") return "back";
   return asksBeforeClosing ? "ask" : "close";
 }
+
+/** What one Esc does to a stack of views: take the top `count` views off (their owners unmount them), close the whole sheet, or ask first. */
+export type EscapePlan = { kind: "pop"; count: number } | { kind: "close" } | { kind: "ask" };
+
+/**
+ * One Esc, one layer. A "back" view (a picker over a form) goes back one view.
+ * A "close" view (a step that answers one pick: a status follow-up, Custom
+ * repeat, the phone calendar) closes the layer it belongs to: if a picker's
+ * own view sits under it, both leave and the form shows again; with none, the
+ * step is the sheet's own layer and the sheet closes (asking first when dirty).
+ */
+export function escapePlan<T extends SheetViewEntry>(stack: readonly T[], asksBeforeClosing: boolean): EscapePlan {
+  const top = stack.at(-1);
+  if (top?.escape === "back") return { kind: "pop", count: 1 };
+  if (top) {
+    for (let i = stack.length - 2; i >= 0; i--) {
+      if (stack[i].escape === "back") return { kind: "pop", count: stack.length - i };
+    }
+  }
+  return asksBeforeClosing ? { kind: "ask" } : { kind: "close" };
+}

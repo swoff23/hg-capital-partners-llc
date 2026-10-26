@@ -5,12 +5,16 @@ import {
   describeRepeat,
   firstOccurrence,
   isUntouchedCopy,
+  matchPreset,
   nextOccurrence,
   nextRepeatDue,
   parseRepeatRule,
   repeatCreatedCopy,
   repeatDue,
   repeatFrom,
+  repeatPresets,
+  repeatRuleSchema,
+  ruleKey,
   type RepeatCopyTrace,
 } from "./repeat";
 
@@ -60,6 +64,100 @@ test("nextOccurrence: quarterly and yearly", () => {
   assert.equal(nextOccurrence({ freq: "quarterly", interval: 1, dayOfMonth: 15 }, "2026-10-01"), "2027-01-15");
   assert.equal(nextOccurrence({ freq: "yearly", interval: 1 }, "2028-02-29"), "2029-02-28");
   assert.equal(nextOccurrence({ freq: "yearly", interval: 1 }, "2026-02-15"), "2027-02-15");
+});
+
+test("nextOccurrence: every N months and every N quarters honor the interval", () => {
+  // The control makes these (G1C-I01), so the next-date math must step by the whole interval.
+  const every2 = { freq: "monthly" as const, interval: 2, dayOfMonth: 30 };
+  assert.equal(nextOccurrence(every2, "2026-10-30"), "2026-12-30");
+  assert.equal(nextOccurrence(every2, "2026-12-30"), "2027-02-28", "the 30th clamps to Feb's last day");
+  assert.equal(nextOccurrence({ freq: "monthly", interval: 3 }, "2026-11-15"), "2027-02-15");
+  assert.equal(nextOccurrence({ freq: "monthly", interval: 12 }, "2026-10-15"), "2027-10-15", "twelve months is a year");
+  assert.equal(nextOccurrence({ freq: "monthly", interval: 14, dayOfMonth: 31 }, "2026-10-31"), "2027-12-31", "past a year");
+  const everyOtherQuarter = { freq: "quarterly" as const, interval: 2, dayOfMonth: 31 };
+  assert.equal(nextOccurrence(everyOtherQuarter, "2026-08-31"), "2027-02-28", "six months");
+  assert.equal(nextOccurrence({ freq: "quarterly", interval: 4 }, "2026-03-10"), "2027-03-10", "four quarters is a year");
+  assert.equal(nextOccurrence({ freq: "yearly", interval: 2 }, "2026-02-15"), "2028-02-15");
+});
+
+test("nextRepeatDue: a late every-2-months repeat keeps its cadence", () => {
+  const every2 = { freq: "monthly" as const, interval: 2, dayOfMonth: 5 };
+  // Due Jan 5, finished Oct 23: Jan, Mar, May, Jul, Sep, Nov.
+  assert.equal(nextRepeatDue(every2, "2026-01-05", "2026-10-23"), "2026-11-05");
+});
+
+test("repeatPresets: read from a date, in menu order, each with its next date", () => {
+  // Fri Oct 30, 2026.
+  const presets = repeatPresets("2026-10-30");
+  assert.deepEqual(
+    presets.map((p) => [p.key, p.label, p.next]),
+    [
+      ["none", "Doesn't repeat", null],
+      ["weekly", "Every week on Fri", "2026-11-06"],
+      ["biweekly", "Every 2 weeks on Fri", "2026-11-13"],
+      ["monthly", "Every month on the 30th", "2026-11-30"],
+      ["quarterly", "Every quarter on the 30th", "2027-01-30"],
+      ["yearly", "Every year on Oct 30", "2027-10-30"],
+    ],
+  );
+  assert.deepEqual(presets[1].rule, { freq: "weeks", interval: 1, weekday: 5 });
+  assert.deepEqual(presets[3].rule, { freq: "monthly", interval: 1, dayOfMonth: 30 });
+  assert.deepEqual(presets[5].rule, { freq: "yearly", interval: 1 }, "yearly isn't pinned");
+});
+
+test("repeatPresets: the day and weekday come from the date; a short month clamps its next date", () => {
+  const sunday = repeatPresets("2026-11-01");
+  assert.equal(sunday[1].label, "Every week on Sun");
+  assert.equal(sunday[1].next, "2026-11-08");
+  const last = repeatPresets("2026-01-31");
+  assert.equal(last[3].label, "Every month on the 31st");
+  assert.equal(last[3].next, "2026-02-28");
+  assert.equal(last[4].next, "2026-04-30", "a quarter on, the 31st clamps to April's 30th");
+});
+
+test("repeatPresets: a late due date never lists a next date that has already passed", () => {
+  // Due Tue Sep 1, looked at on Sun Oct 25: the copy finishing it makes lands on or after today.
+  const late = repeatPresets("2026-09-01", "2026-10-25");
+  assert.equal(late[1].label, "Every week on Tue");
+  assert.equal(late[1].next, "2026-10-27", "weekly, the first Tuesday on or after today");
+  assert.equal(late[2].next, "2026-10-27", "every 2 weeks from Sep 1 lands on Oct 27");
+  assert.equal(late[3].next, "2026-11-01", "monthly on the 1st");
+  assert.equal(late[4].next, "2026-12-01", "quarterly on the 1st: Dec 1");
+  assert.equal(late[5].next, "2027-09-01", "yearly: next Sep 1");
+  // No today given: read from the date alone, as before.
+  assert.equal(repeatPresets("2026-09-01")[1].next, "2026-09-08");
+});
+
+test("matchPreset: a rule the presets make is that preset", () => {
+  const presets = repeatPresets("2026-10-30");
+  assert.equal(matchPreset(null, presets)?.key, "none");
+  assert.equal(matchPreset({ freq: "weeks", interval: 1, weekday: 5 }, presets)?.key, "weekly");
+  assert.equal(matchPreset({ freq: "weeks", interval: 2, weekday: 5 }, presets)?.key, "biweekly");
+  assert.equal(matchPreset({ freq: "monthly", interval: 1, dayOfMonth: 30 }, presets)?.key, "monthly");
+  assert.equal(matchPreset({ freq: "quarterly", interval: 1, dayOfMonth: 30 }, presets)?.key, "quarterly");
+  assert.equal(matchPreset({ freq: "yearly", interval: 1 }, presets)?.key, "yearly");
+  // Postgres hands keys back in its own order.
+  assert.equal(matchPreset(repeatRuleSchema.parse({ weekday: 5, interval: 1, freq: "weeks" }), presets)?.key, "weekly");
+});
+
+test("matchPreset: a stored rule outside the presets matches none, so it shows as its own row", () => {
+  const presets = repeatPresets("2026-10-30");
+  assert.equal(matchPreset({ freq: "days", interval: 3 }, presets), null, "Every 3 days");
+  assert.equal(matchPreset({ freq: "monthly", interval: 2, dayOfMonth: 30 }, presets), null, "Every 2 months");
+  assert.equal(matchPreset({ freq: "weeks", interval: 1, weekday: 1 }, presets), null, "a Monday series on a Friday due date");
+  assert.equal(matchPreset({ freq: "weeks", interval: 1 }, presets), null, "saved before the weekday pin");
+  assert.equal(matchPreset({ freq: "monthly", interval: 1 }, presets), null, "saved before the day pin");
+  assert.equal(matchPreset({ freq: "quarterly", interval: 2, dayOfMonth: 30 }, presets), null);
+  assert.equal(matchPreset({ freq: "yearly", interval: 2 }, presets), null);
+  // The row says what the rule is, in the same words.
+  assert.equal(describeRepeat({ freq: "days", interval: 3 }), "Every 3 days");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 2, dayOfMonth: 30 }), "Every 2 months on the 30th");
+});
+
+test("ruleKey: the same rule is one key whatever its key order", () => {
+  assert.equal(ruleKey(null), "none");
+  assert.equal(ruleKey({ freq: "weeks", interval: 1, weekday: 0 }), ruleKey(repeatRuleSchema.parse({ weekday: 0, freq: "weeks" })));
+  assert.notEqual(ruleKey({ freq: "weeks", interval: 1, weekday: 0 }), ruleKey({ freq: "weeks", interval: 1 }), "Sunday is a pin, not unset");
 });
 
 test("nextRepeatDue: a late repeat's copy lands on the first date on or after today", () => {
@@ -113,15 +211,22 @@ test("repeatDue: a repeating task never starts undated", () => {
 
 test("describeRepeat", () => {
   assert.equal(describeRepeat({ freq: "days", interval: 1 }), "Every day");
+  assert.equal(describeRepeat({ freq: "days", interval: 3 }), "Every 3 days");
   assert.equal(describeRepeat({ freq: "weeks", interval: 2 }), "Every 2 weeks");
   assert.equal(describeRepeat({ freq: "weeks", interval: 1, weekday: 1 }), "Every week on Monday");
   assert.equal(describeRepeat({ freq: "weeks", interval: 2, weekday: 1 }), "Every 2 weeks on Monday");
   assert.equal(describeRepeat({ freq: "weeks", interval: 1, weekday: 0 }), "Every week on Sunday");
-  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 5 }), "Monthly on the 5th");
-  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 22 }), "Monthly on the 22nd");
-  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 11 }), "Monthly on the 11th");
-  assert.equal(describeRepeat({ freq: "quarterly", interval: 1 }), "Quarterly");
-  assert.equal(describeRepeat({ freq: "yearly", interval: 1 }), "Yearly");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 5 }), "Every month on the 5th");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 22 }), "Every month on the 22nd");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 11 }), "Every month on the 11th");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 3 }), "Every month on the 3rd");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 2, dayOfMonth: 5 }), "Every 2 months on the 5th");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 3 }), "Every 3 months");
+  assert.equal(describeRepeat({ freq: "quarterly", interval: 1 }), "Every quarter");
+  assert.equal(describeRepeat({ freq: "quarterly", interval: 1, dayOfMonth: 30 }), "Every quarter on the 30th");
+  assert.equal(describeRepeat({ freq: "quarterly", interval: 2, dayOfMonth: 30 }), "Every 2 quarters on the 30th");
+  assert.equal(describeRepeat({ freq: "yearly", interval: 1 }), "Every year");
+  assert.equal(describeRepeat({ freq: "yearly", interval: 2 }), "Every 2 years");
 });
 
 test("describeRepeat short: the chip names the weekday in three letters", () => {
@@ -129,7 +234,14 @@ test("describeRepeat short: the chip names the weekday in three letters", () => 
   assert.equal(describeRepeat({ freq: "weeks", interval: 2, weekday: 3 }, { short: true }), "Every 2 weeks on Wed");
   assert.equal(describeRepeat({ freq: "weeks", interval: 52, weekday: 0 }, { short: true }), "Every 52 weeks on Sun");
   assert.equal(describeRepeat({ freq: "weeks", interval: 2 }, { short: true }), "Every 2 weeks");
-  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 5 }, { short: true }), "Monthly on the 5th", "only the weekday shortens");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 5 }, { short: true }), "Every month on the 5th", "only the weekday shortens");
+});
+
+test("describeRepeat from a date: a yearly rule says its day", () => {
+  assert.equal(describeRepeat({ freq: "yearly", interval: 1 }, { from: "2026-10-30" }), "Every year on Oct 30");
+  assert.equal(describeRepeat({ freq: "yearly", interval: 2 }, { from: "2026-03-05" }), "Every 2 years on Mar 5");
+  assert.equal(describeRepeat({ freq: "yearly", interval: 1 }, { from: null }), "Every year");
+  assert.equal(describeRepeat({ freq: "monthly", interval: 1, dayOfMonth: 5 }, { from: "2026-10-30" }), "Every month on the 5th", "a pinned day wins over the date");
 });
 
 test("copyOrigin: reads a copy's CREATED event", () => {

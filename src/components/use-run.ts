@@ -8,6 +8,10 @@ export type RunOptions = {
   /** After a failure's toast: put back what the user typed. */
   failed?: () => void;
   done?: string;
+  /** The ripple clause after `done`, in the toast's second tone: "Unit cleared". */
+  detail?: string;
+  /** What the toast is about ("task:abc:due"): a quick second edit replaces the toast instead of stacking another. */
+  key?: string;
   undo?: () => Promise<ActionResult<unknown>>;
 };
 
@@ -50,6 +54,8 @@ export function useRun(): UseRun {
         const undo = opts.undo;
         toast({
           message: opts.done,
+          ...(opts.detail ? { detail: opts.detail } : {}),
+          ...(opts.key ? { key: opts.key } : {}),
           ...(undo
             ? {
                 action: {

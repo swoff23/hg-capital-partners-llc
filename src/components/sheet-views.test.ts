@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pushView, removeView, sheetEscape, updateView, type SheetViewEntry } from "./sheet-views";
+import { escapePlan, pushView, removeView, sheetEscape, updateView, type SheetViewEntry } from "./sheet-views";
 
 const view = (id: string, escape: SheetViewEntry["escape"] = "back"): SheetViewEntry => ({
   id,
@@ -37,4 +37,23 @@ test("sheetEscape: a back view goes back; a step or the sheet's own body closes,
   assert.equal(sheetEscape(view("waiting", "close"), true), "ask");
   assert.equal(sheetEscape(undefined, false), "close");
   assert.equal(sheetEscape(undefined, true), "ask");
+});
+
+test("escapePlan: a picker over a form goes back one view", () => {
+  assert.deepEqual(escapePlan([view("assignee", "back")], false), { kind: "pop", count: 1 });
+  assert.deepEqual(escapePlan([view("due", "back"), view("repeat", "back")], true), { kind: "pop", count: 1 });
+});
+
+test("escapePlan: a step over a picker closes the picker too, and the form shows again", () => {
+  // Due date inside New task: the picker's view, then its calendar step.
+  assert.deepEqual(escapePlan([view("due", "back"), view("calendar", "close")], true), { kind: "pop", count: 2 });
+  // Repeat inside Due inside the form: the picker, the repeat view, Custom.
+  assert.deepEqual(escapePlan([view("due", "back"), view("repeat", "close"), view("custom", "close")], false), { kind: "pop", count: 3 });
+});
+
+test("escapePlan: a step with no picker under it is the sheet's own layer, so the sheet closes (asking first when dirty)", () => {
+  assert.deepEqual(escapePlan([view("waiting", "close")], false), { kind: "close" });
+  assert.deepEqual(escapePlan([view("waiting", "close")], true), { kind: "ask" });
+  assert.deepEqual(escapePlan([], false), { kind: "close" });
+  assert.deepEqual(escapePlan([], true), { kind: "ask" });
 });

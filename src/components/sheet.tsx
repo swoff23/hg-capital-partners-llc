@@ -11,7 +11,6 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { ChevronLeft, X } from "lucide-react";
 import {
   Button as AriaButton,
@@ -23,12 +22,13 @@ import {
   OverlayTriggerStateContext,
   type DialogProps,
 } from "react-aria-components";
+import { Overlay } from "react-aria/Overlay";
 import { cn } from "@/lib/utils";
 import { useKeyboardInset } from "@/components/use-keyboard-inset";
 import {
   pushView,
   removeView,
-  sheetEscape,
+  escapePlan,
   updateView,
   type SheetViewEntry,
   type SheetViewEscape,
@@ -249,12 +249,12 @@ function SheetDialog({
 
   function onKeyDown(e: KeyboardEvent) {
     if (e.key !== "Escape" || e.nativeEvent.isComposing) return;
-    // One Esc, one layer: back one view, or close (asking first when dirty).
+    // One Esc, one layer: back one view, or close the layer a step belongs to (asking first when dirty).
     e.preventDefault();
     e.stopPropagation();
-    const action = sheetEscape(top, asks);
-    if (action === "back") top?.back();
-    else if (action === "ask") onDirtyClose?.();
+    const plan = escapePlan(stack, asks);
+    if (plan.kind === "pop") stack.slice(-plan.count).reverse().forEach((v) => v.back());
+    else if (plan.kind === "ask") onDirtyClose?.();
     else actions.close();
   }
 
@@ -411,10 +411,20 @@ export function SheetView({
   }, [sheet, id, title, escape, hasFooter]);
 
   if (!sheet) return null;
+  // Overlay is the portal React Aria's own layers use: it clears the press responder of whatever
+  // trigger this view's owner sits under, so a button in the view isn't also the trigger's.
   return (
     <>
-      {body && createPortal(children, body)}
-      {foot && hasFooter && createPortal(footer, foot)}
+      {body && (
+        <Overlay portalContainer={body} disableFocusManagement>
+          {children}
+        </Overlay>
+      )}
+      {foot && hasFooter && (
+        <Overlay portalContainer={foot} disableFocusManagement>
+          {footer}
+        </Overlay>
+      )}
     </>
   );
 }

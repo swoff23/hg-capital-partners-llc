@@ -1,20 +1,19 @@
 "use client";
 import { useOptimistic, type ReactNode } from "react";
-import { DoorOpen, KeyRound, MapPin } from "lucide-react";
+import { KeyRound, Repeat } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
-import { AssigneePicker, type AssigneeContractor, type AssigneeUser, type AssigneeValue } from "@/components/assignee-picker";
-import { DueDatePicker } from "@/components/due-date-picker";
-import { RepeatPicker } from "@/components/repeat-picker";
+import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
+import { DatePicker } from "@/components/due-date-picker";
+import { AssigneePicker, PropertyPicker, UnitPicker } from "@/components/entity-picker";
+import { useRun } from "@/components/use-run";
 import type { Ymd } from "@/lib/dates";
-import { weekdayOf } from "@/lib/quick-dates";
+import { offersUnits, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
 import { fmtShortDay } from "@/lib/tasks/activity";
-import type { RepeatRule } from "@/lib/tasks/repeat";
+import { describeRepeat, repeatDue, type RepeatRule } from "@/lib/tasks/repeat";
 import { cn } from "@/lib/utils";
 import { updateTask } from "./actions";
-import { SelectChip } from "./select-chip";
-import { useRun } from "@/components/use-run";
 
-export type PropertyOption = { id: string; label: string; units: string[] };
+export type { PropertyOption };
 
 export interface TaskFieldValues {
   assignee: AssigneeValue;
@@ -25,12 +24,18 @@ export interface TaskFieldValues {
   repeatRule: RepeatRule | null;
 }
 
+const lowerFirst = (s: string) => (s ? s[0].toLowerCase() + s.slice(1) : s);
+
 /**
  * The task's fields: a sticky rail of label and chip rows on a computer
  * (lg up), a row of chips under the title below that, scrolling sideways on
  * a phone. One set of controls; CSS moves them. In the rail, rows sit flat on
  * hairlines with a 112px label column (docs/brand-guidelines.md, section 5);
  * the page puts the Details heading over them.
+ *
+ * Every pick saves at once, shows the new value, and toasts what changed with
+ * Undo (docs/specs/selectors.md 2, Commit and feedback). Repeat lives inside
+ * the due date's panel; the rail keeps a read-only line of what repeats.
  */
 export function TaskFields({
   taskId,
@@ -41,6 +46,8 @@ export function TaskFields({
   users,
   contractors,
   properties,
+  meId,
+  recent,
   lockbox,
   created,
   className,
@@ -53,25 +60,75 @@ export function TaskFields({
   users: AssigneeUser[];
   contractors: AssigneeContractor[];
   properties: PropertyOption[];
+  /** The signed-in user: first in Team, "(you)", and short names below sm. */
+  meId: string;
+  /** The people the viewer assigned last, for the picker's Recent rows. */
+  recent: AssigneeValue[];
   /** Set when a contractor is assigned and the property has lockbox codes (D21). */
   lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
   created: string;
   className?: string;
 }) {
-  const { run, toast } = useRun();
+  const { run } = useRun();
   const [v, setOptimistic] = useOptimistic(values, (cur, patch: Partial<TaskFieldValues>) => ({ ...cur, ...patch }));
   const property = properties.find((p) => p.id === v.propertyId);
 
-  function save(patch: Partial<TaskFieldValues>, opts: { done?: string; undo?: Partial<TaskFieldValues> } = {}) {
+  /** Saves a patch at once and toasts it with Undo; the toast's `key` makes a quick second edit replace it. */
+  function save(
+    patch: Partial<TaskFieldValues>,
+    opts: { done: string; detail?: string; field: string; undo: Partial<TaskFieldValues> },
+  ) {
     run(() => updateTask(taskId, patch), {
       before: () => setOptimistic(patch),
       done: opts.done,
-      undo: opts.undo ? () => updateTask(taskId, opts.undo!) : undefined,
+      detail: opts.detail,
+      key: `task:${taskId}:${opts.field}`,
+      undo: () => updateTask(taskId, opts.undo),
     });
   }
 
-  const defaultDay = Number((v.dueDate ?? today).slice(8, 10));
-  const defaultWeekday = weekdayOf(v.dueDate ?? today);
+  const nameOf = (a: AssigneeValue): string | null => {
+    if (!a) return null;
+    if ("userId" in a) {
+      if (a.userId === meId) return "you";
+      const u = users.find((x) => x.id === a.userId);
+      return u ? (u.name || u.email).split(/\s+/)[0] : null;
+    }
+    const c = contractors.find((x) => x.id === a.contactId);
+    return c ? c.name.split(/\s+/)[0] : null;
+  };
+
+  function assign(assignee: AssigneeValue) {
+    const name = nameOf(assignee);
+    run(
+      // Sends the assignee this chip showed, so a reassignment from a stale
+      // page is refused instead of taking the job off whoever has it now.
+      () => updateTask(taskId, { assignee, expectedAssignee: v.assignee }),
+      {
+        before: () => setOptimistic({ assignee }),
+        done: name ? `Assigned to ${name}` : "Unassigned",
+        key: `task:${taskId}:assignee`,
+        undo: () => updateTask(taskId, { assignee: v.assignee, expectedAssignee: assignee }),
+      },
+    );
+  }
+
+  function changeProperty(propertyId: string | null) {
+    const next = properties.find((p) => p.id === propertyId);
+    const keepUnit = !!v.unitLabel && !!next?.units.includes(v.unitLabel);
+    const dropsUnit = !!v.unitLabel && !keepUnit;
+    save(
+      { propertyId, ...(keepUnit ? {} : { unitLabel: null }) },
+      {
+        done: next ? `Property set to ${next.label}` : "Property removed",
+        detail: dropsUnit ? "Unit cleared" : undefined,
+        field: "property",
+        undo: { propertyId: v.propertyId, unitLabel: v.unitLabel },
+      },
+    );
+  }
+
+  const from = v.dueDate ?? today;
 
   return (
     <div
@@ -87,82 +144,109 @@ export function TaskFields({
           value={v.assignee}
           users={users}
           contractors={contractors}
-          // Sends the assignee this chip showed, so a reassignment from a stale
-          // page is refused instead of taking the job off whoever has it now.
-          onChange={(assignee) => run(() => updateTask(taskId, { assignee, expectedAssignee: v.assignee }), { before: () => setOptimistic({ assignee }) })}
+          meId={meId}
+          recent={recent}
+          size="sm"
+          // The rail's empty fact is a verb.
+          placeholder="Assign"
+          onChange={assign}
         />
       </Row>
       <Row label="Due">
-        <DueDatePicker
+        <DatePicker
           value={v.dueDate}
           today={today}
           overdue={overdue}
           onChange={(dueDate) =>
             save(
               { dueDate },
-              { done: dueDate ? `Due date set to ${fmtShortDay(dueDate, today)}` : "Due date cleared", undo: { dueDate: v.dueDate } },
+              {
+                done: dueDate ? `Due date set to ${fmtShortDay(dueDate, today)}` : "Due date cleared",
+                field: "due",
+                undo: { dueDate: v.dueDate },
+              },
             )
           }
+          // Repeat lives inside Due (selectors question 7): a Repeat row ends the date panel.
+          withRepeat={{
+            value: v.repeatRule,
+            onChange: (repeatRule) => {
+              // A repeat on an undated task dates it to the first occurrence (the service does it too),
+              // so the chip shows that date at once and Undo takes it back with the rule.
+              const dated = repeatRule && !v.dueDate ? repeatDue(repeatRule, null, today) : null;
+              save(
+                { repeatRule, ...(dated ? { dueDate: dated } : {}) },
+                {
+                  done: repeatRule ? `Repeats ${lowerFirst(describeRepeat(repeatRule, { short: true, from }))}` : "Repeat turned off",
+                  detail: dated ? `Due ${fmtShortDay(dated, today)}` : undefined,
+                  field: "repeat",
+                  undo: { repeatRule: v.repeatRule, ...(dated ? { dueDate: null } : {}) },
+                },
+              );
+            },
+          }}
         />
       </Row>
       {status === "SCHEDULED" && (
         <Row label="Scheduled">
-          <DueDatePicker
+          <DatePicker
             label="Visit date"
             placeholder="Pick a date"
             prefix={<span className="text-fg-3 lg:hidden">Visit</span>}
             value={v.scheduledFor}
             today={today}
-            onChange={(scheduledFor) => {
-              if (!scheduledFor) toast({ message: "A scheduled job needs a visit date." });
-              else save({ scheduledFor });
-            }}
+            // A scheduled job needs a visit date: "No date" is never offered.
+            allowNone={false}
+            onChange={(scheduledFor) =>
+              save(
+                { scheduledFor },
+                {
+                  done: scheduledFor ? `Visit set to ${fmtShortDay(scheduledFor, today)}` : "Visit date cleared",
+                  field: "visit",
+                  undo: { scheduledFor: v.scheduledFor },
+                },
+              )
+            }
           />
         </Row>
       )}
       <Row label="Property">
-        <SelectChip
-          label="Property"
-          icon={<MapPin aria-hidden="true" />}
+        <PropertyPicker
           value={v.propertyId}
-          options={properties.map((p) => ({ value: p.id, label: p.label }))}
-          emptyOption="No property"
-          placeholder="No property"
-          onChange={(propertyId) => {
-            const next = properties.find((p) => p.id === propertyId);
-            const keepUnit = !!v.unitLabel && !!next?.units.includes(v.unitLabel);
-            save({ propertyId, ...(keepUnit ? {} : { unitLabel: null }) });
-          }}
+          properties={properties}
+          // The rail's empty fact is a verb.
+          placeholder="Add property"
+          onChange={changeProperty}
         />
       </Row>
-      {property && (property.units.length > 0 || v.unitLabel) && (
+      {property && offersUnits(property.units, v.unitLabel) && (
         <Row label="Unit">
-          <SelectChip
-            label="Unit"
-            icon={<DoorOpen aria-hidden="true" />}
+          <UnitPicker
             value={v.unitLabel}
-            // Labels read as written ("Unit 5", "Floor 1 / Lower"); only a bare number gets "Unit".
-            options={property.units.map((u) => ({ value: u, label: /^\d+[A-Za-z]?$/.test(u) ? `Unit ${u}` : u }))}
-            emptyOption="No unit"
-            placeholder="Pick unit"
-            onChange={(unitLabel) => save({ unitLabel })}
+            units={property.units}
+            placeholder="Add unit"
+            onChange={(unitLabel) =>
+              save(
+                { unitLabel },
+                {
+                  done: unitLabel ? `Unit set to ${unitDisplay(unitLabel)}` : "Unit cleared",
+                  field: "unit",
+                  undo: { unitLabel: v.unitLabel },
+                },
+              )
+            }
           />
         </Row>
       )}
-      <Row label="Repeats">
-        <RepeatPicker
-          value={v.repeatRule}
-          defaultDay={defaultDay}
-          defaultWeekday={defaultWeekday}
-          placeholder={
-            <>
-              <span className="lg:hidden">Repeat</span>
-              <span className="hidden lg:inline">Never</span>
-            </>
-          }
-          onChange={(repeatRule) => save({ repeatRule })}
-        />
-      </Row>
+      {v.repeatRule && (
+        <Row label="Repeats">
+          {/* Read-only: set it inside the due date. relative: the chip row below lg scrolls, and nothing may widen the page. */}
+          <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-fg-3 lg:px-0 [&_svg]:size-3.5 [&_svg]:shrink-0">
+            <Repeat aria-hidden="true" />
+            {describeRepeat(v.repeatRule, { short: true, from })}
+          </span>
+        </Row>
+      )}
       {lockbox && (
         <Row label="Lockbox">
           {/* relative: the sr-only text is absolute, and must stay inside the phone chip row's scroller, not widen the page. */}

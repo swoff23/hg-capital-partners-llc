@@ -47,3 +47,12 @@ export function pickContainer(): PickContainer {
   if (typeof window === "undefined") return "popover";
   return containerFor({ coarse: window.matchMedia(QUERY).matches, phone: !window.matchMedia(TABLET_UP_QUERY).matches });
 }
+
+/**
+ * Whether the screen is touch, read now rather than at render: for a panel
+ * that mounts when it opens (a picker's search takes focus with a mouse and
+ * leaves the keyboard down on touch). False on the server.
+ */
+export function isCoarseNow(): boolean {
+  return typeof window !== "undefined" && window.matchMedia(QUERY).matches;
+}

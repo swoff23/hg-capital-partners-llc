@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { describeRepeat, nextOccurrence, repeatRuleSchema } from "./repeat";
-import { choiceFromRule, followDueDay, ruleFromChoice, switchMode, type RepeatChoice } from "./repeat-choice";
+import {
+  CUSTOM_UNITS,
+  choiceFromRule,
+  customCountError,
+  customFromRule,
+  followDueDay,
+  ruleFromChoice,
+  switchCustomUnit,
+  switchMode,
+  type RepeatChoice,
+} from "./repeat-choice";
 
 // Weekdays: 0 Sunday to 6 Saturday. Oct 23, 2026 is a Friday (5).
 
@@ -32,15 +42,15 @@ test("weekly pins the due date's weekday, as quarterly takes its day", () => {
 test("monthly pins the day of the month", () => {
   const rule = ruleFromChoice({ mode: "monthly", every: 1, day: 5, weekday: 1 })!;
   assert.deepEqual(rule, { freq: "monthly", interval: 1, dayOfMonth: 5 });
-  assert.equal(describeRepeat(rule), "Monthly on the 5th");
+  assert.equal(describeRepeat(rule), "Every month on the 5th");
 });
 
 test("quarterly pins the due date's day too; yearly stays unpinned", () => {
   assert.deepEqual(ruleFromChoice({ mode: "quarterly", every: 1, day: 31, weekday: 1 }), { freq: "quarterly", interval: 1, dayOfMonth: 31 });
   // The chip shows no day for yearly, so a pin would silently undo a renewal date someone moved.
   assert.deepEqual(ruleFromChoice({ mode: "yearly", every: 1, day: 29, weekday: 1 }), { freq: "yearly", interval: 1 });
-  assert.equal(describeRepeat(ruleFromChoice({ mode: "quarterly", every: 1, day: 31, weekday: 1 })!), "Quarterly on the 31st");
-  assert.equal(describeRepeat(ruleFromChoice({ mode: "yearly", every: 1, day: 29, weekday: 1 })!), "Yearly");
+  assert.equal(describeRepeat(ruleFromChoice({ mode: "quarterly", every: 1, day: 31, weekday: 1 })!), "Every quarter on the 31st");
+  assert.equal(describeRepeat(ruleFromChoice({ mode: "yearly", every: 1, day: 29, weekday: 1 })!), "Every year");
   // A quarterly rule saved before the day was pinned takes the due date's day the next time it's saved.
   assert.deepEqual(ruleFromChoice(choiceFromRule({ freq: "quarterly", interval: 1 }, 30, 1)), { freq: "quarterly", interval: 1, dayOfMonth: 30 });
 });
@@ -139,4 +149,51 @@ test("every rule the editor makes passes the stored schema", () => {
     { mode: "yearly", every: 1, day: 1, weekday: 1 },
   ];
   for (const c of choices) assert.ok(repeatRuleSchema.safeParse(ruleFromChoice(c)).success);
+});
+
+test("Custom starts from the stored rule, or at every 2 weeks when there is none", () => {
+  assert.deepEqual(customFromRule(null, 23, 5), { mode: "weeks", every: 2, day: 23, weekday: 5 });
+  assert.deepEqual(customFromRule({ freq: "days", interval: 3 }, 23, 5), { mode: "days", every: 3, day: 23, weekday: 5 });
+  assert.deepEqual(customFromRule({ freq: "weeks", interval: 2, weekday: 1 }, 23, 5), { mode: "weeks", every: 2, day: 23, weekday: 1 });
+  assert.deepEqual(customFromRule({ freq: "monthly", interval: 2, dayOfMonth: 15 }, 23, 5), { mode: "monthly", every: 2, day: 15, weekday: 5 });
+});
+
+test("Custom counts a quarterly or yearly rule in months, so nothing the store holds is out of reach", () => {
+  // Every 2 quarters is every 6 months, on the pinned day.
+  const quarters = customFromRule({ freq: "quarterly", interval: 2, dayOfMonth: 30 }, 23, 5);
+  assert.deepEqual(quarters, { mode: "monthly", every: 6, day: 30, weekday: 5 });
+  assert.deepEqual(ruleFromChoice(quarters), { freq: "monthly", interval: 6, dayOfMonth: 30 });
+  // Every 2 years is every 24 months, on the date's day.
+  const years = customFromRule({ freq: "yearly", interval: 2 }, 23, 5);
+  assert.deepEqual(years, { mode: "monthly", every: 24, day: 23, weekday: 5 });
+  // Months, quarters and years all step the same dates the stored rule does.
+  const from = "2026-10-30";
+  assert.equal(nextOccurrence(ruleFromChoice(quarters)!, from), nextOccurrence({ freq: "quarterly", interval: 2, dayOfMonth: 30 }, from));
+  assert.equal(
+    nextOccurrence({ freq: "monthly", interval: 24, dayOfMonth: 30 }, from),
+    nextOccurrence({ freq: "yearly", interval: 2 }, from),
+  );
+});
+
+test("Custom's unit changes keep the count and take the due date's day and weekday", () => {
+  const twoWeeks: RepeatChoice = { mode: "weeks", every: 2, day: 1, weekday: 1 };
+  assert.deepEqual(switchCustomUnit(twoWeeks, "monthly", 23, 5), { mode: "monthly", every: 2, day: 23, weekday: 5 });
+  assert.deepEqual(ruleFromChoice(switchCustomUnit(twoWeeks, "days", 23, 5)), { freq: "days", interval: 2 });
+  assert.deepEqual(switchCustomUnit(twoWeeks, "weeks", 23, 5), twoWeeks, "the same unit changes nothing");
+});
+
+test("Custom offers days, weeks and months", () => {
+  assert.deepEqual(CUSTOM_UNITS.map((u) => u.label), ["Days", "Weeks", "Months"]);
+});
+
+test("an empty or unreadable count asks for one instead of saving every day (BPLAY-030)", () => {
+  assert.equal(customCountError("weeks", Number.NaN), "Enter how many weeks.");
+  assert.equal(customCountError("days", Number.NaN), "Enter how many days.");
+  assert.equal(customCountError("monthly", Number.NaN), "Enter how many months.");
+  assert.equal(customCountError("weeks", 0), "Enter how many weeks.");
+  assert.equal(customCountError("weeks", -3), "Enter how many weeks.");
+  assert.equal(customCountError("weeks", 1.5), "Enter how many weeks.", "a whole number only");
+  assert.equal(customCountError("days", 366), "Use 365 days or fewer.");
+  assert.equal(customCountError("weeks", 1), null);
+  assert.equal(customCountError("weeks", 365), null);
 });

@@ -1,13 +1,16 @@
 "use client";
-import type { ComponentProps, ReactNode } from "react";
-import { Check } from "lucide-react";
+import { createContext, useContext, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { Check, ChevronLeft } from "lucide-react";
 import {
+  Button as AriaButton,
+  Dialog,
   Header,
   Keyboard,
   Menu as AriaMenu,
   MenuItem as AriaMenuItem,
   MenuSection as AriaMenuSection,
   MenuTrigger as AriaMenuTrigger,
+  RootMenuTriggerStateContext,
   Separator,
   Text,
   type Key,
@@ -18,7 +21,9 @@ import {
 } from "react-aria-components";
 import { cn } from "@/lib/utils";
 import { PopoverSurface } from "@/components/popover";
+import { Sheet, SheetView, useSheet } from "@/components/sheet";
 import { CheckboxMark, kbdClass } from "@/components/ui";
+import { pickContainer } from "@/components/use-coarse-pointer";
 
 /**
  * Action menus and value menus on React Aria (D9): arrow keys, typeahead,
@@ -52,7 +57,7 @@ export type MenuFollowUp = {
    * The question. `back` returns to the list with nothing changed; the caller
    * commits the pick and its answer together, then calls `close`.
    */
-  content: (step: { back: () => void; close: () => void }) => ReactNode;
+  content: (step: { back: () => void; close: () => void; container: "popover" | "sheet" }) => ReactNode;
 };
 
 export type MenuProps<T extends object> = Omit<AriaMenuProps<T>, "className"> & {
@@ -61,24 +66,31 @@ export type MenuProps<T extends object> = Omit<AriaMenuProps<T>, "className"> & 
   /**
    * Value menus: the fixed order behind the number keys. The item whose id is
    * `numberKeys[i]` answers to key i + 1 and prints it as a Kbd with a mouse.
-   * An item that's hidden keeps its number, so the next one never takes it
-   * (4 is always Next week). Interim: accepted, not wired yet.
+   * An item that's hidden (not rendered) keeps its number, so the next one
+   * never takes it: 4 is always Next week, and Done stays 6 when Review hides.
    */
   numberKeys?: readonly Key[];
   /**
-   * Value menus: on a phone the menu opens in a Sheet with this title and 44px
-   * rows instead of anchoring. ⋯ action menus never take it and stay anchored
-   * on every device. Interim: the menu stays anchored.
+   * Value menus: on a touch phone the menu opens in a titled Sheet with 44px
+   * rows instead of anchoring (React Aria's MenuTrigger only takes a Popover,
+   * so the Menu renders itself into our Sheet). ⋯ action menus never take it
+   * and stay anchored on every device.
    */
   sheetTitle?: string;
   /**
    * A pick that needs one more answer (Waiting needs a reason, Scheduled a
-   * visit date) swaps the panel to that question in the same layer, never a
-   * second sheet; return null for picks that commit at once. Interim:
-   * ignored, so every pick commits at once as it did.
+   * visit date) swaps the layer to that question and commits only when it's
+   * answered; return null for picks that commit at once. `onAction` is called
+   * for the picks that commit at once. A phone's sheet pushes the question as a
+   * view with a back arrow; a mouse's popover swaps its panel and shows a
+   * back chevron. Back returns to the list with nothing changed, and Esc
+   * closes the whole layer with nothing changed.
    */
   followUp?: (key: Key) => MenuFollowUp | null;
 };
+
+/** The ids of the menu's number keys, as strings, for the items to read their own number from. */
+const NumberKeysContext = createContext<readonly string[]>([]);
 
 export function Menu<T extends object>({
   placement = "bottom end",
@@ -86,15 +98,111 @@ export function Menu<T extends object>({
   numberKeys,
   sheetTitle,
   followUp,
+  onAction,
+  shouldCloseOnSelect,
   ...props
 }: MenuProps<T>) {
-  // Typed now so callers can pass them; the selectors package wires them up.
-  void numberKeys;
-  void sheetTitle;
-  void followUp;
+  const root = useContext(RootMenuTriggerStateContext);
+  const hostSheet = useSheet();
+  const open = root?.isOpen ?? false;
+  // Where it opens is read when it opens, not at render, so a tap before the
+  // page hydrated can't open the desktop popover on a phone (selectors 2).
+  const container = useMemo(() => (open ? pickContainer() : "popover"), [open]);
+  const asSheet = sheetTitle !== undefined && container === "sheet";
+
+  // The follow-up question on screen, until it's answered or the menu closes.
+  const [step, setStep] = useState<{ title: string; content: MenuFollowUp["content"] } | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setStep(null);
+  }
+
+  const keys = useMemo(() => (numberKeys ?? []).map(String), [numberKeys]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  /** A pick: asks its follow-up in this layer, or commits and closes. */
+  function pick(key: Key) {
+    const follow = followUp?.(key) ?? null;
+    if (follow) {
+      setStep({ title: follow.title, content: follow.content });
+      return;
+    }
+    (onAction as ((key: Key) => void) | undefined)?.(key);
+    root?.close();
+  }
+
+  // A number key picks the item that owns it, if that item is on show and enabled.
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (!keys.length || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !/^[1-9]$/.test(e.key)) return;
+    const id = keys[Number(e.key) - 1];
+    if (id === undefined) return;
+    const item = Array.from(wrapRef.current?.querySelectorAll<HTMLElement>("[data-key]") ?? []).find((el) => el.dataset.key === id);
+    if (!item || item.getAttribute("aria-disabled") === "true") return;
+    e.preventDefault();
+    e.stopPropagation();
+    pick(id);
+  }
+
+  const list = (
+    <NumberKeysContext value={keys}>
+      <div ref={wrapRef} onKeyDown={onKeyDown}>
+        <AriaMenu
+          className={cn("p-1 outline-none", className)}
+          // With a follow-up the menu closes itself only for picks that commit.
+          shouldCloseOnSelect={followUp ? false : shouldCloseOnSelect}
+          onAction={followUp ? pick : onAction}
+          {...props}
+        />
+      </div>
+    </NumberKeysContext>
+  );
+  const back = () => setStep(null);
+  const close = () => root?.close();
+
+  if (asSheet) {
+    // The follow-up question is a view with the sheet's back arrow; Esc closes the whole layer.
+    const question = step && (
+      <SheetView title={step.title} onBack={back} escape="close">
+        {step.content({ back, close, container })}
+      </SheetView>
+    );
+    // Inside a sheet already (a status chip in a create sheet), the list is a view in it, never a second sheet.
+    if (hostSheet) {
+      return open ? (
+        <SheetView title={sheetTitle} onBack={close}>
+          {list}
+          {question}
+        </SheetView>
+      ) : null;
+    }
+    return (
+      <Sheet title={sheetTitle}>
+        {list}
+        {question}
+      </Sheet>
+    );
+  }
+
   return (
-    <PopoverSurface placement={placement} className="min-w-40">
-      <AriaMenu className={cn("p-1 outline-none", className)} {...props} />
+    <PopoverSurface placement={placement} motion="none" className="min-w-40">
+      {step ? (
+        <Dialog aria-label={step.title} className="min-w-64 max-w-80 outline-none">
+          <div className="flex items-center gap-1 border-b border-line py-1 pl-1 pr-3">
+            <AriaButton
+              onPress={back}
+              aria-label="Back"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:size-11"
+            >
+              <ChevronLeft className="size-4" aria-hidden="true" />
+            </AriaButton>
+            <span className="min-w-0 truncate text-label text-fg-1">{step.title}</span>
+          </div>
+          {step.content({ back, close, container })}
+        </Dialog>
+      ) : (
+        list
+      )}
     </PopoverSurface>
   );
 }
@@ -110,6 +218,7 @@ export function MenuItem({
   description,
   className,
   children,
+  id,
   ...props
 }: Omit<AriaMenuItemProps, "className" | "children"> & {
   variant?: "default" | "destructive";
@@ -134,8 +243,13 @@ export function MenuItem({
   className?: string;
   children: ReactNode;
 }) {
+  // The value menu's number key for this item (the Menu's `numberKeys`), printed with a mouse.
+  const number = useContext(NumberKeysContext).indexOf(String(id)) + 1;
+  const printed = shortcut ?? (number > 0 ? String(number) : undefined);
   return (
     <AriaMenuItem
+      id={id}
+      aria-keyshortcuts={number > 0 ? String(number) : undefined}
       textValue={typeof children === "string" ? children : undefined}
       render={
         current === undefined
@@ -150,7 +264,10 @@ export function MenuItem({
       className={cn(
         "flex cursor-default select-none items-center gap-2 whitespace-nowrap rounded-sm px-2 text-body outline-none",
         description ? "min-h-11 py-1.5 pointer-coarse:min-h-14" : "h-8 pointer-coarse:h-11",
-        variant === "destructive" ? "text-danger data-focused:bg-danger-tint" : "text-fg-1 data-focused:bg-fill-2",
+        variant === "destructive"
+          ? "text-danger data-focused:bg-danger-tint"
+          // Focus draws the highlight with a mouse and a keyboard; on touch only a visible (keyboard) focus does, so opening a list doesn't paint its first row.
+          : "text-fg-1 data-focused:bg-fill-2 pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-fill-2",
         "data-disabled:opacity-50",
         className,
       )}
@@ -182,14 +299,20 @@ export function MenuItem({
           ) : (
             children
           )}
-          {shortcut && <Keyboard className={cn(kbdClass, "ml-auto")}>{shortcut}</Keyboard>}
+          {/* A number key is printed for a mouse and kept out of the item's name ("To do", not "To do 1"), as the date picks do. */}
+          {printed && (
+            <Keyboard aria-hidden={shortcut === undefined ? true : undefined} className={cn(kbdClass, "ml-auto")}>
+              {printed}
+            </Keyboard>
+          )}
           {/* One trailing Check: from the selection, the current page, or the legacy flag. */}
           {(selectionMode === "single" || current !== undefined || checked !== undefined) && (
             <Check
               aria-hidden="true"
               className={cn(
                 trailingCheck,
-                !shortcut && "ml-auto",
+                // A keycap pushes the Check right with a mouse; on touch it's hidden, so the Check goes itself.
+                printed ? "pointer-coarse:ml-auto" : "ml-auto",
                 !(selectionMode === "single" ? isSelected : (current ?? checked)) && "invisible",
               )}
             />

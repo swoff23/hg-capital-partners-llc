@@ -54,15 +54,29 @@ type SurfaceProps = Omit<AriaPopoverProps, "className"> & {
   className?: string;
   /** "pop" (the default) scales in; "none" appears at once, for lists. */
   motion?: PopoverMotion;
+  /**
+   * "public" puts the public site's dark tokens on the panel
+   * (`data-surface="public"`): a popover is portaled to <body>, outside the
+   * public wrapper, so it carries the surface itself.
+   */
+  surface?: "app" | "public";
 };
 
 /** A styled React Aria Popover with nothing inside it. For menus and list boxes, which bring their own role. */
-export function PopoverSurface({ className, placement = "bottom start", offset = 6, motion = "pop", ...props }: SurfaceProps) {
+export function PopoverSurface({
+  className,
+  placement = "bottom start",
+  offset = 6,
+  motion = "pop",
+  surface = "app",
+  ...props
+}: SurfaceProps) {
   return (
     <AriaPopover
       placement={placement}
       offset={offset}
       className={cn(popoverFrame, popoverMotion[motion], className)}
+      data-surface={surface === "public" ? "public" : undefined}
       {...props}
     />
   );
