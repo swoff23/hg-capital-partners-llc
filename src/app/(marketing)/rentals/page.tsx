@@ -107,9 +107,22 @@ export default async function RentalsPage() {
  * heading, so the card leaves it out.
  */
 function ListingCard({ listing: l }: { listing: ListingCardData }) {
+  // The full-screen viewer's header: the street, and the rent while it's open ("56 Tamarack St · $1,450/mo").
+  const viewerTitle = (
+    <>
+      {l.street}
+      {!l.leased && l.rent && (
+        <>
+          {" · "}
+          <Money value={l.rent} />
+          /mo
+        </>
+      )}
+    </>
+  );
   return (
     <article className="flex min-w-0 flex-col gap-3">
-      <PhotoCarousel photos={l.photos} label={l.address} status={l.status} />
+      <PhotoCarousel photos={l.photos} label={l.address} status={l.status} viewerTitle={viewerTitle} />
 
       <div className="grid gap-0.5">
         <div className="flex items-baseline justify-between gap-3">

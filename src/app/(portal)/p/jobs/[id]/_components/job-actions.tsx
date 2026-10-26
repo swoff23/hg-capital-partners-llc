@@ -1,19 +1,46 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, ImagePlus } from "lucide-react";
+import { Camera, ImagePlus, Play } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
 import { useHoldLeave, useLeaveGuard } from "@/components/leave-guard";
-import { MediaUploadTray, UploadStatusLine, isGoingUp, useLeaveWarning, useMediaUploader } from "@/components/media-uploader";
+import {
+  MediaUploadTray,
+  UploadStatusLine,
+  UploadTile,
+  isGoingUp,
+  useLeaveWarning,
+  useMediaUploader,
+  type RecordMediaInput,
+  type RecordMediaResult,
+} from "@/components/media-uploader";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { Sheet } from "@/components/sheet";
 import { SpotArt } from "@/components/spot-art";
 import { useToast } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
+import type { UploadTarget } from "@/components/upload-queue";
+import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { callAction } from "@/lib/action-result";
-import { finishingLabel, joinNames, markDoneButton, nextStep, stillUploading } from "@/lib/portal/job-view";
+import { contentTypeForName, fileKindForType, type FileKind } from "@/lib/attachments/content-types";
+import { taskFileUrl } from "@/lib/attachments/media";
+import {
+  finishCountLabel,
+  finishPhotosNeeded,
+  finishSlots,
+  joinNames,
+  lateUploadsEndsIn,
+  lateUploadsOpen,
+  markDoneButton,
+  nextStep,
+  postedText,
+  stillUploading,
+  stripCounts,
+} from "@/lib/portal/job-view";
 import { cn } from "@/lib/utils";
-import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJobAction } from "../actions";
+import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
+import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "../upload-actions";
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -21,9 +48,15 @@ import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJob
  * step), and the Mark done sheet with its payoff. One uploader serves all
  * three, so Mark done can wait for photos still going up.
  *
- * Photos picked from the bar post as their own update once they're all up,
- * unless there's text in the composer: then they wait and go with it. While
- * the Mark done sheet is open they go with the Mark done instead.
+ * Photos picked from the bar post as one update once they're all up, unless
+ * there's text in the composer: then they wait and go with it. While the Mark
+ * done sheet is open they go with the Mark done instead. A batch that posts on
+ * its own says "3 photos posted · Undo" for five seconds, and Undo takes the
+ * update and its files back (uploads 2.7, question 5). Photos go up as a
+ * `display` target: upright, a 2560px JPEG, no GPS, without the original
+ * (question 3), and each carries when it joined the queue, so one taken before
+ * Mark done still records after it, inside the hour (question 4). "Add
+ * photo/video" stays on in Review for that hour, then hides.
  *
  * A held photo is already on the job, but HG only hears about it (the
  * timeline line and the email) once it's posted. Leaving the page for
@@ -32,39 +65,68 @@ import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJob
  *
  * Leaving cancels whatever is still going up, so while anything is, "My
  * jobs" and the payoff's "Back to my jobs" ask first in a sheet (the portal
- * layout's LeaveGuard, decision 24). Mark done waits for uploads, and for each failed
- * photo to be retried or removed (decision 13): in the bar and in the sheet
- * it stays off over one danger line ("2 photos didn't upload · Retry"), and a
- * failed tile keeps its place with the Retry pill. "Add photos" is off while
- * the Mark done is sending: a photo picked then wouldn't go with it.
+ * layout's LeaveGuard, decision 24); the upload queue (UP1) outlives the page,
+ * and this hold retires with that. Mark done waits for uploads, and for each
+ * failed photo to be retried or removed (decision 13): in the bar and in the
+ * sheet it stays off over one line ("2 photos didn't upload · Retry" in
+ * danger, or "Finishing 2 uploads…" in grey), and a failed tile keeps its
+ * place with the Retry pill. "Add photos" is off while the Mark done is
+ * sending: a photo picked then wouldn't go with it.
+ *
+ * The Mark done sheet (uploads 2.8) is the proof slots: "Photos of the
+ * finished work" with "1 of 2" when the playbook asks for photos
+ * (`finishPhotosRequired`, off by default), empty camera squares up to that
+ * count (one on an optional job), then one add tile. An empty slot opens the
+ * camera on touch and the file picker with a mouse. There's no Skip: with no
+ * photos on an optional job the primary reads "Mark done". Its pair is pinned
+ * under the scroll, so the note's keyboard never covers it.
  *
  * One primary per screen (docs/brand-guidelines.md, section 9): the bar's next
  * step on the page, the sheet's Mark done inside it. Send is secondary.
  */
+
+/** A file that's up and recorded, waiting to be posted: what the sheet shows in its slot and the payoff in its strip. */
+type Recorded = { id: string; name: string; kind: FileKind | null; hasThumb: boolean; hasPoster: boolean };
+
 export function JobActions({
   taskId,
   status,
   firstName,
   staffNames,
+  finishPhotosRequired,
+  markedDoneAt,
+  property,
 }: {
   taskId: string;
   status: TaskStatus;
   firstName: string;
   staffNames: string[];
+  /** Photos Mark done asks for, from the job's playbook (TaskTemplate.finishPhotosRequired). Null or 0: optional, as every job starts. */
+  finishPhotosRequired?: number | null;
+  /** When this contractor marked the job done (ISO), while it's in Review: "Add photo/video" hides an hour later. Without it, it stays. */
+  markedDoneAt?: string | null;
+  /** The building, for the upload's name and the payoff's photo: "56 Tamarack St" and its front photo. */
+  property?: { label: string; photoUrl: string | null } | null;
 }) {
   const { toast } = useToast();
   const step = nextStep(status);
+  const coarse = useCoarsePointer();
+  const required = finishPhotosNeeded(finishPhotosRequired);
 
   const [body, setBody] = useState("");
   // Uploaded and recorded, not posted yet.
-  const [ready, setReady] = useState<string[]>([]);
+  const [ready, setReady] = useState<Recorded[]>([]);
   const [sending, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetState, setSheetState] = useState<"ask" | "sent">("ask");
   const [note, setNote] = useState("");
+  // What HG received, for the payoff's strip.
+  const [received, setReceived] = useState<Recorded[]>([]);
   const [finishing, startFinishing] = useTransition();
+  // Set when this page marks the job done, so the hour starts at once without waiting for the page to refresh.
+  const [markedNow, setMarkedNow] = useState<string | null>(null);
 
   // onRecorded runs after the last upload lands, so it reads the latest of these.
   const live = useRef({ body, sheetOpen, ready });
@@ -72,33 +134,89 @@ export function JobActions({
     live.current = { body, sheetOpen, ready };
   });
 
+  // What each recorded file is, by id, since the record step answers with the id alone.
+  const info = useRef(new Map<string, Recorded>());
+
   // Every call goes through callAction: with no signal it fails like a refusal
   // (a toast), and the typed text, the open sheet and the photos stay put.
-  const post = (text: string, ids: string[]) =>
+  const post = (text: string, items: Recorded[]) =>
     startSending(async () => {
+      const ids = items.map((i) => i.id);
       const res = await callAction(() => postJobUpdateAction(taskId, { body: text, attachmentIds: ids }));
       if (!res.ok) {
         toast({ message: res.error });
-        setReady((r) => [...new Set([...r, ...ids])]);
+        setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
         return;
       }
       if (text) setBody((b) => (b.trim() === text ? "" : b));
     });
 
-  const uploader = useMediaUploader({
-    taskId,
-    uploadKind: "portal-task-upload",
-    record: (file) => recordJobUploadAction(taskId, file),
-    onRecorded: (ids) => {
-      const { sheetOpen: holding, body: text, ready: waiting } = live.current;
-      if (holding || text.trim()) {
-        setReady([...waiting, ...ids]);
+  /** A batch that posts on its own: one update, "3 photos posted", and five seconds to take it back. */
+  const postBatch = (items: Recorded[]) =>
+    startSending(async () => {
+      const res = await callAction(() => postJobBatchAction(taskId, items.map((i) => i.id)));
+      if (!res.ok) {
+        toast({ message: res.error });
+        setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
         return;
       }
-      setReady([]);
-      post("", [...waiting, ...ids]);
-    },
-  });
+      const { eventId } = res.data;
+      toast({
+        message: postedText(items.map((i) => i.kind)),
+        key: `job-post:${eventId}`,
+        action: {
+          label: "Undo",
+          onAction: () => {
+            void callAction(() => undoJobPostAction(taskId, eventId)).then((undone) => {
+              if (!undone.ok) toast({ message: undone.error });
+            });
+          },
+        },
+      });
+    });
+
+  /** The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and the strip. */
+  async function record(file: RecordMediaInput): Promise<RecordMediaResult> {
+    const res = await recordJobUploadAction(taskId, file);
+    if (res.ok) {
+      const kind = fileKindForType(contentTypeForName(file.filename)) ?? (file.posterPathname ? "video" : null);
+      info.current.set(res.data.id, {
+        id: res.data.id,
+        name: file.filename,
+        kind,
+        hasThumb: !!file.thumbPathname,
+        hasPoster: !!file.posterPathname,
+      });
+    }
+    return res;
+  }
+
+  function onRecorded(ids: string[]) {
+    const { sheetOpen: holding, body: text, ready: waiting } = live.current;
+    const added = ids.map((id) => info.current.get(id)).filter((i): i is Recorded => !!i);
+    if (holding || text.trim()) {
+      setReady([...waiting, ...added]);
+      return;
+    }
+    setReady([]);
+    postBatch([...waiting, ...added]);
+  }
+
+  const target: UploadTarget = {
+    key: `portal-task:${taskId}`,
+    label: property?.label ?? "this job",
+    uploadKind: "portal-task-upload",
+    parentId: taskId,
+    access: "private",
+    allowed: ["image", "video"],
+    // Photos go up upright, as a 2560px JPEG without GPS and without the original (question 3).
+    prepare: "display",
+    record,
+    onRecorded,
+    // Gone from the page, a contractor's photos still post as their own update.
+    whenAway: "post",
+  };
+  const uploader = useMediaUploader({ target });
   const { pending, failed } = uploader;
 
   // "My jobs" and the payoff's "Back to my jobs" ask before they cancel what's still going up.
@@ -116,7 +234,7 @@ export function JobActions({
     const latest = live;
     const inFlight = finishingIds;
     return () => {
-      const held = latest.current.ready.filter((id) => !inFlight.current.includes(id));
+      const held = latest.current.ready.map((r) => r.id).filter((id) => !inFlight.current.includes(id));
       // Detached: nothing is left on this page to show a result, and a redirect needs no rethrow here.
       if (held.length > 0) postJobUpdateAction(taskId, { body: "", attachmentIds: held }).catch(() => {});
     };
@@ -135,6 +253,18 @@ export function JobActions({
     hadUploads.current = has;
   }, [uploader.uploads.length, sheetOpen]);
 
+  // In Review, "Add photo/video" stays for the hour the server keeps taking files (question 4), then hides.
+  const markedAt = markedNow ?? markedDoneAt ?? null;
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const left = lateUploadsEndsIn(markedAt, new Date());
+    if (left === null || left <= 0) return;
+    // setTimeout can't wait longer than about 24 days; an hour is far inside it.
+    const timer = setTimeout(() => setClock(Date.now()), left + 250);
+    return () => clearTimeout(timer);
+  }, [markedAt]);
+  const canAddMore = step !== "review" || lateUploadsOpen(markedAt, new Date(clock));
+
   const showBar = step !== null;
   // The bar grows by one line for the red Retry line or the "Finishing N uploads" line
   // (never both); ActionBar lifts the toast above whichever shows.
@@ -143,9 +273,9 @@ export function JobActions({
   function send() {
     const text = body.trim();
     if (!text && ready.length === 0) return;
-    const ids = ready;
+    const items = ready;
     setReady([]);
-    post(text, ids);
+    post(text, items);
   }
 
   function start() {
@@ -162,16 +292,18 @@ export function JobActions({
 
   function finish() {
     startFinishing(async () => {
-      const ids = ready;
-      finishingIds.current = ids;
+      const items = ready;
+      finishingIds.current = items.map((i) => i.id);
       try {
-        const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: ids }));
+        const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: items.map((i) => i.id) }));
         if (!res.ok) {
           toast({ message: res.error });
           return;
         }
-        setReady((r) => r.filter((id) => !ids.includes(id)));
+        setReady((r) => r.filter((x) => !items.some((i) => i.id === x.id)));
+        setReceived(items);
         setNote("");
+        setMarkedNow(new Date().toISOString());
         setSheetState("sent");
       } finally {
         finishingIds.current = [];
@@ -180,12 +312,19 @@ export function JobActions({
   }
 
   const canSend = (body.trim() !== "" || ready.length > 0) && !sending;
-  const done = markDoneButton({ pending, failed, sending: finishing, hasContent: ready.length > 0 || note.trim() !== "" });
+  const done = markDoneButton({ pending, failed, sending: finishing, uploaded: ready.length, required });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
   const barButton = actionBarButton;
   // The Mark done sheet's pair: half each on a phone, sized to their labels at the dialog's end from md.
   const sheetButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 md:flex-none";
+
+  // The camera, for an empty slot on touch: the rear camera straight away, photos only (uploads 2.8).
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const openSlot = () => (coarse ? cameraRef.current?.click() : uploader.chooseFiles());
+
+  const slots = finishSlots(required);
+  const filled = ready.length + uploader.uploads.length;
 
   return (
     <>
@@ -220,16 +359,29 @@ export function JobActions({
       </div>
 
       {uploader.inputs}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          if (e.target.files) uploader.addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
 
       {/* Sticky bottom bar: the phone chrome, on --canvas over a --line rule. */}
       {showBar && (
         <ActionBar
           secondary={
-            // Photos can still go up while HG reviews; only the next step waits.
-            <Button variant="secondary" className={cn(barButton, "max-[360px]:px-2")} onClick={uploader.chooseFiles}>
-              <Camera className="h-4 w-4 shrink-0 max-[360px]:hidden" aria-hidden="true" />
-              Add photo/video
-            </Button>
+            // Photos can still go up while HG reviews, for the hour after Mark done; only the next step waits.
+            canAddMore ? (
+              <Button variant="secondary" className={cn(barButton, "max-[360px]:px-2")} onClick={uploader.chooseFiles}>
+                <Camera className="h-4 w-4 shrink-0 max-[360px]:hidden" aria-hidden="true" />
+                Add photo/video
+              </Button>
+            ) : undefined
           }
           primary={
             step === "review" ? (
@@ -252,7 +404,7 @@ export function JobActions({
           // The disabled Mark done's one-line reason: uploads still going up, or the red Retry line.
           error={
             finishingLine ? (
-              <p className="text-center text-meta text-fg-3 lg:text-right">{finishingLabel(pending)}</p>
+              <p className="text-center text-meta text-fg-3 lg:text-right">{done.line}</p>
             ) : failed > 0 ? (
               <UploadStatusLine uploader={uploader} className="lg:justify-end" />
             ) : null
@@ -282,25 +434,46 @@ export function JobActions({
                   <ImagePlus className="h-4 w-4 shrink-0" aria-hidden="true" />
                   Add photos
                 </Button>
-                {/* Off while a photo failed to upload: the red line under it says which (decision 13). */}
-                <Button className={sheetButton} disabled={!done.enabled} onClick={finish}>
+                {/* Off while a photo is still going up or failed, or short of the count: the line under it says which.
+                    It keeps its label and shows its spinner while it sends. */}
+                <Button className={sheetButton} disabled={!done.enabled} pending={done.busy} onClick={finish}>
                   <span className="truncate">{done.label}</span>
                 </Button>
               </div>
-              <UploadStatusLine uploader={uploader} className="md:justify-end" />
+              {failed > 0 ? (
+                <UploadStatusLine uploader={uploader} className="md:justify-end" />
+              ) : done.line ? (
+                <p className="truncate text-center text-meta text-fg-3 md:text-right">{done.line}</p>
+              ) : null}
             </div>
           )
         }
       >
         {sheetState === "ask" ? (
           <div className="space-y-4 p-4">
-            <p className="text-body font-medium text-fg-1">Add photos of the finished work?</p>
-            <MediaUploadTray uploader={uploader} layout="grid" notice={false} />
-            {ready.length > 0 && (
-              <p className="text-meta text-fg-3">
-                {ready.length} {ready.length === 1 ? "upload" : "uploads"} will go with it
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 text-body font-medium text-fg-1">
+                {required > 0 ? "Photos of the finished work" : "Add photos of the finished work?"}
               </p>
-            )}
+              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, ready.length)}</span>}
+            </div>
+            <ul
+              aria-label="Photos of the finished work"
+              className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2"
+            >
+              {ready.map((r) => (
+                <ReadyTile key={r.id} item={r} />
+              ))}
+              {uploader.uploads.map((u) => (
+                <UploadTile key={u.key} upload={u} grid onRetry={() => uploader.retry(u.key)} onRemove={() => uploader.remove(u.key)} />
+              ))}
+              {/* Empty slots up to the count asked for (one on an optional job): solid squares, never dashed. */}
+              {Array.from({ length: Math.max(0, slots - filled) }, (_, i) => (
+                <SlotButton key={`slot-${i}`} label="Add a photo of the finished work" onClick={openSlot} disabled={finishing} />
+              ))}
+              {/* Once the count is met, one add tile remains. */}
+              {filled >= slots && <SlotButton key="more" label="Add another photo" onClick={openSlot} disabled={finishing} />}
+            </ul>
             <div>
               <label htmlFor="done-note" className="sr-only">
                 Note
@@ -316,21 +489,71 @@ export function JobActions({
             </div>
           </div>
         ) : (
-          <Payoff firstName={firstName} staffNames={staffNames} />
+          <Payoff firstName={firstName} staffNames={staffNames} received={received} property={property ?? null} />
         )}
       </Sheet>
     </>
   );
 }
 
+/** An empty proof slot, or the add tile once the count is met: a --fill-1 square with a Camera, opening the camera on touch. */
+function SlotButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled: boolean }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        className="flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors disabled:opacity-50 not-disabled:hover:text-fg-1"
+      >
+        <Camera className="size-5" aria-hidden="true" />
+      </button>
+    </li>
+  );
+}
+
+/** Where a recorded photo or video's picture is: its thumbnail, or the poster of a video, from the task file route. */
+function previewOf(item: Recorded): string | null {
+  if (item.kind === "video") return item.hasPoster ? taskFileUrl(item.id, "poster") : null;
+  return taskFileUrl(item.id, item.hasThumb ? "thumb" : undefined);
+}
+
+/** A photo that's up and waiting for Mark done: its picture in its slot. Nothing to retry, and contractors delete nothing. */
+function ReadyTile({ item }: { item: Recorded }) {
+  const [broken, setBroken] = useState(false);
+  const src = previewOf(item);
+  return (
+    <li aria-label={`${item.name}, uploaded`} className="relative aspect-square w-full overflow-hidden rounded-lg bg-fill-1">
+      {src && !broken && (
+        // Gated, session-checked route; next/image would cache it publicly.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" decoding="async" draggable={false} onError={() => setBroken(true)} className="h-full w-full object-cover" />
+      )}
+      {item.kind === "video" && <Play className="absolute bottom-1 left-1 h-3 w-3 fill-on-photo text-on-photo drop-shadow" aria-hidden="true" />}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg inset-shadow-photo-edge" />
+    </li>
+  );
+}
+
 /**
  * After Mark done (docs/brand-guidelines.md, section 9 Empty and payoff
- * states): the job-done line art, a warm heading, who it went to and what
- * happens next, then the way back to the next job. A payoff tied to a
- * property shows its photo instead; this page has no property photos yet, so
- * it's the art until they exist.
+ * states): the building's photo (the job-done line art until it has one), a
+ * warm heading, the strip of what HG received, who it went to and what
+ * happens next, then the way back to the next job. The strip opens nothing,
+ * so the payoff stays one layer and one Esc closes it.
  */
-function Payoff({ firstName, staffNames }: { firstName: string; staffNames: string[] }) {
+function Payoff({
+  firstName,
+  staffNames,
+  received,
+  property,
+}: {
+  firstName: string;
+  staffNames: string[];
+  received: Recorded[];
+  property: { label: string; photoUrl: string | null } | null;
+}) {
   const to = joinNames(staffNames) || "HG";
   // The button that opened this view is gone: move focus here, so it's read
   // out and Esc still closes the sheet.
@@ -339,12 +562,27 @@ function Payoff({ firstName, staffNames }: { firstName: string; staffNames: stri
   // Through the portal layout's LeaveGuard, like "My jobs": it asks first if anything is still going up.
   const guard = useLeaveGuard();
   const router = useRouter();
+  const { shown, more } = stripCounts(received.length);
   return (
     <div className="flex flex-col items-center px-6 pb-6 pt-8 text-center">
-      <SpotArt name="job-done" className="motion-safe:animate-pop-in" />
+      {property?.photoUrl ? (
+        <PhotoThumb size="full" src={property.photoUrl} alt={`Front of ${property.label}`} className="w-full max-w-xs motion-safe:animate-pop-in" />
+      ) : (
+        <SpotArt name="job-done" className="motion-safe:animate-pop-in" />
+      )}
       <h2 ref={heading} tabIndex={-1} className="mt-4 text-title text-balance text-fg-1 outline-none">
         Thanks, {firstName}!
       </h2>
+      {received.length > 0 && (
+        <ul aria-label={`${received.length} ${received.length === 1 ? "photo" : "photos"} sent`} className="mt-3 flex items-center justify-center gap-2">
+          {received.slice(0, shown).map((r) => (
+            <li key={r.id}>
+              <StripThumb item={r} />
+            </li>
+          ))}
+          {more > 0 && <li className="text-meta tabular-nums text-fg-3">+{more}</li>}
+        </ul>
+      )}
       <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">
         Sent to {to}. You&apos;ll get an email if anything else is needed.
       </p>
@@ -362,5 +600,22 @@ function Payoff({ firstName, staffNames }: { firstName: string; staffNames: stri
         Back to my jobs
       </LinkButton>
     </div>
+  );
+}
+
+/** One thumb in the payoff's strip: the 48x36 photo box, or a play mark for a video with no poster. */
+function StripThumb({ item }: { item: Recorded }): ReactNode {
+  const src = previewOf(item);
+  if (!src) {
+    return (
+      <span className="flex h-9 w-12 items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge" aria-hidden="true">
+        <Play className="size-4" />
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden="true">
+      <PhotoThumb size={48} src={src} alt="" />
+    </span>
   );
 }

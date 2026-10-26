@@ -5,22 +5,31 @@ import { STATUS_ORDER } from "@/lib/task-scope";
 import { statusEventVisibility } from "@/lib/tasks/rules";
 import {
   PORTAL_STATUS_UPDATES,
+  addMorePhotosLine,
   addedText,
   addressLine,
   dayLabel,
+  finishCountLabel,
+  finishPhotosNeeded,
+  finishSlots,
   finishingLabel,
   firstName,
   groupByDate,
   groupByProperty,
   groupJobs,
   joinNames,
+  lateUploadsEndsIn,
+  lateUploadsOpen,
   markDoneButton,
   nextStep,
   parseJobsGroup,
   parseJobsTab,
   portalActorLabel,
+  postedText,
+  rowUploadLine,
   statusUpdateText,
   stillUploading,
+  stripCounts,
   targetLabel,
   updateTimeLabel,
   type JobCard,
@@ -226,17 +235,117 @@ test("finishing label counts uploads", () => {
   assert.equal(finishingLabel(3), "Finishing 3 uploads…");
 });
 
+test("Mark done has no Skip: an optional job reads Mark done and is on, with or without photos", () => {
+  const idle = { pending: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
+  assert.deepEqual(markDoneButton(idle), { label: "Mark done", enabled: true, busy: false, reason: null, line: null });
+  assert.equal(markDoneButton({ ...idle, uploaded: 3 }).label, "Mark done");
+  assert.equal(markDoneButton({ ...idle, uploaded: 3 }).enabled, true);
+});
+
 test("Mark done waits for uploads and stays off while a photo failed (decision 13)", () => {
-  const idle = { pending: 0, failed: 0, sending: false, hasContent: false };
-  assert.deepEqual(markDoneButton(idle), { label: "Skip", enabled: true });
-  assert.deepEqual(markDoneButton({ ...idle, hasContent: true }), { label: "Mark done", enabled: true });
-  assert.deepEqual(markDoneButton({ ...idle, pending: 2 }), { label: "Finishing 2 uploads…", enabled: false });
-  assert.deepEqual(markDoneButton({ ...idle, sending: true }), { label: "Sending…", enabled: false });
-  // A failed photo never turns the button into "Skip": it waits for a Retry or a Remove.
-  assert.deepEqual(markDoneButton({ ...idle, failed: 2 }), { label: "Mark done", enabled: false });
-  assert.deepEqual(markDoneButton({ ...idle, failed: 1, hasContent: true }), { label: "Mark done", enabled: false });
+  const idle = { pending: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
+  // It keeps its label (forms 2.7) and a line says why it waits.
+  assert.deepEqual(markDoneButton({ ...idle, pending: 2 }), {
+    label: "Mark done",
+    enabled: false,
+    busy: false,
+    reason: "uploading",
+    line: "Finishing 2 uploads…",
+  });
+  // Sending is the button's own pending state, not another label.
+  assert.deepEqual(markDoneButton({ ...idle, sending: true }), { label: "Mark done", enabled: false, busy: true, reason: null, line: null });
+  // A failed photo waits for a Retry or a Remove; the red line with Retry is the uploader's.
+  assert.deepEqual(markDoneButton({ ...idle, failed: 2 }), { label: "Mark done", enabled: false, busy: false, reason: "failed", line: null });
   // A retry puts the tile back in flight: the button counts it again.
-  assert.deepEqual(markDoneButton({ ...idle, failed: 1, pending: 1 }), { label: "Finishing 1 upload…", enabled: false });
+  assert.deepEqual(markDoneButton({ ...idle, failed: 1, pending: 1 }), {
+    label: "Mark done",
+    enabled: false,
+    busy: false,
+    reason: "uploading",
+    line: "Finishing 1 upload…",
+  });
+});
+
+test("Mark done with a required count waits for that many uploaded photos, and says how many more", () => {
+  const ask2 = { pending: 0, failed: 0, sending: false, uploaded: 0, required: 2 };
+  assert.deepEqual(markDoneButton(ask2), { label: "Mark done", enabled: false, busy: false, reason: "short", line: "Add 2 more photos" });
+  assert.equal(markDoneButton({ ...ask2, uploaded: 1 }).line, "Add 1 more photo");
+  assert.deepEqual(markDoneButton({ ...ask2, uploaded: 2 }), { label: "Mark done", enabled: true, busy: false, reason: null, line: null });
+  assert.equal(markDoneButton({ ...ask2, uploaded: 5 }).enabled, true, "more than asked is fine");
+  // Only uploaded photos count: one still going up, or one that failed, keeps it off for its own reason.
+  assert.equal(markDoneButton({ ...ask2, uploaded: 1, pending: 1 }).reason, "uploading");
+  assert.equal(markDoneButton({ ...ask2, uploaded: 1, failed: 1 }).reason, "failed");
+  // Once nothing is in flight and the failed one is gone, the count decides again.
+  assert.equal(markDoneButton({ ...ask2, uploaded: 1 }).reason, "short");
+});
+
+test("the count a playbook asks for: null, 0 and nonsense are optional, and a typo can't draw 200 slots", () => {
+  assert.equal(finishPhotosNeeded(null), 0);
+  assert.equal(finishPhotosNeeded(undefined), 0);
+  assert.equal(finishPhotosNeeded(0), 0);
+  assert.equal(finishPhotosNeeded(-3), 0);
+  assert.equal(finishPhotosNeeded(Number.NaN), 0);
+  assert.equal(finishPhotosNeeded(2), 2);
+  assert.equal(finishPhotosNeeded(2.9), 2);
+  assert.equal(finishPhotosNeeded(200), 12);
+});
+
+test("proof slots: the count asked for, or one on an optional job, and the 1 of 2 beside the heading", () => {
+  assert.equal(finishSlots(0), 1);
+  assert.equal(finishSlots(1), 1);
+  assert.equal(finishSlots(3), 3);
+  assert.equal(finishCountLabel(2, 0), "0 of 2");
+  assert.equal(finishCountLabel(2, 1), "1 of 2");
+  assert.equal(finishCountLabel(2, 4), "2 of 2", "never past the count");
+  assert.equal(addMorePhotosLine(1), "Add 1 more photo");
+  assert.equal(addMorePhotosLine(3), "Add 3 more photos");
+});
+
+test("a batch toast says what posted", () => {
+  assert.equal(postedText(["image", "image", "image"]), "3 photos posted");
+  assert.equal(postedText(["image"]), "1 photo posted");
+  assert.equal(postedText(["video", "video"]), "2 videos posted");
+  assert.equal(postedText(["image", "video"]), "2 files posted");
+  assert.equal(postedText([null, null]), "2 files posted", "a kind the page couldn't read is a file");
+});
+
+test("Add photo/video stays on for the server's hour after Mark done, then hides (question 4)", () => {
+  const markedAt = new Date("2026-10-22T15:00:00Z");
+  assert.equal(lateUploadsOpen(markedAt, new Date("2026-10-22T15:00:01Z")), true);
+  assert.equal(lateUploadsOpen(markedAt, new Date("2026-10-22T16:00:00Z")), true, "the hour is inclusive, as acceptsContractorUpload has it");
+  assert.equal(lateUploadsOpen(markedAt, new Date("2026-10-22T16:00:01Z")), false);
+  assert.equal(lateUploadsOpen(markedAt.toISOString(), new Date("2026-10-22T17:30:00Z")), false, "an ISO string from the server page reads the same");
+  // No time to go by: it stays, as before.
+  assert.equal(lateUploadsOpen(null, new Date("2026-10-22T20:00:00Z")), true);
+  assert.equal(lateUploadsOpen(undefined, new Date("2026-10-22T20:00:00Z")), true);
+  assert.equal(lateUploadsOpen("not a date", new Date("2026-10-22T20:00:00Z")), true);
+});
+
+test("the hour has an end to set a timer for", () => {
+  const markedAt = "2026-10-22T15:00:00Z";
+  assert.equal(lateUploadsEndsIn(markedAt, new Date("2026-10-22T15:20:00Z")), 40 * 60_000);
+  assert.equal(lateUploadsEndsIn(markedAt, new Date("2026-10-22T18:00:00Z")), 0);
+  assert.equal(lateUploadsEndsIn(null, new Date("2026-10-22T15:20:00Z")), null);
+});
+
+test("a My jobs row says what its uploads are doing (uploads 2.1)", () => {
+  const none = { pending: 0, failed: 0, pendingKinds: [] as const };
+  assert.equal(rowUploadLine(none), null);
+  assert.deepEqual(rowUploadLine({ ...none, pending: 3, pendingKinds: ["image", "image", "image"] }), { text: "Uploading 3 photos", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, pending: 1, pendingKinds: ["video"] }), { text: "Uploading 1 video", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, pending: 2, pendingKinds: ["image", "video"] }), { text: "Uploading 2 photos", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, failed: 2 }), { text: "2 photos didn't upload", tone: "danger" });
+  assert.deepEqual(rowUploadLine({ ...none, failed: 1 }), { text: "1 photo didn't upload", tone: "danger" });
+  // The one that needs the contractor leads.
+  assert.equal(rowUploadLine({ pending: 2, failed: 1, pendingKinds: ["image", "image"] })?.tone, "danger");
+});
+
+test("the payoff strip shows four thumbs and a count for the rest", () => {
+  assert.deepEqual(stripCounts(0), { shown: 0, more: 0 });
+  assert.deepEqual(stripCounts(3), { shown: 3, more: 0 });
+  assert.deepEqual(stripCounts(4), { shown: 4, more: 0 });
+  assert.deepEqual(stripCounts(6), { shown: 4, more: 2 });
+  assert.deepEqual(stripCounts(6, 3), { shown: 3, more: 3 }, "inside a comment card at 320 it shows three");
 });
 
 test("the leave sheet names what's still uploading (decision 24)", () => {
