@@ -111,9 +111,13 @@ async function joinSeries(tx: Tx, plan: TaskPlan): Promise<string | null> {
  */
 export async function writeTask(tx: Tx, plan: TaskPlan, now = new Date()): Promise<TaskWriteResult> {
   const sync = { asanaLastSynced: json(plan.baseline), asanaSyncedAt: now };
+  // The playbook this was copied from (BPLAY-V01). Templates are written before tasks.
+  const taskTemplateId = plan.templateSectionGid
+    ? ((await tx.taskTemplate.findUnique({ where: { sourceAsanaSectionGid: plan.templateSectionGid }, select: { id: true } }))?.id ?? null)
+    : null;
   if (plan.op === "create") {
     await tx.task.create({
-      data: { ...(taskData(plan.write) as Prisma.TaskUncheckedCreateInput), id: plan.taskId, asanaId: plan.asanaGid, ...sync },
+      data: { ...(taskData(plan.write) as Prisma.TaskUncheckedCreateInput), id: plan.taskId, asanaId: plan.asanaGid, taskTemplateId, ...sync },
     });
   } else {
     // Compare-and-set: the row is written only if the app hasn't edited it since the plan was made.
@@ -123,6 +127,8 @@ export async function writeTask(tx: Tx, plan: TaskPlan, now = new Date()): Promi
       data: { ...(taskData(plan.write) as Prisma.TaskUncheckedUpdateManyInput), ...sync },
     });
     if (r.count !== 1) throw new StalePlanError(plan.taskId);
+    // A link the row already has stays.
+    if (taskTemplateId) await tx.task.updateMany({ where: { id: plan.taskId, taskTemplateId: null }, data: { taskTemplateId } });
   }
 
   // CREATED, once: the CSV rows had no timeline at all.

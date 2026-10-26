@@ -144,6 +144,63 @@ export function playbookAnchorLabel(name: string): string | null {
   return null;
 }
 
+/**
+ * A playbook item's title as a pattern for the tasks copied from it: a fill-in
+ * like "[Tenant]" matches whatever was typed there, the rest must match, case
+ * and spacing aside. Null for a title with nothing left to match once the
+ * fill-ins are out.
+ */
+export function playbookTitlePattern(title: string): RegExp | null {
+  const t = cleanTitle(title);
+  if (t.replace(/\[[^\]]*\]/g, "").replace(/[^a-z0-9]/gi, "").length < 3) return null;
+  const source = t
+    .split(/(\[[^\]]*\])/)
+    .map((part) => (/^\[[^\]]*\]$/.test(part) ? ".+?" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    .join("");
+  return new RegExp(`^${source}$`, "i");
+}
+
+/**
+ * Which playbook each task was copied from, as its Asana section gid, so
+ * applying that playbook to the building again says what's still open
+ * (BPLAY-V01). Asana kept no link: a run was the playbook's tasks copied into
+ * the building's section with the fill-ins typed in, so a task is from a
+ * playbook when its title is one of the playbook's items. A title more than
+ * one playbook has ("Update SREO" is in NEW REFI and NEW PROPERTY) goes to the
+ * one with more of its items on that building, and a tie links nothing. Tasks
+ * with no building are left alone.
+ */
+export function playbookRuns(
+  tasks: ReadonlyArray<{ taskId: string; title: string; propertyId: string | null }>,
+  playbooks: ReadonlyArray<{ sectionGid: string; titles: readonly string[] }>,
+): Map<string, string> {
+  const patterns = playbooks.map((p) => ({ sectionGid: p.sectionGid, items: p.titles.map(playbookTitlePattern) }));
+  const hits = new Map<string, string[]>();
+  // The distinct items of each playbook found on each building.
+  const found = new Map<string, Set<number>>();
+  const key = (propertyId: string, sectionGid: string) => `${propertyId} ${sectionGid}`;
+  for (const t of tasks) {
+    if (!t.propertyId) continue;
+    const title = cleanTitle(t.title);
+    for (const p of patterns) {
+      const item = p.items.findIndex((re) => re?.test(title));
+      if (item < 0) continue;
+      hits.set(t.taskId, [...(hits.get(t.taskId) ?? []), p.sectionGid]);
+      const k = key(t.propertyId, p.sectionGid);
+      found.set(k, (found.get(k) ?? new Set()).add(item));
+    }
+  }
+  const runs = new Map<string, string>();
+  for (const t of tasks) {
+    const from = hits.get(t.taskId);
+    if (!from || !t.propertyId) continue;
+    const scored = from.map((sectionGid) => ({ sectionGid, n: found.get(key(t.propertyId!, sectionGid))!.size })).sort((a, b) => b.n - a.n);
+    if (scored.length > 1 && scored[0].n === scored[1].n) continue;
+    runs.set(t.taskId, scored[0].sectionGid);
+  }
+  return runs;
+}
+
 /** The section of `t` in the HG project, if it's a direct member. */
 export function sectionOf(t: Pick<AsanaTask, "memberships">, projectGid: string): AsanaRef | null {
   return t.memberships?.find((m) => m.project?.gid === projectGid)?.section ?? null;
@@ -844,6 +901,8 @@ export interface DbTaskRow {
   /** Files on the row, and timeline events the app (not the importer) wrote. */
   attachmentCount: number;
   appEventCount: number;
+  /** The playbook the row is already linked to: the importer leaves that link alone. */
+  taskTemplateId?: string | null;
 }
 
 export interface DbChecklistRow {
@@ -878,7 +937,8 @@ export interface PlanDb {
   properties: ReadonlyArray<{ id: string; address: string }>;
   tasks: readonly DbTaskRow[];
   checklist: readonly DbChecklistRow[];
-  templates: ReadonlyArray<{ id: string; sourceAsanaSectionGid: string | null }>;
+  /** `name` and `itemTitles`: the stored playbook, for linking tasks when this input has no copy of it. */
+  templates: ReadonlyArray<{ id: string; sourceAsanaSectionGid: string | null; name?: string; itemTitles?: readonly string[] }>;
   storyGids: ReadonlySet<string>;
   attachmentGids: ReadonlySet<string>;
 }
@@ -976,6 +1036,8 @@ export interface TaskPlan {
    * this one in its series instead of the app making a second copy.
    */
   seriesFrom: string | null;
+  /** The playbook (its Asana section) this task was copied from: the writer links it to that template. */
+  templateSectionGid: string | null;
   created: { createdAt: string | null; actor: Who; htmlNotes: string | null };
   events: EventPlan[];
   checklist: ChecklistPlan[];
@@ -1061,6 +1123,8 @@ export interface PlanReport {
   links: { rewritten: number; unresolved: number };
   /** Rows synced before that the snapshot no longer has: left alone, listed. */
   goneFromAsana: Array<{ taskId: string; title: string; asanaId: string }>;
+  /** New links to the playbook a task was copied from, by playbook and section (BPLAY-V01). */
+  playbookLinks: Array<{ playbook: string; section: string; tasks: number }>;
   notes: string[];
 }
 
@@ -1167,6 +1231,7 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
     unmatchedPropertySections: [],
     links: { rewritten: 0, unresolved: 0 },
     goneFromAsana: [],
+    playbookLinks: [],
     notes: [],
   };
 
@@ -1555,6 +1620,7 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
       hasNotes: !!final.description,
       repeatOnClose: status === "close" && !!row?.hasRepeat,
       seriesFrom: null,
+      templateSectionGid: null,
       created: { createdAt: t.created_at ?? null, actor: who(people, t.created_by), htmlNotes: t.html_notes ?? null },
       events,
       checklist,
@@ -1620,6 +1686,32 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
     }
     templates.push({ sectionGid: section.gid, name, anchorLabel: playbookAnchorLabel(name), items, existingId: templateBySection.get(section.gid) ?? null, skippedCompleted });
   }
+
+  // --- Tasks copied from a playbook (BPLAY-V01) ---------------------------------------
+  // This input's playbooks, else the stored ones (a delta doesn't bring the playbook sections).
+  // Items completed in the playbook since still match: a run copied before that has them open.
+  const playbooks = new Map<string, { name: string; titles: readonly string[] }>();
+  for (const t of db.templates) {
+    if (t.sourceAsanaSectionGid && t.itemTitles?.length) playbooks.set(t.sourceAsanaSectionGid, { name: t.name ?? t.sourceAsanaSectionGid, titles: t.itemTitles });
+  }
+  for (const t of templates) playbooks.set(t.sectionGid, { name: t.name, titles: [...t.items.map((i) => i.title), ...t.skippedCompleted] });
+  const runs = playbookRuns(
+    tasks.map((tp) => ({ taskId: tp.taskId, title: tp.title, propertyId: tp.place.propertyId })),
+    [...playbooks].map(([sectionGid, p]) => ({ sectionGid, titles: p.titles })),
+  );
+  const alreadyLinked = new Set(db.tasks.filter((r) => r.taskTemplateId).map((r) => r.id));
+  const linkCount = new Map<string, { playbook: string; section: string; tasks: number }>();
+  for (const tp of tasks) {
+    const from = alreadyLinked.has(tp.taskId) ? null : (runs.get(tp.taskId) ?? null);
+    tp.templateSectionGid = from;
+    if (!from) continue;
+    const section = tp.sectionName ?? "?";
+    const k = `${from} ${section}`;
+    const c = linkCount.get(k) ?? { playbook: playbooks.get(from)!.name, section, tasks: 0 };
+    c.tasks++;
+    linkCount.set(k, c);
+  }
+  report.playbookLinks = [...linkCount.values()];
 
   // --- Who will see what (Connor reviews this before PORTAL_ENABLED) ------------------
   // Closed jobs too: the importer keeps the assignee's access, so they stay on the contractor's Done list (D18).

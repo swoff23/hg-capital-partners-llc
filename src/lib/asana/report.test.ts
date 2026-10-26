@@ -76,7 +76,7 @@ test("load report: every section of the review is there, and lockbox digits neve
   const nobody = { gid: "1209000000000999", name: "Nobody Here", email: "nobody@example.com" };
   const plan = buildPlan(input(snap, { users: [...snap.users, nobody] }), db([row({ id: "r-old", asanaId: "4040", title: "Deleted in Asana", status: "DONE" })]), opts);
   const text = formatReport(plan, { title: "Asana load (dry run)", names, header: ["database: localhost/test"] });
-  for (const heading of ["Sections", "Tasks", "Timeline events", "Checklist items", "Templates (D28)", "Files", "People", "Will see", "D25 delete list", "App-only tasks", "Links"]) {
+  for (const heading of ["Sections", "Tasks", "Timeline events", "Checklist items", "Templates (D28)", "Tasks copied from a playbook", "Files", "People", "Will see", "D25 delete list", "App-only tasks", "Links"]) {
     assert.ok(text.includes(`-- ${heading}`), heading);
   }
   // Every Asana user ID in the snapshot is listed, even one on no imported work (its match is saved too).
@@ -154,4 +154,15 @@ test("delta report: a skipped task, a conflict and a closed contractor job print
   assert.match(text, /Ivy Electric \(c-ivy\): \d+ open jobs?, 1 closed \(still visible, read-only\)/);
   assert.match(text, /- \[closed\] Mini splits unit 5/);
   assert.match(text, /no deletes in a delta/);
+});
+
+test("delta report: tasks copied from a stored playbook show as newly linked, by playbook and section", () => {
+  const world = { ...DEFAULT_WORLD, existing: [{ gid: "1209000000000911", name: "Send rent roll to lender", section: "118 Congress (HG)", completed: false }] };
+  const s = buildFixture(world);
+  const loaded = buildPlan(input(s), db(), opts);
+  const templates = loaded.templates.map((t, i) => ({ id: `tpl-${i}`, sourceAsanaSectionGid: t.sectionGid, name: t.name, itemTitles: t.items.map((x) => x.title) }));
+  const plan = buildPlan(input(s, { mode: "delta", asOf: "2026-10-25T13:00:00.000Z" }), { ...db(), templates }, opts);
+  const text = formatReport(plan, { title: "Asana delta (dry run)", names });
+  assert.match(text, /-- Tasks copied from a playbook, newly linked to it/);
+  assert.match(text, /NEW REFI: 118 Congress \(HG\) 1/);
 });

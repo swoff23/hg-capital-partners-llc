@@ -17,6 +17,8 @@ import {
   mergeFields,
   parseSynced,
   placeFor,
+  playbookRuns,
+  playbookTitlePattern,
   rewriteAsanaTaskLinks,
   type AsanaStory,
   type AsanaTask,
@@ -665,6 +667,117 @@ test("load: playbooks become four templates, items in section order", () => {
   const refi = plan.templates.find((t) => t.name === "NEW REFI")!;
   assert.deepEqual(refi.skippedCompleted, ["Insurance binder to lender"]);
   assert.equal(refi.anchorLabel, "Closing date");
+});
+
+test("playbookTitlePattern: a fill-in matches what was typed, the rest must match, case aside", () => {
+  const keys = playbookTitlePattern("Give [Tenant] keys (only after they confirmed National Gas/Fuel set up)")!;
+  assert.ok(keys.test("Give Daphne keys (only after they confirmed National Gas/Fuel set up)"));
+  assert.ok(keys.test("give [daphne] KEYS (only after they confirmed national gas/fuel set up)"));
+  assert.ok(!keys.test("Give keys"));
+  assert.ok(!keys.test("Give Daphne keys (only after they confirmed National Gas/Fuel set up) today"));
+  assert.ok(playbookTitlePattern("Update SREO")!.test("update sreo"));
+  assert.ok(!playbookTitlePattern("Update SREO")!.test("Update SREO for 118 Congress"));
+  assert.equal(playbookTitlePattern("[Tenant]"), null, "nothing left to match on");
+  assert.equal(playbookTitlePattern("[Tenant] ok"), null);
+});
+
+test("playbookRuns: a title two playbooks share goes to the one with more of its items on that building; a tie links nothing", () => {
+  const playbooks = [
+    { sectionGid: "refi", titles: ["Update SREO", "Create property management agreement", "Transfer rent collection account", "Set up new loan autopayment"] },
+    { sectionGid: "property", titles: ["Update SREO", "Create property management agreement", "review estimated cost to actual", "Upload photos of before", "Upload photos of before"] },
+    { sectionGid: "tenant", titles: ["Store [Tenant] insurance"] },
+  ];
+  const t = (taskId: string, title: string, propertyId: string | null) => ({ taskId, title, propertyId });
+  const runs = playbookRuns(
+    [
+      // 118: a refi run.
+      t("a1", "Update SREO", "p118"),
+      t("a2", "Create property management agreement", "p118"),
+      t("a3", "Transfer rent collection account", "p118"),
+      // 767: both. Refi has 4 items here and the renovation 3, so the shared titles go to refi.
+      t("b1", "Update SREO", "p767"),
+      t("b2", "Create property management agreement", "p767"),
+      t("b3", "Set up new loan autopayment", "p767"),
+      t("b4", "Transfer rent collection account", "p767"),
+      t("b5", "review estimated cost to actual", "p767"),
+      // 415: two items each (the same item twice counts once), so the shared title ties.
+      t("c1", "Upload photos of before", "p415"),
+      t("c2", "Upload photos of before", "p415"),
+      t("c3", "Update SREO", "p415"),
+      t("c4", "Transfer rent collection account", "p415"),
+      // 23: only a shared title, a tie.
+      t("d1", "Update SREO", "p23"),
+      // Fill-ins typed in, and spacing.
+      t("e1", "Store  [daphne] insurance", "p725"),
+      // No building, and work that isn't a playbook's.
+      t("f1", "Update SREO", null),
+      t("f2", "Fix the porch light", "p118"),
+    ],
+    playbooks,
+  );
+  assert.deepEqual(Object.fromEntries([...runs].sort()), {
+    a1: "refi",
+    a2: "refi",
+    a3: "refi",
+    b1: "refi",
+    b2: "refi",
+    b3: "refi",
+    b4: "refi",
+    b5: "property",
+    c1: "property",
+    c2: "property",
+    c4: "refi",
+    e1: "tenant",
+  });
+});
+
+test("load: tasks copied from a playbook are linked to it by building, from this input's playbooks or the stored ones", () => {
+  const world = {
+    ...DEFAULT_WORLD,
+    existing: [
+      { gid: "1209000000000901", name: "Order appraisal for 118 Congress St", section: "118 Congress (HG)", completed: false },
+      { gid: "1209000000000902", name: "Send  rent roll to Lender", section: "118 Congress (HG)", completed: false },
+      // An item completed in the playbook since this run was copied.
+      { gid: "1209000000000905", name: "Insurance binder to lender", section: "118 Congress (HG)", completed: false },
+      { gid: "1209000000000903", name: "Return deposit to Dana", section: "General", completed: false },
+      { gid: "1209000000000904", name: "Collect deposit from Dana", section: "23 Sherwood (Vontive) (HG2)", completed: false },
+    ],
+  };
+  const snap = buildFixture(world);
+  const p = buildPlan(inputOf(snap), dbOf(), opts);
+  const section = (name: string) => p.templates.find((t) => t.name === name)!.sectionGid;
+  const linksOf = (plan: ImportPlan) => Object.fromEntries(plan.tasks.filter((t) => t.templateSectionGid).map((t) => [t.asanaGid, t.templateSectionGid]));
+  assert.deepEqual(linksOf(p), {
+    "1209000000000901": section("NEW REFI"),
+    "1209000000000902": section("NEW REFI"),
+    "1209000000000905": section("NEW REFI"),
+    "1209000000000904": section("NEW TENANT"),
+  });
+  assert.deepEqual(
+    [...p.report.playbookLinks].sort((a, b) => a.playbook.localeCompare(b.playbook)),
+    [
+      { playbook: "NEW REFI", section: "118 Congress (HG)", tasks: 3 },
+      { playbook: "NEW TENANT", section: "23 Sherwood (Vontive) (HG2)", tasks: 1 },
+    ],
+  );
+
+  // A delta brings no playbook sections: the stored templates' items do the same, except items already completed there.
+  const playbookSection = (t: AsanaTask) => t.memberships?.some((m) => /\[address\]/i.test(m.section?.name ?? ""));
+  const stored = p.templates.map((t, i) => ({ id: `tpl-${i}`, sourceAsanaSectionGid: t.sectionGid, name: t.name, itemTitles: t.items.map((x) => x.title) }));
+  const noPlaybooks = { ...snap, tasks: snap.tasks.filter((t) => !playbookSection(t)) };
+  const fromStored = buildPlan(inputOf(noPlaybooks), dbOf({ templates: stored }), opts);
+  assert.equal(fromStored.templates.length, 0);
+  const withoutRetired = linksOf(p);
+  delete withoutRetired["1209000000000905"];
+  assert.deepEqual(linksOf(fromStored), withoutRetired);
+  assert.ok(fromStored.report.playbookLinks.some((l) => l.playbook === "NEW REFI" && l.tasks === 2));
+
+  // Once written, a row keeps its link: the next run plans and reports nothing for it.
+  const linked = new Set(p.tasks.filter((t) => t.templateSectionGid).map((t) => t.taskId));
+  const rows = rowsAfter(p).map((r) => (linked.has(r.id) ? { ...r, taskTemplateId: "tpl-x" } : r));
+  const rerun = buildPlan(inputOf(snap), dbOf({ tasks: rows, templates: stored }), opts);
+  assert.deepEqual(linksOf(rerun), {});
+  assert.deepEqual(rerun.report.playbookLinks, []);
 });
 
 test("load: the will-see report lists each contractor's open jobs with shared comments and files", () => {
