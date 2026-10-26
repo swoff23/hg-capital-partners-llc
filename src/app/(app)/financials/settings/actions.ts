@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { treatmentForCategory } from "@/lib/quickbooks/categorize";
 import { getConnection } from "@/lib/quickbooks/client";
+import { applyMapsTo, parseMapsTo } from "@/lib/quickbooks/mapping";
 import { revokeToken } from "@/lib/quickbooks/oauth";
 import { decryptSecret } from "@/lib/quickbooks/crypto";
 import { runQuickbooksSync } from "@/lib/quickbooks/sync";
@@ -33,47 +34,45 @@ async function restampClass(realmId: string, classId: string) {
   });
 }
 
-const ROLES = ["UNMAPPED", "PROPERTY", "ENTITY", "OVERHEAD", "IGNORE"] as const;
+const CLASS_ROLES = ["UNMAPPED", "PROPERTY", "ENTITY", "OVERHEAD", "IGNORE"] as const;
 
-export async function setClassRole(classId: string, roleInput: string) {
-  return withLog("setClassRole", async () => {
+/**
+ * "Maps to": one pick for a class, which sets its role and its target
+ * together (applyMapsTo in lib/quickbooks/mapping.ts). `key` is the picker's:
+ * "p:<propertyId>", "e:<entityId>", "OVERHEAD", "IGNORE", or null for
+ * Unmapped. A person's pick is no longer an auto-match.
+ */
+export async function mapClass(classId: string, key: string | null) {
+  return withLog("mapClass", async () => {
     await requireUser();
-    const role = z.enum(ROLES).parse(roleInput);
+    z.string().nullable().parse(key);
+    const pick = parseMapsTo(key);
+    if (!pick) throw new Error("Choose what this class maps to");
     const realmId = await realm();
-    await prisma.qboClass.update({
+    const current = await prisma.qboClass.findUniqueOrThrow({
       where: { id: classId },
-      data: { role, autoMatched: false, ...(role === "PROPERTY" ? {} : { propertyId: null }) },
+      select: { role: true, propertyId: true, entityId: true },
     });
+    await prisma.qboClass.update({ where: { id: classId }, data: { ...applyMapsTo(current, pick), autoMatched: false } });
     await restampClass(realmId, classId);
     revalidate();
   });
 }
 
-export async function mapClassToProperty(classId: string, propertyId: string | null) {
-  return withLog("mapClassToProperty", async () => {
-    await requireUser();
-    const realmId = await realm();
-    await prisma.qboClass.update({
-      where: { id: classId },
-      data: {
-        propertyId: propertyId || null,
-        role: propertyId ? "PROPERTY" : "UNMAPPED",
-        autoMatched: false,
-      },
-    });
-    await restampClass(realmId, classId);
-    revalidate();
-  });
-}
+const restoreSchema = z.object({
+  role: z.enum(CLASS_ROLES),
+  propertyId: z.string().nullable(),
+  entityId: z.string().nullable(),
+  autoMatched: z.boolean(),
+});
 
-export async function setClassEntity(classId: string, entityId: string | null) {
-  return withLog("setClassEntity", async () => {
+/** Undo after "Maps to": puts back exactly the role, property, entity and auto-match the class had. */
+export async function restoreClassMapping(classId: string, before: z.input<typeof restoreSchema>) {
+  return withLog("restoreClassMapping", async () => {
     await requireUser();
+    const data = restoreSchema.parse(before);
     const realmId = await realm();
-    await prisma.qboClass.update({
-      where: { id: classId },
-      data: { entityId: entityId || null, autoMatched: false },
-    });
+    await prisma.qboClass.update({ where: { id: classId }, data });
     await restampClass(realmId, classId);
     revalidate();
   });

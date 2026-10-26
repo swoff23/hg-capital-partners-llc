@@ -83,6 +83,12 @@ type Common = {
   container?: "popover" | "sheet";
   /** Move focus to the search (or the list) on open. Defaults to a mouse only, so a phone's keyboard stays down. */
   autoFocus?: boolean;
+  /**
+   * Scroll the picked row to the middle on open (the default). A sheet that
+   * stacks several lists (the Filters sheet) turns it off, so opening it
+   * starts at the top and not at the last list's pick.
+   */
+  revealPicked?: boolean;
   /** Tab leaves the list: the layer closes and focus goes back to its trigger. */
   onTab?: () => void;
   className?: string;
@@ -180,6 +186,7 @@ export function OptionList(props: OptionListProps) {
     emptyText = "Nothing matches.",
     container = "popover",
     autoFocus,
+    revealPicked = true,
     onTab,
     className,
   } = props;
@@ -206,6 +213,7 @@ export function OptionList(props: OptionListProps) {
   // React Aria renders the rows a frame after the list mounts, and the layer sizes itself in that frame too,
   // so look for the row each frame until it's there and measure once it is.
   useEffect(() => {
+    if (!revealPicked) return;
     let frame = 0;
     let tries = 0;
     const scrollToPicked = () => {
@@ -221,7 +229,7 @@ export function OptionList(props: OptionListProps) {
     };
     frame = requestAnimationFrame(scrollToPicked);
     return () => cancelAnimationFrame(frame);
-  }, [container]);
+  }, [container, revealPicked]);
 
   function onSelectionChange(keys: Selection) {
     if (keys === "all") return;
@@ -239,6 +247,9 @@ export function OptionList(props: OptionListProps) {
       selectedKeys={selected as Iterable<Key>}
       onSelectionChange={onSelectionChange}
       shouldFocusOnHover
+      // Esc closes the layer and nothing else: React Aria would also clear a pick-many list's selection,
+      // which in a filter panel would take the filter off (selectors 3.7: Esc never clears a filter).
+      escapeKeyBehavior="none"
       autoFocus={searchable ? undefined : focusOnOpen}
       renderEmptyState={() => <p className="px-2 py-3 text-body text-fg-3">{emptyText}</p>}
       className={cn(

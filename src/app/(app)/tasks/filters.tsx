@@ -1,136 +1,109 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { SegmentedControl } from "@/components/segmented-control";
-import { Input, Select } from "@/components/ui";
-import { shortAddress } from "@/lib/normalize";
+import { useMemo, type ReactNode } from "react";
+import type { AssigneeContractor, AssigneeUser } from "@/components/assignee-picker";
+import { assigneeRows, propertyRows } from "@/components/entity-picker";
+import { FilterBar, FilterResults, FilterScope, ResultLine, type FilterFacet } from "@/components/filter-bar";
+import type { OptionItem } from "@/components/option-list";
+import type { PropertyOption } from "@/lib/picker-options-shape";
+import type { TaskView } from "@/lib/tasks/list-query";
+import { countTasksAction } from "./filter-actions";
 
-const STATUS_TABS = [
-  { key: "all", label: "All" },
+const VIEWS: { key: TaskView; label: string }[] = [
   { key: "open", label: "Open" },
   { key: "done", label: "Done" },
-] as const;
+  { key: "all", label: "All" },
+];
 
-type Option = { value: string; label: string };
+/** Open is the list's opening view, so it stays out of the URL. */
+const DEFAULTS = { status: "open" } as const;
 
-// The fields match the status switch's height: 36px with a mouse, 48 on touch
-// (its 44px segments in a 2px track), so the row lines up at every width.
-const field = "pointer-coarse:h-12";
+export type TaskFilterData = {
+  users: AssigneeUser[];
+  contractors: AssigneeContractor[];
+  /** Imported names that stand for nobody the list can name: one "Others" group. */
+  others: string[];
+  properties: PropertyOption[];
+  /** Tasks per assignee key and per property id, with the other filters on. */
+  ownerCounts: Record<string, number>;
+  propertyCounts: Record<string, number>;
+  meId: string;
+  /** Per view while a search is typed, so a hit outside the current view shows. */
+  viewCounts: Record<TaskView, number> | null;
+  /** What the filters leave, and what they hide from the view. */
+  shown: number;
+  hidden: number;
+  /** The list isn't in its opening state: the result line shows. */
+  filtered: boolean;
+};
+
+const count = (map: ReadonlyMap<string, number>) => (row: OptionItem): OptionItem => ({ ...row, count: map.get(row.id) ?? 0 });
 
 /**
- * The All tab's filters: title search, status, assignee (team, contractors
- * as c:<contactId>, and legacy free-text names), property. State lives in
- * the URL. On a phone the search and status share a row over the two
- * pickers; every control shrinks to fit rather than wrap, down to 320.
+ * The Tasks page's bar (selectors 3.7, 4.1 option 1): a search over the title,
+ * the property and the assignee, Open | Done | All, and the Assignee and
+ * Property filters with the Repeats toggle, as chips with a mouse on a wide
+ * page and behind a Filters button elsewhere. State lives in the URL;
+ * `children` is the list the server renders, which dims while a change loads.
+ * Assignees list the team (you first), then contractors, then "Others" for
+ * imported names that match nobody; each row counts the tasks picking it would
+ * show.
  */
-export function TaskFilters({
-  current,
-  owners,
-  properties,
-}: {
-  current: { status: string; owner: string; q: string; property: string };
-  owners: { users: Option[]; contacts: Option[]; external: Option[] };
-  properties: { id: string; address: string }[];
-}) {
-  const router = useRouter();
-  const params = useSearchParams();
-
-  function set(key: string, value: string, { replace = false }: { replace?: boolean } = {}) {
-    const next = new URLSearchParams(params);
-    const isDefault = (key === "status" && value === "open") || !value;
-    if (isDefault) next.delete(key);
-    else next.set(key, value);
-    if (key === "owner") next.delete("assignee"); // supersedes the legacy ?assignee=me shortcut
-    const qs = next.toString();
-    const url = qs ? `/tasks?${qs}` : "/tasks";
-    if (replace) router.replace(url);
-    else router.push(url);
-  }
-
-  // Live search: filter as you type, debounced, without stacking browser history.
-  const [q, setQ] = useState(current.q);
-  useEffect(() => {
-    if (q.trim() === current.q) return;
-    const id = setTimeout(() => set("q", q.trim(), { replace: true }), 250);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, current.q]);
+export function TaskFilters({ data, children }: { data: TaskFilterData; children: ReactNode }) {
+  const { users, contractors, others, properties, meId, viewCounts } = data;
+  const facets = useMemo<FilterFacet[]>(() => {
+    const owners = new Map(Object.entries(data.ownerCounts));
+    const places = new Map(Object.entries(data.propertyCounts));
+    const people = assigneeRows({ users, contractors, meId, counts: owners });
+    const buildings = propertyRows({ properties, counts: places });
+    return [
+      {
+        kind: "multi",
+        param: "owner",
+        label: "Assignee",
+        searchLabel: "Search people",
+        emptyText: "No one matches.",
+        pinned: people.pinned.map(count(owners)),
+        sections: [
+          ...people.sections,
+          ...(others.length > 0
+            ? [{ id: "others", title: "Others", items: others.map((n) => ({ id: `n:${n}`, label: n, count: owners.get(`n:${n}`) ?? 0 })) }]
+            : []),
+        ],
+      },
+      {
+        kind: "multi",
+        param: "property",
+        label: "Property",
+        searchLabel: "Search properties",
+        emptyText: "No property matches.",
+        pinned: buildings.pinned.map(count(places)),
+        items: buildings.items,
+      },
+      { kind: "toggle", param: "repeats", label: "Repeats" },
+    ];
+  }, [data.ownerCounts, data.propertyCounts, users, contractors, others, properties, meId]);
 
   return (
-    // Phone: search and status on one row, the two pickers on the next. From sm,
-    // all in one row; the search and pickers shrink to fit, so it never scrolls sideways.
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <div className="flex min-w-0 items-center gap-2 sm:contents">
-        <Input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter by title…"
-          aria-label="Filter by title"
-          className={`${field} min-w-0 flex-1 sm:max-w-64`}
-        />
-        <SegmentedControl
-          aria-label="Status"
-          size="md"
-          options={STATUS_TABS}
-          value={STATUS_TABS.some((t) => t.key === current.status) ? (current.status as (typeof STATUS_TABS)[number]["key"]) : "open"}
-          onChange={(k) => set("status", k)}
-          className="sm:ml-auto"
-        />
-      </div>
-
-      <div className="flex min-w-0 items-center gap-2 sm:contents">
-        <Select
-          value={current.owner}
-          onChange={(e) => set("owner", e.target.value)}
-          aria-label="Assignee"
-          className={`${field} w-auto min-w-0 flex-1 sm:max-w-45`}
-        >
-          <option value="">All assignees</option>
-          <option value="none">Unassigned</option>
-          {owners.users.length > 0 && (
-            <optgroup label="Team">
-              {owners.users.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {owners.contacts.length > 0 && (
-            <optgroup label="Contractors">
-              {owners.contacts.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {owners.external.length > 0 && (
-            <optgroup label="External">
-              {owners.external.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </Select>
-
-        <Select
-          value={current.property}
-          onChange={(e) => set("property", e.target.value)}
-          aria-label="Property"
-          className={`${field} w-auto min-w-0 flex-1 sm:max-w-45`}
-        >
-          <option value="">All properties</option>
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {shortAddress(p.address)}
-            </option>
-          ))}
-        </Select>
-      </div>
-    </div>
+    <FilterScope list="tasks" defaults={DEFAULTS}>
+      <FilterBar
+        noun={{ one: "task", many: "tasks" }}
+        search={{ placeholder: "Search tasks" }}
+        views={{
+          param: "status",
+          label: "Status",
+          default: "open",
+          options: VIEWS.map((v) => ({ ...v, count: viewCounts?.[v.key] })),
+        }}
+        facets={facets}
+        wide="56rem"
+        shown={data.shown}
+        count={countTasksAction}
+      />
+      <FilterResults>
+        {/* An empty list says so itself, with its own way out. */}
+        {data.filtered && data.shown > 0 && <ResultLine shown={data.shown} hidden={data.hidden} noun={{ one: "task", many: "tasks" }} />}
+        {children}
+      </FilterResults>
+    </FilterScope>
   );
 }

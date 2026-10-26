@@ -16,6 +16,7 @@ export default async function SettingsLayout({ children }: LayoutProps<"/setting
       <PageHeader title="Settings" />
       <TopTabs
         base="/settings"
+        label="Settings sections"
         tabs={[
           { href: "", label: "CapEx rules" },
           { href: "/move-in-form", label: "Move-in form" },

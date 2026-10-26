@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { EmptyState, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui";
+import { ScopeButton } from "@/components/filter-bar";
+import { SortHeader } from "@/components/sort-header";
+import { EmptyState, LinkButton, PageHeader, RowCell, Table, Td, Th } from "@/components/ui";
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { shortAddress } from "@/lib/normalize";
@@ -12,6 +13,15 @@ import { getCapexRules } from "@/lib/capex-rules";
 import { cn, toMoneyNumber } from "@/lib/utils";
 import { PortfolioCapexForecastCard } from "../portfolio-capex";
 import { FactStrip } from "./fact-strip";
+import { PropertyFilters } from "./filters";
+import {
+  DEFAULT_PROPERTY_SORT,
+  filterByStatus,
+  isPropertyListFiltered,
+  parsePropertyFilters,
+  sortProperties,
+  statusOptions,
+} from "./list";
 import { PropertyStatus } from "./property-status";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -23,10 +33,13 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * it's taken), money right-aligned and tabular, and a footer row that counts
  * and sums. The whole row opens the property. Below sm the status leads the
  * row's subline and the secondary columns drop. The 5-year CapEx forecast
- * sits under the table at #capex.
+ * sits under the table at #capex. A Status chip filters (several picks) and
+ * the Property, Units and Value headers sort (street order, 15 before 118);
+ * both live in the URL (selectors 3.6 and 3.7).
  */
-export default async function PropertiesPage() {
+export default async function PropertiesPage({ searchParams }: PageProps<"/properties">) {
   await requireUser();
+  const filters = parsePropertyFilters(await searchParams);
   const [properties, openByProp, capexRules] = await Promise.all([
     prisma.property.findMany({ orderBy: { address: "asc" } }),
     prisma.task.groupBy({
@@ -38,7 +51,7 @@ export default async function PropertiesPage() {
   ]);
   const openMap = new Map(openByProp.map((r) => [r.propertyId, r._count]));
 
-  const rows = properties.map((p) => ({
+  const all = properties.map((p) => ({
     id: p.id,
     address: p.address,
     name: shortAddress(p.address) || p.address,
@@ -51,17 +64,22 @@ export default async function PropertiesPage() {
     loan: p.currentLoan,
   }));
 
-  const totals = rows.reduce(
-    (acc, r) => {
-      acc.units += r.units ?? 0;
-      acc.purchase += toMoneyNumber(r.purchase) ?? 0;
-      acc.value += toMoneyNumber(r.value) ?? 0;
-      acc.loan += toMoneyNumber(r.loan) ?? 0;
-      acc.openTasks += r.openTasks;
-      return acc;
-    },
-    { units: 0, purchase: 0, value: 0, loan: 0, openTasks: 0 },
-  );
+  const sum = (list: typeof all) =>
+    list.reduce(
+      (acc, r) => {
+        acc.units += r.units ?? 0;
+        acc.purchase += toMoneyNumber(r.purchase) ?? 0;
+        acc.value += toMoneyNumber(r.value) ?? 0;
+        acc.loan += toMoneyNumber(r.loan) ?? 0;
+        acc.openTasks += r.openTasks;
+        return acc;
+      },
+      { units: 0, purchase: 0, value: 0, loan: 0, openTasks: 0 },
+    );
+  // The footer counts and sums the rows on show; the portfolio strip and the subtitle stay whole.
+  const rows = sortProperties(filterByStatus(all, filters.statuses), filters.sort);
+  const totals = sum(rows);
+  const whole = sum(all);
 
   const capexProperties = properties.map((p) => ({
     id: p.id,
@@ -75,8 +93,8 @@ export default async function PropertiesPage() {
       <PageHeader
         title="Portfolio"
         subtitle={
-          rows.length > 0
-            ? `${plural(rows.length, "property", "properties")} · ${plural(totals.units, "unit", "units")}`
+          all.length > 0
+            ? `${plural(all.length, "property", "properties")} · ${plural(whole.units, "unit", "units")}`
             : undefined
         }
         actions={
@@ -87,106 +105,130 @@ export default async function PropertiesPage() {
         }
       />
 
-      {rows.length === 0 ? (
+      {all.length === 0 ? (
         <EmptyState>Add your first property to track its loan, units and tasks here.</EmptyState>
       ) : (
         <>
           {/* Value, purchase price, units and open tasks are the footer's sums; the strip carries the rest. */}
           <FactStrip
             facts={[
-              { label: "Equity", value: <Money value={totals.value - totals.loan} /> },
-              { label: "Loan balance", value: <Money value={totals.loan} /> },
+              { label: "Equity", value: <Money value={whole.value - whole.loan} /> },
+              { label: "Loan balance", value: <Money value={whole.loan} /> },
               {
                 label: "LTV",
-                value: totals.value > 0 ? `${Math.round((totals.loan / totals.value) * 100)}%` : <span className="text-fg-3">—</span>,
+                value: whole.value > 0 ? `${Math.round((whole.loan / whole.value) * 100)}%` : <span className="text-fg-3">—</span>,
               },
             ]}
           />
 
-          <Table className="mt-6">
-            <thead>
-              <tr>
-                <Th className="pl-0">Property</Th>
-                <Th numeric className="max-[480px]:hidden">
-                  Units
-                </Th>
-                <Th numeric className="max-sm:hidden">
-                  Open tasks
-                </Th>
-                <Th numeric className="max-md:hidden">
-                  Purchase
-                </Th>
-                <Th numeric className="max-sm:pr-0">
-                  Value
-                </Th>
-                <Th className="pr-0 max-sm:hidden">Status</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map((r) => {
-                const href = `/properties/${r.id}`;
-                return (
-                  <tr key={r.id} className="transition-colors duration-fast hover:bg-fill-1">
-                    {/* The address column takes the room the others leave, so a long address truncates instead of widening the table. */}
-                    <RowCell href={href} first cell="w-full max-w-0" className="pl-0">
-                      {/* Decorative inside the link, which the address already names. */}
-                      <span aria-hidden="true" className="shrink-0">
-                        <PhotoThumb size={48} alt="" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-body text-fg-1">{r.name}</span>
-                        {(r.entity || r.status) && (
-                          <span className={cn("block truncate text-meta text-fg-3", !r.entity && "sm:hidden")}>
-                            {/* The status column drops below sm, so its word leads the subline. */}
-                            {r.status && (
-                              <span className="sm:hidden">
-                                <PropertyStatus status={r.status} />
-                                {r.entity && " · "}
+          <PropertyFilters
+            data={{
+              statuses: all.map((r) => r.status),
+              options: statusOptions(all.map((r) => r.status)),
+              shown: rows.length,
+              hidden: all.length - rows.length,
+              filtered: isPropertyListFiltered(filters),
+            }}
+          >
+            {rows.length === 0 ? (
+              <EmptyState action={<ScopeButton clear>Clear filters</ScopeButton>}>No properties match these filters.</EmptyState>
+            ) : (
+              <Table className="mt-4">
+                <thead>
+                  <tr>
+                    <SortHeader label="Property" field="address" defaultSort={DEFAULT_PROPERTY_SORT} className="pl-0" />
+                    <SortHeader
+                      label="Units"
+                      field="units"
+                      defaultSort={DEFAULT_PROPERTY_SORT}
+                      first="desc"
+                      numeric
+                      className="max-[480px]:hidden"
+                    />
+                    <Th numeric className="max-sm:hidden">
+                      Open tasks
+                    </Th>
+                    <Th numeric className="max-md:hidden">
+                      Purchase
+                    </Th>
+                    <SortHeader
+                      label="Value"
+                      field="value"
+                      defaultSort={DEFAULT_PROPERTY_SORT}
+                      first="desc"
+                      numeric
+                      className="max-sm:pr-0"
+                    />
+                    <Th className="pr-0 max-sm:hidden">Status</Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {rows.map((r) => {
+                    const href = `/properties/${r.id}`;
+                    return (
+                      <tr key={r.id} className="transition-colors duration-fast hover:bg-fill-1">
+                        {/* The address column takes the room the others leave, so a long address truncates instead of widening the table. */}
+                        <RowCell href={href} first cell="w-full max-w-0" className="pl-0">
+                          {/* Decorative inside the link, which the address already names. */}
+                          <span aria-hidden="true" className="shrink-0">
+                            <PhotoThumb size={48} alt="" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-body text-fg-1">{r.name}</span>
+                            {(r.entity || r.status) && (
+                              <span className={cn("block truncate text-meta text-fg-3", !r.entity && "sm:hidden")}>
+                                {/* The status column drops below sm, so its word leads the subline. */}
+                                {r.status && (
+                                  <span className="sm:hidden">
+                                    <PropertyStatus status={r.status} />
+                                    {r.entity && " · "}
+                                  </span>
+                                )}
+                                {r.entity}
                               </span>
                             )}
-                            {r.entity}
                           </span>
-                        )}
-                      </span>
-                    </RowCell>
-                    <RowCell href={href} numeric cell="max-[480px]:hidden">
-                      {r.units ?? <span className="text-fg-3">—</span>}
-                    </RowCell>
-                    <RowCell href={href} numeric cell="max-sm:hidden" className={r.openTasks ? undefined : "text-fg-3"}>
-                      {r.openTasks}
-                    </RowCell>
-                    <RowCell href={href} numeric cell="max-md:hidden">
-                      <Money value={r.purchase} />
-                    </RowCell>
-                    <RowCell href={href} numeric className="max-sm:pr-0">
-                      <Money value={r.value} />
-                    </RowCell>
-                    <RowCell href={href} cell="max-sm:hidden" className="whitespace-nowrap pr-0 text-meta">
-                      {r.status ? <PropertyStatus status={r.status} /> : <span className="text-fg-3">—</span>}
-                    </RowCell>
+                        </RowCell>
+                        <RowCell href={href} numeric cell="max-[480px]:hidden">
+                          {r.units ?? <span className="text-fg-3">—</span>}
+                        </RowCell>
+                        <RowCell href={href} numeric cell="max-sm:hidden" className={r.openTasks ? undefined : "text-fg-3"}>
+                          {r.openTasks}
+                        </RowCell>
+                        <RowCell href={href} numeric cell="max-md:hidden">
+                          <Money value={r.purchase} />
+                        </RowCell>
+                        <RowCell href={href} numeric className="max-sm:pr-0">
+                          <Money value={r.value} />
+                        </RowCell>
+                        <RowCell href={href} cell="max-sm:hidden" className="whitespace-nowrap pr-0 text-meta">
+                          {r.status ? <PropertyStatus status={r.status} /> : <span className="text-fg-3">—</span>}
+                        </RowCell>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold">
+                    <Td className="border-t border-line-strong pl-0">{plural(rows.length, "property", "properties")}</Td>
+                    <Td numeric className="border-t border-line-strong max-[480px]:hidden">
+                      {totals.units}
+                    </Td>
+                    <Td numeric className="border-t border-line-strong max-sm:hidden">
+                      {totals.openTasks}
+                    </Td>
+                    <Td numeric className="border-t border-line-strong max-md:hidden">
+                      <Money value={totals.purchase} />
+                    </Td>
+                    <Td numeric className="border-t border-line-strong max-sm:pr-0">
+                      <Money value={totals.value} />
+                    </Td>
+                    <Td className="border-t border-line-strong pr-0 max-sm:hidden" />
                   </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="font-semibold">
-                <Td className="border-t border-line-strong pl-0">{plural(rows.length, "property", "properties")}</Td>
-                <Td numeric className="border-t border-line-strong max-[480px]:hidden">
-                  {totals.units}
-                </Td>
-                <Td numeric className="border-t border-line-strong max-sm:hidden">
-                  {totals.openTasks}
-                </Td>
-                <Td numeric className="border-t border-line-strong max-md:hidden">
-                  <Money value={totals.purchase} />
-                </Td>
-                <Td numeric className="border-t border-line-strong max-sm:pr-0">
-                  <Money value={totals.value} />
-                </Td>
-                <Td className="border-t border-line-strong pr-0 max-sm:hidden" />
-              </tr>
-            </tfoot>
-          </Table>
+                </tfoot>
+              </Table>
+            )}
+          </PropertyFilters>
 
           <PortfolioCapexForecastCard
             id="capex"
@@ -197,58 +239,6 @@ export default async function PropertiesPage() {
         </>
       )}
     </>
-  );
-}
-
-/**
- * One cell of a property's row, all of it a link to the property, so the
- * whole row opens it. The first cell's link wraps its content, takes focus
- * and names the row. Every other cell keeps its value outside the link and
- * lays the same link over itself, out of the tab order and hidden from
- * screen readers, so a mouse or a tap anywhere opens the row and the value
- * still reads. A single link stretched over the row would need the row as
- * its containing block, which not every engine gives a table row; a cell
- * is one. 56px with a mouse, 60 on touch (section 5 Density). `cell` styles
- * the cell (when it drops); `className` its content, with pl-0 and pr-0
- * putting the edge cells on the gutter.
- */
-function RowCell({
-  href,
-  first = false,
-  numeric = false,
-  cell,
-  className,
-  children,
-}: {
-  href: string;
-  first?: boolean;
-  numeric?: boolean;
-  /** The cell's own classes: when it drops, and the first column's width. */
-  cell?: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  const content = cn(
-    "flex min-h-14 items-center gap-3 px-3 pointer-coarse:min-h-15",
-    numeric && "justify-end",
-    className,
-  );
-  return (
-    <Td
-      numeric={numeric}
-      className={cn("p-0 align-middle pointer-coarse:h-auto pointer-coarse:p-0", !first && "relative", cell)}
-    >
-      {first ? (
-        <Link href={href} className={cn(content, "-outline-offset-2")}>
-          {children}
-        </Link>
-      ) : (
-        <>
-          <div className={content}>{children}</div>
-          <Link href={href} tabIndex={-1} aria-hidden="true" className="absolute inset-0" />
-        </>
-      )}
-    </Td>
   );
 }
 

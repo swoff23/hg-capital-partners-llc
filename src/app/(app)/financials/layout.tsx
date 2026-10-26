@@ -10,6 +10,7 @@ export default async function FinancialsLayout({ children }: LayoutProps<"/finan
       <PageHeader title="Financials" subtitle="Read-only from QuickBooks." />
       <TopTabs
         base="/financials"
+        label="Financials sections"
         keep={["basis"]}
         tabs={[
           { href: "", label: "Overview" },

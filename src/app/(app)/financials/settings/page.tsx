@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getConnection } from "@/lib/quickbooks/client";
 import { qbo } from "@/lib/quickbooks/config";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
+import { propertyOptions } from "@/lib/picker-options";
 import type { QboBasis } from "@prisma/client";
 import { oauthReturnLine, reconcileGap, reconcileRow } from "@/lib/quickbooks/notices";
 import { Badge, buttonClass, EmptyState, Section, textLinkClass } from "@/components/ui";
@@ -78,7 +79,7 @@ export default async function FinancialsSettingsPage({
       orderBy: [{ acctType: "asc" }, { fullyQualifiedName: "asc" }],
     }),
     prisma.qboEntity.findMany({ where: { realmId: conn.realmId }, orderBy: { sortOrder: "asc" } }),
-    prisma.property.findMany({ select: { id: true, address: true }, orderBy: { address: "asc" } }),
+    propertyOptions(),
     prisma.qboSyncRun.findFirst({
       where: { realmId: conn.realmId },
       orderBy: { startedAt: "desc" },
@@ -87,6 +88,8 @@ export default async function FinancialsSettingsPage({
   ]);
 
   const dq = overview?.dataQuality ?? null;
+  // The span the cleanup list covers, the same words its source line uses.
+  const span = overview ? periodOf(overview.monthlyTrend.map((m) => m.periodMonth)) : null;
   const rank = { UNMAPPED: 0, PROPERTY: 1, OVERHEAD: 2, ENTITY: 3, IGNORE: 4 } as const;
   const sortedClasses = [...classes].sort(
     (a, b) =>
@@ -146,7 +149,7 @@ export default async function FinancialsSettingsPage({
           <Section title="QuickBooks cleanup list">
             <SourceLine
               className="mb-1"
-              period={periodOf(overview.monthlyTrend.map((m) => m.periodMonth))}
+              period={span}
               basis={overview.basis}
               syncedAt={overview.lastSync?.at ?? null}
             />
@@ -174,7 +177,7 @@ export default async function FinancialsSettingsPage({
                 bad={dq.uncategorizedCents !== 0}
               />
               <DqRow
-                label="Negative reclass lines this period"
+                label={span ? `Negative reclass lines, ${span}` : "Negative reclass lines"}
                 value={
                   <>
                     <MoneyCents cents={dq.negativeReclass.grossCents} /> · {lines(dq.negativeReclass.lineCount)}

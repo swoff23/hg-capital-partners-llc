@@ -101,8 +101,12 @@ const leaveNow = (leave: () => void) => leave();
 /**
  * For anything that navigates within the app (BackLink, the payoff's "Back to
  * my jobs"): `guard(leave)` runs `leave` now, or asks first while something
- * holds the page.
+ * holds the page. A Sign out button passes `{ signOut: true }`: signing out is
+ * the one exit an upload in flight must stop (the queue outlives a page, so
+ * only this exit asks about it). Until holds carry a scope (forms 2.11) every
+ * hold asks, Sign out included.
  */
-export function useLeaveGuard(): (leave: () => void) => void {
+export function useLeaveGuard(options: { signOut?: boolean } = {}): (leave: () => void) => void {
+  void options;
   return useContext(LeaveGuardContext)?.ask ?? leaveNow;
 }

@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { EmptyState, Section, TextLink } from "@/components/ui";
+import { ScopeButton } from "@/components/filter-bar";
 import { todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
-import { allTasks, listFilterOptions } from "@/lib/tasks/queries";
+import { propertyOptions } from "@/lib/picker-options";
+import { assigneeOptions } from "@/lib/tasks/assignee-options";
+import { NONE, parseAllFilters, personRefs } from "@/lib/tasks/list-query";
+import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
 import { AllList } from "./all-list";
 import { TaskFilters } from "./filters";
 import { TaskListProvider } from "./task-list-context";
@@ -11,12 +15,12 @@ import { TasksHeader } from "./tasks-header";
 
 const PAGE = 400;
 
-const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
-
 /**
  * Tasks: every task, filtered, Done included. Today lives on Home now
  * (docs/home-as-today.md), so this opens on the open tasks, and the filters
  * old links carry (?status=done, ?property=…, ?assignee=me) are served here.
+ * The bar is components/filter-bar.tsx; its state is the URL, with
+ * comma-joined picks for the assignee and property filters.
  */
 export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const user = await requireUser();
@@ -25,53 +29,81 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   // Today's Contractors column moved to Home with the rest of Today.
   if (sp.view === "contractors") redirect("/?view=contractors");
 
-  // ?assignee=me is the old shortcut for "assigned to me".
-  const owner = str(sp.owner) || (sp.assignee === "me" ? `u:${user.id}` : "");
-  const current = { status: str(sp.status) || "open", owner, q: str(sp.q), property: str(sp.property) };
+  const filters = parseAllFilters(sp, user.id);
+  const { users, contractors } = await assigneeOptions(
+    filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)),
+  );
+  // Imported names that are a person on offer count for that person; the rest list once as "Others".
+  const legacy = await legacyAssignees(personRefs(users, contractors));
 
-  const [{ tasks, total }, options] = await Promise.all([allTasks(current, PAGE), listFilterOptions()]);
+  const searching = filters.q !== "";
+  const [{ tasks, total }, counts, properties, viewCounts] = await Promise.all([
+    allTasks(filters, PAGE, legacy.merged),
+    taskFilterCounts(filters, legacy.merged),
+    propertyOptions(),
+    // While a query is typed, each view counts its hits, so one outside the current view shows.
+    searching ? taskViewCounts(filters, legacy.merged) : Promise.resolve(null),
+  ]);
 
-  const owners = {
-    users: options.users
-      .slice()
-      .sort((a, b) => (a.id === user.id ? -1 : b.id === user.id ? 1 : (a.name ?? a.email).localeCompare(b.name ?? b.email)))
-      .map((u) => ({ value: `u:${u.id}`, label: (u.name ?? u.email) + (u.id === user.id ? " (me)" : "") })),
-    contacts: options.contacts.map((c) => ({ value: `c:${c.id}`, label: c.fullName })),
-    external: options.legacyNames.map((n) => ({ value: `n:${n}`, label: n })),
-  };
+  const filtered =
+    searching || filters.status !== "open" || filters.owner.length > 0 || filters.property.length > 0 || filters.repeats;
+  const narrowed = searching || filters.owner.length > 0 || filters.property.length > 0 || filters.repeats;
 
   // Scoped to one property: name it above the list.
-  const scopedProperty = current.property ? (options.properties.find((p) => p.id === current.property) ?? null) : null;
+  const only = filters.property.length === 1 && filters.property[0] !== NONE ? filters.property[0] : null;
+  const scopedProperty = only ? (properties.find((p) => p.id === only) ?? null) : null;
 
   return (
     <>
       <TasksHeader />
-      <TaskFilters current={current} owners={owners} properties={options.properties} />
-
-      {tasks.length === 0 ? (
-        <div className="mt-4">
-          <EmptyState>No tasks match.</EmptyState>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <TaskListProvider tasks={tasks} today={todayYmdEastern()}>
-            {scopedProperty ? (
-              <Section
-                title={<TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>}
-              >
-                <AllList scoped />
-              </Section>
-            ) : (
-              <AllList />
-            )}
-          </TaskListProvider>
-        </div>
-      )}
-      {total > PAGE && (
-        <p className="mt-2 text-meta text-fg-3">
-          Showing first {PAGE} of {total}. Narrow the filters to see the rest.
-        </p>
-      )}
+      <TaskFilters
+        data={{
+          users,
+          contractors,
+          others: legacy.others,
+          properties,
+          ownerCounts: Object.fromEntries(counts.owner),
+          propertyCounts: Object.fromEntries(counts.property),
+          meId: user.id,
+          viewCounts,
+          shown: total,
+          hidden: Math.max(0, counts.scope - total),
+          filtered,
+        }}
+      >
+        {tasks.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState
+              action={
+                narrowed && (
+                  <ScopeButton clear>Clear filters</ScopeButton>
+                )
+              }
+            >
+              {searching ? `No tasks match “${filters.q}”.` : narrowed ? "No tasks match these filters." : "No tasks match."}
+            </EmptyState>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <TaskListProvider tasks={tasks} today={todayYmdEastern()}>
+              {scopedProperty ? (
+                <Section
+                  title={<TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>}
+                >
+                  <AllList scoped cadence={filters.repeats} />
+                </Section>
+              ) : (
+                <AllList cadence={filters.repeats} />
+              )}
+            </TaskListProvider>
+          </div>
+        )}
+        {total > PAGE && (
+          <p className="mt-2 text-meta text-fg-3">
+            Showing first {PAGE} of {total}. Narrow the filters to see the rest.
+          </p>
+        )}
+      </TaskFilters>
     </>
   );
 }

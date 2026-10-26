@@ -601,6 +601,66 @@ export function PageHeader({
   );
 }
 
+/**
+ * One cell of a table row that is itself a link to a record, so the whole row
+ * opens it (properties, deals). The first cell's link wraps its content, takes
+ * focus and names the row. Every other cell keeps its value outside the link
+ * and lays the same link over itself, out of the tab order and hidden from
+ * screen readers, so a mouse or a tap anywhere opens the row and the value
+ * still reads. A single link stretched over the row would need the row as its
+ * containing block, which not every engine gives a table row; a cell is one.
+ * A control in such a cell (a stage menu) sits in `relative z-10`, above that
+ * link. 56px with a mouse, 60 on touch (section 5 Density); a denser table
+ * passes `min-h-10 pointer-coarse:min-h-12` in `className`. `cell` styles the
+ * cell (when it drops, the first column's width); `className` its content,
+ * with pl-0 and pr-0 putting the edge cells on the gutter. `aside` is
+ * positioned over the first cell beside its link, for a control that can't sit
+ * inside it (a link nested in a link is invalid).
+ */
+export function RowCell({
+  href,
+  first = false,
+  numeric = false,
+  cell,
+  className,
+  aside,
+  children,
+}: {
+  href: string;
+  first?: boolean;
+  numeric?: boolean;
+  cell?: string;
+  className?: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const content = cn(
+    "flex min-h-14 items-center gap-3 px-3 pointer-coarse:min-h-15",
+    numeric && "justify-end",
+    className,
+  );
+  return (
+    <Td
+      numeric={numeric}
+      className={cn("p-0 align-middle pointer-coarse:h-auto pointer-coarse:p-0", (!first || aside) && "relative", cell)}
+    >
+      {first ? (
+        <>
+          <Link href={href} className={cn(content, "-outline-offset-2")}>
+            {children}
+          </Link>
+          {aside}
+        </>
+      ) : (
+        <>
+          <div className={content}>{children}</div>
+          <Link href={href} tabIndex={-1} aria-hidden="true" className="absolute inset-0" />
+        </>
+      )}
+    </Td>
+  );
+}
+
 /** A label over its value, in a <dl>. An empty value shows the dash glyph in --fg-3. */
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

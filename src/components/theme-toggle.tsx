@@ -1,16 +1,18 @@
 "use client";
-import { useLayoutEffect } from "react";
-import { Moon, Sun } from "lucide-react";
-import { chromeIconClass } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { useLayoutEffect, useSyncExternalStore } from "react";
 
 /**
  * Sets [data-theme] on <html> before paint to avoid a flash. Inlined in <head>.
  *
+ * The theme is the person's pick when they made one (localStorage `hgos-theme`
+ * holds "light" or "dark") and the device's otherwise, which is the "System"
+ * choice in the account menu: with no pick stored, the script follows the OS
+ * and keeps following it when it flips.
+ *
  * It also keeps the browser's bar on the app's theme rather than the OS's.
  * The root layout's viewport emits two theme-color metas, one per
  * prefers-color-scheme (--canvas light and dark). Whenever data-theme changes
- * (here, or from ThemeToggle), the meta for the app's theme gets media "all"
+ * (here, or from setThemePref), the meta for the app's theme gets media "all"
  * and the other "not all", so the browser uses the app's canvas whatever the
  * OS says. Only the media changes, never the content, so React still
  * recognizes Next's metas when it hydrates and replaces them on navigation;
@@ -21,7 +23,7 @@ import { cn } from "@/lib/utils";
  * dark canvas too; the body isn't parsed when this first runs, so it syncs
  * again once the document is.
  */
-export const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var t=localStorage.getItem('hgos-theme');if(!t){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}d.setAttribute('data-theme',t);}catch(e){}try{var sync=function(){var dark=d.getAttribute('data-theme')==='dark'||!!document.querySelector('[data-surface="public"]'),m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++){var s=m[i].getAttribute('data-scheme');if(!s){var q=m[i].getAttribute('media')||'';s=q.indexOf('prefers-color-scheme: dark')>-1?'dark':q.indexOf('prefers-color-scheme: light')>-1?'light':'';if(!s)continue;m[i].setAttribute('data-scheme',s);}var want=(s==='dark')===dark?'all':'not all';if(m[i].getAttribute('media')!==want)m[i].setAttribute('media',want);}};sync();var o=new MutationObserver(sync);o.observe(d,{attributes:true,attributeFilter:['data-theme']});o.observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['media']});document.addEventListener('DOMContentLoaded',sync);}catch(e){}})();`;
+export const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var q=matchMedia('(prefers-color-scheme: dark)');var pick=function(){var t=null;try{t=localStorage.getItem('hgos-theme')}catch(e){}return t==='light'||t==='dark'?t:(q.matches?'dark':'light')};d.setAttribute('data-theme',pick());var follow=function(){var t=null;try{t=localStorage.getItem('hgos-theme')}catch(e){}if(t!=='light'&&t!=='dark')d.setAttribute('data-theme',pick())};if(q.addEventListener)q.addEventListener('change',follow);else if(q.addListener)q.addListener(follow);}catch(e){}try{var sync=function(){var dark=d.getAttribute('data-theme')==='dark'||!!document.querySelector('[data-surface="public"]'),m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++){var s=m[i].getAttribute('data-scheme');if(!s){var q=m[i].getAttribute('media')||'';s=q.indexOf('prefers-color-scheme: dark')>-1?'dark':q.indexOf('prefers-color-scheme: light')>-1?'light':'';if(!s)continue;m[i].setAttribute('data-scheme',s);}var want=(s==='dark')===dark?'all':'not all';if(m[i].getAttribute('media')!==want)m[i].setAttribute('media',want);}};sync();var o=new MutationObserver(sync);o.observe(d,{attributes:true,attributeFilter:['data-theme']});o.observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['media']});document.addEventListener('DOMContentLoaded',sync);}catch(e){}})();`;
 
 /**
  * Runs THEME_SCRIPT once more on a page that arrived without it. When a page
@@ -42,28 +44,62 @@ export function ThemeFallback() {
   return null;
 }
 
-export function ThemeToggle() {
-  // Setting data-theme is enough: THEME_SCRIPT's observer moves the browser's bar with it.
-  function toggle() {
-    const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    const next = cur === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    try {
-      localStorage.setItem("hgos-theme", next);
-    } catch {}
-  }
+/* ---------------- The person's pick ---------------- */
 
-  // A secondary icon button: idle icon --fg-3, --fg-1 on hover. 32px with a mouse, 44px on touch.
-  // Its icons are chrome icons, like the rail's: 16px at 1.5, 20px at 1.75 on touch.
-  return (
-    <button
-      onClick={toggle}
-      aria-label="Toggle dark mode"
-      title="Toggle dark mode"
-      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-line-strong bg-surface text-fg-3 transition-colors hover:bg-fill-1 hover:text-fg-1 pointer-coarse:size-11"
-    >
-      <Sun className={cn(chromeIconClass, "hidden dark:block")} aria-hidden="true" />
-      <Moon className={cn(chromeIconClass, "dark:hidden")} aria-hidden="true" />
-    </button>
-  );
+/** System follows the device; Light and Dark are the person's own. */
+export type ThemePref = "system" | "light" | "dark";
+
+export const THEME_PREFS: readonly { key: ThemePref; label: string }[] = [
+  { key: "system", label: "System" },
+  { key: "light", label: "Light" },
+  { key: "dark", label: "Dark" },
+];
+
+const STORAGE_KEY = "hgos-theme";
+const CHANGED = "hgos-theme-change";
+
+/** The pick in this tab alone, when the browser won't let localStorage hold it (a private window). */
+let held: ThemePref | null = null;
+
+function readPref(): ThemePref {
+  if (held) return held;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === "light" || stored === "dark" ? stored : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function subscribe(onChange: () => void) {
+  window.addEventListener(CHANGED, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(CHANGED, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+/**
+ * Makes a pick: stored (System removes the key, so the device decides) and
+ * applied at once. Setting data-theme is enough: THEME_SCRIPT's observer
+ * moves the browser's bar with it.
+ */
+export function setThemePref(pref: ThemePref) {
+  held = null;
+  try {
+    if (pref === "system") localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, pref);
+  } catch {
+    held = pref;
+  }
+  const dark = pref === "dark" || (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  window.dispatchEvent(new Event(CHANGED));
+}
+
+/** The pick, and a way to change it. "System" until the page has hydrated, so server and browser agree. */
+export function useThemePref(): readonly [ThemePref, (pref: ThemePref) => void] {
+  const pref = useSyncExternalStore(subscribe, readPref, () => "system" as const);
+  return [pref, setThemePref] as const;
 }

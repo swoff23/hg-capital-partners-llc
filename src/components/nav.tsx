@@ -11,16 +11,19 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { useListHrefs } from "@/components/list-memory";
 import { TOUCH_HEIGHT, chromeIconClass } from "@/components/ui";
+import type { ListKey } from "@/lib/list-memory";
 import { cn } from "@/lib/utils";
 
-const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
+/** `list` marks the sections that remember their filters: the link carries the query the list was left in. */
+const LINKS: { href: string; label: string; icon: LucideIcon; list?: ListKey }[] = [
   { href: "/", label: "Home", icon: House },
-  { href: "/deals", label: "Deals", icon: TrendingUp },
-  { href: "/properties", label: "Portfolio", icon: Building2 },
+  { href: "/deals", label: "Deals", icon: TrendingUp, list: "deals" },
+  { href: "/properties", label: "Portfolio", icon: Building2, list: "properties" },
   { href: "/financials", label: "Financials", icon: ChartColumn },
-  { href: "/tasks", label: "Tasks", icon: SquareCheckBig },
-  { href: "/contractors", label: "Contractors", icon: Wrench },
+  { href: "/tasks", label: "Tasks", icon: SquareCheckBig, list: "tasks" },
+  { href: "/contractors", label: "Contractors", icon: Wrench, list: "contractors" },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
@@ -29,7 +32,9 @@ const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
  * with a mouse and 44px on touch. Idle: label --fg-2, icon --fg-3, --fill-1
  * on hover. The current item is --fill-2 with label and icon in --fg-1, and
  * the 2px by 16px --act notch at its left edge is its 3:1 mark, since the
- * fill alone is about 1.2:1 (section 9).
+ * fill alone is about 1.2:1 (section 9). The lists link to where they were
+ * left (their last filters and sort), read from the layout's cookies and kept
+ * current as a filter bar changes (components/list-memory.tsx).
  */
 export function SideNav({
   collapsed = false,
@@ -40,14 +45,15 @@ export function SideNav({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const remembered = useListHrefs();
   return (
-    <nav className="flex flex-col gap-0.5">
-      {LINKS.map(({ href, label, icon: Icon }) => {
+    <nav aria-label="Sections" className="flex flex-col gap-0.5">
+      {LINKS.map(({ href, label, icon: Icon, list }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
           <Link
             key={href}
-            href={href}
+            href={list ? remembered[list] : href}
             onClick={onNavigate}
             title={collapsed ? label : undefined}
             aria-label={label}
@@ -78,10 +84,23 @@ export function SideNav({
  * Page sections that are separate routes (CLAUDE.md, One switch per job):
  * underline tabs over a --line divider (docs/brand-guidelines.md, section 9).
  * Idle --fg-2, selected --fg-1 with the 2px --act underline, one weight for
- * both; the state is `aria-selected` and the styles read it. 44px on touch.
- * `keep` names query params that hold across the tabs (Financials' ?basis=).
+ * both. They are links in a labeled `<nav>`: the page you're on carries
+ * `aria-current="page"` and the styles read it, so a screen reader hears
+ * "current page" rather than a tab choice (selectors question 8). 44px on
+ * touch. `label` names the nav ("Financials sections"); `keep` names query
+ * params that hold across the tabs (Financials' ?basis=).
  */
-export function TopTabs({ tabs, base, keep = [] }: { tabs: { href: string; label: string }[]; base: string; keep?: string[] }) {
+export function TopTabs({
+  tabs,
+  base,
+  label,
+  keep = [],
+}: {
+  tabs: { href: string; label: string }[];
+  base: string;
+  label: string;
+  keep?: string[];
+}) {
   const pathname = usePathname();
   const params = useSearchParams();
   const carried = new URLSearchParams();
@@ -91,7 +110,7 @@ export function TopTabs({ tabs, base, keep = [] }: { tabs: { href: string; label
   }
   const query = carried.toString();
   return (
-    <div role="tablist" className="flex gap-1 border-b border-line">
+    <nav aria-label={label} className="flex gap-1 border-b border-line">
       {tabs.map((t) => {
         const path = `${base}${t.href}`;
         const href = query ? `${path}?${query}` : path;
@@ -100,14 +119,13 @@ export function TopTabs({ tabs, base, keep = [] }: { tabs: { href: string; label
           <Link
             key={t.href}
             href={href}
-            role="tab"
-            aria-selected={active}
+            aria-current={active ? "page" : undefined}
             className={cn(
               // 8px sides below sm, so Settings' three tabs keep one line at 320. A fixed
               // 14 / 20 at every size: text-label grows to 16 on touch (section 9).
               // eslint-disable-next-line hg/design-tokens -- the tab size is fixed
               "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-fg-1 sm:px-3",
-              "aria-selected:border-act aria-selected:text-fg-1",
+              "aria-[current=page]:border-act aria-[current=page]:text-fg-1",
               TOUCH_HEIGHT,
             )}
           >
@@ -115,6 +133,6 @@ export function TopTabs({ tabs, base, keep = [] }: { tabs: { href: string; label
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

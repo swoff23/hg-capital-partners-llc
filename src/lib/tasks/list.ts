@@ -2,6 +2,7 @@ import type { TaskStatus } from "@prisma/client";
 import { daysUntil, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { OVERDUE_ELIGIBLE, isActiveStatus, statusRank } from "@/lib/task-scope";
+import { parseRepeatRule, type RepeatRule } from "./repeat";
 import { targetDate } from "./rules";
 
 /**
@@ -34,6 +35,8 @@ export interface ListTask {
   /** Short address of the property, or of the deal when there's no property. */
   place: string | null;
   assignee: ListAssignee | null;
+  /** How it repeats, or null: the Repeats filter and the cadence under a row's title. */
+  repeat: RepeatRule | null;
   /** ISO instant, for a stable order among equals. */
   createdAt: string;
 }
@@ -53,6 +56,8 @@ export interface ListTaskRecord {
   deal: { address: string } | null;
   assignee: { id: string; name: string | null; email: string } | null;
   assigneeContact: { id: string; fullName: string } | null;
+  /** The stored rule (Json); a row without one, or one that doesn't parse, doesn't repeat. */
+  repeatRule?: unknown;
 }
 
 export function toListTask(r: ListTaskRecord): ListTask {
@@ -75,6 +80,7 @@ export function toListTask(r: ListTaskRecord): ListTask {
     propertyId: r.property?.id ?? null,
     place: shortAddress(r.property?.address ?? r.deal?.address) || null,
     assignee,
+    repeat: parseRepeatRule(r.repeatRule),
     createdAt: r.createdAt.toISOString(),
   };
 }

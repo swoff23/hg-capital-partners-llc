@@ -55,7 +55,7 @@ HG should feel like a well-run property company, not a generic AI template. Calm
 
 ## Typography
 
-- **State toggles use one weight.** Active and inactive are both the same weight; the state shows through color and the pill or underline. Expose it with `aria-pressed` on pill toggles, or `role="tab"` and `aria-selected` on tab rows, and style it globally from the attribute.
+- **State toggles use one weight.** Active and inactive are both the same weight; the state shows through color and the pill or underline. Expose it with `aria-pressed` on pill toggles, or `aria-current="page"` on route tabs (links in a labeled `<nav>`), and style it from the attribute.
 - **Every Geist weight is safe.** It's a self-hosted variable font, so Safari, Chrome and Android render the same weights. There's no weight ban; use weight for hierarchy, never for state.
 
 ## Copy

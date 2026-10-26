@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Repeat,
+  Repeat2,
   Sun,
   Sunrise,
   type LucideIcon,
@@ -136,6 +137,10 @@ function DateChip({
       : capitalize(dueLabel(current, day))
     : placeholder;
   const field = trigger === "field";
+  // A repeating task says so on its chip, since below lg the rail's read-only Repeats line sits last in a
+  // scrolling row, off screen at 375 and 320. The rule rides in the chip's name; from lg the line is in the rail.
+  const repeats = current && withRepeat?.value ? withRepeat.value : null;
+  const repeatWords = repeats ? describeRepeat(repeats, { short: true, from: current }) : null;
 
   function pick(next: Ymd | null) {
     if (next !== current) onChange(next);
@@ -152,7 +157,7 @@ function DateChip({
         <AriaButton
           isDisabled={isDisabled}
           data-placeholder={current ? undefined : true}
-          aria-label={`${label}${subject ? ` for ${subject}` : ""}: ${current ? fmtDay(current) : "none"}`}
+          aria-label={`${label}${subject ? ` for ${subject}` : ""}: ${current ? fmtDay(current) : "none"}${repeatWords ? `, repeats ${repeatWords.charAt(0).toLowerCase()}${repeatWords.slice(1)}` : ""}`}
           className={cn(
             field ? pickerField : pickerChipClass({ size: variant === "row" ? "row" : "sm" }),
             !current && "text-fg-3",
@@ -163,6 +168,7 @@ function DateChip({
           <CalendarDays aria-hidden="true" className={cn(field && "text-fg-3")} />
           {prefix}
           {field ? <span className="min-w-0 flex-1 truncate">{text}</span> : text}
+          {repeats && <Repeat2 aria-hidden="true" className="text-fg-3 lg:hidden" />}
           {field && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
         </AriaButton>
       }

@@ -5,10 +5,11 @@ import { Menu, Pin, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
-import { Avatar } from "@/components/avatar";
+import type { ListHrefs } from "@/lib/list-memory";
+import { AccountMenu, AppearanceRow } from "@/components/account-menu";
 import { GlobalSearch } from "@/components/global-search";
+import { ListMemoryProvider } from "@/components/list-memory";
 import { Monogram } from "@/components/monogram";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { SideNav } from "@/components/nav";
 import { chromeIconClass } from "@/components/ui";
 import { ToastProvider } from "@/components/toast";
@@ -19,14 +20,20 @@ const chromeButtonClass =
 
 export function AppShell({
   children,
-  userLabel,
+  userName,
+  userEmail,
   initialPinned,
+  listHrefs,
   signOutAction,
 }: {
   children: ReactNode;
-  userLabel: string;
+  /** The signed-in person's name, or null when they have none. */
+  userName: string | null;
+  userEmail: string;
   initialPinned: boolean;
-  signOutAction: () => void;
+  /** Each list's href with the query it was left in (lib/list-memory.ts), so the sidebar's links are right on first paint. */
+  listHrefs: ListHrefs;
+  signOutAction: () => Promise<void> | void;
 }) {
   const [pinned, setPinned] = useState(initialPinned);
   const [hovered, setHovered] = useState(false);
@@ -98,8 +105,9 @@ export function AppShell({
         <div className="min-w-0 max-w-md flex-1">
           <GlobalSearch />
         </div>
+        {/* The account menu: from lg, where it carries the Theme; below, the drawer has Appearance and the account row. */}
         <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
-          <ThemeToggle />
+          <AccountMenu name={userName} email={userEmail} signOutAction={signOutAction} />
         </div>
       </header>
 
@@ -156,26 +164,8 @@ export function AppShell({
         <SideNav collapsed={!expanded && !mobileOpen} onNavigate={() => setMobileOpen(false)} />
 
         <div className="mt-auto border-t border-line pt-2">
-          <div className="flex items-center justify-between px-2 py-1.5 lg:hidden pointer-coarse:py-0">
-            <span className="text-meta font-medium text-fg-2">Appearance</span>
-            <ThemeToggle />
-          </div>
-          {/* 10px in, so the 28px avatar centers on the rail's icons. */}
-          <div title={userLabel} className="flex items-center gap-2 px-2.5 py-1.5">
-            <Avatar name={userLabel} size={28} />
-            <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-              <div className="truncate text-meta font-medium text-fg-1">{userLabel}</div>
-              <form action={signOutAction}>
-                {/* A 44px target on touch, like every control in the drawer. */}
-                <button
-                  className="flex w-fit items-center text-meta text-fg-3 transition-colors hover:text-fg-1 pointer-coarse:min-h-11"
-                  type="submit"
-                >
-                  Sign out
-                </button>
-              </form>
-            </div>
-          </div>
+          <AppearanceRow className="lg:hidden" />
+          <AccountMenu variant="sidebar" name={userName} email={userEmail} signOutAction={signOutAction} />
         </div>
       </aside>
 
@@ -196,5 +186,9 @@ export function AppShell({
   );
 
   // One toast region for the app (components/toast.tsx); the portal mounts its own.
-  return <ToastProvider>{shell}</ToastProvider>;
+  return (
+    <ToastProvider>
+      <ListMemoryProvider initial={listHrefs}>{shell}</ListMemoryProvider>
+    </ToastProvider>
+  );
 }

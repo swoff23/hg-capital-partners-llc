@@ -63,6 +63,7 @@ export function TaskRow({
   status = true,
   statusColumn: listHasStatus = true,
   street = true,
+  cadence,
   actions,
 }: {
   task: ListTask;
@@ -79,6 +80,12 @@ export function TaskRow({
   statusColumn?: boolean;
   /** False in a list scoped to one property, whose heading names the street: the place is the unit alone. */
   street?: boolean;
+  /**
+   * How the task repeats ("Every week on Fri"), under its title: the Repeats
+   * filter (docs/specs/selectors.md, question 10). A row with it takes two
+   * lines at every width, like a row with actions.
+   */
+  cadence?: string;
   /** Buttons at the row's end, e.g. Approve and Send back. */
   actions?: ReactNode;
 }) {
@@ -90,7 +97,7 @@ export function TaskRow({
   const who = avatar ? assigneeName(task.assignee) : null;
   const first = name ? who?.split(" ")[0] : null;
   const place = [street && task.place, task.unitLabel].filter(Boolean).join(" · ");
-  const oneLine = !actions;
+  const oneLine = !actions && !cadence;
   const struck = task.checked || task.status === "CANCELED";
   // Waiting with a reason: the pause ring and the reason in --fg-3, so amber
   // stays a partner's decision. Under the Waiting heading the reason alone
@@ -118,9 +125,9 @@ export function TaskRow({
 
   // The place line: the status lead below a 480px list, the place, the avatar.
   // With none of them the row is the title and its date alone.
-  const placeLine = Boolean(narrow || place || who);
+  const placeLine = Boolean(narrow || place || who || cadence);
   // A second line at every width; the status lead alone shows only below a 480px list.
-  const secondLine = Boolean(place || who);
+  const secondLine = Boolean(place || who || cadence);
 
   // Top right on the title's line, on every row; a one-line row puts it last.
   const dateChip = (
@@ -197,6 +204,12 @@ export function TaskRow({
                   ·
                 </span>
               )}
+            </span>
+          )}
+          {cadence && (
+            <span className="flex shrink-0 items-center gap-2 text-meta text-fg-3">
+              {cadence}
+              {place && <span aria-hidden="true">·</span>}
             </span>
           )}
           <span

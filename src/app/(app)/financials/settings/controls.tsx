@@ -108,7 +108,7 @@ export function BasisToggle({ current }: { current: "CASH" | "ACCRUAL" }) {
         if (pending || b === current) return;
         run(() => setAccountingMethod(b));
       }}
-      className={cn(pending && "opacity-60")}
+      className={cn(pending && "opacity-50")}
     />
   );
 }

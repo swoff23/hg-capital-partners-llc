@@ -19,6 +19,22 @@ import {
   type ListAssignee,
   type ListTask,
 } from "./list";
+import { Prisma } from "@prisma/client";
+import {
+  NONE,
+  allTasksOrderBy,
+  allTasksWhere,
+  ownerCounts,
+  ownerWhere,
+  parseAllFilters,
+  personRefs,
+  propertyCounts,
+  propertyWhere,
+  searchWhere,
+  viewScopeWhere,
+  type AllFilters,
+  type LegacyNames,
+} from "./list-query";
 
 const TODAY = "2026-10-22"; // a Thursday
 const ME = "u-connor";
@@ -40,6 +56,7 @@ function task(over: Partial<ListTask> & { who?: ListAssignee | null } = {}): Lis
     propertyId: null,
     place: null,
     assignee: who === undefined ? { kind: "user", id: ME, name: "Connor", email: "c@x.com" } : who,
+    repeat: null,
     createdAt: `2026-10-01T00:00:${String(seq % 60).padStart(2, "0")}.000Z`,
     ...rest,
   };
@@ -255,4 +272,223 @@ test("Done toast's Undo: the row comes back with the status it had, unticked", (
   const again = applyPatch(ticked, { kind: "restore", task: { ...waiting, status: "WAITING", checked: false } });
   assert.deepEqual(again.map((t) => t.id), [waiting.id, other.id]);
   assert.equal(again[0].checked, false);
+});
+
+test("toListTask: carries the repeat rule, and a missing or malformed one is no repeat", () => {
+  const base = {
+    id: "a",
+    title: "Check the sump pump",
+    status: "OPEN" as TaskStatus,
+    dueDate: null,
+    scheduledFor: null,
+    waitingOn: null,
+    unitLabel: null,
+    assigneeName: null,
+    createdAt: new Date("2026-10-01T12:00:00Z"),
+    property: null,
+    deal: null,
+    assignee: null,
+    assigneeContact: null,
+  };
+  assert.deepEqual(toListTask({ ...base, repeatRule: { freq: "weeks", interval: 2, weekday: 5 } }).repeat, {
+    freq: "weeks",
+    interval: 2,
+    weekday: 5,
+  });
+  assert.equal(toListTask({ ...base, repeatRule: null }).repeat, null);
+  assert.equal(toListTask({ ...base }).repeat, null);
+  assert.equal(toListTask({ ...base, repeatRule: { freq: "fortnightly" } }).repeat, null);
+});
+
+// ---------------------------------------------------------------------------
+// The Tasks page's where-builder (list-query.ts)
+// ---------------------------------------------------------------------------
+
+type Row = Record<string, unknown>;
+
+/**
+ * A stand-in for Postgres over the where clauses list-query builds: AND, OR,
+ * equality, `in`, `not`, `contains` (ILIKE) and a relation's own filter.
+ */
+function matches(row: Row, cond: Record<string, unknown>): boolean {
+  return Object.entries(cond).every(([field, filter]) => {
+    if (field === "AND") return (filter as Row[]).every((c) => matches(row, c));
+    if (field === "OR") return (filter as Row[]).some((c) => matches(row, c));
+    const value = row[field];
+    if (filter === null) return value === null || value === undefined;
+    if (typeof filter !== "object") return value === filter;
+    const f = filter as Row;
+    if ("in" in f) return (f.in as unknown[]).includes(value);
+    if ("contains" in f) return typeof value === "string" && value.toLowerCase().includes(String(f.contains).toLowerCase());
+    if ("not" in f) return f.not === Prisma.DbNull ? value !== null && value !== undefined : value !== f.not;
+    return value != null && typeof value === "object" && matches(value as Row, f);
+  });
+}
+
+function dbTask(over: Row & { id: string; title: string }): Row {
+  return {
+    status: "OPEN",
+    bucket: "Property",
+    propertyId: null,
+    property: null,
+    deal: null,
+    assignee: null,
+    assigneeContact: null,
+    assigneeName: null,
+    assigneeUserId: null,
+    assigneeContactId: null,
+    repeatRule: null,
+    ...over,
+  };
+}
+const TAMARACK = { address: "56 Tamarack St, Buffalo, NY 14209" };
+const CONGRESS = { address: "118 Congress St. Buffalo, NY 14213" };
+const TASKS: Row[] = [
+  dbTask({ id: "roof", title: "Fix the roof", propertyId: "p-tam", property: TAMARACK, assigneeContactId: "c-zack", assigneeContact: { fullName: "Zack Reading" } }),
+  dbTask({ id: "gutters", title: "Clean gutters", propertyId: "p-con", property: CONGRESS, assigneeUserId: "u-pieter", assignee: { name: "Pieter" } }),
+  dbTask({ id: "taxes", title: "Check if any taxes are due", repeatRule: { freq: "monthly", interval: 1, dayOfMonth: 5 }, assigneeUserId: "u-connor", assignee: { name: "Connor" } }),
+  dbTask({ id: "legacy-zack", title: "Old plumbing quote", propertyId: "p-con", property: CONGRESS, assigneeName: "Zack Reading" }),
+  dbTask({ id: "legacy-bob", title: "Old paint quote", assigneeName: "Bob Smith, Jr." }),
+  dbTask({ id: "deal-task", title: "Walk through", deal: { address: "767 Prospect Avenue, Buffalo" } }),
+  dbTask({ id: "playbook", title: "Move-in checklist", bucket: "Template" }),
+  dbTask({ id: "done", title: "Fix the fence", status: "DONE", property: TAMARACK, propertyId: "p-tam" }),
+];
+const found = (f: Partial<AllFilters>, legacy: LegacyNames = new Map()) =>
+  TASKS.filter((t) => matches(t, allTasksWhere({ status: "open", owner: [], property: [], repeats: false, q: "", ...f }, legacy) as Row)).map(
+    (t) => t.id,
+  );
+
+test("parseAllFilters: open by default, picks comma-joined, the old shortcuts still served", () => {
+  assert.deepEqual(parseAllFilters({}, "u-me"), { status: "open", owner: [], property: [], repeats: false, q: "" });
+  assert.equal(parseAllFilters({ status: "done" }, "u-me").status, "done");
+  assert.equal(parseAllFilters({ status: "nonsense" }, "u-me").status, "open");
+  assert.deepEqual(parseAllFilters({ owner: "u:a,c:b,none" }, "u-me").owner, ["u:a", "c:b", "none"]);
+  assert.deepEqual(parseAllFilters({ assignee: "me" }, "u-me").owner, ["u:u-me"], "?assignee=me is still 'mine'");
+  assert.deepEqual(parseAllFilters({ assignee: "me", owner: "c:z" }, "u-me").owner, ["c:z"], "?owner= supersedes it");
+  assert.deepEqual(parseAllFilters({ property: "p1,none" }, "u-me").property, ["p1", "none"]);
+  assert.equal(parseAllFilters({ repeats: "1" }, "u-me").repeats, true);
+  assert.equal(parseAllFilters({ repeats: "0" }, "u-me").repeats, false);
+  assert.equal(parseAllFilters({ q: "  roof " }, "u-me").q, "roof");
+});
+
+test("/tasks leaves out Template rows and finished work in the Open view", () => {
+  assert.deepEqual(found({}), ["roof", "gutters", "taxes", "legacy-zack", "legacy-bob", "deal-task"]);
+  assert.deepEqual(found({ status: "done" }), ["done"]);
+  assert.equal(found({ status: "all" }).includes("playbook"), false, "a playbook row is never a task");
+  assert.equal(found({ status: "all" }).length, 7);
+});
+
+test("/tasks search matches the title, the property, the deal and the assignee", () => {
+  assert.deepEqual(found({ q: "roof" }), ["roof"], "the title");
+  assert.deepEqual(found({ q: "tamarack" }), ["roof"], "the property's address");
+  assert.deepEqual(found({ q: "prospect avenue" }), ["deal-task"], "a deal's address, Avenue or Ave");
+  assert.deepEqual(found({ q: "pieter" }), ["gutters"], "a teammate");
+  assert.deepEqual(found({ q: "zack" }), ["roof", "legacy-zack"], "a contractor, and a legacy name");
+  assert.deepEqual(found({ q: "congress gutters" }), ["gutters"], "words in any order, across fields");
+  assert.deepEqual(found({ q: "zzzz" }), []);
+  assert.deepEqual(searchWhere("  "), {}, "no words, no filter");
+});
+
+test("/tasks search runs on the words the palette's does: abbreviations and accents", () => {
+  assert.deepEqual(found({ q: "118 congress street" }), ["gutters", "legacy-zack"]);
+  assert.deepEqual(found({ q: "Tamarack St" }), ["roof"]);
+});
+
+test("owner: several picks are any of them; Unassigned is no real person", () => {
+  assert.deepEqual(found({ owner: ["u:u-pieter", "c:c-zack"] }), ["roof", "gutters"]);
+  assert.deepEqual(found({ owner: [NONE] }), ["legacy-zack", "legacy-bob", "deal-task"], "a legacy name has no real person behind it");
+  assert.deepEqual(found({ owner: [NONE, "u:u-connor"] }), ["taxes", "legacy-zack", "legacy-bob", "deal-task"]);
+  assert.deepEqual(found({ owner: ["n:Bob Smith, Jr."] }), ["legacy-bob"], "a name that holds a comma");
+  assert.deepEqual(ownerWhere([]), {});
+});
+
+test("owner: a picked person also finds the imported rows that carry their name", () => {
+  const legacy: LegacyNames = new Map([["c:c-zack", ["Zack Reading"]]]);
+  assert.deepEqual(found({ owner: ["c:c-zack"] }), ["roof"]);
+  assert.deepEqual(found({ owner: ["c:c-zack"] }, legacy), ["roof", "legacy-zack"]);
+});
+
+test("property: several picks, and 'none' for a task with no property", () => {
+  assert.deepEqual(found({ property: ["p-tam"] }), ["roof"]);
+  assert.deepEqual(found({ property: ["p-tam", "p-con"] }), ["roof", "gutters", "legacy-zack"]);
+  assert.deepEqual(found({ property: [NONE] }), ["taxes", "legacy-bob", "deal-task"], "a deal's task has no property");
+  assert.deepEqual(found({ property: ["p-con", NONE] }), ["gutters", "taxes", "legacy-zack", "legacy-bob", "deal-task"]);
+  assert.deepEqual(propertyWhere([]), {});
+});
+
+test("the Repeats filter keeps only tasks that repeat", () => {
+  assert.deepEqual(found({ repeats: true }), ["taxes"]);
+  assert.deepEqual(found({ repeats: true, owner: ["u:u-pieter"] }), [], "it narrows with every other filter");
+  assert.deepEqual(found({ repeats: true, q: "taxes", owner: ["u:u-connor"] }), ["taxes"]);
+});
+
+test("a facet's own picks are left out of its counts, the others stay on", () => {
+  const f: AllFilters = { status: "open", owner: ["u:u-pieter"], property: ["p-con"], repeats: false, q: "" };
+  const ids = (omit?: "owner" | "property") => TASKS.filter((t) => matches(t, allTasksWhere(f, new Map(), omit) as Row)).map((t) => t.id);
+  assert.deepEqual(ids(), ["gutters"]);
+  assert.deepEqual(ids("owner"), ["gutters", "legacy-zack"], "every task at that property, whoever has it");
+  assert.deepEqual(ids("property"), ["gutters"], "every task Pieter has, wherever");
+});
+
+test("hidden by filters is measured against the whole view", () => {
+  const scope = (s: "open" | "done" | "all") => TASKS.filter((t) => matches(t, viewScopeWhere(s) as Row)).map((t) => t.id);
+  assert.equal(scope("open").length, 6);
+  assert.deepEqual(scope("done"), ["done"]);
+  assert.equal(scope("all").length, 7);
+});
+
+test("Done sorts the newest finished first; Open and All keep the soonest due first", () => {
+  assert.deepEqual(allTasksOrderBy("done"), [{ completedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }]);
+  assert.deepEqual(allTasksOrderBy("open"), [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]);
+  assert.deepEqual(allTasksOrderBy("all"), allTasksOrderBy("open"));
+  // What that order does to three finished tasks, one with no finish time.
+  const rows = [
+    { id: "old", completedAt: new Date("2026-09-01"), createdAt: new Date("2026-01-01") },
+    { id: "none", completedAt: null, createdAt: new Date("2026-08-01") },
+    { id: "new", completedAt: new Date("2026-10-20"), createdAt: new Date("2026-02-01") },
+  ];
+  const sorted = [...rows].sort((a, b) => {
+    if (a.completedAt && b.completedAt) return b.completedAt.getTime() - a.completedAt.getTime();
+    if (a.completedAt) return -1;
+    if (b.completedAt) return 1;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+  assert.deepEqual(sorted.map((r) => r.id), ["new", "old", "none"]);
+});
+
+test("counts beside the assignee rows: a person, Unassigned, and a legacy name folded into its person", () => {
+  const legacy: LegacyNames = new Map([["c:c-zack", ["Zack Reading"]]]);
+  const rows = [
+    { assigneeUserId: "u-pieter", assigneeContactId: null, assigneeName: null, count: 4 },
+    { assigneeUserId: null, assigneeContactId: "c-zack", assigneeName: null, count: 3 },
+    { assigneeUserId: null, assigneeContactId: null, assigneeName: "Zack Reading", count: 2 },
+    { assigneeUserId: null, assigneeContactId: null, assigneeName: "Bob Smith", count: 1 },
+    { assigneeUserId: null, assigneeContactId: null, assigneeName: null, count: 6 },
+  ];
+  const counts = ownerCounts(rows, legacy);
+  assert.equal(counts.get("u:u-pieter"), 4);
+  assert.equal(counts.get("c:c-zack"), 5, "his own jobs and his imported ones");
+  assert.equal(counts.get("n:Bob Smith"), 1, "a name that is nobody the list can name");
+  assert.equal(counts.get(NONE), 9, "no real person: the imported rows count here too");
+  assert.equal(counts.get("n:Zack Reading"), undefined, "a folded name isn't listed twice");
+});
+
+test("counts beside the property rows: 'none' is the tasks with no property", () => {
+  const counts = propertyCounts([
+    { propertyId: "p-tam", count: 5 },
+    { propertyId: null, count: 7 },
+  ]);
+  assert.equal(counts.get("p-tam"), 5);
+  assert.equal(counts.get(NONE), 7);
+  assert.equal(counts.get("p-con"), undefined);
+});
+
+test("personRefs: the team and the contractors by their picker keys", () => {
+  assert.deepEqual(
+    personRefs([{ id: "1", name: null, email: "p@x.com" }], [{ id: "2", name: "Zack Reading", email: "z@x.com" }]),
+    [
+      { key: "u:1", name: "p@x.com", email: "p@x.com" },
+      { key: "c:2", name: "Zack Reading", email: "z@x.com" },
+    ],
+  );
 });

@@ -84,7 +84,7 @@ function PhoneMenu({ pathname }: { pathname: string }) {
         <PopoverSurface placement="bottom end" containerPadding={16} data-surface="public" className="min-w-44">
           <AriaMenu aria-label="Public site" className="p-1 outline-none">
             {LINKS.map((l) => (
-              <MenuItem key={l.href} id={l.href} href={l.href} checked={isCurrent(pathname, l.href)}>
+              <MenuItem key={l.href} id={l.href} href={l.href} current={isCurrent(pathname, l.href)}>
                 {l.label}
               </MenuItem>
             ))}

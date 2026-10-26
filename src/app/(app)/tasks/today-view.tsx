@@ -2,8 +2,9 @@
 import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Avatar } from "@/components/avatar";
-import { SegmentedControl } from "@/components/segmented-control";
+import { SegmentedControl, type SegmentOption } from "@/components/segmented-control";
 import { SpotArt } from "@/components/spot-art";
+import { StatusMark } from "@/components/status-badge";
 import { Button, EmptyState } from "@/components/ui";
 import { groupContractors, groupMine } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
@@ -14,11 +15,6 @@ import { TaskSection } from "./task-section";
 
 export type TodayColumn = "mine" | "contractors";
 
-const COLUMNS = [
-  { key: "mine", label: "Mine" },
-  { key: "contractors", label: "Contractors" },
-] as const;
-
 /**
  * Today (docs/asana-migration-plan.md §6, D31). From 1024px: Mine on the
  * left, Contractors on the right, each under its label. Below that, a Mine |
@@ -27,6 +23,8 @@ const COLUMNS = [
  * page from the router's cache, and only the URL comes back with it. Each
  * group is a flat Section over a hairline (docs/brand-guidelines.md,
  * section 9); an empty Mine is the all-clear moment, so it gets the art.
+ * Contractors carries the Review mark and how many jobs wait on a partner, so
+ * "Needs review" shows on a phone and a tablet without opening the column.
  */
 export function TodayView({ userId }: { userId: string }) {
   const { tasks, today, moveAllToToday } = useTaskList();
@@ -44,6 +42,18 @@ export function TodayView({ userId }: { userId: string }) {
     window.history.replaceState(null, "", search ? `?${search}` : window.location.pathname);
   }
 
+  const review = crew.review.length;
+  const columns: SegmentOption<TodayColumn>[] = [
+    { key: "mine", label: "Mine" },
+    {
+      key: "contractors",
+      label: "Contractors",
+      ...(review > 0
+        ? { count: review, mark: <StatusMark status="REVIEW" />, ariaLabel: `Contractors, ${review} to review` }
+        : {}),
+    },
+  ];
+
   const mineEmpty = Object.values(mine).every((list) => list.length === 0);
   // A section keeps the status column only when one of its rows fills it; a section of
   // staff To dos drops it, so the titles run to the date.
@@ -54,7 +64,7 @@ export function TodayView({ userId }: { userId: string }) {
       <SegmentedControl
         aria-label="Column"
         size="md"
-        options={COLUMNS}
+        options={columns}
         value={column}
         onChange={pick}
         className="mb-4 lg:hidden"

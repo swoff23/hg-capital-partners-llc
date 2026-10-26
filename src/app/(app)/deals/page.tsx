@@ -2,17 +2,20 @@ import type { Prisma } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ScopeButton } from "@/components/filter-bar";
+import { SortHeader } from "@/components/sort-header";
 import { LinkButton, PageHeader, Table, Th, EmptyState, chromeIconClass } from "@/components/ui";
-import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES, dealStatusLabel } from "@/lib/config";
+import { DEAL_FIELD_LABEL, DEAL_STATUSES } from "@/lib/config";
 import { todayYmdEastern } from "@/lib/dates";
+import { parseNoteAuthor } from "@/lib/deals/note-author";
 import { DealFilters } from "./filters";
-import { DealRowEditable } from "./deal-row";
-import { SortHeader } from "./sort-header";
+import { DealListRow } from "./deal-row";
 import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
 import { COLUMN_DROP } from "./columns";
-import { easternDay, noteDay } from "./format";
+import { DEFAULT_DEAL_SORT, easternDay, noteDay } from "./format";
+import { dealSearchWhere, dealsWhere, emptyDeals, isFiltered, parseDealFilters, viewCounts } from "./query";
 
-type SP = { status?: string; statuses?: string; q?: string; sort?: string };
+const CAP = 300;
 
 // Status has no natural DB ordering (it's not alphabetical), so it's ranked by its position
 // in the pipeline (DEAL_STATUSES) and sorted in memory below.
@@ -49,65 +52,46 @@ function sortByStatus<T extends { status: string; updatedAt: Date }>(list: T[], 
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   await requireUser();
-  const sp = (await searchParams) as SP;
+  const f = parseDealFilters(await searchParams);
+  const where = dealsWhere(f);
 
-  const statusFilter = sp.status ?? "active";
-  const selectedStatuses = (sp.statuses ?? "").split(",").filter(Boolean);
-  const where = {
-    ...(selectedStatuses.length > 0
-      ? { status: { in: selectedStatuses } }
-      : statusFilter === "all"
-        ? {}
-        : statusFilter === "active"
-          ? { status: { in: ACTIVE_DEAL_STATUSES } }
-          : { status: statusFilter }),
-    ...(sp.q ? { address: { contains: sp.q, mode: "insensitive" as const } } : {}),
-  };
+  const sortDesc = f.sort.startsWith("-");
+  const sortField = (sortDesc ? f.sort.slice(1) : f.sort) || DEFAULT_DEAL_SORT;
 
-  // The empty list's one line names what narrowed it ("No deals at "zzz" in Active."), and its
-  // action clears the search and the statuses.
-  const VIEW_LABEL: Record<string, string> = { all: "", active: "Active", "5 - TBD": "TBD" };
-  const scope =
-    selectedStatuses.length > 1
-      ? `${selectedStatuses.length} statuses`
-      : selectedStatuses.length === 1
-        ? dealStatusLabel(selectedStatuses[0])
-        : (VIEW_LABEL[statusFilter] ?? dealStatusLabel(statusFilter));
-  const narrowed = Boolean(sp.q) || scope !== "";
-  const emptyLine = !narrowed
-    ? "No deals yet. New ones show up here."
-    : `No deals ${sp.q ? `at “${sp.q}” ` : ""}${scope ? `in ${scope}` : ""}`.trim() + ".";
-
-  const sortRaw = sp.sort || "status";
-  const sortDesc = sortRaw.startsWith("-");
-  const sortField = (sortDesc ? sortRaw.slice(1) : sortRaw) || "status";
-
-  // Sorting by status happens in memory (see sortByStatus), so that fetch can't be `take`-limited
-  // up front: limiting by DB order first would silently drop whole status groups before the
+  // Sorting by stage happens in memory (see sortByStatus), so that fetch can't be `take`-limited
+  // up front: limiting by DB order first would silently drop whole stage groups before the
   // real sort ever runs. Every other sort is a plain DB order, so it can take the cap directly.
-  const [dealsRaw, filteredCount, statusCounts] = await Promise.all([
+  const [dealsRaw, shown, byStageSearched, byStageAll] = await Promise.all([
     prisma.deal.findMany({
       where,
       orderBy: dbOrderBy(sortField, sortDesc),
-      ...(sortField === "status" ? {} : { take: 300 }),
+      ...(sortField === "status" ? {} : { take: CAP }),
       include: {
-        // Most recent notes, typed here or imported from the spreadsheet, shown as a column so
-        // they're visible without opening each deal. Auto-logged "change" entries are excluded.
+        // The most recent note, typed here or imported from the spreadsheet, shown as a column so
+        // it's visible without opening each deal. Auto-logged "change" entries are excluded.
         // Undated imported lines sort after every dated one.
         notes: {
           where: { source: { not: "change" } },
           orderBy: [{ noteDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
-          take: 2,
+          take: 1,
         },
       },
     }),
     prisma.deal.count({ where }),
-    prisma.deal.groupBy({ by: ["status"], _count: true }),
+    // Each view and stage counts the search's hits, so a hit outside the current view shows (DEALS-012).
+    prisma.deal.groupBy({ by: ["status"], where: dealSearchWhere(f.q), _count: true }),
+    // What "hidden by filters" is measured against: the whole view, whatever is typed.
+    f.q ? prisma.deal.groupBy({ by: ["status"], _count: true }) : Promise.resolve(null),
   ]);
   const sorted = sortField === "status" ? sortByStatus(dealsRaw, sortDesc) : dealsRaw;
-  const deals = sorted.slice(0, 300);
-  const truncated = filteredCount > 300;
+  const deals = sorted.slice(0, CAP);
+  const truncated = shown > CAP;
   const today = todayYmdEastern();
+
+  const stageCounts = Object.fromEntries(byStageSearched.map((s) => [s.status, s._count]));
+  const counts = viewCounts(stageCounts);
+  const scope = byStageAll ? viewCounts(Object.fromEntries(byStageAll.map((s) => [s.status, s._count]))) : counts;
+  const empty = emptyDeals(f, counts);
 
   return (
     <>
@@ -122,99 +106,141 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
       />
 
       <DealFilters
-        statusCounts={Object.fromEntries(statusCounts.map((s) => [s.status, s._count]))}
-        current={{ status: statusFilter, statuses: selectedStatuses, q: sp.q ?? "" }}
-      />
-
-      {/* Flat on the page: the header's rule and the row hairlines are its only lines (section 5).
-          A size container, so columns drop by the list's own width (COLUMN_DROP in columns.ts). */}
-      <div className="mt-4 @container">
-        {deals.length === 0 ? (
-          <EmptyState
-            action={
-              narrowed && (
-                <LinkButton href="/deals?status=all" variant="secondary" size="sm">
-                  Show all deals
-                </LinkButton>
-              )
-            }
-          >
-            {emptyLine}
-          </EmptyState>
-        ) : (
-          <ColumnWidthsProvider>
-            <Table style={{ tableLayout: "fixed" }}>
-              <Cols />
-              <thead>
-                <tr>
-                  {/* Column one starts on the page gutter, under the title (section 5). */}
-                  <SortHeader label="Address" field="address" resizeKey="address" className="pl-0" />
-                  <SortHeader label="Status" field="status" resizeKey="status" className={COLUMN_DROP.status} />
-                  <SortHeader label="Units" field="units" resizeKey="units" numeric className={COLUMN_DROP.units} />
-                  <SortHeader
-                    label="Their price"
-                    field="theirPrice"
-                    resizeKey="theirPrice"
-                    numeric
-                    className={COLUMN_DROP.theirPrice}
-                  />
-                  <SortHeader
-                    label="Our price"
-                    field="ourPrice"
-                    resizeKey="ourPrice"
-                    numeric
-                    className={COLUMN_DROP.ourPrice}
-                  />
-                  <Th className={COLUMN_DROP.latestNote}>
-                    Latest note
-                    <ResizeHandle columnKey="latestNote" />
-                  </Th>
-                  <SortHeader
-                    label="Next action"
-                    field="nextAction"
-                    resizeKey="nextAction"
-                    className={COLUMN_DROP.nextAction}
-                  />
-                  <SortHeader
-                    label="Updated"
-                    field="updated"
-                    resizeKey="updated"
-                    className={`pr-0 ${COLUMN_DROP.updated}`}
-                  />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {deals.map((d) => (
-                  <DealRowEditable
-                    key={d.id}
-                    deal={{
-                      id: d.id,
-                      address: d.address,
-                      status: d.status,
-                      units: d.units,
-                      theirPrice: d.theirPrice ? Number(d.theirPrice) : null,
-                      theirPriceRaw: d.theirPriceRaw,
-                      ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
-                      ourPriceRaw: d.ourPriceRaw,
-                      nextAction: d.nextAction,
-                      sourceUrl: d.sourceUrl,
-                      updated: easternDay(d.updatedAt, today),
-                      // An undated imported line has no day of its own; its createdAt is the import run.
-                      latestNotes: d.notes.map((n) => ({
-                        body: n.body,
-                        day: n.noteDate ? noteDay({ noteDate: n.noteDate, source: n.source }, today) : null,
-                      })),
-                    }}
-                  />
-                ))}
-              </tbody>
-            </Table>
-          </ColumnWidthsProvider>
+        data={{
+          view: f.view,
+          counts,
+          stageCounts,
+          shown,
+          hidden: Math.max(0, scope[f.view] - shown),
+          filtered: isFiltered(f),
+        }}
+      >
+        {/* Flat on the page: the header's rule and the row hairlines are its only lines (section 5).
+            A size container, so columns drop by the list's own width (COLUMN_DROP in columns.ts). */}
+        <div className="mt-4 @container">
+          {deals.length === 0 ? (
+            <EmptyState
+              action={
+                empty.action?.kind === "show-all" ? (
+                  <ScopeButton changes={{ status: "all", statuses: null }}>Show {empty.action.count} in All</ScopeButton>
+                ) : empty.action?.kind === "clear-search" ? (
+                  <ScopeButton changes={{ q: null }}>Clear search</ScopeButton>
+                ) : empty.action?.kind === "clear-filters" ? (
+                  <ScopeButton clear>Clear filters</ScopeButton>
+                ) : undefined
+              }
+            >
+              {empty.line}
+            </EmptyState>
+          ) : (
+            <ColumnWidthsProvider>
+              <Table style={{ tableLayout: "fixed" }}>
+                <Cols />
+                <thead>
+                  <tr>
+                    {/* Column one starts on the page gutter, under the title (section 5). */}
+                    <SortHeader
+                      label={DEAL_FIELD_LABEL.address}
+                      field="address"
+                      defaultSort={DEFAULT_DEAL_SORT}
+                      className="pl-0"
+                      trailing={<ResizeHandle columnKey="address" />}
+                    />
+                    <SortHeader
+                      label={DEAL_FIELD_LABEL.status}
+                      field="status"
+                      defaultSort={DEFAULT_DEAL_SORT}
+                      className={COLUMN_DROP.status}
+                      trailing={<ResizeHandle columnKey="status" />}
+                    />
+                    <SortHeader
+                      label={DEAL_FIELD_LABEL.units}
+                      field="units"
+                      defaultSort={DEFAULT_DEAL_SORT}
+                      first="desc"
+                      numeric
+                      className={COLUMN_DROP.units}
+                      trailing={<ResizeHandle columnKey="units" />}
+                    />
+                    <SortHeader
+                      label={DEAL_FIELD_LABEL.theirPrice}
+                      field="theirPrice"
+                      defaultSort={DEFAULT_DEAL_SORT}
+                      first="desc"
+                      numeric
+                      className={COLUMN_DROP.theirPrice}
+                      trailing={<ResizeHandle columnKey="theirPrice" />}
+                    />
+                    <SortHeader
+                      label={DEAL_FIELD_LABEL.ourPrice}
+                      field="ourPrice"
+                      defaultSort={DEFAULT_DEAL_SORT}
+                      first="desc"
+                      numeric
+                      className={COLUMN_DROP.ourPrice}
+                      trailing={<ResizeHandle columnKey="ourPrice" />}
+                    />
+                    <Th className={COLUMN_DROP.latestNote}>
+                      {DEAL_FIELD_LABEL.latestNote}
+                      <ResizeHandle columnKey="latestNote" />
+                    </Th>
+                    <SortHeader
+                      label={DEAL_FIELD_LABEL.nextAction}
+                      field="nextAction"
+                      defaultSort={DEFAULT_DEAL_SORT}
+                      className={COLUMN_DROP.nextAction}
+                      trailing={<ResizeHandle columnKey="nextAction" />}
+                    />
+                    <SortHeader
+                      label={DEAL_FIELD_LABEL.updatedAt}
+                      field="updated"
+                      defaultSort={DEFAULT_DEAL_SORT}
+                      first="desc"
+                      className={`pr-0 ${COLUMN_DROP.updated}`}
+                      trailing={<ResizeHandle columnKey="updated" />}
+                    />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {deals.map((d) => (
+                    <DealListRow
+                      key={d.id}
+                      deal={{
+                        id: d.id,
+                        address: d.address,
+                        status: d.status,
+                        units: d.units,
+                        theirPrice: d.theirPrice ? Number(d.theirPrice) : null,
+                        theirPriceRaw: d.theirPriceRaw,
+                        ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
+                        ourPriceRaw: d.ourPriceRaw,
+                        nextAction: d.nextAction,
+                        sourceUrl: d.sourceUrl,
+                        updated: easternDay(d.updatedAt, today),
+                        // The note without the author pasted into it, "(CS)" or "  ·  Connor". An undated
+                        // imported line has no day of its own; its createdAt is the import run.
+                        latestNote: d.notes[0]
+                          ? {
+                              text: parseNoteAuthor(d.notes[0].body).text,
+                              day: d.notes[0].noteDate ? noteDay({ noteDate: d.notes[0].noteDate, source: d.notes[0].source }, today) : null,
+                            }
+                          : null,
+                      }}
+                    />
+                  ))}
+                </tbody>
+              </Table>
+            </ColumnWidthsProvider>
+          )}
+        </div>
+        {truncated && (
+          // One line at every width: the phone's words are shorter.
+          <p className="mt-2 truncate text-meta text-fg-3">
+            <span className="sm:hidden">First {CAP} of {shown}. Search for more.</span>
+            <span className="max-sm:hidden">Showing first {CAP} of {shown}. Search or filter to see the rest.</span>
+          </p>
         )}
-      </div>
-      {truncated && (
-        <p className="mt-2 text-meta text-fg-3">Showing first 300. Use the address filter to narrow.</p>
-      )}
+      </DealFilters>
     </>
   );
 }

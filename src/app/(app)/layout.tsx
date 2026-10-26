@@ -2,6 +2,7 @@ import type { Viewport } from "next";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth";
 import { signOut } from "@/app/login/actions";
+import { readListHrefs } from "@/lib/list-memory";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import { AppShell } from "@/components/app-shell";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
@@ -20,7 +21,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const pinned = jar.get(SIDEBAR_COOKIE)?.value === "1";
 
   return (
-    <AppShell userLabel={user.name ?? user.email} initialPinned={pinned} signOutAction={signOut}>
+    <AppShell
+      userName={user.name ?? null}
+      userEmail={user.email}
+      initialPinned={pinned}
+      // Each list's last query, so the sidebar's links open the lists as they were left.
+      listHrefs={readListHrefs(jar)}
+      signOutAction={signOut}
+    >
       <RefreshOnReturn />
       {children}
     </AppShell>

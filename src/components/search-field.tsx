@@ -126,7 +126,7 @@ export function SearchInput({
         placeholder={placeholder}
         className={cn(
           // The browser's own clear button goes; ours sits in the same place on every engine.
-          "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none",
+          "text-ellipsis [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none",
           bare
             ? "h-9 w-full rounded-md bg-transparent pl-9 text-body text-fg-1 outline-none placeholder:text-fg-3 pointer-coarse:h-11 pointer-coarse:pl-10"
             : cn(fieldClass, fieldSizeClass[size], "pl-8 pointer-coarse:pl-9"),

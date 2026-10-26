@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 
 type Common = {
   isDisabled?: boolean;
-  /** "always" shows the chevron; "hover" only with a mouse over the control (a table cell). */
+  /** "always" shows the chevron; "hover" only with a mouse over the control or over a `group/row` row it sits in (a table cell). */
   chevron?: "always" | "hover";
   className?: string;
 };
@@ -91,7 +91,7 @@ export function StatusMenu(props: StatusMenuProps) {
         {task ? <StatusBadge status={value as TaskStatus} /> : <DealStage stage={value} label={dealStageLabel(value)} className="text-meta" />}
         <ChevronDown
           aria-hidden="true"
-          className={cn("size-3.5 shrink-0 text-fg-3", chevron === "hover" && "opacity-0 group-hover/status:opacity-100 group-data-pressed/status:opacity-100 pointer-coarse:opacity-100")}
+          className={cn("size-3.5 shrink-0 text-fg-3", chevron === "hover" && "opacity-0 group-hover/row:opacity-100 group-hover/status:opacity-100 group-data-pressed/status:opacity-100 pointer-coarse:opacity-100")}
         />
       </AriaButton>
       <Menu

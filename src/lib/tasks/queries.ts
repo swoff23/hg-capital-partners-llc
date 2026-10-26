@@ -2,9 +2,23 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { addDaysYmd } from "@/lib/quick-dates";
-import { activeTask, closedTask, excludeTemplateTasks } from "@/lib/task-scope";
+import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { easternDayStart, type Ymd } from "@/lib/dates";
+import { mergeLegacyNames, type PersonRef } from "./assignee-people";
+import { assigneeOptions } from "./assignee-options";
 import { EMAIL_DAILY_CAP, toListTask, type ListTask } from "./list";
+import {
+  allTasksOrderBy,
+  allTasksWhere,
+  ownerCounts,
+  personRefs,
+  propertyCounts,
+  viewScopeWhere,
+  TASK_VIEWS,
+  type AllFilters,
+  type LegacyNames,
+  type TaskView,
+} from "./list-query";
 
 /**
  * Staff read queries for the task lists: Today (on Home) and All. Staff only;
@@ -26,6 +40,7 @@ const LIST_SELECT = {
   deal: { select: { address: true } },
   assignee: { select: { id: true, name: true, email: true } },
   assigneeContact: { select: { id: true, fullName: true } },
+  repeatRule: true,
 } satisfies Prisma.TaskSelect;
 
 /**
@@ -45,64 +60,82 @@ export async function todayTasks(userId: string): Promise<ListTask[]> {
   return rows.map(toListTask);
 }
 
-export interface AllFilters {
-  /** "open" (the default), "done" (Done and Canceled) or "all". */
-  status: string;
-  /** "u:<userId>", "c:<contactId>", "n:<legacy name>", "none", or "" for anyone. */
-  owner: string;
-  property: string;
-  q: string;
-}
-
-function ownerWhere(owner: string): Prisma.TaskWhereInput {
-  if (owner.startsWith("u:")) return { assigneeUserId: owner.slice(2) };
-  if (owner.startsWith("c:")) return { assigneeContactId: owner.slice(2) };
-  if (owner.startsWith("n:")) return { assigneeName: owner.slice(2), assigneeUserId: null, assigneeContactId: null };
-  // Same as Today's Unassigned: no real person, so legacy free-text names count too.
-  if (owner === "none") return { assigneeUserId: null, assigneeContactId: null };
-  return {};
-}
-
-/** The All tab: filtered, soonest due first, at most `take` rows plus the full count. */
-export async function allTasks(f: AllFilters, take: number): Promise<{ tasks: ListTask[]; total: number }> {
-  const where: Prisma.TaskWhereInput = {
-    ...excludeTemplateTasks,
-    ...(f.status === "done" ? closedTask : f.status === "all" ? {} : activeTask),
-    ...ownerWhere(f.owner),
-    ...(f.property ? { propertyId: f.property } : {}),
-    ...(f.q ? { title: { contains: f.q, mode: "insensitive" } } : {}),
-  };
+/**
+ * The Tasks page: the rows the view, picks and search leave, in their order
+ * (list-query.ts), at most `take` of them, plus the full count.
+ */
+export async function allTasks(
+  f: AllFilters,
+  take: number,
+  legacy: LegacyNames,
+): Promise<{ tasks: ListTask[]; total: number }> {
+  const where = allTasksWhere(f, legacy);
   const [rows, total] = await Promise.all([
-    prisma.task.findMany({
-      where,
-      orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
-      take,
-      select: LIST_SELECT,
-    }),
+    prisma.task.findMany({ where, orderBy: allTasksOrderBy(f.status), take, select: LIST_SELECT }),
     prisma.task.count({ where }),
   ]);
   return { tasks: rows.map(toListTask), total };
 }
 
-/** The pickers behind the All tab's assignee and property filters. */
-export async function listFilterOptions() {
-  const [users, contacts, legacyNames, properties] = await Promise.all([
-    prisma.user.findMany({ select: { id: true, name: true, email: true } }),
-    prisma.contact.findMany({ where: { active: true }, select: { id: true, fullName: true }, orderBy: { fullName: "asc" } }),
-    prisma.task.findMany({
-      where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...excludeTemplateTasks },
-      select: { assigneeName: true },
-      distinct: ["assigneeName"],
-      orderBy: { assigneeName: "asc" },
+/** How many tasks the filters leave: the number on the Filters sheet's "Show 13 tasks". */
+export async function countAllTasks(f: AllFilters, legacy: LegacyNames): Promise<number> {
+  return prisma.task.count({ where: allTasksWhere(f, legacy) });
+}
+
+/**
+ * The numbers beside the Tasks filters: per assignee and per property, what
+ * picking each would show with every other filter still on (so a row that
+ * leads nowhere reads 0), and `scope`, every task in the view, which "hidden
+ * by filters" is measured against.
+ */
+export async function taskFilterCounts(
+  f: AllFilters,
+  legacy: LegacyNames,
+): Promise<{ owner: Map<string, number>; property: Map<string, number>; scope: number }> {
+  const [ownerRows, propertyRows, scope] = await Promise.all([
+    prisma.task.groupBy({
+      by: ["assigneeUserId", "assigneeContactId", "assigneeName"],
+      where: allTasksWhere(f, legacy, "owner"),
+      _count: { _all: true },
     }),
-    prisma.property.findMany({ select: { id: true, address: true }, orderBy: { address: "asc" } }),
+    prisma.task.groupBy({ by: ["propertyId"], where: allTasksWhere(f, legacy, "property"), _count: { _all: true } }),
+    prisma.task.count({ where: viewScopeWhere(f.status) }),
   ]);
   return {
-    users,
-    contacts,
-    legacyNames: legacyNames.map((t) => t.assigneeName).filter((n): n is string => !!n),
-    properties,
+    owner: ownerCounts(
+      ownerRows.map((r) => ({ ...r, count: r._count._all })),
+      legacy,
+    ),
+    property: propertyCounts(propertyRows.map((r) => ({ propertyId: r.propertyId, count: r._count._all }))),
+    scope,
   };
+}
+
+/** Tasks per view for the current search and picks: the counts on Open, Done and All while a query is typed. */
+export async function taskViewCounts(f: AllFilters, legacy: LegacyNames): Promise<Record<TaskView, number>> {
+  const counts = await Promise.all(TASK_VIEWS.map((status) => prisma.task.count({ where: allTasksWhere({ ...f, status }, legacy) })));
+  return Object.fromEntries(TASK_VIEWS.map((v, i) => [v, counts[i]])) as Record<TaskView, number>;
+}
+
+/**
+ * The free-text assignee names the Asana import left behind, once each, and
+ * which of them are a person on offer (mergeLegacyNames): the Tasks filter
+ * lists the people, and "Others" for names that are nobody it can name.
+ */
+export async function legacyAssignees(
+  people: readonly PersonRef[],
+): Promise<{ merged: LegacyNames; others: string[] }> {
+  const rows = await prisma.task.findMany({
+    where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...excludeTemplateTasks },
+    select: { assigneeName: true },
+    distinct: ["assigneeName"],
+    orderBy: { assigneeName: "asc" },
+  });
+  const names = rows.map((t) => t.assigneeName).filter((n): n is string => !!n);
+  const { merged, others } = mergeLegacyNames(names, people);
+  const byPerson = new Map<string, string[]>();
+  for (const [name, key] of merged) byPerson.set(key, [...(byPerson.get(key) ?? []), name]);
+  return { merged: byPerson, others };
 }
 
 /**
@@ -114,4 +147,15 @@ export async function emailCapReached(today: Ymd): Promise<boolean> {
     where: { sentAt: { gte: easternDayStart(today), lt: easternDayStart(addDaysYmd(today, 1)!) } },
   });
   return sent >= EMAIL_DAILY_CAP;
+}
+
+/**
+ * Which legacy names stand for the people a filter picks, for the Filters
+ * sheet's count: only asked of the database when a person is picked.
+ */
+export async function legacyNamesFor(owner: readonly string[]): Promise<LegacyNames> {
+  if (!owner.some((k) => k.startsWith("u:") || k.startsWith("c:"))) return new Map();
+  // The people the page lists: the team, the active contractors, and any inactive one picked.
+  const { users, contractors } = await assigneeOptions(owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  return (await legacyAssignees(personRefs(users, contractors))).merged;
 }

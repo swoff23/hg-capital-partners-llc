@@ -1,11 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyMapsTo,
   autoMatchClass,
   buildPropertyIndex,
+  classLeaf,
   looksLikeProperty,
+  mapsToKey,
+  mapsToMessage,
   parseClassName,
+  parseMapsTo,
   propertyTokens,
+  type ClassTarget,
 } from "./mapping";
 
 // The 11 real Property rows (address + id).
@@ -102,4 +108,81 @@ test("looksLikeProperty flags a new refi class for a known property", () => {
 
 test("the property index is injective across the 11 properties", () => {
   assert.equal(idx.size, PROPERTIES.length);
+});
+
+// ---------------------------------------------------------------------------
+// "Maps to": one pick sets the role and the target together
+// ---------------------------------------------------------------------------
+
+const propertyClass: ClassTarget = { role: "PROPERTY", propertyId: "p_767", entityId: "e_hgc" };
+
+test("mapsToKey: what a class is mapped to now, as the picker's key", () => {
+  assert.equal(mapsToKey(propertyClass), "p:p_767");
+  assert.equal(mapsToKey({ role: "ENTITY", propertyId: null, entityId: "e_hgc" }), "e:e_hgc");
+  assert.equal(mapsToKey({ role: "OVERHEAD", propertyId: null, entityId: "e_hgc" }), "OVERHEAD");
+  assert.equal(mapsToKey({ role: "IGNORE", propertyId: null, entityId: null }), "IGNORE");
+  assert.equal(mapsToKey({ role: "UNMAPPED", propertyId: null, entityId: null }), null, "Unmapped is the empty choice");
+  assert.equal(mapsToKey({ role: "PROPERTY", propertyId: null, entityId: null }), null, "a property role with no property is unmapped");
+  assert.equal(mapsToKey({ role: "ENTITY", propertyId: null, entityId: null }), "ENTITY", "an entity role with none picked still shows");
+});
+
+test("parseMapsTo: the picker's keys back into picks", () => {
+  assert.deepEqual(parseMapsTo("p:p_767"), { kind: "property", propertyId: "p_767" });
+  assert.deepEqual(parseMapsTo("e:e_hgc"), { kind: "entity", entityId: "e_hgc" });
+  assert.deepEqual(parseMapsTo("OVERHEAD"), { kind: "overhead" });
+  assert.deepEqual(parseMapsTo("IGNORE"), { kind: "ignore" });
+  assert.deepEqual(parseMapsTo(null), { kind: "unmapped" });
+  assert.equal(parseMapsTo("p:"), null);
+  assert.equal(parseMapsTo("ENTITY"), null);
+  assert.equal(parseMapsTo("whatever"), null);
+});
+
+test("Maps to a property sets the role and the property together, and keeps the class's entity", () => {
+  const was: ClassTarget = { role: "UNMAPPED", propertyId: null, entityId: "e_hgc" };
+  assert.deepEqual(applyMapsTo(was, { kind: "property", propertyId: "p_767" }), {
+    role: "PROPERTY",
+    propertyId: "p_767",
+    entityId: "e_hgc",
+  });
+  // The old three-step way left a property behind when the role changed; one pick can't.
+  assert.deepEqual(applyMapsTo(propertyClass, { kind: "property", propertyId: "p_765" }).propertyId, "p_765");
+});
+
+test("Maps to an entity sets the role and the entity together, and drops the property", () => {
+  assert.deepEqual(applyMapsTo(propertyClass, { kind: "entity", entityId: "e_mgmt" }), {
+    role: "ENTITY",
+    propertyId: null,
+    entityId: "e_mgmt",
+  });
+});
+
+test("Maps to Overhead, Ignore or Unmapped sets the role and clears the property", () => {
+  for (const [pick, role] of [
+    [{ kind: "overhead" }, "OVERHEAD"],
+    [{ kind: "ignore" }, "IGNORE"],
+    [{ kind: "unmapped" }, "UNMAPPED"],
+  ] as const) {
+    assert.deepEqual(applyMapsTo(propertyClass, pick), { role, propertyId: null, entityId: "e_hgc" });
+  }
+});
+
+test("a pick read back from its own key is the same pick: Undo can put the old mapping back", () => {
+  for (const c of [
+    propertyClass,
+    { role: "ENTITY", propertyId: null, entityId: "e_hgc" },
+    { role: "OVERHEAD", propertyId: null, entityId: "e_hgc" },
+    { role: "IGNORE", propertyId: null, entityId: null },
+    { role: "UNMAPPED", propertyId: null, entityId: null },
+  ] as ClassTarget[]) {
+    const pick = parseMapsTo(mapsToKey(c));
+    assert.ok(pick);
+    assert.deepEqual(applyMapsTo(c, pick), c);
+  }
+});
+
+test("the toast names the class by its own name", () => {
+  assert.equal(classLeaf("HGC:HGC 767 Prospect"), "HGC 767 Prospect");
+  assert.equal(classLeaf("Prospect"), "Prospect");
+  assert.equal(mapsToMessage("Prospect", "767 Prospect Ave"), "Prospect mapped to 767 Prospect Ave");
+  assert.equal(mapsToMessage("HGC:HGC 767 Prospect", null), "HGC 767 Prospect unmapped");
 });

@@ -117,3 +117,88 @@ export function looksLikeProperty(fullyQualifiedName: string, tokens: Set<string
   }
   return false;
 }
+
+/* ---------------- "Maps to": one decision per class ---------------- */
+
+/** Every role a class can hold. `ClassRole` is what auto-matching can decide; a person can also ignore a class. */
+export type StoredClassRole = ClassRole | "IGNORE";
+
+/** What a class points at, as the mapping table stores it. */
+export interface ClassTarget {
+  role: StoredClassRole;
+  propertyId: string | null;
+  entityId: string | null;
+}
+
+/** One answer to "Maps to": a property, an entity, or one of the roles that has no target. */
+export type MapsToPick =
+  | { kind: "property"; propertyId: string }
+  | { kind: "entity"; entityId: string }
+  | { kind: "overhead" }
+  | { kind: "ignore" }
+  | { kind: "unmapped" };
+
+const KEY_OVERHEAD = "OVERHEAD";
+const KEY_IGNORE = "IGNORE";
+const KEY_ENTITY = "ENTITY";
+
+/**
+ * The picker's key for what a class is mapped to now, or null for Unmapped
+ * (the named empty choice). A property class names its property; one marked
+ * as a property with none picked is unmapped, as the save treats it.
+ */
+export function mapsToKey(c: ClassTarget): string | null {
+  switch (c.role) {
+    case "PROPERTY":
+      return c.propertyId ? `p:${c.propertyId}` : null;
+    case "ENTITY":
+      return c.entityId ? `e:${c.entityId}` : KEY_ENTITY;
+    case "OVERHEAD":
+      return KEY_OVERHEAD;
+    case "IGNORE":
+      return KEY_IGNORE;
+    default:
+      return null;
+  }
+}
+
+/** A picker key back into a pick; null for a key that isn't one ("ENTITY" with no entity is only ever shown). */
+export function parseMapsTo(key: string | null): MapsToPick | null {
+  if (key === null) return { kind: "unmapped" };
+  if (key === KEY_OVERHEAD) return { kind: "overhead" };
+  if (key === KEY_IGNORE) return { kind: "ignore" };
+  if (key.startsWith("p:") && key.length > 2) return { kind: "property", propertyId: key.slice(2) };
+  if (key.startsWith("e:") && key.length > 2) return { kind: "entity", entityId: key.slice(2) };
+  return null;
+}
+
+/**
+ * The role and target a pick sets together. A property keeps the entity the
+ * class's name gave it (the "HGC" in "HGC:HGC 15 Oxford"), which the entity
+ * rollups read; picking an entity drops any property; a role with no target
+ * drops the property and leaves the entity be.
+ */
+export function applyMapsTo(current: ClassTarget, pick: MapsToPick): ClassTarget {
+  switch (pick.kind) {
+    case "property":
+      return { role: "PROPERTY", propertyId: pick.propertyId, entityId: current.entityId };
+    case "entity":
+      return { role: "ENTITY", propertyId: null, entityId: pick.entityId };
+    case "overhead":
+      return { role: "OVERHEAD", propertyId: null, entityId: current.entityId };
+    case "ignore":
+      return { role: "IGNORE", propertyId: null, entityId: current.entityId };
+    case "unmapped":
+      return { role: "UNMAPPED", propertyId: null, entityId: current.entityId };
+  }
+}
+
+/** The class's own name in the table and toast: the leaf of "HGC:HGC 767 Prospect". */
+export function classLeaf(fullyQualifiedName: string): string {
+  return (fullyQualifiedName.split(":").pop() ?? fullyQualifiedName).trim() || fullyQualifiedName;
+}
+
+/** The toast after a pick: "Prospect mapped to 767 Prospect Ave", or "Prospect unmapped". */
+export function mapsToMessage(className: string, targetName: string | null): string {
+  return targetName ? `${classLeaf(className)} mapped to ${targetName}` : `${classLeaf(className)} unmapped`;
+}
