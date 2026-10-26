@@ -228,12 +228,13 @@ export function itemsVersion(items: readonly Pick<TemplateItem, "title">[]): str
 }
 
 /**
- * The key an application's draft is kept under: the playbook, its version
- * (`itemsVersion`) and the building the page was opened for (`?property=`),
- * so a draft for building A is never put over a page opened for building B.
+ * The key an application's draft is kept under: the person, the playbook,
+ * its version (`itemsVersion`) and the building the page was opened for
+ * (`?property=`), so a draft for building A is never put over a page opened
+ * for building B, and a shared browser never hands one person's draft to another.
  */
-export function applyDraftKey(templateId: string, items: readonly Pick<TemplateItem, "title">[], initialPropertyId: string | null): string {
-  return `apply:${templateId}:${itemsVersion(items)}:${initialPropertyId ?? "none"}`;
+export function applyDraftKey(meId: string, templateId: string, items: readonly Pick<TemplateItem, "title">[], initialPropertyId: string | null): string {
+  return `apply:${meId}:${templateId}:${itemsVersion(items)}:${initialPropertyId ?? "none"}`;
 }
 
 /** The anchor date moved by an item's offset, or null without both. */

@@ -113,7 +113,7 @@ export function ApplyFlow({
   const form = useRef<HTMLDivElement>(null);
 
   // The draft: kept in this browser per playbook version and per building the page was opened for, put back after a reload.
-  const { restored, clear: clearDraft } = useDraft(applyDraftKey(templateId, items, initialPropertyId), s);
+  const { restored, clear: clearDraft } = useDraft(applyDraftKey(meId, templateId, items, initialPropertyId), s);
   const baseline = stableJson(initial);
   const dirty = stableJson(s) !== baseline;
   useHoldLeave(dirty ? { title: "Leave before creating tasks?", stay: "Keep editing" } : null);

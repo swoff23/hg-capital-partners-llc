@@ -226,15 +226,17 @@ test("a playbook's version changes with its tasks, so an old draft never lands o
   assert.match(itemsVersion(a), /^2-/);
 });
 
-test("an application's draft is kept per building it was opened for, so it never replaces another building's page", () => {
+test("an application's draft is kept per person and per building it was opened for, so it never replaces another's page", () => {
   const items = [{ title: "Collect deposit" }, { title: "Give keys" }];
-  const forA = applyDraftKey("t1", items, "prop_A");
-  const forB = applyDraftKey("t1", items, "prop_B");
-  const none = applyDraftKey("t1", items, null);
-  assert.equal(forA, applyDraftKey("t1", items, "prop_A"), "the same page finds its own draft again");
+  const forA = applyDraftKey("u1", "t1", items, "prop_A");
+  const forB = applyDraftKey("u1", "t1", items, "prop_B");
+  const none = applyDraftKey("u1", "t1", items, null);
+  assert.equal(forA, applyDraftKey("u1", "t1", items, "prop_A"), "the same page finds its own draft again");
   assert.equal(new Set([forA, forB, none]).size, 3);
+  // A second person on the same browser never gets the first one's draft.
+  assert.notEqual(forA, applyDraftKey("u2", "t1", items, "prop_A"));
   // Still per playbook and per version of its tasks.
-  assert.notEqual(forA, applyDraftKey("t2", items, "prop_A"));
-  assert.notEqual(forA, applyDraftKey("t1", [...items, { title: "Walk the unit" }], "prop_A"));
-  assert.ok(forA.startsWith(`apply:t1:${itemsVersion(items)}:`));
+  assert.notEqual(forA, applyDraftKey("u1", "t2", items, "prop_A"));
+  assert.notEqual(forA, applyDraftKey("u1", "t1", [...items, { title: "Walk the unit" }], "prop_A"));
+  assert.ok(forA.startsWith(`apply:u1:t1:${itemsVersion(items)}:`));
 });
