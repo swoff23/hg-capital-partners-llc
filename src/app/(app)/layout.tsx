@@ -5,6 +5,7 @@ import { signOut } from "@/app/login/actions";
 import { readListHrefs } from "@/lib/list-memory";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import { AppShell } from "@/components/app-shell";
+import { LeaveGuard } from "@/components/leave-guard";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
 
 // Android Chrome resizes the page for its on-screen keyboard, so a sheet's
@@ -15,22 +16,31 @@ import { RefreshOnReturn } from "@/components/refresh-on-return";
 // layout's themeColor.
 export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
-export default async function AppLayout({ children }: LayoutProps<"/">) {
+/**
+ * Every signed-in page. `LeaveGuard` sits above the shell, so a dirty form
+ * sheet, editor or draft holds the back links, tabs, sidebar and Sign out
+ * (forms 2.11). `modal` is the slot the create sheets open in over the page
+ * (`@modal`, intercepting routes; see its default.tsx).
+ */
+export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
   const user = await requireUser();
   const jar = await cookies();
   const pinned = jar.get(SIDEBAR_COOKIE)?.value === "1";
 
   return (
-    <AppShell
-      userName={user.name ?? null}
-      userEmail={user.email}
-      initialPinned={pinned}
-      // Each list's last query, so the sidebar's links open the lists as they were left.
-      listHrefs={readListHrefs(jar)}
-      signOutAction={signOut}
-    >
-      <RefreshOnReturn />
-      {children}
-    </AppShell>
+    <LeaveGuard>
+      <AppShell
+        userName={user.name ?? null}
+        userEmail={user.email}
+        initialPinned={pinned}
+        // Each list's last query, so the sidebar's links open the lists as they were left.
+        listHrefs={readListHrefs(jar)}
+        signOutAction={signOut}
+      >
+        <RefreshOnReturn />
+        {children}
+        {modal}
+      </AppShell>
+    </LeaveGuard>
   );
 }

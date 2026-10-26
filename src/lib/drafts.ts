@@ -1,0 +1,93 @@
+/**
+ * The rules behind `useDraft` (components/use-draft.ts, forms 2.11): how a
+ * draft is stored in this browser, when it has expired, and when a change to
+ * an editor's value is worth writing down. Pure, so drafts.test.ts can run
+ * them without a browser.
+ *
+ * A draft is stored as `{ v: 1, at, value }` under "hg-draft:<key>". The key
+ * names the editor, the record and the version it opened with
+ * ("unit:prop_1:2026-10-26T14:02:11.000Z:unit-2"), so a draft typed against
+ * an older version never lands on a newer one.
+ */
+
+/** Where drafts live in localStorage. The task composer keeps its own "hgos-task-draft:" entries. */
+export const DRAFT_PREFIX = "hg-draft:";
+
+/** How long a draft is kept unless the hook says otherwise. */
+export const DRAFT_MAX_AGE_DAYS = 7;
+
+const DAY_MS = 86_400_000;
+
+export function draftStorageKey(key: string): string {
+  return DRAFT_PREFIX + key;
+}
+
+/** A draft as it comes back: the value and when it was written. */
+export type DraftEntry<T> = { value: T; savedAt: Date };
+
+/** Older than `maxAgeDays`: thrown away on read. */
+export function isDraftExpired(at: number, now: number, maxAgeDays: number = DRAFT_MAX_AGE_DAYS): boolean {
+  return now - at > maxAgeDays * DAY_MS;
+}
+
+export function encodeDraft(value: unknown, at: number): string {
+  return JSON.stringify({ v: 1, at, value });
+}
+
+/**
+ * The stored draft, or null when there's none, it doesn't parse, it's from
+ * another version of this format, or it has expired.
+ */
+export function decodeDraft<T>(raw: string | null | undefined, now: number, maxAgeDays: number = DRAFT_MAX_AGE_DAYS): DraftEntry<T> | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const { v, at, value } = parsed as { v?: unknown; at?: unknown; value?: unknown };
+  if (v !== 1 || typeof at !== "number" || !Number.isFinite(at) || value === undefined) return null;
+  if (isDraftExpired(at, now, maxAgeDays)) return null;
+  return { value: value as T, savedAt: new Date(at) };
+}
+
+/**
+ * JSON with object keys sorted, so two values that hold the same thing
+ * compare equal however their objects were built. Arrays keep their order.
+ */
+export function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : v,
+  ) ?? "undefined";
+}
+
+/**
+ * What the hook remembers about one editor's value: the key it's for, the
+ * value it opened with (`baseline`), the last value it saw, and whether the
+ * person has changed anything since it opened.
+ */
+export type DraftTrack = { key: string; baseline: string; last: string; touched: boolean };
+
+/**
+ * Decides what a new value means for the stored draft:
+ *  - a new key (or the first value seen) is the editor opening: remember it, write nothing;
+ *  - the same value as last time: nothing;
+ *  - back to what it opened with, after a change: the draft goes ("remove");
+ *  - anything else is unsaved work: write it.
+ * Nothing is removed on open, so a draft waiting to be restored survives the
+ * editor's first render with its loaded values.
+ */
+export function trackDraft(
+  prev: DraftTrack | null,
+  key: string,
+  json: string,
+): { track: DraftTrack; action: "write" | "remove" | "none" } {
+  if (!prev || prev.key !== key) return { track: { key, baseline: json, last: json, touched: false }, action: "none" };
+  if (json === prev.last) return { track: prev, action: "none" };
+  if (json === prev.baseline) return { track: { ...prev, last: json }, action: prev.touched ? "remove" : "none" };
+  return { track: { ...prev, last: json, touched: true }, action: "write" };
+}

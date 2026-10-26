@@ -1,6 +1,6 @@
 import "server-only";
 import { unstable_rethrow } from "next/navigation";
-import { type ActionResult, userMessage } from "./action-result";
+import { type ActionResult, toFailure } from "./action-result";
 import { logError } from "./log";
 
 /**
@@ -27,7 +27,7 @@ export async function withResult<T>(name: string, fn: () => Promise<T>): Promise
   } catch (err) {
     unstable_rethrow(err);
     logError(`action:${name}`, err);
-    return { ok: false, error: userMessage(err) };
+    return toFailure(err);
   }
 }
 

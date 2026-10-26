@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
+import { ActionBar, actionBarButton } from "@/components/action-bar";
 import { useHoldLeave, useLeaveGuard } from "@/components/leave-guard";
 import {
   MediaUploadTray,
@@ -13,17 +14,12 @@ import {
 } from "@/components/media-uploader";
 import { Sheet } from "@/components/sheet";
 import { SpotArt } from "@/components/spot-art";
-import { useToast, useToastInset } from "@/components/toast";
+import { useToast } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { finishingLabel, joinNames, markDoneButton, nextStep, stillUploading } from "@/lib/portal/job-view";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJobAction } from "../actions";
-
-/** Height of the sticky bar above the safe area: 48px buttons plus 12px padding each side. */
-const BAR_PX = 72;
-/** What the failed-upload line adds under the bar's buttons: a 12px gap and a 20px line. */
-const FAILED_LINE_PX = 32;
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -147,9 +143,8 @@ export function JobActions({
 
   const showBar = step !== null;
   // The bar grows by one line for the red Retry line or the "Finishing N uploads" line
-  // (never both); the toast sits above whichever shows.
+  // (never both); ActionBar lifts the toast above whichever shows.
   const finishingLine = step !== "start" && step !== "review" && pending > 0 && failed === 0;
-  useToastInset(showBar ? BAR_PX + (failed > 0 || finishingLine ? FAILED_LINE_PX : 0) : 0);
 
   function send() {
     const text = body.trim();
@@ -194,8 +189,7 @@ export function JobActions({
   const done = markDoneButton({ pending, failed, sending: finishing, hasContent: ready.length > 0 || note.trim() !== "" });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
-  // 48px on touch, a mouse's 36px control height otherwise (section 5).
-  const barButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 lg:w-60 lg:flex-none";
+  const barButton = actionBarButton;
   // The Mark done sheet's pair: half each on a phone, sized to their labels at the dialog's end from md.
   const sheetButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 md:flex-none";
 
@@ -235,40 +229,41 @@ export function JobActions({
 
       {/* Sticky bottom bar: the phone chrome, on --canvas over a --line rule. */}
       {showBar && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-          {/* Same width and gutters as the page, so the buttons line up with the content. */}
-          {/* 12px between the lines, so Retry's 44px touch area (12px past its line) never reaches the buttons. */}
-          <div className="mx-auto max-w-300 space-y-3 px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-3 lg:justify-end">
-              {/* Photos can still go up while HG reviews; only the next step waits. */}
-              <Button variant="secondary" className={cn(barButton, "max-[360px]:px-2")} onClick={uploader.chooseFiles}>
-                <Camera className="h-4 w-4 shrink-0 max-[360px]:hidden" aria-hidden="true" />
-                Add photo/video
+        <ActionBar
+          secondary={
+            // Photos can still go up while HG reviews; only the next step waits.
+            <Button variant="secondary" className={cn(barButton, "max-[360px]:px-2")} onClick={uploader.chooseFiles}>
+              <Camera className="h-4 w-4 shrink-0 max-[360px]:hidden" aria-hidden="true" />
+              Add photo/video
+            </Button>
+          }
+          primary={
+            step === "review" ? (
+              <Button variant="secondary" disabled className={cn(barButton, "text-fg-3 disabled:opacity-100 max-[360px]:px-2")}>
+                {/* Half the bar on a phone: the short label there, so it never truncates. */}
+                <span className="truncate sm:hidden">Waiting for review</span>
+                <span className="truncate max-sm:hidden">Waiting for HG to review</span>
               </Button>
-              {step === "review" ? (
-                <Button variant="secondary" disabled className={cn(barButton, "text-fg-3 disabled:opacity-100 max-[360px]:px-2")}>
-                  {/* Half the bar on a phone: the short label there, so it never truncates. */}
-                  <span className="truncate sm:hidden">Waiting for review</span>
-                  <span className="truncate max-sm:hidden">Waiting for HG to review</span>
-                </Button>
-              ) : step === "start" ? (
-                <Button className={barButton} disabled={starting} onClick={start}>
-                  {starting ? "Starting…" : "Start job"}
-                </Button>
-              ) : (
-                // Off while anything is still going up or failed; the line under the bar says which.
-                <Button className={cn(barButton, "max-[360px]:px-2")} disabled={pending > 0 || failed > 0} onClick={openMarkDone}>
-                  Mark done
-                </Button>
-              )}
-            </div>
-            {/* The disabled Mark done's one-line reason: uploads still going up, or the red Retry line. */}
-            {finishingLine && (
+            ) : step === "start" ? (
+              <Button className={barButton} disabled={starting} onClick={start}>
+                {starting ? "Starting…" : "Start job"}
+              </Button>
+            ) : (
+              // Off while anything is still going up or failed; the line under the bar says which.
+              <Button className={cn(barButton, "max-[360px]:px-2")} disabled={pending > 0 || failed > 0} onClick={openMarkDone}>
+                Mark done
+              </Button>
+            )
+          }
+          // The disabled Mark done's one-line reason: uploads still going up, or the red Retry line.
+          error={
+            finishingLine ? (
               <p className="text-center text-meta text-fg-3 lg:text-right">{finishingLabel(pending)}</p>
-            )}
-            <FailedUploadsLine uploader={uploader} className="lg:justify-end" />
-          </div>
-        </div>
+            ) : failed > 0 ? (
+              <FailedUploadsLine uploader={uploader} className="lg:justify-end" />
+            ) : null
+          }
+        />
       )}
 
       {/* Mark done, then the payoff */}

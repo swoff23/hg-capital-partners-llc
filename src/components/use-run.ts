@@ -1,55 +1,78 @@
 "use client";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { callAction, type ActionConflict, type ActionResult, type FieldErrors } from "@/lib/action-result";
 import { useToast } from "@/components/toast";
 
-export type RunOptions = {
+export type RunOptions<T = unknown> = {
   before?: () => void;
-  /** After a failure's toast: put back what the user typed. */
+  /** After a failure: put back what the user typed. */
   failed?: () => void;
+  /** After a success, with what the action returned: a create's `{ id }`, so a sheet can close or open the record. */
+  succeeded?: (data: T) => void;
   done?: string;
   /** The ripple clause after `done`, in the toast's second tone: "Unit cleared". */
   detail?: string;
   /** What the toast is about ("task:abc:due"): a quick second edit replaces the toast instead of stacking another. */
   key?: string;
   undo?: () => Promise<ActionResult<unknown>>;
+  /**
+   * Where a failure shows. "toast" (the default) toasts its one line, as the
+   * task page's chips do. "inline" doesn't: the caller shows `error`,
+   * `fieldErrors` and `conflict` in place, on the field or above the primary
+   * (forms 2.0 and 2.12).
+   */
+  failure?: "toast" | "inline";
 };
 
 export type UseRun = {
-  run: (action: () => Promise<ActionResult<unknown>>, opts?: RunOptions) => void;
-  /** True while an action runs. */
+  run: <T>(action: () => Promise<ActionResult<T>>, opts?: RunOptions<T>) => void;
+  /** True while an action runs, Undo's save included. */
   pending: boolean;
   toast: ReturnType<typeof useToast>["toast"];
   /**
-   * The last failure's line, its per-field messages and a save conflict, for
-   * a form that shows them in place instead of a toast (forms 2.12). The save
-   * pipeline fills them when it lands; until then they stay undefined and a
-   * failure shows as today's toast.
+   * The last run's failure, for a form that shows it in place (forms 2.12):
+   * its one line, each field's line from a zod failure, and a save conflict
+   * (who, when, their values). Cleared when the next run starts, and by
+   * `reset`. Undefined after a success.
    */
   error?: string;
   fieldErrors?: FieldErrors;
   conflict?: ActionConflict;
+  /** Drops the shown failure: the person edited the field it was about, or closed the form. */
+  reset: () => void;
 };
+
+type Failure = { error: string; fieldErrors?: FieldErrors; conflict?: ActionConflict };
 
 /**
  * Run a record's action in a transition. A refusal, or a call that never got
- * through, shows as a toast; `done` adds a confirmation, with Undo when
- * `undo` is given. Optimistic values set inside `before` last until the page
- * refreshes. Moved here from the task page so pickers and rails share it.
+ * through, shows as a toast (or, with `failure: "inline"`, only in the
+ * returned `error`, `fieldErrors` and `conflict`); `done` adds a
+ * confirmation, with Undo when `undo` is given. Optimistic values set inside
+ * `before` last until the page refreshes. Pickers, rails and form sheets
+ * share it.
  */
 export function useRun(): UseRun {
   const { toast } = useToast();
   const [pending, start] = useTransition();
+  const [failure, setFailure] = useState<Failure | null>(null);
 
-  function run(action: () => Promise<ActionResult<unknown>>, opts: RunOptions = {}) {
+  function run<T>(action: () => Promise<ActionResult<T>>, opts: RunOptions<T> = {}) {
+    setFailure(null);
     start(async () => {
       opts.before?.();
       const res = await callAction(action);
       if (!res.ok) {
-        toast({ message: res.error });
+        setFailure({
+          error: res.error,
+          ...(res.fieldErrors ? { fieldErrors: res.fieldErrors } : {}),
+          ...(res.conflict ? { conflict: res.conflict } : {}),
+        });
+        if (opts.failure !== "inline") toast({ message: res.error });
         opts.failed?.();
         return;
       }
+      opts.succeeded?.(res.data);
       if (opts.done) {
         const undo = opts.undo;
         toast({
@@ -75,5 +98,13 @@ export function useRun(): UseRun {
     });
   }
 
-  return { run, pending, toast, error: undefined, fieldErrors: undefined, conflict: undefined };
+  return {
+    run,
+    pending,
+    toast,
+    error: failure?.error,
+    fieldErrors: failure?.fieldErrors,
+    conflict: failure?.conflict,
+    reset: () => setFailure(null),
+  };
 }

@@ -24,10 +24,10 @@ import { cn } from "@/lib/utils";
  * (`showTheme={false}`).
  *
  * Sign out goes through `useLeaveGuard({ signOut: true })`, which asks first
- * wherever a LeaveGuard sits above the menu and a hold is on. Neither the app
- * shell nor the portal layout mounts one yet, so for now it never asks; the
- * upload chunk (UP1, F2) mounts them. `signOutAction` is the server action
- * that ends the session and redirects to sign-in.
+ * while a hold is on in the LeaveGuard the app layout wraps around the shell:
+ * a dirty form (scope "all") or, once the upload queue holds it, uploads in
+ * flight (scope "sign-out"). `signOutAction` is the server action that ends
+ * the session and redirects to sign-in.
  */
 export function AccountMenu({
   name,

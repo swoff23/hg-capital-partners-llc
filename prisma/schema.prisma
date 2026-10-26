@@ -42,6 +42,10 @@ model User {
   createdPortalAccounts PortalAccount[]
   notifications         NotificationOutbox[]
   recentViews           RecentView[]
+  // Who last changed a property or deal, for the conflict line on a save
+  // ("Pieter set this to $410,000 at 2:14 PM", forms 2.12).
+  updatedProperties     Property[]           @relation("PropertyUpdatedBy")
+  updatedDeals          Deal[]               @relation("DealUpdatedBy")
 
   qboConnections QuickbooksConnection[]
 }
@@ -56,7 +60,7 @@ model Deal {
   // Prices: parsed numbers where possible, raw text always preserved.
   theirPrice    Decimal? @db.Decimal(12, 2)
   theirPriceRaw String?
-  ourPrice      Decimal? @db.Decimal(12, 2) // HG target / max offer
+  ourPrice      Decimal? @db.Decimal(12, 2) // HG's target offer ("Target offer" in the UI)
   ourPriceRaw   String?
   currentOffer  Decimal? @db.Decimal(12, 2)
 
@@ -85,8 +89,12 @@ model Deal {
   notes DealNote[]
   tasks Task[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  // Who made the last change (patchDeal, createDeal), so a conflict names them. Null on
+  // rows from before it was recorded, and when that user is deleted.
+  updatedByUser   User?    @relation("DealUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedByUserId String?
 
   @@index([status])
   @@index([address])
@@ -175,8 +183,12 @@ model Property {
   qboClasses  QboClass[]
   ledgerLines LedgerLine[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  // Who made the last change (every write in lib/properties/service.ts), so a conflict
+  // names them. Null on rows from before it was recorded, and when that user is deleted.
+  updatedByUser   User?    @relation("PropertyUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedByUserId String?
 
   @@index([address])
 }

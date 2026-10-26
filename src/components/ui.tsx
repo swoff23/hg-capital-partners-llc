@@ -540,6 +540,102 @@ export function SaveError({ children, className, id }: { children: React.ReactNo
   );
 }
 
+/* ---------------- Form field ----------------
+   The label, the control and one line under it (forms 2.0 and 2.2). Named
+   FormField because Field is the label-over-value display pair. */
+
+/** What a FormField hands its control, so `Input`, `NumberInput`, `Select` and the rest wire up the same way. */
+export type FormFieldControlProps = {
+  id: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: true;
+  "aria-required"?: true;
+};
+
+/**
+ * A form field: the label above (`text-meta` 500 `--fg-2`, 6px over the
+ * control), then the control, then one `text-meta` line: the helper in
+ * `--fg-3`, or the error in `--danger` in its place. Optional fields say
+ * "(optional)" after the label in `--fg-3`; required ones show nothing and
+ * set `aria-required`. No asterisks. The render prop hands the control its
+ * `id`, `aria-describedby`, `aria-invalid` and `aria-required`; the label
+ * points at the `id`, so clicking it focuses the control.
+ *
+ *   <FormField label="Asking price" optional helper="Shown on the deal" error={fieldErrors?.theirPriceRaw}>
+ *     {(p) => <NumberInput kind="money" name="theirPriceRaw" {...p} />}
+ *   </FormField>
+ *
+ * The line never wraps: write the helper to fit the field's width. Nothing
+ * is red before the first try; pass `error` once the form has been sent or
+ * the field left with a bad format (forms 2.0, Timing). On the public
+ * surface the tokens draw it dark.
+ */
+export function FormField({
+  label,
+  optional = false,
+  required = false,
+  helper,
+  error,
+  id: idProp,
+  hideLabel = false,
+  className,
+  children,
+}: {
+  label: React.ReactNode;
+  /** Adds "(optional)" after the label. */
+  optional?: boolean;
+  /** Sets `aria-required` on the control. Nothing shows. */
+  required?: boolean;
+  /** One line under the control: who sees it or what happens ("Adds a reminder 60 days before"). */
+  helper?: React.ReactNode;
+  /**
+   * One plain line saying what to enter ("Enter the address."); replaces the
+   * helper and marks the control invalid. A string almost always; a node when
+   * the line carries a link ("767 Prospect Ave is already a property. Open it").
+   */
+  error?: React.ReactNode;
+  /** The control's id; one is made when it's left out. */
+  id?: string;
+  /** Keep the label for screen readers only (a field whose sheet title already names it). */
+  hideLabel?: boolean;
+  className?: string;
+  children: (control: FormFieldControlProps) => React.ReactNode;
+}) {
+  const made = React.useId();
+  const id = idProp ?? `${made}-field`;
+  const lineId = `${id}-line`;
+  const invalid = error !== undefined && error !== null && error !== false && error !== "";
+  const line = invalid ? error : helper;
+  return (
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+      <label htmlFor={id} className={cn("text-meta font-medium text-fg-2", hideLabel && "sr-only")}>
+        {label}
+        {optional && <span className="font-normal text-fg-3"> (optional)</span>}
+      </label>
+      {children({
+        id,
+        ...(line ? { "aria-describedby": lineId } : {}),
+        ...(invalid ? { "aria-invalid": true as const } : {}),
+        ...(required ? { "aria-required": true as const } : {}),
+      })}
+      {line && (
+        <p id={lineId} className={cn("truncate text-meta", invalid ? "text-danger" : "text-fg-3")}>
+          {line}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Two fields side by side from sm, one column below it (forms 2.2): only for
+ * short, related values whose labels both fit on one line (City and ZIP, the
+ * two deal prices, Beds and Baths). 16px between them either way.
+ */
+export function FieldRow({ className, ...props }: React.ComponentProps<"div">) {
+  return <div className={cn("grid gap-4 sm:grid-cols-2", className)} {...props} />;
+}
+
 /* ---------------- Table ----------------
    The page scrolls, not the table; a table wider than its column scrolls
    sideways in its own box (TableFrame), so it never widens the page. While
