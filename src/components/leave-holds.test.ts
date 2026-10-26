@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { holdApplies, holdFor, setHold, type HoldEntry } from "./leave-holds";
+import { hasUnsavedWork, holdApplies, holdFor, setHold, type HoldEntry } from "./leave-holds";
 
 const form = { title: "Leave without saving Unit 2?", stay: "Keep editing", scope: "all" as const };
 const uploads = { title: "2 photos are still uploading", stay: "Keep uploading", scope: "sign-out" as const };
@@ -39,6 +39,15 @@ test("lifting a hold leaves the others; nothing held means leave at once", () =>
   holds = setHold(holds, "up", null);
   assert.deepEqual(holds, []);
   assert.equal(holdFor(holds, true), null);
+});
+
+test("unsaved work is a hold on every exit; uploads in flight are not a draft", () => {
+  assert.equal(hasUnsavedWork([]), false);
+  assert.equal(hasUnsavedWork(setHold([], "up", uploads)), false);
+  assert.equal(hasUnsavedWork(setHold([], "form", form)), true);
+  assert.equal(hasUnsavedWork(setHold(setHold([], "up", uploads), "form", form)), true);
+  // Saved, or discarded: the hold lifts and the page can refresh again.
+  assert.equal(hasUnsavedWork(setHold(setHold([], "form", form), "form", null)), false);
 });
 
 test("new words keep a hold's place; the same words change nothing", () => {

@@ -13,7 +13,7 @@ import {
 } from "react";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
-import { holdFor, setHold, type HoldEntry, type LeaveScope, type LeaveWords } from "@/components/leave-holds";
+import { hasUnsavedWork, holdFor, setHold, type HoldEntry, type LeaveScope, type LeaveWords } from "@/components/leave-holds";
 
 /**
  * Asks before an in-app link leaves work behind: photos still uploading
@@ -37,6 +37,10 @@ import { holdFor, setHold, type HoldEntry, type LeaveScope, type LeaveWords } fr
  * outlives the page (build plan conflict 33). When several apply, the one
  * placed last speaks.
  *
+ * `useUnsavedWork()` reads whether any hold on every exit is on, so a page
+ * that would refresh itself waits (RefreshOnReturn). `surface="public"` draws
+ * the question on the public site's dark tokens, for the public move-in page.
+ *
  * In-app links never fire beforeunload, so a reload or a closed tab is
  * useLeaveWarning's job (media-uploader.tsx), and useDraft's. The browser's
  * own Back isn't caught here.
@@ -56,7 +60,17 @@ type Guard = {
 
 const LeaveGuardContext = createContext<Guard | null>(null);
 
-export function LeaveGuard({ children }: { children: ReactNode }) {
+/** Whether any hold that covers every exit is on: a dirty sheet, editor or draft (not the upload queue's sign-out hold). */
+const UnsavedContext = createContext(false);
+
+export function LeaveGuard({
+  children,
+  surface = "app",
+}: {
+  children: ReactNode;
+  /** "public" draws the question on the public site's dark tokens (the public move-in page). */
+  surface?: "app" | "public";
+}) {
   const [holds, setHolds] = useState<HoldEntry[]>([]);
   // The exit being asked about, or null when no question is open.
   const [asking, setAsking] = useState<{ signOut: boolean } | null>(null);
@@ -88,15 +102,18 @@ export function LeaveGuard({ children }: { children: ReactNode }) {
     leaveTo.current?.();
   }
 
+  const unsaved = hasUnsavedWork(holds);
+
   return (
     <LeaveGuardContext value={guard}>
-      {children}
+      <UnsavedContext value={unsaved}>{children}</UnsavedContext>
       <Sheet
         isOpen={current !== null}
         onOpenChange={(open) => {
           if (!open) setAsking(null);
         }}
         title={words?.title ?? ""}
+        surface={surface}
         className="md:w-[28rem]"
       >
         <div className="p-4">
@@ -131,6 +148,16 @@ export function useHoldLeave(hold: LeaveHold | null) {
     set(id, title !== undefined && stay !== undefined ? { title, stay, scope } : null);
   }, [set, id, title, stay, scope]);
   useEffect(() => (set ? () => set(id, null) : undefined), [set, id]);
+}
+
+/**
+ * True while any dirty sheet, editor or draft holds the guard (a hold with
+ * scope "all"; the upload queue's "sign-out" hold doesn't count). The page
+ * refreshing itself reads it, so a tab coming back never re-renders under
+ * unsaved work (`RefreshOnReturn`, forms 2.11). False outside a LeaveGuard.
+ */
+export function useUnsavedWork(): boolean {
+  return useContext(UnsavedContext);
 }
 
 const leaveNow = (leave: () => void) => leave();

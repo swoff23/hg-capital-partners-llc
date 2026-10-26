@@ -61,17 +61,28 @@ test("offline: nothing refreshes until the connection is back", () => {
   assert.equal(shouldRefresh({ kind: "online" }, base), true);
 });
 
-test("the move-in form editor and applying a playbook hold off, so their drafts survive", () => {
-  assert.equal(refreshHeld("/settings/move-in-form"), true);
-  assert.equal(refreshHeld("/settings/move-in-form/"), true);
-  assert.equal(refreshHeld("/settings"), false);
-  assert.equal(refreshHeld("/settings/capex-rules"), false);
-  assert.equal(refreshHeld("/templates/cmtg25y4m0003jphsrpe7xpb8/apply"), true);
-  assert.equal(refreshHeld("/templates/cmtg25y4m0003jphsrpe7xpb8/apply/"), true);
-  assert.equal(refreshHeld("/templates"), false);
-  assert.equal(refreshHeld("/templates/abc"), false);
-  const onEditor = { ...base, pathname: "/settings/move-in-form" };
-  assert.equal(shouldRefresh({ kind: "visible", hiddenMs: 10 * 60_000 }, onEditor), false);
-  const onApply = { ...base, pathname: "/templates/abc/apply", today: "2026-10-24" };
-  assert.equal(shouldRefresh({ kind: "online" }, onApply), false);
+test("a dirty draft holds the refresh on any page, instead of a list of pages", () => {
+  // The move-in form editor, the CapEx rules and Apply playbook aren't named anywhere any more.
+  for (const pathname of ["/settings/move-in-form", "/settings", "/templates/abc/apply", "/tasks", "/deals/abc"]) {
+    assert.equal(refreshHeld(pathname), false, pathname);
+    const clean = { ...base, pathname };
+    assert.equal(shouldRefresh({ kind: "visible", hiddenMs: 10 * 60_000 }, clean), true, pathname);
+    const dirty = { ...clean, unsaved: true };
+    assert.equal(shouldRefresh({ kind: "visible", hiddenMs: 10 * 60_000 }, dirty), false, pathname);
+    assert.equal(shouldRefresh({ kind: "online" }, dirty), false, pathname);
+    assert.equal(shouldRefresh({ kind: "pageshow", persisted: true }, dirty), false, pathname);
+  }
+});
+
+test("a new day doesn't refresh over unsaved work either, and the next return asks again", () => {
+  const dirtyNextDay = { ...base, today: "2026-10-24", unsaved: true };
+  assert.equal(shouldRefresh({ kind: "clock" }, dirtyNextDay), false);
+  assert.equal(shouldRefresh({ kind: "visible", hiddenMs: 2_000 }, dirtyNextDay), false);
+  // Saved or discarded: the hold lifts, and the day's change catches up.
+  assert.equal(shouldRefresh({ kind: "visible", hiddenMs: 2_000 }, { ...dirtyNextDay, unsaved: false }), true);
+});
+
+test("an unsaved flag left out means nothing is held", () => {
+  assert.equal(shouldRefresh({ kind: "online" }, base), true);
+  assert.equal(shouldRefresh({ kind: "online" }, { ...base, unsaved: false }), true);
 });

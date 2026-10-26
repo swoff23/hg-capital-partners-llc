@@ -6,44 +6,45 @@ import { requireUser } from "@/lib/auth";
 import { orphanedEquipmentTypes, parseBuildingCapex, parseUnits, type CapexRules } from "@/lib/property-types";
 import type { ActionResult } from "@/lib/action-result";
 import { getAppConfig } from "@/lib/app-config";
-import { saveAppConfigAtVersion } from "@/lib/app-config-write";
+import { saveAppConfigColumn } from "@/lib/app-config-write";
 import { withResult } from "@/lib/server-action";
 
 const RESERVED = new Set(["__proto__", "constructor", "prototype"]);
 
-// z.coerce.number() rejects NaN / non-numeric; .int() additionally rejects Infinity.
-const age = z.coerce.number().int().min(0).max(200);
-const money = z.coerce.number().min(0).max(10_000_000);
+// The words are the editor's (lib/capex-draft.ts says the same ones before a save is sent), so a refusal reads the same either way.
+const years = (field: z.ZodNumber) => field.int("Enter a whole number of years.").min(0, "Enter 0 to 200 years.").max(200, "Enter 0 to 200 years.");
+const age = () => years(z.number({ error: "Enter a whole number of years." }));
+const money = () =>
+  z
+    .number({ error: "Enter an amount, like 6,000." })
+    .min(0, "Enter an amount up to 10,000,000.")
+    .max(10_000_000, "Enter an amount up to 10,000,000.");
+
+const ORDER = "Replace comes after Monitor.";
 
 const equipmentRule = z
   .object({
-    type: z.string().trim().min(1).max(60),
-    monitor: age,
-    replace: age,
-    cost: money,
+    type: z.string({ error: "Choose a type." }).trim().min(1, "Choose a type.").max(60, "Keep the type under 60 characters."),
+    monitor: age(),
+    replace: age(),
+    cost: money(),
   })
-  .refine((r) => r.replace >= r.monitor, {
-    path: ["replace"],
-    message: "Replace age must be ≥ Monitor age",
-  });
+  .refine((r) => r.replace >= r.monitor, { path: ["replace"], message: ORDER });
 
 const buildingRule = z
   .object({
     // present for existing rows; null / absent for a row added in the editor
     key: z.string().trim().min(1).max(40).nullish(),
-    label: z.string().trim().min(1).max(80),
-    monitor: age,
-    replace: age,
-    defaultCost: money,
+    label: z.string({ error: "Name this system." }).trim().min(1, "Name this system.").max(80, "Keep the name under 80 characters."),
+    monitor: age(),
+    replace: age(),
+    defaultCost: money(),
   })
-  .refine((r) => r.replace >= r.monitor, {
-    path: ["replace"],
-    message: "Replace age must be ≥ Monitor age",
-  });
+  .refine((r) => r.replace >= r.monitor, { path: ["replace"], message: ORDER });
 
 const schema = z.object({
-  equipment: z.array(equipmentRule).max(60),
-  building: z.array(buildingRule).max(60),
+  equipment: z.array(equipmentRule).max(60, "That is more than 60 rules."),
+  building: z.array(buildingRule).max(60, "That is more than 60 systems."),
 });
 
 /** label → a short, stable, url-safe key. Empty result falls back to "system". */
@@ -59,17 +60,23 @@ function slug(label: string): string {
   );
 }
 
+/** A refusal that belongs to one cell, so the editor puts it there ("equipment.2.type"). */
+const cell = (path: (string | number)[], message: string) => new z.ZodError([{ code: "custom", path, message, input: undefined }]);
+
 /**
- * Replace the whole CapEx rule set (AppConfig, single row). Existing building
+ * Replace the whole CapEx rule set (AppConfig, single row): the editor is a
+ * draft now, saved as one whole with Save (forms 3.4 A). Existing building
  * rows keep their key; a new row gets a collision-safe slug generated against
  * every key already in the payload, the defaults, and every key currently in use
  * across `Property.buildingCapex` — so a generated slug can never silently adopt
  * an unrelated property's dormant data.
  *
- * Returns the persisted rules (rather than the repo's usual `void`) because the
- * editor autosaves per field with no separate Save step — a just-added building
- * system is sent with `key: null` and needs its server-generated key echoed back
- * before the next edit to that row, or a fresh slug would be minted every time.
+ * `expectedVersion` is the version of the CapEx blob the editor loaded
+ * (`blobVersion`), compared with the stored blob alone, so saving the move-in
+ * form never conflicts it; a CapEx blob someone else saved since is a
+ * `ConflictError` naming who and when. Returns the persisted rules, because a
+ * just-added building system is sent with `key: null` and needs its
+ * server-generated key echoed back, and the new version for the next Save.
  */
 export interface SavedCapexRules {
   rules: CapexRules;
@@ -84,8 +91,8 @@ export async function saveCapexRules(
     const user = await requireUser();
     const parsed = schema.parse(input);
 
-    if (parsed.equipment.length === 0 || parsed.building.length === 0)
-      throw new Error("Keep at least one equipment rule and one building system.");
+    if (parsed.equipment.length === 0) throw cell(["equipment"], "Keep at least one equipment rule.");
+    if (parsed.building.length === 0) throw cell(["building"], "Keep at least one building system.");
 
     // equipment: de-dupe by type (last wins)
     const equipment = [...new Map(parsed.equipment.map((e) => [e.type, e])).values()].map((e) => ({
@@ -101,23 +108,23 @@ export async function saveCapexRules(
       ...inUse,
       ...(parsed.building.map((b) => b.key?.trim()).filter(Boolean) as string[]),
     ]);
-    for (const k of taken) if (RESERVED.has(k)) throw new Error(`Reserved building key: ${k}`);
+    for (const k of taken) if (RESERVED.has(k)) throw new Error("That system key is reserved. Pick another name.");
 
     const seenLabel = new Set<string>();
-    const building = parsed.building.map((b) => {
+    const building = parsed.building.map((b, i) => {
       const lk = b.label.toLowerCase();
-      if (seenLabel.has(lk)) throw new Error(`Duplicate building system name: ${b.label}`);
+      if (seenLabel.has(lk)) throw cell(["building", i, "label"], `${b.label} is already listed.`);
       seenLabel.add(lk);
 
       let key = b.key?.trim() || "";
       if (!key) {
         const base = slug(b.label);
         key = base;
-        let i = 2;
-        while (taken.has(key) || RESERVED.has(key)) key = `${base}-${i++}`;
+        let n = 2;
+        while (taken.has(key) || RESERVED.has(key)) key = `${base}-${n++}`;
         taken.add(key);
       }
-      if (RESERVED.has(key)) throw new Error(`Reserved building key: ${key}`);
+      if (RESERVED.has(key)) throw new Error("That system key is reserved. Pick another name.");
 
       return {
         key,
@@ -140,18 +147,17 @@ export async function saveCapexRules(
       props.map((p) => ({ address: p.address, units: parseUnits(p.units) })),
     );
     if (orphans.length > 0) {
-      const detail = orphans
-        .map((o) => `${o.type} (${o.count} on ${o.properties.length} propert${o.properties.length === 1 ? "y" : "ies"})`)
-        .join(", ");
-      throw new Error(
-        `Cannot remove or rename a type that units still use: ${detail}. Change the equipment on those units first, or keep the rule.`,
-      );
+      // One line the editor shows above the buttons, under the 200 characters a message may run to.
+      const list = orphans.map((o) => `${o.type} (${o.count})`).join(", ");
+      throw new Error(`Units still use ${list}. Change their equipment first, or keep the rule.`);
     }
 
-    const version = await saveAppConfigAtVersion(expectedVersion, {
-      capexRules: capexRules as unknown as object,
-      updatedBy: user.name ?? user.email,
-    });
+    const version = await saveAppConfigColumn(
+      "capexRules",
+      expectedVersion,
+      capexRules as unknown as object,
+      user.name ?? user.email,
+    );
 
     revalidatePath("/settings");
     revalidatePath("/");

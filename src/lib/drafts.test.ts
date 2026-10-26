@@ -4,6 +4,7 @@ import {
   DRAFT_MAX_AGE_DAYS,
   DRAFT_PREFIX,
   decodeDraft,
+  draftLabel,
   draftStorageKey,
   encodeDraft,
   isDraftExpired,
@@ -95,6 +96,16 @@ test("a draft waiting to be restored survives the editor's first render", () => 
   assert.equal(restored.action, "write");
   t = restored.track;
   assert.equal(t.baseline, json({ title: "" }));
+});
+
+test("the draft line says when, in Buffalo time", () => {
+  // 2:10 PM in Buffalo (EDT in October) is 18:10 UTC.
+  const at = new Date(Date.UTC(2026, 9, 26, 18, 10));
+  assert.equal(draftLabel(at, new Date(Date.UTC(2026, 9, 26, 21, 0))), "Draft from 2:10 PM");
+  // Written the evening before, Buffalo time, though it is already the 27th in UTC.
+  const lastNight = new Date(Date.UTC(2026, 9, 27, 1, 30));
+  assert.equal(draftLabel(lastNight, new Date(Date.UTC(2026, 9, 27, 15, 0))), "Draft from Oct 26");
+  assert.equal(draftLabel(new Date(Date.UTC(2025, 11, 30, 15, 0)), new Date(Date.UTC(2026, 0, 3, 15, 0))), "Draft from Dec 30, 2025");
 });
 
 test("a new key is a new editor: a saved record's next version starts clean", () => {

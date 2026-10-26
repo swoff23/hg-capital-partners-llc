@@ -37,18 +37,14 @@ export const ONLINE_SETTLE_MS = 2_000;
  *    typed in Details, Loan, Insurance and Notes (their forms are keyed by
  *    version) and would let a stale Units, Rentals or Building CapEx draft
  *    past the conflict check (it saves with the version prop, which the
- *    refresh moves on). Drop the entry once those editors keep their draft
- *    and the version they opened with.
- *  - The move-in form editor: the whole schema is one draft saved with Save.
- *  - Applying a playbook: the filled fields, ticked rows and due dates are a
- *    draft, and its rows are built once from the items and read by index, so
- *    a refresh that changes the playbook's items breaks the page.
+ *    refresh moves on). Drop the entry once those editors hold the
+ *    LeaveGuard while dirty, as every sheet and draft below does.
+ *
+ * The move-in form editor, the CapEx rules and Apply playbook used to be on
+ * this list. Their drafts now hold the LeaveGuard while dirty, and that is
+ * the signal every page shares (`ReturnState.unsaved`, forms 2.11).
  */
-const HELD: readonly RegExp[] = [
-  /^\/properties\/[^/]+\/?$/,
-  /^\/settings\/move-in-form\/?$/,
-  /^\/templates\/[^/]+\/apply\/?$/,
-];
+const HELD: readonly RegExp[] = [/^\/properties\/[^/]+\/?$/];
 
 export type ReturnTrigger =
   | { kind: "visible"; hiddenMs: number }
@@ -66,6 +62,12 @@ export type ReturnState = {
   sinceLastMs: number;
   /** navigator.onLine at the moment of the trigger. */
   online: boolean;
+  /**
+   * Unsaved work is on the page: a dirty sheet, editor or draft holds the
+   * LeaveGuard (components/leave-guard.tsx `useUnsavedWork`). A refresh
+   * waits for it to be saved or discarded, whatever the page.
+   */
+  unsaved?: boolean;
 };
 
 export function refreshHeld(pathname: string): boolean {
@@ -74,6 +76,7 @@ export function refreshHeld(pathname: string): boolean {
 
 export function shouldRefresh(trigger: ReturnTrigger, s: ReturnState): boolean {
   if (!s.online) return false;
+  if (s.unsaved) return false;
   if (refreshHeld(s.pathname)) return false;
   if (s.sinceLastMs < MIN_GAP_MS) return false;
   if (s.today !== s.loadedDay) return true;

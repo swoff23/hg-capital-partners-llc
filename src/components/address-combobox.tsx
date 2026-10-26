@@ -4,7 +4,14 @@ import { ComboBox, Input as AriaInput, ListBox, ListBoxItem, type Key } from "re
 import { OptionRow } from "@/components/option-list";
 import { PopoverSurface } from "@/components/popover";
 import { FormField, TextLink, fieldClass, fieldSizeClass, type FieldSize } from "@/components/ui";
-import { SUGGEST_FROM, type AddressAnswer, type AddressKind, type AddressMatch } from "@/lib/address-suggestions";
+import {
+  SUGGEST_FROM,
+  looksLikeLink,
+  savesAs,
+  type AddressAnswer,
+  type AddressKind,
+  type AddressMatch,
+} from "@/lib/address-suggestions";
 import { cn } from "@/lib/utils";
 
 /** Wait this long after the last keystroke before asking (forms 2.6). */
@@ -44,6 +51,25 @@ export type AddressComboboxProps = {
   size?: FieldSize;
   /** "public" puts the dark public tokens on the list. */
   surface?: "app" | "public";
+  /**
+   * Where a pasted link belongs ("Listing link"). Without `onLink` the line
+   * says to paste it there; with it, that the link moved there.
+   */
+  linkTarget?: string;
+  /**
+   * A pasted link (DEALS-039, DEALS-040; a link typed a letter at a time isn't
+   * one) is handed here instead of becoming the address, and the form moves
+   * it to its own field. Set the address in the same call if the link says
+   * what it is (`addressFromListingLink`); otherwise the field keeps its text.
+   */
+  onLink?: (link: string) => void;
+  /**
+   * On leaving the field, a line says what the address will save as ("Saves
+   * as 767 Prospect Ave, Buffalo, NY 14209") when that differs from the
+   * typing. Only for a form whose save really stores `tidyAddress`, so the
+   * line never promises more than the save does.
+   */
+  showSavesAs?: boolean;
   className?: string;
 };
 
@@ -62,11 +88,13 @@ export type AddressComboboxProps = {
  *   <AddressCombobox kind="deal" label="Address" name="address" value={address} onChange={setAddress} />
  *
  * `autoComplete="off"` and no field name, so Chrome stops offering a
- * personal address. Still to come with the forms build, props unchanged:
- * the pasted-link line ("That's a link. Paste it in Listing link."), the
- * "Saves as 767 Prospect Ave, Buffalo, NY 14209" preview on leaving the
- * field, and the touch one-field sheet for a heading. Phase 2 (an address
- * provider) waits for Connor's pick and key.
+ * personal address. A pasted link says so ("That's a link. Paste it in
+ * Listing link.") or, with `onLink`, moves to the form's link field. With
+ * `showSavesAs`, leaving the field shows "Saves as 767 Prospect Ave, Buffalo,
+ * NY 14209" when the save would tidy the typing (`tidyAddress`). A heading's
+ * one-field sheet on touch is the heading field's (it holds this combobox,
+ * and the list opens under it like any popover in a sheet). Phase 2 (an
+ * address provider) waits for Connor's pick and key.
  */
 export function AddressCombobox({
   kind,
@@ -84,14 +112,23 @@ export function AddressCombobox({
   autoFocus,
   size = "md",
   surface = "app",
+  linkTarget,
+  onLink,
+  showSavesAs = false,
   className,
 }: AddressComboboxProps) {
   const typed = value.trim();
-  const active = typed.length >= SUGGEST_FROM;
+  const isLink = looksLikeLink(typed);
+  // A link is no address: nothing to suggest for it.
+  const active = typed.length >= SUGGEST_FROM && !isLink;
 
   // The last answer and the text it was for. Its rows stay up while the next one loads.
   const [answer, setAnswer] = useState<{ q: string; data: AddressAnswer } | null>(null);
   const [picked, setPicked] = useState<Key | null>(null);
+  // The field was left with this text in it, so "Saves as" may say what the save will tidy it to.
+  const [left, setLeft] = useState(false);
+  // A pasted link was handed to `onLink`, so the line says where it went.
+  const [moved, setMoved] = useState(false);
 
   useEffect(() => {
     if (!active) return;
@@ -126,7 +163,17 @@ export function AddressCombobox({
       </TextLink>
     </span>
   );
-  const error = errorMessage ? errorMessage : isInvalid ? matchLine : null;
+  const where = linkTarget ?? "Listing link";
+  const linkLine = moved
+    ? `That's a link. Moved to ${where}.`
+    : isLink
+      ? linkTarget
+        ? `That's a link. Paste it in ${linkTarget}.`
+        : "That's a link. Enter the street address."
+      : null;
+  const tidy = showSavesAs && left && !isLink ? savesAs(value) : null;
+  // A refused duplicate says which record, with its link; any other refusal says its own reason.
+  const error = isInvalid && matchLine ? matchLine : errorMessage ? errorMessage : null;
 
   function pick(key: Key | null) {
     setPicked(key);
@@ -142,7 +189,7 @@ export function AddressCombobox({
       label={label ?? ariaLabel ?? "Address"}
       hideLabel={!label}
       required={isRequired}
-      helper={matchLine || helper}
+      helper={matchLine || linkLine || (tidy ? `Saves as ${tidy}` : null) || helper}
       error={error}
       className={className}
     >
@@ -152,11 +199,16 @@ export function AddressCombobox({
             inputValue={value}
             onInputChange={(text) => {
               setPicked(null);
+              setLeft(false);
+              setMoved(false);
               onChange(text);
             }}
             selectedKey={picked}
             onSelectionChange={pick}
             allowsCustomValue
+            // The list starts empty (nothing under 3 characters), so React Aria reads "no rows" on the keystroke
+            // that would open it and never does; open on the keystroke, and keep the panel out of sight until it has rows.
+            allowsEmptyCollection
             menuTrigger="input"
             // The server already matched every word; nothing more to filter here.
             defaultFilter={() => true}
@@ -173,9 +225,18 @@ export function AddressCombobox({
               autoCorrect="off"
               spellCheck={false}
               autoFocus={autoFocus}
+              onBlur={() => setLeft(true)}
+              onPaste={(e) => {
+                // A pasted link (not one typed a letter at a time) goes to the form's own link field.
+                const pasted = e.clipboardData.getData("text");
+                if (!onLink || !looksLikeLink(pasted)) return;
+                e.preventDefault();
+                setMoved(true);
+                onLink(pasted.trim());
+              }}
               className={cn(fieldClass, fieldSizeClass[size])}
             />
-            <PopoverSurface surface={surface} motion="none" className="w-(--trigger-width)">
+            <PopoverSurface surface={surface} motion="none" className={cn("w-(--trigger-width)", !active && "hidden")}>
               <ListBox
                 aria-label={`${label ?? ariaLabel ?? "Address"} suggestions`}
                 shouldFocusOnHover

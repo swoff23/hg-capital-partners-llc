@@ -4,10 +4,8 @@ import type { Metadata, Viewport } from "next";
 import { brandTokensDark } from "@/lib/brand-tokens";
 import { BRAND } from "@/lib/brand";
 import { getEnv } from "@/lib/env";
-import { requestPasswordReset } from "../actions";
-import { Input } from "@/components/ui";
-import { AuthFrame, AuthLabel, AuthNotice, authInputClass, authLinkClass } from "../_components/auth-frame";
-import { AuthSubmit } from "../_components/auth-submit";
+import { AuthFrame, AuthNotice, authLinkClass } from "../_components/auth-frame";
+import { ForgotForm } from "./forgot-form";
 
 export const metadata: Metadata = {
   title: { absolute: `Forgot Password | ${BRAND.company}` },
@@ -28,25 +26,7 @@ export default async function ForgotPasswordPage({ searchParams }: PageProps<"/l
       title={sent ? "Check your email" : "Forgot your password?"}
       subtitle={sent ? undefined : "We'll email you a link to choose a new one."}
     >
-      {sent ? (
-        <AuthNotice>If that email has a login, a link is on its way.</AuthNotice>
-      ) : (
-        <form action={requestPasswordReset} className="mt-8 space-y-4 text-left">
-          <div>
-            <AuthLabel htmlFor="forgot-email">Email</AuthLabel>
-            <Input
-              id="forgot-email"
-              name="email"
-              type="email"
-              autoComplete="username"
-              required
-              autoFocus
-              className={authInputClass}
-            />
-          </div>
-          <AuthSubmit pendingLabel="Sending…">Email me a link</AuthSubmit>
-        </form>
-      )}
+      {sent ? <AuthNotice>If that email has a login, a link is on its way.</AuthNotice> : <ForgotForm />}
 
       <p className="mt-3">
         <Link href="/login" className={authLinkClass}>

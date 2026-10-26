@@ -1,27 +1,21 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { Button } from "@/components/ui";
 import { authButtonClass } from "./auth-frame";
 
 /**
- * The sign-in screens' submit button. While the form is on its way it's
- * disabled and says so ("Signing in…"), the Pending action pattern in
- * docs/components.md, so a slow connection doesn't invite a second tap.
+ * The sign-in screens' submit button: the app's `Button` with its `pending`
+ * look (forms 2.7), so while the form is on its way it keeps its label, turns
+ * busy and shows the spinner, and a slow connection doesn't invite a second
+ * tap. The label never changes to "Signing in…".
  *
  * useFormStatus follows a form whose action is a server action. `native` is
  * for a form that posts to a URL (the reset link's, see reset/submit), which
  * React doesn't follow: the button holds from the submit event until the page
  * is replaced, and lets go if the browser brings the page back from its cache.
  */
-export function AuthSubmit({
-  children,
-  pendingLabel,
-  native = false,
-}: {
-  children: React.ReactNode;
-  pendingLabel: string;
-  native?: boolean;
-}) {
+export function AuthSubmit({ children, native = false }: { children: React.ReactNode; native?: boolean }) {
   const { pending } = useFormStatus();
   const [posted, setPosted] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -29,7 +23,13 @@ export function AuthSubmit({
   useEffect(() => {
     const form = ref.current?.form;
     if (!native || !form) return;
-    const onSubmit = () => setPosted(true);
+    const onSubmit = (e: Event) => {
+      // A form the page stopped (a password that's too short) isn't on its way anywhere. React's own
+      // handler runs after this one, so look once the event is through.
+      setTimeout(() => {
+        if (!e.defaultPrevented) setPosted(true);
+      }, 0);
+    };
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) setPosted(false);
     };
@@ -41,10 +41,9 @@ export function AuthSubmit({
     };
   }, [native]);
 
-  const busy = pending || posted;
   return (
-    <button ref={ref} type="submit" disabled={busy} className={authButtonClass}>
-      {busy ? pendingLabel : children}
-    </button>
+    <Button ref={ref} type="submit" className={authButtonClass} pending={pending || posted}>
+      {children}
+    </Button>
   );
 }
