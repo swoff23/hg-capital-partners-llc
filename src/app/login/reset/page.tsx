@@ -23,8 +23,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
 
 export default async function ResetPasswordPage({ searchParams }: PageProps<"/login/reset">) {
-  if (!getEnv().portalEnabled) notFound();
+  // Read first: a build without PORTAL_ENABLED would otherwise prerender this as a static 404 for good.
   const { token = "", error } = (await searchParams) as { token?: string; error?: string };
+  if (!getEnv().portalEnabled) notFound();
 
   if (!(await resetTokenIsUsable(token))) {
     return (

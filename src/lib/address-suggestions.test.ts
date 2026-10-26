@@ -134,6 +134,14 @@ test("suggestions hold every typed word, one row per building, a property over a
   assert.equal(rows[2].address, "877 Prospect Avenue Buffalo , NY 14213");
 });
 
+test("a form for deals keeps a building's deal row over its property row", () => {
+  const rows = suggestAddresses("prospect", records, { prefer: "deal" });
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    ["p765", "d767", "d877"],
+  );
+});
+
 test("street words read either way, and the best match leads", () => {
   assert.deepEqual(
     suggestAddresses("767 prospect avenue", records).map((r) => r.id),
@@ -246,11 +254,17 @@ const db = { property: table(rowsOf("property")), deal: table(rowsOf("deal")) } 
 
 test("runAddresses answers suggestions and the match from both tables", async () => {
   const answer = await runAddresses(db, { q: "767 Prospect Avenue", kind: "deal" });
+  // New deal keeps the deal's row for a building that is both, so the pick agrees with the line under it.
   assert.deepEqual(
     answer.suggestions.map((s) => s.id),
-    ["p767"],
+    ["d767"],
   );
   assert.equal(answer.match?.id, "d767");
+  const asProperty = await runAddresses(db, { q: "767 Prospect Avenue", kind: "property" });
+  assert.deepEqual(
+    asProperty.suggestions.map((s) => s.id),
+    ["p767"],
+  );
   assert.equal(answer.match?.stage, "CLOSED!");
   // Typed with a different street word than stored, the house number still finds the building.
   const typedLong = await runAddresses(db, { q: "118 Congress Street", kind: "property" });

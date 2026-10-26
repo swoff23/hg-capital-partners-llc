@@ -532,7 +532,30 @@ export function Select({ className, ...props }: React.ComponentProps<"select">) 
  * list, or under the field it belongs to (pass its `id` to the field's
  * `aria-describedby`). `role="alert"`, so it's read out when it appears.
  */
-export function SaveError({ children, className, id }: { children: React.ReactNode; className?: string; id?: string }) {
+export function SaveError({
+  children,
+  className,
+  id,
+  action,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  id?: string;
+  /**
+   * What the person can do about it ("Load the latest"), after the message.
+   * The message truncates and the action never does, so a narrow line cuts
+   * its words and keeps the way out. Give the action a 44px touch area.
+   */
+  action?: React.ReactNode;
+}) {
+  if (action) {
+    return (
+      <p id={id} role="alert" className={cn("flex items-baseline gap-1.5 text-meta text-danger", className)}>
+        <span className="min-w-0 truncate">{children}</span>
+        <span className="shrink-0">{action}</span>
+      </p>
+    );
+  }
   return (
     <p id={id} role="alert" className={cn("text-meta text-danger", className)}>
       {children}

@@ -3,9 +3,12 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { useToast } from "@/components/toast";
 import {
   DRAFT_MAX_AGE_DAYS,
+  DRAFT_PREFIX,
   decodeDraft,
   draftStorageKey,
+  draftWrittenAt,
   encodeDraft,
+  isStoredDraftExpired,
   stableJson,
   trackDraft,
   type DraftEntry,
@@ -42,6 +45,28 @@ function removeRaw(key: string) {
   memory.delete(key);
   try {
     localStorage.removeItem(draftStorageKey(key));
+  } catch {}
+}
+
+let swept = false;
+
+/**
+ * Once per page load, throws away drafts past their age under keys nobody
+ * opens any more: an editor's key carries the version it opened with, so a
+ * draft left under a retired version is never read, and expiry on read would
+ * never reach it.
+ */
+function sweepExpired() {
+  if (swept) return;
+  swept = true;
+  try {
+    const now = Date.now();
+    const stale: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(DRAFT_PREFIX) && isStoredDraftExpired(localStorage.getItem(k), now)) stale.push(k);
+    }
+    for (const k of stale) localStorage.removeItem(k);
   } catch {}
 }
 
@@ -108,9 +133,13 @@ export function useDraft<T>(
   const json = stableJson(value);
   const track = useRef<DraftTrack | null>(null);
   const latest = useRef(value);
+  const openedEntry = useRef(entry);
   useEffect(() => {
     latest.current = value;
+    openedEntry.current = entry;
   });
+
+  useEffect(sweepExpired, []);
 
   useEffect(() => {
     if (!key) {
@@ -119,7 +148,10 @@ export function useDraft<T>(
     }
     const next = trackDraft(track.current, key, json);
     track.current = next.track;
-    if (next.action === "write") writeRaw(key, encodeDraft(latest.current, Date.now()));
+    if (next.action === "write") {
+      const was = openedEntry.current;
+      writeRaw(key, encodeDraft(latest.current, draftWrittenAt(was && { json: stableJson(was.value), at: was.savedAt.getTime() }, json, Date.now())));
+    }
     else if (next.action === "remove") removeRaw(key);
   }, [key, json]);
 

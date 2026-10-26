@@ -14,7 +14,7 @@ export type LeaveScope = "all" | "sign-out";
 
 /** What a hold says when it asks. */
 export type LeaveWords = {
-  /** The sheet's title, and all it says: what's at stake ("Leave without saving Unit 2?"). */
+  /** The sheet's title, and all it says: what's at stake ("Leave Unit 2?"; short enough to keep one line on a phone). */
   title: string;
   /** The main button, which stays ("Keep editing", "Keep uploading"). */
   stay: string;

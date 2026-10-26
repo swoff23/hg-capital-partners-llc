@@ -340,7 +340,7 @@ function CreateLoginSheet({
       values={email}
       dirty={email !== (defaultEmail ?? "")}
       discardTitle="Discard the new login?"
-      leaveTitle="Leave without creating the login?"
+      leaveTitle="Leave the new login?"
       fieldErrors={run.error ? { email: run.error } : undefined}
     >
       <p className="-mt-1 text-body text-fg-2">{first} gets a starting password and picks a new one at first sign-in.</p>
@@ -413,10 +413,10 @@ function ChangeEmailSheet({
       values={email}
       dirty={email.trim().toLowerCase() !== current}
       discardTitle="Discard the change?"
-      leaveTitle="Leave without changing the login email?"
+      leaveTitle="Leave the email change?"
       fieldErrors={run.error ? { email: run.error } : undefined}
     >
-      <FormField label="Email" required helper={`${first} signs in with this email from now on`} error={shownProblem}>
+      <FormField label="Email" required helper={`${first} signs in with this from now on`} error={shownProblem}>
         {(p) => (
           <Input
             {...p}

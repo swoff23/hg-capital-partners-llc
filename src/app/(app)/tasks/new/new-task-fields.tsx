@@ -177,7 +177,7 @@ export function NewTaskForm({
       title="New task"
       primary="Create task"
       discardTitle="Discard the new task?"
-      leaveTitle="Leave without saving the new task?"
+      leaveTitle="Leave the new task?"
       backHref="/tasks"
       createMore
       values={values}
@@ -221,7 +221,7 @@ export function NewTaskForm({
                     setTagOn(false);
                     set({ propertyId: null, unitLabel: null, dealId: null });
                   }}
-                  className="relative flex size-4.5 shrink-0 items-center justify-center rounded-sm text-fg-3 hover:bg-fill-1 hover:text-fg-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
+                  className="relative flex size-4.5 shrink-0 items-center justify-center rounded-sm text-fg-3 hover:bg-fill-1 hover:text-fg-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5"
                 >
                   <X aria-hidden="true" className="size-3" />
                 </button>

@@ -68,6 +68,25 @@ export type ActionBarProps = {
   className?: string;
 };
 
+const isField = (el: Element | null) => !!el && el.matches("input, textarea, select, [contenteditable]");
+
+/**
+ * The tallest the page has been with no field focused, since it loaded. Kept
+ * outside the component and recorded from the module's first run, because a
+ * bar that appears while the first edit is under way (it mounts when the
+ * draft turns dirty, with the keyboard already up) would otherwise never have
+ * seen the page without it.
+ */
+let tallestSeen = 0;
+function recordHeight() {
+  if (!isField(document.activeElement)) tallestSeen = Math.max(tallestSeen, window.innerHeight);
+}
+if (typeof window !== "undefined") {
+  recordHeight();
+  window.addEventListener("resize", recordHeight);
+  document.addEventListener("focusout", recordHeight);
+}
+
 /**
  * Whether the on-screen keyboard is covering the bottom of a touch screen: an
  * editable field has focus on a coarse pointer and either iOS lifted the
@@ -76,17 +95,14 @@ export type ActionBarProps = {
  */
 function useKeyboardUp(enabled: boolean): boolean {
   const inset = useKeyboardInset();
-  const tallest = useRef(0);
   const [editing, setEditing] = useState(false);
   const [short, setShort] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
-    const isField = (el: Element | null) => !!el && el.matches("input, textarea, select, [contenteditable]");
     const sync = () => {
-      const h = window.innerHeight;
-      if (!isField(document.activeElement)) tallest.current = Math.max(tallest.current, h);
-      setShort(tallest.current > 0 && h < tallest.current * 0.8);
+      recordHeight();
+      setShort(tallestSeen > 0 && window.innerHeight < tallestSeen * 0.8);
       setEditing(isField(document.activeElement));
     };
     sync();

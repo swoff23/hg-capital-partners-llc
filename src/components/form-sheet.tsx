@@ -50,7 +50,7 @@ export type FormSheetProps = {
   dirty?: boolean;
   /** The discard question, naming the object: "Discard the new task?", "Discard changes to Unit 2?". */
   discardTitle?: string;
-  /** The question an in-app link asks while it's dirty: "Leave without saving Unit 2?". */
+  /** The question an in-app link asks while it's dirty: "Leave Unit 2?". */
   leaveTitle?: string;
   /**
    * What closing a changed sheet does. "ask" (the default) shows the discard
@@ -312,7 +312,14 @@ function FormBody({
       const form = ref.current;
       if (!form || form.contains(document.activeElement)) return;
       const fields = [...form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(firstEmptyField)];
-      (fields.find((f) => f.value === "") ?? fields[0])?.focus();
+      const first = fields.find((f) => f.value === "") ?? fields[0];
+      first?.focus();
+      // A field that already holds text (a fact's one-field sheet) opens with the caret after it, so typing adds to it.
+      try {
+        if (first?.value) first.setSelectionRange(first.value.length, first.value.length);
+      } catch {
+        // Some input types (email, number) have no selection to set.
+      }
     });
     return () => cancelAnimationFrame(frame);
   }, [isOpen, ref]);

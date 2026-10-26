@@ -1,14 +1,15 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Pin, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
+import { focusHeadingAfter, isSheetPath } from "@/lib/sheet-routes";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import type { ListHrefs } from "@/lib/list-memory";
 import { AccountMenu, AppearanceRow } from "@/components/account-menu";
 import { CommandPalette } from "@/components/command-palette";
+import { LeaveLink } from "@/components/leave-link";
 import { ListMemoryProvider } from "@/components/list-memory";
 import { Monogram } from "@/components/monogram";
 import { SideNav } from "@/components/nav";
@@ -73,10 +74,16 @@ export function AppShell({
   // After a route change focus goes to the new page's h1 (or the main area when it has none), so a
   // keyboard or screen reader user starts at the top of the page and not back at the sidebar.
   // The first render keeps the browser's own start; a filter that only changes the query isn't a new page.
-  const firstPath = useRef(pathname);
+  // A create sheet opening over a page, and closing back onto it, is not a new page: the sheet takes
+  // focus and gives it back to what opened it (lib/sheet-routes.ts).
+  const lastPath = useRef(pathname);
+  const sheetOpenedOver = useRef<string | null>(null);
   useEffect(() => {
-    if (firstPath.current === pathname) return;
-    firstPath.current = pathname;
+    const from = lastPath.current;
+    if (from === pathname) return;
+    lastPath.current = pathname;
+    if (isSheetPath(pathname)) sheetOpenedOver.current = from;
+    if (!focusHeadingAfter(from, pathname, sheetOpenedOver.current)) return;
     // A page that puts focus in a field itself (New task's autofocus title) keeps it.
     const here = document.activeElement;
     if (here instanceof HTMLElement && mainRef.current?.contains(here) && here.matches("input, textarea, select, [contenteditable]")) {
@@ -134,13 +141,13 @@ export function AppShell({
         </button>
         {/* The lockup: the tile and the app's name, which drops on phones.
             From lg the tile sits centered over the rail's icons. */}
-        <Link
+        <LeaveLink
           href="/"
           className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1 pointer-coarse:min-h-11"
         >
           <Monogram size={24} />
           <span className="max-sm:sr-only">{BRAND.app}</span>
-        </Link>
+        </LeaveLink>
         <div className="min-w-0 max-w-md flex-1">
           <CommandPalette suspended={mobileOpen} onBeforeOpen={closeDrawer} />
         </div>

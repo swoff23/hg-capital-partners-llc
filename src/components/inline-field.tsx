@@ -18,6 +18,7 @@ import { AddressCombobox } from "@/components/address-combobox";
 import { Code } from "@/components/code";
 import { DatePanel } from "@/components/due-date-picker";
 import { FormSheet } from "@/components/form-sheet";
+import { listOnScreen } from "@/components/list-on-screen";
 import { useHoldLeave } from "@/components/leave-guard";
 import { Money } from "@/components/money";
 import { NumberInput, numberHelper } from "@/components/number-input";
@@ -106,7 +107,7 @@ export type InlineFieldProps = {
   minLength?: number;
   /** The line for a blank heading: "Enter the address." */
   blank?: string;
-  /** The line for a draft shorter than `minLength`, in the field's own words: "Enter the full street address, like 123 Main St." */
+  /** The line for a draft shorter than `minLength`, in the field's own words: "Enter the full address, like 123 Main St." */
   tooShort?: string;
   /** A deal price: text that isn't one number ("low 400s") is kept. */
   allowText?: boolean;
@@ -678,14 +679,6 @@ function TextFact(props: InlineFieldProps) {
 // The page's h1 on the title token, editable or not. font-semibold repeats the token's weight so a caller's size override (the task title) keeps it.
 const headingText = "rounded-md px-2 py-1 pr-6 text-title font-semibold text-fg-1";
 
-/** Whether a combobox's list is open and drawn: AddressCombobox keeps an empty list open but hidden. */
-function listOnScreen(input: HTMLElement): boolean {
-  if (input.getAttribute("aria-expanded") !== "true") return false;
-  const id = input.getAttribute("aria-controls");
-  const list = id ? document.getElementById(id) : null;
-  return !!list && list.getClientRects().length > 0;
-}
-
 /**
  * The page's h1: the address of a property or a deal, a task's title, a
  * contractor's name. A click opens the field in place (a bordered address
@@ -791,8 +784,14 @@ function HeadingFact(props: InlineFieldProps) {
     router.refresh();
   }
 
+  // An address field owns its refusal: the rename was turned down ("29 Livingston St is already a deal."), and
+  // the field says so in --danger where the duplicate line was, with the link to the record that has it (forms 2.6).
+  const refusal = address && !save.conflict ? save.error : null;
+
   function changed(next: string) {
     setDraft(next);
+    // Typing a different address answers the refusal.
+    if (refusal) save.reset();
     if (problem && decideInlineEdit("heading", next, value, { minLength, blank, tooShort }).kind !== "problem") setProblem(null);
   }
 
@@ -833,7 +832,10 @@ function HeadingFact(props: InlineFieldProps) {
       pending={save.pending}
       values={draft}
       discard="silent"
-      error={!problem && !save.conflict ? save.error : undefined}
+      // The address sheet holds the field and its suggestions (forms 2.6), so it takes the phone's full height and a tablet's dialog is tall enough for the list.
+      fullHeight={!!address}
+      className={address ? "md:min-h-104" : undefined}
+      error={!problem && !save.conflict && !refusal ? save.error : undefined}
     >
       {context && <p className="-mt-1 text-meta text-fg-3">{context}</p>}
       {address ? (
@@ -843,8 +845,10 @@ function HeadingFact(props: InlineFieldProps) {
           aria-label={label}
           value={draft}
           onChange={changed}
-          isInvalid={!!problem}
-          errorMessage={problem ?? undefined}
+          isInvalid={!!problem || !!refusal}
+          errorMessage={problem ?? refusal ?? undefined}
+          // The list stays under the field, inside the sheet.
+          flip={false}
           // Leaving the field inside the sheet says how it will save; in place, leaving saves.
           showSavesAs
         />
@@ -903,8 +907,8 @@ function HeadingFact(props: InlineFieldProps) {
           aria-label={label}
           value={draft}
           onChange={changed}
-          isInvalid={!!problem}
-          errorMessage={problem ?? undefined}
+          isInvalid={!!problem || !!refusal}
+          errorMessage={problem ?? refusal ?? undefined}
           className="px-2"
         />
       ) : (
@@ -923,7 +927,7 @@ function HeadingFact(props: InlineFieldProps) {
         />
       )}
       <div className="px-2">
-        <FactLine id={lineId} problem={address ? null : problem} save={save} p={{ kind: "heading", field }} inRail={false} />
+        {!refusal && <FactLine id={lineId} problem={address ? null : problem} save={save} p={{ kind: "heading", field }} inRail={false} />}
         <ConflictButtons save={save} onKeep={keep} onSaveMine={saveMine} inRail={false} />
       </div>
     </div>
@@ -934,7 +938,7 @@ function HeadingFact(props: InlineFieldProps) {
 
 /** A date or a choice. The value opens its panel (a popover, a sheet on a phone) and a pick saves. */
 function PickedFact(props: InlineFieldProps) {
-  const { kind, label, value, field, empty, tone, display, unit, options = [], emptyLabel, allowNone = true, trailing, onRequest, className } = props;
+  const { kind, label, value, field, empty, tone, helper, display, unit, options = [], emptyLabel, allowNone = true, trailing, onRequest, className } = props;
   const inRail = props.inRail ?? true;
   const save = useFactSave(props);
   const router = useRouter();
@@ -984,18 +988,22 @@ function PickedFact(props: InlineFieldProps) {
         <PickerLayer isOpen={open} onOpenChange={setOpen} title={label} motion={kind === "date" ? "pop" : "none"} trigger={trigger}>
           {({ container, close }) =>
             kind === "date" ? (
-              <DatePanel
-                value={text || null}
-                today={todayYmdEastern()}
-                label={label}
-                picks={false}
-                allowNone={allowNone}
-                layout={container === "sheet" ? "steps" : "together"}
-                onPick={(next) => {
-                  close();
-                  pick(next ?? "");
-                }}
-              />
+              <>
+                <DatePanel
+                  value={text || null}
+                  today={todayYmdEastern()}
+                  label={label}
+                  picks={false}
+                  allowNone={allowNone}
+                  layout={container === "sheet" ? "steps" : "together"}
+                  onPick={(next) => {
+                    close();
+                    pick(next ?? "");
+                  }}
+                />
+                {/* What the date does ("Adds a reminder 60 days before"), where it is being picked. */}
+                {helper && <p className="truncate border-t border-line px-3 py-2 text-meta text-fg-3">{helper}</p>}
+              </>
             ) : (
               <OptionList
                 aria-label={label}

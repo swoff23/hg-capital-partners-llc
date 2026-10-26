@@ -152,3 +152,22 @@ export function capexProblems(draft: CapexDraft): Record<string, string> {
   if (draft.building.length === 0) out["building"] = "Keep at least one building system.";
   return out;
 }
+
+/**
+ * The lines to show before Save is pressed (forms 2.0, Timing): a figure the
+ * person has left while it holds text that can't be read. `left` has
+ * "<row uid>:<monitor | replace | cost>" for each figure they have left. A
+ * blank figure, a name and the list's size wait for Save, and a figure
+ * not yet left says nothing while it is being typed.
+ */
+export function leftProblems(draft: CapexDraft, left: ReadonlySet<string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, line] of Object.entries(capexProblems(draft))) {
+    const m = /^(equipment|building)\.(\d+)\.(monitor|replace|cost|defaultCost)$/.exec(key);
+    if (!m) continue;
+    const row = draft[m[1] as "equipment" | "building"][Number(m[2])];
+    const cell = m[3] === "defaultCost" ? "cost" : (m[3] as "monitor" | "replace" | "cost");
+    if (left.has(`${row.uid}:${cell}`) && row[cell].trim() !== "") out[key] = line;
+  }
+  return out;
+}

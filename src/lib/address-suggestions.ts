@@ -213,8 +213,10 @@ const time = (d: Date | number) => (typeof d === "number" ? d : d.getTime());
 /**
  * Up to `limit` suggestions for what's typed: records whose address holds
  * every typed word (street words read either way, "Avenue" and "Ave"), one
- * row per building with a property kept over a deal at the same address and
- * the newest deal over older ones, best match first (the street is the typed
+ * row per building with the `prefer` kind kept over the other at the same
+ * address (a property by default; New deal prefers a deal, so a pick agrees
+ * with the "is already a deal" line) and the newest deal over older ones,
+ * best match first (the street is the typed
  * text, starts with it, then every word starts a word), properties before
  * deals, then the most recently changed. Nothing under SUGGEST_FROM
  * characters.
@@ -222,7 +224,7 @@ const time = (d: Date | number) => (typeof d === "number" ? d : d.getTime());
 export function suggestAddresses(
   query: string,
   records: readonly AddressRecord[],
-  { limit = SUGGEST_LIMIT, excludeId }: { limit?: number; excludeId?: string } = {},
+  { limit = SUGGEST_LIMIT, excludeId, prefer = "property" }: { limit?: number; excludeId?: string; prefer?: AddressKind } = {},
 ): AddressSuggestion[] {
   const q = query.trim();
   if (q.length < SUGGEST_FROM) return [];
@@ -237,12 +239,12 @@ export function suggestAddresses(
         time(b.r.updatedAt) - time(a.r.updatedAt),
     );
   // One row per building. Sorting put properties and newer deals first within a match quality, so
-  // keep the first of a building unless a property for it comes later (a weaker match on its street).
+  // keep the first of a building unless one of the preferred kind comes later (a weaker match on its street).
   const kept: typeof candidates = [];
   for (const c of candidates) {
     const same = kept.findIndex((k) => sameStreetAddress(k.r.address, c.r.address));
     if (same === -1) kept.push(c);
-    else if (c.r.kind === "property" && kept[same].r.kind === "deal") kept[same] = c;
+    else if (c.r.kind === prefer && kept[same].r.kind !== prefer) kept[same] = c;
   }
   return kept.slice(0, limit).map(({ r, street, place }) => ({
     kind: r.kind,
@@ -332,7 +334,7 @@ export async function runAddresses(
     ...deals.map((d) => ({ kind: "deal" as const, id: d.id, address: d.address, updatedAt: d.updatedAt, stage: d.status })),
   ];
   return {
-    suggestions: suggestAddresses(q, records, { excludeId }),
+    suggestions: suggestAddresses(q, records, { excludeId, prefer: kind }),
     match: findAddressMatch(q, kind, records, excludeId),
   };
 }

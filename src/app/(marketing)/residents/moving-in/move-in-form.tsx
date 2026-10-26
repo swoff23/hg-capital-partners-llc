@@ -108,7 +108,7 @@ export function MoveInForm({
 
   const dirty = !sent && hasProgress(a, schema, today);
   // Leaving is safe, since the answers stay here, but the page says so before it goes.
-  useHoldLeave(dirty ? { title: "Leave your move-in report? Your answers stay on this device.", stay: "Keep going" } : null);
+  useHoldLeave(dirty ? { title: "Leave your move-in report?", stay: "Keep going" } : null);
 
   // The bar shows while the report is on screen, not over the checklist above it.
   useEffect(() => {

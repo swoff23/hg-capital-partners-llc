@@ -52,7 +52,7 @@ export type CreateFormProps<V, R> = {
   primary: string;
   /** The question Cancel, X or Esc ask once something changed: "Discard the new task?". */
   discardTitle: string;
-  /** The question a link asks while it's dirty: "Leave without saving the new task?". */
+  /** The question a link asks while it's dirty: "Leave the new task?". */
   leaveTitle: string;
   /** Where Cancel goes on the page version, which has no sheet to close ("/tasks"). */
   backHref: string;
@@ -224,7 +224,7 @@ export function CreateForm<V, R>({
           {draftLabel(restoredAt)}.{" "}
           <button
             type="button"
-            className={cn(textLinkClass, "rounded-sm pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center")}
+            className={cn(textLinkClass, "rounded-sm pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center pointer-coarse:justify-center")}
             onClick={() => {
               clearDraft();
               setRestoredAt(null);

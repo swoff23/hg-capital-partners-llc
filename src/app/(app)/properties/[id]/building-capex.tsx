@@ -226,7 +226,7 @@ function SystemSheet({
       pending={run.pending}
       values={draft}
       discardTitle={`Discard changes to ${item.label}?`}
-      leaveTitle={`Leave without saving ${item.label}?`}
+      leaveTitle={`Leave ${item.label}?`}
       error={run.error && !serverYear ? run.error : undefined}
       fieldErrors={run.fieldErrors}
     >

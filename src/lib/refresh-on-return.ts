@@ -40,11 +40,18 @@ export const ONLINE_SETTLE_MS = 2_000;
  *    refresh moves on). Drop the entry once those editors hold the
  *    LeaveGuard while dirty, as every sheet and draft below does.
  *
- * The move-in form editor, the CapEx rules and Apply playbook used to be on
- * this list. Their drafts now hold the LeaveGuard while dirty, and that is
- * the signal every page shares (`ReturnState.unsaved`, forms 2.11).
+ *  - Applying a playbook: its rows are built once from the playbook's items
+ *    and read by index, so a refresh that changes the items (an import
+ *    re-ran while the tab sat open) would line titles up with the wrong
+ *    assignees and dates, or throw. A dirty Apply is already held by the
+ *    LeaveGuard; this keeps a page nobody has touched yet from refreshing
+ *    under the person about to start.
+ *
+ * The move-in form editor and the CapEx rules used to be on this list. Their
+ * drafts now hold the LeaveGuard while dirty, and that is the signal every
+ * page shares (`ReturnState.unsaved`, forms 2.11).
  */
-const HELD: readonly RegExp[] = [/^\/properties\/[^/]+\/?$/];
+const HELD: readonly RegExp[] = [/^\/properties\/[^/]+\/?$/, /^\/templates\/[^/]+\/apply\/?$/];
 
 export type ReturnTrigger =
   | { kind: "visible"; hiddenMs: number }

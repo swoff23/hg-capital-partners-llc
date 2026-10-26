@@ -80,7 +80,7 @@ export function NewContractorForm({ variant, trades }: { variant: "sheet" | "pag
       title="New contractor"
       primary="Create contractor"
       discardTitle="Discard the new contractor?"
-      leaveTitle="Leave without saving the new contractor?"
+      leaveTitle="Leave the new contractor?"
       backHref="/contractors"
       createMore
       fullHeight

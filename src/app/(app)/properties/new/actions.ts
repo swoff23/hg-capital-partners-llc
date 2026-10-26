@@ -21,7 +21,7 @@ const propertySchema = z.object({
   address: z
     .string({ error: "Enter the address." })
     .trim()
-    .min(4, "Enter the full street address, like 123 Main St.")
+    .min(4, "Enter the full address, like 123 Main St.")
     .refine((a) => !looksLikeLink(a), "That's a link. Enter the street address."),
   llcOwner: z.string().max(200, "Keep the entity under 200 characters.").optional(),
 });

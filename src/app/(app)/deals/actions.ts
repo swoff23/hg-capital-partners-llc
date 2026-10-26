@@ -31,7 +31,7 @@ const optionalText = (max: number) => z.string().max(max).nullish();
  */
 const dealFieldsSchema = z
   .object({
-    address: z.string().trim().min(4, "Enter the full street address, like 123 Main St.").max(300, "Use 300 characters or fewer."),
+    address: z.string().trim().min(4, "Enter the full address, like 123 Main St.").max(300, "Use 300 characters or fewer."),
     status: z.string().max(60),
     priority: optionalText(60),
     passReason: optionalText(120),

@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Building2,
@@ -11,6 +10,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { LeaveLink } from "@/components/leave-link";
 import { useListHrefs } from "@/components/list-memory";
 import { TOUCH_HEIGHT, chromeIconClass } from "@/components/ui";
 import type { ListKey } from "@/lib/list-memory";
@@ -51,7 +51,7 @@ export function SideNav({
       {LINKS.map(({ href, label, icon: Icon, list }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
-          <Link
+          <LeaveLink
             key={href}
             href={list ? remembered[list] : href}
             onClick={onNavigate}
@@ -73,7 +73,7 @@ export function SideNav({
               className={cn(chromeIconClass, active ? "text-fg-1" : "text-fg-3 group-hover:text-fg-1")}
             />
             <span className="truncate">{label}</span>
-          </Link>
+          </LeaveLink>
         );
       })}
     </nav>
@@ -116,7 +116,7 @@ export function TopTabs({
         const href = query ? `${path}?${query}` : path;
         const active = pathname === path || (t.href === "" && pathname === base);
         return (
-          <Link
+          <LeaveLink
             key={t.href}
             href={href}
             aria-current={active ? "page" : undefined}
@@ -130,7 +130,7 @@ export function TopTabs({
             )}
           >
             {t.label}
-          </Link>
+          </LeaveLink>
         );
       })}
     </nav>

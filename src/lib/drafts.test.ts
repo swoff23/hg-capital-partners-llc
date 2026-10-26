@@ -6,8 +6,10 @@ import {
   decodeDraft,
   draftLabel,
   draftStorageKey,
+  draftWrittenAt,
   encodeDraft,
   isDraftExpired,
+  isStoredDraftExpired,
   stableJson,
   trackDraft,
   type DraftTrack,
@@ -115,4 +117,20 @@ test("a new key is a new editor: a saved record's next version starts clean", ()
   assert.equal(saved.action, "none");
   assert.equal(saved.track.baseline, json({ name: "Unit 2B" }));
   assert.equal(saved.track.touched, false);
+});
+
+test("a draft written again unchanged keeps the time it was typed", () => {
+  const opened = { json: stableJson({ title: "Fix gutter" }), at: 1_000 };
+  assert.equal(draftWrittenAt(opened, stableJson({ title: "Fix gutter" }), 9_000), 1_000);
+  assert.equal(draftWrittenAt(opened, stableJson({ title: "Fix gutters" }), 9_000), 9_000);
+  assert.equal(draftWrittenAt(null, stableJson({ title: "Fix gutter" }), 9_000), 9_000);
+});
+
+test("the sweep finds a draft past its age by its raw text, and leaves what it can't read", () => {
+  const now = 100 * 86_400_000;
+  assert.equal(isStoredDraftExpired(encodeDraft({ a: 1 }, now - 8 * 86_400_000), now), true);
+  assert.equal(isStoredDraftExpired(encodeDraft({ a: 1 }, now - 6 * 86_400_000), now), false);
+  assert.equal(isStoredDraftExpired("not json", now), false);
+  assert.equal(isStoredDraftExpired(JSON.stringify({ v: 1, value: 1 }), now), false);
+  assert.equal(isStoredDraftExpired(null, now), false);
 });

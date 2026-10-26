@@ -116,7 +116,7 @@ export function ApplyFlow({
   const { restored, clear: clearDraft } = useDraft(`apply:${templateId}:${itemsVersion(items)}`, s);
   const baseline = stableJson(initial);
   const dirty = stableJson(s) !== baseline;
-  useHoldLeave(dirty ? { title: `Leave without creating the ${templateName} tasks?`, stay: "Keep editing" } : null);
+  useHoldLeave(dirty ? { title: "Leave before creating tasks?", stay: "Keep editing" } : null);
 
   function discard() {
     clearDraft();

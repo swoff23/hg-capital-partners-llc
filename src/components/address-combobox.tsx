@@ -52,6 +52,12 @@ export type AddressComboboxProps = {
   /** "public" puts the dark public tokens on the list. */
   surface?: "app" | "public";
   /**
+   * False keeps the list under the field however little room there is, so
+   * it never jumps above to cover the sheet's title: a heading's one-field
+   * sheet, which is made tall enough to hold the field and its list.
+   */
+  flip?: boolean;
+  /**
    * Where a pasted link belongs ("Listing link"). Without `onLink` the line
    * says to paste it there; with it, that the link moved there.
    */
@@ -112,6 +118,7 @@ export function AddressCombobox({
   autoFocus,
   size = "md",
   surface = "app",
+  flip = true,
   linkTarget,
   onLink,
   showSavesAs = false,
@@ -236,7 +243,7 @@ export function AddressCombobox({
               }}
               className={cn(fieldClass, fieldSizeClass[size])}
             />
-            <PopoverSurface surface={surface} motion="none" className={cn("w-(--trigger-width)", !active && "hidden")}>
+            <PopoverSurface surface={surface} motion="none" shouldFlip={flip} className={cn("w-(--trigger-width)", !active && "hidden")}>
               <ListBox
                 aria-label={`${label ?? ariaLabel ?? "Address"} suggestions`}
                 shouldFocusOnHover

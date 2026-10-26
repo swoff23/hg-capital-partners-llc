@@ -45,6 +45,33 @@ export function isDraftExpired(at: number, now: number, maxAgeDays: number = DRA
   return now - at > maxAgeDays * DAY_MS;
 }
 
+/**
+ * Whether a stored draft is past `maxAgeDays`, read from the raw text without
+ * deciding anything else about it. For the sweep of drafts nobody opens any
+ * more (an editor's version moved on, so its old key is never read again):
+ * unreadable text and other formats are left alone, since only an editor that
+ * knows them can say they're worthless.
+ */
+export function isStoredDraftExpired(raw: string | null | undefined, now: number, maxAgeDays: number = DRAFT_MAX_AGE_DAYS): boolean {
+  if (!raw) return false;
+  try {
+    const at = (JSON.parse(raw) as { at?: unknown } | null)?.at;
+    return typeof at === "number" && Number.isFinite(at) && isDraftExpired(at, now, maxAgeDays);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * When a draft being written was typed. The draft the editor opened with,
+ * written again unchanged (opening it puts the restored value back, which
+ * counts as a change), keeps its own time; otherwise opening it would restart
+ * the 7 days and "Draft from 2:10 PM" would say when it was last opened.
+ */
+export function draftWrittenAt(opened: { json: string; at: number } | null, json: string, now: number): number {
+  return opened && opened.json === json ? opened.at : now;
+}
+
 export function encodeDraft(value: unknown, at: number): string {
   return JSON.stringify({ v: 1, at, value });
 }

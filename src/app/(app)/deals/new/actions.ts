@@ -31,7 +31,7 @@ const dealSchema = z.object({
   address: z
     .string({ error: "Enter the address." })
     .trim()
-    .min(4, "Enter the full street address, like 123 Main St.")
+    .min(4, "Enter the full address, like 123 Main St.")
     .refine((a) => !looksLikeLink(a), "That's a link. Enter the street address."),
   status: z.enum(DEAL_STATUSES, { error: "Pick a stage." }).default(DEFAULT_DEAL_STATUS),
   theirPriceRaw: z.string().optional(),

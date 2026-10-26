@@ -67,7 +67,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
       title="New deal"
       primary="Create deal"
       discardTitle="Discard the new deal?"
-      leaveTitle="Leave without saving the new deal?"
+      leaveTitle="Leave the new deal?"
       backHref="/deals"
       createMore
       fullHeight
@@ -81,7 +81,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
         const address = String(data.get("address") ?? "").trim();
         if (!address) return { address: "Enter the address." };
         if (looksLikeLink(address)) return { address: "That's a link. Enter the street address." };
-        if (address.length < 4) return { address: "Enter the full street address, like 123 Main St." };
+        if (address.length < 4) return { address: "Enter the full address, like 123 Main St." };
         return null;
       }}
       action={createDeal}

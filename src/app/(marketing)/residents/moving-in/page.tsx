@@ -8,7 +8,7 @@ import { todayYmdEastern } from "@/lib/dates";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { rentableUnitLabels } from "@/lib/property-types";
 import { cn } from "@/lib/utils";
-import { LeaveLink } from "./leave-link";
+import { LeaveLink } from "@/components/leave-link";
 import { MoveInForm } from "./move-in-form";
 
 export const metadata: Metadata = {

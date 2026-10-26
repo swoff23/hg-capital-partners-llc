@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_CAPEX_RULES } from "./property-types";
-import { capexChangeCount, capexProblems, changesLine, changesShort, toDraft, toPayload, type CapexDraft } from "./capex-draft";
+import { capexChangeCount, capexProblems, changesLine, changesShort, leftProblems, toDraft, toPayload, type CapexDraft } from "./capex-draft";
 
 const saved = toDraft(DEFAULT_CAPEX_RULES);
 const edit = (fn: (d: CapexDraft) => void): CapexDraft => {
@@ -114,4 +114,25 @@ test("the payload carries numbers, and the text itself when a figure isn't one",
   assert.equal(p.equipment[1].monitor, "soon");
   assert.equal(p.building[0].label, "Roof");
   assert.deepEqual(p.building[10], { key: null, label: "Fence", monitor: 5, replace: 10, defaultCost: 2000 });
+});
+
+test("leaving a figure that holds text it can't read says so before Save; nothing else does", () => {
+  const bad = edit((d) => {
+    d.equipment[1].replace = "ten";
+    d.equipment[2].monitor = "";
+    d.building[0].label = " ";
+    d.building[2].cost = "-5";
+  });
+  const uid = (i: number) => bad.equipment[i].uid;
+  // Nothing has been left yet.
+  assert.deepEqual(leftProblems(bad, new Set()), {});
+  // Left, with text: the line shows. Left, but blank: it waits for Save. A name never shows here.
+  const left = new Set([`${uid(1)}:replace`, `${uid(2)}:monitor`, `${bad.building[2].uid}:cost`, `${bad.building[0].uid}:cost`]);
+  assert.deepEqual(leftProblems(bad, left), {
+    "equipment.1.replace": "Enter a whole number of years.",
+    "building.2.defaultCost": "Enter an amount up to 10,000,000.",
+  });
+  // A figure typed over and right again has no line.
+  const fixed = edit((d) => void (d.equipment[1].replace = "12"));
+  assert.deepEqual(leftProblems(fixed, new Set([`${uid(1)}:replace`])), {});
 });

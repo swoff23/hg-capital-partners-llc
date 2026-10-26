@@ -18,8 +18,9 @@ export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
 // Contractor logins only (docs/asana-migration-plan.md, defaults 2): a staff
 // email gets the same "sent" answer, and nothing is emailed.
 export default async function ForgotPasswordPage({ searchParams }: PageProps<"/login/forgot">) {
-  if (!getEnv().portalEnabled) notFound();
+  // Read first: a build without PORTAL_ENABLED would otherwise prerender this as a static 404 for good.
   const { sent } = (await searchParams) as { sent?: string };
+  if (!getEnv().portalEnabled) notFound();
 
   return (
     <AuthFrame

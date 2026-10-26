@@ -45,6 +45,9 @@ test("the property page holds off, so its open editors keep what's typed", () =>
   assert.equal(refreshHeld("/properties"), false);
   assert.equal(refreshHeld("/tasks"), false);
   assert.equal(refreshHeld("/deals/abc"), false);
+  // Apply builds its rows once from the playbook's items, so even a clean one waits.
+  assert.equal(refreshHeld("/templates/abc/apply"), true);
+  assert.equal(refreshHeld("/templates/abc"), false);
   const onProperty = { ...base, pathname: "/properties/abc", today: "2026-10-24" };
   assert.equal(shouldRefresh({ kind: "visible", hiddenMs: 10 * 60_000 }, onProperty), false);
   assert.equal(shouldRefresh({ kind: "online" }, onProperty), false);
@@ -62,8 +65,8 @@ test("offline: nothing refreshes until the connection is back", () => {
 });
 
 test("a dirty draft holds the refresh on any page, instead of a list of pages", () => {
-  // The move-in form editor, the CapEx rules and Apply playbook aren't named anywhere any more.
-  for (const pathname of ["/settings/move-in-form", "/settings", "/templates/abc/apply", "/tasks", "/deals/abc"]) {
+  // The move-in form editor and the CapEx rules aren't named anywhere any more.
+  for (const pathname of ["/settings/move-in-form", "/settings", "/tasks", "/deals/abc"]) {
     assert.equal(refreshHeld(pathname), false, pathname);
     const clean = { ...base, pathname };
     assert.equal(shouldRefresh({ kind: "visible", hiddenMs: 10 * 60_000 }, clean), true, pathname);

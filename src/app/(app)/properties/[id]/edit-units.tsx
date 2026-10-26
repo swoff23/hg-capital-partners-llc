@@ -463,7 +463,7 @@ function UnitSheet({
       size="lg"
       fullHeight
       discardTitle={isNew ? "Discard the new unit?" : `Discard changes to ${label}?`}
-      leaveTitle={`Leave without saving ${label}?`}
+      leaveTitle={`Leave ${label}?`}
       error={run.error ?? (firstProblem ? "Check the equipment below." : undefined)}
       fieldErrors={run.fieldErrors}
     >

@@ -108,7 +108,7 @@ export async function saveCapexRules(
       ...inUse,
       ...(parsed.building.map((b) => b.key?.trim()).filter(Boolean) as string[]),
     ]);
-    for (const k of taken) if (RESERVED.has(k)) throw new Error("That system key is reserved. Pick another name.");
+    for (const k of taken) if (RESERVED.has(k)) throw new Error("That name can't be used. Pick another.");
 
     const seenLabel = new Set<string>();
     const building = parsed.building.map((b, i) => {
@@ -124,7 +124,7 @@ export async function saveCapexRules(
         while (taken.has(key) || RESERVED.has(key)) key = `${base}-${n++}`;
         taken.add(key);
       }
-      if (RESERVED.has(key)) throw new Error("That system key is reserved. Pick another name.");
+      if (RESERVED.has(key)) throw new Error("That name can't be used. Pick another.");
 
       return {
         key,

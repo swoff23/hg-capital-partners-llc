@@ -5,10 +5,11 @@ import { del } from "@vercel/blob";
 import type { ListingStatus, Prisma, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
+import { splitAddress } from "@/lib/address-suggestions";
 import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
 import { badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
-import { normalizeAddress } from "@/lib/normalize";
+import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import {
   countUnitRecords,
   parseBuildingCapex,
@@ -27,7 +28,9 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  * goes through here. Server actions authenticate + parse and call in.
  *
  * Rules that live here:
- *   - an address that normalizes to an existing property's is a duplicate
+ *   - an address with an existing property's house number and street is a
+ *     duplicate, when a property is made and when one is renamed (the rename
+ *     is refused on the address field, forms 2.6)
  *   - money fields parse through one parser; dates are calendar dates
  *   - editing a key date re-syncs that property's reminder tasks
  *   - a field save is refused when a field it changes moved after the
@@ -38,8 +41,12 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  *     say "Pieter changed this at 2:14 PM" (forms 2.12)
  */
 
-/** Who is writing: the signed-in user. Optional on every write, so a caller without one (an import) leaves the last editor as it was. */
-export type Editor = { id: string } | null | undefined;
+/**
+ * Who is writing: the signed-in user. Required on every write, so a caller
+ * that forgets it is a type error; an import passes `null` to leave the last
+ * editor as it was.
+ */
+export type Editor = { id: string } | null;
 
 const stamp = (by: Editor) => (by ? { updatedByUserId: by.id } : {});
 
@@ -88,11 +95,20 @@ async function updateAtVersion(
 
 /* ---------------- Create ---------------- */
 
-export async function findDuplicateProperty(address: string): Promise<Property | null> {
-  const dup = await prisma.property.findFirst({
-    where: { address: { contains: address.split(",")[0].trim(), mode: "insensitive" } },
+/**
+ * The existing property this address would duplicate, or null: the same house
+ * number and street however it was typed (`sameStreetAddress`, the test the
+ * address field's "is already a property" line runs). `excludeId` leaves out
+ * the property being renamed, so it isn't its own duplicate.
+ */
+export async function findDuplicateProperty(address: string, opts: { excludeId?: string } = {}): Promise<Property | null> {
+  const lead = streetKey(address).split(" ")[0];
+  if (!lead) return null;
+  const candidates = await prisma.property.findMany({
+    where: { address: { contains: lead, mode: "insensitive" }, ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
+    orderBy: { updatedAt: "desc" },
   });
-  return dup && normalizeAddress(dup.address) === normalizeAddress(address) ? dup : null;
+  return candidates.find((p) => sameStreetAddress(p.address, address)) ?? null;
 }
 
 export interface NewProperty {
@@ -103,7 +119,7 @@ export interface NewProperty {
 
 export async function createProperty(
   input: NewProperty,
-  by?: Editor,
+  by: Editor,
 ): Promise<{ property: Property; duplicateOf?: undefined } | { property?: undefined; duplicateOf: Property }> {
   const duplicateOf = await findDuplicateProperty(input.address);
   if (duplicateOf) return { duplicateOf };
@@ -154,7 +170,7 @@ export async function patchProperty(
   id: string,
   patch: PropertyPatch,
   expected: Record<string, string> = {},
-  by?: Editor,
+  by: Editor,
 ): Promise<void> {
   const has = (k: string) => Object.prototype.hasOwnProperty.call(patch, k);
   const s = (k: string) => patch[k]?.trim() || null;
@@ -178,6 +194,15 @@ export async function patchProperty(
   }
   // Nothing is written when a number didn't read: storing null would erase what's there.
   if (bad.length) throw new Error(badNumbersMessage(bad));
+
+  // A rename onto an address another property has is refused on the address field, like New property's.
+  if (typeof data.address === "string") {
+    const stored = await prisma.property.findUnique({ where: { id }, select: { address: true } });
+    if (stored && stored.address !== data.address) {
+      const duplicateOf = await findDuplicateProperty(data.address, { excludeId: id });
+      if (duplicateOf) throw new FieldError({ address: `${splitAddress(duplicateOf.address).street} is already a property.` });
+    }
+  }
 
   const guarded = Object.keys(expected).filter((k) => k in data);
   if (guarded.length > 0) {
@@ -292,7 +317,7 @@ export async function replaceUnits(
   units: PropertyUnit[],
   expectedVersion: string,
   p: TaskPrincipal,
-  by?: Editor,
+  by: Editor,
 ): Promise<void> {
   await writeUnits(id, expectedVersion, p, by, () => units);
 }
@@ -303,14 +328,14 @@ export async function replaceUnits(
  * sheet opened at, so a change anyone else made to the property meanwhile
  * refuses it, and a rename reaches the tasks and listings that name the unit.
  */
-export async function saveUnit(id: string, unit: PropertyUnit, expectedVersion: string, p: TaskPrincipal, by?: Editor): Promise<void> {
+export async function saveUnit(id: string, unit: PropertyUnit, expectedVersion: string, p: TaskPrincipal, by: Editor): Promise<void> {
   await writeUnits(id, expectedVersion, p, by, (stored) =>
     unit.id && stored.some((u) => u.id === unit.id) ? stored.map((u) => (u.id === unit.id ? unit : u)) : [...stored, unit],
   );
 }
 
 /** Delete one unit by its id, from its row's menu after the confirm (forms 4.2). A unit already gone is not an error. */
-export async function deleteUnit(id: string, unitId: string, expectedVersion: string, p: TaskPrincipal, by?: Editor): Promise<void> {
+export async function deleteUnit(id: string, unitId: string, expectedVersion: string, p: TaskPrincipal, by: Editor): Promise<void> {
   await writeUnits(id, expectedVersion, p, by, (stored) => stored.filter((u) => u.id !== unitId));
 }
 
@@ -385,7 +410,7 @@ export type BuildingCapexPatch = Record<string, { year?: string | null; type?: s
  * rules stays put and reappears if re-added); a key sent with everything
  * blank is an explicit clear.
  */
-export async function mergeBuildingCapex(id: string, patch: BuildingCapexPatch, expectedVersion: string, by?: Editor): Promise<void> {
+export async function mergeBuildingCapex(id: string, patch: BuildingCapexPatch, expectedVersion: string, by: Editor): Promise<void> {
   const current = await prisma.property.findUnique({
     where: { id },
     select: { buildingCapex: true, updatedAt: true, updatedByUser: { select: { name: true, email: true } } },
@@ -429,7 +454,7 @@ export interface ListingInput {
  * transaction that also bumps Property.updatedAt (the version guard);
  * orphaned photo blobs are deleted only after the commit.
  */
-export async function replaceListings(propertyId: string, listings: ListingInput[], expectedVersion: string, by?: Editor): Promise<void> {
+export async function replaceListings(propertyId: string, listings: ListingInput[], expectedVersion: string, by: Editor): Promise<void> {
   const clean = listings.map(cleanListing);
 
   const existing = await prisma.listing.findMany({ where: { propertyId }, select: { id: true, photos: { select: { url: true } } } });
@@ -474,7 +499,7 @@ export async function replaceListings(propertyId: string, listings: ListingInput
  * property meanwhile refuses it. Photos that left the set are deleted after
  * the commit. Returns the listing's id.
  */
-export async function saveListing(propertyId: string, listing: ListingInput, expectedVersion: string, by?: Editor): Promise<{ id: string }> {
+export async function saveListing(propertyId: string, listing: ListingInput, expectedVersion: string, by: Editor): Promise<{ id: string }> {
   const { photos, ...l } = cleanListing(listing);
   const before = l.id
     ? await prisma.listing.findFirst({ where: { id: l.id, propertyId }, select: { photos: { select: { url: true } } } })
@@ -500,7 +525,7 @@ export async function saveListing(propertyId: string, listing: ListingInput, exp
 }
 
 /** Delete one listing and its photos, after the confirm (forms 4.2). A listing already gone is not an error. */
-export async function deleteListing(propertyId: string, listingId: string, expectedVersion: string, by?: Editor): Promise<void> {
+export async function deleteListing(propertyId: string, listingId: string, expectedVersion: string, by: Editor): Promise<void> {
   const row = await prisma.listing.findFirst({ where: { id: listingId, propertyId }, select: { photos: { select: { url: true } } } });
   await prisma.$transaction(async (tx) => {
     await touchAtVersion(tx, propertyId, expectedVersion, by);

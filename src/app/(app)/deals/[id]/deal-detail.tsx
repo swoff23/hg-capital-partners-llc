@@ -29,7 +29,7 @@ export function DealAddress({ id, value }: { id: string; value: string }) {
       value={value}
       minLength={4}
       blank="Enter the address."
-      tooShort="Enter the full street address, like 123 Main St."
+      tooShort="Enter the full address, like 123 Main St."
       address={{ kind: "deal", excludeId: id }}
       onSave={(address, expected) => saveDealFields(id, { address }, { address: expected })}
     />

@@ -34,7 +34,7 @@ export function NewPropertyForm({ variant, entities }: { variant: "sheet" | "pag
       title="New property"
       primary="Create property"
       discardTitle="Discard the new property?"
-      leaveTitle="Leave without saving the new property?"
+      leaveTitle="Leave the new property?"
       backHref="/properties"
       values={values}
       onRestore={(draft) => setValues({ ...BLANK, ...draft })}
@@ -45,7 +45,7 @@ export function NewPropertyForm({ variant, entities }: { variant: "sheet" | "pag
         const address = String(data.get("address") ?? "").trim();
         if (!address) return { address: "Enter the address." };
         if (looksLikeLink(address)) return { address: "That's a link. Enter the street address." };
-        if (address.length < 4) return { address: "Enter the full street address, like 123 Main St." };
+        if (address.length < 4) return { address: "Enter the full address, like 123 Main St." };
         return null;
       }}
       action={createProperty}

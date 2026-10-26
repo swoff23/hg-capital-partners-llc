@@ -15,7 +15,7 @@ export function PropertyAddressHeading({ id, value }: { id: string; value: strin
       value={value}
       minLength={4}
       blank="Enter the address."
-      tooShort="Enter the full street address, like 123 Main St."
+      tooShort="Enter the full address, like 123 Main St."
       address={{ kind: "property", excludeId: id }}
       onSave={(address, expected) => patchProperty(id, { address }, { address: expected })}
     />

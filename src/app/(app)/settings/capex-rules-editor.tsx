@@ -20,6 +20,7 @@ import {
   capexProblems,
   changesLine,
   changesShort,
+  leftProblems,
   toDraft,
   toPayload,
   type BuildingDraft,
@@ -106,6 +107,7 @@ function Figures({
   costKey,
   problems,
   onChange,
+  onLeave,
 }: {
   /** Names the cells for a screen reader: "Dishwasher". */
   name: string;
@@ -113,6 +115,8 @@ function Figures({
   costKey: "cost" | "defaultCost";
   problems: Record<string, string | undefined>;
   onChange: (patch: Partial<Cells>) => void;
+  /** A figure was left: a format error shows from then on (forms 2.0). */
+  onLeave: (cell: keyof Cells) => void;
 }) {
   return (
     <div className={figuresCell}>
@@ -125,6 +129,7 @@ function Figures({
         aria-invalid={problems.monitor ? true : undefined}
         value={row.monitor}
         onChange={(monitor) => onChange({ monitor })}
+        onBlur={() => onLeave("monitor")}
         className="min-w-0"
       />
       <NumberInput
@@ -136,6 +141,7 @@ function Figures({
         aria-invalid={problems.replace ? true : undefined}
         value={row.replace}
         onChange={(replace) => onChange({ replace })}
+        onBlur={() => onLeave("replace")}
         className="min-w-0"
       />
       <NumberInput
@@ -146,6 +152,7 @@ function Figures({
         aria-invalid={problems[costKey] ? true : undefined}
         value={row.cost}
         onChange={(cost) => onChange({ cost })}
+        onBlur={() => onLeave("cost")}
         className="min-w-0"
       />
     </div>
@@ -207,6 +214,8 @@ export function CapexRulesEditor({
   const [draft, setDraft] = useState<CapexDraft>(saved);
   const [version, setVersion] = useState<string | null>(initialVersion);
   const [tried, setTried] = useState(false);
+  // The figures left so far ("<row uid>:<cell>"), whose format errors show before Save is pressed.
+  const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
   const [confirm, setConfirm] = useState<"reset" | "discard" | null>(null);
   const [focusTick, setFocusTick] = useState(0);
   const serial = useRef(0);
@@ -216,7 +225,7 @@ export function CapexRulesEditor({
 
   const changes = capexChangeCount(saved, draft);
   const dirty = changes > 0;
-  useHoldLeave(dirty ? { title: `Leave with ${changesLine(changes)}?`, stay: "Keep editing" } : null);
+  useHoldLeave(dirty ? { title: `Leave with ${changesShort(changes)}?`, stay: "Keep editing" } : null);
 
   // The draft is kept in this browser against the version it opened with, and comes back after a reload.
   const { restored, clear: clearDraft } = useDraft(`capex-rules:${initialVersion ?? "new"}`, draft);
@@ -240,8 +249,9 @@ export function CapexRulesEditor({
     setDraft(next);
   }
   const newUid = () => `n${++serial.current}`;
+  const leave = (uid: string, cell: string) => setLeft((prev) => (prev.has(`${uid}:${cell}`) ? prev : new Set(prev).add(`${uid}:${cell}`)));
 
-  const clientProblems = tried ? capexProblems(draft) : {};
+  const clientProblems = tried ? capexProblems(draft) : leftProblems(draft, left);
   const shown: Record<string, string> = { ...clientProblems, ...(fieldErrors ?? {}) };
   // A failure that isn't on a cell goes above the buttons.
   const cellKey = /^(equipment|building)\.\d+\./;
@@ -284,6 +294,7 @@ export function CapexRulesEditor({
         setDraft(next);
         setVersion(done.version);
         setTried(false);
+        setLeft(new Set());
         toast({ message: "CapEx rules saved", detail: "Forecasts updated" });
       },
     });
@@ -350,6 +361,7 @@ export function CapexRulesEditor({
           costKey="cost"
           problems={mine(["monitor", "replace", "cost"])}
           onChange={(p) => patchEq(r.uid, p)}
+          onLeave={(cell) => leave(r.uid, cell)}
         />
       </RuleRow>
     );
@@ -385,6 +397,7 @@ export function CapexRulesEditor({
           costKey="defaultCost"
           problems={mine(["monitor", "replace", "defaultCost"])}
           onChange={(p) => patchB(r.uid, p)}
+          onLeave={(cell) => leave(r.uid, cell)}
         />
       </RuleRow>
     );
@@ -477,6 +490,7 @@ export function CapexRulesEditor({
                 clearDraft();
                 serial.current = 0;
                 setTried(false);
+                setLeft(new Set());
                 edit(saved);
               }}
             >
@@ -499,21 +513,22 @@ export function CapexRulesEditor({
           }
           error={
             barError && (
-              <SaveError className="truncate">
-                {barError}
-                {conflict && (
-                  <>
-                    {" "}
+              <SaveError
+                className={conflict ? undefined : "truncate"}
+                action={
+                  conflict && (
                     <button
                       type="button"
-                      className={cn(textLinkClass, "rounded-sm")}
-                      // The page re-renders on the latest rules and starts this editor over on them.
+                      className={cn(textLinkClass, "relative rounded-sm pointer-coarse:after:absolute pointer-coarse:after:-inset-3")}
+                      // The page re-renders on the latest and starts this editor over on it.
                       onClick={() => router.refresh()}
                     >
                       Load the latest
                     </button>
-                  </>
-                )}
+                  )
+                }
+              >
+                {barError}
               </SaveError>
             )
           }

@@ -24,6 +24,7 @@ import {
 } from "react-aria-components";
 import { Overlay } from "react-aria/Overlay";
 import { cn } from "@/lib/utils";
+import { listOnScreen } from "@/components/list-on-screen";
 import { useKeyboardInset } from "@/components/use-keyboard-inset";
 import {
   pushView,
@@ -284,6 +285,12 @@ function SheetDialog({
 
   function onKeyDown(e: KeyboardEvent) {
     if (e.key !== "Escape" || e.nativeEvent.isComposing) return;
+    // An open suggestion list is a layer of its own, and the combobox has just closed it with this Esc.
+    // It lets the key through (free text), so the sheet must not close or ask on the same press.
+    if (e.target instanceof HTMLElement && listOnScreen(e.target)) {
+      e.stopPropagation();
+      return;
+    }
     // One Esc, one layer: back one view, or close the layer a step belongs to (asking first when dirty).
     e.preventDefault();
     e.stopPropagation();

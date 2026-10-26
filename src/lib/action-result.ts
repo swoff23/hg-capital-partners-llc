@@ -71,11 +71,14 @@ export function conflictWhen(at: string | Date, now: Date = new Date()): string 
   return `on ${fmtDay(todayYmdEastern(d), { year: "auto", now })}`;
 }
 
-/** Who saved, as a sentence names them: "Pieter" from "Pieter Smith", "zack" from "zack@x.com". */
+/** Who saved, as a sentence names them: "Pieter" from "Pieter Smith", "Zack" from "zack@x.com" (an email's name starts a sentence, so it gets its capital). */
 export function conflictBy(by: string | null | undefined): string | undefined {
   const s = (by ?? "").trim();
   if (!s) return undefined;
-  if (s.includes("@")) return s.split("@")[0] || undefined;
+  if (s.includes("@")) {
+    const local = s.split("@")[0];
+    return local ? local.charAt(0).toUpperCase() + local.slice(1) : undefined;
+  }
   return firstName(s) || undefined;
 }
 

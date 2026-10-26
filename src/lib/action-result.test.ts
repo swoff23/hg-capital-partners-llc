@@ -109,10 +109,10 @@ test("isOfflineError believes the browser when it says it's offline", () => {
 
 test("a message written for people reaches the screen as written", () => {
   const r = z
-    .object({ address: z.string().min(4, "Enter the full street address, like 123 Main St.") })
+    .object({ address: z.string().min(4, "Enter the full address, like 123 Main St.") })
     .safeParse({ address: "ab" });
   assert.equal(r.success, false);
-  assert.equal(userMessage(r.error), "Enter the full street address, like 123 Main St.");
+  assert.equal(userMessage(r.error), "Enter the full address, like 123 Main St.");
 });
 
 test("zod issues become each field's own line, keyed by path", () => {
@@ -220,7 +220,7 @@ test("conflictValueLine: who set it, to what, and when; or what changed when the
 
 test("conflictKeepLabel: names the other person, or says current", () => {
   assert.equal(conflictKeepLabel({ by: "Pieter Louw" }), "Keep Pieter's");
-  assert.equal(conflictKeepLabel({ by: "pieter@hgcapital.com" }), "Keep pieter's");
+  assert.equal(conflictKeepLabel({ by: "pieter@hgcapital.com" }), "Keep Pieter's");
   assert.equal(conflictKeepLabel({}), "Keep current");
 });
 
@@ -238,7 +238,7 @@ test("FieldError: a service's refusal lands on its own fields, the first line as
 
 test("conflictBy: a first name, or an email's name part", () => {
   assert.equal(conflictBy("Pieter Smith"), "Pieter");
-  assert.equal(conflictBy("pieter@hgcapital.com"), "pieter");
+  assert.equal(conflictBy("pieter@hgcapital.com"), "Pieter");
   assert.equal(conflictBy(""), undefined);
   assert.equal(conflictBy(null), undefined);
 });

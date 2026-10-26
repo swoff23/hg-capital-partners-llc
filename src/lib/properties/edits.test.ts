@@ -22,7 +22,7 @@ test("rowConflict: a row that doesn't record who says so without a name", () => 
   const byEmail = rowConflict({ updatedAt: at, updatedByUser: { name: null, email: "pieter@example.com" } }, ["units"]);
   assert.equal(editorName({ name: null, email: "pieter@example.com" }), "pieter@example.com");
   assert.equal(byEmail.conflict.by, "pieter@example.com");
-  assert.match(byEmail.message, /^pieter changed this /);
+  assert.match(byEmail.message, /^Pieter changed this /);
 });
 
 test("rowConflict: a whole-blob editor names the blob and carries no values", () => {

@@ -319,7 +319,7 @@ function ListingSheet({
       size="lg"
       fullHeight
       discardTitle={isNew ? "Discard the new listing?" : `Discard changes to the listing for ${name}?`}
-      leaveTitle={`Leave without saving the listing for ${name}?`}
+      leaveTitle={`Leave the ${name} listing?`}
       error={run.error && Object.keys(run.fieldErrors ?? {}).length === 0 ? run.error : undefined}
       fieldErrors={run.fieldErrors}
     >

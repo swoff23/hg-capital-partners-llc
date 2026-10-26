@@ -153,7 +153,7 @@ export function MoveInFormEditor({
 
   const changes = moveInChangeCount(saved, schema);
   const dirty = changes > 0;
-  useHoldLeave(dirty ? { title: `Leave with ${changesLine(changes)}?`, stay: "Keep editing" } : null);
+  useHoldLeave(dirty ? { title: `Leave with ${changesShort(changes)}?`, stay: "Keep editing" } : null);
 
   // Kept in this browser against the version it opened with, and put back after a reload or a back swipe.
   const { restored, clear: clearDraft } = useDraft(`move-in-form:${initialVersion ?? "new"}`, schema);
@@ -254,16 +254,22 @@ export function MoveInFormEditor({
           }
           error={
             barError && (
-              <SaveError className="truncate">
-                {barError}
-                {conflict && (
-                  <>
-                    {" "}
-                    <button type="button" className={cn(textLinkClass, "rounded-sm")} onClick={() => router.refresh()}>
+              <SaveError
+                className={conflict ? undefined : "truncate"}
+                action={
+                  conflict && (
+                    <button
+                      type="button"
+                      className={cn(textLinkClass, "relative rounded-sm pointer-coarse:after:absolute pointer-coarse:after:-inset-3")}
+                      // The page re-renders on the latest and starts this editor over on it.
+                      onClick={() => router.refresh()}
+                    >
                       Load the latest
                     </button>
-                  </>
-                )}
+                  )
+                }
+              >
+                {barError}
               </SaveError>
             )
           }

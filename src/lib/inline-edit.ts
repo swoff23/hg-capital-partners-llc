@@ -48,7 +48,7 @@ export function inlineEdit(draft: string, saved: string, opts: { minLength?: num
   // Emptied a value that was empty (stray spaces only): nothing to say.
   if (next === "" && tidy(saved) === "") return { kind: "same" };
   if (next.length < minLength) {
-    // The field's own words ("Enter the full street address, like 123 Main St.") beat the generic count.
+    // The field's own words ("Enter the full address, like 123 Main St.") beat the generic count.
     return { kind: "short", message: opts.tooShort ?? tooShortMessage(minLength, next === "" ? blank : undefined) };
   }
   return { kind: "save", value: next };
