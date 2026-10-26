@@ -26,6 +26,8 @@ export interface NeedsYouItem {
   detail: string;
   /** Dollars set ahead of the detail ("$32,000 across 4 properties"), or null. */
   amount: number | null;
+  /** The part of `amount` that's late, a "$4,000 past due" clause in --danger after it; null when none is. */
+  pastDue: number | null;
   /** A key date's label for the date column ("Nov 30", "Tomorrow"), or null. */
   dateLabel: string | null;
   /** The date has passed, so it reads in --danger. */
@@ -77,6 +79,7 @@ export function keyDateItems(properties: KeyDateProperty[], today: Ymd): NeedsYo
         state: late ? "Late" : "Due",
         detail: shortAddress(p.address) || p.address,
         amount: null,
+        pastDue: null,
         dateLabel: dayLabel(date, today),
         late,
         date,
@@ -96,10 +99,17 @@ export function keyDateItems(properties: KeyDateProperty[], today: Ymd): NeedsYo
 export interface CapexForecastView {
   fromYear: number;
   perYear: number[];
+  /** Spend past its replacement age before this year: the part of this year's total that's late. */
+  overdueTotal?: number;
   rows: { perYear: number[] }[];
 }
 
-/** This calendar year's CapEx as one row that opens the forecast on Portfolio, or null when there's none. */
+/**
+ * This calendar year's CapEx as one row that opens the forecast on Portfolio,
+ * or null when there's none. Anything past its replacement age adds a
+ * "$4,000 past due" clause; the row's mark stays --warn, since a partner
+ * decides the spend.
+ */
 export function capexItem(f: CapexForecastView): NeedsYouItem | null {
   const total = f.perYear[0] ?? 0;
   if (!(total > 0)) return null;
@@ -112,6 +122,7 @@ export function capexItem(f: CapexForecastView): NeedsYouItem | null {
     state: "Due",
     detail: `across ${properties} ${properties === 1 ? "property" : "properties"}`,
     amount: total,
+    pastDue: (f.overdueTotal ?? 0) > 0 ? f.overdueTotal! : null,
     dateLabel: null,
     late: false,
     date: null,
@@ -141,7 +152,7 @@ export interface QuickbooksState {
  */
 export function quickbooksItem(conn: QuickbooksState | null, now: Date): NeedsYouItem | null {
   if (!conn || conn.status === "REVOKED") return null;
-  const base = { key: "quickbooks", href: "/financials/settings", amount: null, dateLabel: null, late: false, date: null };
+  const base = { key: "quickbooks", href: "/financials/settings", amount: null, pastDue: null, dateLabel: null, late: false, date: null };
   if (conn.status === "EXPIRED") {
     return { ...base, kind: "sync-lost", title: "QuickBooks connection", state: "Expired", detail: "Reconnect to keep syncing" };
   }

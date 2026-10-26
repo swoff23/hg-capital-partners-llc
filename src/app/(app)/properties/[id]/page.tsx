@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { TextLink } from "@/components/ui";
-import { Money } from "@/components/money";
+import { toMoneyNumber } from "@/lib/utils";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
@@ -14,7 +14,6 @@ import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "
 import { getCapexRules } from "@/lib/capex-rules";
 import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
-import { FactStrip } from "../fact-strip";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { PropertyDocumentsSection } from "./edit-documents";
@@ -25,6 +24,7 @@ import { ListingsSection, type EditableListing } from "./edit-listings";
 import { BuildingCapexSection } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
 import { PropertyFinancialsCard } from "./financials";
+import { PropertyFactStrip } from "./record-strip";
 import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
 
 const ymd = toYmd;
@@ -139,14 +139,11 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
         </div>
       </header>
 
-      <FactStrip
+      {/* Open tasks isn't repeated here: the Tasks section shows its count. */}
+      <PropertyFactStrip
         className="mt-6"
-        facts={[
-          { label: "Value", value: <Money value={value} />, key: true },
-          { label: "Loan balance", value: <Money value={balance} /> },
-          { label: "Equity", value: <Money value={position.equity} /> },
-          { label: "Open tasks", value: tasks.length },
-        ]}
+        property={{ value: toMoneyNumber(property.value), balance: toMoneyNumber(property.currentLoan) }}
+        position={position}
       />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10 pointer-coarse:mt-6">

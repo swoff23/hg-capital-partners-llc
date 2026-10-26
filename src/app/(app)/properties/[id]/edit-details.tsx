@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import { Button, Input, SectionCard, Select, Textarea } from "@/components/ui";
 import { InlineAddressField } from "@/components/inline-address-field";
 import { useToast } from "@/components/toast";
@@ -7,6 +8,7 @@ import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
 import { patchProperty } from "../actions";
 import { LabeledField as L } from "../labeled-field";
 import { dayFact, moneyFact, textFact } from "./fact-values";
+import { onPropertyFieldRequest } from "./edit-field-event";
 import { RailFact, RailList, RailVerb, SaveError } from "./record-ui";
 import { useSectionSave } from "./use-section-save";
 
@@ -66,6 +68,8 @@ function EditActions({ formId, pending, onCancel }: { formId: string; pending: b
 export function PropertyDetailsSection({ property: p }: { property: EditableProperty }) {
   const { loaded: f, open, close, pending, error, onSubmit, formRef } = useSectionSave(p.id, p);
   const formId = `property-details-${p.id}`;
+  // The fact strip's "Add value" opens this editor on Value.
+  useEffect(() => onPropertyFieldRequest(["value"], open), [open]);
 
   if (!f) {
     return (

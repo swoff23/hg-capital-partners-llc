@@ -38,6 +38,22 @@ export function monthRange(startYm: string, endYm: string): string[] {
   return out;
 }
 
+/** The month `k` months after `ym` (before it when `k` is negative), "YYYY-MM". */
+export function addMonths(ym: string, k: number): string {
+  const [y, m] = ym.split("-").map(Number);
+  const i = y * 12 + (m - 1) + k;
+  return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
+}
+
+/**
+ * The `n` months ending with `endYm`, oldest first: the month chart's and the
+ * rent roll's 12-month window, ending with the running month. Every month is
+ * in it, empty ones included, so a gap shows as a gap.
+ */
+export function trailingMonths(endYm: string, n = 12): string[] {
+  return monthRange(addMonths(endYm, -(n - 1)), endYm);
+}
+
 /** First and last calendar day of the month, "YYYY-MM-DD". */
 export function monthBounds(ym: string): { start: string; end: string } {
   const [y, m] = ym.split("-").map(Number);

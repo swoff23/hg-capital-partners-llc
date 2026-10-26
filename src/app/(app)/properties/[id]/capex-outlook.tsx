@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Section, Table, Td, Th, textLinkClass } from "@/components/ui";
+import { grandTotalRow, Section, Table, Td, Th, textLinkClass } from "@/components/ui";
 import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
 import {
@@ -10,14 +10,16 @@ import {
   type CapexRules,
   type PropertyUnit,
 } from "@/lib/property-types";
-import { fmtAge, ForecastYearBars, grandTotalCell } from "../capex-ui";
+import { fmtAge, ForecastYearBars } from "../capex-ui";
 
 /**
- * A property's 5-year CapEx forecast: the total, spend by year and every
- * line item. Picking a year spotlights its rows and swaps the figure to that
- * year's spend, with "show all 5 years" beside it, as Portfolio's does. This
- * year's items are "Due now"; only one past its replacement age reads in
- * --danger.
+ * A property's 5-year CapEx forecast (charts 2.5): the total, spend by year
+ * and the line items. Picking a year filters the items to that year and
+ * swaps the figure and the total row to its spend, with "All 5 years"
+ * beside it to clear the pick; nothing dims (Copilot and Mercury iOS swap
+ * the list below a pick). Red means late only: an item past its replacement
+ * age before this year reads "Past due" in --danger, and the total names how
+ * much is; an item due this year reads its year like the rest.
  */
 export function CapexForecastCard({
   units,
@@ -35,13 +37,15 @@ export function CapexForecastCard({
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const toggleYear = (year: number) => setSelectedYear((cur) => (cur === year ? null : year));
 
-  // The table always shows every item, in a fixed order, so it never reflows on click.
-  // Selecting a year just emphasises the matching rows and swaps the footer total.
   const allRows = f.years.flatMap((y) => y.items);
-  const selectedTotal =
-    selectedYear == null ? f.total : (f.years.find((y) => y.year === selectedYear)?.total ?? 0);
+  const rows = selectedYear == null ? allRows : allRows.filter((l) => l.dueYear === selectedYear);
+  const selectedTotal = selectedYear == null ? f.total : (f.years.find((y) => y.year === selectedYear)?.total ?? 0);
   const totalLabel = selectedYear == null ? `${f.horizonYears}-year total` : `${selectedYear} total`;
-  const pastDue = f.years[0]?.items.some((it) => it.pastDue) ?? false;
+  const allYears = (
+    <button type="button" onClick={() => setSelectedYear(null)} className={cn(textLinkClass, "pointer-coarse:min-h-11")}>
+      All {f.horizonYears} years
+    </button>
+  );
 
   return (
     <Section
@@ -56,18 +60,15 @@ export function CapexForecastCard({
       <div className="space-y-4">
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <Money value={selectedTotal} className="text-figure-m text-fg-1" />
+            <Money key={selectedTotal} value={selectedTotal} className="animate-fade-in text-figure-m text-fg-1" />
             {selectedYear != null ? (
               <span className="text-meta text-fg-3">
-                <span className="num">{selectedYear}</span> spend ·{" "}
-                <button type="button" onClick={() => setSelectedYear(null)} className={textLinkClass}>
-                  show all {f.horizonYears} years
-                </button>
+                <span className="num">{selectedYear}</span> · {allYears}
               </span>
             ) : (
-              f.dueNowCount > 0 && (
-                <span className={cn("text-meta", pastDue ? "text-danger" : "text-fg-2")}>
-                  <Money value={f.dueNowTotal} /> due now
+              f.overdueTotal > 0 && (
+                <span className="text-meta text-danger">
+                  <Money value={f.overdueTotal} /> past due
                 </span>
               )
             )}
@@ -75,16 +76,15 @@ export function CapexForecastCard({
           {undatedNote && <p className="mt-1 text-meta text-fg-3">{undatedNote}</p>}
         </div>
 
-        {/* Year by year: pick one to spotlight its items below. */}
         <ForecastYearBars
           years={f.years.map((y) => ({ year: y.year, total: y.total, count: y.count }))}
           selected={selectedYear}
           onSelect={toggleYear}
+          onClear={() => setSelectedYear(null)}
           showCount
         />
 
-        {/* Line items: the full list, always. Selecting a year emphasises its rows. */}
-        {allRows.length > 0 && (
+        {rows.length > 0 && (
           <div>
             {/* Below 480 the location moves under the asset and the age drops, so cost stays on screen. */}
             <Table>
@@ -100,21 +100,18 @@ export function CapexForecastCard({
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {allRows.map((l, idx) => {
-                  const dimmed = selectedYear != null && l.dueYear !== selectedYear;
-                  const dueNow = l.dueYear === f.fromYear;
-                  const late = l.pastDue;
+                {rows.map((l, idx) => {
                   const where = l.scope === "building" ? "text-fg-1" : "text-fg-2";
                   return (
-                    <tr key={idx} className={cn("transition-opacity duration-fast", dimmed && "opacity-30")}>
+                    <tr key={idx}>
                       <Td className={cn("pl-0 max-[480px]:hidden", where)}>{l.unitLabel}</Td>
                       <Td className="text-fg-1 max-[480px]:pl-0">
                         {l.type}
                         <span className={cn("block text-meta min-[480px]:hidden", where)}>{l.unitLabel}</span>
                       </Td>
                       <Td className="num whitespace-nowrap text-fg-2 max-[480px]:hidden">{fmtAge(l.age)}</Td>
-                      <Td className={cn("num whitespace-nowrap", late ? "text-danger" : dueNow ? "text-fg-1" : "text-fg-2")}>
-                        {dueNow ? "Due now" : l.dueYear}
+                      <Td className={cn("num whitespace-nowrap", l.pastDue ? "text-danger" : "text-fg-2")}>
+                        {l.pastDue ? "Past due" : l.dueYear}
                       </Td>
                       <Td numeric className="pr-0">
                         <Money value={l.cost} />
@@ -125,14 +122,14 @@ export function CapexForecastCard({
               </tbody>
               <tfoot>
                 {/* One cell per column, so the hidden ones drop out of the row the same way. */}
-                <tr>
-                  <Td className={cn("whitespace-nowrap pl-0 max-[480px]:hidden", grandTotalCell)}>{totalLabel}</Td>
-                  <Td className={cn("max-[480px]:pl-0", grandTotalCell)}>
+                <tr className={grandTotalRow}>
+                  <Td className="whitespace-nowrap pl-0 max-[480px]:hidden">{totalLabel}</Td>
+                  <Td className="max-[480px]:pl-0">
                     <span className="whitespace-nowrap min-[480px]:hidden">{totalLabel}</span>
                   </Td>
-                  <Td className={cn("max-[480px]:hidden", grandTotalCell)} />
-                  <Td className={grandTotalCell} />
-                  <Td numeric className={cn("pr-0", grandTotalCell)}>
+                  <Td className="max-[480px]:hidden" />
+                  <Td />
+                  <Td numeric className="pr-0">
                     <Money value={selectedTotal} />
                   </Td>
                 </tr>

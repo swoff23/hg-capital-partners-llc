@@ -9,8 +9,10 @@ import { oauthReturnLine, reconcileGap, reconcileRow } from "@/lib/quickbooks/no
 import { Badge, buttonClass, EmptyState, Section, textLinkClass } from "@/components/ui";
 import { Code } from "@/components/code";
 import { fmtDate } from "@/lib/utils";
-import { periodLabel, periodOf } from "../_components/period";
-import { MoneyCents, SourceLine, WarnMark } from "../_components/ui";
+import { periodLabel, periodOf } from "@/lib/quickbooks/period";
+import { reviewFlags } from "@/lib/quickbooks/review";
+import { SourceLine, WarnMark } from "@/components/source-line";
+import { MoneyCents } from "../_components/ui";
 import { RefreshButton } from "../_components/refresh-button";
 import { ClassMappingTable, AccountCategoryTable } from "./tables";
 import { BasisToggle, DisconnectButton, OAuthReturnNotice } from "./controls";
@@ -84,10 +86,12 @@ export default async function FinancialsSettingsPage({
       where: { realmId: conn.realmId },
       orderBy: { startedAt: "desc" },
     }),
-    getFinancialsOverview(conn.accountingMethod),
+    getFinancialsOverview({ basis: conn.accountingMethod }),
   ]);
 
   const dq = overview?.dataQuality ?? null;
+  // Which checks need the bookkeeper; the Overview's cleanup line reads the same thresholds.
+  const flags = dq ? reviewFlags(dq) : null;
   // The span the cleanup list covers, the same words its source line uses.
   const span = overview ? periodOf(overview.monthlyTrend.map((m) => m.periodMonth)) : null;
   const rank = { UNMAPPED: 0, PROPERTY: 1, OVERHEAD: 2, ENTITY: 3, IGNORE: 4 } as const;
@@ -159,22 +163,19 @@ export default async function FinancialsSettingsPage({
               <DqRow
                 label="Unclassified lines"
                 value={split(dq.unclassed)}
-                bad={
-                  Math.abs(dq.unclassed.inCents) + Math.abs(dq.unclassed.outCents) > 50_000 ||
-                  dq.unclassed.lineCount > 3
-                }
+                bad={flags!.unclassed}
                 note="Assign a class in QuickBooks"
               />
               <DqRow
                 label="Suspense / clearing balance"
                 value={<MoneyCents cents={dq.suspenseCents} />}
-                bad={dq.suspenseCents !== 0}
+                bad={flags!.suspense}
                 note="Left out of income until the bookkeeper reclasses it to an escrow or asset account"
               />
               <DqRow
                 label="Uncategorized Expense"
                 value={<MoneyCents cents={dq.uncategorizedCents} />}
-                bad={dq.uncategorizedCents !== 0}
+                bad={flags!.uncategorized}
               />
               <DqRow
                 label={span ? `Negative reclass lines, ${span}` : "Negative reclass lines"}
@@ -183,17 +184,19 @@ export default async function FinancialsSettingsPage({
                     <MoneyCents cents={dq.negativeReclass.grossCents} /> · {lines(dq.negativeReclass.lineCount)}
                   </>
                 }
-                bad={dq.negativeReclass.lineCount > 5}
+                bad={flags!.negativeReclass}
               />
-              {/* The same figures as the Overview's "Not assigned to a property" row: operating
-                  income and expense, the lines inside NOI. The rows above count every line's money in
-                  and out, below-NOI expense and interest too, so the note says which this is. */}
+              {/* The Overview's "Not assigned to a property" figures over all history, the span
+                  this list's source line states (the Overview's own row covers its period).
+                  Operating income and expense, the lines inside NOI. The rows above count every
+                  line's money in and out, below-NOI expense and interest too, so the note says
+                  which this is. */}
               <DqRow
                 label="Not assigned to a property"
                 value={
                   <>
-                    <MoneyCents cents={overview.unassigned.incomeCents} /> in ·{" "}
-                    <MoneyCents cents={overview.unassigned.expenseCents} /> out
+                    <MoneyCents cents={overview.unassignedAllTime.incomeCents} /> in ·{" "}
+                    <MoneyCents cents={overview.unassignedAllTime.expenseCents} /> out
                   </>
                 }
                 bad={false}
@@ -210,7 +213,7 @@ export default async function FinancialsSettingsPage({
               <DqRow
                 label="Owner-funded rent (P2P)"
                 value={<MoneyCents cents={dq.ownerFundedCents} />}
-                bad={dq.ownerFundedCents !== 0}
+                bad={flags!.ownerFunded}
                 note="Owner money booked to Rents, left out of NOI and collected rent"
               />
               <DqRow
@@ -219,16 +222,17 @@ export default async function FinancialsSettingsPage({
                 bad={false}
                 note="Counted as collected rent, tagged"
               />
+              {/* Cash and accrual always differ by timing, so the gap is information, never a warning (FINANCIALS-059). */}
               <DqRow
                 label="Cash vs accrual net income"
                 value={<MoneyCents cents={dq.cashVsAccrualNetIncomeDeltaCents} />}
-                bad={Math.abs(dq.cashVsAccrualNetIncomeDeltaCents) > 10_000}
+                bad={false}
               />
               {dq.unmappedPropertyLikeClasses.length > 0 && (
                 <DqRow
                   label="Unmapped classes that look like a property"
                   value={dq.unmappedPropertyLikeClasses.map((c) => c.fullyQualifiedName).join(", ")}
-                  bad
+                  bad={flags!.propertyLikeClasses}
                   note="Map these below or that property's income is dropped"
                 />
               )}

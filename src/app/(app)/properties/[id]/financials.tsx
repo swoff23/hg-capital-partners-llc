@@ -1,21 +1,34 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Section, Table, Td, TextLink, chromeIconClass } from "@/components/ui";
+import { flushTable, Section, Table, Td, TextLink, chromeIconClass } from "@/components/ui";
+import { FactStrip } from "@/components/fact-strip";
 import { Money } from "@/components/money";
+import { MoneyBars } from "@/components/money-bars";
+import { MonthBars } from "@/components/month-bars";
+import { SandboxNotice, SourceLine } from "@/components/source-line";
 import { fmtDay } from "@/lib/dates";
 import { signedLineCents } from "@/lib/quickbooks/compute";
+import { periodLabel } from "@/lib/quickbooks/period";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { CATEGORY_LABELS } from "../../financials/_components/labels";
-import { periodOf } from "../../financials/_components/period";
-import { flushTable, Kpi, MoneyBars, SandboxNotice, SourceLine, Strip } from "../../financials/_components/ui";
+
+/** "37.5%", and a loss with a true minus (U+2212), like the money beside it (section 3). */
+function pct(n: number | null): string | null {
+  if (n == null) return null;
+  const v = (Math.abs(n) * 100).toFixed(1);
+  return n < 0 && v !== "0.0" ? `−${v}%` : `${v}%`;
+}
 
 /**
- * QuickBooks P&L for this property, as a Section of the record. Renders
- * nothing when QuickBooks isn't connected — no point cluttering the page with
- * an empty section until there's something to show. Once connected, an
- * unmapped property still gets the section (so the gap is visible) with a
- * link to fix the mapping. Its action says where it goes ("All financials"),
- * since "Portfolio" on this page is the property list.
+ * QuickBooks P&L for this property, as a Section of the record (charts 4,
+ * the property Financials card): Income, Expense, NOI and Margin for Year to
+ * date (2 by 2 on phones), the source line, the month chart at 120px with
+ * the months before purchase saying so, expense by category (top 7, then
+ * Everything else), then the latest transactions. Renders nothing when
+ * QuickBooks isn't connected; once connected, an unmapped property still
+ * gets the section (so the gap is visible) with a link to fix the mapping.
+ * Its action says where it goes ("All financials"), since "Portfolio" on
+ * this page is the property list.
  */
 export async function PropertyFinancialsCard({ propertyId }: { propertyId: string }) {
   const data = await getPropertyFinancials(propertyId); // the basis chosen in Financials → Settings
@@ -32,7 +45,8 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
     );
   }
 
-  const { noi } = data;
+  const { noi, period } = data;
+  const periodText = periodLabel(period.span.from, period.span.to, { through: period.through }) ?? "";
 
   return (
     <Section
@@ -52,31 +66,47 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
         {data.sandbox && <SandboxNotice />}
 
         <div className="space-y-2">
-          {/* Three $0 figures would read as a property that earned nothing; say there's no data instead. */}
-          {data.hasLines ? (
-            <Strip className="grid-cols-3">
-              <Kpi size="m" label="Income" cents={noi.operatingIncomeCents} />
-              <Kpi size="m" label="Opex" cents={noi.operatingExpenseCents} />
-              <Kpi size="m" label="NOI" cents={noi.noiCents} />
-            </Strip>
+          {/* Four $0 figures would read as a property that earned nothing; say there's no data instead. */}
+          {data.hasLinesInPeriod ? (
+            <FactStrip
+              facts={[
+                { label: "Income", value: <Money value={noi.operatingIncomeCents / 100} />, fadeKey: noi.operatingIncomeCents },
+                { label: "Expense", value: <Money value={noi.operatingExpenseCents / 100} />, fadeKey: noi.operatingExpenseCents },
+                { label: "NOI", value: <Money value={noi.noiCents / 100} />, fadeKey: noi.noiCents },
+                { label: "Margin", value: pct(noi.noiMargin) },
+              ]}
+            />
           ) : (
-            <p className="text-body text-fg-3">No QuickBooks activity for this property yet.</p>
+            <p className="text-body text-fg-3">
+              {data.hasLines ? `No QuickBooks lines for ${periodText}.` : "No QuickBooks activity for this property yet."}
+            </p>
           )}
-          <SourceLine
-            period={periodOf(data.monthly.map((m) => m.periodMonth))}
-            basis={data.basis}
-            syncedAt={data.lastSyncAt}
-          />
+          <SourceLine period={periodText} basis={data.basis} syncedAt={data.lastSyncAt} />
         </div>
+
+        {data.hasLines && (
+          <MonthBars
+            frame="plain"
+            size="record"
+            months={data.months}
+            runningMonth={period.runningMonth}
+            through={period.syncedThrough}
+            historyStart={period.historyStart}
+            purchaseMonth={data.purchaseMonth}
+            synced={data.lastSyncAt != null}
+          />
+        )}
 
         {data.expenseByCategory.length > 0 && (
           <div>
             <h3 className="mb-2 text-meta font-medium text-fg-2">Expense by category</h3>
             <MoneyBars
               rows={data.expenseByCategory.map((e) => ({
+                key: e.category,
                 label: CATEGORY_LABELS[e.category] ?? e.category,
                 cents: e.cents,
               }))}
+              emptyLabel={`No operating expenses in QuickBooks for ${periodText}.`}
             />
           </div>
         )}

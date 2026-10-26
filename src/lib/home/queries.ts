@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCapexRules } from "@/lib/capex-rules";
 import type { Ymd } from "@/lib/dates";
 import { parseBuildingCapex, parseUnits, portfolioCapexForecast } from "@/lib/property-types";
+import { isSold } from "@/lib/properties/figures";
 import { capexItem, keyDateItems, needsYouList, quickbooksItem, type NeedsYouItem } from "./needs-you";
 
 /**
@@ -16,6 +17,7 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
       select: {
         id: true,
         address: true,
+        status: true,
         units: true,
         buildingCapex: true,
         loanMaturityDate: true,
@@ -31,16 +33,18 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
     }),
   ]);
 
-  // The forecast the Portfolio page's CapEx card draws, with its year set by
-  // Buffalo's today (forecasts read the year off `now`, which on the UTC
-  // server turns over at 7pm Eastern on Dec 31).
+  // The forecast the Portfolio page's CapEx card draws (a sold building leaves it, charts D4), with
+  // its year set by Buffalo's today (forecasts read the year off `now`, which on the UTC server
+  // turns over at 7pm Eastern on Dec 31).
   const forecast = portfolioCapexForecast(
-    properties.map((p) => ({
-      id: p.id,
-      address: p.address,
-      units: parseUnits(p.units),
-      building: parseBuildingCapex(p.buildingCapex),
-    })),
+    properties
+      .filter((p) => !isSold(p.status))
+      .map((p) => ({
+        id: p.id,
+        address: p.address,
+        units: parseUnits(p.units),
+        building: parseBuildingCapex(p.buildingCapex),
+      })),
     { years: 5, rules, now: new Date(Date.UTC(Number(today.slice(0, 4)), 6, 1, 12)) },
   );
 

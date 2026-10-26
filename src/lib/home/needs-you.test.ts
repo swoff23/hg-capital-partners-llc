@@ -70,6 +70,7 @@ test("key dates: a row names the date, opens the property and shows its short ad
     state: "Due",
     detail: "118 Congress St",
     amount: null,
+    pastDue: null,
     dateLabel: "Nov 30",
     late: false,
     date: "2026-11-30",
@@ -103,6 +104,17 @@ test("capex: one property reads singular; nothing due this year is no row", () =
   assert.equal(capexItem({ fromYear: 2026, perYear: [4_500], rows: [{ perYear: [4_500] }] })?.detail, "across 1 property");
   assert.equal(capexItem({ fromYear: 2026, perYear: [0, 20_000], rows: [{ perYear: [0, 20_000] }] }), null);
   assert.equal(capexItem({ fromYear: 2026, perYear: [], rows: [] }), null);
+});
+
+test("capex: the past due clause carries only what's late, and the mark stays warn", () => {
+  const item = capexItem({ fromYear: 2026, perYear: [32_000, 0], overdueTotal: 4_000, rows: [{ perYear: [32_000, 0] }] });
+  assert.equal(item?.amount, 32_000);
+  assert.equal(item?.pastDue, 4_000);
+  assert.equal(item?.state, "Due");
+  assert.equal(item?.late, false);
+  // Due this year but nothing late: no clause.
+  assert.equal(capexItem({ fromYear: 2026, perYear: [32_000], overdueTotal: 0, rows: [{ perYear: [32_000] }] })?.pastDue, null);
+  assert.equal(capexItem({ fromYear: 2026, perYear: [32_000], rows: [{ perYear: [32_000] }] })?.pastDue, null);
 });
 
 const NOW = new Date("2026-10-25T14:00:00Z");

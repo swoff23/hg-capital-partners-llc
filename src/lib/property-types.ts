@@ -489,6 +489,8 @@ export type CapexForecast = {
   /** Subset due this year (overdue + hitting end of life in the current year). */
   dueNowTotal: number;
   dueNowCount: number;
+  /** Subset past its replacement age before this year (`pastDue`): late, the only spend that reads in --danger. */
+  overdueTotal: number;
   /** Priced, lifecycle-tracked assets whose install year is unknown (can't be scheduled). */
   unknownCount: number;
 };
@@ -513,6 +515,7 @@ export function capexForecast(
   let total = 0;
   let dueNowTotal = 0;
   let dueNowCount = 0;
+  let overdueTotal = 0;
   let unknownCount = 0;
 
   const schedule = (
@@ -542,6 +545,7 @@ export function capexForecast(
       dueNowTotal += cost;
       dueNowCount += 1;
     }
+    if (projected < fromYear) overdueTotal += cost;
   };
 
   const byType = new Map(opts.rules.equipment.map((r) => [r.type, r] as const));
@@ -583,7 +587,7 @@ export function capexForecast(
     });
   }
 
-  return { horizonYears, fromYear, years, total, dueNowTotal, dueNowCount, unknownCount };
+  return { horizonYears, fromYear, years, total, dueNowTotal, dueNowCount, overdueTotal, unknownCount };
 }
 
 /**
@@ -610,6 +614,8 @@ export type PortfolioCapexRow = {
   perYear: number[];
   total: number;
   dueNow: number;
+  /** Past its replacement age before this year. */
+  overdue: number;
   /** Every scheduled replacement for this property across the horizon (year asc, then cost desc). */
   items: CapexForecastItem[];
 };
@@ -622,6 +628,8 @@ export type PortfolioCapexForecast = {
   perYear: number[];
   total: number;
   dueNowTotal: number;
+  /** Spend past its replacement age before this year, across the portfolio: the "$4,000 past due" clause. */
+  overdueTotal: number;
   /** Priced assets across the portfolio left out of the forecast for want of an install year. */
   unknownCount: number;
   /** Per-property breakdown, highest 5-year total first. */
@@ -640,6 +648,7 @@ export function portfolioCapexForecast(
 
   const perYear = new Array(horizonYears).fill(0);
   let dueNowTotal = 0;
+  let overdueTotal = 0;
   let unknownCount = 0;
 
   const rows: PortfolioCapexRow[] = properties.map((p) => {
@@ -647,6 +656,7 @@ export function portfolioCapexForecast(
     const py = f.years.map((y) => y.total);
     py.forEach((v, i) => (perYear[i] += v));
     dueNowTotal += f.dueNowTotal;
+    overdueTotal += f.overdueTotal;
     unknownCount += f.unknownCount;
     return {
       id: p.id,
@@ -654,11 +664,58 @@ export function portfolioCapexForecast(
       perYear: py,
       total: f.total,
       dueNow: f.dueNowTotal,
+      overdue: f.overdueTotal,
       items: f.years.flatMap((y) => y.items),
     };
   });
 
   rows.sort((a, b) => b.total - a.total);
   const total = perYear.reduce((s, v) => s + v, 0);
-  return { fromYear, horizonYears, years, perYear, total, dueNowTotal, unknownCount, rows };
+  return { fromYear, horizonYears, years, perYear, total, dueNowTotal, overdueTotal, unknownCount, rows };
+}
+
+/* ---------------- Dated systems and projected years ---------------- */
+
+/**
+ * A building rule with no replacement age, the "New system 0 yrs 0 yrs $0"
+ * row an editor adds before it's filled in. It can't be forecast, so it
+ * isn't a system to date.
+ */
+export function isPlaceholderRule(rule: BuildingRule): boolean {
+  return !(rule.replace > 0);
+}
+
+/**
+ * "3 of 10 systems dated": how many of the building's systems have a
+ * readable install year, out of the systems the rules track, placeholder
+ * rules left out of both counts.
+ */
+export function systemsDated(building: BuildingCapexData, rules: CapexRules): { dated: number; total: number } {
+  const systems = rules.building.filter((r) => !isPlaceholderRule(r));
+  return {
+    dated: systems.filter((r) => parseInstallYear(building[r.key]?.year) != null).length,
+    total: systems.length,
+  };
+}
+
+/** A unit appliance or a building system, named the way its rule is keyed. */
+export type CapexItemRef =
+  | { kind: "equipment"; type: string; installYear?: string | null }
+  | { kind: "building"; key: string; year?: string | null };
+
+/**
+ * The year an asset reaches its replacement age: install year plus the
+ * rule's replace age ("$8,000 in 2032"), so a cost past the 5-year forecast
+ * reads as later, not missing. null with no readable year, no rule for it,
+ * or a placeholder rule.
+ */
+export function projectedYear(item: CapexItemRef, rules: CapexRules): number | null {
+  if (item.kind === "equipment") {
+    const rule = rules.equipment.find((r) => r.type === item.type);
+    const installY = parseInstallYear(item.installYear);
+    return rule && installY != null && rule.replace > 0 ? installY + rule.replace : null;
+  }
+  const rule = rules.building.find((r) => r.key === item.key);
+  const installY = parseInstallYear(item.year);
+  return rule && installY != null && !isPlaceholderRule(rule) ? installY + rule.replace : null;
 }

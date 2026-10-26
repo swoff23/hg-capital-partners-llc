@@ -3,7 +3,7 @@
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
-import { Badge, EmptyState, Table, Td, Th, Button } from "@/components/ui";
+import { Badge, Button, EmptyState, flushTable, Table, Td, Th } from "@/components/ui";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { SearchInput } from "@/components/search-field";
 import { Select } from "@/components/select";
@@ -16,7 +16,6 @@ import { classLeaf, mapsToKey, mapsToMessage, parseMapsTo, type ClassTarget } fr
 import { matchesSearch } from "@/lib/text-match";
 import { cn } from "@/lib/utils";
 import { CATEGORY_LABELS, ROLE_LABELS } from "../_components/labels";
-import { flushTable } from "../_components/ui";
 import { mapClass, restoreClassMapping, setAccountCategory } from "./actions";
 
 const CATEGORY_ITEMS: OptionItem[] = Object.keys(CATEGORY_LABELS).map((id) => ({ id, label: CATEGORY_LABELS[id] }));

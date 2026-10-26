@@ -580,6 +580,18 @@ export function Td({ className, numeric, ...props }: React.ComponentProps<"td"> 
   );
 }
 
+/* ---------------- Statement rules (section 3) ----------------
+   A table on a finance screen sits flush with the page gutter: its first and
+   last cells drop their outer padding, so the h1, the header and column one
+   share an edge (`flushTable`). A grand total (portfolio NOI, the rent roll
+   total, a CapEx forecast's total, a breakdown's net) takes a --fg-1 rule
+   above, a 3px double rule below and weight 600 (`grandTotalRow`, on the row
+   or on each cell); the 1px top edge of a double border draws as a single
+   line. A subtotal row, when one comes, is a --line-strong rule above at
+   weight 600. */
+export const flushTable = "[&_tr>*:first-child]:pl-0 [&_tr>*:last-child]:pr-0";
+export const grandTotalRow = "border-t border-b-3 border-double border-fg-1 font-semibold";
+
 /* ---------------- Misc ---------------- */
 export function PageHeader({
   title,

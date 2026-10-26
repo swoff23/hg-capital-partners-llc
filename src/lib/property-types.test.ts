@@ -8,6 +8,8 @@ import {
   capexUndatedNote,
   parseCapexCost,
   portfolioCapexForecast,
+  projectedYear,
+  systemsDated,
   isHouseMeterRow,
   propertyUnitCount,
   rentableUnitLabels,
@@ -327,4 +329,82 @@ test("rows follow renames by their old label, so a swap swaps", () => {
     ids(),
   );
   assert.deepEqual(swap, renames);
+});
+
+test("capexForecast: past due means before this year (<), and overdueTotal sums only those", () => {
+  const now = new Date(2026, 5, 1);
+  // Water heater: replace at 10. 2014 + 10 = 2024, past due; 2016 + 10 = 2026, due this year but not late.
+  const units = [
+    { label: "Unit 1", equipment: [{ type: "Water Heater", installYear: "2014" }] },
+    { label: "Unit 2", equipment: [{ type: "Water Heater", installYear: "2016" }] },
+    { label: "Unit 3", equipment: [{ type: "Furnace", installYear: "2012" }] }, // 2012 + 17 = 2029
+  ];
+  const f = capexForecast(units, { years: 5, now, rules: DEFAULT_CAPEX_RULES });
+  const thisYear = f.years[0].items;
+  assert.deepEqual(
+    thisYear.map((it) => [it.unitLabel, it.pastDue]),
+    [
+      ["Unit 1", true],
+      ["Unit 2", false],
+    ],
+  );
+  assert.equal(f.dueNowTotal, 3_000);
+  assert.equal(f.dueNowCount, 2);
+  assert.equal(f.overdueTotal, 1_500);
+  assert.equal(f.total, 3_000 + 6_000);
+
+  // A building system past its age counts too: roof 2000 + 20 = 2020.
+  const withRoof = capexForecast(units, { years: 5, now, building: { roof: { year: "2000" } }, rules: DEFAULT_CAPEX_RULES });
+  assert.equal(withRoof.overdueTotal, 1_500 + 25_000);
+
+  const p = portfolioCapexForecast(
+    [
+      { id: "a", address: "A", units, building: {} },
+      { id: "b", address: "B", units: [], building: { roof: { year: "2000", costOverride: 4_000 } } },
+    ],
+    { years: 5, now, rules: DEFAULT_CAPEX_RULES },
+  );
+  assert.equal(p.overdueTotal, 1_500 + 4_000);
+  assert.equal(p.dueNowTotal, 3_000 + 4_000);
+  assert.deepEqual(
+    p.rows.map((r) => [r.id, r.overdue]),
+    [
+      ["a", 1_500],
+      ["b", 4_000],
+    ],
+  );
+});
+
+test("systemsDated: dated systems out of the rules, placeholder rules left out", () => {
+  const rules = {
+    equipment: DEFAULT_CAPEX_RULES.equipment,
+    building: [
+      { key: "new-system", label: "New system", monitor: 0, replace: 0, defaultCost: 0 },
+      ...DEFAULT_CAPEX_RULES.building,
+    ],
+  };
+  const building = {
+    "new-system": { year: "2020" },
+    roof: { year: "2010" },
+    windows: { year: "~2018" },
+    electrical: { year: "Newer" },
+    sewer: { year: "" },
+  };
+  // 10 real systems; roof and windows have readable years; the placeholder counts in neither.
+  assert.deepEqual(systemsDated(building, rules), { dated: 2, total: 10 });
+  assert.deepEqual(systemsDated({}, DEFAULT_CAPEX_RULES), { dated: 0, total: 10 });
+});
+
+test("projectedYear: install year plus the replace age, or null", () => {
+  assert.equal(projectedYear({ kind: "equipment", type: "HVAC", installYear: "2017" }, DEFAULT_CAPEX_RULES), 2032);
+  assert.equal(projectedYear({ kind: "equipment", type: "Water Heater", installYear: "~2012" }, DEFAULT_CAPEX_RULES), 2022);
+  assert.equal(projectedYear({ kind: "equipment", type: "Sump Pump", installYear: "2017" }, DEFAULT_CAPEX_RULES), null);
+  assert.equal(projectedYear({ kind: "equipment", type: "HVAC", installYear: "Newer" }, DEFAULT_CAPEX_RULES), null);
+  assert.equal(projectedYear({ kind: "building", key: "roof", year: "2010" }, DEFAULT_CAPEX_RULES), 2030);
+  assert.equal(projectedYear({ kind: "building", key: "roof", year: null }, DEFAULT_CAPEX_RULES), null);
+  const placeholder = {
+    equipment: [],
+    building: [{ key: "new-system", label: "New system", monitor: 0, replace: 0, defaultCost: 0 }],
+  };
+  assert.equal(projectedYear({ kind: "building", key: "new-system", year: "2020" }, placeholder), null);
 });

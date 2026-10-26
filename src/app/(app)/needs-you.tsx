@@ -81,12 +81,24 @@ function Row({ item }: { item: NeedsYouItem }) {
         <span className="block text-body text-fg-1">{item.title}</span>
         <span className="flex min-w-0 text-meta text-fg-3">
           <span className="shrink-0 whitespace-pre text-warn @min-[30rem]:hidden">{`${item.state} · `}</span>
-          <span className="min-w-0 truncate">
-            {item.amount != null && (
-              <>
-                <Money value={item.amount} />{" "}
-              </>
-            )}
+          {/* An amount leads the subline, where nothing cuts it; a late part follows in --danger. Under a
+              360px list the detail ("across 4 properties") drops instead of truncating, and only a very
+              long amount line is cut, after the amount, before the chevron. */}
+          {item.amount != null && (
+            <span className="min-w-0 truncate whitespace-pre">
+              <Money value={item.amount} />
+              {item.pastDue != null && (
+                <>
+                  {" · "}
+                  <span className="text-danger">
+                    <Money value={item.pastDue} /> past due
+                  </span>
+                </>
+              )}
+            </span>
+          )}
+          <span className={cn("min-w-0 truncate whitespace-pre", item.amount != null && "@max-[22.5rem]:hidden")}>
+            {item.amount != null && (item.pastDue != null ? " · " : " ")}
             {item.detail}
           </span>
           {date && <span className="shrink-0 whitespace-pre @min-[30rem]:hidden">{" · "}{date}</span>}

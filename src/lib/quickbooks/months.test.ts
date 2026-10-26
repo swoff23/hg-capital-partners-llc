@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { currentMonth, monthBounds, monthRange, planMonths } from "./months";
+import { addMonths, currentMonth, monthBounds, monthRange, planMonths, trailingMonths } from "./months";
 
 test("currentMonth uses UTC", () => {
   assert.equal(currentMonth(new Date(Date.UTC(2026, 8, 1, 0, 30))), "2026-09");
@@ -58,4 +58,24 @@ test("planMonths: every older month is visited within ceil(older/SWEEP) runs", (
     cursor = p.nextSweepCursor;
   }
   assert.deepEqual([...seen].sort(), monthRange("2025-02", "2026-09"));
+});
+
+test("addMonths steps across years both ways", () => {
+  assert.equal(addMonths("2026-10", 1), "2026-11");
+  assert.equal(addMonths("2026-12", 1), "2027-01");
+  assert.equal(addMonths("2026-01", -1), "2025-12");
+  assert.equal(addMonths("2026-10", -11), "2025-11");
+  assert.equal(addMonths("2026-10", -12), "2025-10");
+  assert.equal(addMonths("2026-10", 0), "2026-10");
+});
+
+test("trailingMonths: the 12 months ending with the running month", () => {
+  const w = trailingMonths("2026-10");
+  assert.equal(w.length, 12);
+  assert.equal(w[0], "2025-11");
+  assert.equal(w[11], "2026-10");
+  assert.deepEqual(w.slice(0, 3), ["2025-11", "2025-12", "2026-01"]);
+  // A January window starts in February of the year before.
+  assert.deepEqual(trailingMonths("2027-01").slice(0, 2), ["2026-02", "2026-03"]);
+  assert.deepEqual(trailingMonths("2026-10", 3), ["2026-08", "2026-09", "2026-10"]);
 });

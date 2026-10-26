@@ -484,4 +484,54 @@ body:has([data-surface="public"]) {
     min-height: 0;
     padding: 0;
   }
+
+  /* Paper is ink on white from either theme (docs/specs/charts.md 2.8): the
+     dark theme takes the light values while printing. The public surface
+     keeps its own dark values on purpose. */
+  :root[data-theme="dark"] {
+    color-scheme: light;
+
+    --canvas: #f8f7f3;
+    --surface: #ffffff;
+    --raised: #ffffff;
+    --fill-1: #f2f0ec;
+    --fill-2: #e7e5e0;
+    --select: #e4e9f0;
+    --line: #e7e5e0;
+    --line-strong: #d5d1ca;
+    --line-control: #84817a;
+    --fg-3: #5b6576;
+    --fg-2: #424e61;
+    --fg-1: #152133;
+
+    --act: #152133;
+    --on-act: #ffffff;
+    --act-hover: #28364d;
+
+    --danger: #b91c1c;
+    --danger-tint: #fff2f1;
+    --danger-fill: #b91c1c;
+    --danger-fill-hover: #a31818;
+    --warn: #a54e09;
+    --warn-tint: #fff5ec;
+    --ok: #1d7038;
+    --ok-tint: #eff9f1;
+
+    --toast-bg: #152133;
+    --toast-fg: #ffffff;
+    --toast-fg-2: #c0bdb7;
+    --chart-1: #384e6e;
+
+    --line-float: var(--line);
+    --toast-edge: var(--toast-bg);
+    --tile-edge: var(--ink-tile);
+  }
+
+  /* Every bar, column and meter is a CSS background, which browsers drop
+     when printing unless told to keep it. */
+  [data-chart],
+  [data-chart] * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

@@ -11,8 +11,9 @@ import { activeTask } from "@/lib/task-scope";
 import { parseBuildingCapex, parseUnits, propertyUnitCount } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { cn, toMoneyNumber } from "@/lib/utils";
+import { isSold } from "@/lib/properties/figures";
 import { PortfolioCapexForecastCard } from "../portfolio-capex";
-import { FactStrip } from "./fact-strip";
+import { PortfolioStrip } from "./portfolio-strip";
 import { PropertyFilters } from "./filters";
 import {
   DEFAULT_PROPERTY_SORT,
@@ -27,8 +28,8 @@ import { PropertyStatus } from "./property-status";
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
- * Portfolio (docs/brand-guidelines.md, sections 5 and 9): a summary strip
- * of what the table doesn't total (the debt and what's left over), then one
+ * Portfolio (docs/brand-guidelines.md, sections 5 and 9): the summary strip
+ * (value, loan balance, equity and LTV; charts D4 A), then one
  * 56px row per property with its photo (the fallback tile until
  * it's taken), money right-aligned and tabular, and a footer row that counts
  * and sums. The whole row opens the property. Below sm the status leads the
@@ -61,41 +62,47 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
     openTasks: openMap.get(p.id) ?? 0,
     purchase: p.purchasePrice,
     value: p.value,
-    loan: p.currentLoan,
   }));
 
+  // A sold property leaves every count and sum: the strip, the subtitle and the footer (charts D4).
   const sum = (list: typeof all) =>
-    list.reduce(
-      (acc, r) => {
-        acc.units += r.units ?? 0;
-        acc.purchase += toMoneyNumber(r.purchase) ?? 0;
-        acc.value += toMoneyNumber(r.value) ?? 0;
-        acc.loan += toMoneyNumber(r.loan) ?? 0;
-        acc.openTasks += r.openTasks;
-        return acc;
-      },
-      { units: 0, purchase: 0, value: 0, loan: 0, openTasks: 0 },
-    );
+    list
+      .filter((r) => !isSold(r.status))
+      .reduce(
+        (acc, r) => {
+          acc.count += 1;
+          acc.units += r.units ?? 0;
+          acc.purchase += toMoneyNumber(r.purchase) ?? 0;
+          acc.value += toMoneyNumber(r.value) ?? 0;
+          acc.openTasks += r.openTasks;
+          return acc;
+        },
+        { count: 0, units: 0, purchase: 0, value: 0, openTasks: 0 },
+      );
+  // "11 properties" while every one is owned; "10 owned" once one has sold.
+  const countLabel = (list: typeof all, n: number) =>
+    list.some((r) => isSold(r.status)) ? `${n} owned` : plural(n, "property", "properties");
   // The footer counts and sums the rows on show; the portfolio strip and the subtitle stay whole.
   const rows = sortProperties(filterByStatus(all, filters.statuses), filters.sort);
   const totals = sum(rows);
   const whole = sum(all);
 
-  const capexProperties = properties.map((p) => ({
-    id: p.id,
-    address: p.address,
-    units: parseUnits(p.units),
-    building: parseBuildingCapex(p.buildingCapex),
-  }));
+  // A sold building leaves the CapEx forecast too (charts D4).
+  const capexProperties = properties
+    .filter((p) => !isSold(p.status))
+    .map((p) => ({
+      id: p.id,
+      address: p.address,
+      units: parseUnits(p.units),
+      building: parseBuildingCapex(p.buildingCapex),
+    }));
 
   return (
     <>
       <PageHeader
         title="Portfolio"
         subtitle={
-          all.length > 0
-            ? `${plural(all.length, "property", "properties")} · ${plural(whole.units, "unit", "units")}`
-            : undefined
+          all.length > 0 ? `${countLabel(all, whole.count)} · ${plural(whole.units, "unit", "units")}` : undefined
         }
         actions={
           <LinkButton href="/properties/new" variant="primary">
@@ -109,16 +116,13 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
         <EmptyState>Add your first property to track its loan, units and tasks here.</EmptyState>
       ) : (
         <>
-          {/* Value, purchase price, units and open tasks are the footer's sums; the strip carries the rest. */}
-          <FactStrip
-            facts={[
-              { label: "Equity", value: <Money value={whole.value - whole.loan} /> },
-              { label: "Loan balance", value: <Money value={whole.loan} /> },
-              {
-                label: "LTV",
-                value: whole.value > 0 ? `${Math.round((whole.loan / whole.value) * 100)}%` : <span className="text-fg-3">—</span>,
-              },
-            ]}
+          {/* Purchase, units and open tasks are the footer's sums; the strip carries leverage (charts D4 A). */}
+          <PortfolioStrip
+            properties={properties.map((p) => ({
+              status: p.status,
+              value: toMoneyNumber(p.value),
+              balance: toMoneyNumber(p.currentLoan),
+            }))}
           />
 
           <PropertyFilters
@@ -210,7 +214,7 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                 </tbody>
                 <tfoot>
                   <tr className="font-semibold">
-                    <Td className="border-t border-line-strong pl-0">{plural(rows.length, "property", "properties")}</Td>
+                    <Td className="border-t border-line-strong pl-0">{countLabel(rows, totals.count)}</Td>
                     <Td numeric className="border-t border-line-strong max-[480px]:hidden">
                       {totals.units}
                     </Td>

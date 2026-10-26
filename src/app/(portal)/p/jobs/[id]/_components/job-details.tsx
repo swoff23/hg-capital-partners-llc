@@ -1,7 +1,8 @@
 "use client";
 import { useOptimistic, useTransition } from "react";
-import { Copy, Navigation } from "lucide-react";
+import { Check, Copy, Navigation } from "lucide-react";
 import { Code } from "@/components/code";
+import { Meter } from "@/components/meter";
 import { useToast } from "@/components/toast";
 import { Button, Checkbox, LinkButton, Section } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
@@ -83,7 +84,12 @@ export function LockboxSection({ code }: { code: string }) {
 
 type Item = { id: string; title: string; done: boolean };
 
-/** Tickable while the job is active; read-only once it's closed. */
+/**
+ * Tickable while the job is active; read-only once it's closed, when the
+ * boxes dim to 50% (the one dim level). Progress is the shared Meter under
+ * the heading (charts 2.3), springing with each tick; at the last tick the
+ * count becomes a check and "All done" in --ok, at the count's weight.
+ */
 export function JobChecklist({ items, editable }: { items: Item[]; editable: boolean }) {
   const { toast } = useToast();
   const [, startTransition] = useTransition();
@@ -91,6 +97,7 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
     state.map((i) => (i.id === next.id ? { ...i, done: next.done } : i)),
   );
   const doneCount = shown.filter((i) => i.done).length;
+  const allDone = shown.length > 0 && doneCount === shown.length;
 
   const toggle = (id: string, done: boolean) =>
     startTransition(async () => {
@@ -104,12 +111,29 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
     <Section
       title={
         <>
-          Checklist <span className="ml-1 font-normal tabular-nums text-fg-3">{`${doneCount}/${shown.length}`}</span>
+          Checklist{" "}
+          {allDone ? (
+            <span className="ml-1 inline-flex items-center gap-1 align-baseline font-normal text-ok">
+              <Check aria-hidden="true" strokeWidth={2} className="size-4 self-center" />
+              All done
+            </span>
+          ) : (
+            <span className="ml-1 font-normal tabular-nums text-fg-3">{`${doneCount}/${shown.length}`}</span>
+          )}
         </>
       }
     >
-      {/* The 44px rows already pad each line, so the list starts a little higher. */}
-      <ul className="-mt-2">
+      {shown.length > 0 && (
+        <Meter
+          value={doneCount}
+          max={shown.length}
+          label="Checklist progress"
+          valueText={`${doneCount} of ${shown.length} done`}
+          spring
+          className="mb-1"
+        />
+      )}
+      <ul>
         {shown.map((item) => (
           <li key={item.id}>
             <label className={cn("flex min-h-11 items-center gap-3 py-1", editable ? "cursor-pointer" : "cursor-default")}>

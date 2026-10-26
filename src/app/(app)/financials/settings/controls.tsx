@@ -9,7 +9,7 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { useToast } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
-import { Notice } from "../_components/ui";
+import { Notice } from "@/components/source-line";
 import { disconnectQuickbooks, setAccountingMethod } from "./actions";
 
 /**

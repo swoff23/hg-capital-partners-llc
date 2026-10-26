@@ -11,7 +11,8 @@ export default async function FinancialsLayout({ children }: LayoutProps<"/finan
       <TopTabs
         base="/financials"
         label="Financials sections"
-        keep={["basis"]}
+        // The basis and the Overview's period follow you between the tabs.
+        keep={["basis", "period"]}
         tabs={[
           { href: "", label: "Overview" },
           { href: "/rent-roll", label: "Rent roll" },
