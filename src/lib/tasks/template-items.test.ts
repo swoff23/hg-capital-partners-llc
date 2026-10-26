@@ -1,8 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyProblems,
   applyTokens,
+  createTasksLabel,
   dueFromOffset,
+  hasApplyProblems,
+  itemsVersion,
+  tasksToCreate,
   extractTokens,
   fillNotes,
   hasOpenTokens,
@@ -183,4 +188,39 @@ test("dueFromOffset moves the anchor by whole days, across months and DST", () =
   assert.equal(dueFromOffset(null, 3), null);
   assert.equal(dueFromOffset("not a date", 3), null);
   assert.equal(dueFromOffset("2026-10-30", 2.9), "2026-11-01", "whole days only");
+});
+
+test("the bar counts what Create will make: 39 tasks to create, Create 39 tasks", () => {
+  assert.equal(tasksToCreate(39), "39 tasks to create");
+  assert.equal(createTasksLabel(39), "Create 39 tasks");
+  assert.equal(tasksToCreate(1), "1 task to create");
+  assert.equal(createTasksLabel(1), "Create 1 task");
+  // Nothing ticked: the bar says so, and the primary stays pressable to explain why.
+  assert.equal(tasksToCreate(0), "No tasks to create");
+  assert.equal(createTasksLabel(0), "Create tasks");
+});
+
+test("applyProblems names what to enter, once per field, and stays empty when all is well", () => {
+  const ok = applyProblems({ propertyId: "p1", count: 39, open: [] });
+  assert.deepEqual(ok, { tokens: {} });
+  assert.equal(hasApplyProblems(ok), false);
+
+  const none = applyProblems({ propertyId: null, count: 0, open: ["Tenant", "tenant email", "Tenant"] });
+  assert.equal(none.property, "Choose a property.");
+  assert.equal(none.tasks, "Include a task first.");
+  assert.deepEqual(none.tokens, { Tenant: "Enter the tenant.", "tenant email": "Enter the tenant email." });
+  assert.equal(hasApplyProblems(none), true);
+
+  // Each alone is enough to stop Create.
+  assert.equal(hasApplyProblems(applyProblems({ propertyId: "", count: 3, open: [] })), true);
+  assert.equal(hasApplyProblems(applyProblems({ propertyId: "p1", count: 0, open: [] })), true);
+  assert.equal(hasApplyProblems(applyProblems({ propertyId: "p1", count: 3, open: ["Tenant"] })), true);
+});
+
+test("a playbook's version changes with its tasks, so an old draft never lands on a new list", () => {
+  const a = [{ title: "Collect deposit" }, { title: "Give keys" }];
+  assert.equal(itemsVersion(a), itemsVersion([{ title: "Collect deposit" }, { title: "Give keys" }]));
+  assert.notEqual(itemsVersion(a), itemsVersion([{ title: "Give keys" }, { title: "Collect deposit" }]));
+  assert.notEqual(itemsVersion(a), itemsVersion([...a, { title: "Walk the unit" }]));
+  assert.match(itemsVersion(a), /^2-/);
 });

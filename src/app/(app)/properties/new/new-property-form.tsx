@@ -1,93 +1,91 @@
 "use client";
-import { useState, useTransition, type FormEvent } from "react";
-import { Button, Input, Select, TextLink } from "@/components/ui";
-import { callAction } from "@/lib/action-result";
-import { PROPERTY_STATUSES } from "@/lib/config";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { AddressCombobox } from "@/components/address-combobox";
+import { Combobox } from "@/components/combobox";
+import { CreateForm } from "@/components/create-form";
+import { useToast } from "@/components/toast";
+import { looksLikeLink } from "@/lib/address-suggestions";
 import { shortAddress } from "@/lib/normalize";
-import { createProperty, type ExistingProperty } from "../actions";
-import { LabeledField } from "../labeled-field";
+import { createProperty, type CreatedProperty } from "./actions";
+
+type Values = { address: string; llcOwner: string };
+
+const BLANK: Values = { address: "", llcOwner: "" };
 
 /**
- * Posts without a page load, so a refusal keeps every field as typed: an
- * address that's already a property says which one and links to it. An
- * empty address is the field's own error (its --danger edge and one line),
- * not the browser's bubble.
+ * New property (forms 4.2): the sheet an intercepting route opens over
+ * Portfolio, and the same form flat on `/properties/new` for a pasted link or
+ * a reload. Two fields: the address, which suggests HG's own records, says
+ * when it is already a property and shows what it will save as; and the
+ * Entity, picked from the ones already on properties or typed new. Status is
+ * not asked: a property without one shows the rail's verb. "Create property"
+ * opens the new record with "767 Prospect Ave added".
  */
-export function NewPropertyForm() {
-  const [pending, start] = useTransition();
-  const [existing, setExisting] = useState<ExistingProperty | null>(null);
-  const [error, setError] = useState("");
-  const [missing, setMissing] = useState(false);
-
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    setError("");
-    if (!String(data.get("address") ?? "").trim()) {
-      setMissing(true);
-      e.currentTarget.querySelector<HTMLInputElement>('input[name="address"]')?.focus();
-      return;
-    }
-    start(async () => {
-      const res = await callAction(() => createProperty(data));
-      // A new property redirects to its page (callAction lets it through); only a refusal comes back.
-      if (!res.ok) setError(res.error);
-      else setExisting(res.data.duplicateOf);
-    });
-  }
+export function NewPropertyForm({ variant, entities }: { variant: "sheet" | "page"; entities: string[] }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [values, setValues] = useState<Values>(BLANK);
+  const set = (patch: Partial<Values>) => setValues((v) => ({ ...v, ...patch }));
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-4">
-      <div>
-        <LabeledField label="Address *">
-          <Input
+    <CreateForm<Values, CreatedProperty>
+      variant={variant}
+      title="New property"
+      primary="Create property"
+      discardTitle="Discard the new property?"
+      leaveTitle="Leave without saving the new property?"
+      backHref="/properties"
+      values={values}
+      onRestore={(draft) => setValues({ ...BLANK, ...draft })}
+      onReset={() => setValues(BLANK)}
+      draftKey="new-property"
+      fields={["address", "llcOwner"]}
+      check={(data) => {
+        const address = String(data.get("address") ?? "").trim();
+        if (!address) return { address: "Enter the address." };
+        if (looksLikeLink(address)) return { address: "That's a link. Enter the street address." };
+        if (address.length < 4) return { address: "Enter the full street address, like 123 Main St." };
+        return null;
+      }}
+      action={createProperty}
+      onCreated={(property) => {
+        // The record is the next step: it opens, and its empty facts are the verbs.
+        toast({ message: `${shortAddress(property.address)} added` });
+        router.replace(`/properties/${property.id}`);
+      }}
+    >
+      {({ errors, clear }) => (
+        <>
+          <AddressCombobox
+            kind="property"
+            label="Address"
             name="address"
-            required
-            placeholder="123 Main St, Buffalo, NY 14201"
-            // A taken address is the field's error: its --danger edge, and the line under it says which property.
-            aria-invalid={existing || missing ? true : undefined}
-            aria-describedby={existing ? "address-taken" : missing ? "address-missing" : undefined}
-            onChange={() => {
-              setExisting(null);
-              setMissing(false);
+            value={values.address}
+            onChange={(address) => {
+              clear("address");
+              set({ address });
             }}
+            showSavesAs
+            isRequired
+            isInvalid={!!errors.address}
+            errorMessage={errors.address}
           />
-        </LabeledField>
-        {missing && (
-          <p id="address-missing" className="mt-1.5 text-meta text-danger">
-            Add the address
-          </p>
-        )}
-        {existing && (
-          <p id="address-taken" className="mt-1.5 text-meta text-danger">
-            Already in Properties: {shortAddress(existing.address)}.{" "}
-            <TextLink href={`/properties/${existing.id}`} className="font-medium">
-              Open it
-            </TextLink>
-          </p>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <LabeledField label="Status">
-          <Select name="status" defaultValue="">
-            <option value="">None</option>
-            {PROPERTY_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </Select>
-        </LabeledField>
-        <LabeledField label="Entity">
-          <Input name="llcOwner" placeholder="LLC owner" />
-        </LabeledField>
-      </div>
-      <Button type="submit" disabled={pending}>
-        {pending ? "Creating…" : "Create property"}
-      </Button>
-      {error && (
-        <p role="alert" className="text-meta text-danger">
-          {error}
-        </p>
+          <Combobox
+            label="Entity (optional)"
+            name="llcOwner"
+            items={entities}
+            allowCustom
+            value={values.llcOwner}
+            onChange={(llcOwner) => {
+              clear("llcOwner");
+              set({ llcOwner });
+            }}
+            isInvalid={!!errors.llcOwner}
+            errorMessage={errors.llcOwner}
+          />
+        </>
       )}
-    </form>
+    </CreateForm>
   );
 }

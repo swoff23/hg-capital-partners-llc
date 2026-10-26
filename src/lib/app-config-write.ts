@@ -1,33 +1,50 @@
 import "server-only";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { CONFLICT_MESSAGE } from "@/lib/action-result";
+import { ConflictError } from "@/lib/action-result";
+import { blobVersion } from "@/lib/app-config-version";
+
+/** The two Settings blobs, each saved on its own version. */
+export type AppConfigColumn = "capexRules" | "moveInFormSchema";
+
+/** A save that finds the row moved by the other tab's save retries this many times before giving up. */
+const ATTEMPTS = 3;
 
 /**
- * Write one column of the AppConfig singleton with optimistic concurrency.
- * `expectedVersion` is the `updatedAt` the editor loaded (null when the row
- * did not exist yet). Returns the new version. Throws CONFLICT_MESSAGE when
- * the row moved on — the two settings tabs write different columns, but a
- * stale tab must still not overwrite a newer save of its own column.
+ * Write one column of the AppConfig singleton against the version the editor
+ * loaded (forms 2.12, "Separate Settings versions"). `expectedVersion` is that
+ * column's `blobVersion` when the editor was rendered (null when nothing had
+ * been saved into it); it is compared with the column as it is now, so saving
+ * the CapEx rules never conflicts the move-in form, and the other way round.
+ * Returns the new version.
+ *
+ * A column that changed since throws a `ConflictError` naming who saved it
+ * (`AppConfig.updatedBy`) and when. The write itself is pinned to the row's
+ * `updatedAt` as just read, so two saves in the same moment can't both win; if
+ * the other tab saved its own column in between, the row moved but our column
+ * didn't, and the write is read and tried again.
  */
-export async function saveAppConfigAtVersion(
+export async function saveAppConfigColumn(
+  column: AppConfigColumn,
   expectedVersion: string | null,
-  data: Prisma.AppConfigUpdateInput & Prisma.AppConfigCreateInput,
+  value: object,
+  updatedBy: string,
 ): Promise<string> {
-  const existing = await prisma.appConfig.findUnique({ where: { id: "singleton" }, select: { updatedAt: true } });
-
-  if (!existing) {
-    if (expectedVersion !== null) throw new Error(CONFLICT_MESSAGE);
-    const created = await prisma.appConfig.create({ data: { ...data, id: "singleton" } });
-    return created.updatedAt.toISOString();
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const existing = await prisma.appConfig.findUnique({ where: { id: "singleton" } });
+    if (!existing) {
+      // The editor had a version, and the row is gone: someone reset it.
+      if (expectedVersion !== null) throw new ConflictError({ fields: [column], at: new Date() });
+      await prisma.appConfig.create({ data: { id: "singleton", [column]: value, updatedBy } });
+      return blobVersion(value)!;
+    }
+    if (blobVersion(existing[column]) !== expectedVersion) {
+      throw new ConflictError({ fields: [column], by: existing.updatedBy, at: existing.updatedAt });
+    }
+    const written = await prisma.appConfig.updateMany({
+      where: { id: "singleton", updatedAt: existing.updatedAt },
+      data: { [column]: value, updatedBy },
+    });
+    if (written.count === 1) return blobVersion(value)!;
   }
-
-  const expected = expectedVersion ? new Date(expectedVersion) : null;
-  if (!expected || Number.isNaN(expected.getTime()) || expected.getTime() !== existing.updatedAt.getTime()) {
-    throw new Error(CONFLICT_MESSAGE);
-  }
-  const r = await prisma.appConfig.updateMany({ where: { id: "singleton", updatedAt: expected }, data });
-  if (r.count === 0) throw new Error(CONFLICT_MESSAGE);
-  const after = await prisma.appConfig.findUniqueOrThrow({ where: { id: "singleton" }, select: { updatedAt: true } });
-  return after.updatedAt.toISOString();
+  throw new Error("Settings are being saved from somewhere else right now. Try again.");
 }

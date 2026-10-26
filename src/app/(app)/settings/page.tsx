@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   await requireUser();
-  const { capexRules, version } = await getAppConfig();
+  const { capexRules, capexVersion } = await getAppConfig();
 
-  return <CapexRulesEditor initial={capexRules} initialVersion={version} />;
+  // Keyed by the version it was rendered from, so loading the latest after a conflict starts the editor over on it.
+  return <CapexRulesEditor key={capexVersion ?? "new"} initial={capexRules} initialVersion={capexVersion} />;
 }

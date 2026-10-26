@@ -10,6 +10,8 @@
  * an older version never lands on a newer one.
  */
 
+import { HG_TIME_ZONE, fmtDay, todayYmdEastern } from "./dates";
+
 /** Where drafts live in localStorage. The task composer keeps its own "hgos-task-draft:" entries. */
 export const DRAFT_PREFIX = "hg-draft:";
 
@@ -24,6 +26,19 @@ export function draftStorageKey(key: string): string {
 
 /** A draft as it comes back: the value and when it was written. */
 export type DraftEntry<T> = { value: T; savedAt: Date };
+
+/**
+ * The line a create sheet shows over a restored draft (forms 2.11), in
+ * Buffalo time: "Draft from 2:10 PM" for one written today, "Draft from Oct
+ * 24" for an older one.
+ */
+export function draftLabel(savedAt: Date, now: Date = new Date()): string {
+  const day = todayYmdEastern(savedAt);
+  if (day === todayYmdEastern(now)) {
+    return `Draft from ${savedAt.toLocaleTimeString("en-US", { timeZone: HG_TIME_ZONE, hour: "numeric", minute: "2-digit" })}`;
+  }
+  return `Draft from ${fmtDay(day, { year: "auto", now })}`;
+}
 
 /** Older than `maxAgeDays`: thrown away on read. */
 export function isDraftExpired(at: number, now: number, maxAgeDays: number = DRAFT_MAX_AGE_DAYS): boolean {

@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useToast } from "@/components/toast";
 import {
   DRAFT_MAX_AGE_DAYS,
   decodeDraft,
@@ -139,4 +140,40 @@ export function useDraft<T>(
   }, [key]);
 
   return { restored: entry?.value ?? null, savedAt: entry?.savedAt ?? null, clear };
+}
+
+/**
+ * What a page editor does with the draft `useDraft` found when it opened
+ * (forms 2.11): it puts it back, once, and says so with a toast, "Your
+ * unsaved changes are back", with Discard beside it. The caller's `apply` sets
+ * its own state (it runs while the editor renders, the way a value derived
+ * from props is set, so there is no flash of the saved values first), and
+ * `discard` throws the draft away and shows what was saved. A draft that
+ * `accept` refuses (its shape isn't the editor's any more) is left alone.
+ *
+ *   const { restored, clear } = useDraft(key, draft);
+ *   useRestoredDraft(restored, { apply: setDraft, discard: () => { clear(); setDraft(saved); } });
+ */
+export function useRestoredDraft<T>(
+  restored: T | null,
+  { accept, apply, discard }: { accept?: (draft: T) => boolean; apply: (draft: T) => void; discard: () => void },
+): void {
+  const { toast } = useToast();
+  const [seen, setSeen] = useState<T | null>(null);
+  const [put, setPut] = useState(false);
+  if (restored && restored !== seen) {
+    setSeen(restored);
+    if (!accept || accept(restored)) {
+      setPut(true);
+      apply(restored);
+    }
+  }
+  // Discard is the editor's, with whatever it knows by then.
+  const latest = useRef(discard);
+  useEffect(() => {
+    latest.current = discard;
+  });
+  useEffect(() => {
+    if (put) toast({ message: "Your unsaved changes are back", action: { label: "Discard", onAction: () => latest.current() } });
+  }, [put, toast]);
 }

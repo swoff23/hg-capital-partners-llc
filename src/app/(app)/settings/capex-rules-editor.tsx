@@ -1,485 +1,532 @@
 "use client";
-import { useState, useTransition } from "react";
-import { MoreHorizontal, Trash2 } from "lucide-react";
-import { Button as AriaButton } from "react-aria-components";
-import { AddRow, Button, Section, buttonClass } from "@/components/ui";
-import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Info } from "lucide-react";
+import { ActionBar, SubmitKeycap, actionBarButton } from "@/components/action-bar";
+import { Combobox } from "@/components/combobox";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
-import { callAction } from "@/lib/action-result";
-import { cn, fmtMoney } from "@/lib/utils";
+import { useHoldLeave } from "@/components/leave-guard";
+import { NumberInput } from "@/components/number-input";
+import type { OptionItem } from "@/components/option-list";
+import { Select } from "@/components/select";
+import { useToast } from "@/components/toast";
+import { Tooltip } from "@/components/tooltip";
+import { useDraft, useRestoredDraft } from "@/components/use-draft";
+import { useRun } from "@/components/use-run";
+import { AddRow, Button, SaveError, Section, textLinkClass } from "@/components/ui";
+import {
+  BUILDING_LIKE_EQUIPMENT,
+  capexChangeCount,
+  capexProblems,
+  changesLine,
+  changesShort,
+  toDraft,
+  toPayload,
+  type BuildingDraft,
+  type CapexDraft,
+  type EquipmentDraft,
+} from "@/lib/capex-draft";
 import { EQUIPMENT_TYPES } from "@/lib/config";
-import { DEFAULT_CAPEX_RULES, type BuildingRule, type CapexRules } from "@/lib/property-types";
+import { DEFAULT_CAPEX_RULES, type CapexRules } from "@/lib/property-types";
+import { cn } from "@/lib/utils";
 import { saveCapexRules } from "./actions";
-import { RevealRemoveButton, editorBleed, quietField, revealRow } from "./editor-controls";
+import { RevealRemoveButton, revealRow } from "./editor-controls";
 
-/**
- * Local editor state widens BuildingRule.key to allow `null` — a system just
- * added client-side has no server-assigned slug yet. `CapexRules` (real keys)
- * is always assignable here; `saveCapexRules`'s return narrows it back.
+/*
+ * Rule rows. From sm one line: the name, three right-aligned figures (monitor
+ * and replace in years, cost in whole dollars), then the row's delete, 44px
+ * wide on touch. Below sm a row takes two lines, so every figure shows with no
+ * sideways scroll at 375 or 320: the name and the delete, then the three
+ * figures in thirds under the header's Monitor at, Replace at and Cost.
  */
-type EditableBuildingRule = Omit<BuildingRule, "key"> & { key: string | null };
-type EditableCapexRules = Omit<CapexRules, "building"> & { building: EditableBuildingRule[] };
-
-/**
- * Roof / Furnace / Boiler / HVAC / Water Heater are tracked per unit
- * (Property.units[].equipment[]) — so the underlying rule is still an
- * EquipmentRule, matched by type — but they read as building systems, not
- * small appliances, so they're grouped under "Building systems" here.
- */
-const BUILDING_LIKE_EQUIPMENT = new Set(["Roof", "Furnace", "Boiler", "HVAC", "Water Heater"]);
-
-/* The name, then three right-aligned figures (monitor and replace in years,
-   cost in whole dollars), then the row's delete, 44px wide on touch. Below
-   480px a row takes two lines, so the cost and the delete never sit off
-   screen: the name and the delete, then the three figures in thirds under
-   the header's Monitor, Replace and Cost. */
 const rowGrid = cn(
-  "grid grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_1.5rem] items-center gap-1 pointer-coarse:grid-cols-[minmax(10rem,1fr)_4.5rem_4.5rem_6.5rem_2.75rem]",
-  "max-[480px]:grid-cols-[repeat(3,minmax(0,1fr))_2.75rem] max-[480px]:pointer-coarse:grid-cols-[repeat(3,minmax(0,1fr))_2.75rem]",
+  "grid items-center gap-x-2 gap-y-1.5 max-sm:grid-cols-[minmax(0,1fr)_2.75rem]",
+  "sm:grid-cols-[minmax(10rem,1fr)_6.5rem_6.5rem_7.5rem_1.5rem] sm:pointer-coarse:grid-cols-[minmax(10rem,1fr)_6.5rem_6.5rem_7.5rem_2.75rem]",
 );
-/** The name on a phone: the first line, beside the delete. */
-const phoneName = "max-[480px]:col-span-3";
+/** The figures: in thirds on their own line below sm, three grid cells of the row from sm. */
+const figuresCell = "max-sm:col-span-full max-sm:grid max-sm:grid-cols-3 max-sm:gap-2 sm:contents";
+/** The row's one error line, under all of it. */
+const rowLine = "col-span-full truncate text-meta text-danger";
 
-/** The table's width from 480px; below that the two-line rows fit the screen. */
-const tableMin = "min-[481px]:min-w-115 min-[481px]:pointer-coarse:min-w-120";
+/** A group's label inside Building systems. */
+const subhead = "pb-1 pt-3 text-meta font-medium text-fg-2";
 
-/** An add-row at a table's foot: its rule spans the rows' dividers, its text on the gutter like theirs. */
-const addRowBleed = "-mx-1.75 w-[calc(100%+0.875rem)] px-1.75";
+/** What each age column means, said by hover or focus with a mouse and by tap on touch (ADMIN-045). */
+const MONITOR_TIP = "Age it starts showing as Monitor";
+const REPLACE_TIP = "Age it shows as Replace";
 
-/** A group's label inside Building systems, on the field text's 7px inset. */
-const subhead = "px-1.75 pb-1 pt-3 text-meta font-medium text-fg-2";
+const asOptions = (types: readonly string[]): OptionItem[] => types.map((t) => ({ id: t, label: t }));
 
-const fmtYrs = (n: number) => `${n} yr${n === 1 ? "" : "s"}`;
-const parseNum = (s: string) => {
-  const t = s.replace(/[$,\s]/g, "");
-  return t === "" ? NaN : Number(t);
-};
-
-/**
- * One row of the rules table, on a --line divider. With a mouse its delete is
- * RevealRemoveButton, under the pointer and while focus is in the row. Touch
- * has no hover, so there the row ends in a ⋯ menu with Delete, as the
- * property's Units rows do: never a trash on every row.
- */
-function RuleRow({
-  label,
-  onRemove,
-  canRemove,
-  children,
-}: {
-  /** What the row is, for the delete's label: "Remove Dishwasher". */
-  label: string;
-  onRemove: () => void;
-  canRemove: boolean;
-  children: React.ReactNode;
-}) {
-  const slot = "justify-self-end max-[480px]:col-start-4 max-[480px]:row-start-1";
+/** A ⓘ beside a column header, 16px with a 44px touch area, opening a Tooltip. */
+function InfoTip({ label, name, className }: { label: string; name: string; className?: string }) {
   return (
-    <div data-reveal-row className={cn(rowGrid, revealRow, "py-1.25 transition-colors hover:bg-fill-1 pointer-coarse:py-0.5")}>
-      {children}
-      {canRemove ? (
-        <span className={cn("flex", slot)}>
-          <RevealRemoveButton onRemove={onRemove} aria-label={`Remove ${label || "this row"}`} className="pointer-coarse:hidden" />
-          <span className="pointer-fine:hidden">
-            <MenuTrigger>
-              <AriaButton
-                aria-label={`${label || "This row"} actions`}
-                className={buttonClass({ variant: "ghost", size: "sm", icon: true })}
-              >
-                <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
-              </AriaButton>
-              <Menu>
-                <MenuItem variant="destructive" icon={<Trash2 />} onAction={onRemove}>
-                  Delete
-                </MenuItem>
-              </Menu>
-            </MenuTrigger>
-          </span>
+    <Tooltip label={label} className={className}>
+      <button
+        type="button"
+        aria-label={`What ${name} means`}
+        className="relative inline-flex size-4 items-center justify-center rounded-sm text-fg-3 transition-colors hover:text-fg-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5"
+      >
+        <Info aria-hidden="true" className="size-4" strokeWidth={1.5} />
+      </button>
+    </Tooltip>
+  );
+}
+
+/** The table's header: the first column's name and the three figures (with their ⓘ), from sm; the three figures alone, once, on a phone. */
+function RuleHeader({ first }: { first: string }) {
+  const th = "whitespace-nowrap px-2.5 text-right text-meta font-medium text-fg-3";
+  return (
+    <>
+      <div className={cn(rowGrid, "mb-1 hidden border-b border-line-strong pb-2 sm:grid")}>
+        <span className="text-meta font-medium text-fg-3">{first}</span>
+        <span className={cn(th, "flex items-center justify-end gap-1")}>
+          Monitor at <InfoTip label={MONITOR_TIP} name="Monitor at" />
         </span>
-      ) : (
-        <span className={slot} />
-      )}
+        <span className={cn(th, "flex items-center justify-end gap-1")}>
+          Replace at <InfoTip label={REPLACE_TIP} name="Replace at" />
+        </span>
+        <span className={th}>Cost</span>
+        <span />
+      </div>
+      <div className="mb-1 grid grid-cols-3 gap-2 border-b border-line-strong pb-2 sm:hidden">
+        <span className={th}>Monitor at</span>
+        <span className={th}>Replace at</span>
+        <span className={th}>Cost</span>
+      </div>
+    </>
+  );
+}
+
+type Cells = { monitor: string; replace: string; cost: string };
+
+/** The three figures of a row: years, years, whole dollars, right-aligned on tabular figures. */
+function Figures({
+  name,
+  row,
+  costKey,
+  problems,
+  onChange,
+}: {
+  /** Names the cells for a screen reader: "Dishwasher". */
+  name: string;
+  row: Cells;
+  costKey: "cost" | "defaultCost";
+  problems: Record<string, string | undefined>;
+  onChange: (patch: Partial<Cells>) => void;
+}) {
+  return (
+    <div className={figuresCell}>
+      <NumberInput
+        kind="integer"
+        suffix="yrs"
+        size="sm"
+        align="end"
+        aria-label={`${name} monitor years`}
+        aria-invalid={problems.monitor ? true : undefined}
+        value={row.monitor}
+        onChange={(monitor) => onChange({ monitor })}
+        className="min-w-0"
+      />
+      <NumberInput
+        kind="integer"
+        suffix="yrs"
+        size="sm"
+        align="end"
+        aria-label={`${name} replace years`}
+        aria-invalid={problems.replace ? true : undefined}
+        value={row.replace}
+        onChange={(replace) => onChange({ replace })}
+        className="min-w-0"
+      />
+      <NumberInput
+        kind="money"
+        size="sm"
+        align="end"
+        aria-label={`${name} cost`}
+        aria-invalid={problems[costKey] ? true : undefined}
+        value={row.cost}
+        onChange={(cost) => onChange({ cost })}
+        className="min-w-0"
+      />
     </div>
   );
 }
 
-/**
- * Blends in as plain text; click/focus reveals the raw value; commits onBlur/Enter, reverts onEscape.
- * Only an edit in progress is local (`draft`). Otherwise the field shows `value`, so it follows
- * Reset to defaults and a failed save's revert instead of keeping the text it started with.
- */
-function InlineNumber({
-  value,
-  kind,
-  max,
+/** One row on a --line divider: its name, its figures, its delete (tap to reveal on touch, as the move-in form's items do) and its one error line. */
+function RuleRow({
+  uid,
   label,
-  onCommit,
+  onRemove,
+  canRemove,
+  line,
+  children,
 }: {
-  value: number;
-  kind: "yrs" | "money";
-  max: number;
-  /** Names the field for a screen reader: "Dishwasher replace years". */
+  uid: string;
+  /** What the row is, for the delete's label: "Remove Dishwasher". */
   label: string;
-  onCommit: (n: number) => boolean;
+  onRemove: () => void;
+  canRemove: boolean;
+  /** The first thing wrong with it, once Save was pressed. */
+  line?: string;
+  children: React.ReactNode;
 }) {
-  const format = (n: number) => (kind === "money" ? fmtMoney(n) : fmtYrs(n));
-  const [draft, setDraft] = useState<string | null>(null);
-  const keys = useInlineEditKeys(
-    () => setDraft(null),
-    () => {
-      if (draft === null) return;
-      const n = Math.round(parseNum(draft));
-      // A rejected value (replace under monitor) just shows `value` again.
-      if (Number.isFinite(n) && n >= 0 && n <= max && n !== value) onCommit(n);
-      setDraft(null);
-    },
-  );
   return (
-    <input
-      // Figures right-aligned and tabular; money in whole dollars (section 3).
-      className={cn(quietField, "text-right tabular-nums")}
-      inputMode="numeric"
-      aria-label={label}
-      value={draft ?? format(value)}
-      onFocus={(e) => {
-        setDraft(String(value));
-        e.currentTarget.select();
-      }}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={keys.onBlur}
-      onKeyDown={keys.onKeyDown}
-    />
+    <div data-reveal-row data-row={uid} data-invalid={line ? "true" : undefined} className={cn(rowGrid, revealRow, "py-1.5 pointer-coarse:py-1")}>
+      {children}
+      {canRemove ? (
+        <span className="flex justify-self-end max-sm:col-start-2 max-sm:row-start-1">
+          <RevealRemoveButton onRemove={onRemove} aria-label={`Remove ${label || "this row"}`} />
+        </span>
+      ) : (
+        <span className="max-sm:col-start-2 max-sm:row-start-1" />
+      )}
+      {line && <p className={rowLine}>{line}</p>}
+    </div>
   );
 }
 
-/**
- * Name/type cell — a plain editable text field, no dropdown decoration.
- * `freeText` allows any typed value (building systems); otherwise a committed
- * value must be one of `options` (equipment types are a fixed vocabulary — a
- * made-up type would never match a unit's actual equipment) and an invalid
- * value just reverts. Use the Add buttons to discover other options.
- */
-function ComboField({
-  value,
-  options,
-  onCommit,
-  freeText = false,
-  placeholder,
-  label,
-  className,
-}: {
-  value: string;
-  options: string[];
-  onCommit: (v: string) => boolean;
-  freeText?: boolean;
-  placeholder?: string;
-  /** Names the field for a screen reader: "Appliance", "System". */
-  label: string;
-  className?: string;
-}) {
-  // As in InlineNumber: local only while editing, so a revert or a reset shows through.
-  const [draft, setDraft] = useState<string | null>(null);
-  const keys = useInlineEditKeys(
-    () => setDraft(null),
-    () => {
-      const v = (draft ?? value).trim();
-      setDraft(null);
-      // An empty, unchanged or (for a fixed vocabulary) unknown value just shows `value` again.
-      if (!v || v === value || (!freeText && !options.includes(v))) return;
-      onCommit(v);
-    },
-  );
-  return (
-    <input
-      className={cn(quietField, className)}
-      aria-label={label}
-      placeholder={placeholder}
-      value={draft ?? value}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={keys.onBlur}
-      onKeyDown={keys.onKeyDown}
-    />
-  );
+/** The first line of a row's problems, in the order of its cells. */
+function firstLine(shown: Record<string, string>, prefix: string, cells: readonly string[]): string | undefined {
+  for (const c of cells) if (shown[`${prefix}.${c}`]) return shown[`${prefix}.${c}`];
+  return undefined;
 }
-
-/* A table header's look (Th): sentence case at text-meta 500 in --fg-3 over a
-   --line-strong rule. Each label sits 7px in, on its field's text (the
-   field's 6px padding and 1px edge). */
-const headerRow = (first: string) => (
-  <div className={cn(rowGrid, "border-b border-line-strong pb-2 text-meta font-medium text-fg-3")}>
-    {/* On a phone the section's title names the first column; the labels head the figures' line. */}
-    <span className="px-1.75 max-[480px]:hidden">{first}</span>
-    <span className="px-1.75 text-right">Monitor</span>
-    <span className="px-1.75 text-right">Replace</span>
-    <span className="px-1.75 text-right">Cost</span>
-    <span />
-  </div>
-);
 
 export function CapexRulesEditor({
   initial,
   initialVersion,
 }: {
   initial: CapexRules;
-  /** AppConfig.updatedAt the page rendered with; sent back so a stale tab cannot overwrite a newer save. */
+  /** The version of the CapEx rules the page rendered with; sent back so a stale tab can't overwrite a newer save. */
   initialVersion: string | null;
 }) {
-  const [rules, setRules] = useState<EditableCapexRules>(initial);
+  const router = useRouter();
+  const { toast } = useToast();
+  const { run, pending, error, fieldErrors, conflict, reset: forgetRefusal } = useRun();
+
+  const [saved, setSaved] = useState<CapexDraft>(() => toDraft(initial));
+  const [draft, setDraft] = useState<CapexDraft>(saved);
   const [version, setVersion] = useState<string | null>(initialVersion);
-  const [, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [tried, setTried] = useState(false);
+  const [confirm, setConfirm] = useState<"reset" | "discard" | null>(null);
+  const [focusTick, setFocusTick] = useState(0);
+  const serial = useRef(0);
+  // The row Add just made, which takes focus in its name once it has rendered.
+  const added = useRef<string | null>(null);
+  const body = useRef<HTMLDivElement>(null);
 
-  /** Optimistically apply `next` and persist it; on failure, revert and surface an error. */
-  function persist(next: EditableCapexRules) {
-    const prev = rules;
-    setRules(next);
-    setError(null);
-    start(async () => {
-      // A dropped connection comes back as a refusal, so the row reverts with the message instead of the page crashing.
-      const r = await callAction(() => saveCapexRules(next, version));
-      if (r.ok) {
-        setRules(r.data.rules);
-        setVersion(r.data.version);
-      } else {
-        setRules(prev);
-        setError(r.error);
-      }
-    });
+  const changes = capexChangeCount(saved, draft);
+  const dirty = changes > 0;
+  useHoldLeave(dirty ? { title: `Leave with ${changesLine(changes)}?`, stay: "Keep editing" } : null);
+
+  // The draft is kept in this browser against the version it opened with, and comes back after a reload.
+  const { restored, clear: clearDraft } = useDraft(`capex-rules:${initialVersion ?? "new"}`, draft);
+  useRestoredDraft(restored, {
+    accept: (d) => Array.isArray(d.equipment) && Array.isArray(d.building),
+    apply: (d) => {
+      // Rows added before the reload keep their uids; new ones start after them.
+      const used = [...d.equipment, ...d.building].map((r) => Number(/^n(\d+)$/.exec(r.uid)?.[1] ?? 0));
+      serial.current = Math.max(serial.current, ...used);
+      setDraft(d);
+    },
+    discard: () => {
+      clearDraft();
+      setDraft(saved);
+    },
+  });
+
+  /** Any edit lets go of a refusal: it was about what was there before. */
+  function edit(next: CapexDraft) {
+    forgetRefusal();
+    setDraft(next);
   }
+  const newUid = () => `n${++serial.current}`;
 
-  const appliances = rules.equipment.filter((r) => !BUILDING_LIKE_EQUIPMENT.has(r.type));
-  const coreSystems = rules.equipment.filter((r) => BUILDING_LIKE_EQUIPMENT.has(r.type));
-  const typesInUse = new Set(rules.equipment.map((r) => r.type));
-  const availableApplianceTypes = EQUIPMENT_TYPES.filter(
-    (t) => t !== "Other" && !BUILDING_LIKE_EQUIPMENT.has(t) && !typesInUse.has(t),
-  );
-  const missingCoreTypes = [...BUILDING_LIKE_EQUIPMENT].filter((t) => !typesInUse.has(t));
-  const buildingLabelsLc = rules.building.map((r) => r.label.trim().toLowerCase());
-  const buildingSuggestions = DEFAULT_CAPEX_RULES.building
-    .map((b) => b.label)
-    .filter((l) => !buildingLabelsLc.includes(l.toLowerCase()));
+  const clientProblems = tried ? capexProblems(draft) : {};
+  const shown: Record<string, string> = { ...clientProblems, ...(fieldErrors ?? {}) };
+  // A failure that isn't on a cell goes above the buttons.
+  const cellKey = /^(equipment|building)\.\d+\./;
+  const loose = Object.entries(shown).filter(([k]) => !cellKey.test(k));
+  const barError: string | undefined = loose.length > 0 ? loose.map(([, line]) => line).join(" ") : fieldErrors === undefined ? error : undefined;
 
-  function commitEqField(type: string, field: "monitor" | "replace" | "cost", n: number): boolean {
-    const row = rules.equipment.find((r) => r.type === type);
-    if (!row) return false;
-    if (field === "replace" && n < row.monitor) return false;
-    if (field === "monitor" && n > row.replace) return false;
-    persist({ ...rules, equipment: rules.equipment.map((r) => (r.type === type ? { ...r, [field]: n } : r)) });
-    return true;
-  }
-  function changeEqType(oldType: string, newType: string): boolean {
-    if (newType !== oldType) {
-      persist({ ...rules, equipment: rules.equipment.map((r) => (r.type === oldType ? { ...r, type: newType } : r)) });
+  // Focus goes to the first row that needs something, scrolled to the middle; a row added by Add takes focus in its name.
+  useEffect(() => {
+    if (focusTick === 0) return;
+    // The cell the line is about, else the row's first field.
+    const first =
+      body.current?.querySelector<HTMLElement>('[data-invalid="true"] [aria-invalid="true"]') ??
+      body.current?.querySelector<HTMLElement>('[data-invalid="true"] input, [data-invalid="true"] button:not([aria-label^="Remove"])');
+    first?.focus({ preventScroll: true });
+    first?.scrollIntoView({ block: "center" });
+  }, [focusTick]);
+  useEffect(() => {
+    const uid = added.current;
+    if (!uid) return;
+    added.current = null;
+    const first = body.current?.querySelector<HTMLElement>(`[data-row="${uid}"] input, [data-row="${uid}"] button:not([aria-label^="Remove"])`);
+    first?.focus({ preventScroll: true });
+    first?.scrollIntoView({ block: "center" });
+  }, [draft]);
+
+  function save() {
+    if (pending || !dirty) return;
+    setTried(true);
+    if (Object.keys(capexProblems(draft)).length > 0) {
+      setFocusTick((n) => n + 1);
+      return;
     }
-    return true;
-  }
-  function removeEq(type: string) {
-    persist({ ...rules, equipment: rules.equipment.filter((r) => r.type !== type) });
-  }
-  function addAppliance() {
-    if (availableApplianceTypes.length === 0) return;
-    persist({
-      ...rules,
-      equipment: [...rules.equipment, { type: availableApplianceTypes[0], monitor: 0, replace: 0, cost: 0 }],
-    });
-  }
-  function addCoreSystem() {
-    if (missingCoreTypes.length === 0) return;
-    persist({
-      ...rules,
-      equipment: [...rules.equipment, { type: missingCoreTypes[0], monitor: 0, replace: 0, cost: 0 }],
+    run(() => saveCapexRules(toPayload(draft), version), {
+      failure: "inline",
+      succeeded: (done) => {
+        clearDraft();
+        const next = toDraft(done.rules);
+        serial.current = 0;
+        setSaved(next);
+        setDraft(next);
+        setVersion(done.version);
+        setTried(false);
+        toast({ message: "CapEx rules saved", detail: "Forecasts updated" });
+      },
     });
   }
 
-  function commitBField(idx: number, field: "monitor" | "replace" | "cost", n: number): boolean {
-    const row = rules.building[idx];
-    if (!row) return false;
-    if (field === "replace" && n < row.monitor) return false;
-    if (field === "monitor" && n > row.replace) return false;
-    const key = field === "cost" ? "defaultCost" : field;
-    persist({ ...rules, building: rules.building.map((r, i) => (i === idx ? { ...r, [key]: n } : r)) });
-    return true;
+  // From here the editor reads the rules as drawn from the draft.
+  const appliances = draft.equipment.filter((r) => !BUILDING_LIKE_EQUIPMENT.has(r.type));
+  const coreSystems = draft.equipment.filter((r) => BUILDING_LIKE_EQUIPMENT.has(r.type));
+  const usedTypes = new Set(draft.equipment.map((r) => r.type));
+  const freeAppliances = EQUIPMENT_TYPES.filter((t) => t !== "Other" && !BUILDING_LIKE_EQUIPMENT.has(t) && !usedTypes.has(t));
+  const missingCore = [...BUILDING_LIKE_EQUIPMENT].filter((t) => !usedTypes.has(t));
+  const labels = draft.building.map((r) => r.label.trim().toLowerCase());
+  const suggestions = DEFAULT_CAPEX_RULES.building.map((b) => b.label).filter((l) => !labels.includes(l.toLowerCase()));
+
+  const patchEq = (uid: string, p: Partial<EquipmentDraft>) =>
+    edit({ ...draft, equipment: draft.equipment.map((r) => (r.uid === uid ? { ...r, ...p } : r)) });
+  const patchB = (uid: string, p: Partial<BuildingDraft>) =>
+    edit({ ...draft, building: draft.building.map((r) => (r.uid === uid ? { ...r, ...p } : r)) });
+  const removeEq = (uid: string) => edit({ ...draft, equipment: draft.equipment.filter((r) => r.uid !== uid) });
+  const removeB = (uid: string) => edit({ ...draft, building: draft.building.filter((r) => r.uid !== uid) });
+  function addEquipment(type: string) {
+    const uid = newUid();
+    edit({ ...draft, equipment: [...draft.equipment, { uid, type, monitor: "0", replace: "0", cost: "0" }] });
+    added.current = uid;
   }
-  function renameB(idx: number, label: string): boolean {
-    const lc = label.toLowerCase();
-    if (buildingLabelsLc.some((l, i) => l === lc && i !== idx)) return false;
-    persist({ ...rules, building: rules.building.map((r, i) => (i === idx ? { ...r, label } : r)) });
-    return true;
+  function addSystem() {
+    const uid = newUid();
+    // A new row stays here until Save, so a blank system never reaches every property (ADMIN-002).
+    edit({ ...draft, building: [...draft.building, { uid, key: null, label: "", monitor: "0", replace: "0", cost: "0" }] });
+    added.current = uid;
   }
-  function removeB(idx: number) {
-    persist({ ...rules, building: rules.building.filter((_, i) => i !== idx) });
+
+  const eqIndex = (uid: string) => draft.equipment.findIndex((r) => r.uid === uid);
+  const bIndex = (uid: string) => draft.building.findIndex((r) => r.uid === uid);
+
+  function equipmentRow(r: EquipmentDraft, group: "appliance" | "system") {
+    const i = eqIndex(r.uid);
+    const prefix = `equipment.${i}`;
+    const mine = (cells: readonly string[]) => Object.fromEntries(cells.map((c) => [c, shown[`${prefix}.${c}`]]));
+    const choices = group === "appliance" ? freeAppliances : missingCore;
+    return (
+      <RuleRow
+        key={r.uid}
+        uid={r.uid}
+        label={r.type}
+        onRemove={() => removeEq(r.uid)}
+        canRemove={draft.equipment.length > 1}
+        line={firstLine(shown, prefix, ["type", "monitor", "replace", "cost"])}
+      >
+        <Select
+          size="sm"
+          aria-label={group === "appliance" ? "Appliance" : "System"}
+          placeholder="Choose a type"
+          items={asOptions([...new Set([...(r.type ? [r.type] : []), ...choices])])}
+          value={r.type || null}
+          onChange={(type) => type && patchEq(r.uid, { type })}
+          isInvalid={!!shown[`${prefix}.type`]}
+          searchLabel="Search types"
+          className="min-w-0"
+        />
+        <Figures
+          name={r.type || "New rule"}
+          row={r}
+          costKey="cost"
+          problems={mine(["monitor", "replace", "cost"])}
+          onChange={(p) => patchEq(r.uid, p)}
+        />
+      </RuleRow>
+    );
   }
-  function addBuildingSystem() {
-    const base = "New system";
-    let label = base;
-    let n = 2;
-    while (buildingLabelsLc.includes(label.toLowerCase())) label = `${base} ${n++}`;
-    persist({ ...rules, building: [...rules.building, { key: null, label, monitor: 0, replace: 0, defaultCost: 0 }] });
-  }
-  function resetToDefaults() {
-    setConfirmReset(false);
-    persist(DEFAULT_CAPEX_RULES);
+
+  function buildingRow(r: BuildingDraft) {
+    const i = bIndex(r.uid);
+    const prefix = `building.${i}`;
+    const mine = (cells: readonly string[]) => Object.fromEntries(cells.map((c) => [c, shown[`${prefix}.${c}`]]));
+    return (
+      <RuleRow
+        key={r.uid}
+        uid={r.uid}
+        label={r.label}
+        onRemove={() => removeB(r.uid)}
+        canRemove={draft.building.length > 1}
+        line={firstLine(shown, prefix, ["label", "monitor", "replace", "defaultCost"])}
+      >
+        <Combobox
+          size="sm"
+          aria-label="System"
+          placeholder="System name"
+          items={suggestions}
+          allowCustom
+          value={r.label}
+          onChange={(label) => patchB(r.uid, { label })}
+          isInvalid={!!shown[`${prefix}.label`]}
+          className="min-w-0"
+        />
+        <Figures
+          name={r.label || "New system"}
+          row={r}
+          costKey="defaultCost"
+          problems={mine(["monitor", "replace", "defaultCost"])}
+          onChange={(p) => patchB(r.uid, p)}
+        />
+      </RuleRow>
+    );
   }
 
   return (
-    <div className="space-y-8 pointer-coarse:space-y-6">
-      {/* The tab's one action, at the top right of its content; a refused save's line beside it. */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 text-meta text-danger">{error}</p>
-        <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={() => setConfirmReset(true)}>
+    <div ref={body} className="space-y-8 pointer-coarse:space-y-6">
+      {/* The tab's one extra action, at the top right of its content: it fills the draft, and Save keeps it. */}
+      <div className="flex items-center justify-end">
+        <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={() => setConfirm("reset")} disabled={pending}>
           Reset to defaults
         </Button>
       </div>
 
-      <Section title="Appliances">
-        {/* From 480px, narrower than its columns (460px, 480 on touch), the table scrolls sideways in
-            its own box, never the page; below that each row takes two lines and fits. */}
-        <div className={cn("overflow-x-auto", editorBleed)}>
-          <div className={tableMin}>
-            {headerRow("Appliance")}
-            <div className="divide-y divide-line">
-              {appliances.map((r) => (
-                <RuleRow key={r.type} label={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
-                  <ComboField
-                    className={phoneName}
-                    value={r.type}
-                    label="Appliance"
-                    options={availableApplianceTypes}
-                    onCommit={(t) => changeEqType(r.type, t)}
-                  />
-                  <InlineNumber
-                    value={r.monitor}
-                    kind="yrs"
-                    max={200}
-                    label={`${r.type} monitor years`}
-                    onCommit={(n) => commitEqField(r.type, "monitor", n)}
-                  />
-                  <InlineNumber
-                    value={r.replace}
-                    kind="yrs"
-                    max={200}
-                    label={`${r.type} replace years`}
-                    onCommit={(n) => commitEqField(r.type, "replace", n)}
-                  />
-                  <InlineNumber
-                    value={r.cost}
-                    kind="money"
-                    max={10_000_000}
-                    label={`${r.type} cost`}
-                    onCommit={(n) => commitEqField(r.type, "cost", n)}
-                  />
-                </RuleRow>
-              ))}
-              {appliances.length === 0 && <p className="px-1.75 py-2.5 text-body text-fg-3">No appliance rules.</p>}
-            </div>
-          </div>
+      <Section
+        title="Appliances"
+        actions={
+          <InfoTip
+            label={`Monitor at: ${MONITOR_TIP.toLowerCase()}.\nReplace at: ${REPLACE_TIP.toLowerCase()}.`}
+            name="Monitor at and Replace at"
+            className="sm:hidden"
+          />
+        }
+      >
+        <RuleHeader first="Appliance" />
+        <div className="divide-y divide-line">
+          {appliances.map((r) => equipmentRow(r, "appliance"))}
+          {appliances.length === 0 && <p className="py-2.5 text-body text-fg-3">No appliance rules.</p>}
         </div>
         {/* The list's last row adds one more, as Add unit ends the Units list; it's off once every type has a rule. */}
-        <AddRow onClick={addAppliance} disabled={availableApplianceTypes.length === 0} className={addRowBleed}>
+        <AddRow onClick={() => addEquipment(freeAppliances[0])} disabled={freeAppliances.length === 0}>
           Add appliance
         </AddRow>
       </Section>
 
       <Section title="Building systems">
-        <div className={cn("overflow-x-auto", editorBleed)}>
-          <div className={tableMin}>
-            {headerRow("System")}
-            <div className="divide-y divide-line">
-              {/* Roof, furnace and the rest are kept per unit, and a building can carry its own roof
-                  too: the subheads say which a figure is, so two Roof rows never read as one rule. */}
-              {coreSystems.length > 0 && <p className={subhead}>Per unit</p>}
-              {coreSystems.map((r) => (
-                <RuleRow key={r.type} label={r.type} onRemove={() => removeEq(r.type)} canRemove={rules.equipment.length > 1}>
-                  <ComboField
-                    className={phoneName}
-                    value={r.type}
-                    label="System"
-                    options={missingCoreTypes}
-                    onCommit={(t) => changeEqType(r.type, t)}
-                  />
-                  <InlineNumber
-                    value={r.monitor}
-                    kind="yrs"
-                    max={200}
-                    label={`${r.type} monitor years`}
-                    onCommit={(n) => commitEqField(r.type, "monitor", n)}
-                  />
-                  <InlineNumber
-                    value={r.replace}
-                    kind="yrs"
-                    max={200}
-                    label={`${r.type} replace years`}
-                    onCommit={(n) => commitEqField(r.type, "replace", n)}
-                  />
-                  <InlineNumber
-                    value={r.cost}
-                    kind="money"
-                    max={10_000_000}
-                    label={`${r.type} cost`}
-                    onCommit={(n) => commitEqField(r.type, "cost", n)}
-                  />
-                </RuleRow>
-              ))}
-              {rules.building.length > 0 && <p className={subhead}>Per building</p>}
-              {rules.building.map((r, i) => (
-                <RuleRow key={r.key ?? `new-${i}`} label={r.label} onRemove={() => removeB(i)} canRemove={rules.building.length > 1}>
-                  <ComboField
-                    className={phoneName}
-                    value={r.label}
-                    label="System"
-                    options={buildingSuggestions}
-                    onCommit={(label) => renameB(i, label)}
-                    freeText
-                    placeholder="System name"
-                  />
-                  <InlineNumber
-                    value={r.monitor}
-                    kind="yrs"
-                    max={200}
-                    label={`${r.label} monitor years`}
-                    onCommit={(n) => commitBField(i, "monitor", n)}
-                  />
-                  <InlineNumber
-                    value={r.replace}
-                    kind="yrs"
-                    max={200}
-                    label={`${r.label} replace years`}
-                    onCommit={(n) => commitBField(i, "replace", n)}
-                  />
-                  <InlineNumber
-                    value={r.defaultCost}
-                    kind="money"
-                    max={10_000_000}
-                    label={`${r.label} cost`}
-                    onCommit={(n) => commitBField(i, "cost", n)}
-                  />
-                </RuleRow>
-              ))}
-            </div>
-          </div>
+        <RuleHeader first="System" />
+        <div className="divide-y divide-line">
+          {/* Roof, furnace and the rest are kept per unit, and a building can carry its own roof
+              too: the subheads say which a figure is, so two Roof rows never read as one rule. */}
+          {coreSystems.length > 0 && <p className={subhead}>Per unit</p>}
+          {coreSystems.map((r) => equipmentRow(r, "system"))}
+          {draft.building.length > 0 && <p className={subhead}>Per building</p>}
+          {draft.building.map((r) => buildingRow(r))}
         </div>
         {/* Each group's add at the list's foot: a deleted per-unit system comes back by name, and Add
             system starts a per-building one. */}
-        {missingCoreTypes.length > 0 && (
-          <AddRow onClick={addCoreSystem} className={addRowBleed}>
-            Add {missingCoreTypes[0]}
+        {missingCore.length > 0 && (
+          <AddRow onClick={() => addEquipment(missingCore[0])}>
+            Add {missingCore[0]}
           </AddRow>
         )}
-        <AddRow onClick={addBuildingSystem} className={addRowBleed}>
+        <AddRow onClick={addSystem}>
           Add system
         </AddRow>
       </Section>
 
-      {confirmReset && (
+      {confirm === "reset" && (
         <ConfirmDialog
           title="Reset all CapEx rules to defaults?"
-          onClose={() => setConfirmReset(false)}
-          body="This immediately replaces every rule below with the built-in defaults, discarding anything you've added or changed."
+          onClose={() => setConfirm(null)}
+          body="This replaces every rule below with the built-in defaults. Nothing changes until you save, and Discard undoes it."
+          cancelLabel="Keep editing"
           actions={
-            <Button size="sm" variant="destructive" onClick={resetToDefaults}>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                setConfirm(null);
+                serial.current = 0;
+                edit(toDraft(DEFAULT_CAPEX_RULES));
+              }}
+            >
               Reset rules
+            </Button>
+          }
+        />
+      )}
+      {confirm === "discard" && (
+        <ConfirmDialog
+          title={`Discard ${changes} ${changes === 1 ? "change" : "changes"} to CapEx rules?`}
+          onClose={() => setConfirm(null)}
+          cancelLabel="Keep editing"
+          actions={
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                setConfirm(null);
+                clearDraft();
+                serial.current = 0;
+                setTried(false);
+                edit(saved);
+              }}
+            >
+              Discard changes
+            </Button>
+          }
+        />
+      )}
+
+      {/* Only while there's something to save: the draft's one decision, docked at the bottom at every width. */}
+      {dirty && (
+        <ActionBar
+          placement="app"
+          contentClassName="box-content max-w-300"
+          status={
+            <>
+              <span className="max-sm:hidden">{changesLine(changes)}</span>
+              <span className="sm:hidden">{changesShort(changes)}</span>
+            </>
+          }
+          error={
+            barError && (
+              <SaveError className="truncate">
+                {barError}
+                {conflict && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className={cn(textLinkClass, "rounded-sm")}
+                      // The page re-renders on the latest rules and starts this editor over on them.
+                      onClick={() => router.refresh()}
+                    >
+                      Load the latest
+                    </button>
+                  </>
+                )}
+              </SaveError>
+            )
+          }
+          onPrimary={save}
+          secondary={
+            <Button type="button" variant="secondary" className={actionBarButton} onClick={() => setConfirm("discard")} disabled={pending}>
+              Discard
+            </Button>
+          }
+          primary={
+            <Button type="button" className={actionBarButton} pending={pending} onClick={save} aria-keyshortcuts="Meta+Enter Control+Enter">
+              Save
+              <SubmitKeycap />
             </Button>
           }
         />

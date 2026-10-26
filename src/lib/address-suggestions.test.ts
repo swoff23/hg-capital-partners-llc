@@ -2,15 +2,84 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   SUGGEST_LIMIT,
+  addressFromListingLink,
   answerAddresses,
   findAddressMatch,
+  looksLikeLink,
   parseAddressParams,
   runAddresses,
+  savesAs,
   splitAddress,
   suggestAddresses,
+  tidyAddress,
+  withScheme,
   type AddressDb,
   type AddressRecord,
 } from "./address-suggestions";
+import { sameStreetAddress, streetKey } from "./normalize";
+
+test("tidyAddress: the form an address saves in, Saves as 767 Prospect Ave, Buffalo, NY 14209", () => {
+  assert.equal(tidyAddress("767 prospect avenue buffalo ny 14209"), "767 Prospect Ave, Buffalo, NY 14209");
+  assert.equal(tidyAddress("767 Prospect Avenue, Buffalo, NY 14213"), "767 Prospect Ave, Buffalo, NY 14213");
+  assert.equal(tidyAddress("  118   Congress St.  Buffalo, NY 14213 "), "118 Congress St, Buffalo, NY 14213");
+  assert.equal(tidyAddress("1404 payne avenue,  north tonawanda, ny 14120"), "1404 Payne Ave, North Tonawanda, NY 14120");
+  assert.equal(tidyAddress("877 Prospect Ave, Buffalo NY"), "877 Prospect Ave, Buffalo, NY");
+  assert.equal(tidyAddress("767 PROSPECT AVE"), "767 Prospect Ave");
+  assert.equal(tidyAddress("421 w delavan ave"), "421 W Delavan Ave");
+  assert.equal(tidyAddress("45 virgil"), "45 Virgil");
+  assert.equal(tidyAddress(""), "");
+});
+
+test("tidyAddress leaves what's already right, and words typed with their own capitals", () => {
+  assert.equal(tidyAddress("767 Prospect Ave, Buffalo, NY 14209"), "767 Prospect Ave, Buffalo, NY 14209");
+  assert.equal(tidyAddress("5 O'Brien St"), "5 O'Brien St");
+  assert.equal(tidyAddress("765/767 Prospect Ave"), "765/767 Prospect Ave");
+  assert.equal(tidyAddress("Lot on Main Street"), "Lot on Main St");
+  // A letter after the street is the street's, not a town: no comma goes in front of it.
+  assert.equal(tidyAddress("10 Avenue D"), "10 Ave D");
+  assert.equal(tidyAddress("12 elm st apt 2"), "12 Elm St Apt 2");
+});
+
+test("tidying never changes which building an address is", () => {
+  const typed = ["767 prospect avenue buffalo ny 14209", "118 Congress St. Buffalo, NY 14213", "421 w delavan ave", "1404 payne avenue,  north tonawanda, ny 14120"];
+  for (const t of typed) {
+    assert.equal(streetKey(tidyAddress(t)), streetKey(t), t);
+    assert.equal(sameStreetAddress(tidyAddress(t), t), true, t);
+  }
+});
+
+test("savesAs: the line under the field, only when saving would change the typing", () => {
+  assert.equal(savesAs("767 prospect avenue buffalo ny 14209"), "767 Prospect Ave, Buffalo, NY 14209");
+  assert.equal(savesAs("767 Prospect Ave, Buffalo, NY 14209"), null);
+  // Stray spaces alone aren't worth a line: they were never going to be kept.
+  assert.equal(savesAs("  767   Prospect Ave "), null);
+  // Text that isn't an address yet says nothing.
+  assert.equal(savesAs("pro"), null);
+  assert.equal(savesAs("Lot on Main Street"), null);
+  assert.equal(savesAs("12"), null);
+});
+
+test("a pasted link is no address", () => {
+  assert.equal(looksLikeLink("https://www.zillow.com/homedetails/767-Prospect-Ave-Buffalo-NY-14213/2084530018_zpid/"), true);
+  assert.equal(looksLikeLink(" http://x.test/a "), true);
+  assert.equal(looksLikeLink("www.zillow.com/homedetails/1"), true);
+  assert.equal(looksLikeLink("767 Prospect Ave"), false);
+  assert.equal(looksLikeLink("see https://x.test"), false);
+  assert.equal(withScheme("www.zillow.com/x"), "https://www.zillow.com/x");
+  assert.equal(withScheme("http://a.test"), "http://a.test");
+});
+
+test("a Zillow link's slug fills the address; any other link says nothing", () => {
+  assert.equal(
+    addressFromListingLink("https://www.zillow.com/homedetails/767-Prospect-Ave-Buffalo-NY-14213/2084530018_zpid/"),
+    "767 Prospect Ave, Buffalo, NY 14213",
+  );
+  assert.equal(addressFromListingLink("www.zillow.com/homedetails/118-Congress-St-Buffalo-NY-14213/123_zpid"), "118 Congress St, Buffalo, NY 14213");
+  assert.equal(addressFromListingLink("https://www.zillow.com/buffalo-ny/"), null);
+  assert.equal(addressFromListingLink("https://example.com/homedetails/767-Prospect-Ave/1/"), null);
+  assert.equal(addressFromListingLink("https://www.zillow.com/homedetails/Some-Listing/1_zpid/"), null);
+  assert.equal(addressFromListingLink("not a link"), null);
+});
 
 test("splitAddress: the street over the place, tidied", () => {
   assert.deepEqual(splitAddress("767 Prospect Avenue, Buffalo, NY 14213"), { street: "767 Prospect Avenue", place: "Buffalo, NY 14213" });

@@ -122,3 +122,47 @@ export function parseMoveInFormSchema(json: unknown): MoveInFormSchema {
   if (sections.length === 0) return DEFAULT_MOVE_IN_FORM_SCHEMA;
   return { sections };
 }
+
+/**
+ * How many changes are waiting for Save in the move-in form editor, for the
+ * bar's "3 unsaved changes" (forms 3.4 A): each item added, deleted or
+ * renamed, and each room's Required and Max instances setting that moved.
+ * Items are matched by key, so renaming one is a single change. A room that
+ * isn't in the saved form counts once.
+ */
+export function moveInChangeCount(saved: MoveInFormSchema, draft: MoveInFormSchema): number {
+  let n = 0;
+  const before = new Map(saved.sections.map((s) => [s.key, s]));
+  for (const s of draft.sections) {
+    const old = before.get(s.key);
+    if (!old) {
+      n++;
+      continue;
+    }
+    if (s.minCount !== old.minCount) n++;
+    if (s.maxCount !== old.maxCount) n++;
+    const oldItems = new Map(old.items.map((i) => [i.key, i]));
+    const nowKeys = new Set(s.items.map((i) => i.key));
+    for (const i of s.items) {
+      const was = oldItems.get(i.key);
+      if (!was || was.label.trim() !== i.label.trim()) n++;
+    }
+    for (const i of old.items) if (!nowKeys.has(i.key)) n++;
+  }
+  return n;
+}
+
+/**
+ * What stops a save of the move-in form, keyed by place ("sections.0.items.2.label"),
+ * in the words the server uses: an item with no name. Shown only once Save has
+ * been pressed (forms 2.0). Max instances is clamped to 1 to 10 as it's typed, so it's never refused.
+ */
+export function moveInProblems(draft: MoveInFormSchema): Record<string, string> {
+  const out: Record<string, string> = {};
+  draft.sections.forEach((s, si) => {
+    s.items.forEach((it, ii) => {
+      if (!it.label.trim()) out[`sections.${si}.items.${ii}.label`] = "Name this item.";
+    });
+  });
+  return out;
+}

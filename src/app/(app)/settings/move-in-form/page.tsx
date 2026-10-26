@@ -6,6 +6,6 @@ export const dynamic = "force-dynamic";
 
 export default async function MoveInFormSettingsPage() {
   await requireUser();
-  const { moveInFormSchema, version } = await getAppConfig();
-  return <MoveInFormEditor initial={moveInFormSchema} initialVersion={version} />;
+  const { moveInFormSchema, moveInVersion } = await getAppConfig();
+  return <MoveInFormEditor key={moveInVersion ?? "new"} initial={moveInFormSchema} initialVersion={moveInVersion} />;
 }

@@ -29,6 +29,16 @@ export function holdApplies(hold: Pick<HoldEntry, "scope">, signOut: boolean): b
 }
 
 /**
+ * Whether unsaved work is on the page: any hold that asks before every exit
+ * (a dirty sheet, editor or draft). The upload queue's "sign-out" hold is
+ * work in flight, not a draft, so it doesn't count. A page that would
+ * refresh itself reads this and waits (RefreshOnReturn).
+ */
+export function hasUnsavedWork(holds: readonly Pick<HoldEntry, "scope">[]): boolean {
+  return holds.some((h) => h.scope === "all");
+}
+
+/**
  * The hold that asks before an exit, or null when nothing holds it: the most
  * recently placed one that applies, since it's the work the person touched
  * last.

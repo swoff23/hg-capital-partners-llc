@@ -5,30 +5,14 @@ import { TOUCH_HEIGHT } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /*
- * The inline controls the CapEx rules and move-in form editors share, so the
- * two Settings tabs edit the same way (docs/brand-guidelines.md, section 9).
- * A row's first field sits on the page gutter: the list around the rows
- * takes `editorBleed`, so the fields' 7px inset (6px padding and a 1px edge)
- * and the hover fill reach into the gutter while the text lines up with the
- * h1, the section headings and the controls above.
+ * The controls the CapEx rules and move-in form editors share, so the two
+ * Settings tabs edit the same way (docs/brand-guidelines.md, section 9): a
+ * row's fields are bordered `sm` fields (forms 4.1, the quiet-field recipes
+ * are retired), and a row's delete stays out of sight until it's wanted.
  */
-
-/** On the list around an editor's rows (and its header row): pulls them out by the field inset. */
-export const editorBleed = "-mx-1.75";
 
 /** On each row whose delete is RevealRemoveButton: the group it shows under. */
 export const revealRow = "group/row";
-
-/**
- * A field that reads as plain text in its row: hover shows its control edge
- * with a mouse, and focus is the field's --act edge and inset ring. 44px
- * tall on touch.
- */
-export const quietField = cn(
-  "w-full rounded-sm border border-transparent bg-transparent px-1.5 py-1 text-body text-fg-1 outline-none placeholder:text-fg-3",
-  "hover:border-line-control focus:border-act focus:bg-surface focus:ring-1 focus:ring-inset focus:ring-act",
-  TOUCH_HEIGHT,
-);
 
 /**
  * "Add item" in a section's heading: a standalone action known by its Plus,

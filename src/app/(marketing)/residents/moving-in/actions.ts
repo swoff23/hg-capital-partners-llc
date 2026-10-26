@@ -1,13 +1,20 @@
 "use server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { todayYmdEastern } from "@/lib/dates";
+import { fmtDay, todayYmdEastern } from "@/lib/dates";
+import { renderPlainEmail } from "@/lib/email/render";
+import { sendEmail } from "@/lib/email/send";
+import { getEnv } from "@/lib/env";
+import { logError } from "@/lib/log";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
+import { firstName } from "@/lib/names";
+import { shortAddress } from "@/lib/normalize";
 import { rentableUnitLabels } from "@/lib/property-types";
 import { withResult } from "@/lib/server-action";
 import { createTask, systemPrincipal } from "@/lib/tasks/service";
 import { headers } from "next/headers";
 import { clientIp, RateLimiter } from "@/lib/rate-limit";
+import type { ActionResult } from "@/lib/action-result";
 
 // This is the app's first unauthenticated write path — deliberately no
 // requireUser() below. Anyone with the URL can submit a report; that's the
@@ -46,24 +53,26 @@ const submissionSchema = z.object({
   honeypot: z.string().max(200).optional(),
 });
 
-export async function submitMoveInInspection(
-  input: unknown,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * Submits the report. The answer is an ActionResult, so the form's own
+ * `callAction` and the app's saves read it the same way (forms 2.12), and
+ * `copied` says whether the emailed copy went, for the sent screen: it never
+ * promises a copy that wasn't sent.
+ */
+export async function submitMoveInInspection(input: unknown): Promise<ActionResult<{ copied: boolean }>> {
   // Expected failures are returned by the body; anything thrown (DB down) is
   // logged and turned into the generic line rather than crashing the form.
   const r = await withResult("submitMoveInInspection", () => submitMoveInInspectionBody(input));
   return r.ok ? r.data : { ok: false, error: "Something went wrong. Please try again in a moment." };
 }
 
-async function submitMoveInInspectionBody(
-  input: unknown,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+async function submitMoveInInspectionBody(input: unknown): Promise<ActionResult<{ copied: boolean }>> {
   const parsed = submissionSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Please check the form and try again." };
   const p = parsed.data;
 
   // Honeypot: pretend success, create nothing, don't tip off a bot.
-  if (p.honeypot) return { ok: true };
+  if (p.honeypot) return { ok: true, data: { copied: false } };
 
   const ip = clientIp(await headers());
   if (!perIp.allow(ip).ok || !globalCap.allow("moving-in").ok) return { ok: false, error: RATE_LIMITED };
@@ -134,5 +143,31 @@ async function submitMoveInInspectionBody(
     systemPrincipal("Move-in form"), // public submission; nobody signed in to attribute it to
   );
 
-  return { ok: true };
+  const where = `${shortAddress(property.address)}${unit ? `, ${unit}` : ""}`;
+  const copied = await emailCopy(p.submitterEmail, p.submitterName, where, lines);
+  return { ok: true, data: { copied } };
+}
+
+/**
+ * The resident's own copy of what they sent (PUBLIC-046), in the one email
+ * layout. Only the report's own lines go, nothing from the app. It can fail
+ * without failing the report, which is already saved: false means no copy
+ * went, and the sent screen says nothing of one.
+ */
+async function emailCopy(to: string, name: string, where: string, lines: readonly string[]): Promise<boolean> {
+  try {
+    const { text, html } = renderPlainEmail({
+      line: `Thanks, ${firstName(name) || name}. Here's a copy of the move-in report you sent for ${where}.`,
+      items: lines.map((l) => l.trim()).filter(Boolean),
+      closing: "We'll follow up if anything needs attention.",
+      buttonLabel: "Moving in",
+      buttonUrl: `${getEnv().appUrl}/residents/moving-in`,
+      footnote: `Sent ${fmtDay(todayYmdEastern(), { year: "auto" })} through the HG residents page.`,
+    });
+    const sent = await sendEmail({ to, subject: `Your move-in report for ${where}`, text, html });
+    return sent.ok;
+  } catch (err) {
+    logError("moving-in:copy", err);
+    return false;
+  }
 }

@@ -41,17 +41,11 @@ export function AuthFrame({
   );
 }
 
-/**
+/*
  * A sign-in field's visible label, above the field (Apple HIG; WCAG 3.3.2, a
- * placeholder is not a label): text-meta 500 in --fg-2, 6px over the field.
+ * placeholder is not a label), is the app's `FormField`: text-meta 500 in
+ * --fg-2, 6px over the field, and a line under it for what to enter.
  */
-export function AuthLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
-  return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-meta font-medium text-fg-2">
-      {children}
-    </label>
-  );
-}
 
 /** For the app's `Input` in the public material: 40px to match the CTA, placeholders in --pub-faint. */
 export const authInputClass = "h-10 placeholder:text-pub-faint";

@@ -29,7 +29,8 @@ export async function POST(request: Request): Promise<Response> {
   const result = await finishPasswordReset(
     token,
     String(form.get("password") ?? ""),
-    String(form.get("confirm") ?? ""),
+    // The form has one password field and mirrors it as `confirm`; without script it sends none, and the one field stands.
+    String(form.get("confirm") ?? form.get("password") ?? ""),
     // A reset clears mustChangePassword, so a session still on its starting
     // password is kept like any other.
     await getPortalPrincipal({ allowStartingPassword: true }),

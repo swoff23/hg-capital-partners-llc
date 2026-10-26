@@ -102,6 +102,112 @@ export function splitAddress(raw: string): { street: string; place: string } {
   return { street: tidy(words.slice(0, end + 1).join(" ")), place: tidy(words.slice(end + 1).join(" ")) };
 }
 
+/** The house style's short street words, as `normalizeAddress` writes them for matching, capitalised for display. */
+const SHORT_STREET: Record<string, string> = { avenue: "Ave", street: "St", drive: "Dr", road: "Rd" };
+
+/** Small words that stay lower case inside an address ("Lot on Main St"). */
+const SMALL_WORDS = new Set(["and", "of", "on", "at", "the"]);
+
+/** Words that start a unit after the street ("Apt 2"), which no comma sets apart from it. */
+const UNIT_WORDS = new Set(["apt", "apartment", "unit", "ste", "suite", "fl", "floor", "rm", "room", "bldg", "building", "upper", "lower", "rear", "front", "basement"]);
+
+/** A word to capitalise: all lower case, or all capitals longer than three letters ("PROSPECT"). */
+function capitalise(word: string, first: boolean): string {
+  const letters = word.replace(/[^A-Za-z]/g, "");
+  if (!letters) return word;
+  const lower = letters === letters.toLowerCase();
+  const shouting = letters === letters.toUpperCase() && letters.length > 3;
+  if (!lower && !shouting) return word;
+  if (lower && !first && SMALL_WORDS.has(word)) return word;
+  return word.toLowerCase().replace(/(^|[-/])([a-z])/g, (_m, edge: string, c: string) => edge + c.toUpperCase());
+}
+
+/**
+ * An address as it saves (forms 2.6, "Saves as 767 Prospect Ave, Buffalo, NY
+ * 14209"): spacing and stray commas tidied, words typed all lower case or all
+ * capitals given a capital, "Avenue", "Street", "Drive" and "Road" written as
+ * Ave, St, Dr and Rd, a comma after the street and before the state, and NY
+ * in capitals. Words typed with their own mix of cases stay as typed, and so
+ * does everything else. It changes only how the address looks, never what
+ * `sameStreetAddress` and `streetKey` make of it.
+ */
+export function tidyAddress(raw: string): string {
+  let flat = raw
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/(, )+/g, ", ")
+    .replace(/^[\s,]+|[\s,.]+$/g, "");
+  if (!flat) return "";
+  // Typed in capitals throughout: read it as lower case, so "AVE" and "PROSPECT" are words like the rest.
+  if (flat === flat.toUpperCase() && /[A-Z]{2}/.test(flat)) flat = flat.toLowerCase();
+  const words = flat.split(" ").map((w, i, all) => {
+    const comma = w.endsWith(",") ? "," : "";
+    const bare = comma ? w.slice(0, -1) : w;
+    const unpointed = bare.replace(/\.$/, "");
+    const short = SHORT_STREET[unpointed.toLowerCase()];
+    // The state: two letters ahead of a ZIP, or the NY every address here is in.
+    const state = /^ny$/i.test(unpointed) || (/^[A-Za-z]{2}$/.test(unpointed) && /^\d{5}(-\d{4})?$/.test(all[i + 1] ?? ""));
+    if (state) return unpointed.toUpperCase() + comma;
+    if (short && i > 0) return short + comma;
+    return capitalise(unpointed, i === 0) + comma;
+  });
+  const joined = words.join(" ");
+  const { street, place } = splitAddress(joined);
+  // A town starts with a word of three letters or more; "D" in "10 Avenue D" and "Apt 2" belong to the street.
+  const town = place.split(" ")[0] ?? "";
+  if (!place || town.replace(/[^A-Za-z]/g, "").length < 3 || UNIT_WORDS.has(town.toLowerCase().replace(/[.,]+$/, ""))) return joined;
+  // A comma after the street, and before the state, when they were left out ("767 Prospect Ave Buffalo NY 14209").
+  const rest = place.replace(/^,\s*/, "").replace(/\s+(NY)(\s+\d{5}(?:-\d{4})?)?$/, (_m, st: string, zip: string | undefined) => `, ${st}${zip ?? ""}`);
+  return `${street}, ${rest}`.replace(/,\s*,/g, ",").trim();
+}
+
+/**
+ * What the address field says it will save as, or null when that is how it
+ * was typed: "Saves as 767 Prospect Ave, Buffalo, NY 14209". Nothing for text
+ * that doesn't start with a house number.
+ */
+export function savesAs(typed: string): string | null {
+  const flat = typed.replace(/\s+/g, " ").trim();
+  if (flat.length < SUGGEST_FROM || !/^\d/.test(flat)) return null;
+  const tidy = tidyAddress(flat);
+  return tidy && tidy !== flat ? tidy : null;
+}
+
+/** A pasted link, not an address: starts with http://, https:// or www. and has no spaces. */
+export function looksLikeLink(text: string): boolean {
+  return /^(?:https?:\/\/|www\.)\S+$/i.test(text.trim());
+}
+
+/** A link with its scheme, so "www.zillow.com/..." saves as a link that opens. */
+export function withScheme(link: string): string {
+  const t = link.trim();
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+
+/**
+ * The address in a Zillow listing link, from its path ("/homedetails/767-
+ * Prospect-Ave-Buffalo-NY-14213/2084530018_zpid/"), tidied; null for any
+ * other link or a path that doesn't start with a house number.
+ */
+export function addressFromListingLink(link: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(withScheme(link));
+  } catch {
+    return null;
+  }
+  if (!/(?:^|\.)zillow\.com$/i.test(url.hostname)) return null;
+  const slug = url.pathname.match(/\/homedetails\/([^/]+)\//i)?.[1];
+  if (!slug) return null;
+  let words: string;
+  try {
+    words = decodeURIComponent(slug).replace(/[-_+]+/g, " ").trim();
+  } catch {
+    return null;
+  }
+  return /^\d/.test(words) ? tidyAddress(words) : null;
+}
+
 const time = (d: Date | number) => (typeof d === "number" ? d : d.getTime());
 
 /**

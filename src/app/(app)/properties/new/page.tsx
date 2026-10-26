@@ -1,14 +1,6 @@
-import { requireUser } from "@/lib/auth";
-import { PageHeader } from "@/components/ui";
-import { NewPropertyForm } from "./new-property-form";
+import { NewPropertyScreen } from "./new-property-screen";
 
-/** A short form, flat on the page: cards are for Home and Overview modules (docs/brand-guidelines.md, section 9). */
-export default async function NewPropertyPage() {
-  await requireUser();
-  return (
-    <div className="max-w-xl">
-      <PageHeader title="New property" />
-      <NewPropertyForm />
-    </div>
-  );
+/** New property as a page: a pasted link or a reload. A click inside the app opens it as a sheet over Portfolio (`@modal/(.)properties/new`). */
+export default function NewPropertyPage() {
+  return <NewPropertyScreen variant="page" />;
 }

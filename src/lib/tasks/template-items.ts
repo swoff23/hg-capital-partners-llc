@@ -160,6 +160,73 @@ export function tokenInputType(name: string): "email" | "tel" | "text" {
   return "text";
 }
 
+/**
+ * The bar's status line for applying a playbook (BPLAY-012): "39 tasks to
+ * create", "1 task to create", and "No tasks to create" at zero.
+ */
+export function tasksToCreate(count: number): string {
+  if (count <= 0) return "No tasks to create";
+  return `${count} ${count === 1 ? "task" : "tasks"} to create`;
+}
+
+/** The primary beside it: "Create 39 tasks", "Create 1 task", and plain "Create tasks" at zero. */
+export function createTasksLabel(count: number): string {
+  if (count <= 0) return "Create tasks";
+  return `Create ${count} ${count === 1 ? "task" : "tasks"}`;
+}
+
+/** What stops Create, shown only after it was pressed (BPLAY-011): a line per field, and one for the list. */
+export type ApplyProblems = {
+  /** The property field's line. */
+  property?: string;
+  /** A fill-in's line, keyed by the token as the playbook spells it. */
+  tokens: Record<string, string>;
+  /** The list's line, above the primary: nothing is ticked. */
+  tasks?: string;
+};
+
+/**
+ * The problems with applying a playbook as it stands. `open` are the [Token]s
+ * still blank in a task that will be created, each as the playbook's first
+ * spelling of it. Errors name what to enter ("Enter the tenant."); a field is
+ * only named once, however many tasks use it. Pure; no problems is an empty
+ * result, and Create goes ahead.
+ */
+export function applyProblems({
+  propertyId,
+  count,
+  open,
+}: {
+  propertyId: string | null | undefined;
+  /** Tasks ticked, with a title that will save. */
+  count: number;
+  open: readonly string[];
+}): ApplyProblems {
+  const problems: ApplyProblems = { tokens: {} };
+  if (!propertyId) problems.property = "Choose a property.";
+  if (count === 0) problems.tasks = "Include a task first.";
+  for (const token of open) {
+    if (!(token in problems.tokens)) problems.tokens[token] = `Enter the ${tokenLabel(token).toLowerCase()}.`;
+  }
+  return problems;
+}
+
+/** Whether there is anything to stop Create for. */
+export function hasApplyProblems(p: ApplyProblems): boolean {
+  return !!p.property || !!p.tasks || Object.keys(p.tokens).length > 0;
+}
+
+/**
+ * Names the version of a playbook's items, so a draft of an application
+ * never lands on a playbook whose tasks changed since: the count and a
+ * short hash of the titles in order.
+ */
+export function itemsVersion(items: readonly Pick<TemplateItem, "title">[]): string {
+  let h = 0;
+  for (const ch of items.map((i) => i.title).join("\n")) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0;
+  return `${items.length}-${(h >>> 0).toString(36)}`;
+}
+
 /** The anchor date moved by an item's offset, or null without both. */
 export function dueFromOffset(anchor: Ymd | null | undefined, offset: number | null | undefined): Ymd | null {
   return anchor && typeof offset === "number" && Number.isFinite(offset) ? addDaysYmd(anchor, Math.trunc(offset)) : null;
