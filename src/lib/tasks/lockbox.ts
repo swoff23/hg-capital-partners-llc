@@ -1,7 +1,8 @@
 /**
  * Which lockbox code a contractor's job shows (docs/asana-migration-plan.md
  * D21): the unit's code when the job has a unit; with no unit, the
- * property's code only when it has exactly one. The staff task page uses
+ * property's code only when it has exactly one distinct code, as the portal
+ * decides it (src/lib/portal/access-code.ts). The staff task page uses
  * the state to say whether the contractor will see a code; it never shows
  * the code itself. Pure; see lockbox.test.ts.
  */
@@ -18,8 +19,9 @@ export function resolveLockboxCode(units: readonly UnitCode[], unitLabel: string
     const unit = units.find((u) => sameLabel(u.label, unitLabel));
     return clean(unit?.lockboxCode) || null;
   }
-  const codes = units.map((u) => clean(u.lockboxCode)).filter(Boolean);
-  return codes.length === 1 ? codes[0] : null;
+  // Units sharing one lockbox count once: the contractor sees that code.
+  const codes = new Set(units.map((u) => clean(u.lockboxCode)).filter(Boolean));
+  return codes.size === 1 ? [...codes][0] : null;
 }
 
 /**

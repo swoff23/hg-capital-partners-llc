@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { pickLockboxCode } from "@/lib/portal/access-code";
 import { lockboxState, resolveLockboxCode } from "./lockbox";
 
 const units = [
@@ -34,4 +35,30 @@ test("a property with no codes has nothing to show", () => {
 
 test("labels match case-insensitively", () => {
   assert.equal(resolveLockboxCode([{ label: "Upper", lockboxCode: "77" }], "upper"), "77");
+});
+
+test("no unit: units sharing one code show it, as the contractor's page does", () => {
+  const shared = [
+    { label: "Upper", lockboxCode: "6476" },
+    { label: "Lower", lockboxCode: " 6476" },
+  ];
+  assert.equal(resolveLockboxCode(shared, null), "6476");
+  assert.equal(lockboxState(shared, null), "shown");
+});
+
+test("the staff page and the portal agree on every case", () => {
+  const cases: Array<[{ label?: string | null; lockboxCode?: string | null }[], string | null]> = [
+    [units, "2"],
+    [units, " 1 "],
+    [units, "3"],
+    [units, "9"],
+    [units, null],
+    [units, ""],
+    [[{ label: "A", lockboxCode: "42" }, { label: "B" }], null],
+    [[{ label: "Upper", lockboxCode: "6476" }, { label: "Lower", lockboxCode: "6476 " }], null],
+    [[{ label: "Upper", lockboxCode: "77" }], "upper"],
+    [[{ label: "1" }], null],
+    [[], null],
+  ];
+  for (const [list, unit] of cases) assert.equal(resolveLockboxCode(list, unit), pickLockboxCode(list, unit), JSON.stringify([list, unit]));
 });
