@@ -93,8 +93,11 @@ export type SheetProps = {
   /** "public" puts the public site's dark tokens on the overlay (`data-surface="public"`), for sheets opened from a public page. */
   surface?: "app" | "public";
   /**
-   * "palette" is the command palette's container (search 2.2). Interim: it
-   * renders as a sheet until the search package builds it.
+   * "palette" is the command palette's container (search 2.2): the whole
+   * screen below md, a Float panel from md (640px wide, its top at 20vh with
+   * a mouse, 16px under the app bar on touch), with no scrim and no motion
+   * (--dur-0). The body is a flex column that scrolls its own list, so
+   * nothing else in the sheet (footer, views) applies to it.
    */
   layout?: "sheet" | "palette";
   className?: string;
@@ -116,8 +119,7 @@ export function Sheet({
   layout = "sheet",
   className,
 }: SheetProps) {
-  // The palette layout falls back to the sheet until it's built.
-  void layout;
+  const palette = layout === "palette";
   return (
     <ModalOverlay
       isOpen={isOpen}
@@ -125,25 +127,55 @@ export function Sheet({
       isDismissable={isDismissable && !dirty}
       data-surface={surface === "public" ? "public" : undefined}
       className={cn(
-        "fixed inset-0 z-50 flex items-end justify-center bg-scrim md:items-center md:p-4",
-        // Above the on-screen keyboard: the phone sheet's bottom edge, and the tablet dialog's room.
-        "pb-[var(--kb-inset,0px)] md:pb-[calc(1rem_+_var(--kb-inset,0px))]",
-        "data-entering:animate-fade-in data-exiting:animate-fade-out motion-reduce:animate-none",
+        palette
+          ? // No scrim, and nothing animates: the palette opens and closes at --dur-0.
+            cn(
+              "fixed inset-0 z-50 flex items-start justify-center",
+              "md:px-6 md:pt-[20vh] md:pointer-coarse:pt-[calc(var(--app-bar-h)_+_1rem)]",
+            )
+          : cn(
+              "fixed inset-0 z-50 flex items-end justify-center bg-scrim md:items-center md:p-4",
+              // Above the on-screen keyboard: the phone sheet's bottom edge, and the tablet dialog's room.
+              "pb-[var(--kb-inset,0px)] md:pb-[calc(1rem_+_var(--kb-inset,0px))]",
+              "data-entering:animate-fade-in data-exiting:animate-fade-out motion-reduce:animate-none",
+            ),
       )}
     >
       <Modal
         className={cn(
-          "flex max-h-[calc(90dvh_-_var(--kb-inset,0px))] w-full flex-col overflow-hidden bg-raised text-fg-1 shadow-overlay outline-none",
-          // The safe area, until the keyboard covers it.
-          "rounded-t-xl pb-[max(0px,calc(env(safe-area-inset-bottom)_-_var(--kb-inset,0px)))]",
-          fullHeight && "max-md:h-[calc(90dvh_-_var(--kb-inset,0px))]",
-          "md:max-h-[calc(85dvh_-_var(--kb-inset,0px))] md:w-auto md:min-w-80 md:rounded-xl md:border md:border-line-float md:pb-0",
-          size === "lg" ? "md:max-w-2xl" : "md:max-w-lg",
-          "data-entering:animate-sheet-in data-exiting:animate-sheet-out md:data-entering:animate-pop-in md:data-exiting:animate-pop-out motion-reduce:animate-none",
+          palette
+            ? cn(
+                // The container the rows' one-line and two-line layouts are measured on (search 2.4).
+                "@container flex w-full min-w-0 flex-col overflow-hidden bg-raised text-fg-1 outline-none",
+                // The phone: the whole screen under the status bar, ending above the keyboard.
+                "max-md:h-[calc(100dvh_-_var(--kb-inset,0px))] max-md:pt-[env(safe-area-inset-top)]",
+                "max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)_-_var(--kb-inset,0px)))]",
+                // From md the Float level: a fixed 640px, since its content changes on every keystroke.
+                "md:w-[min(40rem,calc(100vw_-_3rem))] md:rounded-lg md:border md:border-line-float md:shadow-float",
+                "md:max-h-[calc(100dvh_-_20vh_-_1.5rem)]",
+                // A touch tablet: bounded by the visual viewport, so the keyboard never covers the last row.
+                "md:pointer-coarse:max-h-[calc(100dvh_-_var(--app-bar-h)_-_2rem_-_var(--kb-inset,0px))]",
+              )
+            : cn(
+                "flex max-h-[calc(90dvh_-_var(--kb-inset,0px))] w-full flex-col overflow-hidden bg-raised text-fg-1 shadow-overlay outline-none",
+                // The safe area, until the keyboard covers it.
+                "rounded-t-xl pb-[max(0px,calc(env(safe-area-inset-bottom)_-_var(--kb-inset,0px)))]",
+                fullHeight && "max-md:h-[calc(90dvh_-_var(--kb-inset,0px))]",
+                "md:max-h-[calc(85dvh_-_var(--kb-inset,0px))] md:w-auto md:min-w-80 md:rounded-xl md:border md:border-line-float md:pb-0",
+                size === "lg" ? "md:max-w-2xl" : "md:max-w-lg",
+                "data-entering:animate-sheet-in data-exiting:animate-sheet-out md:data-entering:animate-pop-in md:data-exiting:animate-pop-out motion-reduce:animate-none",
+              ),
           className,
         )}
       >
-        <SheetDialog title={title} hideTitle={hideTitle} footer={footer} dirty={dirty} onDirtyClose={onDirtyClose}>
+        <SheetDialog
+          title={title}
+          hideTitle={hideTitle}
+          footer={footer}
+          dirty={dirty}
+          onDirtyClose={onDirtyClose}
+          bodyClass={palette ? paletteBodyClass : scrollClass}
+        >
           {children}
         </SheetDialog>
       </Modal>
@@ -178,6 +210,8 @@ export function useSheet(): Pick<SheetActions, "close"> | null {
 
 const footerClass = "shrink-0 border-t border-line p-4";
 const scrollClass = "min-h-0 flex-1 overflow-y-auto overscroll-contain";
+/** The palette's body: a column whose list scrolls itself under the input row. */
+const paletteBodyClass = "flex min-h-0 flex-1 flex-col";
 
 function SheetDialog({
   title,
@@ -185,8 +219,9 @@ function SheetDialog({
   footer,
   dirty,
   onDirtyClose,
+  bodyClass,
   children,
-}: Pick<SheetProps, "title" | "hideTitle" | "footer" | "dirty" | "onDirtyClose" | "children">) {
+}: Pick<SheetProps, "title" | "hideTitle" | "footer" | "dirty" | "onDirtyClose" | "children"> & { bodyClass: string }) {
   useKeyboardInset();
   const state = useContext(OverlayTriggerStateContext);
   const stateRef = useRef(state);
@@ -272,7 +307,7 @@ function SheetDialog({
               onClose={requestClose}
               onBack={top?.back}
             />
-            <div ref={baseRef} hidden={!showingBase} className={scrollClass}>
+            <div ref={baseRef} hidden={!showingBase} className={bodyClass}>
               {typeof children === "function" ? children(renderProps) : (children as ReactNode)}
             </div>
             {stack.map((v) => (

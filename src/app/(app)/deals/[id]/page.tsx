@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { recordView } from "@/lib/recent-views";
 import { Button, Section, Textarea, TextLink } from "@/components/ui";
 import { cn, fmtDateTime } from "@/lib/utils";
 import { todayYmdEastern } from "@/lib/dates";
@@ -22,7 +24,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
   const deal = await prisma.deal.findUnique({
     where: { id },
@@ -33,6 +35,8 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
     },
   });
   if (!deal) notFound();
+  // Puts it on top of this person's Recent in search, once the response is out.
+  after(() => recordView(user.id, "DEAL", deal.id));
 
   const addNote = addDealNote.bind(null, deal.id);
   const today = todayYmdEastern();

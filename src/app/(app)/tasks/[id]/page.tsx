@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import type { TaskStatus } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { recordView } from "@/lib/recent-views";
 import type { MediaItem } from "@/components/media-grid";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
@@ -87,6 +89,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     },
   });
   if (!task) notFound();
+  // Puts it on top of this person's Recent in search, once the response is out.
+  after(() => recordView(user.id, "TASK", task.id));
 
   const [{ users, contractors, recent }, staff, properties, propertyRow, repeatSlot] = await Promise.all([
     // Recent: the people this viewer assigned last, for the assignee picker.

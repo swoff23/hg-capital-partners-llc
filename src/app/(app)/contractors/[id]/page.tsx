@@ -2,9 +2,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { ArrowUpRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { recordView } from "@/lib/recent-views";
 import { getEnv } from "@/lib/env";
 import { Badge, Section, textLinkClass } from "@/components/ui";
 import { BackLink } from "@/components/back-link";
@@ -74,6 +76,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
     },
   });
   if (!c) notFound();
+  // Puts them on top of this person's Recent in search, once the response is out.
+  after(() => recordView(me.id, "CONTACT", c.id));
   const phone = c.phoneE164 ?? c.phone;
   const sms = textHref(phone);
   const access = c.portalAccount ? portalAccess(c.portalAccount, c.active) : null;

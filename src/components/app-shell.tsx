@@ -1,13 +1,14 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, Pin, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import type { ListHrefs } from "@/lib/list-memory";
 import { AccountMenu, AppearanceRow } from "@/components/account-menu";
-import { GlobalSearch } from "@/components/global-search";
+import { CommandPalette } from "@/components/command-palette";
 import { ListMemoryProvider } from "@/components/list-memory";
 import { Monogram } from "@/components/monogram";
 import { SideNav } from "@/components/nav";
@@ -39,6 +40,10 @@ export function AppShell({
   const [hovered, setHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const expanded = pinned || hovered;
+  const mainRef = useRef<HTMLElement>(null);
+  const pathname = usePathname();
+  // Search opens over the page, so the phone drawer goes first.
+  const closeDrawer = useCallback(() => setMobileOpen(false), []);
 
   function togglePin() {
     setPinned((prev) => {
@@ -65,6 +70,26 @@ export function AppShell({
     };
   }, [mobileOpen]);
 
+  // After a route change focus goes to the new page's h1 (or the main area when it has none), so a
+  // keyboard or screen reader user starts at the top of the page and not back at the sidebar.
+  // The first render keeps the browser's own start; a filter that only changes the query isn't a new page.
+  const firstPath = useRef(pathname);
+  useEffect(() => {
+    if (firstPath.current === pathname) return;
+    firstPath.current = pathname;
+    // A page that puts focus in a field itself (New task's autofocus title) keeps it.
+    const here = document.activeElement;
+    if (here instanceof HTMLElement && mainRef.current?.contains(here) && here.matches("input, textarea, select, [contenteditable]")) {
+      return;
+    }
+    const target = mainRef.current?.querySelector("h1") ?? mainRef.current;
+    if (!target) return;
+    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+    // A heading takes focus for the reader, not to be drawn on.
+    target.style.outline = "none";
+    target.focus({ preventScroll: true });
+  }, [pathname]);
+
   // Drop the drawer state once the viewport is back to desktop width.
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 64rem)");
@@ -81,6 +106,20 @@ export function AppShell({
   // the bar's height at each size, so everything under it reads one value.
   const shell = (
     <div className="min-h-screen">
+      {/* The first Tab stop: past the search and the seven sections to the page. Parked above the screen until it has focus (not sr-only, so it keeps its full size and a touch screen's 44px). */}
+      <a
+        href="#main"
+        // Safari's default Tab skips a plain link.
+        tabIndex={0}
+        onClick={(e) => {
+          e.preventDefault();
+          mainRef.current?.focus();
+        }}
+        // Centered on the bar once shown: 52px below lg, 56px from lg, 36px tall (44px on touch).
+        className="fixed -top-14 left-4 z-60 inline-flex h-9 items-center rounded-md border border-line-float bg-raised px-3 text-label text-fg-1 focus:top-2 focus:shadow-float pointer-coarse:h-11 pointer-coarse:focus:top-1 lg:focus:top-2.5 lg:pointer-coarse:focus:top-1.5"
+      >
+        Skip to content
+      </a>
       <header className="fixed inset-x-0 top-0 z-30 flex h-(--app-bar-h) items-center gap-3 border-b border-line bg-canvas px-4 lg:bg-surface lg:px-5">
         <button
           type="button"
@@ -103,7 +142,7 @@ export function AppShell({
           <span className="max-sm:sr-only">{BRAND.app}</span>
         </Link>
         <div className="min-w-0 max-w-md flex-1">
-          <GlobalSearch />
+          <CommandPalette suspended={mobileOpen} onBeforeOpen={closeDrawer} />
         </div>
         {/* The account menu: from lg, where it carries the Theme; below, the drawer has Appearance and the account row. */}
         <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
@@ -178,7 +217,12 @@ export function AppShell({
         {/* Page gutters 16 / 24 / 32 (phone, tablet, desktop). Lists run full
             width to 1600, anchored to the sidebar; a record page sets its own
             1200 cap (docs/brand-guidelines.md, section 5). */}
-        <main className="min-h-[calc(100vh-var(--app-bar-h))] p-4 md:p-6 lg:p-8">
+        <main
+          id="main"
+          ref={mainRef}
+          tabIndex={-1}
+          className="min-h-[calc(100vh-var(--app-bar-h))] p-4 outline-none md:p-6 lg:p-8"
+        >
           <div className="max-w-400">{children}</div>
         </main>
       </div>

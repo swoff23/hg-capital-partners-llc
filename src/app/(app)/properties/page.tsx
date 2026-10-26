@@ -7,7 +7,7 @@ import { EmptyState, LinkButton, PageHeader, RowCell, Table, Td, Th } from "@/co
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { shortAddress } from "@/lib/normalize";
-import { activeTask } from "@/lib/task-scope";
+import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { parseBuildingCapex, parseUnits, propertyUnitCount } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { cn, toMoneyNumber } from "@/lib/utils";
@@ -45,7 +45,7 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
     prisma.property.findMany({ orderBy: { address: "asc" } }),
     prisma.task.groupBy({
       by: ["propertyId"],
-      where: { ...activeTask, propertyId: { not: null } },
+      where: { ...activeTask, ...excludeTemplateTasks, propertyId: { not: null } },
       _count: true,
     }),
     getCapexRules(),

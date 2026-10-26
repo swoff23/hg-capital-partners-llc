@@ -44,6 +44,12 @@ export type SearchInputProps = {
   inputRef?: Ref<HTMLInputElement>;
   /** On the wrapper: widths and margins. */
   className?: string;
+  /** On the input, after its own classes: a taller row and an indent that clears a wider leading slot (the palette). */
+  inputClassName?: string;
+  /** On the magnifier and the Spinner that stands in for it: where the icon sits. */
+  iconClassName?: string;
+  /** The clear button takes a Tab stop. Off in a filter bar, where Esc clears; on in a layer, where Esc closes it (the palette). */
+  tabbableClear?: boolean;
 };
 
 /**
@@ -74,6 +80,9 @@ export function SearchInput({
   name,
   inputRef,
   className,
+  inputClassName,
+  iconClassName,
+  tabbableClear = false,
 }: SearchInputProps) {
   const [own, setOwn] = useState(defaultValue ?? "");
   const text = value ?? own;
@@ -108,6 +117,7 @@ export function SearchInput({
           chromeIconClass,
           "pointer-events-none absolute top-1/2 -translate-y-1/2 text-fg-3",
           bare ? "left-3" : "left-2.5",
+          iconClassName,
         )}
       >
         <Search
@@ -116,6 +126,7 @@ export function SearchInput({
             chromeIconClass,
             "pointer-events-none absolute top-1/2 -translate-y-1/2 text-fg-3",
             bare ? "left-3" : "left-2.5",
+            iconClassName,
           )}
         />
       </Spinner>
@@ -131,6 +142,7 @@ export function SearchInput({
             ? "h-9 w-full rounded-md bg-transparent pl-9 text-body text-fg-1 outline-none placeholder:text-fg-3 pointer-coarse:h-11 pointer-coarse:pl-10"
             : cn(fieldClass, fieldSizeClass[size], "pl-8 pointer-coarse:pl-9"),
           text ? "pr-8 pointer-coarse:pr-11" : bare ? "pr-3" : undefined,
+          inputClassName,
         )}
       />
       {text && !isDisabled && (
@@ -138,7 +150,7 @@ export function SearchInput({
           // Ours alone: React Aria's SearchField would otherwise merge its own clear in too.
           slot={null}
           aria-label="Clear search"
-          excludeFromTabOrder
+          excludeFromTabOrder={!tabbableClear}
           preventFocusOnPress
           onPress={clear}
           className={cn(

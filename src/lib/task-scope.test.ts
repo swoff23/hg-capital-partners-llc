@@ -9,6 +9,7 @@ import {
   OVERDUE_ELIGIBLE,
   STATUS_LABEL,
   STATUS_ORDER,
+  excludeTemplateTasks,
   isActiveStatus,
   statusRank,
 } from "./task-scope";
@@ -61,4 +62,42 @@ test('no query filters on the literal status "OPEN"', () => {
   };
   walk(root);
   assert.deepEqual(offenders, [], "use activeTask from @/lib/task-scope instead");
+});
+
+// Playbook rows imported from Asana sit in the Template bucket. They aren't
+// work, so every list, count and search of tasks leaves them out (the test
+// docs/asana-migration-plan.md asks for, under "Helpers in task-scope.ts"). A
+// file that queries tasks must reach for excludeTemplateTasks, or for one of
+// the `where` builders that carry it; the few that don't have a reason.
+test("every Task list, count and search query leaves Template rows out", () => {
+  const root = path.join(__dirname, "..");
+  const QUERY = /\.task\.(findMany|count|groupBy|aggregate|findFirst)\(/;
+  const FILTERED = /excludeTemplateTasks|paletteTaskWhere|allTasksWhere|viewScopeWhere/;
+  const EXEMPT: Record<string, string> = {
+    "lib/tasks/core.ts": "renames a unit label on the tasks of one property, as a write",
+    "lib/tasks/bulk.ts": "moves the dates of tasks picked by id",
+    "lib/portal/queries.ts": "a contractor's jobs, only through the access rows they were given",
+    "lib/asana/import.ts": "the import reads its own CSV rows by id, Template rows included",
+  };
+  const found: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) && QUERY.test(fs.readFileSync(p, "utf8"))) {
+        found.push(path.relative(root, p).split(path.sep).join("/"));
+      }
+    }
+  };
+  walk(root);
+
+  const unfiltered = found.filter((f) => !EXEMPT[f] && !FILTERED.test(fs.readFileSync(path.join(root, f), "utf8")));
+  assert.deepEqual(unfiltered, [], "spread excludeTemplateTasks into the where, or use a builder in lib/tasks/list-query.ts");
+
+  const stale = Object.keys(EXEMPT).filter((f) => !found.includes(f));
+  assert.deepEqual(stale, [], "an exemption for a file that no longer queries tasks");
+});
+
+test("excludeTemplateTasks keeps every bucket but Template", () => {
+  assert.deepEqual(excludeTemplateTasks, { bucket: { not: "Template" } });
 });

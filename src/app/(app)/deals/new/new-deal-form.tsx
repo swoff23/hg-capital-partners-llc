@@ -24,7 +24,7 @@ function Label({ text, className, children }: { text: string; className?: string
  * Create deal at the bottom of a phone screen is taken to it (and a screen
  * reader reads the line, through aria-describedby).
  */
-export function NewDealForm() {
+export function NewDealForm({ defaultAddress }: { defaultAddress?: string }) {
   const [pending, start] = useTransition();
   const [existing, setExisting] = useState<ExistingDeal | null>(null);
   const [error, setError] = useState("");
@@ -54,6 +54,7 @@ export function NewDealForm() {
             ref={address}
             name="address"
             required
+            defaultValue={defaultAddress}
             placeholder="123 Main St, Buffalo, NY 14201"
             aria-invalid={existing ? true : undefined}
             aria-describedby={existing ? "new-deal-existing" : undefined}

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
 import { toMoneyNumber } from "@/lib/utils";
 import { PhotoThumb } from "@/components/photo-thumb";
@@ -55,7 +57,7 @@ function taskAssignee(t: {
  * insurance) and the property's tasks, documents and notes.
  */
 export default async function PropertyPage({ params }: PageProps<"/properties/[id]">) {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
   const property = await prisma.property.findUnique({
     where: { id },
@@ -74,6 +76,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     },
   });
   if (!property) notFound();
+  // Puts it on top of this person's Recent in search, once the response is out.
+  after(() => recordView(user.id, "PROPERTY", property.id));
   const units = parseUnits(property.units);
   const buildingCapex = parseBuildingCapex(property.buildingCapex);
   const capexRules = await getCapexRules();
