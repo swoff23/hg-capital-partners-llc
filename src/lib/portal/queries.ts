@@ -3,6 +3,7 @@ import { Prisma, type AttachmentKind, type TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
+import { orderMedia } from "@/lib/tasks/media";
 import { targetDate } from "@/lib/tasks/rules";
 import { readLockboxCode } from "./access-code";
 import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, type JobCard, type JobsTab } from "./job-view";
@@ -110,7 +111,7 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
       dueDate: true,
       scheduledFor: true,
       completedAt: true,
-      property: { select: { address: true } },
+      property: { select: { address: true, photoUrl: true } },
     },
     // A long history keeps its most recent 500.
     ...(tab === "done" ? { orderBy: { completedAt: "desc" as const } } : {}),
@@ -125,6 +126,7 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
     title: r.title,
     status: r.status,
     address: r.property?.address ?? null,
+    photoUrl: r.property?.photoUrl ?? null,
     unitLabel: r.unitLabel,
     target: toYmd(targetDate(r)),
     finishedOn: tab === "done" && r.completedAt ? todayYmdEastern(r.completedAt) : null,
@@ -192,6 +194,8 @@ export interface JobDetail {
   /** Always shown to the assigned contractor (D16). */
   notes: string | null;
   address: string | null;
+  /** The property's front photo (public Blob), or null: the fallback tile. */
+  photoUrl: string | null;
   unitLabel: string | null;
   target: Ymd | null;
   checklist: { id: string; title: string; done: boolean }[];
@@ -255,7 +259,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
       completedAt: true,
       propertyId: true,
       assigneeContactId: true,
-      property: { select: { address: true } },
+      property: { select: { address: true, photoUrl: true } },
       checklist: { select: { id: true, title: true, done: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
     },
   });
@@ -280,10 +284,12 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     status: task.status,
     notes: task.description,
     address: task.property?.address ?? null,
+    photoUrl: task.property?.photoUrl ?? null,
     unitLabel: task.unitLabel,
     target: toYmd(targetDate(task)),
     checklist: task.checklist,
-    media: media.map((a) => toMedia(p, a)),
+    // The grid's order, as on the task page (lib/tasks/media.ts).
+    media: orderMedia(media).map((a) => toMedia(p, a)),
     updates,
     lockbox,
     staffNames,

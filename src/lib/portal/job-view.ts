@@ -35,6 +35,8 @@ export interface JobCard {
   status: TaskStatus;
   /** The property's full address, or null for a job with no property. */
   address: string | null;
+  /** The property's front photo (public Blob), or null: the fallback tile. */
+  photoUrl: string | null;
   unitLabel: string | null;
   /** The neutral Target (rules.ts targetDate), never shown in red. */
   target: Ymd | null;

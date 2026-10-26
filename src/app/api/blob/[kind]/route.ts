@@ -2,6 +2,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { userMessage } from "@/lib/action-result";
 import { uploadLimits } from "@/lib/attachments/limits";
+import type { UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
@@ -21,6 +22,10 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/portal-task-upload    { taskId, fileKind }   contractor, on a job they can open
  *   /api/blob/property-upload       { propertyId }         staff
  *   /api/blob/listing-photo-upload  { propertyId }         staff, images only
+ *
+ * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
+ * uploaders send; a key that isn't there fails typecheck. That list also
+ * holds property-photo-upload, which this route doesn't serve yet.
  *
  * Task kinds only accept a path under tasks/<taskId>/ (paths.ts): Blob can't
  * pick the path for us, only refuse the one asked for. Their token carries a
@@ -92,7 +97,7 @@ const KINDS: Record<string, UploadKind> = {
       return { maximumSizeInBytes: 25 * MB, allowedContentTypes: ["image/jpeg", "image/png", "image/webp", "image/avif"] };
     },
   },
-};
+} satisfies Partial<Record<UploadKindKey, UploadKind>>;
 
 async function currentUploader(kind: Uploader["kind"]): Promise<Uploader | null> {
   if (kind === "staff") {

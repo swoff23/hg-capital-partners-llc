@@ -34,18 +34,20 @@ model User {
   createdTasks   Task[] @relation("TaskCreatedBy")
   completedTasks Task[] @relation("TaskCompletedByUser")
 
-  taskEvents            TaskEvent[]
-  uploadedAttachments   TaskAttachment[]     @relation("AttachmentUploadedByUser")
-  checkedItems          TaskChecklistItem[]  @relation("ChecklistDoneByUser")
-  taskReadStates        TaskReadState[]
-  grantedTaskAccess     TaskAccess[]
-  createdPortalAccounts PortalAccount[]
-  notifications         NotificationOutbox[]
-  recentViews           RecentView[]
+  taskEvents                  TaskEvent[]
+  uploadedAttachments         TaskAttachment[]     @relation("AttachmentUploadedByUser")
+  checkedItems                TaskChecklistItem[]  @relation("ChecklistDoneByUser")
+  taskReadStates              TaskReadState[]
+  grantedTaskAccess           TaskAccess[]
+  createdPortalAccounts       PortalAccount[]
+  notifications               NotificationOutbox[]
+  recentViews                 RecentView[]
   // Who last changed a property or deal, for the conflict line on a save
   // ("Pieter set this to $410,000 at 2:14 PM", forms 2.12).
-  updatedProperties     Property[]           @relation("PropertyUpdatedBy")
-  updatedDeals          Deal[]               @relation("DealUpdatedBy")
+  updatedProperties           Property[]           @relation("PropertyUpdatedBy")
+  updatedDeals                Deal[]               @relation("DealUpdatedBy")
+  // Who added a property document, for "Connor · Oct 3" on its row (uploads 2.4).
+  uploadedPropertyAttachments PropertyAttachment[] @relation("PropertyAttachmentUploadedBy")
 
   qboConnections QuickbooksConnection[]
 }
@@ -174,6 +176,12 @@ model Property {
   buildingCapex Json @default("{}")
 
   notes String? @db.Text
+
+  // The building's front photo (uploads 2.10): a 2560px JPEG with no metadata
+  // on public Blob, shown wherever PhotoThumb stands in for the building.
+  // photoPathname deletes the blob when it's replaced or removed. Null until set.
+  photoUrl      String?
+  photoPathname String?
 
   tasks       Task[]
   attachments PropertyAttachment[]
@@ -494,6 +502,9 @@ model TaskTemplate {
   items                 Json      @default("[]")
   sourceAsanaSectionGid String?   @unique
   archivedAt            DateTime?
+  // Photos a contractor's Mark done asks for on this playbook's jobs (uploads
+  // 2.8, choice 5 A). Null or 0 means optional, every job's default.
+  finishPhotosRequired  Int?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -642,15 +653,19 @@ model NotificationOutbox {
 // PRIVATE: mortgage statements, insurance docs, etc. Never queried by the
 // public site — see Listing.photoUrl below for the public-facing equivalent.
 model PropertyAttachment {
-  id          String   @id @default(cuid())
-  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  propertyId  String
-  url         String
-  pathname    String
-  filename    String
-  size        Int
-  contentType String?
-  createdAt   DateTime @default(now())
+  id               String   @id @default(cuid())
+  property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId       String
+  url              String
+  pathname         String
+  filename         String
+  size             Int
+  contentType      String?
+  createdAt        DateTime @default(now())
+  // Who added it ("Connor · Oct 3", uploads 2.4). Null on rows from before it
+  // was recorded, which show the date alone, and when that user is deleted.
+  uploadedByUser   User?    @relation("PropertyAttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  uploadedByUserId String?
 
   @@index([propertyId])
 }

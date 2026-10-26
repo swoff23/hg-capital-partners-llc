@@ -38,7 +38,7 @@ export type PropertySearchRow = {
   title: string;
   units: number | null;
   owner: string | null;
-  /** The property photo; null until the photo field exists, so the row shows the House tile. */
+  /** The property's front photo (public Blob); null until one is set, so the row shows the House tile. */
   photoUrl: string | null;
 };
 
@@ -99,6 +99,7 @@ const PROPERTY_SELECT = {
   llcOwner: true,
   unitCount: true,
   units: true,
+  photoUrl: true,
   updatedAt: true,
 } satisfies Prisma.PropertySelect;
 
@@ -146,7 +147,7 @@ export function propertyRow(p: PropertyRecord): PropertySearchRow {
     title: shortAddress(p.address) || p.address,
     units: propertyUnitCount(p),
     owner: p.llcOwner?.trim() || null,
-    photoUrl: null,
+    photoUrl: p.photoUrl,
   };
 }
 

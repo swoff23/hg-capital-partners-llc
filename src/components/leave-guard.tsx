@@ -18,7 +18,7 @@ import { hasUnsavedWork, holdFor, setHold, type HoldEntry, type LeaveScope, type
 /**
  * Asks before an in-app link leaves work behind: photos still uploading
  * (decision 24), a dirty form sheet, editor or draft (forms 2.11). Wrap the
- * pages in <LeaveGuard> (the app layout does, and the contractor job page).
+ * pages in <LeaveGuard> (the app layout and the portal layout do).
  * Whatever knows calls useHoldLeave({ title, stay }) while it matters and
  * null when it doesn't; a BackLink inside (or any link that leaves through
  * useLeaveGuard) then asks first in a Sheet with just the title, "Leave

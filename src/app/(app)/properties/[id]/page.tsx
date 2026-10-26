@@ -5,9 +5,7 @@ import { prisma } from "@/lib/db";
 import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
 import { toMoneyNumber } from "@/lib/utils";
-import { PhotoThumb } from "@/components/photo-thumb";
 import { toYmd, todayYmdEastern } from "@/lib/dates";
-import { shortAddress } from "@/lib/normalize";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
 import { targetDate } from "@/lib/tasks/rules";
@@ -18,7 +16,7 @@ import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
-import { PropertyDocumentsSection } from "./edit-documents";
+import { DocumentsSection } from "./documents-section";
 import { PropertyLoanSection } from "./edit-loan";
 import { PropertyInsuranceSection } from "./edit-insurance";
 import { UnitsSection } from "./edit-units";
@@ -27,6 +25,7 @@ import { BuildingCapexSection } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
 import { PropertyFinancialsCard } from "./financials";
 import { PropertyFactStrip } from "./record-strip";
+import { PropertyPhoto } from "./property-photo";
 import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
 
 const ymd = toYmd;
@@ -67,7 +66,6 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
         orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
         include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
       },
-      attachments: { orderBy: { createdAt: "asc" } },
       sourceDeal: { select: { id: true, address: true } },
       listings: {
         orderBy: { createdAt: "asc" },
@@ -117,7 +115,6 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   const value = d(property.value);
   const balance = d(property.currentLoan);
   const position = loanPosition(value, balance);
-  const place = shortAddress(property.address) || property.address;
   const subline = [property.llcOwner?.trim(), unitCount > 0 && `${unitCount} ${unitCount === 1 ? "unit" : "units"}`]
     .filter(Boolean)
     .join(" · ");
@@ -130,8 +127,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       {/* Identity: the building's photo (the fallback tile until it's taken), status, address, entity and units. */}
       <header className="mt-3 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
         {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. */}
-        <PhotoThumb size="full" alt={`Front of ${place}`} className="sm:hidden" />
-        <PhotoThumb size={96} alt={`Front of ${place}`} className="max-sm:hidden" />
+        <PropertyPhoto property={{ id: property.id, address: property.address, photoUrl: property.photoUrl }} canEdit />
         <div className="min-w-0">
           {property.status && (
             <p className="text-meta">
@@ -231,10 +227,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
           <PropertyTasksSection propertyId={property.id} tasks={tasks} today={today} />
 
-          <PropertyDocumentsSection
-            propertyId={property.id}
-            attachments={property.attachments.map((a) => ({ id: a.id, filename: a.filename, size: a.size }))}
-          />
+          <DocumentsSection propertyId={property.id} />
 
           <PropertyNotesSection id={property.id} notes={property.notes} />
           {property.sourceDeal && (

@@ -7,6 +7,9 @@ import nextTs from "eslint-config-next/typescript";
 const EM_DASH_MESSAGE =
   "Em dash in copy. Don't swap it for a period or comma: rewrite the sentence, or ask Connor. See CLAUDE.md, Copy.";
 
+const HEIC_MESSAGE =
+  "heic-to loads only through the dynamic import in src/lib/attachments/heic.ts (heicToJpeg), so it stays out of every page's bundle.";
+
 // Brand values come from the tokens in src/app/globals.css, so a re-brand is a
 // token swap (docs/brand-guidelines.md, section 11). A value the tokens can't
 // carry (a fixed size the guidelines name) takes an eslint-disable-next-line
@@ -77,6 +80,17 @@ const eslintConfig = defineConfig([
         { selector: "TemplateElement[value.raw=/—/]", message: EM_DASH_MESSAGE },
       ],
       "hg/design-tokens": "error",
+      // The HEIC decoder (libheif, LGPL-3.0, about 3 MB) ships as its own lazy
+      // chunk, reached only through the dynamic import in
+      // src/lib/attachments/heic.ts. A static import would put it in a page's
+      // bundle. Dynamic import() isn't checked by this rule.
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [{ name: "heic-to", message: HEIC_MESSAGE, allowTypeImports: true }],
+          patterns: [{ group: ["heic-to/*"], message: HEIC_MESSAGE, allowTypeImports: true }],
+        },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.

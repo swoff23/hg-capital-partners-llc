@@ -1,20 +1,20 @@
 import type { TaskStatus } from "@prisma/client";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { BackLink } from "@/components/back-link";
-import { MediaGrid, type MediaItem } from "@/components/media-grid";
+import type { FileLink } from "@/components/files-list";
+import type { MediaItem } from "@/components/media-grid";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
-import { deleteTaskFile } from "./actions";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
 import { Composer, type ComposerDraft } from "./composer";
 import { TaskFields, type PropertyOption, type TaskFieldValues } from "./fields";
-import { FilesList, type FileLink } from "./files-list";
 import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
 import { ReviewBanner } from "./review-banner";
 import { StatusControl, WaitingReason } from "./status-control";
 import { StatusRunProvider } from "./status-run";
+import { TaskMediaSection } from "./task-media";
 
 export interface TaskPageViewProps {
   task: {
@@ -51,6 +51,8 @@ export interface TaskPageViewProps {
   checklist: ChecklistRow[];
   media: MediaItem[];
   files: FileLink[];
+  /** The ids in `media` sent with the latest Mark done (lib/tasks/media.ts taskMedia). */
+  atFinish?: readonly string[];
   rows: ActivityRow[];
   dayLabels: Record<string, string>;
   /** My uploads waiting in the composer from an earlier visit. */
@@ -142,22 +144,7 @@ export function TaskPageView(p: TaskPageViewProps) {
 
           <Checklist taskId={task.id} items={p.checklist} />
 
-          {(p.media.length > 0 || p.files.length > 0) && (
-            <Section
-              title={
-                <>
-                  {p.media.length > 0 ? "Photos" : "Files"}
-                  {p.media.length > 0 && " "}
-                  {p.media.length > 0 && <span className="ml-1 font-normal tabular-nums text-fg-3">{p.media.length}</span>}
-                </>
-              }
-            >
-              <div className="space-y-3">
-                <MediaGrid items={p.media} onDelete={deleteTaskFile} />
-                <FilesList files={p.files} onDelete={deleteTaskFile} />
-              </div>
-            </Section>
-          )}
+          <TaskMediaSection taskId={task.id} media={p.media} files={p.files} atFinish={p.atFinish} />
 
           <Section title="Activity">
             <TaskActivity rows={p.rows} dayLabels={p.dayLabels} />

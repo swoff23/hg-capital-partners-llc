@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FileText, Phone } from "lucide-react";
 import { BackLink } from "@/components/back-link";
-import { LeaveGuard } from "@/components/leave-guard";
 import { MediaGrid } from "@/components/media-grid";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { StatusBadge } from "@/components/status-badge";
@@ -18,6 +17,7 @@ import { isActiveStatus } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { JobActions } from "./_components/job-actions";
 import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
+import { JobMediaSection } from "./_components/job-media";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -50,9 +50,9 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
   const tel = officeTelHref();
   const photoAlt = job.address ? `Front of ${addressLine(job.address, null, { short: true })}` : null;
 
-  // LeaveGuard: "My jobs" asks first while photos are still uploading (JobActions holds it).
+  // "My jobs" asks first while photos are still uploading: JobActions holds the portal layout's LeaveGuard.
   return (
-    <LeaveGuard>
+    <>
       <header className="sticky top-0 z-20 border-b border-line bg-canvas">
         <div className="mx-auto flex h-14 max-w-300 items-center justify-between gap-3 px-2 sm:px-4 lg:px-6">
           <BackLink fallback="/p" label="My jobs" className="h-11 rounded-md px-2 text-label text-fg-2" />
@@ -95,17 +95,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
 
           {job.checklist.length > 0 && <JobChecklist items={job.checklist} editable={active} />}
 
-          {job.media.length > 0 && (
-            <Section
-              title={
-                <>
-                  Photos & videos <span className="ml-1 font-normal tabular-nums text-fg-3">{job.media.length}</span>
-                </>
-              }
-            >
-              <MediaGrid items={job.media} />
-            </Section>
-          )}
+          <JobMediaSection media={job.media} />
 
           <Section title="Updates">
             {job.updates.length === 0 ? (
@@ -128,7 +118,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
           </Section>
         </div>
       </main>
-    </LeaveGuard>
+    </>
   );
 }
 

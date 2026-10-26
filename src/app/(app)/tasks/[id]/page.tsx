@@ -4,8 +4,6 @@ import type { TaskStatus } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordView } from "@/lib/recent-views";
-import type { MediaItem } from "@/components/media-grid";
-import { taskFileUrl } from "@/lib/attachments/media";
 import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { propertyOptions } from "@/lib/picker-options";
@@ -15,9 +13,10 @@ import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { lockboxState } from "@/lib/tasks/lockbox";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
 import { copySlot } from "@/lib/tasks/repeat-slot";
+import { fileLink, isDraftUpload, isMediaRow, mediaItem, reviewPhotos, taskMedia, taskMediaInclude, type TaskMediaRow } from "@/lib/tasks/media";
 import { OVERDUE_ELIGIBLE, isActiveStatus } from "@/lib/task-scope";
+import type { FileLink } from "@/components/files-list";
 import type { ActivityRow } from "./activity";
-import type { FileLink } from "./files-list";
 import { TaskPageView } from "./view";
 
 /**
@@ -49,28 +48,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       createdBy: { select: { name: true, email: true } },
       assigneeContact: { select: { id: true, fullName: true, active: true } },
       checklist: { orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { id: true, title: true, done: true } },
-      attachments: {
-        where: { deletedAt: null },
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          kind: true,
-          filename: true,
-          size: true,
-          linkUrl: true,
-          visibility: true,
-          thumbPathname: true,
-          posterPathname: true,
-          durationSec: true,
-          eventId: true,
-          asanaGid: true,
-          createdAt: true,
-          uploadedByUserId: true,
-          uploadedByContactId: true,
-          uploadedByUser: { select: { name: true, email: true } },
-          uploadedByContact: { select: { fullName: true } },
-        },
-      },
+      // Posted and drafted files, oldest first (lib/tasks/media.ts).
+      attachments: taskMediaInclude,
       events: {
         where: { deletedAt: null },
         orderBy: { createdAt: "asc" },
@@ -132,33 +111,13 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
 
   /* ---------------- Files ---------------- */
 
-  type Att = (typeof task.attachments)[number];
-  const uploaderOf = (a: Att) => (a.uploadedByUser ? userName(a.uploadedByUser) : (a.uploadedByContact?.fullName ?? null));
-  const asMedia = (a: Att): MediaItem => ({
-    id: a.id,
-    kind: a.kind as "IMAGE" | "VIDEO",
-    filename: a.filename,
-    hasThumb: !!a.thumbPathname,
-    hasPoster: !!a.posterPathname,
-    durationSec: a.durationSec,
-    uploadedBy: uploaderOf(a),
-    createdAt: a.createdAt,
-    internal: a.visibility === "INTERNAL",
-  });
-  const asFile = (a: Att): FileLink | null => {
-    if (a.kind === "LINK") return a.linkUrl ? { id: a.id, kind: "LINK", filename: a.filename, href: a.linkUrl, size: null, internal: a.visibility === "INTERNAL" } : null;
-    return { id: a.id, kind: "FILE", filename: a.filename, href: taskFileUrl(a.id), size: a.size, internal: a.visibility === "INTERNAL" };
-  };
-  const isMedia = (a: Att) => a.kind === "IMAGE" || a.kind === "VIDEO";
-  // A staff upload still waiting in someone's composer: not on any comment
-  // yet, and Internal until Send. It shows only in that person's composer,
-  // so a reload or another visit picks it back up instead of orphaning it.
-  const isDraft = (a: Att) => a.eventId === null && a.asanaGid === null && a.uploadedByUserId !== null;
-  const posted = task.attachments.filter((a) => !isDraft(a));
-  const drafts = task.attachments.filter((a) => isDraft(a) && a.uploadedByUserId === user.id).map((a) => ({ id: a.id, filename: a.filename }));
-  const media = posted.filter(isMedia).map(asMedia);
-  const files = posted.filter((a) => !isMedia(a)).map(asFile).filter((f): f is FileLink => !!f);
-  const byEvent = new Map<string, Att[]>();
+  // The Photos section's tiles and rows, and the "At finish" set (lib/tasks/media.ts).
+  const { media, files, atFinish } = taskMedia(task.attachments, { events: task.events });
+  // My uploads still waiting in the composer: only my own drafts come back to me.
+  const drafts = task.attachments
+    .filter((a) => isDraftUpload(a) && a.uploadedByUserId === user.id)
+    .map((a) => ({ id: a.id, filename: a.filename }));
+  const byEvent = new Map<string, TaskMediaRow[]>();
   for (const a of task.attachments) if (a.eventId) byEvent.set(a.eventId, [...(byEvent.get(a.eventId) ?? []), a]);
 
   /* ---------------- Activity ---------------- */
@@ -175,8 +134,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     if (entry.type === "due-run") return { type: "due-run", id: entry.id, day, ago, text: entry.text };
     const atts = byEvent.get(entry.event.id) ?? [];
     const own = {
-      media: atts.filter(isMedia).map(asMedia),
-      files: atts.filter((a) => !isMedia(a)).map(asFile).filter((f): f is FileLink => !!f),
+      media: atts.filter(isMediaRow).map(mediaItem),
+      files: atts.filter((a) => !isMediaRow(a)).map(fileLink).filter((f): f is FileLink => !!f),
     };
     if (entry.type === "line") return { type: "line", id: entry.id, day, ago, text: entry.text, href: entry.href ?? null, ...own };
     const e = entry.event;
@@ -203,7 +162,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     const marked = [...task.events].reverse().find((e) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "REVIEW");
     const fullName = marked?.actorLabel ?? contractor?.fullName ?? "Someone";
     const contactId = marked?.actorContactId ?? (marked ? null : (contractor?.id ?? null));
-    const photos = contactId ? task.attachments.filter((a) => isMedia(a) && a.uploadedByContactId === contactId).length : 0;
+    const photos = reviewPhotos(task.attachments, { contactId, events: task.events }).length;
     return { fullName, name: firstName(fullName) || fullName, isContractor: !!contactId, photos };
   })();
 
@@ -250,6 +209,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       checklist={task.checklist}
       media={media}
       files={files}
+      atFinish={atFinish}
       rows={rows}
       dayLabels={dayLabels}
       drafts={drafts}

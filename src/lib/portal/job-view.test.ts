@@ -33,6 +33,7 @@ const job = (id: string, over: Partial<JobCard> = {}): JobCard => ({
   title: id,
   status: "OPEN",
   address: null,
+  photoUrl: null,
   unitLabel: null,
   target: null,
   finishedOn: null,

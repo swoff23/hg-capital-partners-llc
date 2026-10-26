@@ -8,27 +8,39 @@ import { Button, buttonClass } from "@/components/ui";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { cn, formatBytes } from "@/lib/utils";
 
-/** A document or a link on a task. Photos and videos go in MediaGrid instead. */
+/** A document or a link on a record. Photos and videos go in MediaGrid instead. */
 export type FileLink = {
   id: string;
   kind: "FILE" | "LINK";
   filename: string;
-  /** /api/files/task/<id> for a file; the outside URL for a link. */
+  /** The gated file route (/api/files/task/<id>, /api/files/property/<id>) for a file; the outside URL for a link. */
   href: string;
   size: number | null;
   internal: boolean;
+  /** Who added it, a first name or a full name: "Connor". Null for an import whose uploader wasn't matched. */
+  uploadedBy?: string | null;
+  /** When it was added, for the byline's date. */
+  createdAt?: Date | string;
 };
 
 /**
- * The task's documents and links, each opening in a new tab. With `onDelete`
+ * A record's documents and links (the task page, Activity, the contractor
+ * job page, property Documents), each opening in a new tab. With `onDelete`
  * (staff), each row has a "…" menu with Delete, asked once more before it
  * goes. The "…" shows on hover or focus with a mouse, always on touch.
+ *
+ * The uploads spec's rows (2.4: type icons, the "Connor · Oct 3" byline from
+ * `uploadedBy` and `createdAt`, Open, Download and Rename in the menu, rows
+ * in flight and failed, the viewer at a desk) are UP1's. `byline` and `menu`
+ * are part of the contract and not drawn yet.
  */
 export function FilesList({
   files,
   className,
   onFill = false,
   onDelete,
+  byline = true,
+  menu = true,
 }: {
   files: FileLink[];
   className?: string;
@@ -36,7 +48,13 @@ export function FilesList({
   onFill?: boolean;
   /** Removes a file for good; a server action can be passed as is. */
   onDelete?: (id: string) => Promise<ActionResult<unknown>>;
+  /** Who added each file and when; off in Activity rows, where the comment already says. */
+  byline?: boolean;
+  /** The row's ⋯ menu; off in Activity rows. */
+  menu?: boolean;
 }) {
+  void byline;
+  void menu;
   const [target, setTarget] = useState<FileLink | null>(null);
   const [error, setError] = useState("");
   const [pending, start] = useTransition();

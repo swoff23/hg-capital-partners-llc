@@ -79,6 +79,7 @@ const property = (id: string, address: string, extra: Row = {}): Row => ({
   llcOwner: "HG Buffalo Holding 1 LLC",
   unitCount: 4,
   units: [],
+  photoUrl: null,
   updatedAt: day(1),
   ...extra,
 });
@@ -281,6 +282,13 @@ test("rows carry what to choose by", async () => {
   const late = tasks.find((t) => t.id === "t2")!;
   assert.equal(late.overdue, true);
   assert.deepEqual(late.assignee, { name: "Luis Ortiz", contractor: true });
+});
+
+test("a property row carries its front photo once one is set", async () => {
+  const url = "https://abc.public.blob.vercel-storage.com/properties/p1/photo/front.jpg";
+  const { db } = fakeDb({ properties: [property("p1", "767 Prospect Ave, Buffalo, NY 14213", { photoUrl: url })] });
+  const { groups } = await search(db, "prospect");
+  assert.equal((group(groups, "property")?.rows[0] as { photoUrl: string | null }).photoUrl, url);
 });
 
 test("live work ranks first: an open task before a done one, an active contractor before an inactive one", async () => {

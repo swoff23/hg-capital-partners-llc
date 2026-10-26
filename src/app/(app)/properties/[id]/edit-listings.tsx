@@ -1,8 +1,7 @@
 "use client";
-import { useRef, useState } from "react";
-import { upload } from "@vercel/blob/client";
+import { useState } from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { ChevronLeft, ChevronRight, ExternalLink, ImagePlus, MoreHorizontal, Pencil, Trash2, X } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DateField } from "@/components/due-date-picker";
 import { FormSheet } from "@/components/form-sheet";
@@ -16,8 +15,7 @@ import { useRun } from "@/components/use-run";
 import { inlineProblem } from "@/lib/inline-edit";
 import { cn } from "@/lib/utils";
 import { deletePropertyListing, savePropertyListing } from "../actions";
-
-export type EditablePhoto = { url: string; pathname: string };
+import { LISTING_PHOTO_MAX, ListingPhotos, discardSessionUploads, type ListingPhotoDraft } from "./listing-photos";
 
 export type EditableListing = {
   id: string | null; // null = not yet saved
@@ -29,11 +27,8 @@ export type EditableListing = {
   sqft: string;
   availableDate: string; // yyyy-mm-dd or ""
   status: "AVAILABLE" | "LEASED" | "HIDDEN";
-  photos: EditablePhoto[]; // order = display/carousel order
+  photos: ListingPhotoDraft[]; // order = display/carousel order
 };
-
-/** The most photos a listing holds (the server's cap). */
-const MAX_PHOTOS = 20;
 
 // A listing's status is a label, not a state, so its word stays neutral (fg-2, as on Portfolio).
 const STATUS_LABEL: Record<EditableListing["status"], string> = {
@@ -297,9 +292,14 @@ function ListingSheet({
   function submit() {
     setTried(true);
     if (Object.keys(problems).length > 0) return;
+    const photos = draft.photos;
     run.run(() => savePropertyListing(propertyId, draft, version), {
       failure: "inline",
-      succeeded: () => onOpenChange(false),
+      succeeded: () => {
+        // Photos uploaded and then removed before this Save go; the saved set stays.
+        void discardSessionUploads(propertyId, photos);
+        onOpenChange(false);
+      },
       done: isNew ? `Listing for ${draft.unitLabel} added` : `Listing for ${draft.unitLabel} saved`,
       key: `listing:${propertyId}:${draft.id ?? "new"}`,
     });
@@ -309,7 +309,11 @@ function ListingSheet({
     <FormSheet
       title={isNew ? "New listing" : name}
       isOpen={isOpen}
-      onOpenChange={onOpenChange}
+      onOpenChange={(open) => {
+        // Discard, Cancel, X or Esc: the photos this sheet uploaded go with the changes (G1D-026).
+        if (!open) void discardSessionUploads(propertyId);
+        onOpenChange(open);
+      }}
       onSubmit={submit}
       primary={isNew ? "Add listing" : "Save listing"}
       pending={run.pending}
@@ -341,21 +345,12 @@ function ListingSheet({
         />
       </div>
 
-      <PhotoGallery
+      <ListingPhotos
         propertyId={propertyId}
         name={name}
-        photos={draft.photos}
-        onAdd={(photo) => setDraft((d) => (d.photos.length >= MAX_PHOTOS ? d : { ...d, photos: [...d.photos, photo] }))}
-        onRemove={(j) => setDraft((d) => ({ ...d, photos: d.photos.filter((_, k) => k !== j) }))}
-        onMove={(j, dir) =>
-          setDraft((d) => {
-            const photos = [...d.photos];
-            const target = j + dir;
-            if (target < 0 || target >= photos.length) return d;
-            [photos[j], photos[target]] = [photos[target], photos[j]];
-            return { ...d, photos };
-          })
-        }
+        value={draft.photos}
+        onChange={(photos) => setDraft((d) => ({ ...d, photos }))}
+        max={LISTING_PHOTO_MAX}
         onPendingChange={setUploading}
       />
 
@@ -401,167 +396,5 @@ function ListingSheet({
         </FormField>
       </div>
     </FormSheet>
-  );
-}
-
-/** A round control on a photo, on the photo tokens: 24px, with a 44px hit area on touch. */
-const onPhotoButton = cn(
-  "relative flex h-6 w-6 items-center justify-center rounded-full bg-photo-scrim text-on-photo transition-opacity disabled:opacity-30",
-  "pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5",
-);
-
-/** Horizontal strip of photo thumbnails: add, remove, and left/right reorder. */
-function PhotoGallery({
-  propertyId,
-  name,
-  photos,
-  onAdd,
-  onRemove,
-  onMove,
-  onPendingChange,
-}: {
-  propertyId: string;
-  /** The listing's unit, for the photos' alt text. */
-  name: string;
-  photos: EditablePhoto[];
-  onAdd: (photo: EditablePhoto) => void;
-  onRemove: (index: number) => void;
-  onMove: (index: number, direction: -1 | 1) => void;
-  /** How many uploads are still going, whenever it changes: the sheet's Save waits on it and says so. */
-  onPendingChange: (pending: number) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  /** Turn a raw @vercel/blob (or fetch) error into something an admin can act on. */
-  function describeUploadError(e: unknown): string {
-    const msg = e instanceof Error ? e.message : "";
-    if (/not configured|Blob store/i.test(msg)) return "uploads aren't set up yet";
-    if (/content type mismatch/i.test(msg)) {
-      return (
-        "HEIC photos aren't supported. Export as JPEG first, or on iPhone set " +
-        'Settings → Camera → Formats to "Most Compatible"'
-      );
-    }
-    if (/too large|exceeds the maximum/i.test(msg)) return "file is too large (25MB max)";
-    // @vercel/blob's client always uses this exact generic wording when the request
-    // for an upload token itself fails (auth, missing property, etc.): it discards
-    // whatever specific reason the server actually sent back. A stale session is the
-    // most common real cause, so that's the fix worth suggesting.
-    if (/retrieve the client token/i.test(msg)) {
-      return "couldn't start the upload. Reload the page, check you're still signed in, and try again";
-    }
-    return "upload failed";
-  }
-
-  async function pick(files: FileList | null) {
-    const list = Array.from(files ?? []);
-    if (list.length === 0) return;
-    setError(null);
-    setBusy(true);
-    let remaining = list.length;
-    onPendingChange(remaining);
-    const failures: string[] = [];
-    try {
-      // A few uploads at once instead of one at a time: each file was paying its own
-      // full round-trip (mint a token, then the transfer) in strict sequence, so five
-      // photos took ~5x one photo's time. Capped (not fully parallel) so a big batch
-      // doesn't fire a burst of concurrent token requests at the DB all at once.
-      const CONCURRENCY = 3;
-      let next = 0;
-      async function worker() {
-        while (next < list.length) {
-          const file = list[next++];
-          try {
-            const blob = await upload(file.name, file, {
-              access: "public",
-              handleUploadUrl: "/api/blob/listing-photo-upload",
-              clientPayload: JSON.stringify({ propertyId }),
-            });
-            onAdd({ url: blob.url, pathname: blob.pathname });
-          } catch (e) {
-            // Keep going: one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
-            failures.push(`${file.name}: ${describeUploadError(e)}`);
-          } finally {
-            remaining -= 1;
-            onPendingChange(remaining);
-          }
-        }
-      }
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, list.length) }, worker));
-      if (failures.length > 0) setError(failures.join("; "));
-    } finally {
-      setBusy(false);
-      onPendingChange(0);
-    }
-  }
-
-  return (
-    <div>
-      <div className="flex flex-wrap gap-2">
-        {photos.map((p, j) => (
-          // The controls show on hover or focus with a mouse; touch has no hover, so they stay.
-          <div key={p.pathname} className="group/photo relative shrink-0">
-            <PhotoThumb src={p.url} alt={`${name} photo ${j + 1}`} size={96} />
-            <div className="absolute inset-0 transition-opacity pointer-fine:opacity-0 pointer-fine:group-focus-within/photo:opacity-100 pointer-fine:group-hover/photo:opacity-100">
-              <button
-                type="button"
-                onClick={() => onRemove(j)}
-                aria-label={`Remove photo ${j + 1}`}
-                className={cn(onPhotoButton, "absolute right-1 top-1")}
-              >
-                <X aria-hidden="true" strokeWidth={1.75} className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onMove(j, -1)}
-                disabled={j === 0}
-                aria-label={`Move photo ${j + 1} left`}
-                className={cn(onPhotoButton, "absolute bottom-1 left-1")}
-              >
-                <ChevronLeft aria-hidden="true" strokeWidth={1.75} className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onMove(j, 1)}
-                disabled={j === photos.length - 1}
-                aria-label={`Move photo ${j + 1} right`}
-                className={cn(onPhotoButton, "absolute bottom-1 right-1")}
-              >
-                <ChevronRight aria-hidden="true" strokeWidth={1.75} className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {j === 0 && (
-              <span className="pointer-events-none absolute left-1 top-1 inline-flex h-5 items-center rounded-full bg-photo-scrim px-1.5 text-micro text-on-photo">
-                Cover
-              </span>
-            )}
-          </div>
-        ))}
-
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={busy || photos.length >= MAX_PHOTOS}
-          className="flex h-18 w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg bg-fill-1 text-meta text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-60"
-        >
-          <ImagePlus aria-hidden="true" strokeWidth={1.5} className="h-4 w-4 text-fg-3" />
-          {busy ? "Uploading…" : "Add photo"}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            void pick(e.target.files);
-            e.target.value = "";
-          }}
-        />
-      </div>
-      {error && <SaveError className="mt-1.5">{error}</SaveError>}
-    </div>
   );
 }

@@ -10,10 +10,10 @@ export type { PropertyOption } from "@/lib/picker-options-shape";
  * behind PropertyPicker, UnitPicker and the property filter chips; unit
  * labels only, so lockbox codes never reach the client.
  *
- * `photoUrl` is null until properties carry a front photo (the uploads
- * build); until then the pickers show the House tile.
+ * `photoUrl` is the property's front photo (public Blob); null until one is
+ * set, and the pickers show the House tile.
  */
 export async function propertyOptions(): Promise<PropertyOption[]> {
-  const rows = await prisma.property.findMany({ select: { id: true, address: true, units: true } });
+  const rows = await prisma.property.findMany({ select: { id: true, address: true, units: true, photoUrl: true } });
   return shapePropertyOptions(rows);
 }

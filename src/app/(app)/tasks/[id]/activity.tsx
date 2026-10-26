@@ -3,11 +3,11 @@ import { Fragment, useState } from "react";
 import { Lock } from "lucide-react";
 import { ActivityDay, ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
 import { Avatar } from "@/components/avatar";
+import { FilesList, type FileLink } from "@/components/files-list";
 import { MediaGrid, type MediaItem } from "@/components/media-grid";
 import { TextLink } from "@/components/ui";
 import { groupByDay, splitEarlier } from "@/lib/tasks/activity";
 import { cn } from "@/lib/utils";
-import { FilesList, type FileLink } from "./files-list";
 
 /** One timeline entry, shaped on the server (src/lib/tasks/activity.ts buildActivity). */
 export type ActivityRow =

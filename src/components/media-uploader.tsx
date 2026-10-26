@@ -4,11 +4,14 @@ import { upload } from "@vercel/blob/client";
 import { Camera, ImagePlus, Play, RotateCw, TriangleAlert, X } from "lucide-react";
 import { RetryPill } from "@/components/photo-thumb";
 import { Button } from "@/components/ui";
+import type { UploadTarget } from "@/components/upload-queue";
 import { isOfflineError } from "@/lib/action-result";
 import { usesMultipart, type FileKind } from "@/lib/attachments/content-types";
 import { CAMERA_ACCEPT, checkMediaFile, pickerAccept, shownReason, uploadFailureReason, uploadNotice } from "@/lib/attachments/media";
-import { taskUploadPath } from "@/lib/attachments/paths";
+import { UPLOAD_KIND_ACCESS, uploadRequest, type UploadKind } from "@/lib/attachments/upload-kinds";
 import { cn } from "@/lib/utils";
+
+export type { UploadKind } from "@/lib/attachments/upload-kinds";
 
 /**
  * Photo-and-video-first uploads for a task: the staff composer and the
@@ -32,9 +35,14 @@ import { cn } from "@/lib/utils";
  * useMediaUploader() with <MediaUploadTray> and render `inputs` once.
  * `pending` counts files not yet recorded: hold "Mark done" until it's 0.
  * `failed` counts the red tiles still waiting for a Retry or a Remove.
+ *
+ * `useMediaUploader({ target })` takes an UploadTarget (upload-queue.tsx)
+ * in place of the task options, for every kind the token route serves. The
+ * uploads spec moves this engine onto the shared queue (2.1, UP1): the
+ * target's prepare step, its cap, its whenAway and the thumbnail, poster and
+ * queuedAt fields of RecordMediaInput are part of the contract (build plan
+ * 1.5) and not acted on yet; files go up as picked, as before.
  */
-
-export type UploadKind = "task-upload" | "portal-task-upload";
 
 export type RecordMediaInput = {
   pathname: string;
@@ -42,6 +50,12 @@ export type RecordMediaInput = {
   width?: number;
   height?: number;
   durationSec?: number;
+  /** The ~1024px JPEG made before upload (uploads 2.1), for grids and ready tiles. Both record actions take it. */
+  thumbPathname?: string;
+  /** A video's poster frame, made before upload. */
+  posterPathname?: string;
+  /** When the file joined the queue (ISO), for the late-upload rule after Mark done (question 4). Not sent until the record steps accept it. */
+  queuedAt?: string;
 };
 
 export type RecordMediaResult = { ok: boolean; data?: { id: string }; error?: string };
@@ -56,6 +70,40 @@ export type MediaUploaderOptions = {
   /** Kinds accepted; photos and videos unless widened. */
   allowed?: readonly FileKind[];
 };
+
+/** The same uploader for one queue target: the target names the kind, the row, what it accepts and how it records. */
+export type MediaUploaderTargetOptions = {
+  target: UploadTarget;
+  /** Called whenever the number of unfinished uploads changes. */
+  onPendingChange?: (pending: number) => void;
+};
+
+/** What the engine reads, whichever way it was called. */
+type EngineOptions = {
+  parentId: string;
+  uploadKind: UploadKind;
+  access: "private" | "public";
+  record: (file: RecordMediaInput) => Promise<RecordMediaResult>;
+  onRecorded?: (ids: string[]) => void;
+  onPendingChange?: (pending: number) => void;
+  allowed?: readonly FileKind[];
+};
+
+function engineOptions(o: MediaUploaderOptions | MediaUploaderTargetOptions): EngineOptions {
+  if ("target" in o) {
+    const t = o.target;
+    return {
+      parentId: t.parentId,
+      uploadKind: t.uploadKind,
+      access: t.access,
+      record: t.record,
+      onRecorded: t.onRecorded,
+      onPendingChange: o.onPendingChange,
+      allowed: t.allowed,
+    };
+  }
+  return { ...o, parentId: o.taskId, access: UPLOAD_KIND_ACCESS[o.uploadKind] };
+}
 
 type UploadStatus = "queued" | "uploading" | "saving" | "failed" | "invalid";
 
@@ -114,7 +162,8 @@ type Job = {
   pathname?: string;
 };
 
-export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderApi {
+export function useMediaUploader(input: MediaUploaderOptions | MediaUploaderTargetOptions): MediaUploaderApi {
+  const options = engineOptions(input);
   const [uploads, setUploads] = useState<MediaUpload[]>([]);
   const jobs = useRef(new Map<string, Job>());
   const queue = useRef<string[]>([]);
@@ -153,11 +202,12 @@ export function useMediaUploader(options: MediaUploaderOptions): MediaUploaderAp
       if (!jobs.current.has(key)) return; // removed before any bytes went up
       let pathname = job.pathname;
       if (!pathname) {
-        const { taskId, uploadKind } = latest.current;
-        const blob = await upload(taskUploadPath(taskId, job.file.name, "orig", job.contentType), job.file, {
-          access: "private",
+        const { parentId, uploadKind, access } = latest.current;
+        const request = uploadRequest(uploadKind, parentId, { name: job.file.name, contentType: job.contentType, fileKind: job.fileKind });
+        const blob = await upload(request.pathname, job.file, {
+          access,
           handleUploadUrl: `/api/blob/${uploadKind}`,
-          clientPayload: JSON.stringify({ taskId, fileKind: job.fileKind }),
+          clientPayload: request.clientPayload,
           contentType: job.contentType,
           multipart: usesMultipart(job.file.size),
           abortSignal: controller.signal,
@@ -404,19 +454,27 @@ export function MediaUploader({
  * section 9 Photos), and Remove sits inside the tile's corner.
  * `notice={false}` leaves the red line to the caller, for a screen that
  * shows it under its own button (the contractor's Mark done, from
- * `failedLine`).
+ * `failedLine`, through UploadStatusLine).
+ *
+ * `slots` is the Mark done sheet's proof slots (uploads 2.8, UP1 builds
+ * them): empty camera squares up to the count a playbook asks for, one on an
+ * optional job. Not drawn yet.
  */
 export function MediaUploadTray({
   uploader,
   layout = "row",
   notice: showNotice = true,
+  slots,
   className,
 }: {
   uploader: MediaUploaderApi;
   layout?: "row" | "grid";
   notice?: boolean;
+  /** How many photo slots to keep open (grid only): empty `--fill-1` squares with a Camera, then one add tile once met. */
+  slots?: number;
   className?: string;
 }) {
+  void slots;
   const { uploads, notice, retry, remove } = uploader;
   if (uploads.length === 0) return null;
   const grid = layout === "grid";
@@ -432,21 +490,30 @@ export function MediaUploadTray({
   );
 }
 
-function UploadTile({
+/**
+ * One file on the tray: its preview, the ring while it goes up, the danger
+ * ring with Retry when it didn't, and Remove. `ready` is a file already
+ * recorded and waiting to be sent (the composer's ready tiles, uploads 2.3):
+ * no ring, and its name ends "ready to send".
+ */
+export function UploadTile({
   upload: u,
   grid,
+  ready = false,
   onRetry,
   onRemove,
 }: {
   upload: MediaUpload;
   grid: boolean;
+  ready?: boolean;
   onRetry: () => void;
   onRemove: () => void;
 }) {
   const [broken, setBroken] = useState(false);
   const failed = u.status === "failed" || u.status === "invalid";
-  const state =
-    u.status === "invalid" || u.status === "failed"
+  const state = ready
+    ? "ready to send"
+    : u.status === "invalid" || u.status === "failed"
       ? `couldn't upload: ${shownReason(u.error ?? "")}`
       : u.status === "saving"
         ? "saving"
@@ -478,7 +545,7 @@ function UploadTile({
         {u.kind === "video" && (
           <Play className="absolute bottom-1 left-1 h-3 w-3 fill-on-photo text-on-photo drop-shadow" aria-hidden="true" />
         )}
-        {u.status !== "invalid" && u.status !== "failed" && (
+        {!ready && u.status !== "invalid" && u.status !== "failed" && (
           <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/50">
             <ProgressRing value={u.status === "queued" ? 0 : u.progress} />
           </div>
@@ -525,6 +592,40 @@ function UploadTile({
         <X className="h-3 w-3" aria-hidden="true" />
       </button>
     </li>
+  );
+}
+
+/**
+ * Under the tray or a bar's buttons while any file didn't upload
+ * (docs/brand-guidelines.md, section 9 Photos; uploads 2.3): "2 photos didn't
+ * upload · Retry", Retry going for every tile that can go again. Each tile's
+ * label keeps its reason. A file the check refused (too big, wrong type) can
+ * only be removed, so it gets no Retry; with nothing to retry, the line keeps
+ * the reason ("1 photo didn't upload: over the 25 MB photo limit"), since
+ * it's the only place a sighted user sees why. Nothing while nothing failed.
+ */
+export function UploadStatusLine({ uploader, className }: { uploader: MediaUploaderApi; className?: string }) {
+  if (uploader.failed === 0) return null;
+  const retryable = uploader.uploads.filter((u) => u.status === "failed");
+  const line =
+    (retryable.length > 0 ? uploader.failedLine : uploader.notice) ||
+    `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
+  return (
+    <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-danger", className)}>
+      <span className="truncate">{line}</span>
+      {retryable.length > 0 && (
+        <>
+          <span aria-hidden="true">·</span>
+          <button
+            type="button"
+            onClick={() => retryable.forEach((u) => uploader.retry(u.key))}
+            className="relative shrink-0 font-medium underline decoration-1 underline-offset-3 hover:decoration-2 pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
+          >
+            Retry
+          </button>
+        </>
+      )}
+    </p>
   );
 }
 

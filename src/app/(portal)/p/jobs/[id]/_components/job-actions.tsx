@@ -5,13 +5,7 @@ import { Camera, ImagePlus } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
 import { useHoldLeave, useLeaveGuard } from "@/components/leave-guard";
-import {
-  MediaUploadTray,
-  isGoingUp,
-  useLeaveWarning,
-  useMediaUploader,
-  type MediaUploaderApi,
-} from "@/components/media-uploader";
+import { MediaUploadTray, UploadStatusLine, isGoingUp, useLeaveWarning, useMediaUploader } from "@/components/media-uploader";
 import { Sheet } from "@/components/sheet";
 import { SpotArt } from "@/components/spot-art";
 import { useToast } from "@/components/toast";
@@ -37,8 +31,8 @@ import { markJobDoneAction, postJobUpdateAction, recordJobUploadAction, startJob
  * tab asks first where the browser allows it (iOS Safari never does).
  *
  * Leaving cancels whatever is still going up, so while anything is, "My
- * jobs" and the payoff's "Back to my jobs" ask first in a sheet (the page's
- * LeaveGuard, decision 24). Mark done waits for uploads, and for each failed
+ * jobs" and the payoff's "Back to my jobs" ask first in a sheet (the portal
+ * layout's LeaveGuard, decision 24). Mark done waits for uploads, and for each failed
  * photo to be retried or removed (decision 13): in the bar and in the sheet
  * it stays off over one danger line ("2 photos didn't upload · Retry"), and a
  * failed tile keeps its place with the Retry pill. "Add photos" is off while
@@ -260,7 +254,7 @@ export function JobActions({
             finishingLine ? (
               <p className="text-center text-meta text-fg-3 lg:text-right">{finishingLabel(pending)}</p>
             ) : failed > 0 ? (
-              <FailedUploadsLine uploader={uploader} className="lg:justify-end" />
+              <UploadStatusLine uploader={uploader} className="lg:justify-end" />
             ) : null
           }
         />
@@ -293,7 +287,7 @@ export function JobActions({
                   <span className="truncate">{done.label}</span>
                 </Button>
               </div>
-              <FailedUploadsLine uploader={uploader} className="md:justify-end" />
+              <UploadStatusLine uploader={uploader} className="md:justify-end" />
             </div>
           )
         }
@@ -330,39 +324,6 @@ export function JobActions({
 }
 
 /**
- * Under Mark done while any photo didn't upload (docs/brand-guidelines.md,
- * section 9 Photos): "2 photos didn't upload · Retry", Retry going for every
- * tile that can go again. Each tile's label keeps its reason. A file the check
- * refused (too big, wrong type) can only be removed, so it gets no Retry; with
- * nothing to retry, the line keeps the reason ("1 photo didn't upload: over
- * the 25 MB photo limit"), since it's the only place a sighted user sees why.
- */
-function FailedUploadsLine({ uploader, className }: { uploader: MediaUploaderApi; className?: string }) {
-  if (uploader.failed === 0) return null;
-  const retryable = uploader.uploads.filter((u) => u.status === "failed");
-  const line =
-    (retryable.length > 0 ? uploader.failedLine : uploader.notice) ||
-    `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
-  return (
-    <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-danger", className)}>
-      <span className="truncate">{line}</span>
-      {retryable.length > 0 && (
-        <>
-          <span aria-hidden="true">·</span>
-          <button
-            type="button"
-            onClick={() => retryable.forEach((u) => uploader.retry(u.key))}
-            className="relative shrink-0 font-medium underline decoration-1 underline-offset-3 hover:decoration-2 pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
-          >
-            Retry
-          </button>
-        </>
-      )}
-    </p>
-  );
-}
-
-/**
  * After Mark done (docs/brand-guidelines.md, section 9 Empty and payoff
  * states): the job-done line art, a warm heading, who it went to and what
  * happens next, then the way back to the next job. A payoff tied to a
@@ -375,7 +336,7 @@ function Payoff({ firstName, staffNames }: { firstName: string; staffNames: stri
   // out and Esc still closes the sheet.
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
-  // Through the page's LeaveGuard, like "My jobs": it asks first if anything is still going up.
+  // Through the portal layout's LeaveGuard, like "My jobs": it asks first if anything is still going up.
   const guard = useLeaveGuard();
   const router = useRouter();
   return (

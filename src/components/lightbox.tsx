@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Download, ImageOff, Trash2, X } from "lucide-react";
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { Sheet } from "@/components/sheet";
@@ -25,6 +25,28 @@ export type MediaItem = {
   createdAt: Date | string;
 };
 
+/**
+ * Where an item's bytes are: the original, or its thumbnail or poster.
+ * Task files default to /api/files/task/<id> (taskFileUrl); property files
+ * and public listing photos pass their own (uploads 2.5, G1D-001).
+ */
+export type MediaUrlFor = (item: MediaItem, variant?: "thumb" | "poster") => string;
+
+export const taskMediaUrl: MediaUrlFor = (item, variant) => taskFileUrl(item.id, variant);
+
+/** One action in the viewer's ⋯ menu for an item: a listing's Make cover, "Set as property photo". */
+export type LightboxMenuItem = {
+  id: string;
+  label: string;
+  icon?: ReactNode;
+  /** Delete and Remove: drawn in --danger, last. */
+  destructive?: boolean;
+  onAction: () => void;
+};
+
+/** Which ground the viewer opens on: the app's, the portal's, or the public site's (its overlay root gets data-surface="public"). */
+export type LightboxSurface = "app" | "portal" | "public";
+
 const SWIPE_PX = 50;
 
 /**
@@ -35,6 +57,12 @@ const SWIPE_PX = 50;
  * React Aria Modal: focus trapped, page scroll locked, focus returns to the
  * tile that opened it. With `onDelete` (staff), a Delete button asks first
  * in a Sheet on top, so Esc closes only that.
+ *
+ * `urlFor` points the stage and Download at files outside the task route.
+ * The rest of the uploads spec's viewer (2.6: zoom, documents, `?file=`
+ * links, the ⋯ menu from `menuItems` and `canEdit`, the public `surface` and
+ * its `header`) is UP1's; those props are part of the contract and not drawn
+ * yet.
  */
 export function Lightbox({
   items,
@@ -43,6 +71,11 @@ export function Lightbox({
   isOpen,
   onOpenChange,
   onDelete,
+  urlFor = taskMediaUrl,
+  surface = "app",
+  header,
+  menuItems,
+  canEdit = false,
 }: {
   items: MediaItem[];
   index: number;
@@ -51,7 +84,21 @@ export function Lightbox({
   onOpenChange: (open: boolean) => void;
   /** Removes the item for good; a server action can be passed as is. */
   onDelete?: (id: string) => Promise<ActionResult<unknown>>;
+  /** Where each item's bytes are; task files by default. */
+  urlFor?: MediaUrlFor;
+  /** The ground: "public" from /rentals. */
+  surface?: LightboxSurface;
+  /** Replaces the name and byline: the public viewer's street and rent ("56 Tamarack St · $1,450/mo"). */
+  header?: { title: ReactNode; byline?: ReactNode };
+  /** The ⋯ menu's actions for the item on screen. */
+  menuItems?: (item: MediaItem) => readonly LightboxMenuItem[];
+  /** Staff who may rename and delete here. */
+  canEdit?: boolean;
 }) {
+  void surface;
+  void header;
+  void menuItems;
+  void canEdit;
   const count = items.length;
   const i = Math.min(Math.max(index, 0), Math.max(count - 1, 0));
   const item = items[i];
@@ -107,7 +154,7 @@ export function Lightbox({
                 </span>
               </span>
             )}
-            <a href={taskFileUrl(item.id)} download={item.filename} aria-label="Download" className={stageButton}>
+            <a href={urlFor(item)} download={item.filename} aria-label="Download" className={stageButton}>
               <Download className="h-5 w-5" aria-hidden="true" />
             </a>
             {onDelete && (
@@ -144,7 +191,7 @@ export function Lightbox({
               swipeFrom.current = null;
             }}
           >
-            <Stage key={item.id} item={item} />
+            <Stage key={item.id} item={item} urlFor={urlFor} />
             {canPrev && (
               <AriaButton onPress={() => go(i - 1)} aria-label="Previous" className={cn(stageButton, arrow, "left-2 sm:left-4")}>
                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
@@ -220,14 +267,15 @@ const stageButton =
 const arrow = "absolute top-1/2 -translate-y-1/2 bg-photo-scrim pointer-coarse:hidden";
 
 /** One photo or video, centered and fit to the stage. */
-function Stage({ item }: { item: MediaItem }) {
+function Stage({ item, urlFor }: { item: MediaItem; urlFor: MediaUrlFor }) {
   // An original the browser can't draw (HEIC outside Safari) falls back to the thumbnail, then to a note.
-  const [src, setSrc] = useState<string | null>(taskFileUrl(item.id));
+  const [src, setSrc] = useState<string | null>(urlFor(item));
+  const thumb = item.hasThumb ? urlFor(item, "thumb") : null;
   if (item.kind === "VIDEO") {
     return (
       <video
-        src={taskFileUrl(item.id)}
-        poster={item.hasPoster ? taskFileUrl(item.id, "poster") : undefined}
+        src={urlFor(item)}
+        poster={item.hasPoster ? urlFor(item, "poster") : undefined}
         controls
         playsInline
         preload="metadata"
@@ -250,7 +298,7 @@ function Stage({ item }: { item: MediaItem }) {
       src={src}
       alt={item.filename}
       draggable={false}
-      onError={() => setSrc(src.includes("?v=thumb") || !item.hasThumb ? null : taskFileUrl(item.id, "thumb"))}
+      onError={() => setSrc(!thumb || src === thumb ? null : thumb)}
       className="max-h-full max-w-full select-none object-contain"
     />
   );
