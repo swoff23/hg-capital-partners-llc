@@ -18,6 +18,13 @@ test("CSP: sandboxed everywhere except PDFs, which get default-src 'none' alone"
   assert.equal(fileResponseHeaders({ contentType: "application/pdf", filename: "a.pdf" })["Content-Security-Policy"], "default-src 'none'");
 });
 
+test("the saving link (?download=1) is always an attachment, a video and a PDF included", () => {
+  for (const contentType of ["video/mp4", "application/pdf", "image/jpeg"]) {
+    assert.equal(fileResponseHeaders({ contentType, filename: "a.x" })["Content-Disposition"].startsWith("inline; "), true, contentType);
+    assert.equal(fileResponseHeaders({ contentType, filename: "a.x", download: true })["Content-Disposition"].startsWith("attachment; "), true, contentType);
+  }
+});
+
 test("only images, videos and PDFs open inline; the rest download", () => {
   assert.equal(opensInline("image/jpeg"), true);
   assert.equal(opensInline("video/quicktime"), true);

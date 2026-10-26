@@ -10,7 +10,7 @@ import { callAction } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { cn } from "@/lib/utils";
-import { recordTaskAttachment } from "../actions";
+import { recordTaskAttachment } from "../upload-actions";
 import { addTaskComment, deleteTaskFile } from "./actions";
 
 type Visibility = "SHARED" | "INTERNAL";

@@ -39,7 +39,11 @@ export const dynamic = "force-dynamic";
  * authorized by the row itself. A LINK row has no bytes here (the UI links
  * straight to it), so it's a 404. Videos redirect to a signed Blob URL for
  * that one path, good for 10 minutes, so phones can make Range requests
- * straight to Blob. Headers are in src/lib/attachments/headers.ts.
+ * straight to Blob. `?download=1` is the saving link (the viewer's Download,
+ * uploads 2.6): the file comes through this route as an attachment, a video
+ * included, since a redirect to Blob's host would play in a tab instead of
+ * saving. Headers are in src/lib/attachments/headers.ts. A PDF opens in the
+ * viewer's frame on a desktop (same origin, no X-Frame-Options anywhere).
  */
 
 type Viewer = { kind: "staff" } | { kind: "contractor"; contactId: string };
@@ -155,15 +159,17 @@ export async function GET(req: Request, ctx: RouteContext<"/api/files/[kind]/[id
     return fail("Unauthorized", 401);
   }
 
-  const v = new URL(req.url).searchParams.get("v");
+  const query = new URL(req.url).searchParams;
+  const v = query.get("v");
   if (v !== null && v !== "thumb" && v !== "poster") return fail("Not found", 404);
   const variant: Variant | null = v;
+  const saving = query.get("download") === "1";
 
   const token = getEnv().BLOB_READ_WRITE_TOKEN;
   const file = await lookup(kind, id, variant, viewer, storeIdFromToken(token));
   if (!file) return fail("Not found", 404);
 
-  const isVideo = !variant && normalizeContentType(file.contentType).startsWith("video/");
+  const isVideo = !variant && !saving && normalizeContentType(file.contentType).startsWith("video/");
   if (isVideo && token && file.privatePathname) {
     const location = await signedVideoUrl(file.privatePathname, token);
     if (location) return new NextResponse(null, { status: 302, headers: signedRedirectHeaders(location) });
@@ -191,6 +197,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/files/[kind]/[id
     contentType: file.contentType || blob.headers.get("content-type"),
     filename: file.filename,
     size: blob.headers.get("content-length"),
+    download: saving,
   });
   const contentRange = blob.headers.get("content-range");
   if (isVideo) headers["Accept-Ranges"] = "bytes";

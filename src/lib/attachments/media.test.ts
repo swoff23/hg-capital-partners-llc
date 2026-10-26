@@ -2,7 +2,28 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { BlobServiceNotAvailable } from "@vercel/blob";
 import { contentTypeForName, fileKindForType } from "./content-types";
-import { MEDIA_ACCEPT, checkMediaFile, fmtDuration, pickerAccept, taskFileUrl, uploadFailureReason, uploadNotice } from "./media";
+import {
+  MEDIA_ACCEPT,
+  byline,
+  bylineName,
+  bylineStamp,
+  checkMediaFile,
+  datedName,
+  documentLook,
+  downloadUrl,
+  fmtDuration,
+  isGenericCameraName,
+  pickerAccept,
+  propertyFileUrl,
+  rowReason,
+  storedNames,
+  taskFileUrl,
+  uploadCountPhrase,
+  uploadFailureReason,
+  uploadNotice,
+  uploadSlug,
+  withExtension,
+} from "./media";
 
 const MB = 1024 * 1024;
 
@@ -160,4 +181,134 @@ test("pickerAccept: every document extension it offers is one the upload check a
     .filter((p) => p.startsWith("."));
   assert.ok(exts.length > 0);
   for (const ext of exts) assert.equal(fileKindForType(contentTypeForName(`a${ext}`)), "file", ext);
+});
+
+/* ---------------- Stored names ---------------- */
+
+// Oct 25, 2026 is daylight time: Eastern is UTC-4, so 18:14 UTC is 2:14 PM.
+const AT = Date.UTC(2026, 9, 25, 18, 14, 10);
+
+test("isGenericCameraName: a capture's empty name is generic, a real name never is", () => {
+  for (const name of ["image.jpg", "Image.JPG", "video.mov", "photo.png", "photo (3).jpg", "photo(2).jpg", "picture.heic", "movie.mp4"]) {
+    assert.equal(isGenericCameraName(name), true, name);
+  }
+  for (const name of ["Lease 2026.pdf", "IMG_6117.png", "image-final.jpg", "photo of the roof.jpg", "video call notes.txt", "Photo 2026-10-25 at 2.14 PM.jpg", "image"]) {
+    assert.equal(isGenericCameraName(name), false, name);
+  }
+});
+
+test("datedName: date first, the year in it, a period in the time, Eastern clock", () => {
+  assert.equal(datedName("image", new Date(AT), "jpg"), "Photo 2026-10-25 at 2.14 PM.jpg");
+  assert.equal(datedName("video", new Date(AT), "MOV"), "Video 2026-10-25 at 2.14 PM.mov");
+  assert.equal(datedName("image", new Date(AT), "jpg", 2), "Photo 2026-10-25 at 2.14 PM 2.jpg");
+  assert.ok(!datedName("image", new Date(AT), "jpg").includes(":"), "Windows refuses a colon in a saved name");
+  // 03:05 UTC on the 26th is 11:05 PM on the 25th in Buffalo; midnight is 12.xx AM.
+  assert.equal(datedName("image", new Date(Date.UTC(2026, 9, 26, 3, 5)), "jpg"), "Photo 2026-10-25 at 11.05 PM.jpg");
+  assert.equal(datedName("image", new Date(Date.UTC(2026, 9, 26, 4, 7)), "jpg"), "Photo 2026-10-26 at 12.07 AM.jpg");
+  // After daylight time ends on Nov 1: UTC-5.
+  assert.equal(datedName("image", new Date(Date.UTC(2026, 10, 2, 2, 30)), "jpg"), "Photo 2026-11-01 at 9.30 PM.jpg");
+});
+
+test("storedNames: generic names are dated, real names stay, a second in the same minute is numbered in pick order", () => {
+  const names = storedNames(
+    [
+      { name: "image.jpg", type: "image/jpeg", lastModified: AT },
+      { name: "image.jpg", type: "image/jpeg", lastModified: AT + 20_000 },
+      { name: "image.jpg", type: "image/jpeg", lastModified: AT + 60_000 },
+      { name: "IMG_6117.png", type: "image/png", lastModified: AT },
+      { name: "Lease 2026.pdf", type: "application/pdf", lastModified: AT },
+      { name: "video.mov", type: "video/quicktime", lastModified: AT },
+      { name: "IMG_6117.png", type: "image/png", lastModified: AT },
+    ],
+    new Date(Date.UTC(2027, 0, 1)),
+  );
+  assert.deepEqual(names, [
+    "Photo 2026-10-25 at 2.14 PM.jpg",
+    "Photo 2026-10-25 at 2.14 PM 2.jpg",
+    "Photo 2026-10-25 at 2.15 PM.jpg",
+    "IMG_6117.png",
+    "Lease 2026.pdf",
+    "Video 2026-10-25 at 2.14 PM.mov",
+    "IMG_6117.png",
+  ]);
+});
+
+test("storedNames: no capture time falls back to now, and a nameless file gets an extension from its type", () => {
+  const now = new Date(AT);
+  assert.deepEqual(storedNames([{ name: "image.jpg", type: "image/jpeg" }], now), ["Photo 2026-10-25 at 2.14 PM.jpg"]);
+  assert.deepEqual(storedNames([{ name: "", type: "image/jpeg", lastModified: 0 }], now), ["Photo 2026-10-25 at 2.14 PM.jpg"]);
+  assert.deepEqual(storedNames([{ name: "", type: "video/mp4" }], now), ["Video 2026-10-25 at 2.14 PM.mov"]);
+});
+
+test("withExtension: swaps the extension, or adds one", () => {
+  assert.equal(withExtension("Photo 2026-10-25 at 2.14 PM.heic", "jpg"), "Photo 2026-10-25 at 2.14 PM.jpg");
+  assert.equal(withExtension("Kitchen", "jpg"), "Kitchen.jpg");
+  assert.equal(withExtension("Bid v1.2", "jpg"), "Bid v1.2.jpg");
+});
+
+test("uploadSlug: a dated name is a lowercase slug, anything else is the usual safe name", () => {
+  assert.equal(uploadSlug("Photo 2026-10-25 at 2.14 PM.jpg"), "photo-2026-10-25-214pm.jpg");
+  assert.equal(uploadSlug("Photo 2026-10-25 at 2.14 PM 2.jpg"), "photo-2026-10-25-214pm-2.jpg");
+  assert.equal(uploadSlug("Video 2026-10-25 at 11.05 PM.MOV"), "video-2026-10-25-1105pm.mov");
+  assert.equal(uploadSlug("Kitchen (after) é.HEIC"), "Kitchen-after-e.heic");
+  assert.equal(uploadSlug("Lease 2026.pdf"), "Lease-2026.pdf");
+});
+
+test("uploadCountPhrase: photos and videos by name, a mix with documents is files", () => {
+  assert.equal(uploadCountPhrase(["image"]), "1 photo");
+  assert.equal(uploadCountPhrase(["image", "image", "image"]), "3 photos");
+  assert.equal(uploadCountPhrase(["video"]), "1 video");
+  assert.equal(uploadCountPhrase(["image", "image", "image", "video"]), "3 photos and 1 video");
+  assert.equal(uploadCountPhrase(["image", "file"]), "2 files");
+  assert.equal(uploadCountPhrase(["file"]), "1 file");
+  assert.equal(uploadCountPhrase([null, "image"]), "2 files");
+});
+
+test("documentLook: a type label and a glyph for a document tile or row", () => {
+  assert.deepEqual(documentLook("Lease 2026.pdf"), { label: "PDF", glyph: "text" });
+  assert.deepEqual(documentLook("Rent roll Sep.xlsx"), { label: "XLSX", glyph: "sheet" });
+  assert.deepEqual(documentLook("export.csv"), { label: "CSV", glyph: "sheet" });
+  assert.deepEqual(documentLook("Insurance card.jpeg"), { label: "JPG", glyph: "image" });
+  assert.deepEqual(documentLook("IMG_0003.HEIC"), { label: "HEIC", glyph: "image" });
+  assert.deepEqual(documentLook("notes"), { label: "FILE", glyph: "text" });
+});
+
+test("bylineStamp: the brand's date in Buffalo time, the year only when it isn't this year", () => {
+  const now = new Date("2026-10-25T18:00:00Z");
+  assert.equal(bylineStamp("2026-10-03T18:14:00Z", { now }), "Oct 3");
+  assert.equal(bylineStamp("2026-10-03T18:14:00Z", { now, time: true }), "Oct 3, 2:14 PM");
+  assert.equal(bylineStamp(new Date("2025-10-03T18:14:00Z"), { now }), "Oct 3, 2025");
+  // 02:30 UTC on the 4th is 10:30 PM on the 3rd in Buffalo.
+  assert.equal(bylineStamp("2026-10-04T02:30:00Z", { now, time: true }), "Oct 3, 10:30 PM");
+  assert.equal(bylineStamp(null), "");
+  assert.equal(bylineStamp("not a date"), "");
+});
+
+test("rowReason: a file row's words for why a file didn't go up", () => {
+  assert.equal(rowReason("no connection"), "No connection");
+  assert.equal(rowReason("over the 50 MB file limit"), "Over the 50 MB limit");
+  assert.equal(rowReason("over the 25 MB photo limit"), "Over the 25 MB limit");
+  assert.equal(rowReason("only photos and documents can be added here"), "This type can't be added");
+  assert.equal(rowReason("the file is empty"), "The file is empty");
+  assert.equal(rowReason("Failed to retrieve the client token"), "The upload was refused. Reload and try again");
+  assert.equal(rowReason(""), "Didn't upload");
+  assert.equal(rowReason(undefined), "Didn't upload");
+});
+
+test("byline: who and when, either alone when the other is missing", () => {
+  const now = new Date("2026-10-25T18:00:00Z");
+  assert.equal(bylineName("Connor Swofford"), "Connor");
+  assert.equal(bylineName("  Zack  "), "Zack");
+  assert.equal(bylineName("pieter@hg.test"), "pieter@hg.test");
+  assert.equal(bylineName(null), "");
+  assert.equal(byline("Connor Swofford", "2026-10-03T18:14:00Z", { now }), "Connor · Oct 3");
+  assert.equal(byline(null, "2026-10-03T18:14:00Z", { now }), "Oct 3");
+  assert.equal(byline("Connor", null), "Connor");
+  assert.equal(byline(null, null), "");
+});
+
+test("file urls: the gated routes, and a saving link", () => {
+  assert.equal(propertyFileUrl("p1"), "/api/files/property/p1");
+  assert.equal(downloadUrl("/api/files/task/abc"), "/api/files/task/abc?download=1");
+  assert.equal(downloadUrl("/api/files/task/abc?v=thumb"), "/api/files/task/abc?v=thumb&download=1");
 });

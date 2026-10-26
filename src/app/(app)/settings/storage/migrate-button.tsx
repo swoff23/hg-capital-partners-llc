@@ -5,7 +5,8 @@ import { callAction } from "@/lib/action-result";
 import type { MigrationReport } from "@/lib/attachments/migrate";
 import { moveDocumentsToPrivate } from "./actions";
 
-export function MigrateButton({ disabled }: { disabled: boolean }) {
+/** Moves the public documents into private storage. The label stays while it works; the button shows the spinner (forms 2.7). */
+export function MigrateButton() {
   const [pending, start] = useTransition();
   const [report, setReport] = useState<MigrationReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +15,7 @@ export function MigrateButton({ disabled }: { disabled: boolean }) {
     <div className="space-y-2">
       <Button
         size="sm"
-        disabled={disabled || pending}
+        pending={pending}
         onClick={() =>
           start(async () => {
             setError(null);
@@ -25,7 +26,7 @@ export function MigrateButton({ disabled }: { disabled: boolean }) {
           })
         }
       >
-        {pending ? "Moving…" : "Move documents to private storage"}
+        Move documents to private storage
       </Button>
       {error && <p className="text-meta text-danger">{error}</p>}
       {report && (

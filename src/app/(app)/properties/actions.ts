@@ -40,22 +40,6 @@ export async function syncPropertyReminders(propertyId: string) {
   });
 }
 
-/* ---------------- Documents (files in Vercel Blob) ---------------- */
-
-export async function recordPropertyAttachment(propertyId: string, data: properties.AttachmentInput) {
-  return withLog("recordPropertyAttachment", async () => {
-    await requireUser();
-    await properties.recordPropertyAttachment(propertyId, data);
-  });
-}
-
-export async function deletePropertyAttachment(attachmentId: string) {
-  return withLog("deletePropertyAttachment", async () => {
-    await requireUser();
-    await properties.deletePropertyAttachment(attachmentId);
-  });
-}
-
 /* ---------------- Whole-blob editors (return an ActionResult) ---------------- */
 
 const unitSchema = z.object({
