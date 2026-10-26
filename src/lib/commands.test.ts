@@ -85,21 +85,21 @@ test("pageContext reads the record page from the path, never the create forms", 
   assert.equal(pageContext("/properties/abc/edit"), null);
 });
 
-test("createCommands: three everywhere, and the record's own lead on its page", () => {
+test("createCommands: four everywhere, and the record's own lead on its page", () => {
   assert.deepEqual(
     createCommands(null).map((c) => c.label),
-    ["New task", "New deal", "New property"],
+    ["New task", "New deal", "New property", "New contractor"],
   );
 
   const onProperty = createCommands({ kind: "property", id: "p 1" }, "767 Prospect Ave");
-  assert.deepEqual(onProperty.map((c) => c.label), ["New task", "Apply playbook", "New deal", "New property"]);
+  assert.deepEqual(onProperty.map((c) => c.label), ["New task", "Apply playbook", "New deal", "New property", "New contractor"]);
   assert.equal(onProperty[0].href, "/tasks/new?propertyId=p%201");
   assert.equal(onProperty[1].href, "/templates?property=p%201");
   assert.equal(onProperty[0].place, "767 Prospect Ave");
   assert.equal(onProperty[1].place, "767 Prospect Ave");
 
   const onDeal = createCommands({ kind: "deal", id: "d1" }, "99 Prospect Ave");
-  assert.deepEqual(onDeal.map((c) => c.label), ["New task", "New deal", "New property"]);
+  assert.deepEqual(onDeal.map((c) => c.label), ["New task", "New deal", "New property", "New contractor"]);
   assert.equal(onDeal[0].href, "/tasks/new?dealId=d1");
   assert.equal(onDeal[0].place, "99 Prospect Ave");
 });

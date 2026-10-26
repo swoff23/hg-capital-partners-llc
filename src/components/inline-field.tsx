@@ -34,6 +34,7 @@ import { conflictKeepLabel, conflictValueLine, type ActionResult } from "@/lib/a
 import { fmtDay, todayYmdEastern } from "@/lib/dates";
 import {
   decideInlineEdit,
+  headingSave,
   inlineSavedMessage,
   inlineShown,
   numberKindOf,
@@ -677,6 +678,14 @@ function TextFact(props: InlineFieldProps) {
 // The page's h1 on the title token, editable or not. font-semibold repeats the token's weight so a caller's size override (the task title) keeps it.
 const headingText = "rounded-md px-2 py-1 pr-6 text-title font-semibold text-fg-1";
 
+/** Whether a combobox's list is open and drawn: AddressCombobox keeps an empty list open but hidden. */
+function listOnScreen(input: HTMLElement): boolean {
+  if (input.getAttribute("aria-expanded") !== "true") return false;
+  const id = input.getAttribute("aria-controls");
+  const list = id ? document.getElementById(id) : null;
+  return !!list && list.getClientRects().length > 0;
+}
+
 /**
  * The page's h1: the address of a property or a deal, a task's title, a
  * contractor's name. A click opens the field in place (a bordered address
@@ -745,7 +754,9 @@ function HeadingFact(props: InlineFieldProps) {
       setProblem(d.message);
       return false;
     }
-    if (d.kind === "same" && !force) {
+    // An address saves tidied (headingSave), and typing that tidies to the saved address is no edit.
+    const next = d.kind === "save" ? headingSave(d.value, value, { address: !!address }) : null;
+    if (next === null && !force) {
       save.reset();
       leave();
       return true;
@@ -753,7 +764,8 @@ function HeadingFact(props: InlineFieldProps) {
     const sheet = mode === "sheet";
     if (!sheet) leave();
     setProblem(null);
-    save.start(d.value, force?.expected ?? value, {
+    // With "Save mine" an unchanged draft still saves: the saved value, or the tidied one, which is it.
+    save.start(next ?? (d.kind === "save" ? value : d.value), force?.expected ?? value, {
       failed: () => {
         setDraft(d.value);
         closing.current = false;
@@ -787,8 +799,9 @@ function HeadingFact(props: InlineFieldProps) {
   function onKeyDown(e: KeyboardEvent<HTMLElement>) {
     if (e.nativeEvent.isComposing) return;
     // The address field's list is a layer of its own: Esc closes it first, and Enter on a highlighted
-    // suggestion picks it (one Esc, one layer), before either reaches the field.
-    const listOpen = (e.target as HTMLElement).getAttribute("aria-expanded") === "true";
+    // suggestion picks it (one Esc, one layer), before either reaches the field. Under 3 characters
+    // the list is open but empty and out of sight (AddressCombobox), so it is no layer to close.
+    const listOpen = listOnScreen(e.target as HTMLElement);
     if (e.key === "Escape") {
       if (listOpen) return;
       e.preventDefault();
@@ -832,6 +845,8 @@ function HeadingFact(props: InlineFieldProps) {
           onChange={changed}
           isInvalid={!!problem}
           errorMessage={problem ?? undefined}
+          // Leaving the field inside the sheet says how it will save; in place, leaving saves.
+          showSavesAs
         />
       ) : (
         <FormField label={label} hideLabel error={problem ?? undefined}>

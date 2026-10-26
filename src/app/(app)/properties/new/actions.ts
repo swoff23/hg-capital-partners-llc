@@ -31,14 +31,15 @@ export type CreatedProperty = { id: string; address: string };
 
 export async function createProperty(formData: FormData): Promise<ActionResult<CreatedProperty>> {
   return withResult("createProperty", async () => {
-    await requireUser();
+    const user = await requireUser();
     const p = propertySchema.parse(formToObject(formData));
     const taken = (street: string) =>
       new z.ZodError([{ code: "custom", path: ["address"], message: `${street} is already a property.`, input: p.address }]);
     // The same test the field's "is already a property" line runs, so what it warned about is what's refused.
     const { match } = await runAddresses(prisma, { q: p.address, kind: "property" });
     if (match) throw taken(match.street);
-    const r = await properties.createProperty({ address: tidyAddress(p.address), llcOwner: p.llcOwner });
+    // The creator is the record's first editor (updatedByUserId), so a later refusal can name them.
+    const r = await properties.createProperty({ address: tidyAddress(p.address), llcOwner: p.llcOwner }, user);
     if (r.duplicateOf) throw taken(splitAddress(r.duplicateOf.address).street);
     return { id: r.property.id, address: r.property.address };
   });

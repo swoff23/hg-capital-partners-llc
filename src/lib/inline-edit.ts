@@ -12,6 +12,7 @@
  * silently, so a draft that is too short stays open with its reason.
  */
 
+import { tidyAddress } from "@/lib/address-suggestions";
 import { PHONE_INVALID, readPhone } from "@/lib/contractors/contact-fields";
 import { fmtDay } from "@/lib/dates";
 import { parseAmount, readNumber, type NumberKind } from "@/lib/money";
@@ -102,6 +103,18 @@ export function inlineProblem(kind: InlineKind, text: string, opts: { allowText?
 
 /** What leaving a fact decides: no change, a draft that can't be read (and why), or the text to save. `value` is the draft once tidied. */
 export type InlineDecision = { kind: "same"; value: string } | { kind: "problem"; message: string; value: string } | { kind: "save"; value: string };
+
+/**
+ * What a heading saves, after `decideInlineEdit` said to save: an address as
+ * `tidyAddress` writes it (the "Saves as" line's promise), so the page, the
+ * toast and Undo's expected value read what is stored. Null when that is the
+ * saved value already: "767 prospect avenue" over a stored "767 Prospect Ave"
+ * is no edit.
+ */
+export function headingSave(value: string, current: string, opts: { address?: boolean } = {}): string | null {
+  const next = opts.address ? tidyAddress(value) : value;
+  return next === current ? null : next;
+}
 
 /** Line endings as "\n" and the ends trimmed: what a textarea hands back on any platform. */
 const tidyBlock = (s: string) => s.replace(/\r\n?/g, "\n").trim();

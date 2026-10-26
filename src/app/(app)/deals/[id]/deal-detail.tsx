@@ -105,7 +105,7 @@ export function DealListingLink({ id, value }: { id: string; value: string | nul
       label={DEAL_FIELD_LABEL.sourceUrl}
       kind="url"
       value={value}
-      empty="Add listing URL"
+      empty="Add listing link"
       trailing={
         value ? (
           <a

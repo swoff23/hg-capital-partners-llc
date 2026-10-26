@@ -67,6 +67,7 @@ export function createCommands(context: PageContext, place?: string): Command[] 
   const newTask: Command = { id: "create-task", kind: "create", label: "New task", href: "/tasks/new", icon: "create" };
   const newDeal: Command = { id: "create-deal", kind: "create", label: "New deal", href: "/deals/new", icon: "create" };
   const newProperty: Command = { id: "create-property", kind: "create", label: "New property", href: "/properties/new", icon: "create" };
+  const newContractor: Command = { id: "create-contractor", kind: "create", label: "New contractor", href: "/contractors/new", icon: "create" };
   if (context?.kind === "property") {
     const id = encodeURIComponent(context.id);
     const here = place ?? "This property";
@@ -75,13 +76,14 @@ export function createCommands(context: PageContext, place?: string): Command[] 
       { id: "create-playbook", kind: "create", label: "Apply playbook", href: `/templates?property=${id}`, icon: "create", place: here },
       newDeal,
       newProperty,
+      newContractor,
     ];
   }
   if (context?.kind === "deal") {
     const id = encodeURIComponent(context.id);
-    return [{ ...newTask, href: `/tasks/new?dealId=${id}`, place: place ?? "This deal" }, newDeal, newProperty];
+    return [{ ...newTask, href: `/tasks/new?dealId=${id}`, place: place ?? "This deal" }, newDeal, newProperty, newContractor];
   }
-  return [newTask, newDeal, newProperty];
+  return [newTask, newDeal, newProperty, newContractor];
 }
 
 const norm = (s: string) => foldAccents(s).toLowerCase();

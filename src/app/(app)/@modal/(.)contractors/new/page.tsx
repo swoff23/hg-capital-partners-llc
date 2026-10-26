@@ -1,16 +1,11 @@
-import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { tradeOptions } from "../../../contractors/query";
-import { NewContractorSheet } from "../../../contractors/new/new-contractor-sheet";
+import { SheetRoute } from "@/components/create-form";
+import { NewContractorScreen } from "../../../contractors/new/new-contractor-screen";
 
-/**
- * New contractor over the page it was opened from (forms 3, intercepting
- * routes in the `@modal` slot): a click opens it as a sheet, and Back closes
- * it. A pasted link or a reload never gets here; it opens
- * `contractors/new/page.tsx`, the same form on a page.
- */
-export default async function NewContractorModal() {
-  await requireUser();
-  const everyone = await prisma.contact.findMany({ select: { trades: true } });
-  return <NewContractorSheet trades={tradeOptions(everyone).map((t) => t.label)} />;
+/** New contractor as a sheet over the page the link was clicked on: an intercepted soft navigation to `/contractors/new`. A pasted link or a reload gets `contractors/new/page.tsx`. */
+export default function NewContractorSheet() {
+  return (
+    <SheetRoute path="/contractors/new">
+      <NewContractorScreen variant="sheet" />
+    </SheetRoute>
+  );
 }

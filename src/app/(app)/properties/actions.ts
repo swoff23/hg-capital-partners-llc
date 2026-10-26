@@ -1,41 +1,16 @@
 "use server";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
-import { formToObject } from "@/lib/forms";
 import type { ActionResult } from "@/lib/action-result";
 import { withLog, withResult } from "@/lib/server-action";
 import * as properties from "@/lib/properties/service";
 import { staffPrincipal } from "@/lib/tasks/service";
 
 /**
- * Thin server actions: authenticate, validate, call the property service,
- * redirect. Everything that touches the database lives in
- * src/lib/properties/service.ts.
+ * Thin server actions: authenticate, validate, call the property service.
+ * Everything that touches the database lives in src/lib/properties/service.ts.
+ * New property's create is `properties/new/actions.ts`.
  */
-
-const propertySchema = z.object({
-  address: z.string().min(4),
-  llcOwner: z.string().optional(),
-  status: z.string().optional(),
-});
-
-/** The property an address already belongs to, for the New property form to point at. */
-export type ExistingProperty = { id: string; address: string };
-
-/**
- * Creates the property and opens it. When the address is already a property,
- * nothing is saved and that property comes back, so the form keeps what was typed.
- */
-export async function createProperty(formData: FormData): Promise<ActionResult<{ duplicateOf: ExistingProperty }>> {
-  return withResult("createProperty", async () => {
-    const user = await requireUser();
-    const p = propertySchema.parse(formToObject(formData));
-    const r = await properties.createProperty(p, user);
-    if (r.duplicateOf) return { duplicateOf: { id: r.duplicateOf.id, address: r.duplicateOf.address } };
-    redirect(`/properties/${r.property.id}`);
-  });
-}
 
 const fieldsSchema = z.record(z.string(), z.string());
 

@@ -7,7 +7,7 @@ type PropertyStatusName = (typeof PROPERTY_STATUSES)[number];
 
 /*
  * The property lifecycle on the status ring (docs/brand-guidelines.md,
- * section 9), as deal stages do it (deals/stage-select.tsx): StatusMark's
+ * section 9), as deal stages do it (components/deal-stage.tsx): StatusMark's
  * stage variant fills the ring in lifecycle order, in --fg-2. Rehabbing is a
  * quarter, Refinancing half, Refinanced three-quarters and Stabilized full;
  * Sold is the check in --ok. Hold is the pause bars and Flip the clock hands,

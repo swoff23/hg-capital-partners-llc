@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { AddressCombobox } from "@/components/address-combobox";
 import { CreateForm } from "@/components/create-form";
 import { DealStageMark } from "@/components/deal-stage";
-import { NumberInput } from "@/components/number-input";
+import { NumberInput, numberHelper } from "@/components/number-input";
 import type { OptionItem } from "@/components/option-list";
 import { Select } from "@/components/select";
 import { useToast } from "@/components/toast";
@@ -107,7 +107,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
               set({ address });
             }}
             // A pasted listing link goes to Listing link, and a Zillow link's street becomes the address.
-            linkTarget="Listing link"
+            linkTarget={DEAL_FIELD_LABEL.sourceUrl}
             onLink={(link) => {
               clear("address");
               set({ sourceUrl: withScheme(link), address: addressFromListingLink(link) ?? values.address });
@@ -132,7 +132,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
           <Section as="h3" title="Details (optional)">
             <div className="space-y-4">
               <FieldRow>
-                <FormField label={DEAL_FIELD_LABEL.theirPrice} error={errors.theirPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.theirPrice} helper={numberHelper("money", values.theirPriceRaw, { allowText: true })} error={errors.theirPriceRaw}>
                   {(p) => (
                     <NumberInput
                       {...p}
@@ -147,7 +147,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
                     />
                   )}
                 </FormField>
-                <FormField label={DEAL_FIELD_LABEL.ourPrice} error={errors.ourPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.ourPrice} helper={numberHelper("money", values.ourPriceRaw, { allowText: true })} error={errors.ourPriceRaw}>
                   {(p) => (
                     <NumberInput
                       {...p}
@@ -179,7 +179,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
                 )}
               </FormField>
 
-              <FormField label="Listing link" error={errors.sourceUrl}>
+              <FormField label={DEAL_FIELD_LABEL.sourceUrl} error={errors.sourceUrl}>
                 {(p) => (
                   <Input
                     {...p}

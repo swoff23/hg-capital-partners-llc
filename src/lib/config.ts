@@ -63,7 +63,7 @@ export const DEAL_FIELD_LABEL = {
   taxes: "Taxes",
   priority: "Priority",
   passReason: "Pass reason",
-  sourceUrl: "Listing URL",
+  sourceUrl: "Listing link",
   nextAction: "Next action",
   nextActionDue: "Next action due",
   latestNote: "Latest note",

@@ -4,6 +4,7 @@ import {
   EMAIL_MESSAGE,
   URL_MESSAGE,
   decideInlineEdit,
+  headingSave,
   inlineEdit,
   inlineEditCommit,
   inlineProblem,
@@ -189,4 +190,12 @@ test("inlineEditCommit: too short or blank reverts", () => {
   assert.equal(inlineEditCommit("   ", "Fix front steps"), null);
   assert.equal(inlineEditCommit("A", "Fix front steps", 2), null);
   assert.equal(inlineEditCommit("Ab", "Fix front steps", 2), "Ab");
+});
+
+test("headingSave: an address saves tidied, and typing that tidies to the saved one is no edit", () => {
+  assert.equal(headingSave("767 prospect avenue buffalo ny 14209", "12 Elm St", { address: true }), "767 Prospect Ave, Buffalo, NY 14209");
+  assert.equal(headingSave("767 prospect ave, buffalo, ny 14209", "767 Prospect Ave, Buffalo, NY 14209", { address: true }), null);
+  // A task title or a name saves as decided, its case kept.
+  assert.equal(headingSave("call prospect avenue", "Call", {}), "call prospect avenue");
+  assert.equal(headingSave("Same", "Same"), null);
 });

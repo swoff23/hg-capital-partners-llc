@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ScopeButton } from "@/components/filter-bar";
-import { Badge, PageHeader, Table, Td, Th, EmptyState, textLinkClass } from "@/components/ui";
+import { Badge, LinkButton, PageHeader, Table, Td, Th, EmptyState, chromeIconClass, textLinkClass } from "@/components/ui";
 import { cleanTrades, docOnFile, telHref } from "@/lib/contacts";
 import { cn } from "@/lib/utils";
 import { ContactLink } from "./contact-link";
@@ -46,6 +47,13 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
         title="Contractors"
         // The count says why it changed: "4 of 52 contractors" while a search or a filter is on.
         subtitle={narrowed ? `${contacts.length} of ${total} contractors` : `${total} contractor${total === 1 ? "" : "s"}`}
+        // Opens the New contractor sheet over the list (forms 4.6); a pasted link gets the same form as a page.
+        actions={
+          <LinkButton href="/contractors/new" variant="primary">
+            <Plus aria-hidden="true" className={chromeIconClass} />
+            New contractor
+          </LinkButton>
+        }
       />
       <ContractorFilters data={{ trades, shown: contacts.length, hidden: total - contacts.length, filtered: narrowed }}>
         {contacts.length === 0 ? (
