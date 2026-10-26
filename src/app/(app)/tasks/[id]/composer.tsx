@@ -5,6 +5,7 @@ import { MediaUploadTray, useMediaUploader } from "@/components/media-uploader";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useToast, useToastInset } from "@/components/toast";
 import { Button, Kbd, buttonClass } from "@/components/ui";
+import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { callAction } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
@@ -48,13 +49,6 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-/* ---------------- The send keys ---------------- */
-
-// Apple keyboards print ⌘ for the key that sends; everyone else presses Ctrl.
-// The server render prints ⌘ and the client corrects it after hydration.
-const neverChanges = () => () => {};
-const onApple = () => /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
-
 /* ---------------- Composer ---------------- */
 
 /** A file that's uploaded and waiting to go out with the message. */
@@ -68,8 +62,8 @@ export type ComposerDraft = { id: string; filename: string };
  * dropped and go out with the message; Send waits for them. Until Send
  * they're Internal whichever side is picked (core.addComment gives them the
  * message's visibility), and the page hands back any left from an earlier
- * visit as `drafts`. Cmd or Ctrl+Enter sends, printed beside Send for a
- * mouse. On a phone it sits on the bottom edge, its contents on the 16px
+ * visit as `drafts`. Cmd or Ctrl+Enter sends, printed inside Send at its
+ * trailing edge for a mouse ("Send ⌘↵"). On a phone it sits on the bottom edge, its contents on the 16px
  * page gutter, and its tools show while you write. `quietSend` makes Send
  * secondary while the Review banner's Approve is the page's next step.
  */
@@ -96,7 +90,7 @@ export function Composer({
     () => readDraft(taskId),
     () => "",
   );
-  const apple = useSyncExternalStore(neverChanges, onApple, () => true);
+  const mod = useModKey();
   const [visibility, setVisibility] = useState<Visibility>("SHARED");
   // Recorded here but not yet in `drafts` (the page catches up after the
   // refresh), and ids sent or removed, which a stale `drafts` mustn't bring back.
@@ -178,9 +172,24 @@ export function Composer({
   // Internal stays open too, so the switch back is never hidden.
   const active = text.length > 0 || ready.length > 0 || uploader.uploads.length > 0 || internal;
 
+  // The keys that send from the text box sit inside the button, at its trailing edge, for a mouse: Kbd
+  // hides on touch, and here below md and in a narrow column, so Send is just "Send" there. The button
+  // carries the shortcut for assistive tech; the printed keys stay out of its name. On the ink fill the
+  // keys drop their keycap, and on the quiet (secondary) Send they keep it.
   const sendButton = (className: string) => (
-    <Button type="button" variant={quietSend ? "secondary" : "primary"} size="sm" disabled={!canSend} onClick={send} className={className}>
+    <Button
+      type="button"
+      variant={quietSend ? "secondary" : "primary"}
+      size="sm"
+      disabled={!canSend}
+      onClick={send}
+      aria-keyshortcuts="Meta+Enter Control+Enter"
+      className={className}
+    >
       {sending ? "Sending…" : "Send"}
+      <Kbd tone={quietSend ? undefined : "act"} aria-hidden="true" className="max-md:hidden @max-md/composer:hidden">
+        {shortcutLabel(mod, "↵")}
+      </Kbd>
     </Button>
   );
 
@@ -278,10 +287,6 @@ export function Composer({
             { key: "INTERNAL", label: "Internal" },
           ]}
         />
-        {/* The keys that send from the text box, printed for a mouse; Kbd hides on touch. */}
-        <Kbd aria-hidden="true" className="ml-1 shrink-0 whitespace-nowrap max-md:hidden @max-md/composer:hidden">
-          {apple ? "⌘↵" : "Ctrl ↵"}
-        </Kbd>
         {sendButton("hidden md:inline-flex")}
       </div>
     </div>

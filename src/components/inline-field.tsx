@@ -119,6 +119,13 @@ export type InlineFieldProps = {
   ripple?: string | ((next: string) => string | undefined);
   /** The toast's line, when "Rate set to 6.875%" isn't how it reads ("Item renamed"). */
   message?: (next: string) => string;
+  /**
+   * The key the save's toast goes under. Each field has its own by default, so
+   * its edits replace one another. Give a toast of yours the same key to
+   * replace this one: a checklist item's removal takes the stale "Item renamed"
+   * Undo off the screen with it.
+   */
+  toastKey?: string;
   /** Shows the value as a code that copies on one tap (a loan, policy or lockbox number); opened with `onRequest`. */
   code?: string;
   /** `heading`: the address field with suggestions and the duplicate line, for a property's or a deal's address. */
@@ -138,7 +145,7 @@ export type InlineFieldProps = {
 /* ---------------- Shared: the save ---------------- */
 
 /** What saves a fact: the optimistic value, the toast with Undo, and the refusal to show. */
-function useFactSave(p: Pick<InlineFieldProps, "kind" | "label" | "value" | "onSave" | "unit" | "options" | "ripple" | "message" | "allowText">) {
+function useFactSave(p: Pick<InlineFieldProps, "kind" | "label" | "value" | "onSave" | "unit" | "options" | "ripple" | "message" | "allowText" | "toastKey">) {
   const run = useRun();
   const key = useId();
   const [shown, setShown] = useOptimistic(p.value);
@@ -152,7 +159,7 @@ function useFactSave(p: Pick<InlineFieldProps, "kind" | "label" | "value" | "onS
       succeeded: after.succeeded,
       done: p.message?.(next) ?? inlineSavedMessage(p.label, p.kind, next, { unit: p.unit, label: labelOf }),
       ...(detail ? { detail } : {}),
-      key: `fact:${key}`,
+      key: p.toastKey ?? `fact:${key}`,
       // Back to what it was, expecting what it is now: the stored form of what was typed ("290k" is stored as 290000).
       undo: () => p.onSave(expected, storedText(p.kind, next, { allowText: p.allowText })),
       failure: "inline",
@@ -665,7 +672,9 @@ function TextFact(props: InlineFieldProps) {
           </Button>
           <Button size="sm" onClick={() => commit(save.conflict ? { expected: theirsText() } : undefined)} aria-keyshortcuts="Meta+Enter Control+Enter">
             Save
-            <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>
+            <Kbd tone="act" aria-hidden="true">
+              {shortcutLabel(mod, "↵")}
+            </Kbd>
           </Button>
         </div>
       )}

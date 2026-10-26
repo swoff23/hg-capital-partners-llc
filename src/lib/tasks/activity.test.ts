@@ -46,6 +46,22 @@ test("system events read as one sentence, people by first name", () => {
   assert.equal(line(ev("CREATED", {}, { actorLabel: "Property reminder", actorUserId: null })), "Property reminder created this task");
 });
 
+test("checklist edits read as what was done, not as a tick", () => {
+  const line = (data: Record<string, unknown>) => eventLine(ev("CHECKLIST", data), names, TODAY).text;
+  assert.equal(line({ action: "renamed", itemId: "i1", title: "Bravo", from: "Alpha", to: "Bravo" }), "Connor renamed “Alpha” to “Bravo”");
+  assert.equal(line({ action: "removed", itemId: "i1", title: "Alpha", from: "Alpha", to: null }), "Connor removed “Alpha”");
+  assert.equal(line({ action: "restored", itemId: "i1", title: "Alpha", from: null, to: "Alpha" }), "Connor put back “Alpha”");
+  // An older or partial event still reads, with no quotes to show.
+  assert.equal(line({ action: "renamed", title: "Bravo" }), "Connor renamed “Bravo”");
+  assert.equal(line({ action: "removed" }), "Connor removed an item");
+  assert.equal(line({ action: "restored" }), "Connor put back an item");
+  // Ticks keep their lines, and an action wins over a stray `done`.
+  assert.equal(line({ action: "removed", title: "demo", done: true }), "Connor removed “demo”");
+  assert.equal(line({ title: "demo", done: true }), "Connor checked “demo”");
+  assert.equal(line({ title: "demo", done: false }), "Connor unchecked “demo”");
+  assert.equal(line({ title: "demo" }), "Connor updated “demo”");
+});
+
 test("a repeat's next copy links to it", () => {
   const out = eventLine(ev("REPEAT_CREATED", { next: "t2", due: "2026-11-20" }, { actorLabel: "Repeats", actorUserId: null }), names, TODAY);
   assert.deepEqual(out, { text: "Next repeat created, due Fri, Nov 20", href: "/tasks/t2" });

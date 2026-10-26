@@ -266,12 +266,20 @@ export function AddRow({
 
 /* ---------------- Kbd ----------------
    A printed shortcut: "Esc", "⌘K". Touch screens get the same actions as
-   visible buttons, so the keycap hides there. */
+   visible buttons, so the keycap hides there. A shortcut prints inside the
+   button it triggers, at the trailing edge after the label ("Send ⌘↵",
+   "Cancel Esc"), and the button carries aria-keyshortcuts while the keys are
+   aria-hidden. On a secondary button the keys keep the keycap above. On a
+   primary (--act) button, where a light keycap would glare, pass
+   tone="act": no ground and no edge, just the button's own --on-act at 70%
+   (8.5:1 on the ink and 6.9:1 on its hover in light; 6.3:1 and 5.6:1 in
+   dark), set 2px further from the label. */
 export const kbdClass =
   "inline-flex h-5 min-w-5 items-center justify-center rounded-sm border border-line-strong bg-fill-1 px-1 font-mono text-micro text-fg-3 pointer-coarse:hidden";
+export const kbdActClass = "ml-0.5 inline-flex h-5 items-center font-mono text-micro text-on-act/70 pointer-coarse:hidden";
 
-export function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
-  return <kbd className={cn(kbdClass, className)} {...props} />;
+export function Kbd({ tone, className, ...props }: React.ComponentProps<"kbd"> & { tone?: "act" }) {
+  return <kbd className={cn(tone === "act" ? kbdActClass : kbdClass, className)} {...props} />;
 }
 
 /* ---------------- Tag ----------------

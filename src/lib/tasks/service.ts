@@ -24,7 +24,7 @@ import * as core from "./core";
  * revalidates every page that shows the task once it commits.
  */
 
-export type { Principal, NewTaskInput, TaskPatch, StatusOptions } from "./core";
+export type { ChecklistSnapshot, Principal, NewTaskInput, TaskPatch, StatusOptions } from "./core";
 export { AssigneeChangedError, TaskChangedError, TaskRuleError, bucketFor } from "./core";
 export { TEMPLATE_BUCKET };
 
@@ -151,6 +151,25 @@ export async function setChecklistItem(itemId: string, done: boolean, p: core.Pr
 export async function addChecklistItem(taskId: string, title: string, p: core.Principal): Promise<void> {
   await prisma.$transaction((tx) => core.addChecklistItem(tx, taskId, title, p));
   revalidatePath(`/tasks/${taskId}`);
+}
+
+/** Rename an item (forms 4.4). Staff only. */
+export async function renameChecklistItem(itemId: string, title: string, p: core.Principal): Promise<void> {
+  const item = await prisma.$transaction((tx) => core.renameChecklistItem(tx, itemId, title, p));
+  revalidatePath(`/tasks/${item.taskId}`);
+}
+
+/** Remove an item. Returns the snapshot the Undo toast passes to `restoreChecklistItem`. */
+export async function removeChecklistItem(itemId: string, p: core.Principal): Promise<core.ChecklistSnapshot> {
+  const snapshot = await prisma.$transaction((tx) => core.removeChecklistItem(tx, itemId, p));
+  revalidatePath(`/tasks/${snapshot.taskId}`);
+  return snapshot;
+}
+
+/** Undo a removal: the item comes back with its id, place and tick. */
+export async function restoreChecklistItem(snapshot: core.ChecklistSnapshot, p: core.Principal): Promise<void> {
+  await prisma.$transaction((tx) => core.restoreChecklistItem(tx, snapshot, p));
+  revalidatePath(`/tasks/${snapshot.taskId}`);
 }
 
 /* ---------------- Auto (system) tasks ---------------- */

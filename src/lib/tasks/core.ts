@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, type Task, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
+import { Prisma, type Task, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
@@ -928,4 +928,138 @@ export async function addChecklistItem(tx: Tx, taskId: string, title: string, p:
   // as touched and isn't taken back when the finished task reopens.
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
   return item;
+}
+
+// ---------------------------------------------------------------------------
+// Checklist edits: rename, remove, and take a removal back
+// ---------------------------------------------------------------------------
+
+const CHECKLIST_TITLE_MAX = 300;
+
+/** What a removal hands back, as plain JSON, so Undo can put the row back exactly. */
+export type ChecklistSnapshot = {
+  id: string;
+  taskId: string;
+  title: string;
+  done: boolean;
+  /** An ISO instant, or null while it isn't ticked. */
+  doneAt: string | null;
+  doneByUserId: string | null;
+  doneByContactId: string | null;
+  assigneeLabel: string | null;
+  /** An ISO instant, from an imported Asana subtask; display only. */
+  dueDate: string | null;
+  position: number;
+  /** An imported item's Asana subtask, so the next Asana import updates it instead of adding it again. */
+  asanaGid: string | null;
+  /** An ISO instant. The page orders by position, then this. */
+  createdAt: string;
+};
+
+/** The edits below that write an event name what they did; the Activity line reads `action`. */
+export type ChecklistAction = "renamed" | "removed" | "restored";
+
+/** Contractors tick items off; changing the list itself is staff only, like Add item. */
+function checklistStaffOnly(p: Principal): void {
+  if (p.kind === "contractor") throw new TaskRuleError("Contractors can't change checklist items yet.");
+}
+
+/**
+ * One CHECKLIST event saying what happened, `{ action, itemId, title, from, to }`,
+ * and the task's edit stamp, like every other edit, so a repeat copy someone
+ * changed counts as touched. No email goes out for these.
+ */
+async function recordChecklistEdit(
+  tx: Tx,
+  taskId: string,
+  p: Principal,
+  action: ChecklistAction,
+  item: { id: string; title: string },
+  change: { from: string | null; to: string | null },
+  now: Date,
+): Promise<void> {
+  await addEvent(tx, taskId, p, {
+    kind: "CHECKLIST",
+    data: { action, itemId: item.id, title: item.title, from: change.from, to: change.to },
+  });
+  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
+}
+
+/** The title an edit saves: trimmed to one line of text, never empty, no longer than Add item allows. */
+export function checklistTitle(raw: string): string {
+  const t = raw.replace(/\s+/g, " ").trim();
+  if (!t) throw new TaskRuleError("Enter a name for the item.");
+  if (t.length > CHECKLIST_TITLE_MAX) throw new TaskRuleError(`Use ${CHECKLIST_TITLE_MAX} characters or fewer.`);
+  return t;
+}
+
+/** Rename an item. The same title (once tidied) writes nothing and adds no line to Activity. */
+export async function renameChecklistItem(tx: Tx, itemId: string, title: string, p: Principal, now = new Date()): Promise<TaskChecklistItem> {
+  checklistStaffOnly(p);
+  const next = checklistTitle(title);
+  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId } });
+  if (!item) throw new TaskRuleError("That checklist item no longer exists.");
+  if (item.title === next) return item;
+  const updated = await tx.taskChecklistItem.update({ where: { id: itemId }, data: { title: next } });
+  await recordChecklistEdit(tx, item.taskId, p, "renamed", { id: itemId, title: next }, { from: item.title, to: next }, now);
+  return updated;
+}
+
+/**
+ * Remove an item. Returns the snapshot Undo needs (the row is deleted, so
+ * `restoreChecklistItem` re-creates it with the same id and place). An item
+ * already gone is a rule error: the checklist moved on.
+ */
+export async function removeChecklistItem(tx: Tx, itemId: string, p: Principal, now = new Date()): Promise<ChecklistSnapshot> {
+  checklistStaffOnly(p);
+  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId } });
+  if (!item) throw new TaskRuleError("That checklist item no longer exists.");
+  await tx.taskChecklistItem.delete({ where: { id: itemId } });
+  await recordChecklistEdit(tx, item.taskId, p, "removed", { id: itemId, title: item.title }, { from: item.title, to: null }, now);
+  return {
+    id: item.id,
+    taskId: item.taskId,
+    title: item.title,
+    done: item.done,
+    doneAt: item.doneAt ? item.doneAt.toISOString() : null,
+    doneByUserId: item.doneByUserId,
+    doneByContactId: item.doneByContactId,
+    assigneeLabel: item.assigneeLabel,
+    dueDate: item.dueDate ? item.dueDate.toISOString() : null,
+    position: item.position,
+    asanaGid: item.asanaGid,
+    createdAt: item.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Undo a removal: the item comes back with its id, place, tick and Asana
+ * link. An item that is already back (a second Undo, another tab, or an
+ * Asana import that brought its subtask in again) is left as it is; a task
+ * that is gone can't take it.
+ */
+export async function restoreChecklistItem(tx: Tx, snapshot: ChecklistSnapshot, p: Principal, now = new Date()): Promise<void> {
+  checklistStaffOnly(p);
+  const existing = await tx.taskChecklistItem.findUnique({ where: { id: snapshot.id } });
+  if (existing) return;
+  if (snapshot.asanaGid && (await tx.taskChecklistItem.findUnique({ where: { asanaGid: snapshot.asanaGid } }))) return;
+  const task = await tx.task.findUnique({ where: { id: snapshot.taskId }, select: { id: true } });
+  if (!task) throw new TaskRuleError("This task is gone, so the item can't come back.");
+  await tx.taskChecklistItem.create({
+    data: {
+      id: snapshot.id,
+      taskId: snapshot.taskId,
+      title: snapshot.title,
+      done: snapshot.done,
+      doneAt: snapshot.doneAt ? new Date(snapshot.doneAt) : null,
+      doneByUserId: snapshot.doneByUserId,
+      doneByContactId: snapshot.doneByContactId,
+      assigneeLabel: snapshot.assigneeLabel,
+      dueDate: snapshot.dueDate ? new Date(snapshot.dueDate) : null,
+      position: snapshot.position,
+      asanaGid: snapshot.asanaGid,
+      createdAt: new Date(snapshot.createdAt),
+    },
+  });
+  await recordChecklistEdit(tx, snapshot.taskId, p, "restored", { id: snapshot.id, title: snapshot.title }, { from: null, to: snapshot.title }, now);
 }

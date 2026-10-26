@@ -128,7 +128,8 @@ export async function createPortalAccount(
       });
       await logSecurityEvent(tx, { kind: "ACCOUNT_CREATED", userId: createdByUser.id, contactId });
       // A contact with no email gets the login's, so staff can reach them without a second step.
-      if (!contact.email?.trim()) await tx.contact.update({ where: { id: contactId }, data: { email } });
+      // Written only while the email is still the empty one read above, so a save that lands in between is kept.
+      if (!contact.email?.trim()) await tx.contact.updateMany({ where: { id: contactId, email: contact.email }, data: { email } });
       return created;
     });
     return { account, password };

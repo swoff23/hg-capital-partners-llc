@@ -77,7 +77,9 @@ export type CreateFormProps<V, R> = {
   /**
    * The action succeeded. Toast and, unless `more` (Create more is on),
    * leave: `router.back()` to stay where you were, or `router.replace(href)`
-   * to open the record. With `more` the form has already started over.
+   * to open the record (New task does, from the sheet and the page, as the
+   * server redirect it replaced did). With `more` the form has already
+   * started over, and the toast is the way to the record.
    */
   onCreated: (data: R, more: boolean) => void;
   /** Offer "Create more" in the sheet's footer. */
@@ -331,7 +333,9 @@ function PageBody({
           <div className="flex items-center gap-2">
             <Button type="submit" pending={pending} aria-keyshortcuts="Meta+Enter Control+Enter">
               {primary}
-              <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>
+              <Kbd tone="act" aria-hidden="true">
+                {shortcutLabel(mod, "↵")}
+              </Kbd>
             </Button>
             <Button type="button" variant="secondary" onClick={() => (dirty ? setAsking(true) : onLeave())}>
               Cancel

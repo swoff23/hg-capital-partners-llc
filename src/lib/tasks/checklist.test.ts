@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checklistTitle, removeChecklistItem, renameChecklistItem, restoreChecklistItem } from "./checklist";
-import { TaskRuleError, type Principal, type Tx } from "./core";
+import { TaskRuleError, checklistTitle, removeChecklistItem, renameChecklistItem, restoreChecklistItem, type Principal, type Tx } from "./core";
 
 const PIETER: Principal = { kind: "staff", userId: "u-pieter", label: "Pieter Louw" };
 const ZACK: Principal = { kind: "contractor", contactId: "c-zack", label: "Zack Reading" };
@@ -16,7 +15,10 @@ type Item = {
   doneByUserId: string | null;
   doneByContactId: string | null;
   assigneeLabel: string | null;
+  dueDate: Date | null;
   position: number;
+  asanaGid: string | null;
+  createdAt: Date;
 };
 
 const item = (over: Partial<Item> = {}): Item => ({
@@ -28,7 +30,10 @@ const item = (over: Partial<Item> = {}): Item => ({
   doneByUserId: null,
   doneByContactId: null,
   assigneeLabel: null,
+  dueDate: null,
   position: 0,
+  asanaGid: null,
+  createdAt: new Date("2026-10-20T12:00:00.000Z"),
   ...over,
 });
 
@@ -40,8 +45,8 @@ function fakeChecklist(initial: Item[], tasks: string[] = ["t1"]) {
   const tx = {
     taskChecklistItem: {
       // Copies, as the database hands back: a later update must not rewrite a row already read.
-      findUnique: async ({ where }: { where: { id: string } }) => {
-        const row = items.find((i) => i.id === where.id);
+      findUnique: async ({ where }: { where: { id: string } | { asanaGid: string } }) => {
+        const row = items.find((i) => ("id" in where ? i.id === where.id : i.asanaGid === where.asanaGid));
         return row ? { ...row } : null;
       },
       update: async ({ where, data }: { where: { id: string }; data: Partial<Item> }) => {
@@ -136,7 +141,10 @@ test("removeChecklistItem: the row goes, Activity says which, and the snapshot h
     doneByUserId: "u-connor",
     doneByContactId: null,
     assigneeLabel: null,
+    dueDate: null,
     position: 3,
+    asanaGid: null,
+    createdAt: "2026-10-20T12:00:00.000Z",
   });
   assert.equal(events.length, 1);
   assert.deepEqual(events[0].data, { action: "removed", itemId: "i2", title: "Swap the lock", from: "Swap the lock", to: null });
@@ -155,6 +163,26 @@ test("restoreChecklistItem: Undo brings the same item back, in its place, still 
     ["removed", "restored"],
   );
   assert.deepEqual(events[1].data, { action: "restored", itemId: "i2", title: "Swap the lock", from: null, to: "Swap the lock" });
+});
+
+test("restoreChecklistItem: an imported item comes back with its Asana link and due date, unless an import brought it back first", async () => {
+  const imported = item({ id: "i2", title: "Patch the soffit", assigneeLabel: "Zack", dueDate: new Date("2026-10-30T00:00:00.000Z"), asanaGid: "120001" });
+  const { tx, items, events } = fakeChecklist([item(), imported]);
+  const snapshot = await removeChecklistItem(tx, "i2", PIETER, NOW);
+  await restoreChecklistItem(tx, JSON.parse(JSON.stringify(snapshot)), PIETER, NOW);
+  assert.deepEqual(items[1], imported);
+
+  // The next Asana import found the subtask missing and added it again under a new id: that is the item, back.
+  const again = fakeChecklist([item(), imported]);
+  const removed = await removeChecklistItem(again.tx, "i2", PIETER, NOW);
+  again.items.push(item({ id: "i9", title: "Patch the soffit", asanaGid: "120001", position: 1 }));
+  await restoreChecklistItem(again.tx, removed, PIETER, NOW);
+  assert.deepEqual(
+    again.items.map((i) => i.id),
+    ["i1", "i9"],
+  );
+  assert.equal(events.length, 2);
+  assert.equal(again.events.length, 1);
 });
 
 test("restoreChecklistItem: a second Undo is a no-op, and a deleted task can't take the item back", async () => {

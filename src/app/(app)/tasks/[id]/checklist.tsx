@@ -15,6 +15,9 @@ import { removeChecklistItem, renameChecklistItem, restoreChecklistItem } from "
 
 export type ChecklistRow = { id: string; title: string; done: boolean };
 
+/** What an item's toasts are about: a rename's Undo and a removal's share it, so the newest replaces the other. */
+const toastKeyFor = (itemId: string) => `checklist:${itemId}`;
+
 /** An optimistic change to the rows: a tick, or an item taken off while its removal saves. */
 type Change = { id: string; done: boolean } | { id: string; removed: true };
 
@@ -98,7 +101,7 @@ function ChecklistItem({ row: r, onTick, onRemoved }: { row: ChecklistRow; onTic
       const snapshot = res.data;
       toast({
         message: "Item removed",
-        key: `checklist:${r.id}`,
+        key: toastKeyFor(r.id),
         action: {
           label: "Undo",
           onAction: () =>
@@ -137,6 +140,8 @@ function ChecklistItem({ row: r, onTick, onRemoved }: { row: ChecklistRow; onTic
           wrap
           inRail={false}
           message={() => "Item renamed"}
+          // Removing the item replaces this toast, so an Undo for a row that is gone never shows.
+          toastKey={toastKeyFor(r.id)}
           className={cn(r.done && "text-fg-3 line-through")}
           onSave={(next) => renameChecklistItem(r.id, next)}
         />

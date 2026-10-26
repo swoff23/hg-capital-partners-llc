@@ -157,6 +157,14 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
     }
     case "CHECKLIST": {
       const title = quoted(s(d.title));
+      // The edits to the list itself name their action; a tick carries `done`.
+      if (d.action === "renamed") {
+        const from = quoted(s(d.from));
+        const to = quoted(s(d.to));
+        return { text: from && to ? `${a} renamed ${from} to ${to}` : `${a} renamed ${title || "an item"}` };
+      }
+      if (d.action === "removed") return { text: `${a} removed ${title || "an item"}` };
+      if (d.action === "restored") return { text: `${a} put back ${title || "an item"}` };
       if (d.done === true) return { text: `${a} checked ${title || "an item"}` };
       if (d.done === false) return { text: `${a} unchecked ${title || "an item"}` };
       return { text: `${a} updated ${title || "the checklist"}` };

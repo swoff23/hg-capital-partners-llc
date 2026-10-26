@@ -37,3 +37,18 @@ test("addToast: a key with no live toast adds a new one", () => {
   assert.equal(list.id, 7);
   assert.equal(list.list.length, 1);
 });
+
+test("addToast: a checklist item's removal takes its rename's Undo off the screen", () => {
+  type U = T & { action?: string };
+  let list: QueuedToast<U>[] = [];
+  list = addToast<U>(list, { message: "Item renamed", key: "checklist:i1", action: "Undo rename" }, 1, 3).list;
+  list = addToast<U>(list, { message: "Item renamed", key: "checklist:i2", action: "Undo rename" }, 2, 3).list;
+  list = addToast<U>(list, { message: "Item removed", key: "checklist:i1", action: "Undo remove" }, 3, 3).list;
+  assert.deepEqual(
+    list.map((t) => [t.message, t.key, t.action]),
+    [
+      ["Item renamed", "checklist:i2", "Undo rename"],
+      ["Item removed", "checklist:i1", "Undo remove"],
+    ],
+  );
+});

@@ -241,7 +241,9 @@ export function FormSheet({
                 aria-keyshortcuts="Meta+Enter Control+Enter"
               >
                 {primary}
-                <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>
+                <Kbd tone="act" aria-hidden="true">
+                  {shortcutLabel(mod, "↵")}
+                </Kbd>
               </Button>
             </div>
             {primaryDisabled && disabledReason && (

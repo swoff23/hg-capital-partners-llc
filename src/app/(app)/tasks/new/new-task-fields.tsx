@@ -198,14 +198,14 @@ export function NewTaskForm({
       }}
       action={createTask}
       onCreated={(task, more) => {
-        toast({
-          message: "Task created",
-          action: { label: "Open", onAction: () => router.push(`/tasks/${task.id}`) },
-        });
-        if (more) return;
-        // From the sheet you stay where you were; from a pasted link there's nowhere to go back to, so the task opens.
-        if (variant === "sheet") router.back();
-        else router.replace(`/tasks/${task.id}`);
+        if (more) {
+          // The sheet stays up for the next one, so the toast is the way to the task just made.
+          toast({ message: "Task created", action: { label: "Open", onAction: () => router.push(`/tasks/${task.id}`) } });
+          return;
+        }
+        // Sheet or page, a create lands on the new task, as the old redirect did. The sheet's path leaves /tasks/new, so it lets go.
+        toast({ message: "Task created" });
+        router.replace(`/tasks/${task.id}`);
       }}
     >
       {({ errors, clear }) => (

@@ -19,10 +19,20 @@ const LINE_PX = 32;
  */
 export const actionBarButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 lg:w-60 lg:flex-none";
 
-/** The printed ⌘↵ (Ctrl ↵ off a Mac) for the primary's label; hidden on touch, where there is no keyboard shortcut. */
+/**
+ * The printed ⌘↵ (Ctrl ↵ off a Mac) at the end of the primary's label, inside
+ * the button, toned for the ink fill (no keycap ground); hidden on touch,
+ * where there is no keyboard shortcut. Give the button
+ * `aria-keyshortcuts="Meta+Enter Control+Enter"`. For a secondary action bar
+ * button, print a plain `Kbd` instead.
+ */
 export function SubmitKeycap() {
   const mod = useModKey();
-  return <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>;
+  return (
+    <Kbd tone="act" aria-hidden="true">
+      {shortcutLabel(mod, "↵")}
+    </Kbd>
+  );
 }
 
 export type ActionBarProps = {
