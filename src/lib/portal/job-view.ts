@@ -1,4 +1,5 @@
 import type { TaskStatus } from "@prisma/client";
+import { LATE_UPLOAD_WINDOW_MS } from "@/lib/attachments/access";
 import type { FileKind } from "@/lib/attachments/content-types";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
@@ -260,19 +261,161 @@ export function finishingLabel(pending: number): string {
 }
 
 /**
- * The Mark done sheet's main button (decision 13). It waits for uploads still
- * going up, and stays off while any photo failed to upload, until each red
- * tile is retried or removed; the tray's red line says why. With no photos
- * and no note it reads "Skip".
+ * The most photos a playbook can ask for at Mark done, so a typo in the
+ * count (200) never draws two hundred slots.
  */
-export function markDoneButton(s: { pending: number; failed: number; sending: boolean; hasContent: boolean }): {
-  label: string;
+const MAX_FINISH_PHOTOS = 12;
+
+/**
+ * How many photos Mark done asks for: the playbook's `finishPhotosRequired`,
+ * where null, 0 and anything that isn't a count mean "optional" (0). Every
+ * job starts optional (uploads choice 5 A).
+ */
+export function finishPhotosNeeded(required: number | null | undefined): number {
+  if (typeof required !== "number" || !Number.isFinite(required) || required < 1) return 0;
+  return Math.min(Math.floor(required), MAX_FINISH_PHOTOS);
+}
+
+/** How many proof slots the Mark done sheet draws: the count asked for, or one on an optional job. */
+export function finishSlots(required: number): number {
+  return required > 0 ? required : 1;
+}
+
+/** "1 of 2", right-aligned over the slots when the playbook asks for photos. Never past the count. */
+export function finishCountLabel(required: number, uploaded: number): string {
+  return `${Math.min(Math.max(uploaded, 0), required)} of ${required}`;
+}
+
+/** "Add 1 more photo", "Add 2 more photos": the one line under a Mark done that's short of its count. */
+export function addMorePhotosLine(missing: number): string {
+  return `Add ${missing} more photo${missing === 1 ? "" : "s"}`;
+}
+
+export type MarkDoneState = {
+  /** The label never changes (forms 2.7): it waits, and a line says why. */
+  label: "Mark done";
   enabled: boolean;
-} {
-  if (s.pending > 0) return { label: finishingLabel(s.pending), enabled: false };
-  if (s.sending) return { label: "Sending…", enabled: false };
-  if (s.failed > 0) return { label: "Mark done", enabled: false };
-  return { label: s.hasContent ? "Mark done" : "Skip", enabled: true };
+  /** The action is running: the button keeps its label and shows its Spinner. */
+  busy: boolean;
+  /** Why it's off, for the caller to draw: "failed" is the red line with Retry, which the uploader's UploadStatusLine owns. */
+  reason: "uploading" | "failed" | "short" | null;
+  /** The one grey line under the buttons for "uploading" and "short"; null otherwise. */
+  line: string | null;
+};
+
+/**
+ * The Mark done sheet's main button (decision 13, uploads 2.8). It waits for
+ * uploads still going up, stays off while any photo failed to upload until
+ * each red tile is retried or removed, and stays off until the photos the
+ * playbook asks for are up (`required`, 0 when it asks for none). There is no
+ * Skip: with no photos on an optional job it reads "Mark done" and is on.
+ * Only uploaded photos count, so a failed one keeps its slot and the count
+ * waits for it. The label is always "Mark done"; `line` says why it's off.
+ */
+export function markDoneButton(s: { pending: number; failed: number; sending: boolean; uploaded: number; required: number }): MarkDoneState {
+  const label = "Mark done" as const;
+  if (s.pending > 0) return { label, enabled: false, busy: false, reason: "uploading", line: finishingLabel(s.pending) };
+  if (s.sending) return { label, enabled: false, busy: true, reason: null, line: null };
+  if (s.failed > 0) return { label, enabled: false, busy: false, reason: "failed", line: null };
+  if (s.uploaded < s.required) {
+    return { label, enabled: false, busy: false, reason: "short", line: addMorePhotosLine(s.required - s.uploaded) };
+  }
+  return { label, enabled: true, busy: false, reason: null, line: null };
+}
+
+// ---------------------------------------------------------------------------
+// Batch posts and Undo (uploads 2.7, question 5)
+// ---------------------------------------------------------------------------
+
+/** How long "3 photos posted · Undo" stays (the toast's own five seconds). */
+export const POST_UNDO_MS = 5_000;
+
+/**
+ * The server accepts an Undo a little after the toast has gone: the tap spends
+ * part of the window in flight on a weak signal, and a toast held under the
+ * pointer or focus (toast.tsx) lasts longer than five seconds.
+ */
+export const POST_UNDO_GRACE_MS = 10_000;
+
+/**
+ * Whether a contractor's post can still be taken back: within the toast's
+ * window plus the grace. A clock that reads the post as slightly in the
+ * future still counts.
+ */
+export function undoWindowOpen(postedAt: Date | string, now: Date): boolean {
+  const at = typeof postedAt === "string" ? Date.parse(postedAt) : postedAt.getTime();
+  if (Number.isNaN(at)) return false;
+  return now.getTime() - at <= POST_UNDO_MS + POST_UNDO_GRACE_MS;
+}
+
+/** What the toast says after a batch posts: "3 photos posted", "1 video posted", "2 files posted". */
+export function postedText(kinds: readonly (FileKind | null)[]): string {
+  const n = kinds.length;
+  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
+  return `${n} ${noun}${n === 1 ? "" : "s"} posted`;
+}
+
+// ---------------------------------------------------------------------------
+// Late uploads after Mark done (uploads question 4)
+// ---------------------------------------------------------------------------
+
+function timeOf(at: Date | string | null | undefined): number | null {
+  if (!at) return null;
+  const t = typeof at === "string" ? Date.parse(at) : at.getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * Whether "Add photo/video" still shows on a job in Review: for the hour the
+ * server keeps taking files after Mark done (attachments/access.ts
+ * LATE_UPLOAD_WINDOW_MS), then it hides, so nobody picks a photo the record
+ * step would refuse. With no time to go by (an older page, or a job another
+ * way into Review) it stays, as before.
+ */
+export function lateUploadsOpen(markedDoneAt: Date | string | null | undefined, now: Date): boolean {
+  const at = timeOf(markedDoneAt);
+  return at === null || now.getTime() - at <= LATE_UPLOAD_WINDOW_MS;
+}
+
+/** Milliseconds until `lateUploadsOpen` turns false, or null when it has no end (no time known). */
+export function lateUploadsEndsIn(markedDoneAt: Date | string | null | undefined, now: Date): number | null {
+  const at = timeOf(markedDoneAt);
+  return at === null ? null : Math.max(0, at + LATE_UPLOAD_WINDOW_MS - now.getTime());
+}
+
+// ---------------------------------------------------------------------------
+// My jobs row and the payoff strip
+// ---------------------------------------------------------------------------
+
+/**
+ * A My jobs row's uploads line (uploads 2.1): "Uploading 3 photos" while any
+ * file for the job is going up, "2 photos didn't upload" once some failed.
+ * Failed leads: it's the one that needs the contractor. Null when the job has
+ * no uploads. The queue counts failed files without their kinds, so that line
+ * says photos.
+ */
+export function rowUploadLine(c: {
+  pending: number;
+  failed: number;
+  pendingKinds: readonly (FileKind | null)[];
+}): { text: string; tone: "info" | "danger" } | null {
+  if (c.failed > 0) return { text: `${c.failed} ${c.failed === 1 ? "photo" : "photos"} didn't upload`, tone: "danger" };
+  if (c.pending > 0) {
+    const kinds = c.pendingKinds;
+    const noun = kinds.length > 0 && kinds.every((k) => k === "video") ? "video" : kinds.length > 0 && kinds.every((k) => k === "file") ? "file" : "photo";
+    return { text: `Uploading ${c.pending} ${noun}${c.pending === 1 ? "" : "s"}`, tone: "info" };
+  }
+  return null;
+}
+
+/** Thumbs the payoff strip fits beside its count: four and "+2" measure about 240px (uploads 2.7). */
+export const STRIP_THUMBS = 4;
+
+/** How many of `total` the strip draws, and the "+N" for the rest. */
+export function stripCounts(total: number, fit = STRIP_THUMBS): { shown: number; more: number } {
+  const all = Math.max(total, 0);
+  const shown = Math.min(all, fit);
+  return { shown, more: all - shown };
 }
 
 /**

@@ -28,14 +28,15 @@ export default function ResidentsPage() {
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         <Tile title="Moving in" body="Move-in checklist and the condition form." href="/residents/moving-in" />
         <Tile title="Pay rent" body="Handled securely through Baselane." href={BASELANE_URL} />
-        <Tile title="Request maintenance" body="Send photos of the issue straight to our team." />
+        {/* No line under it until the request form exists: this page doesn't promise photos it can't take (PUBLIC-035). */}
+        <Tile title="Request maintenance" />
       </div>
     </main>
   );
 }
 
 /** A public fact tile: the flat Card, its name turning gold on hover when it's a link. */
-function Tile({ title, body, href }: { title: string; body: string; href?: string | null }) {
+function Tile({ title, body, href }: { title: string; body?: string; href?: string | null }) {
   // Internal pages (href starting with "/") stay in the same tab and skip the
   // external-link arrow: that icon specifically signals "leaves this site."
   const external = !!href && !href.startsWith("/");
@@ -50,7 +51,7 @@ function Tile({ title, body, href }: { title: string; body: string; href?: strin
           external && <ArrowUpRight aria-hidden="true" className="mt-1 size-4 shrink-0 stroke-[1.5] text-fg-3" />
         )}
       </div>
-      <p className={cn(publicType.meta, "mt-1 text-pretty text-fg-3")}>{body}</p>
+      {body && <p className={cn(publicType.meta, "mt-1 text-pretty text-fg-3")}>{body}</p>}
     </Card>
   );
 
