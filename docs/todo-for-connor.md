@@ -31,8 +31,8 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - [ ] Create your test login: on Contractors, open "Connor Test Contractor", tap Create login, sign in at /login with the starting password it shows, and pick your own password. Three "Test:" jobs are waiting (To do, Scheduled and In progress).
 - [ ] When you're done testing, tell Claude to delete the test contractor and its "Test:" jobs.
 
-- [ ] Add emails for the 14 contractors who have none: Alison Hurtado, David Waryk, Dust 2 Sparkles, Fox Pest, Jeremiah Anderson, Jon Oconnel, Kim Lockett, Kyle Griffin, Mark Kreuder, Melvin Miles, Nick, Richard ONeil, Scott Anderson, Steve Cristiano. You could also mark the ones who'll never use the portal.
-- [ ] Put a person's name on "Dust 2 Sparkles" and "Fox Pest", so the portal and emails don't greet them as "Dust" and "Fox".
+- [ ] Add emails for the 14 contractors who have none (open a contractor, then Edit on Contact): Alison Hurtado, David Waryk, Dust 2 Sparkles, Fox Pest, Jeremiah Anderson, Jon Oconnel, Kim Lockett, Kyle Griffin, Mark Kreuder, Melvin Miles, Nick, Richard ONeil, Scott Anderson, Steve Cristiano. You could also mark the ones who'll never use the portal.
+- [ ] Put a person's name on "Dust 2 Sparkles" and "Fox Pest" (Edit on Contact; the company name can go in Company), so the portal and emails don't greet them as "Dust" and "Fox".
 - [ ] Give the office phone number for the portal's Call button. It stays hidden until then.
 - [ ] Say "invite them" when you're ready.
 
