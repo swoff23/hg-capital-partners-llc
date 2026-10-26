@@ -1,16 +1,12 @@
 "use client";
-import { useEffect } from "react";
-import { Button, Input, SectionCard, Select, Textarea } from "@/components/ui";
-import { InlineAddressField } from "@/components/inline-address-field";
-import { useToast } from "@/components/toast";
-import { callAction } from "@/lib/action-result";
+import { RailList } from "@/components/rail";
+import { Section } from "@/components/ui";
 import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
-import { patchProperty } from "../actions";
-import { LabeledField as L } from "../labeled-field";
-import { dayFact, moneyFact, textFact } from "./fact-values";
-import { onPropertyFieldRequest } from "./edit-field-event";
-import { RailFact, RailList, RailVerb, SaveError } from "./record-ui";
-import { useSectionSave } from "./use-section-save";
+import { shortAddress } from "@/lib/normalize";
+import type { OptionItem } from "@/components/option-list";
+import { PropertyStatus } from "../property-status";
+import { PropertyAddressHeading, PropertyNotes } from "./property-heading";
+import { PropertyFact, PropertyKeyDate } from "./property-fact";
 
 export type EditableProperty = {
   id: string;
@@ -31,193 +27,87 @@ export type EditableProperty = {
   propertyTaxDueDate: string | null;
 };
 
+/** A list of words as picker rows, with a stored value the list no longer has kept as its own row (so opening never changes it). */
+const rows = (words: readonly string[], stored: string | null): OptionItem[] =>
+  [...new Set([stored, ...words].filter((w): w is string => !!w))].map((w) => ({ id: w, label: w }));
+
 /**
- * The page's h1, edited in place: shares InlineAddressField with the deal page.
- * Sent with the address it replaces, so a rename someone else saved meanwhile
- * isn't overwritten; a refused save or a dropped connection shows as a toast.
+ * The page's h1: the address, edited in place with suggestions and the
+ * duplicate line, on touch in a one-field sheet. Sent with the address it
+ * replaces, so a rename someone else saved meanwhile isn't overwritten; a
+ * refused save or a dropped connection reopens the field with what was typed.
  */
 export function PropertyAddressField({ id, value }: { id: string; value: string }) {
-  const { toast } = useToast();
-  return (
-    <InlineAddressField
-      value={value}
-      heading
-      multiline
-      onCommit={async (address) => {
-        const r = await callAction(() => patchProperty(id, { address }, { address: value }));
-        if (!r.ok) toast({ message: r.error });
-      }}
-    />
-  );
+  return <PropertyAddressHeading id={id} value={value} />;
 }
 
-/** Cancel and Save for a section editor's form. */
-function EditActions({ formId, pending, onCancel }: { formId: string; pending: boolean; onCancel: () => void }) {
-  return (
-    <>
-      <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={onCancel}>
-        Cancel
-      </Button>
-      <Button type="submit" form={formId} size="sm" disabled={pending}>
-        {pending ? "Saving…" : "Save"}
-      </Button>
-    </>
-  );
-}
-
+/**
+ * Details (forms 4.2): the facts of the purchase, the plan and the dates, each
+ * changed where it stands. Money, dates, a count and two lists; the empty ones
+ * are verbs ("Add purchase price"). The fact strip's "Add value" opens Value.
+ */
 export function PropertyDetailsSection({ property: p }: { property: EditableProperty }) {
-  const { loaded: f, open, close, pending, error, onSubmit, formRef } = useSectionSave(p.id, p);
-  const formId = `property-details-${p.id}`;
-  // The fact strip's "Add value" opens this editor on Value.
-  useEffect(() => onPropertyFieldRequest(["value"], open), [open]);
-
-  if (!f) {
-    return (
-      <SectionCard title="Details" onEdit={open}>
-        <RailList>
-          <RailFact label="Value" empty="Add value" onAdd={() => open("value")}>
-            {moneyFact(p.value)}
-          </RailFact>
-          <RailFact label="Purchase date" empty="Add purchase date" onAdd={() => open("purchaseDate")}>
-            {dayFact(p.purchaseDate)}
-          </RailFact>
-          <RailFact label="Purchase price" empty="Add purchase price" onAdd={() => open("purchasePrice")}>
-            {moneyFact(p.purchasePrice)}
-          </RailFact>
-          <RailFact label="Closing costs" empty="Add closing costs" onAdd={() => open("closingCosts")}>
-            {moneyFact(p.closingCosts)}
-          </RailFact>
-          <RailFact label="Rehab amount" empty="Add rehab amount" onAdd={() => open("rehabAmount")}>
-            {moneyFact(p.rehabAmount)}
-          </RailFact>
-          <RailFact label="Refinance date" empty="Add refinance date" onAdd={() => open("refinanceDate")}>
-            {dayFact(p.refinanceDate)}
-          </RailFact>
-          <RailFact label="Refi target" empty="Add refi target" onAdd={() => open("refiTarget")}>
-            {textFact(p.refiTarget)}
-          </RailFact>
-          <RailFact label="Strategy" empty="Add strategy" onAdd={() => open("strategy")}>
-            {textFact(p.strategy)}
-          </RailFact>
-          <RailFact label="Sq ft" empty="Add sq ft" onAdd={() => open("sqft")}>
-            {p.sqft != null ? <span className="num">{p.sqft.toLocaleString()}</span> : null}
-          </RailFact>
-          <RailFact label="Entity" empty="Add entity" onAdd={() => open("llcOwner")}>
-            {textFact(p.llcOwner)}
-          </RailFact>
-          <RailFact label="Attorney" empty="Add attorney" onAdd={() => open("attorney")}>
-            {textFact(p.attorney)}
-          </RailFact>
-          <RailFact label="Status" empty="Add status" onAdd={() => open("status")}>
-            {textFact(p.status)}
-          </RailFact>
-          {/* Rail labels fit 96px on a phone on one line: shorter words, not a smaller font. */}
-          <RailFact label="Registration" empty="Add expiry" onAdd={() => open("rentalRegistrationExpiry")}>
-            {dayFact(p.rentalRegistrationExpiry)}
-          </RailFact>
-          <RailFact label="Tax due" empty="Add due date" onAdd={() => open("propertyTaxDueDate")}>
-            {dayFact(p.propertyTaxDueDate)}
-          </RailFact>
-        </RailList>
-      </SectionCard>
-    );
-  }
-
+  const context = `Details · ${shortAddress(p.address) || p.address}`;
+  const common = { id: p.id, context };
   return (
-    <SectionCard title="Details" editing actions={<EditActions formId={formId} pending={pending} onCancel={close} />}>
-      <form id={formId} ref={formRef} onSubmit={onSubmit} className="space-y-3">
-        <L label="Address">
-          <Input name="address" defaultValue={f.address} />
-        </L>
-        {/* Bottom-aligned, so a field under a two-line label still lines up with its neighbor. */}
-        <div className="grid grid-cols-2 items-end gap-3">
-          <L label="Value">
-            <Input name="value" defaultValue={f.value ?? ""} />
-          </L>
-          <L label="Purchase date">
-            <Input name="purchaseDate" type="date" defaultValue={f.purchaseDate ?? ""} />
-          </L>
-          <L label="Purchase price">
-            <Input name="purchasePrice" defaultValue={f.purchasePrice ?? ""} />
-          </L>
-          <L label="Closing costs">
-            <Input name="closingCosts" defaultValue={f.closingCosts ?? ""} />
-          </L>
-          <L label="Rehab amount">
-            <Input name="rehabAmount" defaultValue={f.rehabAmount ?? ""} />
-          </L>
-          <L label="Refinance date">
-            <Input name="refinanceDate" type="date" defaultValue={f.refinanceDate ?? ""} />
-          </L>
-          <L label="Refi target">
-            <Input name="refiTarget" defaultValue={f.refiTarget ?? ""} />
-          </L>
-          <L label="Strategy">
-            <Select name="strategy" defaultValue={f.strategy ?? ""}>
-              <option value="">—</option>
-              {[...new Set([f.strategy, ...PROPERTY_STRATEGIES].filter(Boolean))].map((s) => (
-                <option key={s as string}>{s as string}</option>
-              ))}
-            </Select>
-          </L>
-          <L label="Sq ft">
-            <Input name="sqft" type="number" defaultValue={f.sqft ?? ""} />
-          </L>
-          <L label="Entity / LLC">
-            <Input name="llcOwner" defaultValue={f.llcOwner ?? ""} />
-          </L>
-          <L label="Attorney">
-            <Input name="attorney" defaultValue={f.attorney ?? ""} />
-          </L>
-          <L label="Status">
-            <Select name="status" defaultValue={f.status ?? ""}>
-              <option value="">—</option>
-              {[...new Set([f.status, ...PROPERTY_STATUSES].filter(Boolean))].map((s) => (
-                <option key={s as string}>{s as string}</option>
-              ))}
-            </Select>
-          </L>
-          <L label="Rental registration expires">
-            <Input name="rentalRegistrationExpiry" type="date" defaultValue={f.rentalRegistrationExpiry ?? ""} />
-          </L>
-          <L label="Property tax due">
-            <Input name="propertyTaxDueDate" type="date" defaultValue={f.propertyTaxDueDate ?? ""} />
-          </L>
-        </div>
-        {error && <SaveError>{error}</SaveError>}
-      </form>
-    </SectionCard>
+    <Section title="Details">
+      <RailList>
+        <PropertyFact {...common} field="value" label="Value" anchor="value" kind="money" value={p.value} empty="Add value" />
+        <PropertyFact {...common} field="purchaseDate" label="Purchase date" kind="date" value={p.purchaseDate} empty="Add purchase date" />
+        <PropertyFact {...common} field="purchasePrice" label="Purchase price" kind="money" value={p.purchasePrice} empty="Add purchase price" />
+        <PropertyFact {...common} field="closingCosts" label="Closing costs" kind="money" value={p.closingCosts} empty="Add closing costs" />
+        <PropertyFact {...common} field="rehabAmount" label="Rehab amount" kind="money" value={p.rehabAmount} empty="Add rehab amount" />
+        <PropertyFact {...common} field="refinanceDate" label="Refinance date" kind="date" value={p.refinanceDate} empty="Add refinance date" />
+        <PropertyFact {...common} field="refiTarget" label="Refi target" kind="text" value={p.refiTarget} empty="Add refi target" />
+        <PropertyFact
+          {...common}
+          field="strategy"
+          label="Strategy"
+          kind="choice"
+          value={p.strategy}
+          empty="Add strategy"
+          options={rows(PROPERTY_STRATEGIES, p.strategy)}
+          emptyLabel="Not set"
+        />
+        <PropertyFact {...common} field="sqft" label="Sq ft" kind="integer" unit="sq ft" value={p.sqft == null ? "" : String(p.sqft)} empty="Add sq ft" />
+        <PropertyFact {...common} field="llcOwner" label="Entity" kind="text" value={p.llcOwner} empty="Add entity" />
+        <PropertyFact {...common} field="attorney" label="Attorney" kind="text" value={p.attorney} empty="Add attorney" />
+        <PropertyFact
+          {...common}
+          field="status"
+          label="Status"
+          kind="choice"
+          value={p.status}
+          empty="Add status"
+          options={rows(PROPERTY_STATUSES, p.status)}
+          emptyLabel="Not set"
+          display={(text) => <PropertyStatus status={text} />}
+        />
+        {/* Rail labels fit 96px on a phone on one line: shorter words, not a smaller font. */}
+        <PropertyKeyDate
+          {...common}
+          field="rentalRegistrationExpiry"
+          label="Registration"
+          name="Registration expiry"
+          date={p.rentalRegistrationExpiry}
+          addLabel="Add expiry"
+          leadDays={30}
+        />
+        <PropertyKeyDate {...common} field="propertyTaxDueDate" label="Tax due" name="Tax due date" date={p.propertyTaxDueDate} addLabel="Add due date" leadDays={21} />
+      </RailList>
+    </Section>
   );
 }
 
+/**
+ * The notes (forms 4.2): autosizing, saved with Save or ⌘↵, never on blur, so
+ * a stray tap can't rewrite them, and a change confirms with Undo. The verb
+ * "Add a note" stays.
+ */
 export function PropertyNotesSection({ id, notes }: { id: string; notes: string | null }) {
-  const { loaded: f, open, close, pending, error, onSubmit, formRef } = useSectionSave(id, { notes });
-  const formId = `property-notes-${id}`;
-
-  if (!f) {
-    return (
-      <SectionCard title="Notes" onEdit={open}>
-        {notes?.trim() ? (
-          <p className="whitespace-pre-wrap text-pretty text-body text-fg-1">{notes}</p>
-        ) : (
-          <RailVerb onClick={() => open("notes")}>Add a note</RailVerb>
-        )}
-      </SectionCard>
-    );
-  }
-
   return (
-    <SectionCard title="Notes" editing actions={<EditActions formId={formId} pending={pending} onCancel={close} />}>
-      <form id={formId} ref={formRef} onSubmit={onSubmit} className="space-y-2">
-        <Textarea
-          name="notes"
-          aria-label="Notes"
-          rows={6}
-          defaultValue={f.notes ?? ""}
-          placeholder="Additional notes on this property…"
-        />
-        {error && <SaveError>{error}</SaveError>}
-      </form>
-    </SectionCard>
+    <Section title="Notes">
+      <PropertyNotes id={id} notes={notes} />
+    </Section>
   );
 }

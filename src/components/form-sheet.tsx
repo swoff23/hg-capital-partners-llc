@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useHoldLeave } from "@/components/leave-guard";
 import { Sheet } from "@/components/sheet";
@@ -52,6 +52,20 @@ export type FormSheetProps = {
   discardTitle?: string;
   /** The question an in-app link asks while it's dirty: "Leave without saving Unit 2?". */
   leaveTitle?: string;
+  /**
+   * What closing a changed sheet does. "ask" (the default) shows the discard
+   * question. "silent" is the one-field sheet of a fact (forms 2.11): the
+   * backdrop does nothing while the field holds a change, and X and Esc
+   * throw that one value away without asking.
+   */
+  discard?: "ask" | "silent";
+  /**
+   * Each field's own line from the last refusal (`useRun().fieldErrors`,
+   * keyed by field name). Not drawn here, the fields draw their own; when
+   * they arrive, focus moves to the first invalid field and scrolls it to the
+   * middle of the view (forms 2.0).
+   */
+  fieldErrors?: Record<string, string>;
   /** The centered dialog's width from md: `md` 512 (the default) or `lg` 672 (the unit and listing sheets). */
   size?: "md" | "lg";
   /** On a phone, take the full height even when the form is short: long forms. */
@@ -90,9 +104,11 @@ const firstEmptyField =
  *     <FormField label="Title">{(p) => <Input {...p} value={values.title} onChange={…} />}</FormField>
  *   </FormSheet>
  *
- * Pickers inside it on touch open as a SheetView (back arrow beside the X),
- * never a second sheet. The forms build finishes the details (the field kit
- * inside, pushed pickers); the props are final.
+ * Pickers inside it (`Select`, `Combobox`, `DatePicker`, the entity pickers)
+ * open through PickerLayer: a popover with a mouse, and on touch a SheetView
+ * with a back arrow beside the X, never a second sheet. A refusal comes back
+ * on its fields (`fieldErrors`) and the first of them takes focus; a fact's
+ * one-field sheet uses `discard="silent"`.
  */
 export function FormSheet({
   title,
@@ -109,6 +125,8 @@ export function FormSheet({
   dirty: dirtyProp,
   discardTitle = "Discard changes?",
   leaveTitle = "Leave without saving?",
+  discard = "ask",
+  fieldErrors,
   size,
   fullHeight,
   surface,
@@ -131,7 +149,8 @@ export function FormSheet({
   const [asking, setAsking] = useState(false);
   if (asking && (!isOpen || !dirty)) setAsking(false);
 
-  useHoldLeave(dirty ? { title: leaveTitle, stay: "Keep editing" } : null);
+  // A one-field sheet is modal and short-lived: nothing to hold the page's links for.
+  useHoldLeave(dirty && discard === "ask" ? { title: leaveTitle, stay: "Keep editing" } : null);
 
   function close() {
     if (pending) return;
@@ -139,16 +158,35 @@ export function FormSheet({
   }
   function requestClose() {
     if (pending) return;
-    if (dirty) setAsking(true);
+    if (dirty && discard === "ask") setAsking(true);
     else onOpenChange(false);
   }
+
+  const formRef = useRef<HTMLFormElement>(null);
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (pending || primaryDisabled) return;
     const form = e.currentTarget;
+    marked.current = new Set();
     onSubmit(new FormData(form), form);
+    // A check that failed in onSubmit has marked its fields by the next frame.
+    requestAnimationFrame(() => focusFirstInvalid(form));
   }
+
+  // A refusal that came back from the server marks its fields; the first one takes focus. Only a field
+  // that newly has a line moves it: fixing one never throws focus onto the next, and a Save pressed again
+  // starts the count over, so the same refusal moves focus again.
+  const errorKey = fieldErrors ? Object.keys(fieldErrors).join("|") : "";
+  const marked = useRef<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const keys = errorKey ? errorKey.split("|") : [];
+    const added = keys.some((k) => !marked.current.has(k));
+    marked.current = new Set(keys);
+    if (!added) return;
+    const frame = requestAnimationFrame(() => focusFirstInvalid(formRef.current));
+    return () => cancelAnimationFrame(frame);
+  }, [errorKey]);
 
   function onKeyDown(e: KeyboardEvent<HTMLFormElement>) {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
@@ -167,7 +205,7 @@ export function FormSheet({
         }}
         isDismissable={!pending}
         dirty={dirty || pending}
-        onDirtyClose={requestClose}
+        onDirtyClose={discard === "ask" ? requestClose : undefined}
         size={size}
         fullHeight={fullHeight}
         surface={surface}
@@ -212,7 +250,7 @@ export function FormSheet({
           </div>
         }
       >
-        <FormBody formId={formId} isOpen={isOpen} onSubmit={submit} onKeyDown={onKeyDown}>
+        <FormBody formId={formId} formRef={formRef} isOpen={isOpen} onSubmit={submit} onKeyDown={onKeyDown}>
           {children}
         </FormBody>
       </Sheet>
@@ -239,21 +277,34 @@ export function FormSheet({
   );
 }
 
+/**
+ * Moves focus to the first field a check marked invalid (`aria-invalid`) and
+ * scrolls it to the middle of the view, so a refusal is seen where it is, not
+ * at the top of the form (forms 2.0). Does nothing when no field is marked.
+ */
+export function focusFirstInvalid(root: ParentNode | null): void {
+  const bad = root?.querySelector<HTMLElement>('[aria-invalid="true"]');
+  if (!bad) return;
+  bad.focus({ preventScroll: true });
+  bad.scrollIntoView({ block: "center", behavior: "auto" });
+}
+
 /** The form inside the sheet's body: focus goes to the first empty field once it shows. */
 function FormBody({
   formId,
+  formRef: ref,
   isOpen,
   onSubmit,
   onKeyDown,
   children,
 }: {
   formId: string;
+  formRef: RefObject<HTMLFormElement | null>;
   isOpen: boolean;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onKeyDown: (e: KeyboardEvent<HTMLFormElement>) => void;
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (!isOpen) return;
     // After the dialog's own focus move, which lands on the dialog itself.
@@ -264,7 +315,7 @@ function FormBody({
       (fields.find((f) => f.value === "") ?? fields[0])?.focus();
     });
     return () => cancelAnimationFrame(frame);
-  }, [isOpen]);
+  }, [isOpen, ref]);
   return (
     <form ref={ref} id={formId} noValidate onSubmit={onSubmit} onKeyDown={onKeyDown} className="space-y-4 p-4">
       {children}

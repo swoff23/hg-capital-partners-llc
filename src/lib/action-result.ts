@@ -93,6 +93,26 @@ export function conflictMessage(conflict: Pick<ActionConflict, "by" | "at">, now
 }
 
 /**
+ * The line on the one open field when its save lost to a newer one (forms
+ * 2.8, 2.12): "Pieter set this to $410,000 at 2:14 PM", or, when the row
+ * doesn't record who, "This changed to $410,000 at 2:14 PM". `theirs` is what
+ * the field holds now, as the field shows it ("" when they cleared it).
+ */
+export function conflictValueLine(conflict: Pick<ActionConflict, "by" | "at">, theirs: string, now: Date = new Date()): string {
+  const who = conflictBy(conflict.by);
+  const when = conflictWhen(conflict.at, now);
+  const tail = when ? ` ${when}` : "";
+  if (theirs === "") return who ? `${who} cleared this${tail}` : `This was cleared${tail}`;
+  return who ? `${who} set this to ${theirs}${tail}` : `This changed to ${theirs}${tail}`;
+}
+
+/** The button that takes the other person's value: "Keep Pieter's", or "Keep current" when the row doesn't say who. */
+export function conflictKeepLabel(conflict: Pick<ActionConflict, "by">): string {
+  const who = conflictBy(conflict.by);
+  return who ? `Keep ${who}'s` : "Keep current";
+}
+
+/**
  * What a service throws when a save would overwrite a newer change (forms
  * 2.12), in place of `CONFLICT_MESSAGE`: the fields that moved
  * (`staleFields` knows them), who saved them when the row records it
@@ -130,6 +150,24 @@ export class ConflictError extends Error {
       ...(this.by ? { by: this.by } : {}),
       ...(this.theirs ? { theirs: this.theirs } : {}),
     };
+  }
+}
+
+/**
+ * A refusal a service raises for particular fields, in plain words: what a
+ * zod schema would say, for a rule a schema can't hold (a phone that can't be
+ * dialed, a name already taken). `withResult` returns it as `error` (the
+ * first line) and `fieldErrors`, so a sheet marks the field and focuses it.
+ *
+ *   throw new FieldError({ email: "Enter a full email, like name@example.com." });
+ */
+export class FieldError extends Error {
+  readonly fieldErrors: FieldErrors;
+
+  constructor(fieldErrors: FieldErrors) {
+    super(Object.values(fieldErrors)[0] ?? FIELD_FALLBACK);
+    this.name = "FieldError";
+    this.fieldErrors = { ...fieldErrors };
   }
 }
 
@@ -203,7 +241,7 @@ export function zodFieldErrors(err: { issues: ZodLikeIssue[] }): FieldErrors {
 }
 
 export function userMessage(err: unknown): string {
-  if (err instanceof ConflictError) return err.message;
+  if (err instanceof ConflictError || err instanceof FieldError) return err.message;
   if (isZodLike(err)) {
     const first = err.issues[0];
     if (isPlainMessage(first?.message)) return first.message.trim();
@@ -226,6 +264,7 @@ export function userMessage(err: unknown): string {
  */
 export function toFailure(err: unknown): ActionFailure {
   if (err instanceof ConflictError) return { ok: false, error: err.message, conflict: err.conflict };
+  if (err instanceof FieldError) return { ok: false, error: err.message, fieldErrors: err.fieldErrors };
   if (isZodLike(err)) {
     const fieldErrors = zodFieldErrors(err);
     return Object.keys(fieldErrors).length > 0

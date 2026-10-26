@@ -5,8 +5,11 @@ import { prisma } from "@/lib/db";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
 import { initials } from "@/lib/utils";
-import { dealStatusLabel, isDealStatus, type DealStatus } from "@/lib/config";
+import { dealStatusLabel, type DealStatus } from "@/lib/config";
 import { logDealChanges } from "./log";
+import { dealConflict, dealPatchData, guardedDealFields, staleDealFields, type DealPatch } from "./edits";
+
+export type { DealPatch } from "./edits";
 
 /**
  * Deal domain: every write to Deal / DealNote goes through here. The server
@@ -15,12 +18,19 @@ import { logDealChanges } from "./log";
  *   - prices keep the raw text and a parsed Decimal (null when not one number)
  *   - status is validated against DEAL_STATUSES; unknown values are ignored
  *   - every change is diffed and appended to the deal's activity timeline
+ *   - every write records who made it (`updatedByUserId`), and a save from a
+ *     page that has gone stale is refused with who changed it and when
+ *     (edits.ts, forms 2.12)
  */
 
 export interface Actor {
+  /** The signed-in user's id, recorded as the deal's last editor. The user object `requireUser()` returns has it. */
+  id?: string;
   name: string | null;
   email: string;
 }
+
+const stamp = (a: Actor) => (a.id ? { updatedByUserId: a.id } : {});
 
 const actorLabel = (a: Actor) => a.name ?? a.email;
 
@@ -76,24 +86,12 @@ export async function createDeal(
       units: input.units ?? null,
       sourceUrl: input.sourceUrl || null,
       nextAction: input.nextAction || null,
+      ...stamp(actor),
     },
   });
   await logDealChanges(deal.id, actor, [`Deal created (status ${dealStatusLabel(deal.status)})`]);
   revalidatePath("/deals");
   return { deal };
-}
-
-/** Whitelisted inline-editable fields. A key that is present is written; null / "" clears. */
-export interface DealPatch {
-  address?: string;
-  status?: string;
-  priority?: string | null;
-  passReason?: string | null;
-  theirPriceRaw?: string | null;
-  ourPriceRaw?: string | null;
-  units?: number | null;
-  nextAction?: string | null;
-  sourceUrl?: string | null;
 }
 
 const val = (v: string | null | undefined) => (v == null || v === "" ? "—" : v);
@@ -122,27 +120,31 @@ export function diffDeal(before: Deal, data: Record<string, unknown>): string[] 
   return lines;
 }
 
-export async function patchDeal(id: string, patch: DealPatch, actor: Actor): Promise<void> {
-  const before = await prisma.deal.findUniqueOrThrow({ where: { id } });
-  const data: Record<string, unknown> = {};
-  if (patch.address?.trim()) data.address = patch.address.trim();
-  if (patch.status && isDealStatus(patch.status)) data.status = patch.status;
-  if ("priority" in patch) data.priority = patch.priority || null;
-  if ("passReason" in patch) data.passReason = patch.passReason || null;
-  if ("units" in patch) data.units = patch.units ?? null;
-  if ("sourceUrl" in patch) data.sourceUrl = patch.sourceUrl?.trim() || null;
-  if ("theirPriceRaw" in patch) {
-    data.theirPriceRaw = patch.theirPriceRaw || null;
-    data.theirPrice = amountToDecimal(patch.theirPriceRaw);
-  }
-  if ("ourPriceRaw" in patch) {
-    data.ourPriceRaw = patch.ourPriceRaw || null;
-    data.ourPrice = amountToDecimal(patch.ourPriceRaw);
-  }
-  if ("nextAction" in patch) data.nextAction = patch.nextAction || null;
+/**
+ * Edit a deal. `expected` holds, for each field the editor changed, the text
+ * it loaded for it (the deal rail sends it; the list's stage pick doesn't):
+ * a field whose stored value has moved off that was saved by someone else
+ * meanwhile, and nothing is written. Before this a stale deal page silently
+ * wrote over a partner's newer edit.
+ */
+export async function patchDeal(id: string, patch: DealPatch, actor: Actor, expected: Record<string, string> = {}): Promise<void> {
+  const before = await prisma.deal.findUniqueOrThrow({ where: { id }, include: { updatedByUser: { select: { name: true, email: true } } } });
+  const data = dealPatchData(patch);
   if (Object.keys(data).length === 0) return;
 
-  await prisma.deal.update({ where: { id }, data });
+  const guarded = guardedDealFields(patch, expected);
+  if (guarded.length > 0) {
+    const stale = staleDealFields(before, patch, expected);
+    if (stale.length > 0) throw dealConflict(before, stale);
+    // At the version just read, so a save that lands in between is refused too.
+    const r = await prisma.deal.updateMany({ where: { id, updatedAt: before.updatedAt }, data: { ...data, ...stamp(actor) } });
+    if (r.count === 0) {
+      const now = await prisma.deal.findUniqueOrThrow({ where: { id }, include: { updatedByUser: { select: { name: true, email: true } } } });
+      throw dealConflict(now, guarded);
+    }
+  } else {
+    await prisma.deal.update({ where: { id }, data: { ...data, ...stamp(actor) } });
+  }
   await logDealChanges(id, actor, diffDeal(before, data));
   revalidateDeal(id);
 }

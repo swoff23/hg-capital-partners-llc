@@ -198,6 +198,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <PropertyLoanSection
             loan={{
               id: property.id,
+              address: property.address,
               value,
               currentLoan: balance,
               lender: property.lender,
@@ -216,6 +217,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <PropertyInsuranceSection
             insurance={{
               id: property.id,
+              address: property.address,
               insuranceCarrier: property.insuranceCarrier,
               insurancePolicyNo: property.insurancePolicyNo,
               insurancePremium: d(property.insurancePremium),

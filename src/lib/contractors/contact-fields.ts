@@ -107,6 +107,34 @@ export function readPhone(raw: string): { phone: string | null; phoneE164: strin
   return null;
 }
 
+export type ContactProblems = Partial<Record<ContactField, string>>;
+export type ReadNewContact = { ok: true; data: ContactData & { fullName: string } } | { ok: false; problems: ContactProblems };
+
+/**
+ * A new contractor from the New contractor sheet (forms 4.6): the name is
+ * required, everything else is optional, and each field reads by the same
+ * rules as an edit. Every problem comes back, keyed by field, so the sheet
+ * marks each one and focuses the first. Blank fields are left out, not
+ * stored as empty text. Pure; see contact-fields.test.ts.
+ */
+export function readNewContact(input: Partial<Record<string, string | null>>): ReadNewContact {
+  const problems: ContactProblems = {};
+  const data: ContactData = {};
+  for (const field of CONTACT_FIELDS) {
+    const raw = input[field];
+    if (raw === undefined || raw === null) {
+      if (field === "fullName") problems.fullName = NAME_REQUIRED;
+      continue;
+    }
+    if (field !== "fullName" && raw.trim() === "") continue;
+    const read = readContactPatch({ [field]: raw });
+    if (!read.ok) problems[field] = read.message;
+    else Object.assign(data, read.data);
+  }
+  if (Object.keys(problems).length > 0 || !data.fullName) return { ok: false, problems };
+  return { ok: true, data: { ...data, fullName: data.fullName } };
+}
+
 /**
  * The patch as the columns it writes, or the first problem in the editor's
  * order. Only the fields present in `patch` are read; anything else in it

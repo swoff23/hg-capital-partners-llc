@@ -1,3 +1,4 @@
+import { ConflictError } from "@/lib/action-result";
 import { toYmd } from "@/lib/dates";
 
 /**
@@ -68,4 +69,33 @@ export function staleFields(stored: Record<string, unknown>, edits: FieldEdits):
 export function isAtVersion(updatedAt: Date, expectedVersion: string): boolean {
   const pinned = new Date(expectedVersion);
   return !Number.isNaN(pinned.getTime()) && pinned.getTime() === updatedAt.getTime();
+}
+
+/** The row's last editor, as the property and deal queries select it (`updatedByUser`). */
+export type LastEditor = { name: string | null; email: string } | null | undefined;
+
+/** The name a conflict line uses for the last editor: their name, else their email. Undefined when the row doesn't say. */
+export function editorName(by: LastEditor): string | undefined {
+  return by ? by.name?.trim() || by.email : undefined;
+}
+
+/**
+ * The refusal for a save that would write over a newer change (forms 2.12):
+ * the stale fields, who saved last when the row records it, when, and for a
+ * field save what each field holds now, as text, so the editor can say "Pieter
+ * set this to $410,000 at 2:14 PM" and offer "Keep Pieter's" and "Save
+ * mine". A whole-blob editor (units, building CapEx, listings) names the
+ * blob and has no values. Pure; see edits.test.ts.
+ */
+export function rowConflict(
+  row: Record<string, unknown> & { updatedAt: Date; updatedByUser?: LastEditor },
+  fields: string[],
+  opts: { values?: boolean } = {},
+): ConflictError {
+  return new ConflictError({
+    fields,
+    by: editorName(row.updatedByUser) ?? null,
+    at: row.updatedAt,
+    ...(opts.values ? { theirs: Object.fromEntries(fields.map((k) => [k, fieldText(row[k])])) } : {}),
+  });
 }

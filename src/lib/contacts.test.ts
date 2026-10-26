@@ -1,6 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { capitalizedName, cleanTrades, docOnFile, joinDocLines, mailtoHref, mapsHref, planContactFixes, splitDocLines, telHref, textHref } from "./contacts";
+import { readNewContact } from "./contractors/contact-fields";
+
+test("a new contractor's trades go through cleanTrades, as the directory shows them", () => {
+  // What the sheet's Trades picker posts: the picks joined with " / ", repeats and all.
+  const read = (trades: string) => {
+    const r = readNewContact({ fullName: "Zack Reading", trades });
+    return r.ok ? r.data.trades : undefined;
+  };
+  assert.equal(read("Plumbing / HVAC"), "Plumbing / HVAC");
+  assert.equal(read("HVAC / hvac / Plumbing"), "HVAC / Plumbing");
+  assert.equal(read("  Framing  "), "Framing");
+  // No trade picked is no trades, not an empty string.
+  assert.equal(read(""), undefined);
+  assert.equal(cleanTrades("HVAC / HVAC"), "HVAC");
+});
+
+test("a new contractor keeps the notes and leaves the import's document lines to the importer", () => {
+  const r = readNewContact({ fullName: "Zack Reading", comments: "Prefers texts.\nGate code with Pieter" });
+  assert.deepEqual(r.ok && r.data.comments, "Prefers texts.\nGate code with Pieter");
+  assert.deepEqual(splitDocLines(r.ok ? r.data.comments : null), { notes: "Prefers texts.\nGate code with Pieter", docLines: [] });
+});
 
 test("phone numbers and emails become tel: and mailto: links (ADMIN-004)", () => {
   assert.equal(telHref("716-555-1234"), "tel:7165551234");
