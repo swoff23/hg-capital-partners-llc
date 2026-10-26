@@ -1,5 +1,5 @@
 "use client";
-import { Download, Ellipsis } from "lucide-react";
+import { Download, Ellipsis, House } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { FilesList, type FileLink } from "@/components/files-list";
 import { MediaGrid, type MediaGroup, type MediaItem } from "@/components/media-grid";
@@ -7,6 +7,7 @@ import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { useToast } from "@/components/toast";
 import { Section, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { usePropertyPhoto } from "@/app/(app)/properties/[id]/property-photo";
 import { removeTaskFile, renameTaskFile } from "../upload-actions";
 
 /**
@@ -22,12 +23,16 @@ import { removeTaskFile, renameTaskFile } from "../upload-actions";
  * the place and the job ("56 Tamarack St Fix porch light.zip"), the toast
  * reads "Preparing 14 files…", then the browser saves it. A photo or file
  * taken off a posted comment leaves "Connor removed quote.pdf" in the activity.
+ * On a task tied to a property, the viewer's ⋯ on a photo holds "Set as
+ * property photo" (uploads 2.10): the building's front photo from then on,
+ * with "Property photo set · Undo".
  */
 export function TaskMediaSection({
   taskId,
   media,
   files,
   atFinish = [],
+  property = null,
 }: {
   taskId: string;
   /** Posted photos and videos, in grid order. */
@@ -36,6 +41,8 @@ export function TaskMediaSection({
   files: FileLink[];
   /** The ids in `media` sent with the latest Mark done. */
   atFinish?: readonly string[];
+  /** The task's property, for "Set as property photo": its id and short address. */
+  property?: { id: string; label: string } | null;
 }) {
   const { toast } = useToast();
   if (media.length === 0 && files.length === 0) return null;
@@ -88,9 +95,40 @@ export function TaskMediaSection({
       }
     >
       <div className="space-y-3">
-        <MediaGrid items={media} groups={groups} onDelete={removeTaskFile} onRename={renameTaskFile} canEdit />
+        {property ? (
+          <PropertyPhotoGrid property={property} items={media} groups={groups} />
+        ) : (
+          <MediaGrid items={media} groups={groups} onDelete={removeTaskFile} onRename={renameTaskFile} canEdit />
+        )}
         <FilesList files={files} onDelete={removeTaskFile} onRename={renameTaskFile} />
       </div>
     </Section>
+  );
+}
+
+/** The section's grid on a task tied to a property: the same grid, and "Set as property photo" in the viewer's ⋯ on a photo. */
+function PropertyPhotoGrid({
+  property,
+  items,
+  groups,
+}: {
+  property: { id: string; label: string };
+  items: MediaItem[];
+  groups: MediaGroup[] | undefined;
+}) {
+  const photo = usePropertyPhoto({ propertyId: property.id, label: property.label });
+  return (
+    <MediaGrid
+      items={items}
+      groups={groups}
+      onDelete={removeTaskFile}
+      onRename={renameTaskFile}
+      canEdit
+      menuItems={(item) =>
+        item.kind === "IMAGE"
+          ? [{ id: "property-photo", label: "Set as property photo", icon: <House />, onAction: () => void photo.fromTaskPhoto(item) }]
+          : []
+      }
+    />
   );
 }

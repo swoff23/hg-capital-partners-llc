@@ -114,7 +114,10 @@ export function usePropertyPhoto({ propertyId, label }: { propertyId: string; la
     maxFiles: 1,
     prepare: "display",
     record,
-    whenAway: "hold",
+    // Nothing waits to be sent: the record step sets the photo and says so ("Property photo set · Undo"), on this
+    // page or after it, so a photo that lands once the page is gone gets no "ready to send" toast as well.
+    whenAway: "post",
+    onAway: () => {},
   };
   const uploader = useMediaUploader({ target });
   const uploading = uploader.uploads.some(isGoingUp);

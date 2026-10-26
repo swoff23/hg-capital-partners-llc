@@ -13,7 +13,6 @@ import { UPLOAD_KIND_ACCESS, uploadTargetKey, type UploadKind } from "@/lib/atta
 import { cn } from "@/lib/utils";
 
 export type { UploadKind } from "@/lib/attachments/upload-kinds";
-export { useLeaveWarning } from "@/components/use-leave-warning";
 
 /**
  * Photo-and-video-first uploads for a task, a property or a listing: the staff
@@ -268,11 +267,13 @@ export function useUndoableRemove() {
  * `slots` is the Mark done sheet's proof slots (uploads 2.8): in a grid, the
  * count of finished-work photos the playbook asks for (one on an optional
  * job). Slots not yet holding a photo are empty `--fill-1` squares with a
- * Camera (solid, never dashed) after the tiles in flight; `filled` is how
- * many the caller already shows as recorded (UploadTile `ready`) before the
- * tray, so they count. A tap opens `onSlot`, by default the camera on touch
- * and the file picker with a mouse (`capture` means nothing there). Once the
- * count is met, one add tile remains.
+ * Camera (solid, never dashed) after the tiles in flight. `leading` is the
+ * caller's recorded files (UploadTile `ready`), drawn first in the same grid,
+ * and `filled` is how many there are, so they count. A tap opens `onSlot`, by
+ * default the camera on touch and the file picker with a mouse (`capture`
+ * means nothing there). Once the count is met, one add tile remains.
+ * `disabled` turns the slots and the add tile off (a Mark done sending: a
+ * photo picked then wouldn't go with it); `label` names the list.
  *
  * `onFill` is for a tray on a `--fill-1` ground (an Internal note): the
  * Remove badge's ring takes that ground instead of `--surface`.
@@ -284,6 +285,9 @@ export function MediaUploadTray({
   slots,
   filled = 0,
   onSlot,
+  leading,
+  disabled = false,
+  label,
   onFill = false,
   className,
 }: {
@@ -293,6 +297,10 @@ export function MediaUploadTray({
   slots?: number;
   filled?: number;
   onSlot?: () => void;
+  /** Recorded files drawn before the ones in flight, in the same grid (the Mark done sheet's). */
+  leading?: ReactNode;
+  disabled?: boolean;
+  label?: string;
   onFill?: boolean;
   className?: string;
 }) {
@@ -303,21 +311,19 @@ export function MediaUploadTray({
   if (uploads.length === 0 && !slotted) return null;
   const empty = slotted ? Math.max(0, slots - filled - uploads.filter((u) => u.status !== "invalid").length) : 0;
   const open = onSlot ?? (coarse ? uploader.takePhoto : uploader.chooseFiles);
+  const slotClass =
+    "relative flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors disabled:opacity-50 not-disabled:hover:text-fg-2";
   return (
     <div className={cn("space-y-1.5", className)}>
-      <ul className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2" : "flex flex-wrap gap-2"}>
+      <ul aria-label={label} className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2" : "flex flex-wrap gap-2"}>
+        {slotted && leading}
         {uploads.map((u) => (
           <UploadTile key={u.key} upload={u} grid={grid} onFill={onFill} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
         ))}
         {slotted &&
           Array.from({ length: empty }, (_, i) => (
             <li key={`slot-${i}`}>
-              <button
-                type="button"
-                onClick={open}
-                aria-label="Add a photo"
-                className="relative flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors hover:text-fg-2"
-              >
+              <button type="button" onClick={open} disabled={disabled} aria-label="Add a photo" className={slotClass}>
                 <Camera className="size-5" aria-hidden="true" />
               </button>
             </li>
@@ -327,8 +333,9 @@ export function MediaUploadTray({
             <button
               type="button"
               onClick={uploader.chooseFiles}
+              disabled={disabled}
               aria-label="Add more photos"
-              className="relative flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors hover:text-fg-2"
+              className={slotClass}
             >
               <ImagePlus className="size-5" aria-hidden="true" />
             </button>
@@ -364,8 +371,11 @@ function stateLabel(u: MediaUpload, ready: boolean): string {
  * its type (a glyph over "PDF"), a photo the browser can't draw shows a HEIC
  * tile instead of a broken picture, and a file waiting for a signal sits
  * under the scrim with a WifiOff mark and no ring. `ready` is a file already
- * recorded and waiting to be sent (the composer's ready tiles): no ring, and
- * its name ends "ready to send".
+ * recorded and waiting to be sent (the composer's ready tiles, the Mark done
+ * sheet's photos): no ring, its preview is a picture (the thumbnail, or a
+ * video's poster), and its name ends "ready to send". Without `onRemove`
+ * there's no Remove (a contractor's recorded photo: contractors delete
+ * nothing).
  */
 export function UploadTile({
   upload: u,
@@ -380,8 +390,8 @@ export function UploadTile({
   ready?: boolean;
   /** On a `--fill-1` ground: Remove's ring is that ground. */
   onFill?: boolean;
-  onRetry: () => void;
-  onRemove: () => void;
+  onRetry?: () => void;
+  onRemove?: () => void;
 }) {
   const [broken, setBroken] = useState(false);
   // A server-rendered preview (a ready tile) can fail before hydration attaches onError; this reads one that has settled.
@@ -390,8 +400,9 @@ export function UploadTile({
   }, []);
   const failed = u.status === "failed" || u.status === "invalid";
   const label = stateLabel(u, ready);
-  const photo = u.kind === "image" && !!u.previewUrl && !broken;
-  const video = u.kind === "video" && !!u.previewUrl && !broken;
+  // A ready video's preview is its poster, a picture.
+  const photo = (u.kind === "image" || (ready && u.kind === "video")) && !!u.previewUrl && !broken;
+  const video = !ready && u.kind === "video" && !!u.previewUrl && !broken;
   // A document, or a photo with nothing to draw: its type over a glyph.
   const typed = !photo && !video && u.kind !== "video" ? documentLook(u.name) : null;
   const Glyph = typed?.glyph === "sheet" ? FileSpreadsheet : typed?.glyph === "image" ? FileImage : FileText;
@@ -443,6 +454,7 @@ export function UploadTile({
         />
       </div>
       {u.status === "failed" &&
+        onRetry &&
         (grid ? (
           <RetryPill onClick={onRetry} label={`Retry ${u.name}`} />
         ) : (
@@ -455,25 +467,27 @@ export function UploadTile({
             <RotateCcw className="h-5 w-5" aria-hidden="true" />
           </button>
         ))}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${u.name}`}
-        className={cn(
-          // A square 20px badge: an icon-only button is square, never round. Its 1px ring is the tile's ground, so it
-          // doesn't show a pale halo on an Internal note.
-          "absolute flex h-5 w-5 items-center justify-center rounded-sm bg-act text-on-act ring-1",
-          onFill ? "ring-fill-1" : "ring-surface",
-          // On the corner of a 56px tile. A grid tile runs to the tray's edge, so its X sits inside: the 44px
-          // touch area then reaches 8px out, short of Send in the gap beside it and of the Retry pill on the
-          // tile above (gap 8px; the pill's area stops 2px above its tile's bottom).
-          grid ? "right-1 top-1" : "-right-1.5 -top-1.5",
-          // 44px with a finger, 32px with a mouse.
-          "after:absolute after:-inset-3 pointer-fine:after:-inset-1.5",
-        )}
-      >
-        <X className="size-3.5" aria-hidden="true" />
-      </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${u.name}`}
+          className={cn(
+            // A square 20px badge: an icon-only button is square, never round. Its 1px ring is the tile's ground, so it
+            // doesn't show a pale halo on an Internal note.
+            "absolute flex h-5 w-5 items-center justify-center rounded-sm bg-act text-on-act ring-1",
+            onFill ? "ring-fill-1" : "ring-surface",
+            // On the corner of a 56px tile. A grid tile runs to the tray's edge, so its X sits inside: the 44px
+            // touch area then reaches 8px out, short of Send in the gap beside it and of the Retry pill on the
+            // tile above (gap 8px; the pill's area stops 2px above its tile's bottom).
+            grid ? "right-1 top-1" : "-right-1.5 -top-1.5",
+            // 44px with a finger, 32px with a mouse.
+            "after:absolute after:-inset-3 pointer-fine:after:-inset-1.5",
+          )}
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      )}
     </li>
   );
 }
@@ -523,8 +537,8 @@ export function UploadStatusLine({ uploader, className }: { uploader: MediaUploa
   );
 }
 
-/** A 24px ring that fills clockwise. The tile's label carries the percentage. */
-function ProgressRing({ value }: { value: number }) {
+/** A 24px ring that fills clockwise, on a photo (the scrim under it is the caller's). The tile's label carries the percentage. */
+export function ProgressRing({ value }: { value: number }) {
   const r = 9;
   const c = 2 * Math.PI * r;
   return (

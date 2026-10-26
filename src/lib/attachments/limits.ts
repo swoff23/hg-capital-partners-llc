@@ -52,21 +52,13 @@ const PROPERTY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** A stored-name slug: the upload path's last part (uploads 2.1). */
 const SLUG = /^[A-Za-z0-9._-]{1,100}$/;
 /**
- * A listing photo's bare name. The listing editor has always named its blobs
- * by the picked file's own name (spaces and parentheses included), and the
- * token's content-type allowlist is what holds the bytes to photos, so this
- * only keeps the name one plain path segment.
- */
-const LISTING_NAME = /^[^/\\\u0000-\u001f\u007f]{1,200}$/;
-
-/**
  * The token limits for a property upload, or why it's refused (the same
  * table the uploader checks first and the record step checks again with
  * head()). The path must be this property's for its kind:
  *
  *   property-upload        properties/<id>/<slug>        a document (fileKind "file") or a photo ("image"),
  *                                                        each under its own cap in UPLOAD_RULES
- *   listing-photo-upload   <name>                        a public photo, 25 MB (one plain path segment)
+ *   listing-photo-upload   <slug>                        a public photo, 25 MB (the listing photo manager's bare slug)
  *   property-photo-upload  properties/<id>/photo/<slug>  a public photo, 25 MB
  *
  * A document's name with an extension must name a type its kind allows, as
@@ -86,7 +78,8 @@ export function propertyUploadLimits(kind: PropertyUploadKind, propertyId: strin
     return { maximumSizeInBytes: rule.maxBytes, allowedContentTypes: [...rule.contentTypes] };
   }
   if (kind === "listing-photo-upload") {
-    if (pathname !== name || !LISTING_NAME.test(name) || name === "." || name === "..") return "That upload path isn't allowed.";
+    // The listing photos go through the upload queue, which names each blob by its stored name's slug (upload-kinds.ts uploadRequest).
+    if (pathname !== name || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) return "That upload path isn't allowed.";
   } else if (pathname !== `properties/${propertyId}/photo/${name}` || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) {
     return "That upload path isn't allowed.";
   }

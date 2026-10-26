@@ -5,6 +5,7 @@ import { GripVertical, ImagePlus, MoreHorizontal, TriangleAlert, X } from "lucid
 import { Lightbox, type LightboxMenuItem, type MediaItem } from "@/components/lightbox";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
 import {
+  ProgressRing,
   UploadStatusLine,
   isGoingUp,
   useMediaUploader,
@@ -14,7 +15,7 @@ import {
 } from "@/components/media-uploader";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { useToast } from "@/components/toast";
-import { useDropTarget, type UploadTarget } from "@/components/upload-queue";
+import { DropLabel, useDropTarget, type UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { callAction } from "@/lib/action-result";
 import { shownReason } from "@/lib/attachments/media";
@@ -392,18 +393,8 @@ export function ListingPhotos({
       <UploadStatusLine uploader={uploader} className="mt-2 justify-start" />
       {uploader.inputs}
 
-      {drop.active && (
-        // The drop state: the field focus look, 8px outside the content so nothing shifts.
-        <span aria-hidden="true" className="pointer-events-none absolute -inset-2 rounded-lg ring-1 ring-act" />
-      )}
-      {drop.over && (
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="inline-flex items-center gap-2 rounded-lg border border-line-float bg-raised px-3 py-2 text-label text-fg-1 shadow-float">
-            <ImagePlus aria-hidden="true" className="size-4 text-fg-3" />
-            Drop to add photos
-          </span>
-        </span>
-      )}
+      {/* The drop state: the field focus look 8px outside the content, so nothing shifts, and the label under the pointer. */}
+      <DropLabel state={drop} label="Drop to add photos" />
 
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
@@ -526,28 +517,5 @@ function PendingTile({ upload: u, onRetry, onRemove, first }: { upload: MediaUpl
         <X className="size-3.5" aria-hidden="true" />
       </button>
     </div>
-  );
-}
-
-/** A 24px ring that fills clockwise. The tile's label carries the percentage. */
-function ProgressRing({ value }: { value: number }) {
-  const r = 9;
-  const c = 2 * Math.PI * r;
-  return (
-    <svg viewBox="0 0 24 24" className="size-6 -rotate-90" aria-hidden="true">
-      <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-on-photo/30" />
-      <circle
-        cx="12"
-        cy="12"
-        r={r}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - value)}
-        className="text-on-photo transition-[stroke-dashoffset] duration-200 motion-reduce:transition-none"
-      />
-    </svg>
   );
 }

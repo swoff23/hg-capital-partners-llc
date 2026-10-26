@@ -144,7 +144,14 @@ export function TaskPageView(p: TaskPageViewProps) {
 
           <Checklist taskId={task.id} items={p.checklist} />
 
-          <TaskMediaSection taskId={task.id} media={p.media} files={p.files} atFinish={p.atFinish} />
+          <TaskMediaSection
+            taskId={task.id}
+            media={p.media}
+            files={p.files}
+            atFinish={p.atFinish}
+            // For "Set as property photo" in the viewer (uploads 2.10).
+            property={propertyOf(p.properties, p.values.propertyId)}
+          />
 
           <Section title="Activity">
             <TaskActivity rows={p.rows} dayLabels={p.dayLabels} />
@@ -163,4 +170,10 @@ export function TaskPageView(p: TaskPageViewProps) {
       </div>
     </StatusRunProvider>
   );
+}
+
+/** The task's property as the photos section needs it: its id and short address. */
+function propertyOf(properties: PropertyOption[], id: string | null | undefined): { id: string; label: string } | null {
+  const found = id ? properties.find((x) => x.id === id) : undefined;
+  return found ? { id: found.id, label: found.label } : null;
 }

@@ -12,7 +12,8 @@ type SharedFile = JobFile & { size?: number | null; uploadedBy?: string | null; 
  * grid of everything the contractor may see on the job, newest first with the
  * photos sent with the latest Mark done leading under "At finish", then the
  * documents HG shared on the job as rows with who added each and when, each
- * opening the file. Download only: a contractor deletes nothing here.
+ * opening the file (its ⋯ holds Open and Download). Download only: a
+ * contractor deletes nothing here.
  * Nothing while there's nothing. Titled for what it holds, as the task page's
  * is: "Photos and files 14", "Photos 12" or "Files 3" (TASKS-011).
  *
@@ -68,8 +69,10 @@ export function JobMediaSection({
       }
     >
       <div className="space-y-3">
-        <MediaGrid items={media} groups={groups} />
-        <FilesList files={rows} />
+        {/* The portal's viewer: Download, and no ⋯. */}
+        <MediaGrid items={media} groups={groups} surface="portal" />
+        {/* No handlers here, so the byline and the Open and Download menu are asked for. */}
+        <FilesList files={rows} byline menu />
       </div>
     </Section>
   );

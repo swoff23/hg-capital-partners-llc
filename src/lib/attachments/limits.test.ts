@@ -95,8 +95,9 @@ test("propertyUploadLimits: public photos are photos only, 25 MB, with no HEIC f
     assert.deepEqual(l, { maximumSizeInBytes: 25 * 1024 * 1024, allowedContentTypes: [...PUBLIC_PHOTO_RULE.contentTypes] });
     assert.ok(!(l as { allowedContentTypes: string[] }).allowedContentTypes.includes("image/heic"));
   }
-  // The listing editor has always named a blob by the picked file's own name; the token's type allowlist holds the bytes to photos.
-  assert.equal(typeof propertyUploadLimits("listing-photo-upload", P, "IMG_6117 (2).jpg"), "object");
+  // The listing photo manager uploads through the queue, so a listing blob is its stored name's slug and nothing else.
+  assert.equal(typeof propertyUploadLimits("listing-photo-upload", P, "photo-2026-10-25-214pm-2.jpg"), "object");
+  assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "IMG_6117 (2).jpg") === "string", "a raw file name");
   assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "a/b.jpg") === "string");
   assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "..") === "string");
   assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "") === "string");

@@ -4,14 +4,13 @@ import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Play } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
-import { useHoldLeave, useLeaveGuard } from "@/components/leave-guard";
+import { useLeaveGuard } from "@/components/leave-guard";
 import {
   MediaUploadTray,
   UploadStatusLine,
   UploadTile,
-  isGoingUp,
-  useLeaveWarning,
   useMediaUploader,
+  type MediaUpload,
   type RecordMediaInput,
   type RecordMediaResult,
 } from "@/components/media-uploader";
@@ -22,6 +21,7 @@ import { useToast } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
 import type { UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
+import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction } from "@/lib/action-result";
 import { contentTypeForName, fileKindForType, type FileKind } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
@@ -35,7 +35,6 @@ import {
   markDoneButton,
   nextStep,
   postedText,
-  stillUploading,
   stripCounts,
 } from "@/lib/portal/job-view";
 import { cn } from "@/lib/utils";
@@ -63,23 +62,25 @@ import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "..
  * another one in the app posts whatever is still held. A reload or a closed
  * tab asks first where the browser allows it (iOS Safari never does).
  *
- * Leaving cancels whatever is still going up, so while anything is, "My
- * jobs" and the payoff's "Back to my jobs" ask first in a sheet (the portal
- * layout's LeaveGuard, decision 24); the upload queue (UP1) outlives the page,
- * and this hold retires with that. Mark done waits for uploads, and for each
- * failed photo to be retried or removed (decision 13): in the bar and in the
- * sheet it stays off over one line ("2 photos didn't upload · Retry" in
- * danger, or "Finishing 2 uploads…" in grey), and a failed tile keeps its
- * place with the Retry pill. "Add photos" is off while the Mark done is
- * sending: a photo picked then wouldn't go with it.
+ * Leaving never cancels what's still going up: the portal layout's upload
+ * queue outlives the page, so "My jobs" and the payoff's "Back to my jobs"
+ * don't ask (uploads 2.1; only Sign out does), and a batch that lands after
+ * the contractor left posts on its own with the same Undo (choice 1 A; the
+ * My jobs row says "Uploading 3 photos" meanwhile). Mark done waits for
+ * uploads, and for each failed photo to be retried or removed (decision 13):
+ * in the bar and in the sheet it stays off over one line ("2 photos didn't
+ * upload · Retry" in danger, or "Finishing 2 uploads…" in grey), and a failed
+ * tile keeps its place with the Retry pill. "Add photos" and the slots are
+ * off while the Mark done is sending: a photo picked then wouldn't go with it.
  *
- * The Mark done sheet (uploads 2.8) is the proof slots: "Photos of the
- * finished work" with "1 of 2" when the playbook asks for photos
- * (`finishPhotosRequired`, off by default), empty camera squares up to that
- * count (one on an optional job), then one add tile. An empty slot opens the
- * camera on touch and the file picker with a mouse. There's no Skip: with no
- * photos on an optional job the primary reads "Mark done". Its pair is pinned
- * under the scroll, so the note's keyboard never covers it.
+ * The Mark done sheet (uploads 2.8) is the proof slots, on the upload tray's
+ * `slots`: "Photos of the finished work" with "1 of 2" when the playbook asks
+ * for photos (`finishPhotosRequired`, off by default), the photos already up
+ * as ready tiles, then empty camera squares up to that count (one on an
+ * optional job), then one add tile. An empty slot opens the camera on touch
+ * and the file picker with a mouse. There's no Skip: with no photos on an
+ * optional job the primary reads "Mark done". Its pair is pinned under the
+ * scroll, so the note's keyboard never covers it.
  *
  * One primary per screen (docs/brand-guidelines.md, section 9): the bar's next
  * step on the page, the sheet's Mark done inside it. Send is secondary.
@@ -151,28 +152,34 @@ export function JobActions({
       if (text) setBody((b) => (b.trim() === text ? "" : b));
     });
 
-  /** A batch that posts on its own: one update, "3 photos posted", and five seconds to take it back. */
+  /** Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post. */
+  async function sendBatch(items: Recorded[]): Promise<boolean> {
+    const res = await callAction(() => postJobBatchAction(taskId, items.map((i) => i.id)));
+    if (!res.ok) {
+      toast({ message: res.error });
+      return false;
+    }
+    const { eventId } = res.data;
+    toast({
+      message: postedText(items.map((i) => i.kind)),
+      key: `job-post:${eventId}`,
+      action: {
+        label: "Undo",
+        onAction: () => {
+          void callAction(() => undoJobPostAction(taskId, eventId)).then((undone) => {
+            if (!undone.ok) toast({ message: undone.error });
+          });
+        },
+      },
+    });
+    return true;
+  }
+
+  /** A batch that posts on its own while the page is here. One that doesn't post goes back on the tray, to go with the next send. */
   const postBatch = (items: Recorded[]) =>
     startSending(async () => {
-      const res = await callAction(() => postJobBatchAction(taskId, items.map((i) => i.id)));
-      if (!res.ok) {
-        toast({ message: res.error });
-        setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
-        return;
-      }
-      const { eventId } = res.data;
-      toast({
-        message: postedText(items.map((i) => i.kind)),
-        key: `job-post:${eventId}`,
-        action: {
-          label: "Undo",
-          onAction: () => {
-            void callAction(() => undoJobPostAction(taskId, eventId)).then((undone) => {
-              if (!undone.ok) toast({ message: undone.error });
-            });
-          },
-        },
-      });
+      if (await sendBatch(items)) return;
+      setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
     });
 
   /** The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and the strip. */
@@ -202,6 +209,11 @@ export function JobActions({
     postBatch([...waiting, ...added]);
   }
 
+  /** A batch that landed after the contractor left the page: it posts as its own update, with the same toast and Undo. */
+  function onAway(ids: string[]) {
+    void sendBatch(ids.map((id) => info.current.get(id) ?? { id, name: "", kind: null, hasThumb: false, hasPoster: false }));
+  }
+
   const target: UploadTarget = {
     key: `portal-task:${taskId}`,
     label: property?.label ?? "this job",
@@ -215,13 +227,12 @@ export function JobActions({
     onRecorded,
     // Gone from the page, a contractor's photos still post as their own update.
     whenAway: "post",
+    onAway,
+    // The record step takes when each file joined the queue: one queued before Mark done still records inside the hour (question 4).
+    sendQueuedAt: true,
   };
   const uploader = useMediaUploader({ target });
   const { pending, failed } = uploader;
-
-  // "My jobs" and the payoff's "Back to my jobs" ask before they cancel what's still going up.
-  const goingUp = stillUploading(uploader.uploads.filter(isGoingUp).map((u) => u.kind));
-  useHoldLeave(pending > 0 ? { title: goingUp, stay: "Keep uploading" } : null);
 
   // The photos a Mark done is sending right now, so leaving mid-send doesn't
   // post them a second time as an empty update.
@@ -324,7 +335,6 @@ export function JobActions({
   const openSlot = () => (coarse ? cameraRef.current?.click() : uploader.chooseFiles());
 
   const slots = finishSlots(required);
-  const filled = ready.length + uploader.uploads.length;
 
   return (
     <>
@@ -457,23 +467,21 @@ export function JobActions({
               </p>
               {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, ready.length)}</span>}
             </div>
-            <ul
-              aria-label="Photos of the finished work"
-              className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2"
-            >
-              {ready.map((r) => (
-                <ReadyTile key={r.id} item={r} />
+            {/* The photos already up, then the ones going up, then empty slots up to the count asked for (one on an
+                optional job), solid squares, never dashed; once the count is met, one add tile remains. */}
+            <MediaUploadTray
+              uploader={uploader}
+              layout="grid"
+              notice={false}
+              label="Photos of the finished work"
+              slots={slots}
+              filled={ready.length}
+              onSlot={openSlot}
+              disabled={finishing}
+              leading={ready.map((r) => (
+                <UploadTile key={r.id} upload={readyUpload(r)} grid ready />
               ))}
-              {uploader.uploads.map((u) => (
-                <UploadTile key={u.key} upload={u} grid onRetry={() => uploader.retry(u.key)} onRemove={() => uploader.remove(u.key)} />
-              ))}
-              {/* Empty slots up to the count asked for (one on an optional job): solid squares, never dashed. */}
-              {Array.from({ length: Math.max(0, slots - filled) }, (_, i) => (
-                <SlotButton key={`slot-${i}`} label="Add a photo of the finished work" onClick={openSlot} disabled={finishing} />
-              ))}
-              {/* Once the count is met, one add tile remains. */}
-              {filled >= slots && <SlotButton key="more" label="Add another photo" onClick={openSlot} disabled={finishing} />}
-            </ul>
+            />
             <div>
               <label htmlFor="done-note" className="sr-only">
                 Note
@@ -496,44 +504,15 @@ export function JobActions({
   );
 }
 
-/** An empty proof slot, or the add tile once the count is met: a --fill-1 square with a Camera, opening the camera on touch. */
-function SlotButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled: boolean }) {
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        aria-label={label}
-        className="flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors disabled:opacity-50 not-disabled:hover:text-fg-1"
-      >
-        <Camera className="size-5" aria-hidden="true" />
-      </button>
-    </li>
-  );
-}
-
 /** Where a recorded photo or video's picture is: its thumbnail, or the poster of a video, from the task file route. */
 function previewOf(item: Recorded): string | null {
   if (item.kind === "video") return item.hasPoster ? taskFileUrl(item.id, "poster") : null;
   return taskFileUrl(item.id, item.hasThumb ? "thumb" : undefined);
 }
 
-/** A photo that's up and waiting for Mark done: its picture in its slot. Nothing to retry, and contractors delete nothing. */
-function ReadyTile({ item }: { item: Recorded }) {
-  const [broken, setBroken] = useState(false);
-  const src = previewOf(item);
-  return (
-    <li aria-label={`${item.name}, uploaded`} className="relative aspect-square w-full overflow-hidden rounded-lg bg-fill-1">
-      {src && !broken && (
-        // Gated, session-checked route; next/image would cache it publicly.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" decoding="async" draggable={false} onError={() => setBroken(true)} className="h-full w-full object-cover" />
-      )}
-      {item.kind === "video" && <Play className="absolute bottom-1 left-1 h-3 w-3 fill-on-photo text-on-photo drop-shadow" aria-hidden="true" />}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg inset-shadow-photo-edge" />
-    </li>
-  );
+/** A photo that's up and waiting for Mark done, as the tray's ready tile: its picture in its slot, no Retry, and no Remove (contractors delete nothing). */
+function readyUpload(item: Recorded): MediaUpload {
+  return { key: item.id, name: item.name, kind: item.kind, previewUrl: previewOf(item), progress: 1, status: "saving" };
 }
 
 /**

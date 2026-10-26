@@ -322,6 +322,8 @@ const STAFF_ONLY = [
   "@/lib/session",
   "@/lib/session-token",
   "@/lib/tasks/service",
+  // The task attachment service moved out of service.ts (uploads build plan 1.3); its staff half is as staff-only.
+  "@/lib/tasks/attachments",
   "@/lib/tasks/queries",
   "@/lib/tasks/bulk",
   "@/lib/properties",
