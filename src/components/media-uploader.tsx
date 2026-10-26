@@ -1,47 +1,47 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { upload } from "@vercel/blob/client";
-import { Camera, ImagePlus, Play, RotateCw, TriangleAlert, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Camera, FileImage, FileSpreadsheet, FileText, ImagePlus, Play, RotateCcw, TriangleAlert, WifiOff, X } from "lucide-react";
 import { RetryPill } from "@/components/photo-thumb";
-import { Button } from "@/components/ui";
-import type { UploadTarget } from "@/components/upload-queue";
-import { isOfflineError } from "@/lib/action-result";
-import { usesMultipart, type FileKind } from "@/lib/attachments/content-types";
-import { CAMERA_ACCEPT, checkMediaFile, pickerAccept, shownReason, uploadFailureReason, uploadNotice } from "@/lib/attachments/media";
-import { UPLOAD_KIND_ACCESS, uploadRequest, type UploadKind } from "@/lib/attachments/upload-kinds";
+import { useToast } from "@/components/toast";
+import { browserDeps, useUploadEngine, type UploadTarget } from "@/components/upload-queue";
+import { useCoarsePointer } from "@/components/use-coarse-pointer";
+import { useLeaveWarning } from "@/components/use-leave-warning";
+import { type FileKind } from "@/lib/attachments/content-types";
+import { NO_UPLOADS, UploadEngine } from "@/lib/attachments/engine";
+import { CAMERA_ACCEPT, documentLook, pickerAccept, shownReason, uploadCountPhrase, uploadNotice } from "@/lib/attachments/media";
+import { UPLOAD_KIND_ACCESS, uploadTargetKey, type UploadKind } from "@/lib/attachments/upload-kinds";
 import { cn } from "@/lib/utils";
 
 export type { UploadKind } from "@/lib/attachments/upload-kinds";
+export { useLeaveWarning } from "@/components/use-leave-warning";
 
 /**
- * Photo-and-video-first uploads for a task: the staff composer and the
- * contractor job page (docs/asana-migration-plan.md §5.3). Documents too
- * where `allowed` includes "file" (the staff composer): "Choose files" offers
- * whatever `allowed` lets through.
+ * Photo-and-video-first uploads for a task, a property or a listing: the staff
+ * composer, the contractor job page, property Documents and the listing and
+ * property photos (docs/specs/uploads-photos.md 2.1 and 2.3). The files
+ * themselves go through the shared queue (upload-queue.tsx, engine.ts); this
+ * hook is one surface's view of it: its tiles and counts, the camera and
+ * file pickers, and Retry and Remove.
  *
- * Each file is checked here first (type and size, one-line reasons), then
- * goes straight to private Vercel Blob at tasks/<taskId>/orig/<name>, three at
- * a time, multipart above 8 MB (usesMultipart), with progress. Only one
- * multipart file goes up at a time, since each holds its parts in memory;
- * photos keep the other slots. `record` writes the row (the server re-checks
- * the blob with head()); `onRecorded` gets the new ids each time the queue
- * drains. Failed files keep a Retry; any file can be removed.
+ * Each file is checked here first (type and size, one-line reasons), given a
+ * dated name when the camera's is generic, prepared (a thumbnail, a video
+ * poster, for a "display" target a 2560px JPEG with no metadata), then goes
+ * straight to Vercel Blob, three at a time, multipart above 8 MB, with
+ * progress. `record` writes the row (the server re-checks the blob with
+ * head()). Files keep going when the page that picked them is gone, and wait,
+ * rather than fail, with no signal. Failed files keep a Retry; any file can
+ * be removed.
  *
- *   <MediaUploader taskId={id} uploadKind="task-upload" record={recordAction} onRecorded={…}>
- *     {({ takePhoto, chooseFiles, pending }) => …your buttons…}
- *   </MediaUploader>
+ *   const uploader = useMediaUploader({ target });
+ *   {uploader.inputs}
+ *   <MediaUploadTray uploader={uploader} />
  *
- * When the buttons and the thumbnails live apart (a sticky bottom bar), use
- * useMediaUploader() with <MediaUploadTray> and render `inputs` once.
- * `pending` counts files not yet recorded: hold "Mark done" until it's 0.
- * `failed` counts the red tiles still waiting for a Retry or a Remove.
- *
- * `useMediaUploader({ target })` takes an UploadTarget (upload-queue.tsx)
- * in place of the task options, for every kind the token route serves. The
- * uploads spec moves this engine onto the shared queue (2.1, UP1): the
- * target's prepare step, its cap, its whenAway and the thumbnail, poster and
- * queuedAt fields of RecordMediaInput are part of the contract (build plan
- * 1.5) and not acted on yet; files go up as picked, as before.
+ * The older options (a task id and an upload kind) still work and name the
+ * target themselves. `pending` counts files not yet recorded and sending:
+ * hold "Mark done" until it's 0; `waiting` are the ones held for a signal,
+ * and `failed` counts the red tiles still waiting for a Retry or a Remove.
+ * Under a UploadQueueProvider everything outlives the page; without one
+ * (a page outside both layouts) it is the same engine for the page alone.
  */
 
 export type RecordMediaInput = {
@@ -54,7 +54,7 @@ export type RecordMediaInput = {
   thumbPathname?: string;
   /** A video's poster frame, made before upload. */
   posterPathname?: string;
-  /** When the file joined the queue (ISO), for the late-upload rule after Mark done (question 4). Not sent until the record steps accept it. */
+  /** When the file joined the queue (ISO), for the late-upload rule after Mark done (question 4). Sent only when the target sets `sendQueuedAt`, since the record actions parse their input strictly. */
   queuedAt?: string;
 };
 
@@ -78,34 +78,24 @@ export type MediaUploaderTargetOptions = {
   onPendingChange?: (pending: number) => void;
 };
 
-/** What the engine reads, whichever way it was called. */
-type EngineOptions = {
-  parentId: string;
-  uploadKind: UploadKind;
-  access: "private" | "public";
-  record: (file: RecordMediaInput) => Promise<RecordMediaResult>;
-  onRecorded?: (ids: string[]) => void;
-  onPendingChange?: (pending: number) => void;
-  allowed?: readonly FileKind[];
-};
-
-function engineOptions(o: MediaUploaderOptions | MediaUploaderTargetOptions): EngineOptions {
-  if ("target" in o) {
-    const t = o.target;
-    return {
-      parentId: t.parentId,
-      uploadKind: t.uploadKind,
-      access: t.access,
-      record: t.record,
-      onRecorded: t.onRecorded,
-      onPendingChange: o.onPendingChange,
-      allowed: t.allowed,
-    };
-  }
-  return { ...o, parentId: o.taskId, access: UPLOAD_KIND_ACCESS[o.uploadKind] };
+/** The target the older options describe. A contractor's photos are "display" photos (question 3); the rest go as picked. */
+function targetFrom(o: MediaUploaderOptions): UploadTarget {
+  const contractor = o.uploadKind === "portal-task-upload";
+  return {
+    key: uploadTargetKey(o.uploadKind, o.taskId),
+    label: "",
+    uploadKind: o.uploadKind,
+    parentId: o.taskId,
+    access: UPLOAD_KIND_ACCESS[o.uploadKind],
+    allowed: o.allowed ?? ["image", "video"],
+    prepare: contractor ? "display" : "original",
+    record: o.record,
+    onRecorded: o.onRecorded,
+    whenAway: contractor ? "post" : "hold",
+  };
 }
 
-type UploadStatus = "queued" | "uploading" | "saving" | "failed" | "invalid";
+type UploadStatus = "queued" | "uploading" | "saving" | "waiting" | "failed" | "invalid";
 
 export type MediaUpload = {
   key: string;
@@ -118,12 +108,18 @@ export type MediaUpload = {
   status: UploadStatus;
   /** Why it failed, as the server or the check said it. */
   error?: string;
+  /** The files picked, dropped or pasted together share one. */
+  batchId?: string;
+  /** Bytes. */
+  size?: number;
 };
 
 export type MediaUploaderApi = {
-  uploads: MediaUpload[];
-  /** Files not yet recorded (queued, uploading or saving). */
+  uploads: readonly MediaUpload[];
+  /** Files not yet recorded and on their way (queued, uploading or saving). Files held for a signal are `waiting`. */
   pending: number;
+  /** Files held for a signal: they retry on their own, on coming back online and after 2, 5, 15 and 60 seconds. */
+  waiting: number;
   /** Red tiles: files that didn't go up (failed, or refused by the check) and are still waiting for a Retry or a Remove. */
   failed: number;
   /** One line about what failed, or "". */
@@ -142,203 +138,53 @@ export type MediaUploaderApi = {
   inputs: ReactNode;
 };
 
-/** Not recorded yet: waiting its turn, going up, or being saved. What `pending` counts. */
+/** Not recorded yet and on its way: waiting its turn, going up, or being saved. What `pending` counts. */
 export function isGoingUp(u: MediaUpload): boolean {
   return u.status === "queued" || u.status === "uploading" || u.status === "saving";
 }
 
-const CONCURRENCY = 3;
-const META_TIMEOUT_MS = 3000;
-
-type MediaMeta = { width?: number; height?: number; durationSec?: number };
-
-type Job = {
-  file: File;
-  contentType: string;
-  fileKind: FileKind;
-  controller: AbortController | null;
-  meta?: MediaMeta;
-  /** Set once the bytes are up. A retry after a failed record step records it again instead of re-sending a big video. */
-  pathname?: string;
-};
-
 export function useMediaUploader(input: MediaUploaderOptions | MediaUploaderTargetOptions): MediaUploaderApi {
-  const options = engineOptions(input);
-  const [uploads, setUploads] = useState<MediaUpload[]>([]);
-  const jobs = useRef(new Map<string, Job>());
-  const queue = useRef<string[]>([]);
-  const active = useRef(0);
-  /** A multipart file is going up. @vercel/blob reads up to 96 MB of its parts into memory, so only one at a time. */
-  const multipartActive = useRef(false);
-  const recorded = useRef<string[]>([]);
-  /** Preview object URLs by upload key, revoked when the tile goes. */
-  const previews = useRef(new Map<string, string>());
-  const seq = useRef(0);
+  const target = "target" in input ? input.target : targetFrom(input);
+  const shared = useUploadEngine();
+  // Outside both layouts there is no shared queue: the page gets one of its own, with no outbox.
+  const [own] = useState(() => (shared ? null : new UploadEngine(browserDeps({ notify: () => {}, navigate: () => {}, persist: false }))));
+  const engine = shared ?? own!;
   const cameraRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
-  // Async uploads read the latest props, not the ones from when they started.
-  const latest = useRef(options);
+
+  // The queue holds the latest record step and rules, so a file that lands after this render uses them.
   useEffect(() => {
-    latest.current = options;
+    engine.setTarget(target);
   });
+  // The page is here. Its files keep going when it isn't, and a batch that lands then is "away".
+  useEffect(() => engine.mount(target.key), [engine, target.key]);
 
-  const patch = (key: string, p: Partial<MediaUpload>) => setUploads((us) => us.map((u) => (u.key === key ? { ...u, ...p } : u)));
-
-  const drop = (key: string) => {
-    const url = previews.current.get(key);
-    if (url) URL.revokeObjectURL(url);
-    previews.current.delete(key);
-    setUploads((us) => us.filter((u) => u.key !== key));
-  };
-
-  async function run(key: string) {
-    const job = jobs.current.get(key);
-    if (!job) return;
-    const controller = new AbortController();
-    job.controller = controller;
-    patch(key, { status: "uploading", progress: 0, error: undefined });
-    try {
-      job.meta ??= await readMediaMeta(job.file, job.fileKind);
-      if (!jobs.current.has(key)) return; // removed before any bytes went up
-      let pathname = job.pathname;
-      if (!pathname) {
-        const { parentId, uploadKind, access } = latest.current;
-        const request = uploadRequest(uploadKind, parentId, { name: job.file.name, contentType: job.contentType, fileKind: job.fileKind });
-        const blob = await upload(request.pathname, job.file, {
-          access,
-          handleUploadUrl: `/api/blob/${uploadKind}`,
-          clientPayload: request.clientPayload,
-          contentType: job.contentType,
-          multipart: usesMultipart(job.file.size),
-          abortSignal: controller.signal,
-          onUploadProgress: ({ percentage }) => patch(key, { progress: Math.min(1, percentage / 100) }),
-        });
-        pathname = blob.pathname;
-      }
-      if (!jobs.current.has(key)) return; // removed while the last bytes went up
-      patch(key, { status: "saving", progress: 1 });
-      // One record-only retry: a refusal may have discarded the blob, so after that it uploads again.
-      job.pathname = job.pathname ? undefined : pathname;
-      let res: RecordMediaResult;
-      try {
-        res = await latest.current.record({ pathname, filename: job.file.name, ...job.meta });
-      } catch (err) {
-        // The call itself failed (no signal, an error page, an action retired by a deploy), not a
-        // refusal: its own words mean nothing here. A redirect isn't rethrown: the router is
-        // already navigating, and this runs detached, so a rethrow would only go unhandled.
-        res = { ok: false, error: isOfflineError(err) ? "no connection" : "it couldn't be saved" };
-      }
-      if (!res.ok || !res.data) throw new Error(res.error || "it couldn't be saved");
-      recorded.current.push(res.data.id);
-      jobs.current.delete(key);
-      drop(key);
-    } catch (e) {
-      if (controller.signal.aborted || !jobs.current.has(key)) return;
-      // The browser's and Blob's own words for a dropped connection ("Failed to fetch", "Load failed",
-      // "The blob service is currently not available") mean nothing to anyone.
-      patch(key, { status: "failed", error: uploadFailureReason(e) });
-    } finally {
-      job.controller = null;
-    }
-  }
-
-  /** Whether this queued file sends its bytes in parts (a record-only retry sends none). */
-  const goesMultipart = (key: string) => {
-    const job = jobs.current.get(key);
-    return !!job && !job.pathname && usesMultipart(job.file.size);
-  };
-
-  function pump() {
-    while (active.current < CONCURRENCY) {
-      // The next file in line, passing over multipart ones while one is already going up.
-      const i = queue.current.findIndex((k) => !multipartActive.current || !goesMultipart(k));
-      if (i < 0) break;
-      const [key] = queue.current.splice(i, 1);
-      const multipart = goesMultipart(key);
-      if (multipart) multipartActive.current = true;
-      active.current++;
-      void run(key).finally(() => {
-        active.current--;
-        if (multipart) multipartActive.current = false;
-        pump();
-        if (active.current === 0 && queue.current.length === 0 && recorded.current.length > 0) {
-          const ids = recorded.current;
-          recorded.current = [];
-          latest.current.onRecorded?.(ids);
-        }
-      });
-    }
-  }
-
-  function addFiles(list: FileList | File[]) {
-    const files = Array.from(list);
-    if (files.length === 0) return;
-    const added: MediaUpload[] = [];
-    for (const file of files) {
-      const key = `m${++seq.current}`;
-      const check = checkMediaFile(file, latest.current.allowed);
-      const kind = check.ok ? check.fileKind : null;
-      const previewUrl = kind === "image" || kind === "video" ? URL.createObjectURL(file) : null;
-      if (previewUrl) previews.current.set(key, previewUrl);
-      if (check.ok) {
-        jobs.current.set(key, { file, contentType: check.contentType, fileKind: check.fileKind, controller: null });
-        queue.current.push(key);
-      }
-      added.push({
-        key,
-        name: file.name,
-        kind,
-        previewUrl,
-        progress: 0,
-        status: check.ok ? "queued" : "invalid",
-        error: check.ok ? undefined : check.error,
-      });
-    }
-    setUploads((us) => [...us, ...added]);
-    pump();
-  }
-
-  function retry(key: string) {
-    const job = jobs.current.get(key);
-    if (!job || job.controller) return;
-    patch(key, { status: "queued", progress: 0, error: undefined });
-    queue.current.push(key);
-    pump();
-  }
-
-  function remove(key: string) {
-    const job = jobs.current.get(key);
-    jobs.current.delete(key);
-    queue.current = queue.current.filter((k) => k !== key);
-    job?.controller?.abort();
-    drop(key);
-  }
-
-  // Leaving the page: stop uploads and free the previews.
-  useEffect(() => {
-    const live = jobs.current;
-    const shown = previews.current;
-    return () => {
-      for (const job of live.values()) job.controller?.abort();
-      live.clear();
-      for (const url of shown.values()) URL.revokeObjectURL(url);
-      shown.clear();
-    };
-  }, []);
+  const uploads = useSyncExternalStore(
+    engine.subscribe,
+    () => engine.uploadsFor(target.key),
+    () => NO_UPLOADS,
+  );
 
   const pending = uploads.filter(isGoingUp).length;
+  const waiting = uploads.filter((u) => u.status === "waiting").length;
   const failed = uploads.filter((u) => u.status === "failed" || u.status === "invalid").length;
+  // Told when the count changes, not on every render of a caller that passes a new function each time.
+  const pendingChanged = useRef(input.onPendingChange);
   useEffect(() => {
-    latest.current.onPendingChange?.(pending);
+    pendingChanged.current = input.onPendingChange;
+  });
+  useEffect(() => {
+    pendingChanged.current?.(pending);
   }, [pending]);
 
-  // Leaving the page cancels whatever is still going up, so the browser asks first.
-  useLeaveWarning(pending > 0);
+  // Without a shared queue (or an outbox) a reload loses what's going up, so the browser asks first.
+  useLeaveWarning(!shared && pending + waiting > 0);
 
   const failures = uploads.filter((u) => u.error).map((u) => ({ name: u.name, kind: u.kind, reason: u.error! }));
   const notice = uploadNotice(failures);
   const failedLine = uploadNotice(failures, { reason: false });
 
+  const addFiles = (files: FileList | File[]) => engine.add(target, files);
   const onPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(e.target.files);
     e.target.value = "";
@@ -346,102 +192,65 @@ export function useMediaUploader(input: MediaUploaderOptions | MediaUploaderTarg
   const inputs = (
     <>
       <input ref={cameraRef} type="file" accept={CAMERA_ACCEPT} capture="environment" hidden onChange={onPicked} />
-      <input ref={filesRef} type="file" accept={pickerAccept(options.allowed)} multiple hidden onChange={onPicked} />
+      <input ref={filesRef} type="file" accept={pickerAccept(target.allowed)} multiple hidden onChange={onPicked} />
     </>
   );
 
   return {
     uploads,
     pending,
+    waiting,
     failed,
     notice,
     failedLine,
     takePhoto: () => cameraRef.current?.click(),
     chooseFiles: () => filesRef.current?.click(),
     addFiles,
-    retry,
-    remove,
+    retry: (key) => engine.retry(key),
+    remove: (key) => engine.remove(key),
     inputs,
   };
 }
 
+/** How long a removal can be taken back, the toast's own five seconds. */
+const UNDO_MS = 5000;
+
 /**
- * While `active`, the browser asks before the page goes away: a reload,
- * closing the tab, a typed URL. In-app links don't fire beforeunload, and iOS
- * Safari never asks.
+ * Taking a ready file out of a reply with an Undo (uploads 2.3): the tile
+ * goes at once, the toast reads "Photo removed · Undo", and the file itself is
+ * deleted when the toast ends, not before. `restore` brings the tile back;
+ * `remove` deletes the file. The delete runs even if the page is gone by
+ * then; a reload inside the five seconds leaves the file as a draft.
+ *
+ *   const undoable = useUndoableRemove();
+ *   undoable({ message: "Photo removed", hide: () => forget([r.id]), show: () => unforget([r.id]), remove: () => deleteTaskFile(r.id) });
  */
-export function useLeaveWarning(active: boolean) {
-  useEffect(() => {
-    if (!active) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = ""; // Older Chrome and Safari still look for this.
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [active]);
-}
-
-/** Width, height and length when the browser can read them quickly; never blocks an upload for long. */
-async function readMediaMeta(file: File, kind: FileKind): Promise<MediaMeta> {
-  if (kind !== "image" && kind !== "video") return {};
-  const url = URL.createObjectURL(file);
-  const read = new Promise<MediaMeta>((resolve) => {
-    if (kind === "image") {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.naturalWidth || undefined, height: img.naturalHeight || undefined });
-      img.onerror = () => resolve({});
-      img.src = url;
-    } else {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.muted = true;
-      v.onloadedmetadata = () =>
-        resolve({
-          width: v.videoWidth || undefined,
-          height: v.videoHeight || undefined,
-          durationSec: Number.isFinite(v.duration) && v.duration > 0 ? v.duration : undefined,
-        });
-      v.onerror = () => resolve({});
-      v.src = url;
-    }
-  });
-  const timeout = new Promise<Record<string, never>>((resolve) => setTimeout(() => resolve({}), META_TIMEOUT_MS));
-  try {
-    return await Promise.race([read, timeout]);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-/** The default triggers: the camera on touch screens, and the file picker. */
-function DefaultTriggers({ api }: { api: MediaUploaderApi }) {
-  return (
-    <div className="flex items-center gap-2">
-      <Button type="button" variant="secondary" size="sm" onClick={api.takePhoto} className="pointer-fine:hidden">
-        <Camera className="h-4 w-4" aria-hidden="true" />
-        Take photo or video
-      </Button>
-      <Button type="button" variant="secondary" size="sm" onClick={api.chooseFiles}>
-        <ImagePlus className="h-4 w-4" aria-hidden="true" />
-        Choose files
-      </Button>
-    </div>
-  );
-}
-
-export function MediaUploader({
-  children,
-  className,
-  ...options
-}: MediaUploaderOptions & { children?: (api: MediaUploaderApi) => ReactNode; className?: string }) {
-  const api = useMediaUploader(options);
-  return (
-    <div className={cn("space-y-2", className)}>
-      {api.inputs}
-      {children ? children(api) : <DefaultTriggers api={api} />}
-      <MediaUploadTray uploader={api} />
-    </div>
+export function useUndoableRemove() {
+  const { toast } = useToast();
+  return useCallback(
+    (input: { message: string; key?: string; hide: () => void; show: () => void; remove: () => void | Promise<unknown> }) => {
+      let state: "waiting" | "undone" | "removed" = "waiting";
+      const timer = setTimeout(() => {
+        if (state !== "waiting") return;
+        state = "removed";
+        void input.remove();
+      }, UNDO_MS + 300);
+      input.hide();
+      toast({
+        message: input.message,
+        key: input.key,
+        action: {
+          label: "Undo",
+          onAction: () => {
+            if (state !== "waiting") return;
+            state = "undone";
+            clearTimeout(timer);
+            input.show();
+          },
+        },
+      });
+    },
+    [toast],
   );
 }
 
@@ -456,96 +265,166 @@ export function MediaUploader({
  * shows it under its own button (the contractor's Mark done, from
  * `failedLine`, through UploadStatusLine).
  *
- * `slots` is the Mark done sheet's proof slots (uploads 2.8, UP1 builds
- * them): empty camera squares up to the count a playbook asks for, one on an
- * optional job. Not drawn yet.
+ * `slots` is the Mark done sheet's proof slots (uploads 2.8): in a grid, the
+ * count of finished-work photos the playbook asks for (one on an optional
+ * job). Slots not yet holding a photo are empty `--fill-1` squares with a
+ * Camera (solid, never dashed) after the tiles in flight; `filled` is how
+ * many the caller already shows as recorded (UploadTile `ready`) before the
+ * tray, so they count. A tap opens `onSlot`, by default the camera on touch
+ * and the file picker with a mouse (`capture` means nothing there). Once the
+ * count is met, one add tile remains.
+ *
+ * `onFill` is for a tray on a `--fill-1` ground (an Internal note): the
+ * Remove badge's ring takes that ground instead of `--surface`.
  */
 export function MediaUploadTray({
   uploader,
   layout = "row",
   notice: showNotice = true,
   slots,
+  filled = 0,
+  onSlot,
+  onFill = false,
   className,
 }: {
   uploader: MediaUploaderApi;
   layout?: "row" | "grid";
   notice?: boolean;
-  /** How many photo slots to keep open (grid only): empty `--fill-1` squares with a Camera, then one add tile once met. */
   slots?: number;
+  filled?: number;
+  onSlot?: () => void;
+  onFill?: boolean;
   className?: string;
 }) {
-  void slots;
   const { uploads, notice, retry, remove } = uploader;
-  if (uploads.length === 0) return null;
+  const coarse = useCoarsePointer();
   const grid = layout === "grid";
+  const slotted = grid && slots !== undefined;
+  if (uploads.length === 0 && !slotted) return null;
+  const empty = slotted ? Math.max(0, slots - filled - uploads.filter((u) => u.status !== "invalid").length) : 0;
+  const open = onSlot ?? (coarse ? uploader.takePhoto : uploader.chooseFiles);
   return (
     <div className={cn("space-y-1.5", className)}>
-      <ul className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5 sm:gap-2" : "flex flex-wrap gap-2"}>
+      <ul className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2" : "flex flex-wrap gap-2"}>
         {uploads.map((u) => (
-          <UploadTile key={u.key} upload={u} grid={grid} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
+          <UploadTile key={u.key} upload={u} grid={grid} onFill={onFill} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
         ))}
+        {slotted &&
+          Array.from({ length: empty }, (_, i) => (
+            <li key={`slot-${i}`}>
+              <button
+                type="button"
+                onClick={open}
+                aria-label="Add a photo"
+                className="relative flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors hover:text-fg-2"
+              >
+                <Camera className="size-5" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        {slotted && empty === 0 && (
+          <li>
+            <button
+              type="button"
+              onClick={uploader.chooseFiles}
+              aria-label="Add more photos"
+              className="relative flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors hover:text-fg-2"
+            >
+              <ImagePlus className="size-5" aria-hidden="true" />
+            </button>
+          </li>
+        )}
       </ul>
       {showNotice && notice && <p className="truncate text-meta text-danger">{notice}</p>}
     </div>
   );
 }
 
+/** What the tile says it is, ending its accessible name. */
+function stateLabel(u: MediaUpload, ready: boolean): string {
+  if (ready) return "ready to send";
+  switch (u.status) {
+    case "invalid":
+    case "failed":
+      return `couldn't upload: ${shownReason(u.error ?? "")}`;
+    case "saving":
+      return "saving";
+    case "waiting":
+      return "waiting for signal";
+    case "queued":
+      return "waiting";
+    default:
+      return `uploading, ${Math.round(u.progress * 100)}%`;
+  }
+}
+
 /**
  * One file on the tray: its preview, the ring while it goes up, the danger
- * ring with Retry when it didn't, and Remove. `ready` is a file already
- * recorded and waiting to be sent (the composer's ready tiles, uploads 2.3):
- * no ring, and its name ends "ready to send".
+ * ring with Retry when it didn't, and Remove (uploads 2.3). A document shows
+ * its type (a glyph over "PDF"), a photo the browser can't draw shows a HEIC
+ * tile instead of a broken picture, and a file waiting for a signal sits
+ * under the scrim with a WifiOff mark and no ring. `ready` is a file already
+ * recorded and waiting to be sent (the composer's ready tiles): no ring, and
+ * its name ends "ready to send".
  */
 export function UploadTile({
   upload: u,
   grid,
   ready = false,
+  onFill = false,
   onRetry,
   onRemove,
 }: {
   upload: MediaUpload;
   grid: boolean;
   ready?: boolean;
+  /** On a `--fill-1` ground: Remove's ring is that ground. */
+  onFill?: boolean;
   onRetry: () => void;
   onRemove: () => void;
 }) {
   const [broken, setBroken] = useState(false);
+  // A server-rendered preview (a ready tile) can fail before hydration attaches onError; this reads one that has settled.
+  const settled = useCallback((img: HTMLImageElement | null) => {
+    if (img?.complete && img.naturalWidth === 0) setBroken(true);
+  }, []);
   const failed = u.status === "failed" || u.status === "invalid";
-  const state = ready
-    ? "ready to send"
-    : u.status === "invalid" || u.status === "failed"
-      ? `couldn't upload: ${shownReason(u.error ?? "")}`
-      : u.status === "saving"
-        ? "saving"
-        : u.status === "queued"
-          ? "waiting"
-          : `uploading, ${Math.round(u.progress * 100)}%`;
+  const label = stateLabel(u, ready);
+  const photo = u.kind === "image" && !!u.previewUrl && !broken;
+  const video = u.kind === "video" && !!u.previewUrl && !broken;
+  // A document, or a photo with nothing to draw: its type over a glyph.
+  const typed = !photo && !video && u.kind !== "video" ? documentLook(u.name) : null;
+  const Glyph = typed?.glyph === "sheet" ? FileSpreadsheet : typed?.glyph === "image" ? FileImage : FileText;
 
   return (
     <li
-      aria-label={`${u.name}, ${state}`}
+      aria-label={`${u.name}, ${label}`}
       className={cn("relative rounded-lg bg-fill-1", grid ? "aspect-square w-full" : "h-14 w-14 shrink-0")}
     >
       <div className="absolute inset-0 overflow-hidden rounded-lg">
-        {u.previewUrl && !broken && u.kind === "image" && (
-          // An object URL of the picked file: next/image can't optimize it.
+        {photo && (
+          // An object URL of the picked file or its thumbnail: next/image can't optimize it.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={u.previewUrl} alt="" onError={() => setBroken(true)} className="h-full w-full object-cover" />
+          <img ref={settled} src={u.previewUrl!} alt="" onError={() => setBroken(true)} className="h-full w-full object-cover" />
         )}
-        {u.previewUrl && !broken && u.kind === "video" && (
-          <video
-            src={`${u.previewUrl}#t=0.1`}
-            muted
-            playsInline
-            preload="metadata"
-            onError={() => setBroken(true)}
-            className="h-full w-full object-cover"
-          />
+        {video && (
+          <video src={`${u.previewUrl}#t=0.1`} muted playsInline preload="metadata" onError={() => setBroken(true)} className="h-full w-full object-cover" />
+        )}
+        {typed && (
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-fg-3">
+            <Glyph className="size-5" strokeWidth={1.5} aria-hidden="true" />
+            <span className="text-micro">{typed.label}</span>
+          </span>
         )}
         {u.kind === "video" && (
           <Play className="absolute bottom-1 left-1 h-3 w-3 fill-on-photo text-on-photo drop-shadow" aria-hidden="true" />
         )}
-        {!ready && u.status !== "invalid" && u.status !== "failed" && (
+        {!ready && u.status === "waiting" && (
+          <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/50">
+            <WifiOff className="size-5 text-on-photo" aria-hidden="true" />
+          </div>
+        )}
+        {!ready && !failed && u.status !== "waiting" && (
           <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/50">
             <ProgressRing value={u.status === "queued" ? 0 : u.progress} />
           </div>
@@ -573,7 +452,7 @@ export function UploadTile({
             aria-label={`Retry ${u.name}`}
             className="absolute inset-0 flex items-center justify-center rounded-lg bg-photo-scrim/60 text-on-photo"
           >
-            <RotateCw className="h-5 w-5" aria-hidden="true" />
+            <RotateCcw className="h-5 w-5" aria-hidden="true" />
           </button>
         ))}
       <button
@@ -581,15 +460,19 @@ export function UploadTile({
         onClick={onRemove}
         aria-label={`Remove ${u.name}`}
         className={cn(
-          "absolute flex h-5 w-5 items-center justify-center rounded-full bg-act text-on-act ring-2 ring-surface",
+          // A square 20px badge: an icon-only button is square, never round. Its 1px ring is the tile's ground, so it
+          // doesn't show a pale halo on an Internal note.
+          "absolute flex h-5 w-5 items-center justify-center rounded-sm bg-act text-on-act ring-1",
+          onFill ? "ring-fill-1" : "ring-surface",
           // On the corner of a 56px tile. A grid tile runs to the tray's edge, so its X sits inside: the 44px
           // touch area then reaches 8px out, short of Send in the gap beside it and of the Retry pill on the
-          // tile above (gap 6px; the pill's area stops 2px above its tile's bottom).
+          // tile above (gap 8px; the pill's area stops 2px above its tile's bottom).
           grid ? "right-1 top-1" : "-right-1.5 -top-1.5",
-          "after:absolute after:-inset-3 pointer-fine:after:-inset-1",
+          // 44px with a finger, 32px with a mouse.
+          "after:absolute after:-inset-3 pointer-fine:after:-inset-1.5",
         )}
       >
-        <X className="h-3 w-3" aria-hidden="true" />
+        <X className="size-3.5" aria-hidden="true" />
       </button>
     </li>
   );
@@ -602,10 +485,21 @@ export function UploadTile({
  * label keeps its reason. A file the check refused (too big, wrong type) can
  * only be removed, so it gets no Retry; with nothing to retry, the line keeps
  * the reason ("1 photo didn't upload: over the 25 MB photo limit"), since
- * it's the only place a sighted user sees why. Nothing while nothing failed.
+ * it's the only place a sighted user sees why. With nothing failed but files
+ * held for a signal it is "No signal · 5 photos waiting" in `--fg-3` ("No
+ * signal · 5 waiting" under 360px). Nothing while all is well.
  */
 export function UploadStatusLine({ uploader, className }: { uploader: MediaUploaderApi; className?: string }) {
-  if (uploader.failed === 0) return null;
+  if (uploader.failed === 0) {
+    if (uploader.waiting === 0) return null;
+    const held = uploader.uploads.filter((u) => u.status === "waiting");
+    return (
+      <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-fg-3", className)}>
+        <span className="truncate max-[359px]:hidden">No signal · {uploadCountPhrase(held.map((u) => u.kind))} waiting</span>
+        <span className="truncate min-[360px]:hidden">No signal · {held.length} waiting</span>
+      </p>
+    );
+  }
   const retryable = uploader.uploads.filter((u) => u.status === "failed");
   const line =
     (retryable.length > 0 ? uploader.failedLine : uploader.notice) ||

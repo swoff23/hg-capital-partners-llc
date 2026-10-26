@@ -33,13 +33,15 @@ export interface FileHeaderInput {
   filename: string;
   /** Content-Length, when the upstream gave one. */
   size?: number | string | null;
+  /** The saving link (`?download=1`): always an attachment, even for what would open in the tab. */
+  download?: boolean;
 }
 
-export function fileResponseHeaders({ contentType, filename, size }: FileHeaderInput): Record<string, string> {
+export function fileResponseHeaders({ contentType, filename, size, download = false }: FileHeaderInput): Record<string, string> {
   const type = normalizeContentType(contentType) || "application/octet-stream";
   const headers: Record<string, string> = {
     "Content-Type": type,
-    "Content-Disposition": contentDisposition(filenameForType(filename, type), opensInline(type) ? "inline" : "attachment"),
+    "Content-Disposition": contentDisposition(filenameForType(filename, type), opensInline(type) && !download ? "inline" : "attachment"),
     "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": type === "application/pdf" ? "default-src 'none'" : "sandbox; default-src 'none'",
     "Cache-Control": FILE_CACHE_CONTROL,

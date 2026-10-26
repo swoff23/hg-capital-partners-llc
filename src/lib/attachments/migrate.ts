@@ -1,6 +1,8 @@
 import "server-only";
 import { del, get, put } from "@vercel/blob";
+import { countStillPublic, storeIdFromToken } from "@/lib/attachments/paths";
 import { prisma } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 
 /**
@@ -76,7 +78,17 @@ export async function migrateDocumentsToPrivate(): Promise<MigrationReport> {
   return report;
 }
 
-export async function attachmentCounts(): Promise<{ tasks: number; properties: number }> {
-  const [tasks, properties] = await Promise.all([prisma.taskAttachment.count(), prisma.propertyAttachment.count()]);
-  return { tasks, properties };
+/**
+ * How many files are still public, for the Storage page's one status line
+ * (task attachments and property documents together). Null where no store is
+ * connected: there is nothing to compare against.
+ */
+export async function stillPublicCount(): Promise<number | null> {
+  const storeId = storeIdFromToken(getEnv().BLOB_READ_WRITE_TOKEN);
+  if (!storeId) return null;
+  const [tasks, props] = await Promise.all([
+    prisma.taskAttachment.findMany({ where: { url: { not: null } }, select: { url: true, pathname: true } }),
+    prisma.propertyAttachment.findMany({ select: { url: true, pathname: true } }),
+  ]);
+  return countStillPublic(tasks, storeId) + countStillPublic(props, storeId);
 }

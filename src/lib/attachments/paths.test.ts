@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  countStillPublic,
   isPrivateStoreUrl,
   privateStoreHost,
   requestedUploadRole,
@@ -101,4 +102,20 @@ test("isPrivateStoreUrl: our private store only, at the exact path when given", 
   assert.equal(isPrivateStoreUrl("not a url", "AbC123"), false);
   assert.equal(isPrivateStoreUrl(ok, null), false);
   assert.equal(isPrivateStoreUrl(null, "AbC123"), false);
+});
+
+test("countStillPublic: rows outside our private store, links and other stores' look-alikes included", () => {
+  const priv = (p: string) => ({ url: `https://abc123.private.blob.vercel-storage.com/${p}`, pathname: p });
+  const rows = [
+    priv("properties/p1/lease.pdf"),
+    priv("tasks/t1/orig/a.jpg"),
+    { url: "https://abc123.public.blob.vercel-storage.com/old-lease.pdf", pathname: "old-lease.pdf" },
+    { url: "https://other.private.blob.vercel-storage.com/x.pdf", pathname: "x.pdf" },
+    // The host is ours but the row points at another path than the blob it names.
+    { url: "https://abc123.private.blob.vercel-storage.com/a.pdf", pathname: "b.pdf" },
+    { url: null, pathname: null },
+  ];
+  assert.equal(countStillPublic(rows, "abc123"), 3);
+  assert.equal(countStillPublic([], "abc123"), 0);
+  assert.equal(countStillPublic([priv("a.pdf")], "abc123"), 0);
 });

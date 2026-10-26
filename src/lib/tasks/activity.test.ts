@@ -43,6 +43,9 @@ test("system events read as one sentence, people by first name", () => {
   assert.equal(line(ev("TITLE", { from: "Fix steps", to: "Fix front steps" })), "Connor renamed this from “Fix steps”");
   assert.equal(line(ev("NOTES")), "Connor edited the notes");
   assert.equal(line(ev("ATTACHMENT", { filename: "IMG_1.jpg" })), "Connor added IMG_1.jpg");
+  // Taking a posted file off the task leaves its own line, named for the file.
+  assert.equal(line(ev("ATTACHMENT", { attachmentId: "a1", filename: "quote.pdf", removed: true })), "Connor removed quote.pdf");
+  assert.equal(line(ev("ATTACHMENT", { removed: true })), "Connor removed a file");
   assert.equal(line(ev("CREATED", {}, { actorLabel: "Property reminder", actorUserId: null })), "Property reminder created this task");
 });
 

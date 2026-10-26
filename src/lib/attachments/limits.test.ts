@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PREVIEW_RULE, UPLOAD_RULES } from "./content-types";
-import { durationHint, mediaHint, pixelHint, uploadLimits } from "./limits";
+import { PUBLIC_PHOTO_RULE, durationHint, mediaHint, pixelHint, propertyUploadLimits, storedPropertyDocumentPath, uploadLimits } from "./limits";
+import { UPLOAD_KINDS, UPLOAD_KIND_ALLOWED } from "./upload-kinds";
 
 const T = "cm1abc2def3ghi";
 const limits = (pathname: string, fileKind: unknown) => uploadLimits(T, pathname, fileKind);
@@ -48,6 +49,68 @@ test("uploadLimits: an extension must name a type its kind allows", () => {
   // No extension, or a numeric one, isn't a claim about the type.
   assert.equal(typeof limits(`tasks/${T}/orig/README`, "file"), "object");
   assert.equal(typeof limits(`tasks/${T}/orig/bid-v1.2`, "file"), "object");
+});
+
+/* ---------------- UPLOAD_RULES per target ---------------- */
+
+const P = "cm9prop8erty7";
+
+test("UPLOAD_RULES per target: the caps each kind of file carries, and the kinds each upload target takes", () => {
+  const MB = 1024 * 1024;
+  assert.equal(UPLOAD_RULES.image.maxBytes, 25 * MB);
+  assert.equal(UPLOAD_RULES.file.maxBytes, 50 * MB);
+  assert.equal(UPLOAD_RULES.video.maxBytes, 500 * MB);
+  // Property documents take documents up to 50 MB and photos up to 25 MB; every target names what it takes.
+  for (const k of UPLOAD_KINDS) assert.ok(UPLOAD_KIND_ALLOWED[k].length > 0, k);
+  assert.ok(!UPLOAD_KIND_ALLOWED["property-upload"].includes("video"), "no video on a property");
+  assert.ok(!UPLOAD_KIND_ALLOWED["listing-photo-upload"].includes("file"), "photos only on the public site");
+});
+
+test("propertyUploadLimits: property documents get the cap of what they are", () => {
+  const doc = propertyUploadLimits("property-upload", P, `properties/${P}/Lease-2026.pdf`, "file");
+  assert.deepEqual(doc, { maximumSizeInBytes: UPLOAD_RULES.file.maxBytes, allowedContentTypes: [...UPLOAD_RULES.file.contentTypes] });
+  const photo = propertyUploadLimits("property-upload", P, `properties/${P}/Insurance-card.jpg`, "image");
+  assert.deepEqual(photo, { maximumSizeInBytes: UPLOAD_RULES.image.maxBytes, allowedContentTypes: [...UPLOAD_RULES.image.contentTypes] });
+});
+
+test("propertyUploadLimits: another property's path, a made-up kind and a name that lies are refused", () => {
+  const refused = (v: unknown) => typeof v === "string";
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/other/a.pdf`, "file")));
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/${P}/a/b.pdf`, "file")));
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/${P}/../x.pdf`, "file")));
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/${P}/a b.pdf`, "file")));
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/${P}/a.pdf`, "video")));
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/${P}/a.pdf`, undefined)));
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/${P}/payload.html`, "file")));
+  assert.ok(refused(propertyUploadLimits("property-upload", P, `properties/${P}/scan.pdf`, "image")));
+  assert.ok(refused(propertyUploadLimits("property-upload", "bad/id", `properties/bad/id/a.pdf`, "file")));
+});
+
+test("propertyUploadLimits: public photos are photos only, 25 MB, with no HEIC for the site to choke on", () => {
+  for (const [kind, pathname] of [
+    ["listing-photo-upload", "IMG_6117.jpg"],
+    ["property-photo-upload", `properties/${P}/photo/front.webp`],
+  ] as const) {
+    const l = propertyUploadLimits(kind, P, pathname);
+    assert.deepEqual(l, { maximumSizeInBytes: 25 * 1024 * 1024, allowedContentTypes: [...PUBLIC_PHOTO_RULE.contentTypes] });
+    assert.ok(!(l as { allowedContentTypes: string[] }).allowedContentTypes.includes("image/heic"));
+  }
+  // The listing editor has always named a blob by the picked file's own name; the token's type allowlist holds the bytes to photos.
+  assert.equal(typeof propertyUploadLimits("listing-photo-upload", P, "IMG_6117 (2).jpg"), "object");
+  assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "a/b.jpg") === "string");
+  assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "..") === "string");
+  assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "") === "string");
+  assert.ok(typeof propertyUploadLimits("listing-photo-upload", P, "a\u0000.jpg") === "string");
+  assert.ok(typeof propertyUploadLimits("property-photo-upload", P, "front.jpg") === "string", "wrong folder");
+  assert.ok(typeof propertyUploadLimits("property-photo-upload", P, `properties/${P}/front.jpg`) === "string", "that is a document's folder");
+});
+
+test("storedPropertyDocumentPath: where Blob puts a property document, never the photo folder", () => {
+  assert.equal(storedPropertyDocumentPath(`properties/${P}/Lease-2026-AbC123.pdf`, P), true);
+  assert.equal(storedPropertyDocumentPath(`properties/${P}/photo/front-xyz.jpg`, P), false);
+  assert.equal(storedPropertyDocumentPath(`properties/other/Lease.pdf`, P), false);
+  assert.equal(storedPropertyDocumentPath(`properties/${P}/a b.pdf`, P), false);
+  assert.equal(storedPropertyDocumentPath(`tasks/${P}/orig/a.pdf`, P), false);
 });
 
 test("display hints keep only sane positive numbers", () => {

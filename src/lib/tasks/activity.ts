@@ -153,6 +153,8 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
       return { text: `${a} edited the notes` };
     case "ATTACHMENT": {
       const name = s(d.filename);
+      // A posted file taken off the task leaves its own line (deleteTaskAttachment; uploads 2.4).
+      if (d.removed === true) return { text: name ? `${a} removed ${name}` : `${a} removed a file` };
       return { text: name ? `${a} added ${name}` : `${a} added a file` };
     }
     case "CHECKLIST": {

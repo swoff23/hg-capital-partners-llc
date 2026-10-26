@@ -263,43 +263,7 @@ export async function syncPropertyReminders(propertyId: string): Promise<void> {
   revalidatePath(`/properties/${propertyId}`);
 }
 
-/* ---------------- Documents (files in Vercel Blob) ---------------- */
-
-export interface AttachmentInput {
-  url: string;
-  pathname: string;
-  filename: string;
-  size: number;
-  contentType: string | null;
-}
-
-export async function recordPropertyAttachment(propertyId: string, data: AttachmentInput): Promise<void> {
-  const property = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } });
-  if (!property) return;
-  await prisma.propertyAttachment.create({
-    data: {
-      propertyId,
-      url: data.url,
-      pathname: data.pathname,
-      filename: data.filename.slice(0, 255) || "file",
-      size: Math.max(0, Math.trunc(data.size)),
-      contentType: data.contentType,
-    },
-  });
-  revalidatePath(`/properties/${propertyId}`);
-}
-
-export async function deletePropertyAttachment(attachmentId: string): Promise<void> {
-  const att = await prisma.propertyAttachment.findUnique({ where: { id: attachmentId } });
-  if (!att) return;
-  try {
-    await del(att.url);
-  } catch {
-    // Blob already gone / token missing — still drop the DB row.
-  }
-  await prisma.propertyAttachment.delete({ where: { id: attachmentId } });
-  revalidatePath(`/properties/${att.propertyId}`);
-}
+/* Documents (files in Vercel Blob) live in ./documents (build plan 1.3). */
 
 /* ---------------- Units (JSON, whole-array replace) ---------------- */
 

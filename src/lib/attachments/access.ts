@@ -33,9 +33,30 @@ export function contractorMaySee(att: SeeableFile, contactId: string): boolean {
 
 /**
  * Uploads still finishing after a contractor taps Mark done are kept for this
- * long (docs/asana-migration-plan.md §5.3).
+ * long (docs/asana-migration-plan.md §5.3), and the job page keeps "Add
+ * photo/video" on in Review for the same hour, then hides it (uploads
+ * question 4).
  */
 export const LATE_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * A file queued before Mark done still records with it, even from a phone that
+ * only found a signal later (uploads question 4, the on-device outbox). The
+ * outbox is a safety net for hours, not an archive, so the grace ends a day
+ * after Mark done.
+ */
+export const QUEUED_UPLOAD_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** How far ahead of the server's clock a phone's queuedAt may be before it's ignored (clock skew). */
+const QUEUED_AT_SKEW_MS = 5 * 60 * 1000;
+
+/** A queuedAt from the browser as an instant, or null when it isn't a date or is in the future. */
+export function parseQueuedAt(queuedAt: Date | string | null | undefined, now: Date): Date | null {
+  if (!queuedAt) return null;
+  const at = queuedAt instanceof Date ? queuedAt : new Date(queuedAt);
+  if (Number.isNaN(at.getTime()) || at.getTime() > now.getTime() + QUEUED_AT_SKEW_MS) return null;
+  return at;
+}
 
 export interface UploadWindowTask {
   status: TaskStatus;
@@ -52,12 +73,39 @@ export interface LastReview {
 /**
  * May this contractor's upload be recorded on the task now? On a Done or
  * Review job only when this contractor finished it (Mark done, or completed
- * it) within the last hour, so photos still uploading behind the button
- * aren't lost. Otherwise while the job is active; never once it's Canceled.
+ * it): within the last hour, so photos still uploading behind the button
+ * aren't lost and "Add photo/video" works while HG reviews, or, for a file
+ * that was queued before Mark done (`queuedAt`, from the phone's outbox),
+ * within a day of it (the late-upload rule). Otherwise while the job is
+ * active; never once it's Canceled.
  */
-export function acceptsContractorUpload(task: UploadWindowTask, lastReview: LastReview | null, contactId: string, now: Date): boolean {
+export function acceptsContractorUpload(
+  task: UploadWindowTask,
+  lastReview: LastReview | null,
+  contactId: string,
+  now: Date,
+  queuedAt?: Date | string | null,
+): boolean {
   if (task.status !== "DONE" && task.status !== "REVIEW") return isActiveStatus(task.status);
-  const recent = (at: Date | null) => !!at && now.getTime() - at.getTime() <= LATE_UPLOAD_WINDOW_MS;
-  if (task.completedByContactId === contactId && recent(task.completedAt)) return true;
-  return !!lastReview && lastReview.actorContactId === contactId && recent(lastReview.createdAt);
+  const marked = [
+    task.completedByContactId === contactId ? task.completedAt : null,
+    lastReview && lastReview.actorContactId === contactId ? lastReview.createdAt : null,
+  ].filter((at): at is Date => at !== null);
+  if (marked.some((at) => now.getTime() - at.getTime() <= LATE_UPLOAD_WINDOW_MS)) return true;
+  const queued = parseQueuedAt(queuedAt, now);
+  return !!queued && marked.some((at) => queued.getTime() <= at.getTime() && now.getTime() - at.getTime() <= QUEUED_UPLOAD_GRACE_MS);
+}
+
+/**
+ * Who may ask for a ZIP of a record's files, by what the files belong to
+ * (Download all, uploads 2.5 and 2.6): staff, and only for a task. A
+ * contractor never gets one, whatever the job; an unknown kind gets nobody.
+ * The route reads this before it looks anything up.
+ */
+export const ZIP_VIEWERS: Record<string, readonly ("staff" | "contractor")[]> = {
+  task: ["staff"],
+};
+
+export function mayDownloadZip(kind: string, viewer: "staff" | "contractor"): boolean {
+  return Object.hasOwn(ZIP_VIEWERS, kind) && ZIP_VIEWERS[kind].includes(viewer);
 }

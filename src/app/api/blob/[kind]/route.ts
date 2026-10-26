@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { userMessage } from "@/lib/action-result";
-import { uploadLimits } from "@/lib/attachments/limits";
+import { propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
 import type { UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -14,22 +14,30 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  * Mints short-lived client-upload tokens so the browser uploads straight to
  * Vercel Blob (no 4.5 MB serverless body limit). One route for every kind
  * of upload; the DB row is written afterwards by the matching server action
- * (recordTaskAttachment / recordPropertyAttachment / updatePropertyListings),
- * which for tasks checks the blob itself with head() rather than trusting
- * the browser.
+ * (recordTaskAttachment / recordPropertyDocument / the listing and property
+ * photo saves), which checks the blob itself with head() rather than
+ * trusting the browser.
  *
- *   /api/blob/task-upload           { taskId, fileKind }   staff
- *   /api/blob/portal-task-upload    { taskId, fileKind }   contractor, on a job they can open
- *   /api/blob/property-upload       { propertyId }         staff
- *   /api/blob/listing-photo-upload  { propertyId }         staff, images only
+ *   /api/blob/task-upload            { taskId, fileKind }               staff
+ *   /api/blob/portal-task-upload     { taskId, fileKind, queuedAt? }    contractor, on a job they can open
+ *   /api/blob/property-upload        { propertyId, fileKind }           staff, documents and photos
+ *   /api/blob/listing-photo-upload   { propertyId }                     staff, public photos
+ *   /api/blob/property-photo-upload  { propertyId }                     staff, the building's public photo
  *
  * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
- * uploaders send; a key that isn't there fails typecheck. That list also
- * holds property-photo-upload, which this route doesn't serve yet.
+ * uploaders send; the table below is typed against that list, so a kind
+ * without an entry fails typecheck. What each kind accepts is one table: the
+ * uploader's check, this route's token and the record step's head() read the
+ * same one (attachments/limits.ts, content-types.ts UPLOAD_RULES).
  *
- * Task kinds only accept a path under tasks/<taskId>/ (paths.ts): Blob can't
- * pick the path for us, only refuse the one asked for. Their token carries a
- * per-type allowlist and size cap from `fileKind` (attachments/limits.ts).
+ * Every kind only accepts a path of its own (paths.ts, limits.ts): Blob can't
+ * pick the path for us, only refuse the one asked for. Task and property
+ * document tokens carry a per-type allowlist and size cap from `fileKind`.
+ *
+ * A contractor's token is minted again for a resumed upload (the on-device
+ * outbox), so `queuedAt` rides in the payload and the late-upload rule reads
+ * it (tasks/attachments.ts contractorUploadRefusal): a file queued before
+ * Mark done may still start, or resume, after the job moved to Review.
  */
 
 type Uploader = { kind: "staff"; userId: string } | { kind: "contractor"; contactId: string };
@@ -48,13 +56,27 @@ interface UploadKind {
   authorize: (id: string, pathname: string, payload: Record<string, unknown>, who: Uploader) => Promise<Limits>;
 }
 
-const MB = 1024 * 1024;
 const propertyExists = async (id: string) => !!(await prisma.property.findUnique({ where: { id }, select: { id: true } }));
+
+const stringOrNull = (v: unknown) => (typeof v === "string" ? v : null);
 
 /** The path must be this task's, and the type and size fit what the file says it is. */
 function taskLimits(taskId: string, pathname: string, payload: Record<string, unknown>): Limits {
   const limits = uploadLimits(taskId, pathname, payload.fileKind);
   if (typeof limits === "string") throw new Error(limits);
+  return limits;
+}
+
+/** The path must be this property's for its kind, and the type and size fit what the file says it is. */
+async function propertyLimits(
+  kind: "property-upload" | "listing-photo-upload" | "property-photo-upload",
+  propertyId: string,
+  pathname: string,
+  payload: Record<string, unknown>,
+): Promise<Limits> {
+  const limits = propertyUploadLimits(kind, propertyId, pathname, payload.fileKind);
+  if (typeof limits === "string") throw new Error(limits);
+  if (!(await propertyExists(propertyId))) throw new Error("Not found");
   return limits;
 }
 
@@ -74,7 +96,7 @@ const KINDS: Record<string, UploadKind> = {
     authorize: async (taskId, pathname, payload, who) => {
       const limits = taskLimits(taskId, pathname, payload);
       if (who.kind !== "contractor") throw new Error("Not found");
-      const refusal = await contractorUploadRefusal(taskId, who.contactId, { atMint: true });
+      const refusal = await contractorUploadRefusal(taskId, who.contactId, { atMint: true, queuedAt: stringOrNull(payload.queuedAt) });
       if (refusal) throw new Error(refusal);
       return limits;
     },
@@ -82,22 +104,22 @@ const KINDS: Record<string, UploadKind> = {
   "property-upload": {
     principal: "staff",
     idKey: "propertyId",
-    authorize: async (id) => {
-      if (!(await propertyExists(id))) throw new Error("Not found");
-      return { maximumSizeInBytes: 50 * MB };
-    },
+    authorize: (id, pathname, payload) => propertyLimits("property-upload", id, pathname, payload),
   },
   "listing-photo-upload": {
     principal: "staff",
     idKey: "propertyId",
-    authorize: async (id) => {
-      if (!(await propertyExists(id))) throw new Error("Not found");
-      // 25MB: a plain 10MB cap rejected real phone photos. No HEIC: most
-      // browsers can't render it inline on the public site.
-      return { maximumSizeInBytes: 25 * MB, allowedContentTypes: ["image/jpeg", "image/png", "image/webp", "image/avif"] };
-    },
+    // 25MB: a plain 10MB cap rejected real phone photos. No HEIC: most
+    // browsers can't render it inline on the public site, so the uploader
+    // converts it first.
+    authorize: (id, pathname, payload) => propertyLimits("listing-photo-upload", id, pathname, payload),
   },
-} satisfies Partial<Record<UploadKindKey, UploadKind>>;
+  "property-photo-upload": {
+    principal: "staff",
+    idKey: "propertyId",
+    authorize: (id, pathname, payload) => propertyLimits("property-photo-upload", id, pathname, payload),
+  },
+} satisfies Record<UploadKindKey, UploadKind>;
 
 async function currentUploader(kind: Uploader["kind"]): Promise<Uploader | null> {
   if (kind === "staff") {

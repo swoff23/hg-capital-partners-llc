@@ -1,7 +1,7 @@
 import type { AttachmentKind, Prisma } from "@prisma/client";
 import type { FileLink } from "@/components/files-list";
 import type { MediaItem } from "@/components/lightbox";
-import { taskFileUrl } from "@/lib/attachments/media";
+import { taskFileUrl, uploadCountPhrase } from "@/lib/attachments/media";
 
 /**
  * A task's photos, videos and files as the task page shows them
@@ -11,13 +11,18 @@ import { taskFileUrl } from "@/lib/attachments/media";
  * contractor's job page (lib/portal/queries.ts) and the Review card read the
  * same rules from here. Pure; see media.test.ts.
  *
- * Contract (build plan 1.5): the names and signatures are final, and UP1
- * fills in the rules. Until then the grid keeps today's order (oldest
- * first, as the query reads them), there's no "At finish" set, and the
- * Review card counts every photo and video the contractor added, as before.
+ * The rules (uploads 2.5 and 2.7): the grid is newest first with the "At
+ * finish" set leading (G1D-012), the set being the photos sent with the
+ * latest Mark done; the Review card holds this visit's photos by the
+ * contractor who marked it done, that set first, and photos from earlier
+ * visits don't count (G1A-007, G1D-034).
  */
 
-/** The attachments a task page selects: posted and drafted, never removed, oldest first. */
+/**
+ * The attachments a task page selects: posted and drafted, never removed.
+ * Read oldest first, so a comment's files keep the order they were picked in;
+ * the grid orders its own (orderMedia).
+ */
 export const taskMediaInclude = {
   where: { deletedAt: null },
   orderBy: { createdAt: "asc" },
@@ -111,24 +116,48 @@ export function fileLink(a: TaskMediaRow): FileLink | null {
 const at = (d: Date | string) => (typeof d === "string" ? Date.parse(d) : d.getTime());
 
 /**
- * The grid's order. The uploads spec's is newest first with the `atFinish`
- * set leading (2.5, G1D-012); until UP1 builds it, oldest first, as today,
- * keeping the order given for items added in the same instant.
+ * The grid's order: newest first, with the `atFinish` set leading (the photos
+ * sent with the latest Mark done, uploads 2.5), each run newest first. Items
+ * added in the same instant keep the order given. Doesn't touch its input.
  */
 export function orderMedia<T extends MediaOrderItem>(items: readonly T[], options: { atFinish?: readonly string[] } = {}): T[] {
-  void options;
-  return [...items].sort((a, b) => at(a.createdAt) - at(b.createdAt));
+  const finish = new Set(options.atFinish ?? []);
+  return [...items].sort((a, b) => Number(finish.has(b.id)) - Number(finish.has(a.id)) || at(b.createdAt) - at(a.createdAt));
+}
+
+/** A Mark done is a comment and a move to Review written in one transaction; their times differ by milliseconds, so this is generous. */
+const MARK_DONE_WINDOW_MS = 30_000;
+
+const toReview = (e: MediaEvent) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "REVIEW";
+
+/** The latest move to Review by a contractor, and the comment written with it (the Mark done sheet's note and photos), if it had one. */
+function latestMarkDone(events: readonly MediaEvent[]): { review: MediaEvent; comment: MediaEvent | null } | null {
+  const review = events.filter((e) => toReview(e) && e.actorContactId !== null).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  if (!review) return null;
+  const comment =
+    events
+      .filter(
+        (e) =>
+          e.kind === "COMMENT" &&
+          e.actorContactId === review.actorContactId &&
+          e.createdAt.getTime() <= review.createdAt.getTime() &&
+          review.createdAt.getTime() - e.createdAt.getTime() <= MARK_DONE_WINDOW_MS,
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+  return { review, comment };
 }
 
 /**
  * The photos and videos sent with the latest Mark done (the "At finish"
- * set, uploads 2.5 and 2.8), among `rows`, from the task's events. None
- * until UP1 builds the rule.
+ * set, uploads 2.5 and 2.8), among `rows`, from the task's events: the ones
+ * posted on the comment the contractor wrote as they tapped Mark done. Empty
+ * with no Mark done, a Mark done with no photos, or a job a staff member
+ * moved to Review.
  */
 export function finishPhotoIds(rows: readonly (MediaOrderItem & { eventId: string | null })[], events: readonly MediaEvent[]): string[] {
-  void rows;
-  void events;
-  return [];
+  const done = latestMarkDone(events);
+  if (!done?.comment) return [];
+  return rows.filter((r) => r.eventId === done.comment!.id).map((r) => r.id);
 }
 
 /**
@@ -149,15 +178,31 @@ export function taskMedia(rows: readonly TaskMediaRow[], options: { events?: rea
 /**
  * The photos and videos the Review card holds for the person who marked the
  * job done (uploads 2.7): this visit's, by that contractor, the Mark done set
- * first. Until UP1 builds the visit rule, every photo and video that
- * contractor added, oldest first, so the banner's count reads as before.
- * None when a staff member marked it done (`contactId` null).
+ * first. A visit starts when the job last went to In progress before the
+ * latest Mark done; with no such move (an older job) every one of theirs
+ * counts. Photos from earlier visits don't. None when a staff member marked
+ * it done (`contactId` null).
  */
-export function reviewPhotos<T extends MediaOrderItem & { kind: AttachmentKind; uploadedByContactId: string | null }>(
+export function reviewPhotos<T extends MediaOrderItem & { kind: AttachmentKind; uploadedByContactId: string | null; eventId?: string | null }>(
   rows: readonly T[],
-  { contactId, events }: { contactId: string | null; events?: readonly MediaEvent[] },
+  { contactId, events = [] }: { contactId: string | null; events?: readonly MediaEvent[] },
 ): T[] {
-  void events;
   if (!contactId) return [];
-  return orderMedia(rows.filter((a) => isMediaRow(a) && a.uploadedByContactId === contactId));
+  const mine = rows.filter((a) => isMediaRow(a) && a.uploadedByContactId === contactId);
+  const done = latestMarkDone(events);
+  const before = done ? done.review.createdAt.getTime() : Infinity;
+  const started = events
+    .filter((e) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "IN_PROGRESS" && e.createdAt.getTime() < before)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  const visit = started ? mine.filter((a) => at(a.createdAt) >= started.createdAt.getTime()) : mine;
+  const finish = finishPhotoIds(
+    visit.map((a) => ({ id: a.id, createdAt: a.createdAt, eventId: a.eventId ?? null })),
+    events,
+  );
+  return orderMedia(visit, { atFinish: finish });
+}
+
+/** "3 photos and 1 video": what the Review card says it holds, videos named as videos (uploads 2.7). */
+export function reviewPhotoSummary(rows: readonly { kind: AttachmentKind }[]): string {
+  return uploadCountPhrase(rows.map((r) => (r.kind === "VIDEO" ? "video" : r.kind === "IMAGE" ? "image" : "file")));
 }

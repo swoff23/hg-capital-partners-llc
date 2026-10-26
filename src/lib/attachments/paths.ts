@@ -105,3 +105,13 @@ export function isPrivateStoreUrl(url: string | null | undefined, storeId: strin
     return false;
   }
 }
+
+/**
+ * How many stored files still sit outside our private store (the old public
+ * blobs "Move documents to private storage" re-uploads): the rows whose URL
+ * isn't a blob in the private store, at their own pathname when they have one.
+ * Links have no URL here and aren't counted.
+ */
+export function countStillPublic(rows: readonly { url: string | null; pathname: string | null }[], storeId: string): number {
+  return rows.filter((r) => r.url && !isPrivateStoreUrl(r.url, storeId, r.pathname ?? undefined)).length;
+}
