@@ -11,13 +11,12 @@ import { parseAmount } from "@/lib/money";
 import type { Ymd } from "@/lib/dates";
 import { weekdayOf } from "@/lib/quick-dates";
 import { fmtShortDay } from "@/lib/tasks/activity";
-import { describeRepeat, matchPreset, nextRepeatDue, repeatPresets, type RepeatRule } from "@/lib/tasks/repeat";
+import { describeRepeat, matchPreset, nextCopyDue, repeatPresets, type RepeatRule } from "@/lib/tasks/repeat";
 import {
   CUSTOM_UNITS,
   customCountError,
   customFromRule,
-  ruleFromChoice,
-  switchCustomUnit,
+  customRule,
   type CustomUnit,
   type RepeatChoice,
 } from "@/lib/tasks/repeat-choice";
@@ -53,10 +52,19 @@ import {
 const STORED = "stored";
 const CUSTOM = "custom";
 
+/**
+ * The date finishing the task would give its next copy, for the "Next:" line:
+ * never one that has already passed, however late the due date is, and a pinned
+ * day steps from the date the series gave the copy (`slot`), not the date it
+ * was moved to, as finishing does.
+ */
+const nextLine = (rule: RepeatRule, slot: Ymd | null, from: Ymd, today: Ymd) => `Next: ${fmtShortDay(nextCopyDue(rule, slot, from, today), today)}`;
+
 export function RepeatMenu({
   value,
   from,
   today,
+  slot = null,
   onPick,
   layer,
   onBack,
@@ -65,6 +73,8 @@ export function RepeatMenu({
   /** The date the presets read their weekday and day from: the due date, or today with none. */
   from: Ymd;
   today: Ymd;
+  /** The date the series gave this task when it was made (a repeat copy's CREATED line), null for a series' first task. */
+  slot?: Ymd | null;
   /** A different repeat (null turns repeats off); picking the current one calls it too, so the layer closes. */
   onPick: (rule: RepeatRule | null) => void;
   layer: "popover" | "sheet";
@@ -74,8 +84,7 @@ export function RepeatMenu({
   const [custom, setCustom] = useState(false);
   const presets = repeatPresets(from, today);
   const matched = matchPreset(value, presets);
-  // The date the next copy will really get: never one that has already passed, however late the due date is.
-  const next = (rule: RepeatRule) => `Next: ${fmtShortDay(nextRepeatDue(rule, from, today), today)}`;
+  const next = (rule: RepeatRule) => nextLine(rule, slot, from, today);
 
   const rows: OptionItem[] = presets
     .filter((p) => p.rule)
@@ -109,9 +118,11 @@ export function RepeatMenu({
   if (custom) {
     return (
       <RepeatCustom
+        stored={value}
         initial={customFromRule(value, Number(from.slice(8, 10)), weekdayOf(from))}
         from={from}
         today={today}
+        slot={slot}
         defaultDay={Number(from.slice(8, 10))}
         defaultWeekday={weekdayOf(from)}
         layer={layer}
@@ -149,18 +160,23 @@ export function StepHeader({ title, onBack }: { title: string; onBack: () => voi
 
 /** Custom: "Every [2] [Days | Weeks | Months]", its next date, Cancel and Save. */
 function RepeatCustom({
+  stored,
   initial,
   from,
   today,
+  slot,
   defaultDay,
   defaultWeekday,
   layer,
   onBack,
   onSave,
 }: {
+  /** The rule the task has now; saving without editing the count or the unit hands it back as it was. */
+  stored: RepeatRule | null;
   initial: RepeatChoice;
   from: Ymd;
   today: Ymd;
+  slot: Ymd | null;
   defaultDay: number;
   defaultWeekday: number;
   layer: "popover" | "sheet";
@@ -184,8 +200,8 @@ function RepeatCustom({
   const every = count.trim() === "" ? Number.NaN : (parseAmount(count) ?? Number.NaN);
   const error = customCountError(unit, every);
   // The unit the stored rule had keeps its own day or weekday; another takes the due date's.
-  const rule = error ? null : ruleFromChoice(switchCustomUnit({ ...initial, every }, unit, defaultDay, defaultWeekday));
-  const nextLine = rule ? `Next: ${fmtShortDay(nextRepeatDue(rule, from, today), today)}` : "";
+  const rule = error ? null : customRule(stored, initial, unit, every, defaultDay, defaultWeekday);
+  const next = rule ? nextLine(rule, slot, from, today) : "";
 
   function save() {
     setAsked(true);
@@ -237,7 +253,7 @@ function RepeatCustom({
           onChange={setUnit}
         />
       </div>
-      {asked && error ? <SaveError>{error}</SaveError> : <p className="min-h-5 text-meta text-fg-3">{nextLine}</p>}
+      {asked && error ? <SaveError>{error}</SaveError> : <p className="min-h-5 text-meta text-fg-3">{next}</p>}
     </form>
   );
 

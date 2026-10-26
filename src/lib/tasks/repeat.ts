@@ -115,6 +115,17 @@ export function repeatFrom(rule: RepeatRule, slot: Ymd | null, due: Ymd | null, 
 }
 
 /**
+ * The due date finishing a task gives its next copy: the first step on or
+ * after `today` from where the rule steps (repeatFrom). The repeat menu's
+ * "Next:" line reads it, so the date it promises is the one createNextRepeat
+ * (core.ts) writes, including for a copy moved off its pinned day. `slot` is
+ * the date the series gave the task (repeat-slot.ts copySlot), null for a series' first task.
+ */
+export function nextCopyDue(rule: RepeatRule, slot: Ymd | null, due: Ymd | null, today: Ymd): Ymd {
+  return nextRepeatDue(rule, repeatFrom(rule, slot, due, today), today);
+}
+
+/**
  * The first due date for a repeat that has none yet: the first day on or after
  * `today` the rule lands on. A pinned day of the month is this month's (clamped
  * to short months) unless it has passed, then next month's; a pinned weekday

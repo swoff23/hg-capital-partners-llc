@@ -37,6 +37,8 @@ export interface TaskPageViewProps {
   meId: string;
   /** The people the viewer assigned last, for the assignee picker's Recent rows. */
   recent: AssigneeValue[];
+  /** The date the series gave this task when it is a repeat copy (its CREATED line), null otherwise. */
+  repeatSlot: Ymd | null;
   lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
   created: string;
   /** First name of the assigned contractor. */
@@ -123,6 +125,7 @@ export function TaskPageView(p: TaskPageViewProps) {
               properties={p.properties}
               meId={p.meId}
               recent={p.recent}
+              repeatSlot={p.repeatSlot}
               lockbox={p.lockbox}
               created={p.created}
             />

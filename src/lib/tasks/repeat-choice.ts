@@ -82,8 +82,8 @@ const isYmd = (v: string | null | undefined): v is Ymd => !!v && /^\d{4}-\d{2}-\
 
 /**
  * New task: the due date is the first one, so a pinned day or weekday that
- * came from it moves with it (Due Oct 23, Monthly on the 23rd, then Due
- * Nov 15: Monthly on the 15th; Due Thursday, Every week on Thursday, then
+ * came from it moves with it (Due Oct 23, Every month on the 23rd, then Due
+ * Nov 15: Every month on the 15th; Due Thursday, Every week on Thursday, then
  * Due Monday: Every week on Monday). A day picked apart from the due date
  * stays.
  */
@@ -118,6 +118,29 @@ export function customFromRule(rule: RepeatRule | null, defaultDay: number, defa
 export function switchCustomUnit(choice: RepeatChoice, mode: CustomUnit, defaultDay: number, defaultWeekday: number): RepeatChoice {
   if (choice.mode === mode) return { ...choice };
   return { mode, every: choice.every, day: clamp(defaultDay, 1, 31, 1), weekday: clamp(defaultWeekday, 0, 6, 1) };
+}
+
+/**
+ * The rule Custom's Save writes. When the person changed neither the count nor
+ * the unit, the stored rule comes back as it was: Custom opens a quarterly rule
+ * as "Every 3 months" and a yearly one as "Every 12 months", and writing that
+ * would swap the rule (a yearly one gaining the day pin ruleFromChoice leaves
+ * off) while nothing was edited. Callers compare the result with the stored
+ * rule (ruleKey) before writing, so saving it unchanged writes nothing and
+ * shows no toast. With no stored rule the opening suggestion, every 2 weeks, is
+ * a choice to save. Any change starts from the due date's day and weekday
+ * (switchCustomUnit).
+ */
+export function customRule(
+  stored: RepeatRule | null,
+  initial: RepeatChoice,
+  unit: CustomUnit,
+  every: number,
+  defaultDay: number,
+  defaultWeekday: number,
+): RepeatRule | null {
+  if (stored && unit === initial.mode && every === initial.every) return stored;
+  return ruleFromChoice(switchCustomUnit({ ...initial, every }, unit, defaultDay, defaultWeekday));
 }
 
 const UNIT_WORD: Record<CustomUnit, string> = { days: "days", weeks: "weeks", monthly: "months" };

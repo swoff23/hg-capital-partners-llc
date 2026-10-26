@@ -12,6 +12,7 @@ import { buildActivity, dayLabel, easternDay, fmtAgo, type ActivityEvent } from 
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { lockboxState } from "@/lib/tasks/lockbox";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
+import { copySlot } from "@/lib/tasks/repeat-slot";
 import { OVERDUE_ELIGIBLE, isActiveStatus } from "@/lib/task-scope";
 import type { ActivityRow } from "./activity";
 import type { FileLink } from "./files-list";
@@ -87,7 +88,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   });
   if (!task) notFound();
 
-  const [{ users, contractors, recent }, staff, properties, propertyRow] = await Promise.all([
+  const [{ users, contractors, recent }, staff, properties, propertyRow, repeatSlot] = await Promise.all([
     // Recent: the people this viewer assigned last, for the assignee picker.
     assigneeOptions([task.assigneeContactId], user.id),
     // Who can sign in as staff: the people an Internal note is for.
@@ -96,6 +97,9 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     propertyOptions(),
     // The lockbox state reads this task's own property's units, which stay on the server.
     task.propertyId ? prisma.property.findUnique({ where: { id: task.propertyId }, select: { units: true } }) : null,
+    // The date the series gave this task when it is a repeat copy, so the repeat menu's "Next:" steps from it
+    // as finishing does, not from wherever the copy was moved. Reads the same lines core.ts repeatSlot reads.
+    copySlot(prisma, task.id, task.events.find((e) => e.kind === "CREATED")?.data),
   ]);
 
   const now = new Date();
@@ -232,6 +236,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       properties={properties}
       meId={user.id}
       recent={recent}
+      repeatSlot={repeatSlot}
       lockbox={lockbox}
       created={created}
       contractorFirst={contractorFirst}

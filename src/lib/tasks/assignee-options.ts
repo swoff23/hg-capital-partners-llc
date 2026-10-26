@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cleanTrades } from "@/lib/contacts";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
@@ -14,9 +15,11 @@ const RECENT = 3;
  * login. Never selects a password hash.
  *
  * With `viewerId`, `recent` is the (up to 3) people that viewer assigned most
- * recently, newest first, from their own ASSIGNED events, so the picker's
- * Recent rows follow them across devices (selectors 3.3). Without it `recent`
- * is empty and the picker shows no Recent section.
+ * recently, newest first, from their own ASSIGNED events and the assignee they
+ * gave a task when they created it (its CREATED line's `to`, core.ts
+ * createTask), so the picker's Recent rows follow them across devices
+ * (selectors 3.3). Without it `recent` is empty and the picker shows no Recent
+ * section.
  */
 export async function assigneeOptions(
   include: (string | null | undefined)[] = [],
@@ -41,7 +44,12 @@ export async function assigneeOptions(
     }),
     viewerId
       ? prisma.taskEvent.findMany({
-          where: { kind: "ASSIGNED", actorUserId: viewerId, deletedAt: null },
+          where: {
+            actorUserId: viewerId,
+            deletedAt: null,
+            // A CREATED line with no `to` assigned no one; leaving those out keeps them from crowding the window below.
+            OR: [{ kind: "ASSIGNED" }, { kind: "CREATED", data: { path: ["to"], not: Prisma.DbNull } }],
+          },
           orderBy: { createdAt: "desc" },
           // Enough that three distinct people turn up even when one gets most of the jobs.
           take: 60,

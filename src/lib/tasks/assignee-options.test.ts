@@ -56,6 +56,19 @@ test("recentAssigneeKeys: unassigning, a legacy name and someone no longer offer
   assert.deepEqual(recentAssigneeKeys([], offered), []);
 });
 
+test("recentAssigneeKeys: a task created with an assignee counts like an assignment; a CREATED line without one is skipped", () => {
+  const offered = new Set(["u:a", "c:x", "c:y"]);
+  const events = [
+    { data: {} }, // a task created with nobody
+    { data: { repeatOf: "t0", due: "2026-10-26" } }, // a repeat copy
+    { data: { to: { userId: null, contactId: "x" } } }, // created with a contractor
+    assigned({ userId: "a" }),
+    { data: { to: { userId: "a", contactId: null } } }, // created with a partner, a again
+    { data: { to: { userId: null, contactId: "y" } } },
+  ];
+  assert.deepEqual(recentAssigneeKeys(events, offered), ["c:x", "u:a", "c:y"]);
+});
+
 test("personKey: accents, case, a nickname in parentheses and punctuation don't make two people", () => {
   assert.equal(personKey("José Alvarez"), personKey("Jose Alvarez"));
   assert.equal(personKey("Jacob hoak"), personKey("Jacob (Jake) hoak"));

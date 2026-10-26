@@ -48,6 +48,7 @@ export function TaskFields({
   properties,
   meId,
   recent,
+  repeatSlot,
   lockbox,
   created,
   className,
@@ -64,6 +65,8 @@ export function TaskFields({
   meId: string;
   /** The people the viewer assigned last, for the picker's Recent rows. */
   recent: AssigneeValue[];
+  /** The date the series gave this task when it is a repeat copy, null for a series' first task: the repeat menu's "Next:" steps from it. */
+  repeatSlot: Ymd | null;
   /** Set when a contractor is assigned and the property has lockbox codes (D21). */
   lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
   created: string;
@@ -170,6 +173,7 @@ export function TaskFields({
           // Repeat lives inside Due (selectors question 7): a Repeat row ends the date panel.
           withRepeat={{
             value: v.repeatRule,
+            slot: repeatSlot,
             onChange: (repeatRule) => {
               // A repeat on an undated task dates it to the first occurrence (the service does it too),
               // so the chip shows that date at once and Undo takes it back with the rule.

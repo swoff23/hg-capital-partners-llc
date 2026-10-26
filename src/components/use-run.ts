@@ -60,8 +60,11 @@ export function useRun(): UseRun {
             ? {
                 action: {
                   label: "Undo",
+                  // In the same transition as the change, so whatever waits on `pending` (the status menu,
+                  // Approve, Cancel) waits for Undo to save too.
                   onAction: () =>
-                    void callAction(undo).then((r) => {
+                    start(async () => {
+                      const r = await callAction(undo);
                       if (!r.ok) toast({ message: r.error });
                     }),
                 },

@@ -1,15 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describeRepeat, nextOccurrence, repeatRuleSchema } from "./repeat";
+import { describeRepeat, nextOccurrence, repeatRuleSchema, ruleKey, type RepeatRule } from "./repeat";
 import {
   CUSTOM_UNITS,
   choiceFromRule,
   customCountError,
   customFromRule,
+  customRule,
   followDueDay,
   ruleFromChoice,
   switchCustomUnit,
   switchMode,
+  type CustomUnit,
   type RepeatChoice,
 } from "./repeat-choice";
 
@@ -196,4 +198,64 @@ test("an empty or unreadable count asks for one instead of saving every day (BPL
   assert.equal(customCountError("days", 366), "Use 365 days or fewer.");
   assert.equal(customCountError("weeks", 1), null);
   assert.equal(customCountError("weeks", 365), null);
+});
+
+/** Custom's Save with nothing edited, the way the menu calls it: its opening state, handed back as it stands. */
+function savedUntouched(stored: RepeatRule | null, day = 23, weekday = 5): RepeatRule | null {
+  const initial = customFromRule(stored, day, weekday);
+  return customRule(stored, initial, initial.mode as CustomUnit, initial.every, day, weekday);
+}
+
+test("Custom saved without an edit hands the stored rule back, so nothing is written and no toast shows", () => {
+  // The repeat picker and the due date's panel write, and toast, only when ruleKey(saved) differs from the stored rule's.
+  const stored = [
+    { freq: "quarterly", interval: 1, dayOfMonth: 30 },
+    { freq: "quarterly", interval: 2, dayOfMonth: 15 },
+    { freq: "quarterly", interval: 1 }, // saved before the day was pinned
+    { freq: "yearly", interval: 1 },
+    { freq: "yearly", interval: 2 },
+    { freq: "yearly", interval: 31 }, // more years than Custom can count in months
+    { freq: "monthly", interval: 3, dayOfMonth: 31 },
+    { freq: "weeks", interval: 2, weekday: 1 },
+    { freq: "weeks", interval: 1 }, // saved before the weekday was pinned
+    { freq: "days", interval: 10 },
+  ].map((r) => repeatRuleSchema.parse(r));
+  for (const rule of stored) {
+    const saved = savedUntouched(rule);
+    assert.deepEqual(saved, rule, JSON.stringify(rule));
+    assert.equal(ruleKey(saved), ruleKey(rule), `${JSON.stringify(rule)} writes nothing`);
+  }
+});
+
+test("Custom would have rewritten a quarterly or yearly rule it only re-counted in months", () => {
+  // What Save wrote before customRule: the months rule Custom shows, not the rule the task has.
+  const quarterly = repeatRuleSchema.parse({ freq: "quarterly", interval: 1, dayOfMonth: 30 });
+  const asMonths = ruleFromChoice(customFromRule(quarterly, 23, 5));
+  assert.deepEqual(asMonths, { freq: "monthly", interval: 3, dayOfMonth: 30 });
+  assert.notEqual(ruleKey(asMonths), ruleKey(quarterly));
+  // A yearly rule gains the day pin ruleFromChoice deliberately leaves off yearly.
+  const yearly = repeatRuleSchema.parse({ freq: "yearly", interval: 1 });
+  const yearAsMonths = ruleFromChoice(customFromRule(yearly, 23, 5));
+  assert.deepEqual(yearAsMonths, { freq: "monthly", interval: 12, dayOfMonth: 23 });
+  assert.notEqual(ruleKey(yearAsMonths), ruleKey(yearly));
+});
+
+test("Custom still writes when the count or the unit changed", () => {
+  const quarterly = repeatRuleSchema.parse({ freq: "quarterly", interval: 1, dayOfMonth: 30 });
+  const opened = customFromRule(quarterly, 23, 5); // Every 3 months, on the 30th
+  // Every 6 months keeps the stored day.
+  assert.deepEqual(customRule(quarterly, opened, "monthly", 6, 23, 5), { freq: "monthly", interval: 6, dayOfMonth: 30 });
+  // Another unit takes the due date's weekday, with the count kept.
+  assert.deepEqual(customRule(quarterly, opened, "weeks", 3, 23, 5), { freq: "weeks", interval: 3, weekday: 5 });
+  assert.deepEqual(customRule(quarterly, opened, "days", 3, 23, 5), { freq: "days", interval: 3 });
+  // Going back to what it opened with is no change.
+  assert.deepEqual(customRule(quarterly, opened, "monthly", 3, 23, 5), quarterly);
+  const yearly = repeatRuleSchema.parse({ freq: "yearly", interval: 1 });
+  assert.deepEqual(customRule(yearly, customFromRule(yearly, 23, 5), "monthly", 18, 23, 5), { freq: "monthly", interval: 18, dayOfMonth: 23 });
+});
+
+test("Custom from Doesn't repeat saves its opening suggestion, every 2 weeks on the due date's weekday", () => {
+  const opened = customFromRule(null, 23, 5);
+  assert.deepEqual(customRule(null, opened, "weeks", 2, 23, 5), { freq: "weeks", interval: 2, weekday: 5 });
+  assert.deepEqual(savedUntouched(null), { freq: "weeks", interval: 2, weekday: 5 });
 });

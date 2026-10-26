@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { amountToDecimal, evenShare, moneyParts, parseAmount, toDecimalString } from "./money";
+import { amountToDecimal, evenShare, moneyParts, parseAmount, tidyAmount, toDecimalString } from "./money";
 
 test("parseAmount: the shapes people actually type", () => {
   assert.equal(parseAmount("425000"), 425000);
@@ -63,4 +63,35 @@ test("moneyParts: an amount that rounds to zero has no minus", () => {
   assert.deepEqual(moneyParts(-0.4, false), { negative: false, dollars: 0, cents: 0 });
   assert.deepEqual(moneyParts(-0.004, true), { negative: false, dollars: 0, cents: 0 });
   assert.equal(moneyParts(-0.6, false).negative, true);
+});
+
+test("tidyAmount: a clean number reads in its grouped form once the field is left", () => {
+  assert.equal(tidyAmount("money", "425000"), "425,000");
+  assert.equal(tidyAmount("money", "$1,234.567"), "1,234.57");
+  assert.equal(tidyAmount("money", "425k"), "425,000");
+  assert.equal(tidyAmount("percent", "6.875"), "6.875");
+  assert.equal(tidyAmount("decimal", "1200.50"), "1200.5");
+  assert.equal(tidyAmount("year", "2014"), "2014");
+  assert.equal(tidyAmount("integer", "1200"), "1,200");
+  assert.equal(tidyAmount("integer", "3"), "3");
+  assert.equal(tidyAmount("integer", "2k"), "2,000");
+});
+
+test("tidyAmount: an integer field keeps a fraction as typed instead of rounding it", () => {
+  // Custom repeat's count: "1.5" used to blur to "2" and save every 2 weeks; now it stays for the error line.
+  assert.equal(tidyAmount("integer", "1.5"), null);
+  assert.equal(tidyAmount("integer", "2.4"), null);
+  assert.equal(tidyAmount("integer", "0.5"), null);
+  assert.equal(tidyAmount("integer", "-1.5"), null);
+  // Whole numbers written with a decimal point are still whole.
+  assert.equal(tidyAmount("integer", "4.0"), "4");
+  // The fields that always rounded still do.
+  assert.equal(tidyAmount("year", "2014.6"), "2015");
+});
+
+test("tidyAmount: text that is not one number is left as typed", () => {
+  assert.equal(tidyAmount("money", "low 400s"), null);
+  assert.equal(tidyAmount("integer", ""), null);
+  assert.equal(tidyAmount("integer", "two"), null);
+  assert.equal(tidyAmount("percent", "5 to 6"), null);
 });

@@ -28,6 +28,31 @@ export function parseAmount(raw: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** What a number field holds, which sets its keyboard, its slot and what it accepts (forms 2.3). */
+export type NumberKind = "money" | "percent" | "integer" | "year" | "decimal";
+
+/**
+ * How a number reads once its field is left: "425000" becomes "425,000",
+ * "6.875" stays, "2014" stays. Null leaves the text as typed: anything that
+ * isn't one clean number ("low 400s"), and a fraction in an integer field,
+ * which stays "1.5" so Save shows the form's own error line for it instead of
+ * blur rounding it to 2 and saving something nobody typed.
+ */
+export function tidyAmount(kind: NumberKind, raw: string): string | null {
+  const n = parseAmount(raw);
+  if (n === null) return null;
+  switch (kind) {
+    case "money":
+      return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    case "integer":
+      return Number.isInteger(n) ? n.toLocaleString("en-US") : null;
+    case "year":
+      return String(Math.round(n));
+    default:
+      return String(n);
+  }
+}
+
 /** For a Prisma Decimal column: "425000.00", or null. */
 export function toDecimalString(n: number | null | undefined): string | null {
   return n == null || !Number.isFinite(n) ? null : n.toFixed(2);

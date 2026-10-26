@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { PopoverSurface } from "@/components/popover";
 import { Sheet, SheetView, useSheet } from "@/components/sheet";
 import { CheckboxMark, kbdClass } from "@/components/ui";
-import { pickContainer } from "@/components/use-coarse-pointer";
+import { pickContainer, type PickContainer } from "@/components/use-coarse-pointer";
 
 /**
  * Action menus and value menus on React Aria (D9): arrow keys, typeahead,
@@ -106,17 +106,19 @@ export function Menu<T extends object>({
   const hostSheet = useSheet();
   const open = root?.isOpen ?? false;
   // Where it opens is read when it opens, not at render, so a tap before the
-  // page hydrated can't open the desktop popover on a phone (selectors 2).
-  const container = useMemo(() => (open ? pickContainer() : "popover"), [open]);
-  const asSheet = sheetTitle !== undefined && container === "sheet";
-
+  // page hydrated can't open the desktop popover on a phone (selectors 2). It is
+  // held until the menu has closed, so a phone's sheet slides out instead of
+  // turning into a popover as it goes.
+  const [container, setContainer] = useState<PickContainer>(() => (open ? pickContainer() : "popover"));
   // The follow-up question on screen, until it's answered or the menu closes.
   const [step, setStep] = useState<{ title: string; content: MenuFollowUp["content"] } | null>(null);
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (!open) setStep(null);
+    if (open) setContainer(pickContainer());
+    else setStep(null);
   }
+  const asSheet = sheetTitle !== undefined && container === "sheet";
 
   const keys = useMemo(() => (numberKeys ?? []).map(String), [numberKeys]);
   const wrapRef = useRef<HTMLDivElement>(null);

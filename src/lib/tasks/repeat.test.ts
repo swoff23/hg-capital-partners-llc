@@ -6,6 +6,7 @@ import {
   firstOccurrence,
   isUntouchedCopy,
   matchPreset,
+  nextCopyDue,
   nextOccurrence,
   nextRepeatDue,
   parseRepeatRule,
@@ -249,6 +250,7 @@ test("copyOrigin: reads a copy's CREATED event", () => {
   assert.deepEqual(copyOrigin({ repeatOf: "t1" }), { repeatOf: "t1", due: null }, "made before the date was kept");
   assert.equal(copyOrigin({}), null, "the series' first task");
   assert.equal(copyOrigin({ asanaGid: "123" }), null);
+  assert.equal(copyOrigin({ to: { userId: "u1", contactId: null } }), null, "a task created with an assignee is no copy");
   assert.equal(copyOrigin(null), null);
   assert.equal(copyOrigin(["t1"]), null);
 });
@@ -341,4 +343,37 @@ test("isUntouchedCopy: any sign of use keeps the copy", () => {
     ["one of two emails sent", { emails: [{ sentAt: null, attempts: 0 }, { sentAt: new Date("2026-10-23T15:05:00Z"), attempts: 1 }] }],
   ];
   for (const [why, change] of touched) assert.equal(isUntouchedCopy({ ...fresh, ...change }), false, why);
+});
+
+test("nextCopyDue: the Next line steps from the series' date, as finishing does, not from where the copy was moved", () => {
+  // Every month on the 30th; the Oct 30 copy moved to Nov 2. Stepping from the moved date said Dec 30.
+  const on30 = { freq: "monthly" as const, interval: 1, dayOfMonth: 30 };
+  assert.equal(nextCopyDue(on30, "2026-10-30", "2026-11-02", "2026-11-02"), "2026-11-30");
+  assert.equal(nextRepeatDue(on30, "2026-11-02", "2026-11-02"), "2026-12-30", "from the due date alone");
+  // Every week on Monday; the Oct 26 copy moved to the Saturday before. Stepping from Saturday said Oct 26 again.
+  const mondays = { freq: "weeks" as const, interval: 1, weekday: 1 };
+  assert.equal(nextCopyDue(mondays, "2026-10-26", "2026-10-24", "2026-10-24"), "2026-11-02");
+  assert.equal(nextRepeatDue(mondays, "2026-10-24", "2026-10-24"), "2026-10-26", "from the due date alone");
+  // Every 2 weeks: the Nov 2 copy moved early to Fri Oct 30 keeps the schedule.
+  assert.equal(nextCopyDue({ ...mondays, interval: 2 }, "2026-11-02", "2026-10-30", "2026-10-30"), "2026-11-16");
+});
+
+test("nextCopyDue: with no slot, or one off the pinned day, it is the due date's next date as before", () => {
+  const on30 = { freq: "monthly" as const, interval: 1, dayOfMonth: 30 };
+  assert.equal(nextCopyDue(on30, null, "2026-10-30", "2026-10-23"), "2026-11-30", "the series' first task");
+  assert.equal(nextCopyDue(on30, null, "2026-11-02", "2026-11-02"), nextRepeatDue(on30, "2026-11-02", "2026-11-02"));
+  // Re-pinned from Monday to Wednesday since: the old Monday slot doesn't count.
+  const wednesdays = { freq: "weeks" as const, interval: 1, weekday: 3 };
+  assert.equal(nextCopyDue(wednesdays, "2026-10-26", "2026-10-28", "2026-10-28"), "2026-11-04");
+  // Undated: from today.
+  assert.equal(nextCopyDue(wednesdays, null, null, "2026-10-23"), "2026-10-28");
+  // Yearly and unpinned rules never use the slot.
+  assert.equal(nextCopyDue({ freq: "yearly", interval: 1 }, "2026-03-03", "2026-03-17", "2026-03-17"), "2027-03-17");
+  assert.equal(nextCopyDue({ freq: "days", interval: 3 }, "2026-10-20", "2026-10-23", "2026-10-23"), "2026-10-26");
+});
+
+test("nextCopyDue: never a date that has already passed, however late the copy is", () => {
+  const on5 = { freq: "monthly" as const, interval: 1, dayOfMonth: 5 };
+  // The Jul 5 copy, finished Oct 23: Nov 5, not Aug 5.
+  assert.equal(nextCopyDue(on5, "2026-07-05", "2026-07-05", "2026-10-23"), "2026-11-05");
 });

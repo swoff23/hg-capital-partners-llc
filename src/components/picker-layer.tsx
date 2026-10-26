@@ -1,5 +1,5 @@
 "use client";
-import { cloneElement, isValidElement, useMemo, type KeyboardEvent, type ReactElement, type ReactNode, type RefObject } from "react";
+import { cloneElement, isValidElement, useState, type KeyboardEvent, type ReactElement, type ReactNode, type RefObject } from "react";
 import { DialogTrigger } from "react-aria-components";
 import { Popover, type PopoverMotion } from "@/components/popover";
 import { Sheet, SheetView, useSheet } from "@/components/sheet";
@@ -33,7 +33,9 @@ export function openOnArrow(open: () => void) {
  *   </PickerLayer>
  *
  * The container is chosen when the layer opens (`pickContainer()`), never at
- * render, so a tap before hydration can't open the desktop popover on a phone.
+ * render, so a tap before hydration can't open the desktop popover on a phone,
+ * and it is held until the layer has closed, so a phone's sheet slides out
+ * instead of turning into a popover as it goes.
  */
 export function PickerLayer({
   isOpen,
@@ -68,7 +70,12 @@ export function PickerLayer({
   children: (layer: { container: PickContainer; close: () => void }) => ReactNode;
 }) {
   const sheet = useSheet();
-  const container = useMemo<PickContainer>(() => (isOpen ? pickContainer() : "popover"), [isOpen]);
+  const [container, setContainer] = useState<PickContainer>(() => (isOpen ? pickContainer() : "popover"));
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) setContainer(pickContainer());
+  }
   const close = () => onOpenChange(false);
 
   let layer: ReactNode;

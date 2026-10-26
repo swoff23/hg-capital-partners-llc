@@ -4,7 +4,8 @@ import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates
 import { firstName } from "@/lib/names";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
-import { copyOrigin, hasPinnedDay, isUntouchedCopy, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, type RepeatRule } from "./repeat";
+import { hasPinnedDay, isUntouchedCopy, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, type RepeatRule } from "./repeat";
+import { copySlot } from "./repeat-slot";
 import {
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
@@ -324,7 +325,12 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
       ...editStamp(p, now),
     },
   });
-  await addEvent(tx, task.id, p, { kind: "CREATED" });
+  // Assigning at creation is an assignment: the line carries `to` as ASSIGNED does, so the picker's Recent
+  // rows see it (assignee-options.ts). It has no `repeatOf`, so it is no copy's slot (copyOrigin).
+  await addEvent(tx, task.id, p, {
+    kind: "CREATED",
+    ...(assigneeUserId || assigneeContactId ? { data: { to: { userId: assigneeUserId, contactId: assigneeContactId } } } : {}),
+  });
   if (assigneeContactId) {
     await syncAssigneeAccess(tx, task.id, assigneeContactId, p, now);
     await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
@@ -474,9 +480,9 @@ async function latestRepeatCopy(tx: Tx, taskId: string): Promise<{ eventId: stri
 
 /**
  * The date the series gave a copy when it was made, however it was moved
- * since (repeat.ts repeatFrom): its own CREATED line's `due`, or, for a copy
- * made before that line kept one, the `due` on the REPEAT_CREATED line that
- * made it. Null for a series' first task.
+ * since (repeat.ts repeatFrom), read from its CREATED line (repeat-slot.ts
+ * copySlot, which the task page's repeat menu asks too). Null for a series'
+ * first task.
  */
 async function repeatSlot(tx: Tx, taskId: string): Promise<Ymd | null> {
   const created = await tx.taskEvent.findFirst({
@@ -484,15 +490,7 @@ async function repeatSlot(tx: Tx, taskId: string): Promise<Ymd | null> {
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: { data: true },
   });
-  const origin = copyOrigin(created?.data);
-  if (!origin) return null;
-  if (origin.due) return origin.due;
-  const made = await tx.taskEvent.findFirst({
-    where: { taskId: origin.repeatOf, kind: "REPEAT_CREATED", data: { path: ["next"], equals: taskId } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { data: true },
-  });
-  return repeatCreatedCopy(made?.data)?.due ?? null;
+  return copySlot(tx, taskId, created?.data);
 }
 
 /**

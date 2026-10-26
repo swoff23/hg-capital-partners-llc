@@ -22,11 +22,13 @@ export function youFirst<T extends { id: string }>(users: readonly T[], meId: st
 /**
  * The people the viewer assigned most recently, newest first, at most `max`:
  * the "Recent" rows that show while the picker's search is empty. Read from
- * the viewer's own ASSIGNED events (`events` newest first, each with the
- * event's `data`: `{ from, to: { userId, contactId } }`), so it follows them
- * across devices. Unassigning is no one, a legacy name isn't a person, and
- * someone who isn't on offer any more (`offered` keys) is skipped, so a row
- * never points at a person the list can't pick.
+ * the viewer's own ASSIGNED events and the CREATED events of tasks they gave
+ * an assignee when they made them (`events` newest first, each with the
+ * event's `data`: `{ from, to: { userId, contactId } }` for ASSIGNED, `{ to }`
+ * for CREATED), so it follows them across devices. Unassigning is no one, a
+ * legacy name isn't a person, and someone who isn't on offer any more
+ * (`offered` keys) is skipped, so a row never points at a person the list
+ * can't pick.
  */
 export function recentAssigneeKeys(events: readonly { data: unknown }[], offered: ReadonlySet<string>, max = 3): string[] {
   const seen: string[] = [];

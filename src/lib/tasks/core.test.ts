@@ -2,9 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { Task } from "@prisma/client";
 import { toYmd } from "@/lib/dates";
+import { recentAssigneeKeys } from "./assignee-people";
+import { copyOrigin } from "./repeat";
 import {
   AssigneeChangedError,
   createNextRepeat,
+  createTask,
   isAssignee,
   patchTask,
   setStatus,
@@ -281,6 +284,30 @@ const createdLine = (calls: Call[]) =>
   calls.find((c) => c.model === "taskEvent" && c.op === "create" && (c.args as { data: { kind: string } }).data.kind === "CREATED")?.args as
     | { data: { taskId: string; data: unknown } }
     | undefined;
+
+test("createTask: an assignee given at creation rides on the CREATED line, so the picker's Recent rows see it", async () => {
+  const now = new Date("2026-10-23T15:00:00Z");
+  const made = async (input: Parameters<typeof createTask>[1]) => {
+    const fake = fakeTx({}, makesCopy);
+    await createTask(fake.tx, input, PIETER, now);
+    return createdLine(fake.calls)?.data.data;
+  };
+  // Shaped as an ASSIGNED line's `to`, both keys always there.
+  const partner = await made({ title: "Hang drywall", assignee: { userId: "u-connor" } });
+  assert.deepEqual(partner, { to: { userId: "u-connor", contactId: null } });
+  const contractor = await made({ title: "Hang drywall", assignee: { contactId: "c-zack" } });
+  assert.deepEqual(contractor, { to: { userId: null, contactId: "c-zack" } });
+  // No assignee, or only a legacy name: the line carries nothing, as before.
+  assert.deepEqual(await made({ title: "Hang drywall" }), {});
+  assert.deepEqual(await made({ title: "Hang drywall", assigneeName: "Brandon" }), {});
+
+  // Read back the way the picker reads it, newest first.
+  const offered = new Set(["u:u-connor", "c:c-zack"]);
+  const events = [{ data: {} }, { data: contractor }, { data: { repeatOf: "t0", due: "2026-10-26" } }, { data: partner }];
+  assert.deepEqual(recentAssigneeKeys(events, offered), ["c:c-zack", "u:u-connor"]);
+  // And a task made with an assignee is no repeat copy, so it has no slot.
+  assert.equal(copyOrigin(contractor), null);
+});
 
 test("createNextRepeat: a pinned weekly copy steps from the date the series gave it, not its moved date", async () => {
   const mondays = { freq: "weeks", interval: 1, weekday: 1 };

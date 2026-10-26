@@ -65,6 +65,8 @@ const PICK_ICON: Record<QuickPickKey, LucideIcon> = {
 export type RepeatBinding = {
   value: RepeatRule | null;
   onChange: (rule: RepeatRule | null) => void;
+  /** The date the series gave a repeat copy when it was made, so the menu's "Next:" steps from it as finishing does. */
+  slot?: Ymd | null;
 };
 
 export type DatePickerProps = {
@@ -457,6 +459,7 @@ export function DatePanel({
       value={repeat.value}
       from={value ?? today}
       today={today}
+      slot={repeat.slot}
       layer={steps ? "sheet" : "popover"}
       onPick={(rule) => onRepeat?.(rule)}
       onBack={() => setView("date")}
