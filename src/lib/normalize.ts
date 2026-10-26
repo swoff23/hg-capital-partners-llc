@@ -129,6 +129,40 @@ export function streetKey(raw: string | null | undefined): string {
   return streetParts(raw).key;
 }
 
+const streetCollator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+
+/** Street name (with any direction after it), house number and its letter, for compareStreet. */
+function streetSortParts(raw: string | null | undefined): { street: string; num: number; suffix: string } {
+  const [first = "", ...rest] = streetParts(raw).key.split(" ");
+  const num = first.match(/^(\d+)([a-z]?)$/);
+  if (!num) return { street: [first, ...rest].join(" "), num: Number.POSITIVE_INFINITY, suffix: "" };
+  // streetParts writes a direction as one letter before the name ("421 w delavan").
+  // It sorts after the name, so West Delavan sits beside Delavan.
+  const dir = rest.length > 1 && /^[nsew]$/.test(rest[0]) ? rest.shift()! : "";
+  return { street: [...rest, dir].filter(Boolean).join(" "), num: Number(num[1]), suffix: num[2] };
+}
+
+/**
+ * Orders addresses as a street list reads: by street name, then by house
+ * number as a number, so 15 Oxford comes before 118 Oxford and Congress St
+ * before Oxford Ave (a plain string sort gives "118, 15, 23"). "Ave", "Avenue",
+ * the town and the ZIP don't count; an address with no house number sorts by
+ * its text. For every property picker and filter (docs/specs/selectors.md 3.3).
+ *
+ *   properties.sort((a, b) => compareStreet(a.address, b.address))
+ */
+export function compareStreet(a: string | null | undefined, b: string | null | undefined): number {
+  const pa = streetSortParts(a);
+  const pb = streetSortParts(b);
+  const byNumber = pa.num === pb.num ? 0 : pa.num < pb.num ? -1 : 1;
+  return (
+    streetCollator.compare(pa.street, pb.street) ||
+    byNumber ||
+    streetCollator.compare(pa.suffix, pb.suffix) ||
+    streetCollator.compare(normalizeAddress(a), normalizeAddress(b))
+  );
+}
+
 /** The ZIP code, when one follows the house number. */
 function zipCode(raw: string | null | undefined): string | null {
   const tokens = normalizeAddress(raw).split(" ");

@@ -11,7 +11,7 @@ import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { deleteTask, setTaskStatus, updateTask } from "./actions";
 import { useStatusRun } from "./status-run";
-import { useRun } from "./use-run";
+import { useRun } from "@/components/use-run";
 
 /**
  * The title on the page title token, edited in place. At rest it's the

@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, type ReactNode } from "react";
-import { useRun } from "./use-run";
+import { useRun } from "@/components/use-run";
 
 type Run = ReturnType<typeof useRun>;
 

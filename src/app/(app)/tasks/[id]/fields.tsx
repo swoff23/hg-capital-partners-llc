@@ -12,7 +12,7 @@ import type { RepeatRule } from "@/lib/tasks/repeat";
 import { cn } from "@/lib/utils";
 import { updateTask } from "./actions";
 import { SelectChip } from "./select-chip";
-import { useRun } from "./use-run";
+import { useRun } from "@/components/use-run";
 
 export type PropertyOption = { id: string; label: string; units: string[] };
 

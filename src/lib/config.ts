@@ -15,15 +15,62 @@ export const DEAL_STATUSES = [
 export type DealStatus = (typeof DEAL_STATUSES)[number];
 
 /**
- * How a stage reads on screen where the stored value doesn't: the spreadsheet's
- * "CLOSED!" is "Closed". The stored value, the filters and the URL keep it.
+ * How each stage reads on screen: the spreadsheet's number prefixes go
+ * ("High", not "1 - High"), so typeahead and the number keys never collide,
+ * and "CLOSED!" is "Closed" (docs/specs/selectors.md 3.5, build plan section 4
+ * item 14). Stored values, the filters and the URL keep the stored names.
  */
-const DEAL_STATUS_LABEL: Partial<Record<DealStatus, string>> = { "CLOSED!": "Closed" };
+export const DEAL_STAGE_LABEL: Record<DealStatus, string> = {
+  "1 - High": "High",
+  "2 - Medium": "Medium",
+  "3 - Low": "Low",
+  "4 - To Schedule": "To schedule",
+  "5 - TBD": "TBD",
+  "6 - Holding": "Holding",
+  "CLOSED!": "Closed",
+  Pass: "Pass",
+};
 
-/** A deal stage's display label: "Closed" for "CLOSED!", anything else as stored. */
-export function dealStatusLabel(status: string): string {
-  return DEAL_STATUS_LABEL[status as DealStatus] ?? status;
+/** A deal stage's word on screen ("High" for "1 - High"); a legacy value outside the list reads as stored. */
+export function dealStageLabel(stage: string): string {
+  return DEAL_STAGE_LABEL[stage as DealStatus] ?? stage;
 }
+
+/**
+ * Today's label, until each surface moves to dealStageLabel with its own
+ * package: "Closed" for "CLOSED!", every other stage as stored.
+ */
+export function dealStatusLabel(status: string): string {
+  return status === "CLOSED!" ? DEAL_STAGE_LABEL["CLOSED!"] : status;
+}
+
+/**
+ * The words for a deal's fields wherever they show: the record's rows, New
+ * deal, the list headers, activity sentences and toasts. "Stage" is the deal
+ * word (tasks and properties keep "Status"). `ourPrice` is HG's target offer,
+ * Connor's answer; the column and its `ourPrice` sort key don't change.
+ */
+export const DEAL_FIELD_LABEL = {
+  address: "Address",
+  status: "Stage",
+  theirPrice: "Asking price",
+  ourPrice: "Target offer",
+  currentOffer: "Current offer",
+  units: "Units",
+  beds: "Beds",
+  baths: "Baths",
+  sqft: "Sq ft",
+  taxes: "Taxes",
+  priority: "Priority",
+  passReason: "Pass reason",
+  sourceUrl: "Listing URL",
+  nextAction: "Next action",
+  nextActionDue: "Next action due",
+  latestNote: "Latest note",
+  updatedAt: "Updated",
+} as const;
+
+export type DealField = keyof typeof DEAL_FIELD_LABEL;
 
 export function isDealStatus(s: unknown): s is DealStatus {
   return typeof s === "string" && (DEAL_STATUSES as readonly string[]).includes(s);

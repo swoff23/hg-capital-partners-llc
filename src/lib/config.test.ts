@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES, DEFAULT_DEAL_STATUS, dealStatusLabel, isDealStatus } from "./config";
+import {
+  ACTIVE_DEAL_STATUSES,
+  DEAL_FIELD_LABEL,
+  DEAL_STAGE_LABEL,
+  DEAL_STATUSES,
+  DEFAULT_DEAL_STATUS,
+  dealStageLabel,
+  dealStatusLabel,
+  isDealStatus,
+} from "./config";
 
 test("the default deal status is a real status and is not counted as Active", () => {
   assert.ok(isDealStatus(DEFAULT_DEAL_STATUS));
@@ -23,4 +32,28 @@ test("dealStatusLabel: CLOSED! reads Closed, every other stage as stored", () =>
   assert.equal(dealStatusLabel("1 - High"), "1 - High");
   assert.equal(dealStatusLabel("Pass"), "Pass");
   assert.equal(dealStatusLabel("Active"), "Active"); // a legacy value, untouched
+});
+
+test("DEAL_STAGE_LABEL: every stage has a word on screen, prefixes dropped", () => {
+  assert.deepEqual(
+    DEAL_STATUSES.map((s) => DEAL_STAGE_LABEL[s]),
+    ["High", "Medium", "Low", "To schedule", "TBD", "Holding", "Closed", "Pass"],
+  );
+  // One word per stage, and none starts with a digit, so typeahead never lands on a number key.
+  const words = Object.values(DEAL_STAGE_LABEL);
+  assert.equal(new Set(words).size, words.length);
+  for (const w of words) assert.doesNotMatch(w, /^\d/);
+});
+
+test("dealStageLabel: the word for a stored stage; a legacy value as stored", () => {
+  assert.equal(dealStageLabel("1 - High"), "High");
+  assert.equal(dealStageLabel("4 - To Schedule"), "To schedule");
+  assert.equal(dealStageLabel("CLOSED!"), "Closed");
+  assert.equal(dealStageLabel("Active"), "Active");
+});
+
+test("DEAL_FIELD_LABEL: Stage, Asking price and Target offer", () => {
+  assert.equal(DEAL_FIELD_LABEL.status, "Stage");
+  assert.equal(DEAL_FIELD_LABEL.theirPrice, "Asking price");
+  assert.equal(DEAL_FIELD_LABEL.ourPrice, "Target offer");
 });

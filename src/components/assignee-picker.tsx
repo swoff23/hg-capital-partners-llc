@@ -17,7 +17,7 @@ import {
 import { Avatar } from "@/components/avatar";
 import { Popover } from "@/components/popover";
 import { Sheet } from "@/components/sheet";
-import { pickerChip, pickerField, pickerFieldChevron } from "@/components/ui";
+import { pickerChip, pickerField, pickerFieldChevron, tagClass } from "@/components/ui";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { cn } from "@/lib/utils";
 
@@ -236,7 +236,7 @@ function AssigneeList({
                       <span className="flex items-center gap-1.5">
                         <span className="truncate">{c.name}</span>
                         {c.hasLogin && (
-                          <span className="inline-flex h-5.5 shrink-0 items-center rounded-sm px-2 text-micro text-fg-2 ring-1 ring-inset ring-line-strong">
+                          <span className={tagClass}>
                             Has login
                           </span>
                         )}

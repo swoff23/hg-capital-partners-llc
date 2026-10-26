@@ -4,7 +4,7 @@ import { Check, Plus } from "lucide-react";
 import { Section } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { addChecklistItem, setChecklistItem } from "./actions";
-import { useRun } from "./use-run";
+import { useRun } from "@/components/use-run";
 
 export type ChecklistRow = { id: string; title: string; done: boolean };
 

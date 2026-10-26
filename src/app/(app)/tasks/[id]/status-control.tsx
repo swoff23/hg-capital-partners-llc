@@ -13,7 +13,7 @@ import { STATUS_LABEL, STATUS_ORDER } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { setTaskStatus, updateTask } from "./actions";
 import { useStatusRun } from "./status-run";
-import { useRun } from "./use-run";
+import { useRun } from "@/components/use-run";
 
 /**
  * The status chip at the top of the task page: a menu of all seven (D6,

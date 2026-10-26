@@ -21,3 +21,29 @@ export function useCoarsePointer(): boolean {
     () => false,
   );
 }
+
+/** Where a picker or value menu opens (docs/specs/selectors.md 2 and 4.2 A). */
+export type PickContainer = "popover" | "sheet";
+
+/** Tailwind's `md`: below it a touch screen is a phone. */
+const TABLET_UP_QUERY = "(min-width: 48rem)";
+
+/**
+ * A titled bottom sheet on a touch phone; an anchored popover with a mouse
+ * and on a touch tablet, which gets touch rows instead (4.2 A).
+ */
+export function containerFor({ coarse, phone }: { coarse: boolean; phone: boolean }): PickContainer {
+  return coarse && phone ? "sheet" : "popover";
+}
+
+/**
+ * The container for a picker, read when its trigger is pressed rather than
+ * at render, so a tap before hydration (when useCoarsePointer is still false)
+ * can't open the desktop popover on a phone. Call it in the press handler:
+ *
+ *   onPress={() => setOpen(pickContainer())}
+ */
+export function pickContainer(): PickContainer {
+  if (typeof window === "undefined") return "popover";
+  return containerFor({ coarse: window.matchMedia(QUERY).matches, phone: !window.matchMedia(TABLET_UP_QUERY).matches });
+}

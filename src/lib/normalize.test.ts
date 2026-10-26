@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addressKey, normalizeAddress, sameStreetAddress, shortAddress, streetKey } from "./normalize";
+import { addressKey, compareStreet, normalizeAddress, sameStreetAddress, shortAddress, streetKey } from "./normalize";
 
 test("normalizeAddress: lowercase, common street words, punctuation, whitespace", () => {
   assert.equal(normalizeAddress("725 Linwood Avenue, Buffalo, NY 14209"), "725 linwood ave buffalo ny 14209");
@@ -94,4 +94,40 @@ test("shortAddress strips the city/state tail", () => {
   assert.equal(shortAddress("118 Congress St Buffalo NY 14213"), "118 Congress St");
   assert.equal(shortAddress("58 Mariner St"), "58 Mariner St");
   assert.equal(shortAddress(null), "");
+});
+
+test("compareStreet: street name first, then the house number as a number", () => {
+  const portfolio = [
+    "118 Congress St. Buffalo, NY 14213",
+    "15 Oxford Ave. Buffalo, NY 14209",
+    "23 Sherwood St, Buffalo, NY 14213",
+    "767 Prospect Avenue, Buffalo, NY 14213",
+    "58 Mariner Street, Buffalo, NY 14201",
+    "647 Prospect Ave. Buffalo, NY 14213",
+    "765 Prospect Avenue, Buffalo, NY 14213",
+    "415 Crescent Ave., Buffalo, NY 14214",
+  ];
+  assert.deepEqual([...portfolio].sort(compareStreet), [
+    "118 Congress St. Buffalo, NY 14213",
+    "415 Crescent Ave., Buffalo, NY 14214",
+    "58 Mariner Street, Buffalo, NY 14201",
+    "15 Oxford Ave. Buffalo, NY 14209",
+    "647 Prospect Ave. Buffalo, NY 14213",
+    "765 Prospect Avenue, Buffalo, NY 14213",
+    "767 Prospect Avenue, Buffalo, NY 14213",
+    "23 Sherwood St, Buffalo, NY 14213",
+  ]);
+});
+
+test("compareStreet: 15 before 118 on one street; a letter after its number", () => {
+  const street = ["118 Oxford Ave", "15b Oxford Ave", "23 Oxford Avenue", "15 Oxford Ave"];
+  assert.deepEqual([...street].sort(compareStreet), ["15 Oxford Ave", "15b Oxford Ave", "23 Oxford Avenue", "118 Oxford Ave"]);
+  assert.ok(compareStreet("15 Oxford Ave", "118 Oxford Ave") < 0);
+});
+
+test("compareStreet: a direction sorts after its street's name; no number sorts by text", () => {
+  const list = ["421 W Delavan Ave", "12 Elmwood Ter", "400 Delavan Ave", "Lot on Elmwood"];
+  assert.deepEqual([...list].sort(compareStreet), ["400 Delavan Ave", "421 W Delavan Ave", "12 Elmwood Ter", "Lot on Elmwood"]);
+  assert.equal(compareStreet(null, null), 0);
+  assert.ok(compareStreet("", "15 Oxford Ave") < 0);
 });

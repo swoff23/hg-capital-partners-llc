@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TableFrame } from "@/components/table-frame";
+import { Spinner } from "@/components/spinner";
 
 /* Primitives on the Ink and Limestone tokens (docs/brand-guidelines.md,
    section 9). Colors, type and radii come from the tokens in globals.css, so
@@ -159,15 +160,51 @@ export function buttonClass({ variant = "secondary", size = "md", icon = false }
   );
 }
 
+/**
+ * `pending`: the button's action is running. It's disabled and `aria-busy`
+ * at once and keeps its label; after 200ms a Spinner appears before the label
+ * (in place of the icon on an icon button) and stays at least 400ms (forms
+ * 2.7). Never swap the label for "Saving…".
+ */
 export function Button({
   className,
   variant = "primary",
   size = "md",
   icon,
+  pending,
+  disabled,
+  children,
   ...props
-}: React.ComponentProps<"button"> & ButtonLook) {
-  return <button className={cn(buttonClass({ variant, size, icon }), className)} {...props} />;
+}: React.ComponentProps<"button"> & ButtonLook & { pending?: boolean }) {
+  // A button that never takes `pending` renders as it always has. One that
+  // does keeps its Spinner mounted, so the spinner can finish its 400ms.
+  const busy = pending === true;
+  return (
+    <button
+      className={cn(buttonClass({ variant, size, icon }), className)}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      {...props}
+    >
+      {pending === undefined ? (
+        children
+      ) : icon ? (
+        <Spinner active={busy}>{children}</Spinner>
+      ) : (
+        <>
+          <Spinner active={busy} />
+          {children}
+        </>
+      )}
+    </button>
+  );
 }
+
+/* ---------------- Spinner ----------------
+   The one loading glyph (lucide LoaderCircle), after 200ms for at least 400ms.
+   A client component in its own module; re-exported so primitives come from
+   one place. */
+export { Spinner };
 
 export function LinkButton({
   className,
@@ -230,17 +267,19 @@ export function AddRow({
 /* ---------------- Kbd ----------------
    A printed shortcut: "Esc", "⌘K". Touch screens get the same actions as
    visible buttons, so the keycap hides there. */
+export const kbdClass =
+  "inline-flex h-5 min-w-5 items-center justify-center rounded-sm border border-line-strong bg-fill-1 px-1 font-mono text-micro text-fg-3 pointer-coarse:hidden";
+
 export function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
-  return (
-    <kbd
-      className={cn(
-        "inline-flex h-5 min-w-5 items-center justify-center rounded-sm border border-line-strong bg-fill-1 px-1 font-mono text-micro text-fg-3 pointer-coarse:hidden",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <kbd className={cn(kbdClass, className)} {...props} />;
 }
+
+/* ---------------- Tag ----------------
+   A neutral chip inside a row or an option ("Has login", "Inactive"): no
+   fill, a --line-strong edge, --fg-2, text-micro, 22px (section 9). Not a
+   control and not a status, which keeps the Badge tones. */
+export const tagClass =
+  "inline-flex h-5.5 shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-2 text-micro text-fg-2 ring-1 ring-inset ring-line-strong";
 
 /* ---------------- Badge ----------------
    One tone map for every badge in the app. Color is state: neutral for a
@@ -282,18 +321,37 @@ export function Badge({
  */
 export const chromeIconClass = "size-4 shrink-0 stroke-[1.5] pointer-coarse:size-5 pointer-coarse:stroke-[1.75]";
 
-/**
- * A compact bordered chip that opens a picker (due date, assignee), so a row
- * of them reads as one set. 28px with a mouse; on touch the hit area reaches
- * 44px without the chip growing. Give the element `relative`-friendly room:
- * the hit area is an ::after.
- */
-export const pickerChip = cn(
-  "relative inline-flex h-7 max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line-strong bg-surface px-2 text-meta font-medium text-fg-1",
+export type PickerChipSize = "row" | "sm";
+
+const pickerChipBase = cn(
+  "relative inline-flex max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line-strong bg-surface px-2 font-medium text-fg-1",
+  // The hover fill shows with a mouse only (hover: is under @media (hover: hover)).
   "transition-colors hover:bg-fill-1 data-pressed:bg-fill-1",
-  "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2",
+  // An empty chip's placeholder ("Due date", "Assign") reads in --fg-3: set data-placeholder on it.
+  "data-placeholder:text-fg-3",
   "disabled:opacity-50 data-disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
 );
+
+const pickerChipSizes: Record<PickerChipSize, string> = {
+  // 28px in a list row (an exception to the 32px sm control, brand section 5);
+  // on touch an ::after reaches 44px without the chip growing.
+  row: "h-7 text-meta pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2",
+  // 32px in the record rail, create forms and the filter bar; 44 on touch.
+  sm: "h-8 text-meta pointer-coarse:h-11",
+};
+
+/**
+ * A compact bordered chip that opens a picker (due date, assignee, property),
+ * so a row of them reads as one set (docs/specs/selectors.md 3.12). `row`
+ * for list rows; `sm` for the rail, create forms and filter bars. Give an
+ * empty chip `data-placeholder` and its words turn --fg-3.
+ */
+export function pickerChipClass({ size = "row" }: { size?: PickerChipSize } = {}) {
+  return cn(pickerChipBase, pickerChipSizes[size]);
+}
+
+/** `pickerChipClass()` at the `row` size, the chip every picker drew before the sizes. */
+export const pickerChip = pickerChipClass();
 
 /**
  * A picker's trigger at field height, for a form where pickers share a grid
@@ -324,8 +382,60 @@ export const fieldClass = cn(
   TOUCH_HEIGHT,
 );
 
-export function Input({ className, ...props }: React.ComponentProps<"input">) {
-  return <input className={cn(fieldClass, "h-9", className)} {...props} />;
+export type FieldSize = "sm" | "md";
+
+/** Field heights with a mouse: `md` 36px (forms), `sm` 32px (filter bars, table rows, rails). Both are 44 on touch. */
+export const fieldSizeClass: Record<FieldSize, string> = { sm: "h-8", md: "h-9" };
+
+// Room for a slot's text: 10px in from the edge, the text (a generous width
+// per character, so "%" and "sq ft" clear it), then a 4px gap.
+const slotRoom = (text: string) => `calc(0.625rem + ${(text.length * 0.6 + 0.2).toFixed(2)}em + 0.25rem)`;
+
+export type InputProps = Omit<React.ComponentProps<"input">, "size" | "prefix"> & {
+  size?: FieldSize;
+  /** Short text inside the field's left edge in --fg-3: "$". */
+  prefix?: string;
+  /** Short text inside the field's right edge in --fg-3: "%", "sq ft", "/mo", "yrs". */
+  suffix?: string;
+};
+
+/**
+ * A text field. `size` sets its height (`md` 36, `sm` 32; 44 on touch).
+ * `prefix` and `suffix` put a unit inside the edge in --fg-3 (forms 2.1); the
+ * text keeps clear of it, the slot is hidden from screen readers and the unit
+ * is read through `aria-describedby` instead. With a slot, `className` goes on
+ * the wrapper (set widths there); without one, on the input, as before.
+ */
+export function Input({ className, size = "md", prefix, suffix, style, ...props }: InputProps) {
+  const unitId = React.useId();
+  if (!prefix && !suffix) {
+    return <input className={cn(fieldClass, fieldSizeClass[size], className)} style={style} {...props} />;
+  }
+  const describedBy = [props["aria-describedby"], unitId].filter(Boolean).join(" ");
+  const slot = "pointer-events-none absolute top-1/2 -translate-y-1/2 text-body text-fg-3";
+  return (
+    <span className={cn("relative block", className)}>
+      {prefix && (
+        <span aria-hidden="true" className={cn(slot, "left-2.5")}>
+          {prefix}
+        </span>
+      )}
+      <input
+        {...props}
+        aria-describedby={describedBy}
+        className={cn(fieldClass, fieldSizeClass[size])}
+        style={{ ...style, ...(prefix && { paddingLeft: slotRoom(prefix) }), ...(suffix && { paddingRight: slotRoom(suffix) }) }}
+      />
+      {suffix && (
+        <span aria-hidden="true" className={cn(slot, "right-2.5")}>
+          {suffix}
+        </span>
+      )}
+      <span id={unitId} className="sr-only">
+        {[prefix, suffix].filter(Boolean).join(" ")}
+      </span>
+    </span>
+  );
 }
 export function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return <textarea className={cn(fieldClass, "py-2", className)} {...props} />;
@@ -369,6 +479,42 @@ export function Checkbox({
         className={cn(
           "pointer-events-none col-start-1 row-start-1 text-on-act opacity-0 peer-checked:opacity-100",
           large ? "size-3.5" : "size-3",
+        )}
+      >
+        <path d="m3.5 8.25 3 3 6-6.5" />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * The checkbox's look with no input, for a row that is itself the control
+ * (a pick-many option, a filter row): the row carries the state
+ * (`aria-selected`, `aria-checked`) and this draws it. 16px `rounded-sm`,
+ * `--surface` on a `--line-control` edge; checked, the `--act` fill and edge
+ * with an `--on-act` check that springs in at `--dur-check` (selectors 3.10).
+ * Hidden from screen readers.
+ */
+export function CheckboxMark({ checked, className }: { checked: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "inline-grid size-4 shrink-0 place-items-center rounded-sm border transition-colors duration-check",
+        checked ? "border-act bg-act" : "border-line-control bg-surface",
+        className,
+      )}
+    >
+      <svg
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(
+          "size-3 text-on-act transition-[opacity,scale] duration-check ease-spring",
+          checked ? "scale-100 opacity-100" : "scale-50 opacity-0",
         )}
       >
         <path d="m3.5 8.25 3 3 6-6.5" />

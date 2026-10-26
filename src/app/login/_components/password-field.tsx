@@ -15,7 +15,7 @@ import { authInputClass } from "./auth-frame";
  * 16px text (globals.css), so iOS doesn't zoom. Shown as text, the field
  * still doesn't capitalize, autocorrect or spell-check what's typed.
  */
-export function PasswordField(props: Omit<React.ComponentProps<"input">, "type" | "className">) {
+export function PasswordField(props: Omit<React.ComponentProps<"input">, "type" | "className" | "size" | "prefix">) {
   const [shown, setShown] = useState(false);
   return (
     <div className="relative">

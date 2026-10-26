@@ -2,7 +2,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { Eye } from "lucide-react";
 import { updateTask } from "./actions";
-import { useRun } from "./use-run";
+import { useRun } from "@/components/use-run";
 
 /**
  * The task's notes: a textarea that grows with its text and saves when it

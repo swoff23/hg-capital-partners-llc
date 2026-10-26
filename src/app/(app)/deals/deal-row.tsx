@@ -8,7 +8,7 @@ import { Tooltip } from "@/components/tooltip";
 import { cn } from "@/lib/utils";
 import { COLUMN_DROP } from "./columns";
 import { DealPriceField, DealStageField, DealTextField, DealUnitsField } from "./deal-fields";
-import { DealStage } from "./stage-select";
+import { DealStage } from "@/components/deal-stage";
 
 export type DealRow = {
   id: string;

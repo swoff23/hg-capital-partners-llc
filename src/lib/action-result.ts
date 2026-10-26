@@ -16,7 +16,24 @@
  */
 import { unstable_rethrow } from "next/navigation";
 
-export type ActionResult<T = void> = { ok: true; data: T } | { ok: false; error: string };
+/** One plain message per field name, for the field's own error line (forms 2.12). */
+export type FieldErrors = Record<string, string>;
+
+/**
+ * A save refused because the record changed since the editor loaded it: the
+ * stale fields, who saved them when the row records it, when, and their
+ * values (forms 2.12). The line on the one open field reads from it.
+ */
+export type ActionConflict = { fields: string[]; by?: string; at: string; theirs?: Record<string, string> };
+
+/**
+ * A failure carries one line in `error`. `fieldErrors` and `conflict` are the
+ * save pipeline's richer answers; until it lands (forms 2.12) no action sets
+ * them, and every caller still reads `error`.
+ */
+export type ActionResult<T = void> =
+  | { ok: true; data: T }
+  | { ok: false; error: string; fieldErrors?: FieldErrors; conflict?: ActionConflict };
 
 /** Optimistic-concurrency failure: the row changed since the editor loaded it. */
 export const CONFLICT_MESSAGE =

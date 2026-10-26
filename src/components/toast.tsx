@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { addToast, type QueuedToast } from "@/components/toast-queue";
 
 /**
  * Short confirmations with an optional action, usually Undo:
@@ -14,15 +15,24 @@ import { cn } from "@/lib/utils";
  * lifted above a sticky bottom bar by useToastInset(). Each toast goes after
  * about 5 seconds, held while the pointer or focus is on it. The region is a
  * polite live region (role="status"), so screen readers hear each message.
+ *
+ * `detail` is the ripple clause after " · " in --toast-fg-2 ("CapEx rules
+ * saved · Forecasts updated"). `key` names what the toast is about: a toast
+ * with the key of one still showing replaces it instead of stacking, so ten
+ * quick edits on one record show one toast for the latest (forms 2.13).
  */
 
 export type ToastInput = {
   /** One line. */
   message: string;
+  /** The ripple clause, after " · " in --toast-fg-2: "Forecasts updated". */
+  detail?: string;
+  /** What it's about ("task:abc:due"): a new toast with a live toast's key replaces it. */
+  key?: string;
   action?: { label: string; onAction: () => void };
 };
 
-type ToastItem = ToastInput & { id: number };
+type ToastItem = QueuedToast<ToastInput>;
 
 type ToastApi = {
   /** Shows a toast and returns its id. */
@@ -40,12 +50,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [inset, setInset] = useState(0);
   const lastId = useRef(0);
 
-  const toast = useCallback((t: ToastInput) => {
-    const id = ++lastId.current;
-    setToasts((ts) => [...ts.slice(-(MAX_SHOWN - 1)), { ...t, id }]);
-    return id;
+  // The list lives in a ref as well, so toast() knows at once which toast a
+  // key replaced and hands back the id that's on screen.
+  const listRef = useRef<ToastItem[]>([]);
+  const commit = useCallback((next: ToastItem[]) => {
+    listRef.current = next;
+    setToasts(next);
   }, []);
-  const dismiss = useCallback((id: number) => setToasts((ts) => ts.filter((t) => t.id !== id)), []);
+
+  const toast = useCallback(
+    (t: ToastInput) => {
+      const res = addToast(listRef.current, t, ++lastId.current, MAX_SHOWN);
+      commit(res.list);
+      return res.id;
+    },
+    [commit],
+  );
+  const dismiss = useCallback((id: number) => commit(listRef.current.filter((t) => t.id !== id)), [commit]);
 
   return (
     <ToastContext value={{ toast, dismiss, setInset }}>
@@ -66,13 +87,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => void }) {
   const [held, setHeld] = useState(false);
-  const { id } = item;
+  const { id, version } = item;
 
+  // A replacement (a new version under the same key) starts the 5 seconds over.
   useEffect(() => {
     if (held) return;
     const timer = setTimeout(() => dismiss(id), DURATION_MS);
     return () => clearTimeout(timer);
-  }, [held, dismiss, id]);
+  }, [held, dismiss, id, version]);
   const onDismiss = () => dismiss(id);
 
   return (
@@ -89,7 +111,10 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
         "animate-toast-in motion-reduce:animate-none",
       )}
     >
-      <span className="min-w-0 flex-1 truncate">{item.message}</span>
+      <span className="min-w-0 flex-1 truncate">
+        {item.message}
+        {item.detail && <span className="text-toast-fg-2"> · {item.detail}</span>}
+      </span>
       {item.action && (
         <button
           type="button"

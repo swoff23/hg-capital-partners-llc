@@ -6,7 +6,7 @@ import { Popover, PopoverTrigger } from "@/components/popover";
 import { Checkbox, buttonClass, chromeIconClass } from "@/components/ui";
 import { DEAL_STATUSES, dealStatusLabel } from "@/lib/config";
 import { cn } from "@/lib/utils";
-import { DealStageMark } from "./stage-select";
+import { DealStageMark } from "@/components/deal-stage";
 
 /**
  * Writes the multi-pick to the URL as a comma-joined `statuses` param. It
