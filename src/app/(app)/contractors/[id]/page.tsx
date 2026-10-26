@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -9,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { recordView } from "@/lib/recent-views";
 import { getEnv } from "@/lib/env";
 import { Badge, Section, textLinkClass } from "@/components/ui";
+import { RailFact } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
 import { STATUS_TONE, StatusBadge, StatusMark } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
@@ -17,10 +17,8 @@ import { shortAddress } from "@/lib/normalize";
 import { portalAccess } from "@/lib/portal/access-state";
 import { STATUS_LABEL, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
-import { cleanTrades, docOnFile, mailtoHref, mapsHref, splitDocLines, telHref, textHref } from "@/lib/contacts";
-import { firstName } from "@/lib/names";
-import { ContactLink } from "../contact-link";
-import { ContactSection } from "./contact-section";
+import { docOnFile, splitDocLines } from "@/lib/contacts";
+import { ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
 
 /** The Jobs list's length; the heading's count is every job. */
@@ -37,20 +35,6 @@ async function signInOrigin(): Promise<string> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   return host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : env.appUrl;
-}
-
-/**
- * One fact in the rail: a 112px label column (96 on phones) beside the value,
- * on a --line divider (section 5). An empty value is the dash in --fg-3. A
- * label stays on one line, so a long one gets a shorter phone form.
- */
-function Detail({ label, children }: { label: ReactNode; children?: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-baseline gap-3 border-b border-line py-2.5 last:border-b-0 sm:grid-cols-[7rem_minmax(0,1fr)] pointer-coarse:py-3">
-      <dt className="text-meta text-fg-3">{label}</dt>
-      <dd className="min-w-0 text-body text-fg-1 wrap-anywhere">{children ?? <span className="text-fg-3">—</span>}</dd>
-    </div>
-  );
 }
 
 /** A document opened in a new tab, so the record stays open behind it. */
@@ -79,9 +63,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   // Puts them on top of this person's Recent in search, once the response is out.
   after(() => recordView(me.id, "CONTACT", c.id));
   const phone = c.phoneE164 ?? c.phone;
-  const sms = textHref(phone);
   const access = c.portalAccount ? portalAccess(c.portalAccount, c.active) : null;
-  const trades = cleanTrades(c.trades);
   const w9OnFile = docOnFile(c.comments, "W-9");
   const coiOnFile = docOnFile(c.comments, "Insurance");
   // The import's "W-9 on file:" lines show as the W-9 and Insurance rows, not as notes.
@@ -112,7 +94,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
     <div className="@container max-w-300">
       <BackLink fallback="/contractors" label="Contractors" />
       <div className="mt-2 mb-6">
-        <h1 className="text-title text-balance text-fg-1">{c.fullName}</h1>
+        <ContactName id={c.id} name={c.fullName} />
         {(c.company || c.tenantFixes) && (
           <div className="mt-1 flex min-w-0 items-center gap-2">
             {c.company && <p className="min-w-0 truncate text-meta text-fg-3">{c.company}</p>}
@@ -139,59 +121,34 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             }}
             portalEmail={c.portalAccount?.email ?? null}
           >
-            <dl>
-              <Detail label="Trades">{trades}</Detail>
-              <Detail label="Phone">
-                {c.phone ? (
-                  <>
-                    <ContactLink href={telHref(phone)} className="num">
-                      {c.phone}
-                    </ContactLink>
-                    {/* Touch only, where a tap opens Messages (ADMIN-004). The ::after reaches 44px. */}
-                    {sms && (
-                      <ContactLink
-                        href={sms}
-                        aria-label={`Text ${firstName(c.fullName) || c.fullName}`}
-                        className="relative ml-3 after:absolute after:-inset-x-2.5 after:-inset-y-3.5 pointer-fine:hidden"
-                      >
-                        Text
-                      </ContactLink>
-                    )}
-                  </>
-                ) : null}
-              </Detail>
-              <Detail label="Email">
-                {c.email ? <ContactLink href={mailtoHref(c.email)}>{c.email}</ContactLink> : null}
-              </Detail>
-              <Detail
-                label={
-                  <>
-                    <span className="sm:hidden">Address</span>
-                    <span className="max-sm:hidden">Mailing address</span>
-                  </>
-                }
-              >
-                {c.mailingAddress ? (
-                  <ContactLink href={mapsHref(c.mailingAddress)} newTab className="whitespace-pre-line">
-                    {c.mailingAddress}
-                  </ContactLink>
-                ) : null}
-              </Detail>
-              <Detail label="Billing">{c.billingInfo}</Detail>
-              <Detail label="Availability">{c.availability}</Detail>
-              <Detail label="W-9">{c.w9Url ? <DocLink href={c.w9Url} /> : w9OnFile ? "On file" : null}</Detail>
-              <Detail
-                label={
-                  <>
-                    Insurance<span className="max-sm:hidden"> (COI)</span>
-                  </>
-                }
-              >
-                {c.coiUrl ? <DocLink href={c.coiUrl} /> : coiOnFile ? "On file" : null}
-              </Detail>
-            </dl>
-            {notes && <p className="whitespace-pre-wrap border-t border-line pt-3 text-meta text-fg-3">{notes}</p>}
+            {/* What isn't edited here yet: the documents, which the uploads work takes. */}
+            <RailFact label="W-9">{c.w9Url ? <DocLink href={c.w9Url} /> : w9OnFile ? "On file" : null}</RailFact>
+            <RailFact
+              label={
+                <>
+                  Insurance<span className="max-sm:hidden"> (COI)</span>
+                </>
+              }
+            >
+              {c.coiUrl ? <DocLink href={c.coiUrl} /> : coiOnFile ? "On file" : null}
+            </RailFact>
           </ContactSection>
+
+          <ContactNotes
+            contact={{
+              id: c.id,
+              fullName: c.fullName,
+              company: c.company,
+              trades: c.trades,
+              phone: c.phone,
+              email: c.email,
+              mailingAddress: c.mailingAddress,
+              billingInfo: c.billingInfo,
+              availability: c.availability,
+              tenantFixes: c.tenantFixes,
+              comments: notes,
+            }}
+          />
 
           <PortalAccessCard
             contactId={c.id}

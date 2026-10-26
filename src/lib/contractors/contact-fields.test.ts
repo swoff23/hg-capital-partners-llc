@@ -1,7 +1,53 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { telHref, textHref } from "@/lib/contacts";
-import { EMAIL_INVALID, NAME_REQUIRED, PHONE_INVALID, readContactPatch, readPhone } from "./contact-fields";
+import { EMAIL_INVALID, NAME_REQUIRED, PHONE_INVALID, readContactPatch, readNewContact, readPhone } from "./contact-fields";
+
+test("readNewContact: the name alone is enough, and blank fields are left out", () => {
+  assert.deepEqual(readNewContact({ fullName: "  Zack   Reading ", company: "", phone: " ", email: "", trades: "", comments: "" }), {
+    ok: true,
+    data: { fullName: "Zack Reading" },
+  });
+  assert.deepEqual(readNewContact({ fullName: "Zack Reading" }), { ok: true, data: { fullName: "Zack Reading" } });
+});
+
+test("readNewContact: every field reads as an edit would, phone with its dialable copy", () => {
+  const r = readNewContact({
+    fullName: "Zack Reading",
+    company: "Outlaw Carpentry",
+    trades: "Carpentry / Framing / carpentry",
+    phone: "(716) 555-1234",
+    email: "Zack@Example.com",
+    mailingAddress: "12 Elm St\nBuffalo, NY 14209",
+    billingInfo: "Zelle",
+    availability: "Weekdays",
+    comments: "Prefers texts.",
+  });
+  assert.deepEqual(r, {
+    ok: true,
+    data: {
+      fullName: "Zack Reading",
+      company: "Outlaw Carpentry",
+      // The same trade twice is kept once.
+      trades: "Carpentry / Framing",
+      phone: "716-555-1234",
+      phoneE164: "+17165551234",
+      email: "zack@example.com",
+      mailingAddress: "12 Elm St\nBuffalo, NY 14209",
+      billingInfo: "Zelle",
+      availability: "Weekdays",
+      comments: "Prefers texts.",
+    },
+  });
+});
+
+test("readNewContact: a missing name and a bad email or phone are all reported, each on its field", () => {
+  assert.deepEqual(readNewContact({ fullName: " ", email: "zack@", phone: "555" }), {
+    ok: false,
+    problems: { fullName: NAME_REQUIRED, phone: PHONE_INVALID, email: EMAIL_INVALID },
+  });
+  assert.deepEqual(readNewContact({ company: "Outlaw Carpentry" }), { ok: false, problems: { fullName: NAME_REQUIRED } });
+});
 
 test("readContactPatch: every empty optional field saves as null", () => {
   const blank = { company: "", trades: " ", phone: "", email: "  ", mailingAddress: "\n", billingInfo: "", availability: "", comments: " \r\n " };

@@ -93,7 +93,9 @@ export type CreatedPortalAccount = Pick<PortalAccount, keyof typeof CREATED_ACCO
 
 /**
  * Create a login for a contractor. Returns the starting password, which is
- * not stored anywhere in the clear and can't be shown again.
+ * not stored anywhere in the clear and can't be shown again. The login email
+ * also becomes the contact's email when the contact has none (forms 4.6), so
+ * the directory has a way to reach them.
  */
 export async function createPortalAccount(
   contactId: string,
@@ -108,7 +110,10 @@ export async function createPortalAccount(
 
   try {
     const account = await prisma.$transaction(async (tx) => {
-      const contact = await tx.contact.findUnique({ where: { id: contactId }, select: { id: true, portalAccount: { select: { id: true } } } });
+      const contact = await tx.contact.findUnique({
+        where: { id: contactId },
+        select: { id: true, email: true, portalAccount: { select: { id: true } } },
+      });
       if (!contact) throw new PortalAccountError("That contractor no longer exists.");
       if (contact.portalAccount) throw new PortalAccountError("This contractor already has a login.");
       // /login checks User first, so an address can't be both kinds of account.
@@ -122,6 +127,8 @@ export async function createPortalAccount(
         select: CREATED_ACCOUNT_SELECT,
       });
       await logSecurityEvent(tx, { kind: "ACCOUNT_CREATED", userId: createdByUser.id, contactId });
+      // A contact with no email gets the login's, so staff can reach them without a second step.
+      if (!contact.email?.trim()) await tx.contact.update({ where: { id: contactId }, data: { email } });
       return created;
     });
     return { account, password };
@@ -132,6 +139,47 @@ export async function createPortalAccount(
     }
     throw err;
   }
+}
+
+/**
+ * Change the email a contractor signs in with ("Change login email" in the
+ * card's menu). The same checks as creating a login: it has to look like an
+ * email, and neither a staff login nor another contractor may use it. The
+ * password and the live sessions are untouched, so they stay signed in and use
+ * the new address from the next sign-in. The contact's own email is not
+ * changed.
+ *
+ * SecurityEventKind has no email-changed value yet, so this is logged as an
+ * ACCOUNT_DISABLED row with `action: "email-changed"`, as enablePortalAccount
+ * does for "enabled": read that kind as "access status changed".
+ */
+export async function changePortalEmail(accountId: string, rawEmail: string, byUser: Staff): Promise<{ email: string }> {
+  const email = normalizeEmail(rawEmail);
+  if (!looksLikeEmail(email)) throw new PortalAccountError("Enter a full email, like name@example.com.");
+  try {
+    await prisma.$transaction(async (tx) => {
+      const account = await tx.portalAccount.findUnique({ where: { id: accountId }, select: { id: true, contactId: true, email: true } });
+      if (!account) throw new PortalAccountError("That login no longer exists.");
+      if (account.email === email) return;
+      const staff = await tx.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } });
+      if (staff) throw new PortalAccountError("That email belongs to a staff login.");
+      const taken = await tx.portalAccount.findUnique({ where: { email }, select: { id: true } });
+      if (taken && taken.id !== accountId) throw new PortalAccountError("Another contractor already uses that email.");
+      await tx.portalAccount.update({ where: { id: accountId }, data: { email } });
+      await logSecurityEvent(tx, {
+        kind: "ACCOUNT_DISABLED",
+        userId: byUser.id,
+        contactId: account.contactId,
+        data: { action: "email-changed", from: account.email, to: email },
+      });
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new PortalAccountError("Another contractor already uses that email.");
+    }
+    throw err;
+  }
+  return { email };
 }
 
 /** A new starting password, shown once. Signs the contractor out everywhere. */

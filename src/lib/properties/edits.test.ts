@@ -1,6 +1,35 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { changedFields, fieldText, isAtVersion, sameText, staleFields } from "./edits";
+import { ConflictError } from "@/lib/action-result";
+import { changedFields, editorName, fieldText, isAtVersion, rowConflict, sameText, staleFields } from "./edits";
+
+test("rowConflict: a field save names who saved last, when, and what the field holds now", () => {
+  const at = new Date("2026-10-23T18:14:00.000Z");
+  const row = { updatedAt: at, updatedByUser: { name: "Pieter Louw", email: "pieter@example.com" }, value: { toString: () => "410000" } };
+  const err = rowConflict(row, ["value"], { values: true });
+  assert.ok(err instanceof ConflictError);
+  assert.deepEqual(err.conflict, { fields: ["value"], at: at.toISOString(), by: "Pieter Louw", theirs: { value: "410000" } });
+  // The one line the toast and the form-level fallback use.
+  assert.match(err.message, /^Pieter changed this /);
+});
+
+test("rowConflict: a row that doesn't record who says so without a name", () => {
+  const at = new Date("2026-10-23T18:14:00.000Z");
+  const err = rowConflict({ updatedAt: at, updatedByUser: null, loanRate: "7.25" }, ["loanRate"], { values: true });
+  assert.deepEqual(err.conflict, { fields: ["loanRate"], at: at.toISOString(), theirs: { loanRate: "7.25" } });
+  assert.match(err.message, /^This changed /);
+  // A name-less user falls back to their email's name part in the line.
+  const byEmail = rowConflict({ updatedAt: at, updatedByUser: { name: null, email: "pieter@example.com" } }, ["units"]);
+  assert.equal(editorName({ name: null, email: "pieter@example.com" }), "pieter@example.com");
+  assert.equal(byEmail.conflict.by, "pieter@example.com");
+  assert.match(byEmail.message, /^pieter changed this /);
+});
+
+test("rowConflict: a whole-blob editor names the blob and carries no values", () => {
+  const at = new Date("2026-10-23T18:14:00.000Z");
+  const err = rowConflict({ updatedAt: at, updatedByUser: { name: "Pieter Louw", email: "p@x.com" } }, ["units"]);
+  assert.deepEqual(err.conflict, { fields: ["units"], at: at.toISOString(), by: "Pieter Louw" });
+});
 
 test("fieldText: a stored value as its form field holds it", () => {
   assert.equal(fieldText(null), "");

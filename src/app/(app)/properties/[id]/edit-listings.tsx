@@ -1,18 +1,21 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { Button as AriaButton } from "react-aria-components";
-import { ChevronLeft, ChevronRight, ExternalLink, ImagePlus, MoreHorizontal, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, ImagePlus, MoreHorizontal, Pencil, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DateField } from "@/components/due-date-picker";
+import { FormSheet } from "@/components/form-sheet";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
+import { NumberInput, numberProblem } from "@/components/number-input";
 import { PhotoThumb } from "@/components/photo-thumb";
-import { AddRow, Button, SectionCard, buttonClass, fieldClass, selectTouchHeight, textLinkClass } from "@/components/ui";
+import { Select } from "@/components/select";
+import { AddRow, Button, FormField, Input, SaveError, Section, buttonClass, textLinkClass } from "@/components/ui";
+import { useRun } from "@/components/use-run";
+import { inlineProblem } from "@/lib/inline-edit";
 import { cn } from "@/lib/utils";
-import { updatePropertyListings } from "../actions";
-import { callAction } from "@/lib/action-result";
-import { LabeledField } from "../labeled-field";
-import { SaveError } from "./record-ui";
+import { deletePropertyListing, savePropertyListing } from "../actions";
 
 export type EditablePhoto = { url: string; pathname: string };
 
@@ -29,8 +32,8 @@ export type EditableListing = {
   photos: EditablePhoto[]; // order = display/carousel order
 };
 
-/** A field in a dense editor row: 32px with a mouse, 44 on touch. */
-const inp = cn(fieldClass, "h-8");
+/** The most photos a listing holds (the server's cap). */
+const MAX_PHOTOS = 20;
 
 // A listing's status is a label, not a state, so its word stays neutral (fg-2, as on Portfolio).
 const STATUS_LABEL: Record<EditableListing["status"], string> = {
@@ -38,6 +41,8 @@ const STATUS_LABEL: Record<EditableListing["status"], string> = {
   LEASED: "Leased",
   HIDDEN: "Hidden",
 };
+
+const STATUS_ITEMS = (["HIDDEN", "AVAILABLE", "LEASED"] as const).map((id) => ({ id, label: STATUS_LABEL[id] }));
 
 function blankListing(): EditableListing {
   return {
@@ -54,11 +59,15 @@ function blankListing(): EditableListing {
   };
 }
 
-/** A listing added in this draft (no id yet) that's still exactly blank. */
-function isUntouchedNew(l: EditableListing): boolean {
-  return l.id === null && JSON.stringify(l) === JSON.stringify(blankListing());
-}
+type Sheet = { index: number | null; version: string; id: number };
 
+/**
+ * The rentals (forms 4.2): one row per listing, read at a glance. A row's
+ * name, or "Edit listing" in its ⋯ menu, opens that listing in a sheet: its
+ * unit, status, photos and facts, saved together as one write at the version
+ * the sheet opened at, so a change anyone else made to the property meanwhile
+ * refuses it. "Delete listing" asks first and says how many photos go with it.
+ */
 export function ListingsSection({
   propertyId,
   version,
@@ -66,170 +75,97 @@ export function ListingsSection({
   unitLabels,
 }: {
   propertyId: string;
-  /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
+  /** Property.updatedAt the page rendered with; a sheet pins it when it opens, and the save refuses a newer row. */
   version: string;
   initial: EditableListing[];
   /** Unit labels from the Units & access section above: the only valid choices, so the two stay consistent. */
   unitLabels: string[];
 }) {
-  const [editing, setEditing] = useState(false);
-  const [listings, setListings] = useState<EditableListing[]>(structuredClone(initial));
-  // The version Edit opened at. A save in another card refreshes the page with a
-  // newer one, and sending that would let this draft overwrite a partner's change.
-  const [editVersion, setEditVersion] = useState(version);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  // How many photo uploads are currently in flight, across every listing card. A photo
-  // isn't in `listings` state until its upload resolves and calls onAdd: saving while
-  // this is > 0 would silently persist the listings *without* the photo still uploading,
-  // with no error to show for it. Save stays disabled until every upload settles.
-  const [uploadingCount, setUploadingCount] = useState(0);
-  const root = useRef<HTMLDivElement>(null);
-
-  // A listing Add listing opened and nobody touched isn't a change, so Cancel doesn't ask about it.
-  const dirty = JSON.stringify(listings.filter((l) => !isUntouchedNew(l))) !== JSON.stringify(initial);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [removing, setRemoving] = useState<number | null>(null);
+  const run = useRun();
   const noUnits = unitLabels.length === 0;
 
-  function mutate(fn: (l: EditableListing[]) => void) {
-    setListings((prev) => {
-      const next = structuredClone(prev);
-      fn(next);
-      return next;
+  function openListing(index: number | null) {
+    setSheet({ index, version, id: (sheet?.id ?? 0) + 1 });
+    setIsOpen(true);
+  }
+
+  const doomed = removing != null ? initial[removing] : null;
+
+  function confirmDelete() {
+    if (!doomed?.id) return;
+    const id = doomed.id;
+    const name = doomed.unitLabel || "the listing";
+    run.run(() => deletePropertyListing(propertyId, id, version), {
+      failure: "inline",
+      succeeded: () => setRemoving(null),
+      done: `Listing for ${name} deleted`,
     });
   }
 
-  /**
-   * Start from what's saved now: after a save the page brings each new
-   * listing's id, and a draft still holding a null id would delete that
-   * listing with its photo files and add it back as a new one.
-   */
-  function edit(withNew = false) {
-    setError(null);
-    setListings(withNew ? [...structuredClone(initial), blankListing()] : structuredClone(initial));
-    setEditVersion(version);
-    setEditing(true);
-  }
-
-  function save() {
-    setError(null);
-    // A number input hands React "" for text it can't read ("1,500", "15oo"), and
-    // the server would store that blank over the rent. Catch it while the typed
-    // text is still in the field.
-    const unreadable = [...(root.current?.querySelectorAll<HTMLInputElement>("input[data-check]") ?? [])].find(
-      (el) => el.validity.badInput,
-    );
-    if (unreadable) {
-      setError(unreadable.dataset.check ?? "Check the numbers.");
-      unreadable.focus();
-      return;
-    }
-    start(async () => {
-      const r = await callAction(() => updatePropertyListings(propertyId, listings, editVersion));
-      if (!r.ok) {
-        setError(r.error);
-        setConfirmOpen(false);
-        return;
-      }
-      setConfirmOpen(false);
-      setEditing(false);
-    });
-  }
-
-  function discard() {
-    setError(null);
-    setListings(structuredClone(initial));
-    setConfirmOpen(false);
-    setEditing(false);
-  }
-
-  function cancel() {
-    if (dirty) setConfirmOpen(true);
-    else discard();
-  }
-
-  const saveLabel = pending ? "Saving…" : uploadingCount > 0 ? "Uploading…" : null;
+  const editing = sheet?.index != null ? initial[sheet.index] : undefined;
 
   return (
-    <div ref={root}>
-      <SectionCard
-        title="Rentals"
-        onEdit={() => edit()}
-        editing={editing}
-        actions={
-          <>
-            <Button size="sm" variant="secondary" onClick={cancel}>
-              Cancel
-            </Button>
-            {/* Waits for every photo upload: the label says so while one is going up. */}
-            <Button size="sm" onClick={save} disabled={pending || uploadingCount > 0}>
-              {saveLabel ?? "Save"}
-            </Button>
-          </>
-        }
-      >
-        {!editing ? (
-          <>
-            {initial.length === 0 ? (
-              <p className="pb-2 text-body text-fg-3">No listings yet.</p>
-            ) : (
-              <ReadListings listings={initial} />
-            )}
-            <AddRow onClick={() => edit(true)} disabled={noUnits}>
-              Add listing
-            </AddRow>
-            {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
-          </>
-        ) : (
-          <>
-            {listings.length > 0 && (
-              <ul className="divide-y divide-line">
-                {listings.map((l, i) => (
-                  <EditListing
-                    key={l.id ?? `new-${i}`}
-                    listing={l}
-                    index={i}
-                    propertyId={propertyId}
-                    unitLabels={unitLabels}
-                    mutate={mutate}
-                    onUploadBusyChange={(busy) => setUploadingCount((c) => c + (busy ? 1 : -1))}
-                  />
-                ))}
-              </ul>
-            )}
-            <AddRow onClick={() => mutate((x) => x.push(blankListing()))} disabled={noUnits}>
-              Add listing
-            </AddRow>
-            {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
-          </>
-        )}
+    <Section title="Rentals">
+      {initial.length === 0 ? (
+        <p className="pb-2 text-body text-fg-3">No listings yet.</p>
+      ) : (
+        <ReadListings
+          listings={initial}
+          onEdit={openListing}
+          onDelete={(i) => {
+            run.reset();
+            setRemoving(i);
+          }}
+        />
+      )}
+      <AddRow onClick={() => openListing(null)} disabled={noUnits}>
+        Add listing
+      </AddRow>
+      {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
 
-        {error && <SaveError className="mt-2">{error}</SaveError>}
-      </SectionCard>
+      {sheet && (
+        <ListingSheet
+          key={sheet.id}
+          propertyId={propertyId}
+          version={sheet.version}
+          listing={editing ?? blankListing()}
+          unitLabels={unitLabels}
+          isOpen={isOpen}
+          onOpenChange={setIsOpen}
+        />
+      )}
 
-      {confirmOpen && (
+      {doomed && (
         <ConfirmDialog
-          title="Discard your Rentals edits?"
-          body="Your changes to these listings won't be saved."
-          onClose={() => setConfirmOpen(false)}
-          cancelLabel="Keep editing"
+          title={`Delete the listing for ${doomed.unitLabel || "this unit"}?`}
+          body={doomed.photos.length > 0 ? `Its ${doomed.photos.length} ${doomed.photos.length === 1 ? "photo goes" : "photos go"} too.` : undefined}
+          onClose={() => setRemoving(null)}
+          cancelLabel="Keep it"
+          busy={run.pending}
           actions={
-            <>
-              <Button size="sm" variant="secondary" onClick={discard}>
-                Discard
-              </Button>
-              <Button size="sm" onClick={save} disabled={pending || uploadingCount > 0}>
-                {saveLabel ?? "Save changes"}
-              </Button>
-            </>
+            <Button size="sm" variant="destructive" onClick={confirmDelete} pending={run.pending}>
+              Delete listing
+            </Button>
           }
         />
       )}
-    </div>
+      {doomed && run.error && <SaveError className="mt-2">{run.error}</SaveError>}
+    </Section>
   );
 }
 
-function ReadListings({ listings }: { listings: EditableListing[] }) {
+function ReadListings({
+  listings,
+  onEdit,
+  onDelete,
+}: {
+  listings: EditableListing[];
+  onEdit: (index: number) => void;
+  onDelete: (index: number) => void;
+}) {
   return (
     <ul className="divide-y divide-line">
       {listings.map((l, i) => {
@@ -238,7 +174,12 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
         return (
           <li key={l.id ?? i} className="flex min-h-14 items-center gap-3 py-2">
             <PhotoThumb src={l.photos[0]?.url} alt={`${name} listing photo`} size={48} />
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => onEdit(i)}
+              aria-label={`Edit the listing for ${name}`}
+              className="min-w-0 flex-1 rounded-md text-left pointer-coarse:min-h-11"
+            >
               <p className="truncate text-body text-fg-1">{name}</p>
               <p className="truncate text-meta text-fg-3">
                 {/* The status column drops below 480, so its word leads the subline. */}
@@ -257,7 +198,7 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
                 )}
                 {l.photos.length > 1 && <span className="max-[480px]:hidden"> · {l.photos.length} photos</span>}
               </p>
-            </div>
+            </button>
             {l.zillowUrl && (
               <a
                 href={l.zillowUrl}
@@ -269,10 +210,21 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
                 <ExternalLink aria-hidden="true" strokeWidth={1.5} className="h-3.5 w-3.5 text-fg-3" />
               </a>
             )}
-            {/* The status in one fixed column at the row's end, whether or not a Zillow link sits before it. */}
-            <span className="w-20 shrink-0 whitespace-nowrap text-meta font-medium text-fg-2 max-[480px]:hidden">
-              {STATUS_LABEL[l.status]}
-            </span>
+            {/* The status in one fixed column before the menu, whether or not a Zillow link sits before it. */}
+            <span className="w-20 shrink-0 whitespace-nowrap text-meta font-medium text-fg-2 max-[480px]:hidden">{STATUS_LABEL[l.status]}</span>
+            <MenuTrigger>
+              <AriaButton aria-label={`${name} actions`} className={buttonClass({ variant: "ghost", size: "sm", icon: true })}>
+                <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
+              </AriaButton>
+              <Menu sheetTitle={name}>
+                <MenuItem icon={<Pencil />} onAction={() => onEdit(i)}>
+                  Edit listing
+                </MenuItem>
+                <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => onDelete(i)}>
+                  Delete listing
+                </MenuItem>
+              </Menu>
+            </MenuTrigger>
           </li>
         );
       })}
@@ -280,144 +232,175 @@ function ReadListings({ listings }: { listings: EditableListing[] }) {
   );
 }
 
-function EditListing({
-  listing: l,
-  index: i,
+/* ---------------- The listing's sheet ---------------- */
+
+/** The fields a sheet checks, by name. A field shows its line once it was left or Save was pressed. */
+function problemsOf(l: EditableListing, original: EditableListing): Record<string, string> {
+  const found: Record<string, string> = {};
+  if (!l.unitLabel.trim()) found.unitLabel = "Choose a unit.";
+  const url = inlineProblem("url", l.zillowUrl);
+  if (url) found.zillowUrl = url;
+  const rent = numberProblem("money", l.rent);
+  if (rent) found.rent = rent;
+  const sqft = numberProblem("integer", l.sqft);
+  if (sqft) found.sqft = sqft;
+  // A bed or bath count already stored ("Studio") is left as it is until someone types over it.
+  const beds = l.beds !== original.beds ? numberProblem("integer", l.beds) : null;
+  if (beds) found.beds = beds;
+  const baths = l.baths !== original.baths ? numberProblem("decimal", l.baths) : null;
+  if (baths) found.baths = baths;
+  return found;
+}
+
+/**
+ * One listing in a sheet (forms 4.2, 2.9): unit and status, the photos, the
+ * link, when it's available, the rent and the rest. Save applies the fields
+ * and the photo set together. While photos upload, Save waits and one line
+ * beside it says how many ("2 photos uploading"); its label never changes.
+ */
+function ListingSheet({
   propertyId,
+  version,
+  listing,
   unitLabels,
-  mutate,
-  onUploadBusyChange,
+  isOpen,
+  onOpenChange,
 }: {
-  listing: EditableListing;
-  index: number;
   propertyId: string;
+  version: string;
+  listing: EditableListing;
   unitLabels: string[];
-  mutate: (fn: (l: EditableListing[]) => void) => void;
-  onUploadBusyChange: (busy: boolean) => void;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  // Include the listing's current label even if it's since been renamed/removed
-  // from Units & access, so an existing pick never silently disappears.
-  const options = l.unitLabel && !unitLabels.includes(l.unitLabel) ? [l.unitLabel, ...unitLabels] : unitLabels;
-  const name = l.unitLabel || "New listing";
+  const isNew = listing.id === null;
+  const [draft, setDraft] = useState<EditableListing>(() => structuredClone(listing));
+  const [tried, setTried] = useState(false);
+  const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
+  const [uploading, setUploading] = useState(0);
+  const run = useRun();
+
+  // Include the listing's current label even if it's since been renamed or removed from Units & access,
+  // so an existing pick never silently disappears.
+  const unitItems = [...new Set([listing.unitLabel, ...unitLabels].filter(Boolean))].map((u) => ({ id: u, label: u }));
+  const name = draft.unitLabel || "New listing";
+  const problems = problemsOf(draft, listing);
+  const shows = (field: string) => (tried || left.has(field)) && problems[field] ? problems[field] : undefined;
+  const serverError = (field: string) => run.fieldErrors?.[field];
+  const leave = (field: string) => setLeft((s) => new Set(s).add(field));
+
+  function change(patch: Partial<EditableListing>) {
+    run.reset();
+    setDraft((d) => ({ ...d, ...patch }));
+  }
+
+  function submit() {
+    setTried(true);
+    if (Object.keys(problems).length > 0) return;
+    run.run(() => savePropertyListing(propertyId, draft, version), {
+      failure: "inline",
+      succeeded: () => onOpenChange(false),
+      done: isNew ? `Listing for ${draft.unitLabel} added` : `Listing for ${draft.unitLabel} saved`,
+      key: `listing:${propertyId}:${draft.id ?? "new"}`,
+    });
+  }
 
   return (
-    <li className="space-y-3 py-4 first:pt-1">
-      {/* One row at every width: the unit takes what the status and the menu leave. */}
-      <div className="flex items-center gap-2">
-        <select
-          className={cn(inp, selectTouchHeight, "min-w-0 flex-1 sm:max-w-48")}
-          aria-label="Unit"
-          value={l.unitLabel}
-          onChange={(e) => mutate((x) => (x[i].unitLabel = e.target.value))}
-        >
-          <option value="" disabled>
-            Unit
-          </option>
-          {options.map((label) => (
-            <option key={label} value={label}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          // Sized to "Available", so the unit beside it keeps its room at 320.
-          className={cn(inp, selectTouchHeight, "w-28 shrink-0")}
-          aria-label="Status"
-          value={l.status}
-          onChange={(e) => mutate((x) => (x[i].status = e.target.value as EditableListing["status"]))}
-        >
-          <option value="HIDDEN">Hidden</option>
-          <option value="AVAILABLE">Available</option>
-          <option value="LEASED">Leased</option>
-        </select>
-        <span className="ml-auto shrink-0">
-          <MenuTrigger>
-            <AriaButton aria-label={`${name} actions`} className={buttonClass({ variant: "ghost", size: "sm", icon: true })}>
-              <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
-            </AriaButton>
-            <Menu>
-              <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => mutate((x) => void x.splice(i, 1))}>
-                Delete listing
-              </MenuItem>
-            </Menu>
-          </MenuTrigger>
-        </span>
+    <FormSheet
+      title={isNew ? "New listing" : name}
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      onSubmit={submit}
+      primary={isNew ? "Add listing" : "Save listing"}
+      pending={run.pending}
+      primaryDisabled={uploading > 0}
+      disabledReason={uploading > 0 ? `${uploading} ${uploading === 1 ? "photo" : "photos"} uploading` : undefined}
+      values={draft}
+      size="lg"
+      fullHeight
+      discardTitle={isNew ? "Discard the new listing?" : `Discard changes to the listing for ${name}?`}
+      leaveTitle={`Leave without saving the listing for ${name}?`}
+      error={run.error && Object.keys(run.fieldErrors ?? {}).length === 0 ? run.error : undefined}
+      fieldErrors={run.fieldErrors}
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select
+          label="Unit"
+          items={unitItems}
+          value={draft.unitLabel || null}
+          placeholder="Choose a unit"
+          onChange={(v) => change({ unitLabel: v ?? "" })}
+          isInvalid={!!shows("unitLabel")}
+          errorMessage={shows("unitLabel")}
+        />
+        <Select
+          label="Status"
+          items={STATUS_ITEMS}
+          value={draft.status}
+          onChange={(v) => change({ status: (v ?? "HIDDEN") as EditableListing["status"] })}
+        />
       </div>
 
       <PhotoGallery
         propertyId={propertyId}
         name={name}
-        photos={l.photos}
-        onAdd={(photo) => mutate((x) => void x[i].photos.push(photo))}
-        onRemove={(j) => mutate((x) => void x[i].photos.splice(j, 1))}
+        photos={draft.photos}
+        onAdd={(photo) => setDraft((d) => (d.photos.length >= MAX_PHOTOS ? d : { ...d, photos: [...d.photos, photo] }))}
+        onRemove={(j) => setDraft((d) => ({ ...d, photos: d.photos.filter((_, k) => k !== j) }))}
         onMove={(j, dir) =>
-          mutate((x) => {
-            const arr = x[i].photos;
+          setDraft((d) => {
+            const photos = [...d.photos];
             const target = j + dir;
-            if (target < 0 || target >= arr.length) return;
-            [arr[j], arr[target]] = [arr[target], arr[j]];
+            if (target < 0 || target >= photos.length) return d;
+            [photos[j], photos[target]] = [photos[target], photos[j]];
+            return { ...d, photos };
           })
         }
-        onBusyChange={onUploadBusyChange}
+        onPendingChange={setUploading}
       />
 
-      <div className="@container">
-        <div className="grid grid-cols-2 gap-3 @min-[30rem]:grid-cols-3">
-          <LabeledField label="Zillow link" className="col-span-2 @min-[30rem]:col-span-1">
-            <input
-              className={inp}
-              placeholder="https://www.zillow.com/…"
-              value={l.zillowUrl}
-              onChange={(e) => mutate((x) => (x[i].zillowUrl = e.target.value))}
-            />
-          </LabeledField>
-          <LabeledField label="Available">
-            <input
-              type="date"
-              className={inp}
-              value={l.availableDate}
-              onChange={(e) => mutate((x) => (x[i].availableDate = e.target.value))}
-            />
-          </LabeledField>
-          <LabeledField label="Rent / month">
-            <input
-              type="number"
-              min="0"
-              className={cn(inp, "num")}
-              value={l.rent}
-              data-check={`Rent for ${l.unitLabel || "Unit"} isn't a number.`}
-              onChange={(e) => mutate((x) => (x[i].rent = e.target.value))}
-            />
-          </LabeledField>
-          <LabeledField label="Sq ft">
-            <input
-              type="number"
-              min="0"
-              className={cn(inp, "num")}
-              value={l.sqft}
-              data-check={`Sq ft for ${l.unitLabel || "Unit"} isn't a whole number.`}
-              onChange={(e) => mutate((x) => (x[i].sqft = e.target.value))}
-            />
-          </LabeledField>
-          <LabeledField label="Beds">
-            <input
-              className={inp}
-              placeholder="2"
-              value={l.beds}
-              onChange={(e) => mutate((x) => (x[i].beds = e.target.value))}
-            />
-          </LabeledField>
-          <LabeledField label="Baths">
-            <input
-              className={inp}
-              placeholder="1"
-              value={l.baths}
-              onChange={(e) => mutate((x) => (x[i].baths = e.target.value))}
-            />
-          </LabeledField>
+      <FormField label="Zillow link" optional error={shows("zillowUrl") ?? serverError("zillowUrl")}>
+        {(p) => (
+          <Input
+            {...p}
+            type="text"
+            inputMode="url"
+            autoCapitalize="none"
+            spellCheck={false}
+            autoComplete="off"
+            value={draft.zillowUrl}
+            onBlur={() => leave("zillowUrl")}
+            onChange={(e) => change({ zillowUrl: e.target.value })}
+          />
+        )}
+      </FormField>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-meta font-medium text-fg-2">
+            Available from<span className="font-normal text-fg-3"> (optional)</span>
+          </span>
+          <DateField label="Available from" value={draft.availableDate || null} onChange={(v) => change({ availableDate: v ?? "" })} />
         </div>
+        <FormField label="Rent" optional error={shows("rent") ?? serverError("rent")}>
+          {(p) => (
+            <NumberInput kind="money" suffix="/mo" {...p} value={draft.rent} onBlur={() => leave("rent")} onChange={(v) => change({ rent: v })} />
+          )}
+        </FormField>
       </div>
-    </li>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <FormField label="Sq ft" optional error={shows("sqft") ?? serverError("sqft")}>
+          {(p) => <NumberInput kind="integer" {...p} value={draft.sqft} onBlur={() => leave("sqft")} onChange={(v) => change({ sqft: v })} />}
+        </FormField>
+        <FormField label="Beds" optional error={shows("beds")}>
+          {(p) => <NumberInput kind="integer" {...p} value={draft.beds} onBlur={() => leave("beds")} onChange={(v) => change({ beds: v })} />}
+        </FormField>
+        <FormField label="Baths" optional error={shows("baths")}>
+          {(p) => <NumberInput kind="decimal" {...p} value={draft.baths} onBlur={() => leave("baths")} onChange={(v) => change({ baths: v })} />}
+        </FormField>
+      </div>
+    </FormSheet>
   );
 }
 
@@ -435,7 +418,7 @@ function PhotoGallery({
   onAdd,
   onRemove,
   onMove,
-  onBusyChange,
+  onPendingChange,
 }: {
   propertyId: string;
   /** The listing's unit, for the photos' alt text. */
@@ -444,8 +427,8 @@ function PhotoGallery({
   onAdd: (photo: EditablePhoto) => void;
   onRemove: (index: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
-  /** Tells the parent (which gates Save on it) whenever an upload starts/finishes here. */
-  onBusyChange: (busy: boolean) => void;
+  /** How many uploads are still going, whenever it changes: the sheet's Save waits on it and says so. */
+  onPendingChange: (pending: number) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -456,8 +439,10 @@ function PhotoGallery({
     const msg = e instanceof Error ? e.message : "";
     if (/not configured|Blob store/i.test(msg)) return "uploads aren't set up yet";
     if (/content type mismatch/i.test(msg)) {
-      return "HEIC photos aren't supported. Export as JPEG first, or on iPhone set " +
-        "Settings → Camera → Formats to \"Most Compatible\"";
+      return (
+        "HEIC photos aren't supported. Export as JPEG first, or on iPhone set " +
+        'Settings → Camera → Formats to "Most Compatible"'
+      );
     }
     if (/too large|exceeds the maximum/i.test(msg)) return "file is too large (25MB max)";
     // @vercel/blob's client always uses this exact generic wording when the request
@@ -475,7 +460,8 @@ function PhotoGallery({
     if (list.length === 0) return;
     setError(null);
     setBusy(true);
-    onBusyChange(true);
+    let remaining = list.length;
+    onPendingChange(remaining);
     const failures: string[] = [];
     try {
       // A few uploads at once instead of one at a time: each file was paying its own
@@ -497,6 +483,9 @@ function PhotoGallery({
           } catch (e) {
             // Keep going: one bad photo (wrong format, too large) shouldn't stop the rest of the batch.
             failures.push(`${file.name}: ${describeUploadError(e)}`);
+          } finally {
+            remaining -= 1;
+            onPendingChange(remaining);
           }
         }
       }
@@ -504,7 +493,7 @@ function PhotoGallery({
       if (failures.length > 0) setError(failures.join("; "));
     } finally {
       setBusy(false);
-      onBusyChange(false);
+      onPendingChange(0);
     }
   }
 
@@ -554,7 +543,7 @@ function PhotoGallery({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          disabled={busy}
+          disabled={busy || photos.length >= MAX_PHOTOS}
           className="flex h-18 w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg bg-fill-1 text-meta text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-60"
         >
           <ImagePlus aria-hidden="true" strokeWidth={1.5} className="h-4 w-4 text-fg-3" />

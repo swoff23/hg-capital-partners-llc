@@ -29,9 +29,9 @@ export type ExistingProperty = { id: string; address: string };
  */
 export async function createProperty(formData: FormData): Promise<ActionResult<{ duplicateOf: ExistingProperty }>> {
   return withResult("createProperty", async () => {
-    await requireUser();
+    const user = await requireUser();
     const p = propertySchema.parse(formToObject(formData));
-    const r = await properties.createProperty(p);
+    const r = await properties.createProperty(p, user);
     if (r.duplicateOf) return { duplicateOf: { id: r.duplicateOf.id, address: r.duplicateOf.address } };
     redirect(`/properties/${r.property.id}`);
   });
@@ -53,8 +53,8 @@ export async function patchProperty(
   expected: Record<string, string>,
 ): Promise<ActionResult> {
   return withResult("patchProperty", async () => {
-    await requireUser();
-    await properties.patchProperty(id, fieldsSchema.parse(changes), fieldsSchema.parse(expected));
+    const user = await requireUser();
+    await properties.patchProperty(id, fieldsSchema.parse(changes), fieldsSchema.parse(expected), user);
   });
 }
 
@@ -104,7 +104,23 @@ export async function updatePropertyUnits(id: string, units: unknown, expectedVe
   return withResult("updatePropertyUnits", async () => {
     const me = await requireUser();
     // Staff, as the actor on any task that follows a unit rename.
-    await properties.replaceUnits(id, z.array(unitSchema).parse(units), expectedVersion, staffPrincipal(me));
+    await properties.replaceUnits(id, z.array(unitSchema).parse(units), expectedVersion, staffPrincipal(me), me);
+  });
+}
+
+/** One unit from its sheet: replaces it, or adds it when it has no id yet. At the version the sheet opened at. */
+export async function savePropertyUnit(id: string, unit: unknown, expectedVersion: string): Promise<ActionResult> {
+  return withResult("savePropertyUnit", async () => {
+    const me = await requireUser();
+    await properties.saveUnit(id, unitSchema.parse(unit), expectedVersion, staffPrincipal(me), me);
+  });
+}
+
+/** One unit, after the confirm. */
+export async function deletePropertyUnit(id: string, unitId: string, expectedVersion: string): Promise<ActionResult> {
+  return withResult("deletePropertyUnit", async () => {
+    const me = await requireUser();
+    await properties.deleteUnit(id, z.string().min(1).max(100).parse(unitId), expectedVersion, staffPrincipal(me), me);
   });
 }
 
@@ -115,8 +131,8 @@ const buildingCapexSchema = z.record(
 
 export async function updateBuildingCapex(id: string, data: unknown, expectedVersion: string): Promise<ActionResult> {
   return withResult("updateBuildingCapex", async () => {
-    await requireUser();
-    await properties.mergeBuildingCapex(id, buildingCapexSchema.parse(data), expectedVersion);
+    const me = await requireUser();
+    await properties.mergeBuildingCapex(id, buildingCapexSchema.parse(data), expectedVersion, me);
   });
 }
 
@@ -139,8 +155,29 @@ export async function updatePropertyListings(
   expectedVersion: string,
 ): Promise<ActionResult> {
   return withResult("updatePropertyListings", async () => {
-    await requireUser();
+    const me = await requireUser();
     const parsed = z.array(listingSchema).parse(listings).map((l) => ({ ...l, id: l.id ?? null }));
-    await properties.replaceListings(propertyId, parsed, expectedVersion);
+    await properties.replaceListings(propertyId, parsed, expectedVersion, me);
+  });
+}
+
+/** One listing from its sheet, fields and photos together. Returns its id, so a new listing is known once saved. */
+export async function savePropertyListing(
+  propertyId: string,
+  listing: unknown,
+  expectedVersion: string,
+): Promise<ActionResult<{ id: string }>> {
+  return withResult("savePropertyListing", async () => {
+    const me = await requireUser();
+    const parsed = listingSchema.parse(listing);
+    return properties.saveListing(propertyId, { ...parsed, id: parsed.id ?? null }, expectedVersion, me);
+  });
+}
+
+/** One listing and its photos, after the confirm. */
+export async function deletePropertyListing(propertyId: string, listingId: string, expectedVersion: string): Promise<ActionResult> {
+  return withResult("deletePropertyListing", async () => {
+    const me = await requireUser();
+    await properties.deleteListing(propertyId, z.string().min(1).parse(listingId), expectedVersion, me);
   });
 }

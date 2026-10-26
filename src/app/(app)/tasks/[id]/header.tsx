@@ -4,14 +4,13 @@ import { Ban, Ellipsis, Link2, Trash2 } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import type { TaskStatus } from "@prisma/client";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { InlineAddressField } from "@/components/inline-address-field";
+import { InlineField } from "@/components/inline-field";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
 import { Button, buttonClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { deleteTask, setTaskStatus, updateTask } from "./actions";
 import { useStatusRun } from "./status-run";
-import { useRun } from "@/components/use-run";
 
 /**
  * The title on the page title token, edited in place. At rest it's the
@@ -20,19 +19,17 @@ import { useRun } from "@/components/use-run";
  * status chip carries no strike (docs/brand-guidelines.md, section 9).
  */
 export function TitleField({ taskId, title, closed }: { taskId: string; title: string; closed: boolean }) {
-  const { toast } = useRun();
   return (
-    <InlineAddressField
+    <InlineField
+      kind="heading"
       label="Task title"
+      context="Task title"
       value={title}
+      // "Enter at least 2 characters." under the open field, in place of a silent revert (BTASKS-013).
       minLength={2}
-      heading
-      multiline
+      message={() => "Task renamed"}
       className={cn(closed && "text-fg-3 line-through")}
-      onCommit={async (next) => {
-        const res = await callAction(() => updateTask(taskId, { title: next }));
-        if (!res.ok) toast({ message: res.error });
-      }}
+      onSave={(next) => updateTask(taskId, { title: next })}
     />
   );
 }

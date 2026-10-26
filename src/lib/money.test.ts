@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { amountToDecimal, evenShare, moneyParts, parseAmount, tidyAmount, toDecimalString } from "./money";
+import { amountToDecimal, evenShare, moneyParts, parseAmount, readNumber, savesAs, tidyAmount, toDecimalString } from "./money";
 
 test("parseAmount: the shapes people actually type", () => {
   assert.equal(parseAmount("425000"), 425000);
@@ -94,4 +94,74 @@ test("tidyAmount: text that is not one number is left as typed", () => {
   assert.equal(tidyAmount("integer", ""), null);
   assert.equal(tidyAmount("integer", "two"), null);
   assert.equal(tidyAmount("percent", "5 to 6"), null);
+});
+
+// ---------------------------------------------------------------------------
+// readNumber and savesAs: parseAmount for every kind (forms 2.3)
+// ---------------------------------------------------------------------------
+
+const NOW = new Date("2026-10-26T12:00:00Z");
+
+test("readNumber money: the shapes people type, a blank clears, text is refused", () => {
+  for (const [typed, value] of [["425000", 425000], ["425,000", 425000], ["$425k", 425000], ["1.2m", 1_200_000], ["8k", 8000], ["1842.17", 1842.17]] as const) {
+    assert.deepEqual(readNumber("money", typed, NOW), { ok: true, value }, typed);
+  }
+  assert.deepEqual(readNumber("money", "  ", NOW), { ok: true, value: null });
+  for (const typed of ["low 400s", "400-450k", "ask", "-5"]) {
+    assert.deepEqual(readNumber("money", typed, NOW), { ok: false, message: "Enter an amount, like 425,000." }, typed);
+  }
+});
+
+test("readNumber percent: 6.875 and 6.875%, within 0 to 100", () => {
+  assert.deepEqual(readNumber("percent", "6.875", NOW), { ok: true, value: 6.875 });
+  assert.deepEqual(readNumber("percent", "6.875%", NOW), { ok: true, value: 6.875 });
+  assert.deepEqual(readNumber("percent", "0", NOW), { ok: true, value: 0 });
+  assert.deepEqual(readNumber("percent", "100", NOW), { ok: true, value: 100 });
+  // A forgotten decimal point ("6875") is refused, as the server's readRate refuses it.
+  assert.deepEqual(readNumber("percent", "6875", NOW), { ok: false, message: "Enter a rate, like 6.875." });
+  assert.deepEqual(readNumber("percent", "six", NOW), { ok: false, message: "Enter a rate, like 6.875." });
+});
+
+test("readNumber integer: whole numbers with grouping; a fraction is refused, not rounded", () => {
+  assert.deepEqual(readNumber("integer", "1,200", NOW), { ok: true, value: 1200 });
+  assert.deepEqual(readNumber("integer", "4.0", NOW), { ok: true, value: 4 });
+  assert.deepEqual(readNumber("integer", "1.5", NOW), { ok: false, message: "Enter a whole number." });
+  assert.deepEqual(readNumber("integer", "-2", NOW), { ok: false, message: "Enter a whole number." });
+  assert.deepEqual(readNumber("integer", "two", NOW), { ok: false, message: "Enter a whole number." });
+});
+
+test("readNumber year: 1900 to next year", () => {
+  assert.deepEqual(readNumber("year", "2014", NOW), { ok: true, value: 2014 });
+  assert.deepEqual(readNumber("year", "1900", NOW), { ok: true, value: 1900 });
+  assert.deepEqual(readNumber("year", "2027", NOW), { ok: true, value: 2027 });
+  for (const typed of ["2028", "1899", "Old", "14", "2014.5"]) {
+    assert.deepEqual(readNumber("year", typed, NOW), { ok: false, message: "Enter a year, like 2014." }, typed);
+  }
+});
+
+test("readNumber decimal: baths are 1, 1.5, 2.5", () => {
+  assert.deepEqual(readNumber("decimal", "1.5", NOW), { ok: true, value: 1.5 });
+  assert.deepEqual(readNumber("decimal", "2", NOW), { ok: true, value: 2 });
+  assert.deepEqual(readNumber("decimal", "one and a half", NOW), { ok: false, message: "Enter a number, like 1.5." });
+});
+
+test("savesAs: money shows how it will save when that differs from what was typed", () => {
+  assert.equal(savesAs("money", "425k"), "Saves as $425,000");
+  assert.equal(savesAs("money", "425000"), "Saves as $425,000");
+  assert.equal(savesAs("money", "1.2m"), "Saves as $1,200,000");
+  assert.equal(savesAs("money", "1842.5"), "Saves as $1,842.5");
+  // Already reads that way, blank, or not a number: no preview.
+  assert.equal(savesAs("money", "425,000"), null);
+  assert.equal(savesAs("money", "$425,000"), null);
+  assert.equal(savesAs("money", ""), null);
+  assert.equal(savesAs("money", "low 400s"), null);
+  // Rates and counts read as typed.
+  assert.equal(savesAs("percent", "6.875%"), null);
+  assert.equal(savesAs("integer", "2k"), null);
+});
+
+test("savesAs: a deal price that isn't one number is kept as text", () => {
+  assert.equal(savesAs("money", "low 400s", { allowText: true }), "Kept as text, no amount");
+  assert.equal(savesAs("money", "425k", { allowText: true }), "Saves as $425,000");
+  assert.equal(savesAs("money", "   ", { allowText: true }), null);
 });

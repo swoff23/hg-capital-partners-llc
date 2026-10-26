@@ -5,11 +5,14 @@ import { z } from "zod";
 import {
   ConflictError,
   FIELD_FALLBACK,
+  FieldError,
   GENERIC_ERROR,
   OFFLINE_ERROR,
   callAction,
   conflictBy,
+  conflictKeepLabel,
   conflictMessage,
+  conflictValueLine,
   isOfflineError,
   isPlainMessage,
   toFailure,
@@ -203,6 +206,34 @@ test("conflictMessage: today is a time, an earlier day is the date", () => {
   // Late evening in Buffalo is the next day in UTC, and still today here.
   assert.match(conflictMessage({ at: "2026-10-27T01:30:00Z" }, new Date("2026-10-27T02:00:00Z")), /^This changed at 9:30\sPM\.$/);
   assert.equal(conflictMessage({ at: "not a date" }, NOW), "This changed since you opened it.");
+});
+
+test("conflictValueLine: who set it, to what, and when; or what changed when the row doesn't say who", () => {
+  const at = "2026-10-26T18:14:00Z";
+  assert.match(conflictValueLine({ by: "Pieter Louw", at }, "$410,000", NOW), /^Pieter set this to \$410,000 at 2:14\sPM$/);
+  assert.match(conflictValueLine({ at }, "$410,000", NOW), /^This changed to \$410,000 at 2:14\sPM$/);
+  assert.equal(conflictValueLine({ by: "Pieter Louw", at: "2026-10-24T18:14:00Z" }, "7.25%", NOW), "Pieter set this to 7.25% on Oct 24");
+  // They cleared it.
+  assert.match(conflictValueLine({ by: "Pieter Louw", at }, "", NOW), /^Pieter cleared this at 2:14\sPM$/);
+  assert.match(conflictValueLine({ at }, "", NOW), /^This was cleared at 2:14\sPM$/);
+});
+
+test("conflictKeepLabel: names the other person, or says current", () => {
+  assert.equal(conflictKeepLabel({ by: "Pieter Louw" }), "Keep Pieter's");
+  assert.equal(conflictKeepLabel({ by: "pieter@hgcapital.com" }), "Keep pieter's");
+  assert.equal(conflictKeepLabel({}), "Keep current");
+});
+
+test("FieldError: a service's refusal lands on its own fields, the first line as the form's", () => {
+  const err = new FieldError({ email: "Enter a full email, like name@example.com.", phone: "Enter the full number, like 716-555-1234." });
+  assert.equal(userMessage(err), "Enter a full email, like name@example.com.");
+  assert.deepEqual(toFailure(err), {
+    ok: false,
+    error: "Enter a full email, like name@example.com.",
+    fieldErrors: { email: "Enter a full email, like name@example.com.", phone: "Enter the full number, like 716-555-1234." },
+  });
+  // No lines at all still reads as something to fix, not as nothing.
+  assert.equal(new FieldError({}).message, FIELD_FALLBACK);
 });
 
 test("conflictBy: a first name, or an email's name part", () => {

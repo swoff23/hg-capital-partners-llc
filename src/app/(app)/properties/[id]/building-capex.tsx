@@ -1,43 +1,46 @@
 "use client";
-import { useState, useTransition } from "react";
-import { Button, SectionCard, Table, Td, Th, fieldClass } from "@/components/ui";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useState } from "react";
+import { FormSheet } from "@/components/form-sheet";
+import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
-import { callAction } from "@/lib/action-result";
+import { NumberInput, numberHelper, numberProblem } from "@/components/number-input";
+import { FormField, Input, Section, Table, Td, Th } from "@/components/ui";
+import { useRun } from "@/components/use-run";
 import { cn, fmtMoney } from "@/lib/utils";
 import {
   lifecycleStatus,
   parseCapexCost,
   parseInstallYear,
+  projectedYear,
+  systemsDated,
   type BuildingCapexData,
   type BuildingRule,
   type CapexRules,
 } from "@/lib/property-types";
 import { updateBuildingCapex } from "../actions";
 import { EquipmentStatusText, fmtAge } from "../capex-ui";
-import { SaveError } from "./record-ui";
-
-/** A field inside a table row: 32px with a mouse, so the row keeps its height. */
-const cellField = cn(fieldClass, "h-8");
 
 const NOW = new Date().getFullYear();
 
-type DraftEntry = { type: string; year: string; cost: string };
-type Draft = Record<string, DraftEntry>;
+/** What a system's sheet edits: its type, the year it was installed and a cost that replaces the default. All text, as typed. */
+type Draft = { type: string; year: string; cost: string };
 
-function toDraft(data: BuildingCapexData, items: BuildingRule[]): Draft {
-  const d: Draft = {};
-  for (const item of items) {
-    const e = data[item.key];
-    d[item.key] = {
-      type: e?.type ?? "",
-      year: e?.year ?? "",
-      cost: e?.costOverride != null ? String(e.costOverride) : "",
-    };
-  }
-  return d;
-}
+const toDraft = (data: BuildingCapexData, key: string): Draft => ({
+  type: data[key]?.type ?? "",
+  year: data[key]?.year ?? "",
+  cost: data[key]?.costOverride != null ? String(data[key]!.costOverride) : "",
+});
 
+/**
+ * The building's major systems (forms 4.2): roof, windows, electrical and the
+ * rest, read as rows. A row opens a small sheet for that one system: its
+ * type, the year it went in and a cost when it isn't the default, saved with
+ * the version the sheet opened at, so a change anyone else made to the
+ * property meanwhile refuses it. The count of systems with a year, with a
+ * 64px meter, says how complete the dates are (charts 4.2), and a Monitor or
+ * Replace cost says the year it falls due ("$8,000 in 2032"), so a cost past
+ * the forecast reads as later, not missing.
+ */
 export function BuildingCapexSection({
   propertyId,
   version,
@@ -45,114 +48,55 @@ export function BuildingCapexSection({
   rules,
 }: {
   propertyId: string;
-  /** Property.updatedAt the page rendered with; Edit pins it, and the save refuses a newer row. */
+  /** Property.updatedAt the page rendered with; a sheet pins it when it opens, and the save refuses a newer row. */
   version: string;
   initial: BuildingCapexData;
   rules: CapexRules;
 }) {
   const items = rules.building;
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => toDraft(initial, items));
-  // The version Edit opened at. A save in another card refreshes the page with a
-  // newer one, and sending that would let this draft overwrite a partner's change.
-  const [editVersion, setEditVersion] = useState(version);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pending, start] = useTransition();
+  // The system whose sheet is up, and the version it opened at: a save in another card refreshes the page
+  // with a newer one, and sending that would let this draft overwrite a partner's change. A new `id` per open
+  // gives the sheet fresh fields; it stays mounted while it closes, so it slides out.
+  const [sheet, setSheet] = useState<{ key: string; version: string; id: number } | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const { dated, total } = systemsDated(initial, rules);
+  const current = items.find((i) => i.key === sheet?.key) ?? null;
 
-  // A Cancel with edits asks first, as the Units & access and Rentals tables do. Compared as
-  // they'd save, so a cost the field only reformatted ("8000" to "$8,000") isn't an edit.
-  const asSaved = (d: Draft) =>
-    JSON.stringify(items.map((item) => [d[item.key].type.trim(), d[item.key].year.trim(), parseCapexCost(d[item.key].cost)]));
-  const dirty = editing && asSaved(draft) !== asSaved(toDraft(initial, items));
-
-  const phoneHidden = editing ? undefined : "max-[480px]:hidden";
+  const phoneHidden = "max-[480px]:hidden";
   // Type also drops where the record's main column is narrowest (536px at 1024, beside the rail).
-  const typeHidden = editing ? undefined : "max-[480px]:hidden lg:max-xl:hidden";
-  const datedCount = items.filter((item) => parseInstallYear(initial[item.key]?.year) != null).length;
+  const typeHidden = "max-[480px]:hidden lg:max-xl:hidden";
 
-  const setCell = (key: string, field: keyof DraftEntry, value: string) =>
-    setDraft((d) => ({ ...d, [key]: { ...d[key], [field]: value } }));
-
-  function save() {
-    const payload: Record<string, { type: string | null; year: string | null; costOverride: number | null }> = {};
-    for (const item of items) {
-      const c = draft[item.key];
-      payload[item.key] = {
-        type: c.type.trim() || null,
-        year: c.year.trim() || null,
-        costOverride: parseCapexCost(c.cost),
-      };
-    }
-    setError(null);
-    start(async () => {
-      const r = await callAction(() => updateBuildingCapex(propertyId, payload, editVersion));
-      if (!r.ok) {
-        setConfirmOpen(false);
-        setError(r.error);
-        return;
-      }
-      setConfirmOpen(false);
-      setEditing(false);
-    });
+  function openSheet(key: string) {
+    setSheet({ key, version, id: (sheet?.id ?? 0) + 1 });
+    setIsOpen(true);
   }
 
-  /** Start from what's saved now, at the version it was saved at. */
-  function edit() {
-    setError(null);
-    setDraft(toDraft(initial, items));
-    setEditVersion(version);
-    setEditing(true);
-  }
-
-  function discard() {
-    setError(null);
-    setDraft(toDraft(initial, items));
-    setConfirmOpen(false);
-    setEditing(false);
-  }
-
-  function cancel() {
-    if (dirty) setConfirmOpen(true);
-    else discard();
-  }
-
-  /** Row state from a source (draft in edit mode, stored data in read mode). */
-  const rowFor = (item: BuildingRule, src: { type: string; year: string; costOverride: number | null }) => {
-    const installY = parseInstallYear(src.year);
+  /** Row state from what's stored. */
+  const rowFor = (item: BuildingRule) => {
+    const src = initial[item.key];
+    const installY = parseInstallYear(src?.year);
     const age = installY == null ? null : Math.max(0, NOW - installY);
+    const cost = src?.costOverride ?? item.defaultCost;
     return {
       age,
       status: lifecycleStatus(age, item.monitor, item.replace),
-      cost: src.costOverride ?? item.defaultCost,
-      overridden: src.costOverride != null && src.costOverride !== item.defaultCost,
+      cost,
+      overridden: src?.costOverride != null && src.costOverride !== item.defaultCost,
+      due: projectedYear({ kind: "building", key: item.key, year: src?.year }, rules),
     };
   };
 
   return (
-    <SectionCard
-      title="Building CapEx"
-      onEdit={edit}
-      editing={editing}
-      actions={
-        <>
-          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={cancel}>
-            Cancel
-          </Button>
-          <Button type="button" size="sm" disabled={pending} onClick={save}>
-            {pending ? "Saving…" : "Save"}
-          </Button>
-        </>
-      }
-    >
-      <p className="num text-meta text-fg-3">
-        {datedCount} of {items.length} systems dated
+    <Section title="Building CapEx">
+      <p className="num flex items-center gap-2 text-meta text-fg-3">
+        <span>
+          {dated} of {total} systems dated
+        </span>
+        <Meter value={dated} max={total} label="Systems with an install year" valueText={`${dated} of ${total} dated`} className="w-16" />
       </p>
-      {error && <SaveError className="mt-2">{error}</SaveError>}
 
-      {/* Reading on a phone, the type and age drop so the cost stays on screen; editing keeps
-          every field and scrolls sideways in the table's own box. */}
-      <Table className={cn("mt-2", editing && "min-w-105")}>
+      {/* Reading on a phone, the type and age drop so the cost stays on screen. */}
+      <Table className="mt-2">
         <thead>
           <tr>
             <Th className="pl-0">Component</Th>
@@ -167,74 +111,34 @@ export function BuildingCapexSection({
         </thead>
         <tbody className="divide-y divide-line">
           {items.map((item) => {
-            const d = draft[item.key];
             const stored = initial[item.key];
-            const src = editing
-              ? { type: d.type, year: d.year, costOverride: parseCapexCost(d.cost) }
-              : { type: stored?.type ?? "", year: stored?.year ?? "", costOverride: stored?.costOverride ?? null };
-            const rs = rowFor(item, src);
+            const rs = rowFor(item);
             const showCost = rs.status === "Monitor" || rs.status === "Replace";
-            // Inputs sit in the row: 4px above and below a 32px field keeps it at 40px.
-            const cell = editing ? "py-1 pointer-coarse:py-1" : undefined;
-
             return (
-              <tr key={item.key}>
-                <Td className={cn("pl-0 text-fg-1 align-middle", editing ? "whitespace-nowrap" : "min-[480px]:whitespace-nowrap", cell)}>
-                  {item.label}
+              <tr key={item.key} onClick={() => openSheet(item.key)} className="transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-fill-1">
+                <Td className="pl-0 align-middle text-fg-1 min-[480px]:whitespace-nowrap">
+                  {/* The row opens it with a click; this is the keyboard's way in, and names what it opens. */}
+                  <button type="button" aria-label={`Edit ${item.label}`} className="text-left">
+                    {item.label}
+                  </button>
                 </Td>
-                <Td className={cn("align-middle", typeHidden, cell)}>
-                  {editing ? (
-                    <input
-                      className={cn(cellField, "w-32")}
-                      aria-label={`${item.label} type`}
-                      placeholder="e.g. Shingle"
-                      value={d.type}
-                      onChange={(e) => setCell(item.key, "type", e.target.value)}
-                    />
-                  ) : src.type ? (
-                    <span className="text-fg-2">{src.type}</span>
-                  ) : (
-                    <span className="text-fg-3">—</span>
-                  )}
+                <Td className={cn("align-middle", typeHidden)}>
+                  {stored?.type ? <span className="text-fg-2">{stored.type}</span> : <span className="text-fg-3">—</span>}
                 </Td>
-                <Td className={cn("num align-middle", cell)}>
-                  {editing ? (
-                    <input
-                      className={cn(cellField, "w-20")}
-                      aria-label={`${item.label} year`}
-                      placeholder="Year"
-                      value={d.year}
-                      onChange={(e) => setCell(item.key, "year", e.target.value)}
-                    />
-                  ) : (
-                    src.year || <span className="text-fg-3">—</span>
-                  )}
-                </Td>
-                <Td className={cn("num whitespace-nowrap align-middle text-fg-2", phoneHidden, cell)}>{fmtAge(rs.age)}</Td>
-                <Td className={cn("whitespace-nowrap align-middle", cell)}>
+                <Td className="num align-middle">{stored?.year || <span className="text-fg-3">—</span>}</Td>
+                <Td className={cn("num whitespace-nowrap align-middle text-fg-2", phoneHidden)}>{fmtAge(rs.age)}</Td>
+                <Td className="whitespace-nowrap align-middle">
                   <EquipmentStatusText status={rs.status} />
                 </Td>
-                <Td numeric className={cn("pr-0 align-middle", cell)}>
-                  {editing ? (
-                    <input
-                      className={cn(cellField, "w-24 text-right")}
-                      aria-label={`${item.label} cost`}
-                      placeholder={fmtMoney(item.defaultCost)}
-                      value={d.cost}
-                      onChange={(e) => setCell(item.key, "cost", e.target.value)}
-                      // Show what will be stored: "8k" becomes "$8,000"; anything that
-                      // isn't one clean amount clears back to the default cost.
-                      onBlur={(e) => {
-                        const n = parseCapexCost(e.target.value);
-                        setCell(item.key, "cost", n == null ? "" : fmtMoney(n));
-                      }}
-                    />
-                  ) : showCost ? (
+                <Td numeric className="pr-0 align-middle">
+                  {showCost ? (
                     <>
-                      <Money value={rs.cost} />
-                      {rs.overridden && (
-                        <span className="text-fg-3"> *</span>
-                      )}
+                      <span className="whitespace-nowrap">
+                        <Money value={rs.cost} />
+                        {rs.due != null && <span className="text-meta text-fg-3 max-[480px]:hidden"> in {rs.due}</span>}
+                      </span>
+                      {/* An overridden cost says what it replaced, where the bare "*" used to. */}
+                      {rs.overridden && <span className="block text-meta text-fg-3">Default {fmtMoney(item.defaultCost)}</span>}
                     </>
                   ) : (
                     // Nothing to spend yet (Good or Unknown): the empty-cell dash, so the column never reads unfinished.
@@ -247,24 +151,104 @@ export function BuildingCapexSection({
         </tbody>
       </Table>
 
-      {confirmOpen && (
-        <ConfirmDialog
-          title="Discard your Building CapEx edits?"
-          body="Your changes to these systems won't be saved."
-          onClose={() => setConfirmOpen(false)}
-          cancelLabel="Keep editing"
-          actions={
-            <>
-              <Button size="sm" variant="secondary" onClick={discard}>
-                Discard
-              </Button>
-              <Button size="sm" onClick={save} disabled={pending}>
-                {pending ? "Saving…" : "Save changes"}
-              </Button>
-            </>
-          }
+      {sheet && current && (
+        <SystemSheet
+          key={sheet.id}
+          propertyId={propertyId}
+          version={sheet.version}
+          item={current}
+          initial={toDraft(initial, current.key)}
+          isOpen={isOpen}
+          onOpenChange={setIsOpen}
         />
       )}
-    </SectionCard>
+    </Section>
+  );
+}
+
+/** One system's sheet: Type, Year and Cost. Save is the one write, and it names what happened. */
+function SystemSheet({
+  propertyId,
+  version,
+  item,
+  initial,
+  isOpen,
+  onOpenChange,
+}: {
+  propertyId: string;
+  version: string;
+  item: BuildingRule;
+  initial: Draft;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [draft, setDraft] = useState<Draft>(initial);
+  const [tried, setTried] = useState(false);
+  const run = useRun();
+
+  const yearProblem = draft.year.trim() === "" ? null : numberProblem("year", draft.year);
+  const costProblem = numberProblem("money", draft.cost);
+  const problems = { year: yearProblem, cost: costProblem };
+
+  function submit() {
+    setTried(true);
+    if (yearProblem || costProblem) return;
+    run.run(
+      () =>
+        updateBuildingCapex(
+          propertyId,
+          {
+            [item.key]: {
+              type: draft.type.trim() || null,
+              year: draft.year.trim() || null,
+              costOverride: parseCapexCost(draft.cost),
+            },
+          },
+          version,
+        ),
+      { failure: "inline", succeeded: () => onOpenChange(false), done: `${item.label} saved`, key: `capex:${propertyId}:${item.key}` },
+    );
+  }
+
+  const set = (field: keyof Draft) => (value: string) => {
+    run.reset();
+    setDraft((d) => ({ ...d, [field]: value }));
+  };
+  const serverYear = run.fieldErrors?.[`${item.key}.year`];
+
+  return (
+    <FormSheet
+      title={item.label}
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      onSubmit={submit}
+      primary="Save"
+      pending={run.pending}
+      values={draft}
+      discardTitle={`Discard changes to ${item.label}?`}
+      leaveTitle={`Leave without saving ${item.label}?`}
+      error={run.error && !serverYear ? run.error : undefined}
+      fieldErrors={run.fieldErrors}
+    >
+      <FormField label="Type" optional helper="Shingle, vinyl, copper">
+        {(p) => <Input {...p} value={draft.type} autoComplete="off" onChange={(e) => set("type")(e.target.value)} />}
+      </FormField>
+      <FormField
+        label="Year installed"
+        optional
+        helper="Adds this system to the forecast"
+        error={(tried && problems.year) || serverYear || undefined}
+      >
+        {(p) => <NumberInput kind="year" {...p} value={draft.year} onChange={set("year")} />}
+      </FormField>
+      <FormField
+        label="Cost"
+        optional
+        helper={numberHelper("money", draft.cost, { fallback: `Default ${fmtMoney(item.defaultCost)}` })}
+        error={(tried && problems.cost) || undefined}
+      >
+        {(p) => <NumberInput kind="money" {...p} value={draft.cost} onChange={set("cost")} />}
+      </FormField>
+    </FormSheet>
   );
 }

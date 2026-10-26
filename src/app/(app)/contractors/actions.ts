@@ -33,6 +33,33 @@ export async function patchContact(contactId: string, changes: Record<string, st
   });
 }
 
+const newContractorSchema = z
+  .object({
+    fullName: z.string().max(200),
+    company: z.string().max(500),
+    trades: z.string().max(500),
+    phone: z.string().max(100),
+    email: z.string().max(500),
+    mailingAddress: z.string().max(2000),
+    billingInfo: z.string().max(500),
+    availability: z.string().max(500),
+    comments: z.string().max(20_000),
+  })
+  .partial()
+  .strict();
+
+/**
+ * Add a contractor from the New contractor sheet. The name is required;
+ * everything else is optional. A field that doesn't read comes back on its
+ * own line (`fieldErrors`), and nothing is saved.
+ */
+export async function createContractor(input: z.input<typeof newContractorSchema>): Promise<ActionResult<{ id: string; fullName: string }>> {
+  return withResult("createContractor", async () => {
+    await requireUser();
+    return contractors.createContact(newContractorSchema.parse(input) as Record<string, string>);
+  });
+}
+
 /** Every contractor page shows its card's state; the account ids don't say which page that is. */
 const refresh = () => revalidatePath("/contractors/[id]", "page");
 
@@ -54,6 +81,14 @@ export async function createPortalLogin(contactId: string, email: string): Promi
     const user = await requireUser();
     const { account, password } = await thenRefresh(() => accounts.createPortalAccount(id.parse(contactId), z.string().max(320).parse(email), user));
     return { email: account.email, password };
+  });
+}
+
+/** Change the email a contractor signs in with. Their password and signed-in devices are untouched. */
+export async function changePortalLoginEmail(accountId: string, email: string): Promise<ActionResult<{ email: string }>> {
+  return withResult("changePortalLoginEmail", async () => {
+    const user = await requireUser();
+    return thenRefresh(() => accounts.changePortalEmail(id.parse(accountId), z.string().max(320).parse(email), user));
   });
 }
 
