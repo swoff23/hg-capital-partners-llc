@@ -9,6 +9,7 @@ import {
   notifyAudience,
   statusEventVisibility,
   targetDate,
+  targetIsVisit,
   writeAudience,
 } from "./rules";
 
@@ -71,6 +72,10 @@ test("targetDate: visit date while Scheduled, otherwise due", () => {
   assert.equal(targetDate({ status: "SCHEDULED", scheduledFor: visit, dueDate: due }), visit);
   assert.equal(targetDate({ status: "IN_PROGRESS", scheduledFor: visit, dueDate: due }), due);
   assert.equal(targetDate({ status: "SCHEDULED", scheduledFor: null, dueDate: due }), due);
+  // The portal labels it to match: "Visit date" only when that's the date shown.
+  assert.equal(targetIsVisit({ status: "SCHEDULED", scheduledFor: visit }), true);
+  assert.equal(targetIsVisit({ status: "IN_PROGRESS", scheduledFor: visit }), false);
+  assert.equal(targetIsVisit({ status: "SCHEDULED", scheduledFor: null }), false);
 });
 
 test("email only crosses the staff/contractor line", () => {

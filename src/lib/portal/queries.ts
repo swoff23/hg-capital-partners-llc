@@ -3,7 +3,7 @@ import { Prisma, type AttachmentKind, type TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
-import { targetDate } from "@/lib/tasks/rules";
+import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
 import { readLockboxCode } from "./access-code";
 import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, type JobCard, type JobsTab } from "./job-view";
 import type { PortalPrincipal } from "./session";
@@ -127,6 +127,7 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
     address: r.property?.address ?? null,
     unitLabel: r.unitLabel,
     target: toYmd(targetDate(r)),
+    targetIsVisit: targetIsVisit(r),
     finishedOn: tab === "done" && r.completedAt ? todayYmdEastern(r.completedAt) : null,
     newCount: counts.get(r.id) ?? 0,
   }));
@@ -194,6 +195,8 @@ export interface JobDetail {
   address: string | null;
   unitLabel: string | null;
   target: Ymd | null;
+  /** The target is the booked visit ("Visit date"), not the due date. */
+  targetIsVisit: boolean;
   checklist: { id: string; title: string; done: boolean }[];
   media: JobMedia[];
   updates: JobUpdate[];
@@ -282,6 +285,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     address: task.property?.address ?? null,
     unitLabel: task.unitLabel,
     target: toYmd(targetDate(task)),
+    targetIsVisit: targetIsVisit(task),
     checklist: task.checklist,
     media: media.map((a) => toMedia(p, a)),
     updates,

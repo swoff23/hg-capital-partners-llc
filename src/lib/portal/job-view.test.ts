@@ -21,7 +21,7 @@ import {
   portalActorLabel,
   statusUpdateText,
   stillUploading,
-  targetLabel,
+  dueDateParts,
   updateTimeLabel,
   type JobCard,
 } from "./job-view";
@@ -35,6 +35,7 @@ const job = (id: string, over: Partial<JobCard> = {}): JobCard => ({
   address: null,
   unitLabel: null,
   target: null,
+  targetIsVisit: false,
   finishedOn: null,
   newCount: 0,
   ...over,
@@ -46,8 +47,11 @@ test("day labels: today, tomorrow, yesterday, then the weekday and date", () => 
   assert.equal(dayLabel("2026-10-21", TODAY), "Yesterday");
   assert.equal(dayLabel("2026-10-29", TODAY), "Thu, Oct 29");
   assert.equal(dayLabel("2027-01-05", TODAY), "Tue, Jan 5, 2027");
-  assert.equal(targetLabel("2026-10-22", TODAY), "Target today");
-  assert.equal(targetLabel("2026-10-29", TODAY), "Target Thu, Oct 29");
+});
+
+test("a job's date reads as a label and a day: Due date, or Visit date for a booked visit", () => {
+  assert.deepEqual(dueDateParts("2026-10-22", false, TODAY), { label: "Due date", short: "Due", day: "Today" });
+  assert.deepEqual(dueDateParts("2026-10-29", true, TODAY), { label: "Visit date", short: "Visit", day: "Thu, Oct 29" });
 });
 
 test("By date: soonest first for open jobs, no date last, one group per day", () => {
@@ -60,7 +64,7 @@ test("By date: soonest first for open jobs, no date last, one group per day", ()
     [
       ["Today", ["a"]],
       ["Thu, Oct 29", ["b", "c"]],
-      ["No target date", ["none"]],
+      ["No due date", ["none"]],
     ],
   );
 });

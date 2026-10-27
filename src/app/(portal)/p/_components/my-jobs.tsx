@@ -11,12 +11,12 @@ import {
   JOBS_GROUP_COOKIE,
   addressLine,
   groupJobs,
-  targetLabel,
   type JobCard,
   type JobsGroup,
   type JobsTab,
 } from "@/lib/portal/job-view";
 import { isActiveStatus } from "@/lib/task-scope";
+import { DueDate } from "./due-date";
 
 const TABS = [
   { key: "open", label: "Open" },
@@ -126,7 +126,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
  * One job, 72px (docs/brand-guidelines.md, section 5 Density), the whole row
  * opening it (§6): the property's photo (the fallback tile until HG's photos
  * exist), the title with the "2 new" mark, then the address and unit and the
- * Target, with the status as its mark and word in one fixed column. Below
+ * date ("Due date Today"), with the status as its mark and word in one fixed column. Below
  * 480 the column drops and the status leads the subline instead, in its
  * tone. The subline is status, date and place (section 5 Density): the date
  * before the place, so on a narrow phone the place is what truncates and the
@@ -136,7 +136,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
  */
 function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProperty: boolean }) {
   const where = byProperty ? job.unitLabel?.trim() || null : addressLine(job.address, job.unitLabel, { short: true });
-  const target = job.target && isActiveStatus(job.status) ? targetLabel(job.target, today) : null;
+  const target = job.target && isActiveStatus(job.status) ? job.target : null;
   const street = job.address ? addressLine(job.address, null, { short: true }) : null;
 
   return (
@@ -166,11 +166,14 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
           </span>
           {target && (
             <span className="min-w-0 truncate">
-              {target}
+              <DueDate target={target} isVisit={job.targetIsVisit} today={today} shortBelow480 />
               {where && <span aria-hidden="true"> ·</span>}
             </span>
           )}
-          {where && <span className="min-w-0 shrink-999 truncate">{where}</span>}
+          {/* The place fills what's left from a zero basis, so the date only shrinks once the
+              place is gone. A shrink-999 place still left the date a fraction of a pixel short
+              of its text, and that was enough to fire its ellipsis ("Due Toda…"). */}
+          {where && <span className="min-w-0 flex-1 truncate">{where}</span>}
         </span>
       </span>
       <StatusBadge status={job.status} className="w-28 shrink-0 max-[480px]:hidden" />

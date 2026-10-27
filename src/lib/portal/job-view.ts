@@ -38,6 +38,8 @@ export interface JobCard {
   unitLabel: string | null;
   /** The neutral Target (rules.ts targetDate), never shown in red. */
   target: Ymd | null;
+  /** The target is the booked visit ("Visit date"), not the due date. */
+  targetIsVisit: boolean;
   /** The Buffalo day a finished job was closed; null while it's open. */
   finishedOn: Ymd | null;
   /** Shared updates from someone else since the contractor last opened it. */
@@ -63,13 +65,17 @@ export function dayLabel(ymd: Ymd, today: Ymd): string {
   return fmt(ymd, { weekday: "short", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
-/** "Target today", "Target Thu, Oct 29". */
-export function targetLabel(target: Ymd, today: Ymd): string {
-  const day = dayLabel(target, today);
-  return `Target ${/^(Today|Tomorrow|Yesterday)$/.test(day) ? day.toLowerCase() : day}`;
+/**
+ * A job's date as a label and a day (Connor, Oct 26: "Target today" didn't
+ * read): "Due date" then "Today" or "Thu, Oct 29", and "Visit date" for a
+ * Scheduled job's booked visit, as staff task rows say it. `short` is the
+ * label on a narrow My jobs row, where the status leads the subline.
+ */
+export function dueDateParts(target: Ymd, isVisit: boolean, today: Ymd): { label: string; short: string; day: string } {
+  return { label: isVisit ? "Visit date" : "Due date", short: isVisit ? "Visit" : "Due", day: dayLabel(target, today) };
 }
 
-const NO_DATE = "No target date";
+const NO_DATE = "No due date";
 
 /** Which day a job sorts and groups by, and in which direction. */
 export interface DayOrder {

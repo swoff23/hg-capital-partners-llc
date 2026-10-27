@@ -56,28 +56,16 @@ export function AddressActions({ address }: { address: string }) {
 }
 
 /**
- * D21: the lockbox code, large, through Code: a tap on the code or on Copy
- * copies it. A failed copy from Copy says the code, as the old card did.
- * Code's button names the code for screen readers. A long code wraps inside
- * its column, so every character shows and Copy stays in place.
+ * D21: the lockbox code, large, through Code. It's typed into the box by
+ * hand, so there's no Copy button (Connor, Oct 26) and no hover copy icon;
+ * a tap on the code still copies it, as every Code does. Code's button names
+ * the code for screen readers. A long code wraps inside its column, so every
+ * character shows.
  */
 export function LockboxSection({ code }: { code: string }) {
-  const copy = useCopy();
   return (
     <Section title="Lockbox">
-      {/* Copy sits at the row's end on a phone, beside the code on a wider screen. */}
-      <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
-        {/* Its own Copy button sits beside it, so the code drops the hover copy icon. */}
-        <Code value={code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
-        <Button
-          variant="secondary"
-          className="shrink-0"
-          onClick={() => copy(code, "Lockbox code copied", `Couldn't copy. The code is ${code}.`)}
-        >
-          <Copy className="h-4 w-4" aria-hidden="true" />
-          Copy
-        </Button>
-      </div>
+      <Code value={code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
     </Section>
   );
 }
