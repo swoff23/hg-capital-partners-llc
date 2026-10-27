@@ -125,7 +125,7 @@ test("the token route says no with a 400 only for a refusal; everything else is 
   assert.doesNotMatch(route, /userMessage/, "a database error's words never reach a contractor");
 });
 
-test("a job that is no longer active still gets its late photos recorded, without a post or an email", () => {
+test("a job that is no longer active still gets its late photos recorded, and HG hears once per batch", () => {
   // The page mounts the queue's record-only target when there is no composer.
   const page = read("app", "(portal)", "p", "jobs", "[id]", "page.tsx");
   assert.match(page, /\{active \? \(\s*<JobActions[\s\S]*?\) : \(\s*(?:\/\/[^\n]*\n\s*)?<LateUploads taskId=\{job\.id\}/);
@@ -133,13 +133,25 @@ test("a job that is no longer active still gets its late photos recorded, withou
   assert.match(late, /key: `portal-task:\$\{taskId\}`/, "the same target key the composer uses, so files waiting for a page find it");
   assert.match(late, /recordedUploads\.take\(taskId, ids\)/);
   assert.match(late, /onRecorded: land,[\s\S]*?onAway: land,/);
-  // The server leaves the files as they are on a job that is closed to updates.
-  const uploads = read("lib", "portal", "job-uploads.ts");
-  assert.match(fn(uploads, "postJobBatch"), /if \(task && !isActiveStatus\(task\.status\)\) return null;/);
-  assert.match(fn(uploads, "postJobBatch"), /eventId: event\?\.id \?\? null/);
+  // On a job closed to updates the batch step, access checked first, hands the own files to core's late line
+  // (one update, one email line, never a batch Undo takes back) and answers with no id.
+  const post = fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch");
+  assert.ok(post.indexOf("core.assertContractorAccess(tx, taskId, p.contactId)") < post.indexOf("tx.task.findUnique"), "the access check comes first");
+  assert.match(post, /if \(task && !isActiveStatus\(task\.status\)\) \{\s*await core\.addLateContractorBatch\(tx, taskId, own, taskPrincipal\(p\)\);\s*return null;\s*\}/);
+  assert.match(post, /eventId: undoable\?\.id \?\? null/);
   // And the page says so, with nothing to undo.
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
   assert.match(shared, /if \(eventId === null\) \{\s*toast\(\{ message: addedToJobText\(kinds\)[\s\S]*?return true;/);
+});
+
+test("past the window the record step's closed-job refusal is final, and only that one", () => {
+  const portal = read("app", "(portal)", "p", "jobs", "[id]", "upload-actions.ts");
+  assert.match(fn(portal, "recordJobUploadAction"), /return withFinalRefusal\(res\);/);
+  for (const name of ["postJobBatchAction", "undoJobPostAction"]) assert.doesNotMatch(fn(portal, name), /withFinalRefusal/, name);
+  // The refusal's words are the one constant the final check reads.
+  assert.match(fn(read("lib", "tasks", "attachments.ts"), "contractorUploadRefusal"), /\? null : JOB_CLOSED;/);
+  // The record step hands `final` to the queue as it came.
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts"), /const res = await recordJobUploadAction\(taskId, file, owner\);[\s\S]*?return res;/);
 });
 
 test("the day's grace needs the job's last start, asked only of a job in Review that has a queuedAt", () => {

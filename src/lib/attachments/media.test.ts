@@ -8,6 +8,7 @@ import {
   bylineName,
   bylineStamp,
   checkMediaFile,
+  closedJobLine,
   datedName,
   documentLook,
   downloadUrl,
@@ -133,6 +134,37 @@ test("uploadNotice: one line however many failed, count first", () => {
     uploadNotice([{ name: "a.jpg", kind: "image", reason: "File uploads need a Blob store" }], { reason: false }),
     "File uploads aren't set up yet.",
   );
+});
+
+test("closedJobLine: every red tile one the job closed on, counted with uploadNotice's nouns", () => {
+  const closed = (name: string, kind: "image" | "video" | "file" | null) => ({ name, kind, status: "invalid", final: true });
+  assert.equal(closedJobLine([closed("a.jpg", "image"), closed("b.jpg", "image")]), "Job closed before 2 photos uploaded");
+  assert.equal(closedJobLine([closed("a.jpg", "image")]), "Job closed before 1 photo uploaded");
+  assert.equal(closedJobLine([closed("a.mov", "video"), closed("b.mov", "video")]), "Job closed before 2 videos uploaded");
+  assert.equal(closedJobLine([closed("a.jpg", "image"), closed("b.mov", "video")]), "Job closed before 2 files uploaded");
+  // The same count the "didn't upload" line gives the same tiles.
+  const tiles = [closed("a.jpg", "image"), closed("b.mov", "video"), closed("c.mov", "video")];
+  assert.equal(
+    closedJobLine(tiles).replace(/^Job closed before (.*) uploaded$/, "$1"),
+    uploadNotice(tiles.map((t) => ({ ...t, reason: "This job is closed." })), { reason: false }).replace(/ didn't upload$/, ""),
+  );
+  // Files still going up beside them don't change it.
+  assert.equal(closedJobLine([closed("a.jpg", "image"), { name: "b.jpg", kind: "image", status: "uploading" }]), "Job closed before 1 photo uploaded");
+});
+
+test("closedJobLine: empty unless every red tile is final, so a Retry or a check's refusal keeps today's line", () => {
+  const closed = { name: "a.jpg", kind: "image" as const, status: "invalid", final: true };
+  assert.equal(closedJobLine([]), "");
+  assert.equal(closedJobLine([{ name: "a.jpg", kind: "image", status: "uploading" }]), "");
+  assert.equal(closedJobLine([closed, { name: "b.jpg", kind: "image", status: "failed" }]), "", "one can still be retried");
+  assert.equal(closedJobLine([closed, { name: "big.jpg", kind: null, status: "invalid" }]), "", "the check refused one");
+  assert.equal(closedJobLine([{ name: "b.jpg", kind: "image", status: "failed" }]), "");
+});
+
+test("closedJobLine: one line at 320, the longest count included", () => {
+  // The tray at 320 is 288px wide; text-meta runs about 7px a character, so 40 characters is the ceiling.
+  const many = Array.from({ length: 50 }, (_, i) => ({ name: `${i}.mov`, kind: "video" as const, status: "invalid", final: true }));
+  assert.ok(closedJobLine(many).length <= 40, closedJobLine(many));
 });
 
 test("uploadFailureReason: a dropped connection reads no connection, single PUT or multipart", () => {

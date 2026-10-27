@@ -15,11 +15,13 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  *
  * This is that page: it mounts the same queue target the composer does, so
  * the files record (the server takes them inside the hour after Mark done,
- * attachments/access.ts) and are handed to the batch step, which leaves them
- * on the job with no update and no email and says "3 photos added to the job".
- * Past the hour the server answers "This job is closed.", the tile turns red
- * with that reason, and Remove clears it. It draws nothing while no file is
- * waiting: the tray is the composer's, and shows only when there is a file.
+ * attachments/access.ts) and are handed to the batch step, which tells HG once
+ * for the batch (one line, one email line, no Undo) and says "3 photos added
+ * to the job". Past the hour the server answers "This job is closed." for
+ * good: the tile keeps its red ring with only Remove, and the line under the
+ * tray says "Job closed before 2 photos uploaded". It draws nothing while no
+ * file is waiting: the tray is the composer's, and shows only when there is a
+ * file.
  */
 export function LateUploads({ taskId, label }: { taskId: string; label: string }) {
   const { toast } = useToast();

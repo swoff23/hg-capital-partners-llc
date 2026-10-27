@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
+import { withFinalRefusal } from "@/lib/attachments/access";
 import { assertQueueOwner, portalScope } from "@/lib/attachments/queue-owner";
 import * as jobs from "@/lib/portal/jobs";
 import * as uploads from "@/lib/portal/job-uploads";
@@ -45,22 +46,26 @@ const uploadSchema = z
   })
   .strict();
 
-/** After the browser finished uploading straight to Blob. A result, not a throw, for the uploader's Retry. */
+/**
+ * After the browser finished uploading straight to Blob. A result, not a throw, for the uploader's Retry. A job
+ * that closed before the file recorded answers `final`: no Retry can change it, so the tile keeps only Remove.
+ */
 export async function recordJobUploadAction(
   taskId: string,
   file: z.input<typeof uploadSchema>,
   queueOwner?: string | null,
-): Promise<ActionResult<{ id: string }>> {
-  return withResult("portal:recordJobUpload", async () => {
+): Promise<ActionResult<{ id: string }> & { final?: true }> {
+  const res = await withResult("portal:recordJobUpload", async () => {
     const p = await requirePortalPrincipal();
     assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
     return jobs.recordJobUpload(id.parse(taskId), uploadSchema.parse(file));
   });
+  return withFinalRefusal(res);
 }
 
 /**
  * A batch of recorded files posted as one update. Returns its id, for the Undo; null when the job was approved while
- * the photos were going up, so they stay on the job with no update to post or take back.
+ * the photos were going up: HG is told once, the job stays Done, and there is nothing to take back.
  */
 export async function postJobBatchAction(
   taskId: string,

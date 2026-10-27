@@ -2,7 +2,7 @@ import { OFFLINE_ERROR, isOfflineError } from "@/lib/action-result";
 import type { MediaUpload, RecordMediaInput, RecordMediaResult } from "@/components/media-uploader";
 import type { UploadCounts, UploadTarget } from "@/components/upload-queue";
 import { usesMultipart, type FileKind } from "./content-types";
-import { checkMediaFile, storedNames, uploadCountPhrase, uploadFailureReason, withExtension } from "./media";
+import { checkMediaFile, closedJobLine, storedNames, uploadCountPhrase, uploadFailureReason, withExtension } from "./media";
 import {
   STALL_MS,
   ServerBusyError,
@@ -77,6 +77,8 @@ type Job = {
   tries: number;
   waits: number;
   recordFailures: number;
+  /** The record step refused it for good (RecordMediaResult `final`, a job that closed first): Remove only. */
+  final: boolean;
   /** Bytes are up and there is no record step yet: a reload put the file back before its page did. */
   needsRecord: boolean;
   controller: AbortController | null;
@@ -148,8 +150,15 @@ export function capReason(remaining: number): string {
   return remaining <= 0 ? "no more can be added here" : `only ${remaining} more can be added here`;
 }
 
-/** The record step said no: the page has the reason. */
-class RecordRefused extends Error {}
+/** The record step said no: the page has the reason. `final` when no Retry can change that (a job that closed first). */
+class RecordRefused extends Error {
+  constructor(
+    message: string,
+    readonly final = false,
+  ) {
+    super(message);
+  }
+}
 /** The record call itself threw (a 500, an error page, an action a deploy retired): the road, not the file. It tries again. */
 class RecordThrew extends Error {}
 
@@ -293,6 +302,7 @@ export class UploadEngine {
       progress: j.progress,
       status: j.status,
       error: j.error,
+      ...(j.final ? { final: true } : {}),
       batchId: j.batchId,
       size: j.size,
     };
@@ -403,6 +413,7 @@ export class UploadEngine {
         tries: 0,
         waits: 0,
         recordFailures: 0,
+        final: false,
         needsRecord: false,
         controller: null,
         retryTimer: null,
@@ -635,7 +646,7 @@ export class UploadEngine {
     if (this.disposed) return;
     if (!res.ok || !res.data) {
       if (res.error === OFFLINE_ERROR) throw new TypeError("Failed to fetch");
-      throw new RecordRefused(res.error || "it couldn't be saved");
+      throw new RecordRefused(res.error || "it couldn't be saved", res.final === true);
     }
     this.recorded(job, res.data.id);
   }
@@ -666,6 +677,15 @@ export class UploadEngine {
   }
 
   private fail(job: Job, err: unknown) {
+    if (err instanceof RecordRefused && err.final) {
+      // Refused for good (the job closed before it recorded): the Remove-only state the check's refusals use, with
+      // the server's reason and no Retry anywhere. Its row stays, as every red tile's does, until it is removed.
+      this.patch(job, { status: "invalid", error: err.message, final: true });
+      void this.save(job);
+      if (this.isAway(job.key)) this.noticeFailure(job);
+      this.settle(job.batchId, job.key);
+      return;
+    }
     const refusedByRecord = err instanceof RecordRefused;
     const online = this.deps.online();
     const ownWords = err instanceof RecordRefused || err instanceof RecordThrew || err instanceof ServerBusyError;
@@ -780,7 +800,14 @@ export class UploadEngine {
   }
 
   private noticeFailure(job: Job) {
-    const kinds = [...this.jobs.values()].filter((j) => j.key === job.key && j.status === "failed").map((j) => j.fileKind);
+    const own = [...this.jobs.values()].filter((j) => j.key === job.key);
+    const kinds = own.filter((j) => j.status === "failed").map((j) => j.fileKind);
+    if (kinds.length === 0) {
+      // Nothing can go again, only files the job closed on: the tray's own line, with no Retry to offer.
+      const closed = closedJobLine(own.map((j) => this.view(j)));
+      if (closed) this.deps.notify({ message: closed, key: `upload-failed:${job.key}` });
+      return;
+    }
     this.deps.notify({
       message: `${uploadCountPhrase(kinds)} didn't upload`,
       key: `upload-failed:${job.key}`,
@@ -790,7 +817,7 @@ export class UploadEngine {
 
   /* ---------------- Controls ---------------- */
 
-  /** A failed file tries again from the start. A refused one (the check said no) can only be removed. */
+  /** A failed file tries again from the start. A refused one (the check said no, or the job closed first) can only be removed. */
   retry(id: string): void {
     const job = this.jobs.get(id);
     if (!job || job.status !== "failed" || job.controller) return;
@@ -955,6 +982,7 @@ export class UploadEngine {
         tries: e.tries,
         waits: e.waits,
         recordFailures: 0,
+        final: false,
         needsRecord: false,
         controller: null,
         retryTimer: null,

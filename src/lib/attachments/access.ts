@@ -31,6 +31,21 @@ export function contractorMaySee(att: SeeableFile, contactId: string): boolean {
   );
 }
 
+/** What a contractor's upload is told once the job no longer takes their files (contractorUploadRefusal). */
+export const JOB_CLOSED = "This job is closed.";
+
+/**
+ * The portal record step's answer, final when the job closed before the file
+ * recorded: no Retry can change that (the server has already let the blob
+ * go), so the queue keeps only Remove on its tile and the line under the tray
+ * says "Job closed before 2 photos uploaded" (engine.ts, uploads question 4).
+ * Every other refusal (no access, another sign-in, a bad file) stays one a
+ * Retry may get past.
+ */
+export function withFinalRefusal<R extends { ok: boolean; error?: string }>(res: R): R & { final?: true } {
+  return !res.ok && res.error === JOB_CLOSED ? { ...res, final: true } : res;
+}
+
 /**
  * Uploads still finishing after a contractor taps Mark done are kept for this
  * long (docs/asana-migration-plan.md §5.3), and the job page keeps "Add

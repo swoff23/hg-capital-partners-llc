@@ -2,7 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { BlobNotFoundError, del, head, type HeadBlobResult } from "@vercel/blob";
 import { Prisma, type Visibility } from "@prisma/client";
-import { acceptsContractorUpload } from "@/lib/attachments/access";
+import { JOB_CLOSED, acceptsContractorUpload } from "@/lib/attachments/access";
 import { PREVIEW_RULE, UPLOAD_RULES, fileKindForType, filenameForType, normalizeContentType, type FileKind } from "@/lib/attachments/content-types";
 import { durationHint, pixelHint } from "@/lib/attachments/limits";
 import { isPrivateStoreUrl, storeIdFromToken, storedUploadRole, type UploadRole } from "@/lib/attachments/paths";
@@ -259,7 +259,7 @@ export async function contractorUploadRefusal(
           })
         )?.createdAt ?? null)
       : null;
-  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt, startedAt) ? null : "This job is closed.";
+  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt, startedAt) ? null : JOB_CLOSED;
 }
 
 /**

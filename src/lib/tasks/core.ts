@@ -869,6 +869,44 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   return event;
 }
 
+/**
+ * A contractor's photos that recorded after HG approved the job (uploads
+ * question 4: inside the hour after Mark done, or a phone's outbox catching
+ * up), told to HG once per batch: one update with no text ("Zack added 3
+ * photos", the line a batch post makes) and one line in each partner's email
+ * bundle, through notify like any comment. The job's status doesn't change.
+ * It is never an update Undo takes back: it isn't marked `batch`, and
+ * takeBackContractorPost refuses a job that isn't active. It is written after
+ * the Mark done, so it is never the At finish set and never counts toward
+ * one. Only the contractor's own unposted files on this job are linked; with
+ * none left (another send took them) it is refused as addComment refuses, so
+ * the losing side leaves no empty update.
+ *
+ * The portal's batch step (portal/job-uploads.ts postJobBatch) sends a job
+ * here once it is no longer active; one reopened in the moment between posts
+ * the same way. Access is checked first, then the task row is locked before
+ * any email row, as every write that queues one.
+ */
+export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentIds: string[], p: Principal, now = new Date()): Promise<TaskEvent> {
+  if (p.kind !== "contractor") throw new TaskRuleError("Only a contractor's late photos post this way.");
+  if (attachmentIds.length === 0) throw new TaskRuleError("Write something or add a photo.");
+  await assertContractorAccess(tx, taskId, p.contactId);
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  const task = await tx.task.findUnique({ where: { id: taskId } });
+  if (!task) throw new TaskRuleError("That task no longer exists.");
+  const visibility: Visibility = "SHARED";
+  const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
+  const event = await addEvent(tx, taskId, p, { kind: "COMMENT", visibility, body: null, audienceContactId, data: { late: true } });
+  const { count: linked } = await tx.taskAttachment.updateMany({
+    where: { id: { in: attachmentIds }, taskId, eventId: null, deletedAt: null, uploadedByContactId: p.contactId, asanaGid: null },
+    data: { eventId: event.id, visibility, audienceContactId },
+  });
+  if (linked === 0) throw new TaskRuleError("Write something or add a photo.");
+  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
+  await notify(tx, task, p, { kind: "COMMENT", visibility }, commentSummary("", linked), now, event.id);
+  return event;
+}
+
 // ---------------------------------------------------------------------------
 // A contractor's batch post, taken back (uploads 2.7, question 5)
 // ---------------------------------------------------------------------------

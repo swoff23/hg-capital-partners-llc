@@ -8,7 +8,7 @@ import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { type FileKind } from "@/lib/attachments/content-types";
 import { NO_UPLOADS, UploadEngine } from "@/lib/attachments/engine";
-import { CAMERA_ACCEPT, documentLook, pickerAccept, shownReason, uploadCountPhrase, uploadNotice } from "@/lib/attachments/media";
+import { CAMERA_ACCEPT, closedJobLine, documentLook, pickerAccept, shownReason, uploadCountPhrase, uploadNotice } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ACCESS, uploadTargetKey, type UploadKind } from "@/lib/attachments/upload-kinds";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +57,11 @@ export type RecordMediaInput = {
   queuedAt?: string;
 };
 
-export type RecordMediaResult = { ok: boolean; data?: { id: string }; error?: string };
+/**
+ * `final` on a refusal means no Retry can get past it (the portal's "This job is closed.", attachments/access.ts
+ * withFinalRefusal): its tile keeps only Remove.
+ */
+export type RecordMediaResult = { ok: boolean; data?: { id: string }; error?: string; final?: boolean };
 
 export type MediaUploaderOptions = {
   taskId: string;
@@ -107,6 +111,11 @@ export type MediaUpload = {
   status: UploadStatus;
   /** Why it failed, as the server or the check said it. */
   error?: string;
+  /**
+   * Refused for good by the record step after its bytes went up (a job that closed first): status "invalid", so
+   * Remove only, but it keeps the failed tile's look, since nothing is wrong with the file itself.
+   */
+  final?: boolean;
   /** The files picked, dropped or pasted together share one. */
   batchId?: string;
   /** Bytes. */
@@ -442,7 +451,8 @@ export function UploadTile({
             <ProgressRing value={u.status === "queued" ? 0 : u.progress} />
           </div>
         )}
-        {u.status === "invalid" && (
+        {/* A final refusal (the job closed first) keeps its picture in the red ring: Remove only, as the check's refusals. */}
+        {u.status === "invalid" && !u.final && (
           <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/60">
             <TriangleAlert className="h-5 w-5 text-on-photo" aria-hidden="true" />
           </div>
@@ -501,9 +511,11 @@ export function UploadTile({
  * label keeps its reason. A file the check refused (too big, wrong type) can
  * only be removed, so it gets no Retry; with nothing to retry, the line keeps
  * the reason ("1 photo didn't upload: over the 25 MB photo limit"), since
- * it's the only place a sighted user sees why. With nothing failed but files
- * held for a signal it is "No signal · 5 photos waiting" in `--fg-3` ("No
- * signal · 5 waiting" under 360px). Nothing while all is well.
+ * it's the only place a sighted user sees why. When every red tile is one the
+ * job closed on before it recorded (`final`), it is "Job closed before 2
+ * photos uploaded", also with no Retry. With nothing failed but files held
+ * for a signal it is "No signal · 5 photos waiting" in `--fg-3` ("No signal ·
+ * 5 waiting" under 360px). Nothing while all is well.
  */
 export function UploadStatusLine({ uploader, className }: { uploader: MediaUploaderApi; className?: string }) {
   if (uploader.failed === 0) {
@@ -518,7 +530,7 @@ export function UploadStatusLine({ uploader, className }: { uploader: MediaUploa
   }
   const retryable = uploader.uploads.filter((u) => u.status === "failed");
   const line =
-    (retryable.length > 0 ? uploader.failedLine : uploader.notice) ||
+    (retryable.length > 0 ? uploader.failedLine : closedJobLine(uploader.uploads) || uploader.notice) ||
     `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
   return (
     <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-danger", className)}>

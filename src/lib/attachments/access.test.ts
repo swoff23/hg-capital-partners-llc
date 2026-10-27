@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  JOB_CLOSED,
   LATE_UPLOAD_WINDOW_MS,
   QUEUED_UPLOAD_GRACE_MS,
   ZIP_VIEWERS,
@@ -8,6 +9,7 @@ import {
   contractorMaySee,
   mayDownloadZip,
   parseQueuedAt,
+  withFinalRefusal,
 } from "./access";
 
 const ME = "contact-me";
@@ -153,4 +155,21 @@ test("Download all (ZIP) is staff only, and only for a task", () => {
 test("Canceled jobs never take uploads", () => {
   const canceled = { status: "CANCELED" as const, completedByContactId: ME, completedAt: ago(1) };
   assert.equal(acceptsContractorUpload(canceled, { actorContactId: ME, createdAt: ago(1) }, ME, NOW), false);
+});
+
+test("withFinalRefusal: the closed-job refusal is final, every other answer passes through as it was", () => {
+  assert.equal(JOB_CLOSED, "This job is closed.");
+  assert.deepEqual(withFinalRefusal({ ok: false, error: JOB_CLOSED }), { ok: false, error: JOB_CLOSED, final: true });
+  for (const res of [
+    { ok: true, data: { id: "a1" } },
+    { ok: false, error: "You don't have access to this job." },
+    { ok: false, error: "That upload didn't finish. Try again." },
+    { ok: false, error: "That file is already attached." },
+    { ok: false, error: "this job is closed" },
+    { ok: false },
+  ]) {
+    const out = withFinalRefusal(res);
+    assert.deepEqual(out, res, JSON.stringify(res));
+    assert.equal("final" in out, false);
+  }
 });

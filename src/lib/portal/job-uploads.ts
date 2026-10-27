@@ -35,22 +35,27 @@ function revalidateJob(taskId: string): void {
  * side leaves no empty update behind.
  *
  * A job HG has approved since the photos went up (Done) takes no more
- * updates, but the late photos are already recorded on it: they stay on the
- * job as they are, with no update and no email, and the answer carries no
- * `eventId` (there is nothing to Undo). The page then says they were added
- * to the job. The job page refreshes, so they show in its photos.
+ * updates, but the late photos are already recorded on it, so HG hears about
+ * them once for the batch: the same line and one email line, which can't be
+ * taken back (core.addLateContractorBatch). The job stays Done, and the answer
+ * carries no `eventId` (there is nothing to Undo), so the page says they were
+ * added to the job. The job page refreshes, so they show in its photos. The
+ * access check still comes first.
  */
 export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null }> {
   const p = await requirePortalPrincipal();
-  const event = await prisma.$transaction(async (tx) => {
+  const undoable = await prisma.$transaction(async (tx) => {
     await core.assertContractorAccess(tx, taskId, p.contactId);
     const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
-    if (task && !isActiveStatus(task.status)) return null;
-    const own = await ownUnposted(tx, taskId, p.contactId, attachmentIds);
-    return core.addComment(tx, taskId, { body: "", attachmentIds: own.map((f) => f.id), batch: true }, taskPrincipal(p));
+    const own = (await ownUnposted(tx, taskId, p.contactId, attachmentIds)).map((f) => f.id);
+    if (task && !isActiveStatus(task.status)) {
+      await core.addLateContractorBatch(tx, taskId, own, taskPrincipal(p));
+      return null;
+    }
+    return core.addComment(tx, taskId, { body: "", attachmentIds: own, batch: true }, taskPrincipal(p));
   });
   revalidateJob(taskId);
-  return { eventId: event?.id ?? null };
+  return { eventId: undoable?.id ?? null };
 }
 
 /**

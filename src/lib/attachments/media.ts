@@ -115,14 +115,32 @@ export function uploadFailureReason(e: unknown): string {
 export function uploadNotice(failures: UploadFailure[], { reason: withReason = true }: { reason?: boolean } = {}): string {
   if (failures.length === 0) return "";
   if (failures.some((f) => NO_BLOB_STORE.test(f.reason))) return "File uploads aren't set up yet.";
-  const kinds = failures.map((f) => f.kind ?? fileKindForType(contentTypeForName(f.name)));
-  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
-  const count = `${failures.length} ${noun}${failures.length === 1 ? "" : "s"} didn't upload`;
+  const count = `${failedCount(failures)} didn't upload`;
   if (!withReason) return count;
   const reason = shownReason(failures[0].reason);
   // Different reasons can't share one line; each tile's label has its own.
   const same = failures.every((f) => shownReason(f.reason) === reason);
   return same && reason ? `${count}: ${reason}` : count;
+}
+
+/** "2 photos", "1 video", "3 files": the count the failure lines lead with, a mix of kinds being files. */
+function failedCount(failures: readonly Pick<UploadFailure, "name" | "kind">[]): string {
+  const kinds = failures.map((f) => f.kind ?? fileKindForType(contentTypeForName(f.name)));
+  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
+  return `${failures.length} ${noun}${failures.length === 1 ? "" : "s"}`;
+}
+
+/**
+ * The status line when every red tile on a tray is one the job closed on
+ * before it recorded (the record step's final refusal, uploads question 4):
+ * "Job closed before 2 photos uploaded", the noun as uploadNotice has it. No
+ * Retry goes with it. Empty when nothing is red, or any red tile is something
+ * else (a Retry, or a file the check refused), which keeps today's line.
+ */
+export function closedJobLine(uploads: readonly { name: string; kind: FileKind | null; status: string; final?: boolean }[]): string {
+  const red = uploads.filter((u) => u.status === "failed" || u.status === "invalid");
+  if (red.length === 0 || !red.every((u) => u.final)) return "";
+  return `Job closed before ${failedCount(red)} uploaded`;
 }
 
 /** "0:07", "4:32", "1:02:03". Empty for a missing or nonsense length. */
