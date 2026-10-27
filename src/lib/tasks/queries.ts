@@ -7,6 +7,7 @@ import { easternDayStart, type Ymd } from "@/lib/dates";
 import { mergeLegacyNames, type PersonRef } from "./assignee-people";
 import { assigneeOptions } from "./assignee-options";
 import { EMAIL_DAILY_CAP, toListTask, type ListTask } from "./list";
+import { unreadTaskIds } from "./read-state";
 import {
   allTasksOrderBy,
   allTasksWhere,
@@ -43,6 +44,13 @@ const LIST_SELECT = {
   repeatRule: true,
 } satisfies Prisma.TaskSelect;
 
+/** The rows with something new for this partner since they last opened them get `unread` (activity 3.5 A). */
+async function withUnread(userId: string, tasks: ListTask[]): Promise<ListTask[]> {
+  if (tasks.length === 0) return tasks;
+  const unread = await unreadTaskIds(userId, tasks.map((t) => t.id));
+  return unread.size === 0 ? tasks : tasks.map((t) => (unread.has(t.id) ? { ...t, unread: true } : t));
+}
+
 /**
  * Everything Today shows, for either partner: their own active tasks, every
  * active contractor job (D8), and every active task nobody owns.
@@ -57,24 +65,27 @@ export async function todayTasks(userId: string): Promise<ListTask[]> {
     },
     select: LIST_SELECT,
   });
-  return rows.map(toListTask);
+  return withUnread(userId, rows.map(toListTask));
 }
 
 /**
  * The Tasks page: the rows the view, picks and search leave, in their order
- * (list-query.ts), at most `take` of them, plus the full count.
+ * (list-query.ts), at most `take` of them, plus the full count. With
+ * `viewerId`, the rows new to that partner are marked `unread`.
  */
 export async function allTasks(
   f: AllFilters,
   take: number,
   legacy: LegacyNames,
+  viewerId?: string,
 ): Promise<{ tasks: ListTask[]; total: number }> {
   const where = allTasksWhere(f, legacy);
   const [rows, total] = await Promise.all([
     prisma.task.findMany({ where, orderBy: allTasksOrderBy(f.status), take, select: LIST_SELECT }),
     prisma.task.count({ where }),
   ]);
-  return { tasks: rows.map(toListTask), total };
+  const tasks = rows.map(toListTask);
+  return { tasks: viewerId ? await withUnread(viewerId, tasks) : tasks, total };
 }
 
 /** How many tasks the filters leave: the number on the Filters sheet's "Show 13 tasks". */

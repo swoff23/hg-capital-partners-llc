@@ -462,6 +462,24 @@ test("addComment: a first send stores its clientId, takes the lock before the lo
   assert.equal(item.eventId, "ev9");
 });
 
+test("addComment: a Retry of photos alone that did post (no unposted files left to name) returns the first send", async () => {
+  const first = { id: "ev1", kind: "COMMENT", taskId: "t1", body: null };
+  const { tx, calls } = fakeTx({ status: "IN_PROGRESS" }, (model, op) => accessOk(model, op) ?? (model === "taskEvent" && op === "findFirst" ? first : undefined));
+  const out = await addComment(tx, "t1", { body: "", attachmentIds: [], clientId: "send-1" }, ZACK);
+  assert.equal(out, first);
+  assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "only the lock");
+});
+
+test("addComment: an empty send with a clientId and no first send is still refused, after the lookup and before any write", async () => {
+  const { tx, calls } = fakeTx({ status: "IN_PROGRESS" }, (model, op) => accessOk(model, op) ?? (model === "taskEvent" && op === "findFirst" ? null : undefined));
+  await assert.rejects(addComment(tx, "t1", { body: "  ", attachmentIds: [], clientId: "send-1" }, ZACK), /Write something or add a photo/);
+  assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "only the lock");
+  // Without a clientId it is refused before anything is read.
+  const plain = fakeTx({});
+  await assert.rejects(addComment(plain.tx, "t1", { body: "", attachmentIds: [] }, PIETER), /Write something or add a photo/);
+  assert.equal(plain.calls.length, 0);
+});
+
 test("addComment: no clientId takes no lock (the importer and old callers are unchanged)", async () => {
   const { tx, calls } = fakeTx({});
   await addComment(tx, "t1", { body: "Hello", visibility: "INTERNAL" }, PIETER);

@@ -265,22 +265,30 @@ export async function recordPortalAttachment(
  * event with `data.removed` when `p` says who removed it ("Connor removed
  * quote.pdf"), so the line that said it was added still makes sense; a
  * draft nobody saw leaves nothing, and neither does a call without `p`
- * (the composer unreadying its own draft).
+ * (the composer unreadying its own draft). The line is Internal, with no
+ * email: written Shared it would reach the contractor's job page, and a
+ * Shared staff file line emails them "added quote.pdf". It names the post
+ * the file was on (`data.eventId`), so that comment says "1 file removed".
+ * The row goes only if it is still there, in the same transaction as the
+ * line, and the blobs only after both are in.
  */
 export async function deleteTaskAttachment(attachmentId: string, p?: core.Principal): Promise<void> {
   const att = await prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
   if (!att) return;
-  await prisma.$transaction(async (tx) => {
-    await tx.taskAttachment.delete({ where: { id: attachmentId } });
+  const removed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.taskAttachment.deleteMany({ where: { id: attachmentId } });
+    // Someone else removed it first: theirs is the line, and theirs the blobs.
+    if (count === 0) return false;
     if (p && att.eventId !== null) {
       await core.addEvent(tx, att.taskId, p, {
         kind: "ATTACHMENT",
-        visibility: att.visibility,
-        audienceContactId: att.audienceContactId,
-        data: { attachmentId: att.id, filename: att.filename, removed: true },
+        visibility: "INTERNAL",
+        data: { attachmentId: att.id, filename: att.filename, removed: true, eventId: att.eventId },
       });
     }
+    return true;
   });
+  if (!removed) return;
   // A LINK has no blob. Older rows may still point at a public blob; del() takes either URL.
   const blobs = [att.url, att.thumbPathname, att.posterPathname].filter((x): x is string => !!x);
   const token = getEnv().BLOB_READ_WRITE_TOKEN;

@@ -45,7 +45,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
 
   const searching = filters.q !== "";
   const [{ tasks, total }, counts, properties, viewCounts] = await Promise.all([
-    allTasks(filters, PAGE, legacy.merged),
+    allTasks(filters, PAGE, legacy.merged, user.id),
     taskFilterCounts(filters, legacy.merged),
     propertyOptions(),
     // While a query is typed, each view counts its hits, so one outside the current view shows.

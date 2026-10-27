@@ -65,7 +65,8 @@ export function TaskRow({
   street = true,
   cadence,
   actions,
-  unread = false,
+  // The list queries mark it (lib/tasks/queries.ts); a caller can still say.
+  unread = task.unread ?? false,
 }: {
   task: ListTask;
   checkbox?: boolean;

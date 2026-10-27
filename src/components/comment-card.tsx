@@ -229,6 +229,7 @@ export function CommentEditor({
   initial,
   note,
   hasFiles = false,
+  noun = "comment",
   onSave,
   onCancel,
 }: {
@@ -237,6 +238,8 @@ export function CommentEditor({
   note?: string | null;
   /** The comment keeps files, so emptying the words is allowed. */
   hasFiles?: boolean;
+  /** What the field and its refusal call it: "comment", or "note" on a deal ("Add some text, or delete the note"). */
+  noun?: "comment" | "note";
   onSave: (body: string) => Promise<ActionResult<unknown>>;
   onCancel: () => void;
 }) {
@@ -269,7 +272,7 @@ export function CommentEditor({
     if (saving) return;
     const next = value.trim();
     if (next === initial.trim()) return onCancel();
-    if (!next && !hasFiles) return setError("Add some text, or delete the comment");
+    if (!next && !hasFiles) return setError(`Add some text, or delete the ${noun}`);
     setSaving(true);
     setError(null);
     const res = await callAction(() => onSave(next));
@@ -282,7 +285,7 @@ export function CommentEditor({
     <div className="space-y-2">
       <textarea
         ref={field}
-        aria-label="Edit comment"
+        aria-label={`Edit ${noun}`}
         rows={1}
         value={value}
         maxLength={20_000}

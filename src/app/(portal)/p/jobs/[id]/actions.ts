@@ -19,8 +19,8 @@ const updateSchema = z
     body: z.string().max(5000).default(""),
     attachmentIds: z.array(id).max(50).default([]),
     // Made in the browser for each send, so a Retry after a timeout that did post never posts twice
-    // (activity 2.7). Strict schemas refuse a key they don't know, so it has to be named here; core.addComment
-    // takes it once the dedupe lands (slice 3).
+    // (activity 2.7; core.addComment answers a repeat with the first). Strict schemas refuse a key they don't
+    // know, so it has to be named here.
     clientId: z.string().min(1).max(64).optional(),
   })
   .strict();

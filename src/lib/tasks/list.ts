@@ -39,6 +39,12 @@ export interface ListTask {
   repeat: RepeatRule | null;
   /** ISO instant, for a stable order among equals. */
   createdAt: string;
+  /**
+   * Something new for the signed-in partner since they last opened it
+   * (read-state.ts unreadTaskIds): the row's unread dot, and it opens at the
+   * New divider. Set by the list queries; absent reads as nothing new.
+   */
+  unread?: boolean;
 }
 
 /** The fields the queries select, as Prisma returns them. */

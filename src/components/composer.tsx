@@ -115,6 +115,22 @@ export interface ComposerProps {
   sentClientIds?: readonly string[];
   /** What a drop onto the target says: "Drop to add to this reply" and "Drop to add to this note" by the switch. */
   dropLabel?: { shared?: string; internal?: string };
+  /**
+   * Files the page holds outside the composer's own uploader, going out with
+   * the next Send: the job page's, where photos picked from its bar wait while
+   * there's text in the box and go with it (uploads 2.7). Their ids lead the
+   * message's `attachmentIds` and let Send post them without words; `tray`
+   * draws inside the box, over the field (the page's upload tray and its
+   * "2 uploads ready to send"). The page takes them back when Send answers,
+   * so use it without a PendingSendsProvider.
+   */
+  held?: { ids: readonly string[]; tray?: ReactNode } | null;
+  /**
+   * The words in the box as they change, a draft restored from this browser
+   * included: the job page tells an empty composer, where photos post on their
+   * own, from one being written in.
+   */
+  onTextChange?: (text: string) => void;
 }
 
 /* ---------------- Words that name who sees it ---------------- */
@@ -291,6 +307,7 @@ export function ComposerDropZone({ className, children }: { className?: string; 
 /* ---------------- Composer ---------------- */
 
 const NONE: readonly ComposerDraft[] = [];
+const NO_IDS: readonly string[] = [];
 
 /**
  * Write a reply, a note or an update: text, and with an uploader photos,
@@ -344,6 +361,8 @@ function ComposerBody({
   sendLabel,
   sentClientIds,
   dropLabel,
+  held,
+  onTextChange,
   api,
   added,
   target,
@@ -382,6 +401,16 @@ function ComposerBody({
 
   const setText = (next: string) => writeDraft(draftKey, { text: next });
   const setVisibility = (v: ComposerVisibility) => writeDraft(draftKey, { visibility: v });
+  const heldIds = held?.ids ?? NO_IDS;
+
+  // Tell the page what's in the box, a restored draft included. The latest callback, without re-running on each render.
+  const textChanged = useRef(onTextChange);
+  useLayoutEffect(() => {
+    textChanged.current = onTextChange;
+  });
+  useEffect(() => {
+    textChanged.current?.(text);
+  }, [text]);
 
   // Grow with the text, up to the cap in CSS.
   useLayoutEffect(() => {
@@ -403,7 +432,6 @@ function ComposerBody({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  useToastInset(inset);
 
   // A message that was mid-send when the page went away: dropped if it did post, back in the field if it didn't.
   const restored = useRef<string | null>(null);
@@ -436,7 +464,7 @@ function ComposerBody({
   }, [report, dropState.active, dropState.over, dropText]);
 
   const pendingUploads = api?.pending ?? 0;
-  const canSend = !sendingNow && pendingUploads === 0 && (text.trim().length > 0 || ready.length > 0);
+  const canSend = !sendingNow && pendingUploads === 0 && (text.trim().length > 0 || ready.length > 0 || heldIds.length > 0);
 
   /** One try at posting, for a first Send and a Retry alike. True when it posted. */
   async function post(message: ComposerMessage): Promise<boolean> {
@@ -459,7 +487,7 @@ function ComposerBody({
     const message: ComposerMessage = {
       body: text,
       visibility: internal ? "INTERNAL" : "SHARED",
-      attachmentIds: ready.map((r) => r.id),
+      attachmentIds: [...heldIds, ...ready.map((r) => r.id)],
       clientId: newClientId(),
     };
     const files = [...ready];
@@ -543,7 +571,7 @@ function ComposerBody({
   }
 
   // Active: something is being written or held, or the field has focus. The audience line and the tools show on a phone only then.
-  const active = text.length > 0 || ready.length > 0 || (api?.uploads.length ?? 0) > 0 || internal;
+  const active = text.length > 0 || ready.length > 0 || heldIds.length > 0 || (api?.uploads.length ?? 0) > 0 || internal;
   const open = active || focused;
   // The tools row holds the switch and the file button; without either it has nothing to show.
   const tools = mode === "switch" || !!api;
@@ -606,6 +634,8 @@ function ComposerBody({
       )}
     >
       {api?.inputs}
+      {/* Only a pinned bar lifts the toasts; an inline box leaves them to the page's own bar (the portal's ActionBar). */}
+      {pinned && <ToastLift px={inset} />}
       {audienceLine &&
         (internal ? (
           <p className={cn("items-center gap-1.5 px-4 pt-2 text-meta font-medium text-fg-2 md:px-3", open ? "flex" : "hidden md:flex")}>
@@ -623,6 +653,7 @@ function ComposerBody({
         </ul>
       )}
       {api && <MediaUploadTray uploader={api} onFill={internal} className="px-4 pt-2.5 md:px-3" />}
+      {held?.tray && <div className="px-4 pt-2.5 md:px-3">{held.tray}</div>}
       {/* On a phone the row sits on the 16px gutter, like the cards above it. */}
       <div className={cn("flex items-end gap-1 px-4 py-1.5 md:px-2", !api && "md:pl-2.5")}>
         {api && (
@@ -693,6 +724,12 @@ function ComposerBody({
       {!zone && <DropLabel state={dropState} label={dropText} />}
     </div>
   );
+}
+
+/** Keeps the toasts above the pinned bar while it is mounted. */
+function ToastLift({ px }: { px: number }) {
+  useToastInset(px);
+  return null;
 }
 
 /** A file recorded and waiting to go out, as the upload tile draws it (ready: no ring, its picture, "ready to send"). */

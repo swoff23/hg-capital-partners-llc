@@ -109,17 +109,18 @@ export interface JobUpdateInput {
   /** Files this contractor uploaded to the job and hasn't posted yet. */
   attachmentIds: string[];
   /**
-   * The id the browser made for this send. The action accepts it today; it
-   * goes to core.addComment, which ignores a second write of the same id, once
-   * that dedupe lands (activity slice 3). Until then a repeated send posts twice, as before.
+   * The id the browser made for this send. core.addComment answers a second
+   * write of the same id by this contractor on this job with the first, so a
+   * Retry after a timeout that did post never posts, or emails, twice.
    */
   clientId?: string;
 }
 
 /**
  * Of the ids the browser sent, the ones this contractor uploaded to this job
- * and hasn't posted yet. core.addComment links whatever unposted files it's
- * given and makes them Shared, so nobody else's file can be named here.
+ * and hasn't posted yet. Core links whatever unposted files it's given (an
+ * update through addComment, Mark done's note through setStatus) and makes
+ * them Shared, so nobody else's file can be named here.
  */
 async function ownUnposted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<string[]> {
   if (ids.length === 0) return [];
@@ -135,15 +136,18 @@ export async function postJobUpdate(taskId: string, input: JobUpdateInput): Prom
   const p = await requirePortalPrincipal();
   await prisma.$transaction(async (tx) => {
     const attachmentIds = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
-    await core.addComment(tx, taskId, { body: input.body, attachmentIds }, taskPrincipal(p));
+    await core.addComment(tx, taskId, { body: input.body, attachmentIds, clientId: input.clientId }, taskPrincipal(p));
   });
   revalidateJob(taskId);
 }
 
 /**
- * Mark done: the optional note and photos of the finished work go up as one
- * update, then the job moves to Review (D6b). Both partners get one email
- * for the two (core bundles them). When the job's playbook asks for photos
+ * Mark done: the job moves to Review (D6b) with the optional note and photos
+ * of the finished work as the note core.setStatus writes beside it, tied to
+ * the status line (`data.statusEventId`), so Activity shows the two as one
+ * decision, as a partner's Send back does (activity 2.2 d). Both partners get
+ * one email for the two: the note's line, then "marked it done" (core bundles
+ * them). When the job's playbook asks for photos
  * (TaskTemplate.finishPhotosRequired, uploads 2.8), it needs that many of this
  * contractor's own, unposted files here; the sheet holds the button until they
  * are up, and this is the same rule where the browser can't skip it.
@@ -159,10 +163,7 @@ export async function markJobDone(taskId: string, input: JobUpdateInput): Promis
       if (attachmentIds.length < required) {
         throw new core.TaskRuleError(`${addMorePhotosLine(required - attachmentIds.length)} to mark this done.`);
       }
-      if (input.body.trim() || attachmentIds.length) {
-        await core.addComment(tx, taskId, { body: input.body, attachmentIds }, principal);
-      }
-      await core.setStatus(tx, taskId, "REVIEW", principal);
+      await core.setStatus(tx, taskId, "REVIEW", principal, { note: input.body, attachmentIds });
     }),
   );
   revalidateJob(taskId);

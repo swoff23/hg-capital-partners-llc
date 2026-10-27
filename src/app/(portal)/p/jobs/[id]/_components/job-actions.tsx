@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Play } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
+import { AudienceText, Composer, type ComposerMessage } from "@/components/composer";
 import { useLeaveGuard } from "@/components/leave-guard";
 import {
   MediaUploadTray,
@@ -22,7 +23,7 @@ import { Button, LinkButton, Textarea } from "@/components/ui";
 import type { UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
-import { callAction } from "@/lib/action-result";
+import { callAction, type ActionResult } from "@/lib/action-result";
 import { contentTypeForName, fileKindForType, type FileKind } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
@@ -46,6 +47,15 @@ import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "..
  * end of the scroll, the sticky bottom bar (Add photo/video and the next
  * step), and the Mark done sheet with its payoff. One uploader serves all
  * three, so Mark done can wait for photos still going up.
+ *
+ * The composer is the shared one (activity 2.7, 3.4 A), inline at the end of
+ * Updates and never pinned, since the bar owns the bottom edge: it grows with
+ * the text, keeps a draft per job in this browser (its own key, so a staff
+ * draft never opens here), sends with the mod key and Enter, and says who
+ * reads the update ("Connor and Pieter get this by email"). Each send carries
+ * a `clientId`, so a Retry that did post never posts twice. The bar's photos
+ * stay this page's (`held`): their tray and "2 uploads ready to send" draw
+ * inside the box, and they go with the next Send.
  *
  * Photos picked from the bar post as one update once they're all up, unless
  * there's text in the composer: then they wait and go with it. While the Mark
@@ -114,10 +124,11 @@ export function JobActions({
   const coarse = useCoarsePointer();
   const required = finishPhotosNeeded(finishPhotosRequired);
 
+  // The composer's words as they change (its draft is its own): photos picked while it's empty post on their own.
   const [body, setBody] = useState("");
   // Uploaded and recorded, not posted yet.
   const [ready, setReady] = useState<Recorded[]>([]);
-  const [sending, startSending] = useTransition();
+  const [, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -138,19 +149,21 @@ export function JobActions({
   // What each recorded file is, by id, since the record step answers with the id alone.
   const info = useRef(new Map<string, Recorded>());
 
-  // Every call goes through callAction: with no signal it fails like a refusal
-  // (a toast), and the typed text, the open sheet and the photos stay put.
-  const post = (text: string, items: Recorded[]) =>
-    startSending(async () => {
-      const ids = items.map((i) => i.id);
-      const res = await callAction(() => postJobUpdateAction(taskId, { body: text, attachmentIds: ids }));
-      if (!res.ok) {
-        toast({ message: res.error });
-        setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
-        return;
-      }
-      if (text) setBody((b) => (b.trim() === text ? "" : b));
-    });
+  // The composer's Send: the words and every held photo as one update. The composer runs it through callAction,
+  // so with no signal it fails like a refusal (a toast), and the words stay in the box. The photos leave the tray
+  // while it sends and come back to it unless it posted.
+  async function sendUpdate({ body: text, attachmentIds, clientId }: ComposerMessage): Promise<ActionResult> {
+    const items = ready.filter((r) => attachmentIds.includes(r.id));
+    setReady((r) => r.filter((x) => !attachmentIds.includes(x.id)));
+    let posted = false;
+    try {
+      const res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId });
+      posted = res.ok;
+      return res;
+    } finally {
+      if (!posted) setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
+    }
+  }
 
   /** Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post. */
   async function sendBatch(items: Recorded[]): Promise<boolean> {
@@ -281,14 +294,6 @@ export function JobActions({
   // (never two); ActionBar lifts the toast above whichever shows.
   const finishingLine = step !== "start" && step !== "review" && pending > 0 && failed === 0;
 
-  function send() {
-    const text = body.trim();
-    if (!text && ready.length === 0) return;
-    const items = ready;
-    setReady([]);
-    post(text, items);
-  }
-
   function start() {
     startStarting(async () => {
       const res = await callAction(() => startJobAction(taskId));
@@ -322,7 +327,6 @@ export function JobActions({
     });
   }
 
-  const canSend = (body.trim() !== "" || ready.length > 0) && !sending;
   const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: ready.length, required });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
@@ -338,34 +342,33 @@ export function JobActions({
 
   return (
     <>
-      {/* Composer */}
-      <div className="mt-4">
-        <label htmlFor="job-update" className="sr-only">
-          Write an update
-        </label>
-        <Textarea
-          id="job-update"
-          rows={2}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Write an update…"
-          className="resize-none"
+      {/* Composer: scroll-mb keeps the tiles clear of the sticky bar when they're scrolled into view. */}
+      <div ref={trayRef} className="mt-4 scroll-mb-28">
+        <Composer
+          // The portal's own key: a staff draft on the same origin never opens here.
+          draftKey={`hgos-job-draft:${taskId}`}
+          visibility="none"
+          pin="never"
+          audience={{ shared: <AudienceText words={audienceWords(staffNames)} /> }}
+          placeholders={{ shared: "Write an update…" }}
+          onSend={sendUpdate}
+          onTextChange={setBody}
+          held={{
+            ids: ready.map((r) => r.id),
+            // The sheet shows its own tray while it's open. The red line sits under the bar's buttons instead, with Retry.
+            tray:
+              !sheetOpen && (uploader.uploads.length > 0 || ready.length > 0) ? (
+                <>
+                  <MediaUploadTray uploader={uploader} layout="grid" notice={false} />
+                  {ready.length > 0 && (
+                    <p className="mt-1 truncate text-meta text-fg-3">
+                      {ready.length} upload{ready.length === 1 ? "" : "s"} ready to send
+                    </p>
+                  )}
+                </>
+              ) : null,
+          }}
         />
-        {/* scroll-mb keeps the tiles clear of the sticky bar when they're scrolled into view. */}
-        <div ref={trayRef} className="mt-2 flex scroll-mb-28 items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            {/* The red line sits under the bar's buttons instead, with Retry. */}
-            {!sheetOpen && <MediaUploadTray uploader={uploader} layout="grid" notice={false} />}
-            {ready.length > 0 && !sheetOpen && (
-              <p className="mt-1 truncate text-meta text-fg-3">
-                {ready.length} upload{ready.length === 1 ? "" : "s"} ready to send
-              </p>
-            )}
-          </div>
-          <Button variant="secondary" size="sm" className="shrink-0" disabled={!canSend} onClick={send}>
-            {sending ? "Sending…" : "Send"}
-          </Button>
-        </div>
       </div>
 
       {uploader.inputs}
@@ -502,6 +505,16 @@ export function JobActions({
       </Sheet>
     </>
   );
+}
+
+/**
+ * Who reads an update (activity 2.7): the partners its email goes to,
+ * "Connor and Pieter get this by email", or "The HG team" from three on.
+ */
+function audienceWords(staff: readonly string[]): string {
+  if (staff.length === 1) return `${staff[0]} gets this by email`;
+  if (staff.length === 2) return `${joinNames([...staff])} get this by email`;
+  return "The HG team gets this by email";
 }
 
 /** Where a recorded photo or video's picture is: its thumbnail, or the poster of a video, from the task file route. */

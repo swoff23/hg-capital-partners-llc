@@ -1,18 +1,17 @@
 "use client";
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { Fragment, useEffect, useState, useSyncExternalStore } from "react";
 import { ArrowRight, Copy, Link2, Pencil, Trash2 } from "lucide-react";
 import { ActivityDay, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
 import { ActivityTime } from "@/components/activity-time";
-import { CommentCard } from "@/components/comment-card";
+import { CommentBody, CommentCard, CommentEditor } from "@/components/comment-card";
 import { Composer } from "@/components/composer";
 import { MenuItem, MenuSeparator } from "@/components/menu";
 import { Money } from "@/components/money";
 import { useToast } from "@/components/toast";
-import { Button, Kbd, Textarea } from "@/components/ui";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
-import { callAction, type ActionResult } from "@/lib/action-result";
+import { callAction } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
 import { LOG_SHOWN, groupLog, type ChangeEntry, type FieldRow, type LineEntry, type LogEntry, type NoteEntry } from "@/lib/deals/record-log";
+import { bodySegments } from "@/lib/tasks/body-links";
 import { addDealNote, deleteDealNoteAction, editDealNoteAction, restoreDealNoteAction } from "./note-actions";
 
 function subscribeToHash(onChange: () => void) {
@@ -207,7 +206,11 @@ function NoteRow({
       author={{ name: note.author ?? (note.imported ? "Imported" : "Someone") }}
       at={note.at ?? ""}
       edited={note.editedAt}
-      body={editing ? <NoteEditor initial={note.text} onCancel={() => onEdit(null)} onSave={(text) => editDealNoteAction(dealId, note.id, text)} /> : note.text}
+      // Links in the text open (activity 2.2 a); the edit opens in place, with Esc and the mod key and Enter.
+      body={<CommentBody segments={bodySegments(note.text)} />}
+      editor={
+        editing ? <CommentEditor initial={note.text} noun="note" onCancel={() => onEdit(null)} onSave={(text) => editDealNoteAction(dealId, note.id, text)} /> : undefined
+      }
       menuItems={
         editing ? undefined : (
           <>
@@ -232,95 +235,6 @@ function NoteRow({
         )
       }
     />
-  );
-}
-
-/**
- * Edit in place (activity 2.5): the autogrowing field with the caret at the
- * end, Cancel with Esc and Save with the mod key and Enter. Saving the same
- * text closes it; saving nothing is refused with one line. Built only of
- * inline elements, since the card's body is a paragraph.
- */
-function NoteEditor({
-  initial,
-  onCancel,
-  onSave,
-}: {
-  initial: string;
-  onCancel: () => void;
-  onSave: (text: string) => Promise<ActionResult<unknown>>;
-}) {
-  const [text, setText] = useState(initial);
-  const [error, setError] = useState("");
-  const [saving, startSave] = useTransition();
-  const field = useRef<HTMLTextAreaElement>(null);
-  const mod = useModKey();
-
-  useEffect(() => {
-    const el = field.current;
-    if (!el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, []);
-  useLayoutEffect(() => {
-    const el = field.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
-
-  function save() {
-    const next = text.trim();
-    if (next === initial.trim()) return onCancel();
-    if (!next) return setError("Add some text, or delete the note.");
-    setError("");
-    startSave(async () => {
-      const res = await callAction(() => onSave(next));
-      if (res.ok) onCancel();
-      else setError(res.error);
-    });
-  }
-
-  return (
-    <span className="block">
-      <Textarea
-        ref={field}
-        rows={2}
-        value={text}
-        aria-label="Edit note"
-        aria-invalid={error ? true : undefined}
-        onChange={(e) => {
-          setText(e.target.value);
-          if (error) setError("");
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            // One Esc closes one layer: this edit, nothing around it.
-            e.stopPropagation();
-            onCancel();
-          } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            save();
-          }
-        }}
-        className="max-h-60 resize-none"
-      />
-      {error && (
-        <span role="alert" className="mt-1 block text-meta text-danger">
-          {error}
-        </span>
-      )}
-      <span className="mt-2 flex items-center justify-end gap-2">
-        <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onCancel}>
-          Cancel
-          <Kbd aria-hidden="true">Esc</Kbd>
-        </Button>
-        <Button type="button" variant="secondary" size="sm" pending={saving} onClick={save}>
-          Save
-          <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>
-        </Button>
-      </span>
-    </span>
   );
 }
 

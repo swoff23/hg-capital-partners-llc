@@ -274,6 +274,12 @@ export interface JobUpdate {
   attachments: { media: JobMedia[]; files: JobFile[] };
   /** The id the browser made for this send, on the viewer's own rows only: a pending message already here is dropped. */
   clientId: string | null;
+  /**
+   * A comment written with a status change (a send back's note, a Mark done's
+   * note and photos): that status line's id, so Updates draws the two as one
+   * decision (activity 2.2 d). Null otherwise.
+   */
+  statusEventId: string | null;
 }
 
 /** What happened to the viewer's newest update after it posted: the partners get an email, or they got one. */
@@ -603,6 +609,7 @@ async function removedComments(p: PortalPrincipal, taskId: string): Promise<JobU
     statusTo: null,
     attachments: { media: [], files: [] },
     clientId: null,
+    statusEventId: null,
   }));
 }
 
@@ -620,17 +627,19 @@ interface UpdateRow {
   statusFrom: string | null;
   statusTo: string | null;
   clientId: string | null;
+  statusEventId: string | null;
 }
 
 /** The latest updates, oldest first, with the files posted in each. */
 async function jobUpdates(p: PortalPrincipal, taskId: string, mask: (body: string) => BodyPart[]): Promise<JobUpdate[]> {
   // Newest first, so a long history keeps its latest 500; then back to reading order.
-  // Only whitelisted keys of `data` are selected, one by one (from, to, edited, clientId), never the whole of it.
+  // Only whitelisted keys of `data` are selected, one by one (from, to, edited, clientId, statusEventId), never the whole of it.
   const latest = await prisma.$queryRaw<UpdateRow[]>`
     SELECT e."id", e."kind"::text AS "kind", e."source"::text AS "source", e."actorLabel", e."actorUserId", e."actorContactId",
            e."body", e."createdAt", e."editedAt", e."data"->>'edited' AS "importedEdited",
            e."data"->>'from' AS "statusFrom", e."data"->>'to' AS "statusTo",
-           CASE WHEN e."actorContactId" = ${p.contactId} THEN e."data"->>'clientId' END AS "clientId"
+           CASE WHEN e."actorContactId" = ${p.contactId} THEN e."data"->>'clientId' END AS "clientId",
+           CASE WHEN e."kind" = 'COMMENT' THEN e."data"->>'statusEventId' END AS "statusEventId"
     FROM "TaskEvent" e
     WHERE e."taskId" = ${taskId} AND ${portalEvents(p.contactId)}
     ORDER BY e."createdAt" DESC, e."id" DESC
@@ -682,6 +691,7 @@ async function jobUpdates(p: PortalPrincipal, taskId: string, mask: (body: strin
       statusTo: r.kind === "STATUS" && (PORTAL_STATUS_UPDATES as readonly string[]).includes(r.statusTo ?? "") ? (r.statusTo as TaskStatus) : null,
       attachments,
       clientId: r.clientId,
+      statusEventId: r.statusEventId,
     });
   }
   // Traces of removed comments sit where they happened, among the rest.

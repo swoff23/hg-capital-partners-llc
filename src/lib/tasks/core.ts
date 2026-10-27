@@ -980,7 +980,10 @@ async function priorSend(tx: Tx, taskId: string, p: Principal, clientId: string)
 
 export async function addComment(tx: Tx, taskId: string, input: CommentInput, p: Principal, now = new Date()): Promise<TaskEvent> {
   const body = input.body.trim();
-  if (!body && !input.attachmentIds?.length) throw new TaskRuleError("Write something or add a photo.");
+  // A Retry of photos alone that did post arrives with no files left to name (the portal passes only its
+  // unposted ones), so with a clientId the empty check waits until the first send has been looked for.
+  const empty = !body && !input.attachmentIds?.length;
+  if (empty && !input.clientId) throw new TaskRuleError("Write something or add a photo.");
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") {
@@ -995,6 +998,7 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
     const prior = await priorSend(tx, taskId, p, input.clientId);
     if (prior) return prior;
   }
+  if (empty) throw new TaskRuleError("Write something or add a photo.");
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (input.visibility ?? "INTERNAL");
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
   const { event, linked } = await writeComment(tx, taskId, p, {
