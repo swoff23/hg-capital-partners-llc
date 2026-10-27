@@ -7,6 +7,7 @@ import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { hasPinnedDay, isUntouchedCopy, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
 import { copySlot } from "./repeat-slot";
 import {
+  APPROVAL_UNDO_MS,
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
   canSetStatus,
@@ -276,9 +277,16 @@ async function notify(
 // Deal timeline (tasks against a deal also log there)
 // ---------------------------------------------------------------------------
 
-async function logDeal(tx: Tx, dealId: string | null, p: Principal, line: string, now: Date): Promise<void> {
+/**
+ * `taskEventId` ties the line to the event it reports (`data.taskEventId`), so
+ * Approve's Undo can take its "Task completed" back (undoApproval). The deal
+ * log reads only `field`, `from`, `to` and `clientId` from `data`.
+ */
+async function logDeal(tx: Tx, dealId: string | null, p: Principal, line: string, now: Date, taskEventId?: string): Promise<void> {
   if (!dealId) return;
-  await tx.dealNote.create({ data: { dealId, body: `${line}  ·  ${p.label}`, noteDate: now, source: "change" } });
+  await tx.dealNote.create({
+    data: { dealId, body: `${line}  ·  ${p.label}`, noteDate: now, source: "change", ...(taskEventId ? { data: { taskEventId } } : {}) },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -515,7 +523,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   });
 
   if (to === "DONE" || reopening) {
-    await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now);
+    await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now, to === "DONE" ? statusEvent.id : undefined);
   }
   const nextTaskId = to === "DONE" && before.status !== "DONE" ? await createNextRepeat(tx, task, p, now) : null;
   const nextDue = nextTaskId ? toYmd((await tx.task.findUnique({ where: { id: nextTaskId }, select: { dueDate: true } }))?.dueDate) : null;
@@ -534,28 +542,66 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
  * in the database; the timeline hides what was undone at once, and the drain
  * drops the approval from an email still waiting, since its item names that
  * event), reopens the task, and takes back the next repeat copy while nobody
- * has touched it. Staff only; refused, with who moved it, when the task is no
- * longer Done or the approval is not the latest status line.
+ * has touched it. The deal's "Task completed" line goes too when it names the
+ * approval, and then no "Task reopened" is written.
+ *
+ * Staff only, and only the partner who approved, within APPROVAL_UNDO_MS:
+ * the toast stays up while hovered or focused, so the server keeps the
+ * limit. Refused, with who moved it, when the task is no longer Done or the
+ * approval is not the latest status line, and once the approval's email row
+ * is claimed or sent: by then Zack has been told, and the status menu is the
+ * honest way back. A retry of an Undo that already went through is a quiet
+ * success. Lock order: this task, then its email rows naming the approval
+ * (id order), then takeBackRepeat's copy and the copy's email rows. The
+ * drain locks email rows only.
  */
 export async function undoApproval(tx: Tx, taskId: string, approvedEventId: string, p: Principal, now = new Date()): Promise<{ task: Task }> {
   if (p.kind !== "staff") throw new TaskRuleError("Only staff can undo an approval.");
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
+  // Only this function soft-deletes a STATUS line, and only for its approver: deleted and theirs means a retry of an Undo that went through.
+  const undone = await tx.taskEvent.findFirst({
+    where: { id: approvedEventId, taskId, kind: "STATUS", actorUserId: p.userId, deletedAt: { not: null } },
+    select: { id: true },
+  });
+  if (undone) return { task: before };
   if (before.status !== "DONE") throw await taskChanged(tx, taskId, before.status);
   const latest = await tx.taskEvent.findFirst({
     where: { taskId, kind: "STATUS", deletedAt: null },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { id: true, data: true },
+    select: { id: true, data: true, createdAt: true, actorUserId: true, actorLabel: true },
   });
   const fromReview = (latest?.data as { from?: unknown } | null)?.from === "REVIEW";
   if (!latest || latest.id !== approvedEventId || !fromReview) throw new TaskRuleError("This job changed after it was approved.");
+  // Each refusal fits one toast line on a 375 phone, and names the way back: the status menu on the job page.
+  if (latest.actorUserId !== p.userId) {
+    const by = firstName(latest.actorLabel);
+    throw new TaskRuleError(by ? `${by} approved this. Change the status.` : "Not yours to undo. Change the status.");
+  }
+  if (now.getTime() - latest.createdAt.getTime() > APPROVAL_UNDO_MS) throw new TaskRuleError("Too late to undo. Change the status.");
+  // The approval's email rows, locked so a send run can't claim one between this check and the soft delete
+  // below. A claim that got there first shows as openKey null with a try spent.
+  const emails = await tx.$queryRaw<{ sentAt: Date | null; openKey: string | null; attempts: number }[]>`
+    SELECT "sentAt", "openKey", "attempts" FROM "NotificationOutbox"
+    WHERE "taskId" = ${taskId} AND "items" @> jsonb_build_array(jsonb_build_object('eventId', ${approvedEventId}::text))
+    ORDER BY "id" FOR UPDATE`;
+  if (emails.some((e) => e.sentAt !== null || (e.openKey === null && e.attempts > 0))) {
+    throw new TaskRuleError("Email already sent. Change the status.");
+  }
   const task = await tx.task.update({
     where: { id: taskId },
     data: { status: "REVIEW", completedAt: null, completedByUserId: null, completedByContactId: null, ...editStamp(p, now) },
   });
   await tx.taskEvent.update({ where: { id: approvedEventId }, data: { deletedAt: now } });
-  await logDeal(tx, task.dealId, p, `Task reopened: ${task.title}`, now);
+  const completedLine = task.dealId
+    ? await tx.dealNote.updateMany({
+        where: { dealId: task.dealId, source: "change", deletedAt: null, data: { path: ["taskEventId"], equals: approvedEventId } },
+        data: { deletedAt: now },
+      })
+    : { count: 0 };
+  // An approval whose line doesn't name it (written before lines did): the deal keeps it and hears of the reopen.
+  if (completedLine.count === 0) await logDeal(tx, task.dealId, p, `Task reopened: ${task.title}`, now);
   await takeBackRepeat(tx, taskId);
   return { task };
 }
@@ -893,6 +939,8 @@ export async function renameTaskUnits(
   const tasks = await tx.task.findMany({
     where: { propertyId, OR: renames.map((r) => ({ unitLabel: { equals: r.from, mode: "insensitive" as const } })) },
     select: { id: true, unitLabel: true },
+    // One order for every save, so two saves on one property lock their tasks the same way round.
+    orderBy: { id: "asc" },
   });
   const changed: string[] = [];
   for (const t of tasks) {

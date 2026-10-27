@@ -320,6 +320,35 @@ export interface TickResult {
 }
 
 /**
+ * Needs review to Done is Approve, whichever control makes the move (the
+ * banner, the checkbox in All, the status menu on the job page). Approve's
+ * Undo (core.ts undoApproval) takes it back as if it never happened; a plain
+ * move back to Review is a staff status line that emails the contractor and
+ * leaves the approval live.
+ */
+export function isApproval(from: TaskStatus, to: TaskStatus): boolean {
+  return from === "REVIEW" && to === "DONE";
+}
+
+/**
+ * What a tap on a row's checkbox is. `shown` is the status the row shows:
+ * while an earlier tap is still saving, the optimistic tick and the server's
+ * status disagree, and the row shows where that tap is heading. Ticking a
+ * Needs review row (All gives it a checkbox) is an approval (`approves`).
+ * Unticking that row while its approval is still saving does nothing
+ * (`holds`): a plain move to To do would leave the approval live and the
+ * contractor told it was approved. The toast's Undo is the way back.
+ */
+export function tickPlan(
+  task: Pick<ListTask, "status" | "checked">,
+  done: boolean,
+): { shown: TaskStatus; approves: boolean; holds: boolean } {
+  const settled = task.checked === (task.status === "DONE");
+  const shown: TaskStatus = settled ? task.status : task.checked ? "DONE" : "OPEN";
+  return { shown, approves: done && isApproval(shown, "DONE"), holds: !done && task.status === "REVIEW" && task.checked };
+}
+
+/**
  * The Done toast: "Done: Call plumber", or for a repeat "Done. Next due
  * Nov 5", short enough for a 320 phone. The year shows only when the date is
  * more than about 11 months out, so a monthly copy made in December reads

@@ -9,7 +9,9 @@ import { Button, Input } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import type { Ymd } from "@/lib/dates";
 import { STATUS_LABEL } from "@/lib/task-scope";
+import { isApproval } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
+import { approveTask, undoApprove } from "../list-actions";
 import { setTaskStatus, updateTask } from "./actions";
 import { useStatusRun } from "./status-run";
 
@@ -39,11 +41,36 @@ export function StatusControl({
   /** A contractor is assigned, so Review (their "done, please look") means something. */
   hasContractor: boolean;
 }) {
-  const { run, pending } = useStatusRun();
+  const { run, pending, toast } = useStatusRun();
   const [shown, setShown] = useOptimistic(status);
+
+  /**
+   * Review to Done is Approve, so its Undo is Approve's Undo (core.ts
+   * undoApproval), not a plain move back to Review that emails the contractor
+   * and leaves the approval live. The same toast as any status change. The job
+   * already Done (the other partner approved first) is a quiet success with
+   * nothing to undo.
+   */
+  function approve() {
+    run(() => approveTask(taskId), {
+      before: () => setShown("DONE"),
+      succeeded: ({ approvedEventId }) => {
+        if (!approvedEventId) return;
+        toast({
+          message: `Status set to ${STATUS_LABEL.DONE}`,
+          key: `task:${taskId}:status`,
+          action: { label: "Undo", onAction: () => run(() => undoApprove(taskId, approvedEventId)) },
+        });
+      },
+    });
+  }
 
   /** Sends the change with the status this page showed, so a stale page is refused; toasts it with Undo. */
   function commit(to: TaskStatus, extra: { waitingOn?: string; scheduledFor?: Ymd } = {}) {
+    if (isApproval(status, to)) {
+      approve();
+      return;
+    }
     run(() => setTaskStatus(taskId, to, { ...extra, expected: status }), {
       before: () => setShown(to),
       done: `Status set to ${STATUS_LABEL[to]}`,

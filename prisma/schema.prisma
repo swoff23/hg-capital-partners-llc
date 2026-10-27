@@ -456,6 +456,12 @@ model TaskEvent {
   source         EventSource   @default(APP)
   asanaStoryGid  String?       @unique
   editedAt       DateTime?
+  // A soft delete. On a COMMENT, its author deleted it (or a contractor took
+  // back a photo post, `data.batch`). On any other kind it means an undone
+  // approval: only core.ts undoApproval soft-deletes a non-COMMENT event, so
+  // "STATUS with deletedAt set" reads as "approval undone". markedDoneAt and
+  // lastReview read to=REVIEW lines with no deletedAt filter, which holds only
+  // while no Mark done can be undone.
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())
 

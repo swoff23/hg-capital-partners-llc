@@ -108,6 +108,13 @@ export function notifyAudience(
 export const BUNDLE_QUIET_MS = 3 * 60_000;
 export const BUNDLE_MAX_MS = 10 * 60_000;
 
+/**
+ * How long Approve's Undo lasts (core.ts undoApproval): under the 3 minutes
+ * an approval email waits. A bundle near its 10-minute cap can be due sooner,
+ * so Undo is also refused once the approval's email row is claimed or sent.
+ */
+export const APPROVAL_UNDO_MS = 2 * 60_000;
+
 export function bundleSendAfter(firstAt: Date, now: Date): Date {
   return new Date(Math.min(firstAt.getTime() + BUNDLE_MAX_MS, now.getTime() + BUNDLE_QUIET_MS));
 }

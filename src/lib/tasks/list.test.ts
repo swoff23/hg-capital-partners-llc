@@ -9,12 +9,14 @@ import {
   doneMessage,
   groupContractors,
   groupMine,
+  isApproval,
   isOverdue,
   isTargetLate,
   movedAllMessage,
   movedMessage,
   targetField,
   targetOf,
+  tickPlan,
   toListTask,
   type ListAssignee,
   type ListTask,
@@ -251,6 +253,36 @@ test("toast copy", () => {
   assert.equal(movedMessage(null), "Date removed");
   assert.equal(movedAllMessage(1), "Moved 1 task to today");
   assert.equal(movedAllMessage(3), "Moved 3 tasks to today");
+});
+
+test("a tick on a Needs review row is an approval; any other tick is a plain status move", () => {
+  const row = (status: TaskStatus, checked = status === "DONE") => ({ status, checked });
+  // All's Review row ticked: Approve and Approve's Undo, never Done then back to Review.
+  assert.deepEqual(tickPlan(row("REVIEW"), true), { shown: "REVIEW", approves: true, holds: false });
+  for (const status of ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "CANCELED"] as const) {
+    assert.deepEqual(tickPlan(row(status), true), { shown: status, approves: false, holds: false }, status);
+  }
+  assert.deepEqual(tickPlan(row("DONE"), false), { shown: "DONE", approves: false, holds: false });
+  // While the approving tap is still saving, the row shows Done and a second tap is held: a plain move to To do
+  // would leave the approval live (the contractor emailed "approved" for a job that is back in To do).
+  assert.deepEqual(tickPlan(row("REVIEW", true), false), { shown: "DONE", approves: false, holds: true });
+  // Unticked again before the server answered: the row shows To do, so a new tick isn't an approval.
+  assert.deepEqual(tickPlan(row("DONE", false), true), { shown: "OPEN", approves: false, holds: false });
+  // Only a Review row waiting on its approval holds; any other untick is a plain move.
+  for (const status of ["OPEN", "IN_PROGRESS", "DONE", "CANCELED"] as const) {
+    assert.equal(tickPlan(row(status, true), false).holds, false, status);
+  }
+});
+
+test("Needs review to Done is Approve from any control; every other move is a plain status change", () => {
+  assert.equal(isApproval("REVIEW", "DONE"), true);
+  for (const from of ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "DONE", "CANCELED"] as const) {
+    assert.equal(isApproval(from, "DONE"), false, `${from} to Done`);
+  }
+  // Send back, Cancel and the rest from Review are not approvals.
+  for (const to of ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW", "CANCELED"] as const) {
+    assert.equal(isApproval("REVIEW", to), false, `Review to ${to}`);
+  }
 });
 
 test("Done toast: names the task, or for a repeat when the next one is due", () => {
