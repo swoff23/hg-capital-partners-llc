@@ -299,6 +299,27 @@ test("a task the app edited after planning is skipped, not overwritten", async (
   assert.deepEqual((writes[0].args as { where: unknown }).where, { id: tp.taskId, appEditedAt: null });
 });
 
+test("a task copied from a playbook is linked to its template; a row that already has a link keeps it", async () => {
+  const tp: TaskPlan = { ...plan.tasks[0], templateSectionGid: "sec-refi" };
+  const template = { findUnique: (a: unknown) => ((a as { where: { sourceAsanaSectionGid: string } }).where.sourceAsanaSectionGid === "sec-refi" ? { id: "tpl-refi" } : null) };
+
+  const made = fakeTx();
+  await writeTask(withReads(made.tx, "taskTemplate", template), tp);
+  const create = made.calls.find((c) => c.model === "task" && c.op === "create")!;
+  assert.equal((create.args as { data: { taskTemplateId: unknown } }).data.taskTemplateId, "tpl-refi");
+
+  const updated = fakeTx();
+  await writeTask(withReads(updated.tx, "taskTemplate", template), { ...tp, op: "update", rowAppEditedAt: null });
+  const writes = updated.calls.filter((c) => c.model === "task" && c.op === "updateMany");
+  assert.equal(writes.length, 2);
+  assert.deepEqual(writes[1].args, { where: { id: tp.taskId, taskTemplateId: null }, data: { taskTemplateId: "tpl-refi" } });
+
+  const plain = fakeTx();
+  await writeTask(plain.tx, { ...tp, templateSectionGid: null });
+  assert.ok(!plain.calls.some((c) => c.model === "taskTemplate"), "no lookup without a playbook");
+  assert.equal((plain.calls.find((c) => c.model === "task" && c.op === "create")!.args as { data: { taskTemplateId: unknown } }).data.taskTemplateId, null);
+});
+
 test("an update matching the planned appEditedAt is written", async () => {
   const at = "2026-10-25T10:00:00.000Z";
   const tp: TaskPlan = { ...plan.tasks[0], op: "update", rowAppEditedAt: at };

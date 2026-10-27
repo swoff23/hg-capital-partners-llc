@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { TaskRuleError, checklistTitle, removeChecklistItem, renameChecklistItem, restoreChecklistItem, type Principal, type Tx } from "./core";
+import { checklistSnapshotSchema } from "./checklist-snapshot";
 
 const PIETER: Principal = { kind: "staff", userId: "u-pieter", label: "Pieter Louw" };
 const ZACK: Principal = { kind: "contractor", contactId: "c-zack", label: "Zack Reading" };
@@ -38,14 +39,23 @@ const item = (over: Partial<Item> = {}): Item => ({
 });
 
 /** The three tables the checklist edits touch, in memory: the items, the events and the tasks (with their edit stamps). */
-function fakeChecklist(initial: Item[], tasks: string[] = ["t1"]) {
+function fakeChecklist(initial: Item[], tasks: string[] = ["t1"], onLock?: (items: Item[]) => void) {
   const items = [...initial];
   const events: { taskId: string; kind: string; data: Record<string, unknown>; actorLabel: string }[] = [];
   const stamped: { id: string; data: Record<string, unknown> }[] = [];
+  // What touched the items table, in order: the row lock and the reads, so a test can see the lock comes first.
+  const order: string[] = [];
   const tx = {
+    $executeRaw: async (sql: TemplateStringsArray, ...values: unknown[]) => {
+      order.push(`lock ${values.join(",")}: ${sql.join("?").replace(/\s+/g, " ").trim()}`);
+      // Whoever held the row's lock before us has committed by the time we get it.
+      onLock?.(items);
+      return 1;
+    },
     taskChecklistItem: {
       // Copies, as the database hands back: a later update must not rewrite a row already read.
       findUnique: async ({ where }: { where: { id: string } | { asanaGid: string } }) => {
+        order.push("read");
         const row = items.find((i) => ("id" in where ? i.id === where.id : i.asanaGid === where.asanaGid));
         return row ? { ...row } : null;
       },
@@ -76,7 +86,7 @@ function fakeChecklist(initial: Item[], tasks: string[] = ["t1"]) {
       },
     },
   } as unknown as Tx;
-  return { tx, items, events, stamped };
+  return { tx, items, events, stamped, order };
 }
 
 test("renameChecklistItem: the title changes, and Activity gets one line saying from and to", async () => {
@@ -203,4 +213,67 @@ test("removeChecklistItem: a missing item or a contractor is refused", async () 
   await assert.rejects(removeChecklistItem(tx, "nope", PIETER, NOW), TaskRuleError);
   await assert.rejects(removeChecklistItem(tx, "i1", ZACK, NOW), TaskRuleError);
   assert.equal(items.length, 1);
+});
+
+test("restoreChecklistItem: an item longer than Add item allows still comes back through Undo", async () => {
+  // Imported, playbook and repeat-copy titles aren't held to the 300 characters that Add item and Rename allow.
+  const long = "Replace the damaged soffit and fascia on the north side, ".repeat(6).trim();
+  assert.ok(long.length > 300);
+  const title = "x".repeat(301);
+  const label = "Zack Reading and crew, ".repeat(20);
+  for (const text of [title, long]) {
+    const { tx, items } = fakeChecklist([item({ id: "i2", title: text, assigneeLabel: label, position: 1, asanaGid: "120001" })]);
+    const snapshot = await removeChecklistItem(tx, "i2", PIETER, NOW);
+    assert.equal(snapshot.title, text);
+    // The action checks the snapshot the client sends back, as JSON, before it writes anything.
+    const sent = checklistSnapshotSchema.parse(JSON.parse(JSON.stringify(snapshot)));
+    await restoreChecklistItem(tx, sent, PIETER, NOW);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].title, text);
+    assert.equal(items[0].assigneeLabel, label);
+  }
+  // Add item and Rename keep their cap.
+  const { tx } = fakeChecklist([item()]);
+  await assert.rejects(renameChecklistItem(tx, "i1", title, PIETER, NOW), (e) => e instanceof TaskRuleError && e.message === "Use 300 characters or fewer.");
+});
+
+test("checklistSnapshotSchema: still refuses a snapshot that isn't one", () => {
+  const ok = { id: "i1", taskId: "t1", title: "Shut off the water", done: false, doneAt: null, doneByUserId: null, doneByContactId: null, assigneeLabel: null, dueDate: null, position: 0, asanaGid: null, createdAt: "2026-10-20T12:00:00.000Z" };
+  assert.ok(checklistSnapshotSchema.safeParse(ok).success);
+  assert.ok(!checklistSnapshotSchema.safeParse({ ...ok, title: "" }).success);
+  assert.ok(!checklistSnapshotSchema.safeParse({ ...ok, id: "" }).success);
+  assert.ok(!checklistSnapshotSchema.safeParse({ ...ok, position: 1.5 }).success);
+  assert.ok(!checklistSnapshotSchema.safeParse({ ...ok, done: "yes" }).success);
+});
+
+test("rename and remove lock the item's row before they read it", async () => {
+  const rename = fakeChecklist([item()]);
+  await renameChecklistItem(rename.tx, "i1", "Shut off the main water", PIETER, NOW);
+  assert.match(rename.order[0], /^lock i1: SELECT 1 FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.equal(rename.order[1], "read");
+
+  const remove = fakeChecklist([item()]);
+  await removeChecklistItem(remove.tx, "i1", PIETER, NOW);
+  assert.match(remove.order[0], /^lock i1: SELECT 1 FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.equal(remove.order[1], "read");
+});
+
+test("removeChecklistItem: a tick that lands first is in the snapshot, so Undo brings the item back ticked", async () => {
+  // The tick commits while Remove waits for the row; Remove then reads the ticked row.
+  const tick = (items: Item[]) => Object.assign(items[0], { done: true, doneAt: NOW, doneByUserId: "u-connor" });
+  const { tx, items } = fakeChecklist([item()], ["t1"], tick);
+  const snapshot = await removeChecklistItem(tx, "i1", PIETER, NOW);
+  assert.equal(snapshot.done, true);
+  assert.equal(snapshot.doneByUserId, "u-connor");
+  await restoreChecklistItem(tx, snapshot, PIETER, NOW);
+  assert.equal(items[0].done, true);
+});
+
+test("removeChecklistItem: a Remove that finds the item already gone says so instead of failing on the delete", async () => {
+  // The first Remove commits while the second waits for the row; the second finds nothing.
+  const gone = (items: Item[]) => void items.splice(0, items.length);
+  const { tx, events } = fakeChecklist([item()], ["t1"], gone);
+  await assert.rejects(removeChecklistItem(tx, "i1", PIETER, NOW), (e) => e instanceof TaskRuleError && /no longer exists/.test(e.message));
+  await assert.rejects(renameChecklistItem(tx, "i1", "New name", PIETER, NOW), (e) => e instanceof TaskRuleError && /no longer exists/.test(e.message));
+  assert.deepEqual(events, []);
 });

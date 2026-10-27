@@ -1,4 +1,5 @@
 import { getEnv } from "@/lib/env";
+import { readResetForm } from "@/lib/portal/credentials";
 import { finishPasswordReset } from "@/lib/portal/reset";
 import { getPortalPrincipal } from "@/lib/portal/session";
 
@@ -25,12 +26,12 @@ export async function POST(request: Request): Promise<Response> {
     // Not a form post (wrong content type or a broken body): nothing to do.
     return seeOther("/login/forgot");
   }
-  const token = String(form.get("token") ?? "");
+  // The form has one password field, so the password is its own confirmation.
+  const { token, password, confirm } = readResetForm(form);
   const result = await finishPasswordReset(
     token,
-    String(form.get("password") ?? ""),
-    // The form has one password field and mirrors it as `confirm`; without script it sends none, and the one field stands.
-    String(form.get("confirm") ?? form.get("password") ?? ""),
+    password,
+    confirm,
     // A reset clears mustChangePassword, so a session still on its starting
     // password is kept like any other.
     await getPortalPrincipal({ allowStartingPassword: true }),

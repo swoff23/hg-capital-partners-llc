@@ -1,13 +1,25 @@
 import "server-only";
 import { after } from "next/server";
-import { Prisma, type PortalAccount, type SecurityEventKind, type User } from "@prisma/client";
+import { Prisma, type PortalAccount } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { loginThrottle } from "@/lib/login-throttle";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { checkNewPassword, looksLikeEmail, normalizeEmail, type PasswordProblem } from "./credentials";
+import {
+  PortalAccountError,
+  changePortalEmailIn,
+  expireResetTokens,
+  logSecurityEvent,
+  revokePortalSessions,
+  type Db,
+  type Staff,
+} from "./accounts-core";
 import type { PortalPrincipal } from "./session";
 import { generateStartingPassword } from "./tokens";
+
+// The transaction-level pieces live in accounts-core.ts, where a test can reach them.
+export { PortalAccountError, expireResetTokens, logSecurityEvent, revokePortalSessions, type SecurityEventInput } from "./accounts-core";
 
 /**
  * Contractor logins (docs/asana-migration-plan.md §5.1, D4, D14). A
@@ -18,53 +30,6 @@ import { generateStartingPassword } from "./tokens";
  * SecurityEvent, and anything that changes who can get in revokes the
  * account's live sessions in the same transaction.
  */
-
-type Db = Prisma.TransactionClient | typeof prisma;
-type Staff = Pick<User, "id">;
-
-/** A refusal staff should see as-is ("That email belongs to a staff login."). */
-export class PortalAccountError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "PortalAccountError";
-  }
-}
-
-export interface SecurityEventInput {
-  kind: SecurityEventKind;
-  userId?: string | null;
-  contactId?: string | null;
-  taskId?: string | null;
-  ipHash?: string | null;
-  data?: Prisma.InputJsonObject;
-}
-
-export function logSecurityEvent(db: Db, e: SecurityEventInput) {
-  return db.securityEvent.create({
-    data: {
-      kind: e.kind,
-      userId: e.userId ?? null,
-      contactId: e.contactId ?? null,
-      taskId: e.taskId ?? null,
-      ipHash: e.ipHash ?? null,
-      data: e.data ?? {},
-    },
-  });
-}
-
-/** Revoke the account's live sessions, optionally keeping the one in use. Returns how many. */
-export async function revokePortalSessions(db: Db, accountId: string, opts: { except?: string; at?: Date } = {}): Promise<number> {
-  const { count } = await db.portalSession.updateMany({
-    where: { accountId, revokedAt: null, ...(opts.except ? { NOT: { id: opts.except } } : {}) },
-    data: { revokedAt: opts.at ?? new Date() },
-  });
-  return count;
-}
-
-/** Outstanding reset links die whenever the password changes or access is removed. */
-export async function expireResetTokens(db: Db, accountId: string, at: Date = new Date()): Promise<void> {
-  await db.passwordResetToken.updateMany({ where: { accountId, usedAt: null }, data: { usedAt: at } });
-}
 
 async function accountOrThrow(db: Db, accountId: string) {
   const account = await db.portalAccount.findUnique({ where: { id: accountId }, select: { id: true, contactId: true } });
@@ -147,8 +112,8 @@ export async function createPortalAccount(
  * card's menu). The same checks as creating a login: it has to look like an
  * email, and neither a staff login nor another contractor may use it. The
  * password and the live sessions are untouched, so they stay signed in and use
- * the new address from the next sign-in. The contact's own email is not
- * changed.
+ * the new address from the next sign-in. Reset links mailed to the old address
+ * stop working. The contact's own email is not changed.
  *
  * SecurityEventKind has no email-changed value yet, so this is logged as an
  * ACCOUNT_DISABLED row with `action: "email-changed"`, as enablePortalAccount
@@ -158,22 +123,7 @@ export async function changePortalEmail(accountId: string, rawEmail: string, byU
   const email = normalizeEmail(rawEmail);
   if (!looksLikeEmail(email)) throw new PortalAccountError("Enter a full email, like name@example.com.");
   try {
-    await prisma.$transaction(async (tx) => {
-      const account = await tx.portalAccount.findUnique({ where: { id: accountId }, select: { id: true, contactId: true, email: true } });
-      if (!account) throw new PortalAccountError("That login no longer exists.");
-      if (account.email === email) return;
-      const staff = await tx.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } });
-      if (staff) throw new PortalAccountError("That email belongs to a staff login.");
-      const taken = await tx.portalAccount.findUnique({ where: { email }, select: { id: true } });
-      if (taken && taken.id !== accountId) throw new PortalAccountError("Another contractor already uses that email.");
-      await tx.portalAccount.update({ where: { id: accountId }, data: { email } });
-      await logSecurityEvent(tx, {
-        kind: "ACCOUNT_DISABLED",
-        userId: byUser.id,
-        contactId: account.contactId,
-        data: { action: "email-changed", from: account.email, to: email },
-      });
-    });
+    await prisma.$transaction((tx) => changePortalEmailIn(tx, accountId, email, byUser));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       throw new PortalAccountError("Another contractor already uses that email.");

@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Section, buttonClass } from "@/components/ui";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { todayYmdEastern } from "@/lib/dates";
-import { addressLine, firstName, nextStep, targetLabel, updateTimeLabel } from "@/lib/portal/job-view";
+import { addressLine, firstName, nextStep, updateTimeLabel } from "@/lib/portal/job-view";
 import { noteJobViewed } from "@/lib/portal/jobs";
 import { officeTelHref } from "@/lib/portal/office";
 import { getJob, type JobUpdate } from "@/lib/portal/queries";
@@ -16,6 +16,7 @@ import { requirePortalPrincipal } from "@/lib/portal/session";
 import { isActiveStatus } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { JobActions } from "./_components/job-actions";
+import { DueDate } from "../../_components/due-date";
 import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
 
@@ -77,7 +78,11 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <StatusBadge status={job.status} className="shrink-0" />
-                  {job.target && active && <span className="truncate text-meta text-fg-3">{targetLabel(job.target, today)}</span>}
+                  {job.target && active && (
+                    <span className="truncate text-meta text-fg-3">
+                      <DueDate target={job.target} isVisit={job.targetIsVisit} today={today} />
+                    </span>
+                  )}
                 </div>
                 <h1 className="mt-1 text-title text-balance break-words text-fg-1">{job.title}</h1>
                 {(job.address || job.unitLabel) && (

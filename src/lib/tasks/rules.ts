@@ -62,7 +62,12 @@ export function contractorSeesRow(
 
 /** What a contractor sees as "Target": the visit date while Scheduled, otherwise the due date. */
 export function targetDate(t: { status: TaskStatus; scheduledFor: Date | null; dueDate: Date | null }): Date | null {
-  return t.status === "SCHEDULED" && t.scheduledFor ? t.scheduledFor : t.dueDate;
+  return targetIsVisit(t) ? t.scheduledFor : t.dueDate;
+}
+
+/** Whether that date is the booked visit, which the portal labels "Visit date" rather than "Due date". */
+export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null }): boolean {
+  return t.status === "SCHEDULED" && t.scheduledFor !== null;
 }
 
 /**

@@ -5,8 +5,10 @@ import {
   PASSWORD_MESSAGES,
   checkNewPassword,
   isPasswordProblem,
+  isStartingPasswordTry,
   looksLikeEmail,
   normalizeEmail,
+  readResetForm,
 } from "./credentials";
 
 test("minimum length is 10, counted without surrounding spaces", () => {
@@ -63,4 +65,31 @@ test("emails are trimmed and lowercased, and loosely shape-checked", () => {
   assert.equal(looksLikeEmail("zack example@x.com"), false);
   assert.equal(looksLikeEmail("@example.com"), false);
   assert.equal(looksLikeEmail(""), false);
+});
+
+test("an empty starting password is no try, so it never spends a strike", () => {
+  assert.equal(isStartingPasswordTry(""), false);
+  assert.equal(isStartingPasswordTry("k7mq-4vxp-2hzt"), true);
+  // Anything typed is a try, even spaces: the throttle counts it.
+  assert.equal(isStartingPasswordTry(" "), true);
+});
+
+test("the reset form's one password is its own confirmation", () => {
+  const post = (fields: Record<string, string>) => {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) form.set(k, v);
+    return readResetForm(form);
+  };
+  // No confirm field, as the form sends now.
+  assert.deepEqual(post({ token: "t", password: "plumbing42" }), { token: "t", password: "plumbing42", confirm: "plumbing42" });
+  // The old server-rendered confirm="" (a submit before hydration) must not read as a second, different password.
+  const early = post({ token: "t", password: "plumbing42", confirm: "" });
+  assert.equal(checkNewPassword(early.password, { confirm: early.confirm }), null);
+  // A confirm that is there and different is still a mismatch.
+  const typo = post({ token: "t", password: "plumbing42", confirm: "plumbing43" });
+  assert.equal(checkNewPassword(typo.password, { confirm: typo.confirm }), "mismatch");
+  // Nothing sent at all: empty strings, which the strength check then refuses as short.
+  const none = post({});
+  assert.deepEqual(none, { token: "", password: "", confirm: "" });
+  assert.equal(checkNewPassword(none.password, { confirm: none.confirm }), "short");
 });

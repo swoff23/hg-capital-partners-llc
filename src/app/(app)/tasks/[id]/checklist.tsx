@@ -136,7 +136,7 @@ function ChecklistItem({ row: r, onTick, onRemoved }: { row: ChecklistRow; onTic
           label="Checklist item"
           value={r.title}
           minLength={1}
-          blank="Enter a name for the item."
+          tooShort="Enter a name for the item."
           wrap
           inRail={false}
           message={() => "Item renamed"}
@@ -181,7 +181,11 @@ function AddItem({ taskId }: { taskId: string }) {
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // A fresh row: the blur after Esc never reaches onBlur in React 19 (the input is already gone), so this flag can be left set.
+          cancelled.current = false;
+          setOpen(true);
+        }}
         className="-ml-1 mt-0.5 inline-flex h-8 items-center gap-1.5 rounded-md px-1 text-label text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:h-11"
       >
         <Plus className="size-4" aria-hidden="true" />

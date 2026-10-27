@@ -103,6 +103,14 @@ export function formatReport(plan: ImportPlan, rawCtx: ReportContext): string {
     }
   }
 
+  // Every mode: a link is written once and never replaced, so each new one shows here first.
+  h("Tasks copied from a playbook, newly linked to it (BPLAY-V01)");
+  if (!r.playbookLinks.length) out.push("  none");
+  for (const name of new Set(r.playbookLinks.map((l) => l.playbook))) {
+    const at = r.playbookLinks.filter((l) => l.playbook === name);
+    out.push(`  ${name}: ${at.map((l) => `${l.section} ${l.tasks}`).join(", ")}`);
+  }
+
   h("Files");
   out.push(`  upload ${r.files.upload} (${mb(r.files.uploadBytes)}), already uploaded ${r.files.existing}, links ${r.files.links}, missing ${r.files.missing.length}`);
   for (const m of r.files.missing) out.push(`  ! missing: "${m.filename}" on "${clip(m.taskTitle, 50)}" (${m.asanaGid}): ${m.reason}`);

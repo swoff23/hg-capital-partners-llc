@@ -17,6 +17,7 @@ import { getEnv } from "../../src/lib/env";
 import { isAsanaHosted, safeFileName } from "../../src/lib/asana/snapshot-helpers";
 import { blobSafeName, type AsanaAttachment, type AsanaRef, type AsanaStory, type AsanaTask, type AttachmentPlan, type ImportPlan, type PersonOverride, type PlanDb } from "../../src/lib/asana/map";
 import { writeAttachment, type StoredFile } from "../../src/lib/asana/import";
+import { parseTemplateItems } from "../../src/lib/tasks/template-items";
 import {
   backupCommand,
   backupRefusal,
@@ -276,11 +277,12 @@ export async function loadPlanDb(prisma: PrismaClient): Promise<PlanDb> {
         asanaSyncedAt: true,
         asanaLastSynced: true,
         repeatRule: true,
+        taskTemplateId: true,
         _count: { select: { attachments: true, events: { where: { source: { not: "ASANA" } } } } },
       },
     }),
     prisma.taskChecklistItem.findMany({ where: { asanaGid: { not: null } }, select: { id: true, taskId: true, asanaGid: true, title: true, done: true } }),
-    prisma.taskTemplate.findMany({ select: { id: true, sourceAsanaSectionGid: true } }),
+    prisma.taskTemplate.findMany({ select: { id: true, sourceAsanaSectionGid: true, name: true, items: true } }),
     prisma.taskEvent.findMany({ where: { asanaStoryGid: { not: null } }, select: { asanaStoryGid: true } }),
     prisma.taskAttachment.findMany({ where: { asanaGid: { not: null } }, select: { asanaGid: true } }),
   ]);
@@ -290,7 +292,7 @@ export async function loadPlanDb(prisma: PrismaClient): Promise<PlanDb> {
     properties,
     tasks: tasks.map(({ _count, repeatRule, ...t }) => ({ ...t, hasRepeat: repeatRule != null, attachmentCount: _count.attachments, appEventCount: _count.events })),
     checklist: checklist.map((c) => ({ ...c, asanaGid: c.asanaGid! })),
-    templates,
+    templates: templates.map(({ items, ...t }) => ({ ...t, itemTitles: parseTemplateItems(items).map((i) => i.title) })),
     storyGids: new Set(events.map((e) => e.asanaStoryGid!)),
     attachmentGids: new Set(atts.map((a) => a.asanaGid!)),
   };

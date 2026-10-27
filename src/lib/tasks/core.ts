@@ -985,6 +985,18 @@ async function recordChecklistEdit(
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
 }
 
+/**
+ * Lock the item's row before reading it, as setStatus locks a task: a tick, a
+ * rename or a second Remove landing at the same moment waits its turn and
+ * then sees the result. Without it a Remove could snapshot an item a tick had
+ * just changed (Undo would bring it back unticked), and two Removes would
+ * both read the row and the second delete would fail on a row already gone.
+ * An item that is already gone locks nothing, and the read after it says so.
+ */
+async function lockChecklistItem(tx: Tx, itemId: string): Promise<void> {
+  await tx.$executeRaw`SELECT 1 FROM "TaskChecklistItem" WHERE "id" = ${itemId} FOR NO KEY UPDATE`;
+}
+
 /** The title an edit saves: trimmed to one line of text, never empty, no longer than Add item allows. */
 export function checklistTitle(raw: string): string {
   const t = raw.replace(/\s+/g, " ").trim();
@@ -997,6 +1009,7 @@ export function checklistTitle(raw: string): string {
 export async function renameChecklistItem(tx: Tx, itemId: string, title: string, p: Principal, now = new Date()): Promise<TaskChecklistItem> {
   checklistStaffOnly(p);
   const next = checklistTitle(title);
+  await lockChecklistItem(tx, itemId);
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   if (item.title === next) return item;
@@ -1012,6 +1025,7 @@ export async function renameChecklistItem(tx: Tx, itemId: string, title: string,
  */
 export async function removeChecklistItem(tx: Tx, itemId: string, p: Principal, now = new Date()): Promise<ChecklistSnapshot> {
   checklistStaffOnly(p);
+  await lockChecklistItem(tx, itemId);
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   await tx.taskChecklistItem.delete({ where: { id: itemId } });

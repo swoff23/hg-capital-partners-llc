@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
  * names what was copied ("Lockbox code copied"). `mask` shows only the last
  * four ("•• 2502") with a button to reveal the rest; a copy is always the
  * whole code. `size="lg"` is the lockbox code on the job page and in Access.
- * `copyIcon={false}` drops the hover copy icon where a Copy button sits
- * beside the code, so the two don't double up (the job page's lockbox).
+ * `copyIcon={false}` drops the hover copy icon where copying isn't the job
+ * (the job page's lockbox, typed into the box by hand).
  * `wrap` lets a long code break onto more lines inside its column instead
  * of running past it: imported lockbox codes are free text ("4857 (back
  * door)"), and a large one is about 13 characters wide at 375.
@@ -33,7 +33,7 @@ export function Code({
   label: string;
   mask?: boolean;
   size?: "md" | "lg";
-  /** The copy icon that shows on hover; off where a Copy button is beside the code. */
+  /** The copy icon that shows on hover; off where copying isn't the job (the job page's lockbox). */
   copyIcon?: boolean;
   /** Wrap a long code inside its column (the job page's lockbox) rather than keep it on one line. */
   wrap?: boolean;

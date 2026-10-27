@@ -40,12 +40,17 @@ export function WelcomeForm({ email, next }: { email: string; next: string | nul
   const [typed, setTyped] = useState({ current: "", password: "" });
   // The answer whose line was typed past: each answer is its own object, so the next refusal shows again.
   const [dismissed, setDismissed] = useState<FirstPasswordState | null>(null);
+  // Set when Save was pressed with the starting password empty, like the sign-in form's missing fields.
+  const [missingCurrent, setMissingCurrent] = useState(false);
   const current = useRef<HTMLInputElement>(null);
   const password = useRef<HTMLInputElement>(null);
 
   const problem = state.error && state !== dismissed ? state.error : null;
   const where = problem ? FIELD[problem] : null;
-  const line = (field: "current" | "password") => (problem && where === field ? (WORDS[problem] ?? PASSWORD_MESSAGES[problem]) : undefined);
+  const line = (field: "current" | "password") => {
+    if (field === "current" && missingCurrent) return "Enter your starting password.";
+    return problem && where === field ? (WORDS[problem] ?? PASSWORD_MESSAGES[problem]) : undefined;
+  };
 
   useEffect(() => {
     if (!state.error) return;
@@ -53,7 +58,20 @@ export function WelcomeForm({ email, next }: { email: string; next: string | nul
   }, [state]);
 
   return (
-    <form action={formAction} noValidate className="mt-8 space-y-4 text-left">
+    <form
+      action={formAction}
+      noValidate
+      onSubmit={(e) => {
+        // An empty starting password isn't a try: stopped here, it never reaches the sign-in throttle's strikes.
+        const empty = !String(new FormData(e.currentTarget).get("current") ?? "");
+        setMissingCurrent(empty);
+        if (empty) {
+          e.preventDefault();
+          current.current?.focus();
+        }
+      }}
+      className="mt-8 space-y-4 text-left"
+    >
       {next && <input type="hidden" name="next" value={next} />}
       {/* Lets password managers file the new password under the right login. */}
       <input type="email" name="username" value={email} autoComplete="username" readOnly hidden />
@@ -68,6 +86,7 @@ export function WelcomeForm({ email, next }: { email: string; next: string | nul
             defaultValue={typed.current}
             onChange={(e) => {
               setTyped((t) => ({ ...t, current: e.target.value }));
+              setMissingCurrent(false);
               if (where === "current") setDismissed(state);
             }}
           />
