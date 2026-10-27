@@ -1,13 +1,36 @@
 "use client";
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
-import { Camera, FileText, ImagePlus, Lock, Play, X } from "lucide-react";
-import { MediaUploadTray, useMediaUploader, type MediaUploaderApi, type MediaUploaderOptions } from "@/components/media-uploader";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { Camera, ImagePlus, Lock } from "lucide-react";
+import {
+  MediaUploadTray,
+  UploadTile,
+  useMediaUploader,
+  useUndoableRemove,
+  type MediaUpload,
+  type MediaUploaderApi,
+  type MediaUploaderOptions,
+  type MediaUploaderTargetOptions,
+} from "@/components/media-uploader";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useToast, useToastInset } from "@/components/toast";
+import { DropLabel, useDropTarget, type DropTargetState, type UploadTarget } from "@/components/upload-queue";
 import { Button, Kbd, buttonClass } from "@/components/ui";
+import { useKeyboardInset } from "@/components/use-keyboard-inset";
 import { shortcutLabel, useModKey } from "@/components/use-platform";
-import { callAction, type ActionResult } from "@/lib/action-result";
+import { callAction, OFFLINE_ERROR, type ActionResult } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
+import { EMPTY_DRAFT, parseDraft, resolvePending, serializeDraft, type Draft } from "@/lib/composer-draft";
 import { cn } from "@/lib/utils";
 
 /*
@@ -28,8 +51,8 @@ export interface ComposerMessage {
   attachmentIds: string[];
   /**
    * Made in the browser for this send, so a Retry of a send that did post
-   * never posts twice (activity 2.7, `TaskEvent.data.clientId`). A caller
-   * passes it on once its action takes it.
+   * never posts twice (activity 2.7, `TaskEvent.data.clientId`). The same
+   * message keeps the same id through every Retry.
    */
   clientId: string;
 }
@@ -39,8 +62,13 @@ export type ComposerDraft = { id: string; filename: string };
 
 /** The composer's uploads: where files go, the ones already waiting, how one is taken back. */
 export interface ComposerUploader {
-  /** The upload kind, row and record step, as useMediaUploader takes them. */
-  options: MediaUploaderOptions;
+  /**
+   * The upload kind, row and record step, as useMediaUploader takes them. A
+   * queue `target` also makes the page a drop target (uploads 2.2): files
+   * dropped or pasted anywhere in the composer's zone, or on the composer,
+   * land in its tray.
+   */
+  options: MediaUploaderOptions | MediaUploaderTargetOptions;
   /** Files uploaded on an earlier visit and not sent yet, oldest first. */
   drafts: readonly ComposerDraft[];
   /** Takes a ready file back before it's sent. */
@@ -59,7 +87,8 @@ export interface ComposerProps {
   /**
    * Who will see it, as one line over the field for each side of the switch
    * ("Zack sees this and gets an email"; "Only Connor and Pieter see this",
-   * shown with the Lock). None for the deal note box.
+   * shown with the Lock). A node, so a long first name can truncate while the
+   * fixed words stay (AudienceText). None for the deal note box.
    */
   audience?: { shared?: ReactNode; internal?: ReactNode } | null;
   /** "switch": Shared | Internal before Send. "none": always Shared (the portal) or no audience (deal notes). */
@@ -70,43 +99,92 @@ export interface ComposerProps {
   onSend: (message: ComposerMessage) => Promise<ActionResult<unknown>>;
   /** "phone": below md the composer sits on the bottom edge. "never": inline at every size. */
   pin?: "phone" | "never";
-  /** Placeholder per side: "Reply to Zack" or "Add a comment"; "Add an internal note". */
-  placeholders: { shared: string; internal?: string };
+  /**
+   * Placeholder per side: "Reply to Zack" or "Add a comment"; "Add an internal
+   * note", which shortens to `internalShort` ("Internal note") below 480px.
+   */
+  placeholders: { shared: string; internal?: string; internalShort?: string };
   /** Send's label per side: "Send"; "Add note" for an Internal note or a deal note. */
   sendLabel?: { shared?: string; internal?: string };
+  /**
+   * The `clientId`s of the messages the page already holds. After a reload, a
+   * message that was mid-send is dropped when it is in here (it did post) and
+   * brought back into the field when it isn't, so nothing is lost and
+   * nothing doubles.
+   */
+  sentClientIds?: readonly string[];
+  /** What a drop onto the target says: "Drop to add to this reply" and "Drop to add to this note" by the switch. */
+  dropLabel?: { shared?: string; internal?: string };
+}
+
+/* ---------------- Words that name who sees it ---------------- */
+
+/**
+ * One line of the audience copy: a first name that truncates before the line
+ * could wrap, then the fixed words, which don't ("Maximilian… sees this and
+ * gets an email"). Without a name, just the words.
+ */
+export function AudienceText({ name, words }: { name?: string | null; words: string }) {
+  if (!name) return <span className="min-w-0 truncate">{words}</span>;
+  return (
+    <span className="flex min-w-0">
+      <span className="min-w-0 truncate">{name}</span>
+      <span className="shrink-0 whitespace-pre">{` ${words}`}</span>
+    </span>
+  );
 }
 
 /* ---------------- Draft, kept per key in this browser ---------------- */
 
 // Read through useSyncExternalStore so the server render and hydration see
 // an empty box and the saved draft appears right after. Memory backs it up
-// when storage is off (private windows).
-const drafts = new Map<string, string>();
+// when storage is off (private windows). A draft in today's text-only format
+// is read as Internal and written back in the new one.
+const drafts = new Map<string, Draft>();
 const listeners = new Set<() => void>();
 
-function readDraft(key: string): string {
-  if (!drafts.has(key)) {
-    let saved = "";
-    try {
-      saved = localStorage.getItem(key) ?? "";
-    } catch {}
-    drafts.set(key, saved);
-  }
-  return drafts.get(key) ?? "";
-}
-
-function writeDraft(key: string, text: string) {
-  drafts.set(key, text);
+function persist(key: string, d: Draft) {
   try {
-    if (text) localStorage.setItem(key, text);
+    const raw = serializeDraft(d);
+    if (raw) localStorage.setItem(key, raw);
     else localStorage.removeItem(key);
   } catch {}
+}
+
+function readDraft(key: string): Draft {
+  let d = drafts.get(key);
+  if (!d) {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {}
+    const parsed = parseDraft(raw);
+    d = parsed.draft;
+    if (parsed.legacy) persist(key, d);
+    drafts.set(key, d);
+  }
+  return d;
+}
+
+function writeDraft(key: string, patch: Partial<Draft>) {
+  const next = { ...readDraft(key), ...patch };
+  drafts.set(key, next);
+  persist(key, next);
   listeners.forEach((l) => l());
 }
 
 function subscribe(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
+}
+
+/** Below 480px, where the Internal placeholder shortens. */
+const NARROW = "(max-width: 29.99rem)";
+
+function subscribeNarrow(onChange: () => void) {
+  const mq = window.matchMedia(NARROW);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
 }
 
 function newClientId(): string {
@@ -117,43 +195,142 @@ function newClientId(): string {
   }
 }
 
+/* ---------------- Messages in flight, shown on the timeline ---------------- */
+
+/**
+ * A message sent and not yet in the page's events (activity 2.7). It shows at
+ * the end of the timeline the moment Send is pressed ("Sending…" after
+ * 200ms), stays there if it fails with a Retry line, and goes when the page
+ * holds the real event (its `clientId`).
+ */
+export interface PendingSend {
+  clientId: string;
+  body: string;
+  visibility: ComposerVisibility;
+  files: readonly ComposerDraft[];
+  /** When Send was pressed (ISO). */
+  at: string;
+  status: "sending" | "sent" | "failed";
+  /** Why a failed send failed, as callAction said it. */
+  error?: string;
+  /** Send the same message again, with the same `clientId`. */
+  retry: () => void;
+  /** Take the text and files back into the composer. */
+  edit: () => void;
+  /** Throw it away. */
+  discard: () => void;
+}
+
+export interface PendingSendsApi {
+  /** The signed-in person's name, for the card. */
+  author: string;
+  sends: readonly PendingSend[];
+  begin: (send: PendingSend) => void;
+  update: (clientId: string, patch: Partial<PendingSend>) => void;
+  remove: (clientId: string) => void;
+}
+
+const PendingSendsContext = createContext<PendingSendsApi | null>(null);
+
+/**
+ * Wrap the timeline and the composer in this and a send shows in place:
+ * optimistic, with a failed state that keeps the message and offers Retry.
+ * Without it the composer keeps today's behavior (the field holds the message
+ * until the server says ok, and a failure toasts).
+ */
+export function PendingSendsProvider({ author, children }: { author: string; children: ReactNode }) {
+  const [sends, setSends] = useState<readonly PendingSend[]>([]);
+  const api = useMemo<PendingSendsApi>(
+    () => ({
+      author,
+      sends,
+      begin: (send) => setSends((all) => [...all.filter((s) => s.clientId !== send.clientId), send]),
+      update: (clientId, patch) => setSends((all) => all.map((s) => (s.clientId === clientId ? { ...s, ...patch } : s))),
+      remove: (clientId) => setSends((all) => all.filter((s) => s.clientId !== clientId)),
+    }),
+    [author, sends],
+  );
+  return <PendingSendsContext value={api}>{children}</PendingSendsContext>;
+}
+
+/** The messages in flight, or null outside a PendingSendsProvider. */
+export function usePendingSends(): PendingSendsApi | null {
+  return useContext(PendingSendsContext);
+}
+
+/* ---------------- The drop zone ---------------- */
+
+type ZoneApi = {
+  ref: RefObject<HTMLDivElement | null>;
+  report: (drop: { state: DropTargetState; label: string } | null) => void;
+};
+const ZoneContext = createContext<ZoneApi | null>(null);
+
+/**
+ * The area files can be dropped on (uploads 2.2): on the task page the whole
+ * main column. Anything dropped or pasted inside it goes to the composer's
+ * tray, so nothing posts without Send. While a file is dragged over the
+ * window the zone takes the drop edge, and under the pointer the label
+ * ("Drop to add to this reply"). The composer registers itself as the
+ * target; with no zone around it, the composer box is the target.
+ */
+export function ComposerDropZone({ className, children }: { className?: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [drop, setDrop] = useState<{ state: DropTargetState; label: string } | null>(null);
+  const api = useMemo<ZoneApi>(() => ({ ref, report: setDrop }), []);
+  return (
+    <ZoneContext value={api}>
+      <div ref={ref} className={cn("relative", className)}>
+        {children}
+        {drop && <DropLabel state={drop.state} label={drop.label} />}
+      </div>
+    </ZoneContext>
+  );
+}
+
 /* ---------------- Composer ---------------- */
+
+const NONE: readonly ComposerDraft[] = [];
 
 /**
  * Write a reply, a note or an update: text, and with an uploader photos,
  * videos and documents. Files upload as they're picked, dropped or pasted
  * and go out with the message; Send waits for them. Cmd or Ctrl+Enter
  * sends, printed inside Send at its trailing edge for a mouse ("Send ⌘↵").
- * With the switch, Internal turns the box --fill-1 under a Lock line
- * (docs/brand-guidelines.md, section 9). Pinned on a phone, it sits on the
- * bottom edge with its contents on the 16px page gutter, and its tools show
- * while you write. Send is secondary, so it never competes with a page's one
- * primary (the Review banner's Approve, a deal's stage).
+ * A line over the field says who will see it, and with the switch, Internal
+ * turns the box --fill-1 under a Lock line (docs/brand-guidelines.md, section
+ * 9); the text and the choice are kept together, and Send reads "Add note".
+ * Esc leaves the field and keeps the draft. Pinned on a phone, it sits on the
+ * bottom edge with its contents on the 16px page gutter, rides above the
+ * keyboard, and shows its tools while you write. Send is secondary, so it
+ * never competes with a page's one primary (the Review banner's Approve, a
+ * deal's stage).
  */
 export function Composer(props: ComposerProps) {
   if (props.uploader) return <UploadingComposer {...props} uploader={props.uploader} />;
-  return <ComposerBody {...props} uploader={null} api={null} added={NONE} />;
+  return <ComposerBody {...props} uploader={null} api={null} added={NONE} target={null} />;
 }
-
-const NONE: readonly ComposerDraft[] = [];
 
 /** With uploads: the uploader's hook lives here, so a composer without one never starts it. */
 function UploadingComposer(props: ComposerProps & { uploader: ComposerUploader }) {
   // Recorded here but not yet in `drafts` (the page catches up after the refresh).
   const [added, setAdded] = useState<ComposerDraft[]>([]);
   const { options } = props.uploader;
-  const api = useMediaUploader({
-    ...options,
-    record: async (file) => {
-      const res = await options.record(file);
-      if (res.ok && res.data) {
-        const recorded = { id: res.data.id, filename: file.filename };
-        setAdded((r) => [...r, recorded]);
-      }
-      return res;
-    },
-  });
-  return <ComposerBody {...props} api={api} added={added} />;
+  const recordedHere = (record: (file: Parameters<MediaUploaderOptions["record"]>[0]) => ReturnType<MediaUploaderOptions["record"]>) => async (
+    file: Parameters<MediaUploaderOptions["record"]>[0],
+  ) => {
+    const res = await record(file);
+    if (res.ok && res.data) {
+      const recorded = { id: res.data.id, filename: file.filename };
+      setAdded((r) => [...r, recorded]);
+    }
+    return res;
+  };
+  const target: UploadTarget | null = "target" in options ? { ...options.target, record: recordedHere(options.target.record) } : null;
+  const api = useMediaUploader(
+    "target" in options && target ? { ...options, target } : { ...(options as MediaUploaderOptions), record: recordedHere((options as MediaUploaderOptions).record) },
+  );
+  return <ComposerBody {...props} api={api} added={added} target={target} />;
 }
 
 function ComposerBody({
@@ -165,32 +342,46 @@ function ComposerBody({
   pin = "phone",
   placeholders,
   sendLabel,
+  sentClientIds,
+  dropLabel,
   api,
   added,
+  target,
 }: ComposerProps & {
   uploader: ComposerUploader | null;
   api: MediaUploaderApi | null;
   added: readonly ComposerDraft[];
+  target: UploadTarget | null;
 }) {
   const { toast } = useToast();
-  const text = useSyncExternalStore(
+  const draft = useSyncExternalStore(
     subscribe,
     () => readDraft(draftKey),
-    () => "",
+    () => EMPTY_DRAFT,
   );
+  const text = draft.text;
+  const visibility = mode === "switch" ? draft.visibility : "SHARED";
   const mod = useModKey();
-  const [visibility, setVisibility] = useState<ComposerVisibility>("SHARED");
+  const sends = usePendingSends();
+  const zone = useContext(ZoneContext);
+  const undoable = useUndoableRemove();
   // Ids sent or removed, which a stale `drafts` mustn't bring back.
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
   const waiting = uploader?.drafts ?? [];
   const ready = [...waiting, ...added.filter((a) => !waiting.some((d) => d.id === a.id))].filter((r) => !gone.has(r.id));
-  const forget = (ids: string[]) => setGone((g) => new Set([...g, ...ids]));
-  const [dragging, setDragging] = useState(false);
-  const [sending, startSend] = useTransition();
+  const forget = (ids: readonly string[]) => setGone((g) => new Set([...g, ...ids]));
+  const unforget = (ids: readonly string[]) => setGone((g) => new Set([...g].filter((id) => !ids.includes(id))));
+  const [sendingNow, setSendingNow] = useState(false);
+  const [focused, setFocused] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const internal = mode === "switch" && visibility === "INTERNAL";
   const pinned = pin === "phone";
+  // What was sent, by clientId, so Retry and Edit can use it again.
+  const sent = useRef(new Map<string, { message: ComposerMessage; files: ComposerDraft[] }>());
+
+  const setText = (next: string) => writeDraft(draftKey, { text: next });
+  const setVisibility = (v: ComposerVisibility) => writeDraft(draftKey, { visibility: v });
 
   // Grow with the text, up to the cap in CSS.
   useLayoutEffect(() => {
@@ -200,7 +391,8 @@ function ComposerBody({
     el.style.height = `${el.scrollHeight}px`;
   }, [text]);
 
-  // On a phone the composer is pinned to the bottom edge: lift toasts above it.
+  // On a phone the composer is pinned to the bottom edge: it rides above the keyboard, and toasts stay above it.
+  useKeyboardInset();
   const [inset, setInset] = useState(0);
   useLayoutEffect(() => {
     const el = box.current;
@@ -213,8 +405,54 @@ function ComposerBody({
   }, []);
   useToastInset(inset);
 
+  // A message that was mid-send when the page went away: dropped if it did post, back in the field if it didn't.
+  const restored = useRef<string | null>(null);
+  useEffect(() => {
+    if (restored.current === draftKey) return;
+    restored.current = draftKey;
+    const outcome = resolvePending(readDraft(draftKey), sentClientIds ?? []);
+    if (outcome.action === "drop") writeDraft(draftKey, { pending: null });
+    else if (outcome.action === "restore") writeDraft(draftKey, outcome.draft);
+  }, [draftKey, sentClientIds]);
+
+  const narrow = useSyncExternalStore(subscribeNarrow, () => window.matchMedia(NARROW).matches, () => false);
+  const placeholder = internal
+    ? narrow && placeholders.internalShort
+      ? placeholders.internalShort
+      : (placeholders.internal ?? placeholders.shared)
+    : placeholders.shared;
+  const label = internal ? (sendLabel?.internal ?? "Send") : (sendLabel?.shared ?? "Send");
+  const audienceLine = internal ? audience?.internal : audience?.shared;
+
+  // Files can be dropped or pasted anywhere in the zone (or on the composer, with no zone around it).
+  const dropState = useDropTarget(target, zone?.ref ?? box, {
+    label: internal ? (dropLabel?.internal ?? "Drop to add to this note") : (dropLabel?.shared ?? "Drop to add to this reply"),
+  });
+  const dropText = internal ? (dropLabel?.internal ?? "Drop to add to this note") : (dropLabel?.shared ?? "Drop to add to this reply");
+  const report = zone?.report;
+  useEffect(() => {
+    report?.({ state: { active: dropState.active, over: dropState.over }, label: dropText });
+    return () => report?.(null);
+  }, [report, dropState.active, dropState.over, dropText]);
+
   const pendingUploads = api?.pending ?? 0;
-  const canSend = !sending && pendingUploads === 0 && (text.trim().length > 0 || ready.length > 0);
+  const canSend = !sendingNow && pendingUploads === 0 && (text.trim().length > 0 || ready.length > 0);
+
+  /** One try at posting, for a first Send and a Retry alike. True when it posted. */
+  async function post(message: ComposerMessage): Promise<boolean> {
+    const res = await callAction(() => onSend(message));
+    if (res.ok) {
+      if (readDraft(draftKey).pending?.clientId === message.clientId) writeDraft(draftKey, { pending: null });
+      sends?.update(message.clientId, { status: "sent", error: undefined });
+      sent.current.delete(message.clientId);
+      return true;
+    }
+    // On a timeline the card stays with its Retry, and the text stays in the draft's pending slot until it posts.
+    // Without one, a toast says why, and the field still holds the message.
+    if (sends) sends.update(message.clientId, { status: "failed", error: res.error });
+    else toast({ message: res.error });
+    return false;
+  }
 
   function send() {
     if (!canSend) return;
@@ -224,33 +462,89 @@ function ComposerBody({
       attachmentIds: ready.map((r) => r.id),
       clientId: newClientId(),
     };
-    startSend(async () => {
-      // The draft and the files stay until it's sent, so a failure loses nothing.
-      const res = await callAction(() => onSend(message));
-      if (!res.ok) {
-        toast({ message: res.error });
-        return;
-      }
-      writeDraft(draftKey, "");
-      forget(message.attachmentIds);
+    const files = [...ready];
+    sent.current.set(message.clientId, { message, files });
+    if (!sends) {
+      // No timeline to show it on: the draft and the files stay until it's sent, so a failure loses nothing.
+      setSendingNow(true);
+      void post(message).then((ok) => {
+        setSendingNow(false);
+        if (!ok) return;
+        writeDraft(draftKey, { text: "" });
+        forget(files.map((f) => f.id));
+      });
+      return;
+    }
+    const at = new Date().toISOString();
+    // The words move to the pending slot at once and leave it only on success; the field is free for the next message.
+    writeDraft(draftKey, { text: "", pending: { clientId: message.clientId, text, visibility: message.visibility, files, at } });
+    forget(message.attachmentIds);
+    sends.begin({
+      clientId: message.clientId,
+      body: text.trim(),
+      visibility: message.visibility,
+      files,
+      at,
+      status: "sending",
+      retry: () => retry(message.clientId),
+      edit: () => edit(message.clientId),
+      discard: () => discard(message.clientId),
     });
+    void post(message);
+  }
+
+  function retry(clientId: string) {
+    const entry = sent.current.get(clientId);
+    if (!entry) return;
+    sends?.update(clientId, { status: "sending", error: undefined });
+    void post(entry.message);
+  }
+
+  function edit(clientId: string) {
+    const entry = sent.current.get(clientId);
+    if (!entry) return;
+    sent.current.delete(clientId);
+    sends?.remove(clientId);
+    unforget(entry.files.map((f) => f.id));
+    const current = readDraft(draftKey);
+    writeDraft(draftKey, {
+      text: current.text ? `${entry.message.body}\n\n${current.text}` : entry.message.body,
+      visibility: entry.message.visibility,
+      pending: current.pending?.clientId === clientId ? null : current.pending,
+    });
+    field.current?.focus();
+  }
+
+  function discard(clientId: string) {
+    const entry = sent.current.get(clientId);
+    sent.current.delete(clientId);
+    sends?.remove(clientId);
+    // The files were uploaded and never posted: they are drafts again, waiting in the tray.
+    if (entry) unforget(entry.files.map((f) => f.id));
+    if (readDraft(draftKey).pending?.clientId === clientId) writeDraft(draftKey, { pending: null });
   }
 
   function unready(r: ComposerDraft) {
     if (!uploader) return;
-    forget([r.id]);
-    void callAction(() => uploader.remove(r)).then((res) => {
-      if (!res.ok) toast({ message: `Couldn't remove ${r.filename}.` });
+    const photo = fileKindForType(uploadContentType(r.filename, "")) === "image";
+    // The tile goes at once and the file is deleted when the toast ends; Undo brings it back.
+    undoable({
+      message: photo ? "Photo removed" : "File removed",
+      hide: () => forget([r.id]),
+      show: () => unforget([r.id]),
+      remove: async () => {
+        const res = await callAction(() => uploader.remove(r));
+        if (!res.ok) {
+          unforget([r.id]);
+          toast({ message: `Couldn't remove ${r.filename}.` });
+        }
+      },
     });
   }
 
-  const hasFiles = (e: React.DragEvent) => !!api && e.dataTransfer.types.includes("Files");
-
-  const placeholder = internal ? (placeholders.internal ?? placeholders.shared) : placeholders.shared;
-  const label = internal ? (sendLabel?.internal ?? "Send") : (sendLabel?.shared ?? "Send");
-  const audienceLine = internal ? audience?.internal : audience?.shared;
-  // Internal stays open too, so the switch back is never hidden.
+  // Active: something is being written or held, or the field has focus. The audience line and the tools show on a phone only then.
   const active = text.length > 0 || ready.length > 0 || (api?.uploads.length ?? 0) > 0 || internal;
+  const open = active || focused;
   // The tools row holds the switch and the file button; without either it has nothing to show.
   const tools = mode === "switch" || !!api;
 
@@ -267,63 +561,70 @@ function ComposerBody({
       aria-keyshortcuts="Meta+Enter Control+Enter"
       className={className}
     >
-      {sending ? "Sending…" : label}
+      {sendingNow ? "Sending…" : label}
       <Kbd aria-hidden="true" className="max-md:hidden @max-md/composer:hidden">
         {shortcutLabel(mod, "↵")}
       </Kbd>
     </Button>
   );
 
+  // Leaving the field for the end of the page: the last entry sits just above the bar.
+  function onFieldFocus() {
+    if (!pinned || window.matchMedia("(min-width: 48rem)").matches) return;
+    const root = document.scrollingElement;
+    const atEnd = !!root && root.scrollHeight - (root.scrollTop + window.innerHeight) < 160;
+    if (!atEnd) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // After the keyboard is up and the bar has moved.
+    window.setTimeout(() => box.current?.scrollIntoView({ block: "end", behavior: reduce ? "auto" : "smooth" }), 320);
+  }
+
   return (
     <div
       ref={box}
       data-active={active || undefined}
-      onDragOver={(e) => {
-        if (!hasFiles(e)) return;
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
-      }}
-      onDrop={(e) => {
-        if (!hasFiles(e)) return;
-        e.preventDefault();
-        setDragging(false);
-        api?.addFiles(e.dataTransfer.files);
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
       }}
       className={cn(
         // A container, so the tools row can drop the keycap when the column is narrow (lg with the sidebar pinned).
-        "group/composer @container/composer border transition-colors print:hidden",
+        "group/composer @container/composer relative border transition-colors print:hidden",
         pinned
-          ? "max-md:sticky max-md:bottom-0 max-md:z-20 max-md:-mx-4 max-md:-mb-4 max-md:border-x-0 max-md:border-b-0 max-md:pb-[env(safe-area-inset-bottom)] md:rounded-lg"
+          ? cn(
+              // Edge to edge over a top rule, above the keyboard and the home indicator, and out of the way while a comment is being edited.
+              // `mt-auto` takes the spare height of a short page's flex column, so the bar sits on the bottom edge with nothing to scroll.
+              "max-md:sticky max-md:bottom-[var(--kb-inset,0px)] max-md:z-20 max-md:-mx-4 max-md:-mb-4 max-md:mt-auto max-md:border-x-0 max-md:border-b-0",
+              "max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))] md:rounded-lg",
+              "[html[data-editing-comment]_&]:max-md:hidden",
+            )
           : "rounded-lg",
         // Both grounds are opaque: on a phone it sits over the page.
         internal ? "border-line bg-fill-1" : "border-line bg-surface",
         // Same drop cue as the Attachments box.
-        dragging && "border-act",
+        dropState.over && "border-act",
       )}
     >
       {api?.inputs}
       {audienceLine &&
         (internal ? (
-          <p className="flex items-center gap-1.5 px-4 pt-2 text-meta font-medium text-fg-2 md:px-3">
+          <p className={cn("items-center gap-1.5 px-4 pt-2 text-meta font-medium text-fg-2 md:px-3", open ? "flex" : "hidden md:flex")}>
             <Lock className="size-3.5 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 truncate">{audienceLine}</span>
+            <span className="flex min-w-0 flex-1">{audienceLine}</span>
           </p>
         ) : (
-          <p className="truncate px-4 pt-2 text-meta text-fg-3 md:px-3">{audienceLine}</p>
+          <p className={cn("min-w-0 px-4 pt-2 text-meta text-fg-3 md:px-3", open ? "flex" : "hidden md:flex")}>{audienceLine}</p>
         ))}
       {uploader && ready.length > 0 && (
         <ul className="flex flex-wrap gap-2 px-4 pt-2.5 md:px-3">
           {ready.map((r) => (
-            <ReadyTile key={r.id} item={r} url={uploader.fileUrl(r.id)} onRemove={() => unready(r)} />
+            <UploadTile key={r.id} upload={asReadyUpload(r, uploader.fileUrl(r.id))} grid={false} ready onFill={internal} onRemove={() => unready(r)} />
           ))}
         </ul>
       )}
-      {api && <MediaUploadTray uploader={api} className="px-4 pt-2.5 md:px-3" />}
-      {/* On a phone Send ends on the 16px gutter, under the chips and rules above it. */}
-      <div className={cn("flex items-end gap-1 py-1.5 pl-1.5 pr-4 md:px-2", !api && "pl-2.5")}>
+      {api && <MediaUploadTray uploader={api} onFill={internal} className="px-4 pt-2.5 md:px-3" />}
+      {/* On a phone the row sits on the 16px gutter, like the cards above it. */}
+      <div className={cn("flex items-end gap-1 px-4 py-1.5 md:px-2", !api && "md:pl-2.5")}>
         {api && (
           <IconButton label="Take photo or video" onPress={api.takePhoto} onFill={internal} className="pointer-fine:hidden">
             <Camera />
@@ -335,11 +636,17 @@ function ComposerBody({
           rows={1}
           value={text}
           placeholder={placeholder}
-          onChange={(e) => writeDraft(draftKey, e.target.value)}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={onFieldFocus}
           onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               send();
+            } else if (e.key === "Escape") {
+              // Leaves the field and keeps the draft; it never clears the text. One Esc closes one layer.
+              e.preventDefault();
+              e.currentTarget.blur();
             }
           }}
           onPaste={(e) => {
@@ -348,7 +655,8 @@ function ComposerBody({
               api.addFiles(e.clipboardData.files);
             }
           }}
-          className="max-h-48 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-body text-fg-1 outline-none placeholder:text-fg-3 md:min-h-12 md:px-1"
+          // Five lines on a phone, so the bar stays under half of what an iPhone SE shows above its keyboard; the old cap from md.
+          className="max-h-[6.875rem] min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-body text-fg-1 outline-none placeholder:text-fg-3 md:max-h-48 md:min-h-12 md:px-1"
         />
         {sendButton(cn("mb-0.5", tools && "md:hidden"))}
       </div>
@@ -358,7 +666,7 @@ function ComposerBody({
       {tools && (
         <div
           onMouseDown={(e) => e.preventDefault()}
-          className="hidden items-center gap-1 pb-1.5 pl-1.5 pr-4 group-data-[active]/composer:flex group-focus-within/composer:flex md:flex md:px-2 md:pb-2"
+          className={cn("items-center gap-1 px-4 pb-1.5 md:flex md:px-2 md:pb-2", open ? "flex" : "hidden")}
         >
           {api && (
             <IconButton label="Add photos, videos or files" onPress={api.chooseFiles} onFill={internal}>
@@ -381,8 +689,22 @@ function ComposerBody({
           {sendButton(cn("hidden md:inline-flex", mode !== "switch" && "ml-auto"))}
         </div>
       )}
+      {/* With no zone around it, the composer is the target and draws its own label. */}
+      {!zone && <DropLabel state={dropState} label={dropText} />}
     </div>
   );
+}
+
+/** A file recorded and waiting to go out, as the upload tile draws it (ready: no ring, its picture, "ready to send"). */
+function asReadyUpload(r: ComposerDraft, url: string): MediaUpload {
+  return {
+    key: r.id,
+    name: r.filename,
+    kind: fileKindForType(uploadContentType(r.filename, "")),
+    previewUrl: url,
+    progress: 1,
+    status: "saving",
+  };
 }
 
 function IconButton({
@@ -418,37 +740,7 @@ function IconButton({
   );
 }
 
-/**
- * A file that's uploaded and waiting to go out with the message. The same
- * 56px tile as the upload tray's (components/media-uploader.tsx): --fill-1
- * under the photo, the photo edge on top, an ink Remove badge.
- */
-function ReadyTile({ item, url, onRemove }: { item: ComposerDraft; url: string; onRemove: () => void }) {
-  const kind = fileKindForType(uploadContentType(item.filename, ""));
-  return (
-    <li className="relative h-14 w-14 shrink-0 rounded-lg bg-fill-1" title={item.filename}>
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg">
-        {kind === "image" ? (
-          // Gated, session-checked route; next/image would cache it publicly.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="h-full w-full object-cover" />
-        ) : kind === "video" ? (
-          <span className="flex h-full w-full items-center justify-center bg-photo-stage">
-            <Play className="size-4 fill-on-photo text-on-photo" aria-hidden="true" />
-          </span>
-        ) : (
-          <FileText className="size-5 text-fg-3" aria-hidden="true" />
-        )}
-        <div className="pointer-events-none absolute inset-0 rounded-lg inset-shadow-photo-edge" />
-      </div>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${item.filename}`}
-        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-act text-on-act ring-2 ring-surface after:absolute after:-inset-3 pointer-fine:after:-inset-1"
-      >
-        <X className="size-3" aria-hidden="true" />
-      </button>
-    </li>
-  );
+/** Whether a failed send's error was for want of a connection (the line says so). */
+export function isOfflineMessage(error: string | undefined): boolean {
+  return error === OFFLINE_ERROR;
 }

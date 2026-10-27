@@ -12,11 +12,14 @@ import {
   easternDayStart,
   parseItems,
   reachedCapNow,
+  reconcileItems,
   refusedRetryAt,
   retryAt,
   sendBudget,
   sendFailureKind,
   taskEmail,
+  type EventSnapshot,
+  type OutboxItem,
 } from "./content";
 
 /**
@@ -101,6 +104,48 @@ async function claim(id: string, now: Date): Promise<{ items: unknown; attempts:
   return rows[0] ?? null;
 }
 
+/**
+ * The claimed row's items as they stand now (activity 2.5): each item that
+ * names an event (a comment, a status, a file post, a send-back's note) is
+ * read back, in one query scoped to the row's task, and content.ts
+ * reconcileItems drops what was deleted and re-renders what was edited. The
+ * read is after the claim, so what is sent is what is true as it goes. Items
+ * queued before they named events send as stored, and a row can mix both.
+ */
+async function liveItems(
+  taskId: string,
+  stored: OutboxItem[],
+  row: { audience: "staff" | "contractor"; recipientContactId: string | null },
+): Promise<OutboxItem[]> {
+  const ids = [...new Set(stored.flatMap((i) => [i.eventId, i.noteEventId].filter((x): x is string => !!x)))];
+  if (ids.length === 0) return stored;
+  const found = await prisma.taskEvent.findMany({
+    where: { id: { in: ids }, taskId },
+    select: {
+      id: true,
+      visibility: true,
+      deletedAt: true,
+      body: true,
+      audienceContactId: true,
+      attachments: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, select: { kind: true } },
+    },
+  });
+  const events = new Map<string, EventSnapshot>(
+    found.map((e) => [
+      e.id,
+      {
+        id: e.id,
+        visibility: e.visibility,
+        deletedAt: e.deletedAt,
+        body: e.body,
+        audienceContactId: e.audienceContactId,
+        files: e.attachments.map((a) => (a.kind === "IMAGE" ? "image" : a.kind === "VIDEO" ? "video" : "file")),
+      },
+    ]),
+  );
+  return reconcileItems(stored, events, row);
+}
+
 export async function drainDue(now = new Date(), opts: { limit?: number } = {}): Promise<DrainResult> {
   const started = Date.now();
   const limit = opts.limit ?? BATCH;
@@ -157,7 +202,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
 
     const claimed = await claim(row.id, now);
     if (!claimed) continue;
-    const items = parseItems(claimed.items);
+    const items = await liveItems(row.taskId, parseItems(claimed.items), { audience: delivery.audience, recipientContactId: row.recipientContactId });
     if (items.length === 0) {
       await prisma.notificationOutbox.update({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
       result.skipped++;

@@ -3,6 +3,7 @@ import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/componen
 import { BackLink } from "@/components/back-link";
 import type { FileLink } from "@/components/files-list";
 import type { MediaItem } from "@/components/media-grid";
+import { ComposerDropZone, PendingSendsProvider } from "@/components/composer";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
 import { TaskActivity, type ActivityRow } from "./activity";
@@ -11,7 +12,7 @@ import { Composer, type ComposerDraft } from "./composer";
 import { TaskFields, type PropertyOption, type TaskFieldValues } from "./fields";
 import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
-import { ReviewBanner } from "./review-banner";
+import { ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
 import { StatusControl, WaitingReason } from "./status-control";
 import { StatusRunProvider } from "./status-run";
 import { TaskMediaSection } from "./task-media";
@@ -35,6 +36,8 @@ export interface TaskPageViewProps {
   properties: PropertyOption[];
   /** The signed-in user, for "(you)" and the short names below sm. */
   meId: string;
+  /** Their name as comments carry it, for a message of theirs that is still sending. */
+  meName: string;
   /** The people the viewer assigned last, for the assignee picker's Recent rows. */
   recent: AssigneeValue[];
   /** The date the series gave this task when it is a repeat copy (its CREATED line), null otherwise. */
@@ -45,15 +48,24 @@ export interface TaskPageViewProps {
   contractorFirst: string | null;
   /** The assigned contractor has a portal login; until then nothing here says they'll see it now. */
   contractorHasLogin: boolean;
-  /** "Connor and Pieter". */
-  staffNames: string;
-  review: { name: string; fullName: string; isContractor: boolean; photos: number } | null;
+  /** The assigned contractor, for the composer's line over the field. */
+  contractor: { id: string; first: string; hasLogin: boolean } | null;
+  /** The partners' first names: who sees an Internal note. */
+  staffFirstNames: string[];
+  /** The proof the Review banner shows while the job waits on staff, else null. */
+  review: ReviewProof | null;
+  /** Who decided, while nothing has moved since: the banner's one-line outcome. */
+  decision: ReviewDecision | null;
   checklist: ChecklistRow[];
   media: MediaItem[];
   files: FileLink[];
   /** The ids in `media` sent with the latest Mark done (lib/tasks/media.ts taskMedia). */
   atFinish?: readonly string[];
   rows: ActivityRow[];
+  /** When this person last opened the task before now (ISO): the New divider's baseline. */
+  newSince: string | null;
+  /** The `clientId`s of the comments on the page, so a message mid-send at a reload isn't posted twice. */
+  sentClientIds: string[];
   /** When the page was rendered (ISO), so the times read the same on the server and in the browser. */
   now: string;
   /** My uploads waiting in the composer from an earlier visit. */
@@ -76,6 +88,9 @@ export function TaskPageView(p: TaskPageViewProps) {
       <div
         className={
           "grid max-w-300 gap-x-10 [grid-template-areas:'head'_'fields'_'main'] " +
+          // Below md the page is at least the screen tall under the top bar, and the main area takes the spare
+          // height, so the composer sits on the bottom edge even on a short task (activity 2.7).
+          "max-md:min-h-[calc(100dvh-var(--app-bar-h))] max-md:grid-rows-[auto_auto_1fr] " +
           "lg:grid-cols-[minmax(0,1fr)_20rem] lg:[grid-template-areas:'head_fields'_'main_fields']"
         }
       >
@@ -135,37 +150,49 @@ export function TaskPageView(p: TaskPageViewProps) {
           </Section>
         </aside>
 
-        <div className="min-w-0 space-y-8 pt-2 [grid-area:main] pointer-coarse:space-y-6 lg:pt-4">
-          {p.review && <ReviewBanner taskId={task.id} {...p.review} />}
+        <PendingSendsProvider author={p.meName}>
+          {/* The whole main column is one drop target for the composer's tray (uploads 2.2). */}
+          <ComposerDropZone className="min-w-0 space-y-8 pt-2 [grid-area:main] pointer-coarse:space-y-6 max-md:flex max-md:flex-col lg:pt-4">
+            <ReviewSlot
+              taskId={task.id}
+              review={p.review}
+              decision={p.decision}
+              contractor={p.contractorFirst}
+              hasLogin={p.contractorHasLogin}
+              now={p.now}
+            />
 
-          <div>
-            {task.legacyAssignee && <p className="mb-2 text-meta text-fg-3">Assigned in Asana to {task.legacyAssignee}</p>}
-            <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} hasLogin={p.contractorHasLogin} />
-          </div>
+            <div>
+              {task.legacyAssignee && <p className="mb-2 text-meta text-fg-3">Assigned in Asana to {task.legacyAssignee}</p>}
+              <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} hasLogin={p.contractorHasLogin} />
+            </div>
 
-          <Checklist taskId={task.id} items={p.checklist} />
+            <Checklist taskId={task.id} items={p.checklist} />
 
-          <TaskMediaSection
-            taskId={task.id}
-            media={p.media}
-            files={p.files}
-            atFinish={p.atFinish}
-            // For "Set as property photo" in the viewer (uploads 2.10).
-            property={propertyOf(p.properties, p.values.propertyId)}
-          />
+            <TaskMediaSection
+              taskId={task.id}
+              media={p.media}
+              files={p.files}
+              atFinish={p.atFinish}
+              // For "Set as property photo" in the viewer (uploads 2.10).
+              property={propertyOf(p.properties, p.values.propertyId)}
+            />
 
-          <Section title="Activity">
-            <TaskActivity rows={p.rows} now={p.now} />
-          </Section>
+            <Section title="Activity">
+              <TaskActivity taskId={task.id} rows={p.rows} now={p.now} today={p.today} newSince={p.newSince} />
+            </Section>
 
-          {/* Without a login the composer reads as on a job with no contractor ("Shared", "Add a comment"): no reply reaches them yet. */}
-          <Composer
-            taskId={task.id}
-            contractorFirstName={p.contractorHasLogin ? p.contractorFirst : null}
-            staffNames={p.staffNames}
-            drafts={p.drafts}
-          />
-        </div>
+            {/* Without a login the composer reads as on a job with no contractor ("Shared", "Add a comment"): no reply reaches them yet. */}
+            <Composer
+              taskId={task.id}
+              taskTitle={task.title}
+              contractor={p.contractor}
+              staff={p.staffFirstNames}
+              drafts={p.drafts}
+              sentClientIds={p.sentClientIds}
+            />
+          </ComposerDropZone>
+        </PendingSendsProvider>
       </div>
     </StatusRunProvider>
   );

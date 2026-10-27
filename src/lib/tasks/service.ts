@@ -6,9 +6,11 @@ import { prisma } from "@/lib/db";
 import { TEMPLATE_BUCKET } from "@/lib/config";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
+import { firstName } from "@/lib/names";
 import type { UnitRename } from "@/lib/property-types";
 import { activeTask } from "@/lib/task-scope";
 import * as core from "./core";
+import { deleteEmailNote, emailStatesIn } from "./delivery";
 
 /**
  * Task domain for the app: every staff, system and public-form task write
@@ -136,6 +138,54 @@ export async function deleteTask(id: string, p: core.Principal): Promise<void> {
 export async function addTaskComment(taskId: string, input: core.CommentInput, p: core.Principal): Promise<void> {
   await prisma.$transaction((tx) => core.addComment(tx, taskId, input, p));
   revalidatePath(`/tasks/${taskId}`);
+}
+
+/** Save new text on your own comment (activity 2.5). Nothing is emailed: the drain re-reads each comment when it sends. */
+export async function editTaskComment(eventId: string, body: string, p: core.Principal): Promise<void> {
+  const ev = await prisma.$transaction((tx) => core.editComment(tx, eventId, { body }, p));
+  revalidatePath(`/tasks/${ev.taskId}`);
+}
+
+/**
+ * Delete your own comment, softly. Returns what the toast says about the
+ * email: "Zack won't get it" while it is still queued, "Zack already got the
+ * email" once it went, null for an Internal comment or one never emailed.
+ */
+export async function deleteTaskComment(eventId: string, p: core.Principal): Promise<{ emailNote: string | null }> {
+  const out = await prisma.$transaction(async (tx) => {
+    const was = await tx.taskEvent.findUnique({ where: { id: eventId }, select: { visibility: true, audienceContactId: true } });
+    const { taskId } = await core.deleteComment(tx, eventId, p);
+    let emailNote: string | null = null;
+    if (was?.visibility === "SHARED" && was.audienceContactId) {
+      const states = await emailStatesIn(tx, taskId, was.audienceContactId, [eventId]);
+      const contact = await tx.contact.findUnique({ where: { id: was.audienceContactId }, select: { fullName: true } });
+      emailNote = deleteEmailNote(states.get(eventId) ?? null, firstName(contact?.fullName) || contact?.fullName || null);
+    }
+    return { taskId, emailNote };
+  });
+  revalidatePath(`/tasks/${out.taskId}`);
+  return { emailNote: out.emailNote };
+}
+
+/** Undo a delete: the comment and the files that went with it come back. */
+export async function restoreTaskComment(eventId: string, p: core.Principal): Promise<void> {
+  const { taskId } = await prisma.$transaction((tx) => core.restoreComment(tx, eventId, p));
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+/**
+ * Approve's Undo: back to Review as if never approved (core.undoApproval).
+ * A refused one (the job moved on) still refreshes the pages, so the screen
+ * shows where the job is.
+ */
+export async function undoTaskApproval(taskId: string, approvedEventId: string, p: core.Principal): Promise<void> {
+  try {
+    const { task } = await prisma.$transaction((tx) => core.undoApproval(tx, taskId, approvedEventId, p));
+    revalidateTask(task);
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateTask({ id: taskId });
+    throw err;
+  }
 }
 
 export async function setChecklistItem(itemId: string, done: boolean, p: core.Principal): Promise<void> {

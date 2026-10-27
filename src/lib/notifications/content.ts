@@ -18,6 +18,12 @@ export interface OutboxItem {
   actorLabel: string;
   summary: string;
   at: string;
+  /** The event the line is about, which the drain re-reads when it claims the row (core.ts OutboxItem). Absent on rows queued before it existed. */
+  eventId?: string;
+  /** A send-back's note comment: its text is inside the STATUS summary, and the drain rebuilds or strips it. */
+  noteEventId?: string;
+  /** TARGET: the date that moved is the booked visit. Absent on old rows, which read neutrally. */
+  visit?: boolean;
 }
 
 /** The items column, keeping only well-formed entries. */
@@ -62,10 +68,125 @@ export function deliveryFor(row: RowRecipient, opts: { contractorHasAccess: bool
   return { ok: true, to: c.portalAccount.email, audience: "contractor" };
 }
 
-/** Staff open the task in the app; contractors open the job in the portal. */
-export function openUrl(appUrl: string, audience: Audience, taskId: string): string {
+/**
+ * Staff open the task in the app; contractors open the job in the portal.
+ * With `eventId` the link opens at that update (`#update-<id>`, activity 2.6).
+ */
+export function openUrl(appUrl: string, audience: Audience, taskId: string, eventId?: string | null): string {
   const origin = appUrl.replace(/\/+$/, "");
-  return audience === "staff" ? `${origin}/tasks/${taskId}` : `${origin}/p/jobs/${taskId}`;
+  const page = audience === "staff" ? `${origin}/tasks/${taskId}` : `${origin}/p/jobs/${taskId}`;
+  return eventId ? `${page}#update-${eventId}` : page;
+}
+
+// ---------------------------------------------------------------------------
+// Re-reading the events a row names, when it is claimed (activity 2.5)
+// ---------------------------------------------------------------------------
+
+/** What the drain read back about one event an item names. */
+export interface EventSnapshot {
+  id: string;
+  visibility: "SHARED" | "INTERNAL";
+  /** Set once it was deleted: the item is dropped. */
+  deletedAt: Date | string | null;
+  body: string | null;
+  /** The contractor the event was addressed to when it was written, if any. */
+  audienceContactId: string | null;
+  /** The files still up on it, by kind. */
+  files: readonly ("image" | "video" | "file")[];
+}
+
+/** The longest comment an email carries; a longer one ends in an ellipsis. */
+export const EMAIL_COMMENT_MAX = 500;
+
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+/**
+ * How an email counts a comment's files: "3 photos and 1 file", "2 photos and
+ * 1 video", "1 photo", "4 files". Photos, then videos, then everything else,
+ * joined with commas and a last "and".
+ */
+export function filePhrase(kinds: readonly ("image" | "video" | "file")[]): string {
+  const parts = [
+    ["photo", kinds.filter((k) => k === "image").length],
+    ["video", kinds.filter((k) => k === "video").length],
+    ["file", kinds.filter((k) => k === "file").length],
+  ]
+    .filter(([, n]) => (n as number) > 0)
+    .map(([noun, n]) => plural(n as number, noun as string));
+  return parts.length < 2 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** A comment's text for an email: its line breaks kept, cut at 500 characters with an ellipsis. */
+function emailBody(body: string): string {
+  const text = keepBreaks(body);
+  return text.length > EMAIL_COMMENT_MAX ? `${text.slice(0, EMAIL_COMMENT_MAX).trimEnd()}…` : text;
+}
+
+/**
+ * The items of a claimed row, as they stand now. Run on what the row held at
+ * the claim, so what is sent is the comment as it is when the email goes:
+ *
+ *  - an item with no `eventId` (queued before it existed) sends as stored;
+ *  - an item whose event is gone or deleted is dropped (a delete inside the
+ *    10-minute bundle window means Zack never gets it);
+ *  - a comment is rebuilt from the event's current text and files, up to 500
+ *    characters with its line breaks, "3 photos and 1 file" for the files,
+ *    and dropped if it is empty now;
+ *  - a comment, file post or status for a contractor must still be Shared and
+ *    addressed to them; a Shared event never turns Internal, so this only
+ *    guards a row that was queued oddly. ASSIGNED, TARGET and NOTES have no
+ *    event and are never filtered: they are emailed to contractors by design;
+ *  - a send-back's note, which lives inside its STATUS line, is rebuilt from
+ *    the note comment as it stands, or taken out if that was deleted.
+ *
+ * The order is kept. An item that names an event the caller didn't read
+ * (`events` lacks it) is dropped like a missing one.
+ */
+export function reconcileItems(
+  items: readonly OutboxItem[],
+  events: ReadonlyMap<string, EventSnapshot>,
+  row: { audience: Audience; recipientContactId: string | null },
+): OutboxItem[] {
+  const out: OutboxItem[] = [];
+  for (const item of items) {
+    if (!item.eventId) {
+      out.push(item);
+      continue;
+    }
+    const ev = events.get(item.eventId);
+    if (!ev || ev.deletedAt) continue;
+    const mayRead =
+      row.audience === "staff" ||
+      (ev.visibility === "SHARED" && (ev.audienceContactId === null || ev.audienceContactId === row.recipientContactId));
+    if (item.kind === "COMMENT") {
+      if (!mayRead) continue;
+      const text = ev.body ? emailBody(ev.body) : "";
+      const files = filePhrase(ev.files);
+      if (!text && !files) continue;
+      out.push({ ...item, summary: text ? `"${text}"${files ? ` (${files})` : ""}` : `added ${files}` });
+      continue;
+    }
+    if (item.kind === "STATUS" || item.kind === "ATTACHMENT") {
+      if (!mayRead) continue;
+      out.push(item.kind === "STATUS" && item.noteEventId ? withSendBackNote(item, events.get(item.noteEventId)) : item);
+      continue;
+    }
+    out.push(item);
+  }
+  return out;
+}
+
+/** `sent "T" back: note` with the note as it is now: rewritten if edited, taken out if deleted. Other status lines are untouched. */
+function withSendBackNote(item: OutboxItem, note: EventSnapshot | undefined): OutboxItem {
+  const m = /^sent (".*") back(?:: [\s\S]*)?$/.exec(oneLine(item.summary));
+  if (!m) return item;
+  const text = note && !note.deletedAt && note.body ? oneLine(note.body) : "";
+  return { ...item, summary: `sent ${m[1]} back${text ? `: ${text}` : ""}` };
+}
+
+/** The update an email's button opens at: the first comment, status or file post the recipient can see. */
+export function firstUpdateId(items: readonly OutboxItem[]): string | null {
+  return items.find((i) => i.eventId && (i.kind === "COMMENT" || i.kind === "STATUS" || i.kind === "ATTACHMENT"))?.eventId ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +194,15 @@ export function openUrl(appUrl: string, audience: Audience, taskId: string): str
 // ---------------------------------------------------------------------------
 
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/** A comment's text with its line breaks kept: runs of spaces collapse, a blank line stays one, nothing is trimmed but the ends. */
+const keepBreaks = (s: string) =>
+  s
+    .replace(/\r\n?/g, "\n")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ ?\n ?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
 /** "set it to in progress" back to the label the app shows ("In progress"). */
 const STATUS_BY_WORDS = new Map(Object.entries(STATUS_LABEL).map(([k, label]) => [k.replace("_", " ").toLowerCase(), label]));
@@ -85,7 +215,8 @@ const STATUS_BY_WORDS = new Map(Object.entries(STATUS_LABEL).map(([k, label]) =>
  * title with a quote in it ("Hang 36" mirror") still comes out whole.
  */
 export function itemText(item: OutboxItem): string {
-  const s = oneLine(item.summary);
+  // A comment keeps its line breaks (activity 2.10); everything else is one line.
+  const s = item.kind === "COMMENT" ? keepBreaks(item.summary) : oneLine(item.summary);
   switch (item.kind) {
     case "ASSIGNED": {
       // Anchored on the date, so a title like `Quote "A" for B` isn't read as one.
@@ -95,8 +226,11 @@ export function itemText(item: OutboxItem): string {
     case "NOTES":
       return "updated the notes";
     case "TARGET": {
+      // What a contractor reads is a due date or a visit, never "target" (the job page's words). core.ts records
+      // which at enqueue; a row queued before it reads neutrally.
       const m = /^moved ".*" to (.+)$/.exec(s);
-      return m && m[1] !== "no date" ? `moved the target to ${m[1]}` : "cleared the target date";
+      if (m && m[1] !== "no date") return `moved the ${item.visit === undefined ? "date" : item.visit ? "visit" : "due date"} to ${m[1]}`;
+      return `cleared the ${item.visit === undefined ? "date" : item.visit ? "visit date" : "due date"}`;
     }
     case "COMMENT": {
       const files = /^added files \(\+(\d+) files?\)$/.exec(s);
@@ -252,7 +386,8 @@ export function taskEmail(input: {
     items: itemLines(input.items),
     ...(approved ? { closing: thanksTo ? `Thanks, ${thanksTo}.` : "Thanks." } : {}),
     buttonLabel: !contractor ? "Open task" : approved ? "See job" : "Open job",
-    buttonUrl: openUrl(input.appUrl, input.audience, input.taskId),
+    // Opens at the first update in the bundle, when the items name one (rows queued before they did open the job).
+    buttonUrl: openUrl(input.appUrl, input.audience, input.taskId, firstUpdateId(input.items)),
     ...(contractor && input.jobOpen !== false ? { footnote: replyLine(input.staffNames ?? []) } : {}),
   };
 }

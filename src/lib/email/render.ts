@@ -58,6 +58,16 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * A line's text for the HTML, with its line breaks kept (a comment's own
+ * paragraphs): escaped first, so a break is the only markup that gets in, then
+ * each newline becomes a <br>. A line with no newline comes out exactly as
+ * escapeHtml gives it.
+ */
+export function escapeWithBreaks(s: string): string {
+  return escapeHtml(s).replace(/\r\n?|\n/g, "<br>");
+}
+
 export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
   const url = new URL(input.buttonUrl);
   if (url.protocol !== "https:" && url.protocol !== "http:") {
@@ -91,7 +101,7 @@ export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${t.surface};border:1px solid ${t.line};border-radius:8px;padding:32px 28px;font-family:${FONT};color:${t.fg1};">
 <tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.goldDeep};">${LETTERHEAD}</td></tr>
 <tr><td style="padding:24px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.line)}</td></tr>
-${items.map((item) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeHtml(item)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:16px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
+${items.map((item) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(item)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:16px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
 <a href="${href}" style="display:inline-block;background:${t.act};color:${t.onAct};text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:6px;">${escapeHtml(input.buttonLabel)}</a>
 </td></tr>
 ${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:${t.fg3};">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>

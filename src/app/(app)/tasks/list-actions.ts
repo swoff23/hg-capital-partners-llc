@@ -102,11 +102,39 @@ export async function undoDone(id: string, to: string, waitingOn: string | null)
   });
 }
 
-/** Needs review: Approve makes the job Done (D6b). */
-export async function approveTask(id: string): Promise<ActionResult> {
+/**
+ * Needs review: Approve makes the job Done (D6b). Returns the Done line it
+ * wrote, which the toast's Undo names. A job that is already Done (the other
+ * partner approved it first) is a quiet success with nothing to undo
+ * (`approvedEventId` null): what was asked is true.
+ */
+export async function approveTask(id: string): Promise<ActionResult<ApprovedResult>> {
   return withResult("approveTask", async () => {
     const user = await requireUser();
-    await tasks.setTaskStatus(taskId.parse(id), "DONE", tasks.staffPrincipal(user), { expected: "REVIEW" });
+    try {
+      const { statusEventId, emailsContractor } = await tasks.setTaskStatus(taskId.parse(id), "DONE", tasks.staffPrincipal(user), {
+        expected: "REVIEW",
+      });
+      return { approvedEventId: statusEventId, emailsContractor };
+    } catch (err) {
+      if (err instanceof tasks.TaskChangedError && err.current === "DONE") return { approvedEventId: null, emailsContractor: false };
+      throw err;
+    }
+  });
+}
+
+/** What Approve answers: the Done line it wrote (the toast's Undo names it), and whether the contractor will hear. */
+export type ApprovedResult = { approvedEventId: string | null; emailsContractor: boolean };
+
+/**
+ * Approve's Undo: back to Review as if never approved, which also takes back
+ * the next repeat copy while nobody has touched it (core.ts undoApproval). The
+ * job moving on first is refused with who moved it.
+ */
+export async function undoApprove(id: string, approvedEventId: string): Promise<ActionResult> {
+  return withResult("undoApprove", async () => {
+    const user = await requireUser();
+    await tasks.undoTaskApproval(taskId.parse(id), z.string().min(1).max(64).parse(approvedEventId), tasks.staffPrincipal(user));
   });
 }
 

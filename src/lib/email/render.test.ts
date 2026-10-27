@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { brandTokens } from "@/lib/brand-tokens";
-import { escapeHtml, renderPlainEmail } from "./render";
+import { escapeHtml, escapeWithBreaks, renderPlainEmail } from "./render";
 
 const input = {
   line: "Choose a new password for your HG jobs login.",
@@ -70,6 +70,23 @@ test("a closing line sits after the items and before the button, escaped", () =>
 
 test("escapeHtml covers the five specials", () => {
   assert.equal(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
+});
+
+test("a comment's line breaks come through in the html as breaks, after the text is escaped", () => {
+  const { html, text } = renderPlainEmail({ ...input, items: ['Zack: "Doors are in.\n\nTrim <b>needs</b> a coat.\r\nFriday?"'] });
+  assert.ok(html.includes("Zack: &quot;Doors are in.<br><br>Trim &lt;b&gt;needs&lt;/b&gt; a coat.<br>Friday?&quot;"));
+  assert.ok(!html.includes("<b>"), "the break is the only markup that gets in");
+  // The text version keeps its newlines as they are.
+  assert.ok(text.includes('Zack: "Doors are in.\n\nTrim <b>needs</b> a coat.'));
+  assert.equal(escapeWithBreaks("a\nb\r\nc\rd"), "a<br>b<br>c<br>d");
+});
+
+test("every other byte of the email is the same when no line has a break", () => {
+  const plain = { ...input, items: ["Zack started the job", 'Zack: "Uppers in" (2 photos)'], closing: "Thanks, Zack.", footnote: "Reply in the job." };
+  const { html } = renderPlainEmail(plain);
+  assert.ok(!html.includes("<br"));
+  assert.ok(html.includes(`color:${brandTokens.fg2};">Zack started the job</td></tr>\n`));
+  assert.equal(escapeWithBreaks(`Fix & "go" 'now'`), escapeHtml(`Fix & "go" 'now'`));
 });
 
 test("every color in the html is a brand token", () => {

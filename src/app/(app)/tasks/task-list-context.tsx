@@ -14,7 +14,7 @@ import {
   type ListPatch,
   type ListTask,
 } from "@/lib/tasks/list";
-import { approveTask, rescheduleTasks, sendBackTask, setTaskDone, undoDone, undoReschedule } from "./list-actions";
+import { approveTask, rescheduleTasks, sendBackTask, setTaskDone, undoApprove, undoDone, undoReschedule } from "./list-actions";
 
 /**
  * The rows a task list shows and the edits it makes, shared by Today (on
@@ -127,7 +127,22 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
       );
     },
     approve(task) {
-      run({ kind: "status", id: task.id, status: "DONE" }, () => approveTask(task.id), () => toast({ message: `Approved: ${task.title}` }));
+      const who = assigneeName(task.assignee)?.split(" ")[0];
+      run(
+        { kind: "status", id: task.id, status: "DONE" },
+        () => approveTask(task.id),
+        ({ approvedEventId, emailsContractor }) => {
+          // The other partner got there first: it is Done, which is what was asked, and there is nothing of ours to undo.
+          if (!approvedEventId) return;
+          const back: ListPatch = { kind: "restore", task: { ...task, status: "REVIEW", checked: false } };
+          toast({
+            message: "Approved",
+            // Only when it is true: the contractor has a login and the email waits ten minutes, so Undo is honest.
+            ...(emailsContractor && who ? { detail: `${who} gets an email` } : {}),
+            action: { label: "Undo", onAction: () => run(back, () => undoApprove(task.id, approvedEventId)) },
+          });
+        },
+      );
     },
     sendBack(task, note) {
       const who = assigneeName(task.assignee)?.split(" ")[0];

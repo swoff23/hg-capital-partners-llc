@@ -4,7 +4,7 @@ import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates
 import { firstName } from "@/lib/names";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
-import { hasPinnedDay, isUntouchedCopy, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, type RepeatRule } from "./repeat";
+import { hasPinnedDay, isUntouchedCopy, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
 import { copySlot } from "./repeat-slot";
 import {
   BUNDLE_MAX_MS,
@@ -13,6 +13,7 @@ import {
   notifyAudience,
   statusEventVisibility,
   targetDate,
+  targetIsVisit,
   writeAudience,
   type NotifyChange,
   type PrincipalKind,
@@ -175,7 +176,22 @@ export interface OutboxItem {
   actorLabel: string;
   summary: string;
   at: string;
+  /**
+   * The event this line is about (a comment, a file post, a status change).
+   * The drain (notifications/outbox.ts) re-reads it when the row is claimed,
+   * so an edit or a delete inside the bundle window changes the email
+   * (activity 2.5). Optional: rows queued before it send as stored, and a row
+   * can mix both.
+   */
+  eventId?: string;
+  /** A send-back's note: the note comment's id. Its text sits inside the STATUS summary, so the drain rebuilds or strips it. */
+  noteEventId?: string;
+  /** TARGET: the date that moved is the booked visit, not the due date ("moved the visit to Fri, Oct 30"). */
+  visit?: boolean;
 }
+
+/** What a line carries beside its summary (OutboxItem's optional fields). */
+type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit">;
 
 type NotifyTask = Pick<Task, "id" | "assigneeContactId">;
 
@@ -227,18 +243,31 @@ async function enqueue(
       "sendAfter" = LEAST("NotificationOutbox"."firstAt" + ${BUNDLE_MAX_MS} * interval '1 millisecond', ${quietUntil})`;
 }
 
-/** Route one change to whoever should hear about it (rules.ts notifyAudience). */
-async function notify(tx: Tx, task: NotifyTask, p: Principal, change: NotifyChange, summary: string, now: Date): Promise<void> {
+/**
+ * Route one change to whoever should hear about it (rules.ts notifyAudience).
+ * Says who it was queued for, so a caller can tell the person what happens
+ * next ("Zack gets an email"): null when nobody hears.
+ */
+async function notify(
+  tx: Tx,
+  task: NotifyTask,
+  p: Principal,
+  change: NotifyChange,
+  summary: string,
+  now: Date,
+  refs: ItemRefs = {},
+): Promise<"contractor" | "staff" | null> {
   const hasLogin = await contractorHasLogin(tx, task.assigneeContactId);
   const audience = notifyAudience(kindOf(p), change, { contractorHasLogin: hasLogin });
-  if (!audience) return;
-  const item: OutboxItem = { kind: change.kind, actorLabel: p.label, summary, at: now.toISOString() };
+  if (!audience) return null;
+  const item: OutboxItem = { kind: change.kind, actorLabel: p.label, summary, at: now.toISOString(), ...refs };
   if (audience === "contractor" && task.assigneeContactId) {
     await enqueue(tx, { contactId: task.assigneeContactId }, task.id, item, now);
   } else if (audience === "staff") {
     const staff = await tx.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true } });
     for (const s of staff) await enqueue(tx, { userId: s.id }, task.id, item, now);
   }
+  return audience;
 }
 
 // ---------------------------------------------------------------------------
@@ -367,8 +396,14 @@ export interface StatusOptions {
   waitingOn?: string | null;
   /** The visit date for SCHEDULED; keeps the existing one when omitted. */
   scheduledFor?: Ymd | null;
-  /** A shared note to the contractor, e.g. why a job was sent back from Review. */
+  /** A shared note to the contractor, e.g. why a job was sent back from Review; a contractor's Mark done note. */
   note?: string | null;
+  /**
+   * Files already recorded for the change's note: a contractor's Mark done
+   * photos. They are linked to the note comment the way addComment links
+   * them, and a note that is only photos is still written.
+   */
+  attachmentIds?: string[];
   /**
    * The status the caller's screen showed. When the task has moved on since,
    * nothing changes and TaskChangedError says who moved it.
@@ -382,6 +417,22 @@ export interface StatusResult {
   nextTaskId: string | null;
   /** That copy's due date, for "Done. Next due Nov 5". */
   nextDue: Ymd | null;
+  /** The STATUS line this change wrote (Approve's Undo names it). */
+  statusEventId: string;
+  /** The note comment written with it, whose `data.statusEventId` names the status: Activity shows the two as one decision. Null with no note and no files. */
+  noteEventId: string | null;
+  /** The change queued an email to the assigned contractor, so the toast can say "Zack gets an email". */
+  emailsContractor: boolean;
+}
+
+/** The refusal for a change from a stale screen: whoever moved the task to where it is now, not a later change that didn't. */
+async function taskChanged(tx: Tx, taskId: string, current: TaskStatus): Promise<TaskChangedError> {
+  const last = await tx.taskEvent.findFirst({
+    where: { taskId, kind: "STATUS", deletedAt: null, data: { path: ["to"], equals: current } },
+    orderBy: { createdAt: "desc" },
+    select: { actorLabel: true },
+  });
+  return new TaskChangedError(current, firstName(last?.actorLabel));
 }
 
 export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Principal, opts: StatusOptions = {}, now = new Date()): Promise<StatusResult> {
@@ -394,15 +445,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
-  if (opts.expected && before.status !== opts.expected) {
-    // Whoever moved it to where it is now, not a later change that didn't.
-    const last = await tx.taskEvent.findFirst({
-      where: { taskId, kind: "STATUS", data: { path: ["to"], equals: before.status } },
-      orderBy: { createdAt: "desc" },
-      select: { actorLabel: true },
-    });
-    throw new TaskChangedError(before.status, firstName(last?.actorLabel));
-  }
+  if (opts.expected && before.status !== opts.expected) throw await taskChanged(tx, taskId, before.status);
   if (!canSetStatus(kindOf(p), before.status, to)) {
     throw new TaskRuleError(p.kind === "contractor" ? "You can start a job or mark it done." : "That status change isn't allowed.");
   }
@@ -435,17 +478,39 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
 
   const visibility = statusEventVisibility(to, !!task.assigneeContactId);
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
-  await addEvent(tx, taskId, p, {
+  const statusEvent = await addEvent(tx, taskId, p, {
     kind: "STATUS",
     visibility,
     audienceContactId,
     data: { from: before.status, to, ...(waitingOn ? { waitingOn } : {}), ...(to === "SCHEDULED" ? { scheduledFor: toYmd(scheduledFor) } : {}) },
   });
+  // The note (and any photos) is its own comment, tied to the status by id so Activity shows the two as one decision.
   const note = opts.note?.trim();
-  if (note) await addEvent(tx, taskId, p, { kind: "COMMENT", visibility: "SHARED", body: note, audienceContactId });
+  const noteEvent =
+    note || opts.attachmentIds?.length
+      ? await writeComment(tx, taskId, p, {
+          body: note ?? "",
+          visibility: "SHARED",
+          audienceContactId,
+          attachmentIds: opts.attachmentIds,
+          data: { statusEventId: statusEvent.id },
+          // A contractor's Mark done note has always been written just before the move to Review, and the
+          // "At finish" photo set finds it that way (tasks/media.ts latestMarkDone): a millisecond ahead keeps it.
+          ...(p.kind === "contractor" ? { createdAt: new Date(statusEvent.createdAt.getTime() - 1) } : {}),
+        })
+      : null;
 
   const summary = statusSummary({ title: task.title, from: before.status, to, actor: p.kind, note, scheduledFor }, now);
-  await notify(tx, task, p, { kind: "STATUS", visibility }, summary, now);
+  // A contractor's note is a line of its own in the partners' email, ahead of "marked it done". A partner's
+  // send-back note is already inside the status line (statusSummary), so the status line names it and the
+  // drain re-reads it; it is never listed twice.
+  if (noteEvent && p.kind === "contractor") {
+    await notify(tx, task, p, { kind: "COMMENT", visibility: "SHARED" }, commentSummary(note ?? "", noteEvent.linked), now, { eventId: noteEvent.event.id });
+  }
+  const audience = await notify(tx, task, p, { kind: "STATUS", visibility }, summary, now, {
+    eventId: statusEvent.id,
+    ...(noteEvent && p.kind !== "contractor" && note ? { noteEventId: noteEvent.event.id } : {}),
+  });
 
   if (to === "DONE" || reopening) {
     await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now);
@@ -454,7 +519,43 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const nextDue = nextTaskId ? toYmd((await tx.task.findUnique({ where: { id: nextTaskId }, select: { dueDate: true } }))?.dueDate) : null;
   // Done to Canceled isn't a reopen: the copy stays.
   if (before.status === "DONE" && isActiveStatus(to)) await takeBackRepeat(tx, taskId);
-  return { task, nextTaskId, nextDue };
+  return { task, nextTaskId, nextDue, statusEventId: statusEvent.id, noteEventId: noteEvent?.event.id ?? null, emailsContractor: audience === "contractor" };
+}
+
+/**
+ * Approve's Undo (activity 2.8): the job goes back to Review as if it had not
+ * been approved. A plain `setStatus(REVIEW)` would not do: it writes a Shared
+ * status line, so Zack is emailed "moved it to Review" and the portal shows
+ * "Connor marked it done", and it becomes the latest move to Review, so the
+ * contractor loses the late-upload hour after his own Mark done. This writes
+ * no status line of its own. It soft-deletes the Done line (the events stay
+ * in the database; the timeline hides what was undone at once, and the drain
+ * drops the approval from an email still waiting, since its item names that
+ * event), reopens the task, and takes back the next repeat copy while nobody
+ * has touched it. Staff only; refused, with who moved it, when the task is no
+ * longer Done or the approval is not the latest status line.
+ */
+export async function undoApproval(tx: Tx, taskId: string, approvedEventId: string, p: Principal, now = new Date()): Promise<{ task: Task }> {
+  if (p.kind !== "staff") throw new TaskRuleError("Only staff can undo an approval.");
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  const before = await tx.task.findUnique({ where: { id: taskId } });
+  if (!before) throw new TaskRuleError("That task no longer exists.");
+  if (before.status !== "DONE") throw await taskChanged(tx, taskId, before.status);
+  const latest = await tx.taskEvent.findFirst({
+    where: { taskId, kind: "STATUS", deletedAt: null },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, data: true },
+  });
+  const fromReview = (latest?.data as { from?: unknown } | null)?.from === "REVIEW";
+  if (!latest || latest.id !== approvedEventId || !fromReview) throw new TaskRuleError("This job changed after it was approved.");
+  const task = await tx.task.update({
+    where: { id: taskId },
+    data: { status: "REVIEW", completedAt: null, completedByUserId: null, completedByContactId: null, ...editStamp(p, now) },
+  });
+  await tx.taskEvent.update({ where: { id: approvedEventId }, data: { deletedAt: now } });
+  await logDeal(tx, task.dealId, p, `Task reopened: ${task.title}`, now);
+  await takeBackRepeat(tx, taskId);
+  return { task };
 }
 
 // ---------------------------------------------------------------------------
@@ -572,7 +673,9 @@ async function takeBackRepeat(tx: Tx, doneId: string): Promise<boolean> {
       appEditedAt: true,
       asanaId: true,
       events: { select: { kind: true } },
-      _count: { select: { attachments: true, readStates: true, checklist: { where: { done: true } } } },
+      // Read states are the contractor's "opened in the portal"; a partner opening the copy (staff read state,
+      // activity 2.6) doesn't touch it, or Undo on the Done toast would stop taking the copy back.
+      _count: { select: { attachments: true, readStates: { where: { contactId: { not: null } } }, checklist: { where: { done: true } } } },
     },
   });
   if (!copy) return false;
@@ -672,7 +775,9 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
     const d = patch.description?.trim() || null;
     if (d !== before.description) {
       data.description = d;
-      events.push({ kind: "NOTES" });
+      // The text before the save, so "View previous" can show it and Restore can put it back (activity 2.3 rule 6).
+      // "" for notes that were empty, so a stored `from` always means the event can be undone.
+      events.push({ kind: "NOTES", data: { from: before.description ?? "" } });
     }
   }
   // Setting a repeat on an undated task dates it to the first occurrence, logged like any due change.
@@ -713,7 +818,15 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
     if (!w) throw new TaskRuleError("Say what it's waiting on.");
     if (w !== before.waitingOn) data.waitingOn = w;
   }
-  if (patch.repeatRule !== undefined) data.repeatRule = patch.repeatRule ?? Prisma.DbNull;
+  if (patch.repeatRule !== undefined) {
+    data.repeatRule = patch.repeatRule ?? Prisma.DbNull;
+    // Turning repeats on, changing them or turning them off is a line of its own (activity 2.3 rule 9). Only a
+    // rule that actually changes writes one: the editors send the rule on every save. Never from createTask,
+    // createNextRepeat or the importer, which set a rule as the task is made.
+    const was = parseRepeatRule(before.repeatRule);
+    const rule = patch.repeatRule ? parseRepeatRule(patch.repeatRule) : null;
+    if (ruleKey(was) !== ruleKey(rule)) events.push({ kind: "REPEAT", data: { from: was, to: rule } });
+  }
 
   let newContactId: string | null | undefined;
   if (patch.assignee !== undefined) {
@@ -746,7 +859,10 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
     const targetAfter = toYmd(targetDate(after));
     if (targetBefore !== targetAfter) {
       const to = targetAfter ? emailDay(targetAfter, now) : "no date";
-      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now);
+      // Whether the date that moved is the booked visit, so the email says "visit" or "due date" the way the job
+      // page labels it (a cleared date is the one the job had).
+      const visit = targetIsVisit(targetAfter ? after : before);
+      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { visit });
     }
     if (events.some((e) => e.kind === "NOTES")) {
       await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now);
@@ -796,6 +912,70 @@ export interface CommentInput {
   visibility?: Visibility;
   /** Already-recorded attachments to show inside this comment. */
   attachmentIds?: string[];
+  /**
+   * Made in the browser for one send, stored on the event (`data.clientId`).
+   * A second write with the same id by the same person on the same task
+   * returns the first event and writes nothing, so a Retry after a timeout
+   * that did post never posts, or emails, twice (activity 2.7).
+   */
+  clientId?: string;
+}
+
+/** The stored email line for a comment: `"the words"` with a files tail, or `added files` for photos alone. */
+export function commentSummary(body: string, linked: number): string {
+  const photos = linked ? ` (+${linked} file${linked > 1 ? "s" : ""})` : "";
+  return `${body ? `"${body.slice(0, 140)}"` : "added files"}${photos}`;
+}
+
+/**
+ * One COMMENT and the files it carries. The files are linked only if they are
+ * this task's and nobody has posted them yet; a post that was to be files only
+ * and lost them to another post (two sends of the same held photos at once)
+ * is refused, so the losing side leaves no empty update behind and the
+ * transaction rolls back.
+ */
+async function writeComment(
+  tx: Tx,
+  taskId: string,
+  p: Principal,
+  c: {
+    body: string;
+    visibility: Visibility;
+    audienceContactId: string | null;
+    attachmentIds?: string[];
+    data?: Prisma.InputJsonValue;
+    createdAt?: Date;
+  },
+): Promise<{ event: TaskEvent; linked: number }> {
+  const event = await addEvent(tx, taskId, p, {
+    kind: "COMMENT",
+    visibility: c.visibility,
+    body: c.body || null,
+    audienceContactId: c.audienceContactId,
+    ...(c.data ? { data: c.data } : {}),
+    ...(c.createdAt ? { createdAt: c.createdAt } : {}),
+  });
+  let linked = 0;
+  if (c.attachmentIds?.length) {
+    ({ count: linked } = await tx.taskAttachment.updateMany({
+      where: { id: { in: c.attachmentIds }, taskId, eventId: null },
+      data: { eventId: event.id, visibility: c.visibility, audienceContactId: c.audienceContactId },
+    }));
+  }
+  if (!c.body && linked === 0) throw new TaskRuleError("Write something or add a photo.");
+  return { event, linked };
+}
+
+/** A comment this person already posted with this `clientId` on this task, if any. */
+async function priorSend(tx: Tx, taskId: string, p: Principal, clientId: string): Promise<TaskEvent | null> {
+  return tx.taskEvent.findFirst({
+    where: {
+      taskId,
+      kind: "COMMENT",
+      ...(p.kind === "staff" ? { actorUserId: p.userId } : p.kind === "contractor" ? { actorContactId: p.contactId } : { actorLabel: p.label }),
+      data: { path: ["clientId"], equals: clientId },
+    },
+  });
 }
 
 export async function addComment(tx: Tx, taskId: string, input: CommentInput, p: Principal, now = new Date()): Promise<TaskEvent> {
@@ -807,23 +987,131 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
     await assertContractorAccess(tx, taskId, p.contactId);
     if (!isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
   }
+  if (input.clientId) {
+    // One send at a time per task: without the lock, a Retry in flight beside the original double-posts and
+    // double-emails. NO KEY UPDATE, never FOR UPDATE: the key-share locks a comment's own inserts take would
+    // deadlock against it (40P01), as in setStatus.
+    await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+    const prior = await priorSend(tx, taskId, p, input.clientId);
+    if (prior) return prior;
+  }
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (input.visibility ?? "INTERNAL");
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
-  const event = await addEvent(tx, taskId, p, { kind: "COMMENT", visibility, body: body || null, audienceContactId });
-  let linked = 0;
+  const { event, linked } = await writeComment(tx, taskId, p, {
+    body,
+    visibility,
+    audienceContactId,
+    attachmentIds: input.attachmentIds,
+    ...(input.clientId ? { data: { clientId: input.clientId } } : {}),
+  });
+  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
+  await notify(tx, task, p, { kind: "COMMENT", visibility }, commentSummary(body, linked), now, { eventId: event.id });
+  return event;
+}
+
+// ---------------------------------------------------------------------------
+// Edit, delete and restore a comment (activity 2.5)
+// ---------------------------------------------------------------------------
+
+/** The longest comment, matching the staff and portal actions. */
+export const COMMENT_BODY_MAX = 20_000;
+
+/**
+ * Whether `p` wrote this event and may change it: staff by user, a contractor
+ * by contact. Only rows written in the app or the portal count. Imported
+ * Asana comments (a partner's carry `actorUserId` too) and system rows are
+ * never anyone's to change, so the delta sync that mirrors them and the D25
+ * re-check that keeps CSV rows stay true.
+ */
+function isCommentAuthor(e: Pick<TaskEvent, "actorUserId" | "actorContactId" | "source">, p: Principal): boolean {
+  if (e.source !== "APP" && e.source !== "PORTAL") return false;
+  if (p.kind === "staff") return e.actorUserId === p.userId;
+  if (p.kind === "contractor") return e.actorContactId === p.contactId;
+  return false;
+}
+
+/**
+ * The comment `p` is changing, locked, after the checks every change makes:
+ * it is a comment, it is theirs, and it is (`deleted: false`) or isn't
+ * (`deleted: true`) deleted. A contractor must still have access to the job.
+ * None of them recompute who sees it: visibility, audience, actor, source and
+ * createdAt are fixed when the comment is written, so an edit or an Undo
+ * can't show Zack's thread to whoever has the job now.
+ */
+async function ownComment(tx: Tx, eventId: string, p: Principal, { deleted }: { deleted: boolean | null }): Promise<TaskEvent> {
+  await tx.$executeRaw`SELECT 1 FROM "TaskEvent" WHERE "id" = ${eventId} FOR NO KEY UPDATE`;
+  const ev = await tx.taskEvent.findUnique({ where: { id: eventId } });
+  if (!ev || ev.kind !== "COMMENT") throw new TaskRuleError("That comment no longer exists.");
+  if (!isCommentAuthor(ev, p)) throw new TaskRuleError("You can only change your own comments.");
+  if (deleted === false && ev.deletedAt) throw new TaskRuleError("That comment was deleted.");
+  if (p.kind === "contractor") await assertContractorAccess(tx, ev.taskId, p.contactId);
+  return ev;
+}
+
+/**
+ * Save new text on your own comment. The card shows "edited" (`editedAt`).
+ * Nothing is emailed: the drain re-reads the comment when a row is claimed,
+ * so an edit inside the bundle window is what Zack receives, and one after it
+ * is the web page's version only. Files added with the edit take the
+ * comment's own visibility and audience. Saving the same text writes
+ * nothing; saving no text on a comment with no files is refused.
+ */
+export async function editComment(
+  tx: Tx,
+  eventId: string,
+  input: { body: string; attachmentIds?: string[] },
+  p: Principal,
+  now = new Date(),
+): Promise<TaskEvent> {
+  const body = input.body.trim();
+  if (body.length > COMMENT_BODY_MAX) throw new TaskRuleError(`Use ${COMMENT_BODY_MAX.toLocaleString("en-US")} characters or fewer.`);
+  const ev = await ownComment(tx, eventId, p, { deleted: false });
+  const kept = await tx.taskAttachment.count({ where: { eventId, deletedAt: null } });
+  let added = 0;
   if (input.attachmentIds?.length) {
-    ({ count: linked } = await tx.taskAttachment.updateMany({
-      where: { id: { in: input.attachmentIds }, taskId, eventId: null },
-      data: { eventId: event.id, visibility, audienceContactId },
+    ({ count: added } = await tx.taskAttachment.updateMany({
+      where: { id: { in: input.attachmentIds }, taskId: ev.taskId, eventId: null },
+      data: { eventId, visibility: ev.visibility, audienceContactId: ev.audienceContactId },
     }));
   }
-  // Files only, and another post took them first (two sends of the same held
-  // photos at once): refuse, so the losing side leaves no empty update behind.
-  if (!body && linked === 0) throw new TaskRuleError("Write something or add a photo.");
-  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
-  const photos = linked ? ` (+${linked} file${linked > 1 ? "s" : ""})` : "";
-  await notify(tx, task, p, { kind: "COMMENT", visibility }, `${body ? `"${body.slice(0, 140)}"` : "added files"}${photos}`, now);
-  return event;
+  if (!body && kept + added === 0) throw new TaskRuleError("Add some text, or delete the comment.");
+  if (body === (ev.body ?? "") && added === 0) return ev;
+  const updated = await tx.taskEvent.update({ where: { id: eventId }, data: { body: body || null, editedAt: now } });
+  await tx.task.update({ where: { id: ev.taskId }, data: editStamp(p, now) });
+  return updated;
+}
+
+/**
+ * Delete your own comment, softly: `deletedAt` is set, the card becomes a
+ * staff-only line, and the files it carries go with it, stamped with the
+ * event's exact `deletedAt` and still pointing at it, so Undo can bring back
+ * those files and never one a person took off earlier. The portal's file
+ * checks read only the file's own `deletedAt`, which is why they are marked
+ * here and not hidden by the comment alone. Never a hard delete: an imported
+ * comment would come back with the next Asana delta, and Undo needs the rows.
+ * The drain drops the comment from any email still waiting.
+ */
+export async function deleteComment(tx: Tx, eventId: string, p: Principal, now = new Date()): Promise<{ taskId: string; deletedAt: Date }> {
+  const ev = await ownComment(tx, eventId, p, { deleted: false });
+  await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: now } });
+  // The files that are still up. A file a person took off earlier keeps its own stamp.
+  await tx.taskAttachment.updateMany({ where: { eventId, deletedAt: null }, data: { deletedAt: now } });
+  await tx.task.update({ where: { id: ev.taskId }, data: editStamp(p, now) });
+  return { taskId: ev.taskId, deletedAt: now };
+}
+
+/**
+ * Undo a delete: the comment comes back, with the files that went with it
+ * (the ones stamped with its exact `deletedAt`). A comment that is back
+ * already (a second Undo, another tab) is left as it is.
+ */
+export async function restoreComment(tx: Tx, eventId: string, p: Principal, now = new Date()): Promise<{ taskId: string }> {
+  const ev = await ownComment(tx, eventId, p, { deleted: null });
+  if (!ev.deletedAt) return { taskId: ev.taskId };
+  await tx.taskAttachment.updateMany({ where: { eventId, deletedAt: ev.deletedAt }, data: { deletedAt: null } });
+  await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: null } });
+  await tx.task.update({ where: { id: ev.taskId }, data: editStamp(p, now) });
+  return { taskId: ev.taskId };
 }
 
 export interface AttachmentMeta {
@@ -888,13 +1176,16 @@ export async function recordAttachment(
       data: { attachmentId: att.id, filename: att.filename },
     });
     await tx.taskAttachment.update({ where: { id: att.id }, data: { eventId: ev.id } });
-    await notify(tx, task, p, { kind: "ATTACHMENT", visibility }, `added ${att.filename}`, now);
+    await notify(tx, task, p, { kind: "ATTACHMENT", visibility }, `added ${att.filename}`, now, { eventId: ev.id });
   }
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
   return att;
 }
 
 export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p: Principal, now = new Date()) {
+  // Locked before it is read, as rename and remove lock it: a tick that lands beside a Remove waits, then finds the
+  // item gone and says so, instead of failing on a row that vanished between the read and the write (P2025).
+  await lockChecklistItem(tx, itemId);
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { id: true, status: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   if (p.kind === "contractor") {

@@ -47,7 +47,8 @@ const statusOptsSchema = z
   .object({
     waitingOn: z.string().max(300).nullable(),
     scheduledFor: ymd.nullable(),
-    note: z.string().max(5000).nullable(),
+    // Send back's note: 2,000 characters, the same on the banner, Today's rows and both servers (forms 4.4).
+    note: z.string().max(2000).nullable(),
     // The status the page showed: a change from a stale page is refused.
     expected: statusSchema,
   })
@@ -71,6 +72,8 @@ const commentSchema = z
     body: z.string().max(20_000),
     visibility: z.enum(["SHARED", "INTERNAL"]),
     attachmentIds: z.array(id).max(50).default([]),
+    // Made in the browser per send, so a Retry that follows a post that did land writes nothing twice.
+    clientId: z.string().min(1).max(100).optional(),
   })
   .strict();
 
@@ -78,6 +81,30 @@ export async function addTaskComment(taskId: string, input: z.input<typeof comme
   return withResult("addTaskComment", async () => {
     const user = await requireUser();
     await tasks.addTaskComment(id.parse(taskId), commentSchema.parse(input), tasks.staffPrincipal(user));
+  });
+}
+
+/** New text on your own comment (activity 2.5). Nothing is emailed; an email still waiting sends the edited text. */
+export async function editTaskComment(eventId: string, body: string): Promise<ActionResult> {
+  return withResult("editTaskComment", async () => {
+    const user = await requireUser();
+    await tasks.editTaskComment(id.parse(eventId), z.string().max(20_000).parse(body), tasks.staffPrincipal(user));
+  });
+}
+
+/** Delete your own comment. The result names what the toast says about the email. */
+export async function deleteTaskComment(eventId: string): Promise<ActionResult<{ emailNote: string | null }>> {
+  return withResult("deleteTaskComment", async () => {
+    const user = await requireUser();
+    return tasks.deleteTaskComment(id.parse(eventId), tasks.staffPrincipal(user));
+  });
+}
+
+/** The delete toast's Undo. */
+export async function restoreTaskComment(eventId: string): Promise<ActionResult> {
+  return withResult("restoreTaskComment", async () => {
+    const user = await requireUser();
+    await tasks.restoreTaskComment(id.parse(eventId), tasks.staffPrincipal(user));
   });
 }
 

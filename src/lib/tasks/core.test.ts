@@ -6,14 +6,20 @@ import { recentAssigneeKeys } from "./assignee-people";
 import { copyOrigin } from "./repeat";
 import {
   AssigneeChangedError,
+  addComment,
   createNextRepeat,
   createTask,
+  deleteComment,
+  editComment,
   isAssignee,
   patchTask,
+  restoreComment,
+  setChecklistItem,
   setStatus,
   statusSummary,
   TaskChangedError,
   TaskRuleError,
+  undoApproval,
   type Principal,
   type Tx,
 } from "./core";
@@ -405,4 +411,425 @@ test("status email lines: Approve and the contractor's Start have their own word
     statusSummary({ ...base, from: "OPEN", to: "SCHEDULED", actor: "staff", scheduledFor: new Date("2026-10-29T00:00:00Z") }, now),
     'scheduled "Cabinet install" for Thu, Oct 29',
   );
+});
+
+// ---------------------------------------------------------------------------
+// Comments: a Retry never posts twice, edit, delete and restore (activity 2.5, 2.7)
+// ---------------------------------------------------------------------------
+
+const ZACK: Principal = { kind: "contractor", contactId: "c-zack", label: "Zack Reading" };
+const accessOk = (model: string, op: string): unknown =>
+  model === "taskAccess" && op === "findUnique" ? { revokedAt: null, contact: { active: true, portalAccount: { status: "ACTIVE" } } } : undefined;
+const created = (calls: Call[], model: string) => calls.filter((c) => c.model === model && c.op === "create");
+/** The outbox lines a run queued: the JSON each insert carried. */
+const queued = (calls: Call[]) =>
+  calls
+    .filter((c) => c.model === "$executeRaw" && c.op.includes("NotificationOutbox"))
+    .map((c) => JSON.parse((c.args as unknown[]).find((v) => typeof v === "string" && v.startsWith("{")) as string) as Record<string, unknown>);
+
+test("addComment: a second send with the same clientId returns the first and writes nothing", async () => {
+  const first = { id: "ev1", kind: "COMMENT", taskId: "t1", body: "Hello" };
+  const { tx, calls } = fakeTx({ assigneeContactId: "c-zack" }, (model, op) => (model === "taskEvent" && op === "findFirst" ? first : undefined));
+  const out = await addComment(tx, "t1", { body: "Hello", visibility: "SHARED", clientId: "send-1" }, PIETER);
+  assert.equal(out, first);
+  assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "the lock, and no event, no link, no edit stamp, no email");
+  // Locked first, with NO KEY UPDATE (FOR UPDATE would deadlock against the key-share locks of the inserts).
+  const lock = calls.find((c) => c.model === "$executeRaw")!;
+  assert.match(lock.op, /FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE/);
+  assert.doesNotMatch(lock.op, /FOR UPDATE/);
+  // Looked up by task, this person and the id the browser made.
+  const find = calls.find((c) => c.model === "taskEvent" && c.op === "findFirst")!;
+  assert.deepEqual((find.args as { where: unknown }).where, { taskId: "t1", kind: "COMMENT", actorUserId: "u-pieter", data: { path: ["clientId"], equals: "send-1" } });
+});
+
+test("addComment: a first send stores its clientId, takes the lock before the lookup, and queues the email with the event's id", async () => {
+  const { tx, calls } = fakeTx({ assigneeContactId: "c-zack" }, (model, op, args) => {
+    if (model === "taskEvent" && op === "findFirst") return null;
+    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE" };
+    if (model === "taskEvent" && op === "create") return { id: "ev9", ...args.data };
+    return undefined;
+  });
+  await addComment(tx, "t1", { body: "  Doors are in  ", visibility: "SHARED", clientId: "send-1" }, PIETER);
+  const order = calls.map((c) => `${c.model}.${c.op.startsWith("SELECT") ? "lock" : c.op.startsWith("INSERT") ? "insert" : c.op}`);
+  assert.ok(order.indexOf("$executeRaw.lock") < order.indexOf("taskEvent.findFirst"), "locked, then looked up");
+  assert.ok(order.indexOf("taskEvent.findFirst") < order.indexOf("taskEvent.create"));
+  const ev = created(calls, "taskEvent")[0].args as { data: { data: unknown; body: string; visibility: string; audienceContactId: string | null } };
+  assert.deepEqual(ev.data.data, { clientId: "send-1" });
+  assert.equal(ev.data.body, "Doors are in");
+  assert.equal(ev.data.audienceContactId, "c-zack", "addressed to the contractor assigned now");
+  const item = queued(calls)[0];
+  assert.equal(item.kind, "COMMENT");
+  assert.equal(item.eventId, "ev9");
+});
+
+test("addComment: no clientId takes no lock (the importer and old callers are unchanged)", async () => {
+  const { tx, calls } = fakeTx({});
+  await addComment(tx, "t1", { body: "Hello", visibility: "INTERNAL" }, PIETER);
+  assert.ok(!calls.some((c) => c.model === "$executeRaw"));
+  assert.ok(!calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"));
+  assert.deepEqual((created(calls, "taskEvent")[0].args as { data: { data: unknown } }).data.data, {});
+});
+
+test("addComment: a contractor is refused on a closed job or without access before any lock", async () => {
+  const closed = fakeTx({ status: "DONE" }, accessOk);
+  await assert.rejects(addComment(closed.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /closed/);
+  assert.ok(!closed.calls.some((c) => c.model === "$executeRaw"));
+  const noAccess = fakeTx({ status: "OPEN" });
+  await assert.rejects(addComment(noAccess.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /don't have access/);
+  assert.ok(!noAccess.calls.some((c) => c.model === "$executeRaw"));
+});
+
+test("addComment: a contractor's comment is always Shared, found by their contact", async () => {
+  const { tx, calls } = fakeTx({ status: "OPEN" }, (model, op, args) => {
+    if (model === "taskEvent" && op === "findFirst") return null;
+    return accessOk(model, op) ?? (model === "taskEvent" && op === "create" ? { id: "ev1", ...args.data } : undefined);
+  });
+  await addComment(tx, "t1", { body: "On my way", visibility: "INTERNAL", clientId: "c1" }, ZACK);
+  const find = calls.find((c) => c.model === "taskEvent" && c.op === "findFirst")!;
+  assert.deepEqual((find.args as { where: { actorContactId: string } }).where.actorContactId, "c-zack");
+  assert.equal((created(calls, "taskEvent")[0].args as { data: { visibility: string } }).data.visibility, "SHARED");
+});
+
+test("addComment keeps its link guard: only this task's files nobody has posted, and a files-only post that lost them is refused", async () => {
+  const { tx, calls } = fakeTx({}, (model, op) => (model === "taskAttachment" && op === "updateMany" ? { count: 0 } : undefined));
+  await assert.rejects(addComment(tx, "t1", { body: "", visibility: "SHARED", attachmentIds: ["a1", "a2"] }, PIETER), /Write something or add a photo/);
+  const link = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!;
+  assert.deepEqual((link.args as { where: unknown }).where, { id: { in: ["a1", "a2"] }, taskId: "t1", eventId: null });
+  assert.ok(!calls.some((c) => c.model === "task" && c.op === "update"), "refused before the edit stamp, so the transaction rolls back");
+});
+
+const MINE = { id: "ev1", taskId: "t1", kind: "COMMENT", visibility: "SHARED", audienceContactId: "c-zack", actorUserId: "u-pieter", actorContactId: null, source: "APP", body: "Original", deletedAt: null };
+/** A fake transaction that holds one comment. */
+const withComment = (over: Record<string, unknown> = {}, more?: Answer) =>
+  fakeTx({}, (model, op, args) => {
+    if (model === "taskEvent" && op === "findUnique") return { ...MINE, ...over };
+    if (model === "taskEvent" && op === "update") return { ...MINE, ...over, ...args.data };
+    return more?.(model, op, args) ?? accessOk(model, op);
+  });
+
+test("editComment: writes the words and editedAt and nothing else about the comment", async () => {
+  const now = new Date("2026-10-23T15:00:00Z");
+  const { tx, calls } = withComment({}, (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined));
+  const out = await editComment(tx, "ev1", { body: "  Better words " }, PIETER, now);
+  assert.equal(out.body, "Better words");
+  const update = calls.find((c) => c.model === "taskEvent" && c.op === "update")!;
+  // Never visibility, the audience, the actor, the source or the time it was written: those are fixed when it is.
+  assert.deepEqual(update.args, { where: { id: "ev1" }, data: { body: "Better words", editedAt: now } });
+  // Locked first; no email is queued (the drain re-reads).
+  assert.match(calls[0].op, /"TaskEvent" WHERE "id" = \? FOR NO KEY UPDATE/);
+  assert.ok(!calls.some((c) => c.op.includes("NotificationOutbox")));
+});
+
+test("editComment: the same text writes nothing; empty text with no files is refused", async () => {
+  const same = withComment({}, (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined));
+  await editComment(same.tx, "ev1", { body: "Original " }, PIETER);
+  assert.deepEqual(writes(same.calls).map((c) => c.model), ["$executeRaw"]);
+  const empty = withComment({}, (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined));
+  await assert.rejects(editComment(empty.tx, "ev1", { body: "   " }, PIETER), /Add some text, or delete the comment/);
+  // A comment that still has a file may lose its words.
+  const files = withComment({}, (m, op) => (m === "taskAttachment" && op === "count" ? 2 : undefined));
+  assert.equal((await editComment(files.tx, "ev1", { body: "" }, PIETER)).body, null);
+  await assert.rejects(editComment(files.tx, "ev1", { body: "x".repeat(20_001) }, PIETER), /20,000/);
+});
+
+test("editComment: files added with the edit take the comment's own visibility and audience", async () => {
+  const { tx, calls } = withComment({ visibility: "INTERNAL", audienceContactId: null }, (m, op) => (m === "taskAttachment" && op === "count" ? 0 : m === "taskAttachment" && op === "updateMany" ? { count: 1 } : undefined));
+  await editComment(tx, "ev1", { body: "With a file", attachmentIds: ["a1"] }, PIETER);
+  const link = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!;
+  assert.deepEqual(link.args, { where: { id: { in: ["a1"] }, taskId: "t1", eventId: null }, data: { eventId: "ev1", visibility: "INTERNAL", audienceContactId: null } });
+});
+
+test("edit, delete and restore are for the author only, on app and portal comments, never imported ones", async () => {
+  const count: Answer = (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined);
+  const other = { actorUserId: "u-connor" };
+  await assert.rejects(editComment(withComment(other, count).tx, "ev1", { body: "x" }, PIETER), /your own comments/);
+  await assert.rejects(deleteComment(withComment(other).tx, "ev1", PIETER), /your own comments/);
+  await assert.rejects(restoreComment(withComment({ ...other, deletedAt: new Date() }).tx, "ev1", PIETER), /your own comments/);
+  // A partner's mapped Asana comment carries actorUserId too, but it is imported history.
+  const imported = { source: "ASANA", asanaStoryGid: "s1" };
+  await assert.rejects(editComment(withComment(imported, count).tx, "ev1", { body: "x" }, PIETER), /your own comments/);
+  await assert.rejects(deleteComment(withComment(imported).tx, "ev1", PIETER), /your own comments/);
+  // Not a comment, not there, already deleted.
+  await assert.rejects(editComment(withComment({ kind: "STATUS" }, count).tx, "ev1", { body: "x" }, PIETER), /no longer exists/);
+  await assert.rejects(deleteComment(fakeTx({}).tx, "ev1", PIETER), /no longer exists/);
+  await assert.rejects(editComment(withComment({ deletedAt: new Date() }, count).tx, "ev1", { body: "x" }, PIETER), /was deleted/);
+  await assert.rejects(deleteComment(withComment({ deletedAt: new Date() }).tx, "ev1", PIETER), /your own comments|deleted/);
+});
+
+test("a contractor changes only their own comment, and only with live access", async () => {
+  const mine = { actorUserId: null, actorContactId: "c-zack", source: "PORTAL" };
+  const ok = withComment(mine, (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined));
+  assert.equal((await editComment(ok.tx, "ev1", { body: "Edited" }, ZACK)).body, "Edited");
+  const other = withComment({ ...mine, actorContactId: "c-jose" });
+  await assert.rejects(deleteComment(other.tx, "ev1", ZACK), /your own comments/);
+  const revoked = fakeTx({}, (model, op, args) => {
+    if (model === "taskEvent" && op === "findUnique") return { ...MINE, ...mine };
+    if (model === "taskAccess" && op === "findUnique") return { revokedAt: new Date(), contact: { active: true, portalAccount: { status: "ACTIVE" } } };
+    return args && undefined;
+  });
+  await assert.rejects(deleteComment(revoked.tx, "ev1", ZACK), /don't have access/);
+});
+
+test("deleteComment: a soft delete that takes its files along at the same instant, keeping their link", async () => {
+  const now = new Date("2026-10-23T15:00:00Z");
+  const { tx, calls } = withComment();
+  const out = await deleteComment(tx, "ev1", PIETER, now);
+  assert.deepEqual(out, { taskId: "t1", deletedAt: now });
+  assert.ok(!calls.some((c) => c.op === "delete" || c.op === "deleteMany"), "never a hard delete: an imported comment would come back with the next delta");
+  assert.deepEqual(calls.find((c) => c.model === "taskEvent" && c.op === "update")!.args, { where: { id: "ev1" }, data: { deletedAt: now } });
+  // Only files still up; one a person removed earlier keeps its own stamp. They keep eventId.
+  const files = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!;
+  assert.deepEqual(files.args, { where: { eventId: "ev1", deletedAt: null }, data: { deletedAt: now } });
+  assert.ok(!calls.some((c) => c.op.includes("NotificationOutbox")), "the drain drops it; no row is touched");
+});
+
+test("restoreComment: the comment and the files that went with it come back, and nothing else", async () => {
+  const gone = new Date("2026-10-23T15:00:00Z");
+  const { tx, calls } = withComment({ deletedAt: gone });
+  await restoreComment(tx, "ev1", PIETER, new Date("2026-10-23T15:00:04Z"));
+  const files = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!;
+  assert.deepEqual(files.args, { where: { eventId: "ev1", deletedAt: gone }, data: { deletedAt: null } }, "only those the delete stamped, never an earlier removal");
+  assert.deepEqual(calls.find((c) => c.model === "taskEvent" && c.op === "update")!.args, { where: { id: "ev1" }, data: { deletedAt: null } });
+  // It is not recomputed: no visibility, audience, actor, source or createdAt anywhere in the writes.
+  const written = JSON.stringify(writes(calls).filter((c) => c.model !== "$executeRaw").map((c) => c.args));
+  assert.doesNotMatch(written, /visibility|audienceContactId|actorUserId|source|createdAt/);
+  // A comment that is back already is left as it is.
+  const back = withComment();
+  await restoreComment(back.tx, "ev1", PIETER);
+  assert.deepEqual(writes(back.calls).map((c) => c.model), ["$executeRaw"]);
+});
+
+// ---------------------------------------------------------------------------
+// Decisions: the note rides with its status (activity 2.2 d)
+// ---------------------------------------------------------------------------
+
+test("setStatus: Send back writes the status, then the note tied to it, and the email names the note inside the status line", async () => {
+  const { tx, calls } = fakeTx({ status: "REVIEW", assigneeContactId: "c-zack", title: "Cabinet install" }, (model, op, args) => {
+    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE" };
+    if (model === "taskEvent" && op === "create") return { id: (args.data as { kind: string }).kind === "STATUS" ? "s1" : "n1", ...args.data };
+    return undefined;
+  });
+  const out = await setStatus(tx, "t1", "IN_PROGRESS", PIETER, { note: "  Level the uppers ", expected: "REVIEW" });
+  assert.equal(out.statusEventId, "s1");
+  assert.equal(out.noteEventId, "n1");
+  const [status, note] = created(calls, "taskEvent").map((c) => (c.args as { data: Record<string, unknown> }).data);
+  assert.equal(status.kind, "STATUS");
+  assert.equal(note.kind, "COMMENT");
+  assert.equal(note.body, "Level the uppers");
+  assert.equal(note.visibility, "SHARED");
+  assert.deepEqual(note.data, { statusEventId: "s1" }, "paired by id, never by adjacency");
+  assert.equal(note.audienceContactId, "c-zack");
+  // One email line: the status, with the note's id so an edit or a delete reaches it. No second comment line.
+  const items = queued(calls);
+  assert.equal(items.length, 1);
+  assert.deepEqual(items[0], { kind: "STATUS", actorLabel: "Pieter Louw", summary: 'sent "Cabinet install" back: Level the uppers', at: items[0].at, eventId: "s1", noteEventId: "n1" });
+});
+
+test("setStatus: a move with no note writes no comment and no note id", async () => {
+  const { tx, calls } = fakeTx({ status: "REVIEW" });
+  const out = await setStatus(tx, "t1", "IN_PROGRESS", PIETER, { expected: "REVIEW" });
+  assert.equal(out.noteEventId, null);
+  assert.equal(created(calls, "taskEvent").length, 1);
+});
+
+test("setStatus: a contractor's Mark done posts the note and photos as a comment tied to the status, even with photos only", async () => {
+  const now = new Date("2026-10-23T15:00:00Z");
+  const statusAt = new Date("2026-10-23T15:00:00.500Z");
+  const { tx, calls } = fakeTx({ status: "IN_PROGRESS", assigneeContactId: "c-zack", title: "Fix steps" }, (model, op, args) => {
+    if (model === "taskAccess" && op === "findUnique") return accessOk(model, op);
+    if (model === "user" && op === "findMany") return [{ id: "u-connor" }];
+    if (model === "taskAttachment" && op === "updateMany") return { count: 2 };
+    if (model === "taskEvent" && op === "create") {
+      const kind = (args.data as { kind: string }).kind;
+      return { id: kind === "STATUS" ? "s1" : "n1", createdAt: statusAt, ...args.data };
+    }
+    return undefined;
+  });
+  const out = await setStatus(tx, "t1", "REVIEW", ZACK, { attachmentIds: ["a1", "a2"] }, now);
+  assert.equal(out.noteEventId, "n1");
+  const [, note] = created(calls, "taskEvent").map((c) => (c.args as { data: Record<string, unknown> }).data);
+  assert.equal(note.body, null, "photos only");
+  assert.deepEqual(note.data, { statusEventId: "s1" });
+  assert.equal((note.createdAt as Date).getTime(), statusAt.getTime() - 1, "written a moment before the move to Review, as the finish set expects");
+  assert.equal(note.audienceContactId, null);
+  const link = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!;
+  assert.deepEqual(link.args, { where: { id: { in: ["a1", "a2"] }, taskId: "t1", eventId: null }, data: { eventId: "n1", visibility: "SHARED", audienceContactId: null } });
+  // Each partner is told the note, then that the job is done; the subject stays "Zack marked ... done".
+  const items = queued(calls);
+  assert.deepEqual(items.slice(0, 2).map((i) => [i.kind, i.summary, i.eventId]), [
+    ["COMMENT", "added files (+2 files)", "n1"],
+    ["STATUS", 'marked "Fix steps" done', "s1"],
+  ]);
+});
+
+test("setStatus: a Mark done whose photos were taken by another post is refused as a whole", async () => {
+  const { tx } = fakeTx({ status: "IN_PROGRESS", assigneeContactId: "c-zack" }, (model, op, args) => {
+    if (model === "taskAccess") return accessOk(model, op);
+    if (model === "taskAttachment" && op === "updateMany") return { count: 0 };
+    if (model === "taskEvent" && op === "create") return { id: "s1", createdAt: new Date(), ...args.data };
+    return undefined;
+  });
+  await assert.rejects(setStatus(tx, "t1", "REVIEW", ZACK, { attachmentIds: ["a1"] }), /Write something or add a photo/);
+});
+
+test("setStatus: a stale change credits whoever moved it there, not an approval that was taken back", async () => {
+  const { tx, calls } = fakeTx({ status: "DONE" });
+  await assert.rejects(setStatus(tx, "t1", "OPEN", PIETER, { expected: "REVIEW" }), TaskChangedError);
+  const find = calls.find((c) => c.model === "taskEvent" && c.op === "findFirst")!;
+  assert.deepEqual((find.args as { where: unknown }).where, { taskId: "t1", kind: "STATUS", deletedAt: null, data: { path: ["to"], equals: "DONE" } });
+});
+
+// ---------------------------------------------------------------------------
+// Approve's Undo
+// ---------------------------------------------------------------------------
+
+test("undoApproval: back to Review as if never approved, writing no status line and no email", async () => {
+  const now = new Date("2026-10-23T15:00:00Z");
+  const { tx, calls } = fakeTx({ status: "DONE", dealId: "d1", completedAt: now }, (model, op, args) => {
+    if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS") return { id: "s9", data: { from: "REVIEW", to: "DONE" } };
+    return undefined;
+  });
+  await undoApproval(tx, "t1", "s9", PIETER, now);
+  assert.match(calls[0].op, /FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE/);
+  const update = calls.find((c) => c.model === "task" && c.op === "update")!;
+  const data = (update.args as { data: Record<string, unknown> }).data;
+  assert.equal(data.status, "REVIEW");
+  assert.equal(data.completedAt, null);
+  assert.equal(data.completedByUserId, null);
+  // The Done line is soft-deleted, so the timeline hides it and the drain drops the queued approval.
+  assert.deepEqual(calls.find((c) => c.model === "taskEvent" && c.op === "update")!.args, { where: { id: "s9" }, data: { deletedAt: now } });
+  // No status line, so Zack isn't told it moved to Review and his late-upload hour (the latest move to Review) is untouched.
+  assert.ok(!created(calls, "taskEvent").some((c) => (c.args as { data: { kind: string } }).data.kind === "STATUS"));
+  assert.ok(!calls.some((c) => c.op.includes("NotificationOutbox")));
+  // The deal hears it was reopened, as any reopen says.
+  assert.ok(created(calls, "dealNote").length === 1);
+});
+
+test("undoApproval: refused when the job moved on, when the approval isn't the latest status line, or by a contractor", async () => {
+  await assert.rejects(undoApproval(fakeTx({ status: "IN_PROGRESS" }).tx, "t1", "s9", PIETER), (e: unknown) => e instanceof TaskChangedError && e.current === "IN_PROGRESS");
+  const later = fakeTx({ status: "DONE" }, (m, op, args) => (m === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS" ? { id: "s10", data: { from: "REVIEW", to: "DONE" } } : undefined));
+  await assert.rejects(undoApproval(later.tx, "t1", "s9", PIETER), /changed after it was approved/);
+  const notApproval = fakeTx({ status: "DONE" }, (m, op, args) => (m === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS" ? { id: "s9", data: { from: "OPEN", to: "DONE" } } : undefined));
+  await assert.rejects(undoApproval(notApproval.tx, "t1", "s9", PIETER), /changed after it was approved/);
+  await assert.rejects(undoApproval(fakeTx({ status: "DONE" }).tx, "t1", "s9", ZACK), /Only staff/);
+  const none = fakeTx({ status: "DONE" }, (m, op, args) => (m === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS" ? null : undefined));
+  await assert.rejects(undoApproval(none.tx, "t1", "s9", PIETER), TaskRuleError);
+});
+
+test("undoApproval takes the next repeat copy back through the same rule as a reopen", async () => {
+  const copy = { status: "OPEN", appEditedAt: null, asanaId: null, events: [{ kind: "CREATED" }], _count: { attachments: 0, readStates: 0, checklist: 0 } };
+  const { tx, calls } = fakeTx({ status: "DONE", repeatRule: MONTHLY_5, repeatSeriesId: "s1" }, (model, op, args) => {
+    if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS") return { id: "s9", data: { from: "REVIEW", to: "DONE" } };
+    if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "REPEAT_CREATED") return { id: "r1", data: { next: "t2", due: "2026-11-05" } };
+    if (model === "task" && op === "findUnique" && args.where?.id === "t2") return args.select?.status ? copy : { id: "t2" };
+    if (model === "$queryRaw" && op.includes('FROM "Task"')) return [{ id: "t2" }];
+    return undefined;
+  });
+  await undoApproval(tx, "t1", "s9", PIETER);
+  const deleted = calls.filter((c) => c.op === "delete").map((c) => `${c.model}:${(c.args as { where: { id: string } }).where.id}`);
+  assert.deepEqual(deleted, ["task:t2", "taskEvent:r1"]);
+});
+
+test("takeBackRepeat: a partner opening the copy doesn't keep it; only the contractor's reads count", async () => {
+  const { tx, calls } = fakeTx({ status: "DONE", repeatRule: MONTHLY_5, repeatSeriesId: "s1" }, (model, op, args) => {
+    if (model === "taskEvent" && op === "findFirst") return { id: "e1", data: { next: "t2", due: "2026-11-05" } };
+    if (model === "task" && op === "findUnique" && args.where?.id === "t2") {
+      return args.select?.status ? { status: "OPEN", appEditedAt: null, asanaId: null, events: [{ kind: "CREATED" }], _count: { attachments: 0, readStates: 0, checklist: 0 } } : { id: "t2" };
+    }
+    if (model === "$queryRaw" && op.includes('FROM "Task"')) return [{ id: "t2" }];
+    return undefined;
+  });
+  await setStatus(tx, "t1", "OPEN", PIETER, { expected: "DONE" }, new Date("2026-10-23T15:00:00Z"));
+  const read = calls.find((c) => c.model === "task" && c.op === "findUnique" && (c.args as CallArgs).select?.status)!;
+  const count = ((read.args as CallArgs).select as { _count: { select: { readStates: unknown } } })._count.select.readStates;
+  assert.deepEqual(count, { where: { contactId: { not: null } } });
+});
+
+// ---------------------------------------------------------------------------
+// Edits that leave a trail: notes, repeats and the date the contractor sees
+// ---------------------------------------------------------------------------
+
+const events = (calls: Call[]) =>
+  created(calls, "taskEvent").map((c) => {
+    const { kind, data, visibility } = (c.args as { data: { kind: string; data: unknown; visibility: string } }).data;
+    return { kind, data, visibility };
+  });
+
+test("patchTask: notes keep the text from before the save, empty when there was none", async () => {
+  const withText = fakeTx({ description: "Use the side door" });
+  await patchTask(withText.tx, "t1", { description: "Use the back door" }, PIETER);
+  assert.deepEqual(events(withText.calls).filter((e) => e.kind === "NOTES").map((e) => e.data), [{ from: "Use the side door" }]);
+  const empty = fakeTx({ description: null });
+  await patchTask(empty.tx, "t1", { description: "First notes" }, PIETER);
+  assert.deepEqual(events(empty.calls).filter((e) => e.kind === "NOTES").map((e) => e.data), [{ from: "" }]);
+});
+
+test("patchTask: turning repeats on, changing and turning them off each write a REPEAT line; a save that changes nothing writes none", async () => {
+  const weekly = { freq: "weeks", interval: 1 };
+  const on = fakeTx({ repeatRule: null, dueDate: day("2026-10-30") });
+  await patchTask(on.tx, "t1", { repeatRule: weekly as never }, PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.deepEqual(events(on.calls).filter((e) => e.kind === "REPEAT"), [{ kind: "REPEAT", data: { from: null, to: { freq: "weeks", interval: 1 } }, visibility: "INTERNAL" }]);
+
+  const change = fakeTx({ repeatRule: weekly, dueDate: day("2026-10-30") });
+  await patchTask(change.tx, "t1", { repeatRule: { freq: "weeks", interval: 2 } as never }, PIETER);
+  assert.deepEqual(events(change.calls).filter((e) => e.kind === "REPEAT").map((e) => e.data), [{ from: { freq: "weeks", interval: 1 }, to: { freq: "weeks", interval: 2 } }]);
+
+  const off = fakeTx({ repeatRule: weekly, dueDate: day("2026-10-30") });
+  await patchTask(off.tx, "t1", { repeatRule: null }, PIETER);
+  assert.deepEqual(events(off.calls).filter((e) => e.kind === "REPEAT").map((e) => e.data), [{ from: { freq: "weeks", interval: 1 }, to: null }]);
+
+  // The editors send the rule on every save: unchanged writes the column, and no line.
+  const same = fakeTx({ repeatRule: weekly, dueDate: day("2026-10-30") });
+  await patchTask(same.tx, "t1", { repeatRule: { freq: "weeks", interval: 1 } as never }, PIETER);
+  assert.equal(events(same.calls).filter((e) => e.kind === "REPEAT").length, 0);
+  assert.ok(same.calls.some((c) => c.model === "task" && c.op === "update"));
+  // Off to off is nothing either.
+  const nothing = fakeTx({ repeatRule: null });
+  await patchTask(nothing.tx, "t1", { repeatRule: null }, PIETER);
+  assert.equal(events(nothing.calls).filter((e) => e.kind === "REPEAT").length, 0);
+});
+
+test("REPEAT is written only from patchTask, never as a task is made or its next copy", async () => {
+  const made = fakeTx({}, makesCopy);
+  await createTask(made.tx, { title: "Check taxes", repeatRule: MONTHLY_5 as never }, PIETER);
+  await createNextRepeat(made.tx, finished({ dueDate: day("2026-07-05") }), PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.ok(!events(made.calls).some((e) => e.kind === "REPEAT"));
+});
+
+test("patchTask: the email for a moved date says whether it is the visit or the due date", async () => {
+  const hasLogin: Answer = (model, op) => (model === "portalAccount" && op === "findUnique" ? { status: "ACTIVE" } : undefined);
+  // Scheduled: the date the contractor sees is the booked visit.
+  const visit = fakeTx({ status: "SCHEDULED", assigneeContactId: "c-zack", scheduledFor: day("2026-10-29"), dueDate: day("2026-11-10") }, hasLogin);
+  await patchTask(visit.tx, "t1", { scheduledFor: "2026-10-30" }, PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.deepEqual(queued(visit.calls).map((i) => [i.kind, i.summary, i.visit]), [["TARGET", 'moved "Hang drywall" to Fri, Oct 30', true]]);
+  // Otherwise it is the due date.
+  const due = fakeTx({ status: "IN_PROGRESS", assigneeContactId: "c-zack", dueDate: day("2026-10-29") }, hasLogin);
+  await patchTask(due.tx, "t1", { dueDate: "2026-10-30" }, PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.deepEqual(queued(due.calls).map((i) => [i.kind, i.visit]), [["TARGET", false]]);
+  // Clearing the visit date is still about the visit.
+  const cleared = fakeTx({ status: "SCHEDULED", assigneeContactId: "c-zack", scheduledFor: day("2026-10-29"), dueDate: null }, hasLogin);
+  await patchTask(cleared.tx, "t1", { scheduledFor: null }, PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.deepEqual(queued(cleared.calls).map((i) => [i.summary, i.visit]), [['moved "Hang drywall" to no date', true]]);
+});
+
+// ---------------------------------------------------------------------------
+// A tick that loses a race to a Remove
+// ---------------------------------------------------------------------------
+
+test("setChecklistItem: locks the item before it reads it, so a tick that loses to a Remove gets the rule error, not a missing-row failure", async () => {
+  // The Remove committed while the tick waited: after the lock the item is gone.
+  const { tx, calls } = fakeTx({}, (model, op) => (model === "taskChecklistItem" && op === "findUnique" ? null : undefined));
+  await assert.rejects(setChecklistItem(tx, "i1", true, PIETER), (err: unknown) => err instanceof TaskRuleError && err.message === "That checklist item no longer exists.");
+  assert.equal(calls[0].model, "$executeRaw");
+  assert.match(calls[0].op, /FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE/);
+  assert.equal(calls[1].model, "taskChecklistItem");
+  assert.ok(!calls.some((c) => c.op === "update"), "nothing written");
+});
+
+test("setChecklistItem: a tick on an item that is there still writes the tick and its line", async () => {
+  const item = { id: "i1", taskId: "t1", title: "Demo", done: false, task: { id: "t1", status: "OPEN" } };
+  const { tx, calls } = fakeTx({}, (model, op) => (model === "taskChecklistItem" && op === "findUnique" ? item : undefined));
+  await setChecklistItem(tx, "i1", true, PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.deepEqual(events(calls).map((e) => e.kind), ["CHECKLIST"]);
+  assert.ok(calls.some((c) => c.model === "taskChecklistItem" && c.op === "update"));
 });

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button as AriaButton } from "react-aria-components";
 import { Ellipsis, Lock } from "lucide-react";
 import { ActivityItem } from "@/components/activity-timeline";
@@ -7,10 +7,13 @@ import { ActivityTime, useActivityNow } from "@/components/activity-time";
 import { Menu, MenuHeader, MenuTrigger } from "@/components/menu";
 import { Tooltip } from "@/components/tooltip";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
-import { buttonClass } from "@/components/ui";
+import { Button, Kbd, TextLink, buttonClass, textLinkClass } from "@/components/ui";
+import { shortcutLabel, useModKey } from "@/components/use-platform";
+import { callAction, type ActionResult } from "@/lib/action-result";
 import { fmtDay, fullStamp, seenTime, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { joinNames } from "@/lib/portal/job-view";
+import type { BodySegment } from "@/lib/tasks/body-links";
 import { cn } from "@/lib/utils";
 
 /** Who wrote a comment. */
@@ -29,31 +32,40 @@ export interface CommentCardProps {
   author: CommentAuthor;
   /** When it was posted. */
   at: Date | string;
+  /** Under a month heading: the time slot reads the day ("Oct 3"). */
+  month?: boolean;
   /** When it was last edited; `true` for an imported comment Asana marked edited, with no time. */
   edited?: Date | string | true | null;
   /** Staff only: the --fill-1 card with Lock and "Internal". */
   internal?: boolean;
   /** Imported from an Asana subtask: the checklist item it was on. */
   onItem?: string | null;
-  /** The message, pre-wrapped: plain text, or the caller's segments (links, masked codes). */
+  /** The message, pre-wrapped: plain text, or the caller's segments (CommentBody). */
   body?: ReactNode;
+  /** Edit in place: replaces the body while it is open (CommentEditor). */
+  editor?: ReactNode;
   /** The photos and videos (the uploads strip). */
   media?: ReactNode;
   /** The documents (FilesList). */
   files?: ReactNode;
   /** Files taken off after posting: "1 file removed" in the files slot. */
   removedFiles?: number;
-  /** One line under the card, outside it: the delivery line (DeliveryLine) or the failed send's line. */
+  /** One line under the card, outside it: the delivery line (DeliveryLine) or the failed send's line (SendFailedLine). */
   footer?: ReactNode;
   /**
    * The comment's menu items (MenuItem, MenuSeparator): Copy link and Copy
-   * text on every comment, Edit and Delete on your own (activity 2.5). With
-   * a mouse a 32px ghost Ellipsis at the header's end opens them on hover or
-   * keyboard focus; the menu leads with the full label and the stamp.
+   * text on every comment, Edit and Delete on your own (activity 2.5). With a
+   * mouse a 32px ghost Ellipsis at the header's end opens them on hover or
+   * keyboard focus. On touch nothing is drawn: a tap on the card (not on its
+   * links, photos or files) opens the same menu, and a visually hidden
+   * trigger keeps it reachable for VoiceOver and Switch Control (choice 3.2
+   * B). The menu leads with the full label and the stamp.
    */
   menuItems?: ReactNode;
   /** Posting: after 200ms the time slot reads "Sending…". */
   sending?: boolean;
+  /** Where the entry id sits, when the card is not a timeline entry of its own (inside a decision pair). */
+  bare?: boolean;
 }
 
 /**
@@ -69,70 +81,100 @@ export function CommentCard({
   id,
   author,
   at,
+  month = false,
   edited,
   internal = false,
   onItem,
   body,
+  editor,
   media,
   files,
   removedFiles = 0,
   footer,
   menuItems,
   sending = false,
+  bare = false,
 }: CommentCardProps) {
   const now = useActivityNow();
   const coarse = useCoarsePointer();
+  const [menuOpen, setMenuOpen] = useState(false);
   const shown = author.you ? "You" : firstName(author.name) || author.name;
   const editedAt = edited && edited !== true ? edited : null;
   const editedDay = editedAt ? fmtDay(todayYmdEastern(new Date(editedAt)), { year: "auto", now: todayYmdEastern(new Date(now)) }) : null;
   const editedWord = <span className="shrink-0 text-meta text-fg-3">edited</span>;
 
-  return (
-    <ActivityItem id={`update-${id}`} marker={{ avatar: author.name, contractor: author.contractor }} align="card">
-      <div className={cn("group/card rounded-md border px-3 py-2.5", internal ? "border-transparent bg-fill-1" : "border-line bg-surface")}>
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 truncate text-body font-medium text-fg-1">
-            {shown}
-            {author.contractor && <span className="sr-only">, contractor</span>}
+  const card = (
+    <div
+      // A tap on the card opens its menu on touch; a mouse does nothing on click, so text stays selectable.
+      onClick={(e) => {
+        if (!menuItems || !coarse || editor) return;
+        if ((e.target as HTMLElement).closest("a, button, input, textarea, select, label, video, [role='button'], [role='menuitem']")) return;
+        if (window.getSelection()?.toString()) return;
+        setMenuOpen(true);
+      }}
+      className={cn("group/card rounded-md border px-3 py-2.5", internal ? "border-transparent bg-fill-1" : "border-line bg-surface")}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 truncate text-body font-medium text-fg-1">
+          {shown}
+          {author.contractor && <span className="sr-only">, contractor</span>}
+        </span>
+        {sending ? <SendingLabel /> : <ActivityTime at={at} month={month} className="shrink-0 text-meta text-fg-3" />}
+        {edited && (editedAt && !coarse ? <Tooltip label={`Edited ${fullStamp(editedAt, now)}`}>{editedWord}</Tooltip> : editedWord)}
+        {internal && (
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-meta font-medium text-fg-2">
+            <Lock className="size-3.5" aria-hidden="true" />
+            <span className="max-[30rem]:sr-only">Internal</span>
           </span>
-          {sending ? <SendingLabel /> : <ActivityTime at={at} className="shrink-0 text-meta text-fg-3" />}
-          {edited &&
-            (editedAt && !coarse ? <Tooltip label={`Edited ${fullStamp(editedAt, now)}`}>{editedWord}</Tooltip> : editedWord)}
-          {internal && (
-            <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-meta font-medium text-fg-2">
-              <Lock className="size-3.5" aria-hidden="true" />
-              <span className="max-[30rem]:sr-only">Internal</span>
-            </span>
-          )}
-          {menuItems && (
-            <MenuTrigger>
-              <AriaButton
-                aria-label={`Actions for ${author.you ? "your" : `${shown}'s`} comment`}
-                className={cn(
-                  buttonClass({ variant: "ghost", size: "sm", icon: true }),
-                  // 32px without growing the 20px header line; shown on hover or keyboard focus, with a mouse only.
-                  "-my-1.5 shrink-0 text-fg-3 data-pressed:bg-fill-1",
-                  !internal && "ml-auto",
-                  "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:hidden",
-                )}
-              >
-                <Ellipsis className="size-4" aria-hidden="true" />
-              </AriaButton>
-              <Menu>
-                <MenuHeader title={author.name} detail={`${fullStamp(at, now)}${editedDay ? ` · edited ${editedDay}` : ""}`} />
-                {menuItems}
-              </Menu>
-            </MenuTrigger>
-          )}
-        </div>
-        {onItem && <p className="mt-1 truncate text-meta text-fg-3">On checklist item: {onItem}</p>}
-        {body != null && body !== "" && <p className="mt-1 whitespace-pre-wrap break-words text-body text-fg-1">{body}</p>}
-        {media && <div className="mt-2">{media}</div>}
-        {files && <div className="mt-2">{files}</div>}
-        {removedFiles > 0 && (
-          <p className="mt-2 text-meta text-fg-3">{removedFiles === 1 ? "1 file removed" : `${removedFiles} files removed`}</p>
+        )}
+        {menuItems && (
+          <MenuTrigger isOpen={menuOpen} onOpenChange={setMenuOpen}>
+            <AriaButton
+              aria-label={`Actions for ${author.you ? "your" : `${shown}'s`} comment`}
+              className={cn(
+                buttonClass({ variant: "ghost", size: "sm", icon: true }),
+                // 32px without growing the 20px header line; shown on hover or keyboard focus, with a mouse only.
+                "-my-1.5 shrink-0 text-fg-3 data-pressed:bg-fill-1",
+                !internal && "ml-auto",
+                "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100",
+                // On touch it is not drawn, but stays a real button for VoiceOver and Switch Control.
+                "[@media(hover:none)]:sr-only [@media(hover:none)]:focus-visible:not-sr-only [@media(hover:none)]:focus-visible:opacity-100",
+              )}
+            >
+              <Ellipsis className="size-4" aria-hidden="true" />
+            </AriaButton>
+            <Menu>
+              <MenuHeader title={author.name} detail={`${fullStamp(at, now)}${editedDay ? ` · edited ${editedDay}` : ""}`} />
+              {menuItems}
+            </Menu>
+          </MenuTrigger>
         )}
       </div>
+      {onItem && <p className="mt-1 truncate text-meta text-fg-3">On checklist item: {onItem}</p>}
+      {editor ? (
+        <div className="mt-1.5">{editor}</div>
+      ) : (
+        body != null && body !== "" && <p className="mt-1 whitespace-pre-wrap break-words text-body text-fg-1">{body}</p>
+      )}
+      {media && <div className="mt-2">{media}</div>}
+      {files && <div className="mt-2">{files}</div>}
+      {removedFiles > 0 && (
+        <p className="mt-2 text-meta text-fg-3">{removedFiles === 1 ? "1 file removed" : `${removedFiles} files removed`}</p>
+      )}
+    </div>
+  );
+
+  if (bare) {
+    return (
+      <div id={`update-${id}`} className="scroll-mt-[calc(var(--app-bar-h)+1rem)]">
+        {card}
+        {footer && <div className="mt-1">{footer}</div>}
+      </div>
+    );
+  }
+  return (
+    <ActivityItem id={`update-${id}`} marker={{ avatar: author.name, contractor: author.contractor }} align="card">
+      {card}
       {footer && <div className="mt-1">{footer}</div>}
     </ActivityItem>
   );
@@ -146,6 +188,139 @@ function SendingLabel() {
     return () => clearTimeout(t);
   }, []);
   return <span className="shrink-0 text-meta text-fg-3">{show ? "Sending…" : ""}</span>;
+}
+
+/**
+ * A comment's body as text with links (activity 2.2 a): https addresses open
+ * in a new tab and `/tasks/<id>` paths go to the task (lib/tasks/body-links.ts
+ * makes the segments). Nothing else is formatted.
+ */
+export function CommentBody({ segments }: { segments: readonly BodySegment[] }) {
+  return (
+    <>
+      {segments.map((seg, i) =>
+        seg.type === "text" ? (
+          <Fragment key={i}>{seg.text}</Fragment>
+        ) : seg.type === "link" ? (
+          <a key={i} href={seg.href} target="_blank" rel="noopener noreferrer" className={cn(textLinkClass, "break-all")}>
+            {seg.text}
+          </a>
+        ) : (
+          <TextLink key={i} href={seg.href}>
+            {seg.text}
+          </TextLink>
+        ),
+      )}
+    </>
+  );
+}
+
+/**
+ * Edit in place (activity 2.5): the body swaps for an autogrowing field with
+ * the caret at the end, and one line under it only when it matters ("Zack
+ * already got the first version", "Zack gets the edited version"). Cancel
+ * (ghost) with Esc, Save (secondary) with the mod key and Enter; no primary
+ * in edit mode, so nothing sits disabled without a reason. Saving unchanged
+ * text just closes it; saving nothing, with no files, says so in one line.
+ * Esc cancels the edit only. While it is open a phone's pinned composer hides,
+ * so there is one field and one keyboard.
+ */
+export function CommentEditor({
+  initial,
+  note,
+  hasFiles = false,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  /** Under the field: what the email did or will do with the edit. */
+  note?: string | null;
+  /** The comment keeps files, so emptying the words is allowed. */
+  hasFiles?: boolean;
+  onSave: (body: string) => Promise<ActionResult<unknown>>;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const mod = useModKey();
+
+  useEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+    document.documentElement.dataset.editingComment = "true";
+    return () => {
+      delete document.documentElement.dataset.editingComment;
+    };
+  }, []);
+
+  // Grow with the text.
+  useEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  async function save() {
+    if (saving) return;
+    const next = value.trim();
+    if (next === initial.trim()) return onCancel();
+    if (!next && !hasFiles) return setError("Add some text, or delete the comment");
+    setSaving(true);
+    setError(null);
+    const res = await callAction(() => onSave(next));
+    setSaving(false);
+    if (res.ok) onCancel();
+    else setError(res.error);
+  }
+
+  return (
+    <div className="space-y-2">
+      <textarea
+        ref={field}
+        aria-label="Edit comment"
+        rows={1}
+        value={value}
+        maxLength={20_000}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setError(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            onCancel();
+          } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void save();
+          }
+        }}
+        className="block max-h-60 min-h-9 w-full resize-none rounded-md border border-line-control bg-surface px-2.5 py-2 text-body text-fg-1 outline-none focus:border-act"
+      />
+      {note && <p className="truncate text-meta text-fg-3">{note}</p>}
+      {error && (
+        <p role="alert" className="text-meta text-danger">
+          {error}
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} aria-keyshortcuts="Escape">
+          Cancel
+          <Kbd aria-hidden="true">Esc</Kbd>
+        </Button>
+        <Button type="button" variant="secondary" size="sm" onClick={() => void save()} pending={saving} aria-keyshortcuts="Meta+Enter Control+Enter">
+          Save
+          <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -193,6 +368,28 @@ export function DeliveryLine({
       {before && <span className="shrink-0 whitespace-pre">{before}</span>}
       <span className="min-w-0 truncate">{who}</span>
       {after && <span className="shrink-0 whitespace-pre">{after}</span>}
+    </p>
+  );
+}
+
+/**
+ * A message that didn't go (activity 2.7): one `--danger` text-meta line under
+ * its card, built from what the call said. "Didn't send: no connection ·
+ * Retry" offline, "Didn't send · Retry" otherwise. Retry sends the same text,
+ * visibility, files and `clientId`, so nothing posts twice.
+ */
+export function SendFailedLine({ offline = false, onRetry, className }: { offline?: boolean; onRetry: () => void; className?: string }) {
+  return (
+    <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-danger", className)}>
+      <span className="truncate">{offline ? "Didn't send: no connection" : "Didn't send"}</span>
+      <span aria-hidden="true">·</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="relative shrink-0 font-medium underline decoration-1 underline-offset-3 hover:decoration-2 pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
+      >
+        Retry
+      </button>
     </p>
   );
 }
