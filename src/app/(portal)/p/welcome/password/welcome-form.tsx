@@ -49,7 +49,9 @@ export function WelcomeForm({ email, next }: { email: string; next: string | nul
   const where = problem ? FIELD[problem] : null;
   const line = (field: "current" | "password") => {
     if (field === "current" && missingCurrent) return "Enter your starting password.";
-    return problem && where === field ? (WORDS[problem] ?? PASSWORD_MESSAGES[problem]) : undefined;
+    // The same line when the server got it empty (no script), which it never counts as a try.
+    if (problem && where === field) return state.missing ? "Enter your starting password." : (WORDS[problem] ?? PASSWORD_MESSAGES[problem]);
+    return undefined;
   };
 
   useEffect(() => {

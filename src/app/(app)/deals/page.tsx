@@ -71,7 +71,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
         // it's visible without opening each deal. Auto-logged "change" entries are excluded.
         // Undated imported lines sort after every dated one.
         notes: {
-          where: { source: { not: "change" } },
+          where: { source: { not: "change" }, deletedAt: null },
           orderBy: [{ noteDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
           take: 1,
         },

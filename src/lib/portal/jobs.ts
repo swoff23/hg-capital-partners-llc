@@ -108,6 +108,12 @@ export interface JobUpdateInput {
   body: string;
   /** Files this contractor uploaded to the job and hasn't posted yet. */
   attachmentIds: string[];
+  /**
+   * The id the browser made for this send. The action accepts it today; it
+   * goes to core.addComment, which ignores a second write of the same id, once
+   * that dedupe lands (activity slice 3). Until then a repeated send posts twice, as before.
+   */
+  clientId?: string;
 }
 
 /**
