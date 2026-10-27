@@ -154,16 +154,21 @@ test("a job that is no longer active still gets its late photos recorded, and HG
   const batch = read("lib", "portal", "job-batch.ts");
   const step = fn(batch, "postBatchIn");
   assert.ok(step.indexOf("core.assertContractorAccess(tx, taskId, p.contactId)") < step.indexOf("tx.task.findUnique"), "the access check comes first");
-  assert.match(step, /if \(task && !isActiveStatus\(task\.status\)\) return postLate\(tx, taskId, p, attachmentIds, own\);/);
+  // A send whose files are all posted already answers quietly whatever the job's status, so it can't stall the next piece.
+  assert.match(step, /if \(own\.length === 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, attachmentIds\)\)\) return \{ event: null, linked: \[\] \};/);
+  assert.ok(step.indexOf("allOwnPosted(") < step.indexOf("!isActiveStatus("), "the quiet answer comes before the status branch");
+  assert.match(step, /if \(task && !isActiveStatus\(task\.status\)\) return postLate\(tx, taskId, p, own\);/);
   assert.match(step, /err instanceof core\.TaskRuleError && err\.message === JOB_CLOSED\) return postLate\(/);
-  assert.match(fn(batch, "postLate"), /await core\.addLateContractorBatch\(tx, taskId, own, p\);\s*return \{ event: null, linked: own \};/);
+  // `linked` is what the post linked, read back from its event, never the earlier read of what was unposted.
+  assert.match(fn(batch, "postLate"), /const event = await core\.addLateContractorBatch\(tx, taskId, own, p\);\s*return \{ event: null, linked: await linkedTo\(tx, event\.id\) \};/);
+  assert.match(step, /return \{ event, linked: await linkedTo\(tx, event\.id\) \};/);
   assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /eventId: posted\.event\?\.id \?\? null, linked: posted\.linked/);
   // Held photos the composer still had when the job closed go the late way as the page goes.
   const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
-  assert.match(actions, /!res\.ok && res\.error === JOB_CLOSED \? postJobBatchAction\(taskId, held, queueOwner\.current\)/);
-  // And the page says so, with nothing to undo.
+  assert.match(actions, /!res\.ok && res\.error === JOB_CLOSED \? await postJobBatchAction\(taskId, held, queueOwner\.current\)/);
+  // And the page says so, with nothing to undo, in one toast that counts every late piece.
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
-  assert.match(shared, /if \(eventId === null\) \{\s*toast\(\{ message: addedToJobText\(kinds\)[\s\S]*?return true;/);
+  assert.match(shared, /if \(eventId === null\) \{\s*added\.push\(\.\.\.kinds\);\s*toast\(\{ message: addedToJobText\(added\), key: `job-added:\$\{taskId\}` \}\);\s*return true;/);
 });
 
 test("past the window the record step's closed-job refusal is final, and only that one", () => {
@@ -246,16 +251,31 @@ test("no post names more files than the actions take, and a kept batch can't sta
   assert.doesNotMatch(read(...jobDir, "upload-actions.ts"), /\.max\(50\)/);
   assert.doesNotMatch(read(...jobDir, "actions.ts"), /\.max\(50\)/);
   // Every post of recorded files goes through postInBatches, so a tab that kept 30 and then recorded 25 posts 50 and 5.
-  assert.match(fn(read(...jobDir, "_components", "record-and-post.ts"), "postRecordedBatch"), /return postInBatches\(items, \(piece\) => postPiece\(taskId, piece, toast, owner\)\);/);
+  const shared = read(...jobDir, "_components", "record-and-post.ts");
+  assert.match(fn(shared, "postRecordedBatch"), /return postInBatches\(items, \(piece\) => postPiece\(taskId, piece, toast, added, owner\)\);/);
   // The tray holds what one Send or Mark done takes; files that don't fit, or didn't post, wait in the tab's registry.
   const actions = read(...jobDir, "_components", "job-actions.tsx");
   assert.match(actions, /const room = Math\.max\(0, MAX_FILES_PER_POST - live\.current\.ready\.length\);\s*recordedUploads\.keep\(taskId, items\.slice\(room\)\);/);
   assert.match(actions, /putBack\(items\);/);
   assert.match(actions, /if \(left\.length > 0\) putBack\(left\);/);
+  // While a Send or Mark done holds them, the queue's cap is what's left of one post, so the 51st gets its tile.
+  assert.match(actions, /maxFiles: trayRoom\(sheetOpen \|\| body\.trim\(\) !== "", ready\.length\),/);
+  // What the tab kept posts once the Send or Mark done went, and as the page goes, so none is left unposted.
+  assert.match(fn(shared, "postKept"), /const kept = recordedUploads\.take\(taskId, \[\]\);\s*return kept\.length === 0 \? \[\] : postRecordedBatch\(taskId, kept, toast, owner\);/);
+  assert.match(actions, /const sendKept = async \(\) => \{\s*const left = await postKept\(taskId, toast, owner\);\s*if \(left\.length > 0\) putBack\(left\);/);
+  assert.match(actions, /if \(text\) setBody\([^\n]*\);\s*await sendKept\(\);/, "after a Send went");
+  assert.match(actions, /setSheetState\("sent"\);[\s\S]*?startSending\(sendKept\);/, "after a Mark done went");
+  assert.match(actions, /here\.current = false;\s*void postKept\(taskId, toastLater\.current, queueOwner\.current\)\.then\(\(left\) => recordedUploads\.keep\(taskId, left\)\);/, "as the page goes");
+  // With the page gone, files that didn't post are all kept for the tab, never put into a tray that's gone.
+  assert.match(actions, /if \(!mounted\.current\) \{\s*recordedUploads\.keep\(taskId, items\);\s*return;\s*\}/);
+  assert.match(actions, /if \(!posted\.ok\) recordedUploads\.keep\(taskId, heldItems\);/);
 });
 
 test("a job page that stays open mounts its upload target again when the job's status changes", () => {
   // A tile the job refused for good gets its one more go when HG moves the job back, not only when the page opens.
   assert.match(read("components", "media-uploader.tsx"), /useEffect\(\(\) => engine\.mount\(target\.key\), \[engine, target\.key, reopenOn\]\);/);
-  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx"), /useMediaUploader\(\{ target, reopenOn: status \}\)/);
+  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
+  assert.match(actions, /useMediaUploader\(\{ target, reopenOn: status \}\)/);
+  // The page learns of that change with one refresh when a tile is first refused for good.
+  assert.match(actions, /if \(finals > 0 && !hadFinal\.current\) router\.refresh\(\);\s*hadFinal\.current = finals > 0;/);
 });

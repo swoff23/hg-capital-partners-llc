@@ -42,10 +42,18 @@ async function allOwnPosted(tx: core.Tx, taskId: string, contactId: string, ids:
 }
 
 /**
+ * The files a post linked: the rows on its event, read in the same transaction. A file another send took between
+ * the read of what's unposted and the link isn't among them, so the toast never counts it twice.
+ */
+async function linkedTo(tx: core.Tx, eventId: string): Promise<string[]> {
+  return (await tx.taskAttachment.findMany({ where: { eventId }, select: { id: true } })).map((f) => f.id);
+}
+
+/**
  * What a batch post did: its event, for the Undo (null when none is one Undo
- * takes back), and the files it told HG of. The page words its toast from
- * `linked`, so a file it sent that was posted already (one sent again after
- * its answer was lost) isn't counted twice.
+ * takes back), and the files it linked, the ones it told HG of. The page
+ * words its toast from `linked`, so a file it sent that was posted already
+ * (one sent again after its answer was lost) isn't counted twice.
  */
 export interface BatchPosted {
   event: TaskEvent | null;
@@ -54,19 +62,22 @@ export interface BatchPosted {
 
 /**
  * Late photos on a job that is no longer active: HG hears once for the batch
- * (core.addLateContractorBatch). A send whose files are all posted already
- * (one sent again after its answer was lost) has nothing new to tell, so it
- * answers as the first did, quietly, instead of "Write something or add a
- * photo.", with nothing linked.
+ * (core.addLateContractorBatch). Its event is a line Undo never takes back,
+ * so the answer carries none; the event is kept only to read what it linked.
  */
-async function postLate(tx: core.Tx, taskId: string, p: Contractor, attachmentIds: string[], own: string[]): Promise<BatchPosted> {
-  if (own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, attachmentIds))) return { event: null, linked: [] };
-  await core.addLateContractorBatch(tx, taskId, own, p);
-  return { event: null, linked: own };
+async function postLate(tx: core.Tx, taskId: string, p: Contractor, own: string[]): Promise<BatchPosted> {
+  const event = await core.addLateContractorBatch(tx, taskId, own, p);
+  return { event: null, linked: await linkedTo(tx, event.id) };
 }
 
 /**
  * One batch of recorded files, posted together. The access check comes first.
+ * A send whose files are all this contractor's and posted already (one sent
+ * again after its answer was lost) has nothing new to tell, on a job of any
+ * status: it answers quietly, with no event and nothing linked, so the pieces
+ * after it still go (record-and-post.ts posts a big batch in pieces and stops
+ * at the first refused). Two sends of the same files at once still meet on
+ * the files' rows, so the one that waited is refused and leaves nothing.
  * On an active job it is one update with no text, marked as a batch for the
  * Undo (core.addComment `batch`), and its event comes back for that Undo. On
  * a job HG has approved or canceled since the photos went up, the late
@@ -85,12 +96,13 @@ export async function postBatchIn(tx: core.Tx, taskId: string, p: Contractor, at
   await core.assertContractorAccess(tx, taskId, p.contactId);
   const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
   const own = (await ownUnposted(tx, taskId, p.contactId, attachmentIds)).map((f) => f.id);
-  if (task && !isActiveStatus(task.status)) return postLate(tx, taskId, p, attachmentIds, own);
+  if (own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, attachmentIds))) return { event: null, linked: [] };
+  if (task && !isActiveStatus(task.status)) return postLate(tx, taskId, p, own);
   try {
     const event = await core.addComment(tx, taskId, { body: "", attachmentIds: own, batch: true }, p);
-    return { event, linked: own };
+    return { event, linked: await linkedTo(tx, event.id) };
   } catch (err) {
-    if (err instanceof core.TaskRuleError && err.message === JOB_CLOSED) return postLate(tx, taskId, p, attachmentIds, own);
+    if (err instanceof core.TaskRuleError && err.message === JOB_CLOSED) return postLate(tx, taskId, p, own);
     throw err;
   }
 }

@@ -30,9 +30,11 @@ function revalidateJob(taskId: string): void {
  * added 4 photos" on the timeline and one line in the partners' email. It's
  * marked as a batch (core.addComment `batch`), the only kind of post Undo
  * takes back. Returns the update's id for that Undo, and `linked`, the ids of
- * the files it told HG of (the page counts its toast from these). A batch that
- * was already posted (two sends of the same photos at once) is refused, so the
- * losing side leaves no empty update behind.
+ * the files it linked (the page counts its toast from these). Two sends of the
+ * same photos at once: the one that waited is refused, so it leaves no empty
+ * update behind. A send whose photos were all posted already (sent again after
+ * its answer was lost) answers quietly with no id and nothing linked, so the
+ * next piece of a big batch still goes.
  *
  * A job HG has approved or canceled since the photos went up takes no batch
  * post, but the late photos are already recorded on it, so HG hears about
@@ -40,8 +42,10 @@ function revalidateJob(taskId: string): void {
  * taken back (core.addLateContractorBatch). The job keeps its status, and the
  * answer carries no `eventId` (there is nothing to Undo), so the page says
  * they were added to the job. The job page refreshes, so they show in its
- * photos. The access check still comes first, and an approve that lands while
- * the batch posts goes the same late way (job-batch.ts postBatchIn).
+ * photos. The access check still comes first. An approve that lands between
+ * this step's status read and addComment's takes the same late way; one that
+ * commits while addComment is writing leaves a batch line on the Done job,
+ * whose Undo is then refused (job-batch.ts postBatchIn).
  */
 export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null; linked: string[] }> {
   const p = await requirePortalPrincipal();

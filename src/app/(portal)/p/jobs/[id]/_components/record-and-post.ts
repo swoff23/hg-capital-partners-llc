@@ -42,7 +42,8 @@ export async function recordJobFile(taskId: string, file: RecordMediaInput, owne
  * it back. Answers the files that didn't post, none when all did, so the caller keeps just those. A piece that
  * fails stops the rest, which wait with it.
  * A job approved or canceled while the photos were going up keeps its status: the server tells HG once (one line,
- * one email line) and answers with no id, and the toast says "3 photos added to the job" with nothing to undo.
+ * one email line) and answers with no id, and the toast says "3 photos added to the job" with nothing to undo. Its
+ * pieces share that one toast, which counts them all ("60 photos added to the job", not the last piece's 10).
  */
 export async function postRecordedBatch(
   taskId: string,
@@ -50,11 +51,28 @@ export async function postRecordedBatch(
   toast: (t: ToastInput) => unknown,
   owner?: string,
 ): Promise<RecordedUpload[]> {
-  return postInBatches(items, (piece) => postPiece(taskId, piece, toast, owner));
+  const added: RecordedUpload["kind"][] = [];
+  return postInBatches(items, (piece) => postPiece(taskId, piece, toast, added, owner));
 }
 
-/** One post of at most MAX_FILES_PER_POST files, with its toast. False when it didn't post. */
-async function postPiece(taskId: string, piece: RecordedUpload[], toast: (t: ToastInput) => unknown, owner?: string): Promise<boolean> {
+/**
+ * Posts the files this tab kept for the job (recordedUploads.keep): ones past what the tray could hold, or from a
+ * post that didn't go through. A page calls it once its own Send or Mark done went, and as it goes, so none of them
+ * waits for another batch that may never come. Answers the files that didn't post.
+ */
+export async function postKept(taskId: string, toast: (t: ToastInput) => unknown, owner?: string): Promise<RecordedUpload[]> {
+  const kept = recordedUploads.take(taskId, []);
+  return kept.length === 0 ? [] : postRecordedBatch(taskId, kept, toast, owner);
+}
+
+/** One post of at most MAX_FILES_PER_POST files, with its toast. False when it didn't post. `added` sums the pieces with no id. */
+async function postPiece(
+  taskId: string,
+  piece: RecordedUpload[],
+  toast: (t: ToastInput) => unknown,
+  added: RecordedUpload["kind"][],
+  owner?: string,
+): Promise<boolean> {
   const res = await callAction(() => postJobBatchAction(taskId, piece.map((i) => i.id), owner));
   if (!res.ok) {
     toast({ message: res.error });
@@ -64,7 +82,8 @@ async function postPiece(taskId: string, piece: RecordedUpload[], toast: (t: Toa
   // The toast counts what the post told HG of, as the timeline line does.
   const kinds = toldOf(piece, linked).map((i) => i.kind);
   if (eventId === null) {
-    toast({ message: addedToJobText(kinds), key: `job-added:${taskId}` });
+    added.push(...kinds);
+    toast({ message: addedToJobText(added), key: `job-added:${taskId}` });
     return true;
   }
   toast({

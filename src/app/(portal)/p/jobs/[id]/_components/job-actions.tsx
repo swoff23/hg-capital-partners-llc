@@ -37,11 +37,11 @@ import {
   nextStep,
   stripCounts,
 } from "@/lib/portal/job-view";
-import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
+import { recordedUploads, trayRoom, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
 import { postJobBatchAction } from "../upload-actions";
-import { postRecordedBatch, recordJobFile } from "./record-and-post";
+import { postKept, postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -51,7 +51,9 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  *
  * Photos picked from the bar post as one update once they're all up, unless
  * there's text in the composer: then they wait and go with it. While the Mark
- * done sheet is open they go with the Mark done instead. A batch that posts on
+ * done sheet is open they go with the Mark done instead. Either holds no more
+ * than one post takes (MAX_FILES_PER_POST); once it went, any files the tab
+ * kept for the job post as their own batch. A batch that posts on
  * its own says "3 photos posted · Undo" for five seconds, and Undo takes the
  * update and its files back (uploads 2.7, question 5). Photos go up as a
  * `display` target: upright, a 2560px JPEG, no GPS, without the original
@@ -142,16 +144,31 @@ export function JobActions({
   useEffect(() => {
     live.current = { body, sheetOpen, ready };
   });
+  // False once the page is gone (set in the unmount cleanup below).
+  const mounted = useRef(true);
 
   /**
    * Files that didn't post go back on the tray, to go with the next send, up to what one send takes
    * (MAX_FILES_PER_POST: a written update and Mark done refuse more). Any more are kept for the tab, and the next
-   * batch for this job carries them (recordedUploads.keep).
+   * batch for this job carries them (recordedUploads.keep). With the page gone they are all kept: no tray is left.
    */
   const putBack = (items: Recorded[]) => {
+    if (!mounted.current) {
+      recordedUploads.keep(taskId, items);
+      return;
+    }
     const room = Math.max(0, MAX_FILES_PER_POST - live.current.ready.length);
     recordedUploads.keep(taskId, items.slice(room));
     setReady((r) => [...r, ...items.slice(0, room).filter((i) => !r.some((x) => x.id === i.id))]);
+  };
+
+  /**
+   * Once a Send or Mark done went, the files the tab kept for this job (past what the tray held, or from a post that
+   * didn't go through) post as their own batch, so none waits for one that may never come. Any that don't go back.
+   */
+  const sendKept = async () => {
+    const left = await postKept(taskId, toast, owner);
+    if (left.length > 0) putBack(left);
   };
 
   // Every call goes through callAction: with no signal it fails like a refusal
@@ -166,6 +183,7 @@ export function JobActions({
         return;
       }
       if (text) setBody((b) => (b.trim() === text ? "" : b));
+      await sendKept();
     });
 
   /** Posts a batch as updates of up to MAX_FILES_PER_POST files: "3 photos posted", and five seconds to take it back. Answers the files that didn't post. */
@@ -211,6 +229,9 @@ export function JobActions({
     parentId: taskId,
     access: "private",
     allowed: ["image", "video"],
+    // While a Send or Mark done holds them, no more than one post takes: a file past that gets the queue's
+    // "no more can be added here" tile, as a full listing's does.
+    maxFiles: trayRoom(sheetOpen || body.trim() !== "", ready.length),
     // Photos go up upright, as a 2560px JPEG without GPS and without the original (question 3).
     prepare: "display",
     record,
@@ -226,6 +247,16 @@ export function JobActions({
   const uploader = useMediaUploader({ target, reopenOn: status });
   const { pending, waiting, failed } = uploader;
 
+  // The first tile refused for good: one refresh, so a status that changed under this page (HG approved, or sent
+  // the job back) reaches the page and reopenOn.
+  const router = useRouter();
+  const finals = uploader.uploads.filter((u) => u.final).length;
+  const hadFinal = useRef(false);
+  useEffect(() => {
+    if (finals > 0 && !hadFinal.current) router.refresh();
+    hadFinal.current = finals > 0;
+  }, [finals, router]);
+
   // The photos a Mark done is sending right now, so leaving mid-send doesn't
   // post them a second time as an empty update.
   const finishingIds = useRef<string[]>([]);
@@ -236,21 +267,33 @@ export function JobActions({
   // when HG approves or cancels the job while photos are held (the job page
   // shows a closed job without this composer): the update is refused then, so
   // the held photos take the batch step's late way and HG still hears of them.
+  // The files the tab kept for the job post too, as their own batch. Whatever
+  // doesn't post stays kept for the tab, for the next batch of this job.
   const ownerNow = useRef(owner);
+  const toastNow = useRef(toast);
   useEffect(() => {
     ownerNow.current = owner;
+    toastNow.current = toast;
   });
   useEffect(() => {
     const latest = live;
     const inFlight = finishingIds;
     const queueOwner = ownerNow;
+    const toastLater = toastNow;
+    const here = mounted;
+    here.current = true;
     return () => {
-      const held = latest.current.ready.map((r) => r.id).filter((id) => !inFlight.current.includes(id));
+      here.current = false;
+      void postKept(taskId, toastLater.current, queueOwner.current).then((left) => recordedUploads.keep(taskId, left));
+      const heldItems = latest.current.ready.filter((r) => !inFlight.current.includes(r.id));
+      const held = heldItems.map((r) => r.id);
       if (held.length === 0) return;
       // Detached: nothing is left on this page to show a result, and a redirect needs no rethrow here.
-      postJobUpdateAction(taskId, { body: "", attachmentIds: held })
-        .then((res) => (!res.ok && res.error === JOB_CLOSED ? postJobBatchAction(taskId, held, queueOwner.current) : undefined))
-        .catch(() => {});
+      void (async () => {
+        const res = await postJobUpdateAction(taskId, { body: "", attachmentIds: held });
+        const posted = !res.ok && res.error === JOB_CLOSED ? await postJobBatchAction(taskId, held, queueOwner.current) : res;
+        if (!posted.ok) recordedUploads.keep(taskId, heldItems);
+      })().catch(() => recordedUploads.keep(taskId, heldItems));
     };
   }, [taskId]);
   useLeaveWarning(ready.length > 0);
@@ -319,6 +362,8 @@ export function JobActions({
         setNote("");
         setMarkedNow(new Date().toISOString());
         setSheetState("sent");
+        // Its own transition, so the payoff can close while the kept files post.
+        startSending(sendKept);
       } finally {
         finishingIds.current = [];
       }

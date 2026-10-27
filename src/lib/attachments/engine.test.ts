@@ -1059,6 +1059,36 @@ test("a page showing the job again gives each final tile one more go: still clos
   assert.deepEqual(h.engine.uploadsFor(t.key), []);
 });
 
+test("a final at a video's poster token leaves the poster out of that go only: the next go records it with its poster", async () => {
+  const h = setup();
+  h.deps.prepare = async (f, input) => ({ blob: f, name: input.name, contentType: input.contentType, thumb: null, poster: new Blob(["poster"]), meta: {} });
+  // The video's bytes go up; the job closes before the poster's token, and the record step then refuses for good.
+  h.state.script = ["ok", new FinalRefusalError(JOB_CLOSED)];
+  let open = false;
+  const seen: { posterPathname?: string | null }[] = [];
+  const t = target({
+    key: "portal-task:t9",
+    whenAway: "post",
+    allowed: ["image", "video"],
+    record: async (f) => (seen.push(f), open ? { ok: true, data: { id: "a1" } } : CLOSED),
+  });
+  const leave = h.engine.mount(t.key);
+  h.engine.add(t, [file("walkthrough.mov", "video/quicktime")]);
+  await h.flush();
+  assert.deepEqual(h.engine.uploadsFor(t.key).map((u) => [u.status, u.final]), [["invalid", true]], "Remove only");
+  assert.deepEqual(h.sent.map((s) => s.role), ["orig", "poster"]);
+  assert.equal(seen[0].posterPathname, undefined, "that go recorded with no poster, and was refused");
+  leave();
+
+  // HG sent the job back: the page shows it again, and the poster goes up with the video this time.
+  open = true;
+  h.engine.mount(t.key);
+  await h.flush();
+  assert.deepEqual(h.sent.map((s) => s.role), ["orig", "poster", "orig", "poster"], "bytes and poster, both again");
+  assert.match(seen[1].posterPathname ?? "", /^poster\//, "the video records with its poster");
+  assert.deepEqual(h.engine.uploadsFor(t.key), []);
+});
+
 test("a tile that failed for any other reason is not sent again by a page coming", async () => {
   const h = setup();
   const t = target({ key: "portal-task:t9", record: async () => ({ ok: false, error: "You don't have access to this job." }) });

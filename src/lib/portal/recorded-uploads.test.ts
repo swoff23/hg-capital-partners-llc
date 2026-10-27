@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { UploadTarget } from "@/components/upload-queue";
+import { UploadEngine } from "@/lib/attachments/engine";
 import { MAX_FILES_PER_POST } from "./job-view";
-import { postInBatches, RecordedUploads, recordedUploads, toldOf, type RecordedUpload } from "./recorded-uploads";
+import { postInBatches, RecordedUploads, recordedUploads, toldOf, trayRoom, type RecordedUpload } from "./recorded-uploads";
 
 // The job page's record step answers with an id alone, so each page notes what
 // it recorded. A batch can start under one visit to the job and land under the
@@ -145,4 +147,51 @@ test("a toast counts the files the post told HG of; one posted already isn't cou
 
 test("every job page shares one registry for the tab", () => {
   assert.ok(recordedUploads instanceof RecordedUploads);
+});
+
+test("a tray holding photos for a Send or Mark done takes no more than one post, counting what it holds", () => {
+  assert.equal(trayRoom(true, 0), MAX_FILES_PER_POST);
+  assert.equal(trayRoom(true, 45), 5);
+  assert.equal(trayRoom(true, MAX_FILES_PER_POST), 0);
+  assert.equal(trayRoom(true, 60), 0, "never below none");
+  // Nothing holds them: a batch that posts on its own goes in pieces, so there is no cap.
+  assert.equal(trayRoom(false, 10), undefined);
+});
+
+test("the 51st photo picked with the Mark done sheet open gets the queue's cap tile, and the first 50 go up", () => {
+  let n = 0;
+  const engine = new UploadEngine({
+    // The bytes never land here: the cap is decided as the files are added.
+    transfer: () => new Promise(() => {}),
+    outbox: null,
+    notify: () => {},
+    navigate: () => {},
+    online: () => true,
+    now: () => new Date(Date.UTC(2026, 9, 27, 14, 0)),
+    setTimer: () => 0,
+    clearTimer: () => {},
+    preview: { create: () => null, revoke: () => {} },
+    uid: () => String(++n),
+  });
+  const target: UploadTarget = {
+    key: "portal-task:t1",
+    label: "56 Tamarack St",
+    uploadKind: "portal-task-upload",
+    parentId: "t1",
+    access: "private",
+    allowed: ["image", "video"],
+    // The sheet is open with nothing held yet.
+    maxFiles: trayRoom(true, 0),
+    prepare: "display",
+    record: async () => ({ ok: true, data: { id: "a" } }),
+    whenAway: "post",
+  };
+  const files = Array.from({ length: 60 }, (_, i) => new File([new Uint8Array(10)], `IMG_${i + 1}.jpg`, { type: "image/jpeg" }));
+  engine.add(target, files);
+  const tiles = engine.uploadsFor(target.key);
+  assert.equal(tiles.filter((u) => u.status !== "invalid").length, MAX_FILES_PER_POST, "50 going up");
+  const capped = tiles.filter((u) => u.status === "invalid");
+  assert.equal(capped.length, 10);
+  assert.deepEqual([...new Set(capped.map((u) => u.error))], ["no more can be added here"], "each says why, with Remove");
+  engine.dispose();
 });

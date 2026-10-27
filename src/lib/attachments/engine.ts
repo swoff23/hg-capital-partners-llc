@@ -80,6 +80,8 @@ type Job = {
   recordFailures: number;
   /** The server refused it for good (the record step's `final`, or the token route's: a job that stopped taking files first): Remove only. */
   final: boolean;
+  /** A thumbnail or poster this go left out (refused, or its last try), so a final tile's next go (reopenFinal) sends it again. */
+  leftOut?: Partial<Pick<Prepared, "thumb" | "poster">>;
   /** Bytes are up and there is no record step yet: a reload put the file back before its page did. */
   needsRecord: boolean;
   controller: AbortController | null;
@@ -363,6 +365,9 @@ export class UploadEngine {
     for (const j of this.jobs.values()) {
       if (j.key !== key || !j.final || j.controller) continue;
       Object.assign(j, { final: false, tries: 0, waits: 0, recordFailures: 0 });
+      // The previews go again too: a refusal at the thumbnail or poster token left them out of the last go only.
+      if (j.prepared && j.leftOut) Object.assign(j.prepared, j.leftOut);
+      j.leftOut = undefined;
       this.requeue(j);
       any = true;
     }
@@ -618,6 +623,7 @@ export class UploadEngine {
         } catch (err) {
           if (!this.jobs.has(job.id) || (controller.signal.aborted && !job.stalled)) return;
           if (lastTry || classifyFailure(err, this.deps.online()) === "refused") {
+            job.leftOut = { ...job.leftOut, [role]: blob };
             prepared[role === "thumb" ? "thumb" : "poster"] = null;
           } else {
             throw err;
