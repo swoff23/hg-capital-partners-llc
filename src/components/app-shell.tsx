@@ -59,8 +59,9 @@ export function AppShell({
   // Mobile drawer: lock body scroll and close on Escape while it's open.
   useEffect(() => {
     if (!mobileOpen) return;
+    // One Esc closes one layer: a toast (or any layer on top) that took the key has already called preventDefault.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobileOpen(false);
+      if (e.key === "Escape" && !e.defaultPrevented) setMobileOpen(false);
     };
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;

@@ -59,8 +59,9 @@ export function Tooltip({
     const away = (e: PointerEvent) => {
       if (!ref.current?.contains(e.target as Node)) hide();
     };
+    // One Esc closes one layer: a toast (or any layer on top) that took the key has already called preventDefault.
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") hide();
+      if (e.key === "Escape" && !e.defaultPrevented) hide();
     };
     document.addEventListener("pointerdown", away, true);
     document.addEventListener("keydown", key);
