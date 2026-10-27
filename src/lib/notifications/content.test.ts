@@ -6,17 +6,22 @@ import {
   deliveryFor,
   easternDayStart,
   emailSubject,
+  filePhrase,
+  firstUpdateId,
+  itemLine,
   itemLines,
   itemText,
   openUrl,
   parseItems,
   reachedCapNow,
+  reconcileItems,
   refusedRetryAt,
   replyLine,
   retryAt,
   sendBudget,
   sendFailureKind,
   taskEmail,
+  type EventSnapshot,
   type OutboxItem,
 } from "./content";
 
@@ -50,8 +55,14 @@ test("subject: an assignment alone says assigned; two partners are both named", 
 });
 
 test("each change reads as one line without the title", () => {
-  assert.equal(itemText(item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)), "moved the target to Fri, Oct 30");
-  assert.equal(itemText(item("TARGET", `moved "${TITLE}" to no date`)), "cleared the target date");
+  // A contractor reads a due date or a visit, never "target" (the job page's words). Core records which at enqueue.
+  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: false }), "moved the due date to Fri, Oct 30");
+  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: true }), "moved the visit to Fri, Oct 30");
+  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to no date`), visit: false }), "cleared the due date");
+  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to no date`), visit: true }), "cleared the visit date");
+  // Rows queued before the flag read neutrally, and still parse.
+  assert.equal(itemText(item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)), "moved the date to Fri, Oct 30");
+  assert.equal(itemText(item("TARGET", `moved "${TITLE}" to no date`)), "cleared the date");
   assert.equal(itemText(item("NOTES", `updated the notes on "${TITLE}"`)), "updated the notes");
   assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}"`)), "assigned you this job");
   assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}" for Thu, Oct 29`)), "assigned you this job for Thu, Oct 29");
@@ -127,7 +138,7 @@ test("a scheduled job's email gives the visit date", () => {
 test("a title with a quote in it comes out whole", () => {
   const t = 'Hang 36" mirror';
   assert.equal(itemText(item("STATUS", `scheduled "${t}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
-  assert.equal(itemText(item("TARGET", `moved "${t}" to Fri, Oct 30`)), "moved the target to Fri, Oct 30");
+  assert.equal(itemText({ ...item("TARGET", `moved "${t}" to Fri, Oct 30`), visit: false }), "moved the due date to Fri, Oct 30");
   assert.equal(itemText(item("STATUS", `marked "${t}" done`)), "marked it done");
   assert.equal(itemText(item("STATUS", `sent "${t}" back: Level it`)), "sent it back: Level it");
   assert.equal(itemText(item("STATUS", `sent "${t}" back`)), "sent it back");
@@ -140,7 +151,7 @@ test("lines: comments quote, oldest first, only the latest target and notes", ()
     item("COMMENT", '"Doors arrive Thu" (+1 file)'),
     item("TARGET", `moved "${TITLE}" to Fri, Oct 30`),
   ]);
-  assert.deepEqual(lines, ['Connor: "Doors arrive Thu" (+1 file)', "Connor moved the target to Fri, Oct 30"]);
+  assert.deepEqual(lines, ['Connor: "Doors arrive Thu" (+1 file)', "Connor moved the date to Fri, Oct 30"]);
 });
 
 test("the whole email: job and street, the lines, one button to the right place", () => {
@@ -304,4 +315,156 @@ test("the Buffalo day starts at local midnight, in daylight and standard time", 
   assert.equal(easternDayStart(new Date("2026-11-01T20:00:00Z")).toISOString(), "2026-11-01T04:00:00.000Z");
   // Spring forward (Mar 8, 2026): the day began in standard time.
   assert.equal(easternDayStart(new Date("2026-03-08T20:00:00Z")).toISOString(), "2026-03-08T05:00:00.000Z");
+});
+
+/* ---------------- What a claimed row sends (activity 2.5 and 2.10) ---------------- */
+
+const snap = (over: Partial<EventSnapshot> & { id: string }): EventSnapshot => ({
+  visibility: "SHARED",
+  deletedAt: null,
+  body: "Doors are in",
+  audienceContactId: "c-zack",
+  files: [],
+  ...over,
+});
+const withEvent = (it: OutboxItem, eventId: string, extra: Partial<OutboxItem> = {}): OutboxItem => ({ ...it, eventId, ...extra });
+const toZack = { audience: "contractor" as const, recipientContactId: "c-zack" };
+const events = (...list: EventSnapshot[]) => new Map(list.map((e) => [e.id, e]));
+
+test("files read as '3 photos and 1 file', not '(+3 files)'", () => {
+  assert.equal(filePhrase(["image", "image", "image", "file"]), "3 photos and 1 file");
+  assert.equal(filePhrase(["image"]), "1 photo");
+  assert.equal(filePhrase(["file", "file"]), "2 files");
+  assert.equal(filePhrase(["video"]), "1 video");
+  assert.equal(filePhrase(["image", "image", "video", "file", "file"]), "2 photos, 1 video and 2 files");
+  assert.equal(filePhrase([]), "");
+});
+
+test("a comment is re-read when the row is claimed: the current words, up to 500 characters, with its line breaks", () => {
+  const stored = withEvent(item("COMMENT", '"Doors are in"'), "e1");
+  const [edited] = reconcileItems([stored], events(snap({ id: "e1", body: "Doors are in.\n\nTrim needs one more coat.\r\nFriday?" })), toZack);
+  assert.equal(edited.summary, '"Doors are in.\n\nTrim needs one more coat.\nFriday?"');
+  assert.equal(itemLine(edited), 'Connor: "Doors are in.\n\nTrim needs one more coat.\nFriday?"');
+  // The cut: 500 characters, then an ellipsis. Not shorter than the old 140.
+  const long = "word ".repeat(200);
+  const [cut] = reconcileItems([stored], events(snap({ id: "e1", body: long })), toZack);
+  const body = cut.summary.slice(1, cut.summary.lastIndexOf('"'));
+  assert.ok(body.length > 140 && body.length <= 501, "500 characters of text, trimmed, then the ellipsis");
+  assert.ok(body.endsWith("…") && !body.endsWith(" …"));
+  const dense = "x".repeat(900);
+  const [denseCut] = reconcileItems([stored], events(snap({ id: "e1", body: dense })), toZack);
+  assert.equal(denseCut.summary, `"${"x".repeat(500)}…"`);
+  const exact = "a".repeat(500);
+  assert.equal(reconcileItems([stored], events(snap({ id: "e1", body: exact })), toZack)[0].summary, `"${exact}"`);
+});
+
+test("files after the words, or alone, are counted the new way", () => {
+  const stored = withEvent(item("COMMENT", '"Doors are in" (+4 files)'), "e1");
+  const photos = ["image", "image", "image", "file"] as const;
+  assert.equal(reconcileItems([stored], events(snap({ id: "e1", files: [...photos] })), toZack)[0].summary, '"Doors are in" (3 photos and 1 file)');
+  const only = reconcileItems([withEvent(item("COMMENT", "added files (+2 files)"), "e1")], events(snap({ id: "e1", body: null, files: ["image", "image"] })), toZack)[0];
+  assert.equal(only.summary, "added 2 photos");
+  assert.equal(itemLine(only), "Connor added 2 photos");
+  assert.equal(itemLine(reconcileItems([stored], events(snap({ id: "e1", files: [...photos] })), toZack)[0]), 'Connor: "Doors are in" (3 photos and 1 file)');
+  // Files removed since: just the words.
+  assert.equal(reconcileItems([stored], events(snap({ id: "e1", files: [] })), toZack)[0].summary, '"Doors are in"');
+});
+
+test("the old forms still parse", () => {
+  assert.equal(itemText(item("COMMENT", '"Doors are in" (+2 files)')), ': "Doors are in" (+2 files)');
+  assert.equal(itemText(item("COMMENT", "added files (+3 files)")), "added 3 files");
+  assert.equal(itemText(item("COMMENT", "added files (+1 file)")), "added 1 file");
+  // A queued comment's line breaks survive the plain parse too.
+  assert.equal(itemLine(item("COMMENT", '"one\ntwo"')), 'Connor: "one\ntwo"');
+});
+
+test("a deleted comment never reaches Zack; an edited one is what he gets", () => {
+  const first = withEvent(item("COMMENT", '"Thursday?"'), "e1");
+  const second = withEvent(item("COMMENT", '"Friday"'), "e2");
+  const out = reconcileItems([first, second], events(snap({ id: "e1", deletedAt: new Date() }), snap({ id: "e2", body: "Friday at 9" })), toZack);
+  assert.deepEqual(out.map((i) => i.summary), ['"Friday at 9"']);
+  // An event the read didn't find is dropped like a deleted one; so is a comment emptied of its words and files.
+  assert.deepEqual(reconcileItems([first], events(), toZack), []);
+  assert.deepEqual(reconcileItems([first], events(snap({ id: "e1", body: null })), toZack), []);
+  // The order of what stays is kept.
+  const third = withEvent(item("COMMENT", '"c"'), "e3");
+  assert.deepEqual(
+    reconcileItems([first, second, third], events(snap({ id: "e1" }), snap({ id: "e2", deletedAt: new Date() }), snap({ id: "e3", body: "c2" })), toZack).map((i) => i.eventId),
+    ["e1", "e3"],
+  );
+});
+
+test("a row can mix new items and ones queued before they named events: the old send as stored", () => {
+  const old = item("COMMENT", '"Old note" (+1 file)');
+  const assigned = item("ASSIGNED", `assigned you "${TITLE}"`);
+  const fresh = withEvent(item("COMMENT", '"Doors"'), "e1");
+  const out = reconcileItems([old, assigned, fresh], events(snap({ id: "e1", body: "Doors, edited" })), toZack);
+  assert.deepEqual(out.map((i) => i.summary), ['"Old note" (+1 file)', `assigned you "${TITLE}"`, '"Doors, edited"']);
+  // Nothing needing a read means nothing changes.
+  assert.deepEqual(reconcileItems([old, assigned], events(), toZack), [old, assigned]);
+});
+
+test("TARGET, NOTES and ASSIGNED are never filtered: they email contractors by design", () => {
+  const rest = [
+    { ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: true },
+    item("NOTES", `updated the notes on "${TITLE}"`),
+    item("ASSIGNED", `assigned you "${TITLE}"`),
+  ];
+  assert.deepEqual(reconcileItems(rest, events(), toZack), rest);
+});
+
+test("a comment that isn't Shared or isn't Zack's is not sent to Zack; partners get a contractor's as it is", () => {
+  const stored = withEvent(item("COMMENT", '"Hmm"'), "e1");
+  assert.deepEqual(reconcileItems([stored], events(snap({ id: "e1", visibility: "INTERNAL" })), toZack), []);
+  assert.deepEqual(reconcileItems([stored], events(snap({ id: "e1", audienceContactId: "c-jose" })), toZack), []);
+  assert.equal(reconcileItems([stored], events(snap({ id: "e1", audienceContactId: null })), toZack).length, 1);
+  const toPartner = { audience: "staff" as const, recipientContactId: null };
+  assert.equal(reconcileItems([stored], events(snap({ id: "e1", audienceContactId: null })), toPartner).length, 1);
+  const status = withEvent(item("STATUS", `approved "${TITLE}"`), "s1");
+  assert.deepEqual(reconcileItems([status], events(snap({ id: "s1", visibility: "INTERNAL", body: null })), toZack), []);
+  assert.equal(reconcileItems([status], events(snap({ id: "s1", body: null })), toZack).length, 1);
+});
+
+test("an approval that was taken back (its Done line deleted) is dropped from the email", () => {
+  const approved = withEvent(item("STATUS", `approved "${TITLE}"`), "s1");
+  const comment = withEvent(item("COMMENT", '"Thanks"'), "e1");
+  const out = reconcileItems([comment, approved], events(snap({ id: "e1", body: "Thanks" }), snap({ id: "s1", body: null, deletedAt: new Date() })), toZack);
+  assert.deepEqual(out.map((i) => i.kind), ["COMMENT"]);
+});
+
+test("a send-back's note lives inside its status line: edited, the email follows; deleted, it comes out", () => {
+  const back = withEvent(item("STATUS", `sent "${TITLE}" back: Level the uppers`), "s1", { noteEventId: "n1" });
+  const status = snap({ id: "s1", body: null });
+  assert.equal(reconcileItems([back], events(status, snap({ id: "n1", body: "Level the uppers and re-hang" })), toZack)[0].summary, `sent "${TITLE}" back: Level the uppers and re-hang`);
+  assert.equal(itemLine(reconcileItems([back], events(status, snap({ id: "n1", body: "Level the uppers and re-hang" })), toZack)[0]), "Connor sent it back: Level the uppers and re-hang");
+  assert.equal(reconcileItems([back], events(status, snap({ id: "n1", deletedAt: new Date() })), toZack)[0].summary, `sent "${TITLE}" back`);
+  assert.equal(reconcileItems([back], events(status), toZack)[0].summary, `sent "${TITLE}" back`, "a note the read didn't find is taken out");
+  // A title with quotes stays whole; the line is never listed twice.
+  const odd = withEvent(item("STATUS", `sent "Hang 36" mirror" back: old`), "s1", { noteEventId: "n1" });
+  assert.equal(reconcileItems([odd], events(status, snap({ id: "n1", body: "new" })), toZack)[0].summary, 'sent "Hang 36" mirror" back: new');
+  assert.equal(reconcileItems([back], events(status, snap({ id: "n1", body: "x" })), toZack).length, 1);
+  // Other status lines with a note id are untouched.
+  const approved = withEvent(item("STATUS", `approved "${TITLE}"`), "s1", { noteEventId: "n1" });
+  assert.equal(reconcileItems([approved], events(status, snap({ id: "n1" })), toZack)[0].summary, `approved "${TITLE}"`);
+});
+
+test("the button opens at the first update in the bundle; nothing to open at means the job", () => {
+  const base = { title: TITLE, address: null, audience: "contractor" as const, appUrl: "https://hg.example.com", taskId: "t1" };
+  const items = [item("ASSIGNED", `assigned you "${TITLE}"`), withEvent(item("COMMENT", '"Doors"'), "e7"), withEvent(item("STATUS", `approved "${TITLE}"`), "e8")];
+  assert.equal(taskEmail({ ...base, items }).buttonUrl, "https://hg.example.com/p/jobs/t1#update-e7");
+  assert.equal(taskEmail({ ...base, audience: "staff", items }).buttonUrl, "https://hg.example.com/tasks/t1#update-e7");
+  // Old rows, and kinds that have no row in the timeline, open the page.
+  assert.equal(taskEmail({ ...base, items: [item("COMMENT", '"Doors"')] }).buttonUrl, "https://hg.example.com/p/jobs/t1");
+  assert.equal(taskEmail({ ...base, items: [withEvent(item("NOTES", "updated the notes"), "e9")] }).buttonUrl, "https://hg.example.com/p/jobs/t1");
+  assert.equal(firstUpdateId(items), "e7");
+  assert.equal(firstUpdateId([]), null);
+  assert.equal(openUrl("https://hg.example.com/", "staff", "t1", "e7"), "https://hg.example.com/tasks/t1#update-e7");
+});
+
+test("a bundle with a comment and Mark done reads as before: the note, then marked it done", () => {
+  const items = [withEvent(item("COMMENT", '"All done"', "Zack Smith"), "n1"), withEvent(item("STATUS", `marked "${TITLE}" done`, "Zack Smith"), "s1")];
+  const email = taskEmail({ items, title: TITLE, address: null, audience: "staff", appUrl: "https://hg.example.com", taskId: "t1" });
+  assert.equal(email.subject, "Zack marked Cabinet install done");
+  assert.deepEqual(email.items, ['Zack: "All done"', "Zack marked it done"]);
+  assert.equal(email.buttonUrl, "https://hg.example.com/tasks/t1#update-n1");
 });

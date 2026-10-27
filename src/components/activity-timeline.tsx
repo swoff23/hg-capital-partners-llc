@@ -201,6 +201,7 @@ export function ActivityRun({
   marker = "dot",
   id,
   defaultOpen = false,
+  after,
   children,
 }: {
   /** The sentence: "Zack checked 14 items", "Connor assigned Zack and made 3 more changes". */
@@ -210,40 +211,57 @@ export function ActivityRun({
   marker?: ActivityMarker;
   id?: string;
   defaultOpen?: boolean;
+  /**
+   * A control that belongs to the run but not to its toggle ("View previous"
+   * on a notes run): it follows the line on the same row, wrapping under it
+   * when there is no room. The toggle then takes only its own width.
+   */
+  after?: ReactNode;
   /** The member lines, shown under the run while it's open. */
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const toggle = (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={() => setOpen((o) => !o)}
+      className={cn(
+        "-mx-1.5 block rounded-sm px-1.5 text-left text-meta text-fg-3 transition-colors hover:bg-fill-1",
+        after ? "max-w-[calc(100%+0.75rem)]" : "w-[calc(100%+0.75rem)]",
+        // 32px with a mouse without moving the line; a real 44px row on touch.
+        "-my-1.75 min-h-8 py-1.75 pointer-coarse:my-0 pointer-coarse:min-h-11 pointer-coarse:py-3",
+      )}
+    >
+      {summary}
+      <span className="whitespace-nowrap">
+        {time != null && (
+          <>
+            <span aria-hidden="true">{" · "}</span>
+            {time}
+          </>
+        )}
+        <ChevronRight
+          aria-hidden="true"
+          className={cn(
+            "ml-1 inline-block size-4 align-[-0.1875rem] text-fg-3 transition-transform duration-fast motion-reduce:transition-none print:hidden",
+            open && "rotate-90",
+          )}
+        />
+      </span>
+    </button>
+  );
   return (
     <>
       <ActivityItem marker={marker} align="run" id={id}>
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-          className={cn(
-            "-mx-1.5 block w-[calc(100%+0.75rem)] rounded-sm px-1.5 text-left text-meta text-fg-3 transition-colors hover:bg-fill-1",
-            // 32px with a mouse without moving the line; a real 44px row on touch.
-            "-my-1.75 min-h-8 py-1.75 pointer-coarse:my-0 pointer-coarse:min-h-11 pointer-coarse:py-3",
-          )}
-        >
-          {summary}
-          <span className="whitespace-nowrap">
-            {time != null && (
-              <>
-                <span aria-hidden="true">{" · "}</span>
-                {time}
-              </>
-            )}
-            <ChevronRight
-              aria-hidden="true"
-              className={cn(
-                "ml-1 inline-block size-4 align-[-0.1875rem] text-fg-3 transition-transform duration-fast motion-reduce:transition-none print:hidden",
-                open && "rotate-90",
-              )}
-            />
-          </span>
-        </button>
+        {after ? (
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            {toggle}
+            {after}
+          </div>
+        ) : (
+          toggle
+        )}
       </ActivityItem>
       {open && children}
     </>

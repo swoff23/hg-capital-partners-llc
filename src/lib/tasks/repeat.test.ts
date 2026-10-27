@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import {
   copyOrigin,
   describeRepeat,
@@ -343,6 +345,16 @@ test("isUntouchedCopy: any sign of use keeps the copy", () => {
     ["one of two emails sent", { emails: [{ sentAt: null, attempts: 0 }, { sentAt: new Date("2026-10-23T15:05:00Z"), attempts: 1 }] }],
   ];
   for (const [why, change] of touched) assert.equal(isUntouchedCopy({ ...fresh, ...change }), false, why);
+});
+
+test("isUntouchedCopy: opened by staff stays untouched, because core counts only the contractor's read states", () => {
+  // The count isUntouchedCopy gets is the contractor's "opened in the portal" (contactId set). A partner opening the
+  // copy writes a staff read state (activity 2.6), which isn't counted, or a partner who looked at the next copy
+  // from the Done toast would stop Undo from taking it back and the contractor would get its "assigned you" email.
+  assert.equal(isUntouchedCopy({ ...fresh, readStates: 0 }), true);
+  const source = fs.readFileSync(path.join(import.meta.dirname, "core.ts"), "utf8");
+  assert.match(source, /readStates: \{ where: \{ contactId: \{ not: null \} \} \}/);
+  assert.doesNotMatch(source, /readStates: true/);
 });
 
 test("nextCopyDue: the Next line steps from the series' date, as finishing does, not from where the copy was moved", () => {

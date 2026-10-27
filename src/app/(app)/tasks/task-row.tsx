@@ -146,6 +146,8 @@ export function TaskRow({
         today={today}
         overdue={late}
         label={visit ? "Visit date" : "Due date"}
+        // Named with the task, so a screen reader hears which one: "Due date for Fix the sink: Apr 19" (TASKS-V02).
+        subject={task.title}
         isDisabled={!isActiveStatus(task.status)}
         onChange={(to) => reschedule(task, to, job ? "target" : "due")}
       />

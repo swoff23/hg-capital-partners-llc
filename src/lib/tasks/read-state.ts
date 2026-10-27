@@ -1,38 +1,35 @@
-/**
- * Staff read state: what a partner hasn't seen on a task yet (docs/specs/
- * activity-comments.md 2.6 and choice 3.5 A), for the unread dot on task
- * rows and the New divider on the task page. It reads `TaskReadState` rows
- * by `userId`; the contractor's rows (by `contactId`) are the portal's.
- *
- * No rows are seeded at release. A partner with no row reads as having seen
- * everything up to READ_STATE_SINCE, so day one shows no dot or divider for
- * history nobody missed. The dot and the divider share one baseline,
- * COALESCE(lastSeenAt, READ_STATE_SINCE) (seenBaseline). Only events written
- * in the app or the portal by someone else count toward unread, so imported
- * Asana history, whenever it loads, never does.
- *
- * Writes stamp nothing on the Task row (no editStamp, no task.update), so
- * opening a task never trips the importer's compare-and-set.
- *
- * Interim: unreadTaskIds answers an empty set until the read-state writes
- * and the unread rule land (activity slice 3).
- */
-
-/** The release: every partner has seen everything before it. Set to the instant this ships to production. */
-export const READ_STATE_SINCE = new Date("2026-10-27T04:00:00.000Z");
+import "server-only";
+import { prisma } from "@/lib/db";
+import { lastSeenIn, markSeenIn, otherPartnersSeenIn, unreadTaskIdsIn } from "./read-state-core";
 
 /**
- * When the viewer last looked at a task, as unread is counted:
- * COALESCE(lastSeenAt, READ_STATE_SINCE), their row's time or the release
- * without one. The row dot and the New divider both read it, so they agree.
+ * Staff read state on the app's database client (docs/specs/activity-comments.md
+ * 2.6, choice 3.5 A). The rules, the release constant and their tests are in
+ * read-state-core.ts; this binds them to `prisma`.
+ *
+ *   unreadTaskIds   the task rows' unread dot (Today, All)
+ *   lastSeen        the New divider's baseline, read before the page writes
+ *   markTaskSeen    note the open, in after() once the page is out
  */
-export function seenBaseline(lastSeenAt: Date | null | undefined): Date {
-  return lastSeenAt ?? READ_STATE_SINCE;
-}
+
+export { READ_STATE_SINCE, seenBaseline } from "./read-state-core";
 
 /** The tasks among `taskIds` with something new for this partner since they last opened them. */
-export async function unreadTaskIds(userId: string, taskIds: readonly string[]): Promise<Set<string>> {
-  void userId;
-  void taskIds;
-  return new Set();
+export function unreadTaskIds(userId: string, taskIds: readonly string[]): Promise<Set<string>> {
+  return unreadTaskIdsIn(prisma, userId, taskIds);
+}
+
+/** When this partner last opened the task before now; null if they never have. */
+export function lastSeen(userId: string, taskId: string): Promise<Date | null> {
+  return lastSeenIn(prisma, userId, taskId);
+}
+
+/** Note that this partner opened the task. Never throws into the page that called it. */
+export function markTaskSeen(userId: string, taskId: string, now = new Date()): Promise<void> {
+  return markSeenIn(prisma, userId, taskId, now);
+}
+
+/** The other partners' latest opens of the task, newest first. */
+export function otherPartnersSeen(userId: string, taskId: string): Promise<{ userId: string; lastSeenAt: Date }[]> {
+  return otherPartnersSeenIn(prisma, userId, taskId);
 }
