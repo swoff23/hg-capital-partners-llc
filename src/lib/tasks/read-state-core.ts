@@ -25,7 +25,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 type Db = Pick<PrismaClient, "$queryRaw" | "taskReadState">;
 
 /** The release: every partner has seen everything before it. Set to the instant this ships to production. */
-export const READ_STATE_SINCE = new Date("2026-10-27T04:00:00.000Z");
+export const READ_STATE_SINCE = new Date("2026-10-27T11:00:00.000Z");
 
 /**
  * When the viewer last looked at a task, as unread is counted:

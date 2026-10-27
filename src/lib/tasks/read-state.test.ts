@@ -17,7 +17,7 @@ import {
 test("READ_STATE_SINCE is one fixed instant, not the time the code loaded", () => {
   assert.ok(READ_STATE_SINCE instanceof Date);
   assert.ok(!Number.isNaN(READ_STATE_SINCE.getTime()));
-  assert.equal(READ_STATE_SINCE.toISOString(), "2026-10-27T04:00:00.000Z");
+  assert.equal(READ_STATE_SINCE.toISOString(), "2026-10-27T11:00:00.000Z");
 });
 
 test("seenBaseline: a partner with no row has seen everything before the release", () => {
@@ -95,7 +95,7 @@ test("unreadTaskIdsIn: counts app and portal rows by someone else after COALESCE
   assert.match(sql, /e\."kind" = 'COMMENT' OR \(e\."actorContactId" IS NOT NULL AND e\."kind" IN \('ATTACHMENT', 'STATUS'\)\)/);
   // The user, the task ids and the release instant are parameters, never pasted in.
   assert.equal(queries[0].values[0], "u-connor");
-  assert.ok(queries[0].values.some((v) => !!v && typeof v === "object" && "values" in v && (v as { values: unknown[] }).values.includes("2026-10-27T04:00:00.000Z")));
+  assert.ok(queries[0].values.some((v) => !!v && typeof v === "object" && "values" in v && (v as { values: unknown[] }).values.includes("2026-10-27T11:00:00.000Z")));
   assert.ok(!sql.includes("u-connor") && !sql.includes("t1"));
 });
 
