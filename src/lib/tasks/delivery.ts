@@ -136,6 +136,12 @@ export function sawComment(
  * portal's "Connor removed a comment" line shows to exactly these people and
  * to nobody who opens the job afterwards, so a comment Zack never saw leaves
  * no trace. `audienceContactId` null means any contractor with the job.
+ *
+ * One narrow gap, known and left: a send run that claimed the row and read
+ * the comment back (outbox.ts liveItems) just before the delete, and sends
+ * just after it, still has `sentAt` null here, so the contractor that email
+ * reaches isn't counted and sees no "removed a comment" line. Counting a
+ * claimed row instead would count emails that then fail or close unsent.
  */
 export async function contactsWhoSaw(
   db: Pick<PrismaClient, "notificationOutbox" | "taskAccess" | "taskReadState">,

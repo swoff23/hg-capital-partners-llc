@@ -9,6 +9,7 @@ import { MenuItem, MenuSeparator } from "@/components/menu";
 import { Money } from "@/components/money";
 import { useToast } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
+import { personalDraftKey } from "@/lib/composer-draft";
 import type { Ymd } from "@/lib/dates";
 import { LOG_SHOWN, groupLog, type ChangeEntry, type FieldRow, type LineEntry, type LogEntry, type NoteEntry } from "@/lib/deals/record-log";
 import { bodySegments } from "@/lib/tasks/body-links";
@@ -114,8 +115,9 @@ function DealLogBody({
   return (
     <>
       <Composer
-        // This surface's own key: a deal note draft never opens on another record or in the portal.
-        draftKey={`hgos-deal-note-draft:${dealId}`}
+        // This surface's own key, per deal and per partner: a note draft never opens on another record, in the
+        // portal, or for the other partner on a shared computer.
+        draftKey={personalDraftKey("deal-note", dealId, viewerId)}
         visibility="none"
         pin="never"
         placeholders={{ shared: "Add a note" }}

@@ -45,11 +45,16 @@ function fakeChecklist(initial: Item[], tasks: string[] = ["t1"], onLock?: (item
   const stamped: { id: string; data: Record<string, unknown> }[] = [];
   // What touched the items table, in order: the row lock and the reads, so a test can see the lock comes first.
   const order: string[] = [];
+  let waited = false;
   const tx = {
     $executeRaw: async (sql: TemplateStringsArray, ...values: unknown[]) => {
       order.push(`lock ${values.join(",")}: ${sql.join("?").replace(/\s+/g, " ").trim()}`);
-      // Whoever held the row's lock before us has committed by the time we get it.
-      onLock?.(items);
+      // Whoever held the lock before us has committed by the time we get it: the first lock an edit waits on (its
+      // task's row), once.
+      if (!waited) {
+        waited = true;
+        onLock?.(items);
+      }
       return 1;
     },
     taskChecklistItem: {
@@ -246,16 +251,44 @@ test("checklistSnapshotSchema: still refuses a snapshot that isn't one", () => {
   assert.ok(!checklistSnapshotSchema.safeParse({ ...ok, done: "yes" }).success);
 });
 
-test("rename and remove lock the item's row before they read it", async () => {
-  const rename = fakeChecklist([item()]);
-  await renameChecklistItem(rename.tx, "i1", "Shut off the main water", PIETER, NOW);
-  assert.match(rename.order[0], /^lock i1: SELECT 1 FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE$/);
-  assert.equal(rename.order[1], "read");
+test("rename and remove lock the item's task, then its row, before the read they use", async () => {
+  // The first read only names the task; the one after both locks is what the edit acts on. Task first, as every writer
+  // on a task takes it, so an edit never deadlocks against a task delete or another edit's stamp (40P01).
+  for (const run of [
+    (tx: Tx) => renameChecklistItem(tx, "i1", "Shut off the main water", PIETER, NOW),
+    (tx: Tx) => removeChecklistItem(tx, "i1", PIETER, NOW),
+  ]) {
+    const { tx, order } = fakeChecklist([item()]);
+    await run(tx);
+    assert.equal(order[0], "read");
+    assert.match(order[1], /^lock t1: SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+    assert.match(order[2], /^lock i1: SELECT 1 FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE$/);
+    assert.equal(order[3], "read");
+  }
+});
 
-  const remove = fakeChecklist([item()]);
-  await removeChecklistItem(remove.tx, "i1", PIETER, NOW);
-  assert.match(remove.order[0], /^lock i1: SELECT 1 FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE$/);
-  assert.equal(remove.order[1], "read");
+test("restoreChecklistItem: locks the task row before it reads or writes anything", async () => {
+  const { tx, order, items } = fakeChecklist([]);
+  await restoreChecklistItem(tx, { ...JSON.parse(JSON.stringify(item())), doneAt: null, dueDate: null }, PIETER, NOW);
+  assert.match(order[0], /^lock t1: SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.equal(items.length, 1);
+});
+
+test("an edit that waited on a task delete finds the item, or the task, gone and says so", async () => {
+  // The delete held the task while its cascade took the items; the edit gets the task's lock after it commits.
+  const deleted = (items: Item[]) => void items.splice(0, items.length);
+  for (const run of [
+    (tx: Tx) => renameChecklistItem(tx, "i1", "New name", PIETER, NOW),
+    (tx: Tx) => removeChecklistItem(tx, "i1", PIETER, NOW),
+  ]) {
+    const { tx, events, stamped } = fakeChecklist([item()], ["t1"], deleted);
+    await assert.rejects(run(tx), (e) => e instanceof TaskRuleError && /no longer exists/.test(e.message));
+    assert.deepEqual(events, []);
+    assert.deepEqual(stamped, []);
+  }
+  const snapshot = { ...JSON.parse(JSON.stringify(item())), doneAt: null, dueDate: null };
+  const gone = fakeChecklist([], []);
+  await assert.rejects(restoreChecklistItem(gone.tx, snapshot, PIETER, NOW), /This task is gone/);
 });
 
 test("removeChecklistItem: a tick that lands first is in the snapshot, so Undo brings the item back ticked", async () => {

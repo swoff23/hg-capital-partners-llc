@@ -6,7 +6,7 @@ import { isActiveStatus } from "@/lib/task-scope";
 import { withResult } from "@/lib/server-action";
 import { moveTaskDates, restoreTaskDates } from "@/lib/tasks/bulk";
 import type { DateChange, TickResult } from "@/lib/tasks/list";
-import { approved, type ApprovedResult } from "@/lib/tasks/approve";
+import { approved, approvedTick, type ApprovedResult } from "@/lib/tasks/approve";
 import * as tasks from "@/lib/tasks/service";
 
 /**
@@ -67,9 +67,15 @@ export async function setTaskDone(id: string, done: boolean, expected: string): 
   return withResult("setTaskDone", async () => {
     const user = await requireUser();
     const want = z.boolean().parse(done);
+    const shown = status.parse(expected);
+    // Needs review to Done is Approve, whichever control sends it: a tab from before the lists sent this tick
+    // through approveTask still gets Approve's answer.
+    if (want && shown === "REVIEW") {
+      return approvedTick(() => tasks.setTaskStatus(taskId.parse(id), "DONE", tasks.staffPrincipal(user), { expected: "REVIEW" }));
+    }
     try {
       const { nextDue } = await tasks.setTaskStatus(taskId.parse(id), want ? "DONE" : "OPEN", tasks.staffPrincipal(user), {
-        expected: status.parse(expected),
+        expected: shown,
       });
       return want ? { nextDue } : null;
     } catch (err) {

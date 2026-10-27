@@ -22,3 +22,15 @@ export async function approved(run: () => Promise<Pick<StatusResult, "statusEven
     throw err;
   }
 }
+
+/**
+ * A tick on a row that showed Needs review, answered as a tick: Approve, through
+ * `approved`, whatever sent it (list.ts isApproval). Today's lists send such a
+ * tick to approveTask, so this is a tab loaded before they did. It still gets
+ * Approve's quiet success when the other partner approved first: null, so no
+ * Done toast offers an Undo of their approval.
+ */
+export async function approvedTick(run: Parameters<typeof approved>[0]): Promise<Pick<StatusResult, "nextDue"> | null> {
+  const { approvedEventId, nextDue } = await approved(run);
+  return approvedEventId ? { nextDue } : null;
+}

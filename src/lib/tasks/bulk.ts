@@ -40,6 +40,8 @@ export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" 
     const rows = await tx.task.findMany({
       where: { id: { in: [...new Set(ids)] } },
       select: { id: true, status: true, dueDate: true, scheduledFor: true, propertyId: true, dealId: true },
+      // One order for every batch, so two that share tasks (both partners' "Move all to today") take them the same way round.
+      orderBy: { id: "asc" },
     });
     const moved: DateChange[] = [];
     for (const r of rows) {
@@ -64,11 +66,14 @@ export async function restoreTaskDates(changes: DateChange[], p: core.Principal)
     const rows = await tx.task.findMany({
       where: { id: { in: [...new Set(changes.map((c) => c.id))] } },
       select: { id: true, propertyId: true, dealId: true },
+      // In the database's id order, as moveTaskDates takes them, whatever order the Undo's list came in.
+      orderBy: { id: "asc" },
     });
-    const exists = new Set(rows.map((r) => r.id));
-    for (const c of changes) {
-      if (!exists.has(c.id)) continue;
-      await core.patchTask(tx, c.id, c.field === "dueDate" ? { dueDate: c.value } : { scheduledFor: c.value }, p);
+    for (const r of rows) {
+      for (const c of changes) {
+        if (c.id !== r.id) continue;
+        await core.patchTask(tx, c.id, c.field === "dueDate" ? { dueDate: c.value } : { scheduledFor: c.value }, p);
+      }
     }
     return rows;
   }, TX);

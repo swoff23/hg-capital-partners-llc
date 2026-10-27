@@ -24,6 +24,7 @@ import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction, type ActionResult } from "@/lib/action-result";
+import { personalDraftKey } from "@/lib/composer-draft";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
   finishCountLabel,
@@ -103,6 +104,7 @@ type Recorded = RecordedUpload;
 
 export function JobActions({
   taskId,
+  contactId,
   status,
   firstName,
   staffNames,
@@ -112,6 +114,8 @@ export function JobActions({
   sentClientIds,
 }: {
   taskId: string;
+  /** The signed-in contractor, whose draft the composer keeps. */
+  contactId: string;
   status: TaskStatus;
   firstName: string;
   staffNames: string[];
@@ -318,8 +322,9 @@ export function JobActions({
       {/* Composer: scroll-mb keeps the tiles clear of the sticky bar when they're scrolled into view. */}
       <div ref={trayRef} className="mt-4 scroll-mb-28">
         <Composer
-          // The portal's own key: a staff draft on the same origin never opens here.
-          draftKey={`hgos-job-draft:${taskId}`}
+          // The portal's own key, per job and per contractor: a staff draft on the same origin never opens here, and
+          // neither does another contractor's who signed in on this phone before.
+          draftKey={personalDraftKey("job", taskId, contactId)}
           visibility="none"
           pin="never"
           // The fixed bar covers the foot of the page: focus and a send bring the box clear above it.

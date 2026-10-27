@@ -142,6 +142,9 @@ test("a title with a quote in it comes out whole", () => {
   assert.equal(itemText(item("STATUS", `marked "${t}" done`)), "marked it done");
   assert.equal(itemText(item("STATUS", `sent "${t}" back: Level it`)), "sent it back: Level it");
   assert.equal(itemText(item("STATUS", `sent "${t}" back`)), "sent it back");
+  // A note that says `" back` itself keeps its words: the title ends at the first `" back`.
+  assert.equal(itemText(item("STATUS", `sent "${t}" back: Put the "old" back`)), 'sent it back: Put the "old" back');
+  assert.equal(itemText(item("STATUS", `sent "Paint" back: put the "old" back`)), 'sent it back: put the "old" back');
   assert.equal(itemText(item("STATUS", `set "${t}" to done`)), "moved it to Done");
 });
 
@@ -480,6 +483,10 @@ test("a send-back's note lives inside its status line: edited, the email follows
   // A title with quotes stays whole; the line is never listed twice.
   const odd = withEvent(item("STATUS", `sent "Hang 36" mirror" back: old`), "s1", { noteEventId: "n1" });
   assert.equal(reconcileItems([odd], events(status, snap({ id: "n1", body: "new" })), toZack)[0].summary, 'sent "Hang 36" mirror" back: new');
+  // An old note that said `" back` itself is replaced whole, never kept as part of the title.
+  const quoted = withEvent(item("STATUS", `sent "Paint" back: put the "old" back`), "s1", { noteEventId: "n1" });
+  assert.equal(reconcileItems([quoted], events(status, snap({ id: "n1", body: "Use the new one" })), toZack)[0].summary, 'sent "Paint" back: Use the new one');
+  assert.equal(reconcileItems([quoted], events(status, snap({ id: "n1", deletedAt: new Date() })), toZack)[0].summary, 'sent "Paint" back');
   assert.equal(reconcileItems([back], events(status, snap({ id: "n1", body: "x" })), toZack).length, 1);
   // Other status lines with a note id are untouched.
   const approved = withEvent(item("STATUS", `approved "${TITLE}"`), "s1", { noteEventId: "n1" });

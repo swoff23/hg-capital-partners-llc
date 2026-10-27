@@ -6,7 +6,9 @@ import { recentAssigneeKeys } from "./assignee-people";
 import { copyOrigin } from "./repeat";
 import {
   AssigneeChangedError,
+  addChecklistItem,
   addComment,
+  approvalEmailRefusal,
   createNextRepeat,
   createTask,
   deleteComment,
@@ -481,21 +483,51 @@ test("addComment: an empty send with a clientId and no first send is still refus
   assert.equal(plain.calls.length, 0);
 });
 
-test("addComment: no clientId takes no lock (the importer and old callers are unchanged)", async () => {
-  const { tx, calls } = fakeTx({});
-  await addComment(tx, "t1", { body: "Hello", visibility: "INTERNAL" }, PIETER);
-  assert.ok(!calls.some((c) => c.model === "$executeRaw"));
+test("addComment: a send with no clientId takes the task lock too, before it reads the task or links a file", async () => {
+  // The portal's leave-page flush and a batch post send no clientId. Linking the files first and locking the task
+  // after would deadlock against a staff Remove, which takes the task and then the file (40P01).
+  const { tx, calls } = fakeTx({}, (model, op) => (model === "taskAttachment" && op === "updateMany" ? { count: 1 } : undefined));
+  await addComment(tx, "t1", { body: "", visibility: "SHARED", attachmentIds: ["a1"] }, PIETER);
+  const at = (model: string, op: string) => calls.findIndex((c) => c.model === model && c.op === op);
+  assert.equal(calls[0].model, "$executeRaw", "the lock comes before anything is read");
+  assert.match(calls[0].op, /^SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.deepEqual(calls[0].args, ["t1"]);
+  assert.ok(at("task", "findUnique") > 0, "the task is read under the lock");
+  assert.ok(at("taskAttachment", "updateMany") > at("task", "findUnique"));
+  assert.ok(at("task", "update") > at("taskAttachment", "updateMany"));
+  // Nothing to dedupe: no lookup, and the event carries no clientId.
   assert.ok(!calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"));
   assert.deepEqual((created(calls, "taskEvent")[0].args as { data: { data: unknown } }).data.data, {});
+  assert.equal(calls.filter((c) => c.model === "$executeRaw" && c.op.includes("FOR NO KEY UPDATE")).length, 1, "one lock, not two");
 });
 
-test("addComment: a contractor is refused on a closed job or without access before any lock", async () => {
+test("addComment: a contractor is refused on a closed job or without access before the clientId lookup and any write", async () => {
+  // The status is read under the lock, so a job approved a moment ago is closed to the post that waited on it.
   const closed = fakeTx({ status: "DONE" }, accessOk);
   await assert.rejects(addComment(closed.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /closed/);
-  assert.ok(!closed.calls.some((c) => c.model === "$executeRaw"));
+  assert.deepEqual(writes(closed.calls).map((c) => c.model), ["$executeRaw"], "only the lock");
+  assert.ok(!closed.calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"), "an earlier post is never handed back");
   const noAccess = fakeTx({ status: "OPEN" });
   await assert.rejects(addComment(noAccess.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /don't have access/);
-  assert.ok(!noAccess.calls.some((c) => c.model === "$executeRaw"));
+  assert.deepEqual(writes(noAccess.calls).map((c) => c.model), ["$executeRaw"], "only the lock");
+  assert.ok(!noAccess.calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"));
+});
+
+test("addComment: a task deleted while the send waited is refused under the lock, before any write", async () => {
+  const { tx, calls } = fakeTx({}, (model, op) => (model === "task" && op === "findUnique" ? null : undefined));
+  await assert.rejects(addComment(tx, "t1", { body: "Hi" }, PIETER), /no longer exists/);
+  assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"]);
+});
+
+test("notify queues the partners' rows in user id order", async () => {
+  const { tx, calls } = fakeTx({ status: "OPEN" }, (model, op) => accessOk(model, op) ?? (model === "user" && op === "findMany" ? [{ id: "u-a" }, { id: "u-b" }] : undefined));
+  await addComment(tx, "t1", { body: "On my way" }, ZACK);
+  const staff = calls.find((c) => c.model === "user" && c.op === "findMany")!;
+  assert.deepEqual((staff.args as { orderBy?: unknown }).orderBy, { id: "asc" });
+  assert.deepEqual(
+    calls.filter((c) => c.model === "$executeRaw" && c.op.includes("NotificationOutbox")).map((c) => (c.args as unknown[])[2]),
+    ["u-a", "u-b"],
+  );
 });
 
 test("addComment: a contractor's comment is always Shared, found by their contact", async () => {
@@ -751,7 +783,7 @@ test("setStatus: a stale change credits whoever moved it there, not an approval 
 const UNDO_NOW = new Date("2026-10-23T15:00:00Z");
 /** Pieter's approval, 30 seconds before UNDO_NOW. */
 const APPROVAL = { id: "s9", data: { from: "REVIEW", to: "DONE" }, createdAt: new Date("2026-10-23T14:59:30Z"), actorUserId: "u-pieter", actorLabel: "Pieter Louw" };
-type EmailRow = { sentAt: Date | null; openKey: string | null; attempts: number };
+type EmailRow = { sentAt: Date | null; lastError?: string | null; openKey: string | null; attempts: number };
 
 /**
  * A Done task whose latest status line is `approval` (null for none), with the
@@ -806,21 +838,54 @@ test("undoApproval: the approval's email rows are locked after the task and befo
   assert.deepEqual(calls[lock].args, ["t1", "s9"]);
 });
 
-test("undoApproval: refused once the approval's email is claimed or sent, with nothing written", async () => {
-  const claimed: EmailRow = { sentAt: null, openKey: null, attempts: 1 };
-  const sent: EmailRow = { sentAt: new Date("2026-10-23T14:59:50Z"), openKey: null, attempts: 1 };
-  const open: EmailRow = { sentAt: null, openKey: "c:c-zack:t1", attempts: 0 };
-  for (const emails of [[claimed], [sent], [open, claimed]]) {
+test("undoApproval: refused once the approval's email is sent or on its way, each with its own line, and nothing written", async () => {
+  const sent: EmailRow = { sentAt: new Date("2026-10-23T14:59:50Z"), lastError: null, openKey: null, attempts: 1 };
+  const claimed: EmailRow = { sentAt: null, lastError: null, openKey: null, attempts: 1 };
+  // A try failed and the row waits to try again: it may still reach Zack.
+  const backoff: EmailRow = { sentAt: null, lastError: "502 Bad Gateway", openKey: null, attempts: 2 };
+  const open: EmailRow = { sentAt: null, lastError: null, openKey: "c:c-zack:t1", attempts: 0 };
+  const cases: [EmailRow[], string][] = [
+    [[sent], "Email already sent. Change the status."],
+    [[claimed], "The email is on its way. Change the status."],
+    [[backoff], "The email is on its way. Change the status."],
+    [[open, claimed], "The email is on its way. Change the status."],
+    // Sent says sent, whatever else is waiting.
+    [[claimed, sent], "Email already sent. Change the status."],
+  ];
+  for (const [emails, line] of cases) {
     const { tx, calls } = approvalTx({}, { emails });
-    await assert.rejects(undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW), (e: unknown) => e instanceof TaskRuleError && e.message === "Email already sent. Change the status.");
+    await assert.rejects(undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW), (e: unknown) => e instanceof TaskRuleError && e.message === line);
     assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "only the task lock");
   }
   // Still open, or a try Resend refused and gave back (openKey null, attempts 0): the drain re-reads, so Undo goes through.
-  for (const emails of [[open], [{ sentAt: null, openKey: null, attempts: 0 }]]) {
+  for (const emails of [[open], [{ sentAt: null, lastError: "rate limited", openKey: null, attempts: 0 }]]) {
     const { tx, calls } = approvalTx({}, { emails });
     await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
     assert.ok(calls.some((c) => c.model === "task" && c.op === "update"));
   }
+});
+
+test("undoApproval: a row the drain closed without sending never reached Zack, so the Undo goes through", async () => {
+  for (const lastError of ["nothing to send", "no login", "gave up: 500 Internal Server Error"]) {
+    const closed: EmailRow = { sentAt: new Date("2026-10-23T14:59:50Z"), lastError, openKey: null, attempts: 1 };
+    const { tx, calls } = approvalTx({}, { emails: [closed] });
+    await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
+    assert.ok(calls.some((c) => c.model === "task" && c.op === "update"), lastError);
+  }
+  // The lock reads lastError beside the rest, so it can tell the two apart.
+  const { tx, calls } = approvalTx();
+  await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
+  assert.match(calls[approvalEmailLock(calls)].op, /SELECT "sentAt", "lastError", "openKey", "attempts" FROM "NotificationOutbox"/);
+});
+
+test("approvalEmailRefusal: sent, on its way, or nothing stopping the Undo", () => {
+  const at = new Date("2026-10-23T14:59:50Z");
+  assert.equal(approvalEmailRefusal([]), null);
+  assert.equal(approvalEmailRefusal([{ sentAt: at, lastError: null, openKey: null, attempts: 1 }]), "Email already sent. Change the status.");
+  assert.equal(approvalEmailRefusal([{ sentAt: at, lastError: "no login", openKey: null, attempts: 0 }]), null);
+  assert.equal(approvalEmailRefusal([{ sentAt: null, lastError: null, openKey: null, attempts: 1 }]), "The email is on its way. Change the status.");
+  assert.equal(approvalEmailRefusal([{ sentAt: null, lastError: "timeout", openKey: null, attempts: 3 }]), "The email is on its way. Change the status.");
+  assert.equal(approvalEmailRefusal([{ sentAt: null, lastError: null, openKey: "u:u1:t1", attempts: 0 }]), null);
 });
 
 test("undoApproval: only the partner who approved, and only within 2 minutes", async () => {
@@ -910,6 +975,9 @@ test("undoApproval takes the next repeat copy back through the same rule as a re
     .filter(({ c }) => c.op.includes("FOR UPDATE") || c.op.includes("FOR NO KEY UPDATE"))
     .map(({ c }) => (c.op.includes('FROM "Task"') ? `task:${(c.args as unknown[])[0]}` : c.op.includes("@>") ? "emails:approval" : `emails:${(c.args as unknown[])[0]}`));
   assert.deepEqual(order, ["task:t1", "emails:approval", "task:t2", "emails:t2"]);
+  // The copy's email rows in id order too, as every outbox lock takes them.
+  const copyEmails = calls.find((c) => c.model === "$queryRaw" && c.op.includes('FROM "NotificationOutbox"') && !c.op.includes("@>"))!;
+  assert.match(copyEmails.op, /WHERE "taskId" = \? ORDER BY "id" FOR UPDATE$/);
 });
 
 test("undoApproval: a touched copy stays, and the job still goes back to Review", async () => {
@@ -1025,14 +1093,38 @@ test("patchTask: the email for a moved date says whether it is the visit or the 
 // A tick that loses a race to a Remove
 // ---------------------------------------------------------------------------
 
-test("setChecklistItem: locks the item before it reads it, so a tick that loses to a Remove gets the rule error, not a missing-row failure", async () => {
-  // The Remove committed while the tick waited: after the lock the item is gone.
-  const { tx, calls } = fakeTx({}, (model, op) => (model === "taskChecklistItem" && op === "findUnique" ? null : undefined));
+test("setChecklistItem: locks the task and then the item before it reads it, so a tick that loses to a Remove gets the rule error, not a missing-row failure", async () => {
+  // The first read only names the task. The Remove committed while the tick waited: after the locks the item is gone.
+  const { tx, calls } = fakeTx({}, (model, op, args) =>
+    model === "taskChecklistItem" && op === "findUnique" ? (args.select?.taskId ? { taskId: "t1" } : null) : undefined,
+  );
   await assert.rejects(setChecklistItem(tx, "i1", true, PIETER), (err: unknown) => err instanceof TaskRuleError && err.message === "That checklist item no longer exists.");
-  assert.equal(calls[0].model, "$executeRaw");
-  assert.match(calls[0].op, /FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE/);
-  assert.equal(calls[1].model, "taskChecklistItem");
+  assert.deepEqual(
+    calls.slice(0, 4).map((c) => `${c.model}${c.model === "$executeRaw" ? ` ${(c.args as unknown[])[0]}` : `.${c.op}`}`),
+    ["taskChecklistItem.findUnique", "$executeRaw t1", "$executeRaw i1", "taskChecklistItem.findUnique"],
+  );
+  assert.match(calls[1].op, /^SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.match(calls[2].op, /^SELECT 1 FROM "TaskChecklistItem" WHERE "id" = \? FOR NO KEY UPDATE$/);
   assert.ok(!calls.some((c) => c.op === "update"), "nothing written");
+});
+
+test("setChecklistItem: an item already gone locks nothing and says so", async () => {
+  const { tx, calls } = fakeTx({}, (model, op) => (model === "taskChecklistItem" && op === "findUnique" ? null : undefined));
+  await assert.rejects(setChecklistItem(tx, "i1", true, PIETER), /no longer exists/);
+  assert.ok(!calls.some((c) => c.model === "$executeRaw"));
+});
+
+test("addChecklistItem: the task row is locked first, and a task deleted meanwhile is refused before the insert", async () => {
+  const { tx, calls } = fakeTx({});
+  await addChecklistItem(tx, "t1", "Patch the wall", PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.equal(calls[0].model, "$executeRaw");
+  assert.match(calls[0].op, /^SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.deepEqual(calls[0].args, ["t1"]);
+  assert.ok(calls.findIndex((c) => c.model === "taskChecklistItem" && c.op === "create") > 0);
+
+  const gone = fakeTx({}, (model, op) => (model === "task" && op === "findUnique" ? null : undefined));
+  await assert.rejects(addChecklistItem(gone.tx, "t1", "Patch the wall", PIETER), /no longer exists/);
+  assert.ok(!gone.calls.some((c) => c.model === "taskChecklistItem" && c.op === "create"));
 });
 
 test("setChecklistItem: a tick on an item that is there still writes the tick and its line", async () => {

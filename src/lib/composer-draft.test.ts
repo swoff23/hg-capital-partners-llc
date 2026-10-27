@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EMPTY_DRAFT, clientIdToReuse, parseDraft, resolvePending, serializeDraft, type Draft } from "./composer-draft";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { EMPTY_DRAFT, clientIdToReuse, parseDraft, personalDraftKey, resolvePending, serializeDraft, type Draft } from "./composer-draft";
 
 test("a version 2 draft keeps the words and who sees them together", () => {
   const raw = JSON.stringify({ v: 2, text: "Check with Pieter first", visibility: "INTERNAL" });
@@ -81,4 +83,20 @@ test("failed, then Send again: the same message reuses its clientId; any change 
   assert.equal(clientIdToReuse(EMPTY_DRAFT, same), null, "nothing held");
   // A timeline send waiting on its answer is not a held one: Retry has its own record of the message.
   assert.equal(clientIdToReuse({ ...d, pending }, same), null);
+});
+
+test("the portal's job composer and the deal note box keep one draft per person, so a second sign-in on the device starts empty", () => {
+  assert.equal(personalDraftKey("job", "t1", "c-zack"), "hgos-job-draft:t1:c-zack");
+  assert.notEqual(personalDraftKey("job", "t1", "c-zack"), personalDraftKey("job", "t1", "c-jose"));
+  assert.equal(personalDraftKey("deal-note", "d1", "u-connor"), "hgos-deal-note-draft:d1:u-connor");
+  assert.notEqual(personalDraftKey("deal-note", "d1", "u-connor"), personalDraftKey("deal-note", "d1", "u-pieter"));
+  // Never the per-record keys the two boxes used before the person was in them.
+  assert.notEqual(personalDraftKey("job", "t1", "c-zack"), "hgos-job-draft:t1");
+});
+
+test("both boxes build their key from the person signed in", () => {
+  const read = (...parts: string[]) => readFileSync(join(import.meta.dirname, "..", ...parts), "utf8");
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx"), /draftKey=\{personalDraftKey\("job", taskId, contactId\)\}/);
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "page.tsx"), /contactId=\{principal\.contactId\}/);
+  assert.match(read("app", "(app)", "deals", "[id]", "deal-log.tsx"), /draftKey=\{personalDraftKey\("deal-note", dealId, viewerId\)\}/);
 });

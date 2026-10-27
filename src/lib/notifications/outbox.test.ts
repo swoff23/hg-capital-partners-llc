@@ -38,3 +38,15 @@ test("the drain never deletes or rewrites a row to retract a line", () => {
   assert.doesNotMatch(code, /items:\s*\{?\s*(set|push)/);
   assert.doesNotMatch(code, /UPDATE "NotificationOutbox"[\s\S]{0,80}"items" =/, "only the claim and the failure paths write the row");
 });
+
+test("a quota refusal pushes every due row back in one id-ordered statement that never waits on a row a write holds", () => {
+  // An unordered updateMany across every task's rows could hold one row a queueing write wants while waiting on one
+  // it holds (40P01). Id order and SKIP LOCKED: it never waits, so it can't be one side of a deadlock.
+  assert.doesNotMatch(code, /notificationOutbox\.updateMany\(\{\s*where: \{ sentAt: null, sendAfter/, "no unordered update across rows");
+  assert.match(code, /if \(failure === "quota"\) \{\s*await pushBackDue\(now, until\);/);
+  const push = code.slice(code.indexOf("async function pushBackDue"));
+  assert.match(
+    push,
+    /UPDATE "NotificationOutbox" SET "sendAfter" = [^;]*WHERE "id" IN \(\s*SELECT "id" FROM "NotificationOutbox"\s*WHERE "sentAt" IS NULL AND "sendAfter" <= [^;]*ORDER BY "id"\s*FOR UPDATE SKIP LOCKED\s*\)/,
+  );
+});

@@ -82,7 +82,8 @@ export interface ComposerProps {
   /**
    * Where the draft lives in this browser, one key per surface and record,
    * so a staff draft never opens in the portal's composer on the same
-   * origin ("hgos-task-draft:<taskId>" on the task page).
+   * origin ("hgos-task-draft:<taskId>" on the task page), and per person
+   * where one device may be shared (composer-draft.ts personalDraftKey).
    */
   draftKey: string;
   /**

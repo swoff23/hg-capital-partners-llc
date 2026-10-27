@@ -16,12 +16,20 @@
 -- a soft delete so the toast's Undo can bring the note back.
 --
 -- Additive only: nullable columns, one constant default and one foreign key.
--- Nothing is altered, dropped, renamed or tightened, so today's code runs on
--- it and it is safe on the existing production database whenever it is
--- applied, by prebuild's `prisma migrate deploy` or out of band through `npm
--- run migrate`, before or after the code that reads it ships. Nothing is
--- backfilled here: every existing note keeps a null author, an empty data
--- object and no edit or delete time.
+-- Nothing is altered, dropped, renamed or tightened, so the code already in
+-- production runs on it unchanged. Nothing is backfilled here: every
+-- existing note keeps a null author, an empty data object and no edit or
+-- delete time.
+--
+-- It must be in place before the code that ships with it serves a request.
+-- That code needs the columns: Prisma names every DealNote column in what it
+-- writes and reads back, so logDeal (core.ts) fails without them, and so
+-- does every task write that logs to a deal, setStatus's Approve and Done
+-- among them. It reaches production through `prisma migrate deploy` in the
+-- production build's prebuild (scripts/prebuild.mjs), which runs before
+-- `next build`, so before the new code serves. Prebuild runs it on a direct
+-- or session DATABASE_URL and skips the transaction pooler. (`npm run
+-- migrate` is the spreadsheet import, not this.)
 --
 -- Roll forward only once code that writes these columns has shipped.
 --

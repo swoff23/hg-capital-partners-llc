@@ -410,18 +410,22 @@ test("findOwnUpload: a writer that never uploads asks nothing", async () => {
 const file = (over: Partial<RemovedFile>): RemovedFile => ({
   id: "a1",
   taskId: "t1",
-  eventId: "e1",
   asanaGid: null,
   filename: "photo.jpg",
   ...over,
 });
 
+/** The file as removeAttachment reads it under the lock: on post `eventId` (null for a draft). */
+const onPost = (eventId: string | null, more?: Answer): Answer => (model, op, args) =>
+  more?.(model, op, args) ?? (model === "taskAttachment" && op === "findUnique" ? { eventId } : undefined);
+const fileWrites = (calls: Call[]) => calls.filter((c) => c.model === "taskAttachment" && c.op !== "findUnique");
+
 test("removeAttachment: an imported file is only marked removed, so the delta sync doesn't bring it back", async () => {
   const now = new Date("2026-10-26T16:00:00Z");
-  const { tx, calls } = fakeTx();
+  const { tx, calls } = fakeTx(onPost("e1"));
   assert.equal(await removeAttachment(tx, file({ asanaGid: "1209876543" }), CONNOR, now), true);
   assert.deepEqual(
-    calls.filter((c) => c.model === "taskAttachment").map((c) => [c.op, c.args]),
+    fileWrites(calls).map((c) => [c.op, c.args]),
     [["updateMany", { where: { id: "a1", deletedAt: null }, data: { deletedAt: now } }]],
   );
   assert.ok(!calls.some((c) => c.op === "delete" || c.op === "deleteMany"));
@@ -432,7 +436,7 @@ test("removeAttachment: an imported file is only marked removed, so the delta sy
 
 test("removeAttachment: the removed line is Internal and emails nobody, and the task is locked first and stamped as edited", async () => {
   const now = new Date("2026-10-26T16:00:00Z");
-  const { tx, calls } = fakeTx();
+  const { tx, calls } = fakeTx(onPost("e1"));
   assert.equal(await removeAttachment(tx, file({}), CONNOR, now), true);
   // A Shared line would reach the contractor's job page, and a Shared staff file line emails them "added photo.jpg".
   const line = calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as CallArgs;
@@ -448,10 +452,10 @@ test("removeAttachment: the removed line is Internal and emails nobody, and the 
 });
 
 test("removeAttachment: a file added in the app is deleted for good", async () => {
-  const { tx, calls } = fakeTx();
+  const { tx, calls } = fakeTx(onPost("e1"));
   assert.equal(await removeAttachment(tx, file({}), CONNOR), true);
   assert.deepEqual(
-    calls.filter((c) => c.model === "taskAttachment").map((c) => [c.op, c.args]),
+    fileWrites(calls).map((c) => [c.op, c.args]),
     // Only while it is still up: one a comment's delete or a take-back stamped since the caller read it stays for Undo.
     [["deleteMany", { where: { id: "a1", deletedAt: null } }]],
   );
@@ -461,9 +465,11 @@ test("removeAttachment: a Remove that loses to a comment delete or a take-back d
   // deleteTaskAttachment reads the file before its transaction. Between the read and the delete the post is taken off and
   // its files are stamped, so the row no longer matches `deletedAt: null` (a count of 0), whichever kind of file it is.
   for (const over of [{}, { asanaGid: "1209" }]) {
-    const lost = fakeTx((model, op) => (model === "taskAttachment" && op === "deleteMany" ? { count: 0 } : model === "taskAttachment" && op === "updateMany" ? { count: 0 } : undefined));
+    const lost = fakeTx(
+      onPost("e1", (model, op) => (model === "taskAttachment" && op === "deleteMany" ? { count: 0 } : model === "taskAttachment" && op === "updateMany" ? { count: 0 } : undefined)),
+    );
     assert.equal(await removeAttachment(lost.tx, file(over), CONNOR), false);
-    const attempts = lost.calls.filter((c) => c.model === "taskAttachment");
+    const attempts = fileWrites(lost.calls);
     assert.equal(attempts.length, 1);
     assert.deepEqual((attempts[0].args as { where: unknown }).where, { id: "a1", deletedAt: null }, "matched on the file still being up");
     assert.ok(!lost.calls.some((c) => c.model === "taskEvent" || (c.model === "task" && c.op === "update")), "no line and no stamp");
@@ -471,19 +477,30 @@ test("removeAttachment: a Remove that loses to a comment delete or a take-back d
 });
 
 test("removeAttachment: a remove that lost the race writes nothing, and a draft or a call with no one leaves no line", async () => {
-  const lost = fakeTx((model, op) => (model === "taskAttachment" && /Many$/.test(op) ? { count: 0 } : undefined));
+  const lost = fakeTx(onPost("e1", (model, op) => (model === "taskAttachment" && /Many$/.test(op) ? { count: 0 } : undefined)));
   assert.equal(await removeAttachment(lost.tx, file({ asanaGid: "1209" }), CONNOR), false);
   assert.ok(!lost.calls.some((c) => c.model === "taskEvent"));
   assert.ok(!lost.calls.some((c) => c.model === "task" && c.op === "update"), "no stamp either");
   assert.ok(!lost.calls.some((c) => isWrite(c) && !(c.model === "taskAttachment" && /Many$/.test(c.op))), "only the remove that lost");
 
-  const draft = fakeTx();
-  await removeAttachment(draft.tx, file({ eventId: null }), CONNOR);
+  const draft = fakeTx(onPost(null));
+  await removeAttachment(draft.tx, file({}), CONNOR);
   assert.ok(!draft.calls.some((c) => c.model === "taskEvent"), "never posted");
 
-  const unnamed = fakeTx();
+  const unnamed = fakeTx(onPost("e1"));
   await removeAttachment(unnamed.tx, file({}));
   assert.ok(!unnamed.calls.some((c) => c.model === "taskEvent"), "the composer unreadying its own draft");
+});
+
+test("removeAttachment: which post the file is on is read under the task lock, not taken from the caller's earlier read", async () => {
+  // deleteTaskAttachment read a draft; a send posted it (on e7) before the Remove got the task. It is a posted file now.
+  const { tx, calls } = fakeTx(onPost("e7"));
+  assert.equal(await removeAttachment(tx, file({}), CONNOR), true);
+  const read = calls.findIndex((c) => c.model === "taskAttachment" && c.op === "findUnique");
+  assert.ok(read > 0 && calls[0].op.includes("FOR NO KEY UPDATE"), "after the task lock");
+  assert.ok(read < calls.findIndex((c) => c.model === "taskAttachment" && c.op === "deleteMany"), "before the delete");
+  const line = calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as CallArgs;
+  assert.equal((line.data?.data as { eventId?: string }).eventId, "e7");
 });
 
 // ---------------------------------------------------------------------------
@@ -513,4 +530,25 @@ test("renameAttachment: a file that is gone is refused, and nothing is written",
     await assert.rejects(renameAttachment(tx, "a1", "x.jpg", CONNOR), /That file no longer exists\./);
     assert.ok(!calls.some(isWrite));
   }
+});
+
+test("renameAttachment: the task row is locked before the file is checked again and written", async () => {
+  // The first read only names the task. Remove, a comment's delete and a take-back lock the task before the file.
+  const { tx, calls } = fakeTx((model, op) => (model === "taskAttachment" && op === "findUnique" ? { taskId: "t9", deletedAt: null } : undefined));
+  await renameAttachment(tx, "a1", "Roof leak.jpg", CONNOR);
+  assert.deepEqual(
+    calls.map((c) => (c.model === "$executeRaw" ? `lock ${(c.args as unknown[])[0]}` : `${c.model}.${c.op}`)),
+    ["taskAttachment.findUnique", "lock t9", "taskAttachment.findUnique", "taskAttachment.update", "task.update"],
+  );
+  assert.match(calls[1].op, /^SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+});
+
+test("renameAttachment: a rename that waited on a delete finds the file gone under the lock, and writes nothing", async () => {
+  let reads = 0;
+  const { tx, calls } = fakeTx((model, op) =>
+    model === "taskAttachment" && op === "findUnique" ? (++reads === 1 ? { taskId: "t9" } : { taskId: "t9", deletedAt: new Date() }) : undefined,
+  );
+  await assert.rejects(renameAttachment(tx, "a1", "x.jpg", CONNOR), /That file no longer exists\./);
+  assert.ok(calls.some((c) => c.model === "$executeRaw"), "it waited on the task");
+  assert.ok(!calls.some(isWrite));
 });

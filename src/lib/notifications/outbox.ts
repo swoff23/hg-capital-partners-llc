@@ -105,6 +105,22 @@ async function claim(id: string, now: Date): Promise<{ items: unknown; attempts:
 }
 
 /**
+ * Resend refused for its quota: every row still due waits until `until`.
+ * Locked in id order and SKIP LOCKED, so it never waits on a row a write in
+ * core.ts holds, and never holds one that write then waits for.
+ */
+async function pushBackDue(now: Date, until: Date): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE "NotificationOutbox" SET "sendAfter" = (${until.toISOString()}::timestamptz AT TIME ZONE 'UTC')
+    WHERE "id" IN (
+      SELECT "id" FROM "NotificationOutbox"
+      WHERE "sentAt" IS NULL AND "sendAfter" <= (${now.toISOString()}::timestamptz AT TIME ZONE 'UTC')
+      ORDER BY "id"
+      FOR UPDATE SKIP LOCKED
+    )`;
+}
+
+/**
  * The claimed row's items as they stand now (activity 2.5): each item that
  * names an event (a comment, a status, a file post, a send-back's note) is
  * read back, in one query scoped to the row's task, and content.ts
@@ -253,8 +269,11 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         data: { sendAfter: until, attempts: { decrement: 1 }, lastError: error },
       });
       if (failure === "quota") {
-        // Everything else due waits too, so each later run doesn't spend a refused call.
-        await prisma.notificationOutbox.updateMany({ where: { sentAt: null, sendAfter: { lte: now } }, data: { sendAfter: until } });
+        // Everything else due waits too, so each later run doesn't spend a refused call. One statement across
+        // every task's rows: it takes them in id order, as every outbox lock in core.ts does, and passes over
+        // a row a write holds right now (a line queueing, an Undo reading it) instead of waiting on it, so it
+        // never deadlocks against them. A row passed over stays due and waits at the next run's refusal.
+        await pushBackDue(now, until);
         logError("notifications:resend-quota", new Error("Resend's sending quota is used up; emails wait and retry hourly"), {
           sentToday: sentBefore + result.sent,
         });

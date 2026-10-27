@@ -123,6 +123,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
             {active ? (
               <JobActions
                 taskId={job.id}
+                contactId={principal.contactId}
                 status={job.status}
                 firstName={firstName(principal.label)}
                 staffNames={job.staffNames}

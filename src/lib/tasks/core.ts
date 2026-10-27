@@ -267,7 +267,8 @@ async function notify(
   if (audience === "contractor" && task.assigneeContactId) {
     await enqueue(tx, { contactId: task.assigneeContactId }, task.id, item, now);
   } else if (audience === "staff") {
-    const staff = await tx.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true } });
+    // In id order, so two writes queueing for the partners take their rows the same way round.
+    const staff = await tx.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true }, orderBy: { id: "asc" } });
     for (const s of staff) await enqueue(tx, { userId: s.id }, task.id, item, now);
   }
   return audience;
@@ -532,6 +533,22 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   return { task, nextTaskId, nextDue, statusEventId: statusEvent.id, noteEventId: noteEvent?.event.id ?? null, emailsContractor: audience === "contractor" };
 }
 
+type ApprovalEmail = { sentAt: Date | null; lastError: string | null; openKey: string | null; attempts: number };
+
+/**
+ * What an approval's email rows say about its Undo, as one toast line, or
+ * null when nothing stops it. Sent (`sentAt` with no `lastError`): Zack has
+ * it. On its way (`sentAt` null, claimed, a try spent): a send run has it,
+ * or it failed and waits to try again, and either way it may reach him. A
+ * row closed without sending (`sentAt` with a `lastError`: nothing left in
+ * it, no login, given up) never reached him, so it doesn't stop the Undo.
+ */
+export function approvalEmailRefusal(rows: readonly ApprovalEmail[]): string | null {
+  if (rows.some((e) => e.sentAt !== null && e.lastError === null)) return "Email already sent. Change the status.";
+  if (rows.some((e) => e.sentAt === null && e.openKey === null && e.attempts > 0)) return "The email is on its way. Change the status.";
+  return null;
+}
+
 /**
  * Approve's Undo (activity 2.8): the job goes back to Review as if it had not
  * been approved. A plain `setStatus(REVIEW)` would not do: it writes a Shared
@@ -548,12 +565,13 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
  * Staff only, and only the partner who approved, within APPROVAL_UNDO_MS:
  * the toast stays up while hovered or focused, so the server keeps the
  * limit. Refused, with who moved it, when the task is no longer Done or the
- * approval is not the latest status line, and once the approval's email row
- * is claimed or sent: by then Zack has been told, and the status menu is the
- * honest way back. A retry of an Undo that already went through is a quiet
- * success. Lock order: this task, then its email rows naming the approval
- * (id order), then takeBackRepeat's copy and the copy's email rows. The
- * drain locks email rows only.
+ * approval is not the latest status line, and once the approval's email is
+ * sent or on its way (approvalEmailRefusal): by then Zack has been told, or
+ * may be, and the status menu is the honest way back. A row the drain closed
+ * without sending doesn't stop it. A retry of an Undo that already went
+ * through is a quiet success. Lock order: this task, then its email rows
+ * naming the approval (id order), then takeBackRepeat's copy and the copy's
+ * email rows (id order). The drain locks email rows only.
  */
 export async function undoApproval(tx: Tx, taskId: string, approvedEventId: string, p: Principal, now = new Date()): Promise<{ task: Task }> {
   if (p.kind !== "staff") throw new TaskRuleError("Only staff can undo an approval.");
@@ -581,14 +599,13 @@ export async function undoApproval(tx: Tx, taskId: string, approvedEventId: stri
   }
   if (now.getTime() - latest.createdAt.getTime() > APPROVAL_UNDO_MS) throw new TaskRuleError("Too late to undo. Change the status.");
   // The approval's email rows, locked so a send run can't claim one between this check and the soft delete
-  // below. A claim that got there first shows as openKey null with a try spent.
-  const emails = await tx.$queryRaw<{ sentAt: Date | null; openKey: string | null; attempts: number }[]>`
-    SELECT "sentAt", "openKey", "attempts" FROM "NotificationOutbox"
+  // below (approvalEmailRefusal says which rows stop the Undo).
+  const emails = await tx.$queryRaw<ApprovalEmail[]>`
+    SELECT "sentAt", "lastError", "openKey", "attempts" FROM "NotificationOutbox"
     WHERE "taskId" = ${taskId} AND "items" @> jsonb_build_array(jsonb_build_object('eventId', ${approvedEventId}::text))
     ORDER BY "id" FOR UPDATE`;
-  if (emails.some((e) => e.sentAt !== null || (e.openKey === null && e.attempts > 0))) {
-    throw new TaskRuleError("Email already sent. Change the status.");
-  }
+  const refusal = approvalEmailRefusal(emails);
+  if (refusal) throw new TaskRuleError(refusal);
   const task = await tx.task.update({
     where: { id: taskId },
     data: { status: "REVIEW", completedAt: null, completedByUserId: null, completedByContactId: null, ...editStamp(p, now) },
@@ -711,9 +728,10 @@ async function takeBackRepeat(tx: Tx, doneId: string): Promise<boolean> {
   // first and is seen below, or waits and then finds the copy gone.
   const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id" = ${made.nextId} FOR UPDATE`;
   if (locked.length === 0) return false;
-  // And its email rows, so a send run can't take one between this read and the delete.
+  // And its email rows, in id order as every outbox lock here, so a send run can't take one between this read and
+  // the delete.
   const emails = await tx.$queryRaw<{ sentAt: Date | null; attempts: number }[]>`
-    SELECT "sentAt", "attempts" FROM "NotificationOutbox" WHERE "taskId" = ${made.nextId} FOR UPDATE`;
+    SELECT "sentAt", "attempts" FROM "NotificationOutbox" WHERE "taskId" = ${made.nextId} ORDER BY "id" FOR UPDATE`;
   const copy = await tx.task.findUnique({
     where: { id: made.nextId },
     select: {
@@ -1041,12 +1059,28 @@ async function priorSend(tx: Tx, taskId: string, p: Principal, clientId: string)
   });
 }
 
+/**
+ * Every send takes the task row first, before it reads the task or links a
+ * file, as every other writer on a task does (setStatus, removeAttachment,
+ * takeBackContractorPost, a comment's edit, delete and restore). A send that
+ * linked its files first and stamped the task after (the portal's leave-page
+ * flush and a batch post carry no clientId) would hold a file row a staff
+ * Remove waits for while it waits for the task row the Remove holds, and
+ * Postgres aborts one of them (40P01). Under the lock the task is read as it
+ * is now, so a job approved a moment ago refuses a contractor's post, and a
+ * reassignment that just landed decides who the comment is addressed to.
+ * One send at a time per task also keeps a Retry in flight beside its
+ * original from posting, and emailing, twice (`clientId`). NO KEY UPDATE,
+ * never FOR UPDATE: the key-share locks a comment's own inserts take would
+ * deadlock against it (40P01), as in setStatus.
+ */
 export async function addComment(tx: Tx, taskId: string, input: CommentInput, p: Principal, now = new Date()): Promise<TaskEvent> {
   const body = input.body.trim();
   // A Retry of photos alone that did post arrives with no files left to name (the portal passes only its
   // unposted ones), so with a clientId the empty check waits until the first send has been looked for.
   const empty = !body && !input.attachmentIds?.length;
   if (empty && !input.clientId) throw new TaskRuleError("Write something or add a photo.");
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") {
@@ -1054,10 +1088,7 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
     if (!isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
   }
   if (input.clientId) {
-    // One send at a time per task: without the lock, a Retry in flight beside the original double-posts and
-    // double-emails. NO KEY UPDATE, never FOR UPDATE: the key-share locks a comment's own inserts take would
-    // deadlock against it (40P01), as in setStatus.
-    await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+    // After the access and closed-job checks, so a refused contractor never gets an earlier post back.
     const prior = await priorSend(tx, taskId, p, input.clientId);
     if (prior) return prior;
   }
@@ -1409,8 +1440,8 @@ export async function findOwnUpload(tx: Tx, taskId: string, pathname: string, p:
   return tx.taskAttachment.findFirst({ where: { taskId, pathname, deletedAt: null, ...by }, select: { id: true } });
 }
 
-/** What removing a file needs to know about it. */
-export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "eventId" | "asanaGid" | "filename">;
+/** What removing a file needs to know about it. Which post it is on is read again under the lock. */
+export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "asanaGid" | "filename">;
 
 /**
  * Staff take a file off a task (tasks/attachments.ts deleteTaskAttachment,
@@ -1435,19 +1466,23 @@ export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "eventId" | "as
  * still up (`deletedAt` null): the caller read the row before this
  * transaction, so a comment deleted or a post taken back in between has
  * already stamped it, and it must stay for that comment's Undo. False when
- * the file is already gone or off, and then nothing is written.
+ * the file is already gone or off, and then nothing is written. Which post
+ * the file is on is read under the lock too: a draft the caller read that a
+ * send posted in between is a posted file now, and leaves its line.
  */
 export async function removeAttachment(tx: Tx, att: RemovedFile, p?: Principal, now = new Date()): Promise<boolean> {
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${att.taskId} FOR NO KEY UPDATE`;
+  const posted = await tx.taskAttachment.findUnique({ where: { id: att.id }, select: { eventId: true } });
   const { count } = att.asanaGid
     ? await tx.taskAttachment.updateMany({ where: { id: att.id, deletedAt: null }, data: { deletedAt: now } })
     : await tx.taskAttachment.deleteMany({ where: { id: att.id, deletedAt: null } });
   if (count === 0) return false;
-  if (p && att.eventId !== null) {
+  const eventId = posted?.eventId ?? null;
+  if (p && eventId !== null) {
     await addEvent(tx, att.taskId, p, {
       kind: "ATTACHMENT",
       visibility: "INTERNAL",
-      data: { attachmentId: att.id, filename: att.filename, removed: true, eventId: att.eventId },
+      data: { attachmentId: att.id, filename: att.filename, removed: true, eventId },
     });
   }
   if (p) await tx.task.update({ where: { id: att.taskId }, data: editStamp(p, now) });
@@ -1460,8 +1495,17 @@ export async function removeAttachment(tx: Tx, att: RemovedFile, p?: Principal, 
  * the task is stamped as edited (`appEditedAt`): a task left untouched since
  * an import is cleaned up with its row (D25), and a renamed file on one must
  * keep the task. Returns the file's task, to refresh its page.
+ *
+ * The task row is locked before the file's, as Remove, a comment's delete
+ * and a take-back lock it before they touch a post's files: the first read
+ * only names the task and takes no lock, and the check that the file is
+ * still up is made again once the task is held, so a rename that waited on
+ * a delete finds the file gone and says so.
  */
 export async function renameAttachment(tx: Tx, attachmentId: string, filename: string, p: Principal, now = new Date()): Promise<{ taskId: string }> {
+  const named = await tx.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true } });
+  if (!named) throw new TaskRuleError("That file no longer exists.");
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${named.taskId} FOR NO KEY UPDATE`;
   const att = await tx.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true, deletedAt: true } });
   if (!att || att.deletedAt) throw new TaskRuleError("That file no longer exists.");
   await tx.taskAttachment.update({ where: { id: attachmentId }, data: { filename } });
@@ -1470,8 +1514,9 @@ export async function renameAttachment(tx: Tx, attachmentId: string, filename: s
 }
 
 export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p: Principal, now = new Date()) {
-  // Locked before it is read, as rename and remove lock it: a tick that lands beside a Remove waits, then finds the
-  // item gone and says so, instead of failing on a row that vanished between the read and the write (P2025).
+  // Its task and then the item, locked before the item is read, as rename and remove lock them: a tick that lands
+  // beside a Remove or a task delete waits, then finds the item gone and says so, instead of failing on a row that
+  // vanished between the read and the write (P2025).
   await lockChecklistItem(tx, itemId);
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { id: true, status: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
@@ -1500,6 +1545,10 @@ export async function addChecklistItem(tx: Tx, taskId: string, title: string, p:
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't add checklist items yet.");
   const t = title.trim();
   if (!t) throw new TaskRuleError("The item needs a name.");
+  // The task row first, as every writer on a task takes it: two adds at once take the next place one after the
+  // other, and an add beside a task delete waits and then finds the task gone.
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  if (!(await tx.task.findUnique({ where: { id: taskId }, select: { id: true } }))) throw new TaskRuleError("That task no longer exists.");
   const last = await tx.taskChecklistItem.findFirst({ where: { taskId }, orderBy: { position: "desc" }, select: { position: true } });
   const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1 } });
   // Stamped like every other edit, so a repeat copy someone added to counts
@@ -1564,14 +1613,24 @@ async function recordChecklistEdit(
 }
 
 /**
- * Lock the item's row before reading it, as setStatus locks a task: a tick, a
- * rename or a second Remove landing at the same moment waits its turn and
- * then sees the result. Without it a Remove could snapshot an item a tick had
- * just changed (Undo would bring it back unticked), and two Removes would
- * both read the row and the second delete would fail on a row already gone.
- * An item that is already gone locks nothing, and the read after it says so.
+ * Lock the item's task and then the item's row before reading it, as
+ * setStatus locks a task: a tick, a rename or a second Remove landing at the
+ * same moment waits its turn and then sees the result. Without it a Remove
+ * could snapshot an item a tick had just changed (Undo would bring it back
+ * unticked), and two Removes would both read the row and the second delete
+ * would fail on a row already gone.
+ *
+ * The task row comes first, as every writer on a task takes it: each edit
+ * ends by stamping the task, and a task delete holds the task while its
+ * cascade takes the items, so an item locked first would deadlock against
+ * either (40P01). The first read only names the task and takes no lock; the
+ * read after both locks is the one the edit uses. An item that is already
+ * gone locks nothing, and that read says so.
  */
 async function lockChecklistItem(tx: Tx, itemId: string): Promise<void> {
+  const named = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, select: { taskId: true } });
+  if (!named) return;
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${named.taskId} FOR NO KEY UPDATE`;
   await tx.$executeRaw`SELECT 1 FROM "TaskChecklistItem" WHERE "id" = ${itemId} FOR NO KEY UPDATE`;
 }
 
@@ -1632,6 +1691,8 @@ export async function removeChecklistItem(tx: Tx, itemId: string, p: Principal, 
  */
 export async function restoreChecklistItem(tx: Tx, snapshot: ChecklistSnapshot, p: Principal, now = new Date()): Promise<void> {
   checklistStaffOnly(p);
+  // The task row first, as every writer on a task takes it: an Undo beside a task delete waits, then finds the task gone.
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${snapshot.taskId} FOR NO KEY UPDATE`;
   const existing = await tx.taskChecklistItem.findUnique({ where: { id: snapshot.id } });
   if (existing) return;
   if (snapshot.asanaGid && (await tx.taskChecklistItem.findUnique({ where: { asanaGid: snapshot.asanaGid } }))) return;

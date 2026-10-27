@@ -189,7 +189,8 @@ export function reconcileItems(
 
 /** `sent "T" back: note` with the note as it is now: rewritten if edited, taken out if deleted. Other status lines are untouched. */
 function withSendBackNote(item: OutboxItem, note: EventSnapshot | undefined): OutboxItem {
-  const m = /^sent (".*") back(?:: [\s\S]*)?$/.exec(oneLine(item.summary));
+  // Non-greedy for the same reason as itemText's: the old note may say `" back` itself.
+  const m = /^sent (".*?") back(?:: [\s\S]*)?$/.exec(oneLine(item.summary));
   if (!m) return item;
   const text = note && !note.deletedAt && note.body ? oneLine(note.body) : "";
   return { ...item, summary: `sent ${m[1]} back${text ? `: ${text}` : ""}` };
@@ -223,7 +224,8 @@ const STATUS_BY_WORDS = new Map(Object.entries(STATUS_LABEL).map(([k, label]) =>
  * (the subject has it): "moved the target to Fri, Oct 30", "scheduled it for
  * Thu, Oct 29", "marked it done", `: "Doors arrive Thu"`. Dates arrive
  * already written out (core.ts emailDay). The title patterns are greedy so a
- * title with a quote in it ("Hang 36" mirror") still comes out whole.
+ * title with a quote in it ("Hang 36" mirror") still comes out whole; the
+ * send-back's is not, since its note comes after the title.
  */
 export function itemText(item: OutboxItem): string {
   // A comment keeps its line breaks (activity 2.10); everything else is one line.
@@ -257,7 +259,9 @@ export function itemText(item: OutboxItem): string {
       const set = /^set ".*" to (.+)$/.exec(s);
       if (set) return `moved it to ${STATUS_BY_WORDS.get(set[1]) ?? set[1]}`;
       if (/^marked ".*" done$/.test(s)) return "marked it done";
-      const back = /^sent ".*" back(: .+)?$/.exec(s);
+      // Non-greedy, unlike the other title patterns: the note follows the title, and a greedy title would swallow
+      // a note that says `" back` itself ('put the "old" back') and drop it from the line.
+      const back = /^sent ".*?" back(: .+)?$/.exec(s);
       if (back) return `sent it back${back[1] ?? ""}`;
       return s.replace(/"[^"]*"/, "it");
     }

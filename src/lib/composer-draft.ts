@@ -2,7 +2,8 @@
  * What the composer keeps in this browser for one reply box (docs/specs/
  * activity-comments.md 2.7): the words and who sees them, together, so a
  * half-written Internal note comes back Internal. One entry per surface and
- * record (`hgos-task-draft:<taskId>`), as JSON:
+ * record (`hgos-task-draft:<taskId>`), and per person on the portal's job
+ * composer and the deal note box (personalDraftKey), as JSON:
  *
  *   { v: 2, text, visibility, pending? }
  *
@@ -19,6 +20,18 @@
  */
 
 export type DraftVisibility = "SHARED" | "INTERNAL";
+
+/**
+ * Where one person's draft for one reply box lives: the surface, the record
+ * and the person (a contractor's contact id in the portal's job composer, a
+ * partner's user id in the deal note box), so a second person who signs in
+ * on the same device never opens another's unsent words. Drafts stored under
+ * the earlier per-record keys ("hgos-job-draft:<taskId>"), which never
+ * shipped, are not read.
+ */
+export function personalDraftKey(surface: "job" | "deal-note", recordId: string, personId: string): string {
+  return `hgos-${surface}-draft:${recordId}:${personId}`;
+}
 
 /** A message sent and not yet confirmed. */
 export interface PendingDraft {
