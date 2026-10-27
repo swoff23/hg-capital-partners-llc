@@ -135,11 +135,20 @@ async function perPartner(eventIds: string[]): Promise<string[][]> {
   return Array.from({ length: partners }, () => eventIds);
 }
 
+/** The files a post told HG of come in the database's order, not the send's: compared sorted. */
+const sortLinked = (value: unknown) => {
+  const v = value as { linked?: string[] } | null;
+  return v && Array.isArray(v.linked) ? { ...v, linked: [...v.linked].sort() } : value;
+};
+
 const outcome = (p: Promise<unknown>) =>
   p.then(
-    (value) => ({ ok: true as const, value }),
+    (value) => ({ ok: true as const, value: sortLinked(value) }),
     (err: Error) => ({ ok: false as const, message: err.message }),
   );
+
+/** What a late send answers: no event to undo, and the files it linked. */
+const told = (files: string[]) => ({ ok: true, value: { event: null, linked: [...files].sort() } });
 
 test("an active send holding the files and a late send of the same files: the late one waits, then rolls back whole", { skip }, async () => {
   const { taskId, files } = await jobWithFiles("IN_PROGRESS");
@@ -171,7 +180,7 @@ test("a late send holding the files and an active send of the same files: the ac
   await someoneWaits();
   hold.release();
   const [l, a] = await Promise.all([late, active]);
-  assert.deepEqual(l, { ok: true, value: null });
+  assert.deepEqual(l, told(files));
   assert.deepEqual(a, { ok: false, message: "Write something or add a photo." });
   const after = await lines(taskId);
   assert.deepEqual(after.events, [{ late: true }], "one line, the late send's, never one an Undo takes back");
@@ -187,14 +196,14 @@ test("two late sends of the same files at once: one line and one email line each
   await someoneWaits();
   hold.release();
   const [one, two] = await Promise.all([first, second]);
-  assert.deepEqual(one, { ok: true, value: null });
+  assert.deepEqual(one, told(files));
   assert.deepEqual(two, { ok: false, message: "Write something or add a photo." });
   const after = await lines(taskId);
   assert.deepEqual(after.events, [{ late: true }]);
   assert.deepEqual(after.linkedTo, after.eventIds, "all three files on the one line");
   assert.deepEqual(after.emailLines, await perPartner(after.eventIds));
   // The same send again later (its answer lost) has nothing new to say: quiet, and nothing more written.
-  assert.deepEqual(await outcome(prisma.$transaction((tx) => postBatchIn(tx, taskId, zack, files))), { ok: true, value: null });
+  assert.deepEqual(await outcome(prisma.$transaction((tx) => postBatchIn(tx, taskId, zack, files))), told([]));
   assert.deepEqual(await lines(taskId), after);
 });
 
@@ -206,7 +215,7 @@ test("an approve that commits between the step's status read and addComment's: t
   await hold.atHold;
   await prisma.task.update({ where: { id: taskId }, data: { status: "DONE" } });
   hold.release();
-  assert.deepEqual(await post, { ok: true, value: null }, "no batch to undo: the page says the photos were added");
+  assert.deepEqual(await post, told(files), "no batch to undo: the page says the photos were added");
   const after = await lines(taskId);
   assert.deepEqual(after.events, [{ late: true }], "HG hears once, and no empty batch update was left");
   assert.deepEqual(after.linkedTo, after.eventIds);

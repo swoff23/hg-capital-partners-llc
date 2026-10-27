@@ -346,6 +346,7 @@ export class UploadEngine {
    * The page is there. Returns what to call when it goes: the files keep going, and a batch that lands later is
    * "away". A file the job refused for good gets one more go as the page comes, as a reload's restore() gives
    * every row: HG may have sent the job back to In progress since. One still refused turns back to Remove only.
+   * A page that stays open while the job's status changes mounts again for this (media-uploader.tsx reopenOn).
    */
   mount(key: string): () => void {
     this.mounts.set(key, (this.mounts.get(key) ?? 0) + 1);

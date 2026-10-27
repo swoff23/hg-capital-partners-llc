@@ -29,9 +29,10 @@ function revalidateJob(taskId: string): void {
  * The files of one batch, posted together as one update with no text: "Zack
  * added 4 photos" on the timeline and one line in the partners' email. It's
  * marked as a batch (core.addComment `batch`), the only kind of post Undo
- * takes back. Returns the update's id for that Undo. A batch that was already
- * posted (two sends of the same photos at once) is refused, so the losing
- * side leaves no empty update behind.
+ * takes back. Returns the update's id for that Undo, and `linked`, the ids of
+ * the files it told HG of (the page counts its toast from these). A batch that
+ * was already posted (two sends of the same photos at once) is refused, so the
+ * losing side leaves no empty update behind.
  *
  * A job HG has approved or canceled since the photos went up takes no batch
  * post, but the late photos are already recorded on it, so HG hears about
@@ -42,11 +43,11 @@ function revalidateJob(taskId: string): void {
  * photos. The access check still comes first, and an approve that lands while
  * the batch posts goes the same late way (job-batch.ts postBatchIn).
  */
-export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null }> {
+export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null; linked: string[] }> {
   const p = await requirePortalPrincipal();
-  const undoable = await prisma.$transaction((tx) => postBatchIn(tx, taskId, taskPrincipal(p), attachmentIds));
+  const posted = await prisma.$transaction((tx) => postBatchIn(tx, taskId, taskPrincipal(p), attachmentIds));
   revalidateJob(taskId);
-  return { eventId: undoable?.id ?? null };
+  return { eventId: posted.event?.id ?? null, linked: posted.linked };
 }
 
 /**

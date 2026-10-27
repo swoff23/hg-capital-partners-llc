@@ -5,6 +5,7 @@ import { withFinalRefusal } from "@/lib/attachments/access";
 import { assertQueueOwner, portalScope } from "@/lib/attachments/queue-owner";
 import * as jobs from "@/lib/portal/jobs";
 import * as uploads from "@/lib/portal/job-uploads";
+import { MAX_FILES_PER_POST } from "@/lib/portal/job-view";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { withResult } from "@/lib/server-action";
 
@@ -66,16 +67,17 @@ export async function recordJobUploadAction(
 /**
  * A batch of recorded files posted as one update. Returns its id, for the Undo; null when the job was approved or
  * canceled while the photos were going up: HG is told once, the job keeps its status, and there is nothing to take back.
+ * `linked` are the files it told HG of, for the toast's count.
  */
 export async function postJobBatchAction(
   taskId: string,
   attachmentIds: string[],
   queueOwner?: string | null,
-): Promise<ActionResult<{ eventId: string | null }>> {
+): Promise<ActionResult<{ eventId: string | null; linked: string[] }>> {
   return withResult("portal:postJobBatch", async () => {
     const p = await requirePortalPrincipal();
     assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
-    return uploads.postJobBatch(id.parse(taskId), z.array(id).min(1).max(50).parse(attachmentIds));
+    return uploads.postJobBatch(id.parse(taskId), z.array(id).min(1).max(MAX_FILES_PER_POST).parse(attachmentIds));
   });
 }
 

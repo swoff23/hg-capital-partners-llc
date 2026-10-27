@@ -353,6 +353,13 @@ export function markDoneButton(s: {
 // Batch posts and Undo (uploads 2.7, question 5)
 // ---------------------------------------------------------------------------
 
+/**
+ * The most files one post takes: a batch post, a written update and Mark done each refuse more (their actions'
+ * schemas read this). The page posts a bigger batch in pieces (recorded-uploads.ts postInBatches) and never holds
+ * more than this for one Send or Mark done.
+ */
+export const MAX_FILES_PER_POST = 50;
+
 /** How long "3 photos posted · Undo" stays (the toast's own five seconds). */
 export const POST_UNDO_MS = 5_000;
 

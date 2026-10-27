@@ -30,14 +30,11 @@ export function LateUploads({ taskId, label }: { taskId: string; label: string }
 
   const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
   /**
-   * The batch landed: with this page open or gone, it is handed to the same step. One whose post didn't go
-   * through keeps its files for the tab (recordedUploads.keep), and the next batch for this job carries them.
+   * The batch landed: with this page open or gone, it is handed to the same step. Files whose post didn't go
+   * through stay kept for the tab (recordedUploads.keep), and the next batch for this job carries them.
    */
   const land = (ids: string[]) => {
-    const items = recordedUploads.take(taskId, ids);
-    void postRecordedBatch(taskId, items, toast, owner).then((posted) => {
-      if (!posted) recordedUploads.keep(taskId, items);
-    });
+    void postRecordedBatch(taskId, recordedUploads.take(taskId, ids), toast, owner).then((left) => recordedUploads.keep(taskId, left));
   };
 
   const target: UploadTarget = {

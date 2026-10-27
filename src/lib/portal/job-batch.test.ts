@@ -90,13 +90,14 @@ const outboxInserts = (calls: Call[]) => calls.filter((c) => c.model === "$execu
 for (const status of ["IN_PROGRESS", "REVIEW"] as const) {
   test(`postBatchIn on a job ${status === "REVIEW" ? "in Review" : "in progress"}: one undoable batch post, its event back for the Undo`, async () => {
     const { tx, calls } = fakeTx({ statuses: [status] });
-    const event = await postBatchIn(tx, "t1", ZACK, ["a1", "a2", "a3"]);
+    const { event, linked } = await postBatchIn(tx, "t1", ZACK, ["a1", "a2", "a3"]);
     assert.ok(event, "an event, for the Undo");
     const made = events(calls);
     assert.equal(made.length, 1, "one line for the batch");
     assert.deepEqual(made[0].data, { batch: true }, "marked as the batch Undo can take back");
     assert.equal(made[0].body, null);
     assert.deepEqual(event.data, { batch: true }, "the event it hands back is that update");
+    assert.deepEqual(linked, ["a1", "a2", "a3"], "the files it told HG of, for the toast's count");
     assert.equal(outboxInserts(calls).length, 2, "one email line per partner");
     // The access check is the first thing it does.
     assert.equal(calls[0].model, "taskAccess");
@@ -107,7 +108,7 @@ for (const status of ["DONE", "CANCELED"] as const) {
   test(`postBatchIn on a job HG ${status === "DONE" ? "approved" : "canceled"}: the late line tells HG once, and nothing to undo`, async () => {
     const { tx, calls } = fakeTx({ statuses: [status] });
     const answer = await postBatchIn(tx, "t1", ZACK, ["a1", "a2", "a3"]);
-    assert.equal(answer, null, "no event id: the page says the photos were added to the job");
+    assert.deepEqual(answer, { event: null, linked: ["a1", "a2", "a3"] }, "no event id: the page says the photos were added to the job");
     const made = events(calls);
     assert.equal(made.length, 1, "one line for the batch");
     assert.deepEqual(made[0].data, { late: true }, "never a batch Undo takes back");
@@ -123,7 +124,7 @@ for (const status of ["DONE", "CANCELED"] as const) {
 test("postBatchIn: HG approves between the status read and addComment's, and the batch goes the late way in the same transaction", async () => {
   const { tx, calls } = fakeTx({ statuses: ["IN_PROGRESS", "DONE"] });
   const answer = await postBatchIn(tx, "t1", ZACK, ["a1", "a2"]);
-  assert.equal(answer, null);
+  assert.deepEqual(answer, { event: null, linked: ["a1", "a2"] });
   // addComment read the job closed and refused before writing anything: the only writes are the late line's.
   const reads = calls.filter((c) => c.model === "task" && c.op === "findUnique");
   assert.ok(reads.length >= 2, "the step's read, then addComment's");
@@ -159,7 +160,7 @@ test("postBatchIn: a job that no longer exists is refused, and nothing is writte
 test("postBatchIn: a late send whose files are all posted already answers quietly, with nothing written", async () => {
   // Sent again after its answer was lost: every id is this contractor's own posted file on the job.
   const { tx, calls } = fakeTx({ statuses: ["DONE"], unposted: [], posted: 2 });
-  assert.equal(await postBatchIn(tx, "t1", ZACK, ["a1", "a2", "a2"]), null);
+  assert.deepEqual(await postBatchIn(tx, "t1", ZACK, ["a1", "a2", "a2"]), { event: null, linked: [] }, "nothing new was told, so nothing is counted");
   assert.deepEqual(calls.filter(isWrite), []);
   const count = calls.find((c) => c.model === "taskAttachment" && c.op === "count")!.args;
   assert.deepEqual(count.where, { id: { in: ["a1", "a2"] }, taskId: "t1", uploadedByContactId: "c-zack", eventId: { not: null }, deletedAt: null, asanaGid: null });
@@ -183,3 +184,14 @@ test("postBatchIn: only the contractor's own unposted files are handed on", asyn
   const link = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!.args;
   assert.deepEqual((link.where?.id as { in: string[] }).in, ["a1"]);
 });
+
+for (const status of ["IN_PROGRESS", "DONE"] as const) {
+  test(`postBatchIn on a job ${status === "DONE" ? "approved" : "in progress"}: a file posted already isn't among the files it told HG of`, async () => {
+    // a1 went out with an earlier post whose answer was lost, and came again with a later batch.
+    const { tx, calls } = fakeTx({ statuses: [status], unposted: ["a2", "a3"] });
+    const { linked } = await postBatchIn(tx, "t1", ZACK, ["a1", "a2", "a3"]);
+    assert.deepEqual(linked, ["a2", "a3"], "the toast counts two, as the timeline line does");
+    const link = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!.args;
+    assert.deepEqual((link.where?.id as { in: string[] }).in, ["a2", "a3"]);
+  });
+}

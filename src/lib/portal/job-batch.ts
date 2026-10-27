@@ -42,16 +42,27 @@ async function allOwnPosted(tx: core.Tx, taskId: string, contactId: string, ids:
 }
 
 /**
+ * What a batch post did: its event, for the Undo (null when none is one Undo
+ * takes back), and the files it told HG of. The page words its toast from
+ * `linked`, so a file it sent that was posted already (one sent again after
+ * its answer was lost) isn't counted twice.
+ */
+export interface BatchPosted {
+  event: TaskEvent | null;
+  linked: string[];
+}
+
+/**
  * Late photos on a job that is no longer active: HG hears once for the batch
  * (core.addLateContractorBatch). A send whose files are all posted already
  * (one sent again after its answer was lost) has nothing new to tell, so it
  * answers as the first did, quietly, instead of "Write something or add a
- * photo.".
+ * photo.", with nothing linked.
  */
-async function postLate(tx: core.Tx, taskId: string, p: Contractor, attachmentIds: string[], own: string[]): Promise<null> {
-  if (own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, attachmentIds))) return null;
+async function postLate(tx: core.Tx, taskId: string, p: Contractor, attachmentIds: string[], own: string[]): Promise<BatchPosted> {
+  if (own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, attachmentIds))) return { event: null, linked: [] };
   await core.addLateContractorBatch(tx, taskId, own, p);
-  return null;
+  return { event: null, linked: own };
 }
 
 /**
@@ -60,18 +71,24 @@ async function postLate(tx: core.Tx, taskId: string, p: Contractor, attachmentId
  * Undo (core.addComment `batch`), and its event comes back for that Undo. On
  * a job HG has approved or canceled since the photos went up, the late
  * photos are already recorded on it, so HG hears about them once for the
- * batch, a line and an email line Undo never takes back, and the answer is
- * null. HG can approve between the status read here and addComment's own
+ * batch, a line and an email line Undo never takes back, and there is no
+ * event. HG can approve between the status read here and addComment's own
  * read: addComment then refuses "This job is closed." before it writes
  * anything, so the same files take the late way in this same transaction.
+ * An approve that commits after addComment's read, while it is still writing,
+ * leaves a batch line on a job that is Done (HG hears once; the toast's Undo
+ * is then refused "This job is closed."). Closing that gap takes the task
+ * row's lock first, which moves where two sends of the same files wait on
+ * each other (job-batch.pg.test.ts), so it is left.
  */
-export async function postBatchIn(tx: core.Tx, taskId: string, p: Contractor, attachmentIds: string[]): Promise<TaskEvent | null> {
+export async function postBatchIn(tx: core.Tx, taskId: string, p: Contractor, attachmentIds: string[]): Promise<BatchPosted> {
   await core.assertContractorAccess(tx, taskId, p.contactId);
   const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
   const own = (await ownUnposted(tx, taskId, p.contactId, attachmentIds)).map((f) => f.id);
   if (task && !isActiveStatus(task.status)) return postLate(tx, taskId, p, attachmentIds, own);
   try {
-    return await core.addComment(tx, taskId, { body: "", attachmentIds: own, batch: true }, p);
+    const event = await core.addComment(tx, taskId, { body: "", attachmentIds: own, batch: true }, p);
+    return { event, linked: own };
   } catch (err) {
     if (err instanceof core.TaskRuleError && err.message === JOB_CLOSED) return postLate(tx, taskId, p, attachmentIds, own);
     throw err;

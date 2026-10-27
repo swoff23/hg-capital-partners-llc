@@ -2,6 +2,7 @@
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import * as jobs from "@/lib/portal/jobs";
+import { MAX_FILES_PER_POST } from "@/lib/portal/job-view";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { withResult } from "@/lib/server-action";
 
@@ -17,7 +18,7 @@ const id = z.string().min(1).max(64);
 const updateSchema = z
   .object({
     body: z.string().max(5000).default(""),
-    attachmentIds: z.array(id).max(50).default([]),
+    attachmentIds: z.array(id).max(MAX_FILES_PER_POST).default([]),
   })
   .strict();
 

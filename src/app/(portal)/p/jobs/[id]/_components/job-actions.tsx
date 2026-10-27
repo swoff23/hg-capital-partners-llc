@@ -33,6 +33,7 @@ import {
   lateUploadsEndsIn,
   lateUploadsOpen,
   markDoneButton,
+  MAX_FILES_PER_POST,
   nextStep,
   stripCounts,
 } from "@/lib/portal/job-view";
@@ -142,6 +143,17 @@ export function JobActions({
     live.current = { body, sheetOpen, ready };
   });
 
+  /**
+   * Files that didn't post go back on the tray, to go with the next send, up to what one send takes
+   * (MAX_FILES_PER_POST: a written update and Mark done refuse more). Any more are kept for the tab, and the next
+   * batch for this job carries them (recordedUploads.keep).
+   */
+  const putBack = (items: Recorded[]) => {
+    const room = Math.max(0, MAX_FILES_PER_POST - live.current.ready.length);
+    recordedUploads.keep(taskId, items.slice(room));
+    setReady((r) => [...r, ...items.slice(0, room).filter((i) => !r.some((x) => x.id === i.id))]);
+  };
+
   // Every call goes through callAction: with no signal it fails like a refusal
   // (a toast), and the typed text, the open sheet and the photos stay put.
   const post = (text: string, items: Recorded[]) =>
@@ -150,20 +162,20 @@ export function JobActions({
       const res = await callAction(() => postJobUpdateAction(taskId, { body: text, attachmentIds: ids }));
       if (!res.ok) {
         toast({ message: res.error });
-        setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
+        putBack(items);
         return;
       }
       if (text) setBody((b) => (b.trim() === text ? "" : b));
     });
 
-  /** Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post. */
+  /** Posts a batch as updates of up to MAX_FILES_PER_POST files: "3 photos posted", and five seconds to take it back. Answers the files that didn't post. */
   const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast, owner);
 
-  /** A batch that posts on its own while the page is here. One that doesn't post goes back on the tray, to go with the next send. */
+  /** A batch that posts on its own while the page is here. Files that don't post go back on the tray, to go with the next send. */
   const postBatch = (items: Recorded[]) =>
     startSending(async () => {
-      if (await sendBatch(items)) return;
-      setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
+      const left = await sendBatch(items);
+      if (left.length > 0) putBack(left);
     });
 
   /**
@@ -174,24 +186,22 @@ export function JobActions({
 
   function onRecorded(ids: string[]) {
     const { sheetOpen: holding, body: text, ready: held } = live.current;
-    const added = recordedUploads.take(taskId, ids);
     if (holding || text.trim()) {
-      setReady([...held, ...added]);
+      // Held for the Send or Mark done, which take MAX_FILES_PER_POST: any more wait, kept for the next batch.
+      setReady([...held, ...recordedUploads.take(taskId, ids, MAX_FILES_PER_POST - held.length)]);
       return;
     }
+    const added = recordedUploads.take(taskId, ids);
     setReady([]);
     postBatch([...held, ...added]);
   }
 
   /**
    * A batch that landed after the contractor left the page: it posts as its own update, with the same toast and
-   * Undo. One that doesn't post keeps its files for the tab, and the next batch for this job carries them.
+   * Undo. Files that don't post stay kept for the tab, and the next batch for this job carries them.
    */
   function onAway(ids: string[]) {
-    const items = recordedUploads.take(taskId, ids);
-    void sendBatch(items).then((posted) => {
-      if (!posted) recordedUploads.keep(taskId, items);
-    });
+    void sendBatch(recordedUploads.take(taskId, ids)).then((left) => recordedUploads.keep(taskId, left));
   }
 
   const target: UploadTarget = {
@@ -211,7 +221,9 @@ export function JobActions({
     // The record step takes when each file joined the queue: one queued before Mark done still records inside the hour (question 4).
     sendQueuedAt: true,
   };
-  const uploader = useMediaUploader({ target });
+  // A job HG sends back to In progress or Review while this page stays open takes files again: tiles it refused for
+  // good get one more go when its status changes, as they do when the page opens.
+  const uploader = useMediaUploader({ target, reopenOn: status });
   const { pending, waiting, failed } = uploader;
 
   // The photos a Mark done is sending right now, so leaving mid-send doesn't

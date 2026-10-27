@@ -1,4 +1,5 @@
 import type { FileKind } from "@/lib/attachments/content-types";
+import { MAX_FILES_PER_POST } from "@/lib/portal/job-view";
 
 /** A file that's up and recorded, waiting to be posted: what the Mark done sheet shows in its slot and the payoff in its strip. */
 export type RecordedUpload = { id: string; name: string; kind: FileKind | null; hasThumb: boolean; hasPoster: boolean };
@@ -25,18 +26,23 @@ export class RecordedUploads {
 
   /**
    * The files for these ids, in their order, each let go of here once handed over. Files a post that didn't go
-   * through kept (keep) come first: they ride with this batch, so HG still hears of them.
+   * through kept (keep) come first: they ride with this batch, so HG still hears of them. `room` is how many the
+   * caller can hold (a tray holds what one Send or Mark done takes, MAX_FILES_PER_POST); the files past it stay
+   * kept, in the same order, for the next batch.
    */
-  take(taskId: string, ids: readonly string[]): RecordedUpload[] {
+  take(taskId: string, ids: readonly string[], room = Infinity): RecordedUpload[] {
     const job = this.byJob.get(taskId);
     const kept = this.unsent.get(taskId) ?? new Map<string, RecordedUpload>();
     this.unsent.delete(taskId);
-    const out = ids.map((id) => job?.get(id) ?? kept.get(id) ?? { id, name: "", kind: null, hasThumb: false, hasPoster: false });
+    const named = ids.map((id) => job?.get(id) ?? kept.get(id) ?? { id, name: "", kind: null, hasThumb: false, hasPoster: false });
     if (job) {
       for (const id of ids) job.delete(id);
       if (job.size === 0) this.byJob.delete(taskId);
     }
-    return [...[...kept.values()].filter((r) => !ids.includes(r.id)), ...out];
+    const all = [...[...kept.values()].filter((r) => !ids.includes(r.id)), ...named];
+    const fit = Math.max(0, room);
+    this.keep(taskId, all.slice(fit));
+    return all.slice(0, fit);
   }
 
   /**
@@ -50,6 +56,28 @@ export class RecordedUploads {
     for (const item of items) held.set(item.id, item);
     this.unsent.set(taskId, held);
   }
+}
+
+/**
+ * Posts files in pieces of at most `size` (the most one post takes), one piece after another, and stops at the
+ * first piece that doesn't go through. Answers the files not posted, none when every piece went, so a caller
+ * keeps just those. `post` answers whether its piece went.
+ */
+export async function postInBatches<T>(items: readonly T[], post: (piece: T[]) => Promise<boolean>, size = MAX_FILES_PER_POST): Promise<T[]> {
+  for (let at = 0; at < items.length; at += size) {
+    if (!(await post(items.slice(at, at + size)))) return items.slice(at);
+  }
+  return [];
+}
+
+/**
+ * The files a post told HG of, for its toast: the ones it linked. A file kept from a post whose answer was lost
+ * is on the job and was told of then, so it isn't counted again; with nothing new (every one was posted
+ * already) the toast counts them all, since they are on the job as it says.
+ */
+export function toldOf<T extends { id: string }>(piece: readonly T[], linked: readonly string[]): T[] {
+  const told = piece.filter((item) => linked.includes(item.id));
+  return told.length > 0 ? told : [...piece];
 }
 
 /** The one each tab shares: every job page reads and writes this. */

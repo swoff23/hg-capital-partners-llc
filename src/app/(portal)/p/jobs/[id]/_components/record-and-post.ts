@@ -3,7 +3,7 @@ import type { ToastInput } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
 import { contentTypeForName, fileKindForType } from "@/lib/attachments/content-types";
 import { addedToJobText, postedText } from "@/lib/portal/job-view";
-import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
+import { postInBatches, recordedUploads, toldOf, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "../upload-actions";
 
 /**
@@ -37,23 +37,32 @@ export async function recordJobFile(taskId: string, file: RecordMediaInput, owne
 }
 
 /**
- * Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post.
- * A job approved or canceled while the photos were going up keeps its status: the server tells HG once (one line, one email
- * line) and answers with no id, and the toast says "3 photos added to the job" with nothing to undo.
+ * Posts a batch as updates of at most MAX_FILES_PER_POST files each (a tab that kept an earlier batch carries it
+ * with the next one, so a long wait can hold more than one post takes): "3 photos posted", and five seconds to take
+ * it back. Answers the files that didn't post, none when all did, so the caller keeps just those. A piece that
+ * fails stops the rest, which wait with it.
+ * A job approved or canceled while the photos were going up keeps its status: the server tells HG once (one line,
+ * one email line) and answers with no id, and the toast says "3 photos added to the job" with nothing to undo.
  */
 export async function postRecordedBatch(
   taskId: string,
   items: RecordedUpload[],
   toast: (t: ToastInput) => unknown,
   owner?: string,
-): Promise<boolean> {
-  const res = await callAction(() => postJobBatchAction(taskId, items.map((i) => i.id), owner));
+): Promise<RecordedUpload[]> {
+  return postInBatches(items, (piece) => postPiece(taskId, piece, toast, owner));
+}
+
+/** One post of at most MAX_FILES_PER_POST files, with its toast. False when it didn't post. */
+async function postPiece(taskId: string, piece: RecordedUpload[], toast: (t: ToastInput) => unknown, owner?: string): Promise<boolean> {
+  const res = await callAction(() => postJobBatchAction(taskId, piece.map((i) => i.id), owner));
   if (!res.ok) {
     toast({ message: res.error });
     return false;
   }
-  const { eventId } = res.data;
-  const kinds = items.map((i) => i.kind);
+  const { eventId, linked } = res.data;
+  // The toast counts what the post told HG of, as the timeline line does.
+  const kinds = toldOf(piece, linked).map((i) => i.kind);
   if (eventId === null) {
     toast({ message: addedToJobText(kinds), key: `job-added:${taskId}` });
     return true;

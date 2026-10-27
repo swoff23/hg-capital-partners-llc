@@ -79,6 +79,11 @@ export type MediaUploaderTargetOptions = {
   target: UploadTarget;
   /** Called whenever the number of unfinished uploads changes. */
   onPendingChange?: (pending: number) => void;
+  /**
+   * A value that changes when the parent row may take files again (a job's status, on a page that stays open):
+   * tiles it refused for good get one more go then, as they do when the page opens (engine.mount).
+   */
+  reopenOn?: string;
 };
 
 /** The target the older options describe. A contractor's photos are "display" photos (question 3); the rest go as picked. */
@@ -164,8 +169,10 @@ export function useMediaUploader(input: MediaUploaderOptions | MediaUploaderTarg
   useEffect(() => {
     engine.setTarget(target);
   });
-  // The page is here. Its files keep going when it isn't, and a batch that lands then is "away".
-  useEffect(() => engine.mount(target.key), [engine, target.key]);
+  // The page is here. Its files keep going when it isn't, and a batch that lands then is "away". Showing again for a
+  // new `reopenOn` gives a refused-for-good tile its one more go (a mount does), without leaving the page.
+  const reopenOn = "target" in input ? input.reopenOn : undefined;
+  useEffect(() => engine.mount(target.key), [engine, target.key, reopenOn]);
 
   const uploads = useSyncExternalStore(
     engine.subscribe,
