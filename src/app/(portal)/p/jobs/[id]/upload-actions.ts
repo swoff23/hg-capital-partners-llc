@@ -1,7 +1,9 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
+import { MAX_FILENAME } from "@/lib/attachments/content-types";
 import { assertQueueOwner, portalScope } from "@/lib/attachments/queue-owner";
+import { MAX_FILES_PER_POST, TOO_MANY_FILES } from "@/lib/portal/job-view";
 import * as jobs from "@/lib/portal/jobs";
 import * as uploads from "@/lib/portal/job-uploads";
 import { requirePortalPrincipal } from "@/lib/portal/session";
@@ -35,7 +37,9 @@ const owner = z.string().max(80).nullish();
 const uploadSchema = z
   .object({
     pathname: z.string().min(1).max(300),
-    filename: z.string().min(1).max(255),
+    // The page cuts a long name to fit (media.ts storedNames) and the record step keeps 255 (filenameForType), so
+    // a longer one from an older tab's outbox is cut there instead of refused with its bytes already up.
+    filename: z.string().min(1).max(MAX_FILENAME * 4),
     width: z.number().nullish(),
     height: z.number().nullish(),
     durationSec: z.number().nullish(),
@@ -66,11 +70,11 @@ export async function postJobBatchAction(
   taskId: string,
   attachmentIds: string[],
   queueOwner?: string | null,
-): Promise<ActionResult<{ eventId: string | null }>> {
+): Promise<ActionResult<{ eventId: string | null; alreadyPosted?: true }>> {
   return withResult("portal:postJobBatch", async () => {
     const p = await requirePortalPrincipal();
     assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
-    return uploads.postJobBatch(id.parse(taskId), z.array(id).min(1).max(50).parse(attachmentIds));
+    return uploads.postJobBatch(id.parse(taskId), z.array(id).min(1).max(MAX_FILES_PER_POST, TOO_MANY_FILES).parse(attachmentIds));
   });
 }
 

@@ -97,6 +97,19 @@ export function storedPropertyDocumentPath(pathname: string, propertyId: string)
   return pathname.startsWith(prefix) && /^[A-Za-z0-9._-]{1,160}$/.test(pathname.slice(prefix.length)) && /[A-Za-z0-9]/.test(pathname.slice(prefix.length));
 }
 
+/** The record step's refusal of a blob that arrived with no bytes: the upload broke, so it goes again. */
+export const EMPTY_UPLOAD = "That file arrived empty. Try again.";
+
+/**
+ * Why the record step refuses a blob of `size` bytes (head()'s own count) under a rule's cap, or null. An empty
+ * one is a broken upload; the page refuses an empty file before it goes (media.ts checkMediaFile).
+ */
+export function blobSizeRefusal(size: number, maxBytes: number): string | null {
+  if (!(size > 0)) return EMPTY_UPLOAD;
+  if (size > maxBytes) return `That file is over the ${Math.round(maxBytes / (1024 * 1024))} MB limit.`;
+  return null;
+}
+
 /** A display hint (seconds, pixels) kept only when it's a sane positive number. */
 export function mediaHint(n: number | null | undefined, max: number): number | null {
   return typeof n === "number" && Number.isFinite(n) && n > 0 && n <= max ? n : null;

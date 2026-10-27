@@ -27,6 +27,7 @@ import { callAction, type ActionResult } from "@/lib/action-result";
 import { personalDraftKey } from "@/lib/composer-draft";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
+  MAX_FILES_REASON,
   finishCountLabel,
   finishPhotosNeeded,
   finishSlots,
@@ -35,6 +36,7 @@ import {
   lateUploadsOpen,
   markDoneButton,
   nextStep,
+  postRoom,
   stripCounts,
 } from "@/lib/portal/job-view";
 import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
@@ -211,6 +213,9 @@ export function JobActions({
     parentId: taskId,
     access: "private",
     allowed: ["image", "video"],
+    // One post takes 50: the files held for it count, so a pick of 55 sends 50 and refuses 5 with the reason.
+    maxFiles: postRoom(ready.length),
+    maxFilesReason: MAX_FILES_REASON,
     // Photos go up upright, as a 2560px JPEG without GPS and without the original (question 3).
     prepare: "display",
     record,

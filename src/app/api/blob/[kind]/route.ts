@@ -199,8 +199,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
           tokenPayload: JSON.stringify({ [cfg.idKey]: id, principal: who.kind }),
         };
       },
-      // Fires only from deployed environments; the DB row is recorded by the action.
-      onUploadCompleted: async () => {},
+      // No onUploadCompleted: the row is written by the record action, which checks the blob itself. With one, Blob
+      // would call this route back after every file to run nothing, and every token logs that no callback URL could
+      // be found off Vercel. A callback an older token still asks for is verified and answered all the same.
     });
     return NextResponse.json(result);
   } catch (err) {

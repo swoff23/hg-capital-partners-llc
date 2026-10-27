@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { BlobServiceNotAvailable } from "@vercel/blob";
-import { contentTypeForName, fileKindForType } from "./content-types";
+import { MAX_FILENAME, contentTypeForName, fileKindForType, fitFilename } from "./content-types";
 import {
+  BROWSER_STOPPED,
   MEDIA_ACCEPT,
   byline,
   bylineName,
@@ -145,6 +146,37 @@ test("uploadFailureReason: a dropped connection reads no connection, single PUT 
   // Anything else keeps its words; a non-error has none.
   assert.equal(uploadFailureReason(new Error("Vercel Blob: Failed to retrieve the client token")), "Vercel Blob: Failed to retrieve the client token");
   assert.equal(uploadFailureReason("x"), "");
+});
+
+test("uploadFailureReason: the browser's own fetch errors never reach the tile in its words", () => {
+  const raw = new TypeError("Failed to execute 'fetch' on 'Window': The provided ReadableStream is disturbed");
+  assert.equal(uploadFailureReason(raw), BROWSER_STOPPED);
+  assert.equal(uploadFailureReason(raw), "the browser couldn't send it");
+  assert.equal(
+    uploadNotice([{ name: "Kitchen.jpg", kind: "image", reason: uploadFailureReason(raw) }]),
+    "1 photo didn't upload: the browser couldn't send it",
+  );
+  assert.equal(rowReason(uploadFailureReason(raw)), "The browser couldn't send it");
+});
+
+test("fitFilename: a name over 255 characters is cut to fit with its extension, a name that fits is kept", () => {
+  assert.equal(MAX_FILENAME, 255);
+  assert.equal(fitFilename("Kitchen.jpg"), "Kitchen.jpg");
+  const long = `${"K".repeat(296)}.jpg`;
+  const fit = fitFilename(long);
+  assert.equal(fit.length, 255);
+  assert.ok(fit.endsWith("K.jpg"));
+  assert.equal(fitFilename("x".repeat(300)).length, 255, "no extension: just cut");
+  // Never half of an emoji.
+  const emoji = fitFilename(`${"a".repeat(250)}${"😀".repeat(10)}.jpg`);
+  assert.ok(emoji.length <= 255);
+  assert.ok(!/[\uD800-\uDBFF]\./.test(emoji), "no lone surrogate before the extension");
+});
+
+test("storedNames: a real name too long for the record step is cut to fit, its extension kept", () => {
+  const [name] = storedNames([{ name: `${"K".repeat(300)}.jpg`, type: "image/jpeg", lastModified: AT }]);
+  assert.equal(name.length, 255);
+  assert.ok(name.endsWith(".jpg"));
 });
 
 test("fmtDuration: m:ss under an hour, h:mm:ss over", () => {

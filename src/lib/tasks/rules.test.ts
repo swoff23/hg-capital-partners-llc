@@ -6,6 +6,7 @@ import {
   bundleSendAfter,
   canSetStatus,
   contractorSeesRow,
+  contractorStatusRefusal,
   notifyAudience,
   statusEventVisibility,
   targetDate,
@@ -32,6 +33,25 @@ test("contractors can only Start job and Mark done", () => {
   assert.equal(canSetStatus("contractor", "REVIEW", "IN_PROGRESS"), false);
   assert.equal(canSetStatus("contractor", "OPEN", "WAITING"), false);
   assert.equal(canSetStatus("contractor", "OPEN", "SCHEDULED"), false);
+});
+
+test("a stale tab's Start job or Mark done is told where the job is now, not the rule", () => {
+  // Mark done after HG approved, and a second Mark done from another tab.
+  assert.equal(contractorStatusRefusal("DONE", "REVIEW"), "This job is already done.");
+  assert.equal(contractorStatusRefusal("REVIEW", "REVIEW"), "This job is already in review.");
+  // Start job on a job another tab already started, or one already marked done.
+  assert.equal(contractorStatusRefusal("IN_PROGRESS", "IN_PROGRESS"), "This job is already started.");
+  assert.equal(contractorStatusRefusal("REVIEW", "IN_PROGRESS"), "This job is already in review.");
+  assert.equal(contractorStatusRefusal("CANCELED", "REVIEW"), "This job was canceled.");
+  // Every case the rule refuses has a line, and none is the old catch-all for those three.
+  for (const from of ["DONE", "REVIEW"] as const) {
+    for (const to of ["IN_PROGRESS", "REVIEW"] as const) {
+      assert.equal(canSetStatus("contractor", from, to), false);
+      assert.notEqual(contractorStatusRefusal(from, to), "You can start a job or mark it done.");
+    }
+  }
+  // A change no button makes keeps the rule.
+  assert.equal(contractorStatusRefusal("OPEN", "CANCELED"), "You can start a job or mark it done.");
 });
 
 test("status events reach contractors only for the states they care about", () => {

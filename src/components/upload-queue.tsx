@@ -61,6 +61,11 @@ export type UploadTarget = {
    * past it gets a refused tile.
    */
   maxFiles?: number;
+  /**
+   * The refused tile's reason past `maxFiles`, when the target's cap is not "no more can be added here" (capReason):
+   * a contractor's update takes 50 at a time, and more can follow once those post.
+   */
+  maxFilesReason?: string;
   /** "display" re-encodes a photo to a 2560px JPEG with no metadata before it goes up; "original" sends it as picked. */
   prepare: "original" | "display";
   /**
@@ -97,6 +102,11 @@ export type UploadCounts = {
   waiting: number;
   /** Refused or out of retries: each waits for a Retry or a Remove. */
   failed: number;
+  /**
+   * Of `pending`, the files whose bytes are up and wait for their page to record them: a reload or a new sign-in put
+   * them back before that page opened (engine needsRecord). Nothing moves until it does, so a My jobs row says so.
+   */
+  awaitingPage: number;
   /** The kinds of the pending and waiting files, for "3 photos are still uploading" (job-view stillUploading). */
   pendingKinds: readonly (FileKind | null)[];
 };

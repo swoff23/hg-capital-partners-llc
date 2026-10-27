@@ -1,6 +1,15 @@
 import { isOfflineError } from "@/lib/action-result";
 import { HG_TIME_ZONE, fmtDay, todayYmdEastern } from "@/lib/dates";
-import { FILE_KINDS, UPLOAD_RULES, contentTypeForName, fileKindForType, nameExtension, uploadContentType, type FileKind } from "./content-types";
+import {
+  FILE_KINDS,
+  UPLOAD_RULES,
+  contentTypeForName,
+  fileKindForType,
+  fitFilename,
+  nameExtension,
+  uploadContentType,
+  type FileKind,
+} from "./content-types";
 import { safeUploadName } from "./paths";
 
 /**
@@ -97,11 +106,20 @@ export function shownReason(reason: string): string {
 }
 
 /**
+ * The reason for any other TypeError a send threw: the browser's own words
+ * ("Failed to execute 'fetch' on 'Window': The provided ReadableStream is
+ * disturbed") mean nothing to the person reading the tile.
+ */
+export const BROWSER_STOPPED = "the browser couldn't send it";
+
+/**
  * Why an upload to Blob failed, for the tile and the red line: "no connection"
- * for a dropped connection however it surfaced, else the error's own message.
+ * for a dropped connection however it surfaced, BROWSER_STOPPED for the
+ * browser's own errors, else the error's own message.
  */
 export function uploadFailureReason(e: unknown): string {
   if (isOfflineError(e) || (e instanceof Error && BLOB_SERVICE_DOWN.test(e.message))) return "no connection";
+  if (e instanceof TypeError) return BROWSER_STOPPED;
   return e instanceof Error ? e.message : "";
 }
 
@@ -248,13 +266,14 @@ export type PickedFile = { name: string; type: string; lastModified?: number };
  * The stored names for one batch, in pick order. Generic camera names become
  * dated names; photos in one batch that share a minute get " 2", " 3", so
  * every tile, viewer header and delete confirm names a different file. Real
- * names are kept (they may repeat; Blob keeps the paths apart). A dated name
- * keeps the extension it came with, or the type's when it has none.
+ * names are kept (they may repeat; Blob keeps the paths apart), cut to the
+ * 255 characters the record step takes, extension kept. A dated name keeps
+ * the extension it came with, or the type's when it has none.
  */
 export function storedNames(files: readonly PickedFile[], now: Date = new Date()): string[] {
   const seen = new Map<string, number>();
   return files.map((f) => {
-    if (f.name.trim() !== "" && !isGenericCameraName(f.name)) return f.name;
+    if (f.name.trim() !== "" && !isGenericCameraName(f.name)) return fitFilename(f.name);
     const type = contentTypeForName(f.name) ?? f.type;
     const kind = type.startsWith("video/") ? "video" : "image";
     const ext = nameExtension(f.name) ?? (kind === "video" ? "mov" : "jpg");

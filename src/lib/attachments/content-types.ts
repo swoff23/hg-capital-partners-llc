@@ -111,13 +111,28 @@ const CANONICAL_EXT: Record<string, string> = {
  */
 const HIDDEN_CHARS = /[\u0000-\u001f\u007f-\u009f؜​-‏‪-‮⁠-⁩﻿]/g;
 
-/** TaskAttachment.filename keeps 255 characters. */
-const MAX_FILENAME = 255;
+/** TaskAttachment.filename keeps 255 characters, and the record steps take no longer a name. */
+export const MAX_FILENAME = 255;
 
 /** A real extension has a letter in it, so "Bid v1.2" keeps its ".2". */
 export function nameExtension(name: string): string | null {
   const ext = /\.([A-Za-z0-9]{1,10})$/.exec(name)?.[1];
   return ext && /[A-Za-z]/.test(ext) ? ext : null;
+}
+
+/**
+ * A name cut to fit `max` characters, its extension kept: a 300-character
+ * camera export still records instead of being refused forever. A name that
+ * fits is returned as it is.
+ */
+export function fitFilename(name: string, max: number = MAX_FILENAME): string {
+  if (name.length <= max) return name;
+  const ext = nameExtension(name);
+  const tail = ext ? `.${ext}` : "";
+  let stem = (ext ? name.slice(0, -tail.length) : name).slice(0, Math.max(1, max - tail.length));
+  // Never half of a character: a cut between a surrogate pair leaves a lone one.
+  if (/[\uD800-\uDBFF]$/.test(stem)) stem = stem.slice(0, -1);
+  return `${stem.trimEnd() || "file"}${tail}`;
 }
 
 /**

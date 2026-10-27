@@ -4,7 +4,7 @@ import { BlobNotFoundError, del, head, type HeadBlobResult } from "@vercel/blob"
 import { Prisma, type Visibility } from "@prisma/client";
 import { acceptsContractorUpload } from "@/lib/attachments/access";
 import { PREVIEW_RULE, UPLOAD_RULES, fileKindForType, filenameForType, normalizeContentType, type FileKind } from "@/lib/attachments/content-types";
-import { durationHint, pixelHint } from "@/lib/attachments/limits";
+import { blobSizeRefusal, durationHint, pixelHint } from "@/lib/attachments/limits";
 import { isPrivateStoreUrl, storeIdFromToken, storedUploadRole, type UploadRole } from "@/lib/attachments/paths";
 import { UPLOAD_KIND_ALLOWED } from "@/lib/attachments/upload-kinds";
 import { prisma } from "@/lib/db";
@@ -122,9 +122,9 @@ async function verifyBlob(taskId: string, pathname: string, role: UploadRole, au
   const kind = fileKindForType(contentType);
   const rule = role === "orig" ? kind && UPLOAD_RULES[kind] : PREVIEW_RULE.contentTypes.includes(contentType) ? PREVIEW_RULE : null;
   if (!rule) throw new core.TaskRuleError("That type of file can't be attached.");
-  if (blob.size > rule.maxBytes) {
-    throw new core.TaskRuleError(`That file is over the ${Math.round(rule.maxBytes / (1024 * 1024))} MB limit.`);
-  }
+  // An empty blob is a broken upload (the page refuses an empty file before it goes), refused like one over the cap.
+  const sizeRefusal = blobSizeRefusal(blob.size, rule.maxBytes);
+  if (sizeRefusal) throw new core.TaskRuleError(sizeRefusal);
   return { url: blob.url, size: blob.size, contentType, kind };
 }
 

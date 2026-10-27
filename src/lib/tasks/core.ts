@@ -11,6 +11,7 @@ import {
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
   canSetStatus,
+  contractorStatusRefusal,
   notifyAudience,
   statusEventVisibility,
   targetDate,
@@ -500,7 +501,8 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
   if (opts.expected && before.status !== opts.expected) throw await taskChanged(tx, taskId, before.status, p);
   if (!canSetStatus(kindOf(p), before.status, to)) {
-    throw new TaskRuleError(p.kind === "contractor" ? "You can start a job or mark it done." : "That status change isn't allowed.");
+    // A contractor's refusal says where the job is now: their tab is usually stale (approved, or done in another tab).
+    throw new TaskRuleError(p.kind === "contractor" ? contractorStatusRefusal(before.status, to) : "That status change isn't allowed.");
   }
 
   const waitingOn = opts.waitingOn?.trim() || null;

@@ -1,10 +1,9 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { isActiveStatus } from "@/lib/task-scope";
 import * as core from "@/lib/tasks/core";
+import { BatchAlreadyPosted, postBatchIn, type BatchPosted } from "./job-batch";
 import { undoWindowOpen } from "./job-view";
-import { ownUnposted } from "./jobs";
 import { requirePortalPrincipal, taskPrincipal } from "./session";
 
 /**
@@ -20,9 +19,6 @@ import { requirePortalPrincipal, taskPrincipal } from "./session";
  * taskPrincipal(principal), which checks access and the job's state.
  */
 
-/** core.addComment's refusal of a contractor's post on a job that is no longer active. */
-const JOB_CLOSED = "This job is closed.";
-
 function revalidateJob(taskId: string): void {
   revalidatePath(`/p/jobs/${taskId}`);
   revalidatePath("/p");
@@ -33,35 +29,31 @@ function revalidateJob(taskId: string): void {
  * The files of one batch, posted together as one update with no text: "Zack
  * added 4 photos" on the timeline and one line in the partners' email. It's
  * marked as a batch (core.addComment `batch`), the only kind of post Undo
- * takes back. Returns the update's id for that Undo. A batch that was already
- * posted (two sends of the same photos at once) is refused, so the losing
- * side leaves no empty update behind.
+ * takes back. Returns the update's id for that Undo. The same photos sent
+ * twice (two tabs at once, or again after an answer that never came) post
+ * once: the other send answers `alreadyPosted`, leaves no empty update behind,
+ * and the page says nothing.
  *
  * A job HG has approved since the photos went up (Done) takes no more
  * updates, but the late photos are already recorded on it: they stay on the
  * job as they are, with no update and no email, and the answer carries no
  * `eventId` (there is nothing to Undo). The page then says they were added
  * to the job. The job page refreshes, so they show in its photos. A batch that
- * waited on the task row behind HG's Approve gets the same answer, not an error.
+ * waited on the task row behind HG's Approve gets the same answer, not an error
+ * (job-batch.ts postBatchIn has the rules).
  */
-export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null }> {
+export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null; alreadyPosted?: true }> {
   const p = await requirePortalPrincipal();
-  const event = await prisma.$transaction(async (tx) => {
-    await core.assertContractorAccess(tx, taskId, p.contactId);
-    const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
-    if (task && !isActiveStatus(task.status)) return null;
-    const own = await ownUnposted(tx, taskId, p.contactId, attachmentIds);
-    try {
-      return await core.addComment(tx, taskId, { body: "", attachmentIds: own.map((f) => f.id), batch: true }, taskPrincipal(p));
-    } catch (err) {
-      // addComment reads the job under the task row's lock, so a batch that waited behind Approve finds it Done.
-      // It refuses before writing anything: the photos stay on the job as they are, the same answer as above.
-      if (err instanceof core.TaskRuleError && err.message === JOB_CLOSED) return null;
-      throw err;
-    }
-  });
+  let posted: BatchPosted;
+  try {
+    posted = await prisma.$transaction((tx) => postBatchIn(tx, taskId, taskPrincipal(p), attachmentIds));
+  } catch (err) {
+    // Lost to the same photos posted a moment ago: its own update has rolled back, and nothing is missing.
+    if (!(err instanceof BatchAlreadyPosted)) throw err;
+    posted = { event: null, alreadyPosted: true };
+  }
   revalidateJob(taskId);
-  return { eventId: event?.id ?? null };
+  return posted.alreadyPosted ? { eventId: null, alreadyPosted: true } : { eventId: posted.event?.id ?? null };
 }
 
 /**
