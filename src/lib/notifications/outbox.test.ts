@@ -50,3 +50,17 @@ test("a quota refusal pushes every due row back in one id-ordered statement that
     /UPDATE "NotificationOutbox" SET "sendAfter" = [^;]*WHERE "id" IN \(\s*SELECT "id" FROM "NotificationOutbox"\s*WHERE "sentAt" IS NULL AND "sendAfter" <= [^;]*ORDER BY "id"\s*FOR UPDATE SKIP LOCKED\s*\)/,
   );
 });
+
+test("every write to a claimed row is an updateMany by id, so a row deleteTask's cascade removed mid-send never fails the run", () => {
+  // An update on a missing row throws P2025, and drainDue would reject with every row after it left for the next run.
+  assert.doesNotMatch(code, /notificationOutbox\.update\(/, "no update that needs the row to be there");
+  const drain = code.slice(code.indexOf("export async function drainDue"));
+  const writes = drain.match(/notificationOutbox\.updateMany\(\{\s*where: \{ [^}]*\}/g) ?? [];
+  // nothing to send, sent, refused for Resend's limits, failed: each by the row's id alone.
+  assert.equal(writes.length, 4);
+  for (const w of writes) assert.match(w, /where: \{ id: row\.id \}$/);
+  // A count of 0 is not an error: nothing reads it, and the loop goes on to the next row.
+  assert.doesNotMatch(drain, /const \{ count \} = await prisma\.notificationOutbox\.updateMany/);
+  // The sent count is the email that went out, whether or not its row is still there.
+  assert.match(drain, /if \(res\.ok\) \{\s*await prisma\.notificationOutbox\.updateMany\(\{ where: \{ id: row\.id \}, data: \{ sentAt: new Date\(\), lastError: null \} \}\);\s*result\.sent\+\+;/);
+});

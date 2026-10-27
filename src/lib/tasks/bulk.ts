@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { toYmd, type Ymd } from "@/lib/dates";
@@ -12,6 +13,17 @@ import { targetField, type DateChange } from "./list";
  * core.patchTask, so it gets its own timeline line and, on a contractor's
  * job, the email the move calls for. All of a batch commits together or not
  * at all.
+ *
+ * Both take their tasks in id order, as every write that holds more than one
+ * task does (renameTaskUnits; a reopen and Approve's Undo hold the finished
+ * task, then the repeat copy it made). Those orders agree only because ids
+ * sort by when the task was made: Prisma's cuid() (v1) starts with "c" and
+ * the time in base 36, and so does the importer's newTaskId
+ * (scripts/asana/_import-lib.ts), so a repeat copy always sorts after the
+ * task it was made from. If ids stop sorting by time (cuid2, UUIDs), an Undo
+ * here holding a copy and waiting on its parent could meet a reopen holding
+ * the parent and waiting on the copy, and Postgres aborts one (40P01). A new
+ * id scheme needs copies taken after their parents some other way first.
  */
 
 /** A batch makes several round trips per task; give a busy Overdue list room. */
@@ -62,13 +74,13 @@ export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" 
 /** Undo: put each date back as it was. Tasks deleted since are skipped. */
 export async function restoreTaskDates(changes: DateChange[], p: core.Principal): Promise<void> {
   if (!changes.length) return;
+  const ids = [...new Set(changes.map((c) => c.id))];
   const rows = await prisma.$transaction(async (tx) => {
-    const rows = await tx.task.findMany({
-      where: { id: { in: [...new Set(changes.map((c) => c.id))] } },
-      select: { id: true, propertyId: true, dealId: true },
-      // In the database's id order, as moveTaskDates takes them, whatever order the Undo's list came in.
-      orderBy: { id: "asc" },
-    });
+    // Locked as they are read, in the database's id order (as moveTaskDates takes them), whatever order the Undo's
+    // list came in. Held from here, a task can't be deleted between this read and its patch, which would fail the
+    // whole Undo; one deleted before it isn't read, and is skipped. NO KEY UPDATE, the lock patchTask's update takes.
+    const rows = await tx.$queryRaw<{ id: string; propertyId: string | null; dealId: string | null }[]>`
+      SELECT "id", "propertyId", "dealId" FROM "Task" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR NO KEY UPDATE`;
     for (const r of rows) {
       for (const c of changes) {
         if (c.id !== r.id) continue;

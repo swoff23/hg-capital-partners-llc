@@ -368,6 +368,35 @@ test("recordAttachment: the task row is written before any email row, as every o
   assert.ok(taskUpdate >= 0 && firstInsert > taskUpdate, `task update at ${taskUpdate}, first email row at ${firstInsert}`);
 });
 
+test("recordAttachment: the task row is locked before the task is read, so a reassignment that landed meanwhile decides who the file is for", async () => {
+  // Pieter gave the job to Jose while Connor's upload waited on the row: the read under the lock sees Jose.
+  const { tx, calls } = fakeTx((model, op, args) => {
+    if (model === "task" && op === "findUnique") return { id: "t1", title: "Tile the bath", status: "IN_PROGRESS", assigneeContactId: "c-jose" };
+    return model === "taskAttachment" && op === "create" ? { id: "a1", ...args.data } : undefined;
+  });
+  const meta = { url: "https://x.private.blob.vercel-storage.com/tasks/t1/orig/q.pdf", pathname: "tasks/t1/orig/q.pdf", filename: "q.pdf", size: 10, contentType: "application/pdf" };
+  await recordAttachment(tx, "t1", meta, CONNOR, { visibility: "SHARED" }, POSTED);
+  assert.equal(calls[0].model, "$executeRaw", "the lock comes before anything is read");
+  assert.match(calls[0].op, /^SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.deepEqual(calls[0].args, ["t1"]);
+  assert.ok(calls.findIndex((c) => c.model === "task" && c.op === "findUnique") > 0, "the task is read under the lock");
+  assert.equal(calls.filter((c) => c.model === "$executeRaw" && c.op.includes("FOR NO KEY UPDATE")).length, 1, "one lock, not two");
+  const att = calls.find((c) => c.model === "taskAttachment" && c.op === "create")!.args as CallArgs;
+  assert.equal(att.data?.audienceContactId, "c-jose", "addressed to whoever has the job now");
+  const inserts = outboxInserts(calls);
+  assert.ok(inserts.some((c) => (c.args as unknown[]).includes("c-jose")), "Jose's email");
+  assert.ok(!inserts.some((c) => (c.args as unknown[]).includes("c-zack")), "never the contractor who just lost the job");
+});
+
+test("recordAttachment: a contractor who lost the job while the upload waited is refused under the lock, and nothing is written", async () => {
+  const { tx, calls } = fakeTx((model, op) => (model === "taskAccess" && op === "findUnique" ? null : undefined));
+  const meta = { url: "https://x.private.blob.vercel-storage.com/tasks/t1/orig/p.jpg", pathname: "tasks/t1/orig/p.jpg", filename: "p.jpg", size: 10, contentType: "image/jpeg" };
+  await assert.rejects(recordAttachment(tx, "t1", meta, ZACK, { standalone: false }, POSTED), /don't have access/);
+  assert.equal(calls[0].model, "$executeRaw");
+  assert.ok(calls.findIndex((c) => c.model === "taskAccess" && c.op === "findUnique") > 0, "the access check runs under the lock");
+  assert.deepEqual(calls.filter(isWrite), [], "no file row, no stamp, no line, no email");
+});
+
 test("addComment: the task row is written before any email row", async () => {
   const { tx, calls } = fakeTx();
   await addComment(tx, "t1", { body: "Arrived" }, ZACK, POSTED);
@@ -411,13 +440,12 @@ const file = (over: Partial<RemovedFile>): RemovedFile => ({
   id: "a1",
   taskId: "t1",
   asanaGid: null,
-  filename: "photo.jpg",
   ...over,
 });
 
-/** The file as removeAttachment reads it under the lock: on post `eventId` (null for a draft). */
-const onPost = (eventId: string | null, more?: Answer): Answer => (model, op, args) =>
-  more?.(model, op, args) ?? (model === "taskAttachment" && op === "findUnique" ? { eventId } : undefined);
+/** The file as removeAttachment reads it under the lock: on post `eventId` (null for a draft), named `filename`. */
+const onPost = (eventId: string | null, more?: Answer, filename = "photo.jpg"): Answer => (model, op, args) =>
+  more?.(model, op, args) ?? (model === "taskAttachment" && op === "findUnique" ? { eventId, filename } : undefined);
 const fileWrites = (calls: Call[]) => calls.filter((c) => c.model === "taskAttachment" && c.op !== "findUnique");
 
 test("removeAttachment: an imported file is only marked removed, so the delta sync doesn't bring it back", async () => {
@@ -501,6 +529,22 @@ test("removeAttachment: which post the file is on is read under the task lock, n
   assert.ok(read < calls.findIndex((c) => c.model === "taskAttachment" && c.op === "deleteMany"), "before the delete");
   const line = calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as CallArgs;
   assert.equal((line.data?.data as { eventId?: string }).eventId, "e7");
+});
+
+test("removeAttachment: the removed line names the file as it is under the lock, with which post it is on", async () => {
+  // deleteTaskAttachment read the file as "IMG_2231.jpg"; Pieter renamed it before the Remove got the task.
+  const { tx, calls } = fakeTx(onPost("e1", undefined, "Kitchen before.jpg"));
+  assert.equal(await removeAttachment(tx, file({}), CONNOR), true);
+  const read = calls.find((c) => c.model === "taskAttachment" && c.op === "findUnique")!.args as CallArgs;
+  assert.deepEqual(read.select, { eventId: true, filename: true }, "one read, under the lock");
+  const line = calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as CallArgs;
+  assert.deepEqual(line.data?.data, { attachmentId: "a1", filename: "Kitchen before.jpg", removed: true, eventId: "e1" });
+});
+
+test("removeAttachment: a file already gone when the lock is held is left alone, with nothing written", async () => {
+  const { tx, calls } = fakeTx((model, op) => (model === "taskAttachment" && op === "findUnique" ? null : undefined));
+  assert.equal(await removeAttachment(tx, file({}), CONNOR), false);
+  assert.deepEqual(calls.filter(isWrite), []);
 });
 
 // ---------------------------------------------------------------------------

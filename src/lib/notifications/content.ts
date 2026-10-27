@@ -278,6 +278,13 @@ export function itemText(item: OutboxItem, title?: string): string {
  * title is taken to end at the first `" back`: the note follows the title, and
  * a greedy title would swallow a note that says `" back` itself ('put the
  * "old" back') and drop it from the line.
+ *
+ * Known and left as it is: a job renamed while the line waits to send, from
+ * an old title that says `" back` itself, has that title cut at its first
+ * `" back`, so the rest of the old title reads as the note ('Put "old" back:
+ * kitchen', renamed, gives `sent it back: kitchen" back`). It takes both the
+ * rename and such a title, and the email's subject still names the job as it
+ * is now.
  */
 function sendBackTail(s: string, title?: string): string | null {
   if (title) {

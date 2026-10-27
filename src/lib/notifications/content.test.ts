@@ -160,6 +160,9 @@ test("a send-back on a title that says `\" back: ` itself comes out whole when t
   // A job renamed since the line was queued falls back to the first `" back`, as before.
   assert.equal(itemText(item("STATUS", 'sent "Paint" back: put the "old" back'), "Paint the hall"), 'sent it back: put the "old" back');
   assert.equal(itemText(item("STATUS", 'sent "Paint" back'), "Paint the hall"), "sent it back");
+  // The narrow case sendBackTail's note keeps: renamed from a title that says `" back` itself, the old title is cut at
+  // that first `" back` and its rest reads as the note.
+  assert.equal(itemText(item("STATUS", `sent "${t}" back`), "Kitchen faucet"), 'sent it back: kitchen" back');
   // The note after an exact title may say `" back: ` too.
   assert.equal(itemText(item("STATUS", `sent "${t}" back: Put it "back: here"`), t), 'sent it back: Put it "back: here"');
   // taskEmail hands its title down.

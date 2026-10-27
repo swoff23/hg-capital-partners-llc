@@ -501,17 +501,35 @@ test("addComment: a send with no clientId takes the task lock too, before it rea
   assert.equal(calls.filter((c) => c.model === "$executeRaw" && c.op.includes("FOR NO KEY UPDATE")).length, 1, "one lock, not two");
 });
 
-test("addComment: a contractor is refused on a closed job or without access before the clientId lookup and any write", async () => {
+test("addComment: a contractor is refused on a closed job or without access before any write, and without access before the clientId lookup", async () => {
   // The status is read under the lock, so a job approved a moment ago is closed to the post that waited on it.
-  const closed = fakeTx({ status: "DONE" }, accessOk);
+  const closed = fakeTx({ status: "DONE" }, (model, op) => accessOk(model, op) ?? (model === "taskEvent" && op === "findFirst" ? null : undefined));
   // The portal's batch post answers on these exact words (portal/job-uploads.ts postJobBatch).
   await assert.rejects(addComment(closed.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /^TaskRuleError: This job is closed\.$/);
   assert.deepEqual(writes(closed.calls).map((c) => c.model), ["$executeRaw"], "only the lock");
-  assert.ok(!closed.calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"), "an earlier post is never handed back");
-  const noAccess = fakeTx({ status: "OPEN" });
+  const noAccess = fakeTx({ status: "OPEN" }, (model, op) => (model === "taskEvent" && op === "findFirst" ? { id: "ev1", kind: "COMMENT" } : undefined));
   await assert.rejects(addComment(noAccess.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /don't have access/);
   assert.deepEqual(writes(noAccess.calls).map((c) => c.model), ["$executeRaw"], "only the lock");
-  assert.ok(!noAccess.calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"));
+  assert.ok(!noAccess.calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"), "an earlier post is never handed to someone who lost the job");
+  // Without a clientId there is nothing to look for: a closed job refuses at once.
+  const plain = fakeTx({ status: "DONE" }, accessOk);
+  await assert.rejects(addComment(plain.tx, "t1", { body: "Hi" }, ZACK), /^TaskRuleError: This job is closed\.$/);
+  assert.ok(!plain.calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"));
+});
+
+test("addComment: a contractor's Retry of an update that did post gets it back after the job closed, looked up after the access check", async () => {
+  // Zack's send posted, its answer never arrived, and Connor approved the job before Zack tapped Retry.
+  const first = { id: "ev1", kind: "COMMENT", taskId: "t1", body: "Uppers in" };
+  for (const status of ["DONE", "CANCELED"]) {
+    const { tx, calls } = fakeTx({ status }, (model, op) => accessOk(model, op) ?? (model === "taskEvent" && op === "findFirst" ? first : undefined));
+    const out = await addComment(tx, "t1", { body: "Uppers in", clientId: "send-1" }, ZACK);
+    assert.equal(out, first, status);
+    assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "only the lock: no second post, no email");
+    const at = (model: string, op: string) => calls.findIndex((c) => c.model === model && c.op === op);
+    assert.ok(at("taskAccess", "findUnique") >= 0 && at("taskAccess", "findUnique") < at("taskEvent", "findFirst"), "access first");
+    const find = calls[at("taskEvent", "findFirst")].args as { where: Record<string, unknown> };
+    assert.equal(find.where.actorContactId, "c-zack", "only Zack's own post");
+  }
 });
 
 test("addComment: a task deleted while the send waited is refused under the lock, before any write", async () => {

@@ -162,6 +162,14 @@ async function liveItems(
   return reconcileItems(stored, events, row);
 }
 
+/**
+ * Every write to a claimed row after the claim is an updateMany by id, never
+ * an update: deleteTask removes a task's rows by cascade, and a row can go
+ * while its email is sending. An update would throw P2025 on the missing row
+ * and fail the whole run, leaving every row after it for the next minute;
+ * updateMany writes nothing to a row that is gone and the run goes on. An
+ * email that went out still counts as sent.
+ */
 export async function drainDue(now = new Date(), opts: { limit?: number } = {}): Promise<DrainResult> {
   const started = Date.now();
   const limit = opts.limit ?? BATCH;
@@ -220,7 +228,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     if (!claimed) continue;
     const items = await liveItems(row.taskId, parseItems(claimed.items), { audience: delivery.audience, recipientContactId: row.recipientContactId });
     if (items.length === 0) {
-      await prisma.notificationOutbox.update({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
+      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
       result.skipped++;
       continue;
     }
@@ -252,7 +260,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     const res = await sendEmail({ to: delivery.to, subject: email.subject, text: rendered.text, html: rendered.html });
 
     if (res.ok) {
-      await prisma.notificationOutbox.update({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });
+      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });
       result.sent++;
       continue;
     }
@@ -264,7 +272,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       refused = true;
       result.held++;
       const until = refusedRetryAt(failure, new Date());
-      await prisma.notificationOutbox.update({
+      await prisma.notificationOutbox.updateMany({
         where: { id: row.id },
         data: { sendAfter: until, attempts: { decrement: 1 }, lastError: error },
       });
@@ -282,7 +290,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     }
     result.failed++;
     const next = retryAt(claimed.attempts, new Date());
-    await prisma.notificationOutbox.update({
+    await prisma.notificationOutbox.updateMany({
       where: { id: row.id },
       data: next ? { sendAfter: next, lastError: error } : { sentAt: new Date(), lastError: `gave up: ${error}` },
     });

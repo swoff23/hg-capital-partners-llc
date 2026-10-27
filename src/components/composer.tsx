@@ -31,7 +31,7 @@ import { useKeyboardInset } from "@/components/use-keyboard-inset";
 import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { callAction, OFFLINE_ERROR, type ActionResult } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
-import { EMPTY_DRAFT, clientIdToReuse, parseDraft, resolvePending, serializeDraft, type Draft } from "@/lib/composer-draft";
+import { EMPTY_DRAFT, adoptSharedDraft, clientIdToReuse, parseDraft, resolvePending, serializeDraft, type Draft } from "@/lib/composer-draft";
 import { cn } from "@/lib/utils";
 
 /*
@@ -80,10 +80,10 @@ export interface ComposerUploader {
 
 export interface ComposerProps {
   /**
-   * Where the draft lives in this browser, one key per surface and record,
-   * so a staff draft never opens in the portal's composer on the same
-   * origin ("hgos-task-draft:<taskId>" on the task page), and per person
-   * where one device may be shared (composer-draft.ts personalDraftKey).
+   * Where the draft lives in this browser, one key per surface, record and
+   * person (composer-draft.ts personalDraftKey), so a staff draft never
+   * opens in the portal's composer on the same origin, and a second person
+   * on a shared device never opens another's.
    */
   draftKey: string;
   /**
@@ -164,7 +164,8 @@ export function AudienceText({ name, words }: { name?: string | null; words: str
 // Read through useSyncExternalStore so the server render and hydration see
 // an empty box and the saved draft appears right after. Memory backs it up
 // when storage is off (private windows). A draft in today's text-only format
-// is read as Internal and written back in the new one.
+// is read as Internal and written back in the new one, and the first read of
+// a task page key takes over the draft its shared key held (adoptSharedDraft).
 const drafts = new Map<string, Draft>();
 const listeners = new Set<() => void>();
 
@@ -181,6 +182,7 @@ function readDraft(key: string): Draft {
   if (!d) {
     let raw: string | null = null;
     try {
+      adoptSharedDraft(localStorage, key);
       raw = localStorage.getItem(key);
     } catch {}
     const parsed = parseDraft(raw);

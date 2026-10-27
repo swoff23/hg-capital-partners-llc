@@ -2,7 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { EMPTY_DRAFT, clientIdToReuse, parseDraft, personalDraftKey, resolvePending, serializeDraft, type Draft } from "./composer-draft";
+import {
+  EMPTY_DRAFT,
+  adoptSharedDraft,
+  clientIdToReuse,
+  parseDraft,
+  personalDraftKey,
+  resolvePending,
+  serializeDraft,
+  sharedDraftKey,
+  type Draft,
+  type DraftStorage,
+} from "./composer-draft";
 
 test("a version 2 draft keeps the words and who sees them together", () => {
   const raw = JSON.stringify({ v: 2, text: "Check with Pieter first", visibility: "INTERNAL" });
@@ -94,9 +105,84 @@ test("the portal's job composer and the deal note box keep one draft per person,
   assert.notEqual(personalDraftKey("job", "t1", "c-zack"), "hgos-job-draft:t1");
 });
 
-test("both boxes build their key from the person signed in", () => {
+test("every box builds its key from the person signed in", () => {
   const read = (...parts: string[]) => readFileSync(join(import.meta.dirname, "..", ...parts), "utf8");
   assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx"), /draftKey=\{personalDraftKey\("job", taskId, contactId\)\}/);
   assert.match(read("app", "(portal)", "p", "jobs", "[id]", "page.tsx"), /contactId=\{principal\.contactId\}/);
   assert.match(read("app", "(app)", "deals", "[id]", "deal-log.tsx"), /draftKey=\{personalDraftKey\("deal-note", dealId, viewerId\)\}/);
+  // The task page: the partner signed in, handed down from the page's user.
+  assert.match(read("app", "(app)", "tasks", "[id]", "composer.tsx"), /draftKey=\{personalDraftKey\("task", taskId, viewerId\)\}/);
+  assert.match(read("app", "(app)", "tasks", "[id]", "view.tsx"), /viewerId=\{p\.meId\}/);
+  assert.match(read("app", "(app)", "tasks", "[id]", "page.tsx"), /meId=\{user\.id\}/);
+  assert.doesNotMatch(read("app", "(app)", "tasks", "[id]", "composer.tsx"), /draftKey=\{`hgos-task-draft:/, "never the shared key");
+});
+
+test("the task page keeps one draft per partner, and its shared key from before is the only one read once", () => {
+  assert.equal(personalDraftKey("task", "t1", "u-connor"), "hgos-task-draft:t1:u-connor");
+  assert.notEqual(personalDraftKey("task", "t1", "u-connor"), personalDraftKey("task", "t1", "u-pieter"));
+  assert.equal(sharedDraftKey(personalDraftKey("task", "t1", "u-connor")), "hgos-task-draft:t1");
+  // The portal's and the deal box's earlier keys never shipped; nothing is read for them.
+  assert.equal(sharedDraftKey(personalDraftKey("job", "t1", "c-zack")), null);
+  assert.equal(sharedDraftKey(personalDraftKey("deal-note", "d1", "u-connor")), null);
+  assert.equal(sharedDraftKey("hgos-task-draft:t1"), null, "the shared key itself has nothing before it");
+});
+
+/** localStorage as a Map, counting what the move does. */
+function storage(entries: Record<string, string>): DraftStorage & { map: Map<string, string>; writes: string[] } {
+  const map = new Map(Object.entries(entries));
+  const writes: string[] = [];
+  return {
+    map,
+    writes,
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => {
+      writes.push(`set ${k}`);
+      map.set(k, v);
+    },
+    removeItem: (k) => {
+      writes.push(`remove ${k}`);
+      map.delete(k);
+    },
+  };
+}
+
+test("adoptSharedDraft: the task page's old draft moves to the first partner's key once, then the old key is gone", () => {
+  const old = JSON.stringify({ v: 2, text: "Ask Zack about the vanity", visibility: "INTERNAL" });
+  const mine = personalDraftKey("task", "t1", "u-connor");
+  const s = storage({ "hgos-task-draft:t1": old, "hgos-task-draft:t2": "other task" });
+  adoptSharedDraft(s, mine);
+  assert.equal(s.map.get(mine), old, "moved whole, words, side and any pending send");
+  assert.equal(s.map.has("hgos-task-draft:t1"), false);
+  assert.equal(s.map.get("hgos-task-draft:t2"), "other task", "another task's draft waits for its own page");
+  assert.deepEqual(parseDraft(s.map.get(mine)).draft.visibility, "INTERNAL");
+  // Read once: a second read, or another partner's, finds nothing to take.
+  const theirs = personalDraftKey("task", "t1", "u-pieter");
+  s.writes.length = 0;
+  adoptSharedDraft(s, mine);
+  adoptSharedDraft(s, theirs);
+  assert.deepEqual(s.writes, []);
+  assert.equal(s.map.has(theirs), false);
+});
+
+test("adoptSharedDraft: a draft already under the partner's key is theirs and stays; the old one goes", () => {
+  const mine = personalDraftKey("task", "t1", "u-connor");
+  const s = storage({ "hgos-task-draft:t1": "older words", [mine]: JSON.stringify({ v: 2, text: "Mine", visibility: "SHARED" }) });
+  adoptSharedDraft(s, mine);
+  assert.equal(parseDraft(s.map.get(mine)).draft.text, "Mine");
+  assert.equal(s.map.has("hgos-task-draft:t1"), false);
+  assert.deepEqual(s.writes, ["remove hgos-task-draft:t1"]);
+});
+
+test("adoptSharedDraft: nothing under the old key, or a key with none before it, writes nothing", () => {
+  const empty = storage({});
+  adoptSharedDraft(empty, personalDraftKey("task", "t1", "u-connor"));
+  const job = storage({ "hgos-job-draft:t1": "never shipped" });
+  adoptSharedDraft(job, personalDraftKey("job", "t1", "c-zack"));
+  assert.deepEqual([...empty.writes, ...job.writes], []);
+  assert.equal(job.map.get("hgos-job-draft:t1"), "never shipped");
+});
+
+test("the composer moves the old draft on the first read of a key, before it reads the key", () => {
+  const src = readFileSync(join(import.meta.dirname, "..", "components", "composer.tsx"), "utf8");
+  assert.match(src, /function readDraft\(key: string\): Draft \{\s*let d = drafts\.get\(key\);\s*if \(!d\) \{\s*let raw: string \| null = null;\s*try \{\s*adoptSharedDraft\(localStorage, key\);\s*raw = localStorage\.getItem\(key\);/);
 });

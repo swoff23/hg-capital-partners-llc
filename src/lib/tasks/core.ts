@@ -1083,15 +1083,15 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  if (p.kind === "contractor") {
-    await assertContractorAccess(tx, taskId, p.contactId);
-    if (!isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
-  }
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
   if (input.clientId) {
-    // After the access and closed-job checks, so a refused contractor never gets an earlier post back.
+    // After the access check, so a contractor who lost the job never gets an earlier post back. Before the
+    // closed-job check, so a Retry of an update that did post before the job closed gets that post back instead
+    // of "This job is closed." and a send that never posted is still refused below.
     const prior = await priorSend(tx, taskId, p, input.clientId);
     if (prior) return prior;
   }
+  if (p.kind === "contractor" && !isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
   if (empty) throw new TaskRuleError("Write something or add a photo.");
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (input.visibility ?? "INTERNAL");
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
@@ -1375,6 +1375,13 @@ const kindForType = (type: string | null) => (type?.startsWith("image/") ? "IMAG
  * size and type with head() first and passes those values, never the
  * browser's. `standalone` adds a timeline line; files posted with a comment
  * show inside it instead (addComment links them).
+ *
+ * The task row is locked before the task is read, as addComment locks it:
+ * a reassignment (patchTask locks the row first) that lands while this
+ * waits is the one it sees, so a staff file is addressed and emailed to
+ * whoever has the job now, never the contractor who just lost it, and a
+ * contractor who lost the job is refused by the access check under the
+ * lock instead of recording after it.
  */
 export async function recordAttachment(
   tx: Tx,
@@ -1384,6 +1391,7 @@ export async function recordAttachment(
   opts: { visibility?: Visibility; standalone?: boolean } = {},
   now = new Date(),
 ) {
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
@@ -1409,9 +1417,9 @@ export async function recordAttachment(
       posterPathname: meta.posterPathname ?? null,
     },
   });
-  // The task row before any email row, as every other write here: a take-back
-  // holding the task (takeBackContractorPost) then never waits on an email
-  // row this holds while this waits on the task.
+  // The task row is held from the top, before any email row, as every other
+  // write here takes it: a take-back holding the task (takeBackContractorPost)
+  // then never waits on an email row this holds while this waits on the task.
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
   if (opts.standalone !== false) {
     const ev = await addEvent(tx, taskId, p, {
@@ -1440,8 +1448,8 @@ export async function findOwnUpload(tx: Tx, taskId: string, pathname: string, p:
   return tx.taskAttachment.findFirst({ where: { taskId, pathname, deletedAt: null, ...by }, select: { id: true } });
 }
 
-/** What removing a file needs to know about it. Which post it is on is read again under the lock. */
-export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "asanaGid" | "filename">;
+/** What removing a file needs to know about it. Which post it is on, and its name, are read under the lock. */
+export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "asanaGid">;
 
 /**
  * Staff take a file off a task (tasks/attachments.ts deleteTaskAttachment,
@@ -1467,22 +1475,25 @@ export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "asanaGid" | "f
  * transaction, so a comment deleted or a post taken back in between has
  * already stamped it, and it must stay for that comment's Undo. False when
  * the file is already gone or off, and then nothing is written. Which post
- * the file is on is read under the lock too: a draft the caller read that a
- * send posted in between is a posted file now, and leaves its line.
+ * the file is on, and its name, are read under the lock too: a draft the
+ * caller read that a send posted in between is a posted file now, and leaves
+ * its line, and a rename that landed in between (renameAttachment takes the
+ * task first too) is the name the line gives.
  */
 export async function removeAttachment(tx: Tx, att: RemovedFile, p?: Principal, now = new Date()): Promise<boolean> {
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${att.taskId} FOR NO KEY UPDATE`;
-  const posted = await tx.taskAttachment.findUnique({ where: { id: att.id }, select: { eventId: true } });
+  const posted = await tx.taskAttachment.findUnique({ where: { id: att.id }, select: { eventId: true, filename: true } });
+  if (!posted) return false;
   const { count } = att.asanaGid
     ? await tx.taskAttachment.updateMany({ where: { id: att.id, deletedAt: null }, data: { deletedAt: now } })
     : await tx.taskAttachment.deleteMany({ where: { id: att.id, deletedAt: null } });
   if (count === 0) return false;
-  const eventId = posted?.eventId ?? null;
+  const eventId = posted.eventId;
   if (p && eventId !== null) {
     await addEvent(tx, att.taskId, p, {
       kind: "ATTACHMENT",
       visibility: "INTERNAL",
-      data: { attachmentId: att.id, filename: att.filename, removed: true, eventId },
+      data: { attachmentId: att.id, filename: posted.filename, removed: true, eventId },
     });
   }
   if (p) await tx.task.update({ where: { id: att.taskId }, data: editStamp(p, now) });

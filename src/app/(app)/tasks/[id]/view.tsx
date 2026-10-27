@@ -187,6 +187,7 @@ export function TaskPageView(p: TaskPageViewProps) {
             <Composer
               taskId={task.id}
               taskTitle={task.title}
+              viewerId={p.meId}
               contractor={p.contractor}
               staff={p.staffFirstNames}
               drafts={p.drafts}

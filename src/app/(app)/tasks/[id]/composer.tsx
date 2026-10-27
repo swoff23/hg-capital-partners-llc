@@ -4,6 +4,7 @@ import { TextLink } from "@/components/ui";
 import type { UploadTarget } from "@/components/upload-queue";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ALLOWED, uploadTargetHref, uploadTargetKey } from "@/lib/attachments/upload-kinds";
+import { personalDraftKey } from "@/lib/composer-draft";
 import { joinNames } from "@/lib/portal/job-view";
 import { recordTaskAttachment } from "../upload-actions";
 import { addTaskComment, deleteTaskFile } from "./actions";
@@ -27,6 +28,7 @@ export type { ComposerDraft } from "@/components/composer";
 export function Composer({
   taskId,
   taskTitle,
+  viewerId,
   contractor,
   staff,
   drafts,
@@ -34,6 +36,8 @@ export function Composer({
 }: {
   taskId: string;
   taskTitle: string;
+  /** The signed-in partner, whose draft this box keeps. */
+  viewerId: string;
   /** The assigned contractor, if any: their first name, their contact id (for "Set up login") and whether they have a portal login. */
   contractor: { id: string; first: string; hasLogin: boolean } | null;
   /** The partners' first names: who sees an Internal note. */
@@ -67,8 +71,8 @@ export function Composer({
 
   return (
     <SharedComposer
-      // The staff surface's key; the portal's composer keeps its own, so an Internal draft never opens there.
-      draftKey={`hgos-task-draft:${taskId}`}
+      // The staff surface's key, per partner; the portal's composer keeps its own, so an Internal draft never opens there.
+      draftKey={personalDraftKey("task", taskId, viewerId)}
       visibility="switch"
       pin="phone"
       audience={{
