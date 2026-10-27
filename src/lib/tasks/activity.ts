@@ -28,7 +28,8 @@ import { describeRepeat, parseRepeatRule } from "./repeat";
  *    emailed or seen, so it stays);
  *  - a status change and the note written with it (`data.statusEventId`) are
  *    one decision; files posted within 2 minutes of each other by one person
- *    are one batch line; a soft-deleted comment leaves a staff-only line.
+ *    are one batch line; a soft-deleted comment leaves a staff-only line,
+ *    except a photo post its contractor took back, which goes.
  *
  * Pure; see activity.test.ts.
  */
@@ -501,8 +502,9 @@ export interface BuildOptions {
  */
 export function buildActivity<E extends ActivityEvent>(events: readonly E[], names: ActivityNames, today: Ymd, opts: BuildOptions = {}): ActivityEntry<E>[] {
   const sorted = [...events].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id.localeCompare(y.id));
-  // A deleted comment leaves a line; anything else deleted (an undone approval) is gone from the timeline.
-  const live = sorted.filter((e) => !e.deletedAt || e.kind === "COMMENT");
+  // A deleted comment leaves a line. Anything else deleted (an undone approval) is gone from the timeline, and so
+  // is a photo post its contractor took back (`data.batch`): that is an Undo at once, not a deleted comment.
+  const live = sorted.filter((e) => !e.deletedAt || (e.kind === "COMMENT" && dataOf(e).batch !== true));
   const hidden = reversedPairs(live.filter((e) => !e.deletedAt));
 
   // A note is paired with the status change it was written with, by id, never by adjacency.

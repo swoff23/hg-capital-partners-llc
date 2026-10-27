@@ -10,6 +10,7 @@ import {
   movedAllMessage,
   movedMessage,
   targetField,
+  tickPlan,
   type DateChange,
   type ListPatch,
   type ListTask,
@@ -104,25 +105,28 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
       );
     },
     setDone(task, done) {
-      // The status the row shows. While an earlier tap is still saving, the
-      // optimistic tick and the server's status disagree, and the row shows
-      // where that tap is heading.
-      const settled = task.checked === (task.status === "DONE");
-      const shown = settled ? task.status : task.checked ? "DONE" : "OPEN";
+      // The status the row shows, and whether this tick is an approval (tickPlan).
+      const { shown, approves } = tickPlan(task, done);
+      // A tick that finished it says so, with an Undo back to the status it
+      // had, Canceled included. An untick, or a tick someone else beat, says
+      // nothing. Undo puts the row itself back: by then the refresh has
+      // dropped it from Today and All > Open.
+      const ticked = (nextDue: Ymd | null, undoTick: () => Promise<ActionResult>) => {
+        const back: ListPatch = { kind: "restore", task: { ...task, status: shown, checked: false } };
+        toast({ message: doneMessage(task.title, nextDue, today), action: { label: "Undo", onAction: () => run(back, undoTick) } });
+      };
+      // A Needs review row ticked: Approve, and Approve's Undo back to Review as if never approved, with the same toast.
+      if (approves) {
+        run({ kind: "check", id: task.id, checked: true }, () => approveTask(task.id), ({ approvedEventId, nextDue }) => {
+          if (approvedEventId) ticked(nextDue, () => undoApprove(task.id, approvedEventId));
+        });
+        return;
+      }
       run(
         { kind: "check", id: task.id, checked: done },
         () => setTaskDone(task.id, done, shown),
-        // A tick that finished it says so, with an Undo back to the status it
-        // had, Canceled included. An untick, or a tick someone else beat, says
-        // nothing. Undo puts the row itself back: by then the refresh has
-        // dropped it from Today and All > Open.
-        (ticked) => {
-          if (!ticked) return;
-          const back: ListPatch = { kind: "restore", task: { ...task, status: shown, checked: false } };
-          toast({
-            message: doneMessage(task.title, ticked.nextDue, today),
-            action: { label: "Undo", onAction: () => run(back, () => undoDone(task.id, shown, task.waitingOn)) },
-          });
+        (result) => {
+          if (result) ticked(result.nextDue, () => undoDone(task.id, shown, task.waitingOn));
         },
       );
     },
@@ -137,7 +141,8 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
           const back: ListPatch = { kind: "restore", task: { ...task, status: "REVIEW", checked: false } };
           toast({
             message: "Approved",
-            // Only when it is true: the contractor has a login and the email waits ten minutes, so Undo is honest.
+            // Only when it is true: the contractor has a login. The email waits 3 minutes (10 at most from the
+            // bundle's first line), and the server refuses Undo once it is claimed or sent, so Undo is honest.
             ...(emailsContractor && who ? { detail: `${who} gets an email` } : {}),
             action: { label: "Undo", onAction: () => run(back, () => undoApprove(task.id, approvedEventId)) },
           });

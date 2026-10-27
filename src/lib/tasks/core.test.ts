@@ -13,6 +13,7 @@ import {
   editComment,
   isAssignee,
   patchTask,
+  renameTaskUnits,
   restoreComment,
   setChecklistItem,
   setStatus,
@@ -715,13 +716,38 @@ test("setStatus: a stale change credits whoever moved it there, not an approval 
 // Approve's Undo
 // ---------------------------------------------------------------------------
 
-test("undoApproval: back to Review as if never approved, writing no status line and no email", async () => {
-  const now = new Date("2026-10-23T15:00:00Z");
-  const { tx, calls } = fakeTx({ status: "DONE", dealId: "d1", completedAt: now }, (model, op, args) => {
-    if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS") return { id: "s9", data: { from: "REVIEW", to: "DONE" } };
+const UNDO_NOW = new Date("2026-10-23T15:00:00Z");
+/** Pieter's approval, 30 seconds before UNDO_NOW. */
+const APPROVAL = { id: "s9", data: { from: "REVIEW", to: "DONE" }, createdAt: new Date("2026-10-23T14:59:30Z"), actorUserId: "u-pieter", actorLabel: "Pieter Louw" };
+type EmailRow = { sentAt: Date | null; openKey: string | null; attempts: number };
+
+/**
+ * A Done task whose latest status line is `approval` (null for none), with the
+ * reads undoApproval makes: `undone` answers the retry check (the approval
+ * already soft-deleted by this approver), `emails` the approval's outbox rows.
+ */
+function approvalTx(
+  row: Record<string, unknown> = {},
+  opts: { approval?: Partial<typeof APPROVAL> | null; undone?: boolean; emails?: EmailRow[]; answer?: Answer } = {},
+) {
+  return fakeTx({ status: "DONE", ...row }, (model, op, args) => {
+    const given = opts.answer?.(model, op, args);
+    if (given !== undefined) return given;
+    const where = args.where ?? {};
+    if (model === "taskEvent" && op === "findFirst" && where.kind === "STATUS" && where.deletedAt && typeof where.deletedAt === "object") {
+      return opts.undone ? { id: "s9" } : null;
+    }
+    if (model === "taskEvent" && op === "findFirst" && where.kind === "STATUS") return opts.approval === null ? null : { ...APPROVAL, ...opts.approval };
+    if (model === "$queryRaw" && op.includes('FROM "NotificationOutbox"') && op.includes("@>")) return opts.emails ?? [];
     return undefined;
   });
-  await undoApproval(tx, "t1", "s9", PIETER, now);
+}
+
+const approvalEmailLock = (calls: Call[]) => calls.findIndex((c) => c.model === "$queryRaw" && c.op.includes('FROM "NotificationOutbox"') && c.op.includes("@>"));
+
+test("undoApproval: back to Review as if never approved, writing no status line and no email", async () => {
+  const { tx, calls } = approvalTx({ dealId: "d1", completedAt: UNDO_NOW }, { emails: [{ sentAt: null, openKey: "c:c-zack:t1", attempts: 0 }] });
+  await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
   assert.match(calls[0].op, /FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE/);
   const update = calls.find((c) => c.model === "task" && c.op === "update")!;
   const data = (update.args as { data: Record<string, unknown> }).data;
@@ -729,37 +755,156 @@ test("undoApproval: back to Review as if never approved, writing no status line 
   assert.equal(data.completedAt, null);
   assert.equal(data.completedByUserId, null);
   // The Done line is soft-deleted, so the timeline hides it and the drain drops the queued approval.
-  assert.deepEqual(calls.find((c) => c.model === "taskEvent" && c.op === "update")!.args, { where: { id: "s9" }, data: { deletedAt: now } });
+  assert.deepEqual(calls.find((c) => c.model === "taskEvent" && c.op === "update")!.args, { where: { id: "s9" }, data: { deletedAt: UNDO_NOW } });
   // No status line, so Zack isn't told it moved to Review and his late-upload hour (the latest move to Review) is untouched.
   assert.ok(!created(calls, "taskEvent").some((c) => (c.args as { data: { kind: string } }).data.kind === "STATUS"));
-  assert.ok(!calls.some((c) => c.op.includes("NotificationOutbox")));
-  // The deal hears it was reopened, as any reopen says.
-  assert.ok(created(calls, "dealNote").length === 1);
+  // The approval's email rows are only locked and read, never written: the drain drops the line itself.
+  assert.ok(!calls.some((c) => c.model === "$executeRaw" && c.op.includes("NotificationOutbox")));
+  // An approval whose deal line doesn't name it (written before lines did): the deal hears it was reopened.
+  assert.equal(created(calls, "dealNote").length, 1);
+});
+
+test("undoApproval: the approval's email rows are locked after the task and before any write, in id order", async () => {
+  const { tx, calls } = approvalTx();
+  await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
+  const lock = approvalEmailLock(calls);
+  assert.ok(lock > 0, "after the task lock");
+  assert.ok(lock < calls.findIndex((c) => c.model === "task" && c.op === "update"), "before the task moves");
+  assert.match(calls[lock].op, /"taskId" = \? AND "items" @> jsonb_build_array\(jsonb_build_object\('eventId', \?::text\)\)\s+ORDER BY "id" FOR UPDATE$/);
+  assert.deepEqual(calls[lock].args, ["t1", "s9"]);
+});
+
+test("undoApproval: refused once the approval's email is claimed or sent, with nothing written", async () => {
+  const claimed: EmailRow = { sentAt: null, openKey: null, attempts: 1 };
+  const sent: EmailRow = { sentAt: new Date("2026-10-23T14:59:50Z"), openKey: null, attempts: 1 };
+  const open: EmailRow = { sentAt: null, openKey: "c:c-zack:t1", attempts: 0 };
+  for (const emails of [[claimed], [sent], [open, claimed]]) {
+    const { tx, calls } = approvalTx({}, { emails });
+    await assert.rejects(undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW), (e: unknown) => e instanceof TaskRuleError && e.message === "Email already sent. Change the status.");
+    assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "only the task lock");
+  }
+  // Still open, or a try Resend refused and gave back (openKey null, attempts 0): the drain re-reads, so Undo goes through.
+  for (const emails of [[open], [{ sentAt: null, openKey: null, attempts: 0 }]]) {
+    const { tx, calls } = approvalTx({}, { emails });
+    await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
+    assert.ok(calls.some((c) => c.model === "task" && c.op === "update"));
+  }
+});
+
+test("undoApproval: only the partner who approved, and only within 2 minutes", async () => {
+  const connor = approvalTx({}, { approval: { actorUserId: "u-connor", actorLabel: "Connor Swofford" } });
+  await assert.rejects(undoApproval(connor.tx, "t1", "s9", PIETER, UNDO_NOW), (e: unknown) => e instanceof TaskRuleError && e.message === "Connor approved this. Change the status.");
+  assert.deepEqual(writes(connor.calls).map((c) => c.model), ["$executeRaw"]);
+  assert.equal(approvalEmailLock(connor.calls), -1, "refused before any email row is locked");
+  // An approval with no user behind it (an import, a system line) is nobody's to undo.
+  const nobody = approvalTx({}, { approval: { actorUserId: null as unknown as string, actorLabel: "" } });
+  await assert.rejects(undoApproval(nobody.tx, "t1", "s9", PIETER, UNDO_NOW), (e: unknown) => e instanceof TaskRuleError && e.message === "Not yours to undo. Change the status.");
+
+  const late = approvalTx({}, { approval: { createdAt: new Date(UNDO_NOW.getTime() - 2 * 60_000 - 1) } });
+  await assert.rejects(undoApproval(late.tx, "t1", "s9", PIETER, UNDO_NOW), (e: unknown) => e instanceof TaskRuleError && e.message === "Too late to undo. Change the status.");
+  assert.deepEqual(writes(late.calls).map((c) => c.model), ["$executeRaw"]);
+  const onTime = approvalTx({}, { approval: { createdAt: new Date(UNDO_NOW.getTime() - 2 * 60_000) } });
+  await undoApproval(onTime.tx, "t1", "s9", PIETER, UNDO_NOW);
+  assert.ok(onTime.calls.some((c) => c.model === "task" && c.op === "update"), "exactly 2 minutes is still in time");
+});
+
+test("undoApproval: a retry of an Undo that went through is a quiet success that writes nothing", async () => {
+  // The first try committed: the job is back in Review and the approval is soft-deleted.
+  const { tx, calls } = approvalTx({ status: "REVIEW" }, { undone: true });
+  const out = await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
+  assert.equal(out.task.status, "REVIEW");
+  assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"]);
+  const check = calls.find((c) => c.model === "taskEvent" && c.op === "findFirst")!;
+  assert.deepEqual((check.args as CallArgs).where, { id: "s9", taskId: "t1", kind: "STATUS", actorUserId: "u-pieter", deletedAt: { not: null } });
+  // Without that, the retry reads as the job having moved: "Zack moved this to Review."
+  await assert.rejects(undoApproval(approvalTx({ status: "REVIEW" }).tx, "t1", "s9", PIETER, UNDO_NOW), TaskChangedError);
+});
+
+test("undoApproval: the deal's Task completed line goes when it names the approval, with no Task reopened", async () => {
+  const { tx, calls } = approvalTx({ dealId: "d1" }, { answer: (m, op) => (m === "dealNote" && op === "updateMany" ? { count: 1 } : undefined) });
+  await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
+  const gone = calls.find((c) => c.model === "dealNote" && c.op === "updateMany")!;
+  assert.deepEqual(gone.args, {
+    where: { dealId: "d1", source: "change", deletedAt: null, data: { path: ["taskEventId"], equals: "s9" } },
+    data: { deletedAt: UNDO_NOW },
+  });
+  assert.equal(created(calls, "dealNote").length, 0);
+  // A task with no deal touches no deal lines.
+  const solo = approvalTx();
+  await undoApproval(solo.tx, "t1", "s9", PIETER, UNDO_NOW);
+  assert.ok(!solo.calls.some((c) => c.model === "dealNote"));
+});
+
+test("setStatus: Approve's deal line names the Done line, so its Undo can take it back; a reopen's doesn't", async () => {
+  const { tx, calls } = fakeTx({ status: "REVIEW", dealId: "d1" }, (model, op, args) =>
+    model === "taskEvent" && op === "create" ? { id: "s1", createdAt: UNDO_NOW, ...args.data } : undefined,
+  );
+  await setStatus(tx, "t1", "DONE", PIETER, { expected: "REVIEW" }, UNDO_NOW);
+  const line = created(calls, "dealNote")[0].args as { data: { body: string; data?: unknown } };
+  assert.equal(line.data.body, "Task completed: Hang drywall  ·  Pieter Louw");
+  assert.deepEqual(line.data.data, { taskEventId: "s1" });
+  const reopen = fakeTx({ status: "DONE", dealId: "d1" });
+  await setStatus(reopen.tx, "t1", "OPEN", PIETER, { expected: "DONE" }, UNDO_NOW);
+  assert.equal((created(reopen.calls, "dealNote")[0].args as { data: { data?: unknown } }).data.data, undefined);
 });
 
 test("undoApproval: refused when the job moved on, when the approval isn't the latest status line, or by a contractor", async () => {
-  await assert.rejects(undoApproval(fakeTx({ status: "IN_PROGRESS" }).tx, "t1", "s9", PIETER), (e: unknown) => e instanceof TaskChangedError && e.current === "IN_PROGRESS");
-  const later = fakeTx({ status: "DONE" }, (m, op, args) => (m === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS" ? { id: "s10", data: { from: "REVIEW", to: "DONE" } } : undefined));
-  await assert.rejects(undoApproval(later.tx, "t1", "s9", PIETER), /changed after it was approved/);
-  const notApproval = fakeTx({ status: "DONE" }, (m, op, args) => (m === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS" ? { id: "s9", data: { from: "OPEN", to: "DONE" } } : undefined));
-  await assert.rejects(undoApproval(notApproval.tx, "t1", "s9", PIETER), /changed after it was approved/);
-  await assert.rejects(undoApproval(fakeTx({ status: "DONE" }).tx, "t1", "s9", ZACK), /Only staff/);
-  const none = fakeTx({ status: "DONE" }, (m, op, args) => (m === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS" ? null : undefined));
-  await assert.rejects(undoApproval(none.tx, "t1", "s9", PIETER), TaskRuleError);
+  await assert.rejects(undoApproval(approvalTx({ status: "IN_PROGRESS" }).tx, "t1", "s9", PIETER, UNDO_NOW), (e: unknown) => e instanceof TaskChangedError && e.current === "IN_PROGRESS");
+  await assert.rejects(undoApproval(approvalTx({}, { approval: { id: "s10" } }).tx, "t1", "s9", PIETER, UNDO_NOW), /changed after it was approved/);
+  await assert.rejects(undoApproval(approvalTx({}, { approval: { data: { from: "OPEN", to: "DONE" } } }).tx, "t1", "s9", PIETER, UNDO_NOW), /changed after it was approved/);
+  await assert.rejects(undoApproval(approvalTx().tx, "t1", "s9", ZACK, UNDO_NOW), /Only staff/);
+  await assert.rejects(undoApproval(approvalTx({}, { approval: null }).tx, "t1", "s9", PIETER, UNDO_NOW), TaskRuleError);
 });
 
-test("undoApproval takes the next repeat copy back through the same rule as a reopen", async () => {
+test("undoApproval takes the next repeat copy back through the same rule as a reopen, locking the copy after the task's email rows", async () => {
   const copy = { status: "OPEN", appEditedAt: null, asanaId: null, events: [{ kind: "CREATED" }], _count: { attachments: 0, readStates: 0, checklist: 0 } };
-  const { tx, calls } = fakeTx({ status: "DONE", repeatRule: MONTHLY_5, repeatSeriesId: "s1" }, (model, op, args) => {
-    if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS") return { id: "s9", data: { from: "REVIEW", to: "DONE" } };
-    if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "REPEAT_CREATED") return { id: "r1", data: { next: "t2", due: "2026-11-05" } };
-    if (model === "task" && op === "findUnique" && args.where?.id === "t2") return args.select?.status ? copy : { id: "t2" };
-    if (model === "$queryRaw" && op.includes('FROM "Task"')) return [{ id: "t2" }];
-    return undefined;
-  });
-  await undoApproval(tx, "t1", "s9", PIETER);
+  const { tx, calls } = approvalTx(
+    { repeatRule: MONTHLY_5, repeatSeriesId: "s1" },
+    {
+      answer: (model, op, args) => {
+        if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "REPEAT_CREATED") return { id: "r1", data: { next: "t2", due: "2026-11-05" } };
+        if (model === "task" && op === "findUnique" && args.where?.id === "t2") return args.select?.status ? copy : { id: "t2" };
+        if (model === "$queryRaw" && op.includes('FROM "Task"')) return [{ id: "t2" }];
+        return undefined;
+      },
+    },
+  );
+  await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
   const deleted = calls.filter((c) => c.op === "delete").map((c) => `${c.model}:${(c.args as { where: { id: string } }).where.id}`);
   assert.deepEqual(deleted, ["task:t2", "taskEvent:r1"]);
+  // Task A, A's email rows, copy B, B's email rows: the order every writer and the take-back keep.
+  const order = calls
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => c.op.includes("FOR UPDATE") || c.op.includes("FOR NO KEY UPDATE"))
+    .map(({ c }) => (c.op.includes('FROM "Task"') ? `task:${(c.args as unknown[])[0]}` : c.op.includes("@>") ? "emails:approval" : `emails:${(c.args as unknown[])[0]}`));
+  assert.deepEqual(order, ["task:t1", "emails:approval", "task:t2", "emails:t2"]);
+});
+
+test("undoApproval: a touched copy stays, and the job still goes back to Review", async () => {
+  const touched = { status: "OPEN", appEditedAt: null, asanaId: null, events: [{ kind: "CREATED" }, { kind: "COMMENT" }], _count: { attachments: 0, readStates: 0, checklist: 0 } };
+  const { tx, calls } = approvalTx(
+    { repeatRule: MONTHLY_5, repeatSeriesId: "s1" },
+    {
+      answer: (model, op, args) => {
+        if (model === "taskEvent" && op === "findFirst" && args.where?.kind === "REPEAT_CREATED") return { id: "r1", data: { next: "t2", due: "2026-11-05" } };
+        if (model === "task" && op === "findUnique" && args.where?.id === "t2") return args.select?.status ? touched : { id: "t2" };
+        if (model === "$queryRaw" && op.includes('FROM "Task"')) return [{ id: "t2" }];
+        return undefined;
+      },
+    },
+  );
+  const out = await undoApproval(tx, "t1", "s9", PIETER, UNDO_NOW);
+  assert.equal(out.task.status, "REVIEW");
+  assert.ok(!calls.some((c) => c.op === "delete"), "the copy and its REPEAT_CREATED line stay");
+});
+
+test("renameTaskUnits patches a property's tasks in id order, so two saves on one property lock them the same way round", async () => {
+  const { tx, calls } = fakeTx({ propertyId: "p1", unitLabel: "1" }, (model, op) =>
+    model === "task" && op === "findMany" ? [{ id: "t1", unitLabel: "1" }] : undefined,
+  );
+  assert.deepEqual(await renameTaskUnits(tx, "p1", [{ from: "1", to: "Upper" }], PIETER), ["t1"]);
+  const find = calls.find((c) => c.model === "task" && c.op === "findMany")!;
+  assert.deepEqual((find.args as { orderBy?: unknown }).orderBy, { id: "asc" });
 });
 
 test("takeBackRepeat: a partner opening the copy doesn't keep it; only the contractor's reads count", async () => {

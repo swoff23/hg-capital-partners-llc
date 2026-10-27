@@ -398,6 +398,16 @@ test("a deleted comment leaves a line, and any other deleted event is gone", () 
   assert.equal(out[0].id, gone.id);
 });
 
+test("a photo post its contractor took back is gone at once, not a deleted comment", () => {
+  // postJobBatch marks the post `data.batch`; undoing it soft-deletes the post and its files.
+  const takenBack = ev("COMMENT", { batch: true }, { ...ZACK, visibility: "SHARED", createdAt: at(10), deletedAt: at(10.2) });
+  const kept = ev("COMMENT", { batch: true }, { ...ZACK, visibility: "SHARED", createdAt: at(12) });
+  const written = ev("COMMENT", {}, { ...ZACK, visibility: "SHARED", body: "Tile set", createdAt: at(14), deletedAt: at(15) });
+  const out = build([takenBack, kept, written]);
+  assert.deepEqual(types(out), ["comment", "deleted"]);
+  assert.deepEqual(out.map((e) => e.id), [kept.id, written.id]);
+});
+
 test("imported history is flagged: story rows and the importer's creation line, not later sync rows", () => {
   const sync = { actorUserId: null, source: "ASANA" } as const;
   const created = ev("CREATED", {}, { ...sync, actorLabel: "Asana import" });

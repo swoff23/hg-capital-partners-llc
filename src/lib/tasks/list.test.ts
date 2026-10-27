@@ -15,6 +15,7 @@ import {
   movedMessage,
   targetField,
   targetOf,
+  tickPlan,
   toListTask,
   type ListAssignee,
   type ListTask,
@@ -251,6 +252,20 @@ test("toast copy", () => {
   assert.equal(movedMessage(null), "Date removed");
   assert.equal(movedAllMessage(1), "Moved 1 task to today");
   assert.equal(movedAllMessage(3), "Moved 3 tasks to today");
+});
+
+test("a tick on a Needs review row is an approval; any other tick is a plain status move", () => {
+  const row = (status: TaskStatus, checked = status === "DONE") => ({ status, checked });
+  // All's Review row ticked: Approve and Approve's Undo, never Done then back to Review.
+  assert.deepEqual(tickPlan(row("REVIEW"), true), { shown: "REVIEW", approves: true });
+  for (const status of ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "CANCELED"] as const) {
+    assert.deepEqual(tickPlan(row(status), true), { shown: status, approves: false }, status);
+  }
+  assert.deepEqual(tickPlan(row("DONE"), false), { shown: "DONE", approves: false });
+  // While the approving tap is still saving, the row shows Done: unticking it again is a plain move.
+  assert.deepEqual(tickPlan(row("REVIEW", true), false), { shown: "DONE", approves: false });
+  // Unticked again before the server answered: the row shows To do, so a new tick isn't an approval.
+  assert.deepEqual(tickPlan(row("DONE", false), true), { shown: "OPEN", approves: false });
 });
 
 test("Done toast: names the task, or for a repeat when the next one is due", () => {

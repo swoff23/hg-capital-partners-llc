@@ -320,6 +320,20 @@ export interface TickResult {
 }
 
 /**
+ * What a tap on a row's checkbox is. `shown` is the status the row shows:
+ * while an earlier tap is still saving, the optimistic tick and the server's
+ * status disagree, and the row shows where that tap is heading. Ticking a
+ * Needs review row (All gives it a checkbox) is an approval, so it goes
+ * through Approve and Approve's Undo (core.ts undoApproval), never a plain
+ * move back to Review that emails the contractor.
+ */
+export function tickPlan(task: Pick<ListTask, "status" | "checked">, done: boolean): { shown: TaskStatus; approves: boolean } {
+  const settled = task.checked === (task.status === "DONE");
+  const shown: TaskStatus = settled ? task.status : task.checked ? "DONE" : "OPEN";
+  return { shown, approves: done && shown === "REVIEW" };
+}
+
+/**
  * The Done toast: "Done: Call plumber", or for a repeat "Done. Next due
  * Nov 5", short enough for a 320 phone. The year shows only when the date is
  * more than about 11 months out, so a monthly copy made in December reads
