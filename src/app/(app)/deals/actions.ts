@@ -8,7 +8,8 @@ import * as deals from "@/lib/deals/service";
 /**
  * Thin server actions: authenticate, validate, call the deal service.
  * Everything that touches the database lives in src/lib/deals/service.ts.
- * New deal's create is `deals/new/actions.ts`.
+ * New deal's create is `deals/new/actions.ts`; a note on the deal's
+ * timeline is `deals/[id]/note-actions.ts`.
  */
 
 /**
@@ -69,12 +70,5 @@ export async function saveDealFields(
       user,
       z.record(z.string(), z.string().max(2000)).parse(expected),
     );
-  });
-}
-
-export async function addDealNote(dealId: string, formData: FormData) {
-  return withLog("addDealNote", async () => {
-    const user = await requireUser();
-    await deals.addDealNote(dealId, String(formData.get("body") ?? ""), user);
   });
 }

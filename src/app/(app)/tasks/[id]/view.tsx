@@ -54,7 +54,8 @@ export interface TaskPageViewProps {
   /** The ids in `media` sent with the latest Mark done (lib/tasks/media.ts taskMedia). */
   atFinish?: readonly string[];
   rows: ActivityRow[];
-  dayLabels: Record<string, string>;
+  /** When the page was rendered (ISO), so the times read the same on the server and in the browser. */
+  now: string;
   /** My uploads waiting in the composer from an earlier visit. */
   drafts: ComposerDraft[];
 }
@@ -154,7 +155,7 @@ export function TaskPageView(p: TaskPageViewProps) {
           />
 
           <Section title="Activity">
-            <TaskActivity rows={p.rows} dayLabels={p.dayLabels} />
+            <TaskActivity rows={p.rows} now={p.now} />
           </Section>
 
           {/* Without a login the composer reads as on a job with no contractor ("Shared", "Add a comment"): no reply reaches them yet. */}
@@ -163,8 +164,6 @@ export function TaskPageView(p: TaskPageViewProps) {
             contractorFirstName={p.contractorHasLogin ? p.contractorFirst : null}
             staffNames={p.staffNames}
             drafts={p.drafts}
-            // While the Review banner shows, Approve is the page's one primary.
-            quietSend={!!p.review}
           />
         </div>
       </div>

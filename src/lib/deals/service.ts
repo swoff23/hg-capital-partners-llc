@@ -6,9 +6,8 @@ import { FieldError } from "@/lib/action-result";
 import { splitAddress } from "@/lib/address-suggestions";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
-import { initials } from "@/lib/utils";
-import { DEAL_FIELD_LABEL, dealStatusLabel, type DealStatus } from "@/lib/config";
-import { logDealChanges } from "./log";
+import type { DealStatus } from "@/lib/config";
+import { recordDealChanges, recordDealCreated } from "./log";
 import { dealConflict, dealPatchData, guardedDealFields, staleDealFields, type DealPatch } from "./edits";
 
 export type { DealPatch } from "./edits";
@@ -22,6 +21,7 @@ export type { DealPatch } from "./edits";
  *   - prices keep the raw text and a parsed Decimal (null when not one number)
  *   - status is validated against DEAL_STATUSES; unknown values are ignored
  *   - every change is diffed and appended to the deal's activity timeline
+ *     (log.ts); a partner's own notes are notes.ts
  *   - every write records who made it (`updatedByUserId`), and a save from a
  *     page that has gone stale is refused with who changed it and when
  *     (edits.ts, forms 2.12)
@@ -35,8 +35,6 @@ export interface Actor {
 }
 
 const stamp = (a: Actor) => ({ updatedByUserId: a.id });
-
-const actorLabel = (a: Actor) => a.name ?? a.email;
 
 function revalidateDeal(id: string): void {
   revalidatePath("/deals");
@@ -94,35 +92,9 @@ export async function createDeal(
       ...stamp(actor),
     },
   });
-  await logDealChanges(deal.id, actor, [`Deal created (status ${dealStatusLabel(deal.status)})`]);
+  await recordDealCreated(deal, actor);
   revalidatePath("/deals");
   return { deal };
-}
-
-const val = (v: string | null | undefined) => (v == null || v === "" ? "—" : v);
-
-/** Diff old deal vs the applied data object → human-readable change lines. */
-export function diffDeal(before: Deal, data: Record<string, unknown>): string[] {
-  const lines: string[] = [];
-  if ("status" in data && data.status !== before.status)
-    lines.push(`Status: ${val(dealStatusLabel(before.status))} → ${val(dealStatusLabel(data.status as string))}`);
-  if ("priority" in data && (data.priority ?? null) !== before.priority)
-    lines.push(`Priority: ${val(before.priority)} → ${val(data.priority as string)}`);
-  if ("passReason" in data && (data.passReason ?? null) !== before.passReason)
-    lines.push(`Pass reason: ${val(before.passReason)} → ${val(data.passReason as string)}`);
-  if ("units" in data && (data.units ?? null) !== before.units)
-    lines.push(`Units: ${before.units ?? "—"} → ${(data.units as number | null) ?? "—"}`);
-  if ("theirPriceRaw" in data && (data.theirPriceRaw ?? null) !== before.theirPriceRaw)
-    lines.push(`${DEAL_FIELD_LABEL.theirPrice}: ${val(before.theirPriceRaw)} → ${val(data.theirPriceRaw as string)}`);
-  if ("ourPriceRaw" in data && (data.ourPriceRaw ?? null) !== before.ourPriceRaw)
-    lines.push(`${DEAL_FIELD_LABEL.ourPrice}: ${val(before.ourPriceRaw)} → ${val(data.ourPriceRaw as string)}`);
-  if ("nextAction" in data && (data.nextAction ?? null) !== before.nextAction)
-    lines.push(`Next action: ${val(before.nextAction)} → ${val(data.nextAction as string)}`);
-  if ("sourceUrl" in data && (data.sourceUrl ?? null) !== before.sourceUrl)
-    lines.push(`${DEAL_FIELD_LABEL.sourceUrl} ${before.sourceUrl ? "updated" : "added"}`);
-  if ("address" in data && data.address !== before.address)
-    lines.push(`Address: ${before.address} → ${data.address}`);
-  return lines;
 }
 
 /**
@@ -156,21 +128,6 @@ export async function patchDeal(id: string, patch: DealPatch, actor: Actor, expe
   } else {
     await prisma.deal.update({ where: { id }, data: { ...data, ...stamp(actor) } });
   }
-  await logDealChanges(id, actor, diffDeal(before, data));
+  await recordDealChanges(id, actor, before, data);
   revalidateDeal(id);
-}
-
-/** A manual note on the timeline, signed with the author's initials. */
-export async function addDealNote(dealId: string, body: string, actor: Actor): Promise<void> {
-  const text = body.trim();
-  if (!text) return;
-  await prisma.dealNote.create({
-    data: {
-      dealId,
-      body: `${text} (${initials(actorLabel(actor))})`,
-      noteDate: new Date(),
-      source: "manual",
-    },
-  });
-  revalidatePath(`/deals/${dealId}`);
 }

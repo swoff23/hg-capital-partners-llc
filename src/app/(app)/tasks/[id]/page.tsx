@@ -8,13 +8,13 @@ import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { propertyOptions } from "@/lib/picker-options";
 import { parseUnits } from "@/lib/property-types";
-import { buildActivity, dayLabel, easternDay, fmtAgo, type ActivityEvent } from "@/lib/tasks/activity";
+import { buildActivity, easternDay, type ActivityEvent } from "@/lib/tasks/activity";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { lockboxState } from "@/lib/tasks/lockbox";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
 import { copySlot } from "@/lib/tasks/repeat-slot";
 import { fileLink, isDraftUpload, isMediaRow, mediaItem, reviewPhotos, taskMedia, taskMediaInclude, type TaskMediaRow } from "@/lib/tasks/media";
-import { OVERDUE_ELIGIBLE, isActiveStatus } from "@/lib/task-scope";
+import { OVERDUE_ELIGIBLE, STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import type { FileLink } from "@/components/files-list";
 import type { ActivityRow } from "./activity";
 import { TaskPageView } from "./view";
@@ -130,21 +130,26 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   const events: ActivityEvent[] = task.events;
   const rows: ActivityRow[] = buildActivity(events, names, today).map((entry): ActivityRow => {
     const day = easternDay(entry.at);
-    const ago = fmtAgo(entry.at, now);
-    if (entry.type === "due-run") return { type: "due-run", id: entry.id, day, ago, text: entry.text };
+    const at = entry.at.toISOString();
+    if (entry.type === "due-run") return { type: "due-run", id: entry.id, day, at, text: entry.text };
     const atts = byEvent.get(entry.event.id) ?? [];
     const own = {
       media: atts.filter(isMediaRow).map(mediaItem),
       files: atts.filter((a) => !isMediaRow(a)).map(fileLink).filter((f): f is FileLink => !!f),
     };
-    if (entry.type === "line") return { type: "line", id: entry.id, day, ago, text: entry.text, href: entry.href ?? null, ...own };
+    if (entry.type === "line") {
+      // A status change carries its new status, for the mark on the rail (choice 3.1 B).
+      const to = entry.event.kind === "STATUS" ? (entry.event.data as { to?: unknown } | null)?.to : null;
+      const status = typeof to === "string" && to in STATUS_LABEL ? (to as TaskStatus) : null;
+      return { type: "line", id: entry.id, day, at, text: entry.text, href: entry.href ?? null, status, ...own };
+    }
     const e = entry.event;
     const data = (e.data ?? {}) as { fromChecklistItem?: { title?: string } };
     return {
       type: "comment",
       id: e.id,
       day,
-      ago,
+      at,
       author: e.actorLabel,
       isContractor: !!e.actorContactId,
       internal: e.visibility === "INTERNAL",
@@ -153,7 +158,6 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       ...own,
     };
   });
-  const dayLabels = Object.fromEntries([...new Set(rows.map((r) => r.day))].map((d) => [d, dayLabel(d, today)]));
 
   /* ---------------- Review ---------------- */
 
@@ -211,7 +215,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       files={files}
       atFinish={atFinish}
       rows={rows}
-      dayLabels={dayLabels}
+      now={now.toISOString()}
       drafts={drafts}
     />
   );

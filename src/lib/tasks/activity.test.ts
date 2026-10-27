@@ -141,3 +141,15 @@ test("fmtAgo: minutes and hours within a day, then the Buffalo time of day", () 
   assert.equal(fmtAgo(new Date("2026-10-23T08:00:00Z"), now), "10h");
   assert.equal(fmtAgo(new Date("2026-10-21T18:14:00Z"), now), "2:14 PM");
 });
+
+test("turning repeats on, changing them or turning them off reads as one sentence (activity 2.3 rule 9)", () => {
+  const line = (e: ActivityEvent) => eventLine(e, names, TODAY).text;
+  assert.equal(line(ev("REPEAT", { from: null, to: { freq: "weeks", interval: 2 } })), "Connor set this to repeat every 2 weeks");
+  assert.equal(line(ev("REPEAT", { from: { freq: "weeks", interval: 2 }, to: { freq: "monthly", interval: 1, dayOfMonth: 5 } })), "Connor set this to repeat every month on the 5th");
+  assert.equal(line(ev("REPEAT", { from: { freq: "weeks", interval: 2 }, to: null })), "Connor turned off repeats");
+  // A rule that doesn't parse still says repeats changed, never raw JSON or a false "off".
+  assert.equal(line(ev("REPEAT", { to: { freq: "hourly" } })), "Connor changed how this repeats");
+  assert.equal(line(ev("REPEAT", {})), "Connor turned off repeats");
+  // Its own kind: the next copy's line is unchanged.
+  assert.equal(line(ev("REPEAT_CREATED", { due: "2026-12-05" })), "Next repeat created, due Sat, Dec 5");
+});

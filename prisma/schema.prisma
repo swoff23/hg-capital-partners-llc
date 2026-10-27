@@ -48,6 +48,9 @@ model User {
   updatedDeals                Deal[]               @relation("DealUpdatedBy")
   // Who added a property document, for "Connor · Oct 3" on its row (uploads 2.4).
   uploadedPropertyAttachments PropertyAttachment[] @relation("PropertyAttachmentUploadedBy")
+  // Who wrote a deal note, so the deal's Activity names its author instead of
+  // initials pasted into the text (activity 2.9, DEALS-044).
+  dealNotes                   DealNote[]           @relation("DealNoteAuthor")
 
   qboConnections QuickbooksConnection[]
 }
@@ -109,8 +112,16 @@ model DealNote {
   dealId    String
   noteDate  DateTime? // parsed date; null when the line had no clear date
   body      String    @db.Text
-  source    String    @default("manual") // "migration" | "manual"
+  source    String    @default("manual") // "migration" | "manual" | "change"
   createdAt DateTime  @default(now())
+
+  // Activity and comments (docs/specs/activity-comments.md 2.9, question 1).
+  // The note's author; old notes get it from scripts/backfill-deal-note-authors.ts.
+  author       User?     @relation("DealNoteAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorUserId String?
+  data         Json      @default("{}") // a change entry: { field, from, to }
+  editedAt     DateTime?
+  deletedAt    DateTime? // soft delete, so Undo can bring it back
 
   @@index([dealId, noteDate])
 }
@@ -411,6 +422,7 @@ enum TaskEventKind {
   ACCESS
   REPEAT_CREATED
   CONFLICT // the Asana delta sync and the app disagreed; see data
+  REPEAT // repeats turned on, changed or off (patchTask only)
 }
 
 enum EventSource {

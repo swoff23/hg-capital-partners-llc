@@ -6,6 +6,7 @@ import { formToObject } from "@/lib/forms";
 import { DEAL_STATUSES, DEFAULT_DEAL_STATUS } from "@/lib/config";
 import { looksLikeLink, splitAddress, tidyAddress, withScheme } from "@/lib/address-suggestions";
 import { withResult } from "@/lib/server-action";
+import { addDealNote } from "@/lib/deals/notes";
 import * as deals from "@/lib/deals/service";
 
 /**
@@ -65,7 +66,7 @@ export async function createDeal(formData: FormData): Promise<ActionResult<Creat
       const street = splitAddress(r.duplicateOf.address).street;
       throw new z.ZodError([{ code: "custom", path: ["address"], message: `${street} is already a deal.`, input: p.address }]);
     }
-    if (note) await deals.addDealNote(r.deal.id, note, user);
+    if (note) await addDealNote(r.deal.id, note, user);
     return { id: r.deal.id, address: r.deal.address, status: r.deal.status };
   });
 }

@@ -65,6 +65,7 @@ export function TaskRow({
   street = true,
   cadence,
   actions,
+  unread = false,
 }: {
   task: ListTask;
   checkbox?: boolean;
@@ -88,6 +89,13 @@ export function TaskRow({
   cadence?: string;
   /** Buttons at the row's end, e.g. Approve and Send back. */
   actions?: ReactNode;
+  /**
+   * Something new since you last opened it (docs/specs/activity-comments.md
+   * 2.6, choice 3.5 A): the 8px --act unread dot hangs in the leading gutter,
+   * centered 8px before the row's first column on the title's line, and the
+   * row opens the task at its New divider.
+   */
+  unread?: boolean;
 }) {
   const { today, reschedule, setDone } = useTaskList();
   const job = isContractorJob(task);
@@ -158,12 +166,28 @@ export function TaskRow({
       )}
     >
       <Link
-        href={`/tasks/${task.id}`}
+        href={unread ? `/tasks/${task.id}#new` : `/tasks/${task.id}`}
         title={waitingOn ? `Waiting on ${waitingOn}` : undefined}
         className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1"
       >
-        <span className="sr-only">{task.title}</span>
+        <span className="sr-only">
+          {task.title}
+          {unread && ", new updates"}
+        </span>
       </Link>
+
+      {unread && (
+        // Outside the first column, so checkboxes and titles line up whether or not a row is
+        // unread: centered 8px before it (12px to 4px), on the title's 28px line, and lower
+        // where a one-line touch row adds its padding.
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute -left-3 top-4 size-2 rounded-full bg-act",
+            !secondLine && (narrow ? "@min-[30rem]:pointer-coarse:top-5" : "pointer-coarse:top-5"),
+          )}
+        />
+      )}
 
       {checkbox && (
         <TaskCheckbox

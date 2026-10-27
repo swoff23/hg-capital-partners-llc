@@ -2,6 +2,7 @@ import type { TaskEventKind, TaskStatus, Visibility } from "@prisma/client";
 import { HG_TIME_ZONE, daysUntil, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { STATUS_LABEL } from "@/lib/task-scope";
+import { describeRepeat, parseRepeatRule } from "./repeat";
 
 /**
  * The staff task page's Activity: one oldest-first timeline from TaskEvent
@@ -180,6 +181,12 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
         text: due ? `Next repeat created, due ${fmtShortDay(due, today)}` : "Next repeat created",
         ...(next ? { href: `/tasks/${next}` } : {}),
       };
+    }
+    case "REPEAT": {
+      // Turning repeats on, changing them or turning them off (activity 2.3 rule 9): `to` is the rule now, null when off.
+      if (d.to == null) return { text: `${a} turned off repeats` };
+      const rule = parseRepeatRule(d.to);
+      return { text: rule ? `${a} set this to repeat ${describeRepeat(rule).replace(/^Every/, "every")}` : `${a} changed how this repeats` };
     }
     case "CONFLICT":
       return { text: e.body ? `Asana sync conflict: ${e.body}` : "Asana and the app disagreed on a change" };

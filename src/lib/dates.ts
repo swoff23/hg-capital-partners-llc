@@ -196,3 +196,125 @@ export function dueLabel(v: Date | string | null | undefined, now: Now = new Dat
   }
   return fmtDay(y, { year: "auto", now: today });
 }
+
+/* ---------------- History: when something happened (activity 2.4) ---------------- */
+
+/*
+ * The timeline's times, the same on the staff task page, the deal page and
+ * the contractor's job page (docs/specs/activity-comments.md 2.4). Instants
+ * are read on Buffalo's clock wherever the code runs. These replace
+ * activity.ts `fmtAgo` and `dayLabel` and job-view.ts `updateTimeLabel`.
+ */
+
+/** An instant from a Date or an ISO string; null when it isn't one. */
+function instant(v: Date | string | number | null | undefined): Date | null {
+  if (v == null || v === "") return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+const CLOCK = new Intl.DateTimeFormat("en-US", { timeZone: HG_TIME_ZONE, hour: "numeric", minute: "2-digit", hour12: true });
+
+/**
+ * "2:14 PM" on Buffalo's clock. Built from its parts with a plain space, so
+ * the server and every browser write the same text (some engines put a
+ * narrow no-break space before PM, which would fail hydration).
+ */
+export function clockTime(at: Date | string | number): string {
+  const d = instant(at);
+  if (!d) return "";
+  const parts = CLOCK.formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("hour")}:${get("minute")} ${get("dayPeriod").toUpperCase()}`;
+}
+
+/** "Oct 3": a day's month and date, never its year (the month heading over it has that). */
+function monthDay(day: Ymd): string {
+  const p = parts(day)!;
+  return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+}
+
+/** "Tue": a day's short weekday. */
+function weekdayOf(day: Ymd): string {
+  const p = parts(day)!;
+  return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short" });
+}
+
+/**
+ * An entry's time slot. Under a day heading: "now" under a minute, "5m"
+ * earlier today under an hour, "2h" earlier today, then the clock time
+ * ("2:14 PM") on an earlier day, whose heading has the date. Under a month
+ * heading (`month`): the day, "Oct 3". "Earlier today" is Buffalo's today. A
+ * time ahead of `now` (a clock a little fast) reads "now". "" for an invalid
+ * instant.
+ */
+export function activityTime(at: Date | string | number, now: Date | string | number, opts: { month?: boolean } = {}): string {
+  const a = instant(at);
+  const n = instant(now);
+  if (!a || !n) return "";
+  const day = todayYmdEastern(a);
+  if (opts.month) return monthDay(day);
+  const sec = (n.getTime() - a.getTime()) / 1000;
+  if (sec < 60) return "now";
+  if (day !== todayYmdEastern(n)) return clockTime(a);
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  return `${Math.floor(sec / 3600)}h`;
+}
+
+/**
+ * The full stamp behind an entry's time: "Thu, Oct 30 at 2:14 PM", with the
+ * year when it isn't this year ("Thu, Oct 30, 2025 at 2:14 PM"). The Tooltip
+ * with a mouse; a comment's menu header on touch. "" for an invalid instant.
+ */
+export function fullStamp(at: Date | string | number, now: Date | string | number = new Date()): string {
+  const a = instant(at);
+  const n = instant(now) ?? new Date();
+  if (!a) return "";
+  const day = fmtDay(todayYmdEastern(a), { weekday: true, year: "auto", now: todayYmdEastern(n) });
+  return `${day} at ${clockTime(a)}`;
+}
+
+/**
+ * A history heading. Days: Today, Yesterday, a weekday within six days back
+ * ("Tue"), then "Oct 20", with the year only when it isn't this year: the
+ * brand's one formatter (dayLabel) with its past side added. `month` heads a
+ * month of older history instead: "September", or "August 2025" when it
+ * isn't this year. Pass Buffalo's today (todayYmdEastern). "" for an invalid
+ * day.
+ */
+export function historyDay(day: Ymd, today: Ymd, opts: { month?: boolean } = {}): string {
+  const y = toYmd(day);
+  if (!y) return "";
+  if (opts.month) {
+    const p = parts(y)!;
+    const sameYear = y.slice(0, 4) === today.slice(0, 4);
+    return new Date(Date.UTC(p.y, p.m - 1, 1)).toLocaleDateString("en-US", {
+      timeZone: "UTC",
+      month: "long",
+      ...(sameYear ? {} : { year: "numeric" }),
+    });
+  }
+  const d = daysUntil(y, today);
+  if (d == null || d >= 0) return dayLabel(y, today);
+  if (d === -1) return "Yesterday";
+  if (d >= -6) return weekdayOf(y);
+  return fmtDay(y, { year: "auto", now: today });
+}
+
+/**
+ * When someone last opened a record, for "Seen by Zack · 2:14 PM" (activity
+ * 2.6): the clock time today, a weekday within six days back ("Tue"), then
+ * the date ("Oct 20", the year only when it isn't this year). "" for an
+ * invalid instant.
+ */
+export function seenTime(at: Date | string | number, now: Date | string | number): string {
+  const a = instant(at);
+  const n = instant(now);
+  if (!a || !n) return "";
+  const day = todayYmdEastern(a);
+  const today = todayYmdEastern(n);
+  const d = daysUntil(day, today) ?? 0;
+  if (d >= 0) return clockTime(a);
+  if (d >= -6) return weekdayOf(day);
+  return fmtDay(day, { year: "auto", now: today });
+}
