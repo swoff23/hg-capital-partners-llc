@@ -1,5 +1,6 @@
 import { isOfflineError } from "@/lib/action-result";
 import { HG_TIME_ZONE, fmtDay, todayYmdEastern } from "@/lib/dates";
+import { JOB_CLOSED } from "./access";
 import { FILE_KINDS, UPLOAD_RULES, contentTypeForName, fileKindForType, nameExtension, uploadContentType, type FileKind } from "./content-types";
 import { safeUploadName } from "./paths";
 
@@ -130,18 +131,45 @@ function failedCount(failures: readonly Pick<UploadFailure, "name" | "kind">[]):
   return `${failures.length} ${noun}${failures.length === 1 ? "" : "s"}`;
 }
 
+/** What the failure lines read of a tile: the engine's MediaUpload, or any list shaped like it. */
+type ShownTile = { name: string; kind: FileKind | null; status: string; error?: string; final?: boolean };
+
+const isRed = (u: ShownTile) => u.status === "failed" || u.status === "invalid";
+
 /**
- * The status line when every red tile on a tray is one the job closed on
- * before it uploaded (the token route's or the record step's final refusal,
- * uploads question 4):
- * "Job closed before 2 photos uploaded", the noun as uploadNotice has it. No
- * Retry goes with it. Empty when nothing is red, or any red tile is something
- * else (a Retry, or a file the check refused), which keeps today's line.
+ * The status line when every red tile on a tray is one the job stopped
+ * taking before it uploaded (the token route's or the record step's final
+ * refusal, uploads question 4), the noun as uploadNotice has it: "Job closed
+ * before 2 photos uploaded" when the server said the job closed (Done or
+ * Canceled, access.ts JOB_CLOSED), and "Too late to add 2 photos" otherwise
+ * (a job still in Review past its window, TOO_LATE), which is true either
+ * way. No Retry goes with it. Empty when nothing is red, or any red tile is
+ * something else (a Retry, or a file the check refused), which keeps today's
+ * line.
  */
-export function closedJobLine(uploads: readonly { name: string; kind: FileKind | null; status: string; final?: boolean }[]): string {
-  const red = uploads.filter((u) => u.status === "failed" || u.status === "invalid");
+export function closedJobLine(uploads: readonly ShownTile[]): string {
+  const red = uploads.filter(isRed);
   if (red.length === 0 || !red.every((u) => u.final)) return "";
-  return `Job closed before ${failedCount(red)} uploaded`;
+  const count = failedCount(red);
+  return red.every((u) => u.error === JOB_CLOSED) ? `Job closed before ${count} uploaded` : `Too late to add ${count}`;
+}
+
+/**
+ * The one line about a target's red tiles, which the line under its tray
+ * (UploadStatusLine) and the toast its queue shows once the page is gone
+ * (engine.ts) both say, so the two always count alike: every red tile,
+ * final ones included, in uploadNotice's nouns. While any can go again it is
+ * "2 photos didn't upload" with a Retry for those; when every red tile is
+ * final, closedJobLine; otherwise uploadNotice's line with its reason when
+ * they share one ("1 photo didn't upload: over the 25 MB photo limit"). Null
+ * when nothing is red.
+ */
+export function redTilesLine(uploads: readonly ShownTile[]): { text: string; retry: boolean } | null {
+  const red = uploads.filter(isRed);
+  if (red.length === 0) return null;
+  const failures = red.map((u) => ({ name: u.name, kind: u.kind, reason: u.error ?? "" }));
+  if (red.some((u) => u.status === "failed")) return { text: uploadNotice(failures, { reason: false }), retry: true };
+  return { text: closedJobLine(red) || uploadNotice(failures), retry: false };
 }
 
 /** "0:07", "4:32", "1:02:03". Empty for a missing or nonsense length. */

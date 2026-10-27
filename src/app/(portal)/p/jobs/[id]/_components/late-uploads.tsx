@@ -19,17 +19,26 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  * for the batch (one line, one email line, no Undo) and says "3 photos added
  * to the job". Past the hour the server answers "This job is closed." for
  * good: the tile keeps its red ring with only Remove, and the line under the
- * tray says "Job closed before 2 photos uploaded". It draws nothing while no
- * file is waiting: the tray is the composer's, and shows only when there is a
- * file.
+ * tray says "Job closed before 2 photos uploaded". The tile gets one more go
+ * each time this page opens again (engine.ts mount), in case HG sent the job
+ * back. It draws nothing while no file is waiting: the tray is the
+ * composer's, and shows only when there is a file.
  */
 export function LateUploads({ taskId, label }: { taskId: string; label: string }) {
   const { toast } = useToast();
   const owner = useUploadScope();
 
   const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
-  /** The batch landed: with this page open or gone, it is handed to the same step. */
-  const land = (ids: string[]) => void postRecordedBatch(taskId, recordedUploads.take(taskId, ids), toast, owner);
+  /**
+   * The batch landed: with this page open or gone, it is handed to the same step. One whose post didn't go
+   * through keeps its files for the tab (recordedUploads.keep), and the next batch for this job carries them.
+   */
+  const land = (ids: string[]) => {
+    const items = recordedUploads.take(taskId, ids);
+    void postRecordedBatch(taskId, items, toast, owner).then((posted) => {
+      if (!posted) recordedUploads.keep(taskId, items);
+    });
+  };
 
   const target: UploadTarget = {
     key: `portal-task:${taskId}`,

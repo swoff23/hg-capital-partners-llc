@@ -1,10 +1,9 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { isActiveStatus } from "@/lib/task-scope";
 import * as core from "@/lib/tasks/core";
 import { undoWindowOpen } from "./job-view";
-import { ownUnposted } from "./jobs";
+import { postBatchIn } from "./job-batch";
 import { requirePortalPrincipal, taskPrincipal } from "./session";
 
 /**
@@ -34,26 +33,18 @@ function revalidateJob(taskId: string): void {
  * posted (two sends of the same photos at once) is refused, so the losing
  * side leaves no empty update behind.
  *
- * A job HG has approved since the photos went up (Done) takes no more
- * updates, but the late photos are already recorded on it, so HG hears about
+ * A job HG has approved or canceled since the photos went up takes no batch
+ * post, but the late photos are already recorded on it, so HG hears about
  * them once for the batch: the same line and one email line, which can't be
- * taken back (core.addLateContractorBatch). The job stays Done, and the answer
- * carries no `eventId` (there is nothing to Undo), so the page says they were
- * added to the job. The job page refreshes, so they show in its photos. The
- * access check still comes first.
+ * taken back (core.addLateContractorBatch). The job keeps its status, and the
+ * answer carries no `eventId` (there is nothing to Undo), so the page says
+ * they were added to the job. The job page refreshes, so they show in its
+ * photos. The access check still comes first, and an approve that lands while
+ * the batch posts goes the same late way (job-batch.ts postBatchIn).
  */
 export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null }> {
   const p = await requirePortalPrincipal();
-  const undoable = await prisma.$transaction(async (tx) => {
-    await core.assertContractorAccess(tx, taskId, p.contactId);
-    const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
-    const own = (await ownUnposted(tx, taskId, p.contactId, attachmentIds)).map((f) => f.id);
-    if (task && !isActiveStatus(task.status)) {
-      await core.addLateContractorBatch(tx, taskId, own, taskPrincipal(p));
-      return null;
-    }
-    return core.addComment(tx, taskId, { body: "", attachmentIds: own, batch: true }, taskPrincipal(p));
-  });
+  const undoable = await prisma.$transaction((tx) => postBatchIn(tx, taskId, taskPrincipal(p), attachmentIds));
   revalidateJob(taskId);
   return { eventId: undoable?.id ?? null };
 }

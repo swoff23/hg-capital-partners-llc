@@ -11,7 +11,8 @@
  * Only an error the route threw on purpose, as an UploadRefusal, is a 400.
  * Anything else it didn't expect (a Prisma error among them) is a 503, so a
  * hiccup never reads as "the upload was refused". A refusal no Retry can change
- * (the job closed, attachments/access.ts isFinalRefusal) also says `final`, and
+ * (the job closed, or in Review past its window: attachments/access.ts
+ * isFinalRefusal) also says `final`, and
  * the queue then keeps only Remove on its tile. Pure; see token-failure.test.ts.
  */
 

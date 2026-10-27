@@ -8,7 +8,7 @@ import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { type FileKind } from "@/lib/attachments/content-types";
 import { NO_UPLOADS, UploadEngine } from "@/lib/attachments/engine";
-import { CAMERA_ACCEPT, closedJobLine, documentLook, pickerAccept, shownReason, uploadCountPhrase, uploadNotice } from "@/lib/attachments/media";
+import { CAMERA_ACCEPT, documentLook, pickerAccept, redTilesLine, shownReason, uploadCountPhrase, uploadNotice } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ACCESS, uploadTargetKey, type UploadKind } from "@/lib/attachments/upload-kinds";
 import { cn } from "@/lib/utils";
 
@@ -58,8 +58,8 @@ export type RecordMediaInput = {
 };
 
 /**
- * `final` on a refusal means no Retry can get past it (the portal's "This job is closed.", attachments/access.ts
- * withFinalRefusal): its tile keeps only Remove.
+ * `final` on a refusal means no Retry can get past it (the portal's "This job is closed." or its Review twin,
+ * attachments/access.ts withFinalRefusal): its tile keeps only Remove.
  */
 export type RecordMediaResult = { ok: boolean; data?: { id: string }; error?: string; final?: boolean };
 
@@ -112,7 +112,7 @@ export type MediaUpload = {
   /** Why it failed, as the server or the check said it. */
   error?: string;
   /**
-   * Refused for good by the token route or the record step (a job that closed first): status "invalid", so
+   * Refused for good by the token route or the record step (a job that stopped taking files first): status "invalid", so
    * Remove only, but it keeps the failed tile's look, since nothing is wrong with the file itself.
    */
   final?: boolean;
@@ -451,7 +451,7 @@ export function UploadTile({
             <ProgressRing value={u.status === "queued" ? 0 : u.progress} />
           </div>
         )}
-        {/* A final refusal (the job closed first) keeps its picture in the red ring: Remove only, as the check's refusals. */}
+        {/* A final refusal (the job stopped taking files first) keeps its picture in the red ring: Remove only, as the check's refusals. */}
         {u.status === "invalid" && !u.final && (
           <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/60">
             <TriangleAlert className="h-5 w-5 text-on-photo" aria-hidden="true" />
@@ -512,8 +512,10 @@ export function UploadTile({
  * only be removed, so it gets no Retry; with nothing to retry, the line keeps
  * the reason ("1 photo didn't upload: over the 25 MB photo limit"), since
  * it's the only place a sighted user sees why. When every red tile is one the
- * job closed on before it uploaded (`final`), it is "Job closed before 2
- * photos uploaded", also with no Retry. With nothing failed but files held
+ * job stopped taking before it uploaded (`final`), it is "Job closed before 2
+ * photos uploaded" (Done or Canceled) or "Too late to add 2 photos" (still in
+ * Review), also with no Retry. Every red tile counts, final ones too, as the
+ * queue's toast counts them (media.ts redTilesLine). With nothing failed but files held
  * for a signal it is "No signal · 5 photos waiting" in `--fg-3` ("No signal ·
  * 5 waiting" under 360px). Nothing while all is well.
  */
@@ -529,9 +531,8 @@ export function UploadStatusLine({ uploader, className }: { uploader: MediaUploa
     );
   }
   const retryable = uploader.uploads.filter((u) => u.status === "failed");
-  const line =
-    (retryable.length > 0 ? uploader.failedLine : closedJobLine(uploader.uploads) || uploader.notice) ||
-    `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
+  // The same words and count the queue's toast uses when the page is gone (media.ts redTilesLine).
+  const line = redTilesLine(uploader.uploads)?.text || `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
   return (
     <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-danger", className)}>
       <span className="truncate">{line}</span>

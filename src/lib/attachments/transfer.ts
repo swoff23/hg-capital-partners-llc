@@ -87,7 +87,7 @@ async function clientToken(kind: UploadKind, pathname: string, clientPayload: st
   });
   if (res.status >= 500 || res.status === 408 || res.status === 429) throw new ServerBusyError();
   if (!res.ok) {
-    // A job that closed before the file got a token says so for good (`final`): no Retry can change it.
+    // A job that stopped taking files before this one got a token says so for good (`final`): no Retry can change it.
     const refused = (await res.json().catch(() => null)) as { error?: unknown; final?: unknown } | null;
     if (refused?.final === true && typeof refused.error === "string") throw new FinalRefusalError(refused.error);
     // The words match upload()'s own, which media.ts shownReason turns into "the upload was refused. Reload and try again".

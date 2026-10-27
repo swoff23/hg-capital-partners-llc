@@ -870,11 +870,12 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
 }
 
 /**
- * A contractor's photos that recorded after HG approved the job (uploads
- * question 4: inside the hour after Mark done, or a phone's outbox catching
- * up), told to HG once per batch: one update with no text ("Zack added 3
- * photos", the line a batch post makes) and one line in each partner's email
- * bundle, through notify like any comment. The job's status doesn't change.
+ * A contractor's photos that are posted after HG approved or canceled the job
+ * (uploads question 4: recorded inside the hour after Mark done, or before
+ * the cancel, or a phone's outbox catching up), told to HG once per batch:
+ * one update with no text ("Zack added 3 photos", the line a batch post
+ * makes) and one line in each partner's email bundle, through notify like
+ * any comment. The job's status doesn't change.
  * It is never an update Undo takes back: it isn't marked `batch`, and
  * takeBackContractorPost refuses a job that isn't active. It is written after
  * the Mark done, so it is never the At finish set and never counts toward
@@ -882,13 +883,15 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
  * none left (another send took them) it is refused as addComment refuses, so
  * the losing side leaves no empty update.
  *
- * The portal's batch step (portal/job-uploads.ts postJobBatch) sends a job
- * here once it is no longer active; one reopened in the moment between posts
- * the same way. Access is checked first. The writes run in addComment's order
- * (the update, the files, the task row's stamp, then the email rows), so a
- * late send and an active send of the same files meet on the files' rows and
- * never wait on each other crosswise; the stamp takes the task row before any
- * email row, as every write that queues one.
+ * The portal's batch step (portal/job-batch.ts postBatchIn) sends a job here
+ * once it is no longer active, and when an approve lands between its status
+ * read and addComment's (addComment refuses before writing anything); one
+ * reopened in the moment between posts the same way. Access is checked
+ * first. The writes run in addComment's order (the update, the files, the
+ * task row's stamp, then the email rows), so a late send and an active send
+ * of the same files meet on the files' rows and never wait on each other
+ * crosswise; the stamp takes the task row before any email row, as every
+ * write that queues one (job-batch.pg.test.ts runs both races on Postgres).
  */
 export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentIds: string[], p: Principal, now = new Date()): Promise<TaskEvent> {
   if (p.kind !== "contractor") throw new TaskRuleError("Only a contractor's late photos post this way.");

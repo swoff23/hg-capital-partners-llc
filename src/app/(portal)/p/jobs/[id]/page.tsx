@@ -127,7 +127,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 property={place}
               />
             ) : (
-              // An approved job has no composer, but photos queued before it was can still be waiting to record.
+              // An approved or canceled job has no composer, but photos queued before then can still be waiting to record.
               <LateUploads taskId={job.id} label={place?.label ?? "this job"} />
             )}
           </Section>

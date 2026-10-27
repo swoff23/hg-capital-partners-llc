@@ -2,7 +2,7 @@ import { OFFLINE_ERROR, isOfflineError } from "@/lib/action-result";
 import type { MediaUpload, RecordMediaInput, RecordMediaResult } from "@/components/media-uploader";
 import type { UploadCounts, UploadTarget } from "@/components/upload-queue";
 import { usesMultipart, type FileKind } from "./content-types";
-import { checkMediaFile, closedJobLine, storedNames, uploadCountPhrase, uploadFailureReason, withExtension } from "./media";
+import { checkMediaFile, redTilesLine, storedNames, uploadFailureReason, withExtension } from "./media";
 import {
   STALL_MS,
   FinalRefusalError,
@@ -78,7 +78,7 @@ type Job = {
   tries: number;
   waits: number;
   recordFailures: number;
-  /** The server refused it for good (the record step's `final`, or the token route's: a job that closed first): Remove only. */
+  /** The server refused it for good (the record step's `final`, or the token route's: a job that stopped taking files first): Remove only. */
   final: boolean;
   /** Bytes are up and there is no record step yet: a reload put the file back before its page did. */
   needsRecord: boolean;
@@ -151,7 +151,7 @@ export function capReason(remaining: number): string {
   return remaining <= 0 ? "no more can be added here" : `only ${remaining} more can be added here`;
 }
 
-/** The record step said no: the page has the reason. `final` when no Retry can change that (a job that closed first). */
+/** The record step said no: the page has the reason. `final` when no Retry can change that (a job that stopped taking files first). */
 class RecordRefused extends Error {
   constructor(
     message: string,
@@ -342,12 +342,32 @@ export class UploadEngine {
     if (released) this.pump();
   }
 
-  /** The page is there. Returns what to call when it goes: the files keep going, and a batch that lands later is "away". */
+  /**
+   * The page is there. Returns what to call when it goes: the files keep going, and a batch that lands later is
+   * "away". A file the job refused for good gets one more go as the page comes, as a reload's restore() gives
+   * every row: HG may have sent the job back to In progress since. One still refused turns back to Remove only.
+   */
   mount(key: string): () => void {
     this.mounts.set(key, (this.mounts.get(key) ?? 0) + 1);
+    this.reopenFinal(key);
     return () => {
       this.mounts.set(key, Math.max(0, (this.mounts.get(key) ?? 1) - 1));
     };
+  }
+
+  /** Puts this key's final tiles back in the queue, once for this showing of the page, from the start (fail() forgot their paths). */
+  private reopenFinal(key: string): void {
+    if (this.disposed) return;
+    let any = false;
+    for (const j of this.jobs.values()) {
+      if (j.key !== key || !j.final || j.controller) continue;
+      Object.assign(j, { final: false, tries: 0, waits: 0, recordFailures: 0 });
+      this.requeue(j);
+      any = true;
+    }
+    if (!any) return;
+    void this.prepareNext();
+    this.pump();
   }
 
   private isAway(key: string): boolean {
@@ -679,9 +699,12 @@ export class UploadEngine {
 
   private fail(job: Job, err: unknown) {
     if (err instanceof FinalRefusalError || (err instanceof RecordRefused && err.final)) {
-      // Refused for good (the job closed before the file got a token or recorded): the Remove-only state the
-      // check's refusals use, with the server's reason and no Retry anywhere. Its row stays, as every red tile's
-      // does, until it is removed.
+      // Refused for good (the job stopped taking files before this one got a token or recorded): the Remove-only
+      // state the check's refusals use, with the server's reason and no Retry anywhere. Its row stays, as every red
+      // tile's does, until it is removed. The refusal let go of whatever was up (the record step discards its
+      // blobs), so the row forgets it too: if the job opens again, the next go (a reload, or the page showing it
+      // again) sends the bytes afresh instead of recording paths that are gone.
+      Object.assign(job, { pathname: null, thumbPathname: null, posterPathname: null, multipart: null });
       this.patch(job, { status: "invalid", error: err.message, final: true });
       void this.save(job);
       if (this.isAway(job.key)) this.noticeFailure(job);
@@ -801,25 +824,24 @@ export class UploadEngine {
     }, 1500);
   }
 
+  /**
+   * A file failed with its page gone: the tray's own line (media.ts redTilesLine), counted the same way, with
+   * Retry when any red tile can go again. With nothing to retry (only files the job stopped taking, or those
+   * beside a file the check refused) it has no action.
+   */
   private noticeFailure(job: Job) {
-    const own = [...this.jobs.values()].filter((j) => j.key === job.key);
-    const kinds = own.filter((j) => j.status === "failed").map((j) => j.fileKind);
-    if (kinds.length === 0) {
-      // Nothing can go again, only files the job closed on: the tray's own line, with no Retry to offer.
-      const closed = closedJobLine(own.map((j) => this.view(j)));
-      if (closed) this.deps.notify({ message: closed, key: `upload-failed:${job.key}` });
-      return;
-    }
+    const line = redTilesLine([...this.jobs.values()].filter((j) => j.key === job.key).map((j) => this.view(j)));
+    if (!line) return;
     this.deps.notify({
-      message: `${uploadCountPhrase(kinds)} didn't upload`,
+      message: line.text,
       key: `upload-failed:${job.key}`,
-      action: { label: "Retry", run: () => this.retryAll(job.key) },
+      ...(line.retry ? { action: { label: "Retry", run: () => this.retryAll(job.key) } } : {}),
     });
   }
 
   /* ---------------- Controls ---------------- */
 
-  /** A failed file tries again from the start. A refused one (the check said no, or the job closed first) can only be removed. */
+  /** A failed file tries again from the start. A refused one (the check said no, or the job stopped taking files first) can only be removed. */
   retry(id: string): void {
     const job = this.jobs.get(id);
     if (!job || job.status !== "failed" || job.controller) return;

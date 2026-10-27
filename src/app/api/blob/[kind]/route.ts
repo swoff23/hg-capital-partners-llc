@@ -34,7 +34,8 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *
  * A 400 means the server said no (an UploadRefusal: the job closed, a type or
  * size that isn't allowed, a session that ended) and the uploader's tile turns
- * red. A closed job also says `final`, so the tile keeps only Remove, as the
+ * red. A job that no longer takes the contractor's files (closed, or in Review
+ * past its window) also says `final`, so the tile keeps only Remove, as the
  * record step's answer does (access.ts isFinalRefusal). Anything else that goes
  * wrong, a database blip included, is a 503, which the uploader waits out and
  * tries again (attachments/token-failure.ts).

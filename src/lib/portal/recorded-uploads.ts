@@ -14,6 +14,8 @@ export type RecordedUpload = { id: string; name: string; kind: FileKind | null; 
  */
 export class RecordedUploads {
   private readonly byJob = new Map<string, Map<string, RecordedUpload>>();
+  /** Files a post handed back (keep), by job, for the next batch of that job. */
+  private readonly unsent = new Map<string, Map<string, RecordedUpload>>();
 
   note(taskId: string, upload: RecordedUpload): void {
     const job = this.byJob.get(taskId) ?? new Map<string, RecordedUpload>();
@@ -21,15 +23,32 @@ export class RecordedUploads {
     this.byJob.set(taskId, job);
   }
 
-  /** The files for these ids, in their order, each let go of here once handed over. */
+  /**
+   * The files for these ids, in their order, each let go of here once handed over. Files a post that didn't go
+   * through kept (keep) come first: they ride with this batch, so HG still hears of them.
+   */
   take(taskId: string, ids: readonly string[]): RecordedUpload[] {
     const job = this.byJob.get(taskId);
-    const out = ids.map((id) => job?.get(id) ?? { id, name: "", kind: null, hasThumb: false, hasPoster: false });
+    const kept = this.unsent.get(taskId) ?? new Map<string, RecordedUpload>();
+    this.unsent.delete(taskId);
+    const out = ids.map((id) => job?.get(id) ?? kept.get(id) ?? { id, name: "", kind: null, hasThumb: false, hasPoster: false });
     if (job) {
       for (const id of ids) job.delete(id);
       if (job.size === 0) this.byJob.delete(taskId);
     }
-    return out;
+    return [...[...kept.values()].filter((r) => !ids.includes(r.id)), ...out];
+  }
+
+  /**
+   * A batch whose post didn't go through (no signal, a blip, the job closing under a held photo): its files are on
+   * the job already but HG hasn't heard of them, so they wait here, kinds and all, for the next batch this tab
+   * posts for the job (take). A reload lets them go; they stay on the job, unposted, as before.
+   */
+  keep(taskId: string, items: readonly RecordedUpload[]): void {
+    if (items.length === 0) return;
+    const held = this.unsent.get(taskId) ?? new Map<string, RecordedUpload>();
+    for (const item of items) held.set(item.id, item);
+    this.unsent.set(taskId, held);
   }
 }
 

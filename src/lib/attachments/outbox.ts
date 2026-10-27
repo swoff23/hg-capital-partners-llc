@@ -57,7 +57,7 @@ export class ServerBusyError extends Error {
 }
 
 /**
- * The token route refused the file for good (`final` in its 400: the job closed before the file got a token).
+ * The token route refused the file for good (`final` in its 400: the job stopped taking files before this one got a token).
  * Nothing about the file or the road is wrong and no Retry can change it, so the tile keeps only Remove,
  * the same as the record step's final refusal (engine.ts). The message is the server's own words.
  */

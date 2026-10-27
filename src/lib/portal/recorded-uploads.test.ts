@@ -44,6 +44,35 @@ test("each file is handed over once, and jobs never mix", () => {
   assert.equal(tab.take("t2", ["b1"])[0].name, "b1.jpg");
 });
 
+test("a batch whose post didn't go through rides with the next batch for the job, kinds and all, once", () => {
+  const tab = new RecordedUploads();
+  for (const id of ["a1", "a2"]) tab.note("t1", photo(id));
+  const first = tab.take("t1", ["a1", "a2"]);
+  // The post failed (no signal): the page keeps the batch.
+  tab.keep("t1", first);
+  tab.note("t1", photo("a3"));
+  assert.deepEqual(
+    tab.take("t1", ["a3"]).map((r) => [r.id, r.kind]),
+    [
+      ["a1", "image"],
+      ["a2", "image"],
+      ["a3", "image"],
+    ],
+    "the kept files first, then the new batch",
+  );
+  assert.deepEqual(tab.take("t1", ["a4"]).map((r) => r.id), ["a4"], "handed over once");
+});
+
+test("kept files stay with their job, and one the next batch names already isn't doubled", () => {
+  const tab = new RecordedUploads();
+  tab.keep("t1", [photo("a1")]);
+  tab.keep("t2", [photo("b1")]);
+  assert.deepEqual(tab.take("t2", ["b2"]).map((r) => r.id), ["b1", "b2"]);
+  assert.deepEqual(tab.take("t1", ["a1"]), [photo("a1")], "named again: once, and still known");
+  tab.keep("t1", []);
+  assert.deepEqual(tab.take("t1", ["a5"]).map((r) => r.id), ["a5"]);
+});
+
 test("every job page shares one registry for the tab", () => {
   assert.ok(recordedUploads instanceof RecordedUploads);
 });

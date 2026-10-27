@@ -382,10 +382,10 @@ export function postedText(kinds: readonly (FileKind | null)[]): string {
 }
 
 /**
- * What the toast says when files land on a job that has been approved since:
- * "3 photos added to the job". They are on the job, in its photos, and HG is
- * told once (core.addLateContractorBatch), but the job is closed to updates,
- * so there is no Undo.
+ * What the toast says when files land on a job that has been approved or
+ * canceled since: "3 photos added to the job". They are on the job, in its
+ * photos, and HG is told once (core.addLateContractorBatch), but the job
+ * takes no batch post, so there is no Undo.
  */
 export function addedToJobText(kinds: readonly (FileKind | null)[]): string {
   const n = kinds.length;

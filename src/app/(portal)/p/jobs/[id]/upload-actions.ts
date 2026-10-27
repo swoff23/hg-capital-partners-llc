@@ -48,7 +48,7 @@ const uploadSchema = z
 
 /**
  * After the browser finished uploading straight to Blob. A result, not a throw, for the uploader's Retry. A job
- * that closed before the file recorded answers `final`: no Retry can change it, so the tile keeps only Remove.
+ * that stopped taking files before this one recorded answers `final`: no Retry can change it, so the tile keeps only Remove.
  */
 export async function recordJobUploadAction(
   taskId: string,
@@ -64,8 +64,8 @@ export async function recordJobUploadAction(
 }
 
 /**
- * A batch of recorded files posted as one update. Returns its id, for the Undo; null when the job was approved while
- * the photos were going up: HG is told once, the job stays Done, and there is nothing to take back.
+ * A batch of recorded files posted as one update. Returns its id, for the Undo; null when the job was approved or
+ * canceled while the photos were going up: HG is told once, the job keeps its status, and there is nothing to take back.
  */
 export async function postJobBatchAction(
   taskId: string,

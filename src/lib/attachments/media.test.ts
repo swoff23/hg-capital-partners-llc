@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { BlobServiceNotAvailable } from "@vercel/blob";
+import { JOB_CLOSED, TOO_LATE } from "./access";
 import { contentTypeForName, fileKindForType } from "./content-types";
 import {
   MEDIA_ACCEPT,
@@ -16,6 +17,7 @@ import {
   isGenericCameraName,
   pickerAccept,
   propertyFileUrl,
+  redTilesLine,
   rowReason,
   storedNames,
   taskFileUrl,
@@ -137,7 +139,7 @@ test("uploadNotice: one line however many failed, count first", () => {
 });
 
 test("closedJobLine: every red tile one the job closed on, counted with uploadNotice's nouns", () => {
-  const closed = (name: string, kind: "image" | "video" | "file" | null) => ({ name, kind, status: "invalid", final: true });
+  const closed = (name: string, kind: "image" | "video" | "file" | null) => ({ name, kind, status: "invalid", error: JOB_CLOSED, final: true });
   assert.equal(closedJobLine([closed("a.jpg", "image"), closed("b.jpg", "image")]), "Job closed before 2 photos uploaded");
   assert.equal(closedJobLine([closed("a.jpg", "image")]), "Job closed before 1 photo uploaded");
   assert.equal(closedJobLine([closed("a.mov", "video"), closed("b.mov", "video")]), "Job closed before 2 videos uploaded");
@@ -152,8 +154,24 @@ test("closedJobLine: every red tile one the job closed on, counted with uploadNo
   assert.equal(closedJobLine([closed("a.jpg", "image"), { name: "b.jpg", kind: "image", status: "uploading" }]), "Job closed before 1 photo uploaded");
 });
 
+test("closedJobLine: a job still in Review is too late, never closed, with the same nouns", () => {
+  const late = (name: string, kind: "image" | "video" | "file" | null) => ({ name, kind, status: "invalid", error: TOO_LATE, final: true });
+  assert.equal(closedJobLine([late("a.jpg", "image"), late("b.jpg", "image")]), "Too late to add 2 photos");
+  assert.equal(closedJobLine([late("a.jpg", "image")]), "Too late to add 1 photo");
+  assert.equal(closedJobLine([late("a.mov", "video")]), "Too late to add 1 video");
+  assert.equal(closedJobLine([late("a.mov", "video"), late("b.mov", "video")]), "Too late to add 2 videos");
+  assert.equal(closedJobLine([late("a.jpg", "image"), late("b.mov", "video"), late("c.mov", "video")]), "Too late to add 3 files");
+  assert.equal(closedJobLine([late("a.pdf", "file"), late("b.pdf", "file")]), "Too late to add 2 files");
+  // One refused in Review and one after HG approved: "closed" isn't true of the first, "too late" is true of both.
+  const closed = { name: "c.jpg", kind: "image" as const, status: "invalid", error: JOB_CLOSED, final: true };
+  assert.equal(closedJobLine([late("a.jpg", "image"), closed]), "Too late to add 2 photos");
+  // A final tile with words the page doesn't know says the line that is true of any job.
+  assert.equal(closedJobLine([{ ...closed, error: "Something new." }]), "Too late to add 1 photo");
+  assert.equal(closedJobLine([{ ...closed, error: undefined }]), "Too late to add 1 photo");
+});
+
 test("closedJobLine: empty unless every red tile is final, so a Retry or a check's refusal keeps today's line", () => {
-  const closed = { name: "a.jpg", kind: "image" as const, status: "invalid", final: true };
+  const closed = { name: "a.jpg", kind: "image" as const, status: "invalid", error: JOB_CLOSED, final: true };
   assert.equal(closedJobLine([]), "");
   assert.equal(closedJobLine([{ name: "a.jpg", kind: "image", status: "uploading" }]), "");
   assert.equal(closedJobLine([closed, { name: "b.jpg", kind: "image", status: "failed" }]), "", "one can still be retried");
@@ -161,10 +179,42 @@ test("closedJobLine: empty unless every red tile is final, so a Retry or a check
   assert.equal(closedJobLine([{ name: "b.jpg", kind: "image", status: "failed" }]), "");
 });
 
-test("closedJobLine: one line at 320, the longest count included", () => {
+test("closedJobLine: one line at 320, the longest count included, in both states", () => {
   // The tray at 320 is 288px wide; text-meta runs about 7px a character, so 40 characters is the ceiling.
-  const many = Array.from({ length: 50 }, (_, i) => ({ name: `${i}.mov`, kind: "video" as const, status: "invalid", final: true }));
-  assert.ok(closedJobLine(many).length <= 40, closedJobLine(many));
+  for (const error of [JOB_CLOSED, TOO_LATE]) {
+    const many = Array.from({ length: 50 }, (_, i) => ({ name: `${i}.mov`, kind: "video" as const, status: "invalid", error, final: true }));
+    assert.ok(closedJobLine(many).length <= 40, closedJobLine(many));
+  }
+});
+
+test("redTilesLine: the tray's line and the away toast count every red tile alike, final ones too", () => {
+  const tile = (name: string, status: string, over: { error?: string; final?: boolean; kind?: "image" | "video" | null } = {}) => ({
+    name,
+    kind: over.kind === undefined ? ("image" as const) : over.kind,
+    status,
+    error: over.error,
+    final: over.final,
+  });
+  const closed = tile("late.jpg", "invalid", { error: JOB_CLOSED, final: true });
+  const tooLate = tile("late.jpg", "invalid", { error: TOO_LATE, final: true });
+  const flaky = tile("flaky.jpg", "failed", { error: "no connection" });
+  const big = tile("big.jpg", "invalid", { error: "over the 25 MB photo limit" });
+  assert.equal(redTilesLine([]), null);
+  assert.equal(redTilesLine([tile("a.jpg", "uploading"), tile("b.jpg", "waiting")]), null);
+  // Any that can go again: the count of every red tile, and a Retry.
+  assert.deepEqual(redTilesLine([flaky, closed]), { text: "2 photos didn't upload", retry: true });
+  assert.deepEqual(redTilesLine([flaky]), { text: "1 photo didn't upload", retry: true });
+  // Only final ones: the job's own line, no Retry.
+  assert.deepEqual(redTilesLine([closed, { ...closed, name: "b.jpg" }]), { text: "Job closed before 2 photos uploaded", retry: false });
+  assert.deepEqual(redTilesLine([tooLate]), { text: "Too late to add 1 photo", retry: false });
+  // A final one beside a file the check refused: still a line (the away notice used to say nothing), no Retry.
+  assert.deepEqual(redTilesLine([big, closed]), { text: "2 photos didn't upload", retry: false });
+  // Only the check's refusals keep their reason, as before.
+  assert.deepEqual(redTilesLine([big]), { text: "1 photo didn't upload: over the 25 MB photo limit", retry: false });
+  // A mix of kinds is files, as uploadNotice words it.
+  assert.deepEqual(redTilesLine([flaky, tile("v.mov", "failed", { error: "no connection", kind: "video" })]), { text: "2 files didn't upload", retry: true });
+  // A red tile with no words still counts.
+  assert.deepEqual(redTilesLine([tile("a.jpg", "failed")]), { text: "1 photo didn't upload", retry: true });
 });
 
 test("uploadFailureReason: a dropped connection reads no connection, single PUT or multipart", () => {

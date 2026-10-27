@@ -38,7 +38,7 @@ export async function recordJobFile(taskId: string, file: RecordMediaInput, owne
 
 /**
  * Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post.
- * A job approved while the photos were going up keeps its status: the server tells HG once (one line, one email
+ * A job approved or canceled while the photos were going up keeps its status: the server tells HG once (one line, one email
  * line) and answers with no id, and the toast says "3 photos added to the job" with nothing to undo.
  */
 export async function postRecordedBatch(

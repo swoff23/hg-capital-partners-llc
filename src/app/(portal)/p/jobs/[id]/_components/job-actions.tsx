@@ -23,6 +23,7 @@ import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction } from "@/lib/action-result";
+import { JOB_CLOSED } from "@/lib/attachments/access";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
   finishCountLabel,
@@ -38,6 +39,7 @@ import {
 import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
+import { postJobBatchAction } from "../upload-actions";
 import { postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
@@ -65,9 +67,11 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  * queue outlives the page, so "My jobs" and the payoff's "Back to my jobs"
  * don't ask (uploads 2.1; only Sign out does), and a batch that lands after
  * the contractor left posts on its own with the same Undo (choice 1 A; the
- * My jobs row says "Uploading 3 photos" meanwhile). If HG approved the job in
- * the meantime the photos still land on it, with no update and no email:
- * "3 photos added to the job" (record-and-post.ts), and late-uploads.tsx is the
+ * My jobs row says "Uploading 3 photos" meanwhile). If HG approved or
+ * canceled the job in the meantime the photos still land on it, and HG is
+ * told once for the batch, one line and one email line with no Undo: "3
+ * photos added to the job" (record-and-post.ts). Photos held here when that
+ * happens go the same way when the page goes, and late-uploads.tsx is the
  * page that records them once the job has no composer. Mark done waits for
  * uploads, and for each failed photo to be retried or removed (decision 13):
  * in the bar and in the sheet it stays off over one line ("2 photos didn't
@@ -179,9 +183,15 @@ export function JobActions({
     postBatch([...held, ...added]);
   }
 
-  /** A batch that landed after the contractor left the page: it posts as its own update, with the same toast and Undo. */
+  /**
+   * A batch that landed after the contractor left the page: it posts as its own update, with the same toast and
+   * Undo. One that doesn't post keeps its files for the tab, and the next batch for this job carries them.
+   */
   function onAway(ids: string[]) {
-    void sendBatch(recordedUploads.take(taskId, ids));
+    const items = recordedUploads.take(taskId, ids);
+    void sendBatch(items).then((posted) => {
+      if (!posted) recordedUploads.keep(taskId, items);
+    });
   }
 
   const target: UploadTarget = {
@@ -210,14 +220,25 @@ export function JobActions({
 
   // Moving to another page in the app: post what's still held, as its own
   // update (any unsent text stays unsent). Read at unmount on purpose, so it's
-  // the latest list; live is the same ref onRecorded reads.
+  // the latest list; live is the same ref onRecorded reads. The page also goes
+  // when HG approves or cancels the job while photos are held (the job page
+  // shows a closed job without this composer): the update is refused then, so
+  // the held photos take the batch step's late way and HG still hears of them.
+  const ownerNow = useRef(owner);
+  useEffect(() => {
+    ownerNow.current = owner;
+  });
   useEffect(() => {
     const latest = live;
     const inFlight = finishingIds;
+    const queueOwner = ownerNow;
     return () => {
       const held = latest.current.ready.map((r) => r.id).filter((id) => !inFlight.current.includes(id));
+      if (held.length === 0) return;
       // Detached: nothing is left on this page to show a result, and a redirect needs no rethrow here.
-      if (held.length > 0) postJobUpdateAction(taskId, { body: "", attachmentIds: held }).catch(() => {});
+      postJobUpdateAction(taskId, { body: "", attachmentIds: held })
+        .then((res) => (!res.ok && res.error === JOB_CLOSED ? postJobBatchAction(taskId, held, queueOwner.current) : undefined))
+        .catch(() => {});
     };
   }, [taskId]);
   useLeaveWarning(ready.length > 0);
