@@ -1,7 +1,8 @@
 // Runs before `next build`. Always regenerates the Prisma client. Applies
 // migrations only through a direct/session connection — the Supabase transaction
-// pooler (port 6543) can't run migrations, so those are applied out-of-band
-// (see README runbook / `npm run migrate`).
+// pooler (port 6543) can't run migrations, so those are applied out-of-band:
+// `npx prisma migrate deploy` against the direct or session URL. (`npm run
+// migrate` is the spreadsheet import, not this.)
 //
 // Migrations are also gated on VERCEL_ENV. Vercel's default env-var scoping
 // applies the same DATABASE_URL to Production, Preview, *and* Development

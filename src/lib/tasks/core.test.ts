@@ -504,7 +504,8 @@ test("addComment: a send with no clientId takes the task lock too, before it rea
 test("addComment: a contractor is refused on a closed job or without access before the clientId lookup and any write", async () => {
   // The status is read under the lock, so a job approved a moment ago is closed to the post that waited on it.
   const closed = fakeTx({ status: "DONE" }, accessOk);
-  await assert.rejects(addComment(closed.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /closed/);
+  // The portal's batch post answers on these exact words (portal/job-uploads.ts postJobBatch).
+  await assert.rejects(addComment(closed.tx, "t1", { body: "Hi", clientId: "c1" }, ZACK), /^TaskRuleError: This job is closed\.$/);
   assert.deepEqual(writes(closed.calls).map((c) => c.model), ["$executeRaw"], "only the lock");
   assert.ok(!closed.calls.some((c) => c.model === "taskEvent" && c.op === "findFirst"), "an earlier post is never handed back");
   const noAccess = fakeTx({ status: "OPEN" });

@@ -137,6 +137,10 @@ test("a job that is no longer active still gets its late photos recorded, withou
   const uploads = read("lib", "portal", "job-uploads.ts");
   assert.match(fn(uploads, "postJobBatch"), /if \(task && !isActiveStatus\(task\.status\)\) return null;/);
   assert.match(fn(uploads, "postJobBatch"), /eventId: event\?\.id \?\? null/);
+  // And so does a batch that waited behind Approve and found the job Done under addComment's lock: core refuses
+  // before it writes, the same answer comes back. The message is core.addComment's (core.test.ts pins its words).
+  assert.match(uploads, /const JOB_CLOSED = "This job is closed\.";/);
+  assert.match(fn(uploads, "postJobBatch"), /err instanceof core\.TaskRuleError && err\.message === JOB_CLOSED\) return null;/);
   // And the page says so, with nothing to undo.
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
   assert.match(shared, /if \(eventId === null\) \{\s*toast\(\{ message: addedToJobText\(kinds\)[\s\S]*?return true;/);

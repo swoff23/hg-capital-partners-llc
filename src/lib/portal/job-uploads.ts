@@ -20,6 +20,9 @@ import { requirePortalPrincipal, taskPrincipal } from "./session";
  * taskPrincipal(principal), which checks access and the job's state.
  */
 
+/** core.addComment's refusal of a contractor's post on a job that is no longer active. */
+const JOB_CLOSED = "This job is closed.";
+
 function revalidateJob(taskId: string): void {
   revalidatePath(`/p/jobs/${taskId}`);
   revalidatePath("/p");
@@ -38,7 +41,8 @@ function revalidateJob(taskId: string): void {
  * updates, but the late photos are already recorded on it: they stay on the
  * job as they are, with no update and no email, and the answer carries no
  * `eventId` (there is nothing to Undo). The page then says they were added
- * to the job. The job page refreshes, so they show in its photos.
+ * to the job. The job page refreshes, so they show in its photos. A batch that
+ * waited on the task row behind HG's Approve gets the same answer, not an error.
  */
 export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null }> {
   const p = await requirePortalPrincipal();
@@ -47,7 +51,14 @@ export async function postJobBatch(taskId: string, attachmentIds: string[]): Pro
     const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
     if (task && !isActiveStatus(task.status)) return null;
     const own = await ownUnposted(tx, taskId, p.contactId, attachmentIds);
-    return core.addComment(tx, taskId, { body: "", attachmentIds: own.map((f) => f.id), batch: true }, taskPrincipal(p));
+    try {
+      return await core.addComment(tx, taskId, { body: "", attachmentIds: own.map((f) => f.id), batch: true }, taskPrincipal(p));
+    } catch (err) {
+      // addComment reads the job under the task row's lock, so a batch that waited behind Approve finds it Done.
+      // It refuses before writing anything: the photos stay on the job as they are, the same answer as above.
+      if (err instanceof core.TaskRuleError && err.message === JOB_CLOSED) return null;
+      throw err;
+    }
   });
   revalidateJob(taskId);
   return { eventId: event?.id ?? null };

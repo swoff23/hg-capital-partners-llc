@@ -225,9 +225,10 @@ const STATUS_BY_WORDS = new Map(Object.entries(STATUS_LABEL).map(([k, label]) =>
  * Thu, Oct 29", "marked it done", `: "Doors arrive Thu"`. Dates arrive
  * already written out (core.ts emailDay). The title patterns are greedy so a
  * title with a quote in it ("Hang 36" mirror") still comes out whole; the
- * send-back's is not, since its note comes after the title.
+ * send-back's is not, since its note comes after the title (sendBackTail).
+ * `title`, when the caller has the job's, lets that one be cut off exactly.
  */
-export function itemText(item: OutboxItem): string {
+export function itemText(item: OutboxItem, title?: string): string {
   // A comment keeps its line breaks (activity 2.10); everything else is one line.
   const s = item.kind === "COMMENT" ? keepBreaks(item.summary) : oneLine(item.summary);
   switch (item.kind) {
@@ -259,10 +260,8 @@ export function itemText(item: OutboxItem): string {
       const set = /^set ".*" to (.+)$/.exec(s);
       if (set) return `moved it to ${STATUS_BY_WORDS.get(set[1]) ?? set[1]}`;
       if (/^marked ".*" done$/.test(s)) return "marked it done";
-      // Non-greedy, unlike the other title patterns: the note follows the title, and a greedy title would swallow
-      // a note that says `" back` itself ('put the "old" back') and drop it from the line.
-      const back = /^sent ".*?" back(: .+)?$/.exec(s);
-      if (back) return `sent it back${back[1] ?? ""}`;
+      const tail = sendBackTail(s, title);
+      if (tail !== null) return `sent it back${tail}`;
       return s.replace(/"[^"]*"/, "it");
     }
     default:
@@ -270,9 +269,29 @@ export function itemText(item: OutboxItem): string {
   }
 }
 
+/**
+ * What follows `sent "T" back` in a send-back line: `: note`, or nothing for a
+ * send-back with no note; null when the line is not a send-back. With the
+ * job's title, the line's own title is cut off exactly, so a title that says
+ * `" back: ` itself ('Put "old" back: kitchen') keeps its words out of the
+ * line. Without it, or when the job was renamed since the line was queued, the
+ * title is taken to end at the first `" back`: the note follows the title, and
+ * a greedy title would swallow a note that says `" back` itself ('put the
+ * "old" back') and drop it from the line.
+ */
+function sendBackTail(s: string, title?: string): string | null {
+  if (title) {
+    const head = `sent "${oneLine(title)}" back`;
+    if (s === head) return "";
+    if (s.startsWith(`${head}: `) && s.length > head.length + 2) return s.slice(head.length);
+  }
+  const m = /^sent ".*?" back(: .+)?$/.exec(s);
+  return m ? (m[1] ?? "") : null;
+}
+
 /** "Connor moved the target to Fri, Oct 30", 'Zack: "Uppers in"'. */
-export function itemLine(item: OutboxItem): string {
-  const text = itemText(item);
+export function itemLine(item: OutboxItem, title?: string): string {
+  const text = itemText(item, title);
   const name = firstName(item.actorLabel);
   return text.startsWith(":") ? `${name}${text}` : `${name} ${text}`;
 }
@@ -281,12 +300,12 @@ export function itemLine(item: OutboxItem): string {
  * The lines of one email, oldest first. Target and notes changes say only
  * their latest; everything else is listed.
  */
-export function itemLines(items: OutboxItem[]): string[] {
+export function itemLines(items: OutboxItem[], title?: string): string[] {
   const lastOf = new Map<string, number>();
   items.forEach((it, i) => {
     if (it.kind === "TARGET" || it.kind === "NOTES") lastOf.set(it.kind, i);
   });
-  return items.filter((it, i) => (it.kind === "TARGET" || it.kind === "NOTES" ? lastOf.get(it.kind) === i : true)).map(itemLine);
+  return items.filter((it, i) => (it.kind === "TARGET" || it.kind === "NOTES" ? lastOf.get(it.kind) === i : true)).map((it) => itemLine(it, title));
 }
 
 /**
@@ -398,7 +417,7 @@ export function taskEmail(input: {
   return {
     subject: emailSubject(input.items, input.title),
     line: where ? `${oneLine(input.title)}, ${where}` : oneLine(input.title),
-    items: itemLines(input.items),
+    items: itemLines(input.items, input.title),
     ...(approved ? { closing: thanksTo ? `Thanks, ${thanksTo}.` : "Thanks." } : {}),
     buttonLabel: !contractor ? "Open task" : approved ? "See job" : "Open job",
     // Opens at the first update in the bundle, when the items name one (rows queued before they did open the job).

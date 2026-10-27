@@ -148,6 +148,25 @@ test("a title with a quote in it comes out whole", () => {
   assert.equal(itemText(item("STATUS", `set "${t}" to done`)), "moved it to Done");
 });
 
+test("a send-back on a title that says `\" back: ` itself comes out whole when the job's title is known", () => {
+  const t = 'Put "old" back: kitchen';
+  const noNote = item("STATUS", `sent "${t}" back`);
+  const withNote = item("STATUS", `sent "${t}" back: Level it`);
+  assert.equal(itemText(noNote, t), "sent it back");
+  assert.equal(itemText(withNote, t), "sent it back: Level it");
+  assert.equal(itemLines([noNote, withNote], t)[0], "Connor sent it back");
+  // The title is compared as the email writes it, with its runs of spaces collapsed.
+  assert.equal(itemText(item("STATUS", `sent "${t}" back: Level it`), 'Put  "old" back:   kitchen'), "sent it back: Level it");
+  // A job renamed since the line was queued falls back to the first `" back`, as before.
+  assert.equal(itemText(item("STATUS", 'sent "Paint" back: put the "old" back'), "Paint the hall"), 'sent it back: put the "old" back');
+  assert.equal(itemText(item("STATUS", 'sent "Paint" back'), "Paint the hall"), "sent it back");
+  // The note after an exact title may say `" back: ` too.
+  assert.equal(itemText(item("STATUS", `sent "${t}" back: Put it "back: here"`), t), 'sent it back: Put it "back: here"');
+  // taskEmail hands its title down.
+  const email = taskEmail({ items: [noNote], title: t, address: null, audience: "contractor", appUrl: "https://hg.example.com", taskId: "t1" });
+  assert.deepEqual(email.items, ["Connor sent it back"]);
+});
+
 test("lines: comments quote, oldest first, only the latest target and notes", () => {
   const lines = itemLines([
     item("TARGET", `moved "${TITLE}" to Thu, Oct 29`),
