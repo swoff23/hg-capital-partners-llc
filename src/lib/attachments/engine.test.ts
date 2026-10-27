@@ -671,3 +671,125 @@ test("a record step that answers no is red at once", async () => {
   assert.equal(tile.status, "failed");
   assert.equal(tile.error, "this job is closed");
 });
+
+// ---------------------------------------------------------------------------
+// Whose queue it is, and the queue stopping with its layout (chunk 6 review, fixes 4 and 5)
+// ---------------------------------------------------------------------------
+
+const portalTarget = (over: Partial<UploadTarget> = {}) =>
+  target({ key: "portal-task:t9", uploadKind: "portal-task-upload", parentId: "t9", whenAway: "post", allowed: ["image", "video"], ...over });
+
+test("two contractors on one phone: each one's queue picks up only their own leftover files", async () => {
+  const outbox = memoryOutbox();
+  const zack = setup({ outbox, scope: "portal:c-zack", online: false, script: [new TypeError("Failed to fetch")] });
+  zack.engine.add(portalTarget(), [file("zack.jpg")]);
+  await zack.flush();
+  const mike = setup({ outbox, scope: "portal:c-mike", online: false, script: [new TypeError("Failed to fetch")] });
+  mike.state.seq = 100;
+  mike.engine.add(portalTarget(), [file("mike.jpg")]);
+  await mike.flush();
+
+  // Mike signs in next on the same phone, with a signal: Zack's photo is not his to record or post.
+  const mikeNext = setup({ outbox, scope: "portal:c-mike" });
+  const recordedAsMike: string[] = [];
+  mikeNext.engine.setTarget(portalTarget({ record: async (f) => (recordedAsMike.push(f.filename), { ok: true, data: { id: "a-m" } }) }));
+  await mikeNext.engine.restore();
+  await mikeNext.flush();
+  assert.deepEqual(recordedAsMike, ["mike.jpg"]);
+  assert.deepEqual(
+    (await outbox.all()).map((e) => [e.scope, e.name]),
+    [["portal:c-zack", "zack.jpg"]],
+    "Zack's waits for Zack",
+  );
+
+  const zackNext = setup({ outbox, scope: "portal:c-zack" });
+  const recordedAsZack: string[] = [];
+  zackNext.engine.setTarget(portalTarget({ record: async (f) => (recordedAsZack.push(f.filename), { ok: true, data: { id: "a-z" } }) }));
+  await zackNext.engine.restore();
+  await zackNext.flush();
+  assert.deepEqual(recordedAsZack, ["zack.jpg"]);
+});
+
+test("dispose: an upload in flight is aborted, its claim let go and its outbox row kept for the next queue", async () => {
+  const outbox = memoryOutbox();
+  const shared = locks();
+  const h = setup({ outbox, claim: shared.claim, scope: "portal:c-zack" });
+  const aborted: string[] = [];
+  h.deps.transfer = async (input) => {
+    h.sent.push(input);
+    return new Promise((_, reject) => input.signal.addEventListener("abort", () => (aborted.push(input.name), reject(new Error("aborted")))));
+  };
+  const recorded: string[] = [];
+  const t = portalTarget({ record: async (f) => (recorded.push(f.filename), { ok: true, data: { id: "a1" } }) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("video.mov", "video/quicktime")]);
+  await h.flush();
+  assert.equal(h.sent.length, 1, "going up");
+  assert.equal(shared.held.size, 1, "this tab holds it");
+
+  h.engine.dispose();
+  await h.flush();
+  assert.equal(aborted.length, 1);
+  assert.equal(shared.held.size, 0, "the claim is let go");
+  assert.equal(h.timers.size, 0, "no stall or retry timer left");
+  assert.deepEqual(recorded, [], "nothing recorded");
+  assert.equal((await outbox.all()).length, 1, "the row stays");
+  assert.deepEqual(h.engine.counts(), { pending: 0, waiting: 0, failed: 0, pendingKinds: [] });
+
+  // The same person's next queue picks it up.
+  const next = setup({ outbox, claim: shared.claim, scope: "portal:c-zack" });
+  const again: string[] = [];
+  next.engine.setTarget(portalTarget({ record: async (f) => (again.push(f.filename), { ok: true, data: { id: "a1" } }) }));
+  await next.engine.restore();
+  await next.flush();
+  assert.equal(again.length, 1);
+});
+
+test("dispose: a record call already out finishes on the server, but its answer records and posts nothing here", async () => {
+  const outbox = memoryOutbox();
+  const h = setup({ outbox, scope: "portal:c-zack" });
+  let answer: (v: { ok: true; data: { id: string } }) => void = () => {};
+  const landed: string[][] = [];
+  const away: string[][] = [];
+  const t = portalTarget({
+    record: () => new Promise((resolve) => (answer = resolve)),
+    onRecorded: (ids) => landed.push(ids),
+    onAway: (ids) => away.push(ids),
+  });
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  h.engine.dispose();
+  answer({ ok: true, data: { id: "a1" } });
+  await h.flush();
+  assert.deepEqual(landed, []);
+  assert.deepEqual(away, [], "no post under whoever signs in next");
+  assert.equal((await outbox.all()).length, 1, "the row comes back to the next queue, which records it again as the same row");
+});
+
+test("dispose: after it, nothing is added, restored, retried or sent, and no toast is shown", async () => {
+  const outbox = memoryOutbox();
+  const before = setup({ outbox, scope: "portal:c-zack", online: false, script: [new TypeError("Failed to fetch")] });
+  before.engine.add(portalTarget(), [file("left.jpg")]);
+  await before.flush();
+
+  const h = setup({ outbox, scope: "portal:c-zack", online: false, script: [new TypeError("Failed to fetch")] });
+  h.engine.dispose();
+  await h.engine.restore();
+  h.engine.add(portalTarget(), [file("new.jpg")]);
+  h.engine.nudge();
+  await h.advance(120_000);
+  assert.equal(h.sent.length, 0);
+  assert.equal(h.notices.length, 0);
+  assert.deepEqual(h.engine.uploadsFor("portal-task:t9"), []);
+  assert.equal((await outbox.all()).length, 1, "the earlier row is untouched");
+
+  // A waiting file's retry timer, cleared by dispose, never fires a send.
+  const w = setup({ outbox: memoryOutbox(), scope: "portal:c-zack", script: [new TypeError("Failed to fetch")], online: false });
+  w.engine.add(portalTarget(), [file("w.jpg")]);
+  await w.flush();
+  assert.equal(w.engine.uploadsFor("portal-task:t9")[0].status, "waiting");
+  w.engine.dispose();
+  w.state.online = true;
+  await w.advance(120_000);
+  assert.equal(w.sent.length, 1, "only the first try");
+});

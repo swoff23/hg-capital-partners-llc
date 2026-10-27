@@ -133,7 +133,7 @@ async function verifiedAttachment(taskId: string, input: UploadedFile, auth: Blo
   const paths = requestPaths(input);
   if (new Set(paths).size !== paths.length) throw new core.TaskRuleError("Each file needs its own path.");
   const taken = await prisma.taskAttachment.findFirst({ where: usingPaths(paths), select: { id: true } });
-  if (taken) throw new core.TaskRuleError("That file is already attached.");
+  if (taken) throw new AlreadyAttachedError();
 
   const orig = await verifyBlob(taskId, input.pathname, "orig", auth);
   // What the blob really is, not what the browser called it: a contractor's job takes photos and videos only (the same table the token route reads).
@@ -157,12 +157,30 @@ async function verifiedAttachment(taskId: string, input: UploadedFile, auth: Blo
   };
 }
 
-/** Two requests recording the same blob at once: the unique pathname lets one through. */
-function alreadyAttached(err: unknown): never {
-  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-    throw new core.TaskRuleError("That file is already attached.");
+/** A row already uses a path this record step names. */
+class AlreadyAttachedError extends core.TaskRuleError {
+  constructor() {
+    super("That file is already attached.");
   }
-  throw err;
+}
+
+/**
+ * Runs one record step, and when the file turns out to be attached already
+ * by this same person, answers with that row (core.findOwnUpload) instead of
+ * refusing: the earlier step committed and its answer never reached the
+ * browser, so this is its Retry, or the two ran at once and the unique
+ * pathname let the other through. Anyone else's row is still a refusal.
+ */
+async function recordOnce(taskId: string, input: UploadedFile, p: core.Principal, run: () => Promise<{ id: string }>): Promise<{ id: string }> {
+  try {
+    return await run();
+  } catch (err) {
+    const taken = err instanceof AlreadyAttachedError || (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002");
+    if (!taken) throw err;
+    const mine = await core.findOwnUpload(prisma, taskId, input.pathname, p);
+    if (mine) return mine;
+    throw err instanceof AlreadyAttachedError ? err : new AlreadyAttachedError();
+  }
 }
 
 /**
@@ -181,12 +199,13 @@ export async function recordTaskAttachment(
   const att = await discardingOnRefusal(taskId, input, auth, async () => {
     const task = await prisma.task.findUnique({ where: { id: taskId }, select: { id: true } });
     if (!task) throw new core.TaskRuleError("That task no longer exists.");
-    const meta = await verifiedAttachment(taskId, input, auth);
-    return prisma
-      .$transaction((tx) =>
+    // A Retry of a record that committed gets the same row back, with no second timeline line.
+    return recordOnce(taskId, input, p, async () => {
+      const meta = await verifiedAttachment(taskId, input, auth);
+      return prisma.$transaction((tx) =>
         core.recordAttachment(tx, taskId, meta, p, { visibility: opts.visibility ?? "SHARED", standalone: opts.standalone }),
-      )
-      .catch(alreadyAttached);
+      );
+    });
   });
   revalidatePath(`/tasks/${taskId}`);
   return { id: att.id };
@@ -242,45 +261,42 @@ export async function recordPortalAttachment(
 ): Promise<{ id: string }> {
   const auth = blobAuth();
   const queuedAt = input.queuedAt ?? null;
+  const p = taskPrincipal(portal);
   // A refusal here (job closed, access gone, the hour after Mark done run out) discards the uploads too: they can never be recorded.
+  // A recorded file is never discarded: discardUnrecorded skips every path a row uses.
   const att = await discardingOnRefusal(taskId, input, auth, async () => {
     const early = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt });
     if (early) throw new core.TaskRuleError(early);
-    const meta = await verifiedAttachment(taskId, input, auth, UPLOAD_KIND_ALLOWED["portal-task-upload"]);
-    return prisma
-      .$transaction(async (tx) => {
+    // A Retry of a record that committed gets the same row back, so the tile finishes and no second copy is made.
+    return recordOnce(taskId, input, p, async () => {
+      const meta = await verifiedAttachment(taskId, input, auth, UPLOAD_KIND_ALLOWED["portal-task-upload"]);
+      return prisma.$transaction(async (tx) => {
         const refusal = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt }, tx);
         if (refusal) throw new core.TaskRuleError(refusal);
-        return core.recordAttachment(tx, taskId, meta, taskPrincipal(portal), { visibility: "SHARED", standalone: opts.standalone });
-      })
-      .catch(alreadyAttached);
+        return core.recordAttachment(tx, taskId, meta, p, { visibility: "SHARED", standalone: opts.standalone });
+      });
+    });
   });
   revalidatePath(`/tasks/${taskId}`);
   return { id: att.id };
 }
 
 /**
- * Staff only: removes the row, then the blobs, for good. A file that was
- * already posted (on a comment or a line of its own) leaves an ATTACHMENT
- * event with `data.removed` when `p` says who removed it ("Connor removed
- * quote.pdf"), so the line that said it was added still makes sense; a
- * draft nobody saw leaves nothing, and neither does a call without `p`
- * (the composer unreadying its own draft).
+ * Staff only: takes the file off the task, then deletes its blobs. The row
+ * goes for good, except a file imported from Asana, which is only marked
+ * removed so the delta sync doesn't import it again (core.removeAttachment).
+ * A file that was already posted (on a comment or a line of its own) leaves
+ * an ATTACHMENT event with `data.removed` when `p` says who removed it
+ * ("Connor removed quote.pdf"), so the line that said it was added still
+ * makes sense; a draft nobody saw leaves nothing, and neither does a call
+ * without `p` (the composer unreadying its own draft). A file already removed
+ * is left as it is.
  */
 export async function deleteTaskAttachment(attachmentId: string, p?: core.Principal): Promise<void> {
   const att = await prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
-  if (!att) return;
-  await prisma.$transaction(async (tx) => {
-    await tx.taskAttachment.delete({ where: { id: attachmentId } });
-    if (p && att.eventId !== null) {
-      await core.addEvent(tx, att.taskId, p, {
-        kind: "ATTACHMENT",
-        visibility: att.visibility,
-        audienceContactId: att.audienceContactId,
-        data: { attachmentId: att.id, filename: att.filename, removed: true },
-      });
-    }
-  });
+  if (!att || att.deletedAt) return;
+  const removed = await prisma.$transaction((tx) => core.removeAttachment(tx, att, p));
+  if (!removed) return;
   // A LINK has no blob. Older rows may still point at a public blob; del() takes either URL.
   const blobs = [att.url, att.thumbPathname, att.posterPathname].filter((x): x is string => !!x);
   const token = getEnv().BLOB_READ_WRITE_TOKEN;

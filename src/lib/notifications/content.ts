@@ -10,7 +10,8 @@ import { addressLine, firstName, joinNames } from "@/lib/portal/job-view";
  * the database and the sending. See content.test.ts.
  *
  * Rows are queued by src/lib/tasks/core.ts, one per recipient and task, each
- * holding the bundled changes as items: { kind, actorLabel, summary, at }.
+ * holding the bundled changes as items: { kind, actorLabel, summary, at },
+ * and on some items the eventId of the event the line is about.
  */
 
 export interface OutboxItem {
@@ -18,6 +19,12 @@ export interface OutboxItem {
   actorLabel: string;
   summary: string;
   at: string;
+  /**
+   * The event the line is about (core.ts OutboxItem), decided per item. A row
+   * can mix items with and without it; what the email says never depends on
+   * it, so an old row sends exactly as stored.
+   */
+  eventId?: string;
 }
 
 /** The items column, keeping only well-formed entries. */

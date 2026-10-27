@@ -244,7 +244,7 @@ export function browserDeps(parts: {
   notify: (n: EngineNotice) => void;
   navigate: (href: string) => void;
   persist?: boolean;
-  /** Whose queue: "app:<user id>" or "portal" (EngineDeps.scope). */
+  /** Whose queue: "app:<user id>" or "portal:<contact id>" (EngineDeps.scope). */
   scope?: string;
 }): EngineDeps {
   return {
@@ -293,7 +293,7 @@ export function useUploadEngine(): UploadEngine | null {
 
 /**
  * The queue for everything under it. Mounted once per layout; a second one inside would split the counts.
- * `scope` says whose files it is: "app:<user id>" in the app, "portal" in the contractor portal. One browser
+ * `scope` says whose files it is: "app:<user id>" in the app, "portal:<contact id>" in the contractor portal. One browser
  * database serves both layouts and every person who signs in on it, so each queue picks up only its own.
  */
 export function UploadQueueProvider({ children, scope }: { children: ReactNode; scope: string }) {
@@ -317,6 +317,19 @@ export function UploadQueueProvider({ children, scope }: { children: ReactNode; 
       navigate: (href) => router.push(href),
     });
   }, [engine, toast, router]);
+
+  // Gone with its layout (Sign out, or the portal keying a new queue to whoever signed in): the engine stops, so
+  // nothing it was sending records or posts under the next person's session, and its files wait in the outbox for
+  // their own person (engine.dispose). A tick later, because Strict Mode in development unmounts and mounts every
+  // effect once on purpose, and that rehearsal must not stop it.
+  const stopping = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (stopping.current !== null) clearTimeout(stopping.current);
+    stopping.current = null;
+    return () => {
+      stopping.current = setTimeout(() => engine.dispose(), 0);
+    };
+  }, [engine]);
 
   // Pick the outbox up, and try again when the signal or the tab comes back.
   useEffect(() => {

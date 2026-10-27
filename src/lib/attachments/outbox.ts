@@ -107,8 +107,8 @@ export type MultipartState = {
 export type OutboxEntry = {
   id: string;
   /**
-   * Whose queue this is: "app:<user id>" for a signed-in staff member, "portal"
-   * for the contractor portal. One browser database serves both layouts and
+   * Whose queue this is: "app:<user id>" for a signed-in staff member,
+   * "portal:<contact id>" for a contractor. One browser database serves both layouts and
    * every person who signs in on it; a queue only picks up its own.
    */
   scope: string;

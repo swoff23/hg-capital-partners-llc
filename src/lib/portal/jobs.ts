@@ -1,14 +1,14 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, type AttachmentKind } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern } from "@/lib/dates";
 import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { logSecurityEvent } from "./accounts";
-import { addMorePhotosLine, finishPhotosNeeded } from "./job-view";
+import { addMorePhotosLine, finishPhotoCount, finishPhotosNeeded } from "./job-view";
 import { requestIpHash } from "./request";
 import { requirePortalPrincipal, taskPrincipal, type PortalPrincipal } from "./session";
 
@@ -111,25 +111,27 @@ export interface JobUpdateInput {
 }
 
 /**
- * Of the ids the browser sent, the ones this contractor uploaded to this job
- * and hasn't posted yet. core.addComment links whatever unposted files it's
- * given and makes them Shared, so nobody else's file can be named here.
+ * Of the ids the browser sent, the files this contractor uploaded to this job
+ * through the portal and hasn't posted yet, with their kinds. core.addComment
+ * links whatever unposted files it's given and makes them Shared, so nobody
+ * else's file can be named here. A file imported from Asana never counts,
+ * even one the importer credits to this contractor with no update of its
+ * own: it's history, not this visit's work. job-uploads.ts uses this too.
  */
-async function ownUnposted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<string[]> {
+export async function ownUnposted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<{ id: string; kind: AttachmentKind }[]> {
   if (ids.length === 0) return [];
-  const rows = await tx.taskAttachment.findMany({
-    where: { id: { in: ids }, taskId, uploadedByContactId: contactId, eventId: null, deletedAt: null },
-    select: { id: true },
+  return tx.taskAttachment.findMany({
+    where: { id: { in: ids }, taskId, uploadedByContactId: contactId, eventId: null, deletedAt: null, asanaGid: null },
+    select: { id: true, kind: true },
   });
-  return rows.map((r) => r.id);
 }
 
 /** An update from the composer: text, files, or both. Always Shared (core). */
 export async function postJobUpdate(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
   await prisma.$transaction(async (tx) => {
-    const attachmentIds = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
-    await core.addComment(tx, taskId, { body: input.body, attachmentIds }, taskPrincipal(p));
+    const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
+    await core.addComment(tx, taskId, { body: input.body, attachmentIds: own.map((f) => f.id) }, taskPrincipal(p));
   });
   revalidateJob(taskId);
 }
@@ -139,20 +141,23 @@ export async function postJobUpdate(taskId: string, input: JobUpdateInput): Prom
  * update, then the job moves to Review (D6b). Both partners get one email
  * for the two (core bundles them). When the job's playbook asks for photos
  * (TaskTemplate.finishPhotosRequired, uploads 2.8), it needs that many of this
- * contractor's own, unposted files here; the sheet holds the button until they
- * are up, and this is the same rule where the browser can't skip it.
+ * contractor's own, unposted photos and videos here (job-view finishPhotoCount,
+ * what the sheet counts); the sheet holds the button until they are up, and
+ * this is the same rule where the browser can't skip it.
  */
 export async function markJobDone(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
   const principal = taskPrincipal(p);
   await refreshOnRefusal(taskId, () =>
     prisma.$transaction(async (tx) => {
-      const attachmentIds = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
+      const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
       const template = await tx.task.findUnique({ where: { id: taskId }, select: { taskTemplate: { select: { finishPhotosRequired: true } } } });
       const required = finishPhotosNeeded(template?.taskTemplate?.finishPhotosRequired);
-      if (attachmentIds.length < required) {
-        throw new core.TaskRuleError(`${addMorePhotosLine(required - attachmentIds.length)} to mark this done.`);
+      const photos = finishPhotoCount(own.map((f) => f.kind));
+      if (photos < required) {
+        throw new core.TaskRuleError(`${addMorePhotosLine(required - photos)} to mark this done.`);
       }
+      const attachmentIds = own.map((f) => f.id);
       if (input.body.trim() || attachmentIds.length) {
         await core.addComment(tx, taskId, { body: input.body, attachmentIds }, principal);
       }

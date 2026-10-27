@@ -10,6 +10,7 @@ import {
   addressLine,
   dayLabel,
   finishCountLabel,
+  finishPhotoCount,
   finishPhotosNeeded,
   finishSlots,
   finishingLabel,
@@ -304,6 +305,16 @@ test("the count a playbook asks for: null, 0 and nonsense are optional, and a ty
   assert.equal(finishPhotosNeeded(2), 2);
   assert.equal(finishPhotosNeeded(2.9), 2);
   assert.equal(finishPhotosNeeded(200), 12);
+});
+
+test("Mark done counts photos and videos toward the playbook's count, never a document or a link", () => {
+  // The chunk 6 review's database run: a PDF counted as a finish photo.
+  assert.equal(finishPhotoCount(["IMAGE", "FILE"]), 1);
+  assert.equal(finishPhotoCount(["IMAGE", "VIDEO"]), 2, "the sheet counts every upload, and the job page uploads photos and videos");
+  assert.equal(finishPhotoCount(["FILE", "LINK"]), 0);
+  assert.equal(finishPhotoCount([]), 0);
+  // So a playbook asking for 2 is short with one photo and a PDF.
+  assert.ok(finishPhotoCount(["IMAGE", "FILE"]) < finishPhotosNeeded(2));
 });
 
 test("proof slots: the count asked for, or one on an optional job, and the 1 of 2 beside the heading", () => {

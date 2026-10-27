@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@prisma/client";
+import type { AttachmentKind, TaskStatus } from "@prisma/client";
 import { LATE_UPLOAD_WINDOW_MS } from "@/lib/attachments/access";
 import type { FileKind } from "@/lib/attachments/content-types";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
@@ -280,6 +280,15 @@ const MAX_FINISH_PHOTOS = 12;
 export function finishPhotosNeeded(required: number | null | undefined): number {
   if (typeof required !== "number" || !Number.isFinite(required) || required < 1) return 0;
   return Math.min(Math.floor(required), MAX_FINISH_PHOTOS);
+}
+
+/**
+ * How many of a Mark done's files count toward `finishPhotosNeeded`: photos
+ * and videos, the two kinds the job page uploads, so the server counts what
+ * the sheet counts. A document (a PDF) never stands in for a photo.
+ */
+export function finishPhotoCount(kinds: readonly AttachmentKind[]): number {
+  return kinds.filter((k) => k === "IMAGE" || k === "VIDEO").length;
 }
 
 /** How many proof slots the Mark done sheet draws: the count asked for, or one on an optional job. */

@@ -116,7 +116,7 @@ export type EngineDeps = {
   /** Asks the browser to keep the outbox (navigator.storage.persist()); once, when the first file joins. */
   persist?: () => void;
   /**
-   * Whose queue this is: "app:<user id>" in the app, "portal" in the contractor portal. One browser database serves
+   * Whose queue this is: "app:<user id>" in the app, "portal:<contact id>" in the contractor portal. One browser database serves
    * both layouts and everyone who signs in on it, so a queue only picks up the files of its own scope.
    */
   scope?: string;
@@ -163,6 +163,8 @@ export class UploadEngine {
   private preparing = false;
   private persistAsked = false;
   private restored = false;
+  /** Set by dispose(): the queue's provider is gone, and nothing here runs again. */
+  private disposed = false;
   /** Keys that already told the person their files are waiting for a page to record them. */
   private readonly pageNoticed = new Set<string>();
 
@@ -177,6 +179,40 @@ export class UploadEngine {
    */
   setHandlers(handlers: Partial<Pick<EngineDeps, "notify" | "navigate">>): void {
     Object.assign(this.deps, handlers);
+  }
+
+  /**
+   * The queue's provider is gone: Sign out left its layout, or the portal
+   * mounted a new queue for whoever signed in next. Stops for good. Each
+   * upload in flight is aborted, its timers cleared and its claim let go, and
+   * its outbox row stays, so the same person's next queue picks it up where
+   * it was. Nothing records, posts, saves or toasts after this: a target's
+   * record step is the page that set it, and it would run under whoever is
+   * signed in by then. A record call already on its way finishes on the
+   * server, and its row comes back to the next queue, which records it again
+   * as the same row (core.findOwnUpload).
+   */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const job of this.jobs.values()) {
+      job.controller?.abort();
+      this.deps.clearTimer(job.retryTimer);
+      this.deps.clearTimer(job.stallTimer);
+      job.retryTimer = null;
+      job.stallTimer = null;
+      if (job.previewUrl) this.deps.preview.revoke(job.previewUrl);
+      job.previewUrl = null;
+      const lease = job.lease;
+      job.lease = null;
+      lease?.();
+    }
+    this.jobs.clear();
+    this.targets.clear();
+    this.mounts.clear();
+    this.recordedByBatch.clear();
+    this.uploadCache.clear();
+    this.countCache.clear();
   }
 
   /* ---------------- Reading ---------------- */
@@ -260,6 +296,7 @@ export class UploadEngine {
    * which was waiting for a record step to exist goes on to record.
    */
   setTarget(target: UploadTarget): void {
+    if (this.disposed) return;
     this.targets.set(target.key, target);
     let released = false;
     this.pageNoticed.delete(target.key);
@@ -307,7 +344,7 @@ export class UploadEngine {
    */
   add(target: UploadTarget, files: FileList | readonly File[]): void {
     const list = Array.from(files);
-    if (list.length === 0) return;
+    if (list.length === 0 || this.disposed) return;
     this.setTarget(target);
     const now = this.deps.now();
     const batchId = `b_${this.deps.uid()}`;
@@ -378,7 +415,7 @@ export class UploadEngine {
   /* ---------------- Preparing ---------------- */
 
   private async prepareNext(): Promise<void> {
-    if (this.preparing) return;
+    if (this.preparing || this.disposed) return;
     const job = [...this.jobs.values()].find((j) => j.status === "queued" && !j.prepared);
     if (!job) return;
     this.preparing = true;
@@ -440,7 +477,7 @@ export class UploadEngine {
   /* ---------------- Sending ---------------- */
 
   private pump(): void {
-    while (this.active < CONCURRENCY) {
+    while (this.active < CONCURRENCY && !this.disposed) {
       const next = [...this.jobs.values()].find(
         (j) => j.status === "queued" && j.prepared && !j.controller && !j.retryTimer && !(this.multipartActive && this.goesInParts(j)),
       );
@@ -549,6 +586,7 @@ export class UploadEngine {
   }
 
   private async record(job: Job): Promise<void> {
+    if (this.disposed) return;
     const target = this.targets.get(job.key);
     if (!target) {
       // The page that would record this file isn't open yet (a reload put it back first).
@@ -570,6 +608,8 @@ export class UploadEngine {
       if (isOfflineError(err)) throw new TypeError("Failed to fetch");
       throw new RecordThrew("it couldn't be saved");
     }
+    // Stopped while the call was out: the row stays in the outbox for the next queue, and nothing is handed to a page.
+    if (this.disposed) return;
     if (!res.ok || !res.data) {
       if (res.error === OFFLINE_ERROR) throw new TypeError("Failed to fetch");
       throw new RecordRefused(res.error || "it couldn't be saved");
@@ -819,7 +859,7 @@ export class UploadEngine {
    * tab, goes back in its target's queue and carries on.
    */
   async restore(): Promise<void> {
-    if (this.restored || !this.deps.outbox) return;
+    if (this.restored || this.disposed || !this.deps.outbox) return;
     this.restored = true;
     let entries: OutboxEntry[];
     try {
@@ -827,6 +867,7 @@ export class UploadEngine {
     } catch {
       return;
     }
+    if (this.disposed) return;
     const now = this.deps.now().getTime();
     const live = resumable(entries, now);
     for (const e of entries) if (!live.includes(e)) void this.deps.outbox.delete(e.id).catch(() => {});
@@ -839,6 +880,10 @@ export class UploadEngine {
       // Another open tab that is still sending this file keeps it.
       const lease = this.deps.claim ? await this.deps.claim(e.id).catch(() => () => {}) : () => {};
       if (!lease) continue;
+      if (this.disposed) {
+        lease();
+        return;
+      }
       if (this.jobs.has(e.id)) {
         lease();
         continue;

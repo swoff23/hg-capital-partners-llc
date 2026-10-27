@@ -23,7 +23,7 @@ import type { UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction } from "@/lib/action-result";
-import { contentTypeForName, fileKindForType, type FileKind } from "@/lib/attachments/content-types";
+import { contentTypeForName, fileKindForType } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
   finishCountLabel,
@@ -37,6 +37,7 @@ import {
   postedText,
   stripCounts,
 } from "@/lib/portal/job-view";
+import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
 import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "../upload-actions";
@@ -87,7 +88,7 @@ import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "..
  */
 
 /** A file that's up and recorded, waiting to be posted: what the sheet shows in its slot and the payoff in its strip. */
-type Recorded = { id: string; name: string; kind: FileKind | null; hasThumb: boolean; hasPoster: boolean };
+type Recorded = RecordedUpload;
 
 export function JobActions({
   taskId,
@@ -135,9 +136,6 @@ export function JobActions({
     live.current = { body, sheetOpen, ready };
   });
 
-  // What each recorded file is, by id, since the record step answers with the id alone.
-  const info = useRef(new Map<string, Recorded>());
-
   // Every call goes through callAction: with no signal it fails like a refusal
   // (a toast), and the typed text, the open sheet and the photos stay put.
   const post = (text: string, items: Recorded[]) =>
@@ -182,12 +180,16 @@ export function JobActions({
       setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
     });
 
-  /** The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and the strip. */
+  /**
+   * The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and
+   * the strip. Kept for the tab (recordedUploads), not this page: a batch that started under an earlier visit to the
+   * job lands here with that visit's files in it.
+   */
   async function record(file: RecordMediaInput): Promise<RecordMediaResult> {
     const res = await recordJobUploadAction(taskId, file);
     if (res.ok) {
       const kind = fileKindForType(contentTypeForName(file.filename)) ?? (file.posterPathname ? "video" : null);
-      info.current.set(res.data.id, {
+      recordedUploads.note(taskId, {
         id: res.data.id,
         name: file.filename,
         kind,
@@ -200,7 +202,7 @@ export function JobActions({
 
   function onRecorded(ids: string[]) {
     const { sheetOpen: holding, body: text, ready: held } = live.current;
-    const added = ids.map((id) => info.current.get(id)).filter((i): i is Recorded => !!i);
+    const added = recordedUploads.take(taskId, ids);
     if (holding || text.trim()) {
       setReady([...held, ...added]);
       return;
@@ -211,7 +213,7 @@ export function JobActions({
 
   /** A batch that landed after the contractor left the page: it posts as its own update, with the same toast and Undo. */
   function onAway(ids: string[]) {
-    void sendBatch(ids.map((id) => info.current.get(id) ?? { id, name: "", kind: null, hasThumb: false, hasPoster: false }));
+    void sendBatch(recordedUploads.take(taskId, ids));
   }
 
   const target: UploadTarget = {
