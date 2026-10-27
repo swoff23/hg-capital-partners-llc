@@ -1,19 +1,14 @@
 import { PrismaClient } from "@prisma/client";
+import { runtimeDatabaseUrl } from "@/lib/db-url";
 import { getEnv } from "@/lib/env";
 
 /**
- * Normalize the connection string for serverless + Supabase's PgBouncer pooler.
- * The transaction pooler (port 6543) requires `pgbouncer=true`; without it Prisma
- * errors on prepared statements at runtime.
+ * The connection string for serverless + Supabase's pooler: production reads
+ * through the transaction pooler with `pgbouncer=true` (src/lib/db-url.ts);
+ * everything else uses DATABASE_URL.
  */
 function connectionUrl(): string | undefined {
-  const url = getEnv().DATABASE_URL;
-  if (!url) return url;
-  const isTxPooler = /pooler\.supabase\.com:6543/.test(url);
-  if (isTxPooler && !/[?&]pgbouncer=/.test(url)) {
-    return url + (url.includes("?") ? "&" : "?") + "pgbouncer=true&connection_limit=1";
-  }
-  return url;
+  return runtimeDatabaseUrl(getEnv());
 }
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };

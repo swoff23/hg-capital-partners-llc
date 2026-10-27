@@ -35,6 +35,8 @@ const schema = z.object({
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
 
   DATABASE_URL: z.string().optional(), // Prisma reports a missing URL itself, at first query
+  // The Supabase integration's transaction pooler URL; production's runtime reads through it (src/lib/db-url.ts).
+  POSTGRES_PRISMA_URL: z.string().optional(),
   SESSION_SECRET: z.string().optional(),
   HEALTH_TOKEN: z.string().optional(),
   CRON_SECRET: z.string().optional(),
