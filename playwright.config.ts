@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 import { defineConfig } from "@playwright/test";
 import { DEVICES } from "./tests/devices/config";
 
-const PORT = 3100;
+// DEVICES_PORT lets two checkouts run the device check side by side.
+const PORT = Number(process.env.DEVICES_PORT) || 3100;
 // Set before the build starts, so files edited mid-run still count as
 // unchecked for scripts/device-check-gate.mjs.
 process.env.DEVICE_CHECK_STARTED_AT ??= String(Date.now());
