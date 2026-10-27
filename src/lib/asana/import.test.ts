@@ -360,12 +360,80 @@ test("events are append-only by story gid: ones already stored aren't written ag
   assert.ok(!calls.some((c) => c.model === "taskEvent" && (c.op === "createMany" || c.op === "create")));
 });
 
-// A static check on top: no importer file names the outbox or a core write that notifies.
+test("D25 repeats its check in the delete, and only a task it deleted gives up its files", async () => {
+  const { tx, calls } = fakeTx();
+  let reads = 0;
+  const wrapped = withReads(tx, "task", {
+    // The candidates as first read, then which of them are still there after the delete: r2 was edited in between.
+    findMany: () =>
+      reads++ === 0
+        ? [
+            { id: "r1", attachments: [{ url: "https://store.example/r1.jpg", pathname: "tasks/r1/orig/a", thumbPathname: "tasks/r1/thumb/a", posterPathname: null }] },
+            { id: "r2", attachments: [{ url: null, pathname: "tasks/r2/orig/b", thumbPathname: null, posterPathname: null }] },
+          ]
+        : [{ id: "r2" }],
+    deleteMany: (args) => {
+      calls.push({ model: "task", op: "deleteMany", args });
+      return { count: 1 };
+    },
+  });
+  assert.deepEqual(await deleteCsvRows(wrapped, ["r1", "r2", "r3"]), { deleted: 1, blobPaths: ["https://store.example/r1.jpg", "tasks/r1/thumb/a"] });
+  const del = calls.find((c) => c.model === "task" && c.op === "deleteMany")!;
+  assert.deepEqual((del.args as { where: unknown }).where, {
+    id: { in: ["r1", "r2"] },
+    asanaId: { not: null },
+    asanaSyncedAt: null,
+    appEditedAt: null,
+    events: { none: { source: { not: "ASANA" } } },
+  });
+  assert.deepEqual(await deleteCsvRows(withReads(fakeTx().tx, "task", { findMany: () => [] }), ["r9"]), { deleted: 0, blobPaths: [] });
+});
+
+// A static check on top: no importer file names the outbox, and it takes from core only writes that never email.
 const NOTIFYING_NAME =
   /notificationOutbox|NotificationOutbox|\benqueue\(|\bcore\.(createTask|setStatus|toggleDone|patchTask|addComment|recordAttachment|editComment|deleteComment|restoreComment|undoApproval|takeBackContractorPost|renameTaskUnits)\b/;
-// Any specifier that resolves to core or service: "@/lib/tasks/core", "../../src/lib/tasks/core", with or without .ts.
-const NOTIFYING_IMPORT =
-  /import\s*\{[^}]*\b(createTask|setStatus|toggleDone|patchTask|addComment|recordAttachment|editComment|deleteComment|restoreComment|undoApproval|takeBackContractorPost|renameTaskUnits)\b[^}]*\}\s*from\s*["'][^"']*lib\/tasks\/(core|service)(\.ts)?["']/;
+/**
+ * What the importer may name from core: the writes it uses, which never email
+ * as the Asana principal (the test above), and their types. Nothing from
+ * service.ts, whose wrappers (setTaskStatus, addTaskComment and the rest)
+ * email. A list of what's allowed, so a notifying write added to core later is
+ * refused without anyone remembering to add it here.
+ */
+const CORE_ALLOWED = new Set(["addEvent", "createNextRepeat", "grantAssigneeAccess", "syncAssigneeAccess", "Principal", "Tx"]);
+// Core or service, however the path is spelled: "@/lib/tasks/core", "../../src/lib/tasks/service.ts".
+const TASK_WRITES = /(?:^|\/)lib\/tasks\/(core|service)(?:\.ts)?$/;
+// Modules that queue or send email, or reach the portal writes that do.
+const MAILERS = /(?:^|\/)lib\/(?:notifications|email|portal)(?:\/|$)/;
+
+/** Why a file's imports could reach an email, or [] when they can't. */
+function importViolations(src: string): string[] {
+  const out: string[] = [];
+  // An import or re-export clause never holds a ";", so the match can't run on into the code after it.
+  for (const [, clause, spec] of src.matchAll(/\b(?:import|export)\s+(?:type\s+)?([^;]*?)\s+from\s*["']([^"']+)["']/g)) {
+    if (MAILERS.test(spec)) {
+      out.push(`${spec}: sends or queues email`);
+      continue;
+    }
+    const writes = TASK_WRITES.exec(spec);
+    if (!writes) continue;
+    const list = /^\{([^}]*)\}$/.exec(clause.trim());
+    if (!list) {
+      out.push(`${spec}: ${clause.trim()}, only named imports`);
+      continue;
+    }
+    for (const part of list[1].split(",")) {
+      const name = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim();
+      if (name && (writes[1] === "service" || !CORE_ALLOWED.has(name))) out.push(`${spec}: ${name}`);
+    }
+  }
+  for (const [, spec] of src.matchAll(/\b(?:require|import)\s*\(\s*["']([^"']+)["']\s*\)/g)) {
+    if (TASK_WRITES.test(spec) || MAILERS.test(spec)) out.push(`${spec}: loaded at run time`);
+  }
+  for (const [, spec] of src.matchAll(/\bimport\s*["']([^"']+)["']/g)) {
+    if (TASK_WRITES.test(spec) || MAILERS.test(spec)) out.push(`${spec}: imported for its side effects`);
+  }
+  return out;
+}
 
 test("the static check catches a notifying import however it's spelled", () => {
   for (const src of [
@@ -380,10 +448,33 @@ test("the static check catches a notifying import however it's spelled", () => {
     `import { takeBackContractorPost } from "@/lib/tasks/core";`,
     // A unit rename moves each task through patchTask, which emails.
     `import { renameTaskUnits } from "@/lib/tasks/core";`,
+    // Service's wrappers email, whatever they're called here.
+    `import { setTaskStatus } from "../../src/lib/tasks/service";`,
+    `import { addTaskComment as post } from "@/lib/tasks/service.ts";`,
+    `import { setStatus as close } from "@/lib/tasks/core";`,
+    // A namespace, a default, a re-export, a require, a dynamic import or a bare import can reach any of them.
+    `import * as tasks from "@/lib/tasks/service";`,
+    `import core from "@/lib/tasks/core";`,
+    `export { setStatus } from "@/lib/tasks/core";`,
+    `const core = require("../../src/lib/tasks/core");`,
+    `const tasks = await import("@/lib/tasks/service");`,
+    `import "@/lib/tasks/service";`,
+    // The modules that send or queue mail, and the portal's writes.
+    `import { drainDue } from "@/lib/notifications/outbox";`,
+    `import { sendEmail } from "@/lib/email/send";`,
+    `import { postJobBatch } from "@/lib/portal/job-uploads";`,
   ]) {
-    assert.ok(NOTIFYING_IMPORT.test(src), src);
+    assert.ok(importViolations(src).length > 0, src);
   }
-  assert.ok(!NOTIFYING_IMPORT.test(`import { addEvent, createNextRepeat, grantAssigneeAccess } from "@/lib/tasks/core";`));
+  for (const src of [
+    `import { addEvent, createNextRepeat, grantAssigneeAccess, type Principal, type Tx } from "@/lib/tasks/core";`,
+    `import type { Tx } from "../../src/lib/tasks/core.ts";`,
+    `import { statusEventVisibility } from "@/lib/tasks/rules";`,
+    `import { parseTemplateItems } from "../../src/lib/tasks/template-items";`,
+    `import type { Prisma } from "@prisma/client";`,
+  ]) {
+    assert.deepEqual(importViolations(src), [], src);
+  }
 });
 
 test("no importer file reaches for the outbox or a notifying core write", () => {
@@ -394,9 +485,10 @@ test("no importer file reaches for the outbox or a notifying core write", () => 
     ...fs.readdirSync(path.join(dir, "scripts/asana"), { recursive: true }).map((f) => path.join(dir, "scripts/asana", String(f))),
   ].filter((f) => /\.ts$/.test(f) && !f.endsWith(".test.ts"));
   assert.ok(files.length >= 4);
-  const offenders = files.filter((f) => {
+  const offenders = files.flatMap((f) => {
     const src = fs.readFileSync(f, "utf8");
-    return NOTIFYING_NAME.test(src) || NOTIFYING_IMPORT.test(src);
+    const why = [...(NOTIFYING_NAME.test(src) ? ["names the outbox or a notifying core write"] : []), ...importViolations(src)];
+    return why.map((w) => `${path.relative(dir, f)}: ${w}`);
   });
-  assert.deepEqual(offenders.map((f) => path.relative(dir, f)), []);
+  assert.deepEqual(offenders, []);
 });

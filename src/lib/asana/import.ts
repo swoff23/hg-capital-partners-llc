@@ -383,20 +383,37 @@ export async function writeTemplate(tx: Tx, t: TemplatePlan, opts: { refresh?: b
   return "updated";
 }
 
+/** What makes a CSV row D25's to delete: never synced by the importer, never edited in the app, no app timeline events. */
+const untouchedCsvRow = {
+  asanaId: { not: null },
+  asanaSyncedAt: null,
+  appEditedAt: null,
+  events: { none: { source: { not: "ASANA" } } },
+} satisfies Prisma.TaskWhereInput;
+
 /**
  * D25: hard-delete CSV rows that aren't open work, with their files' rows.
- * Re-checks inside the transaction that each row was never synced by the
- * importer, never edited in the app and has no app timeline events, so a
- * stale list can't take anything else. Returns the Blob paths to delete
- * once the transaction commits.
+ * Re-checks inside the transaction that each row is still untouched, so a
+ * stale list can't take anything else. The delete repeats the check: a
+ * partner's edit that commits between the read and the delete, or that the
+ * delete waits on, stamps the task (appEditedAt), and Postgres re-checks the
+ * delete's conditions on that newer row, so the edited task stays. Returns
+ * the Blob paths of the tasks actually deleted, for the caller to remove
+ * once the transaction commits; a task that stayed keeps its files.
  */
 export async function deleteCsvRows(tx: Tx, ids: readonly string[]): Promise<{ deleted: number; blobPaths: string[] }> {
   if (!ids.length) return { deleted: 0, blobPaths: [] };
   const rows = await tx.task.findMany({
-    where: { id: { in: [...ids] }, asanaId: { not: null }, asanaSyncedAt: null, appEditedAt: null, events: { none: { source: { not: "ASANA" } } } },
+    where: { id: { in: [...ids] }, ...untouchedCsvRow },
     select: { id: true, attachments: { select: { url: true, pathname: true, thumbPathname: true, posterPathname: true } } },
   });
-  const blobPaths = rows.flatMap((r) => r.attachments.flatMap((a) => [a.url ?? a.pathname, a.thumbPathname, a.posterPathname])).filter((p): p is string => !!p);
-  const res = await tx.task.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  if (!rows.length) return { deleted: 0, blobPaths: [] };
+  const candidates = rows.map((r) => r.id);
+  const res = await tx.task.deleteMany({ where: { id: { in: candidates }, ...untouchedCsvRow } });
+  const kept = new Set((await tx.task.findMany({ where: { id: { in: candidates } }, select: { id: true } })).map((r) => r.id));
+  const blobPaths = rows
+    .filter((r) => !kept.has(r.id))
+    .flatMap((r) => r.attachments.flatMap((a) => [a.url ?? a.pathname, a.thumbPathname, a.posterPathname]))
+    .filter((p): p is string => !!p);
   return { deleted: res.count, blobPaths };
 }
