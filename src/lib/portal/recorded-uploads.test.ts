@@ -199,7 +199,7 @@ test("drainKept: a second call while one is posting does nothing, so a closed jo
   assert.deepEqual(calls, [["a1", "a2"], ["b1"], ["c1"]]);
 });
 
-test("drainKept lets go once it ends, even when the post throws, so the next page's drain still runs", async () => {
+test("drainKept lets go once it ends, even when the post throws, and keeps what it took for the next page's drain", async () => {
   const scope = "portal:c-drain-3";
   recordedUploadsOf(scope).keep("t1", [photo("a1")]);
   await assert.rejects(
@@ -210,5 +210,5 @@ test("drainKept lets go once it ends, even when the post throws, so the next pag
   recordedUploadsOf(scope).keep("t1", [photo("a2")]);
   const seen: string[] = [];
   await drainKept(scope, "t1", async (kept) => (seen.push(...kept.map((r) => r.id)), []));
-  assert.ok(seen.includes("a2"), "the next drain ran");
+  assert.deepEqual(seen, ["a1", "a2"], "the next drain ran, and the file the throw left behind (a redirect on a session that ended) is still kept");
 });

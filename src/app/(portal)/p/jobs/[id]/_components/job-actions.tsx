@@ -79,9 +79,8 @@ import { postKept, postRecordedBatch, recordJobFile } from "./record-and-post";
  * closed (the page then refreshes to show it), or when the page goes, and
  * late-uploads.tsx is the page that records them once the job has no
  * composer. Files a send already posted, whose answer was lost, go back on the
- * tray and clear with the next Send or Mark done (portal/jobs.ts); the sheet
- * doesn't count the ones a failed Send may have posted, as Mark done doesn't.
- * Mark done waits for uploads, and for each failed photo to be retried or removed
+ * tray and clear with the next Send or Mark done (portal/jobs.ts). Mark done
+ * waits for uploads, and for each failed photo to be retried or removed
  * (decision 13): in the bar and in the sheet it stays off over one line ("2
  * photos didn't upload · Retry" in danger, or "Finishing 2 uploads…" in
  * grey), and a failed tile keeps its place with the Retry pill. "Add photos"
@@ -196,8 +195,7 @@ export function JobActions({
           router.refresh();
           return;
         }
-        // The update may have gone all the same (its answer lost): on it the photos don't count for Mark done.
-        putBack(items.map((i) => ({ ...i, sent: true })));
+        putBack(items);
         return;
       }
       if (text) setBody((b) => (b.trim() === text ? "" : b));
@@ -387,9 +385,7 @@ export function JobActions({
   }
 
   const canSend = (body.trim() !== "" || ready.length > 0) && !sending;
-  // What the sheet counts toward the playbook's photos, as Mark done does: not a photo a failed Send may have posted.
-  const counted = ready.filter((r) => !r.sent).length;
-  const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: counted, required });
+  const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: ready.length, required });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
   const barButton = actionBarButton;
@@ -531,7 +527,7 @@ export function JobActions({
               <p className="min-w-0 text-body font-medium text-fg-1">
                 {required > 0 ? "Photos of the finished work" : "Add photos of the finished work?"}
               </p>
-              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, counted)}</span>}
+              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, ready.length)}</span>}
             </div>
             {/* The photos already up, then the ones going up, then empty slots up to the count asked for (one on an
                 optional job), solid squares, never dashed; once the count is met, one add tile remains. */}
@@ -541,7 +537,7 @@ export function JobActions({
               notice={false}
               label="Photos of the finished work"
               slots={slots}
-              filled={counted}
+              filled={ready.length}
               onSlot={openSlot}
               disabled={finishing}
               leading={ready.map((r) => (

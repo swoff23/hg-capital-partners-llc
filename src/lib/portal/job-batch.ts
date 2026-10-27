@@ -36,8 +36,9 @@ export async function ownUnposted(tx: core.Tx, taskId: string, contactId: string
  * "3 photos posted" kind) during this visit, with their kinds: a batch whose answer was lost comes back on the tray.
  * Mark done counts these toward the photos it asks for (portal/jobs.ts), since HG heard of them with that post.
  * `since` is when the visit started (lib/tasks/media.ts visitStart, which the Review card reads too): a batch post
- * from before the job last went to In progress counted for an earlier Mark done, not this one. A photo posted with a
- * written update never counts, as before.
+ * from before the job last went to In progress counted for an earlier Mark done, not this one. It bounds the file's
+ * own row, as the Review card does, so a photo recorded before the visit but posted in it is left out of both. A
+ * photo posted with a written update never counts, as before.
  */
 export async function ownPosted(
   tx: core.Tx,
@@ -53,7 +54,9 @@ export async function ownPosted(
       taskId,
       uploadedByContactId: contactId,
       eventId: { not: null },
-      event: { is: { data: { path: ["batch"], equals: true }, ...(since ? { createdAt: { gte: since } } : {}) } },
+      // The file's own row, as the Review card bounds it (media.ts reviewPhotos): a post is never older than its files.
+      ...(since ? { createdAt: { gte: since } } : {}),
+      event: { is: { data: { path: ["batch"], equals: true } } },
       deletedAt: null,
       asanaGid: null,
     },

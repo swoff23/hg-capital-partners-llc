@@ -8,11 +8,6 @@ export type RecordedUpload = {
   kind: FileKind | null;
   hasThumb: boolean;
   hasPoster: boolean;
-  /**
-   * It went with a Send that didn't go through, which may have posted it all the same (its answer lost). On that
-   * update Mark done never counts it (portal/jobs.ts), so the sheet doesn't count it either.
-   */
-  sent?: true;
 };
 
 /**
@@ -128,7 +123,14 @@ export async function drainKept(
   try {
     const tab = recordedUploadsOf(scope);
     const kept = tab.take(taskId, []);
-    if (kept.length > 0) tab.keep(taskId, await post(kept));
+    // A post that throws (the session ended, so the call redirects) answers nothing: everything it took stays kept for
+    // the next sign-in on this tab. A piece that had already posted answers quietly when sent again.
+    let left = kept;
+    try {
+      if (kept.length > 0) left = await post(kept);
+    } finally {
+      tab.keep(taskId, left);
+    }
   } finally {
     draining.delete(job);
   }

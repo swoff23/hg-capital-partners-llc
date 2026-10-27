@@ -324,17 +324,8 @@ test("a Send refused because HG closed the job posts the held photos the late wa
   const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
   assert.match(
     actions,
-    /if \(res\.error === JOB_CLOSED\) \{[^}]*?const left = items\.length > 0 \? await sendBatch\(items\) : \[\];\s*if \(left\.length > 0\) putBack\(left\);\s*router\.refresh\(\);\s*return;\s*\}\s*\/\/[^\n]*\n\s*putBack\(items\.map\(\(i\) => \(\{ \.\.\.i, sent: true \}\)\)\);/,
+    /if \(res\.error === JOB_CLOSED\) \{[^}]*?const left = items\.length > 0 \? await sendBatch\(items\) : \[\];\s*if \(left\.length > 0\) putBack\(left\);\s*router\.refresh\(\);\s*return;\s*\}\s*putBack\(items\);/,
   );
-});
-
-test("the Mark done sheet counts what the server will: not a photo a failed Send may have posted", () => {
-  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
-  assert.match(actions, /const counted = ready\.filter\(\(r\) => !r\.sent\)\.length;/);
-  assert.match(actions, /markDoneButton\(\{ pending, waiting, failed, sending: finishing, uploaded: counted, required \}\)/);
-  assert.match(actions, /finishCountLabel\(required, counted\)/);
-  assert.match(actions, /filled=\{counted\}/);
-  assert.doesNotMatch(actions, /uploaded: ready\.length|finishCountLabel\(required, ready\.length\)|filled=\{ready\.length\}/);
 });
 
 test("a job page that stays open mounts its upload target again when the job's status changes", () => {

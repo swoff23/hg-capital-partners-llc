@@ -245,7 +245,8 @@ test("ownPosted: the contractor's own files on a batch post of this visit, with 
     taskId: "t1",
     uploadedByContactId: "c-zack",
     eventId: { not: null },
-    event: { is: { data: { path: ["batch"], equals: true }, createdAt: { gte: since } } },
+    createdAt: { gte: since },
+    event: { is: { data: { path: ["batch"], equals: true } } },
     deletedAt: null,
     asanaGid: null,
   });
@@ -254,6 +255,7 @@ test("ownPosted: the contractor's own files on a batch post of this visit, with 
   await ownPosted(old.tx, "t1", "c-zack", ["a1"], null);
   const unbounded = old.calls.find((c) => c.model === "taskAttachment" && c.op === "findMany")!.args;
   assert.deepEqual((unbounded.where as { event: unknown }).event, { is: { data: { path: ["batch"], equals: true } } });
+  assert.equal("createdAt" in (unbounded.where as object), false);
   const none = fakeTx();
   assert.deepEqual(await ownPosted(none.tx, "t1", "c-zack", [], since), []);
   assert.deepEqual(none.calls, [], "nothing asked");
