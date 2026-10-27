@@ -2,7 +2,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { userMessage } from "@/lib/action-result";
 import { propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
-import type { UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
+import { UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
@@ -60,9 +60,9 @@ const propertyExists = async (id: string) => !!(await prisma.property.findUnique
 
 const stringOrNull = (v: unknown) => (typeof v === "string" ? v : null);
 
-/** The path must be this task's, and the type and size fit what the file says it is. */
-function taskLimits(taskId: string, pathname: string, payload: Record<string, unknown>): Limits {
-  const limits = uploadLimits(taskId, pathname, payload.fileKind);
+/** The path must be this task's, the kind of file one this upload kind takes, and the type and size fit what the file says it is. */
+function taskLimits(kind: "task-upload" | "portal-task-upload", taskId: string, pathname: string, payload: Record<string, unknown>): Limits {
+  const limits = uploadLimits(taskId, pathname, payload.fileKind, UPLOAD_KIND_ALLOWED[kind]);
   if (typeof limits === "string") throw new Error(limits);
   return limits;
 }
@@ -85,7 +85,7 @@ const KINDS: Record<string, UploadKind> = {
     principal: "staff",
     idKey: "taskId",
     authorize: async (taskId, pathname, payload) => {
-      const limits = taskLimits(taskId, pathname, payload);
+      const limits = taskLimits("task-upload", taskId, pathname, payload);
       if (!(await prisma.task.findUnique({ where: { id: taskId }, select: { id: true } }))) throw new Error("Not found");
       return limits;
     },
@@ -94,7 +94,7 @@ const KINDS: Record<string, UploadKind> = {
     principal: "contractor",
     idKey: "taskId",
     authorize: async (taskId, pathname, payload, who) => {
-      const limits = taskLimits(taskId, pathname, payload);
+      const limits = taskLimits("portal-task-upload", taskId, pathname, payload);
       if (who.kind !== "contractor") throw new Error("Not found");
       const refusal = await contractorUploadRefusal(taskId, who.contactId, { atMint: true, queuedAt: stringOrNull(payload.queuedAt) });
       if (refusal) throw new Error(refusal);

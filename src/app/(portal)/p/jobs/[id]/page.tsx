@@ -49,8 +49,11 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
   const hasBar = nextStep(job.status) !== null;
   const tel = officeTelHref();
   const photoAlt = job.address ? `Front of ${addressLine(job.address, null, { short: true })}` : null;
+  // The building, for the upload's name and the payoff's photo.
+  const place = job.address ? { label: addressLine(job.address, null, { short: true }), photoUrl: job.photoUrl } : null;
 
-  // "My jobs" asks first while photos are still uploading: JobActions holds the portal layout's LeaveGuard.
+  // Leaving this page never cancels what's still going up: the portal layout's upload queue keeps it going and
+  // posts it, and only Sign out asks.
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-line bg-canvas">
@@ -113,6 +116,9 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 status={job.status}
                 firstName={firstName(principal.label)}
                 staffNames={job.staffNames}
+                finishPhotosRequired={job.finishPhotosRequired}
+                markedDoneAt={job.markedDoneAt}
+                property={place}
               />
             )}
           </Section>

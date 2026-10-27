@@ -32,9 +32,9 @@ const uploadedSchema = z
   .object({
     pathname,
     filename: z.string().max(255).optional(),
-    width: z.number().int().positive().max(20000).nullish(),
-    height: z.number().int().positive().max(20000).nullish(),
-    durationSec: z.number().positive().max(24 * 3600).nullish(),
+    width: z.number().nullish(),
+    height: z.number().nullish(),
+    durationSec: z.number().nullish(),
     thumbPathname: pathname.nullish(),
     posterPathname: pathname.nullish(),
     queuedAt: z.string().max(40).nullish(),

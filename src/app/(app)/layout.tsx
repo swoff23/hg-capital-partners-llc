@@ -40,7 +40,7 @@ export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
         listHrefs={readListHrefs(jar)}
         signOutAction={signOut}
       >
-        <UploadQueueProvider>
+        <UploadQueueProvider scope={`app:${user.id}`}>
           <RefreshOnReturn />
           {children}
           {modal}

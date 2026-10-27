@@ -8,6 +8,7 @@ import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { logSecurityEvent } from "./accounts";
+import { addMorePhotosLine, finishPhotosNeeded } from "./job-view";
 import { requestIpHash } from "./request";
 import { requirePortalPrincipal, taskPrincipal, type PortalPrincipal } from "./session";
 
@@ -136,7 +137,10 @@ export async function postJobUpdate(taskId: string, input: JobUpdateInput): Prom
 /**
  * Mark done: the optional note and photos of the finished work go up as one
  * update, then the job moves to Review (D6b). Both partners get one email
- * for the two (core bundles them).
+ * for the two (core bundles them). When the job's playbook asks for photos
+ * (TaskTemplate.finishPhotosRequired, uploads 2.8), it needs that many of this
+ * contractor's own, unposted files here; the sheet holds the button until they
+ * are up, and this is the same rule where the browser can't skip it.
  */
 export async function markJobDone(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
@@ -144,6 +148,11 @@ export async function markJobDone(taskId: string, input: JobUpdateInput): Promis
   await refreshOnRefusal(taskId, () =>
     prisma.$transaction(async (tx) => {
       const attachmentIds = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
+      const template = await tx.task.findUnique({ where: { id: taskId }, select: { taskTemplate: { select: { finishPhotosRequired: true } } } });
+      const required = finishPhotosNeeded(template?.taskTemplate?.finishPhotosRequired);
+      if (attachmentIds.length < required) {
+        throw new core.TaskRuleError(`${addMorePhotosLine(required - attachmentIds.length)} to mark this done.`);
+      }
       if (input.body.trim() || attachmentIds.length) {
         await core.addComment(tx, taskId, { body: input.body, attachmentIds }, principal);
       }

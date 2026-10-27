@@ -1,6 +1,6 @@
 import { completeMultipartUpload, createMultipartUpload, upload, uploadPart } from "@vercel/blob/client";
 import { MULTIPART_THRESHOLD, usesMultipart, type FileKind } from "./content-types";
-import { classifyFailure, type MultipartState } from "./outbox";
+import { ServerBusyError, classifyFailure, type MultipartState } from "./outbox";
 import { uploadRequest, type UploadKind } from "./upload-kinds";
 import type { UploadRole } from "./paths";
 
@@ -72,6 +72,8 @@ async function clientToken(kind: UploadKind, pathname: string, clientPayload: st
     body: JSON.stringify({ type: "blob.generate-client-token", payload: { pathname, clientPayload, multipart: true } }),
     signal,
   });
+  // A server error is the road, not the file (the next push to main, a restart): it waits and tries again.
+  if (res.status >= 500) throw new ServerBusyError();
   // The words match upload()'s own, which media.ts shownReason turns into "the upload was refused. Reload and try again".
   if (!res.ok) throw new Error("Failed to retrieve the client token");
   const body = (await res.json().catch(() => null)) as { clientToken?: string } | null;

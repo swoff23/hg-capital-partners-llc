@@ -30,7 +30,7 @@ export default function PortalLayout({ children }: LayoutProps<"/p">) {
     <div className="min-h-screen bg-surface text-fg-1">
       <ToastProvider>
         <LeaveGuard>
-          <UploadQueueProvider>{children}</UploadQueueProvider>
+          <UploadQueueProvider scope="portal">{children}</UploadQueueProvider>
         </LeaveGuard>
       </ToastProvider>
     </div>

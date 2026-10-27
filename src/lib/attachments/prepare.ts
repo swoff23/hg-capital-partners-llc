@@ -65,6 +65,16 @@ export function planPrepare(input: { fileKind: FileKind; mode: PrepareMode; prev
   };
 }
 
+/**
+ * Whether a photo the browser can't decode gets the HEIC fallback: only a
+ * photo going to a public page (`strict`). The fallback is a 3 MB chunk, and a
+ * contractor's private photo is wanted as it is; it never pulls the chunk
+ * over a phone's data (question 6a).
+ */
+export function heicFallbackApplies(plan: PreparePlan, strict: boolean): boolean {
+  return plan.display && strict;
+}
+
 export type MediaMeta = { width?: number; height?: number; durationSec?: number };
 
 /** What goes up for one picked file, and the extras that go with it. */
@@ -81,6 +91,9 @@ export type Prepared = {
 
 /** A photo that has to be re-encoded and can't be read here. The message is the reason, for "<n> photos didn't upload: <reason>". */
 export class PrepareError extends Error {}
+
+/** The reason a public photo gives when it can't be re-encoded: sent as picked it would keep its GPS. */
+export const UNREADABLE_PHOTO = "this photo can't be read here. Try a JPEG";
 
 const META_TIMEOUT_MS = 3000;
 const POSTER_TIMEOUT_MS = 5000;
@@ -199,8 +212,9 @@ export async function prepareFile(
 
   let source: Blob = file;
   let bitmap = await decode(file);
-  // A desktop browser can't open an iPhone's HEIC; a photo going public converts it with the fallback.
-  if (!bitmap && plan.display && ((await isHeicFile(file)) || /hei[cf]$/.test(input.contentType))) {
+  // A desktop browser can't open an iPhone's HEIC; a photo going public converts it with the fallback (a 3 MB chunk, loaded
+  // only here). A contractor's private photo never pulls it: it goes up as picked (question 6a).
+  if (!bitmap && heicFallbackApplies(plan, !!input.strict) && ((await isHeicFile(file)) || /hei[cf]$/.test(input.contentType))) {
     try {
       source = await heicToJpeg(file, DISPLAY_QUALITY);
       bitmap = await decode(source);
@@ -210,7 +224,7 @@ export async function prepareFile(
   }
 
   if (!bitmap) {
-    if (plan.display && input.strict) throw new PrepareError("this photo can't be read here. Try a JPEG");
+    if (plan.display && input.strict) throw new PrepareError(UNREADABLE_PHOTO);
     return { ...asPicked, meta: plan.thumb ? await imageSize(file) : {} };
   }
 
@@ -220,7 +234,7 @@ export async function prepareFile(
     if (!plan.display) return { ...asPicked, meta, thumb };
     const display = await toJpeg(bitmap, bitmap.width, bitmap.height, DISPLAY_EDGE, DISPLAY_QUALITY);
     if (!display) {
-      if (input.strict) throw new PrepareError("this photo can't be read here. Try a JPEG");
+      if (input.strict) throw new PrepareError(UNREADABLE_PHOTO);
       return { ...asPicked, meta, thumb };
     }
     const size = fitWithin(bitmap.width, bitmap.height, DISPLAY_EDGE);

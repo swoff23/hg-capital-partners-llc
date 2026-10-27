@@ -15,7 +15,7 @@ import type { SendInput } from "./transfer";
 
 type Step = "ok" | Error;
 
-function setup(opts: { outbox?: OutboxStore | null; script?: Step[]; online?: boolean } = {}) {
+function setup(opts: { outbox?: OutboxStore | null; script?: Step[]; online?: boolean; scope?: string; claim?: EngineDeps["claim"] } = {}) {
   let clock = Date.UTC(2026, 9, 25, 18, 14, 30);
   let nextTimer = 1;
   const timers = new Map<number, { due: number; fn: () => void }>();
@@ -48,6 +48,8 @@ function setup(opts: { outbox?: OutboxStore | null; script?: Step[]; online?: bo
     },
     preview: { create: () => "blob:preview", revoke: () => {} },
     uid: () => String(++state.seq),
+    scope: opts.scope,
+    claim: opts.claim,
   };
   const engine = new UploadEngine(deps);
 
@@ -482,7 +484,21 @@ test("without an outbox the queue still works and says a reload would lose files
   assert.equal(h.engine.needsLeaveWarning(), true);
   const kept = setup();
   assert.equal(kept.engine.persistent, true);
-  assert.equal(kept.engine.needsLeaveWarning(), false);
+  kept.engine.add(target(), [file("b.jpg")]);
+  await kept.flush();
+  assert.equal(kept.engine.needsLeaveWarning(), false, "its row is in the outbox, so a reload resumes it");
+});
+
+test("a file whose row could not be written still warns before a reload", async () => {
+  const full: OutboxStore = { ...memoryOutbox(), put: async () => { throw new Error("QuotaExceededError"); } };
+  const h = setup({ outbox: full, online: false, script: [new TypeError("Failed to fetch")] });
+  h.engine.add(target(), [file("big.mov", "video/quicktime")]);
+  await h.flush();
+  assert.equal(h.engine.persistent, true, "there is an outbox");
+  assert.equal(h.engine.needsLeaveWarning(), true, "but this file never made it in");
+  // Once it is gone there is nothing left to lose.
+  h.engine.remove(h.engine.uploadsFor("task:t1")[0].key);
+  assert.equal(h.engine.needsLeaveWarning(), false);
 });
 
 test("uploadsFor and counts return the same value until something changes", async () => {
@@ -496,4 +512,162 @@ test("uploadsFor and counts return the same value until something changes", asyn
   assert.equal(mid, h.engine.uploadsFor(t.key));
   await h.flush();
   assert.notEqual(h.engine.uploadsFor(t.key), mid);
+});
+
+/** A stand-in for Web Locks: one set of held ids shared by every "tab". */
+function locks() {
+  const held = new Set<string>();
+  const claim: NonNullable<EngineDeps["claim"]> = async (id) => {
+    if (held.has(id)) return null;
+    held.add(id);
+    return () => void held.delete(id);
+  };
+  return { held, claim };
+}
+
+test("a second tab on the same outbox leaves a file the first is still sending alone", async () => {
+  const outbox = memoryOutbox();
+  const { claim } = locks();
+  const a = setup({ outbox, claim, scope: "app:u1", online: false, script: [new TypeError("Failed to fetch")] });
+  const t = target();
+  a.engine.add(t, [file("a.jpg")]);
+  await a.flush();
+  assert.equal(a.engine.uploadsFor(t.key)[0].status, "waiting");
+
+  // Another tab opens with a signal: it must not send or record the same file.
+  const b = setup({ outbox, claim, scope: "app:u1" });
+  await b.engine.restore();
+  await b.flush();
+  assert.equal(b.engine.uploadsFor(t.key).length, 0, "not its file");
+  assert.equal(b.sent.length, 0);
+  assert.deepEqual(await outbox.all().then((rows) => rows.length), 1, "the row stays for tab a");
+});
+
+test("when the tab that owned a file is gone, the next page picks it up, once", async () => {
+  const outbox = memoryOutbox();
+  const shared = locks();
+  const a = setup({ outbox, claim: shared.claim, scope: "app:u1", online: false, script: [new TypeError("Failed to fetch")] });
+  a.engine.add(target(), [file("a.jpg")]);
+  await a.flush();
+  // Tab a closes: the browser lets go of its locks.
+  shared.held.clear();
+
+  const b = setup({ outbox, claim: shared.claim, scope: "app:u1" });
+  await b.engine.restore();
+  await b.flush();
+  assert.equal(b.engine.uploadsFor("task:t1").length, 1, "its tile is back");
+  assert.equal(b.sent.length, 1, "the bytes went from the new tab");
+
+  // A third tab finds it claimed.
+  const c = setup({ outbox, claim: shared.claim, scope: "app:u1" });
+  await c.engine.restore();
+  await c.flush();
+  assert.equal(c.sent.length, 0);
+});
+
+test("a finished file is let go only after its row is deleted", async () => {
+  const outbox = memoryOutbox();
+  const shared = locks();
+  const events: string[] = [];
+  const watched: OutboxStore = {
+    ...outbox,
+    delete: async (id) => {
+      events.push(`delete ${shared.held.has(id) ? "(still held)" : "(not held)"}`);
+      await outbox.delete(id);
+    },
+  };
+  const claim: NonNullable<EngineDeps["claim"]> = async (id) => {
+    const lease = await shared.claim(id);
+    return lease && (() => (events.push("release"), lease()));
+  };
+  const h = setup({ outbox: watched, claim, scope: "app:u1" });
+  h.engine.add(target(), [file("a.jpg")]);
+  await h.flush();
+  assert.deepEqual(events, ["delete (still held)", "release"]);
+  assert.equal(shared.held.size, 0);
+});
+
+test("a queue picks up only the files of its own scope", async () => {
+  const outbox = memoryOutbox();
+  const staff = setup({ outbox, scope: "app:u1", online: false, script: [new TypeError("Failed to fetch")] });
+  staff.engine.add(target(), [file("a.jpg")]);
+  await staff.flush();
+  const portal = setup({ outbox, scope: "portal", online: false, script: [new TypeError("Failed to fetch")] });
+  portal.state.seq = 100; // ids are counted per setup; two browsers' worth of tabs don't repeat them
+  portal.engine.add(target({ key: "portal-task:t9", uploadKind: "portal-task-upload", parentId: "t9", whenAway: "post" }), [file("b.jpg")]);
+  await portal.flush();
+  assert.equal((await outbox.all()).length, 2);
+
+  // The app's other person, and the portal, each see none of the other's.
+  const other = setup({ outbox, scope: "app:u2" });
+  await other.engine.restore();
+  await other.flush();
+  assert.equal(other.engine.counts().pending + other.engine.counts().waiting, 0);
+  assert.equal(other.sent.length, 0);
+  assert.equal((await outbox.all()).length, 2, "and leaves them where they are");
+
+  const app = setup({ outbox, scope: "app:u1" });
+  await app.engine.restore();
+  await app.flush();
+  assert.deepEqual(app.engine.uploadsFor("task:t1").map((u) => u.name.startsWith("a")), [true]);
+  assert.equal(app.engine.uploadsFor("portal-task:t9").length, 0, "the portal's file is not the app's");
+});
+
+test("a public photo that fails to prepare for any reason is refused, not sent with its GPS", async () => {
+  const h = setup();
+  h.deps.prepare = async () => {
+    throw new Error("canvas is not available");
+  };
+  const t = target({ key: "listing:p1", uploadKind: "listing-photo-upload", parentId: "p1", access: "public", prepare: "display", allowed: ["image"] });
+  h.engine.add(t, [file("front.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(tile.status, "invalid");
+  assert.equal(tile.error, "this photo can't be read here. Try a JPEG");
+  assert.equal(h.sent.length, 0, "nothing went up");
+
+  // A private photo still goes as picked.
+  const priv = setup();
+  priv.deps.prepare = async () => {
+    throw new Error("canvas is not available");
+  };
+  const p = target();
+  priv.engine.add(p, [file("kitchen.jpg")]);
+  await priv.flush();
+  assert.deepEqual(p.recorded, ["kitchen.jpg"]);
+});
+
+test("a record call that throws tries again like a dropped request, and turns red only after four tries online", async () => {
+  const h = setup();
+  let calls = 0;
+  const t = target({
+    record: async () => {
+      calls++;
+      throw new Error("500");
+    },
+  });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  assert.equal(h.engine.uploadsFor(t.key)[0].status, "waiting", "not red at once");
+  assert.equal(calls, 1);
+  await h.advance(2000);
+  await h.advance(5000);
+  await h.advance(15000);
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(calls, MAX_ONLINE_TRIES);
+  assert.equal(tile.status, "failed");
+  assert.equal(tile.error, "it couldn't be saved");
+  assert.equal(h.sent.length, 1, "the bytes went once; the tries were the record step alone");
+});
+
+test("a record step that answers no is red at once", async () => {
+  const h = setup();
+  const t = target({ record: async () => ({ ok: false, error: "this job is closed" }) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(tile.status, "failed");
+  assert.equal(tile.error, "this job is closed");
 });

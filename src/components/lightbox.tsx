@@ -78,6 +78,8 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const DOUBLE_ZOOM = 2;
 const ZOOM_STEP = 1.25;
+/** Where a key press belongs to something above the photo: a text field, the ⋯ menu, the delete question. The viewer's keys stay out. */
+const KEYS_FOR_LAYERS_ABOVE = "input, textarea, [role=menu], [role=alertdialog]";
 
 /**
  * Full-screen viewer on the dark photo stage (docs/specs/uploads-photos.md
@@ -160,18 +162,20 @@ export function Lightbox({
   const [renaming, setRenaming] = useState(false);
   const [names, setNames] = useState<Record<string, string>>({});
 
-  // Arrow keys step through, at fit. Not while a video has focus (there they seek) or a name is being typed.
+  // Arrow keys step through, at fit. Not while a video has focus (there they seek), a name is being typed, or a layer
+  // above the photo is up: the ⋯ menu and the delete question act on this photo, so it must not change under them.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement | null)?.closest("video, input, textarea")) return;
+      if (confirming || renaming || e.defaultPrevented) return;
+      if ((e.target as HTMLElement | null)?.closest(`video, ${KEYS_FOR_LAYERS_ABOVE}`)) return;
       if (zoomed) return;
       if (e.key === "ArrowLeft") go(i - 1);
       else if (e.key === "ArrowRight") go(i + 1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, i, go, zoomed]);
+  }, [isOpen, i, go, zoomed, confirming, renaming]);
 
   // The neighbors load before they're asked for, thumbnail first.
   useEffect(() => {
@@ -470,7 +474,8 @@ function Stage({
       />
     );
   }
-  if (item.kind === "FILE") return <DocumentStage item={item} url={url} owner={owner} coarse={coarse} />;
+  // A photo kept as a document (an insurance card's JPG) opens as the photo it is; a HEIC the browser can't draw falls back inside PhotoStage.
+  if (item.kind === "FILE" && documentLook(item.filename).glyph !== "image") return <DocumentStage item={item} url={url} owner={owner} coarse={coarse} />;
   return <PhotoStage item={item} urlFor={urlFor} coarse={coarse} onZoomedChange={onZoomedChange} onStep={onStep} onClose={onClose} />;
 }
 
@@ -597,7 +602,7 @@ function PhotoStage({
   // + and - step, 0 goes back to fit.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement | null)?.closest("input, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.defaultPrevented || (e.target as HTMLElement | null)?.closest(KEYS_FOR_LAYERS_ABOVE) || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "+" || e.key === "=") zoomTo(viewRef.current.scale * ZOOM_STEP);
       else if (e.key === "-" || e.key === "_") zoomTo(viewRef.current.scale / ZOOM_STEP);
       else if (e.key === "0") commit(FIT);
@@ -762,8 +767,10 @@ function ZoomButton({ label, disabled, onPress, children }: { label: string; dis
  * a pasted link opens straight to that file; stepping replaces it, so Back
  * doesn't walk through every photo. With `enabled` false the viewer is plain
  * local state (a strip in a comment, a row with a mouse that opened nothing).
- * Only the lists on a page that own a `?file=` link turn it on, and only the
- * one whose items hold the id opens, so two grids never open one photo twice.
+ * Only the record's own list turns it on (MediaGrid `link`, once per page).
+ * Two lists that hold the same photo and both read `?file=` would open two
+ * viewers on top of each other, each making the other inert, so the Activity
+ * and update grids stay local.
  *
  *   const viewer = useViewerLink(items, true);
  *   <Lightbox items={items} index={viewer.index} onIndexChange={viewer.setIndex} isOpen={viewer.isOpen} onOpenChange={viewer.onOpenChange} />

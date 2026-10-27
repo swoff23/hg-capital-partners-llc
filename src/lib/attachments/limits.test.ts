@@ -51,6 +51,22 @@ test("uploadLimits: an extension must name a type its kind allows", () => {
   assert.equal(typeof limits(`tasks/${T}/orig/bid-v1.2`, "file"), "object");
 });
 
+test("uploadLimits: a contractor's kind takes photos and videos only, a document is refused at the token", () => {
+  const portal = UPLOAD_KIND_ALLOWED["portal-task-upload"];
+  for (const [kind, name] of [["image", "a.jpg"], ["video", "a.mov"]] as const) {
+    assert.notEqual(typeof uploadLimits(T, `tasks/${T}/orig/${name}`, kind, portal), "string", kind);
+  }
+  // A PDF, a DOCX, a CSV or a TXT can't be put on a job as a shared file.
+  for (const name of ["lease.pdf", "bid.docx", "costs.csv", "notes.txt", "README"]) {
+    assert.equal(typeof uploadLimits(T, `tasks/${T}/orig/${name}`, "file", portal), "string", name);
+  }
+  // Their thumbnails and posters are images, which the kind takes.
+  assert.notEqual(typeof uploadLimits(T, `tasks/${T}/thumb/a.jpg`, "image", portal), "string");
+  // Staff task uploads take all three, and with no list nothing changes.
+  assert.notEqual(typeof uploadLimits(T, `tasks/${T}/orig/lease.pdf`, "file", UPLOAD_KIND_ALLOWED["task-upload"]), "string");
+  assert.notEqual(typeof uploadLimits(T, `tasks/${T}/orig/lease.pdf`, "file"), "string");
+});
+
 /* ---------------- UPLOAD_RULES per target ---------------- */
 
 const P = "cm9prop8erty7";

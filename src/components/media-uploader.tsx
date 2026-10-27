@@ -260,9 +260,10 @@ export function useUndoableRemove() {
  * fluid grid, where a failed photo keeps its picture inside the danger ring
  * with PhotoThumb's RetryPill near its bottom (docs/brand-guidelines.md,
  * section 9 Photos), and Remove sits inside the tile's corner.
- * `notice={false}` leaves the red line to the caller, for a screen that
- * shows it under its own button (the contractor's Mark done, from
- * `failedLine`, through UploadStatusLine).
+ * The line under the tiles is UploadStatusLine ("2 files didn't upload ·
+ * Retry", "No signal · 2 files waiting"); `notice={false}` leaves it to the
+ * caller, for a screen that shows it under its own button (the contractor's
+ * Mark done).
  *
  * `slots` is the Mark done sheet's proof slots (uploads 2.8): in a grid, the
  * count of finished-work photos the playbook asks for (one on an optional
@@ -304,7 +305,7 @@ export function MediaUploadTray({
   onFill?: boolean;
   className?: string;
 }) {
-  const { uploads, notice, retry, remove } = uploader;
+  const { uploads, retry, remove } = uploader;
   const coarse = useCoarsePointer();
   const grid = layout === "grid";
   const slotted = grid && slots !== undefined;
@@ -342,7 +343,8 @@ export function MediaUploadTray({
           </li>
         )}
       </ul>
-      {showNotice && notice && <p className="truncate text-meta text-danger">{notice}</p>}
+      {/* "2 files didn't upload · Retry" or "No signal · 2 files waiting", the same line every bar and list uses. */}
+      {showNotice && <UploadStatusLine uploader={uploader} className="justify-start" />}
     </div>
   );
 }

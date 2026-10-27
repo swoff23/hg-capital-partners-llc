@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DISPLAY_EDGE, DISPLAY_QUALITY, THUMB_EDGE, THUMB_QUALITY, fitWithin, planPrepare } from "./prepare";
+import { DISPLAY_EDGE, DISPLAY_QUALITY, THUMB_EDGE, THUMB_QUALITY, UNREADABLE_PHOTO, fitWithin, heicFallbackApplies, planPrepare } from "./prepare";
 
 test("the sizes the spec names: a 2560px display JPEG at 0.85, a 1024px thumbnail", () => {
   assert.equal(DISPLAY_EDGE, 2560);
@@ -43,4 +43,18 @@ test("planPrepare: previews only where the record step keeps them, the display J
   // Property documents and staff documents.
   assert.deepEqual(planPrepare({ fileKind: "image", mode: "original", previews: false }), { thumb: false, poster: false, display: false });
   assert.deepEqual(planPrepare({ fileKind: "file", mode: "display", previews: true }), { thumb: false, poster: false, display: false });
+});
+
+test("the HEIC fallback is for photos going public only, never a contractor's private photo", () => {
+  const listing = planPrepare({ fileKind: "image", mode: "display", previews: false });
+  const contractor = planPrepare({ fileKind: "image", mode: "display", previews: true });
+  const staffTask = planPrepare({ fileKind: "image", mode: "original", previews: true });
+  assert.equal(heicFallbackApplies(listing, true), true);
+  assert.equal(heicFallbackApplies(contractor, false), false, "a 3 MB chunk over a phone's data");
+  assert.equal(heicFallbackApplies(staffTask, false), false);
+  assert.equal(heicFallbackApplies(staffTask, true), false, "nothing to re-encode");
+});
+
+test("the reason a public photo gives when it can't be re-encoded is one short clause", () => {
+  assert.equal(UNREADABLE_PHOTO, "this photo can't be read here. Try a JPEG");
 });

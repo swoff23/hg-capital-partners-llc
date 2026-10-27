@@ -146,13 +146,15 @@ export function usePropertyPhoto({ propertyId, label }: { propertyId: string; la
 
   /** A photo taken at this property: fetched through the task file route and sent the way a picked file is. */
   async function fromTaskPhoto(attachment: { id: string; filename: string }) {
+    // A big photo takes a few seconds to fetch and re-encode; the record step's toast replaces this one (same key).
+    toast({ message: "Setting property photo…", key: `property-photo:${propertyId}` });
     try {
       const res = await fetch(taskFileUrl(attachment.id));
       if (!res.ok) throw new Error("fetch");
       const blob = await res.blob();
       upload(new File([blob], attachment.filename, { type: blob.type }));
     } catch {
-      toast({ message: "That photo wouldn't open. Try again." });
+      toast({ message: "That photo wouldn't open. Try again.", key: `property-photo:${propertyId}` });
     }
   }
 

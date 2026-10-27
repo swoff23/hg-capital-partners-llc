@@ -236,14 +236,14 @@ test("finishing label counts uploads", () => {
 });
 
 test("Mark done has no Skip: an optional job reads Mark done and is on, with or without photos", () => {
-  const idle = { pending: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
+  const idle = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
   assert.deepEqual(markDoneButton(idle), { label: "Mark done", enabled: true, busy: false, reason: null, line: null });
   assert.equal(markDoneButton({ ...idle, uploaded: 3 }).label, "Mark done");
   assert.equal(markDoneButton({ ...idle, uploaded: 3 }).enabled, true);
 });
 
 test("Mark done waits for uploads and stays off while a photo failed (decision 13)", () => {
-  const idle = { pending: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
+  const idle = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
   // It keeps its label (forms 2.7) and a line says why it waits.
   assert.deepEqual(markDoneButton({ ...idle, pending: 2 }), {
     label: "Mark done",
@@ -266,8 +266,20 @@ test("Mark done waits for uploads and stays off while a photo failed (decision 1
   });
 });
 
+test("Mark done stays off while a photo waits for a signal, and its line is the uploader's", () => {
+  const idle = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
+  // A photo held for a signal isn't on the job yet: marking done now would leave it out of the finish set.
+  assert.deepEqual(markDoneButton({ ...idle, waiting: 2 }), { label: "Mark done", enabled: false, busy: false, reason: "waiting", line: null });
+  // Going up leads, then failed, then waiting, then the count.
+  assert.equal(markDoneButton({ ...idle, waiting: 1, pending: 1 }).reason, "uploading");
+  assert.equal(markDoneButton({ ...idle, waiting: 1, failed: 1 }).reason, "failed");
+  assert.equal(markDoneButton({ ...idle, waiting: 1, required: 2 }).reason, "waiting");
+  // The signal comes back and they land: the count decides again.
+  assert.equal(markDoneButton({ ...idle, required: 2 }).reason, "short");
+});
+
 test("Mark done with a required count waits for that many uploaded photos, and says how many more", () => {
-  const ask2 = { pending: 0, failed: 0, sending: false, uploaded: 0, required: 2 };
+  const ask2 = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 2 };
   assert.deepEqual(markDoneButton(ask2), { label: "Mark done", enabled: false, busy: false, reason: "short", line: "Add 2 more photos" });
   assert.equal(markDoneButton({ ...ask2, uploaded: 1 }).line, "Add 1 more photo");
   assert.deepEqual(markDoneButton({ ...ask2, uploaded: 2 }), { label: "Mark done", enabled: true, busy: false, reason: null, line: null });
@@ -329,7 +341,7 @@ test("the hour has an end to set a timer for", () => {
 });
 
 test("a My jobs row says what its uploads are doing (uploads 2.1)", () => {
-  const none = { pending: 0, failed: 0, pendingKinds: [] as const };
+  const none = { pending: 0, waiting: 0, failed: 0, pendingKinds: [] as const };
   assert.equal(rowUploadLine(none), null);
   assert.deepEqual(rowUploadLine({ ...none, pending: 3, pendingKinds: ["image", "image", "image"] }), { text: "Uploading 3 photos", tone: "info" });
   assert.deepEqual(rowUploadLine({ ...none, pending: 1, pendingKinds: ["video"] }), { text: "Uploading 1 video", tone: "info" });
@@ -337,7 +349,11 @@ test("a My jobs row says what its uploads are doing (uploads 2.1)", () => {
   assert.deepEqual(rowUploadLine({ ...none, failed: 2 }), { text: "2 photos didn't upload", tone: "danger" });
   assert.deepEqual(rowUploadLine({ ...none, failed: 1 }), { text: "1 photo didn't upload", tone: "danger" });
   // The one that needs the contractor leads.
-  assert.equal(rowUploadLine({ pending: 2, failed: 1, pendingKinds: ["image", "image"] })?.tone, "danger");
+  assert.equal(rowUploadLine({ pending: 2, waiting: 0, failed: 1, pendingKinds: ["image", "image"] })?.tone, "danger");
+  // Files held for a signal say so, after the ones going up.
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 3, pendingKinds: ["image", "image", "image"] }), { text: "No signal · 3 photos waiting", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 1, pendingKinds: ["video"] }), { text: "No signal · 1 video waiting", tone: "info" });
+  assert.equal(rowUploadLine({ ...none, pending: 1, waiting: 2, pendingKinds: ["image", "image", "image"] })?.text, "Uploading 1 photo");
 });
 
 test("the payoff strip shows four thumbs and a count for the rest", () => {

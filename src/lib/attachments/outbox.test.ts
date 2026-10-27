@@ -6,6 +6,7 @@ import {
   OUTBOX_MAX_AGE_MS,
   RETRY_DELAYS_MS,
   STALL_MS,
+  ServerBusyError,
   StalledError,
   afterFailure,
   classifyFailure,
@@ -29,6 +30,7 @@ test("classifyFailure: no signal is offline, a dropped request online is the net
   assert.equal(classifyFailure(new TypeError("Failed to fetch"), true), "network");
   assert.equal(classifyFailure(new TypeError("Load failed"), true), "network");
   assert.equal(classifyFailure(new BlobServiceNotAvailable(), true), "network");
+  assert.equal(classifyFailure(new ServerBusyError(), true), "network", "a 5xx from the token route is the road, not the file");
   assert.equal(classifyFailure(new StalledError(), true), "timeout");
   assert.equal(classifyFailure(new StalledError(), false), "timeout");
   assert.equal(classifyFailure(new Error("Failed to retrieve the client token"), true), "refused");
@@ -91,6 +93,7 @@ test("offline spells don't count as tries, so a bad signal can't use them up", (
 
 const entry = (id: string, savedAt: number): OutboxEntry => ({
   id,
+  scope: "app:u1",
   key: "task:t1",
   batchId: "b1",
   queuedAt: "2026-10-25T18:14:00.000Z",

@@ -1,5 +1,6 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import * as core from "@/lib/tasks/core";
 import { undoWindowOpen } from "./job-view";
@@ -55,12 +56,54 @@ export async function postJobBatch(taskId: string, attachmentIds: string[]): Pro
   return { eventId: event.id };
 }
 
+/** How far an outbox item's own time may sit from its update's and still be that update's line (the two are stamped a moment apart). */
+const POST_ITEM_SLACK_MS = 5_000;
+
+/**
+ * Takes the post's line out of the partners' unsent email bundle
+ * (NotificationOutbox.items), so the email never says "Zack added files" for
+ * an update that is gone. The line is the one core.addComment queued for a
+ * post with no text: kind COMMENT, this contractor's label, "added files
+ * (+N files)" for the N files it linked, stamped at the post's own time. Only
+ * the one nearest the post goes, so a second post of the same size a moment
+ * later keeps its line. One statement, so an item another writer appends to
+ * the same bundle at the same moment is never lost; a bundle left with no
+ * items is deleted. A bundle already sent can't be called back.
+ */
+async function dropPostFromEmailBundle(tx: core.Tx, taskId: string, label: string, postedAt: Date, files: number): Promise<void> {
+  // core.addComment's own words for a post with no text: "added files (+3 files)".
+  const summary = `added files (+${files} file${files > 1 ? "s" : ""})`;
+  const at = postedAt.toISOString();
+  const from = new Date(postedAt.getTime() - POST_ITEM_SLACK_MS).toISOString();
+  const to = new Date(postedAt.getTime() + POST_ITEM_SLACK_MS).toISOString();
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "NotificationOutbox" AS o
+    SET "items" = COALESCE((
+      SELECT jsonb_agg(e.item ORDER BY e.n)
+      FROM jsonb_array_elements(o."items") WITH ORDINALITY AS e(item, n)
+      WHERE e.n IS DISTINCT FROM (
+        SELECT m.n
+        FROM jsonb_array_elements(o."items") WITH ORDINALITY AS m(item, n)
+        WHERE m.item->>'kind' = 'COMMENT'
+          AND m.item->>'actorLabel' = ${label}
+          AND m.item->>'summary' = ${summary}
+          AND (m.item->>'at')::timestamptz BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+        ORDER BY abs(extract(epoch FROM ((m.item->>'at')::timestamptz - ${at}::timestamptz))), m.n
+        LIMIT 1
+      )
+    ), '[]'::jsonb)
+    WHERE o."taskId" = ${taskId} AND o."sentAt" IS NULL`);
+  await tx.$executeRaw(Prisma.sql`
+    DELETE FROM "NotificationOutbox"
+    WHERE "taskId" = ${taskId} AND "sentAt" IS NULL AND jsonb_array_length("items") = 0`);
+}
+
 /**
  * Takes a batch post back: the update and its files are soft-deleted, so they
- * leave the timeline, the grids and the "2 new" counts, and the email bundle
- * drops the line (notifications/outbox.ts). Contractors only ever soft-delete,
- * and this is their only delete: it takes only their own post, one with files
- * and no text (a written update isn't a batch), and only within
+ * leave the timeline, the grids and the "2 new" counts, and its line leaves
+ * the unsent email bundle (dropPostFromEmailBundle). Contractors only ever
+ * soft-delete, and this is their only delete: it takes only their own post,
+ * one with files and no text (a written update isn't a batch), and only within
  * `undoWindowOpen` of when it posted.
  */
 export async function undoJobPost(taskId: string, eventId: string, now = new Date()): Promise<void> {
@@ -74,10 +117,11 @@ export async function undoJobPost(taskId: string, eventId: string, now = new Dat
     if (!event) throw new core.TaskRuleError("That update is already gone.");
     if (!undoWindowOpen(event.createdAt, now)) throw new core.TaskRuleError("It's too late to take that back.");
     await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: now } });
-    await tx.taskAttachment.updateMany({
+    const { count } = await tx.taskAttachment.updateMany({
       where: { eventId, taskId, uploadedByContactId: p.contactId, deletedAt: null },
       data: { deletedAt: now },
     });
+    if (count > 0) await dropPostFromEmailBundle(tx, taskId, taskPrincipal(p).label, event.createdAt, count);
   });
   revalidateJob(taskId);
 }

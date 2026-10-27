@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Button as AriaButton, GridList, GridListItem, useDragAndDrop, type DropTarget } from "react-aria-components";
-import { GripVertical, ImagePlus, MoreHorizontal, TriangleAlert, X } from "lucide-react";
+import { GripVertical, ImagePlus, MoreHorizontal, TriangleAlert, WifiOff, X } from "lucide-react";
 import { Lightbox, type LightboxMenuItem, type MediaItem } from "@/components/lightbox";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
 import {
@@ -190,7 +190,9 @@ export function ListingPhotos({
 
   // Drops and pastes anywhere on the section, while the editor is open (uploads 2.2).
   const sectionRef = useRef<HTMLDivElement>(null);
-  const drop = useDropTarget(value.length < max ? target : null, sectionRef, { label: "Drop to add photos" });
+  // Photos on their way fill the set as they go, so the Add tile and the drop target close at 20 saved or on the way.
+  const inFlight = uploader.pending + uploader.waiting;
+  const drop = useDropTarget(value.length + inFlight < max ? target : null, sectionRef, { label: "Drop to add photos" });
 
   // ---- Changing the set ----
 
@@ -292,7 +294,7 @@ export function ListingPhotos({
   const pending = uploader.uploads.length;
   const helper =
     photosNeededLine(count) ?? (coarse ? "The first photo is the cover on the site." : "The first photo is the cover on the site. Drag to reorder.");
-  const full = count >= max;
+  const full = count + inFlight >= max;
   // A tile is the cover when it's first: it spans two columns (and two rows from md), and fills its cell.
   const coverCell = "col-span-2 md:row-span-2";
 
@@ -481,9 +483,11 @@ function PendingTile({ upload: u, onRetry, onRemove, first }: { upload: MediaUpl
       ? `couldn't upload: ${shownReason(u.error ?? "")}`
       : u.status === "saving"
         ? "saving"
-        : u.status === "queued"
-          ? "waiting"
-          : `uploading, ${Math.round(u.progress * 100)}%`;
+        : u.status === "waiting"
+          ? "waiting for signal"
+          : u.status === "queued"
+            ? "waiting"
+            : `uploading, ${Math.round(u.progress * 100)}%`;
   return (
     <div role="group" aria-label={`${u.name}, ${state}`} className={cn("relative min-w-0", first && "col-span-2 md:row-span-2")}>
       <PhotoThumb
@@ -498,6 +502,11 @@ function PendingTile({ upload: u, onRetry, onRemove, first }: { upload: MediaUpl
       {isGoingUp(u) && (
         <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-photo-scrim/50">
           <ProgressRing value={u.status === "queued" ? 0 : u.progress} />
+        </span>
+      )}
+      {u.status === "waiting" && (
+        <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-photo-scrim/50">
+          <WifiOff className="size-5 text-on-photo" aria-hidden="true" />
         </span>
       )}
       {refused && (

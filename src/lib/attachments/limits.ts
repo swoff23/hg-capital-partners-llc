@@ -20,12 +20,15 @@ const isFileKind = (k: unknown): k is FileKind => typeof k === "string" && (FILE
  * this task's (paths.ts) and `fileKind` picks the allowlist and cap.
  * Thumbnails and posters are always stills (PREVIEW_RULE). A name with an
  * extension must name a type its kind allows, so "payload.html" can't land as
- * a text file and a video can't sit at "clip.jpg".
+ * a text file and a video can't sit at "clip.jpg". `allowed` is the upload
+ * kind's own list of file kinds, when it has one.
  */
-export function uploadLimits(taskId: string, pathname: string, fileKind: unknown): TokenLimits | string {
+export function uploadLimits(taskId: string, pathname: string, fileKind: unknown, allowed?: readonly FileKind[]): TokenLimits | string {
   const role = requestedUploadRole(pathname, taskId);
   if (!role) return "That upload path isn't allowed.";
   if (!isFileKind(fileKind)) return "fileKind must be image, video or file.";
+  // The kind's own table (upload-kinds.ts UPLOAD_KIND_ALLOWED): a contractor's photos and videos can't be a document.
+  if (allowed && !allowed.includes(fileKind)) return "Only photos and videos can be added here.";
   let rule: UploadRule = UPLOAD_RULES[fileKind];
   if (role !== "orig") {
     if (fileKind !== "image") return "Thumbnails and posters must be images.";

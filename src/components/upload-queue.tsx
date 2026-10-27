@@ -208,8 +208,48 @@ class DropRegistry {
 
 /* ---------------- The engine's browser dependencies ---------------- */
 
-export function browserDeps(parts: { notify: (n: EngineNotice) => void; navigate: (href: string) => void; persist?: boolean }): EngineDeps {
+/**
+ * Takes a Web Lock named for the file and holds it until the tab is gone or
+ * the engine lets go (the file is recorded or removed), so a second tab, or a
+ * reload in another one, never sends and records the same file twice. null
+ * when another tab holds it. Where there are no Web Locks (or they throw), the
+ * file is ours.
+ */
+function claimFile(id: string): Promise<(() => void) | null> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  if (!locks) return Promise.resolve(() => {});
+  return new Promise((resolve) => {
+    let letGo: () => void = () => {};
+    const held = new Promise<void>((done) => {
+      letGo = done;
+    });
+    try {
+      locks
+        .request(`hg-upload:${id}`, { ifAvailable: true }, (lock) => {
+          if (!lock) {
+            resolve(null);
+            return;
+          }
+          resolve(letGo);
+          return held;
+        })
+        .catch(() => resolve(() => {}));
+    } catch {
+      resolve(() => {});
+    }
+  });
+}
+
+export function browserDeps(parts: {
+  notify: (n: EngineNotice) => void;
+  navigate: (href: string) => void;
+  persist?: boolean;
+  /** Whose queue: "app:<user id>" or "portal" (EngineDeps.scope). */
+  scope?: string;
+}): EngineDeps {
   return {
+    scope: parts.scope,
+    claim: parts.persist === false ? undefined : claimFile,
     transfer: sendBlob,
     outbox: parts.persist === false ? null : idbOutbox(),
     notify: parts.notify,
@@ -251,12 +291,16 @@ export function useUploadEngine(): UploadEngine | null {
   return useContext(QueueContext)?.engine ?? null;
 }
 
-/** The queue for everything under it. Mounted once per layout; a second one inside would split the counts. */
-export function UploadQueueProvider({ children }: { children: ReactNode }) {
+/**
+ * The queue for everything under it. Mounted once per layout; a second one inside would split the counts.
+ * `scope` says whose files it is: "app:<user id>" in the app, "portal" in the contractor portal. One browser
+ * database serves both layouts and every person who signs in on it, so each queue picks up only its own.
+ */
+export function UploadQueueProvider({ children, scope }: { children: ReactNode; scope: string }) {
   const { toast } = useToast();
   const router = useRouter();
   const [value] = useState<QueueContextValue>(() => ({
-    engine: new UploadEngine(browserDeps({ notify: () => {}, navigate: () => {} })),
+    engine: new UploadEngine(browserDeps({ notify: () => {}, navigate: () => {}, scope })),
     drops: new DropRegistry(),
   }));
   const { engine, drops } = value;
@@ -293,8 +337,9 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
   const all = useSyncExternalStore(engine.subscribe, () => engine.counts(), () => NO_COUNTS);
   const going = all.pending + all.waiting;
   useHoldLeave(going > 0 ? { title: stillUploading(all.pendingKinds), stay: "Keep uploading", scope: "sign-out" } : null);
-  // Where the outbox can't keep a file, a reload would lose it: browsers that honor it ask.
-  useLeaveWarning(going > 0 && !engine.persistent);
+  // Where the outbox can't keep a file (none, or a write that failed), a reload would lose it: browsers that honor it ask.
+  const unsaved = useSyncExternalStore(engine.subscribe, engine.needsLeaveWarning, () => false);
+  useLeaveWarning(unsaved);
 
   return (
     <QueueContext value={value}>

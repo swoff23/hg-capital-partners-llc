@@ -46,10 +46,18 @@ export class StalledError extends Error {
   }
 }
 
+/** The server answered a request with an error of its own (a 5xx: a deploy, a hiccup), not a refusal of the file. */
+export class ServerBusyError extends Error {
+  constructor() {
+    super("the server is busy");
+  }
+}
+
 /** Whether an error is the connection (no signal, a dropped request, a stall) rather than anyone refusing the file. */
 export function classifyFailure(err: unknown, online: boolean): FailureKind {
   if (err instanceof StalledError) return "timeout";
   if (!online) return "offline";
+  if (err instanceof ServerBusyError) return "network";
   if (uploadFailureReason(err) === "no connection" || isOfflineError(err)) return "network";
   return "refused";
 }
@@ -98,6 +106,12 @@ export type MultipartState = {
  */
 export type OutboxEntry = {
   id: string;
+  /**
+   * Whose queue this is: "app:<user id>" for a signed-in staff member, "portal"
+   * for the contractor portal. One browser database serves both layouts and
+   * every person who signs in on it; a queue only picks up its own.
+   */
+  scope: string;
   /** The queue key of the target: "task:<id>", "portal-task:<id>", … */
   key: string;
   batchId: string;

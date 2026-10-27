@@ -4,7 +4,7 @@ import { FileImage, ImageOff, Lock, Play } from "lucide-react";
 import { Lightbox, taskMediaUrl, useViewerLink, type LightboxMenuItem, type LightboxSurface, type MediaItem, type MediaUrlFor } from "@/components/lightbox";
 import { PhotoThumb } from "@/components/photo-thumb";
 import type { ActionResult } from "@/lib/action-result";
-import { fmtDuration, bylineName, bylineStamp, documentLook, uploadCountPhrase } from "@/lib/attachments/media";
+import { fmtDuration, bylineName, bylineStamp, documentLook, uploadCountPhrase, visibleTiles } from "@/lib/attachments/media";
 import { cn } from "@/lib/utils";
 
 export type { MediaItem, MediaUrlFor } from "@/components/lightbox";
@@ -21,15 +21,19 @@ const STRIP_MAX = 4;
 
 /**
  * Square thumbnails of a record's photos and videos (docs/specs/uploads-
- * photos.md 2.5): 3 fluid columns on a phone, 6 columns of 88px from sm, two
- * rows, the last tile carrying "+N" when there are more, which opens the
- * viewer at that photo with the whole set. Photos load ?v=thumb when the row
- * has a thumbnail, otherwise the original. Videos show their poster (or a
- * dark tile), a play mark and the length. A tap opens the Lightbox at that
- * item, and, on a page that owns it, pushes `?file=<id>` so Back closes it
- * and the link can be shared. With `onDelete` (staff) it offers Delete there.
- * `urlFor` points tiles and the viewer at files outside the task route
- * (property files, public listing photos).
+ * photos.md 2.5): 3 fluid columns on a phone, 6 of 88px from sm, two rows
+ * (a labeled run starts a new row, so rows are counted as they fall), the
+ * last tile carrying "+N" when there are more, which opens the viewer at that
+ * photo with the whole set. Photos load ?v=thumb when the row has a
+ * thumbnail, otherwise the original. Videos show their poster (or a dark
+ * tile), a play mark and the length. A tap opens the Lightbox at that item.
+ * With `link` (the record's own grid, once per page: the task page's Photos
+ * section, the job page's) it also pushes `?file=<id>`, so Back closes the
+ * viewer and the link can be shared; every other grid keeps the viewer in
+ * local state, so a photo that shows twice on a page (the section and its
+ * Activity comment) never opens two viewers. With `onDelete` (staff) the
+ * viewer offers Delete. `urlFor` points tiles and the viewer at files outside
+ * the task route (property files, public listing photos).
  *
  * The caller orders the items (newest first, the finish set leading:
  * lib/tasks/media.ts orderMedia); `groups` puts a label above each run,
@@ -54,7 +58,7 @@ export function MediaGrid({
   variant = "grid",
   groups,
   inCard = false,
-  link,
+  link = false,
   surface,
   header,
   menuItems,
@@ -76,14 +80,14 @@ export function MediaGrid({
   groups?: readonly MediaGroup[];
   /** A strip inside a comment card shows one thumb fewer at 320. */
   inCard?: boolean;
-  /** Push `?file=<id>` when the viewer opens. On for the page's own grid, off for a strip or the Review row. */
+  /** Push `?file=<id>` when the viewer opens. Off unless asked: only the record's own grid, once per page, turns it on. */
   link?: boolean;
   surface?: LightboxSurface;
   header?: { title: ReactNode; byline?: ReactNode };
   menuItems?: (item: MediaItem) => readonly LightboxMenuItem[];
   canEdit?: boolean;
 }) {
-  const viewer = useViewerLink(items, link ?? (variant === "grid" && rows === 2));
+  const viewer = useViewerLink(items, link && variant === "grid" && rows === 2);
   if (items.length === 0) return null;
 
   const total = items.length;
@@ -108,6 +112,8 @@ export function MediaGrid({
   if (variant === "strip") {
     const shown = items.slice(0, STRIP_MAX);
     const more = total - STRIP_MAX;
+    // Inside a comment card at 320 the 4th photo drops, so exactly four still end with a "+1".
+    const narrowMore = inCard ? Math.max(0, total - (STRIP_MAX - 1)) : 0;
     return (
       <div className={className}>
         <ul className="flex items-center gap-2">
@@ -116,10 +122,10 @@ export function MediaGrid({
               <StripThumb item={item} urlFor={urlFor} onOpen={() => viewer.openAt(i)} />
             </li>
           ))}
-          {more > 0 && (
+          {(more > 0 || narrowMore > 0) && (
             <li className="text-meta tabular-nums text-fg-3">
-              <span className={cn(inCard && "max-[359px]:hidden")}>+{more}</span>
-              {inCard && <span className="min-[360px]:hidden">+{total - (STRIP_MAX - 1)}</span>}
+              {more > 0 && <span className={cn(inCard && "max-[359px]:hidden")}>+{more}</span>}
+              {narrowMore > 0 && <span className="min-[360px]:hidden">+{narrowMore}</span>}
             </li>
           )}
         </ul>
@@ -128,8 +134,6 @@ export function MediaGrid({
     );
   }
 
-  const phoneCap = PHONE_COLS * rows;
-  const wideCap = WIDE_COLS * rows;
   const labelAt = new Map<number, string>();
   if (groups && rows === 2) {
     for (const g of groups) {
@@ -137,6 +141,10 @@ export function MediaGrid({
       if (first >= 0) labelAt.set(first, g.label);
     }
   }
+  // Rows are counted as they fall: a label starts a new row, so "At finish" with 2 photos doesn't leave "+9" alone on a third.
+  const starts = [...labelAt.keys()];
+  const phoneCap = visibleTiles(total, PHONE_COLS, rows, starts);
+  const wideCap = visibleTiles(total, WIDE_COLS, rows, starts);
 
   return (
     <div className={className}>

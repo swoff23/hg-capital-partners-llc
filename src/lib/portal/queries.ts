@@ -205,6 +205,10 @@ export interface JobDetail {
   lockbox: string | null;
   /** First names of the partners a Mark done goes to, for the payoff line. */
   staffNames: string[];
+  /** Photos Mark done asks for, from the job's playbook (TaskTemplate.finishPhotosRequired); null or 0 means optional. */
+  finishPhotosRequired: number | null;
+  /** When this contractor last sent the job to Review (ISO), while it is in Review: "Add photo/video" hides an hour later. Else null. */
+  markedDoneAt: string | null;
 }
 
 const uploaderSelect = {
@@ -260,6 +264,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
       propertyId: true,
       assigneeContactId: true,
       property: { select: { address: true, photoUrl: true } },
+      taskTemplate: { select: { finishPhotosRequired: true } },
       checklist: { select: { id: true, title: true, done: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
     },
   });
@@ -267,7 +272,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
   const active = isActiveStatus(task.status);
   if (!active && (!task.completedAt || task.completedAt < PORTAL_HISTORY_FROM)) return null;
 
-  const [media, updates, lockbox, staffNames] = await Promise.all([
+  const [media, updates, lockbox, staffNames, marked] = await Promise.all([
     prisma.taskAttachment.findMany({
       where: { taskId, ...visibleFile(p.contactId, ["IMAGE", "VIDEO"]) },
       select: mediaSelect,
@@ -276,6 +281,15 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     jobUpdates(p, taskId),
     active && task.assigneeContactId === p.contactId ? readLockboxCode(prisma, task.propertyId, task.unitLabel) : null,
     staffFirstNames(),
+    // The hour after Mark done runs from the job's newest move to Review, and only when this contractor made it
+    // (acceptsContractorUpload reads the same event).
+    task.status === "REVIEW"
+      ? prisma.taskEvent.findFirst({
+          where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "REVIEW" } },
+          orderBy: { createdAt: "desc" },
+          select: { actorContactId: true, createdAt: true },
+        })
+      : null,
   ]);
 
   return {
@@ -293,6 +307,8 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     updates,
     lockbox,
     staffNames,
+    finishPhotosRequired: task.taskTemplate?.finishPhotosRequired ?? null,
+    markedDoneAt: marked && marked.actorContactId === p.contactId ? marked.createdAt.toISOString() : null,
   };
 }
 

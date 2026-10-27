@@ -136,6 +136,8 @@ export function taskFileUrl(id: string, variant?: "thumb" | "poster"): string {
  * check's own reasons are lowercase clauses for "<name>: <reason>" lines.
  */
 export function rowReason(reason: string | null | undefined): string {
+  // A row has its own Retry beside this, so the tile's "Reload and try again" would argue with it.
+  if (TOKEN_REFUSED.test(reason ?? "")) return "Upload refused";
   const r = shownReason((reason ?? "").trim());
   const over = /^over the (\d+) MB\b/.exec(r);
   if (over) return `Over the ${over[1]} MB limit`;
@@ -295,4 +297,32 @@ export function documentLook(filename: string): DocumentLook {
   if (ext === "xlsx" || ext === "csv") return { label: ext.toUpperCase(), glyph: "sheet" };
   if (["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext)) return { label: ext === "jpeg" ? "JPG" : ext.toUpperCase(), glyph: "image" };
   return { label: ext ? ext.toUpperCase() : "FILE", glyph: "text" };
+}
+
+/**
+ * How many tiles a photo grid shows before its "+N" tile (uploads 2.5):
+ * `rows` rows of `cols`, counted as they fall. A labeled run ("At finish",
+ * then "Other photos") starts a new row, so `starts` are the indexes of the
+ * runs' first tiles; a short first run leaves its row short instead of
+ * letting the second row's tiles slide up under the first label.
+ */
+export function visibleTiles(total: number, cols: number, rows: number, starts: readonly number[] = []): number {
+  const breaks = new Set(starts.filter((i) => i > 0));
+  let row = 0;
+  let col = 0;
+  let shown = 0;
+  for (let i = 0; i < total; i++) {
+    if (col > 0 && breaks.has(i)) {
+      row++;
+      col = 0;
+    }
+    if (row >= rows) break;
+    shown++;
+    col++;
+    if (col === cols) {
+      row++;
+      col = 0;
+    }
+  }
+  return shown;
 }

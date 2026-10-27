@@ -193,14 +193,17 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
         <span className="mt-0.5 flex min-w-0 items-center gap-1 text-meta text-fg-3">
           {uploading && (
             <>
-              <span className={cn("min-w-0 truncate", uploading.tone === "danger" && "text-danger")}>{uploading.text}</span>
-              {/* Only when something follows: below 480 the status always does. */}
-              <span aria-hidden="true" className={cn(!(target || where) && "min-[480px]:hidden")}>
-                ·
-              </span>
+              {/* The urgent state leads and keeps its words; the place and the date are what truncate (uploads 3.1). */}
+              <span className={cn("shrink-0", uploading.tone === "danger" && "text-danger")}>{uploading.text}</span>
+              {(target || where) && (
+                <span aria-hidden="true" className="shrink-0">
+                  ·
+                </span>
+              )}
             </>
           )}
-          <span className="flex shrink-0 items-center gap-1 min-[480px]:hidden">
+          {/* Below 480 the status leads the subline, except while the job has files in flight: the upload line has the room then. */}
+          <span className={cn("shrink-0 items-center gap-1 min-[480px]:hidden", uploading ? "hidden" : "flex")}>
             <StatusBadge status={job.status} />
             {(target || where) && <span aria-hidden="true">·</span>}
           </span>
@@ -213,7 +216,7 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
           {where && <span className="min-w-0 shrink-999 truncate">{where}</span>}
         </span>
       </span>
-      <StatusBadge status={job.status} className="w-28 shrink-0 max-[480px]:hidden" />
+      <StatusBadge status={job.status} className="w-28 shrink-0 max-[479px]:hidden" />
     </Link>
   );
 }

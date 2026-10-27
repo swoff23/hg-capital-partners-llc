@@ -16,14 +16,16 @@ const id = z.string().min(1).max(64);
 
 // Where the browser put the file and what to call it. Never its URL, size or
 // type: the service reads those from Blob itself. Shared unless the composer
-// says Internal (D15).
+// says Internal (D15). Width, height and length are display hints: the service
+// keeps them only when they are sane (limits.ts pixelHint, durationHint), so a
+// 30000px panorama still uploads instead of being refused over a hint.
 const uploadedSchema = z
   .object({
     pathname: z.string().min(1).max(300),
     filename: z.string().min(1).max(255),
-    width: z.number().int().positive().max(20000).nullish(),
-    height: z.number().int().positive().max(20000).nullish(),
-    durationSec: z.number().positive().max(24 * 3600).nullish(),
+    width: z.number().nullish(),
+    height: z.number().nullish(),
+    durationSec: z.number().nullish(),
     thumbPathname: z.string().min(1).max(300).nullish(),
     posterPathname: z.string().min(1).max(300).nullish(),
     visibility: z.enum(["SHARED", "INTERNAL"]).default("SHARED"),

@@ -186,8 +186,11 @@ export function FilesList({
                     )}
                   </span>
                   {stacked && <span className="hidden w-28 shrink-0 truncate text-meta text-fg-3 @md:block">{who}</span>}
-                  {size && (
-                    <span className={cn("shrink-0 text-meta tabular-nums text-fg-3", stacked ? "hidden w-16 text-right @md:block" : "")}>{size}</span>
+                  {/* The size column keeps its width for a link or a file with no size, so every byline starts at the same x. */}
+                  {stacked ? (
+                    <span className="hidden w-16 shrink-0 text-right text-meta tabular-nums text-fg-3 @md:block">{size}</span>
+                  ) : (
+                    size && <span className="shrink-0 text-meta tabular-nums text-fg-3">{size}</span>
                   )}
                 </a>
               )}
@@ -347,19 +350,20 @@ function UploadRow({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onRe
         )}
         <span className="min-w-0 flex-1">
           <span className="block truncate">{u.name}</span>
-          <span className={cn("block truncate text-meta @md:hidden", failed || refused ? "text-danger" : "text-fg-3")}>
-            {status}
+          {/* The reason truncates; Retry never does, so a long reason can't push it out of the row. */}
+          <span className={cn("flex min-w-0 items-center gap-1 text-meta @md:hidden", failed || refused ? "text-danger" : "text-fg-3")}>
+            <span className="truncate">{status}</span>
             {failed && (
               <>
-                {" · "}
+                <span aria-hidden="true">·</span>
                 <RowRetry onRetry={onRetry} name={u.name} />
               </>
             )}
           </span>
         </span>
-        <span className={cn("hidden shrink-0 truncate text-meta @md:block", failed || refused ? "text-danger" : "text-fg-3")}>{status}</span>
+        <span className={cn("hidden max-w-56 min-w-0 truncate text-meta @md:block", failed || refused ? "text-danger" : "text-fg-3")}>{status}</span>
         {failed && (
-          <Button variant="ghost" size="sm" onClick={onRetry} aria-label={`Retry ${u.name}`} className="hidden @md:inline-flex">
+          <Button variant="ghost" size="sm" onClick={onRetry} aria-label={`Retry ${u.name}`} className="hidden shrink-0 @md:inline-flex">
             <RotateCcw className="size-4" aria-hidden="true" />
             Retry
           </Button>
@@ -383,7 +387,7 @@ function RowRetry({ onRetry, name }: { onRetry: () => void; name: string }) {
       type="button"
       onClick={onRetry}
       aria-label={`Retry ${name}`}
-      className="relative font-medium underline decoration-1 underline-offset-3 after:absolute after:-inset-3"
+      className="relative shrink-0 font-medium underline decoration-1 underline-offset-3 after:absolute after:-inset-3"
     >
       Retry
     </button>

@@ -22,6 +22,7 @@ import {
   uploadFailureReason,
   uploadNotice,
   uploadSlug,
+  visibleTiles,
   withExtension,
 } from "./media";
 
@@ -290,7 +291,8 @@ test("rowReason: a file row's words for why a file didn't go up", () => {
   assert.equal(rowReason("over the 25 MB photo limit"), "Over the 25 MB limit");
   assert.equal(rowReason("only photos and documents can be added here"), "This type can't be added");
   assert.equal(rowReason("the file is empty"), "The file is empty");
-  assert.equal(rowReason("Failed to retrieve the client token"), "The upload was refused. Reload and try again");
+  // A row has its own Retry, so it never says to reload.
+  assert.equal(rowReason("Failed to retrieve the client token"), "Upload refused");
   assert.equal(rowReason(""), "Didn't upload");
   assert.equal(rowReason(undefined), "Didn't upload");
 });
@@ -311,4 +313,28 @@ test("file urls: the gated routes, and a saving link", () => {
   assert.equal(propertyFileUrl("p1"), "/api/files/property/p1");
   assert.equal(downloadUrl("/api/files/task/abc"), "/api/files/task/abc?download=1");
   assert.equal(downloadUrl("/api/files/task/abc?v=thumb"), "/api/files/task/abc?v=thumb&download=1");
+});
+
+test("visibleTiles: two even rows, counted as they fall", () => {
+  // No labels: 6 on a phone, 12 from sm.
+  assert.equal(visibleTiles(40, 3, 2), 6);
+  assert.equal(visibleTiles(40, 6, 2), 12);
+  assert.equal(visibleTiles(4, 3, 2), 4, "fewer than the cap: all of them");
+  assert.equal(visibleTiles(0, 3, 2), 0);
+  // One row (the Review card).
+  assert.equal(visibleTiles(40, 3, 1), 3);
+  assert.equal(visibleTiles(40, 6, 1), 6);
+});
+
+test("visibleTiles: a labeled run starts a new row, so '+N' ends the second row, not the third", () => {
+  // 14 photos, "At finish" is the first 2, "Other photos" start at 2.
+  assert.equal(visibleTiles(14, 3, 2, [0, 2]), 5, "phone: 2, then 3, with +9 on the 5th");
+  assert.equal(visibleTiles(14, 6, 2, [0, 2]), 8, "wide: 2, then 6, with +7 on the 8th");
+  // A full first run fills its row; the second run starts the next one.
+  assert.equal(visibleTiles(14, 3, 2, [0, 3]), 6);
+  assert.equal(visibleTiles(20, 6, 2, [0, 6]), 12);
+  // A first run longer than a row wraps first; the next run starts a new row, which is past two here.
+  assert.equal(visibleTiles(20, 3, 2, [0, 4]), 4, "4 at finish take both rows; '+16' ends the second and 'Other photos' wait");
+  // Few photos: everything shows, labels or not.
+  assert.equal(visibleTiles(3, 6, 2, [0, 1]), 3);
 });

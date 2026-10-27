@@ -20,14 +20,16 @@ const id = z.string().min(1).max(64);
 // Where the browser put the file and what to call it, never its URL, size or
 // type: the service reads those from Blob itself. `queuedAt` is when the file
 // joined the upload queue, so a photo taken before Mark done still records
-// after it, inside the hour (question 4); the record step reads it.
+// after it, inside the hour (question 4); the record step reads it. Width,
+// height and length are display hints the service keeps only when sane, so an
+// odd one never refuses a whole upload.
 const uploadSchema = z
   .object({
     pathname: z.string().min(1).max(300),
     filename: z.string().min(1).max(255),
-    width: z.number().int().positive().max(20000).nullish(),
-    height: z.number().int().positive().max(20000).nullish(),
-    durationSec: z.number().positive().max(24 * 3600).nullish(),
+    width: z.number().nullish(),
+    height: z.number().nullish(),
+    durationSec: z.number().nullish(),
     thumbPathname: z.string().min(1).max(300).nullish(),
     posterPathname: z.string().min(1).max(300).nullish(),
     queuedAt: z.iso.datetime().nullish(),

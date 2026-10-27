@@ -70,7 +70,7 @@ export function JobMediaSection({
     >
       <div className="space-y-3">
         {/* The portal's viewer: Download, and no ⋯. */}
-        <MediaGrid items={media} groups={groups} surface="portal" />
+        <MediaGrid items={media} groups={groups} surface="portal" link />
         {/* No handlers here, so the byline and the Open and Download menu are asked for. */}
         <FilesList files={rows} byline menu />
       </div>

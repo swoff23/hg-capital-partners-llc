@@ -199,14 +199,14 @@ export function JobActions({
   }
 
   function onRecorded(ids: string[]) {
-    const { sheetOpen: holding, body: text, ready: waiting } = live.current;
+    const { sheetOpen: holding, body: text, ready: held } = live.current;
     const added = ids.map((id) => info.current.get(id)).filter((i): i is Recorded => !!i);
     if (holding || text.trim()) {
-      setReady([...waiting, ...added]);
+      setReady([...held, ...added]);
       return;
     }
     setReady([]);
-    postBatch([...waiting, ...added]);
+    postBatch([...held, ...added]);
   }
 
   /** A batch that landed after the contractor left the page: it posts as its own update, with the same toast and Undo. */
@@ -232,7 +232,7 @@ export function JobActions({
     sendQueuedAt: true,
   };
   const uploader = useMediaUploader({ target });
-  const { pending, failed } = uploader;
+  const { pending, waiting, failed } = uploader;
 
   // The photos a Mark done is sending right now, so leaving mid-send doesn't
   // post them a second time as an empty update.
@@ -277,8 +277,8 @@ export function JobActions({
   const canAddMore = step !== "review" || lateUploadsOpen(markedAt, new Date(clock));
 
   const showBar = step !== null;
-  // The bar grows by one line for the red Retry line or the "Finishing N uploads" line
-  // (never both); ActionBar lifts the toast above whichever shows.
+  // The bar grows by one line for the red Retry line, the "No signal" line or the "Finishing N uploads" line
+  // (never two); ActionBar lifts the toast above whichever shows.
   const finishingLine = step !== "start" && step !== "review" && pending > 0 && failed === 0;
 
   function send() {
@@ -323,7 +323,7 @@ export function JobActions({
   }
 
   const canSend = (body.trim() !== "" || ready.length > 0) && !sending;
-  const done = markDoneButton({ pending, failed, sending: finishing, uploaded: ready.length, required });
+  const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: ready.length, required });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
   const barButton = actionBarButton;
@@ -406,7 +406,7 @@ export function JobActions({
               </Button>
             ) : (
               // Off while anything is still going up or failed; the line under the bar says which.
-              <Button className={cn(barButton, "max-[360px]:px-2")} disabled={pending > 0 || failed > 0} onClick={openMarkDone}>
+              <Button className={cn(barButton, "max-[360px]:px-2")} disabled={pending > 0 || waiting > 0 || failed > 0} onClick={openMarkDone}>
                 Mark done
               </Button>
             )
@@ -415,7 +415,7 @@ export function JobActions({
           error={
             finishingLine ? (
               <p className="text-center text-meta text-fg-3 lg:text-right">{done.line}</p>
-            ) : failed > 0 ? (
+            ) : failed > 0 || waiting > 0 ? (
               <UploadStatusLine uploader={uploader} className="lg:justify-end" />
             ) : null
           }
@@ -450,7 +450,7 @@ export function JobActions({
                   <span className="truncate">{done.label}</span>
                 </Button>
               </div>
-              {failed > 0 ? (
+              {failed > 0 || (waiting > 0 && pending === 0) ? (
                 <UploadStatusLine uploader={uploader} className="md:justify-end" />
               ) : done.line ? (
                 <p className="truncate text-center text-meta text-fg-3 md:text-right">{done.line}</p>

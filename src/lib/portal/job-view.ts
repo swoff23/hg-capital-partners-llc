@@ -297,8 +297,8 @@ export type MarkDoneState = {
   enabled: boolean;
   /** The action is running: the button keeps its label and shows its Spinner. */
   busy: boolean;
-  /** Why it's off, for the caller to draw: "failed" is the red line with Retry, which the uploader's UploadStatusLine owns. */
-  reason: "uploading" | "failed" | "short" | null;
+  /** Why it's off, for the caller to draw: "failed" and "waiting" are the uploader's UploadStatusLine ("2 photos didn't upload · Retry", "No signal · 2 photos waiting"). */
+  reason: "uploading" | "failed" | "waiting" | "short" | null;
   /** The one grey line under the buttons for "uploading" and "short"; null otherwise. */
   line: string | null;
 };
@@ -306,17 +306,28 @@ export type MarkDoneState = {
 /**
  * The Mark done sheet's main button (decision 13, uploads 2.8). It waits for
  * uploads still going up, stays off while any photo failed to upload until
- * each red tile is retried or removed, and stays off until the photos the
- * playbook asks for are up (`required`, 0 when it asks for none). There is no
- * Skip: with no photos on an optional job it reads "Mark done" and is on.
- * Only uploaded photos count, so a failed one keeps its slot and the count
- * waits for it. The label is always "Mark done"; `line` says why it's off.
+ * each red tile is retried or removed, stays off while a photo waits for a
+ * signal (it isn't on the job yet, so it would miss the finish set and land
+ * later as its own update), and stays off until the photos the playbook asks
+ * for are up (`required`, 0 when it asks for none). There is no Skip: with no
+ * photos on an optional job it reads "Mark done" and is on. Only uploaded
+ * photos count, so a failed one keeps its slot and the count waits for it.
+ * The label is always "Mark done"; `line` says why it's off.
  */
-export function markDoneButton(s: { pending: number; failed: number; sending: boolean; uploaded: number; required: number }): MarkDoneState {
+export function markDoneButton(s: {
+  pending: number;
+  /** Files held for a signal: not done either. */
+  waiting: number;
+  failed: number;
+  sending: boolean;
+  uploaded: number;
+  required: number;
+}): MarkDoneState {
   const label = "Mark done" as const;
   if (s.pending > 0) return { label, enabled: false, busy: false, reason: "uploading", line: finishingLabel(s.pending) };
   if (s.sending) return { label, enabled: false, busy: true, reason: null, line: null };
   if (s.failed > 0) return { label, enabled: false, busy: false, reason: "failed", line: null };
+  if (s.waiting > 0) return { label, enabled: false, busy: false, reason: "waiting", line: null };
   if (s.uploaded < s.required) {
     return { label, enabled: false, busy: false, reason: "short", line: addMorePhotosLine(s.required - s.uploaded) };
   }
@@ -389,22 +400,23 @@ export function lateUploadsEndsIn(markedDoneAt: Date | string | null | undefined
 
 /**
  * A My jobs row's uploads line (uploads 2.1): "Uploading 3 photos" while any
- * file for the job is going up, "2 photos didn't upload" once some failed.
- * Failed leads: it's the one that needs the contractor. Null when the job has
- * no uploads. The queue counts failed files without their kinds, so that line
- * says photos.
+ * file for the job is going up, "2 photos didn't upload" once some failed,
+ * "No signal · 3 photos waiting" when the only ones left are held for a
+ * signal. Failed leads: it's the one that needs the contractor. Null when the
+ * job has no uploads. The queue counts failed files without their kinds, so
+ * that line says photos.
  */
 export function rowUploadLine(c: {
   pending: number;
+  waiting: number;
   failed: number;
   pendingKinds: readonly (FileKind | null)[];
 }): { text: string; tone: "info" | "danger" } | null {
   if (c.failed > 0) return { text: `${c.failed} ${c.failed === 1 ? "photo" : "photos"} didn't upload`, tone: "danger" };
-  if (c.pending > 0) {
-    const kinds = c.pendingKinds;
-    const noun = kinds.length > 0 && kinds.every((k) => k === "video") ? "video" : kinds.length > 0 && kinds.every((k) => k === "file") ? "file" : "photo";
-    return { text: `Uploading ${c.pending} ${noun}${c.pending === 1 ? "" : "s"}`, tone: "info" };
-  }
+  const kinds = c.pendingKinds;
+  const noun = kinds.length > 0 && kinds.every((k) => k === "video") ? "video" : kinds.length > 0 && kinds.every((k) => k === "file") ? "file" : "photo";
+  if (c.pending > 0) return { text: `Uploading ${c.pending} ${noun}${c.pending === 1 ? "" : "s"}`, tone: "info" };
+  if (c.waiting > 0) return { text: `No signal · ${c.waiting} ${noun}${c.waiting === 1 ? "" : "s"} waiting`, tone: "info" };
   return null;
 }
 

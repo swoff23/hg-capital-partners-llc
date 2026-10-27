@@ -5,6 +5,7 @@ import { usesMultipart, type FileKind } from "./content-types";
 import { checkMediaFile, storedNames, uploadCountPhrase, uploadFailureReason, withExtension } from "./media";
 import {
   STALL_MS,
+  ServerBusyError,
   StalledError,
   afterFailure,
   classifyFailure,
@@ -13,7 +14,7 @@ import {
   type OutboxEntry,
   type OutboxStore,
 } from "./outbox";
-import { PrepareError, type PrepareMode, type Prepared, prepareFile } from "./prepare";
+import { PrepareError, UNREADABLE_PHOTO, type PrepareMode, type Prepared, prepareFile } from "./prepare";
 import type { Transfer } from "./transfer";
 import { UPLOAD_KIND_PREVIEWS, uploadTargetHref, type UploadKind } from "./upload-kinds";
 
@@ -86,6 +87,10 @@ type Job = {
   writing: Promise<void> | null;
   /** Bytes, for the tile and the row. */
   size: number;
+  /** Lets go of this tab's claim on the file (deps.claim), once it is recorded or removed. */
+  lease: (() => void) | null;
+  /** Its row is in the outbox, so a reload resumes it. A file whose write never went through is lost by a reload. */
+  stored: boolean;
 };
 
 export type EngineNotice = {
@@ -110,6 +115,17 @@ export type EngineDeps = {
   uid: () => string;
   /** Asks the browser to keep the outbox (navigator.storage.persist()); once, when the first file joins. */
   persist?: () => void;
+  /**
+   * Whose queue this is: "app:<user id>" in the app, "portal" in the contractor portal. One browser database serves
+   * both layouts and everyone who signs in on it, so a queue only picks up the files of its own scope.
+   */
+  scope?: string;
+  /**
+   * Takes ownership of a file for as long as this tab lives (a Web Lock named for it), so a second tab, or a reload in
+   * another one, doesn't send and record the same file again. Resolves to what lets go of it, or null when another
+   * tab holds it. Without it every file is ours.
+   */
+  claim?: (id: string) => Promise<(() => void) | null>;
 };
 
 /** The tiles of a target with none: one shared array, so a server snapshot and an idle client one are the same. */
@@ -123,7 +139,10 @@ export function capReason(remaining: number): string {
   return remaining <= 0 ? "no more can be added here" : `only ${remaining} more can be added here`;
 }
 
+/** The record step said no: the page has the reason. */
 class RecordRefused extends Error {}
+/** The record call itself threw (a 500, an error page, an action a deploy retired): the road, not the file. It tries again. */
+class RecordThrew extends Error {}
 
 const isInFlight = (s: JobStatus) => s === "queued" || s === "uploading" || s === "saving" || s === "waiting";
 
@@ -202,11 +221,10 @@ export class UploadEngine {
     return this.deps.outbox !== null;
   }
 
-  /** Whether a reload right now would lose files. */
+  /** Whether a reload right now would lose files: any in flight whose row never made it into the outbox (no outbox at all, a quota, a private window). */
   needsLeaveWarning = (): boolean => {
-    if (this.persistent) return false;
-    const c = this.counts();
-    return c.pending + c.waiting > 0;
+    for (const j of this.jobs.values()) if (isInFlight(j.status) && !j.stored) return true;
+    return false;
   };
 
   private view(j: Job): MediaUpload {
@@ -334,11 +352,16 @@ export class UploadEngine {
         stalled: false,
         writing: null,
         size: file.size,
+        lease: null,
+        stored: false,
       });
     }
     // Every file goes in the outbox before any bytes move, the whole batch at once, so a tab closed
-    // while the first is being prepared doesn't lose the rest.
-    for (const job of this.jobs.values()) if (job.batchId === batchId && job.status === "queued") job.writing = this.save(job);
+    // while the first is being prepared doesn't lose the rest. The claim comes first: a row another tab
+    // can see is already ours.
+    for (const job of this.jobs.values()) {
+      if (job.batchId === batchId && job.status === "queued") job.writing = this.hold(job).then(() => this.save(job));
+    }
     this.emit(target.key);
     if (!this.persistAsked) {
       this.persistAsked = true;
@@ -378,6 +401,11 @@ export class UploadEngine {
       } catch (err) {
         if (err instanceof PrepareError) {
           if (this.jobs.has(job.id)) this.patch(job, { status: "invalid", error: err.message });
+          return;
+        }
+        // A photo going public that couldn't be prepared for any other reason is refused too: as picked it would keep its GPS.
+        if (input.strict) {
+          if (this.jobs.has(job.id)) this.patch(job, { status: "invalid", error: UNREADABLE_PHOTO });
           return;
         }
         // Anything else: it goes up as picked, with no preview.
@@ -538,9 +566,9 @@ export class UploadEngine {
       res = await target.record(input);
     } catch (err) {
       // The call itself failed (no signal, an error page, an action retired by a deploy), not a refusal:
-      // its own words mean nothing here. A redirect isn't rethrown: the router is already navigating.
+      // its own words mean nothing here, and it tries again like any request the road dropped.
       if (isOfflineError(err)) throw new TypeError("Failed to fetch");
-      throw new RecordRefused("it couldn't be saved");
+      throw new RecordThrew("it couldn't be saved");
     }
     if (!res.ok || !res.data) {
       if (res.error === OFFLINE_ERROR) throw new TypeError("Failed to fetch");
@@ -566,15 +594,28 @@ export class UploadEngine {
     job.retryTimer = null;
     if (job.previewUrl) this.deps.preview.revoke(job.previewUrl);
     job.previewUrl = null;
+    // The row goes first, then the claim: another tab that read the row before it was gone would otherwise find the file free and send it again.
+    const lease = job.lease;
+    job.lease = null;
     // Whether or not a write got through: a row left behind would put a recorded file back after a reload.
-    if (this.deps.outbox) void this.deps.outbox.delete(job.id).catch(() => {});
+    if (this.deps.outbox) void this.deps.outbox.delete(job.id).catch(() => {}).finally(() => lease?.());
+    else lease?.();
   }
 
   private fail(job: Job, err: unknown) {
     const refusedByRecord = err instanceof RecordRefused;
     const online = this.deps.online();
-    const failure = refusedByRecord ? "refused" : job.stalled ? "timeout" : classifyFailure(err, online);
-    const reason = refusedByRecord ? err.message : failure === "refused" ? uploadFailureReason(err) : "no connection";
+    const ownWords = err instanceof RecordRefused || err instanceof RecordThrew || err instanceof ServerBusyError;
+    const failure = refusedByRecord
+      ? "refused"
+      : job.stalled
+        ? "timeout"
+        : err instanceof RecordThrew
+          ? online
+            ? "network"
+            : "offline"
+          : classifyFailure(err, online);
+    const reason = ownWords ? err.message : failure === "refused" ? uploadFailureReason(err) : "no connection";
     const next = afterFailure({ tries: job.tries, waits: job.waits }, failure);
     if (refusedByRecord) {
       // One record-only retry: a refusal may have discarded the blob, so after that it uploads again.
@@ -719,6 +760,7 @@ export class UploadEngine {
     const p = job.prepared;
     return {
       id: job.id,
+      scope: this.deps.scope ?? "",
       key: job.key,
       batchId: job.batchId,
       queuedAt: job.queuedAt,
@@ -754,14 +796,27 @@ export class UploadEngine {
     if (!outbox || !entry || !this.jobs.has(job.id)) return;
     try {
       await outbox.put(entry);
+      if (!job.stored) {
+        job.stored = true;
+        this.emit(job.key);
+      }
     } catch {
       /* carry on without it */
     }
   }
 
+  /** Takes this tab's claim on a file before its row is visible to other tabs. A claim that can't be made (no Web Locks) leaves the file ours. */
+  private async hold(job: Job): Promise<void> {
+    const lease = await this.deps.claim?.(job.id).catch(() => () => {});
+    if (!lease) return;
+    if (this.jobs.get(job.id) !== job) lease();
+    else job.lease = lease;
+  }
+
   /**
    * Picks the outbox back up after a reload (once per page load): every file
-   * still worth sending goes back in its target's queue and carries on.
+   * of this queue's scope still worth sending, and not held by another open
+   * tab, goes back in its target's queue and carries on.
    */
   async restore(): Promise<void> {
     if (this.restored || !this.deps.outbox) return;
@@ -773,11 +828,21 @@ export class UploadEngine {
       return;
     }
     const now = this.deps.now().getTime();
-    const keep = resumable(entries, now);
-    for (const e of entries) if (!keep.includes(e)) void this.deps.outbox.delete(e.id).catch(() => {});
+    const live = resumable(entries, now);
+    for (const e of entries) if (!live.includes(e)) void this.deps.outbox.delete(e.id).catch(() => {});
+    // The app and the portal share one database, and so does everyone who signs in on this browser: a queue takes only its own.
+    const scope = this.deps.scope ?? "";
+    const keep = live.filter((e) => (e.scope ?? "") === scope);
     const touched = new Set<string>();
     for (const e of keep) {
       if (this.jobs.has(e.id)) continue;
+      // Another open tab that is still sending this file keeps it.
+      const lease = this.deps.claim ? await this.deps.claim(e.id).catch(() => () => {}) : () => {};
+      if (!lease) continue;
+      if (this.jobs.has(e.id)) {
+        lease();
+        continue;
+      }
       const prepared: Prepared | null = e.prepared
         ? { blob: e.blob, name: e.name, contentType: e.contentType, thumb: e.thumb, poster: e.poster, meta: e.meta }
         : null;
@@ -818,6 +883,8 @@ export class UploadEngine {
         stalled: false,
         writing: null,
         size: e.blob.size,
+        lease,
+        stored: true,
       });
       touched.add(e.key);
     }

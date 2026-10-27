@@ -98,7 +98,7 @@ export function TaskMediaSection({
         {property ? (
           <PropertyPhotoGrid property={property} items={media} groups={groups} />
         ) : (
-          <MediaGrid items={media} groups={groups} onDelete={removeTaskFile} onRename={renameTaskFile} canEdit />
+          <MediaGrid items={media} groups={groups} onDelete={removeTaskFile} onRename={renameTaskFile} canEdit link />
         )}
         <FilesList files={files} onDelete={removeTaskFile} onRename={renameTaskFile} />
       </div>
@@ -124,6 +124,7 @@ function PropertyPhotoGrid({
       onDelete={removeTaskFile}
       onRename={renameTaskFile}
       canEdit
+      link
       menuItems={(item) =>
         item.kind === "IMAGE"
           ? [{ id: "property-photo", label: "Set as property photo", icon: <House />, onAction: () => void photo.fromTaskPhoto(item) }]

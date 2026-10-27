@@ -3,9 +3,10 @@ import { revalidatePath } from "next/cache";
 import { BlobNotFoundError, del, head, type HeadBlobResult } from "@vercel/blob";
 import { Prisma, type Visibility } from "@prisma/client";
 import { acceptsContractorUpload } from "@/lib/attachments/access";
-import { PREVIEW_RULE, UPLOAD_RULES, fileKindForType, filenameForType, normalizeContentType } from "@/lib/attachments/content-types";
+import { PREVIEW_RULE, UPLOAD_RULES, fileKindForType, filenameForType, normalizeContentType, type FileKind } from "@/lib/attachments/content-types";
 import { durationHint, pixelHint } from "@/lib/attachments/limits";
 import { isPrivateStoreUrl, storeIdFromToken, storedUploadRole, type UploadRole } from "@/lib/attachments/paths";
+import { UPLOAD_KIND_ALLOWED } from "@/lib/attachments/upload-kinds";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
@@ -128,13 +129,15 @@ async function verifyBlob(taskId: string, pathname: string, role: UploadRole, au
 }
 
 /** The verified metadata for core.recordAttachment, built from head(), not the browser. */
-async function verifiedAttachment(taskId: string, input: UploadedFile, auth: BlobAuth): Promise<core.AttachmentMeta> {
+async function verifiedAttachment(taskId: string, input: UploadedFile, auth: BlobAuth, allowed?: readonly FileKind[]): Promise<core.AttachmentMeta> {
   const paths = requestPaths(input);
   if (new Set(paths).size !== paths.length) throw new core.TaskRuleError("Each file needs its own path.");
   const taken = await prisma.taskAttachment.findFirst({ where: usingPaths(paths), select: { id: true } });
   if (taken) throw new core.TaskRuleError("That file is already attached.");
 
   const orig = await verifyBlob(taskId, input.pathname, "orig", auth);
+  // What the blob really is, not what the browser called it: a contractor's job takes photos and videos only (the same table the token route reads).
+  if (allowed && (!orig.kind || !allowed.includes(orig.kind))) throw new core.TaskRuleError("Only photos and videos can be added here.");
   const thumb = input.thumbPathname ? await verifyBlob(taskId, input.thumbPathname, "thumb", auth) : null;
   // A poster is a frame of a video; on anything else it's dropped, blob and all.
   const poster = input.posterPathname && orig.kind === "video" ? await verifyBlob(taskId, input.posterPathname, "poster", auth) : null;
@@ -243,7 +246,7 @@ export async function recordPortalAttachment(
   const att = await discardingOnRefusal(taskId, input, auth, async () => {
     const early = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt });
     if (early) throw new core.TaskRuleError(early);
-    const meta = await verifiedAttachment(taskId, input, auth);
+    const meta = await verifiedAttachment(taskId, input, auth, UPLOAD_KIND_ALLOWED["portal-task-upload"]);
     return prisma
       .$transaction(async (tx) => {
         const refusal = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt }, tx);
