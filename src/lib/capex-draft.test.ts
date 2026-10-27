@@ -1,7 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_CAPEX_RULES } from "./property-types";
-import { capexChangeCount, capexProblems, changesLine, changesShort, leftProblems, toDraft, toPayload, type CapexDraft } from "./capex-draft";
+import {
+  capexChangeCount,
+  capexProblems,
+  cellErrorProps,
+  changesLine,
+  changesShort,
+  leftProblems,
+  rowLineId,
+  toDraft,
+  toPayload,
+  type CapexDraft,
+} from "./capex-draft";
 
 const saved = toDraft(DEFAULT_CAPEX_RULES);
 const edit = (fn: (d: CapexDraft) => void): CapexDraft => {
@@ -135,4 +146,14 @@ test("leaving a figure that holds text it can't read says so before Save; nothin
   // A figure typed over and right again has no line.
   const fixed = edit((d) => void (d.equipment[1].replace = "12"));
   assert.deepEqual(leftProblems(fixed, new Set([`${uid(1)}:replace`])), {});
+});
+
+test("an invalid figure points to its row's error line, so a screen reader reads the problem", () => {
+  // The field had aria-invalid, but its aria-describedby named only the "yrs" suffix.
+  const line = rowLineId("e1");
+  assert.equal(line, "capex-row-e1-line");
+  assert.deepEqual(cellErrorProps("Enter 0 or more.", line), { "aria-invalid": true, "aria-describedby": line });
+  // No line on screen yet: invalid, with nothing to point to.
+  assert.deepEqual(cellErrorProps("Enter 0 or more.", undefined), { "aria-invalid": true });
+  assert.deepEqual(cellErrorProps(undefined, line), {});
 });

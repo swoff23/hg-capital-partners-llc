@@ -48,3 +48,15 @@ export function cronAuthorized(
   if (!m) return "denied";
   return safeEqual(configuredSecret, m[1].trim()) ? "ok" : "denied";
 }
+
+/**
+ * What a cron route answers when it won't run, or null when it may. The
+ * status tells the operator which side to fix (503 the env, 401 the caller);
+ * the body is the bare HTTP phrase, since anyone can call these routes and
+ * the reason (which variable is missing) is for the logs, not for them.
+ */
+export function cronRefusal(auth: CronAuth): { status: 401 | 503; body: string } | null {
+  if (auth === "unconfigured") return { status: 503, body: "Service Unavailable" };
+  if (auth === "denied") return { status: 401, body: "Unauthorized" };
+  return null;
+}

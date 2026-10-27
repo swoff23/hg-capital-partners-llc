@@ -21,8 +21,15 @@
  * schema carries them (`z.string().min(4, "Enter the full street address,
  * like 123 Main St.")`), and they reach the screen as written. zod's own
  * defaults never end with one ("Too small: expected string to have >=4
- * characters"), so they're developer text: the form-level line keeps today's
- * "Invalid address: …" for them and a field's line says "Check this value."
+ * characters"), so they're developer text and never reach the screen:
+ * `plainIssueMessage` says the same rule in plain words ("Use 300 characters
+ * or fewer."), for the form-level line and the field's own line alike, and
+ * "Check this value." when there's no plain way to say it. A thrown Error's
+ * message passes through only when it's written for people the same way, so
+ * a library's or a config check's text ("QuickBooks needs QBO_CLIENT_ID …")
+ * becomes the generic line. A number too big for its column, which Postgres
+ * refuses, says "Enter a smaller number." instead of "Try again", since
+ * trying again can't fix it.
  */
 import { unstable_rethrow } from "next/navigation";
 import { HG_TIME_ZONE, fmtDay, todayYmdEastern } from "./dates";
@@ -209,9 +216,25 @@ export async function callAction<T>(fn: () => Promise<ActionResult<T>>): Promise
   }
 }
 
+/** A number Postgres can't store in its column (an INT4, a Decimal(12, 2)): a smaller one is the only fix. */
+export const NUMBER_TOO_BIG = "Enter a smaller number.";
+
+/**
+ * The fields of a zod issue the plain words read: zod 4's (`origin`,
+ * `format`, `expected`), with zod 3's `type` read as the origin.
+ */
 interface ZodLikeIssue {
   path?: PropertyKey[];
   message?: string;
+  code?: string;
+  origin?: string;
+  type?: string;
+  format?: string;
+  expected?: string;
+  minimum?: number | bigint;
+  maximum?: number | bigint;
+  inclusive?: boolean;
+  divisor?: number | bigint;
 }
 
 function isZodLike(err: unknown): err is { issues: ZodLikeIssue[] } {
@@ -228,6 +251,80 @@ export const FIELD_FALLBACK = "Check this value.";
 
 const issuePath = (issue: ZodLikeIssue) => (issue.path ?? []).map(String).join(".");
 
+/** A bound as people read it: "10,000". Past a trillion it's no help, so null. */
+function boundText(n: number | bigint | undefined): string | null {
+  if (n === undefined) return null;
+  const v = Number(n);
+  if (!Number.isFinite(v) || Math.abs(v) > 1e12) return null;
+  return v.toLocaleString("en-US");
+}
+
+/**
+ * The rule a zod issue broke, in plain words, for when its schema gave no
+ * message of its own: "Use 300 characters or fewer.", "Enter 10,000 or
+ * less.", "Enter a whole number." Never zod's developer text; "Check this
+ * value." when there's no plainer way to say it.
+ */
+export function plainIssueMessage(issue: ZodLikeIssue | undefined): string {
+  if (!issue) return FIELD_FALLBACK;
+  if (isPlainMessage(issue.message)) return issue.message.trim();
+  const origin = issue.origin ?? issue.type;
+  const exclusive = issue.inclusive === false;
+  // A count (characters, items) past an exclusive bound reads as the last one allowed; a number says "less than".
+  const step = exclusive && (origin === "string" || origin === "array" || origin === "set") ? 1 : 0;
+  switch (issue.code) {
+    case "too_big": {
+      const max = issue.maximum === undefined ? undefined : Number(issue.maximum) - step;
+      const text = boundText(max);
+      if (origin === "string") return text ? `Use ${text} characters or fewer.` : FIELD_FALLBACK;
+      if (origin === "array" || origin === "set") return text ? `Use ${text} or fewer.` : FIELD_FALLBACK;
+      if (origin === "number" || origin === "int" || origin === "bigint") {
+        if (!text) return NUMBER_TOO_BIG;
+        return exclusive ? `Enter less than ${text}.` : `Enter ${text} or less.`;
+      }
+      if (origin === "date") return "Pick an earlier date.";
+      return FIELD_FALLBACK;
+    }
+    case "too_small": {
+      const min = issue.minimum === undefined ? undefined : Number(issue.minimum) + step;
+      const text = boundText(min);
+      if (origin === "string") {
+        if (min === undefined || min <= 1) return "Fill this in.";
+        return text ? `Use at least ${text} characters.` : FIELD_FALLBACK;
+      }
+      if (origin === "array" || origin === "set") {
+        if (min === undefined || min <= 1) return "Add at least one.";
+        return text ? `Add at least ${text}.` : FIELD_FALLBACK;
+      }
+      if (origin === "number" || origin === "int" || origin === "bigint") {
+        if (!text) return FIELD_FALLBACK;
+        return exclusive ? `Enter more than ${text}.` : `Enter ${text} or more.`;
+      }
+      if (origin === "date") return "Pick a later date.";
+      return FIELD_FALLBACK;
+    }
+    case "invalid_type":
+      if (issue.expected === "int") return "Enter a whole number.";
+      if (issue.expected === "number" || issue.expected === "bigint") return "Enter a number.";
+      if (issue.expected === "string") return "Fill this in.";
+      if (issue.expected === "date") return "Enter a date.";
+      return FIELD_FALLBACK;
+    case "invalid_format":
+    case "invalid_string":
+      if ((issue.format ?? issue.type) === "email") return "Enter a full email, like name@example.com.";
+      if ((issue.format ?? issue.type) === "url") return "Enter a full link, like https://example.com.";
+      return FIELD_FALLBACK;
+    case "invalid_value":
+    case "invalid_enum_value":
+    case "invalid_literal":
+      return "Pick one of the options.";
+    case "not_multiple_of":
+      return Number(issue.divisor) === 1 ? "Enter a whole number." : FIELD_FALLBACK;
+    default:
+      return FIELD_FALLBACK;
+  }
+}
+
 /**
  * Each field's own line from a zod failure, keyed by the issue's path
  * ("address", "units.0.label"): the first issue for a field wins, and an
@@ -238,24 +335,27 @@ export function zodFieldErrors(err: { issues: ZodLikeIssue[] }): FieldErrors {
   for (const issue of err.issues) {
     const key = issuePath(issue);
     if (!key || key in out) continue;
-    out[key] = isPlainMessage(issue.message) ? issue.message.trim() : FIELD_FALLBACK;
+    out[key] = plainIssueMessage(issue);
   }
   return out;
 }
 
+/** Postgres refused a number too big for its column: an INT4 ("Unable to fit integer value"), a Decimal(12, 2) ("numeric field overflow"). */
+function isNumberOverflow(err: Error): boolean {
+  const code = (err as { code?: unknown }).code;
+  if (code === "P2020" || code === "P2033") return true;
+  return /numeric field overflow|Unable to fit integer value|value out of range|out of range for type|does not fit into a 64 bit/i.test(err.message);
+}
+
 export function userMessage(err: unknown): string {
   if (err instanceof ConflictError || err instanceof FieldError) return err.message;
-  if (isZodLike(err)) {
-    const first = err.issues[0];
-    if (isPlainMessage(first?.message)) return first.message.trim();
-    const where = first?.path?.length ? issuePath(first) : "input";
-    return `Invalid ${where}: ${first?.message ?? "check the value"}`;
-  }
+  if (isZodLike(err)) return plainIssueMessage(err.issues[0]);
   if (err instanceof Error) {
-    if (err.name.startsWith("PrismaClient")) return GENERIC_ERROR;
+    if (err.name.startsWith("PrismaClient")) return isNumberOverflow(err) ? NUMBER_TOO_BIG : GENERIC_ERROR;
     if (!err.message || err.message.length > 200) return GENERIC_ERROR;
     if (/ECONN|ETIMEDOUT|fetch failed|Invocation|Server Components render/i.test(err.message)) return GENERIC_ERROR;
-    return err.message;
+    // Only a sentence written for people ("This job is closed."); a library's or a config check's text never shows.
+    return isPlainMessage(err.message) ? err.message.trim() : GENERIC_ERROR;
   }
   return GENERIC_ERROR;
 }

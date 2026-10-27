@@ -97,9 +97,21 @@ export function matchesNeedsW9(c: { w9Url: string | null; comments: string | nul
   return !f.needsW9 || (!c.w9Url && !docOnFile(c.comments, "W-9"));
 }
 
-/** The one sentence an empty list says, and the way out. */
+/**
+ * The one sentence an empty list says, and the way out. A search with a
+ * filter on (Has login, Needs W-9, a trade) blames neither alone: "these
+ * filters", and Clear filters takes off both, as the Tasks and Deals lists
+ * do. Blaming the search offered Clear search, which only led to a second
+ * empty list.
+ */
 export function emptyContractors(f: ContractorFilters, total: number): { line: string; clear: "search" | "filters" | null } {
   if (total === 0) return { line: "No contractors yet.", clear: null };
-  if (f.q) return { line: `No contractors match “${f.q}”.`, clear: "search" };
+  const filtered = f.trades.length > 0 || f.hasLogin || f.needsW9;
+  if (f.q && !filtered) return { line: `No contractors match “${f.q}”.`, clear: "search" };
   return { line: "No contractors match these filters.", clear: "filters" };
+}
+
+/** The header's count: always the whole list, as Portfolio's is. The line under the filters says how many show. */
+export function contractorsCount(total: number): string {
+  return `${total.toLocaleString("en-US")} ${total === 1 ? "contractor" : "contractors"}`;
 }

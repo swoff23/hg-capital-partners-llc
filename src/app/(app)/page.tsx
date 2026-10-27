@@ -10,6 +10,9 @@ import { emailCapReached, todayTasks } from "@/lib/tasks/queries";
 import { NeedsYou } from "./needs-you";
 import { TaskListProvider } from "./tasks/task-list-context";
 import { TodayView } from "./tasks/today-view";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Home" };
 
 export const dynamic = "force-dynamic";
 

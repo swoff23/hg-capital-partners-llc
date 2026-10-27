@@ -12,6 +12,9 @@ import { AllList } from "./all-list";
 import { TaskFilters } from "./filters";
 import { TaskListProvider } from "./task-list-context";
 import { TasksHeader } from "./tasks-header";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Tasks" };
 
 const PAGE = 400;
 

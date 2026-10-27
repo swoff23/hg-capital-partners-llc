@@ -62,32 +62,42 @@ test("partialSyncLine: 'to the cent' only when the gap is under $1", () => {
   );
 });
 
+const live = { status: "ACTIVE" };
+
+test("oauthReturnLine: a typed or shared ?connected=1 says nothing without a live connection", () => {
+  // /financials/settings?connected=1 said "Connected to QuickBooks. A full sync is running now." over "QuickBooks isn't set up yet."
+  assert.equal(oauthReturnLine({ connected: "1" }, null), null);
+  assert.equal(oauthReturnLine({ connected: "1" }, { status: "REVOKED" }), null);
+  assert.equal(oauthReturnLine({ connected: "1" }, { status: "EXPIRED" }), null);
+  assert.equal(oauthReturnLine({ connected: "1" }, live)?.text, "Connected to QuickBooks. A full sync is running now.");
+});
+
 test("oauthReturnLine: one line per way the Intuit round trip ends", () => {
-  assert.equal(oauthReturnLine({}), null);
-  assert.deepEqual(oauthReturnLine({ connected: "1" }), {
+  assert.equal(oauthReturnLine({}, live), null);
+  assert.deepEqual(oauthReturnLine({ connected: "1" }, live), {
     tone: "info",
     text: "Connected to QuickBooks. A full sync is running now.",
     retry: false,
   });
-  assert.deepEqual(oauthReturnLine({ error: "access_denied" }), {
+  assert.deepEqual(oauthReturnLine({ error: "access_denied" }, null), {
     tone: "info",
     text: "Connection cancelled. Nothing changed.",
     retry: true,
   });
-  assert.deepEqual(oauthReturnLine({ error: "state_mismatch" }), {
+  assert.deepEqual(oauthReturnLine({ error: "state_mismatch" }, null), {
     tone: "error",
     text: "That sign-in expired.",
     retry: true,
   });
   for (const code of ["token_exchange_failed", "missing_params", "something_new"]) {
-    assert.deepEqual(oauthReturnLine({ error: code }), {
+    assert.deepEqual(oauthReturnLine({ error: code }, null), {
       tone: "error",
       text: "QuickBooks didn't finish connecting.",
       retry: true,
     });
   }
   // an error wins over a stray connected flag
-  assert.equal(oauthReturnLine({ connected: "1", error: ["access_denied"] })?.text, "Connection cancelled. Nothing changed.");
+  assert.equal(oauthReturnLine({ connected: "1", error: ["access_denied"] }, live)?.text, "Connection cancelled. Nothing changed.");
 });
 
 test("reconcileRow: the review's case, Accrual NOI $50 off while Cash ties", () => {

@@ -1,4 +1,7 @@
 import { NewDealScreen } from "./new-deal-screen";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "New deal" };
 
 /** New deal as a page: a pasted link or a reload. A click inside the app opens it as a sheet over the list (`@modal/(.)deals/new`). */
 export default function NewDealPage({ searchParams }: PageProps<"/deals/new">) {

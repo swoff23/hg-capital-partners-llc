@@ -18,9 +18,11 @@ import {
   BUILDING_LIKE_EQUIPMENT,
   capexChangeCount,
   capexProblems,
+  cellErrorProps,
   changesLine,
   changesShort,
   leftProblems,
+  rowLineId,
   toDraft,
   toPayload,
   type BuildingDraft,
@@ -106,6 +108,7 @@ function Figures({
   row,
   costKey,
   problems,
+  lineId,
   onChange,
   onLeave,
 }: {
@@ -114,6 +117,8 @@ function Figures({
   row: Cells;
   costKey: "cost" | "defaultCost";
   problems: Record<string, string | undefined>;
+  /** The row's error line while it shows, which an invalid figure points to (aria-describedby). */
+  lineId: string | undefined;
   onChange: (patch: Partial<Cells>) => void;
   /** A figure was left: a format error shows from then on (forms 2.0). */
   onLeave: (cell: keyof Cells) => void;
@@ -126,7 +131,7 @@ function Figures({
         size="sm"
         align="end"
         aria-label={`${name} monitor years`}
-        aria-invalid={problems.monitor ? true : undefined}
+        {...cellErrorProps(problems.monitor, lineId)}
         value={row.monitor}
         onChange={(monitor) => onChange({ monitor })}
         onBlur={() => onLeave("monitor")}
@@ -138,7 +143,7 @@ function Figures({
         size="sm"
         align="end"
         aria-label={`${name} replace years`}
-        aria-invalid={problems.replace ? true : undefined}
+        {...cellErrorProps(problems.replace, lineId)}
         value={row.replace}
         onChange={(replace) => onChange({ replace })}
         onBlur={() => onLeave("replace")}
@@ -149,7 +154,7 @@ function Figures({
         size="sm"
         align="end"
         aria-label={`${name} cost`}
-        aria-invalid={problems[costKey] ? true : undefined}
+        {...cellErrorProps(problems[costKey], lineId)}
         value={row.cost}
         onChange={(cost) => onChange({ cost })}
         onBlur={() => onLeave("cost")}
@@ -187,7 +192,11 @@ function RuleRow({
       ) : (
         <span className="max-sm:col-start-2 max-sm:row-start-1" />
       )}
-      {line && <p className={rowLine}>{line}</p>}
+      {line && (
+        <p id={rowLineId(uid)} className={rowLine}>
+          {line}
+        </p>
+      )}
     </div>
   );
 }
@@ -360,6 +369,7 @@ export function CapexRulesEditor({
           row={r}
           costKey="cost"
           problems={mine(["monitor", "replace", "cost"])}
+          lineId={firstLine(shown, prefix, ["type", "monitor", "replace", "cost"]) ? rowLineId(r.uid) : undefined}
           onChange={(p) => patchEq(r.uid, p)}
           onLeave={(cell) => leave(r.uid, cell)}
         />
@@ -396,6 +406,7 @@ export function CapexRulesEditor({
           row={r}
           costKey="defaultCost"
           problems={mine(["monitor", "replace", "defaultCost"])}
+          lineId={firstLine(shown, prefix, ["label", "monitor", "replace", "defaultCost"]) ? rowLineId(r.uid) : undefined}
           onChange={(p) => patchB(r.uid, p)}
           onLeave={(cell) => leave(r.uid, cell)}
         />

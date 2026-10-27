@@ -15,16 +15,121 @@ import {
   conflictValueLine,
   isOfflineError,
   isPlainMessage,
+  NUMBER_TOO_BIG,
+  plainIssueMessage,
   toFailure,
   userMessage,
   zodFieldErrors,
 } from "./action-result";
 
-test("zod errors name the field and the first issue", () => {
+test("zod's own defaults never reach the screen: the rule comes out in plain words", () => {
   const r = z.object({ address: z.string().min(4) }).safeParse({ address: "ab" });
   assert.equal(r.success, false);
-  const msg = userMessage(r.error);
-  assert.match(msg, /^Invalid address: /);
+  assert.equal(userMessage(r.error), "Use at least 4 characters.");
+});
+
+test("the break-the-app cases: a long Next action, a long title, a long checklist item", () => {
+  // deals: "Invalid nextAction: Too big: expected string to have <=300 characters"
+  const deal = z.object({ nextAction: z.string().max(300).nullish() }).safeParse({ nextAction: "x".repeat(301) });
+  assert.equal(deal.success, false);
+  assert.equal(userMessage(deal.error), "Use 300 characters or fewer.");
+  assert.deepEqual(toFailure(deal.error), {
+    ok: false,
+    error: "Use 300 characters or fewer.",
+    fieldErrors: { nextAction: "Use 300 characters or fewer." },
+  });
+  // tasks: "Invalid description: Too big: expected string to have <=20000 characters"
+  const notes = z.object({ description: z.string().max(20_000) }).safeParse({ description: "x".repeat(20_001) });
+  assert.equal(notes.success, false);
+  assert.equal(userMessage(notes.error), "Use 20,000 characters or fewer.");
+  // a schema with no path at all: "Invalid input: Too big: …"
+  const item = z.string().max(300).safeParse("x".repeat(301));
+  assert.equal(item.success, false);
+  assert.equal(userMessage(item.error), "Use 300 characters or fewer.");
+});
+
+test("plainIssueMessage: every common rule has plain words, and none is zod's text", () => {
+  const schema = z.object({
+    a: z.string().max(300),
+    b: z.string().min(1),
+    c: z.coerce.number().int(),
+    d: z.coerce.number().max(10_000),
+    e: z.string().email(),
+    f: z.enum(["x", "y"]),
+    g: z.array(z.string()).max(50),
+    h: z.number().positive(),
+    i: z.string().url(),
+    j: z.number(),
+    k: z.int(),
+    l: z.number().lt(100),
+    m: z.number().min(1),
+    n: z.array(z.string()).min(1),
+    o: z.number().multipleOf(1),
+  });
+  const r = schema.safeParse({
+    a: "x".repeat(301),
+    b: "",
+    c: "1.5",
+    d: "20000",
+    e: "nope",
+    f: "z",
+    g: Array(51).fill("a"),
+    h: 0,
+    i: "nah",
+    j: "text",
+    k: 2 ** 60,
+    l: 100,
+    m: 0,
+    n: [],
+    o: 1.5,
+  });
+  assert.equal(r.success, false);
+  assert.deepEqual(zodFieldErrors(r.error), {
+    a: "Use 300 characters or fewer.",
+    b: "Fill this in.",
+    c: "Enter a whole number.",
+    d: "Enter 10,000 or less.",
+    e: "Enter a full email, like name@example.com.",
+    f: "Pick one of the options.",
+    g: "Use 50 or fewer.",
+    h: "Enter more than 0.",
+    i: "Enter a full link, like https://example.com.",
+    j: "Enter a number.",
+    k: NUMBER_TOO_BIG,
+    l: "Enter less than 100.",
+    m: "Enter 1 or more.",
+    n: "Add at least one.",
+    o: "Enter a whole number.",
+  });
+  for (const issue of r.error.issues) {
+    const line = plainIssueMessage(issue);
+    assert.equal(isPlainMessage(line), true, line);
+    assert.doesNotMatch(line, /Invalid|expected|Too (big|small)|<=|>=/, line);
+  }
+  assert.equal(plainIssueMessage(undefined), FIELD_FALLBACK);
+  assert.equal(plainIssueMessage({ code: "custom", message: "Invalid input" }), FIELD_FALLBACK);
+});
+
+test("a number too big for its column says so, since trying again can't fix it", () => {
+  // deals and portfolio: Units 3000000000 into an INT4, $20,000,000,000 into a Decimal(12, 2)
+  const int4 = Object.assign(new Error("Unable to fit integer value '3000000000' into an INT4 (32-bit signed integer)."), {
+    name: "PrismaClientUnknownRequestError",
+  });
+  const numeric = Object.assign(new Error("Invalid `prisma.deal.update()` invocation: numeric field overflow"), {
+    name: "PrismaClientKnownRequestError",
+    code: "P2020",
+  });
+  assert.equal(userMessage(int4), NUMBER_TOO_BIG);
+  assert.equal(userMessage(numeric), NUMBER_TOO_BIG);
+  assert.deepEqual(toFailure(numeric), { ok: false, error: NUMBER_TOO_BIG });
+});
+
+test("a thrown message passes through only when it's written for people", () => {
+  assert.equal(userMessage(new Error("This job is closed.")), "This job is closed.");
+  // A config check's or a library's text, which would name env vars or internals.
+  assert.equal(userMessage(new Error("QuickBooks needs QBO_CLIENT_ID, QBO_CLIENT_SECRET, QBO_REDIRECT_URI and QBO_TOKEN_SECRET set")), GENERIC_ERROR);
+  assert.equal(userMessage(new TypeError("Cannot read properties of undefined (reading 'id')")), GENERIC_ERROR);
+  assert.equal(userMessage(new Error("Not a date: 2026-02-30")), GENERIC_ERROR);
 });
 
 test("our own thrown messages pass through", () => {
@@ -128,8 +233,8 @@ test("zod issues become each field's own line, keyed by path", () => {
   assert.deepEqual(fieldErrors, {
     address: "Enter the address.",
     units: "Enter a whole number.",
-    // zod's own default is developer text, so the field gets the plain fallback.
-    rate: FIELD_FALLBACK,
+    // zod's own default is developer text, so the field gets the rule in plain words.
+    rate: "Enter 30 or less.",
     "items.1.label": "Name the item.",
   });
 });

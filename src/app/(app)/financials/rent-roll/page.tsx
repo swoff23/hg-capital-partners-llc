@@ -11,6 +11,9 @@ import { BasisControl } from "../_components/period-row";
 import { MoneyCents } from "../_components/ui";
 import { GridFrame } from "./grid-frame";
 import { RentRollByMonth } from "./month-stepper";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Rent roll" };
 
 export const dynamic = "force-dynamic";
 

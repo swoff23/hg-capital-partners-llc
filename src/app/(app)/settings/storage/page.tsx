@@ -2,6 +2,9 @@ import { requireUser } from "@/lib/auth";
 import { stillPublicCount } from "@/lib/attachments/migrate";
 import { Section } from "@/components/ui";
 import { MigrateButton } from "./migrate-button";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Storage" };
 
 export const dynamic = "force-dynamic";
 

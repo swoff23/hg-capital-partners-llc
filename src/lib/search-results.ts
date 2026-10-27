@@ -27,6 +27,12 @@ export const ALL_LIMIT = 4;
 export const TYPE_LIMIT = 20;
 /** Fewest characters the server searches on. */
 export const MIN_QUERY = 2;
+/**
+ * Most characters the server reads: longer than any title worth typing (300
+ * is the task title's cap, and only the first six words count anyway), and
+ * short enough that a pasted page of text stays one cheap query.
+ */
+export const MAX_QUERY = 200;
 /** Records Recent shows. */
 export const RECENT_SHOWN = 5;
 
@@ -323,7 +329,7 @@ export type SearchParams = { q: string; type?: SearchType; limit?: number };
  * panel can point to them.
  */
 export async function runSearch(db: SearchDb, params: SearchParams): Promise<SearchResponse> {
-  const q = params.q.trim();
+  const q = boundQuery(params.q);
   const terms = searchTerms(q);
   if (q.length < MIN_QUERY || terms.length === 0) return { groups: [] };
 
@@ -408,6 +414,11 @@ export type Viewer = { id: string } | null;
 
 export const SIGNED_OUT = { status: 401, body: { error: "signed-out" } } as const satisfies Answer<never>;
 
+/** What was typed, trimmed and cut to MAX_QUERY characters, so any length costs the same. */
+export function boundQuery(q: string): string {
+  return q.trim().slice(0, MAX_QUERY).trim();
+}
+
 /** Reads `q`, `type` and `limit` from a request's query string. */
 export function parseSearchParams(sp: URLSearchParams): SearchParams | { error: string } {
   const type = sp.get("type");
@@ -415,7 +426,7 @@ export function parseSearchParams(sp: URLSearchParams): SearchParams | { error: 
   const limit = sp.get("limit");
   const n = limit === null || limit === "" ? undefined : Number(limit);
   return {
-    q: (sp.get("q") ?? "").trim(),
+    q: boundQuery(sp.get("q") ?? ""),
     type: type ? (type as SearchType) : undefined,
     limit: n,
   };
