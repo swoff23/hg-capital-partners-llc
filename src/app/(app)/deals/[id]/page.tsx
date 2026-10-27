@@ -8,6 +8,13 @@ import { RailList } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
 import { DealActivity } from "./deal-activity";
 import { DealAddress, DealFact, DealListingLink, DealPassReason, DealPrice, DealStageRow, DealUnits } from "./deal-detail";
+import type { Metadata } from "next";
+import { recordMetadata } from "@/lib/record-metadata";
+
+/** The tab names the record (record-title.ts), so tabs and history can be told apart. */
+export async function generateMetadata({ params }: PageProps<"/deals/[id]">): Promise<Metadata> {
+  return recordMetadata("deal", (await params).id);
+}
 
 export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
   const user = await requireUser();

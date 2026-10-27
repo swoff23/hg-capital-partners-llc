@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ContactLink } from "./contact-link";
 import { ContractorFilters } from "./filters";
 import {
+  contractorsCount,
   contractorsWhere,
   emptyContractors,
   isNarrowed,
@@ -17,6 +18,9 @@ import {
   parseContractorFilters,
   tradeOptions,
 } from "./query";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Contractors" };
 
 /** An empty cell: the lone dash glyph in --fg-3 (docs/brand-guidelines.md, section 3). */
 const EMPTY = <span className="text-fg-3">—</span>;
@@ -45,8 +49,8 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
     <>
       <PageHeader
         title="Contractors"
-        // The count says why it changed: "4 of 52 contractors" while a search or a filter is on.
-        subtitle={narrowed ? `${contacts.length} of ${total} contractors` : `${total} contractor${total === 1 ? "" : "s"}`}
+        // The whole list, filtered or not: the result line under the filters says "2 contractors · 28 hidden".
+        subtitle={contractorsCount(total)}
         // Opens the New contractor sheet over the list (forms 4.6); a pasted link gets the same form as a page.
         actions={
           <LinkButton href="/contractors/new" variant="primary">

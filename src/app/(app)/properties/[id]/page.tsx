@@ -27,6 +27,13 @@ import { PropertyFinancialsCard } from "./financials";
 import { PropertyFactStrip } from "./record-strip";
 import { PropertyPhoto } from "./property-photo";
 import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
+import type { Metadata } from "next";
+import { recordMetadata } from "@/lib/record-metadata";
+
+/** The tab names the record (record-title.ts), so tabs and history can be told apart. */
+export async function generateMetadata({ params }: PageProps<"/properties/[id]">): Promise<Metadata> {
+  return recordMetadata("property", (await params).id);
+}
 
 const ymd = toYmd;
 

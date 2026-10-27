@@ -6,6 +6,9 @@ import { BackLink } from "@/components/back-link";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
 import { parseTemplateItems } from "@/lib/tasks/template-items";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Playbooks" };
 
 /**
  * Playbooks (D28): the task templates imported from Asana. Pick one to apply

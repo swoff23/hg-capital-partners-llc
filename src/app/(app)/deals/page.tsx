@@ -14,6 +14,9 @@ import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
 import { COLUMN_DROP } from "./columns";
 import { DEFAULT_DEAL_SORT, easternDay, noteDay } from "./format";
 import { dealSearchWhere, dealsWhere, emptyDeals, isFiltered, parseDealFilters, viewCounts } from "./query";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Deals" };
 
 const CAP = 300;
 

@@ -214,3 +214,19 @@ test("STAFF_SECTIONS is the list of folders in src/app/(app)", () => {
     .sort();
   assert.deepEqual([...STAFF_SECTIONS].sort(), folders);
 });
+
+test("every staff section answers an unknown address with the app's own Not found", () => {
+  // /settings/xyz, /financials/xyz and /templates/notreal fell through to the public site's 404
+  // (src/app/not-found.tsx), which reads to a signed-in person as if they'd been signed out.
+  let dir = process.cwd();
+  while (!fs.existsSync(path.join(dir, "prisma", "schema.prisma"))) {
+    const up = path.dirname(dir);
+    assert.notEqual(up, dir, "could not locate the repo root");
+    dir = up;
+  }
+  for (const section of STAFF_SECTIONS) {
+    const page = path.join(dir, "src", "app", "(app)", section, "[...missing]", "page.tsx");
+    assert.ok(fs.existsSync(page), `${section} has no [...missing]/page.tsx`);
+    assert.match(fs.readFileSync(page, "utf8"), /\bnotFound\(\)/, `${section}/[...missing] doesn't call notFound()`);
+  }
+});

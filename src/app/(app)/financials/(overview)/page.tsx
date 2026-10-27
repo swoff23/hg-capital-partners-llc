@@ -16,6 +16,9 @@ import { CATEGORY_LABELS } from "../_components/labels";
 import { ExpenseCard } from "../_components/expense-card";
 import { PeriodRow } from "../_components/period-row";
 import { MoneyCents } from "../_components/ui";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Financials" };
 
 export const dynamic = "force-dynamic";
 

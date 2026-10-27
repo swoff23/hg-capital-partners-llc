@@ -8,6 +8,7 @@ import { newToken } from "@/lib/portal/tokens";
 import { readSessionToken, signSessionToken } from "@/lib/session-token";
 import {
   answerRecent,
+  MAX_QUERY,
   answerSearch,
   parseSearchParams,
   runSearch,
@@ -362,6 +363,31 @@ test("parseSearchParams: type and limit are checked", () => {
   assert.deepEqual(parseSearchParams(new URLSearchParams("q= roof &type=task&limit=7")), { q: "roof", type: "task", limit: 7 });
   assert.deepEqual(parseSearchParams(new URLSearchParams("q=roof")), { q: "roof", type: undefined, limit: undefined });
   assert.deepEqual(parseSearchParams(new URLSearchParams("type=widget")), { error: "bad-type" });
+});
+
+test("the query is bounded: a pasted page of text costs what a title does", async () => {
+  // 400 distinct words took 1,153 ms and a 5,000-character term 722 ms, against ~100 ms for a normal query.
+  const words = Array.from({ length: 400 }, (_, i) => `w${i}`).join(" ");
+  const long = new URLSearchParams({ q: words });
+  const parsed = parseSearchParams(long);
+  assert.ok(!("error" in parsed));
+  assert.ok(parsed.q.length <= MAX_QUERY, `${parsed.q.length} characters`);
+  assert.ok(words.startsWith(parsed.q));
+  const one = parseSearchParams(new URLSearchParams({ q: "x".repeat(5000) }));
+  assert.equal("q" in one ? one.q.length : -1, MAX_QUERY);
+
+  // runSearch bounds it too, whoever calls it: no spelling sent to the database is longer than the cap.
+  const seen: string[] = [];
+  const record = (args: unknown) =>
+    JSON.stringify(args, (key, value) => {
+      if (key === "contains" && typeof value === "string") seen.push(value);
+      return value;
+    });
+  const recording = { findMany: async (args: unknown) => (record(args), []), count: async (args: unknown) => (record(args), 0) };
+  const db = { property: recording, task: recording, deal: recording, contact: recording } as unknown as SearchDb;
+  await runSearch(db, { q: "y".repeat(5000) });
+  assert.ok(seen.length > 0);
+  assert.ok(seen.every((s) => s.length <= MAX_QUERY), `longest spelling ${Math.max(...seen.map((s) => s.length))}`);
 });
 
 test("a bad type is a 400 and a database error is a 500 that is logged, not shown", async () => {

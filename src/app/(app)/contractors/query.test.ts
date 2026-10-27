@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   contractorQuery,
   contractorsWhere,
+  contractorsCount,
   emptyContractors,
   isNarrowed,
   matchesNeedsW9,
@@ -117,4 +118,18 @@ test("an empty list: a miss on a search is not an empty directory", () => {
   assert.deepEqual(emptyContractors({ ...none, q: "luis" }, 52), { line: "No contractors match “luis”.", clear: "search" });
   assert.deepEqual(emptyContractors({ ...none, hasLogin: true }, 52), { line: "No contractors match these filters.", clear: "filters" });
   assert.deepEqual(emptyContractors(none, 0), { line: "No contractors yet.", clear: null });
+});
+
+test("an empty list with a search and a filter on blames neither alone, and clears both", () => {
+  // /contractors?q=david&login=1 said 'No contractors match "david".' with Clear search, which led to a second empty list.
+  assert.deepEqual(emptyContractors({ ...none, q: "david", hasLogin: true }, 30), { line: "No contractors match these filters.", clear: "filters" });
+  assert.deepEqual(emptyContractors({ ...none, q: "david", needsW9: true }, 30), { line: "No contractors match these filters.", clear: "filters" });
+  assert.deepEqual(emptyContractors({ ...none, q: "david", trades: ["Plumbing"] }, 30), { line: "No contractors match these filters.", clear: "filters" });
+});
+
+test("the header counts the whole list; the result line says how many show", () => {
+  // "2 of 30 contractors" over "2 contractors · 28 hidden by filters" said the same thing twice.
+  assert.equal(contractorsCount(30), "30 contractors");
+  assert.equal(contractorsCount(1), "1 contractor");
+  assert.equal(contractorsCount(0), "0 contractors");
 });

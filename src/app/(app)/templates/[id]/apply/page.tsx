@@ -9,6 +9,13 @@ import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { parseTemplateItems } from "@/lib/tasks/template-items";
 import { ApplyFlow } from "./apply-flow";
+import type { Metadata } from "next";
+import { recordMetadata } from "@/lib/record-metadata";
+
+/** The tab names the record (record-title.ts), so tabs and history can be told apart. */
+export async function generateMetadata({ params }: PageProps<"/templates/[id]/apply">): Promise<Metadata> {
+  return recordMetadata("template", (await params).id);
+}
 
 /** Apply a playbook to a property (D28): property and unit, date and fill-ins, then the tasks, then create. */
 export default async function ApplyPlaybookPage({ params, searchParams }: PageProps<"/templates/[id]/apply">) {

@@ -24,6 +24,9 @@ import {
   statusOptions,
 } from "./list";
 import { PropertyStatus } from "./property-status";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Portfolio" };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

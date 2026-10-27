@@ -16,6 +16,9 @@ import { MoneyCents } from "../_components/ui";
 import { RefreshButton } from "../_components/refresh-button";
 import { ClassMappingTable, AccountCategoryTable } from "./tables";
 import { BasisToggle, DisconnectButton, OAuthReturnNotice } from "./controls";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Financials settings" };
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +49,8 @@ export default async function FinancialsSettingsPage({
 }: PageProps<"/financials/settings">) {
   await requireUser(); // here as well as in the layout, which doesn't gate every render
   const [conn, sp] = await Promise.all([getConnection(), searchParams]);
-  // /api/quickbooks/callback lands here with ?connected=1 or ?error=<code>
-  const oauth = oauthReturnLine({ connected: sp.connected, error: sp.error });
+  // /api/quickbooks/callback lands here with ?connected=1 or ?error=<code>; "Connected" needs a live connection too.
+  const oauth = oauthReturnLine({ connected: sp.connected, error: sp.error }, conn);
 
   if (!conn || conn.status === "REVOKED") {
     return (

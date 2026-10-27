@@ -75,6 +75,13 @@ export const ROUTE_SESSION_OVERRIDE: Record<string, RouteSession> = {
  */
 const REDIRECT_ONLY = new Set(["/tasks/all"]);
 
+/**
+ * A staff section's catch-all (`[...missing]`) only answers an unknown
+ * address with the app's Not found, a 404 by design, so there's no page of
+ * its own to sweep. next-path.test.ts checks every section has one.
+ */
+const NOT_FOUND_ONLY = /\/\[\.\.\.missing\]$/;
+
 function findPages(dir: string, segments: string[] = []): string[][] {
   const found: string[][] = [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -102,7 +109,7 @@ export function listRoutes(): Route[] {
       const session = ROUTE_SESSION_OVERRIDE[pattern] ?? SESSION_BY_GROUP[segments[0]] ?? "none";
       return { pattern, params, session };
     })
-    .filter((r) => !REDIRECT_ONLY.has(r.pattern))
+    .filter((r) => !REDIRECT_ONLY.has(r.pattern) && !NOT_FOUND_ONLY.test(r.pattern))
     .sort((a, b) => a.pattern.localeCompare(b.pattern));
 }
 

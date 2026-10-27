@@ -22,6 +22,13 @@ import { OVERDUE_ELIGIBLE, excludeTemplateTasks, isActiveStatus } from "@/lib/ta
 import { shapeActivity } from "./activity-rows";
 import type { ReviewDecision, ReviewProof } from "./review-banner";
 import { TaskPageView } from "./view";
+import type { Metadata } from "next";
+import { recordMetadata } from "@/lib/record-metadata";
+
+/** The tab names the record (record-title.ts), so tabs and history can be told apart. */
+export async function generateMetadata({ params }: PageProps<"/tasks/[id]">): Promise<Metadata> {
+  return recordMetadata("task", (await params).id);
+}
 
 /**
  * The staff task page: loads the task and shapes it for TaskPageView

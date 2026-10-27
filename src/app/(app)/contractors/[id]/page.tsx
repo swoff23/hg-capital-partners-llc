@@ -20,6 +20,13 @@ import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
 import { ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
+import type { Metadata } from "next";
+import { recordMetadata } from "@/lib/record-metadata";
+
+/** The tab names the record (record-title.ts), so tabs and history can be told apart. */
+export async function generateMetadata({ params }: PageProps<"/contractors/[id]">): Promise<Metadata> {
+  return recordMetadata("contractor", (await params).id);
+}
 
 /** The Jobs list's length; the heading's count is every job. */
 const JOBS_SHOWN = 60;

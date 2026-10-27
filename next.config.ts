@@ -38,6 +38,22 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Every response: never sniffed into another type, and never framed
+        // by another site (clickjacking). Same-origin frames stay allowed:
+        // the media viewer shows a PDF from /api/files in an iframe.
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        ],
+      },
+      {
+        // Pages say the same in CSP, which supersedes X-Frame-Options. Not on
+        // /api: the file routes send a CSP of their own (attachments/headers.ts).
+        source: "/((?!api/).*)",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self'" }],
+      },
+      {
         // Password reset links carry their token in the URL: never pass it on
         // as a Referer, and never keep the page in any cache.
         source: "/login/reset",

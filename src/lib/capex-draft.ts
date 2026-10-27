@@ -171,3 +171,19 @@ export function leftProblems(draft: CapexDraft, left: ReadonlySet<string>): Reco
   }
   return out;
 }
+
+/** The id of a row's one error line, which its invalid figures point to. */
+export const rowLineId = (uid: string) => `capex-row-${uid}-line`;
+
+/**
+ * A figure's error state for a screen reader: invalid, and described by the
+ * row's error line (rowLineId) while that line is on screen, so the problem
+ * is read with the field and not only shown under it. Nothing while it's fine.
+ */
+export function cellErrorProps(
+  problem: string | undefined,
+  lineId: string | undefined,
+): { "aria-invalid"?: true; "aria-describedby"?: string } {
+  if (!problem) return {};
+  return lineId ? { "aria-invalid": true, "aria-describedby": lineId } : { "aria-invalid": true };
+}

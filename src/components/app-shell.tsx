@@ -5,7 +5,7 @@ import { Menu, Pin, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { focusHeadingAfter, isSheetPath } from "@/lib/sheet-routes";
-import { SIDEBAR_COOKIE } from "@/lib/sidebar";
+import { SIDEBAR_COOKIE, railState } from "@/lib/sidebar";
 import type { ListHrefs } from "@/lib/list-memory";
 import { AccountMenu, AppearanceRow } from "@/components/account-menu";
 import { CommandPalette } from "@/components/command-palette";
@@ -39,8 +39,10 @@ export function AppShell({
 }) {
   const [pinned, setPinned] = useState(initialPinned);
   const [hovered, setHovered] = useState(false);
+  // Keyboard focus inside the rail opens it as a hover does (lib/sidebar.ts), so a Tab never lands on a hidden button.
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const expanded = pinned || hovered;
+  const { expanded, floating } = railState({ pinned, hovered, keyboardFocus });
   const mainRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
   // Search opens over the page, so the phone drawer goes first.
@@ -171,6 +173,12 @@ export function AppShell({
       <aside
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        // Only focus a keyboard put there (:focus-visible): a clicked link or Pin keeps none, so the rail
+        // still closes when the pointer leaves.
+        onFocus={(e) => setKeyboardFocus(e.target.matches(":focus-visible"))}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setKeyboardFocus(false);
+        }}
         className={cn(
           // Below lg the drawer scrolls, so a phone held sideways still reaches
           // every item and the footer. Across it stays clipped, which is how
@@ -180,7 +188,7 @@ export function AppShell({
           // The phone drawer is the Overlay level; the rail, opened by hover over the page, floats.
           mobileOpen ? "translate-x-0 shadow-overlay" : "-translate-x-full lg:translate-x-0",
           expanded ? "lg:w-60" : "lg:w-16",
-          hovered && !pinned && "lg:shadow-float",
+          floating && "lg:shadow-float",
         )}
       >
         <div className="mb-1 flex min-h-7 items-center justify-end">

@@ -133,12 +133,18 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 
 /**
  * /api/quickbooks/callback sends the browser back to Settings with
- * ?connected=1 or ?error=<code> (Intuit's own code, or ours).
+ * ?connected=1 or ?error=<code> (Intuit's own code, or ours). The query
+ * string alone proves nothing (an old tab, a shared link, a typed URL), so
+ * "Connected" shows only when `connection` is a live one: ACTIVE, as the
+ * callback leaves it.
  */
-export function oauthReturnLine(params: {
-  connected?: string | string[];
-  error?: string | string[];
-}): OAuthReturnLine | null {
+export function oauthReturnLine(
+  params: {
+    connected?: string | string[];
+    error?: string | string[];
+  },
+  connection: { status: string } | null,
+): OAuthReturnLine | null {
   const error = first(params.error);
   if (error) {
     if (error === "access_denied") {
@@ -149,7 +155,7 @@ export function oauthReturnLine(params: {
     }
     return { tone: "error", text: "QuickBooks didn't finish connecting.", retry: true };
   }
-  if (first(params.connected) === "1") {
+  if (first(params.connected) === "1" && connection?.status === "ACTIVE") {
     return { tone: "info", text: "Connected to QuickBooks. A full sync is running now.", retry: false };
   }
   return null;
