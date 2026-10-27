@@ -20,6 +20,12 @@ export async function signOutPortal() {
  */
 export interface FirstPasswordState {
   error: PasswordProblem | null;
+  /**
+   * The starting password was posted empty (the form sent without script): its
+   * own line, "Enter your starting password.", on that field. It is the form
+   * unfilled, not a guess, so it never reaches the sign-in throttle.
+   */
+  missing?: boolean;
 }
 
 /**
@@ -39,8 +45,8 @@ export async function chooseOwnPassword(_prev: FirstPasswordState, formData: For
 
   const problem = checkNewPassword(password);
   if (problem) return { error: problem };
-  // An empty starting password is no try: refused here, before the throttle can count a strike.
-  if (!isStartingPasswordTry(current)) return { error: "wrong-current" };
+  // An empty starting password is no try: it gets its own line here, before the throttle can count a strike.
+  if (!isStartingPasswordTry(current)) return { error: "wrong-current", missing: true };
 
   const result = await changeOwnPassword(principal, current, password);
   if (!result.ok) return { error: result.error };

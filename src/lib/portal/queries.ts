@@ -5,7 +5,8 @@ import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { orderMedia } from "@/lib/tasks/media";
 import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
-import { readLockboxCode } from "./access-code";
+import { lockboxMasker, readLockboxCode, type BodyPart } from "./access-code";
+import { NO_NOTICE, dateChange, dateChangeText, noticeCount, sendBackStands, type DateChange, type DateEvent, type JobNotice } from "./job-notice";
 import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, type JobCard, type JobsTab } from "./job-view";
 import type { PortalPrincipal } from "./session";
 
@@ -117,10 +118,14 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
     ...(tab === "done" ? { orderBy: { completedAt: "desc" as const } } : {}),
     take: 500,
   });
-  const counts = await newUpdateCounts(
-    p.contactId,
-    rows.map((r) => r.id),
-  );
+  const ids = rows.map((r) => r.id);
+  const [counts, notices] = await Promise.all([
+    newUpdateCounts(p.contactId, ids),
+    noticeCounts(
+      p.contactId,
+      rows.map((r) => ({ id: r.id, status: r.status, due: toYmd(r.dueDate), scheduled: toYmd(r.scheduledFor) })),
+    ),
+  ]);
   return rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -131,7 +136,7 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
     target: toYmd(targetDate(r)),
     targetIsVisit: targetIsVisit(r),
     finishedOn: tab === "done" && r.completedAt ? todayYmdEastern(r.completedAt) : null,
-    newCount: counts.get(r.id) ?? 0,
+    newCount: (counts.get(r.id) ?? 0) + (notices.get(r.id) ?? 0),
   }));
 }
 
@@ -155,6 +160,67 @@ async function newUpdateCounts(contactId: string, taskIds: string[]): Promise<Ma
   return new Map(rows.map((r) => [r.taskId, r.n]));
 }
 
+/** Parameters for a Date against the timestamp-without-time-zone columns, which hold UTC (as core.ts and outbox.ts convert them). */
+const utc = (d: Date) => Prisma.sql`(${d.toISOString()}::timestamptz AT TIME ZONE 'UTC')`;
+
+/**
+ * What the job page's notice would show, counted for My jobs: one for a date
+ * that moved to a different day, one for updated notes, since the contractor
+ * last opened each job (the baseline is newUpdateCounts', so the dot and the
+ * notice agree). The Updates rule above never sees these events, which are
+ * internal, so they get their own query, and only their kind, day and who
+ * are read: never a NOTES event's text.
+ */
+async function noticeCounts(
+  contactId: string,
+  jobs: { id: string; status: TaskStatus; due: Ymd | null; scheduled: Ymd | null }[],
+): Promise<Map<string, number>> {
+  if (jobs.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<(NoticeEventRow & { taskId: string })[]>`
+    SELECT e."taskId", e."kind"::text AS "kind", e."actorUserId", e."actorLabel",
+           CASE WHEN e."kind" <> 'NOTES' THEN e."data"->>'from' END AS "from",
+           CASE WHEN e."kind" <> 'NOTES' THEN e."data"->>'to' END AS "to"
+    FROM "TaskEvent" e
+    JOIN "TaskAccess" a ON a."taskId" = e."taskId" AND a."contactId" = ${contactId} AND a."revokedAt" IS NULL
+    LEFT JOIN "TaskReadState" r ON r."taskId" = e."taskId" AND r."contactId" = ${contactId}
+    WHERE e."taskId" IN (${Prisma.join(jobs.map((j) => j.id))})
+      AND e."kind" IN ('DUE', 'SCHEDULED', 'STATUS', 'NOTES')
+      AND e."deletedAt" IS NULL
+      AND e."createdAt" > COALESCE(r."lastSeenAt", a."createdAt")
+    ORDER BY e."createdAt" ASC, e."id" ASC`;
+  const byTask = new Map<string, NoticeEventRow[]>();
+  for (const row of rows) byTask.set(row.taskId, [...(byTask.get(row.taskId) ?? []), row]);
+  const out = new Map<string, number>();
+  for (const j of jobs) {
+    const events = byTask.get(j.id);
+    if (!events) continue;
+    const n = noticeCount(
+      dateChange(j, dateEvents(events)),
+      events.some((e) => e.kind === "NOTES"),
+    );
+    if (n > 0) out.set(j.id, n);
+  }
+  return out;
+}
+
+/** One DUE, SCHEDULED, STATUS or NOTES event, as much of it as the notice may read. */
+interface NoticeEventRow {
+  kind: string;
+  actorUserId: string | null;
+  actorLabel: string;
+  from: string | null;
+  to: string | null;
+}
+
+/** A partner's first name from the event's actor; null for a contractor, the system or the importer. */
+const partner = (e: Pick<NoticeEventRow, "actorUserId" | "actorLabel">) => (e.actorUserId ? firstName(e.actorLabel) : null);
+
+function dateEvents(rows: readonly NoticeEventRow[]): DateEvent[] {
+  return rows
+    .filter((e) => e.kind === "DUE" || e.kind === "SCHEDULED" || e.kind === "STATUS")
+    .map((e) => ({ kind: e.kind as DateEvent["kind"], from: e.from, to: e.to, by: partner(e) }));
+}
+
 // ---------------------------------------------------------------------------
 // Job page
 // ---------------------------------------------------------------------------
@@ -171,21 +237,51 @@ export interface JobMedia {
   createdAt: Date;
 }
 
+/** A document on the job, shaped for FilesList (components/files-list.tsx FileLink). */
 export interface JobFile {
   id: string;
   filename: string;
+  size: number | null;
+  uploadedBy: string | null;
+  createdAt: Date;
 }
 
-/** One line in Updates (§5.1): never the event's raw data. */
+/**
+ * One entry in Updates (§5.1): never the event's raw data. The page draws it
+ * on the shared timeline (components/activity-timeline.tsx), so it carries what
+ * the rail and the card need: who, whether they are a contractor, whether it
+ * is the viewer's own, the status a change moved to, and the edited mark.
+ */
 export interface JobUpdate {
   id: string;
-  kind: "comment" | "status" | "attachment";
+  /** "removed" is the trace of a comment HG took back after the contractor could have seen it: who and when, never its text. */
+  kind: "comment" | "status" | "attachment" | "removed";
   /** "You" for the contractor's own, otherwise a first name ("Connor"). */
   actorLabel: string;
-  /** The comment, or what happened for a status change or file post ("started the job"). */
+  /** The author is a contractor (the square avatar and "contractor" for screen readers). */
+  contractor: boolean;
+  /** The viewer wrote it. */
+  you: boolean;
+  /** What happened for a status change or file post ("started the job"); null for a comment, whose text is `parts`. */
   body: string | null;
+  /** A comment's text, with this property's lockbox codes in imported comments already replaced. */
+  parts: BodyPart[] | null;
   createdAt: Date;
+  /** When it was edited; `true` for an imported comment Asana marked edited, with no time. */
+  edited: Date | true | null;
+  /** The status a status change moved to, for its mark on the rail. */
+  statusTo: TaskStatus | null;
   attachments: { media: JobMedia[]; files: JobFile[] };
+  /** The id the browser made for this send, on the viewer's own rows only: a pending message already here is dropped. */
+  clientId: string | null;
+}
+
+/** What happened to the viewer's newest update after it posted: the partners get an email, or they got one. */
+export interface JobDelivery {
+  eventId: string;
+  state: "queued" | "emailed";
+  /** First names of the partners it went to. */
+  to: string[];
 }
 
 export interface JobDetail {
@@ -204,6 +300,15 @@ export interface JobDetail {
   checklist: { id: string; title: string; done: boolean }[];
   media: JobMedia[];
   updates: JobUpdate[];
+  /**
+   * Where the viewer last looked (ISO), for the New divider: their last open
+   * of the job, or when they got access before the first. The divider sits
+   * above the first entry after it written by someone else.
+   */
+  newSince: string;
+  delivery: JobDelivery | null;
+  /** The send back, date and notes changes since the viewer last looked, for the top of the page. */
+  notice: JobNotice;
   /** D21: only for the assigned contractor while the job is active, else null. */
   lockbox: string | null;
   /** First names of the partners a Mark done goes to, for the payoff line. */
@@ -234,6 +339,15 @@ const mediaSelect = {
 
 type MediaRow = Prisma.TaskAttachmentGetPayload<{ select: typeof mediaSelect }>;
 
+/** Who added a file, as the contractor sees names: "You", a first name, or nothing. */
+function uploaderLabel(p: PortalPrincipal, a: MediaRow): string | null {
+  return portalActorLabel(p.contactId, {
+    userId: a.uploadedByUserId,
+    contactId: a.uploadedByContactId,
+    label: a.uploadedByUser?.name || a.uploadedByUser?.email.split("@")[0] || a.uploadedByContact?.fullName || null,
+  });
+}
+
 function toMedia(p: PortalPrincipal, a: MediaRow): JobMedia {
   return {
     id: a.id,
@@ -242,11 +356,7 @@ function toMedia(p: PortalPrincipal, a: MediaRow): JobMedia {
     hasThumb: !!a.thumbPathname,
     hasPoster: !!a.posterPathname,
     durationSec: a.durationSec,
-    uploadedBy: portalActorLabel(p.contactId, {
-      userId: a.uploadedByUserId,
-      contactId: a.uploadedByContactId,
-      label: a.uploadedByUser?.name || a.uploadedByUser?.email.split("@")[0] || a.uploadedByContact?.fullName || null,
-    }),
+    uploadedBy: uploaderLabel(p, a),
     createdAt: a.createdAt,
   };
 }
@@ -275,13 +385,16 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
   const active = isActiveStatus(task.status);
   if (!active && (!task.completedAt || task.completedAt < PORTAL_HISTORY_FROM)) return null;
 
-  const [media, updates, lockbox, staffNames, marked] = await Promise.all([
+  // Where they last looked (the New divider and the notice) and the filter for codes in imported comments.
+  const [since, mask] = await Promise.all([lastLooked(p, taskId), lockboxMasker(prisma, task.propertyId)]);
+
+  const [media, updates, lockbox, staffNames, marked, notice] = await Promise.all([
     prisma.taskAttachment.findMany({
       where: { taskId, ...visibleFile(p.contactId, ["IMAGE", "VIDEO"]) },
       select: mediaSelect,
       orderBy: { createdAt: "asc" },
     }),
-    jobUpdates(p, taskId),
+    jobUpdates(p, taskId, mask),
     active && task.assigneeContactId === p.contactId ? readLockboxCode(prisma, task.propertyId, task.unitLabel) : null,
     staffFirstNames(),
     // The hour after Mark done runs from the job's newest move to Review, and only when this contractor made it
@@ -293,7 +406,10 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
           select: { actorContactId: true, createdAt: true },
         })
       : null,
+    // Only an open job has anything to tell: a closed one is read-only history.
+    active ? jobNotice(p, task, since) : NO_NOTICE,
   ]);
+  const delivery = await deliveryFor(taskId, updates);
 
   return {
     id: task.id,
@@ -309,6 +425,9 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     // The grid's order, as on the task page (lib/tasks/media.ts).
     media: orderMedia(media).map((a) => toMedia(p, a)),
     updates,
+    newSince: since.toISOString(),
+    delivery,
+    notice,
     lockbox,
     staffNames,
     finishPhotosRequired: task.taskTemplate?.finishPhotosRequired ?? null,
@@ -330,34 +449,199 @@ export async function staffFirstNames(): Promise<string[]> {
   return staff.map((u) => firstName(u.name || u.email.split("@")[0]));
 }
 
+/**
+ * When the contractor last opened this job; before the first open, when they
+ * got access, so a job assigned with imported history doesn't arrive full of
+ * "new" (newUpdateCounts reads the same baseline, so the dot on My jobs and
+ * the New divider here agree). Read before the page records this visit.
+ */
+async function lastLooked(p: PortalPrincipal, taskId: string): Promise<Date> {
+  const [read, access] = await Promise.all([
+    prisma.taskReadState.findUnique({ where: { taskId_contactId: { taskId, contactId: p.contactId } }, select: { lastSeenAt: true } }),
+    prisma.taskAccess.findFirst({ where: { taskId, contactId: p.contactId, revokedAt: null }, select: { createdAt: true } }),
+  ]);
+  return read?.lastSeenAt ?? access?.createdAt ?? new Date();
+}
+
+/**
+ * The notice at the top of the job (activity question 2 A): the open send
+ * back with its note, the date if the contractor's Target moved, and updated
+ * notes, all since they last looked. The send back and its note go through
+ * portalEvents, so the audience rule is the Updates' own. The date and notes
+ * events are internal and carry no audience, so they are read here for their
+ * kind, day and who only (job-notice.ts), never a NOTES event's text.
+ */
+async function jobNotice(
+  p: PortalPrincipal,
+  task: { id: string; status: TaskStatus; dueDate: Date | null; scheduledFor: Date | null },
+  since: Date,
+): Promise<JobNotice> {
+  const [sentBack, events] = await Promise.all([
+    task.status === "IN_PROGRESS" ? openSendBack(p, task.id) : null,
+    prisma.$queryRaw<NoticeEventRow[]>`
+      SELECT e."kind"::text AS "kind", e."actorUserId", e."actorLabel",
+             CASE WHEN e."kind" <> 'NOTES' THEN e."data"->>'from' END AS "from",
+             CASE WHEN e."kind" <> 'NOTES' THEN e."data"->>'to' END AS "to"
+      FROM "TaskEvent" e
+      WHERE e."taskId" = ${task.id} AND e."deletedAt" IS NULL
+        AND e."kind" IN ('DUE', 'SCHEDULED', 'STATUS', 'NOTES')
+        AND e."createdAt" > ${utc(since)}
+      ORDER BY e."createdAt" ASC, e."id" ASC`,
+  ]);
+  const change: DateChange | null = dateChange(
+    { status: task.status, due: toYmd(task.dueDate), scheduled: toYmd(task.scheduledFor) },
+    dateEvents(events),
+  );
+  const lastNotes = events.findLast((e) => e.kind === "NOTES");
+  return {
+    sentBack,
+    date: change ? { text: dateChangeText(change, todayYmdEastern()), by: change.by } : null,
+    notes: lastNotes ? { by: partner(lastNotes) } : null,
+  };
+}
+
+/** The newest send back this contractor can see, with the note written with it, while it stands (job-notice.ts sendBackStands). */
+async function openSendBack(p: PortalPrincipal, taskId: string): Promise<JobNotice["sentBack"]> {
+  const [row] = await prisma.$queryRaw<{ id: string; createdAt: Date; actorUserId: string | null; actorLabel: string }[]>`
+    SELECT e."id", e."createdAt", e."actorUserId", e."actorLabel"
+    FROM "TaskEvent" e
+    WHERE e."taskId" = ${taskId} AND ${portalEvents(p.contactId)}
+      AND e."kind" = 'STATUS' AND e."actorContactId" IS NULL
+      AND e."data"->>'from' = 'REVIEW' AND e."data"->>'to' = 'IN_PROGRESS'
+    ORDER BY e."createdAt" DESC, e."id" DESC
+    LIMIT 1`;
+  if (!row) return null;
+  const [[marked], [note]] = await Promise.all([
+    prisma.$queryRaw<{ at: Date | null }[]>`
+      SELECT max(e."createdAt") AS "at"
+      FROM "TaskEvent" e
+      WHERE e."taskId" = ${taskId} AND ${portalEvents(p.contactId)} AND e."kind" = 'STATUS' AND e."data"->>'to' = 'REVIEW'`,
+    // The note written with the send back says so in its data; the audience rule is the Updates' own.
+    prisma.$queryRaw<{ id: string; body: string | null }[]>`
+      SELECT e."id", e."body"
+      FROM "TaskEvent" e
+      WHERE e."taskId" = ${taskId} AND ${portalEvents(p.contactId)}
+        AND e."kind" = 'COMMENT' AND e."data"->>'statusEventId' = ${row.id}
+      ORDER BY e."createdAt" ASC, e."id" ASC
+      LIMIT 1`,
+  ]);
+  if (!sendBackStands("IN_PROGRESS", row.createdAt, marked?.at ?? null)) return null;
+  return {
+    statusEventId: row.id,
+    noteEventId: note?.id ?? null,
+    by: partner(row),
+    at: row.createdAt.toISOString(),
+    note: note?.body?.trim() || null,
+  };
+}
+
+/**
+ * What happened to the contractor's newest update after it posted (activity
+ * 2.6, portal side): queued while the partners' emails wait out the bundle
+ * window, emailed once every one of them has gone. It stops there: partners
+ * read updates in their email, so an app visit would say nothing about whether
+ * they read it. The outbox rows are read for their state only (never their
+ * items), matched on the event id the items carry.
+ */
+async function deliveryFor(taskId: string, updates: readonly JobUpdate[]): Promise<JobDelivery | null> {
+  const mine = updates.findLast((u) => u.you);
+  if (!mine) return null;
+  const rows = await prisma.$queryRaw<{ sentAt: Date | null; lastError: string | null; name: string | null; email: string }[]>`
+    SELECT o."sentAt", o."lastError", u."name", u."email"
+    FROM "NotificationOutbox" o
+    JOIN "User" u ON u."id" = o."recipientUserId"
+    WHERE o."taskId" = ${taskId} AND o."items" @> ${JSON.stringify([{ eventId: mine.id }])}::jsonb
+    ORDER BY u."createdAt" ASC`;
+  if (rows.length === 0) return null;
+  // Emailed is sent with no error; a row closed with an error (nothing to send) said nothing to anyone.
+  const state = rows.some((r) => !r.sentAt) ? "queued" : rows.every((r) => !r.lastError) ? "emailed" : null;
+  if (!state) return null;
+  return { eventId: mine.id, state, to: rows.map((r) => firstName(r.name || r.email.split("@")[0])) };
+}
+
+/**
+ * Comments HG took back after the contractor could have seen them (activity
+ * question 3: leave "Connor removed a comment"). Their text is never read:
+ * the rows carry who and when only. A comment shows here only when the
+ * contractor opened the job after it was written, or its email went to them,
+ * and only one written by a partner to this contractor or to nobody in
+ * particular (portalEvents' audience rule, with `deletedAt` the other way
+ * round). Anything they never saw leaves no trace.
+ */
+async function removedComments(p: PortalPrincipal, taskId: string): Promise<JobUpdate[]> {
+  const rows = await prisma.$queryRaw<{ id: string; actorLabel: string; deletedAt: Date }[]>`
+    SELECT e."id", e."actorLabel", e."deletedAt"
+    FROM "TaskEvent" e
+    JOIN "TaskAccess" a ON a."taskId" = e."taskId" AND a."contactId" = ${p.contactId} AND a."revokedAt" IS NULL
+    LEFT JOIN "TaskReadState" r ON r."taskId" = e."taskId" AND r."contactId" = ${p.contactId}
+    WHERE e."taskId" = ${taskId}
+      AND e."kind" = 'COMMENT' AND e."visibility" = 'SHARED' AND e."deletedAt" IS NOT NULL
+      AND e."source" = 'APP' AND e."actorUserId" IS NOT NULL
+      AND (e."audienceContactId" IS NULL OR e."audienceContactId" = ${p.contactId})
+      AND e."createdAt" > a."createdAt"
+      AND (
+        e."createdAt" <= COALESCE(r."lastSeenAt", a."createdAt")
+        OR EXISTS (
+          SELECT 1 FROM "NotificationOutbox" o
+          WHERE o."taskId" = e."taskId" AND o."recipientContactId" = ${p.contactId} AND o."sentAt" IS NOT NULL
+            AND o."items" @> jsonb_build_array(jsonb_build_object('eventId', e."id"))
+        )
+      )
+    ORDER BY e."deletedAt" ASC, e."id" ASC
+    LIMIT 50`;
+  return rows.map((r) => ({
+    id: r.id,
+    kind: "removed" as const,
+    actorLabel: firstName(r.actorLabel),
+    contractor: false,
+    you: false,
+    body: "removed a comment",
+    parts: null,
+    // The line sits where it happened: when the comment came off.
+    createdAt: r.deletedAt,
+    edited: null,
+    statusTo: null,
+    attachments: { media: [], files: [] },
+    clientId: null,
+  }));
+}
+
 interface UpdateRow {
   id: string;
   kind: "COMMENT" | "ATTACHMENT" | "STATUS";
+  source: string;
   actorLabel: string;
   actorUserId: string | null;
   actorContactId: string | null;
   body: string | null;
   createdAt: Date;
+  editedAt: Date | null;
+  importedEdited: string | null;
   statusFrom: string | null;
   statusTo: string | null;
+  clientId: string | null;
 }
 
 /** The latest updates, oldest first, with the files posted in each. */
-async function jobUpdates(p: PortalPrincipal, taskId: string): Promise<JobUpdate[]> {
+async function jobUpdates(p: PortalPrincipal, taskId: string, mask: (body: string) => BodyPart[]): Promise<JobUpdate[]> {
   // Newest first, so a long history keeps its latest 500; then back to reading order.
+  // Only whitelisted keys of `data` are selected, one by one (from, to, edited, clientId), never the whole of it.
   const latest = await prisma.$queryRaw<UpdateRow[]>`
-    SELECT e."id", e."kind"::text AS "kind", e."actorLabel", e."actorUserId", e."actorContactId", e."body", e."createdAt",
-           e."data"->>'from' AS "statusFrom", e."data"->>'to' AS "statusTo"
+    SELECT e."id", e."kind"::text AS "kind", e."source"::text AS "source", e."actorLabel", e."actorUserId", e."actorContactId",
+           e."body", e."createdAt", e."editedAt", e."data"->>'edited' AS "importedEdited",
+           e."data"->>'from' AS "statusFrom", e."data"->>'to' AS "statusTo",
+           CASE WHEN e."actorContactId" = ${p.contactId} THEN e."data"->>'clientId' END AS "clientId"
     FROM "TaskEvent" e
     WHERE e."taskId" = ${taskId} AND ${portalEvents(p.contactId)}
     ORDER BY e."createdAt" DESC, e."id" DESC
     LIMIT 500`;
   const rows = latest.reverse();
-  if (rows.length === 0) return [];
+  const removed = await removedComments(p, taskId);
+  if (rows.length === 0) return removed;
 
   const files = await prisma.taskAttachment.findMany({
     where: { taskId, eventId: { in: rows.map((r) => r.id) }, ...visibleFile(p.contactId, PORTAL_FILE_KINDS) },
-    select: { ...mediaSelect, eventId: true },
+    select: { ...mediaSelect, size: true, eventId: true },
     orderBy: { createdAt: "asc" },
   });
   const byEvent = new Map<string, typeof files>();
@@ -371,23 +655,35 @@ async function jobUpdates(p: PortalPrincipal, taskId: string): Promise<JobUpdate
     const own = byEvent.get(r.id) ?? [];
     const attachments = {
       media: own.filter((f) => f.kind === "IMAGE" || f.kind === "VIDEO").map((f) => toMedia(p, f)),
-      files: own.filter((f) => f.kind === "FILE").map((f) => ({ id: f.id, filename: f.filename })),
+      files: own
+        .filter((f) => f.kind === "FILE")
+        .map((f) => ({ id: f.id, filename: f.filename, size: f.size, uploadedBy: uploaderLabel(p, f), createdAt: f.createdAt })),
     };
     // A file post whose files were all removed has nothing left to show (portalEvents drops these too).
     if (r.kind === "ATTACHMENT" && own.length === 0) continue;
+    const comment = r.kind === "COMMENT";
+    // Codes in imported comments are hidden here, on the server; a comment HG wrote to this contractor shows as written.
+    const parts = comment && r.body ? (r.source === "ASANA" ? mask(r.body) : [{ text: r.body }]) : null;
     out.push({
       id: r.id,
       kind: r.kind === "STATUS" ? "status" : r.kind === "ATTACHMENT" ? "attachment" : "comment",
       actorLabel: portalActorLabel(p.contactId, { userId: r.actorUserId, contactId: r.actorContactId, label: r.actorLabel }) ?? r.actorLabel,
+      contractor: !!r.actorContactId,
+      you: r.actorContactId === p.contactId,
       body:
         r.kind === "STATUS"
           ? statusUpdateText(r.statusFrom, r.statusTo, { contractor: !!r.actorContactId })
           : r.kind === "ATTACHMENT"
             ? addedText(own.map((f) => f.kind))
-            : r.body,
+            : null,
+      parts,
       createdAt: r.createdAt,
+      edited: r.editedAt ?? (r.importedEdited === "true" ? true : null),
+      statusTo: r.kind === "STATUS" && (PORTAL_STATUS_UPDATES as readonly string[]).includes(r.statusTo ?? "") ? (r.statusTo as TaskStatus) : null,
       attachments,
+      clientId: r.clientId,
     });
   }
-  return out;
+  // Traces of removed comments sit where they happened, among the rest.
+  return removed.length > 0 ? [...out, ...removed].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()) : out;
 }
