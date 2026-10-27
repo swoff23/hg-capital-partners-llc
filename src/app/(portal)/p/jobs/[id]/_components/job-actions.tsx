@@ -375,8 +375,12 @@ export function JobActions({
           primary={
             step === "review" ? (
               <Button variant="secondary" disabled className={cn(barButton, "text-fg-3 disabled:opacity-100 max-[360px]:px-2")}>
-                {/* Half the bar on a phone: the short label there, so it never truncates. */}
-                <span className="truncate sm:hidden">Waiting for review</span>
+                {/* Half the bar on a phone, beside "Add photo/video" for the hour after Mark done: shorter words as the
+                    bar narrows, so the label never truncates ("Waiting for review" needs 166px and has no slack
+                    until 173px, at 390). Max-[390px] is "below 390", so the first two split there and neither shows
+                    twice. */}
+                <span className="truncate min-[390px]:hidden">In review</span>
+                <span className="truncate max-[390px]:hidden sm:hidden">Waiting for review</span>
                 <span className="truncate max-sm:hidden">Waiting for HG to review</span>
               </Button>
             ) : step === "start" ? (

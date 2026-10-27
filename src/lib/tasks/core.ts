@@ -1058,8 +1058,18 @@ function isCommentAuthor(e: Pick<TaskEvent, "actorUserId" | "actorContactId" | "
  * None of them recompute who sees it: visibility, audience, actor, source and
  * createdAt are fixed when the comment is written, so an edit or an Undo
  * can't show Zack's thread to whoever has the job now.
+ *
+ * The task row is locked before the comment's, as every writer on a task takes
+ * it first (removeAttachment, takeBackContractorPost, addComment, setStatus).
+ * A partner deleting a reply while another removes a photo on it would
+ * otherwise each hold the row the other waits for (Postgres aborts one with
+ * 40P01). The first read names the task and takes no lock; the second, once
+ * both are held, is the one the checks use.
  */
 async function ownComment(tx: Tx, eventId: string, p: Principal, { deleted }: { deleted: boolean | null }): Promise<TaskEvent> {
+  const named = await tx.taskEvent.findUnique({ where: { id: eventId }, select: { taskId: true } });
+  if (!named) throw new TaskRuleError("That comment no longer exists.");
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${named.taskId} FOR NO KEY UPDATE`;
   await tx.$executeRaw`SELECT 1 FROM "TaskEvent" WHERE "id" = ${eventId} FOR NO KEY UPDATE`;
   const ev = await tx.taskEvent.findUnique({ where: { id: eventId } });
   if (!ev || ev.kind !== "COMMENT") throw new TaskRuleError("That comment no longer exists.");
@@ -1371,15 +1381,19 @@ export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "eventId" | "as
  * is (renameAttachment): a task left untouched since an import is cleaned up
  * with its row (D25).
  *
- * The task row is locked first, as takeBackContractorPost locks it before it
- * touches a post's files, so the two never wait on each other's rows. False
- * when another remove got there first, and then nothing is written.
+ * The task row is locked first, as takeBackContractorPost and a comment's
+ * edit, delete and restore lock it before they touch a post's files, so none
+ * of them waits on another's rows. Both branches act only on a file that is
+ * still up (`deletedAt` null): the caller read the row before this
+ * transaction, so a comment deleted or a post taken back in between has
+ * already stamped it, and it must stay for that comment's Undo. False when
+ * the file is already gone or off, and then nothing is written.
  */
 export async function removeAttachment(tx: Tx, att: RemovedFile, p?: Principal, now = new Date()): Promise<boolean> {
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${att.taskId} FOR NO KEY UPDATE`;
   const { count } = att.asanaGid
     ? await tx.taskAttachment.updateMany({ where: { id: att.id, deletedAt: null }, data: { deletedAt: now } })
-    : await tx.taskAttachment.deleteMany({ where: { id: att.id } });
+    : await tx.taskAttachment.deleteMany({ where: { id: att.id, deletedAt: null } });
   if (count === 0) return false;
   if (p && att.eventId !== null) {
     await addEvent(tx, att.taskId, p, {

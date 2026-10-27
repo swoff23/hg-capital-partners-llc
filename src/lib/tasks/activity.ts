@@ -28,7 +28,9 @@ import { describeRepeat, parseRepeatRule } from "./repeat";
  *    emailed or seen, so it stays);
  *  - a status change and the note written with it (`data.statusEventId`) are
  *    one decision; files posted within 2 minutes of each other by one person
- *    are one batch line; a soft-deleted comment leaves a staff-only line.
+ *    are one batch line; a soft-deleted comment leaves a staff-only line,
+ *    except a contractor's photo post taken back inside its Undo window, which
+ *    leaves nothing (core.takeBackContractorPost: it "leaves the timeline").
  *
  * Pure; see activity.test.ts.
  */
@@ -50,7 +52,7 @@ export interface ActivityEvent {
   /** On a staff or system line: the contractor it was addressed to when written (rules.ts writeAudience). */
   audienceContactId?: string | null;
   editedAt?: Date | null;
-  /** A deleted comment leaves a line; any other deleted event is left out. */
+  /** A deleted comment leaves a line; any other deleted event is left out, and so is a contractor's post taken back (see `takenBack`). */
   deletedAt?: Date | null;
 }
 
@@ -101,6 +103,16 @@ export type ActivityEntry<E extends ActivityEvent = ActivityEvent> =
 type Data = Record<string, unknown>;
 const dataOf = (e: ActivityEvent): Data => (e.data && typeof e.data === "object" ? (e.data as Data) : {});
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+/**
+ * A contractor's photo post they took back within its Undo window (the portal's
+ * "3 photos posted · Undo"). Only addComment's contractor post carries
+ * `data.batch`, and only takeBackContractorPost deletes it, while it has no
+ * words, so it is the update that never was: the partners were never told of it
+ * and there is nothing to say "deleted a comment" about. A batch post that was
+ * given words and then deleted is a real delete and keeps its line.
+ */
+const takenBack = (e: ActivityEvent): boolean => !!e.deletedAt && e.kind === "COMMENT" && !!e.actorContactId && !s(e.body) && dataOf(e).batch === true;
 
 const THIRTY_MINUTES = 30 * 60_000;
 const TWO_MINUTES = 2 * 60_000;
@@ -501,8 +513,9 @@ export interface BuildOptions {
  */
 export function buildActivity<E extends ActivityEvent>(events: readonly E[], names: ActivityNames, today: Ymd, opts: BuildOptions = {}): ActivityEntry<E>[] {
   const sorted = [...events].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id.localeCompare(y.id));
-  // A deleted comment leaves a line; anything else deleted (an undone approval) is gone from the timeline.
-  const live = sorted.filter((e) => !e.deletedAt || e.kind === "COMMENT");
+  // A deleted comment leaves a line; anything else deleted (an undone approval) is gone from the timeline, and so is a
+  // post a contractor took back.
+  const live = sorted.filter((e) => !e.deletedAt || (e.kind === "COMMENT" && !takenBack(e)));
   const hidden = reversedPairs(live.filter((e) => !e.deletedAt));
 
   // A note is paired with the status change it was written with, by id, never by adjacency.

@@ -452,8 +452,22 @@ test("removeAttachment: a file added in the app is deleted for good", async () =
   assert.equal(await removeAttachment(tx, file({}), CONNOR), true);
   assert.deepEqual(
     calls.filter((c) => c.model === "taskAttachment").map((c) => [c.op, c.args]),
-    [["deleteMany", { where: { id: "a1" } }]],
+    // Only while it is still up: one a comment's delete or a take-back stamped since the caller read it stays for Undo.
+    [["deleteMany", { where: { id: "a1", deletedAt: null } }]],
   );
+});
+
+test("removeAttachment: a Remove that loses to a comment delete or a take-back deletes nothing and writes no line", async () => {
+  // deleteTaskAttachment reads the file before its transaction. Between the read and the delete the post is taken off and
+  // its files are stamped, so the row no longer matches `deletedAt: null` (a count of 0), whichever kind of file it is.
+  for (const over of [{}, { asanaGid: "1209" }]) {
+    const lost = fakeTx((model, op) => (model === "taskAttachment" && op === "deleteMany" ? { count: 0 } : model === "taskAttachment" && op === "updateMany" ? { count: 0 } : undefined));
+    assert.equal(await removeAttachment(lost.tx, file(over), CONNOR), false);
+    const attempts = lost.calls.filter((c) => c.model === "taskAttachment");
+    assert.equal(attempts.length, 1);
+    assert.deepEqual((attempts[0].args as { where: unknown }).where, { id: "a1", deletedAt: null }, "matched on the file still being up");
+    assert.ok(!lost.calls.some((c) => c.model === "taskEvent" || (c.model === "task" && c.op === "update")), "no line and no stamp");
+  }
 });
 
 test("removeAttachment: a remove that lost the race writes nothing, and a draft or a call with no one leaves no line", async () => {

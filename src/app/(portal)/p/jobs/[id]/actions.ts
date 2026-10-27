@@ -1,7 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
-import { assertQueueOwner, portalScope } from "@/lib/attachments/queue-owner";
+import { portalScope, withQueueOwner } from "@/lib/attachments/queue-owner";
 import * as jobs from "@/lib/portal/jobs";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { withResult } from "@/lib/server-action";
@@ -15,7 +15,8 @@ import { withResult } from "@/lib/server-action";
  * An update and a Mark done carry the photos the upload queue held, so they
  * name the queue's owner too, as the record step, a batch post and its Undo do
  * (upload-actions.ts, queue-owner.ts): a tab still showing Zack's job after
- * Mike signs in elsewhere is refused instead of posting as Mike. A call that
+ * Mike signs in elsewhere is refused instead of posting as Mike. The write runs
+ * inside withQueueOwner, so it cannot happen before the check. A call that
  * names no owner passes.
  */
 
@@ -43,16 +44,14 @@ export async function startJobAction(taskId: string): Promise<ActionResult> {
 export async function markJobDoneAction(taskId: string, input: z.input<typeof updateSchema>, queueOwner?: string | null): Promise<ActionResult> {
   return withResult("portal:markJobDone", async () => {
     const p = await requirePortalPrincipal();
-    assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
-    await jobs.markJobDone(id.parse(taskId), updateSchema.parse(input));
+    await withQueueOwner(owner.parse(queueOwner), portalScope(p.contactId), () => jobs.markJobDone(id.parse(taskId), updateSchema.parse(input)));
   });
 }
 
 export async function postJobUpdateAction(taskId: string, input: z.input<typeof updateSchema>, queueOwner?: string | null): Promise<ActionResult> {
   return withResult("portal:postJobUpdate", async () => {
     const p = await requirePortalPrincipal();
-    assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
-    await jobs.postJobUpdate(id.parse(taskId), updateSchema.parse(input));
+    await withQueueOwner(owner.parse(queueOwner), portalScope(p.contactId), () => jobs.postJobUpdate(id.parse(taskId), updateSchema.parse(input)));
   });
 }
 

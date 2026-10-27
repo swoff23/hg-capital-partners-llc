@@ -39,3 +39,15 @@ export function assertQueueOwner(sent: unknown, mine: string): void {
   const refusal = ownerRefusal(sent, mine);
   if (refusal) throw new Error(refusal);
 }
+
+/**
+ * Runs `act` for the queue `sent` names, once it is known to be the session's own
+ * (`mine`): a mismatch throws the refusal and `act` is never called, so nothing
+ * is written for a tab still showing someone else's queue. A call that names no
+ * owner passes. The portal's Send and Mark done run their write through this, so
+ * the check cannot be parsed after the write or against another scope.
+ */
+export async function withQueueOwner<T>(sent: unknown, mine: string, act: () => Promise<T>): Promise<T> {
+  assertQueueOwner(sent, mine);
+  return act();
+}

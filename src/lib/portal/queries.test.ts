@@ -80,6 +80,20 @@ test("the trace is not counted as new on My jobs", () => {
   assert.doesNotMatch(counts, /deletedAt" IS NOT NULL/);
 });
 
+test("a comment left with no words and no file is skipped by the page and by the counts, on portalEvents' own file rule", () => {
+  // Staff took off every photo of a batch, a photo-only reply or a Mark done note: the card would be empty.
+  assert.match(fn("jobUpdates"), /if \(comment && !r\.body\?\.trim\(\) && own\.length === 0\) continue;/);
+  assert.match(fn("newUpdateCounts"), /AND NOT \$\{emptyComment\(contactId\)\}/, "the dot on My jobs agrees with the page");
+  // portalEvents itself is as it was (it still drops a deleted event and keeps the audience rule); the file test inside
+  // emptyComment is its ATTACHMENT branch's, line for line, so the two can't drift apart.
+  const fileRule = (text: string) => text.match(/t\."visibility" = 'SHARED'[\s\S]*?t\."audienceContactId" = \$\{contactId\}\)\)\s*\)/)?.[0].replace(/\s+/g, " ");
+  const rule = fileRule(declaration("portalEvents"));
+  assert.ok(rule, "portalEvents has the file rule");
+  assert.equal(fileRule(declaration("emptyComment")), rule);
+  assert.match(declaration("emptyComment"), /e\."kind" = 'COMMENT'/);
+  assert.match(declaration("emptyComment"), /btrim\(COALESCE\(e\."body", ''\)\) = ''/);
+});
+
 test("the delivery line reads the outbox for state only, never its items", () => {
   const delivery = fn("deliveryFor");
   const select = delivery.slice(delivery.indexOf("select:"), delivery.indexOf("orderBy:"));

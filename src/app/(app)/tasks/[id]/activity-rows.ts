@@ -88,8 +88,11 @@ export interface LineFields {
 
 export type ActivityRow =
   | (Base & { type: "comment"; comment: CommentFields })
-  /** "Connor deleted a comment", staff only. */
-  | (Base & { type: "deleted"; author: string })
+  /**
+   * "Connor deleted a comment", staff only. The row keeps the comment's place on the timeline (`at` is when it was
+   * written); `deletedAt` is when it came off, which is the time the line prints ("· now").
+   */
+  | (Base & { type: "deleted"; author: string; deletedAt: string })
   | (Base & { type: "line" } & LineFields)
   | (Base & { type: "run" } & LineFields & { members: (LineFields & { id: string; at: string })[] })
   | (Base & { type: "batch" } & LineFields)
@@ -264,7 +267,12 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
       case "comment":
         return { ...base, type: "comment", comment: comment(entry.event) };
       case "deleted":
-        return { ...base, type: "deleted", author: firstName(entry.event.actorLabel) || entry.event.actorLabel };
+        return {
+          ...base,
+          type: "deleted",
+          author: firstName(entry.event.actorLabel) || entry.event.actorLabel,
+          deletedAt: (entry.event.deletedAt ?? entry.at).toISOString(),
+        };
       case "line":
         return { ...base, type: "line", ...lineFields(entry) };
       case "run":

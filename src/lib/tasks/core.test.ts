@@ -533,15 +533,47 @@ test("editComment: writes the words and editedAt and nothing else about the comm
   const update = calls.find((c) => c.model === "taskEvent" && c.op === "update")!;
   // Never visibility, the audience, the actor, the source or the time it was written: those are fixed when it is.
   assert.deepEqual(update.args, { where: { id: "ev1" }, data: { body: "Better words", editedAt: now } });
-  // Locked first; no email is queued (the drain re-reads).
-  assert.match(calls[0].op, /"TaskEvent" WHERE "id" = \? FOR NO KEY UPDATE/);
+  // The task row is locked first and the comment's second, as every writer on a task takes the task first; no email
+  // is queued (the drain re-reads).
+  const locks = calls.filter((c) => c.model === "$executeRaw");
+  assert.equal(locks.length, 2);
+  assert.match(locks[0].op, /FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE/);
+  assert.deepEqual(locks[0].args, ["t1"]);
+  assert.match(locks[1].op, /"TaskEvent" WHERE "id" = \? FOR NO KEY UPDATE/);
   assert.ok(!calls.some((c) => c.op.includes("NotificationOutbox")));
+});
+
+test("edit, delete and restore take the task row before the comment's, then the files (a removed photo on it never deadlocks)", async () => {
+  // removeAttachment and takeBackContractorPost lock the task row first; a comment change that locked its own row
+  // first would wait on theirs while they waited on it (Postgres 40P01), so every change here follows them.
+  const count: Answer = (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined);
+  const gone = new Date("2026-10-23T15:00:00Z");
+  const rounds = [
+    ["edit", withComment({}, count), (tx: Tx) => editComment(tx, "ev1", { body: "New words" }, PIETER)],
+    ["delete", withComment(), (tx: Tx) => deleteComment(tx, "ev1", PIETER)],
+    ["restore", withComment({ deletedAt: gone }), (tx: Tx) => restoreComment(tx, "ev1", PIETER)],
+  ] as const;
+  for (const [name, { tx, calls }, run] of rounds) {
+    await run(tx);
+    const order = calls.flatMap((c, n) => (c.model === "$executeRaw" ? [[n, /FROM "Task" /.test(c.op) ? "task" : "comment"] as const] : []));
+    assert.deepEqual(order.map(([, which]) => which), ["task", "comment"], `${name}: the task row, then the comment's`);
+    const firstWrite = calls.findIndex((c) => /^(create|update|upsert|delete)/.test(c.op));
+    assert.ok(order[1][0] < firstWrite, `${name}: both locks come before any write`);
+    // Nothing but a read can come before the task lock: the read that names the task takes no lock.
+    assert.ok(calls.slice(0, order[0][0]).every((c) => c.model === "taskEvent" && c.op === "findUnique"), `${name}: only the read that names the task first`);
+  }
+});
+
+test("a comment that does not exist is refused before any lock", async () => {
+  const none = fakeTx({});
+  await assert.rejects(deleteComment(none.tx, "ghost", PIETER), /no longer exists/);
+  assert.ok(!none.calls.some((c) => c.model === "$executeRaw"));
 });
 
 test("editComment: the same text writes nothing; empty text with no files is refused", async () => {
   const same = withComment({}, (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined));
   await editComment(same.tx, "ev1", { body: "Original " }, PIETER);
-  assert.deepEqual(writes(same.calls).map((c) => c.model), ["$executeRaw"]);
+  assert.deepEqual(writes(same.calls).map((c) => c.model), ["$executeRaw", "$executeRaw"], "only the two locks");
   const empty = withComment({}, (m, op) => (m === "taskAttachment" && op === "count" ? 0 : undefined));
   await assert.rejects(editComment(empty.tx, "ev1", { body: "   " }, PIETER), /Add some text, or delete the comment/);
   // A comment that still has a file may lose its words.
@@ -628,7 +660,7 @@ test("restoreComment: the comment and the files that went with it come back, and
   // A comment that is back already is left as it is.
   const back = withComment();
   await restoreComment(back.tx, "ev1", PIETER);
-  assert.deepEqual(writes(back.calls).map((c) => c.model), ["$executeRaw"]);
+  assert.deepEqual(writes(back.calls).map((c) => c.model), ["$executeRaw", "$executeRaw"], "only the two locks");
 });
 
 // ---------------------------------------------------------------------------

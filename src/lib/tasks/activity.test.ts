@@ -398,6 +398,22 @@ test("a deleted comment leaves a line, and any other deleted event is gone", () 
   assert.equal(out[0].id, gone.id);
 });
 
+test("a contractor's photo post taken back leaves no line, but a real delete does", () => {
+  // takeBackContractorPost soft-deletes a body-less comment marked `batch`, written by the contractor: the update
+  // that never was. Staff were told of it by no one, and "Zack deleted a comment" would describe nothing he did.
+  const taken = ev("COMMENT", { batch: true }, { ...ZACK, visibility: "SHARED", createdAt: at(1), deletedAt: at(1.05) });
+  const kept = ev("COMMENT", { batch: true }, { ...ZACK, visibility: "SHARED", createdAt: at(2) });
+  assert.deepEqual(build([taken, kept]).map((e) => e.id), [kept.id], "only the post that stayed");
+  // Staff deleting their own reply, or a contractor's post that was given words first, still leave the line.
+  const reply = ev("COMMENT", {}, { visibility: "SHARED", body: "Gate code changed", createdAt: at(3), deletedAt: at(4) });
+  const worded = ev("COMMENT", { batch: true }, { ...ZACK, visibility: "SHARED", body: "Before photo", createdAt: at(5), deletedAt: at(6) });
+  const contractorsOwn = ev("COMMENT", {}, { ...ZACK, visibility: "SHARED", createdAt: at(7), deletedAt: at(8) });
+  assert.deepEqual(types(build([reply, worded, contractorsOwn])), ["deleted", "deleted", "deleted"]);
+  // A staff member's body-less comment is never a batch post, whatever its data says.
+  const staffBatch = ev("COMMENT", { batch: true }, { createdAt: at(9), deletedAt: at(10) });
+  assert.deepEqual(types(build([staffBatch])), ["deleted"], "no contractor behind it");
+});
+
 test("imported history is flagged: story rows and the importer's creation line, not later sync rows", () => {
   const sync = { actorUserId: null, source: "ASANA" } as const;
   const created = ev("CREATED", {}, { ...sync, actorLabel: "Asana import" });

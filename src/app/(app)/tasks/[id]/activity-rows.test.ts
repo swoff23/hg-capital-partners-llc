@@ -159,6 +159,15 @@ test("a deleted comment ships no words", () => {
   assert.ok(!JSON.stringify(rows).includes("Secret"));
 });
 
+test("a deleted comment's line keeps its place and prints when it came off", () => {
+  const written = new Date("2026-10-21T15:00:00Z");
+  const gone = ev("COMMENT", {}, { body: "Oops", createdAt: written, deletedAt: new Date("2026-10-21T15:08:00Z") });
+  const row = shape([gone], { contractor: null })[0];
+  assert.ok(row.type === "deleted");
+  assert.equal(row.at, written.toISOString(), "it sits where the comment was");
+  assert.equal(row.deletedAt, "2026-10-21T15:08:00.000Z", "and says when it was deleted, not when it was written");
+});
+
 test("rows mark what is new to the viewer, whenever it was written", () => {
   const theirs = ev("COMMENT", {}, { ...ZACK, body: "Hi" });
   const mine = ev("COMMENT", {}, { body: "Mine" });

@@ -71,6 +71,29 @@ const portalEvents = (contactId: string) => Prisma.sql`(
 )`;
 
 /**
+ * A comment with nothing left to show: no words, and no file this contractor may
+ * see (staff took off every photo of a batch, a photo-only reply or a Mark done
+ * note). The Updates skip it (jobUpdates) and so do the "2 new" counts, which
+ * would otherwise count a card the page never draws. The file test is
+ * portalEvents' own for a file post, written out again here so portalEvents
+ * stays as it is (queries.test pins the two to the same lines).
+ */
+const emptyComment = (contactId: string) => Prisma.sql`(
+  e."kind" = 'COMMENT'
+  AND btrim(COALESCE(e."body", '')) = ''
+  AND NOT EXISTS (
+    SELECT 1 FROM "TaskAttachment" t
+    WHERE t."eventId" = e."id" AND t."visibility" = 'SHARED' AND t."deletedAt" IS NULL
+      AND t."kind"::text IN (${Prisma.join([...PORTAL_FILE_KINDS])})
+      AND (
+        t."asanaGid" IS NOT NULL
+        OR t."uploadedByContactId" = ${contactId}
+        OR (t."uploadedByContactId" IS NULL AND (t."audienceContactId" IS NULL OR t."audienceContactId" = ${contactId}))
+      )
+  )
+)`;
+
+/**
  * A file this contractor may see: Shared, not removed, with bytes in our
  * store (attachments/access.ts contractorMaySee), and by the same rule as
  * portalEvents: imported, their own, or a staff upload addressed to them or
@@ -155,6 +178,7 @@ async function newUpdateCounts(contactId: string, taskIds: string[]): Promise<Ma
     LEFT JOIN "TaskReadState" r ON r."taskId" = e."taskId" AND r."contactId" = ${contactId}
     WHERE e."taskId" IN (${Prisma.join(taskIds)})
       AND ${portalEvents(contactId)}
+      AND NOT ${emptyComment(contactId)}
       AND e."actorContactId" IS DISTINCT FROM ${contactId}
       AND e."createdAt" > COALESCE(r."lastSeenAt", a."createdAt")
     GROUP BY e."taskId"`;
@@ -698,9 +722,11 @@ async function jobUpdates(p: PortalPrincipal, taskId: string, mask: (body: strin
         .filter((f) => f.kind === "FILE")
         .map((f) => ({ id: f.id, filename: f.filename, size: f.size, uploadedBy: uploaderLabel(p, f), createdAt: f.createdAt })),
     };
-    // A file post whose files were all removed has nothing left to show (portalEvents drops these too).
+    // A file post whose files were all removed has nothing left to show (portalEvents drops these too), and neither
+    // does a comment of photos alone that lost them all (the same test as the counts': emptyComment).
     if (r.kind === "ATTACHMENT" && own.length === 0) continue;
     const comment = r.kind === "COMMENT";
+    if (comment && !r.body?.trim() && own.length === 0) continue;
     // Codes in imported comments are hidden here, on the server; a comment HG wrote to this contractor shows as written.
     const parts = comment && r.body ? (r.source === "ASANA" ? mask(r.body) : [{ text: r.body }]) : null;
     out.push({

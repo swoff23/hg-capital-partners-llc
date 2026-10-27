@@ -73,6 +73,12 @@ export interface CommentCardProps {
   sending?: boolean;
   /** Where the entry id sits, when the card is not a timeline entry of its own (inside a decision pair). */
   bare?: boolean;
+  /**
+   * Take focus when the card appears with this on, or when it turns on, on its menu button (the card itself
+   * without a menu): an Undo that brings a deleted comment back puts a keyboard user where the deleted line was,
+   * not at the top of the page.
+   */
+  focusOnMount?: boolean;
 }
 
 /**
@@ -102,6 +108,7 @@ export function CommentCard({
   menuItems,
   sending = false,
   bare = false,
+  focusOnMount = false,
 }: CommentCardProps) {
   const now = useActivityNow();
   const coarse = useCoarsePointer();
@@ -120,6 +127,9 @@ export function CommentCard({
     if (wasEditing.current && !editing) (triggerRef.current ?? cardRef.current)?.focus();
     wasEditing.current = editing;
   }, [editing]);
+  useEffect(() => {
+    if (focusOnMount) (triggerRef.current ?? cardRef.current)?.focus();
+  }, [focusOnMount]);
   const editedDay = editedAt ? fmtDay(todayYmdEastern(new Date(editedAt)), { year: "auto", now: todayYmdEastern(new Date(now)) }) : null;
   const editedWord = <span className="shrink-0 text-meta text-fg-3">edited</span>;
 

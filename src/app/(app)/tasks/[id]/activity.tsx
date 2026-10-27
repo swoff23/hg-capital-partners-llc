@@ -65,7 +65,12 @@ export function TaskActivity({
   const [anchor, setAnchor] = useState<string | null>(null);
   // The comment just deleted: its card is gone, and focus goes to the line that took its place.
   const [deletedId, setDeletedId] = useState<string | null>(null);
-  const focused = useCallback(() => setDeletedId(null), []);
+  // The comment just brought back by Undo: focus goes to its menu button, where the deleted line was.
+  const [restoredId, setRestoredId] = useState<string | null>(null);
+  const focused = useCallback(() => {
+    setDeletedId(null);
+    setRestoredId(null);
+  }, []);
 
   // A link to an update (`#update-<id>`, from a job email or Copy link) opens the fold as far as it needs.
   useEffect(() => {
@@ -140,6 +145,8 @@ export function TaskActivity({
                   onViewPrevious={(text, by) => setViewing({ text, by })}
                   deletedId={deletedId}
                   onDeleted={setDeletedId}
+                  restoredId={restoredId}
+                  onRestored={setRestoredId}
                   onFocused={focused}
                 />
               </Fragment>
@@ -168,6 +175,8 @@ function Row({
   onViewPrevious,
   deletedId,
   onDeleted,
+  restoredId,
+  onRestored,
   onFocused,
 }: {
   row: ActivityRow;
@@ -179,6 +188,8 @@ function Row({
   onViewPrevious: (text: string, by: string) => void;
   deletedId: string | null;
   onDeleted: (id: string) => void;
+  restoredId: string | null;
+  onRestored: (id: string) => void;
   onFocused: () => void;
 }) {
   switch (row.type) {
@@ -193,6 +204,9 @@ function Row({
           editing={editing === row.comment.id}
           setEditing={setEditing}
           onDeleted={onDeleted}
+          focus={restoredId === row.comment.id}
+          onRestored={onRestored}
+          onFocused={onFocused}
         />
       );
     case "deleted":
@@ -323,7 +337,7 @@ function DecisionRowView({ row, month }: { row: Extract<ActivityRow, { type: "de
   );
 }
 
-/** "Connor deleted a comment · now": a staff-only trace. Takes focus when it is the card that was just deleted. */
+/** "Connor deleted a comment · now": a staff-only trace, timed from the delete. Takes focus when it is the card that was just deleted. */
 function DeletedLine({ row, month, focus, onFocused }: { row: Extract<ActivityRow, { type: "deleted" }>; month: boolean; focus: boolean; onFocused: () => void }) {
   const line = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
@@ -336,7 +350,7 @@ function DeletedLine({ row, month, focus, onFocused }: { row: Extract<ActivityRo
       <p ref={line} tabIndex={-1} className="text-meta text-fg-3 outline-none">
         {row.author} deleted a comment
         <span aria-hidden="true">{" · "}</span>
-        <ActivityTime at={row.at} month={month} />
+        <ActivityTime at={row.deletedAt} month={month} />
       </p>
     </ActivityItem>
   );
@@ -353,6 +367,9 @@ function CommentRowView({
   editing,
   setEditing,
   onDeleted,
+  focus,
+  onRestored,
+  onFocused,
 }: {
   row: CommentFields;
   at: string;
@@ -362,8 +379,16 @@ function CommentRowView({
   editing: boolean;
   setEditing: (id: string | null) => void;
   onDeleted: (id: string) => void;
+  /** This card is the one Undo just brought back: its menu button takes focus as it appears. */
+  focus: boolean;
+  onRestored: (id: string) => void;
+  onFocused: () => void;
 }) {
   const { toast } = useToast();
+  // The card has taken focus (CommentCard's focusOnMount runs first); the page lets go of the request.
+  useEffect(() => {
+    if (focus) onFocused();
+  }, [focus, onFocused]);
 
   async function copy(text: string, done: string) {
     try {
@@ -385,7 +410,8 @@ function CommentRowView({
         label: "Undo",
         onAction: () =>
           void callAction(() => restoreTaskComment(c.id)).then((r) => {
-            if (!r.ok) toast({ message: r.error });
+            if (!r.ok) return toast({ message: r.error });
+            onRestored(c.id);
           }),
       },
     });
@@ -431,6 +457,7 @@ function CommentRowView({
       media={c.media.length > 0 ? <MediaGrid items={c.media} variant="strip" inCard /> : null}
       files={c.files.length > 0 ? <FilesList files={c.files} onFill={c.internal} /> : null}
       removedFiles={c.removedFiles}
+      focusOnMount={focus}
       footer={delivery ? <DeliveryLine state={delivery.state} to={delivery.to} at={delivery.at} /> : undefined}
       menuItems={
         <>

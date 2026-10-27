@@ -1,6 +1,7 @@
 "use client";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -439,13 +440,34 @@ function ComposerBody({
     textChanged.current?.(text);
   }, [text]);
 
-  // Grow with the text, up to the cap in CSS.
-  useLayoutEffect(() => {
+  // Grow with the text, up to the cap in CSS, and again when the field's width changes (Send grows a spinner and the
+  // field narrows, so the words wrap onto another line that would otherwise sit clipped under the box's edge).
+  const grow = useCallback(() => {
     const el = field.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
+  }, []);
+  useLayoutEffect(grow, [grow, text]);
+  useEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    let width = el.offsetWidth;
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      if (el.offsetWidth === width) return;
+      width = el.offsetWidth;
+      // On the next frame, not inside the callback: setting the field's height there resizes what is being observed
+      // and Safari reports "ResizeObserver loop completed with undelivered notifications".
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(grow);
+    });
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
+  }, [grow]);
 
   // On a phone the composer is pinned to the bottom edge: it rides above the keyboard, and toasts stay above it.
   useKeyboardInset();
