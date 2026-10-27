@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { MAX_FILES_PER_POST } from "./job-view";
-import { postInBatches, RecordedUploads, recordedUploads, toldOf, type RecordedUpload } from "./recorded-uploads";
+import { drainKept, postInBatches, RecordedUploads, recordedUploadsOf, toldOf, type RecordedUpload } from "./recorded-uploads";
 
 // The job page's record step answers with an id alone, so each page notes what
 // it recorded. A batch can start under one visit to the job and land under the
@@ -139,10 +139,76 @@ test("a toast counts the files the post told HG of; one posted already isn't cou
   // a4 and a5 were posted by an earlier send whose answer was lost: the post linked three.
   assert.deepEqual(toldOf(piece, ["a1", "a2", "a3"]).map((r) => r.id), ["a1", "a2", "a3"]);
   assert.deepEqual(toldOf(piece, piece.map((r) => r.id)).length, 5);
-  // Everything was posted already (the answer was lost): they are on the job as the toast says.
-  assert.deepEqual(toldOf(piece, []).length, 5);
+  // Everything was posted already (the answer was lost): the quiet answer told HG of nothing, so its toast says nothing.
+  assert.deepEqual(toldOf(piece, []), []);
 });
 
-test("every job page shares one registry for the tab", () => {
-  assert.ok(recordedUploads instanceof RecordedUploads);
+test("every job page shares one registry for each queue's owner, and one owner's kept files never reach another's", () => {
+  const zack = recordedUploadsOf("portal:c-zack-reg");
+  assert.ok(zack instanceof RecordedUploads);
+  assert.equal(recordedUploadsOf("portal:c-zack-reg"), zack, "the same registry every time, for every page of the tab");
+  zack.keep("t-reg", [photo("z1")]);
+  zack.note("t-reg", photo("z2"));
+  const mike = recordedUploadsOf("portal:c-mike-reg");
+  assert.deepEqual(mike.take("t-reg", []), [], "Mike's page on the same tab and job gets none of Zack's kept files");
+  assert.deepEqual(mike.take("t-reg", ["z2"])[0].kind, null, "nor what Zack's queue noted");
+  assert.deepEqual(zack.take("t-reg", []).map((r) => r.id), ["z1"], "Zack's stay his");
+});
+
+/* ---------------- drainKept: the kept files post as a page opens and goes, one drain at a time ---------------- */
+
+test("drainKept hands the job's kept files to one post and keeps the ones it answers didn't go", async () => {
+  const scope = "portal:c-drain-1";
+  recordedUploadsOf(scope).keep("t1", [photo("a1"), photo("a2"), photo("a3")]);
+  const posted: string[][] = [];
+  await drainKept(scope, "t1", async (kept) => {
+    posted.push(kept.map((r) => r.id));
+    return kept.slice(2);
+  });
+  assert.deepEqual(posted, [["a1", "a2", "a3"]]);
+  assert.deepEqual(recordedUploadsOf(scope).take("t1", []).map((r) => r.id), ["a3"], "the one that didn't post waits for the next drain");
+  let called = false;
+  await drainKept(scope, "t1", async () => ((called = true), []));
+  assert.equal(called, false, "nothing kept, nothing posted");
+});
+
+test("drainKept: a second call while one is posting does nothing, so a closed job's page opening as the composer goes posts each file once", async () => {
+  const scope = "portal:c-drain-2";
+  recordedUploadsOf(scope).keep("t1", [photo("a1"), photo("a2")]);
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  const calls: string[][] = [];
+  // The composer's unmount starts the drain, and the finished job's page mounts while it is still posting.
+  const first = drainKept(scope, "t1", async (kept) => {
+    calls.push(kept.map((r) => r.id));
+    await held;
+    return [];
+  });
+  const second = drainKept(scope, "t1", async (kept) => (calls.push(kept.map((r) => r.id)), []));
+  await second;
+  assert.deepEqual(calls, [["a1", "a2"]], "the second didn't post");
+  release();
+  await first;
+  // Another job, or another owner's same job, drains on its own meanwhile.
+  recordedUploadsOf(scope).keep("t2", [photo("b1")]);
+  recordedUploadsOf("portal:c-drain-other").keep("t1", [photo("c1")]);
+  await Promise.all([
+    drainKept(scope, "t2", async (kept) => (calls.push(kept.map((r) => r.id)), [])),
+    drainKept("portal:c-drain-other", "t1", async (kept) => (calls.push(kept.map((r) => r.id)), [])),
+  ]);
+  assert.deepEqual(calls, [["a1", "a2"], ["b1"], ["c1"]]);
+});
+
+test("drainKept lets go once it ends, even when the post throws, so the next page's drain still runs", async () => {
+  const scope = "portal:c-drain-3";
+  recordedUploadsOf(scope).keep("t1", [photo("a1")]);
+  await assert.rejects(
+    drainKept(scope, "t1", async () => {
+      throw new Error("boom");
+    }),
+  );
+  recordedUploadsOf(scope).keep("t1", [photo("a2")]);
+  const seen: string[] = [];
+  await drainKept(scope, "t1", async (kept) => (seen.push(...kept.map((r) => r.id)), []));
+  assert.ok(seen.includes("a2"), "the next drain ran");
 });

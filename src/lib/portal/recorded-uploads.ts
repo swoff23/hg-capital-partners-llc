@@ -2,7 +2,18 @@ import type { FileKind } from "@/lib/attachments/content-types";
 import { MAX_FILES_PER_POST } from "@/lib/portal/job-view";
 
 /** A file that's up and recorded, waiting to be posted: what the Mark done sheet shows in its slot and the payoff in its strip. */
-export type RecordedUpload = { id: string; name: string; kind: FileKind | null; hasThumb: boolean; hasPoster: boolean };
+export type RecordedUpload = {
+  id: string;
+  name: string;
+  kind: FileKind | null;
+  hasThumb: boolean;
+  hasPoster: boolean;
+  /**
+   * It went with a Send that didn't go through, which may have posted it all the same (its answer lost). On that
+   * update Mark done never counts it (portal/jobs.ts), so the sheet doesn't count it either.
+   */
+  sent?: true;
+};
 
 /**
  * What each recorded file is, by job, for whichever job page posts it. The
@@ -12,6 +23,8 @@ export type RecordedUpload = { id: string; name: string; kind: FileKind | null; 
  * to the page that's open then. Kept per tab, outside any page (as
  * listing-photos' sessionUploads is), so none of the five is dropped. A file
  * no page here noted (a reload in between) still comes back, by id alone.
+ * There is one for each upload queue's scope (recordedUploadsOf), so what one
+ * person's queue recorded or kept only ever posts for them.
  */
 export class RecordedUploads {
   private readonly byJob = new Map<string, Map<string, RecordedUpload>>();
@@ -48,7 +61,8 @@ export class RecordedUploads {
   /**
    * A batch whose post didn't go through (no signal, a blip, the job closing under a held photo): its files are on
    * the job already but HG hasn't heard of them, so they wait here, kinds and all, for the next batch this tab
-   * posts for the job (take). A reload lets them go; they stay on the job, unposted, as before.
+   * posts for the job (take), or the next time a page for the job opens or goes (drainKept). A reload lets them go;
+   * they stay on the job, unposted, as before.
    */
   keep(taskId: string, items: readonly RecordedUpload[]): void {
     if (items.length === 0) return;
@@ -72,13 +86,50 @@ export async function postInBatches<T>(items: readonly T[], post: (piece: T[]) =
 
 /**
  * The files a post told HG of, for its toast: the ones it linked. A file kept from a post whose answer was lost
- * is on the job and was told of then, so it isn't counted again; with nothing new (every one was posted
- * already) the toast counts them all, since they are on the job as it says.
+ * is on the job and was told of then, so it isn't counted again. A post with nothing new (every one was posted
+ * already, or is gone from the job) told of none, and its toast says nothing.
  */
 export function toldOf<T extends { id: string }>(piece: readonly T[], linked: readonly string[]): T[] {
-  const told = piece.filter((item) => linked.includes(item.id));
-  return told.length > 0 ? told : [...piece];
+  return piece.filter((item) => linked.includes(item.id));
 }
 
-/** The one each tab shares: every job page reads and writes this. */
-export const recordedUploads = new RecordedUploads();
+const byScope = new Map<string, RecordedUploads>();
+
+/**
+ * The tab's registry for one upload queue's scope ("portal:<contact id>", useUploadScope), which every job page
+ * reads and writes for its queue: files kept for one contractor post only for them, never for whoever signs in
+ * on the tab next.
+ */
+export function recordedUploadsOf(scope: string | undefined): RecordedUploads {
+  const key = scope ?? "";
+  const known = byScope.get(key);
+  if (known) return known;
+  const tab = new RecordedUploads();
+  byScope.set(key, tab);
+  return tab;
+}
+
+/** The jobs whose kept files are posting now, by scope and job: one drain at a time for each. */
+const draining = new Set<string>();
+
+/**
+ * Hands every file the tab kept for the job (keep) to `post`, and keeps again the ones it answers didn't go. One
+ * drain at a time for each scope and job: a call while one is running does nothing, since that one took every kept
+ * file, so a page going as the next one opens (or a page and its own Send) makes one post of them, not two at once.
+ */
+export async function drainKept(
+  scope: string | undefined,
+  taskId: string,
+  post: (kept: RecordedUpload[]) => Promise<RecordedUpload[]>,
+): Promise<void> {
+  const job = `${scope ?? ""}|${taskId}`;
+  if (draining.has(job)) return;
+  draining.add(job);
+  try {
+    const tab = recordedUploadsOf(scope);
+    const kept = tab.take(taskId, []);
+    if (kept.length > 0) tab.keep(taskId, await post(kept));
+  } finally {
+    draining.delete(job);
+  }
+}

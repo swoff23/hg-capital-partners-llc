@@ -392,6 +392,12 @@ export interface StatusOptions {
    * nothing changes and TaskChangedError says who moved it.
    */
   expected?: TaskStatus;
+  /**
+   * A contractor's Mark done: the photos a batch post had already told HG of
+   * that it counted toward the playbook's (portal/jobs.ts), kept on the move to
+   * Review so they show under "At finish" (lib/tasks/media.ts finishPhotoIds).
+   */
+  finishIds?: string[];
 }
 
 export interface StatusResult {
@@ -457,7 +463,13 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
     kind: "STATUS",
     visibility,
     audienceContactId,
-    data: { from: before.status, to, ...(waitingOn ? { waitingOn } : {}), ...(to === "SCHEDULED" ? { scheduledFor: toYmd(scheduledFor) } : {}) },
+    data: {
+      from: before.status,
+      to,
+      ...(waitingOn ? { waitingOn } : {}),
+      ...(to === "SCHEDULED" ? { scheduledFor: toYmd(scheduledFor) } : {}),
+      ...(to === "REVIEW" && opts.finishIds?.length ? { finishIds: opts.finishIds } : {}),
+    },
   });
   const note = opts.note?.trim();
   if (note) await addEvent(tx, taskId, p, { kind: "COMMENT", visibility: "SHARED", body: note, audienceContactId });
@@ -990,8 +1002,10 @@ async function dropPostLine(tx: Tx, taskId: string, post: PostLine): Promise<voi
  * the timeline, the grids and the "2 new" counts, and its line leaves the
  * unsent email (dropPostLine). Only their own post marked `batch` by
  * addComment (never a Mark done's photos or a written update), only on a job
- * still active, and only while `undoable` says the window is open
- * (portal/job-view.ts undoWindowOpen).
+ * still active, only while `undoable` says the window is open
+ * (portal/job-view.ts undoWindowOpen), and only while the job hasn't gone to
+ * Review since: a Mark done can have counted the post's photos. A batch posted
+ * in the hour after Mark done can still be taken back.
  *
  * The task row is locked first, as setStatus does: every write that queues an
  * email updates the task before it touches the outbox, so a post landing now
@@ -1026,6 +1040,12 @@ export async function takeBackContractorPost(
   });
   if (!event) throw new TaskRuleError("That update is already gone.");
   if (!opts.undoable(event.createdAt)) throw new TaskRuleError("It's too late to take that back.");
+  const review = await tx.taskEvent.findFirst({
+    where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "REVIEW" } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  if (review && review.createdAt.getTime() >= event.createdAt.getTime()) throw new TaskRuleError("It's too late to take that back.");
   await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: now } });
   const { count } = await tx.taskAttachment.updateMany({
     where: { eventId, taskId, uploadedByContactId: p.contactId, deletedAt: null },

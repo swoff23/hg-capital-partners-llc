@@ -33,11 +33,19 @@ export async function ownUnposted(tx: core.Tx, taskId: string, contactId: string
 
 /**
  * Of the ids the browser sent, the files this contractor already posted on this job as a batch post (no text, the
- * "3 photos posted" kind), with their kinds: a batch whose answer was lost comes back on the tray. Mark done counts
- * these toward the photos it asks for (portal/jobs.ts), since HG heard of them with that post. A photo posted with a
+ * "3 photos posted" kind) during this visit, with their kinds: a batch whose answer was lost comes back on the tray.
+ * Mark done counts these toward the photos it asks for (portal/jobs.ts), since HG heard of them with that post.
+ * `since` is when the visit started (lib/tasks/media.ts visitStart, which the Review card reads too): a batch post
+ * from before the job last went to In progress counted for an earlier Mark done, not this one. A photo posted with a
  * written update never counts, as before.
  */
-export async function ownPosted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<{ id: string; kind: AttachmentKind }[]> {
+export async function ownPosted(
+  tx: core.Tx,
+  taskId: string,
+  contactId: string,
+  ids: string[],
+  since: Date | null,
+): Promise<{ id: string; kind: AttachmentKind }[]> {
   if (ids.length === 0) return [];
   return tx.taskAttachment.findMany({
     where: {
@@ -45,7 +53,7 @@ export async function ownPosted(tx: core.Tx, taskId: string, contactId: string, 
       taskId,
       uploadedByContactId: contactId,
       eventId: { not: null },
-      event: { is: { data: { path: ["batch"], equals: true } } },
+      event: { is: { data: { path: ["batch"], equals: true }, ...(since ? { createdAt: { gte: since } } : {}) } },
       deletedAt: null,
       asanaGid: null,
     },
@@ -54,16 +62,19 @@ export async function ownPosted(tx: core.Tx, taskId: string, contactId: string, 
 }
 
 /**
- * Whether every id is a file of this contractor's on this job with nothing left to tell HG: posted already, or taken
- * off the job since (HG deleted it). A send that came again, after its answer was lost, answers quietly on this.
+ * Whether every id is a file of this contractor's on this job with nothing left to tell HG: posted already (one Undo
+ * took back since keeps its post), or gone from the job (staff Remove deletes the row, so an id with no row on this
+ * job counts as removed). A send that came again, after its answer was lost, answers quietly on this. Any other row
+ * (someone else's, unposted, imported) means there is something to refuse.
  */
 export async function allOwnPosted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<boolean> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return false;
-  const done = await tx.taskAttachment.count({
-    where: { id: { in: unique }, taskId, uploadedByContactId: contactId, asanaGid: null, OR: [{ eventId: { not: null } }, { deletedAt: { not: null } }] },
+  const rows = await tx.taskAttachment.findMany({
+    where: { id: { in: unique }, taskId },
+    select: { uploadedByContactId: true, eventId: true, asanaGid: true },
   });
-  return done === unique.length;
+  return rows.every((f) => f.uploadedByContactId === contactId && f.eventId !== null && f.asanaGid === null);
 }
 
 /**
@@ -97,8 +108,8 @@ async function postLate(tx: core.Tx, taskId: string, p: Contractor, own: string[
 
 /**
  * One batch of recorded files, posted together. The access check comes first.
- * A send whose files are all this contractor's and posted already, or taken
- * off the job since (one sent again after its answer was lost) has nothing new
+ * A send whose files are all this contractor's and posted already, or removed
+ * from the job since (one sent again after its answer was lost) has nothing new
  * to tell, on a job of any status: it answers quietly, with no event and
  * nothing linked, so the pieces after it still go (record-and-post.ts posts a
  * big batch in pieces and stops at the first refused). Two sends of the same

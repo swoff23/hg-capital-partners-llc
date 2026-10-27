@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { todayYmdEastern } from "@/lib/dates";
 import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
+import { visitStart } from "@/lib/tasks/media";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { logSecurityEvent } from "./accounts";
 import { allOwnPosted, ownPosted, ownUnposted } from "./job-batch";
@@ -137,9 +138,12 @@ export async function postJobUpdate(taskId: string, input: JobUpdateInput): Prom
  * (TaskTemplate.finishPhotosRequired, uploads 2.8), it needs that many of this
  * contractor's own photos and videos here (job-view finishPhotoCount, what the
  * sheet counts): the unposted ones, which this update links, and any a batch
- * post already told HG of whose answer was lost, which stay on that post's
- * line (job-batch.ts ownPosted). The sheet holds the button until they are
- * up, and this is the same rule where the browser can't skip it.
+ * post of this visit already told HG of whose answer was lost, which stay on
+ * that post's line (job-batch.ts ownPosted; the visit is the Review card's,
+ * lib/tasks/media.ts visitStart). Those are named on the move to Review
+ * (`finishIds`), so they show under "At finish" with the rest. The sheet holds
+ * the button until they are up, and this is the same rule where the browser
+ * can't skip it.
  */
 export async function markJobDone(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
@@ -150,8 +154,9 @@ export async function markJobDone(taskId: string, input: JobUpdateInput): Promis
       const template = await tx.task.findUnique({ where: { id: taskId }, select: { taskTemplate: { select: { finishPhotosRequired: true } } } });
       const required = finishPhotosNeeded(template?.taskTemplate?.finishPhotosRequired);
       let photos = finishPhotoCount(own.map((f) => f.kind));
-      // Photos a batch post already told HG of, put back on the tray after its answer was lost, count too.
-      if (photos < required) photos += finishPhotoCount((await ownPosted(tx, taskId, p.contactId, input.attachmentIds)).map((f) => f.kind));
+      // Photos a batch post of this visit already told HG of, put back on the tray after its answer was lost, count too.
+      const posted = photos < required ? await ownPosted(tx, taskId, p.contactId, input.attachmentIds, await visitStartOf(tx, taskId)) : [];
+      photos += finishPhotoCount(posted.map((f) => f.kind));
       if (photos < required) {
         throw new core.TaskRuleError(`${addMorePhotosLine(required - photos)} to mark this done.`);
       }
@@ -159,10 +164,19 @@ export async function markJobDone(taskId: string, input: JobUpdateInput): Promis
       if (input.body.trim() || attachmentIds.length) {
         await core.addComment(tx, taskId, { body: input.body, attachmentIds }, principal);
       }
-      await core.setStatus(tx, taskId, "REVIEW", principal);
+      await core.setStatus(tx, taskId, "REVIEW", principal, { finishIds: posted.map((f) => f.id) });
     }),
   );
   revalidateJob(taskId);
+}
+
+/** When this visit to the job started: the job's latest move to In progress (visitStart), or null for an older job with none. */
+async function visitStartOf(tx: core.Tx, taskId: string): Promise<Date | null> {
+  const starts = await tx.taskEvent.findMany({
+    where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "IN_PROGRESS" } },
+    select: { kind: true, data: true, createdAt: true },
+  });
+  return visitStart(starts);
 }
 
 /** Tick or untick a checklist item on an active job. */

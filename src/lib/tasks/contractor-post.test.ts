@@ -215,10 +215,15 @@ const bundles = [
   { id: "o2", items: [item({ eventId: "e-a" })] },
 ];
 
+/** The read of the job's latest move to Review, which the post's own lookup isn't. */
+const isReviewRead = (model: string, op: string, args: CallArgs) => model === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS";
+
+/** A job never moved to Review unless `over` says so. */
 function undoTx(over: Answer = () => undefined) {
   return fakeTx((model, op, args) => {
     const given = over(model, op, args);
     if (given !== undefined) return given;
+    if (isReviewRead(model, op, args)) return null;
     if (model === "taskEvent" && op === "findFirst") return BATCH_EVENT;
     if (model === "taskAttachment" && op === "updateMany") return { count: 2 };
     if (model === "$queryRaw" && op.includes('FROM "NotificationOutbox"')) return bundles;
@@ -331,6 +336,30 @@ test("takeBackContractorPost: the window is judged on the post's own time", asyn
   const { tx } = undoTx();
   await takeBackContractorPost(tx, "t1", "e-a", ZACK, { undoable: (at) => (seen.push(at), true) }, SECONDS(3));
   assert.deepEqual(seen, [POSTED]);
+});
+
+test("takeBackContractorPost: a post the job went to Review at or after is refused, since Mark done could count its photos", async () => {
+  for (const reviewedAt of [POSTED, SECONDS(2)]) {
+    const { tx, calls } = undoTx((model, op, args) =>
+      isReviewRead(model, op, args) ? { createdAt: reviewedAt } : model === "task" && op === "findUnique" ? { status: "REVIEW" } : undefined,
+    );
+    await assert.rejects(takeBackContractorPost(tx, "t1", "e-a", ZACK, within, SECONDS(3)), /It's too late to take that back\./, reviewedAt.toISOString());
+    assert.deepEqual(calls.filter(isWrite), [], "nothing written");
+    const read = calls.find((c) => isReviewRead(c.model, c.op, c.args as CallArgs))!.args as CallArgs & { orderBy?: unknown };
+    assert.deepEqual(read.where, { taskId: "t1", kind: "STATUS", data: { path: ["to"], equals: "REVIEW" } }, "the job's latest move to Review, by anyone");
+    assert.deepEqual(read.orderBy, { createdAt: "desc" });
+  }
+});
+
+test("takeBackContractorPost: a batch posted in the hour after Mark done can still be taken back", async () => {
+  const { tx, calls } = undoTx((model, op, args) =>
+    isReviewRead(model, op, args) ? { createdAt: new Date(POSTED.getTime() - 60_000) } : model === "task" && op === "findUnique" ? { status: "REVIEW" } : undefined,
+  );
+  await takeBackContractorPost(tx, "t1", "e-a", ZACK, within, SECONDS(3));
+  assert.ok(calls.some((c) => c.model === "taskEvent" && c.op === "update"), "the post goes");
+  // The lookups keep their order: the post first, then its window, then the move to Review.
+  const finds = calls.filter((c) => c.model === "taskEvent" && c.op === "findFirst").map((c) => ((c.args as CallArgs).where?.kind as string) ?? "");
+  assert.deepEqual(finds, ["COMMENT", "STATUS"]);
 });
 
 test("takeBackContractorPost: staff can't use it", async () => {

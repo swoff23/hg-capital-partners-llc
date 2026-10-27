@@ -1,9 +1,10 @@
 "use client";
+import { useEffect } from "react";
 import { MediaUploadTray, useMediaUploader, type RecordMediaInput, type RecordMediaResult } from "@/components/media-uploader";
 import { useToast } from "@/components/toast";
 import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
-import { recordedUploads } from "@/lib/portal/recorded-uploads";
-import { postRecordedBatch, recordJobFile } from "./record-and-post";
+import { recordedUploadsOf } from "@/lib/portal/recorded-uploads";
+import { postKept, postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
  * The queue's way onto a job that is no longer active (docs/specs/uploads-photos.md
@@ -21,20 +22,28 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  * good: the tile keeps its red ring with only Remove, and the line under the
  * tray says "Job closed before 2 photos uploaded". The tile gets one more go
  * each time this page opens again (engine.ts mount), in case HG sent the job
- * back. It draws nothing while no file is waiting: the tray is the
- * composer's, and shows only when there is a file.
+ * back. Files the tab kept for the job (a post that didn't go through before
+ * HG closed it) post the same way as this page opens. It draws nothing while
+ * no file is waiting: the tray is the composer's, and shows only when there is
+ * a file.
  */
 export function LateUploads({ taskId, label }: { taskId: string; label: string }) {
   const { toast } = useToast();
   const owner = useUploadScope();
+  const tab = recordedUploadsOf(owner);
+
+  // What the tab kept for this job posts now, the late way, rather than waiting for a batch that may never land.
+  useEffect(() => {
+    void postKept(taskId, toast, owner);
+  }, [taskId, toast, owner]);
 
   const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
   /**
    * The batch landed: with this page open or gone, it is handed to the same step. Files whose post didn't go
-   * through stay kept for the tab (recordedUploads.keep), and the next batch for this job carries them.
+   * through stay kept for the tab (keep), and the next batch for this job, or the next time it opens, carries them.
    */
   const land = (ids: string[]) => {
-    void postRecordedBatch(taskId, recordedUploads.take(taskId, ids), toast, owner).then((left) => recordedUploads.keep(taskId, left));
+    void postRecordedBatch(taskId, tab.take(taskId, ids), toast, owner).then((left) => tab.keep(taskId, left));
   };
 
   const target: UploadTarget = {
