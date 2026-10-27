@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PREVIEW_RULE, UPLOAD_RULES } from "./content-types";
-import { PUBLIC_PHOTO_RULE, durationHint, mediaHint, pixelHint, propertyUploadLimits, storedPropertyDocumentPath, uploadLimits } from "./limits";
+import {
+  EMPTY_UPLOAD,
+  PUBLIC_PHOTO_RULE,
+  blobSizeRefusal,
+  durationHint,
+  mediaHint,
+  pixelHint,
+  propertyUploadLimits,
+  storedPropertyDocumentPath,
+  uploadLimits,
+} from "./limits";
 import { UPLOAD_KINDS, UPLOAD_KIND_ALLOWED } from "./upload-kinds";
 
 const T = "cm1abc2def3ghi";
@@ -142,4 +152,15 @@ test("display hints keep only sane positive numbers", () => {
   assert.equal(pixelHint(1023.6), 1024);
   assert.equal(durationHint(12.5), 12.5);
   assert.equal(durationHint(24 * 3600 + 1), null);
+});
+
+test("blobSizeRefusal: the record step refuses a blob that arrived empty, and one over its cap", () => {
+  const cap = UPLOAD_RULES.image.maxBytes;
+  assert.equal(blobSizeRefusal(0, cap), EMPTY_UPLOAD);
+  assert.equal(EMPTY_UPLOAD, "That file arrived empty. Try again.");
+  assert.equal(blobSizeRefusal(-1, cap), EMPTY_UPLOAD);
+  assert.equal(blobSizeRefusal(Number.NaN, cap), EMPTY_UPLOAD);
+  assert.equal(blobSizeRefusal(1, cap), null);
+  assert.equal(blobSizeRefusal(cap, cap), null);
+  assert.equal(blobSizeRefusal(cap + 1, cap), "That file is over the 25 MB limit.");
 });

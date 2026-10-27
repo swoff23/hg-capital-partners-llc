@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { connection } from "next/server";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import type { Principal } from "@/lib/tasks/core";
@@ -28,8 +29,18 @@ interface PortalSessionState {
   mustChangePassword: boolean;
 }
 
+/**
+ * PORTAL_ENABLED is read per request, like the rest of env.ts. Waiting for the request first keeps a build made
+ * without the flag from prerendering a portal page as it found it (a static 404 for /p and the first-password page,
+ * which would stay one after the flag is turned on, or after a rollback to that build).
+ */
+async function portalOnForRequest(): Promise<boolean> {
+  await connection();
+  return getEnv().portalEnabled;
+}
+
 const readSession = cache(async (): Promise<PortalSessionState | null> => {
-  if (!getEnv().portalEnabled) return null;
+  if (!(await portalOnForRequest())) return null;
   const { name } = await portalCookieForRequest();
   const token = (await cookies()).get(name)?.value;
   if (!isWellFormedToken(token)) return null;
@@ -110,7 +121,7 @@ export async function getPortalPrincipal(opts: { allowStartingPassword?: boolean
  * chosen. So an email's job link still opens that job after sign-in.
  */
 export async function requirePortalPrincipal(opts: { passwordPage?: boolean } = {}): Promise<PortalPrincipal> {
-  if (!getEnv().portalEnabled) notFound();
+  if (!(await portalOnForRequest())) notFound();
   const state = await readSession();
   if (!state) redirect(withNext("/login", await requestedPortalPath()));
   if (opts.passwordPage) {

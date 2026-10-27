@@ -532,6 +532,18 @@ test("addComment: a contractor's Retry of an update that did post gets it back a
   }
 });
 
+test("setStatus: a contractor's stale Mark done or Start job says where the job is now, and writes nothing", async () => {
+  for (const [status, to, words] of [
+    ["DONE", "REVIEW", /^TaskRuleError: This job is already done\.$/],
+    ["REVIEW", "REVIEW", /^TaskRuleError: This job is already in review\.$/],
+    ["IN_PROGRESS", "IN_PROGRESS", /^TaskRuleError: This job is already started\.$/],
+  ] as const) {
+    const { tx, calls } = fakeTx({ status, assigneeContactId: "c-zack" }, accessOk);
+    await assert.rejects(setStatus(tx, "t1", to, ZACK), words, `${status} to ${to}`);
+    assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "only the row lock");
+  }
+});
+
 test("addComment: a task deleted while the send waited is refused under the lock, before any write", async () => {
   const { tx, calls } = fakeTx({}, (model, op) => (model === "task" && op === "findUnique" ? null : undefined));
   await assert.rejects(addComment(tx, "t1", { body: "Hi" }, PIETER), /no longer exists/);

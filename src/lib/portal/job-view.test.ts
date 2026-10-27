@@ -1,10 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { TaskStatus } from "@prisma/client";
+import { uploadNotice } from "@/lib/attachments/media";
 import { STATUS_ORDER } from "@/lib/task-scope";
 import { statusEventVisibility } from "@/lib/tasks/rules";
 import {
+  MAX_FILES_PER_POST,
+  MAX_FILES_REASON,
   PORTAL_STATUS_UPDATES,
+  TOO_MANY_FILES,
+  postRoom,
   addMorePhotosLine,
   addedText,
   addedToJobText,
@@ -378,6 +383,28 @@ test("a My jobs row says what its uploads are doing (uploads 2.1)", () => {
   assert.deepEqual(rowUploadLine({ ...none, waiting: 3, pendingKinds: ["image", "image", "image"] }), { text: "No signal · 3 photos waiting", tone: "info" });
   assert.deepEqual(rowUploadLine({ ...none, waiting: 1, pendingKinds: ["video"] }), { text: "No signal · 1 video waiting", tone: "info" });
   assert.equal(rowUploadLine({ ...none, pending: 1, waiting: 2, pendingKinds: ["image", "image", "image"] })?.text, "Uploading 1 photo");
+});
+
+test("a My jobs row whose photos are up and only wait for the job to open says to open it, not Uploading", () => {
+  const none = { pending: 0, waiting: 0, failed: 0, awaitingPage: 0, pendingKinds: [] as const };
+  // Signed back in on My jobs: both photos' bytes are up, and only the job page records and posts them.
+  assert.deepEqual(rowUploadLine({ ...none, pending: 2, awaitingPage: 2, pendingKinds: ["image", "image"] }), { text: "Open to send 2 photos", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, pending: 1, awaitingPage: 1, pendingKinds: ["image"] }), { text: "Open to send 1 photo", tone: "info" });
+  // One still going up leads, counted alone.
+  assert.deepEqual(rowUploadLine({ ...none, pending: 3, awaitingPage: 2, pendingKinds: ["image", "image", "image"] }), { text: "Uploading 1 photo", tone: "info" });
+  assert.equal(rowUploadLine({ ...none, pending: 2, awaitingPage: 2, failed: 1, pendingKinds: ["image", "image"] })?.tone, "danger");
+});
+
+test("one post takes 50 files, and the job page's room is what's left of that", () => {
+  assert.equal(MAX_FILES_PER_POST, 50);
+  assert.equal(postRoom(0), 50);
+  assert.equal(postRoom(12), 38);
+  assert.equal(postRoom(50), 0);
+  assert.equal(postRoom(64), 0);
+  assert.equal(MAX_FILES_REASON, "only 50 at a time");
+  assert.equal(uploadNotice([1, 2, 3, 4, 5].map((n) => ({ name: `p${n}.jpg`, kind: "image" as const, reason: MAX_FILES_REASON }))), "5 photos didn't upload: only 50 at a time");
+  assert.equal(TOO_MANY_FILES, "Send up to 50 photos at a time.");
+  assert.ok(!/[—]/.test(MAX_FILES_REASON + TOO_MANY_FILES));
 });
 
 test("the payoff strip shows four thumbs and a count for the rest", () => {

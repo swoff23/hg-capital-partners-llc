@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { UploadTarget } from "@/components/upload-queue";
-import { UploadEngine, capReason, type EngineDeps, type EngineNotice } from "./engine";
+import { UploadEngine, capReason, failedAwayText, type EngineDeps, type EngineNotice } from "./engine";
 import { MAX_ONLINE_TRIES, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
 import { WRONG_SIGN_IN } from "./queue-owner";
 import type { SendInput } from "./transfer";
@@ -118,7 +118,7 @@ test("a batch: camera names are dated, a refused file gets its reason, the rest 
   );
   assert.equal(tiles[2].error, "only photos, videos and documents can be added here");
   assert.equal(new Set(tiles.map((u) => u.batchId)).size, 1, "one batch");
-  assert.deepEqual(h.engine.counts(t.key), { pending: 3, waiting: 0, failed: 1, pendingKinds: ["image", "image", "file"] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 3, waiting: 0, failed: 1, awaitingPage: 0, pendingKinds: ["image", "image", "file"] });
 
   await h.flush();
   assert.deepEqual(t.recorded.sort(), ["Lease 2026.pdf", "Photo 2026-10-25 at 2.14 PM 2.jpg", "Photo 2026-10-25 at 2.14 PM.jpg"].sort());
@@ -126,7 +126,7 @@ test("a batch: camera names are dated, a refused file gets its reason, the rest 
   assert.deepEqual(h.engine.uploadsFor(t.key).map((u) => u.status), ["invalid"]);
   assert.equal(landed.length, 1);
   assert.equal(landed[0].length, 3);
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, failed: 1, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, failed: 1, awaitingPage: 0, pendingKinds: [] });
 });
 
 test("the record step gets the pathname, the stored name and no queuedAt unless the target asks", async () => {
@@ -168,7 +168,7 @@ test("no signal: the file waits, then goes the moment the signal is back", async
   h.engine.add(t, [file("a.jpg")]);
   await h.flush();
   assert.equal(h.engine.uploadsFor(t.key)[0].status, "waiting");
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 1, failed: 0, pendingKinds: ["image"] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 1, failed: 0, awaitingPage: 0, pendingKinds: ["image"] });
   assert.equal(h.sent.length, 1);
 
   h.state.online = true;
@@ -913,7 +913,7 @@ test("dispose: an upload in flight is aborted, its claim let go and its outbox r
   assert.equal(h.timers.size, 0, "no stall or retry timer left");
   assert.deepEqual(recorded, [], "nothing recorded");
   assert.equal((await outbox.all()).length, 1, "the row stays");
-  assert.deepEqual(h.engine.counts(), { pending: 0, waiting: 0, failed: 0, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(), { pending: 0, waiting: 0, failed: 0, awaitingPage: 0, pendingKinds: [] });
 
   // The same person's next queue picks it up.
   const next = setup({ outbox, claim: shared.claim, scope: "portal:c-zack" });
@@ -971,4 +971,121 @@ test("dispose: after it, nothing is added, restored, retried or sent, and no toa
   w.state.online = true;
   await w.advance(120_000);
   assert.equal(w.sent.length, 1, "only the first try");
+});
+
+/* ---------------- The break-the-app pass ---------------- */
+
+/** A prepare that makes a thumbnail, as a real photo gets. */
+const withThumb: EngineDeps["prepare"] = async (file, input) => ({
+  blob: file,
+  name: input.name,
+  contentType: input.contentType,
+  thumb: new Blob([new Uint8Array(10)], { type: "image/jpeg" }),
+  poster: null,
+  meta: {},
+});
+
+test("a thumbnail that landed is in its row at once, so a queue stopped before the record step never sends it again", async () => {
+  const outbox = memoryOutbox();
+  const h = setup({ outbox, scope: "portal:c-zack" });
+  h.deps.prepare = withThumb;
+  // Signing out: the record call is out when the queue stops, and its answer never counts here.
+  const t = portalTarget({ record: () => new Promise(() => {}) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("Kitchen.jpg")]);
+  await h.flush();
+  assert.deepEqual(h.sent.map((s) => s.role), ["orig", "thumb"]);
+  h.engine.dispose();
+  const [row] = await outbox.all();
+  assert.ok(row.pathname && row.thumbPathname, "both blobs are in the row");
+
+  // Signed back in: the next queue records both and sends neither again.
+  const next = setup({ outbox, scope: "portal:c-zack" });
+  next.deps.prepare = withThumb;
+  const seen: { pathname: string; thumbPathname?: string }[] = [];
+  next.engine.setTarget(portalTarget({ record: async (f) => (seen.push(f), { ok: true, data: { id: "a1" } }) }));
+  await next.engine.restore();
+  await next.flush();
+  assert.equal(next.sent.length, 0, "no second original, no second thumbnail");
+  assert.deepEqual(seen.map((f) => [f.pathname, f.thumbPathname]), [[row.pathname, row.thumbPathname]]);
+});
+
+test("files put back by a sign-in whose bytes are up wait for their page, and the counts say so", async () => {
+  const outbox = memoryOutbox();
+  const first = setup({ outbox, scope: "portal:c-zack", online: false, script: [new TypeError("Failed to fetch"), new TypeError("Failed to fetch")] });
+  first.engine.add(portalTarget(), [file("a.jpg"), file("b.jpg")]);
+  await first.flush();
+  first.engine.dispose();
+
+  // My jobs: no job page sets the target, so the bytes go up and then wait.
+  const myJobs = setup({ outbox, scope: "portal:c-zack" });
+  await myJobs.engine.restore();
+  await myJobs.flush();
+  const counts = myJobs.engine.counts("portal-task:t9");
+  assert.equal(counts.pending, 2);
+  assert.equal(counts.awaitingPage, 2, "up, and only the job's page can record them");
+  // The job opens: they record, and nothing waits.
+  myJobs.engine.setTarget(portalTarget());
+  await myJobs.flush();
+  assert.equal(myJobs.engine.counts("portal-task:t9").awaitingPage, 0);
+  assert.equal(myJobs.engine.counts("portal-task:t9").pending, 0);
+});
+
+test("a failure after its page was left names where the file was going", async () => {
+  const h = setup({ script: [new Error("This job is closed.")] });
+  const t = target({ label: "56 Tamarack St" });
+  const gone = h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg")]);
+  gone();
+  await h.flush();
+  assert.equal(h.notices.length, 1);
+  assert.equal(h.notices[0].message, "1 photo didn't upload to 56 Tamarack St");
+  assert.equal(h.notices[0].action?.label, "Retry");
+  assert.equal(failedAwayText(["image", "image"], ""), "2 photos didn't upload", "a target with no label says the count alone");
+});
+
+test("a file another tab or an earlier visit left in the outbox fails quietly: no toast on whatever page is open", async () => {
+  const outbox = memoryOutbox();
+  const first = setup({ outbox, scope: "app:u1", online: false, script: [new TypeError("Failed to fetch")] });
+  first.engine.add(target({ key: "property-photo:p1", uploadKind: "property-photo-upload", parentId: "p1", allowed: ["image"] }), [file("front.jpg")]);
+  await first.flush();
+  first.engine.dispose();
+
+  // Home in another tab: the outbox puts the photo back, it goes up and is refused.
+  const home = setup({ outbox, scope: "app:u1", script: [new Error("Failed to retrieve the client token")] });
+  await home.engine.restore();
+  await home.flush();
+  assert.equal(home.engine.uploadsFor("property-photo:p1")[0]?.status, "failed", "its red tile waits on its own page");
+  assert.equal(home.notices.length, 0, "nothing on Home that reads as Home's upload");
+
+  // Retried from its page and left again: now it is this page load's, so a second failure says so.
+  home.state.script.push(new Error("Failed to retrieve the client token"));
+  home.engine.retry(home.engine.uploadsFor("property-photo:p1")[0].key);
+  await home.flush();
+  assert.equal(home.notices.length, 1);
+  assert.equal(home.notices[0].message, "1 photo didn't upload to 56 Tamarack St");
+});
+
+test("a cap counts files recorded in a batch that hasn't reached the page yet", async () => {
+  const h = setup();
+  let finish: () => void = () => {};
+  h.deps.transfer = async (input) => {
+    h.sent.push(input);
+    if (input.name === "slow.jpg") await new Promise<void>((resolve) => (finish = resolve));
+    return { pathname: `orig/${input.name}` };
+  };
+  const landed: string[][] = [];
+  const t = target({ maxFiles: 2, maxFilesReason: "only 2 at a time", allowed: ["image"], onRecorded: (ids) => landed.push(ids) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("fast.jpg"), file("slow.jpg")]);
+  await h.flush();
+  assert.equal(landed.length, 0, "fast.jpg is recorded, but its batch waits on slow.jpg");
+  // The page still holds nothing, so it offers the whole cap again: one recorded and one going up leave no room.
+  h.engine.add(t, [file("third.jpg")]);
+  const third = h.engine.uploadsFor(t.key).find((u) => u.name === "third.jpg")!;
+  assert.equal(third.status, "invalid");
+  assert.equal(third.error, "only 2 at a time", "the target's own reason past its cap");
+  finish();
+  await h.flush();
+  assert.equal(landed.length, 1);
 });

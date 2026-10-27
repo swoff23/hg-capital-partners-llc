@@ -2,6 +2,7 @@
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { portalScope, withQueueOwner } from "@/lib/attachments/queue-owner";
+import { MAX_FILES_PER_POST, TOO_MANY_FILES } from "@/lib/portal/job-view";
 import * as jobs from "@/lib/portal/jobs";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { withResult } from "@/lib/server-action";
@@ -26,7 +27,8 @@ const owner = z.string().max(80).nullish();
 const updateSchema = z
   .object({
     body: z.string().max(5000).default(""),
-    attachmentIds: z.array(id).max(50).default([]),
+    // The page holds no more than one post takes (job-actions.tsx maxFiles); a tab that held more hears it in words.
+    attachmentIds: z.array(id).max(MAX_FILES_PER_POST, TOO_MANY_FILES).default([]),
     // Made in the browser for each send, so a Retry after a timeout that did post never posts twice
     // (activity 2.7; core.addComment answers a repeat with the first). Strict schemas refuse a key they don't
     // know, so it has to be named here.

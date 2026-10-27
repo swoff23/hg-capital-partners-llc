@@ -21,6 +21,19 @@ export function canSetStatus(kind: PrincipalKind, from: TaskStatus, to: TaskStat
 }
 
 /**
+ * Why a contractor's Start job or Mark done was refused, from where the job is now. The page asking is usually a
+ * stale tab (HG approved meanwhile, a second tab already marked it done or started it), so it says what happened;
+ * the page refreshes to show it. Anything else keeps the rule itself.
+ */
+export function contractorStatusRefusal(from: TaskStatus, to: TaskStatus): string {
+  if (from === "DONE") return "This job is already done.";
+  if (from === "CANCELED") return "This job was canceled.";
+  if (from === "REVIEW") return "This job is already in review.";
+  if (from === "IN_PROGRESS" && to === "IN_PROGRESS") return "This job is already started.";
+  return "You can start a job or mark it done.";
+}
+
+/**
  * Status changes a contractor sees on their job: it got scheduled, work
  * started (or was sent back), they marked it done, it was approved.
  * Waiting and Canceled stay internal.

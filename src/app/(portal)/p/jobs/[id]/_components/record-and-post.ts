@@ -52,6 +52,9 @@ export async function postRecordedBatch(
     toast({ message: res.error });
     return false;
   }
+  // The same photos went from another tab a moment ago (or this send's first answer was lost): they're posted, so the
+  // tray lets them go and there is nothing to say.
+  if (res.data.alreadyPosted) return true;
   const { eventId } = res.data;
   const kinds = items.map((i) => i.kind);
   if (eventId === null) {

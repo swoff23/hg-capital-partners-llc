@@ -20,7 +20,20 @@ import type { UploadRole } from "./paths";
  * reason other than the connection, the whole file goes the way it always
  * did, through put({ multipart: true }) on the same token.
  *
- * Needs a browser; the part arithmetic is pure and tested (transfer.test.ts).
+ * Progress needs a streamed request body: @vercel/blob reads the bytes
+ * through a stream to count them. A browser extension that wraps the page's
+ * fetch (Jam does, in Connor's Chrome) can lock that stream before a byte
+ * goes, and Chrome then throws "The provided ReadableStream is locked" (or
+ * "disturbed"). The first send that fails that way goes again at once with a
+ * plain Blob body, and so does every send after it on the page
+ * (streamFallback). The bytes, the resume and a multipart upload's per-part
+ * progress are the same; what's lost is the count inside one request, so the
+ * stall watchdog is fed for as long as its bytes could take on a slow line
+ * (blindBudgetMs) instead of cutting a slow request off at 30 seconds.
+ *
+ * Needs a browser; the part arithmetic and the fallback are pure and tested
+ * (transfer.test.ts), and blobTransfer takes the client, so the fallback is
+ * tried against a fake one there.
  */
 
 /** One part is 8 MB (Blob wants at least 5 MB, but the last). */
@@ -93,39 +106,120 @@ async function clientToken(kind: UploadKind, pathname: string, clientPayload: st
   return body.clientToken;
 }
 
+/* ---------------- Streamed bodies, and the plain fallback ---------------- */
+
+/**
+ * Whether a send failed because the page's fetch can't take a streamed body: a wrapper locked or read the stream
+ * ("The provided ReadableStream is locked", "... is disturbed"), or rebuilt the request without `duplex` ("The
+ * `duplex` member must be specified for a request with a streaming body"). Chrome throws it before any byte goes.
+ */
+export function isStreamBodyError(err: unknown): boolean {
+  return err instanceof TypeError && /ReadableStream|duplex|streaming body/i.test(err.message);
+}
+
+/**
+ * Sends with a streamed body (for progress) until one fails as isStreamBodyError, then sends that one again with a
+ * plain body, and every later one straight away. One per page, so a page pays for the failed try once.
+ */
+export function streamFallback() {
+  let broken = false;
+  return {
+    /** Whether sends now go with a plain body. */
+    get broken(): boolean {
+      return broken;
+    },
+    async run<T>(send: (stream: boolean) => Promise<T>): Promise<T> {
+      if (!broken) {
+        try {
+          return await send(true);
+        } catch (err) {
+          if (!isStreamBodyError(err)) throw err;
+          broken = true;
+        }
+      }
+      return send(false);
+    },
+  };
+}
+
+type Fallback = ReturnType<typeof streamFallback>;
+
+/** The slowest a working connection is taken to send at, for a request that can't say how far it got. */
+export const BLIND_BYTES_PER_SEC = 16 * 1024;
+
+/** How long a request sent without progress keeps the stall watchdog fed: what its bytes take at BLIND_BYTES_PER_SEC. */
+export function blindBudgetMs(bytes: number): number {
+  return Math.ceil((Math.max(0, bytes) / BLIND_BYTES_PER_SEC) * 1000);
+}
+
+/** How often a request with no progress feeds the watchdog, well inside its 30 seconds. */
+const BLIND_BEAT_MS = 5_000;
+
+/** Runs a request that reports no progress, calling `beat` every few seconds for as long as `bytes` could take. */
+async function sendBlind<T>(bytes: number, beat: () => void, send: () => Promise<T>): Promise<T> {
+  const until = Date.now() + blindBudgetMs(bytes);
+  const timer = setInterval(() => {
+    if (Date.now() < until) beat();
+  }, BLIND_BEAT_MS);
+  try {
+    return await send();
+  } finally {
+    clearInterval(timer);
+  }
+}
+
+/** The @vercel/blob client calls a transfer makes: the real ones in the browser, fakes in tests. */
+export type BlobClient = {
+  put: typeof put;
+  createMultipartUpload: typeof createMultipartUpload;
+  uploadPart: typeof uploadPart;
+  completeMultipartUpload: typeof completeMultipartUpload;
+};
+
 /**
  * The whole file in one call: put(), multipart above 8 MB (retried part by part inside the client). The token is the
  * route's, asked for here, so a 5xx from the route waits like any dropped request and the stall abort reaches it.
  */
-async function sendWhole(input: SendInput, pathname: string, clientPayload: string, token?: string): Promise<{ pathname: string }> {
+async function sendWhole(
+  client: BlobClient,
+  bodies: Fallback,
+  input: SendInput,
+  pathname: string,
+  clientPayload: string,
+  token?: string,
+): Promise<{ pathname: string }> {
   const multipart = usesMultipart(input.blob.size);
-  const blob = await put(pathname, input.blob, {
+  const options = {
     access: input.access,
     token: token ?? (await clientToken(input.uploadKind, pathname, clientPayload, input.signal, multipart)),
     contentType: input.contentType,
     multipart,
     abortSignal: input.signal,
-    onUploadProgress: ({ percentage }) => input.onProgress(Math.min(1, percentage / 100)),
-  });
+  };
+  const blob = await bodies.run((stream) =>
+    stream
+      ? client.put(pathname, input.blob, { ...options, onUploadProgress: ({ percentage }) => input.onProgress(Math.min(1, percentage / 100)) })
+      : sendBlind(input.blob.size, () => input.onProgress(0), () => client.put(pathname, input.blob, options)),
+  );
   return { pathname: blob.pathname };
 }
 
 /** A token that ran out is asked for again this many times in one run; a file that needs more has a problem of its own. */
 const MAX_REMINTS = 3;
 
-async function sendInParts(input: SendInput, pathname: string, clientPayload: string): Promise<{ pathname: string }> {
+async function sendInParts(client: BlobClient, bodies: Fallback, input: SendInput, pathname: string, clientPayload: string): Promise<{ pathname: string }> {
   const { access, contentType, signal } = input;
   const mint = () => clientToken(input.uploadKind, pathname, clientPayload, signal, true);
   let token = await mint();
   let state = input.resume && input.resume.pathname === pathname ? input.resume : null;
   if (!state) {
     try {
-      const created = await createMultipartUpload(pathname, { access, token, contentType, abortSignal: signal });
+      const created = await client.createMultipartUpload(pathname, { access, token, contentType, abortSignal: signal });
       state = { pathname, key: created.key, uploadId: created.uploadId, parts: [] };
     } catch (err) {
       // The connection is the caller's to retry; anything else, and the old path is the safe one.
       if (signal.aborted || classifyFailure(err, true) !== "refused") throw err;
-      return sendWhole(input, pathname, clientPayload, token);
+      return sendWhole(client, bodies, input, pathname, clientPayload, token);
     }
     input.onMultipart(state);
   }
@@ -165,20 +259,27 @@ async function sendInParts(input: SendInput, pathname: string, clientPayload: st
       while (failures.length === 0 && next < todo.length) {
         const range = todo[next++];
         try {
-          const part = await uploadPart(pathname, input.blob.slice(range.start, range.end), {
-            access,
-            token: withToken,
-            uploadId,
-            key,
-            partNumber: range.partNumber,
-            contentType,
-            abortSignal: local.signal,
-            onUploadProgress: ({ loaded }) => {
-              if (local.signal.aborted) return;
-              loadedBy.set(range.partNumber, loaded);
-              report();
-            },
-          });
+          const slice = input.blob.slice(range.start, range.end);
+          const options = { access, token: withToken, uploadId, key, partNumber: range.partNumber, contentType, abortSignal: local.signal };
+          const part = await bodies.run((stream) =>
+            stream
+              ? client.uploadPart(pathname, slice, {
+                  ...options,
+                  onUploadProgress: ({ loaded }) => {
+                    if (local.signal.aborted) return;
+                    loadedBy.set(range.partNumber, loaded);
+                    report();
+                  },
+                })
+              : // No bytes to count: the finished parts are the progress, and the watchdog is fed while this one goes.
+                sendBlind(
+                  slice.size,
+                  () => {
+                    if (!local.signal.aborted) report();
+                  },
+                  () => client.uploadPart(pathname, slice, options),
+                ),
+          );
           loadedBy.delete(range.partNumber);
           parts.push({ etag: part.etag, partNumber: part.partNumber });
           input.onMultipart({ pathname, key, uploadId, parts: [...parts] });
@@ -203,7 +304,7 @@ async function sendInParts(input: SendInput, pathname: string, clientPayload: st
   for (let reminted = 0; ; reminted++) {
     try {
       await sendMissing(token);
-      const done = await completeMultipartUpload(pathname, [...parts].sort((a, b) => a.partNumber - b.partNumber), {
+      const done = await client.completeMultipartUpload(pathname, [...parts].sort((a, b) => a.partNumber - b.partNumber), {
         access,
         token,
         uploadId,
@@ -224,14 +325,20 @@ async function sendInParts(input: SendInput, pathname: string, clientPayload: st
   }
 }
 
-/** The browser's Transfer. */
-export const sendBlob: Transfer = async (input) => {
-  const request = uploadRequest(
-    input.uploadKind,
-    input.parentId,
-    { name: input.name, contentType: input.contentType, fileKind: input.fileKind },
-    { role: input.role, queuedAt: input.queuedAt, owner: input.owner },
-  );
-  if (!usesMultipart(input.blob.size)) return sendWhole(input, request.pathname, request.clientPayload);
-  return sendInParts(input, request.pathname, request.clientPayload);
-};
+/** A Transfer on a Blob client, with its own stream fallback. The browser's is sendBlob. */
+export function blobTransfer(client: BlobClient = { put, createMultipartUpload, uploadPart, completeMultipartUpload }): Transfer {
+  const bodies = streamFallback();
+  return async (input) => {
+    const request = uploadRequest(
+      input.uploadKind,
+      input.parentId,
+      { name: input.name, contentType: input.contentType, fileKind: input.fileKind },
+      { role: input.role, queuedAt: input.queuedAt, owner: input.owner },
+    );
+    if (!usesMultipart(input.blob.size)) return sendWhole(client, bodies, input, request.pathname, request.clientPayload);
+    return sendInParts(client, bodies, input, request.pathname, request.clientPayload);
+  };
+}
+
+/** The browser's Transfer: one stream fallback for every upload on the page. */
+export const sendBlob: Transfer = blobTransfer();

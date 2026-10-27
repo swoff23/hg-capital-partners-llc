@@ -95,6 +95,46 @@ export class PrepareError extends Error {}
 /** The reason a public photo gives when it can't be re-encoded: sent as picked it would keep its GPS. */
 export const UNREADABLE_PHOTO = "this photo can't be read here. Try a JPEG";
 
+/** The reasons a file named as a photo or a video gives when its bytes are something else (a PDF, SVG markup, noise). */
+export const NOT_A_PHOTO = "the file isn't a photo";
+export const NOT_A_VIDEO = "the file isn't a video";
+
+/** The first bytes a file is sniffed by. */
+export const SNIFF_BYTES = 16;
+
+const ascii = (head: Uint8Array, from: number, to: number) => String.fromCharCode(...head.subarray(from, to));
+
+/** The QuickTime and MP4 boxes a video file can open with: "ftyp" first in every modern one, the rest in older MOVs. */
+const VIDEO_BOXES = new Set(["ftyp", "moov", "mdat", "wide", "free", "skip", "pnot", "uuid"]);
+
+/**
+ * Whether a file's first bytes are a photo or a video of the kinds an upload
+ * takes (content-types.ts UPLOAD_RULES), asked only of a file the browser
+ * couldn't open. A photo is a JPEG, a PNG, a WebP, or an ISO media box (HEIC,
+ * HEIF, which most desktop browsers can't decode); a video is an MP4 or a
+ * MOV. A PDF, SVG markup or random bytes renamed .jpg or .mp4 is neither, so
+ * it is refused instead of posting a tile nobody can open. A real file the
+ * browser can't decode still passes and goes up as picked.
+ */
+export function looksLikeMedia(head: Uint8Array, kind: "image" | "video"): boolean {
+  if (head.length < 4) return false;
+  const box = head.length >= 8 ? ascii(head, 4, 8) : "";
+  if (kind === "video") return VIDEO_BOXES.has(box);
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return true;
+  if (head[0] === 0x89 && ascii(head, 1, 4) === "PNG") return true;
+  if (head.length >= 12 && ascii(head, 0, 4) === "RIFF" && ascii(head, 8, 12) === "WEBP") return true;
+  return box === "ftyp";
+}
+
+/** Reads a file's first bytes for looksLikeMedia. A file that can't be read is given the benefit of the doubt. */
+async function sniffsAs(file: Blob, kind: "image" | "video"): Promise<boolean> {
+  try {
+    return looksLikeMedia(new Uint8Array(await file.slice(0, SNIFF_BYTES).arrayBuffer()), kind);
+  } catch {
+    return true;
+  }
+}
+
 const META_TIMEOUT_MS = 3000;
 const POSTER_TIMEOUT_MS = 5000;
 
@@ -206,6 +246,8 @@ export async function prepareFile(
 
   if (input.fileKind === "video") {
     const { meta, poster } = await readVideo(file, plan.poster);
+    // The browser couldn't read it as a video: a real MOV it can't play (HEVC in Firefox) still goes as picked.
+    if (!meta.width && !meta.durationSec && !(await sniffsAs(file, "video"))) throw new PrepareError(NOT_A_VIDEO);
     return { ...asPicked, meta, poster };
   }
   if (input.fileKind !== "image") return asPicked;
@@ -224,6 +266,8 @@ export async function prepareFile(
   }
 
   if (!bitmap) {
+    // Bytes that aren't a photo at all (a PDF or SVG markup named .jpg, noise named .HEIC) would post a tile nobody can open.
+    if (!(await sniffsAs(file, "image"))) throw new PrepareError(NOT_A_PHOTO);
     if (plan.display && input.strict) throw new PrepareError(UNREADABLE_PHOTO);
     return { ...asPicked, meta: plan.thumb ? await imageSize(file) : {} };
   }

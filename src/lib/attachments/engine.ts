@@ -97,6 +97,12 @@ type Job = {
    * counted) writes its small state alone, so a big video isn't rewritten into storage at every part.
    */
   written: Prepared | typeof AS_PICKED | null;
+  /**
+   * Put back from the outbox by this page load (restore), not picked here: maybe in another tab, maybe days ago.
+   * If it fails while its page isn't open it says nothing, since a toast on whatever page is open would read as
+   * that page's upload; its red tile waits on its own page (and a My jobs row) with Retry.
+   */
+  restored: boolean;
 };
 
 /** Stands for "the file as picked" in Job.written, until it is prepared. */
@@ -141,11 +147,20 @@ export type EngineDeps = {
 export const NO_UPLOADS: readonly MediaUpload[] = [];
 const EMPTY = NO_UPLOADS;
 /** The counts of a target with nothing in flight: shared, so a server snapshot and an idle client one are the same. */
-export const NO_COUNTS: UploadCounts = { pending: 0, waiting: 0, failed: 0, pendingKinds: [] };
+export const NO_COUNTS: UploadCounts = { pending: 0, waiting: 0, failed: 0, awaitingPage: 0, pendingKinds: [] };
 
 /** "no more can be added here", "only 3 more can be added here": the reason a file past a target's cap gives. */
 export function capReason(remaining: number): string {
   return remaining <= 0 ? "no more can be added here" : `only ${remaining} more can be added here`;
+}
+
+/**
+ * The toast for files that failed after their page was left: "2 photos didn't upload to 56 Tamarack St". It shows on
+ * whatever page is open, so it names the target; one with no label says the count alone.
+ */
+export function failedAwayText(kinds: readonly (FileKind | null)[], label: string): string {
+  const where = label.trim();
+  return `${uploadCountPhrase(kinds)} didn't upload${where ? ` to ${where}` : ""}`;
 }
 
 /** The record step said no: the page has the reason. */
@@ -167,6 +182,8 @@ export class UploadEngine {
   private readonly countCache = new Map<string, UploadCounts>();
   /** Ids recorded in a batch and not yet handed to its target. */
   private readonly recordedByBatch = new Map<string, string[]>();
+  /** The target key of each batch in recordedByBatch, so a cap counts what is recorded and not handed over yet. */
+  private readonly batchKeys = new Map<string, string>();
   private active = 0;
   private multipartActive = false;
   private preparing = false;
@@ -232,6 +249,7 @@ export class UploadEngine {
     this.targets.clear();
     this.mounts.clear();
     this.recordedByBatch.clear();
+    this.batchKeys.clear();
     this.uploadCache.clear();
     this.countCache.clear();
   }
@@ -267,6 +285,7 @@ export class UploadEngine {
             pending: pending.length,
             waiting: own.filter((j) => j.status === "waiting").length,
             failed: own.filter((j) => j.status === "failed" || j.status === "invalid").length,
+            awaitingPage: pending.filter((j) => j.needsRecord).length,
             pendingKinds: [...pending, ...own.filter((j) => j.status === "waiting")].map((j) => j.fileKind),
           };
     this.countCache.set(cacheKey, counts);
@@ -377,7 +396,7 @@ export class UploadEngine {
       const check = checkMediaFile({ name, type: file.type, size: file.size }, target.allowed);
       const id = `u_${this.deps.uid()}`;
       let error: string | undefined = check.ok ? undefined : check.error;
-      if (check.ok && room <= 0) error = capReason(0);
+      if (check.ok && room <= 0) error = target.maxFilesReason ?? capReason(0);
       else if (check.ok) room -= 1;
       const fileKind = check.ok ? check.fileKind : null;
       const previewUrl = fileKind === "image" || fileKind === "video" ? this.deps.preview.create(file) : null;
@@ -413,6 +432,7 @@ export class UploadEngine {
         lease: null,
         stored: false,
         written: null,
+        restored: false,
       });
     }
     // Every file goes in the outbox before any bytes move, the whole batch at once, so a tab closed
@@ -429,9 +449,14 @@ export class UploadEngine {
     void this.prepareNext();
   }
 
-  /** Files of this target that count against its cap: queued, going up or waiting (a refused tile holds no room). */
+  /**
+   * Files of this target that count against its cap: queued, going up or waiting (a refused tile holds no room), and
+   * the ones recorded in a batch that hasn't settled yet, which the page doesn't hold yet either.
+   */
   private holding(key: string): number {
-    return [...this.jobs.values()].filter((j) => j.key === key && isInFlight(j.status)).length;
+    let held = [...this.jobs.values()].filter((j) => j.key === key && isInFlight(j.status)).length;
+    for (const [batchId, ids] of this.recordedByBatch) if (this.batchKeys.get(batchId) === key) held += ids.length;
+    return held;
   }
 
   /* ---------------- Preparing ---------------- */
@@ -582,6 +607,9 @@ export class UploadEngine {
           const sent = await send(role, blob, jpeg, "image/jpeg", "image");
           if (role === "thumb") job.thumbPathname = sent.pathname;
           else job.posterPathname = sent.pathname;
+          // Into its row at once, as the original's pathname is: a queue stopped before the record step (Sign out, a
+          // reload) would otherwise send the thumbnail again, and leave the first one in the store unrecorded.
+          await this.save(job);
         } catch (err) {
           if (!this.jobs.has(job.id) || (controller.signal.aborted && !job.stalled)) return;
           if (lastTry || classifyFailure(err, this.deps.online()) === "refused") {
@@ -646,6 +674,7 @@ export class UploadEngine {
     const ids = this.recordedByBatch.get(job.batchId) ?? [];
     ids.push(id);
     this.recordedByBatch.set(job.batchId, ids);
+    this.batchKeys.set(job.batchId, job.key);
     this.emit(job.key);
     this.settle(job.batchId, job.key);
   }
@@ -691,7 +720,8 @@ export class UploadEngine {
     if (next.phase === "failed") {
       this.patch(job, { status: "failed", error: reason });
       void this.save(job);
-      if (this.isAway(job.key)) this.noticeFailure(job);
+      // Only for a file picked on this page load: one the outbox put back (another tab's, an earlier visit's) waits on its own page.
+      if (this.isAway(job.key) && !job.restored) this.noticeFailure(job);
       this.settle(job.batchId, job.key);
       return;
     }
@@ -779,10 +809,11 @@ export class UploadEngine {
     }, 1500);
   }
 
+  /** "2 photos didn't upload to 56 Tamarack St · Retry": the page that's open isn't theirs, so the toast names where they were going. */
   private noticeFailure(job: Job) {
     const kinds = [...this.jobs.values()].filter((j) => j.key === job.key && j.status === "failed").map((j) => j.fileKind);
     this.deps.notify({
-      message: `${uploadCountPhrase(kinds)} didn't upload`,
+      message: failedAwayText(kinds, job.spec.label),
       key: `upload-failed:${job.key}`,
       action: { label: "Retry", run: () => this.retryAll(job.key) },
     });
@@ -796,6 +827,8 @@ export class UploadEngine {
     if (!job || job.status !== "failed" || job.controller) return;
     job.tries = 0;
     job.waits = 0;
+    // Retried here, so it is this page load's: if it fails again once its page is left, it says so.
+    job.restored = false;
     this.requeue(job);
     void this.prepareNext();
     this.pump();
@@ -965,6 +998,7 @@ export class UploadEngine {
         lease,
         stored: true,
         written: prepared ?? AS_PICKED,
+        restored: true,
       });
       touched.add(e.key);
     }

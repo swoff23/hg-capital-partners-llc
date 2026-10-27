@@ -56,23 +56,34 @@ test("a job page keeps what it recorded for the tab, not for itself (fix 6)", ()
 });
 
 test("Mark done counts only this visit's photos and videos: no imported file, no document (fix 8)", () => {
-  const jobs = read("lib", "portal", "jobs.ts");
-  const own = fn(jobs, "ownUnposted");
+  // The rule lives with the batch step, which job-batch.test.ts runs on a fake transaction.
+  const batch = read("lib", "portal", "job-batch.ts");
+  const own = fn(batch, "ownUnposted");
   assert.match(own, /uploadedByContactId: contactId, eventId: null, deletedAt: null, asanaGid: null/);
+  const jobs = read("lib", "portal", "jobs.ts");
   assert.match(fn(jobs, "markJobDone"), /finishPhotoCount\(own\.map\(\(f\) => f\.kind\)\)/);
-  // One copy of the rule: the batch post uses the same one.
-  const uploads = read("lib", "portal", "job-uploads.ts");
-  assert.match(uploads, /import \{ ownUnposted \} from "\.\/jobs";/);
-  assert.doesNotMatch(uploads, /function ownUnposted/);
+  // One copy of the rule: Mark done, a written update and the batch post all use the same one.
+  assert.match(jobs, /import \{ ownUnposted \} from "\.\/job-batch";/);
+  assert.match(fn(batch, "postBatchIn"), /await ownUnposted\(tx, taskId, p\.contactId, attachmentIds\)/);
+  for (const [name, source] of [["jobs.ts", jobs], ["job-uploads.ts", read("lib", "portal", "job-uploads.ts")]] as const) {
+    assert.doesNotMatch(source, /function ownUnposted/, name);
+  }
 });
 
 test("a batch post is marked as one, and its Undo is core's (fixes 1, 2, 3 and 10)", () => {
   const uploads = read("lib", "portal", "job-uploads.ts");
-  assert.match(fn(uploads, "postJobBatch"), /batch: true/);
+  assert.match(fn(uploads, "postJobBatch"), /prisma\.\$transaction\(\(tx\) => postBatchIn\(tx, taskId, taskPrincipal\(p\), attachmentIds\)\)/);
+  assert.match(fn(read("lib", "portal", "job-batch.ts"), "postBatchIn"), /core\.addComment\(tx, taskId, \{ body: "", attachmentIds: own, batch: true \}, p\)/);
   assert.match(fn(uploads, "undoJobPost"), /core\.takeBackContractorPost\(/);
   for (const word of ["$executeRaw", "$queryRaw", "NotificationOutbox", "notificationOutbox", "taskEvent.", "taskAttachment."]) {
     assert.ok(!uploads.includes(word), `job-uploads.ts names ${word}; task writes go through core`);
   }
+  // The batch step on its transaction only reads: every write is core's.
+  const batch = read("lib", "portal", "job-batch.ts");
+  for (const word of ["$executeRaw", "$queryRaw", "NotificationOutbox", "notificationOutbox", "taskEvent.", ".create(", ".update(", ".updateMany(", ".delete(", ".deleteMany(", ".upsert("]) {
+    assert.ok(!batch.includes(word), `job-batch.ts names ${word}; task writes go through core`);
+  }
+  assert.doesNotMatch(batch, /^import "server-only";/m, "kept apart from the session so job-batch.test.ts can run it");
 });
 
 test("raw SQL on the email outbox lives only in core.ts and the send run", () => {
@@ -129,8 +140,11 @@ test("the record step answers a Retry with its own earlier row, and staff Remove
 test("a small file's token comes from the route's own call, so a 5xx waits and the stall abort reaches it", () => {
   const transfer = read("lib", "attachments", "transfer.ts");
   assert.doesNotMatch(transfer, /import \{[^}]*\bupload\b[^}]*\} from "@vercel\/blob\/client"/, "upload() mints its own token and reads any failure as a refusal");
-  assert.match(fn(transfer, "sendWhole"), /await put\(pathname, input\.blob, \{/);
-  assert.match(fn(transfer, "sendWhole"), /token \?\? \(await clientToken\(/);
+  // put() itself (the client's, passed in by blobTransfer), with and without a streamed body.
+  assert.match(fn(transfer, "sendWhole"), /client\.put\(pathname, input\.blob, \{ \.\.\.options, onUploadProgress/);
+  assert.match(fn(transfer, "sendWhole"), /client\.put\(pathname, input\.blob, options\)/);
+  assert.match(fn(transfer, "sendWhole"), /token: token \?\? \(await clientToken\(/);
+  assert.match(fn(transfer, "blobTransfer"), /client: BlobClient = \{ put, createMultipartUpload, uploadPart, completeMultipartUpload \}/);
   assert.match(fn(transfer, "clientToken"), /res\.status >= 500/);
 });
 
@@ -149,13 +163,13 @@ test("a job that is no longer active still gets its late photos recorded, withou
   assert.match(late, /recordedUploads\.take\(taskId, ids\)/);
   assert.match(late, /onRecorded: land,[\s\S]*?onAway: land,/);
   // The server leaves the files as they are on a job that is closed to updates.
-  const uploads = read("lib", "portal", "job-uploads.ts");
-  assert.match(fn(uploads, "postJobBatch"), /if \(task && !isActiveStatus\(task\.status\)\) return null;/);
-  assert.match(fn(uploads, "postJobBatch"), /eventId: event\?\.id \?\? null/);
+  const batch = read("lib", "portal", "job-batch.ts");
+  assert.match(fn(batch, "postBatchIn"), /if \(task && !isActiveStatus\(task\.status\)\) return \{ event: null, alreadyPosted: false \};/);
+  assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /eventId: posted\.event\?\.id \?\? null/);
   // And so does a batch that waited behind Approve and found the job Done under addComment's lock: core refuses
   // before it writes, the same answer comes back. The message is core.addComment's (core.test.ts pins its words).
-  assert.match(uploads, /const JOB_CLOSED = "This job is closed\.";/);
-  assert.match(fn(uploads, "postJobBatch"), /err instanceof core\.TaskRuleError && err\.message === JOB_CLOSED\) return null;/);
+  assert.match(batch, /export const JOB_CLOSED = "This job is closed\.";/);
+  assert.match(fn(batch, "postBatchIn"), /if \(err\.message === JOB_CLOSED\) return \{ event: null, alreadyPosted: false \};/);
   // And the page says so, with nothing to undo.
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
   assert.match(shared, /if \(eventId === null\) \{\s*toast\(\{ message: addedToJobText\(kinds\)[\s\S]*?return true;/);
@@ -214,4 +228,40 @@ test("a tab left open under another sign-in can't mint, record, post or undo as 
   assert.match(shared, /undoJobPostAction\(taskId, eventId, owner\)/);
   // No second copy of the record step without the check.
   assert.doesNotMatch(read("app", "(portal)", "p", "jobs", "[id]", "actions.ts"), /recordJobUploadAction/);
+});
+
+/* ---------------- The break-the-app pass ---------------- */
+
+test("the portal decides PORTAL_ENABLED per request, so a build made without it never prerenders /p as a 404", () => {
+  const session = read("lib", "portal", "session.ts");
+  assert.match(session, /import \{ connection \} from "next\/server";/);
+  // The request first, then the flag: a page that reads nothing else (My jobs, the first-password page) stays dynamic.
+  assert.match(fn(session, "portalOnForRequest"), /await connection\(\);\s*return getEnv\(\)\.portalEnabled;/);
+  assert.match(fn(session, "requirePortalPrincipal"), /if \(!\(await portalOnForRequest\(\)\)\) notFound\(\);/);
+  assert.match(session, /const readSession = cache\(async \(\): Promise<PortalSessionState \| null> => \{\s*if \(!\(await portalOnForRequest\(\)\)\) return null;/);
+  assert.doesNotMatch(session, /if \(!getEnv\(\)\.portalEnabled\)/, "no flag read before the request");
+});
+
+test("the token route asks Blob for no upload-completed callback: the record action writes the row", () => {
+  const route = read("app", "api", "blob", "[kind]", "route.ts");
+  assert.doesNotMatch(route.replace(/\/\/.*$/gm, ""), /onUploadCompleted/);
+});
+
+test("a job page holds no more photos than one post takes, and says why past that", () => {
+  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
+  assert.match(actions, /maxFiles: postRoom\(ready\.length\),\s*maxFilesReason: MAX_FILES_REASON,/);
+  // Every action that posts files refuses more than that in words, not zod's.
+  const jobActions = read("app", "(portal)", "p", "jobs", "[id]", "actions.ts");
+  assert.match(jobActions, /attachmentIds: z\.array\(id\)\.max\(MAX_FILES_PER_POST, TOO_MANY_FILES\)/);
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "upload-actions.ts"), /z\.array\(id\)\.min\(1\)\.max\(MAX_FILES_PER_POST, TOO_MANY_FILES\)/);
+  // The engine uses the target's reason past its cap.
+  assert.match(read("lib", "attachments", "engine.ts"), /error = target\.maxFilesReason \?\? capReason\(0\);/);
+});
+
+test("the losing side of a double batch post says nothing, and the record step cuts a long name instead of refusing it", () => {
+  const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
+  assert.match(shared, /if \(res\.data\.alreadyPosted\) return true;/);
+  assert.ok(shared.indexOf("if (res.data.alreadyPosted) return true;") < shared.indexOf("toast({\n    message: postedText(kinds)"), "before any toast");
+  assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /if \(!\(err instanceof BatchAlreadyPosted\)\) throw err;/);
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "upload-actions.ts"), /filename: z\.string\(\)\.min\(1\)\.max\(MAX_FILENAME \* 4\),/);
 });

@@ -1,13 +1,14 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { Prisma, type AttachmentKind } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern } from "@/lib/dates";
 import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { logSecurityEvent } from "./accounts";
+import { ownUnposted } from "./job-batch";
 import { addMorePhotosLine, finishPhotoCount, finishPhotosNeeded } from "./job-view";
 import { requestIpHash } from "./request";
 import { requirePortalPrincipal, taskPrincipal, type PortalPrincipal } from "./session";
@@ -116,24 +117,7 @@ export interface JobUpdateInput {
   clientId?: string;
 }
 
-/**
- * Of the ids the browser sent, the files this contractor uploaded to this job
- * through the portal and hasn't posted yet, with their kinds. Core links
- * whatever unposted files it's given (an update through addComment, Mark
- * done's note through setStatus) and makes them Shared, so nobody else's file
- * can be named here. A file imported from Asana never counts, even one the
- * importer credits to this contractor with no update of its own: it's
- * history, not this visit's work. job-uploads.ts uses this too.
- */
-export async function ownUnposted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<{ id: string; kind: AttachmentKind }[]> {
-  if (ids.length === 0) return [];
-  return tx.taskAttachment.findMany({
-    where: { id: { in: ids }, taskId, uploadedByContactId: contactId, eventId: null, deletedAt: null, asanaGid: null },
-    select: { id: true, kind: true },
-  });
-}
-
-/** An update from the composer: text, files, or both. Always Shared (core). */
+/** An update from the composer: text, files, or both. Always Shared (core). Only the contractor's own unposted files go (job-batch.ts ownUnposted). */
 export async function postJobUpdate(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
   await prisma.$transaction(async (tx) => {
