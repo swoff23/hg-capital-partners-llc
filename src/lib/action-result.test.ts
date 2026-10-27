@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -166,7 +166,17 @@ test("isPlainMessage: a sentence is written for people, zod's defaults aren't", 
 // Buffalo is on daylight time in late October: 18:14 UTC is 2:14 PM there.
 const NOW = new Date("2026-10-26T20:00:00Z");
 
-test("ConflictError names who and when", () => {
+/**
+ * ConflictError writes its line against the real clock, so its tests pin Date
+ * to NOW (and put it back after); otherwise they'd read "on Oct 26" from Oct 27.
+ */
+function pinClock(t: TestContext) {
+  t.mock.timers.enable({ apis: ["Date"], now: NOW });
+  t.after(() => t.mock.timers.reset());
+}
+
+test("ConflictError names who and when", (t) => {
+  pinClock(t);
   const err = new ConflictError(
     { fields: ["loanRate"], by: "Pieter Smith", at: new Date("2026-10-26T18:14:00Z"), theirs: { loanRate: "7.25" } },
   );
@@ -187,7 +197,8 @@ test("ConflictError names who and when", () => {
   assert.equal(userMessage(err), err.message);
 });
 
-test("ConflictError without a person says what changed and when", () => {
+test("ConflictError without a person says what changed and when", (t) => {
+  pinClock(t);
   const err = new ConflictError({ fields: ["status"], by: null, at: "2026-10-26T18:14:00.000Z" });
   assert.match(err.message, /^This changed at 2:14\sPM\.$/);
   assert.deepEqual(err.conflict, { fields: ["status"], at: "2026-10-26T18:14:00.000Z" });
@@ -197,6 +208,11 @@ test("ConflictError without a person says what changed and when", () => {
   assert.equal(new ConflictError({ fields: [], by: "  ", at: NOW }).by, undefined);
   // A caller's own words win.
   assert.equal(new ConflictError({ fields: [], at: NOW }, "Unit 2 changed.").message, "Unit 2 changed.");
+});
+
+test("the pinned clock is put back after each test", () => {
+  assert.notEqual(Date.now(), NOW.getTime());
+  assert.ok(Math.abs(Date.now() - (performance.timeOrigin + performance.now())) < 60_000);
 });
 
 test("conflictMessage: today is a time, an earlier day is the date", () => {
