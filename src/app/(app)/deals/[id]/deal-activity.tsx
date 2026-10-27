@@ -49,7 +49,14 @@ export async function DealActivity({ dealId }: { dealId: string }) {
 
   return (
     <Section title="Activity">
-      <DealLog dealId={dealId} entries={entries} viewerId={user.id} now={now.toISOString()} today={todayYmdEastern(now)} />
+      <DealLog
+        dealId={dealId}
+        entries={entries}
+        viewerId={user.id}
+        viewerName={user.name || user.email.split("@")[0]}
+        now={now.toISOString()}
+        today={todayYmdEastern(now)}
+      />
     </Section>
   );
 }

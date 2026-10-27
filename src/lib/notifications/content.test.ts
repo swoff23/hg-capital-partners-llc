@@ -331,6 +331,17 @@ const withEvent = (it: OutboxItem, eventId: string, extra: Partial<OutboxItem> =
 const toZack = { audience: "contractor" as const, recipientContactId: "c-zack" };
 const events = (...list: EventSnapshot[]) => new Map(list.map((e) => [e.id, e]));
 
+test("a file post whose files were taken off since is dropped, and no button anchors at it", () => {
+  const post: OutboxItem = { kind: "ATTACHMENT", actorLabel: "Connor Swofford", summary: "added quote.pdf", at: "2026-10-26T15:00:00Z", eventId: "a1" };
+  const comment = withEvent({ kind: "COMMENT", actorLabel: "Connor Swofford", summary: '"Doors are in"', at: "2026-10-26T15:01:00Z" }, "e1");
+  const live = reconcileItems([post, comment], events(snap({ id: "a1", files: ["file"] }), snap({ id: "e1" })), toZack);
+  assert.deepEqual(live.map((i) => i.eventId), ["a1", "e1"], "a file still up is sent as stored");
+  const gone = reconcileItems([post, comment], events(snap({ id: "a1", files: [] }), snap({ id: "e1" })), toZack);
+  assert.deepEqual(gone.map((i) => i.eventId), ["e1"]);
+  assert.equal(firstUpdateId(gone), "e1", "the button opens at the comment, not the post that is gone");
+  assert.deepEqual(reconcileItems([post], events(snap({ id: "a1", files: [] })), toZack), [], "nothing left sends nothing");
+});
+
 test("files read as '3 photos and 1 file', not '(+3 files)'", () => {
   assert.equal(filePhrase(["image", "image", "image", "file"]), "3 photos and 1 file");
   assert.equal(filePhrase(["image"]), "1 photo");

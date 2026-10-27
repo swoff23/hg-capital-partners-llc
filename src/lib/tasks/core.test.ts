@@ -601,6 +601,20 @@ test("deleteComment: a soft delete that takes its files along at the same instan
   assert.ok(!calls.some((c) => c.op.includes("NotificationOutbox")), "the drain drops it; no row is touched");
 });
 
+test("deleteComment: stamps who could have read it, keeping the data it had", async () => {
+  const now = new Date("2026-10-23T15:00:00Z");
+  const { tx, calls } = withComment({ data: { clientId: "k1" } });
+  await deleteComment(tx, "ev1", PIETER, now, ["c-zack"]);
+  assert.deepEqual(calls.find((c) => c.model === "taskEvent" && c.op === "update")!.args, {
+    where: { id: "ev1" },
+    data: { deletedAt: now, data: { clientId: "k1", seenBy: ["c-zack"] } },
+  });
+  // Nobody could have: the key says so, an empty list, and the portal shows no line.
+  const none = withComment();
+  await deleteComment(none.tx, "ev1", PIETER, now, []);
+  assert.deepEqual((none.calls.find((c) => c.model === "taskEvent" && c.op === "update")!.args as { data: unknown }).data, { deletedAt: now, data: { seenBy: [] } });
+});
+
 test("restoreComment: the comment and the files that went with it come back, and nothing else", async () => {
   const gone = new Date("2026-10-23T15:00:00Z");
   const { tx, calls } = withComment({ deletedAt: gone });

@@ -3,6 +3,7 @@ import { Prisma, type AttachmentKind, type TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
+import { partnersEmailState } from "@/lib/tasks/delivery";
 import { orderMedia } from "@/lib/tasks/media";
 import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
 import { lockboxMasker, readLockboxCode, type BodyPart } from "./access-code";
@@ -558,41 +559,34 @@ async function deliveryFor(taskId: string, updates: readonly JobUpdate[]): Promi
     JOIN "User" u ON u."id" = o."recipientUserId"
     WHERE o."taskId" = ${taskId} AND o."items" @> ${JSON.stringify([{ eventId: mine.id }])}::jsonb
     ORDER BY u."createdAt" ASC`;
-  if (rows.length === 0) return null;
   // Emailed is sent with no error; a row closed with an error (nothing to send) said nothing to anyone.
-  const state = rows.some((r) => !r.sentAt) ? "queued" : rows.every((r) => !r.lastError) ? "emailed" : null;
+  const state = partnersEmailState(rows);
   if (!state) return null;
   return { eventId: mine.id, state, to: rows.map((r) => firstName(r.name || r.email.split("@")[0])) };
 }
 
 /**
- * Comments HG took back after the contractor could have seen them (activity
+ * Comments HG took back after the contractor could have read them (activity
  * question 3: leave "Connor removed a comment"). Their text is never read:
- * the rows carry who and when only. A comment shows here only when the
- * contractor opened the job after it was written, or its email went to them,
- * and only one written by a partner to this contractor or to nobody in
- * particular (portalEvents' audience rule, with `deletedAt` the other way
- * round). Anything they never saw leaves no trace.
+ * the rows carry who and when only. Whether this contractor could have read
+ * one was settled when it came off and stored on the event as `seenBy` (the
+ * contactIds that had opened the job since it was written, or had its email
+ * go to them: delivery.contactsWhoSaw), so a visit after the delete shows
+ * nothing. Only a comment written by a partner to this contractor or to
+ * nobody in particular counts (portalEvents' audience rule, with `deletedAt`
+ * the other way round). Anything they never saw leaves no trace.
  */
 async function removedComments(p: PortalPrincipal, taskId: string): Promise<JobUpdate[]> {
   const rows = await prisma.$queryRaw<{ id: string; actorLabel: string; deletedAt: Date }[]>`
     SELECT e."id", e."actorLabel", e."deletedAt"
     FROM "TaskEvent" e
     JOIN "TaskAccess" a ON a."taskId" = e."taskId" AND a."contactId" = ${p.contactId} AND a."revokedAt" IS NULL
-    LEFT JOIN "TaskReadState" r ON r."taskId" = e."taskId" AND r."contactId" = ${p.contactId}
     WHERE e."taskId" = ${taskId}
       AND e."kind" = 'COMMENT' AND e."visibility" = 'SHARED' AND e."deletedAt" IS NOT NULL
       AND e."source" = 'APP' AND e."actorUserId" IS NOT NULL
       AND (e."audienceContactId" IS NULL OR e."audienceContactId" = ${p.contactId})
       AND e."createdAt" > a."createdAt"
-      AND (
-        e."createdAt" <= COALESCE(r."lastSeenAt", a."createdAt")
-        OR EXISTS (
-          SELECT 1 FROM "NotificationOutbox" o
-          WHERE o."taskId" = e."taskId" AND o."recipientContactId" = ${p.contactId} AND o."sentAt" IS NOT NULL
-            AND o."items" @> jsonb_build_array(jsonb_build_object('eventId', e."id"))
-        )
-      )
+      AND e."data"->'seenBy' @> ${JSON.stringify([p.contactId])}::jsonb
     ORDER BY e."deletedAt" ASC, e."id" ASC
     LIMIT 50`;
   return rows.map((r) => ({

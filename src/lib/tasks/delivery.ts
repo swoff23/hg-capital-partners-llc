@@ -10,19 +10,33 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 type Db = Pick<PrismaClient, "$queryRaw">;
 
-/** An email still waiting, or one that went. */
-export type EmailState = "queued" | "emailed";
+/** An email still waiting, one a run has claimed and is sending, or one that went. */
+export type EmailState = "queued" | "sending" | "emailed";
 
 /**
  * What an outbox row says about the email for an item inside it. "Emailed"
  * is sent with no error; a row that was closed unsent (no login, no access,
  * gave up) carries an error and says nothing, so the line never claims an
- * email that did not go. A row not sent yet is queued whether or not a run
- * has claimed it (`attempts` above zero means it is on its way).
+ * email that did not go. A row not sent yet is queued; once a run has
+ * claimed it (`attempts` above zero) it is on its way: it can no longer be
+ * held back, so a delete says nothing about the email.
  */
-export function emailStateOf(row: { sentAt: Date | string | null; lastError: string | null }): EmailState | null {
-  if (!row.sentAt) return "queued";
+export function emailStateOf(row: { sentAt: Date | string | null; lastError: string | null; attempts?: number }): EmailState | null {
+  if (!row.sentAt) return (row.attempts ?? 0) > 0 ? "sending" : "queued";
   return row.lastError ? null : "emailed";
+}
+
+/**
+ * What the contractor's update says about the partners' emails (activity 2.6,
+ * portal side), from the outbox rows of the partners it went to: "queued"
+ * while any has not gone, "emailed" once every one has with no error, and
+ * nothing when a row was closed with an error (it told no one), so the line
+ * never claims an email that did not go. No rows, no line.
+ */
+export function partnersEmailState(rows: readonly { sentAt: Date | string | null; lastError: string | null }[]): "queued" | "emailed" | null {
+  if (rows.length === 0) return null;
+  if (rows.some((r) => !r.sentAt)) return "queued";
+  return rows.every((r) => !r.lastError) ? "emailed" : null;
 }
 
 /**
@@ -34,8 +48,8 @@ export function emailStateOf(row: { sentAt: Date | string | null; lastError: str
  */
 export async function emailStatesIn(db: Db, taskId: string, contactId: string, eventIds: readonly string[]): Promise<Map<string, EmailState>> {
   if (eventIds.length === 0) return new Map();
-  const rows = await db.$queryRaw<{ eventId: string; sentAt: Date | null; lastError: string | null }[]>`
-    SELECT item->>'eventId' AS "eventId", o."sentAt", o."lastError"
+  const rows = await db.$queryRaw<{ eventId: string; sentAt: Date | null; lastError: string | null; attempts: number }[]>`
+    SELECT item->>'eventId' AS "eventId", o."sentAt", o."lastError", o."attempts"
     FROM "NotificationOutbox" o
     CROSS JOIN LATERAL jsonb_array_elements(o."items") AS item
     WHERE o."taskId" = ${taskId}
@@ -71,16 +85,73 @@ export function deliveryLine(input: {
   if (!input.hasLogin) return { state: "no-login", to: input.to };
   const seen = input.seenAt ? new Date(input.seenAt) : null;
   if (seen && seen.getTime() > new Date(input.eventAt).getTime()) return { state: "seen", to: input.to, at: seen.toISOString() };
-  if (input.email) return { state: input.email, to: input.to };
+  // A row a run is sending is still "gets an email" to the person reading.
+  if (input.email) return { state: input.email === "sending" ? "queued" : input.email, to: input.to };
   return null;
 }
 
 /**
  * What the delete toast says about the email (activity 2.5): "Zack won't get
  * it" while it is still queued, "Zack already got the email" once it went,
- * nothing for an Internal comment or one that was never emailed.
+ * nothing for an Internal comment, one that was never emailed, or one a run
+ * is sending right now (it can still go).
  */
 export function deleteEmailNote(email: EmailState | null, to: string | null): string | null {
-  if (!email || !to) return null;
+  if (!email || !to || email === "sending") return null;
   return email === "queued" ? `${to} won't get it` : `${to} already got the email`;
+}
+
+/**
+ * Whether a contractor could have read a Shared comment by the time it comes
+ * off: they had the job before it was written and have opened it since, or an
+ * email carrying it went to them with no error. Opening the job later never
+ * counts (that visit would find the comment gone), and an email row closed
+ * with an error ("nothing to send", no login) said nothing to anyone.
+ */
+export function sawComment(
+  contact: { accessSince: Date; lastSeenAt: Date | null; emails: readonly { sentAt: Date | null; lastError: string | null }[] },
+  commentAt: Date,
+): boolean {
+  if (contact.accessSince.getTime() >= commentAt.getTime()) return false;
+  if (contact.lastSeenAt && contact.lastSeenAt.getTime() > commentAt.getTime()) return true;
+  return contact.emails.some((r) => r.sentAt !== null && !r.lastError);
+}
+
+/**
+ * The contractors who could have read this Shared comment, read at the moment
+ * it is deleted, while the facts are known (activity 2.5, question 3). The
+ * portal's "Connor removed a comment" line shows to exactly these people and
+ * to nobody who opens the job afterwards, so a comment Zack never saw leaves
+ * no trace. `audienceContactId` null means any contractor with the job.
+ */
+export async function contactsWhoSaw(
+  db: Pick<PrismaClient, "$queryRaw" | "taskAccess" | "taskReadState">,
+  ev: { id: string; taskId: string; createdAt: Date; audienceContactId: string | null },
+): Promise<string[]> {
+  const access = await db.taskAccess.findMany({
+    where: { taskId: ev.taskId, revokedAt: null, ...(ev.audienceContactId ? { contactId: ev.audienceContactId } : {}) },
+    select: { contactId: true, createdAt: true },
+  });
+  if (access.length === 0) return [];
+  const ids = access.map((a) => a.contactId);
+  const [seen, emails] = await Promise.all([
+    db.taskReadState.findMany({ where: { taskId: ev.taskId, contactId: { in: ids } }, select: { contactId: true, lastSeenAt: true } }),
+    db.$queryRaw<{ contactId: string; sentAt: Date | null; lastError: string | null }[]>`
+      SELECT o."recipientContactId" AS "contactId", o."sentAt", o."lastError"
+      FROM "NotificationOutbox" o
+      WHERE o."taskId" = ${ev.taskId} AND o."recipientContactId" IS NOT NULL
+        AND o."items" @> jsonb_build_array(jsonb_build_object('eventId', ${ev.id}::text))`,
+  ]);
+  return access
+    .filter((a) =>
+      sawComment(
+        {
+          accessSince: a.createdAt,
+          lastSeenAt: seen.find((r) => r.contactId === a.contactId)?.lastSeenAt ?? null,
+          emails: emails.filter((r) => r.contactId === a.contactId),
+        },
+        ev.createdAt,
+      ),
+    )
+    .map((a) => a.contactId);
 }

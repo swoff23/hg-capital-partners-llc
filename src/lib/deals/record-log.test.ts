@@ -173,6 +173,31 @@ test("a line that isn't a field edit stays a line and ends a burst", () => {
   assert.equal(line.type === "line" && line.text, "Task added: Replace porch light");
 });
 
+test("a note from the first version of the app names its author and drops the signature from its text", () => {
+  const [entry] = buildDealLog([
+    row({ source: "manual", body: "going to see it tomorrow\n\n\u2014 Connor Swofford", authorUserId: null, authorName: null, at: "2026-10-01T14:00:00Z" }),
+  ]);
+  assert.equal(entry.type === "note" && entry.author, "Connor Swofford");
+  assert.equal(entry.type === "note" && entry.text, "going to see it tomorrow");
+});
+
+test("a line from the deals sheet names no one: no author is made up", () => {
+  const log = buildDealLog([
+    row({ source: "migration", body: "Called Oct 3", noteDate: new Date("2026-10-03T00:00:00Z"), authorUserId: null, authorName: null }),
+    row({ source: "manual", body: "Typed, with nobody on the row", authorUserId: null, authorName: null, at: "2026-10-26T14:00:00Z" }),
+  ]);
+  for (const e of log) assert.equal(e.type === "note" && e.author, null);
+});
+
+test("a note carries the clientId it was sent with, so the note box can tell its send landed", () => {
+  const [sent, plain] = buildDealLog([
+    row({ source: "manual", body: "From the box", data: { clientId: "k1" }, at: "2026-10-26T14:00:00Z" }),
+    row({ source: "manual", body: "Older", data: {}, at: "2026-10-25T14:00:00Z" }),
+  ]);
+  assert.equal(sent.type === "note" && sent.clientId, "k1");
+  assert.equal(plain.type === "note" && plain.clientId, null);
+});
+
 test("an imported note has a day and no time; an undated one sits last, under no day", () => {
   const dated = row({ source: "migration", body: "Called Oct 3", noteDate: new Date("2026-10-03T00:00:00Z"), createdAt: new Date("2026-10-25T09:00:00Z"), authorUserId: null, authorName: null });
   const undated = row({ source: "migration", body: "Old line", noteDate: null, createdAt: new Date("2026-10-25T09:00:00Z"), authorUserId: null, authorName: null });

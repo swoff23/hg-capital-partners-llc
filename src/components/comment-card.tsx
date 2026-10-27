@@ -29,7 +29,14 @@ export interface CommentAuthor {
 export interface CommentCardProps {
   /** The event's id: the entry is `update-<id>`, which job emails and Copy link open at. */
   id: string;
-  author: CommentAuthor;
+  /**
+   * Who wrote it. Null when the record doesn't say (a line from the deals
+   * sheet): no avatar on the rail, a dot, and no name in the header. A name
+   * is never made up.
+   */
+  author: CommentAuthor | null;
+  /** What the card is called in its menu's name and header: "comment" on a task, "note" on a deal. */
+  noun?: "comment" | "note";
   /** When it was posted. */
   at: Date | string;
   /** Under a month heading: the time slot reads the day ("Oct 3"). */
@@ -80,6 +87,7 @@ export interface CommentCardProps {
 export function CommentCard({
   id,
   author,
+  noun = "comment",
   at,
   month = false,
   edited,
@@ -98,13 +106,52 @@ export function CommentCard({
   const now = useActivityNow();
   const coarse = useCoarsePointer();
   const [menuOpen, setMenuOpen] = useState(false);
-  const shown = author.you ? "You" : firstName(author.name) || author.name;
+  const shown = author ? (author.you ? "You" : firstName(author.name) || author.name) : null;
   const editedAt = edited && edited !== true ? edited : null;
+  const timed = at !== "" && at != null;
+  // Nothing to say in the header (a line from the sheet: no name, no time): the row is dropped and the menu's button sits in the corner.
+  const headerless = !shown && !sending && !timed && !edited && !internal;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Closing the editor removes the field that had focus: put it back on the card's menu button, or the card itself.
+  const editing = !!editor;
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (wasEditing.current && !editing) (triggerRef.current ?? cardRef.current)?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
   const editedDay = editedAt ? fmtDay(todayYmdEastern(new Date(editedAt)), { year: "auto", now: todayYmdEastern(new Date(now)) }) : null;
   const editedWord = <span className="shrink-0 text-meta text-fg-3">edited</span>;
 
+  const trigger = menuItems ? (
+    <MenuTrigger isOpen={menuOpen} onOpenChange={setMenuOpen}>
+      <AriaButton
+        ref={triggerRef}
+        aria-label={author ? `Actions for ${author.you ? "your" : `${shown}'s`} ${noun}` : `Actions for imported ${noun}`}
+        className={cn(
+          buttonClass({ variant: "ghost", size: "sm", icon: true }),
+          // 32px without growing the 20px header line; shown on hover or keyboard focus, with a mouse only.
+          "-my-1.5 shrink-0 text-fg-3 data-pressed:bg-fill-1",
+          headerless ? "absolute right-1.5 top-1.5 my-0" : !internal && "ml-auto",
+          "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100",
+          // On touch it is not drawn, but stays a real button for VoiceOver and Switch Control. It sits at the
+          // header's end, so the menu opens under the card's edge and not at the screen's.
+          "[@media(hover:none)]:sr-only [@media(hover:none)]:right-0 [@media(hover:none)]:focus-visible:not-sr-only [@media(hover:none)]:focus-visible:opacity-100",
+        )}
+      >
+        <Ellipsis className="size-4" aria-hidden="true" />
+      </AriaButton>
+      <Menu>
+        <MenuHeader title={author ? author.name : `Imported ${noun}`} detail={`${timed ? fullStamp(at, now) : ""}${editedDay ? `${timed ? " · " : ""}edited ${editedDay}` : ""}`} />
+        {menuItems}
+      </Menu>
+    </MenuTrigger>
+  ) : null;
+
   const card = (
     <div
+      ref={cardRef}
+      tabIndex={-1}
       // A tap on the card opens its menu on touch; a mouse does nothing on click, so text stays selectable.
       onClick={(e) => {
         if (!menuItems || !coarse || editor) return;
@@ -112,49 +159,35 @@ export function CommentCard({
         if (window.getSelection()?.toString()) return;
         setMenuOpen(true);
       }}
-      className={cn("group/card rounded-md border px-3 py-2.5", internal ? "border-transparent bg-fill-1" : "border-line bg-surface")}
+      className={cn("group/card relative rounded-md border px-3 py-2.5 outline-none", internal ? "border-transparent bg-fill-1" : "border-line bg-surface")}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 truncate text-body font-medium text-fg-1">
-          {shown}
-          {author.contractor && <span className="sr-only">, contractor</span>}
-        </span>
-        {sending ? <SendingLabel /> : <ActivityTime at={at} month={month} className="shrink-0 text-meta text-fg-3" />}
-        {edited && (editedAt && !coarse ? <Tooltip label={`Edited ${fullStamp(editedAt, now)}`}>{editedWord}</Tooltip> : editedWord)}
-        {internal && (
-          <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-meta font-medium text-fg-2">
-            <Lock className="size-3.5" aria-hidden="true" />
-            <span className="max-[30rem]:sr-only">Internal</span>
-          </span>
-        )}
-        {menuItems && (
-          <MenuTrigger isOpen={menuOpen} onOpenChange={setMenuOpen}>
-            <AriaButton
-              aria-label={`Actions for ${author.you ? "your" : `${shown}'s`} comment`}
-              className={cn(
-                buttonClass({ variant: "ghost", size: "sm", icon: true }),
-                // 32px without growing the 20px header line; shown on hover or keyboard focus, with a mouse only.
-                "-my-1.5 shrink-0 text-fg-3 data-pressed:bg-fill-1",
-                !internal && "ml-auto",
-                "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100",
-                // On touch it is not drawn, but stays a real button for VoiceOver and Switch Control.
-                "[@media(hover:none)]:sr-only [@media(hover:none)]:focus-visible:not-sr-only [@media(hover:none)]:focus-visible:opacity-100",
-              )}
-            >
-              <Ellipsis className="size-4" aria-hidden="true" />
-            </AriaButton>
-            <Menu>
-              <MenuHeader title={author.name} detail={`${fullStamp(at, now)}${editedDay ? ` · edited ${editedDay}` : ""}`} />
-              {menuItems}
-            </Menu>
-          </MenuTrigger>
-        )}
-      </div>
+      {headerless ? (
+        trigger
+      ) : (
+        <div className="relative flex min-w-0 items-center gap-2">
+          {shown && (
+            <span className="min-w-0 truncate text-body font-medium text-fg-1">
+              {shown}
+              {author?.contractor && !author.you && <span className="sr-only">, contractor</span>}
+            </span>
+          )}
+          {sending ? <SendingLabel /> : timed ? <ActivityTime at={at} month={month} className="shrink-0 text-meta text-fg-3" /> : null}
+          {edited && (editedAt && !coarse ? <Tooltip label={`Edited ${fullStamp(editedAt, now)}`}>{editedWord}</Tooltip> : editedWord)}
+          {internal && (
+            <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-meta font-medium text-fg-2">
+              <Lock className="size-3.5" aria-hidden="true" />
+              <span className="max-[30rem]:sr-only">Internal</span>
+            </span>
+          )}
+          {trigger}
+        </div>
+      )}
       {onItem && <p className="mt-1 truncate text-meta text-fg-3">On checklist item: {onItem}</p>}
       {editor ? (
         <div className="mt-1.5">{editor}</div>
       ) : (
-        body != null && body !== "" && <p className="mt-1 whitespace-pre-wrap break-words text-body text-fg-1">{body}</p>
+        body != null &&
+        body !== "" && <p className={cn("whitespace-pre-wrap break-words text-body text-fg-1", headerless ? "pointer-fine:pr-7" : "mt-1")}>{body}</p>
       )}
       {media && <div className="mt-2">{media}</div>}
       {files && <div className="mt-2">{files}</div>}
@@ -173,7 +206,7 @@ export function CommentCard({
     );
   }
   return (
-    <ActivityItem id={`update-${id}`} marker={{ avatar: author.name, contractor: author.contractor }} align="card">
+    <ActivityItem id={`update-${id}`} marker={author ? { avatar: author.name, contractor: author.contractor } : "dot"} align="card">
       {card}
       {footer && <div className="mt-1">{footer}</div>}
     </ActivityItem>
@@ -378,13 +411,25 @@ export function DeliveryLine({
 /**
  * A message that didn't go (activity 2.7): one `--danger` text-meta line under
  * its card, built from what the call said. "Didn't send: no connection ·
- * Retry" offline, "Didn't send · Retry" otherwise. Retry sends the same text,
- * visibility, files and `clientId`, so nothing posts twice.
+ * Retry" offline, "Didn't send · Retry" otherwise; a deal note says "save".
+ * Retry sends the same text, visibility, files and `clientId`, so nothing
+ * posts twice.
  */
-export function SendFailedLine({ offline = false, onRetry, className }: { offline?: boolean; onRetry: () => void; className?: string }) {
+export function SendFailedLine({
+  offline = false,
+  verb = "send",
+  onRetry,
+  className,
+}: {
+  offline?: boolean;
+  /** "save" for a deal note. */
+  verb?: "send" | "save";
+  onRetry: () => void;
+  className?: string;
+}) {
   return (
     <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-danger", className)}>
-      <span className="truncate">{offline ? "Didn't send: no connection" : "Didn't send"}</span>
+      <span className="truncate">{offline ? `Didn't ${verb}: no connection` : `Didn't ${verb}`}</span>
       <span aria-hidden="true">·</span>
       <button
         type="button"

@@ -1,13 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deleteEmailNote, deliveryLine, emailStateOf, emailStatesIn } from "./delivery";
+import { contactsWhoSaw, deleteEmailNote, deliveryLine, emailStateOf, emailStatesIn, partnersEmailState, sawComment } from "./delivery";
 
 const sent = new Date("2026-10-23T15:03:00Z");
 
 test("emailStateOf: queued until it is sent; sent with no error is emailed; closed with an error says nothing", () => {
   assert.equal(emailStateOf({ sentAt: null, lastError: null }), "queued");
-  // A row a run has claimed (attempts above zero) but not finished is still on its way.
-  assert.equal(emailStateOf({ sentAt: null, lastError: "temporary failure" }), "queued");
+  // A row a run has claimed (attempts above zero) but not finished is on its way: it can no longer be held back.
+  assert.equal(emailStateOf({ sentAt: null, lastError: "temporary failure", attempts: 1 }), "sending");
+  assert.equal(emailStateOf({ sentAt: null, lastError: null, attempts: 0 }), "queued");
   assert.equal(emailStateOf({ sentAt: sent, lastError: null }), "emailed");
   // Skipped (no login, no access) or given up: no email went, so the line never claims one.
   assert.equal(emailStateOf({ sentAt: sent, lastError: "no login" }), null);
@@ -33,6 +34,88 @@ test("deleteEmailNote: what the delete toast says about the email", () => {
   assert.equal(deleteEmailNote("emailed", "Zack"), "Zack already got the email");
   assert.equal(deleteEmailNote(null, "Zack"), null);
   assert.equal(deleteEmailNote("queued", null), null);
+  // A run has claimed the row: it may still go, so the toast promises nothing.
+  assert.equal(deleteEmailNote("sending", "Zack"), null);
+});
+
+test("deliveryLine: an email a run is sending still reads as one on its way", () => {
+  const line = deliveryLine({ to: "Zack", hasLogin: true, email: "sending", seenAt: null, eventAt: "2026-10-23T15:00:00Z" });
+  assert.deepEqual(line, { state: "queued", to: "Zack" });
+});
+
+const wrote = new Date("2026-10-23T15:00:00Z");
+const had = new Date("2026-10-20T12:00:00Z");
+
+test("sawComment: a visit after it was written counts; the job opened before, or only later, does not", () => {
+  const base = { accessSince: had, lastSeenAt: null, emails: [] };
+  assert.equal(sawComment({ ...base, lastSeenAt: new Date("2026-10-23T15:30:00Z") }, wrote), true, "opened it since");
+  assert.equal(sawComment({ ...base, lastSeenAt: new Date("2026-10-23T14:00:00Z") }, wrote), false, "last opened before it was written");
+  assert.equal(sawComment(base, wrote), false, "never opened, never emailed");
+  assert.equal(sawComment({ ...base, accessSince: new Date("2026-10-23T15:10:00Z"), lastSeenAt: new Date("2026-10-23T16:00:00Z") }, wrote), false, "got the job after it was written");
+});
+
+test("sawComment: only an email that went with no error counts", () => {
+  const base = { accessSince: had, lastSeenAt: null };
+  const at = new Date("2026-10-23T15:12:00Z");
+  assert.equal(sawComment({ ...base, emails: [{ sentAt: at, lastError: null }] }, wrote), true);
+  // Closed because nothing was left to send once the comment was dropped, or no login: nobody was told.
+  assert.equal(sawComment({ ...base, emails: [{ sentAt: at, lastError: "nothing to send" }] }, wrote), false);
+  assert.equal(sawComment({ ...base, emails: [{ sentAt: at, lastError: "no login" }] }, wrote), false);
+  assert.equal(sawComment({ ...base, emails: [{ sentAt: null, lastError: null }] }, wrote), false, "still queued");
+});
+
+test("partnersEmailState: queued until every partner's email has gone, and silent when one was closed unsent", () => {
+  const went = { sentAt: sent, lastError: null };
+  const waiting = { sentAt: null, lastError: null };
+  assert.equal(partnersEmailState([]), null, "no rows, no line");
+  assert.equal(partnersEmailState([went, went]), "emailed");
+  assert.equal(partnersEmailState([went, waiting]), "queued", "one partner's email is still waiting");
+  assert.equal(partnersEmailState([waiting]), "queued");
+  assert.equal(partnersEmailState([went, { sentAt: sent, lastError: "nothing to send" }]), null, "a row closed with an error told no one");
+  // A claimed row is on its way, not sent.
+  assert.equal(partnersEmailState([{ sentAt: null, lastError: "temporary failure" }]), "queued");
+});
+
+test("contactsWhoSaw: reads the facts once and keeps the contractors who could have read it", async () => {
+  const sql: string[] = [];
+  const db = {
+    taskAccess: {
+      findMany: async (args: { where: Record<string, unknown> }) => {
+        assert.equal(args.where.taskId, "t1");
+        assert.equal(args.where.revokedAt, null);
+        return [
+          { contactId: "c-zack", createdAt: had },
+          { contactId: "c-jose", createdAt: had },
+          { contactId: "c-dee", createdAt: had },
+        ];
+      },
+    },
+    taskReadState: { findMany: async () => [{ contactId: "c-zack", lastSeenAt: new Date("2026-10-23T16:00:00Z") }, { contactId: "c-jose", lastSeenAt: new Date("2026-10-23T14:00:00Z") }] },
+    $queryRaw: async (strings: TemplateStringsArray) => {
+      sql.push(strings.join("?"));
+      return [{ contactId: "c-dee", sentAt: new Date("2026-10-23T15:12:00Z"), lastError: null }, { contactId: "c-jose", sentAt: new Date("2026-10-23T15:12:00Z"), lastError: "nothing to send" }];
+    },
+  };
+  const saw = await contactsWhoSaw(db as never, { id: "ev1", taskId: "t1", createdAt: wrote, audienceContactId: null });
+  assert.deepEqual(saw, ["c-zack", "c-dee"], "Zack opened it since, Dee was emailed, Jose had neither");
+  assert.equal(sql.length, 1);
+  assert.match(sql[0], /o\."items" @> jsonb_build_array/);
+});
+
+test("contactsWhoSaw: a comment written to one contractor is checked for that one only", async () => {
+  let asked: Record<string, unknown> = {};
+  const db = {
+    taskAccess: {
+      findMany: async (args: { where: Record<string, unknown> }) => {
+        asked = args.where;
+        return [];
+      },
+    },
+    taskReadState: { findMany: async () => assert.fail("no access, nothing to read") },
+    $queryRaw: async () => assert.fail("no access, nothing to read"),
+  };
+  assert.deepEqual(await contactsWhoSaw(db as never, { id: "ev1", taskId: "t1", createdAt: wrote, audienceContactId: "c-zack" }), []);
+  assert.equal(asked.contactId, "c-zack");
 });
 
 test("emailStatesIn: asks the outbox once, for this contractor's rows on this task, by the event ids inside", async () => {

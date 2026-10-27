@@ -17,6 +17,16 @@ test("a change line with its author after the dot", () => {
   assert.deepEqual(parseNoteAuthor("Listing URL added  ·  Pieter Louw"), { text: "Listing URL added", initials: null, name: "Pieter Louw" });
 });
 
+test("the first version's signature: a blank line, an em dash and the name", () => {
+  assert.deepEqual(parseNoteAuthor("going to see it tomorrow\n\n\u2014 Connor Swofford"), { text: "going to see it tomorrow", initials: null, name: "Connor Swofford" });
+  assert.deepEqual(parseNoteAuthor("Line one\nLine two\n\n\u2014 Pieter Louw  "), { text: "Line one\nLine two", initials: null, name: "Pieter Louw" });
+  // Only the blank-line shape counts: a dash opening a line, or a dash inside a sentence, is text.
+  assert.equal(parseNoteAuthor("Offer in \u2014 waiting on the agent").name, null);
+  assert.equal(parseNoteAuthor("Notes\n\u2014 see Dana").name, null);
+  assert.equal(parseNoteAuthor("Notes\n\n\u2014 " + "x".repeat(80)).name, null, "a whole sentence isn't a name");
+  assert.equal(parseNoteAuthor("Notes\n\n\u2014 first\nsecond").name, null, "a label doesn't span lines");
+});
+
 test("any other label after the dot is read the same way", () => {
   assert.deepEqual(parseNoteAuthor("Price: $425,000 → $410,000  ·  Spreadsheet import"), {
     text: "Price: $425,000 → $410,000",

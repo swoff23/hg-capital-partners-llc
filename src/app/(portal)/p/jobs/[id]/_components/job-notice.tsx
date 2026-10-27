@@ -40,7 +40,7 @@ export function JobNotice({ notice, now }: { notice: Notice; now: string }) {
           <div className="mt-2 rounded-md border border-line bg-surface px-3 py-2.5">
             {sentBack.note && <p className="line-clamp-3 whitespace-pre-wrap break-words text-body text-fg-1">{sentBack.note}</p>}
             <p className={sentBack.note ? "mt-1.5" : undefined}>
-              <a href={`#update-${sentBack.noteEventId ?? sentBack.statusEventId}`} className={`${textLinkClass} text-label`}>
+              <a href={`#update-${sentBack.noteEventId ?? sentBack.statusEventId}`} className={`${textLinkClass} relative text-label pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2 pointer-coarse:after:-inset-y-3`}>
                 See the update
               </a>
             </p>

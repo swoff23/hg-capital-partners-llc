@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TaskStatus } from "@prisma/client";
 import { ActivityDay, ActivityDivider, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
@@ -63,6 +63,9 @@ export function TaskActivity({
   const [editing, setEditing] = useState<string | null>(null);
   const [viewing, setViewing] = useState<{ text: string; by: string } | null>(null);
   const [anchor, setAnchor] = useState<string | null>(null);
+  // The comment just deleted: its card is gone, and focus goes to the line that took its place.
+  const [deletedId, setDeletedId] = useState<string | null>(null);
+  const focused = useCallback(() => setDeletedId(null), []);
 
   // A link to an update (`#update-<id>`, from a job email or Copy link) opens the fold as far as it needs.
   useEffect(() => {
@@ -101,26 +104,24 @@ export function TaskActivity({
   return (
     <>
       <ActivityTimeline now={now}>
-        {start > 0 && (
+        {/* One toggle, so it keeps focus when it opens and closes. In print the earlier updates stay folded, and say so. */}
+        {(start > 0 || (open && folded > 0)) && (
           <ActivityItem marker="none" className="print:hidden">
             <button
               type="button"
-              onClick={() => setOpen(true)}
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
               className="rounded-sm text-meta font-medium text-fg-1 underline-offset-3 hover:underline pointer-coarse:min-h-11"
             >
-              Show {start} earlier {start === 1 ? "update" : "updates"}
+              {open ? "Hide earlier updates" : `Show ${start} earlier ${start === 1 ? "update" : "updates"}`}
             </button>
           </ActivityItem>
         )}
-        {open && folded > 0 && (
-          <ActivityItem marker="none" className="print:hidden">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-sm text-meta font-medium text-fg-1 underline-offset-3 hover:underline pointer-coarse:min-h-11"
-            >
-              Hide earlier updates
-            </button>
+        {start > 0 && (
+          <ActivityItem marker="none" className="hidden print:grid">
+            <p className="text-meta text-fg-3">
+              {start} earlier {start === 1 ? "update" : "updates"} not shown
+            </p>
           </ActivityItem>
         )}
         {groups.map((g) => (
@@ -137,6 +138,9 @@ export function TaskActivity({
                   setEditing={setEditing}
                   openRun={anchor !== null && r.ids.includes(anchor)}
                   onViewPrevious={(text, by) => setViewing({ text, by })}
+                  deletedId={deletedId}
+                  onDeleted={setDeletedId}
+                  onFocused={focused}
                 />
               </Fragment>
             ))}
@@ -162,6 +166,9 @@ function Row({
   setEditing,
   openRun,
   onViewPrevious,
+  deletedId,
+  onDeleted,
+  onFocused,
 }: {
   row: ActivityRow;
   month: boolean;
@@ -170,20 +177,26 @@ function Row({
   setEditing: (id: string | null) => void;
   openRun: boolean;
   onViewPrevious: (text: string, by: string) => void;
+  deletedId: string | null;
+  onDeleted: (id: string) => void;
+  onFocused: () => void;
 }) {
   switch (row.type) {
     case "comment":
-      return <CommentRowView row={row.comment} at={row.at} delivery={row.delivery} month={month} taskId={taskId} editing={editing === row.comment.id} setEditing={setEditing} />;
-    case "deleted":
       return (
-        <ActivityItem id={`update-${row.id}`} marker="dot">
-          <p className="text-meta text-fg-3">
-            {row.author} deleted a comment
-            <span aria-hidden="true">{" · "}</span>
-            <ActivityTime at={row.at} month={month} />
-          </p>
-        </ActivityItem>
+        <CommentRowView
+          row={row.comment}
+          at={row.at}
+          delivery={row.delivery}
+          month={month}
+          taskId={taskId}
+          editing={editing === row.comment.id}
+          setEditing={setEditing}
+          onDeleted={onDeleted}
+        />
       );
+    case "deleted":
+      return <DeletedLine row={row} month={month} focus={deletedId === row.id} onFocused={onFocused} />;
     case "moved":
       return <ActivityDivider>{row.label}</ActivityDivider>;
     case "decision":
@@ -310,6 +323,25 @@ function DecisionRowView({ row, month }: { row: Extract<ActivityRow, { type: "de
   );
 }
 
+/** "Connor deleted a comment · now": a staff-only trace. Takes focus when it is the card that was just deleted. */
+function DeletedLine({ row, month, focus, onFocused }: { row: Extract<ActivityRow, { type: "deleted" }>; month: boolean; focus: boolean; onFocused: () => void }) {
+  const line = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!focus) return;
+    line.current?.focus();
+    onFocused();
+  }, [focus, onFocused]);
+  return (
+    <ActivityItem id={`update-${row.id}`} marker="dot">
+      <p ref={line} tabIndex={-1} className="text-meta text-fg-3 outline-none">
+        {row.author} deleted a comment
+        <span aria-hidden="true">{" · "}</span>
+        <ActivityTime at={row.at} month={month} />
+      </p>
+    </ActivityItem>
+  );
+}
+
 /* ---------------- A comment ---------------- */
 
 function CommentRowView({
@@ -320,6 +352,7 @@ function CommentRowView({
   taskId,
   editing,
   setEditing,
+  onDeleted,
 }: {
   row: CommentFields;
   at: string;
@@ -328,6 +361,7 @@ function CommentRowView({
   taskId: string;
   editing: boolean;
   setEditing: (id: string | null) => void;
+  onDeleted: (id: string) => void;
 }) {
   const { toast } = useToast();
 
@@ -343,6 +377,7 @@ function CommentRowView({
   async function remove() {
     const res = await callAction(() => deleteTaskComment(c.id));
     if (!res.ok) return toast({ message: res.error });
+    onDeleted(c.id);
     toast({
       message: "Comment deleted",
       detail: res.data.emailNote ?? undefined,

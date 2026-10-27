@@ -166,7 +166,9 @@ test("isPlainMessage: a sentence is written for people, zod's defaults aren't", 
 // Buffalo is on daylight time in late October: 18:14 UTC is 2:14 PM there.
 const NOW = new Date("2026-10-26T20:00:00Z");
 
-test("ConflictError names who and when", () => {
+test("ConflictError names who and when", (t) => {
+  // The message reads the clock ("at 2:14 PM" today, a date otherwise): hold it at NOW so the test is the same on any day.
+  t.mock.timers.enable({ apis: ["Date"], now: NOW });
   const err = new ConflictError(
     { fields: ["loanRate"], by: "Pieter Smith", at: new Date("2026-10-26T18:14:00Z"), theirs: { loanRate: "7.25" } },
   );
@@ -187,7 +189,8 @@ test("ConflictError names who and when", () => {
   assert.equal(userMessage(err), err.message);
 });
 
-test("ConflictError without a person says what changed and when", () => {
+test("ConflictError without a person says what changed and when", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: NOW });
   const err = new ConflictError({ fields: ["status"], by: null, at: "2026-10-26T18:14:00.000Z" });
   assert.match(err.message, /^This changed at 2:14\sPM\.$/);
   assert.deepEqual(err.conflict, { fields: ["status"], at: "2026-10-26T18:14:00.000Z" });

@@ -40,8 +40,9 @@ test("no query reads an event's whole data, only named keys", () => {
   for (const next of reads) assert.match(next, /^->>?'/, `e."data" is read by key, not whole (found e."data"${next})`);
   const keys = new Set([...source.matchAll(/e\."data"->>?'(\w+)'/g)].map((m) => m[1]));
   // from, to: a status or a date edit; edited: an imported comment marked edited; clientId: the viewer's own send;
-  // statusEventId: the note written with a send back.
-  assert.deepEqual([...keys].sort(), ["clientId", "edited", "from", "statusEventId", "to"]);
+  // statusEventId: the note written with a send back; seenBy: the contacts who could read a comment that came off
+  // (ids only, matched against the viewer's own).
+  assert.deepEqual([...keys].sort(), ["clientId", "edited", "from", "seenBy", "statusEventId", "to"]);
 });
 
 test("the notice never reads a NOTES event's text or the notes it replaced", () => {
@@ -68,8 +69,9 @@ test("the trace of a removed comment carries no body, and only for a comment the
   assert.match(trace, /e\."deletedAt" IS NOT NULL/);
   assert.match(trace, /e\."visibility" = 'SHARED'/);
   assert.match(trace, /e\."audienceContactId" IS NULL OR e\."audienceContactId" = \$\{p\.contactId\}/);
-  assert.match(trace, /COALESCE\(r\."lastSeenAt", a\."createdAt"\)/, "bounded by the last open, or by when they got access");
-  assert.match(trace, /o\."sentAt" IS NOT NULL/, "or its email went");
+  // Whether they could have read it is settled at delete time and stored; a visit after the delete decides nothing.
+  assert.match(trace, /e\."data"->'seenBy' @> \$\{JSON\.stringify\(\[p\.contactId\]\)\}::jsonb/);
+  assert.doesNotMatch(trace, /lastSeenAt|NotificationOutbox/, "the facts are not re-read after the fact");
 });
 
 test("the trace is not counted as new on My jobs", () => {

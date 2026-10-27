@@ -107,6 +107,7 @@ export function JobActions({
   finishPhotosRequired,
   markedDoneAt,
   property,
+  sentClientIds,
 }: {
   taskId: string;
   status: TaskStatus;
@@ -118,6 +119,8 @@ export function JobActions({
   markedDoneAt?: string | null;
   /** The building, for the upload's name and the payoff's photo: "56 Tamarack St" and its front photo. */
   property?: { label: string; photoUrl: string | null } | null;
+  /** The contractor's own updates already on the page, by the id each was sent with: a reload mid-send drops one that did post. */
+  sentClientIds?: readonly string[];
 }) {
   const { toast } = useToast();
   const step = nextStep(status);
@@ -349,6 +352,9 @@ export function JobActions({
           draftKey={`hgos-job-draft:${taskId}`}
           visibility="none"
           pin="never"
+          // The fixed bar covers the foot of the page: focus and a send bring the box clear above it.
+          clearance="7rem"
+          sentClientIds={sentClientIds}
           audience={{ shared: <AudienceText words={audienceWords(staffNames)} /> }}
           placeholders={{ shared: "Write an update…" }}
           onSend={sendUpdate}

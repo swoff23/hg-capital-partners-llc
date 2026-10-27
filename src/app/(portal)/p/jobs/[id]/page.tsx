@@ -128,6 +128,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 finishPhotosRequired={job.finishPhotosRequired}
                 markedDoneAt={job.markedDoneAt}
                 property={place}
+                sentClientIds={job.updates.flatMap((u) => (u.clientId ? [u.clientId] : []))}
               />
             )}
           </Section>

@@ -6,6 +6,7 @@ import { isActiveStatus } from "@/lib/task-scope";
 import { withResult } from "@/lib/server-action";
 import { moveTaskDates, restoreTaskDates } from "@/lib/tasks/bulk";
 import type { DateChange, TickResult } from "@/lib/tasks/list";
+import { approved, type ApprovedResult } from "@/lib/tasks/approve";
 import * as tasks from "@/lib/tasks/service";
 
 /**
@@ -111,20 +112,11 @@ export async function undoDone(id: string, to: string, waitingOn: string | null)
 export async function approveTask(id: string): Promise<ActionResult<ApprovedResult>> {
   return withResult("approveTask", async () => {
     const user = await requireUser();
-    try {
-      const { statusEventId, emailsContractor } = await tasks.setTaskStatus(taskId.parse(id), "DONE", tasks.staffPrincipal(user), {
-        expected: "REVIEW",
-      });
-      return { approvedEventId: statusEventId, emailsContractor };
-    } catch (err) {
-      if (err instanceof tasks.TaskChangedError && err.current === "DONE") return { approvedEventId: null, emailsContractor: false };
-      throw err;
-    }
+    return approved(() => tasks.setTaskStatus(taskId.parse(id), "DONE", tasks.staffPrincipal(user), { expected: "REVIEW" }));
   });
 }
 
-/** What Approve answers: the Done line it wrote (the toast's Undo names it), and whether the contractor will hear. */
-export type ApprovedResult = { approvedEventId: string | null; emailsContractor: boolean };
+export type { ApprovedResult };
 
 /**
  * Approve's Undo: back to Review as if never approved, which also takes back

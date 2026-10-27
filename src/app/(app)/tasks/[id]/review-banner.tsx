@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TaskStatus } from "@prisma/client";
 import { ActivityTime } from "@/components/activity-time";
 import { Avatar } from "@/components/avatar";
@@ -66,10 +66,17 @@ export function ReviewSlot({
 }) {
   const [heldBanner, setHeldBanner] = useState(!!review);
   if (review && !heldBanner) setHeldBanner(true);
+  // The banner (and the button just pressed) is gone: the outcome line takes the keyboard's place, unless focus went somewhere else.
+  const outcome = useRef<HTMLParagraphElement>(null);
+  const showsOutcome = !review && heldBanner && !!decision;
+  useEffect(() => {
+    const active = document.activeElement;
+    if (showsOutcome && (!active || active === document.body)) outcome.current?.focus();
+  }, [showsOutcome]);
   if (review) return <ReviewBanner taskId={taskId} contractor={contractor} hasLogin={hasLogin} now={now} {...review} />;
   if (!heldBanner || !decision) return null;
   return (
-    <p role="status" className="flex min-w-0 items-center gap-2 text-meta text-fg-3">
+    <p ref={outcome} tabIndex={-1} role="status" className="flex min-w-0 items-center gap-2 text-meta text-fg-3 outline-none">
       <StatusMark status={decision.status} />
       <span className="min-w-0 truncate">
         {decision.name} {decision.status === "DONE" ? "approved this" : "sent this back"}
@@ -188,7 +195,7 @@ function Note({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setMore((m) => !m)}
-          className="mt-0.5 text-meta font-medium text-fg-2 underline decoration-1 underline-offset-3 hover:text-fg-1 pointer-coarse:min-h-11"
+          className="mt-0.5 text-meta font-medium text-fg-2 underline decoration-1 underline-offset-3 hover:text-fg-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         >
           {more ? "Less" : "More"}
         </button>

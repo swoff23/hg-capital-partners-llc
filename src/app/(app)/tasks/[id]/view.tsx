@@ -89,8 +89,9 @@ export function TaskPageView(p: TaskPageViewProps) {
         className={
           "grid max-w-300 gap-x-10 [grid-template-areas:'head'_'fields'_'main'] " +
           // Below md the page is at least the screen tall under the top bar, and the main area takes the spare
-          // height, so the composer sits on the bottom edge even on a short task (activity 2.7).
-          "max-md:min-h-[calc(100dvh-var(--app-bar-h))] max-md:grid-rows-[auto_auto_1fr] " +
+          // height, so the composer sits on the bottom edge even on a short task (activity 2.7). The 2rem is the
+          // page's own top and bottom padding, so a short task has nothing to scroll.
+          "max-md:min-h-[calc(100dvh-var(--app-bar-h)-2rem)] max-md:grid-rows-[auto_auto_1fr] " +
           "lg:grid-cols-[minmax(0,1fr)_20rem] lg:[grid-template-areas:'head_fields'_'main_fields']"
         }
       >

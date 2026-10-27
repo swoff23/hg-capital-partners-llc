@@ -30,7 +30,7 @@ import { useKeyboardInset } from "@/components/use-keyboard-inset";
 import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { callAction, OFFLINE_ERROR, type ActionResult } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
-import { EMPTY_DRAFT, parseDraft, resolvePending, serializeDraft, type Draft } from "@/lib/composer-draft";
+import { EMPTY_DRAFT, clientIdToReuse, parseDraft, resolvePending, serializeDraft, type Draft } from "@/lib/composer-draft";
 import { cn } from "@/lib/utils";
 
 /*
@@ -99,6 +99,13 @@ export interface ComposerProps {
   onSend: (message: ComposerMessage) => Promise<ActionResult<unknown>>;
   /** "phone": below md the composer sits on the bottom edge. "never": inline at every size. */
   pin?: "phone" | "never";
+  /**
+   * For an inline composer on a page with a fixed bar over its foot (the
+   * portal's ActionBar): how much of the page's bottom that bar covers, as a
+   * CSS length ("7rem"). On focus and after a send the box scrolls to sit
+   * above it, so what was typed and what was sent never end up underneath.
+   */
+  clearance?: string;
   /**
    * Placeholder per side: "Reply to Zack" or "Add a comment"; "Add an internal
    * note", which shortens to `internalShort` ("Internal note") below 480px.
@@ -201,6 +208,12 @@ function subscribeNarrow(onChange: () => void) {
   const mq = window.matchMedia(NARROW);
   mq.addEventListener("change", onChange);
   return () => mq.removeEventListener("change", onChange);
+}
+
+/** The end of the page, at once: the bar below it has just grown or the keyboard has come up. */
+function scrollToEnd() {
+  const root = document.scrollingElement;
+  if (root) root.scrollTop = root.scrollHeight;
 }
 
 function newClientId(): string {
@@ -357,6 +370,7 @@ function ComposerBody({
   uploader,
   onSend,
   pin = "phone",
+  clearance,
   placeholders,
   sendLabel,
   sentClientIds,
@@ -398,8 +412,21 @@ function ComposerBody({
   const pinned = pin === "phone";
   // What was sent, by clientId, so Retry and Edit can use it again.
   const sent = useRef(new Map<string, { message: ComposerMessage; files: ComposerDraft[] }>());
+  // Timers for scrolling a moment after a change (the keyboard, the page refreshing), cleared with the box.
+  const timers = useRef<number[]>([]);
+  useEffect(() => {
+    const all = timers.current;
+    return () => all.forEach((t) => window.clearTimeout(t));
+  }, []);
+  const later = (ms: number, fn: () => void) => void timers.current.push(window.setTimeout(fn, ms));
+  // While true the end of the page is kept in view as the bar grows (a focus at the end of Activity on a phone).
+  const stickToEnd = useRef(false);
 
-  const setText = (next: string) => writeDraft(draftKey, { text: next });
+  const setText = (next: string) => {
+    // Words changed after a failed send are a different message: the id kept for the failed one is let go.
+    const kept = readDraft(draftKey).pending;
+    writeDraft(draftKey, { text: next, ...(kept?.held && kept.text !== next ? { pending: null } : {}) });
+  };
   const setVisibility = (v: ComposerVisibility) => writeDraft(draftKey, { visibility: v });
   const heldIds = held?.ids ?? NO_IDS;
 
@@ -426,11 +453,24 @@ function ComposerBody({
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    const measure = () => setInset(getComputedStyle(el).position === "sticky" ? el.offsetHeight : 0);
+    const measure = () => {
+      setInset(getComputedStyle(el).position === "sticky" ? el.offsetHeight : 0);
+      // The bar just grew over the last entry: scroll the page to its end so the entry sits above it.
+      if (stickToEnd.current) scrollToEnd();
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    // The keyboard rising moves the bar too.
+    const vv = window.visualViewport;
+    const keyboard = () => {
+      if (stickToEnd.current) scrollToEnd();
+    };
+    vv?.addEventListener("resize", keyboard);
+    return () => {
+      ro.disconnect();
+      vv?.removeEventListener("resize", keyboard);
+    };
   }, []);
 
   // A message that was mid-send when the page went away: dropped if it did post, back in the field if it didn't.
@@ -484,22 +524,38 @@ function ComposerBody({
 
   function send() {
     if (!canSend) return;
+    const attachmentIds = [...heldIds, ...ready.map((r) => r.id)];
+    const side: ComposerVisibility = internal ? "INTERNAL" : "SHARED";
     const message: ComposerMessage = {
       body: text,
-      visibility: internal ? "INTERNAL" : "SHARED",
-      attachmentIds: [...heldIds, ...ready.map((r) => r.id)],
-      clientId: newClientId(),
+      visibility: side,
+      attachmentIds,
+      // The same message after a failure keeps its id, so a send that did post is recognised and not posted twice.
+      clientId: clientIdToReuse(readDraft(draftKey), { body: text, visibility: side, attachmentIds }) ?? newClientId(),
     };
     const files = [...ready];
     sent.current.set(message.clientId, { message, files });
     if (!sends) {
       // No timeline to show it on: the draft and the files stay until it's sent, so a failure loses nothing.
       setSendingNow(true);
+      // The id is written before the call: a failure, or a page closed mid-send, keeps it for the next Send.
+      writeDraft(draftKey, {
+        pending: {
+          clientId: message.clientId,
+          text,
+          visibility: side,
+          files: attachmentIds.map((id) => ({ id, filename: files.find((f) => f.id === id)?.filename ?? "" })),
+          at: new Date().toISOString(),
+          held: true,
+        },
+      });
       void post(message).then((ok) => {
         setSendingNow(false);
         if (!ok) return;
         writeDraft(draftKey, { text: "" });
         forget(files.map((f) => f.id));
+        // The page refreshes with the new entry above the box: bring the box back into view.
+        revealBox();
       });
       return;
     }
@@ -518,7 +574,30 @@ function ComposerBody({
       edit: () => edit(message.clientId),
       discard: () => discard(message.clientId),
     });
+    showSent(message.clientId);
     void post(message);
+  }
+
+  /** Pinned over the page, the bar can send from anywhere on it: bring the new card into view above the bar. */
+  function showSent(clientId: string) {
+    if (inset <= 0) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const clear = inset + 16;
+    // The card is drawn on the next frame or two.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const card = document.getElementById(`update-pending-${clientId}`);
+        if (!card) return;
+        card.style.scrollMarginBottom = `${clear}px`;
+        card.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+      }),
+    );
+  }
+
+  /** An inline box above a fixed bar: scroll it to sit clear of the bar, now and again as the keyboard and the page settle. */
+  function revealBox() {
+    if (!clearance) return;
+    for (const ms of [60, 400, 1000]) later(ms, () => box.current?.scrollIntoView({ block: "nearest", behavior: "auto" }));
   }
 
   function retry(clientId: string) {
@@ -585,31 +664,37 @@ function ComposerBody({
       variant="secondary"
       size="sm"
       disabled={!canSend}
+      // Pressing Send keeps focus in the field, so a phone's keyboard stays up for the next line.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={send}
+      pending={sendingNow}
       aria-keyshortcuts="Meta+Enter Control+Enter"
       className={className}
     >
-      {sendingNow ? "Sending…" : label}
+      {label}
       <Kbd aria-hidden="true" className="max-md:hidden @max-md/composer:hidden">
         {shortcutLabel(mod, "↵")}
       </Kbd>
     </Button>
   );
 
-  // Leaving the field for the end of the page: the last entry sits just above the bar.
+  // Focusing the field grows the bar (the audience line and the tools row). If you were at the end of Activity, the
+  // page follows it so the last entry stays just above. An inline box above a fixed bar is brought clear of it.
   function onFieldFocus() {
-    if (!pinned || window.matchMedia("(min-width: 48rem)").matches) return;
+    if (!pinned) return revealBox();
+    if (window.matchMedia("(min-width: 48rem)").matches) return;
     const root = document.scrollingElement;
     const atEnd = !!root && root.scrollHeight - (root.scrollTop + window.innerHeight) < 160;
     if (!atEnd) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // After the keyboard is up and the bar has moved.
-    window.setTimeout(() => box.current?.scrollIntoView({ block: "end", behavior: reduce ? "auto" : "smooth" }), 320);
+    stickToEnd.current = true;
+    later(800, () => (stickToEnd.current = false));
+    requestAnimationFrame(scrollToEnd);
   }
 
   return (
     <div
       ref={box}
+      style={clearance ? { scrollMarginBottom: clearance } : undefined}
       data-active={active || undefined}
       onFocus={() => setFocused(true)}
       onBlur={(e) => {
@@ -622,7 +707,8 @@ function ComposerBody({
           ? cn(
               // Edge to edge over a top rule, above the keyboard and the home indicator, and out of the way while a comment is being edited.
               // `mt-auto` takes the spare height of a short page's flex column, so the bar sits on the bottom edge with nothing to scroll.
-              "max-md:sticky max-md:bottom-[var(--kb-inset,0px)] max-md:z-20 max-md:-mx-4 max-md:-mb-4 max-md:mt-auto max-md:border-x-0 max-md:border-b-0",
+              // Its foot margin makes room for the keyboard under it, so the page can still scroll its last entry above the lifted bar.
+              "max-md:sticky max-md:bottom-[var(--kb-inset,0px)] max-md:z-20 max-md:-mx-4 max-md:mb-[calc(var(--kb-inset,0px)_-_1rem)] max-md:mt-auto max-md:border-x-0 max-md:border-b-0",
               "max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))] md:rounded-lg",
               "[html[data-editing-comment]_&]:max-md:hidden",
             )

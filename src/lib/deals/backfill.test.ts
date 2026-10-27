@@ -28,6 +28,15 @@ test("a note signed with initials is set to that user, and loses the signature",
   });
 });
 
+test("a note from the first version of the app, signed on a line of its own, is set to that user", () => {
+  const step = planNote(note("going to see it tomorrow\n\n\u2014 Connor Swofford"), users);
+  assert.ok(step.action === "set");
+  if (step.action !== "set") return;
+  assert.equal(step.authorUserId, "u1");
+  assert.equal(step.text, "going to see it tomorrow");
+  assert.equal(step.via, "name");
+});
+
 test("a change line with a name after the dot is set to that user by their full name", () => {
   const step = planNote(note("Status: 1 - High → Pass  ·  Pieter Louw", { source: "change" }), users);
   assert.ok(step.action === "set");

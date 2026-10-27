@@ -10,7 +10,7 @@ import { firstName } from "@/lib/names";
 import type { UnitRename } from "@/lib/property-types";
 import { activeTask } from "@/lib/task-scope";
 import * as core from "./core";
-import { deleteEmailNote, emailStatesIn } from "./delivery";
+import { contactsWhoSaw, deleteEmailNote, emailStatesIn } from "./delivery";
 
 /**
  * Task domain for the app: every staff, system and public-form task write
@@ -153,8 +153,10 @@ export async function editTaskComment(eventId: string, body: string, p: core.Pri
  */
 export async function deleteTaskComment(eventId: string, p: core.Principal): Promise<{ emailNote: string | null }> {
   const out = await prisma.$transaction(async (tx) => {
-    const was = await tx.taskEvent.findUnique({ where: { id: eventId }, select: { visibility: true, audienceContactId: true } });
-    const { taskId } = await core.deleteComment(tx, eventId, p);
+    const was = await tx.taskEvent.findUnique({ where: { id: eventId }, select: { visibility: true, audienceContactId: true, taskId: true, createdAt: true } });
+    // Who could have read it, settled before it comes off: a comment no contractor saw leaves no trace in the portal.
+    const seenBy = was?.visibility === "SHARED" && p.kind === "staff" ? await contactsWhoSaw(tx, { id: eventId, ...was }) : undefined;
+    const { taskId } = await core.deleteComment(tx, eventId, p, new Date(), seenBy);
     let emailNote: string | null = null;
     if (was?.visibility === "SHARED" && was.audienceContactId) {
       const states = await emailStatesIn(tx, taskId, was.audienceContactId, [eventId]);

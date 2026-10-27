@@ -82,7 +82,8 @@ const ROW = "grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-3";
 const ANCHOR = "scroll-mt-[calc(var(--app-bar-h)+1rem)]";
 
 function Knockout({ square = false, children }: { square?: boolean; children: ReactNode }) {
-  return <span className={cn("flex items-center justify-center bg-surface p-0.5", square ? "rounded-sm" : "rounded-full")}>{children}</span>;
+  // `relative` so it paints after the rail's positioned ::before and covers the hairline.
+  return <span className={cn("relative flex items-center justify-center bg-surface p-0.5", square ? "rounded-sm" : "rounded-full")}>{children}</span>;
 }
 
 function MarkerGlyph({ marker }: { marker: Exclude<ActivityMarker, "none"> }) {

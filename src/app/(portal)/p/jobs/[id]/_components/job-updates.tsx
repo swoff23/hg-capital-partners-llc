@@ -134,7 +134,7 @@ function EntryView({ entry, delivery, viewerName }: { entry: Entry; delivery: Jo
   return (
     <ActivityItem id={`update-${u.id}`} marker={u.statusTo ? { status: u.statusTo } : "dot"}>
       <p className="text-meta text-fg-3">
-        <span className="font-medium text-fg-2">{u.actorLabel}</span> {u.body}
+        {u.actorLabel} {u.body}
         <span aria-hidden="true">{" · "}</span>
         <ActivityTime at={u.createdAt} />
       </p>

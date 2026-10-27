@@ -132,6 +132,9 @@ function emailBody(body: string): string {
  *  - a comment is rebuilt from the event's current text and files, up to 500
  *    characters with its line breaks, "3 photos and 1 file" for the files,
  *    and dropped if it is empty now;
+ *  - a file post with no live file left is dropped, so its email never says
+ *    "added quote.pdf" for a file that is gone, and its button never opens
+ *    at a row the portal does not show;
  *  - a comment, file post or status for a contractor must still be Shared and
  *    addressed to them; a Shared event never turns Internal, so this only
  *    guards a row that was queued oddly. ASSIGNED, TARGET and NOTES have no
@@ -168,6 +171,8 @@ export function reconcileItems(
     }
     if (item.kind === "STATUS" || item.kind === "ATTACHMENT") {
       if (!mayRead) continue;
+      // A file post whose files were all taken off since says nothing now, and the portal shows no row for it to open at.
+      if (item.kind === "ATTACHMENT" && ev.files.length === 0) continue;
       out.push(item.kind === "STATUS" && item.noteEventId ? withSendBackNote(item, events.get(item.noteEventId)) : item);
       continue;
     }

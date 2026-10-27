@@ -1095,9 +1095,18 @@ export async function editComment(
  * comment would come back with the next Asana delta, and Undo needs the rows.
  * The drain drops the comment from any email still waiting.
  */
-export async function deleteComment(tx: Tx, eventId: string, p: Principal, now = new Date()): Promise<{ taskId: string; deletedAt: Date }> {
+export async function deleteComment(
+  tx: Tx,
+  eventId: string,
+  p: Principal,
+  now = new Date(),
+  seenBy?: readonly string[],
+): Promise<{ taskId: string; deletedAt: Date }> {
   const ev = await ownComment(tx, eventId, p, { deleted: false });
-  await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: now } });
+  // `seenBy`: the contractors who could have read it, decided now while it is known (delivery.contactsWhoSaw).
+  // The portal's "removed a comment" line reads only this, so the comment's text is never needed for it.
+  const kept = ev.data && typeof ev.data === "object" && !Array.isArray(ev.data) ? (ev.data as Prisma.JsonObject) : {};
+  await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: now, ...(seenBy ? { data: { ...kept, seenBy: [...seenBy] } } : {}) } });
   // The files that are still up. A file a person took off earlier keeps its own stamp.
   await tx.taskAttachment.updateMany({ where: { eventId, deletedAt: null }, data: { deletedAt: now } });
   await tx.task.update({ where: { id: ev.taskId }, data: editStamp(p, now) });

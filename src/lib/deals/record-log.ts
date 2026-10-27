@@ -83,6 +83,8 @@ export interface NoteEntry extends Base {
   editedAt: string | null;
   /** From the spreadsheet import, not typed here. */
   imported: boolean;
+  /** The id the note was sent with from the note box, so the box can tell its own send has landed. */
+  clientId: string | null;
 }
 
 export interface ChangeEntry extends Base {
@@ -104,6 +106,13 @@ export interface LineEntry extends Base {
 export type LogEntry = NoteEntry | ChangeEntry | LineEntry;
 
 const isMigration = (r: LogSourceRow) => r.source === "migration";
+
+/** The `clientId` a note was sent with, when its data holds one. */
+function clientIdOf(data: unknown): string | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const id = (data as Record<string, unknown>).clientId;
+  return typeof id === "string" && id ? id : null;
+}
 
 /** The instant a row sorts at; imported lines sort by their sheet date, undated ones last. */
 function sortMs(r: LogSourceRow): number {
@@ -207,6 +216,7 @@ export function buildDealLog(rows: readonly LogSourceRow[]): LogEntry[] {
           text,
           editedAt: r.editedAt ? r.editedAt.toISOString() : null,
           imported: isMigration(r),
+          clientId: clientIdOf(r.data),
         },
       });
       continue;
