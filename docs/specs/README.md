@@ -20,3 +20,5 @@ Six specs, researched on Mobbin, checked by a critic and approved by Connor on O
 7. Activity and comments
 
 Each chunk ships its own small migration.
+
+[tenant-contact.md](tenant-contact.md) puts the tenant's name and phone on jobs. It was planned with Connor on Oct 26, 2026, and waits for his "build it" before any of it is built.
