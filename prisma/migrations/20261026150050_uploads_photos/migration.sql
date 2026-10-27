@@ -14,13 +14,21 @@
 -- optional, which every job stays until a playbook editor sets it.
 --
 -- Additive only: three tables gain nullable columns and one foreign key.
--- Nothing is altered, dropped, renamed or tightened, so today's code runs on
--- it and it is safe on the existing production database whenever it is
--- applied, by prebuild's `prisma migrate deploy` or out of band through `npm
--- run migrate`, before or after the code that reads it ships. Nothing is
--- backfilled: existing documents stay null and show the date alone, no
--- property has a photo until someone sets one, and every playbook stays
--- optional.
+-- Nothing is altered, dropped, renamed or tightened, so the code already in
+-- production runs on it unchanged. Nothing is backfilled: existing documents
+-- stay null and show the date alone, no property has a photo until someone
+-- sets one, and every playbook stays optional.
+--
+-- It must be in place before the code that ships with it serves a request.
+-- That code needs the columns: Prisma names every column of a model in a
+-- read that doesn't pick its own fields, so the property record page fails
+-- without them, and search, the pickers, My jobs, a contractor's job page and
+-- adding a property document name them outright. It reaches production
+-- through `prisma migrate deploy` in the production build's prebuild
+-- (scripts/prebuild.mjs), which runs before `next build`, so before the new
+-- code serves. Prebuild runs it on a direct or session DATABASE_URL and skips
+-- the transaction pooler. (`npm run migrate` is the spreadsheet import, not
+-- this.)
 --
 -- ON DELETE SET NULL: removing a user keeps the document and forgets who
 -- added it. No index on the new column: it's only read with the row it sits
