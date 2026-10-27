@@ -38,6 +38,17 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Every page and route: never inside another site's frame (clickjacking),
+        // and never sniffed as another type. The files routes set their own
+        // nosniff and sandbox CSP (lib/attachments/headers.ts); this adds no CSP,
+        // so theirs stands as it is. SAMEORIGIN keeps our own pages frameable by us.
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+      {
         // Password reset links carry their token in the URL: never pass it on
         // as a Referer, and never keep the page in any cache.
         source: "/login/reset",

@@ -13,8 +13,9 @@ import { Sheet } from "@/components/sheet";
 import { useToast } from "@/components/toast";
 import { Button, TextLink } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
+import { sendRefusal } from "@/lib/composer-draft";
 import { todayYmdEastern, type Ymd } from "@/lib/dates";
-import { foldStart, firstNewIndex, groupHeadings } from "@/lib/tasks/activity";
+import { foldStart, firstNewIndex, groupHeadings, linkedUpdateId } from "@/lib/tasks/activity";
 import { cn } from "@/lib/utils";
 import { deleteTaskComment, editTaskComment, restoreTaskComment, updateTask } from "./actions";
 import type { ActivityRow, CommentFields, LineFields } from "./activity-rows";
@@ -73,11 +74,9 @@ export function TaskActivity({
   }, []);
 
   // A link to an update (`#update-<id>`, from a job email or Copy link) opens the fold as far as it needs.
+  // A mangled hash (cut at a %) is no anchor: the page opens as usual instead of the error screen.
   useEffect(() => {
-    const read = () => {
-      const m = /^#update-(.+)$/.exec(window.location.hash);
-      setAnchor(m ? decodeURIComponent(m[1]) : null);
-    };
+    const read = () => setAnchor(linkedUpdateId(window.location.hash));
     read();
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
@@ -490,6 +489,8 @@ function CommentRowView({
 
 function InFlight({ send, author }: { send: PendingSend; author: string }) {
   const failed = send.status === "failed";
+  // A refusal a second try can't change (too long, the task is gone) says why and offers no Retry; Edit is the way on.
+  const refusal = failed ? sendRefusal(send.error) : null;
   const text = send.body;
   return (
     <CommentCard
@@ -500,13 +501,15 @@ function InFlight({ send, author }: { send: PendingSend; author: string }) {
       body={text || null}
       files={send.files.length > 0 ? <p className="truncate text-meta text-fg-3">{send.files.map((f) => f.filename).join(", ")}</p> : null}
       sending={send.status === "sending"}
-      footer={failed ? <SendFailedLine offline={isOfflineMessage(send.error)} onRetry={send.retry} /> : undefined}
+      footer={failed ? <SendFailedLine offline={isOfflineMessage(send.error)} reason={refusal} onRetry={send.retry} /> : undefined}
       menuItems={
         failed ? (
           <>
-            <MenuItem id="retry" onAction={send.retry}>
-              Retry
-            </MenuItem>
+            {!refusal && (
+              <MenuItem id="retry" onAction={send.retry}>
+                Retry
+              </MenuItem>
+            )}
             <MenuItem id="edit" onAction={send.edit}>
               Edit
             </MenuItem>

@@ -196,6 +196,9 @@ function WaitingForm({
         value={reason}
         autoFocus
         required
+        // Free text, not a login: password managers keep their icon and menu off it.
+        autoComplete="off"
+        data-1p-ignore
         maxLength={300}
         onChange={(e) => setReason(e.target.value)}
       />

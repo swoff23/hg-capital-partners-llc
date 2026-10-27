@@ -113,6 +113,32 @@ export function withMergedOwners(sp: Params, legacy: LegacyNames): string | null
   return qs.toString();
 }
 
+/**
+ * The query for a link that names what the page doesn't have (a status that
+ * isn't Open, Done or All; a person or property that's gone or never was):
+ * those go, every other param stays, so the bar shows Open picked and never a
+ * raw id in a chip. `known` holds the picks the filters list (people by their
+ * keys, properties by id); "none" always counts. Null when every value is known.
+ */
+export function withKnownFilters(sp: Params, known: { owner: ReadonlySet<string>; property: ReadonlySet<string> }): string | null {
+  const qs = toQuery(sp);
+  let changed = false;
+  if (qs.has("status") && !(TASK_VIEWS as readonly string[]).includes(str(sp.status))) {
+    qs.delete("status");
+    changed = true;
+  }
+  for (const param of ["owner", "property"] as const) {
+    if (!qs.has(param)) continue;
+    const picks = parseFacet(str(sp[param]));
+    const kept = picks.filter((k) => k === NONE || known[param].has(k));
+    if (kept.length === picks.length && picks.length > 0) continue;
+    changed = true;
+    if (kept.length > 0) qs.set(param, joinFacet(kept));
+    else qs.delete(param);
+  }
+  return changed ? qs.toString() : null;
+}
+
 /** Which of the facets a count leaves out, so a facet's rows count what picking each would show. */
 export type OmitFacet = "owner" | "property";
 
@@ -150,9 +176,11 @@ export function paletteTaskWhere(q: string): Prisma.TaskWhereInput {
 }
 
 /**
- * Any of the picked people. Unassigned is "no real person", legacy free-text
- * names included, as Today's Unassigned is. A picked person also finds the
- * imported rows that carry their name in `legacy` (TASKS-013).
+ * Any of the picked people. A picked person also finds the imported rows
+ * that carry their name in `legacy` (TASKS-013), and those rows are theirs
+ * alone: Unassigned is no real person and no name that stands for one, the
+ * legacy names that are nobody included, as Today's Unassigned is (list.ts
+ * groupMine), so the row Asana gave Kenneth reads as Kenneth's on both.
  */
 export function ownerWhere(owner: readonly string[], legacy: LegacyNames = new Map()): Prisma.TaskWhereInput {
   const users: string[] = [];
@@ -170,7 +198,15 @@ export function ownerWhere(owner: readonly string[], legacy: LegacyNames = new M
   if (users.length > 0) any.push({ assigneeUserId: { in: users } });
   if (contacts.length > 0) any.push({ assigneeContactId: { in: contacts } });
   if (names.length > 0) any.push({ assigneeName: { in: [...new Set(names)] }, assigneeUserId: null, assigneeContactId: null });
-  if (nobody) any.push({ assigneeUserId: null, assigneeContactId: null });
+  if (nobody) {
+    // NOT IN is never true of a null name, so no name at all is its own branch.
+    const someone = [...new Set([...legacy.values()].flat())];
+    any.push(
+      someone.length > 0
+        ? { assigneeUserId: null, assigneeContactId: null, OR: [{ assigneeName: null }, { assigneeName: { notIn: someone } }] }
+        : { assigneeUserId: null, assigneeContactId: null },
+    );
+  }
   return any.length > 0 ? { OR: any } : {};
 }
 
@@ -231,8 +267,8 @@ export interface OwnerCountRow {
 
 /**
  * Tasks per assignee key, from the grouped rows. A legacy name that stands
- * for a person counts for that person too, and a task with no real person
- * counts under Unassigned, as the filter treats them.
+ * for a person counts for that person alone, and a task with nobody behind
+ * it counts under Unassigned, as the filter treats them (ownerWhere).
  */
 export function ownerCounts(rows: readonly OwnerCountRow[], legacy: LegacyNames = new Map()): Map<string, number> {
   const personOfName = personOfLegacyName(legacy);
@@ -242,11 +278,13 @@ export function ownerCounts(rows: readonly OwnerCountRow[], legacy: LegacyNames 
     if (r.assigneeUserId) add(`u:${r.assigneeUserId}`, r.count);
     else if (r.assigneeContactId) add(`c:${r.assigneeContactId}`, r.count);
     else {
-      add(NONE, r.count);
-      if (r.assigneeName) {
-        const person = personOfName.get(r.assigneeName);
-        add(person ?? `n:${r.assigneeName}`, r.count);
+      const person = r.assigneeName ? personOfName.get(r.assigneeName) : undefined;
+      if (person) {
+        add(person, r.count);
+        continue;
       }
+      add(NONE, r.count);
+      if (r.assigneeName) add(`n:${r.assigneeName}`, r.count);
     }
   }
   return counts;

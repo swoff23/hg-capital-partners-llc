@@ -6,9 +6,11 @@ import { recentAssigneeKeys } from "./assignee-people";
 import { copyOrigin } from "./repeat";
 import {
   AssigneeChangedError,
+  NotesChangedError,
   addChecklistItem,
   addComment,
   approvalEmailRefusal,
+  changedBy,
   createNextRepeat,
   createTask,
   deleteComment,
@@ -218,6 +220,88 @@ test("patchTask: edits that don't touch the assignee take no lock", async () => 
   assert.ok(!calls.some((c) => c.model === "$executeRaw"));
 });
 
+test("patchTask: a task deleted elsewhere is refused, never a quiet success", async () => {
+  // The service no longer returns early on a missing task, so this refusal is what a stale rename hears.
+  const { tx, calls } = fakeTx({}, (model, op) => (model === "task" && op === "findUnique" ? null : undefined));
+  await assert.rejects(patchTask(tx, "t1", { title: "Hang and tape drywall" }, PIETER), (err: unknown) => err instanceof TaskRuleError && err.message === "That task no longer exists.");
+  assert.deepEqual(writes(calls), []);
+});
+
+// ---------------------------------------------------------------------------
+// patchTask's compare-and-set on the notes
+// ---------------------------------------------------------------------------
+
+const UPDATED = new Date("2026-10-27T18:14:00Z");
+/** The notes line that saved what the task holds now, by `by`. */
+const notesLine = (by: Record<string, unknown>): Answer => (model, op, args) =>
+  model === "taskEvent" && op === "findFirst" && args.where?.kind === "NOTES" ? { createdAt: UPDATED, ...by } : undefined;
+
+test("patchTask: a notes save from a stale screen is refused, names who saved them, and writes nothing", async () => {
+  // Pieter's screen loaded "Old words"; Connor has since saved new notes.
+  const { tx, calls } = fakeTx({ description: "Connor's newer notes", updatedAt: UPDATED }, notesLine({ actorLabel: "Connor Swofford", actorUserId: "u-connor" }));
+  await assert.rejects(
+    patchTask(tx, "t1", { description: "Old words, and a line Pieter added", expectedDescription: "Old words" }, PIETER),
+    (err: unknown) =>
+      err instanceof NotesChangedError &&
+      err instanceof TaskRuleError &&
+      err.by === "Connor" &&
+      !err.mine &&
+      err.current === "Connor's newer notes" &&
+      err.at.getTime() === UPDATED.getTime(),
+  );
+  // The row lock comes first, so two saves at once run one after the other.
+  assert.equal(calls[0].model, "$executeRaw");
+  assert.match(calls[0].op, /FOR NO KEY UPDATE/);
+  assert.deepEqual(writes(calls).map((c) => c.model), ["$executeRaw"], "no task update, no notes line, no email");
+});
+
+test("patchTask: notes still as the screen loaded them save; notes that already say the same aren't a conflict", async () => {
+  // Stored trimmed, compared trimmed: the field's own whitespace never reads as someone else's change.
+  let fake = fakeTx({ description: "Old words" });
+  const after = await patchTask(fake.tx, "t1", { description: "New words", expectedDescription: "Old words \n" }, PIETER);
+  assert.equal(after.description, "New words");
+  assert.ok(fake.calls.some((c) => c.model === "taskEvent" && c.op === "create"));
+  // Empty notes load as "" and are stored as null.
+  fake = fakeTx({ description: null });
+  assert.equal((await patchTask(fake.tx, "t1", { description: "First notes", expectedDescription: null }, PIETER)).description, "First notes");
+  fake = fakeTx({ description: "Same words" });
+  await patchTask(fake.tx, "t1", { description: "Same words", expectedDescription: "Older words" }, PIETER);
+  assert.ok(!fake.calls.some((c) => c.model === "task" && c.op === "update"), "nothing to write");
+  // A caller that doesn't say what it loaded (Restore from View previous, the system) saves as before, with no lock.
+  fake = fakeTx({ description: "Connor's newer notes" });
+  await patchTask(fake.tx, "t1", { description: "Restored words" }, PIETER);
+  assert.ok(!fake.calls.some((c) => c.model === "$executeRaw"));
+  assert.ok(fake.calls.some((c) => c.model === "task" && c.op === "update"));
+});
+
+test("a stale change made in your own other tab says You, not your first name", async () => {
+  // Status: Pieter moved it to Done in another tab.
+  let fake = fakeTx({ status: "DONE" }, (model, op) =>
+    model === "taskEvent" && op === "findFirst" ? { actorLabel: "Pieter Louw", actorUserId: "u-pieter", actorContactId: null } : undefined,
+  );
+  await assert.rejects(setStatus(fake.tx, "t1", "OPEN", PIETER, { expected: "IN_PROGRESS" }), (err: unknown) => err instanceof TaskChangedError && err.message === "You moved this to Done.");
+  // Someone else with the same first name is still named.
+  fake = fakeTx({ status: "DONE" }, (model, op) =>
+    model === "taskEvent" && op === "findFirst" ? { actorLabel: "Pieter Smith", actorUserId: "u-pieter-2", actorContactId: null } : undefined,
+  );
+  await assert.rejects(setStatus(fake.tx, "t1", "OPEN", PIETER, { expected: "IN_PROGRESS" }), (err: unknown) => err instanceof TaskChangedError && err.message === "Pieter moved this to Done.");
+  // Assignee.
+  fake = fakeTx({ assigneeContactId: "c-jose" }, (model, op, args) =>
+    model === "taskEvent" && op === "findFirst" && args.where?.kind === "ASSIGNED" ? { actorLabel: "Pieter Louw", actorUserId: "u-pieter" } : undefined,
+  );
+  await assert.rejects(
+    patchTask(fake.tx, "t1", { assignee: { userId: "u-pieter" }, expectedAssignee: { contactId: "c-zack" } }, PIETER),
+    (err: unknown) => err instanceof AssigneeChangedError && err.message === "You assigned this to Jose Alvarez.",
+  );
+  // Notes: mine, so the field names nobody.
+  fake = fakeTx({ description: "From my other tab" }, notesLine({ actorLabel: "Pieter Louw", actorUserId: "u-pieter" }));
+  await assert.rejects(patchTask(fake.tx, "t1", { description: "x", expectedDescription: "y" }, PIETER), (err: unknown) => err instanceof NotesChangedError && err.mine && err.by === null);
+  // A contractor is "You" by contact.
+  assert.equal(changedBy({ kind: "contractor", contactId: "c-zack", label: "Zack Reading" }, { actorLabel: "Zack Reading", actorContactId: "c-zack" }), "You");
+  assert.equal(changedBy({ kind: "contractor", contactId: "c-zack", label: "Zack Reading" }, { actorLabel: "Zack Reading", actorUserId: "u-x" }), "Zack");
+  assert.equal(changedBy(PIETER, null), null);
+});
+
 // ---------------------------------------------------------------------------
 // Repeats: the next copy's date (decision 14), on the same fake transaction
 // ---------------------------------------------------------------------------
@@ -281,6 +365,27 @@ test("createNextRepeat: on time, the usual next date; a pinned weekday holds", a
   fake = fakeTx({}, makesCopy);
   await createNextRepeat(fake.tx, finished({ dueDate: null }), PIETER, now);
   assert.equal(copyDue(fake.calls), "2026-11-05");
+});
+
+test("createNextRepeat: a yearly rule finished on Feb 29 hands its copies the leap day, so 2032 is Feb 29 again", async () => {
+  const copyRule = (calls: Call[]) => (calls.find((c) => c.model === "task" && c.op === "create")!.args as { data: { repeatRule: unknown } }).data.repeatRule;
+  // A rule saved before the pin, as the tester's was: the copy carries the pin from here on.
+  const rule: unknown = { freq: "yearly", interval: 1 };
+  let due = "2028-02-29";
+  const dues: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    const fake = fakeTx({}, makesCopy);
+    // Each copy is finished on its due date.
+    await createNextRepeat(fake.tx, finished({ dueDate: day(due), repeatRule: i === 0 ? rule : { freq: "yearly", interval: 1, dayOfMonth: 29 } }), PIETER, new Date(`${due}T15:00:00Z`));
+    due = copyDue(fake.calls)!;
+    dues.push(due);
+    assert.deepEqual(copyRule(fake.calls), { freq: "yearly", interval: 1, dayOfMonth: 29 });
+  }
+  assert.deepEqual(dues, ["2029-02-28", "2030-02-28", "2031-02-28", "2032-02-29"]);
+  // Any other yearly date is left unpinned.
+  const fake = fakeTx({}, makesCopy);
+  await createNextRepeat(fake.tx, finished({ dueDate: day("2026-10-30"), repeatRule: { freq: "yearly", interval: 1 } }), PIETER, new Date("2026-10-30T15:00:00Z"));
+  assert.deepEqual(copyRule(fake.calls), { freq: "yearly", interval: 1 });
 });
 
 /** A fake transaction whose finished task is a copy: its CREATED line and the REPEAT_CREATED line on the task that made it. */

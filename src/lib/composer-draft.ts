@@ -18,7 +18,21 @@
  * composer-draft.test.ts.
  */
 
+import { GENERIC_ERROR, OFFLINE_ERROR } from "./action-result";
+
 export type DraftVisibility = "SHARED" | "INTERNAL";
+
+/**
+ * Why a sent message was refused, when trying again can't change it: the
+ * server's own plain words ("Shorten it to 20,000 characters.", "That task
+ * no longer exists."), which the failed line says in place of Retry. Null
+ * when another try may well work (no connection, a server hiccup, no word at
+ * all), so the line keeps Retry. Edit and Discard stay on the card either way.
+ */
+export function sendRefusal(error: string | null | undefined): string | null {
+  if (!error || error === OFFLINE_ERROR || error === GENERIC_ERROR) return null;
+  return error;
+}
 
 /**
  * Where one person's draft for one reply box lives: the surface, the record

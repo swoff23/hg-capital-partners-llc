@@ -6,9 +6,10 @@ import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { easternDayStart, type Ymd } from "@/lib/dates";
 import { mergeLegacyNames, type PersonRef } from "./assignee-people";
 import { assigneeOptions } from "./assignee-options";
-import { EMAIL_DAILY_CAP, toListTask, type ListTask } from "./list";
+import { EMAIL_DAILY_CAP, toListTask, withLegacyPeople, type ListTask } from "./list";
 import { unreadTaskIds } from "./read-state";
 import {
+  NONE,
   allTasksOrderBy,
   allTasksWhere,
   ownerCounts,
@@ -40,7 +41,8 @@ const LIST_SELECT = {
   property: { select: { id: true, address: true } },
   deal: { select: { address: true } },
   assignee: { select: { id: true, name: true, email: true } },
-  assigneeContact: { select: { id: true, fullName: true } },
+  // Whether they can sign in (list.ts hasPortalLogin), so Today's Send back promises the note only when it reaches them.
+  assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: { status: true } } } },
   repeatRule: true,
 } satisfies Prisma.TaskSelect;
 
@@ -53,19 +55,24 @@ async function withUnread(userId: string, tasks: ListTask[]): Promise<ListTask[]
 
 /**
  * Everything Today shows, for either partner: their own active tasks, every
- * active contractor job (D8), and every active task nobody owns.
+ * active contractor job (D8), and every active task nobody owns. An imported
+ * name that stands for a person on offer is marked with them
+ * (withLegacyPeople), by the people the Tasks filter matches against.
  * Grouping happens in list.ts (groupMine, groupContractors).
  */
 export async function todayTasks(userId: string): Promise<ListTask[]> {
-  const rows = await prisma.task.findMany({
-    where: {
-      ...activeTask,
-      ...excludeTemplateTasks,
-      OR: [{ assigneeUserId: userId }, { assigneeContactId: { not: null } }, { assigneeUserId: null, assigneeContactId: null }],
-    },
-    select: LIST_SELECT,
-  });
-  return withUnread(userId, rows.map(toListTask));
+  const [rows, { users, contractors }] = await Promise.all([
+    prisma.task.findMany({
+      where: {
+        ...activeTask,
+        ...excludeTemplateTasks,
+        OR: [{ assigneeUserId: userId }, { assigneeContactId: { not: null } }, { assigneeUserId: null, assigneeContactId: null }],
+      },
+      select: LIST_SELECT,
+    }),
+    assigneeOptions(),
+  ]);
+  return withUnread(userId, withLegacyPeople(rows.map(toListTask), personRefs(users, contractors)));
 }
 
 /**
@@ -162,10 +169,11 @@ export async function emailCapReached(today: Ymd): Promise<boolean> {
 
 /**
  * Which legacy names stand for the people a filter picks, for the Filters
- * sheet's count: only asked of the database when a person is picked.
+ * sheet's count: only asked of the database when a person, or Unassigned
+ * (which leaves those names out), is picked.
  */
 export async function legacyNamesFor(owner: readonly string[]): Promise<LegacyNames> {
-  if (!owner.some((k) => k.startsWith("u:") || k.startsWith("c:"))) return new Map();
+  if (!owner.some((k) => k.startsWith("u:") || k.startsWith("c:") || k === NONE)) return new Map();
   // The people the page lists: the team, the active contractors, and any inactive one picked.
   const { users, contractors } = await assigneeOptions(owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
   return (await legacyAssignees(personRefs(users, contractors))).merged;

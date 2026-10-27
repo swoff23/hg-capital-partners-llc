@@ -1,23 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { TaskStatus } from "@prisma/client";
 import {
   applyPatch,
   byDateThenStatus,
+  canReceiveSendBack,
   compareByDue,
   compareByTarget,
   doneMessage,
   groupContractors,
   groupMine,
   isApproval,
+  isContractorJob,
   isOverdue,
   isTargetLate,
   movedAllMessage,
   movedMessage,
+  ownerKeyOf,
   targetField,
   targetOf,
   tickPlan,
   toListTask,
+  withLegacyPeople,
   type ListAssignee,
   type ListTask,
 } from "./list";
@@ -37,6 +43,7 @@ import {
   searchWhere,
   toQuery,
   viewScopeWhere,
+  withKnownFilters,
   withMergedOwners,
   withoutAssigneeShortcut,
   type AllFilters,
@@ -93,7 +100,7 @@ test("toListTask: names the assignee, shortens the address, keeps calendar dates
   assert.equal(t.scheduledFor, "2026-10-27");
   assert.equal(t.place, "767 Prospect Ave");
   assert.equal(t.propertyId, "p1");
-  assert.deepEqual(t.assignee, { kind: "contact", id: "c-zack", name: "Zack Reading" });
+  assert.deepEqual(t.assignee, { kind: "contact", id: "c-zack", name: "Zack Reading", hasLogin: false });
   assert.equal(t.checked, false);
   assert.equal(targetOf(t), "2026-10-27", "Scheduled jobs target the visit date");
   assert.equal(targetField(t), "scheduledFor");
@@ -172,6 +179,80 @@ test("groupContractors: Needs review on top, then a group per contractor by soon
       ["Jacob Hoak", ["mini splits"]],
     ],
   );
+});
+
+test("Today files an imported name that stands for a person with that person, as /tasks counts it, never under Unassigned", () => {
+  const people = personRefs(
+    [
+      { id: ME, name: "Connor Swofford", email: "connor@x.com" },
+      { id: PIETER, name: "Pieter Louw", email: "pieter@x.com" },
+    ],
+    [
+      { id: "c-kenneth", name: "Kenneth Gonzalez", email: "ken@x.com" },
+      { id: "c-zack", name: "Zack Reading", email: "zack@outlawcarpentry.com" },
+    ],
+  );
+  const rows = withLegacyPeople(
+    [
+      task({ title: "prime paint", who: { kind: "name", name: "Kenneth Gonzalez" } }),
+      // Asana's email-only assignee, matched by email.
+      task({ title: "porch rail", who: { kind: "name", name: "zack@outlawcarpentry.com" }, due: "2026-10-21" }),
+      task({ title: "zack's real job", who: zack, due: "2026-10-23" }),
+      task({ title: "mine from asana", who: { kind: "name", name: "Connor Swofford" }, due: TODAY }),
+      task({ title: "pieter's from asana", who: { kind: "name", name: "Pieter Louw" }, due: TODAY }),
+      task({ title: "nobody we know", who: { kind: "name", name: "Rae Realtor" } }),
+      task({ title: "kenneth in review", who: { kind: "name", name: "Kenneth Gonzalez" }, status: "REVIEW" }),
+    ],
+    people,
+  );
+  const mine = groupMine(rows, ME, TODAY);
+  assert.deepEqual(ids(mine.unassigned), ["nobody we know"], "only a name that is nobody is Unassigned");
+  assert.deepEqual(ids(mine.today), ["mine from asana"]);
+  assert.deepEqual(ids(groupMine(rows, PIETER, TODAY).today), ["pieter's from asana"]);
+  const crew = groupContractors(rows);
+  assert.deepEqual(
+    crew.groups.map((g) => [g.name, ids(g.jobs)]),
+    [
+      ["Zack Reading", ["porch rail", "zack's real job"]],
+      ["Kenneth Gonzalez", ["prime paint", "kenneth in review"]],
+    ],
+  );
+  // Needs review is a contractor's Mark done; an imported name has no portal to mark it from.
+  assert.deepEqual(ids(crew.review), []);
+  // The row keeps its imported name, with the person beside it.
+  assert.deepEqual(rows[1].assignee, { kind: "name", name: "zack@outlawcarpentry.com", person: { key: "c:c-zack", name: "Zack Reading" } });
+  assert.equal(ownerKeyOf(rows[0].assignee), "c:c-kenneth");
+  assert.equal(ownerKeyOf(rows[5].assignee), null);
+  // In the group it reads like his other jobs (status and Target); one that stands for a partner stays a task.
+  assert.equal(isContractorJob(rows[0]), true);
+  assert.equal(isContractorJob(rows[3]), false);
+});
+
+test("Today's Send back promises the note only to a contractor who can sign in, as the task page does", () => {
+  const record = (contact: { active: boolean; portalAccount: { status: string } | null }) =>
+    toListTask({
+      id: "a",
+      title: "Fix the porch light",
+      status: "REVIEW",
+      dueDate: null,
+      scheduledFor: null,
+      waitingOn: null,
+      unitLabel: null,
+      assigneeName: null,
+      createdAt: new Date("2026-10-01T12:00:00Z"),
+      property: null,
+      deal: null,
+      assignee: null,
+      assigneeContact: { id: "c-test", fullName: "Connor Test Contractor", ...contact },
+    }).assignee;
+  assert.equal(canReceiveSendBack(record({ active: true, portalAccount: { status: "ACTIVE" } })), true);
+  assert.equal(canReceiveSendBack(record({ active: true, portalAccount: null })), false, "no login yet");
+  assert.equal(canReceiveSendBack(record({ active: true, portalAccount: { status: "INVITED" } })), false);
+  assert.equal(canReceiveSendBack(record({ active: false, portalAccount: { status: "ACTIVE" } })), false, "an inactive contact can't sign in");
+  assert.equal(canReceiveSendBack(null), false);
+  // Today's row hands the sheet that answer instead of promising every contractor the note.
+  const src = readFileSync(join(import.meta.dirname, "..", "..", "app", "(app)", "tasks", "review-actions.tsx"), "utf8");
+  assert.match(src, /hasLogin=\{canReceiveSendBack\(task\.assignee\)\}/);
 });
 
 test("groupContractors: undated groups go last, by name", () => {
@@ -356,6 +437,8 @@ function matches(row: Row, cond: Record<string, unknown>): boolean {
     if (typeof filter !== "object") return value === filter;
     const f = filter as Row;
     if ("in" in f) return (f.in as unknown[]).includes(value);
+    // NOT IN, as Postgres has it: never true of a null.
+    if ("notIn" in f) return value !== null && value !== undefined && !(f.notIn as unknown[]).includes(value);
     if ("contains" in f) return typeof value === "string" && value.toLowerCase().includes(String(f.contains).toLowerCase());
     if ("not" in f) return f.not === Prisma.DbNull ? value !== null && value !== undefined : value !== f.not;
     return value != null && typeof value === "object" && matches(value as Row, f);
@@ -550,6 +633,24 @@ test("owner: a picked person also finds the imported rows that carry their name"
   assert.deepEqual(found({ owner: ["c:c-zack"] }, legacy), ["roof", "legacy-zack"]);
 });
 
+test("owner: a row whose imported name stands for a person is theirs alone, not Unassigned too, as on Today", () => {
+  const legacy: LegacyNames = new Map([["c:c-zack", ["Zack Reading"]]]);
+  assert.deepEqual(found({ owner: [NONE] }, legacy), ["legacy-bob", "deal-task"], "Zack's imported row is Zack's");
+  assert.deepEqual(found({ owner: [NONE, "c:c-zack"] }, legacy), ["roof", "legacy-zack", "legacy-bob", "deal-task"]);
+});
+
+test("withKnownFilters: a status, person or property the page doesn't have goes, and everything else stays", () => {
+  const known = { owner: new Set(["u:u-connor", "c:c-zack", "n:Bob Smith"]), property: new Set(["p-tam"]) };
+  const q = (sp: Record<string, string>) => withKnownFilters(sp, known);
+  // The tester's link: Open picked, no raw ids in the chips.
+  assert.equal(q({ status: "bogus", owner: "u:nonexistent,c:zzz", property: "notreal" }), "");
+  assert.equal(q({ status: "bogus", q: "porch" }), "q=porch");
+  assert.equal(q({ owner: "u:u-connor,c:zzz,none", property: "p-tam,notreal" }), `owner=${encodeURIComponent("u:u-connor,none")}&property=p-tam`);
+  // Nothing to change: no redirect.
+  assert.equal(q({ status: "done", owner: "c:c-zack,n:Bob Smith,none", property: "p-tam,none", repeats: "1" }), null);
+  assert.equal(q({}), null);
+});
+
 test("property: several picks, and 'none' for a task with no property", () => {
   assert.deepEqual(found({ property: ["p-tam"] }), ["roof"]);
   assert.deepEqual(found({ property: ["p-tam", "p-con"] }), ["roof", "gutters", "legacy-zack"]);
@@ -611,7 +712,7 @@ test("counts beside the assignee rows: a person, Unassigned, and a legacy name f
   assert.equal(counts.get("u:u-pieter"), 4);
   assert.equal(counts.get("c:c-zack"), 5, "his own jobs and his imported ones");
   assert.equal(counts.get("n:Bob Smith"), 1, "a name that is nobody the list can name");
-  assert.equal(counts.get(NONE), 9, "no real person: the imported rows count here too");
+  assert.equal(counts.get(NONE), 7, "nobody behind it: Bob's imported row, not Zack's, which is his");
   assert.equal(counts.get("n:Zack Reading"), undefined, "a folded name isn't listed twice");
 });
 

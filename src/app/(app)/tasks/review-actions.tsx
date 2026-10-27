@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui";
-import { assigneeName, type ListTask } from "@/lib/tasks/list";
+import { assigneeName, canReceiveSendBack, type ListTask } from "@/lib/tasks/list";
 import { SendBackSheet } from "./send-back-sheet";
 import { useTaskList } from "./task-list-context";
 
@@ -30,8 +30,8 @@ export function ReviewActions({ task }: { task: ListTask }) {
         isOpen={open}
         onOpenChange={setOpen}
         name={first}
-        // A row doesn't know whether they can sign in, so the sheet promises the note and nothing about email.
-        hasLogin
+        // The row knows whether they can sign in (list.ts hasPortalLogin), so the sheet says what the task page's does.
+        hasLogin={canReceiveSendBack(task.assignee)}
         taskTitle={task.title}
         value={note}
         onChange={setNote}

@@ -9,11 +9,13 @@ import {
   parseDraft,
   personalDraftKey,
   resolvePending,
+  sendRefusal,
   serializeDraft,
   sharedDraftKey,
   type Draft,
   type DraftStorage,
 } from "./composer-draft";
+import { GENERIC_ERROR, OFFLINE_ERROR } from "./action-result";
 
 test("a version 2 draft keeps the words and who sees them together", () => {
   const raw = JSON.stringify({ v: 2, text: "Check with Pieter first", visibility: "INTERNAL" });
@@ -206,6 +208,20 @@ test("adoptSharedDraft: nothing under the old key, or a key with none before it,
   adoptSharedDraft(job, personalDraftKey("job", "t1", "c-zack"));
   assert.deepEqual([...empty.writes, ...job.writes], []);
   assert.equal(job.map.get("hgos-job-draft:t1"), "never shipped");
+});
+
+test("sendRefusal: a refusal no Retry can change is said instead of Retry; a dropped connection or hiccup keeps Retry", () => {
+  assert.equal(sendRefusal("Shorten it to 20,000 characters."), "Shorten it to 20,000 characters.");
+  assert.equal(sendRefusal("That task no longer exists."), "That task no longer exists.");
+  assert.equal(sendRefusal(OFFLINE_ERROR), null);
+  assert.equal(sendRefusal(GENERIC_ERROR), null);
+  assert.equal(sendRefusal(undefined), null);
+  assert.equal(sendRefusal(""), null);
+  // The task page's failed card passes it on and drops its Retry row when there is one.
+  const src = readFileSync(join(import.meta.dirname, "..", "app", "(app)", "tasks", "[id]", "activity.tsx"), "utf8");
+  assert.match(src, /const refusal = failed \? sendRefusal\(send\.error\) : null;/);
+  assert.match(src, /<SendFailedLine offline=\{isOfflineMessage\(send\.error\)\} reason=\{refusal\}/);
+  assert.match(src, /\{!refusal && \(\s*<MenuItem id="retry"/);
 });
 
 test("the composer moves the old draft on the first read of a key, before it reads the key", () => {
