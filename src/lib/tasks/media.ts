@@ -126,7 +126,7 @@ export function orderMedia<T extends MediaOrderItem>(items: readonly T[], option
 }
 
 /** A Mark done is a comment and a move to Review written in one transaction; their times differ by milliseconds, so this is generous. */
-const MARK_DONE_WINDOW_MS = 30_000;
+export const MARK_DONE_WINDOW_MS = 30_000;
 
 const toReview = (e: MediaEvent) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "REVIEW";
 

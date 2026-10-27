@@ -28,7 +28,7 @@ export function PropertyDocumentsSection({ propertyId, label, files }: { propert
     access: "private",
     allowed: UPLOAD_KIND_ALLOWED["property-upload"],
     prepare: "original",
-    record: (file) => recordPropertyDocument(propertyId, file),
+    record: (file, owner) => recordPropertyDocument(propertyId, file, owner),
     // A file that lands with this page gone is on the property all the same.
     whenAway: "hold",
     href: uploadTargetHref("property-upload", propertyId),

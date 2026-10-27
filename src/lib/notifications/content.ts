@@ -10,7 +10,8 @@ import { addressLine, firstName, joinNames } from "@/lib/portal/job-view";
  * the database and the sending. See content.test.ts.
  *
  * Rows are queued by src/lib/tasks/core.ts, one per recipient and task, each
- * holding the bundled changes as items: { kind, actorLabel, summary, at }.
+ * holding the bundled changes as items: { kind, actorLabel, summary, at },
+ * and on some items the eventId of the event the line is about.
  */
 
 export interface OutboxItem {
@@ -18,7 +19,12 @@ export interface OutboxItem {
   actorLabel: string;
   summary: string;
   at: string;
-  /** The event the line is about, which the drain re-reads when it claims the row (core.ts OutboxItem). Absent on rows queued before it existed. */
+  /**
+   * The event the line is about (core.ts OutboxItem), decided per item: the
+   * drain re-reads it when it claims the row (reconcileItems), and the button
+   * opens at the first one (firstUpdateId). A row can mix items with and
+   * without it, and an item without it sends exactly as stored.
+   */
   eventId?: string;
   /** A send-back's note comment: its text is inside the STATUS summary, and the drain rebuilds or strips it. */
   noteEventId?: string;

@@ -73,10 +73,35 @@ test("a file queued before Mark done still records after the hour, within a day"
   // Mark done 3 hours ago; the photo was queued 3 hours and 10 minutes ago, in a basement with no signal.
   assert.equal(acceptsContractorUpload(reviewTask, markedDone(3 * HOUR), ME, NOW, queued(3 * HOUR + 10)), true);
   assert.equal(acceptsContractorUpload(reviewTask, markedDone(23 * HOUR), ME, NOW, queued(23 * HOUR + 10)), true);
-  assert.equal(
-    acceptsContractorUpload({ status: "DONE", completedByContactId: ME, completedAt: ago(5 * HOUR) }, null, ME, NOW, queued(6 * HOUR)),
-    true,
-  );
+});
+
+test("the day's grace is for a job in Review: once HG has approved it, a queuedAt buys nothing past the hour", () => {
+  const done = { status: "DONE" as const, completedByContactId: ME, completedAt: ago(5 * HOUR) };
+  // Marked done by this contractor 5 hours ago, approved since; a photo queued 6 hours ago is too late.
+  assert.equal(acceptsContractorUpload(done, markedDone(5 * HOUR), ME, NOW, queued(6 * HOUR)), false);
+  assert.equal(acceptsContractorUpload(done, null, ME, NOW, queued(6 * HOUR)), false);
+  // The hour is the same for a Done job as for one in Review, with or without a queuedAt.
+  const justDone = { status: "DONE" as const, completedByContactId: ME, completedAt: ago(30) };
+  assert.equal(acceptsContractorUpload(justDone, markedDone(45), ME, NOW), true);
+  assert.equal(acceptsContractorUpload(justDone, markedDone(45), ME, NOW, queued(2 * HOUR)), true);
+  // Backdating to a day ago doesn't stretch it.
+  assert.equal(acceptsContractorUpload({ ...done, completedAt: ago(90) }, markedDone(90), ME, NOW, queued(24 * HOUR)), false);
+});
+
+test("the grace is only for a file queued during this visit, after the job last went to In progress", () => {
+  const started = ago(5 * HOUR);
+  const markedAt = markedDone(3 * HOUR);
+  // Queued 4 hours ago, after the start 5 hours ago and before Mark done 3 hours ago: this visit's.
+  assert.equal(acceptsContractorUpload(reviewTask, markedAt, ME, NOW, queued(4 * HOUR), started), true);
+  // Queued before the start belongs to an earlier visit.
+  assert.equal(acceptsContractorUpload(reviewTask, markedAt, ME, NOW, queued(5 * HOUR + 1), started), false);
+  assert.equal(acceptsContractorUpload(reviewTask, markedAt, ME, NOW, queued(20 * HOUR), started), false);
+  // The start itself counts.
+  assert.equal(acceptsContractorUpload(reviewTask, markedAt, ME, NOW, started.toISOString(), started), true);
+  // Never started (Mark done straight from To do): no lower bound, as the Review card's visit has it.
+  assert.equal(acceptsContractorUpload(reviewTask, markedAt, ME, NOW, queued(20 * HOUR), null), true);
+  // The hour is not affected by when it started.
+  assert.equal(acceptsContractorUpload(reviewTask, markedDone(30), ME, NOW, queued(20 * HOUR), started), true);
 });
 
 test("a file queued after Mark done gets only the hour", () => {

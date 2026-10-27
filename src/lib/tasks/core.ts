@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, type Task, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
+import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
@@ -177,11 +177,13 @@ export interface OutboxItem {
   summary: string;
   at: string;
   /**
-   * The event this line is about (a comment, a file post, a status change).
-   * The drain (notifications/outbox.ts) re-reads it when the row is claimed,
-   * so an edit or a delete inside the bundle window changes the email
-   * (activity 2.5). Optional: rows queued before it send as stored, and a row
-   * can mix both.
+   * The event this line is about (a comment, a file post, a status change),
+   * decided per item. The drain (notifications/outbox.ts) re-reads it when
+   * the row is claimed, so an edit or a delete inside the bundle window
+   * changes the email (activity 2.5), and a contractor's take-back
+   * (takeBackContractorPost) finds exactly its own line in a row nobody has
+   * claimed. Optional: rows queued before it send as stored, and a row can
+   * mix both.
    */
   eventId?: string;
   /** A send-back's note: the note comment's id. Its text sits inside the STATUS summary, so the drain rebuilds or strips it. */
@@ -919,11 +921,24 @@ export interface CommentInput {
    * that did post never posts, or emails, twice (activity 2.7).
    */
   clientId?: string;
+  /**
+   * A contractor's batch of files posting on its own, with no text (the
+   * portal's "3 photos posted · Undo", uploads 2.7): the event carries
+   * `data.batch`, and only a post marked so can be taken back
+   * (takeBackContractorPost). Ignored on anything else, so a Mark done's
+   * photos or a written update never are.
+   */
+  batch?: boolean;
 }
 
-/** The stored email line for a comment: `"the words"` with a files tail, or `added files` for photos alone. */
-export function commentSummary(body: string, linked: number): string {
-  const photos = linked ? ` (+${linked} file${linked > 1 ? "s" : ""})` : "";
+/**
+ * The email line for a comment; content.ts itemText reads it back: the text
+ * (its first 140 characters) or "added files", then "(+3 files)" when it
+ * linked any. takeBackContractorPost builds the same words to find a line
+ * queued before items carried an eventId.
+ */
+export function commentSummary(body: string, files: number): string {
+  const photos = files > 0 ? ` (+${files} file${files > 1 ? "s" : ""})` : "";
   return `${body ? `"${body.slice(0, 140)}"` : "added files"}${photos}`;
 }
 
@@ -1001,12 +1016,14 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   if (empty) throw new TaskRuleError("Write something or add a photo.");
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (input.visibility ?? "INTERNAL");
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
+  // Only a contractor's files posting on their own are a batch, the one kind of post they can take back.
+  const batch = input.batch === true && p.kind === "contractor" && !body;
   const { event, linked } = await writeComment(tx, taskId, p, {
     body,
     visibility,
     audienceContactId,
     attachmentIds: input.attachmentIds,
-    ...(input.clientId ? { data: { clientId: input.clientId } } : {}),
+    ...(input.clientId || batch ? { data: { ...(input.clientId ? { clientId: input.clientId } : {}), ...(batch ? { batch: true } : {}) } } : {}),
   });
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
   await notify(tx, task, p, { kind: "COMMENT", visibility }, commentSummary(body, linked), now, { eventId: event.id });
@@ -1127,6 +1144,128 @@ export async function restoreComment(tx: Tx, eventId: string, p: Principal, now 
   return { taskId: ev.taskId };
 }
 
+// ---------------------------------------------------------------------------
+// A contractor's batch post, taken back (uploads 2.7, question 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * How far an older outbox item's time may sit from its post's and still be
+ * that post's line (addComment stamps the two a moment apart). Only for items
+ * queued before they carried an eventId.
+ */
+export const POST_ITEM_SLACK_MS = 5_000;
+
+/** The line a post queued: its event, and the words and time to know an older line by. */
+export interface PostLine {
+  eventId: string;
+  actorLabel: string;
+  summary: string;
+  at: Date;
+}
+
+const isItem = (i: unknown): i is Record<string, unknown> => !!i && typeof i === "object" && !Array.isArray(i);
+
+/**
+ * A bundle's items without the post's line, or null when it holds none. The
+ * line is the COMMENT item carrying the post's eventId. A row can mix new and
+ * old items (an insert appends to an open row), so when no item carries it,
+ * an item with no eventId is matched the old way: a COMMENT by the same
+ * person with the same words, stamped within POST_ITEM_SLACK_MS of the post,
+ * the nearest one. An item that names another event is never taken, so a
+ * second post of the same size moments later keeps its line.
+ */
+export function withoutPostLine(items: unknown, post: PostLine): unknown[] | null {
+  if (!Array.isArray(items)) return null;
+  const own = (i: unknown) => isItem(i) && i.kind === "COMMENT" && i.eventId === post.eventId;
+  if (items.some(own)) return items.filter((i) => !own(i));
+  let nearest = -1;
+  let best = Infinity;
+  items.forEach((i, n) => {
+    if (!isItem(i) || i.eventId !== undefined) return;
+    if (i.kind !== "COMMENT" || i.actorLabel !== post.actorLabel || i.summary !== post.summary) return;
+    const gap = Math.abs((typeof i.at === "string" ? Date.parse(i.at) : NaN) - post.at.getTime());
+    if (gap <= POST_ITEM_SLACK_MS && gap < best) {
+      best = gap;
+      nearest = n;
+    }
+  });
+  return nearest < 0 ? null : items.filter((_, n) => n !== nearest);
+}
+
+/**
+ * Takes the post's line out of the bundles still open for it, so the email
+ * never says "Zack added files" for an update that is gone; a bundle left
+ * empty is deleted. Only a row with its openKey set and never tried: a send
+ * run clears openKey when it claims a row, so a row being sent, retried or
+ * already sent is left exactly as it is (its email may be out, and the run
+ * writes to it after). Each row is locked first, in id order, and a claim
+ * waiting on that lock finds the row as this left it.
+ */
+async function dropPostLine(tx: Tx, taskId: string, post: PostLine): Promise<void> {
+  const rows = await tx.$queryRaw<{ id: string; items: unknown }[]>`
+    SELECT "id", "items" FROM "NotificationOutbox"
+    WHERE "taskId" = ${taskId} AND "sentAt" IS NULL AND "openKey" IS NOT NULL AND "attempts" = 0
+    ORDER BY "id"
+    FOR UPDATE`;
+  for (const row of rows) {
+    const kept = withoutPostLine(row.items, post);
+    if (!kept) continue;
+    const open = { id: row.id, sentAt: null, openKey: { not: null }, attempts: 0 } satisfies Prisma.NotificationOutboxWhereInput;
+    if (kept.length === 0) await tx.notificationOutbox.deleteMany({ where: open });
+    else await tx.notificationOutbox.updateMany({ where: open, data: { items: kept as Prisma.InputJsonArray } });
+  }
+}
+
+/**
+ * A contractor takes back the batch they just posted (the portal's "3 photos
+ * posted · Undo"): the update and its files are soft-deleted, so they leave
+ * the timeline, the grids and the "2 new" counts, and its line leaves the
+ * unsent email (dropPostLine). Only their own post marked `batch` by
+ * addComment (never a Mark done's photos or a written update), only on a job
+ * still active, and only while `undoable` says the window is open
+ * (portal/job-view.ts undoWindowOpen).
+ *
+ * The task row is locked first, as setStatus does: every write that queues an
+ * email updates the task before it touches the outbox, so a post landing now
+ * either finishes first or waits for this, and the two never hold each
+ * other's email rows (a deadlock otherwise).
+ */
+export async function takeBackContractorPost(
+  tx: Tx,
+  taskId: string,
+  eventId: string,
+  p: Principal,
+  opts: { undoable: (postedAt: Date) => boolean },
+  now = new Date(),
+): Promise<void> {
+  if (p.kind !== "contractor") throw new TaskRuleError("Only the contractor who posted it can take it back.");
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
+  if (!task) throw new TaskRuleError("That task no longer exists.");
+  await assertContractorAccess(tx, taskId, p.contactId);
+  if (!isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
+  const event = await tx.taskEvent.findFirst({
+    where: {
+      id: eventId,
+      taskId,
+      kind: "COMMENT",
+      actorContactId: p.contactId,
+      deletedAt: null,
+      body: null,
+      data: { path: ["batch"], equals: true },
+    },
+    select: { createdAt: true },
+  });
+  if (!event) throw new TaskRuleError("That update is already gone.");
+  if (!opts.undoable(event.createdAt)) throw new TaskRuleError("It's too late to take that back.");
+  await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: now } });
+  const { count } = await tx.taskAttachment.updateMany({
+    where: { eventId, taskId, uploadedByContactId: p.contactId, deletedAt: null },
+    data: { deletedAt: now },
+  });
+  await dropPostLine(tx, taskId, { eventId, actorLabel: p.label, summary: commentSummary("", count), at: event.createdAt });
+}
+
 export interface AttachmentMeta {
   url: string;
   pathname: string;
@@ -1181,6 +1320,10 @@ export async function recordAttachment(
       posterPathname: meta.posterPathname ?? null,
     },
   });
+  // The task row before any email row, as every other write here: a take-back
+  // holding the task (takeBackContractorPost) then never waits on an email
+  // row this holds while this waits on the task.
+  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
   if (opts.standalone !== false) {
     const ev = await addEvent(tx, taskId, p, {
       kind: "ATTACHMENT",
@@ -1191,8 +1334,77 @@ export async function recordAttachment(
     await tx.taskAttachment.update({ where: { id: att.id }, data: { eventId: ev.id } });
     await notify(tx, task, p, { kind: "ATTACHMENT", visibility }, `added ${att.filename}`, now, { eventId: ev.id });
   }
-  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
   return att;
+}
+
+/**
+ * The row an earlier record step made for this same upload, when that step
+ * committed but its answer never reached the browser: this task, this path,
+ * uploaded by this same person, not removed. Blob's random suffix means only
+ * the uploader can name the path, so a Retry gets the row back instead of
+ * "That file is already attached." (and a second Retry, a second copy).
+ * Null for a writer that never uploads (system, Asana).
+ */
+export async function findOwnUpload(tx: Tx, taskId: string, pathname: string, p: Principal): Promise<{ id: string } | null> {
+  const by = p.kind === "staff" ? { uploadedByUserId: p.userId } : p.kind === "contractor" ? { uploadedByContactId: p.contactId } : null;
+  if (!by) return null;
+  return tx.taskAttachment.findFirst({ where: { taskId, pathname, deletedAt: null, ...by }, select: { id: true } });
+}
+
+/** What removing a file needs to know about it. */
+export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "eventId" | "asanaGid" | "filename">;
+
+/**
+ * Staff take a file off a task (tasks/attachments.ts deleteTaskAttachment,
+ * which deletes its blobs after). A file imported from Asana is only marked
+ * removed (deletedAt): the delta sync dedupes files by asanaGid, so a row
+ * deleted for good would be imported again, and every contractor on the job
+ * would see it back under its "removed" line. Every other row is deleted.
+ *
+ * A file that was posted leaves "Connor removed quote.pdf" when `p` says who
+ * removed it. The line is Internal, with no email: written Shared it would
+ * reach the contractor's job page, and a Shared staff file line emails them
+ * "added quote.pdf". It names the post the file was on (`data.eventId`), so
+ * that comment says "1 file removed". A draft nobody saw leaves no line, and
+ * neither does a call without `p` (the composer unreadying its own draft).
+ * It's an edit made in the app, so the task is stamped as edited, as a rename
+ * is (renameAttachment): a task left untouched since an import is cleaned up
+ * with its row (D25).
+ *
+ * The task row is locked first, as takeBackContractorPost locks it before it
+ * touches a post's files, so the two never wait on each other's rows. False
+ * when another remove got there first, and then nothing is written.
+ */
+export async function removeAttachment(tx: Tx, att: RemovedFile, p?: Principal, now = new Date()): Promise<boolean> {
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${att.taskId} FOR NO KEY UPDATE`;
+  const { count } = att.asanaGid
+    ? await tx.taskAttachment.updateMany({ where: { id: att.id, deletedAt: null }, data: { deletedAt: now } })
+    : await tx.taskAttachment.deleteMany({ where: { id: att.id } });
+  if (count === 0) return false;
+  if (p && att.eventId !== null) {
+    await addEvent(tx, att.taskId, p, {
+      kind: "ATTACHMENT",
+      visibility: "INTERNAL",
+      data: { attachmentId: att.id, filename: att.filename, removed: true, eventId: att.eventId },
+    });
+  }
+  if (p) await tx.task.update({ where: { id: att.taskId }, data: editStamp(p, now) });
+  return true;
+}
+
+/**
+ * Staff give a file a new name (tasks/attachments.ts renameTaskAttachment,
+ * which settles what the name should be). It's an edit made in the app, so
+ * the task is stamped as edited (`appEditedAt`): a task left untouched since
+ * an import is cleaned up with its row (D25), and a renamed file on one must
+ * keep the task. Returns the file's task, to refresh its page.
+ */
+export async function renameAttachment(tx: Tx, attachmentId: string, filename: string, p: Principal, now = new Date()): Promise<{ taskId: string }> {
+  const att = await tx.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true, deletedAt: true } });
+  if (!att || att.deletedAt) throw new TaskRuleError("That file no longer exists.");
+  await tx.taskAttachment.update({ where: { id: attachmentId }, data: { filename } });
+  await tx.task.update({ where: { id: att.taskId }, data: editStamp(p, now) });
+  return { taskId: att.taskId };
 }
 
 export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p: Principal, now = new Date()) {

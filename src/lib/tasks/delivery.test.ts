@@ -77,7 +77,7 @@ test("partnersEmailState: queued until every partner's email has gone, and silen
 });
 
 test("contactsWhoSaw: reads the facts once and keeps the contractors who could have read it", async () => {
-  const sql: string[] = [];
+  const asked: unknown[] = [];
   const db = {
     taskAccess: {
       findMany: async (args: { where: Record<string, unknown> }) => {
@@ -91,15 +91,26 @@ test("contactsWhoSaw: reads the facts once and keeps the contractors who could h
       },
     },
     taskReadState: { findMany: async () => [{ contactId: "c-zack", lastSeenAt: new Date("2026-10-23T16:00:00Z") }, { contactId: "c-jose", lastSeenAt: new Date("2026-10-23T14:00:00Z") }] },
-    $queryRaw: async (strings: TemplateStringsArray) => {
-      sql.push(strings.join("?"));
-      return [{ contactId: "c-dee", sentAt: new Date("2026-10-23T15:12:00Z"), lastError: null }, { contactId: "c-jose", sentAt: new Date("2026-10-23T15:12:00Z"), lastError: "nothing to send" }];
+    notificationOutbox: {
+      findMany: async (args: unknown) => {
+        asked.push(args);
+        return [
+          { recipientContactId: "c-dee", sentAt: new Date("2026-10-23T15:12:00Z"), lastError: null },
+          { recipientContactId: "c-jose", sentAt: new Date("2026-10-23T15:12:00Z"), lastError: "nothing to send" },
+        ];
+      },
     },
   };
   const saw = await contactsWhoSaw(db as never, { id: "ev1", taskId: "t1", createdAt: wrote, audienceContactId: null });
   assert.deepEqual(saw, ["c-zack", "c-dee"], "Zack opened it since, Dee was emailed, Jose had neither");
-  assert.equal(sql.length, 1);
-  assert.match(sql[0], /o\."items" @> jsonb_build_array/);
+  // One read of the contractors' rows on this task whose items hold this event (`items @> [{"eventId": "ev1"}]`),
+  // for their state only. Through the client: raw SQL naming the outbox is core.ts's and the send run's alone.
+  assert.deepEqual(asked, [
+    {
+      where: { taskId: "t1", recipientContactId: { not: null }, items: { array_contains: [{ eventId: "ev1" }] } },
+      select: { recipientContactId: true, sentAt: true, lastError: true },
+    },
+  ]);
 });
 
 test("contactsWhoSaw: a comment written to one contractor is checked for that one only", async () => {
@@ -112,31 +123,42 @@ test("contactsWhoSaw: a comment written to one contractor is checked for that on
       },
     },
     taskReadState: { findMany: async () => assert.fail("no access, nothing to read") },
-    $queryRaw: async () => assert.fail("no access, nothing to read"),
+    notificationOutbox: { findMany: async () => assert.fail("no access, nothing to read") },
   };
   assert.deepEqual(await contactsWhoSaw(db as never, { id: "ev1", taskId: "t1", createdAt: wrote, audienceContactId: "c-zack" }), []);
   assert.equal(asked.contactId, "c-zack");
 });
 
 test("emailStatesIn: asks the outbox once, for this contractor's rows on this task, by the event ids inside", async () => {
-  const calls: { sql: string; values: unknown[] }[] = [];
+  const calls: unknown[] = [];
+  const line = (eventId?: string) => ({ kind: "COMMENT", actorLabel: "Connor Swofford", summary: '"x"', at: sent.toISOString(), ...(eventId ? { eventId } : {}) });
   const db = {
-    $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
-      calls.push({ sql: strings.join("?"), values });
-      return [
-        { eventId: "e1", sentAt: null, lastError: null },
-        { eventId: "e2", sentAt: sent, lastError: null },
-        { eventId: "e3", sentAt: sent, lastError: "no login" },
-      ];
+    notificationOutbox: {
+      findMany: async (args: unknown) => {
+        calls.push(args);
+        return [
+          // A row mixing an old item (no eventId), a line this didn't ask about and one it did.
+          { items: [line(), line("e9"), line("e1")], sentAt: null, lastError: null, attempts: 0 },
+          { items: [line("e2")], sentAt: sent, lastError: null, attempts: 1 },
+          { items: [line("e3")], sentAt: sent, lastError: "no login", attempts: 1 },
+          { items: "junk", sentAt: null, lastError: null, attempts: 0 },
+        ];
+      },
     },
   };
   const states = await emailStatesIn(db as never, "t1", "c-zack", ["e1", "e2", "e3", "e4"]);
   assert.deepEqual([...states], [["e1", "queued"], ["e2", "emailed"]]);
-  assert.equal(calls.length, 1);
-  assert.match(calls[0].sql, /jsonb_array_elements\(o\."items"\)/);
-  assert.match(calls[0].sql, /o\."taskId" = \?\s+AND o\."recipientContactId" = \?/);
-  assert.match(calls[0].sql, /item->>'eventId' IN/);
-  assert.ok(!calls[0].sql.includes("c-zack") && !calls[0].sql.includes("e1"), "ids are parameters");
+  // One read: this contractor's rows on this task holding any of the events, through the client.
+  assert.deepEqual(calls, [
+    {
+      where: {
+        taskId: "t1",
+        recipientContactId: "c-zack",
+        OR: ["e1", "e2", "e3", "e4"].map((eventId) => ({ items: { array_contains: [{ eventId }] } })),
+      },
+      select: { items: true, sentAt: true, lastError: true, attempts: true },
+    },
+  ]);
   // Nothing to look up asks nothing.
   assert.equal((await emailStatesIn(db as never, "t1", "c-zack", [])).size, 0);
   assert.equal(calls.length, 1);

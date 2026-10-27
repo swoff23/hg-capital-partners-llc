@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@prisma/client";
+import type { AttachmentKind, TaskStatus } from "@prisma/client";
 import { LATE_UPLOAD_WINDOW_MS } from "@/lib/attachments/access";
 import type { FileKind } from "@/lib/attachments/content-types";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
@@ -282,6 +282,15 @@ export function finishPhotosNeeded(required: number | null | undefined): number 
   return Math.min(Math.floor(required), MAX_FINISH_PHOTOS);
 }
 
+/**
+ * How many of a Mark done's files count toward `finishPhotosNeeded`: photos
+ * and videos, the two kinds the job page uploads, so the server counts what
+ * the sheet counts. A document (a PDF) never stands in for a photo.
+ */
+export function finishPhotoCount(kinds: readonly AttachmentKind[]): number {
+  return kinds.filter((k) => k === "IMAGE" || k === "VIDEO").length;
+}
+
 /** How many proof slots the Mark done sheet draws: the count asked for, or one on an optional job. */
 export function finishSlots(required: number): number {
   return required > 0 ? required : 1;
@@ -370,6 +379,17 @@ export function postedText(kinds: readonly (FileKind | null)[]): string {
   const n = kinds.length;
   const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
   return `${n} ${noun}${n === 1 ? "" : "s"} posted`;
+}
+
+/**
+ * What the toast says when files land on a job that has been approved since:
+ * "3 photos added to the job". They are on the job, in its photos, but there
+ * is no update to post them as, so there is no Undo and nobody is emailed.
+ */
+export function addedToJobText(kinds: readonly (FileKind | null)[]): string {
+  const n = kinds.length;
+  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
+  return `${n} ${noun}${n === 1 ? "" : "s"} added to the job`;
 }
 
 // ---------------------------------------------------------------------------

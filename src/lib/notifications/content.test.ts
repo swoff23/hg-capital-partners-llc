@@ -244,6 +244,33 @@ test("parseItems keeps only well-formed items", () => {
   assert.deepEqual(parseItems([{ kind: "COMMENT" }, item("NOTES", "x"), "junk"]), [item("NOTES", "x")]);
 });
 
+test("an item's eventId changes no word of the email, only where its button opens, and a row mixing old and new items sends every line", () => {
+  // core.ts puts eventId on a comment's line (so a contractor's Undo finds it); rows queued before it carry none.
+  const zack = "Zack Outlaw";
+  const old = item("COMMENT", "added files (+2 files)", zack);
+  const tagged: OutboxItem = { ...item("COMMENT", '"Tile set" (+1 file)', zack), eventId: "e-2" };
+  const stored = [old, tagged, item("STATUS", `marked "${TITLE}" done`, zack)];
+  const parsed = parseItems(JSON.parse(JSON.stringify(stored)));
+  assert.deepEqual(parsed, stored, "kept as stored, eventId and all");
+  const withIds = taskEmail({ items: parsed, title: TITLE, address: null, audience: "staff", appUrl: "https://hg.example.com", taskId: "t1" });
+  const without = taskEmail({
+    items: parsed.map((i) => ({ kind: i.kind, actorLabel: i.actorLabel, summary: i.summary, at: i.at })),
+    title: TITLE,
+    address: null,
+    audience: "staff",
+    appUrl: "https://hg.example.com",
+    taskId: "t1",
+  });
+  // Every line, the subject and the rest read the same; the button opens at the first update an item names
+  // (activity 2.6), and a row of old items opens the job as it always did.
+  const { buttonUrl: anchored, ...said } = withIds;
+  const { buttonUrl: plain, ...saidWithout } = without;
+  assert.deepEqual(said, saidWithout);
+  assert.equal(anchored, "https://hg.example.com/tasks/t1#update-e-2");
+  assert.equal(plain, "https://hg.example.com/tasks/t1");
+  assert.equal(withIds.items.length, 3);
+});
+
 test("recipients: staff, a contractor with an active login and access, or skipped", () => {
   const access = { contractorHasAccess: true };
   assert.deepEqual(deliveryFor({ recipientUser: { email: "c@hg.com" }, recipientContact: null }, access), {

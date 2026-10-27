@@ -1,5 +1,6 @@
 import type { Viewport } from "next";
 import { cookies } from "next/headers";
+import { appScope } from "@/lib/attachments/queue-owner";
 import { requireUser } from "@/lib/auth";
 import { signOut } from "@/app/login/actions";
 import { readListHrefs } from "@/lib/list-memory";
@@ -23,12 +24,16 @@ export const viewport: Viewport = { interactiveWidget: "resizes-content" };
  * (forms 2.11). `modal` is the slot the create sheets open in over the page
  * (`@modal`, intercepting routes; see its default.tsx). The upload queue sits
  * inside the shell, under its toasts and the guard, so uploads outlive the
- * page that started them and hold Sign out (uploads 2.1).
+ * page that started them and hold Sign out (uploads 2.1). The queue is the
+ * signed-in person's own (`app:<user id>`) and keyed by it, so a different
+ * person signing in gets a fresh one and the old one stops
+ * (attachments/queue-owner.ts).
  */
 export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
   const user = await requireUser();
   const jar = await cookies();
   const pinned = jar.get(SIDEBAR_COOKIE)?.value === "1";
+  const scope = appScope(user.id);
 
   return (
     <LeaveGuard>
@@ -40,7 +45,7 @@ export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
         listHrefs={readListHrefs(jar)}
         signOutAction={signOut}
       >
-        <UploadQueueProvider scope={`app:${user.id}`}>
+        <UploadQueueProvider key={scope} scope={scope}>
           <RefreshOnReturn />
           {children}
           {modal}

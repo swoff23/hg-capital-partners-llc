@@ -20,11 +20,10 @@ import { Sheet } from "@/components/sheet";
 import { SpotArt } from "@/components/spot-art";
 import { useToast } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
-import type { UploadTarget } from "@/components/upload-queue";
+import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction, type ActionResult } from "@/lib/action-result";
-import { contentTypeForName, fileKindForType, type FileKind } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
   finishCountLabel,
@@ -35,12 +34,12 @@ import {
   lateUploadsOpen,
   markDoneButton,
   nextStep,
-  postedText,
   stripCounts,
 } from "@/lib/portal/job-view";
+import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
-import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "../upload-actions";
+import { postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -76,7 +75,10 @@ import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "..
  * queue outlives the page, so "My jobs" and the payoff's "Back to my jobs"
  * don't ask (uploads 2.1; only Sign out does), and a batch that lands after
  * the contractor left posts on its own with the same Undo (choice 1 A; the
- * My jobs row says "Uploading 3 photos" meanwhile). Mark done waits for
+ * My jobs row says "Uploading 3 photos" meanwhile). If HG approved the job in
+ * the meantime the photos still land on it, with no update and no email:
+ * "3 photos added to the job" (record-and-post.ts), and late-uploads.tsx is the
+ * page that records them once the job has no composer. Mark done waits for
  * uploads, and for each failed photo to be retried or removed (decision 13):
  * in the bar and in the sheet it stays off over one line ("2 photos didn't
  * upload · Retry" in danger, or "Finishing 2 uploads…" in grey), and a failed
@@ -97,7 +99,7 @@ import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "..
  */
 
 /** A file that's up and recorded, waiting to be posted: what the sheet shows in its slot and the payoff in its strip. */
-type Recorded = { id: string; name: string; kind: FileKind | null; hasThumb: boolean; hasPoster: boolean };
+type Recorded = RecordedUpload;
 
 export function JobActions({
   taskId,
@@ -123,6 +125,7 @@ export function JobActions({
   sentClientIds?: readonly string[];
 }) {
   const { toast } = useToast();
+  const owner = useUploadScope();
   const step = nextStep(status);
   const coarse = useCoarsePointer();
   const required = finishPhotosNeeded(finishPhotosRequired);
@@ -149,9 +152,6 @@ export function JobActions({
     live.current = { body, sheetOpen, ready };
   });
 
-  // What each recorded file is, by id, since the record step answers with the id alone.
-  const info = useRef(new Map<string, Recorded>());
-
   // The composer's Send: the words and every held photo as one update. The composer runs it through callAction,
   // so with no signal it fails like a refusal (a toast), and the words stay in the box. The photos leave the tray
   // while it sends and come back to it unless it posted.
@@ -160,7 +160,7 @@ export function JobActions({
     setReady((r) => r.filter((x) => !attachmentIds.includes(x.id)));
     let posted = false;
     try {
-      const res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId });
+      const res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId }, owner);
       posted = res.ok;
       return res;
     } finally {
@@ -169,27 +169,7 @@ export function JobActions({
   }
 
   /** Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post. */
-  async function sendBatch(items: Recorded[]): Promise<boolean> {
-    const res = await callAction(() => postJobBatchAction(taskId, items.map((i) => i.id)));
-    if (!res.ok) {
-      toast({ message: res.error });
-      return false;
-    }
-    const { eventId } = res.data;
-    toast({
-      message: postedText(items.map((i) => i.kind)),
-      key: `job-post:${eventId}`,
-      action: {
-        label: "Undo",
-        onAction: () => {
-          void callAction(() => undoJobPostAction(taskId, eventId)).then((undone) => {
-            if (!undone.ok) toast({ message: undone.error });
-          });
-        },
-      },
-    });
-    return true;
-  }
+  const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast, owner);
 
   /** A batch that posts on its own while the page is here. One that doesn't post goes back on the tray, to go with the next send. */
   const postBatch = (items: Recorded[]) =>
@@ -198,25 +178,15 @@ export function JobActions({
       setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
     });
 
-  /** The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and the strip. */
-  async function record(file: RecordMediaInput): Promise<RecordMediaResult> {
-    const res = await recordJobUploadAction(taskId, file);
-    if (res.ok) {
-      const kind = fileKindForType(contentTypeForName(file.filename)) ?? (file.posterPathname ? "video" : null);
-      info.current.set(res.data.id, {
-        id: res.data.id,
-        name: file.filename,
-        kind,
-        hasThumb: !!file.thumbPathname,
-        hasPoster: !!file.posterPathname,
-      });
-    }
-    return res;
-  }
+  /**
+   * The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and
+   * the strip, for the tab and not this page (record-and-post.ts).
+   */
+  const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
 
   function onRecorded(ids: string[]) {
     const { sheetOpen: holding, body: text, ready: held } = live.current;
-    const added = ids.map((id) => info.current.get(id)).filter((i): i is Recorded => !!i);
+    const added = recordedUploads.take(taskId, ids);
     if (holding || text.trim()) {
       setReady([...held, ...added]);
       return;
@@ -227,7 +197,7 @@ export function JobActions({
 
   /** A batch that landed after the contractor left the page: it posts as its own update, with the same toast and Undo. */
   function onAway(ids: string[]) {
-    void sendBatch(ids.map((id) => info.current.get(id) ?? { id, name: "", kind: null, hasThumb: false, hasPoster: false }));
+    void sendBatch(recordedUploads.take(taskId, ids));
   }
 
   const target: UploadTarget = {
@@ -263,9 +233,9 @@ export function JobActions({
     return () => {
       const held = latest.current.ready.map((r) => r.id).filter((id) => !inFlight.current.includes(id));
       // Detached: nothing is left on this page to show a result, and a redirect needs no rethrow here.
-      if (held.length > 0) postJobUpdateAction(taskId, { body: "", attachmentIds: held }).catch(() => {});
+      if (held.length > 0) postJobUpdateAction(taskId, { body: "", attachmentIds: held }, owner).catch(() => {});
     };
-  }, [taskId]);
+  }, [taskId, owner]);
   useLeaveWarning(ready.length > 0);
 
   // Bring the upload tiles into view when uploads start from the bar.
@@ -314,7 +284,7 @@ export function JobActions({
       const items = ready;
       finishingIds.current = items.map((i) => i.id);
       try {
-        const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: items.map((i) => i.id) }));
+        const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: items.map((i) => i.id) }, owner));
         if (!res.ok) {
           toast({ message: res.error });
           return;

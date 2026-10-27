@@ -20,6 +20,9 @@ import { getPortalPrincipal } from "@/lib/portal/session";
 import { assertContractorAccess } from "@/lib/tasks/core";
 
 export const dynamic = "force-dynamic";
+// The saving link (?download=1) streams a big video through here, since a redirect to Blob's host would play it in a
+// tab instead of saving it, so the function has to outlast the download.
+export const maxDuration = 300;
 
 /**
  * Gated file delivery for private documents (property attachments, task

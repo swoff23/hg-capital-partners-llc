@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { partnersEmailState } from "@/lib/tasks/delivery";
-import { orderMedia } from "@/lib/tasks/media";
+import { MARK_DONE_WINDOW_MS, finishPhotoIds, orderMedia } from "@/lib/tasks/media";
 import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
 import { lockboxMasker, readLockboxCode, type BodyPart } from "./access-code";
 import { NO_NOTICE, dateChange, dateChangeText, noticeCount, sendBackStands, type DateChange, type DateEvent, type JobNotice } from "./job-notice";
@@ -306,6 +306,8 @@ export interface JobDetail {
   targetIsVisit: boolean;
   checklist: { id: string; title: string; done: boolean }[];
   media: JobMedia[];
+  /** The ids in `media` sent with the latest Mark done, which lead under "At finish" (uploads 2.5). Empty with no Mark done set. */
+  atFinish: string[];
   updates: JobUpdate[];
   /**
    * Where the viewer last looked (ISO), for the New divider: their last open
@@ -368,6 +370,37 @@ function toMedia(p: PortalPrincipal, a: MediaRow): JobMedia {
   };
 }
 
+const markDoneEventSelect = { id: true, kind: true, data: true, createdAt: true, actorContactId: true } satisfies Prisma.TaskEventSelect;
+
+/**
+ * The ids among `media` that were sent with the latest Mark done (the "At
+ * finish" set, uploads 2.5): the photos posted on the comment the contractor
+ * wrote as they tapped Mark done, from the same rule the task page uses
+ * (lib/tasks/media.ts finishPhotoIds). It reads the latest move to Review by a
+ * contractor and that person's comments in the seconds before it, and nothing
+ * else of the job's events; only ids leave here, and only of files the page
+ * already shows this contractor. Empty with no Mark done, or one with no photos.
+ */
+async function finishSet(taskId: string, media: readonly { id: string; createdAt: Date; eventId: string | null }[]): Promise<string[]> {
+  if (media.length === 0) return [];
+  const review = await prisma.taskEvent.findFirst({
+    where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "REVIEW" }, actorContactId: { not: null } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: markDoneEventSelect,
+  });
+  if (!review) return [];
+  const comments = await prisma.taskEvent.findMany({
+    where: {
+      taskId,
+      kind: "COMMENT",
+      actorContactId: review.actorContactId,
+      createdAt: { gte: new Date(review.createdAt.getTime() - MARK_DONE_WINDOW_MS), lte: review.createdAt },
+    },
+    select: markDoneEventSelect,
+  });
+  return finishPhotoIds(media, [review, ...comments]);
+}
+
 /** The job, or null when this contact can't open it (no access, revoked, or closed before PORTAL_HISTORY_FROM). */
 export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDetail | null> {
   const task = await prisma.task.findFirst({
@@ -398,7 +431,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
   const [media, updates, lockbox, staffNames, marked, notice] = await Promise.all([
     prisma.taskAttachment.findMany({
       where: { taskId, ...visibleFile(p.contactId, ["IMAGE", "VIDEO"]) },
-      select: mediaSelect,
+      select: { ...mediaSelect, eventId: true },
       orderBy: { createdAt: "asc" },
     }),
     jobUpdates(p, taskId, mask),
@@ -416,6 +449,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     // Only an open job has anything to tell: a closed one is read-only history.
     active ? jobNotice(p, task, since) : NO_NOTICE,
   ]);
+  const atFinish = await finishSet(taskId, media);
   const delivery = await deliveryFor(taskId, updates);
 
   return {
@@ -429,8 +463,9 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     target: toYmd(targetDate(task)),
     targetIsVisit: targetIsVisit(task),
     checklist: task.checklist,
-    // The grid's order, as on the task page (lib/tasks/media.ts).
-    media: orderMedia(media).map((a) => toMedia(p, a)),
+    // The grid's order, as on the task page (lib/tasks/media.ts): the Mark done set under "At finish" first, then newest first.
+    media: orderMedia(media, { atFinish }).map((a) => toMedia(p, a)),
+    atFinish,
     updates,
     newSince: since.toISOString(),
     delivery,
@@ -553,16 +588,17 @@ async function openSendBack(p: PortalPrincipal, taskId: string): Promise<JobNoti
 async function deliveryFor(taskId: string, updates: readonly JobUpdate[]): Promise<JobDelivery | null> {
   const mine = updates.findLast((u) => u.you);
   if (!mine) return null;
-  const rows = await prisma.$queryRaw<{ sentAt: Date | null; lastError: string | null; name: string | null; email: string }[]>`
-    SELECT o."sentAt", o."lastError", u."name", u."email"
-    FROM "NotificationOutbox" o
-    JOIN "User" u ON u."id" = o."recipientUserId"
-    WHERE o."taskId" = ${taskId} AND o."items" @> ${JSON.stringify([{ eventId: mine.id }])}::jsonb
-    ORDER BY u."createdAt" ASC`;
+  // Through the client, never raw SQL: the only raw SQL that names the outbox is core.ts's and the send run's.
+  const rows = await prisma.notificationOutbox.findMany({
+    where: { taskId, recipientUserId: { not: null }, items: { array_contains: [{ eventId: mine.id }] } },
+    select: { sentAt: true, lastError: true, recipientUser: { select: { name: true, email: true } } },
+    orderBy: { recipientUser: { createdAt: "asc" } },
+  });
+  const partners = rows.flatMap((r) => (r.recipientUser ? [{ sentAt: r.sentAt, lastError: r.lastError, ...r.recipientUser }] : []));
   // Emailed is sent with no error; a row closed with an error (nothing to send) said nothing to anyone.
-  const state = partnersEmailState(rows);
+  const state = partnersEmailState(partners);
   if (!state) return null;
-  return { eventId: mine.id, state, to: rows.map((r) => firstName(r.name || r.email.split("@")[0])) };
+  return { eventId: mine.id, state, to: partners.map((r) => firstName(r.name || r.email.split("@")[0])) };
 }
 
 /**

@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/lib/action-result";
+import { appScope, assertQueueOwner } from "@/lib/attachments/queue-owner";
 import * as documents from "@/lib/properties/documents";
 import { withResult } from "@/lib/server-action";
 
@@ -30,10 +31,18 @@ const recordedSchema = z
   })
   .strict();
 
-/** After the browser finished uploading straight to Blob. Returns the new document's id. */
-export async function recordPropertyDocument(propertyId: string, file: z.input<typeof recordedSchema>): Promise<ActionResult<{ id: string }>> {
+/**
+ * After the browser finished uploading straight to Blob. Returns the new document's id. `queueOwner` is the upload
+ * queue's scope (queue-owner.ts): a tab left open under another sign-in can't record its files as whoever signed in since.
+ */
+export async function recordPropertyDocument(
+  propertyId: string,
+  file: z.input<typeof recordedSchema>,
+  queueOwner?: string | null,
+): Promise<ActionResult<{ id: string }>> {
   return withResult("recordPropertyDocument", async () => {
     const user = await requireUser();
+    assertQueueOwner(z.string().max(80).nullish().parse(queueOwner), appScope(user.id));
     const { pathname, filename } = recordedSchema.parse(file);
     return documents.recordPropertyAttachment(id.parse(propertyId), { pathname, filename }, { userId: user.id });
   });

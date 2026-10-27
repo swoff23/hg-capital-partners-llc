@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * What happened to a message after it posted (docs/specs/activity-comments.md
@@ -8,7 +8,21 @@ import { Prisma, type PrismaClient } from "@prisma/client";
  * and used from the page and from the delete toast alike.
  */
 
-type Db = Pick<PrismaClient, "$queryRaw">;
+type Db = Pick<PrismaClient, "notificationOutbox">;
+
+/**
+ * Outbox rows holding a line about this event (`items @> [{"eventId": id}]`).
+ * Read through the client: the only raw SQL that names the outbox is core.ts's
+ * and the send run's (upload-guards.test.ts), so the rules for writing it
+ * stay in one place.
+ */
+const namingEvent = (eventId: string) => ({ items: { array_contains: [{ eventId }] } }) satisfies Prisma.NotificationOutboxWhereInput;
+
+/** The eventIds a row's items carry (old items carry none). */
+function itemEventIds(items: Prisma.JsonValue): string[] {
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((i) => (i && typeof i === "object" && !Array.isArray(i) && typeof i.eventId === "string" ? [i.eventId] : []));
+}
 
 /** An email still waiting, one a run has claimed and is sending, or one that went. */
 export type EmailState = "queued" | "sending" | "emailed";
@@ -48,17 +62,16 @@ export function partnersEmailState(rows: readonly { sentAt: Date | string | null
  */
 export async function emailStatesIn(db: Db, taskId: string, contactId: string, eventIds: readonly string[]): Promise<Map<string, EmailState>> {
   if (eventIds.length === 0) return new Map();
-  const rows = await db.$queryRaw<{ eventId: string; sentAt: Date | null; lastError: string | null; attempts: number }[]>`
-    SELECT item->>'eventId' AS "eventId", o."sentAt", o."lastError", o."attempts"
-    FROM "NotificationOutbox" o
-    CROSS JOIN LATERAL jsonb_array_elements(o."items") AS item
-    WHERE o."taskId" = ${taskId}
-      AND o."recipientContactId" = ${contactId}
-      AND item->>'eventId' IN (${Prisma.join([...eventIds])})`;
+  const rows = await db.notificationOutbox.findMany({
+    where: { taskId, recipientContactId: contactId, OR: eventIds.map(namingEvent) },
+    select: { items: true, sentAt: true, lastError: true, attempts: true },
+  });
+  const wanted = new Set(eventIds);
   const out = new Map<string, EmailState>();
   for (const r of rows) {
     const state = emailStateOf(r);
-    if (state) out.set(r.eventId, state);
+    if (!state) continue;
+    for (const id of itemEventIds(r.items)) if (wanted.has(id)) out.set(id, state);
   }
   return out;
 }
@@ -125,7 +138,7 @@ export function sawComment(
  * no trace. `audienceContactId` null means any contractor with the job.
  */
 export async function contactsWhoSaw(
-  db: Pick<PrismaClient, "$queryRaw" | "taskAccess" | "taskReadState">,
+  db: Pick<PrismaClient, "notificationOutbox" | "taskAccess" | "taskReadState">,
   ev: { id: string; taskId: string; createdAt: Date; audienceContactId: string | null },
 ): Promise<string[]> {
   const access = await db.taskAccess.findMany({
@@ -136,11 +149,10 @@ export async function contactsWhoSaw(
   const ids = access.map((a) => a.contactId);
   const [seen, emails] = await Promise.all([
     db.taskReadState.findMany({ where: { taskId: ev.taskId, contactId: { in: ids } }, select: { contactId: true, lastSeenAt: true } }),
-    db.$queryRaw<{ contactId: string; sentAt: Date | null; lastError: string | null }[]>`
-      SELECT o."recipientContactId" AS "contactId", o."sentAt", o."lastError"
-      FROM "NotificationOutbox" o
-      WHERE o."taskId" = ${ev.taskId} AND o."recipientContactId" IS NOT NULL
-        AND o."items" @> jsonb_build_array(jsonb_build_object('eventId', ${ev.id}::text))`,
+    db.notificationOutbox.findMany({
+      where: { taskId: ev.taskId, recipientContactId: { not: null }, ...namingEvent(ev.id) },
+      select: { recipientContactId: true, sentAt: true, lastError: true },
+    }),
   ]);
   return access
     .filter((a) =>
@@ -148,7 +160,7 @@ export async function contactsWhoSaw(
         {
           accessSince: a.createdAt,
           lastSeenAt: seen.find((r) => r.contactId === a.contactId)?.lastSeenAt ?? null,
-          emails: emails.filter((r) => r.contactId === a.contactId),
+          emails: emails.filter((r) => r.recipientContactId === a.contactId),
         },
         ev.createdAt,
       ),

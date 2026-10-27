@@ -14,6 +14,8 @@ import { shortAddress } from "@/lib/normalize";
 import { isDraftUpload } from "@/lib/tasks/media";
 
 export const dynamic = "force-dynamic";
+// A ZIP of a few hundred megabytes streams from Blob for as long as the connection holds; the function default would cut it off.
+export const maxDuration = 300;
 
 /**
  * Download all (docs/specs/uploads-photos.md 2.5): one ZIP of a record's

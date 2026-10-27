@@ -52,8 +52,9 @@ export function Composer({
     access: "private",
     allowed: UPLOAD_KIND_ALLOWED["task-upload"],
     prepare: "original",
-    // Internal until Send, so a contractor can't open it while it waits.
-    record: (file) => recordTaskAttachment(taskId, { ...file, visibility: "INTERNAL", standalone: false }),
+    // Internal until Send, so a contractor can't open it while it waits. The queue names its owner, and the server
+    // refuses the record step when someone else is signed in now (queue-owner.ts).
+    record: (file, owner) => recordTaskAttachment(taskId, { ...file, visibility: "INTERNAL", standalone: false }, owner),
     // A file that lands with this page gone stays a draft for the next visit.
     whenAway: "hold",
     href: uploadTargetHref("task-upload", taskId),

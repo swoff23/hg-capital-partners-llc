@@ -117,31 +117,31 @@ export interface UploadRequest {
  * with their fileKind, so the token holds each to its own cap; listing photos
  * to their bare slug; the property photo under properties/<propertyId>/photo/.
  * `queuedAt` rides in a contractor's payload so the token route can apply the
- * late-upload rule when it mints a resumed upload a fresh token.
+ * late-upload rule when it mints a resumed upload a fresh token. `owner` is
+ * the queue's scope (queue-owner.ts), in every kind's payload, so the route
+ * can refuse a token asked for by a queue that isn't the signed-in person's.
  */
 export function uploadRequest(
   kind: UploadKind,
   parentId: string,
   file: { name: string; contentType: string; fileKind: FileKind },
-  opts: { role?: UploadRole; queuedAt?: string } = {},
+  opts: { role?: UploadRole; queuedAt?: string; owner?: string } = {},
 ): UploadRequest {
   const role = opts.role ?? "orig";
   const slug = uploadSlug(file.name);
+  const owned = (payload: Record<string, string>): string => JSON.stringify(opts.owner ? { ...payload, owner: opts.owner } : payload);
   switch (kind) {
     case "task-upload":
     case "portal-task-upload": {
       const payload: Record<string, string> = { taskId: parentId, fileKind: file.fileKind };
       if (kind === "portal-task-upload" && opts.queuedAt) payload.queuedAt = opts.queuedAt;
-      return { pathname: taskUploadPath(parentId, slug, role, file.contentType), clientPayload: JSON.stringify(payload) };
+      return { pathname: taskUploadPath(parentId, slug, role, file.contentType), clientPayload: owned(payload) };
     }
     case "property-upload":
-      return {
-        pathname: `properties/${parentId}/${slug}`,
-        clientPayload: JSON.stringify({ propertyId: parentId, fileKind: file.fileKind }),
-      };
+      return { pathname: `properties/${parentId}/${slug}`, clientPayload: owned({ propertyId: parentId, fileKind: file.fileKind }) };
     case "listing-photo-upload":
-      return { pathname: slug, clientPayload: JSON.stringify({ propertyId: parentId }) };
+      return { pathname: slug, clientPayload: owned({ propertyId: parentId }) };
     case "property-photo-upload":
-      return { pathname: `properties/${parentId}/photo/${slug}`, clientPayload: JSON.stringify({ propertyId: parentId }) };
+      return { pathname: `properties/${parentId}/photo/${slug}`, clientPayload: owned({ propertyId: parentId }) };
   }
 }

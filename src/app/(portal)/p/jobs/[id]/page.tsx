@@ -19,6 +19,7 @@ import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-
 import { JobMediaSection } from "./_components/job-media";
 import { JobNotice } from "./_components/job-notice";
 import { JobUpdates } from "./_components/job-updates";
+import { LateUploads } from "./_components/late-uploads";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -109,7 +110,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
 
           {job.checklist.length > 0 && <JobChecklist items={job.checklist} editable={active} />}
 
-          <JobMediaSection media={job.media} />
+          <JobMediaSection media={job.media} atFinish={job.atFinish} />
 
           <Section title="Updates">
             <JobUpdates
@@ -119,7 +120,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
               delivery={job.delivery}
               viewerName={principal.label}
             />
-            {active && (
+            {active ? (
               <JobActions
                 taskId={job.id}
                 status={job.status}
@@ -130,6 +131,9 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 property={place}
                 sentClientIds={job.updates.flatMap((u) => (u.clientId ? [u.clientId] : []))}
               />
+            ) : (
+              // An approved job has no composer, but photos queued before it was can still be waiting to record.
+              <LateUploads taskId={job.id} label={place?.label ?? "this job"} />
             )}
           </Section>
         </div>

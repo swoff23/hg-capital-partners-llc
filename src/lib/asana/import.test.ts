@@ -362,10 +362,10 @@ test("events are append-only by story gid: ones already stored aren't written ag
 
 // A static check on top: no importer file names the outbox or a core write that notifies.
 const NOTIFYING_NAME =
-  /notificationOutbox|NotificationOutbox|\benqueue\(|\bcore\.(createTask|setStatus|toggleDone|patchTask|addComment|recordAttachment|editComment|deleteComment|restoreComment|undoApproval)\b/;
+  /notificationOutbox|NotificationOutbox|\benqueue\(|\bcore\.(createTask|setStatus|toggleDone|patchTask|addComment|recordAttachment|editComment|deleteComment|restoreComment|undoApproval|takeBackContractorPost|renameTaskUnits)\b/;
 // Any specifier that resolves to core or service: "@/lib/tasks/core", "../../src/lib/tasks/core", with or without .ts.
 const NOTIFYING_IMPORT =
-  /import\s*\{[^}]*\b(createTask|setStatus|toggleDone|patchTask|addComment|recordAttachment|editComment|deleteComment|restoreComment|undoApproval)\b[^}]*\}\s*from\s*["'][^"']*lib\/tasks\/(core|service)(\.ts)?["']/;
+  /import\s*\{[^}]*\b(createTask|setStatus|toggleDone|patchTask|addComment|recordAttachment|editComment|deleteComment|restoreComment|undoApproval|takeBackContractorPost|renameTaskUnits)\b[^}]*\}\s*from\s*["'][^"']*lib\/tasks\/(core|service)(\.ts)?["']/;
 
 test("the static check catches a notifying import however it's spelled", () => {
   for (const src of [
@@ -376,6 +376,10 @@ test("the static check catches a notifying import however it's spelled", () => {
     `import { editComment } from "@/lib/tasks/core";`,
     `import { restoreComment, deleteComment } from "../../src/lib/tasks/service";`,
     `import { undoApproval } from "@/lib/tasks/core";`,
+    // It rewrites outbox rows: never the importer's.
+    `import { takeBackContractorPost } from "@/lib/tasks/core";`,
+    // A unit rename moves each task through patchTask, which emails.
+    `import { renameTaskUnits } from "@/lib/tasks/core";`,
   ]) {
     assert.ok(NOTIFYING_IMPORT.test(src), src);
   }

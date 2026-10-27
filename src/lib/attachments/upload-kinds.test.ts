@@ -109,6 +109,30 @@ test("uploadRequest: property kinds name the property; a document's payload carr
   assert.equal(typeof propertyUploadLimits("property-photo-upload", P, photo.pathname), "object");
 });
 
+test("uploadRequest: the queue's owner rides in every kind's payload when it is given, and in none when it isn't", () => {
+  const img = { name: "a.jpg", contentType: "image/jpeg", fileKind: "image" as const };
+  const owner = "portal:c-zack";
+  for (const [kind, parent, key] of [
+    ["task-upload", T, "taskId"],
+    ["portal-task-upload", T, "taskId"],
+    ["property-upload", P, "propertyId"],
+    ["listing-photo-upload", P, "propertyId"],
+    ["property-photo-upload", P, "propertyId"],
+  ] as const) {
+    const named = JSON.parse(uploadRequest(kind, parent, img, { owner }).clientPayload);
+    assert.equal(named.owner, owner, kind);
+    assert.equal(named[key], parent, kind);
+    assert.ok(!("owner" in JSON.parse(uploadRequest(kind, parent, img).clientPayload)), `${kind} without one`);
+  }
+  // Beside queuedAt, not instead of it.
+  assert.deepEqual(JSON.parse(uploadRequest("portal-task-upload", T, img, { queuedAt: "2026-10-26T20:00:00.000Z", owner }).clientPayload), {
+    taskId: T,
+    fileKind: "image",
+    queuedAt: "2026-10-26T20:00:00.000Z",
+    owner,
+  });
+});
+
 test("uploadRequest: a camera file's path is its dated slug, whichever kind", () => {
   const name = "Photo 2026-10-25 at 2.14 PM 2.jpg";
   const file = { name, contentType: "image/jpeg", fileKind: "image" as const };

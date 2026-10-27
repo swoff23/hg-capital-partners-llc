@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
+import { assertQueueOwner, appScope } from "@/lib/attachments/queue-owner";
 import { requireUser } from "@/lib/auth";
 import { withResult } from "@/lib/server-action";
 import * as tasks from "@/lib/tasks/service";
@@ -37,10 +38,18 @@ const uploadedSchema = z
 /**
  * After the browser finished uploading straight to Blob. Returns the new
  * attachment's id, or a message instead of throwing, for the uploader to show.
+ * `queueOwner` is the upload queue's scope (`app:<user id>`, queue-owner.ts):
+ * a tab left open under another person's sign-in can't record its files as
+ * whoever signed in since.
  */
-export async function recordTaskAttachment(taskId: string, data: z.input<typeof uploadedSchema>): Promise<ActionResult<{ id: string }>> {
+export async function recordTaskAttachment(
+  taskId: string,
+  data: z.input<typeof uploadedSchema>,
+  queueOwner?: string | null,
+): Promise<ActionResult<{ id: string }>> {
   return withResult("recordTaskAttachment", async () => {
     const user = await requireUser();
+    assertQueueOwner(z.string().max(80).nullish().parse(queueOwner), appScope(user.id));
     const { visibility, standalone, ...file } = uploadedSchema.parse(data);
     return tasks.recordTaskAttachment(id.parse(taskId), file, tasks.staffPrincipal(user), { visibility, standalone });
   });
@@ -62,7 +71,7 @@ export async function removeTaskFile(attachmentId: string): Promise<ActionResult
 /** Renames a file on the task page; its extension stays its type's. Returns the saved name. */
 export async function renameTaskFile(attachmentId: string, name: string): Promise<ActionResult<{ filename: string }>> {
   return withResult("renameTaskFile", async () => {
-    await requireUser();
-    return tasks.renameTaskAttachment(id.parse(attachmentId), z.string().max(255).parse(name));
+    const user = await requireUser();
+    return tasks.renameTaskAttachment(id.parse(attachmentId), z.string().max(255).parse(name), tasks.staffPrincipal(user));
   });
 }

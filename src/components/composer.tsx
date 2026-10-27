@@ -346,10 +346,10 @@ function UploadingComposer(props: ComposerProps & { uploader: ComposerUploader }
   // Recorded here but not yet in `drafts` (the page catches up after the refresh).
   const [added, setAdded] = useState<ComposerDraft[]>([]);
   const { options } = props.uploader;
-  const recordedHere = (record: (file: Parameters<MediaUploaderOptions["record"]>[0]) => ReturnType<MediaUploaderOptions["record"]>) => async (
-    file: Parameters<MediaUploaderOptions["record"]>[0],
-  ) => {
-    const res = await record(file);
+  // The queue's owner goes on to the record step untouched (queue-owner.ts), so the server can refuse a tab left
+  // signed in as someone else.
+  const recordedHere = (record: MediaUploaderOptions["record"]) => async (file: Parameters<MediaUploaderOptions["record"]>[0], owner?: string) => {
+    const res = await record(file, owner);
     if (res.ok && res.data) {
       const recorded = { id: res.data.id, filename: file.filename };
       setAdded((r) => [...r, recorded]);

@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
+import { assertQueueOwner, portalScope } from "@/lib/attachments/queue-owner";
 import * as jobs from "@/lib/portal/jobs";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { withResult } from "@/lib/server-action";
@@ -10,9 +11,16 @@ import { withResult } from "@/lib/server-action";
  * service (src/lib/portal/jobs.ts), and hand back a one-line result for the
  * page to show. Every rule (access, the job's state, Start job and Mark done
  * only) is enforced in the service and core, not here.
+ *
+ * An update and a Mark done carry the photos the upload queue held, so they
+ * name the queue's owner too, as the record step, a batch post and its Undo do
+ * (upload-actions.ts, queue-owner.ts): a tab still showing Zack's job after
+ * Mike signs in elsewhere is refused instead of posting as Mike. A call that
+ * names no owner passes.
  */
 
 const id = z.string().min(1).max(64);
+const owner = z.string().max(80).nullish();
 
 const updateSchema = z
   .object({
@@ -25,20 +33,6 @@ const updateSchema = z
   })
   .strict();
 
-// Where the browser put the file and what to call it, never its URL, size or
-// type: the service reads those from Blob itself.
-const uploadSchema = z
-  .object({
-    pathname: z.string().min(1).max(300),
-    filename: z.string().min(1).max(255),
-    width: z.number().int().positive().max(20000).nullish(),
-    height: z.number().int().positive().max(20000).nullish(),
-    durationSec: z.number().positive().max(24 * 3600).nullish(),
-    thumbPathname: z.string().min(1).max(300).nullish(),
-    posterPathname: z.string().min(1).max(300).nullish(),
-  })
-  .strict();
-
 export async function startJobAction(taskId: string): Promise<ActionResult> {
   return withResult("portal:startJob", async () => {
     await requirePortalPrincipal();
@@ -46,16 +40,18 @@ export async function startJobAction(taskId: string): Promise<ActionResult> {
   });
 }
 
-export async function markJobDoneAction(taskId: string, input: z.input<typeof updateSchema>): Promise<ActionResult> {
+export async function markJobDoneAction(taskId: string, input: z.input<typeof updateSchema>, queueOwner?: string | null): Promise<ActionResult> {
   return withResult("portal:markJobDone", async () => {
-    await requirePortalPrincipal();
+    const p = await requirePortalPrincipal();
+    assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
     await jobs.markJobDone(id.parse(taskId), updateSchema.parse(input));
   });
 }
 
-export async function postJobUpdateAction(taskId: string, input: z.input<typeof updateSchema>): Promise<ActionResult> {
+export async function postJobUpdateAction(taskId: string, input: z.input<typeof updateSchema>, queueOwner?: string | null): Promise<ActionResult> {
   return withResult("portal:postJobUpdate", async () => {
-    await requirePortalPrincipal();
+    const p = await requirePortalPrincipal();
+    assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
     await jobs.postJobUpdate(id.parse(taskId), updateSchema.parse(input));
   });
 }
@@ -64,13 +60,5 @@ export async function setChecklistItemAction(itemId: string, done: boolean): Pro
   return withResult("portal:setChecklistItem", async () => {
     await requirePortalPrincipal();
     await jobs.setJobChecklistItem(id.parse(itemId), z.boolean().parse(done));
-  });
-}
-
-/** After the browser finished uploading straight to Blob. A result, not a throw, for the uploader's Retry. */
-export async function recordJobUploadAction(taskId: string, file: z.input<typeof uploadSchema>): Promise<ActionResult<{ id: string }>> {
-  return withResult("portal:recordJobUpload", async () => {
-    await requirePortalPrincipal();
-    return jobs.recordJobUpload(id.parse(taskId), uploadSchema.parse(file));
   });
 }

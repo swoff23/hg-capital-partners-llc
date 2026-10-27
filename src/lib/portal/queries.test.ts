@@ -82,11 +82,12 @@ test("the trace is not counted as new on My jobs", () => {
 
 test("the delivery line reads the outbox for state only, never its items", () => {
   const delivery = fn("deliveryFor");
-  const select = delivery.slice(delivery.indexOf("SELECT"), delivery.indexOf("FROM"));
-  assert.match(select, /o\."sentAt"/);
-  assert.match(select, /o\."lastError"/);
+  const select = delivery.slice(delivery.indexOf("select:"), delivery.indexOf("orderBy:"));
+  assert.match(select, /sentAt: true/);
+  assert.match(select, /lastError: true/);
   assert.doesNotMatch(select, /items/);
-  assert.match(delivery, /recipientUserId/, "the partners' rows, not another contractor's");
+  assert.match(delivery, /recipientUserId: \{ not: null \}/, "the partners' rows, not another contractor's");
+  assert.match(delivery, /items: \{ array_contains: \[\{ eventId: mine\.id \}\] \}/, "matched on the event id the items carry");
 });
 
 test("a contractor sees their own clientId and no one else's", () => {
