@@ -64,6 +64,10 @@ next-env.d.ts
 /.next-devices/
 /device-report/
 
+# Any other NEXT_DIST_DIR build (".next-live" and the like). Tailwind scans every
+# file git doesn't ignore, and the binary caches inside break globals.css.
+/.next-*/
+
 # UI/UX review page with evidence screenshots (docs/uiux-review is the committed version).
 # Kept out of git for the same reason as the device report: real tenant, loan and P&L figures.
 /uiux-review/
