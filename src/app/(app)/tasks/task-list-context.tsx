@@ -106,7 +106,9 @@ export function TaskListProvider({ tasks: rows, today, children }: { tasks: List
     },
     setDone(task, done) {
       // The status the row shows, and whether this tick is an approval (tickPlan).
-      const { shown, approves } = tickPlan(task, done);
+      const { shown, approves, holds } = tickPlan(task, done);
+      // An untick while the row's approval is still saving: the toast's Undo is the way back, not a second move.
+      if (holds) return;
       // A tick that finished it says so, with an Undo back to the status it
       // had, Canceled included. An untick, or a tick someone else beat, says
       // nothing. Undo puts the row itself back: by then the refresh has
