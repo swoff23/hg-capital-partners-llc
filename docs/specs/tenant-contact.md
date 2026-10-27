@@ -1,6 +1,6 @@
 # Tenant contact on jobs
 
-Planned with Connor on Oct 26, 2026, in three rounds of questions (Q1 to Q17 below), and he took every recommendation. Q18 is his answer (B) to the one question an Opus review of the draft raised. Nothing here gets built until Connor says "build it" in chat.
+Planned with Connor on Oct 26, 2026, in three rounds of questions (Q1 to Q17 below), and he took every recommendation. Q18 is his answer (B) to the one question an Opus review of the draft raised, and Q19 and Q20 are his answers to two questions asked after the reviews. Nothing here gets built until Connor says "build it" in chat.
 
 It builds after chunk 7 (activity and comments) lands. Chunks 6 and 7 are rewriting the same job page and its queries. Chunk 7 owns `lockbox.ts`, `core.ts`, `activity.ts`, `portal/queries.ts` and `portal/jobs.ts`, and may change `access-code.ts` to mask lockbox codes in comments. Chunk 6, not on main yet, moves lines cited here in `properties/actions.ts`, `properties/service.ts`, the property page and the task and job pages. So the build re-reads every file cited here once chunks 6 and 7 are on main.
 
@@ -12,9 +12,9 @@ It builds after chunk 7 (activity and comments) lands. Chunks 6 and 7 are rewrit
 
 - Each unit on a property can hold one tenant: a name and a phone number, next to its lockbox code (Q1, Q4).
 - Each job shares the tenant, the lockbox code, or both, chosen on the task's Access row. By default a job shares the tenant when one is on file and the lockbox when not (Q6).
-- Adding a tenant moves the unit's open jobs that follow the default and show a code to Both, so those contractors keep the code (Q18).
+- Adding a tenant moves the unit's open jobs that show a code to Both, so those contractors keep the code. A job set to Lockbox keeps just the code (Q18, Q20).
 - The contractor sees the tenant on the job page as a Tenant section with Call and Text buttons, above the Lockbox section (Q3, Q14 B).
-- The Tenant section follows the lockbox code's rules: only the assigned contractor, only while the job is open, logged when shown (Q2, Q12). Playbook fill-ins are the one exception, since Apply writes them into task text (section 7).
+- The Tenant section follows the lockbox code's rules: only the assigned contractor, only while the job is open, logged when shown (Q2, Q12). Playbook fill-ins are the one exception, since Apply writes them into task text (section 7, Q19).
 - Staff see the tenant on the task with Call and Text (Q10), and playbooks fill their tenant blanks from the unit (Q11).
 - Nothing is sent to the tenant (Q5).
 
@@ -39,7 +39,9 @@ It builds after chunk 7 (activity and comments) lands. Chunks 6 and 7 are rewrit
 | Q15 | Built right after chunk 7 lands |
 | Q16 | The choice is a menu on the task's Access row |
 | Q17 | The Units editor gets Tenant and Tenant phone under each unit's lockbox code, with Remove tenant, and Add tenant on a unit without one |
-| Q18 | Adding a tenant to a unit switches its open jobs that have no stored choice and show a lockbox code to Both, so the contractor keeps the code and gets the tenant. A stored choice stays, and new jobs keep Q6's default |
+| Q18 | Adding a tenant to a unit switches its open jobs that have no stored choice and show a lockbox code to Both, so the contractor keeps the code and gets the tenant. New jobs keep Q6's default. Q20 closes the gap for a job stored as Tenant |
+| Q19 | Playbook fill-ins stay as they are, though Apply writes the tenant's name and number into task text a contractor sees, even after the job closes. Staff type the same name and number by hand today, the prefill only saves typing, and staff see the filled text before they create the tasks |
+| Q20 | When a save gives a unit a tenant it didn't have, every open, assigned job there that shows the code switches to Both, a job stored as Tenant that fell back to the lockbox included, so no code disappears mid-job. A job stored as Lockbox keeps just the code. Replacing one tenant with another switches nothing |
 
 ## 2. Data
 
@@ -87,14 +89,14 @@ shows lockbox = code and (share is LOCKBOX or BOTH, or share is TENANT and no te
 
 The last clause is the move-out fallback (Q7): once staff remove a tenant, a job set to Tenant falls back to the lockbox. A single-unit property means one rentable unit, so the house-meter rows `isHouseMeterRow` finds don't count.
 
-**Adding a tenant (Q18).** Under the default alone, adding a tenant would move a job with no stored choice from Lockbox to Tenant, and the contractor would lose the code mid-job. So when a save gives a unit a tenant it didn't have, `writeUnits` switches that unit's jobs in the same transaction. A pure `tenantsAdded(before, edited)` beside `readUnitTenant` in `property-types.ts` finds those units, matched by id. The switch runs on every save, before the early return at `service.ts:385` (most saves rename nothing, so a call placed after it would never run). It works from the units and labels as they were before the save, and any renames follow it. Its task ids join the renamed ones in `revalidateTasks`. It calls a new `shareTenantOnOpenJobs` in `core.ts` through `tasks/service.ts`, as it calls `renameTaskUnits` (`core.ts:767`) today. A job switches when all of these hold:
+**Adding a tenant (Q18, Q20).** Under the rule alone, adding a tenant would hide the code on a job with no stored choice (its default turns to Tenant) or one stored as Tenant (its move-out fallback ends), and the contractor would lose it mid-job. So when a save gives a unit a tenant it didn't have, `writeUnits` switches that unit's jobs in the same transaction. A pure `tenantsAdded(before, edited)` beside `readUnitTenant` in `property-types.ts` finds those units, matched by id. The switch runs on every save, before the early return at `service.ts:385` (most saves rename nothing, so a call placed after it would never run). It works from the units and labels as they were before the save, and any renames follow it. Its task ids join the renamed ones in `revalidateTasks`. It calls a new `shareTenantOnOpenJobs` in `core.ts` through `tasks/service.ts`, as it calls `renameTaskUnits` (`core.ts:767`) today. A job switches when all of these hold:
 
 - it's at that unit, or has no unit on a single-unit property (Q9);
 - it's active (`isActiveStatus`, Review included) with a contractor assigned;
-- its `accessShare` is null;
+- its `accessShare` is null or TENANT (Q20);
 - `resolveLockboxCode` finds a code for it in the units as they were before the save.
 
-Each one goes through `patchTask`, as a rename does, with `accessShare` BOTH and `accessReason: "tenantAdded"`. `TaskPatch` gains that server-only `accessReason?: "tenantAdded"`, which `patchSchema` never accepts, and `patchTask` copies it into the INTERNAL ACCESS event's data (section 4), with no notify and no email. A job where staff stored a choice (Tenant, Lockbox or Both) keeps it. A job stored as Tenant that fell back to the lockbox while the unit was empty goes back to the tenant alone, since staff picked Tenant. Replacing one tenant with another switches nothing, since those jobs already default to Tenant. New jobs keep Q6's default.
+Each one goes through `patchTask`, as a rename does, with `accessShare` BOTH and `accessReason: "tenantAdded"`. `TaskPatch` gains that server-only `accessReason?: "tenantAdded"`, which `patchSchema` never accepts, and `patchTask` copies it into the INTERNAL ACCESS event's data (section 4), with no notify and no email. A job stored as Lockbox keeps just the code, and one stored as Both already shows both. Replacing one tenant with another switches nothing, since no job shows only the code then except one stored as Lockbox. New jobs keep Q6's default.
 
 **The security log.** `SecurityEventKind` gains `TENANT_VIEWED`. `noteJobViewed` (`src/lib/portal/jobs.ts:44`) takes `{ lockboxShown, tenantShown }` and hashes the IP when either is true. `logLockboxView` (`jobs.ts:77`) takes the kind as a parameter and reuses its once-a-day advisory lock, so each kind is logged once per contractor, job and Buffalo day.
 
@@ -225,7 +227,7 @@ The prefill is a computed default, like `[Address]` in `valueOf`, and is never w
 - `src/lib/portal/access-code.ts` stays the one portal file that reads `Property.units`. The guard (`src/lib/auth-guard.test.ts:435`) is a plain search for the word "units" in portal files, so in the portal only `access-code.ts` calls `accessState`. It gains `readJobAccess(db, propertyId, unitLabel, accessShare)`, which returns `{ lockbox: string | null, tenant: { name, phone, dial } | null }` for this one job, never the list. `pickLockboxCode` keeps its JSON guard and delegates the pick to `resolveLockboxCode`, so the portal and the staff page can't disagree.
 - `readJobAccess` stays under the existing gate in `getJob` (`queries.ts:276`): only for the assigned contractor while the job is active.
 - Open means `isActiveStatus`, Review included, exactly as the lockbox works today, so the tenant stays on the job page through Review until staff Approve. It never appears in My jobs, Updates, emails or the job-page notice.
-- Playbook fill-ins are the one exception. Apply writes the prefilled name and number into the new tasks' titles, notes and checklists as text, as typing them does today (`apply-flow.tsx:148`). On a task assigned to a contractor they show wherever its title and notes do: My jobs, emails, and the job page after it closes too (`queries.ts:284`). That follows from Q11; the Access rule covers only the Tenant section.
+- Playbook fill-ins are the one exception. Apply writes the prefilled name and number into the new tasks' titles, notes and checklists as text, as typing them does today (`apply-flow.tsx:148`). On a task assigned to a contractor they show wherever its title and notes do: My jobs, emails, and the job page after it closes too (`queries.ts:284`). That follows from Q11, and Connor is fine with it (Q19); the Access rule covers only the Tenant section.
 - The staff task page sends the client only the tenant of this task's unit. It still never sends a lockbox code.
 - The Asana importer never sets `accessShare`, so imported jobs take the default.
 
@@ -247,7 +249,7 @@ Every portal, task and notification file here is the task migration session's co
 - `accessState` covers every row of the rule in section 2: the default, each choice, the move-out fallback, Both after a move-out, Both after the code is removed, Lockbox after the code is removed, no unit on single-unit and multi-unit properties (a code the units share included), and house-meter rows.
 - `readUnitTenant` cleans the name and phone, refuses a phone without a name, a name without a phone and a number `readPhone` can't read, and writes the phone pair together.
 - `tenantsAdded` finds a unit that gained a tenant by id, on a save with no rename too, and skips a tenant replaced by another.
-- `shareTenantOnOpenJobs`, on `core.test.ts`'s fake transaction: an assigned, active job (Review included) with no stored choice and a code becomes BOTH, with one INTERNAL ACCESS event marked `tenantAdded` and no outbox row. A stored choice, a job stored as Tenant that fell back to the lockbox, a closed job, an unassigned job and a job with no code stay as they were. A job with no unit switches only on a single-unit property, and replacing one tenant with another switches nothing.
+- `shareTenantOnOpenJobs`, on `core.test.ts`'s fake transaction: an assigned, active job (Review included) with a code and no stored choice becomes BOTH, with one INTERNAL ACCESS event marked `tenantAdded` and no outbox row, and so does a job stored as Tenant that fell back to the lockbox. A job stored as Lockbox or Both, a closed job, an unassigned job and a job with no code stay as they were, with no event. A job with no unit switches only on a single-unit property, and replacing one tenant with another switches nothing.
 - `readJobAccess` returns this job's tenant only.
 - `patchTask` writes `accessShare` with an INTERNAL ACCESS event and no outbox row, and an Undo to null stores null.
 - `createNextRepeat` copies `accessShare`.
