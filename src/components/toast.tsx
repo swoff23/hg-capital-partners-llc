@@ -13,8 +13,11 @@ import { addToast, type QueuedToast } from "@/components/toast-queue";
  * One region per surface: AppShell mounts a ToastProvider, and the portal
  * layout mounts its own. Bottom-left on a computer; full width on a phone,
  * lifted above a sticky bottom bar by useToastInset(). Each toast goes after
- * about 5 seconds, held while the pointer or focus is on it. The region is a
- * polite live region (role="status"), so screen readers hear each message.
+ * about 5 seconds, held while the pointer or focus is on it; Esc closes the
+ * one that has focus. On a coarse pointer a toast with an action draws no ×
+ * (it closes itself, and the message gets the room), but keeps the Dismiss
+ * button for assistive tech. The region is a polite live region
+ * (role="status"), so screen readers hear each message.
  *
  * `detail` is the ripple clause after " · " in --toast-fg-2 ("CapEx rules
  * saved · Forecasts updated"). `key` names what the toast is about: a toast
@@ -105,9 +108,17 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setHeld(false);
       }}
+      // Focus holds a toast open, so Esc closes it from any of its buttons, with or without a drawn ×.
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || e.nativeEvent.isComposing) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDismiss();
+      }}
       className={cn(
         // The ink pill on the toast tokens, at the Float level. Its edge only shows in dark (--toast-edge).
-        "pointer-events-auto flex min-h-10 items-center gap-2 rounded-lg border border-toast-edge bg-toast-bg py-1 pl-3.5 pr-1 text-body text-toast-fg shadow-float",
+        // relative: a hidden Dismiss is absolute and stays inside the pill.
+        "pointer-events-auto relative flex min-h-10 items-center gap-2 rounded-lg border border-toast-edge bg-toast-bg py-1 pl-3.5 pr-1 text-body text-toast-fg shadow-float",
         "animate-toast-in motion-reduce:animate-none",
       )}
     >
@@ -131,7 +142,12 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
         type="button"
         aria-label="Dismiss"
         onClick={onDismiss}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-toast-fg-2 transition-colors hover:bg-toast-hover hover:text-toast-fg focus-visible:outline-toast-fg pointer-coarse:h-11 pointer-coarse:w-11"
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-toast-fg-2 transition-colors hover:bg-toast-hover hover:text-toast-fg focus-visible:outline-toast-fg pointer-coarse:h-11 pointer-coarse:w-11",
+          // On touch (tablets too) a toast with an action closes itself, so its × gives the message the room.
+          // It stays a real button for VoiceOver and Switch Control, and is drawn again while it has keyboard focus.
+          item.action && "pointer-coarse:not-focus-visible:sr-only",
+        )}
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>

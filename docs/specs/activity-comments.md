@@ -4,6 +4,8 @@ Spec for Connor's approval, Oct 25, 2026. Nothing here gets built until Connor s
 
 It covers every place a record shows its history or takes a comment: the staff task page, Today's Needs review rows, the contractor's job page and My jobs, the deal page and Deals list, the property and contractor records, and the job emails. Visual rules come from `docs/brand-guidelines.md` (Ink and Limestone). Anything those guidelines don't cover is marked **new**. Code state is the `claude/app-uiux-review-mobbin-e2e22f` worktree at `2a07648` (brand slices merged), with uncommitted edits to `task-row.tsx` and `property-tasks.tsx`. Revised the same day after a review against the brand guidelines, CLAUDE.md, the earlier review's decisions and a sample of the references (section 7).
 
+**Changes since approval.** Connor approved these on Oct 27, to match what chunk 7 built: the date form in sentences (2.2 b, 2.3), a contractor's photo take-back (2.5), the portal's first-visit New divider (2.6), the portal composer (2.7), email timing, Approve's Undo and the Send back sheet (2.8), and the job-page notice (3.4).
+
 ## 1. Summary
 
 **What's wrong today**
@@ -52,7 +54,7 @@ The recommended picks from section 3 (markers on the rail, tap to act on touch).
 Activity ────────────────────────────────────────────────────────────────
       Show 12 earlier updates
  o    Yesterday
- (~)  Connor set status to Scheduled for Oct 27 · 9:03 AM
+ (~)  Connor set status to Scheduled for Tue, Oct 27 · 9:03 AM
  *    Zack checked 14 items · 4:40 PM                                    >
  o    Today
  @    New ────────────────────────────────────────────────────────────────
@@ -191,10 +193,10 @@ Today's card lives inside `src/app/(app)/tasks/[id]/activity.tsx`. It moves to `
 
 - One sentence in `text-meta` `--fg-3` with first names, then " · " and `ActivityTime`. It wraps, since it is a sentence and not a label.
 - Automated writers read by their label: "Property reminder created this task", "Move-in form created this task".
-- "Next repeat created, due Dec 5" links forward as today. "Created as the next repeat" now links back to the earlier task through `data.repeatOf` (BPLAY-031).
+- "Next repeat created, due Sat, Dec 5" links forward as today. "Created as the next repeat" now links back to the earlier task through `data.repeatOf` (BPLAY-031).
 - Live Asana sync events after the move add " · via Asana" after the time (G2B-I11).
-- Sync conflicts become sentences: "Asana and HG disagreed on the due date. Kept Oct 30." The importer stores the field and the kept value in `data`. Older rows read "Asana and HG disagreed on a change". The raw ids stay in the database, out of the UI (G2B-020, G1C-I03).
-- Dates inside a sentence use the formatter's absolute form ("Oct 30"), never "Today" or "Tomorrow", because relative words go stale in a record. **New** clarification of brand section 3.
+- Sync conflicts become sentences: "Asana and HG disagreed on the due date. Kept Fri, Oct 30." The importer stores the field and the kept value in `data`. Older rows read "Asana and HG disagreed on a change". The raw ids stay in the database, out of the UI (G2B-020, G1C-I03).
+- Dates inside a sentence are absolute and lead with the weekday ("Fri, Oct 30", with the year when it isn't this year: `fmtShortDay` in `src/lib/tasks/activity.ts`), never "Today" or "Tomorrow", because relative words go stale in a record. **New** clarification of brand section 3.
 - **Who saw a line.** System lines carry no lock, Internal or not. On a contractor's job the portal shows only scheduled, started, sent back, marked done and approved (`CONTRACTOR_VISIBLE_STATUS` in `src/lib/tasks/rules.ts`, and `docs/asana-migration-plan.md` section 5.1); every other line is staff-only. A lock on each staff-only line would mark most of the timeline and help no decision, so "who saw it" lives in one place: the delivery line under the newest entry Zack can see (2.6).
 
 #### c. Folded run (**new**: `ActivityRun` in `activity-timeline.tsx`)
@@ -240,9 +242,9 @@ Extends `src/lib/tasks/activity.ts` (`buildActivity`, `eventLine`, `splitEarlier
    |---|---|
    | 14 checklist ticks | Zack checked 14 items |
    | Ticks and unticks | Zack checked 12 items and unchecked 2 |
-   | Due date moved 3 times | Pieter moved the due date from Oct 20 to Oct 30 |
+   | Due date moved 3 times | Pieter moved the due date from Tue, Oct 20 to Fri, Oct 30 |
    | Due date set, then cleared | Pieter set the due date, then cleared it |
-   | Visit moved twice | Connor moved the visit from Oct 22 to Oct 24 |
+   | Visit moved twice | Connor moved the visit from Thu, Oct 22 to Sat, Oct 24 |
    | Status there and back | Connor set status to Waiting, then back to In progress |
    | Status changed 3 or more times | Connor changed the status 3 times, now In progress |
    | Notes saved 5 times | Connor edited the notes · View previous |
@@ -322,8 +324,9 @@ Uses `src/components/menu.tsx` (`Menu`, `MenuItem`, `MenuSeparator`), the shared
   - Internal, or no contractor: "Comment deleted"
 - Undo clears `deletedAt`. Files on the comment hide with it and come back on Undo. Storage cleanup belongs to the uploads and photos spec.
 - Portal: if Zack opened the job after the comment, or its email went, his Updates show "Connor removed a comment · 2h". Otherwise it is gone without a trace (question 3).
+- A contractor's photo post taken back from its toast ("3 photos posted · Undo", 5 seconds) leaves no line on either timeline, and its line leaves the unsent email (`core.takeBackContractorPost`). The partners never heard of it, so there is no delete to record.
 
-**Email interplay.** `OutboxItem` gains `eventId` (it is JSON, no migration). At claim time the drain in `src/lib/notifications/outbox.ts` drops items whose event is deleted and reads the comment's current body. A fast delete or edit inside the 10-minute bundle window (D19) therefore changes what Zack receives. Rows queued before this ships send as stored.
+**Email interplay.** `OutboxItem` gains `eventId` (it is JSON, no migration). At claim time the drain in `src/lib/notifications/outbox.ts` drops items whose event is deleted and reads the comment's current body. A fast delete or edit before the bundle sends (D19, timing in 2.8) therefore changes what Zack receives. Rows queued before this ships send as stored.
 
 **References.** [GitHub](https://mobbin.com/screens/f51b36bd-2708-42e4-bf86-c4ab39b2afae) (comment menu with Copy link, Edit and a red Delete, checked), [Asana flow](https://mobbin.com/flows/1374a9aa-bfcf-4a40-b1ec-db872e71b8ce) (Pin to top, Edit comment, Copy comment link, Delete comment; inline edit with Cancel and Save changes; "(edited)" after the time, checked), [Asana flow](https://mobbin.com/flows/115a8be3-b56e-4630-ae39-b249bd62c786) (delete at once, toast "Comment was removed" with Undo, checked), [Intercom](https://mobbin.com/screens/e757d6f0-1da5-45a1-9684-298d6adb933b) ("This message was deleted" left in the thread, checked), [hilos](https://mobbin.com/screens/59c3c368-c3bc-4cdb-82c8-91d25d5ad605) (edit in place with key hints), [Campsite](https://mobbin.com/screens/2f32f194-9690-4f68-9e6c-7cf89f88c572) (a short, plain comment menu).
 
@@ -338,7 +341,7 @@ One `text-meta` `--fg-3` line, 4px under the card, aligned with the card's left 
 | State | Line |
 |---|---|
 | The contractor has no login | Zack has no login yet |
-| Email queued (inside the 10 minutes) | Zack gets an email |
+| Email queued (the bundle hasn't sent, 2.8) | Zack gets an email |
 | Email sent, job not opened since | Emailed to Zack |
 | Zack opened the job after it | Seen by Zack · 2:14 PM |
 
@@ -356,7 +359,8 @@ The time follows `ActivityTime`'s rows: a clock time today, then the weekday ("S
 
 #### New divider
 
-- `newSince` is the viewer's previous `lastSeenAt` on this task: by `userId` for staff (nothing writes these today) and by `contactId` for contractors. A first visit has no divider. At release every staff row starts at the release time, so no divider or row dot appears on day one for history nobody missed.
+- `newSince` is the viewer's previous `lastSeenAt` on this task: by `userId` for staff and by `contactId` for contractors. At release every staff row starts at the release time, so no divider or row dot appears on day one for history nobody missed.
+- A contractor's first visit counts from when he got access to the job (`lastLooked` in `src/lib/portal/queries.ts`): what HG wrote after the assignment sits under New, and history from before it never does. The My jobs dot reads the same baseline.
 - The divider sits above the first entry after `newSince` written by someone else. The viewer's own entries never count.
 - The page writes `lastSeenAt = now` for that viewer on open, as the portal already does through `noteJobViewed` and `markJobSeen`.
 - It stays put for the visit. The client keeps the first `newSince` it got, so a refresh (RefreshOnReturn, or after sending) doesn't move it, and replies that arrive meanwhile land under it. Leaving and coming back moves it.
@@ -434,6 +438,7 @@ Internal turns the box `--fill-1` and the switch track `--fill-2`, as today. Tab
 - The outgoing text moves to a pending slot in the same storage entry and clears only on success. After a reload, a pending message whose `clientId` is already in the page's events is dropped; otherwise it comes back in the field. Nothing is lost and nothing doubles.
 - Success swaps in the server's event and its delivery line. No toast: the message in view is the confirmation, and its line says what happens next.
 - Failure keeps the card with one `--danger` `text-meta` line built from `callAction`'s message: "Didn't send: no connection · Retry" offline, "Didn't send · Retry" otherwise. Retry resends the same text, visibility, uploaded file ids and `clientId`, so nothing uploads or posts twice. The failed card's menu offers Retry, Edit (back into the composer) and Discard.
+- **The portal composer isn't optimistic yet** (it has no `PendingSendsProvider`). The field holds the message while it sends, a failure is a toast with the words kept in the box under the same `clientId`, and the update shows once the page refreshes. Showing it in place at once is a follow-up.
 
 **Print.** `print:hidden` (G1E-010).
 
@@ -448,8 +453,10 @@ Internal turns the box `--fill-1` and the switch track `--fill-2`, as today. Tab
 Extends `src/app/(app)/tasks/[id]/review-banner.tsx`, `src/app/(app)/tasks/review-actions.tsx` and `src/app/(app)/tasks/task-list-context.tsx`. The banner's layout is choice 3.6. The rest is fixed here.
 
 - **One order everywhere.** Send back, then Approve, the primary at the trailing edge as in dialogs. The banner uses secondary then primary. Today's rows use ghost then secondary, one step lighter in a list (BTASKS-014).
-- **Approve** toasts "Approved · Zack gets an email" with Undo for 5 seconds. The ripple clause shows only when it's true (Zack has a login); otherwise the toast reads "Approved". Emails wait 10 minutes, so Undo before the bundle goes is honest. Undo returns the job to Review, drops the queued item, writes no email of its own, and takes back a repeat's next copy through the existing `takeBackRepeat` (BTASKS-015).
-- **One Send back sheet** (`src/app/(app)/tasks/send-back-sheet.tsx`, feature-only) for the banner and Today. Title "Send back to Zack", label "What needs another look?", one consequence line "Back to In progress · Zack gets an email" (G1A-012; "Back to In progress · Zack has no login yet" without one), Cancel with Esc and Send back with ⌘↵, 5000 characters on both. The note survives closing the sheet and a failed send. The forms and editing spec owns the field rules if it says otherwise.
+- **Approve** toasts "Approved · Zack gets an email" with Undo for 5 seconds. The ripple clause shows only when it's true (Zack has a login); otherwise the toast reads "Approved". An email bundle sends 3 minutes after its latest line, and never more than 10 minutes after its first (`bundleSendAfter` in `src/lib/tasks/rules.ts`), so Undo before the bundle goes is honest. Undo returns the job to Review, drops the queued item, writes no email of its own, and takes back a repeat's next copy through the existing `takeBackRepeat` (BTASKS-015).
+- **Undo's limits live on the server** (`core.undoApproval`), since a toast held by hover or focus outlasts its 5 seconds. Only the partner who approved can undo, for 2 minutes after the approval. It is refused once the approval's email is sent ("Email already sent. Change the status.") or a send run has claimed it ("The email is on its way. Change the status."). A row the drain closed without sending doesn't stop it. The other refusals: "Too late to undo. Change the status.", "Pieter approved this. Change the status.", "Not yours to undo. Change the status." and "This job changed after it was approved."
+- **Undo writes no undoOf event.** The soft-deleted Done line is the record, so Activity shows neither the approval nor its Undo (2.3, rule 5). The deal's "Task completed" line goes too. One written before these lines named their approval stays, and the deal gets "Task reopened" instead.
+- **One Send back sheet** (`src/app/(app)/tasks/send-back-sheet.tsx`, feature-only) for the banner and Today, with the field rules from forms 4.4. Title "Send back to Zack", label "What still needs doing?", one consequence line "Goes back to In progress with your note for Zack." (G1A-012; "Goes back to In progress. Zack has no login yet." without a login, "Goes back to In progress with your note." with no contractor), Cancel with Esc and Send back with ⌘↵. The note holds 2,000 characters in the sheet and on the server, with a count from 1,800, and survives closing the sheet and a failed send.
 - **After a decision** the banner shrinks in place to one system line for the rest of the visit, led by the new status's StatusMark: "Pieter approved this · 9:14 AM" beside the Done mark, or "Connor sent this back · now" beside In progress. The next visit drops it, and the decision pair (2.2 d) keeps the record in Activity. This closes the loop where the eye already is (G1A-014; G2B follows Mercury's Submitted, Approved stepper). A stale banner is refused with "Pieter approved this", the page refreshes, and the same line takes the banner's place.
 - **Needs review rows at 375 and 320.** Below a 480px list the two buttons keep today's line of their own under the title and place, right-aligned (`task-row.tsx`), so neither row of controls wraps. This departs from brand section 5's density rule, where a trailing button drops below 480; it predates this spec, and approving from Today on a phone is the row's main job. Say if the buttons should drop instead, leaving the row to open the proof card.
 - **Photos on a send back note** (G1D-I06): not in this spec.
@@ -676,18 +683,18 @@ On my way.                                       On my way.
 
 ```
 375                                       320
- (~) Connor sent this back · 2h            (~) Connor sent this back
+ (~) Connor sent this back                 (~) Connor sent this back
  ┌──────────────────────────────────┐      ┌──────────────────────────────┐
  │ The trim on the left side still  │      │ The trim on the left side    │
  │ needs paint. Bring the ...       │      │ still needs paint. Bring...  │
  │ See the update                   │      │ See the update               │
  └──────────────────────────────────┘      └──────────────────────────────┘
- [cal] Moved to Fri, Oct 30 (was Thu,      [cal] Moved to Fri, Oct 30
-       Oct 29) by Connor                         (was Thu, Oct 29)
+ [cal] Due date moved to Fri, Oct 30       [cal] Due date moved to Fri,
+       (was Thu, Oct 29) by Connor               Oct 30 (was Thu, Oct 29)
 ```
 
-- **Sent back.** The decision pair (2.2 d) without the rail: In progress's StatusMark, "Connor sent this back · 2h", then his note in a `--surface` card on a `--line` edge, three lines, then "See the update" (a `TextLink` to `#update-<eventId>`). It stays until Zack marks the job done again. Below 480 the " · 2h" drops before the sentence would wrap.
-- **Date or notes changed since he last looked** (question 2): one line each in `text-body` `--fg-1`, led by a lucide `CalendarClock` or `FileText` in `--fg-3` (16px, 20 on touch): "Moved to Fri, Oct 30 (was Thu, Oct 29) by Connor", "Notes updated by Connor". At 375 they may take two lines; at 320 "by Connor" drops. They clear once he has opened the page after the change.
+- **Sent back.** The decision pair (2.2 d) without the rail: In progress's StatusMark, "Connor sent this back · 2h" ("HG sent this back" when no partner did), then his note in a `--surface` card on a `--line` edge, three lines, then "See the update" (a `TextLink` to `#update-<eventId>` of the note, or of the status line without one). It stays until Zack marks the job done again. Below 480 the " · 2h" drops before the sentence would wrap.
+- **Date or notes changed since he last looked** (question 2): one line each in `text-body` `--fg-1`, led by a lucide `CalendarClock` or `FileText` in `--fg-3` (16px, 20 on touch). The date line names the Target: "Due date moved to Fri, Oct 30 (was Thu, Oct 29) by Connor", or "Visit moved to …" while the job is Scheduled, and "Due date set to Fri, Oct 30" or "Due date cleared (was Thu, Oct 29)" (`dateChangeText` in `src/lib/portal/job-notice.ts`). Several moves read as one, first day to last, and a date back where it started shows nothing. The notes line reads "Notes updated by Connor". "by Connor" shows only when a partner made the change, and drops below 360. At 375 a date line may take two lines. They clear once he has opened the page after the change.
 - Desktop and tablet show the same notice at the record's width; nothing else drops.
 - References: the staff `ReviewBanner` anatomy this mirrors, [Flighty](https://mobbin.com/screens/09e08a95-1063-4e78-baeb-a68dddb6136a) ("Departure changed to 10:15 AM" at the top of the record, from G1A-I09).
 
