@@ -1,6 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
+import { appScope, ownerRefusal, portalScope } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
 import { UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
 import { getCurrentUser } from "@/lib/auth";
@@ -34,6 +35,11 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  * size that isn't allowed, a session that ended) and the uploader's tile turns
  * red. Anything else that goes wrong, a database blip included, is a 503, which
  * the uploader waits out and tries again (attachments/token-failure.ts).
+ *
+ * The queue that asks says whose it is (`owner` in the payload, queue-owner.ts):
+ * a tab still showing Zack's queue after Mike signed in elsewhere is refused
+ * with a 400 instead of getting a token under Mike's cookie, so its files wait
+ * for Zack.
  *
  * Every kind only accepts a path of its own (paths.ts, limits.ts): Blob can't
  * pick the path for us, only refuse the one asked for. Task and property
@@ -181,6 +187,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
           throw new UploadRefusal("That request isn't valid.");
         }
         const payload = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
+        const wrongQueue = ownerRefusal(payload.owner, who.kind === "staff" ? appScope(who.userId) : portalScope(who.contactId));
+        if (wrongQueue) throw new UploadRefusal(wrongQueue);
         const id = payload[cfg.idKey];
         if (typeof id !== "string" || !id) throw new UploadRefusal(`Missing ${cfg.idKey}`);
         const limits = await cfg.authorize(id, pathname, payload, who);

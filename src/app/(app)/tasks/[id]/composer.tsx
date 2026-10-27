@@ -108,9 +108,9 @@ export function Composer({
     taskId,
     uploadKind: "task-upload",
     allowed: ["image", "video", "file"],
-    record: async (file) => {
+    record: async (file, owner) => {
       // Internal until Send, so a contractor can't open it while it waits.
-      const res = await recordTaskAttachment(taskId, { ...file, visibility: "INTERNAL", standalone: false });
+      const res = await recordTaskAttachment(taskId, { ...file, visibility: "INTERNAL", standalone: false }, owner);
       if (res.ok) setAdded((r) => [...r, { id: res.data.id, filename: file.filename }]);
       return res;
     },

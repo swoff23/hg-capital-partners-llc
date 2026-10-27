@@ -62,7 +62,7 @@ export type RecordMediaResult = { ok: boolean; data?: { id: string }; error?: st
 export type MediaUploaderOptions = {
   taskId: string;
   uploadKind: UploadKind;
-  record: (file: RecordMediaInput) => Promise<RecordMediaResult>;
+  record: (file: RecordMediaInput, owner?: string) => Promise<RecordMediaResult>;
   onRecorded?: (ids: string[]) => void;
   /** Called whenever the number of unfinished uploads changes. */
   onPendingChange?: (pending: number) => void;

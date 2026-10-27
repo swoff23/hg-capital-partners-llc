@@ -174,11 +174,22 @@ export class UploadEngine {
   private restored = false;
   /** Set by dispose(): the queue's provider is gone, and nothing here runs again. */
   private disposed = false;
+  /**
+   * The files dispose() found in flight. Their rows stay in the outbox for the next queue, so a late answer from
+   * the road (the original's last bytes landing as the abort goes out) may still write what it learned to its row:
+   * the pathname, so the next queue records that blob instead of sending the file again.
+   */
+  private readonly retained = new WeakSet<Job>();
   /** Keys that already told the person their files are waiting for a page to record them. */
   private readonly pageNoticed = new Set<string>();
 
   constructor(deps: EngineDeps) {
     this.deps = deps;
+  }
+
+  /** Whose queue this is ("app:<user id>", "portal:<contact id>"), for the requests that act for it (queue-owner.ts). */
+  get scope(): string | undefined {
+    return this.deps.scope;
   }
 
   /**
@@ -205,6 +216,7 @@ export class UploadEngine {
     if (this.disposed) return;
     this.disposed = true;
     for (const job of this.jobs.values()) {
+      this.retained.add(job);
       job.controller?.abort();
       this.deps.clearTimer(job.retryTimer);
       this.deps.clearTimer(job.stallTimer);
@@ -539,6 +551,7 @@ export class UploadEngine {
           role,
           blob,
           queuedAt: job.queuedAt,
+          owner: this.deps.scope,
           resume: role === "orig" ? job.multipart : null,
           onMultipart: (state) => {
             if (role !== "orig") return;
@@ -611,7 +624,7 @@ export class UploadEngine {
     if (target.sendQueuedAt) input.queuedAt = job.queuedAt;
     let res: RecordMediaResult;
     try {
-      res = await target.record(input);
+      res = await target.record(input, this.deps.scope);
     } catch (err) {
       // The call itself failed (no signal, an error page, an action retired by a deploy), not a refusal:
       // its own words mean nothing here, and it tries again like any request the road dropped.
@@ -847,7 +860,8 @@ export class UploadEngine {
   private async save(job: Job): Promise<void> {
     const outbox = this.deps.outbox;
     const entry = this.entryOf(job);
-    if (!outbox || !entry || !this.jobs.has(job.id)) return;
+    // A removed job stays removed; a disposed queue's files keep their rows, and may still learn their pathname.
+    if (!outbox || !entry || !(this.jobs.has(job.id) || this.retained.has(job))) return;
     const bytes = job.prepared ?? AS_PICKED;
     try {
       if (job.written === bytes) {

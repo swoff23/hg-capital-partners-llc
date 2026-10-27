@@ -19,7 +19,7 @@ import { Sheet } from "@/components/sheet";
 import { SpotArt } from "@/components/spot-art";
 import { useToast } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
-import type { UploadTarget } from "@/components/upload-queue";
+import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction } from "@/lib/action-result";
@@ -112,6 +112,7 @@ export function JobActions({
   property?: { label: string; photoUrl: string | null } | null;
 }) {
   const { toast } = useToast();
+  const owner = useUploadScope();
   const step = nextStep(status);
   const coarse = useCoarsePointer();
   const required = finishPhotosNeeded(finishPhotosRequired);
@@ -152,7 +153,7 @@ export function JobActions({
     });
 
   /** Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post. */
-  const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast);
+  const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast, owner);
 
   /** A batch that posts on its own while the page is here. One that doesn't post goes back on the tray, to go with the next send. */
   const postBatch = (items: Recorded[]) =>
@@ -165,7 +166,7 @@ export function JobActions({
    * The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and
    * the strip, for the tab and not this page (record-and-post.ts).
    */
-  const record = (file: RecordMediaInput): Promise<RecordMediaResult> => recordJobFile(taskId, file);
+  const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
 
   function onRecorded(ids: string[]) {
     const { sheetOpen: holding, body: text, ready: held } = live.current;

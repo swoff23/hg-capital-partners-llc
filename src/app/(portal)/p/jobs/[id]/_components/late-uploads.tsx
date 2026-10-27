@@ -1,7 +1,7 @@
 "use client";
 import { MediaUploadTray, useMediaUploader, type RecordMediaInput, type RecordMediaResult } from "@/components/media-uploader";
 import { useToast } from "@/components/toast";
-import type { UploadTarget } from "@/components/upload-queue";
+import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
 import { recordedUploads } from "@/lib/portal/recorded-uploads";
 import { postRecordedBatch, recordJobFile } from "./record-and-post";
 
@@ -23,10 +23,11 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  */
 export function LateUploads({ taskId, label }: { taskId: string; label: string }) {
   const { toast } = useToast();
+  const owner = useUploadScope();
 
-  const record = (file: RecordMediaInput): Promise<RecordMediaResult> => recordJobFile(taskId, file);
+  const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
   /** The batch landed: with this page open or gone, it is handed to the same step. */
-  const land = (ids: string[]) => void postRecordedBatch(taskId, recordedUploads.take(taskId, ids), toast);
+  const land = (ids: string[]) => void postRecordedBatch(taskId, recordedUploads.take(taskId, ids), toast, owner);
 
   const target: UploadTarget = {
     key: `portal-task:${taskId}`,

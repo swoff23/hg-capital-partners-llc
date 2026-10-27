@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LeaveGuard } from "@/components/leave-guard";
 import { ToastProvider } from "@/components/toast";
 import { UploadQueueProvider } from "@/components/upload-queue";
+import { portalScope } from "@/lib/attachments/queue-owner";
 import { BRAND } from "@/lib/brand";
 import { getPortalPrincipal } from "@/lib/portal/session";
 
@@ -31,11 +32,15 @@ export const metadata: Metadata = {
  * never pick up each other's leftover files, so a file is only ever recorded
  * and posted as the person who picked it. The key gives each person a fresh
  * queue. Reading the session here decides only whose queue it is; pages still
- * check it themselves.
+ * check it themselves. A second tab that keeps showing someone else's queue
+ * after another person signs in is stopped on the server: the queue names its
+ * owner with every token, record, post and Undo, and a mismatch is refused
+ * (attachments/queue-owner.ts), so its files wait in the outbox for their own
+ * person.
  */
 export default async function PortalLayout({ children }: LayoutProps<"/p">) {
   const principal = await getPortalPrincipal({ allowStartingPassword: true });
-  const scope = `portal:${principal?.contactId ?? "signed-out"}`;
+  const scope = principal ? portalScope(principal.contactId) : "portal:signed-out";
   return (
     <div className="min-h-screen bg-surface text-fg-1">
       <ToastProvider>

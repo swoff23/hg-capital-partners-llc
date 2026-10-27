@@ -58,6 +58,8 @@ export type SendInput = {
   blob: Blob;
   /** A contractor's queuedAt, so a resumed upload's fresh token passes the late-upload rule. */
   queuedAt?: string;
+  /** Whose queue this is (the engine's scope): the token route refuses it when the signed-in person is someone else. */
+  owner?: string;
   /** Where a multipart upload of this blob stood, from the outbox. */
   resume: MultipartState | null;
   /** The multipart state after each finished part, and null once it completes. */
@@ -228,7 +230,7 @@ export const sendBlob: Transfer = async (input) => {
     input.uploadKind,
     input.parentId,
     { name: input.name, contentType: input.contentType, fileKind: input.fileKind },
-    { role: input.role, queuedAt: input.queuedAt },
+    { role: input.role, queuedAt: input.queuedAt, owner: input.owner },
   );
   if (!usesMultipart(input.blob.size)) return sendWhole(input, request.pathname, request.clientPayload);
   return sendInParts(input, request.pathname, request.clientPayload);

@@ -27,9 +27,15 @@ function fn(source: string, name: string): string {
 test("the portal's upload queue is each contractor's own, and a new person gets a fresh one (fix 4)", () => {
   const layout = read("app", "(portal)", "p", "layout.tsx");
   assert.match(layout, /getPortalPrincipal\(\{ allowStartingPassword: true \}\)/);
-  assert.match(layout, /`portal:\$\{principal\?\.contactId/);
+  assert.match(layout, /principal \? portalScope\(principal\.contactId\) : "portal:signed-out"/);
   assert.match(layout, /<UploadQueueProvider key=\{scope\} scope=\{scope\}>/);
   assert.doesNotMatch(layout, /scope="portal"/, "one shared portal queue hands one contractor's files to the next");
+});
+
+test("the app's upload queue is each person's own too, keyed so a different sign-in gets a fresh one", () => {
+  const layout = read("app", "(app)", "layout.tsx");
+  assert.match(layout, /const scope = appScope\(user\.id\);/);
+  assert.match(layout, /<UploadQueueProvider key=\{scope\} scope=\{scope\}>/);
 });
 
 test("the upload queue stops with its layout, so nothing records under the next person's session (fix 5)", () => {
@@ -43,7 +49,7 @@ test("a job page keeps what it recorded for the tab, not for itself (fix 6)", ()
   const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
   // The record step is shared with the finished job's page, so the tab's registry is written in one place.
   assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts"), /recordedUploads\.note\(taskId,/);
-  assert.match(actions, /recordJobFile\(taskId, file\)/);
+  assert.match(actions, /recordJobFile\(taskId, file, from\)/);
   assert.match(fn(actions, "JobActions"), /function onRecorded\(ids: string\[\]\) \{[\s\S]*?recordedUploads\.take\(taskId, ids\)/);
   assert.match(actions, /function onAway\(ids: string\[\]\) \{\s*void sendBatch\(recordedUploads\.take\(taskId, ids\)\);/);
   assert.doesNotMatch(actions, /useRef\(new Map/, "a per-page map drops the files an earlier visit recorded");
@@ -162,4 +168,31 @@ test("the portal job page labels the Mark done set under At finish, from the job
   assert.match(queries, /const atFinish = await finishSet\(taskId, media\);/);
   assert.match(fn(queries, "finishSet"), /finishPhotoIds\(media, \[review, \.\.\.comments\]\)/);
   assert.match(read("app", "(portal)", "p", "jobs", "[id]", "page.tsx"), /<JobMediaSection media=\{job\.media\} atFinish=\{job\.atFinish\} \/>/);
+});
+
+test("a tab left open under another sign-in can't mint, record, post or undo as whoever signed in since", () => {
+  // The portal's three steps name the contractor's queue and are refused when the session is someone else's.
+  const portal = read("app", "(portal)", "p", "jobs", "[id]", "upload-actions.ts");
+  for (const name of ["recordJobUploadAction", "postJobBatchAction", "undoJobPostAction"]) {
+    const body = fn(portal, name);
+    assert.match(body, /const p = await requirePortalPrincipal\(\);\s*assertQueueOwner\(owner\.parse\(queueOwner\), portalScope\(p\.contactId\)\);/, name);
+  }
+  // Staff: the record steps that attribute a file to a person.
+  const owned = /assertQueueOwner\(z\.string\(\)\.max\(80\)\.nullish\(\)\.parse\(queueOwner\), appScope\(user\.id\)\);/;
+  assert.match(fn(read("app", "(app)", "tasks", "upload-actions.ts"), "recordTaskAttachment"), owned);
+  assert.match(fn(read("app", "(app)", "properties", "[id]", "document-actions.ts"), "recordPropertyDocument"), owned);
+  // The token route reads the owner from every kind's payload, before it looks at the row.
+  const route = read("app", "api", "blob", "[kind]", "route.ts");
+  assert.match(route, /ownerRefusal\(payload\.owner, who\.kind === "staff" \? appScope\(who\.userId\) : portalScope\(who\.contactId\)\)/);
+  assert.ok(route.indexOf("ownerRefusal(payload.owner") < route.indexOf("cfg.authorize("), "the owner is checked before the row is");
+  // The queue sends it: with every record step (engine), every token request (transfer) and the page's post and Undo.
+  assert.match(read("lib", "attachments", "engine.ts"), /target\.record\(input, this\.deps\.scope\)/);
+  assert.match(read("lib", "attachments", "engine.ts"), /owner: this\.deps\.scope,/);
+  assert.match(read("lib", "attachments", "transfer.ts"), /owner: input\.owner/);
+  const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
+  assert.match(shared, /recordJobUploadAction\(taskId, file, owner\)/);
+  assert.match(shared, /postJobBatchAction\(taskId, items\.map\(\(i\) => i\.id\), owner\)/);
+  assert.match(shared, /undoJobPostAction\(taskId, eventId, owner\)/);
+  // No second copy of the record step without the check.
+  assert.doesNotMatch(read("app", "(portal)", "p", "jobs", "[id]", "actions.ts"), /recordJobUploadAction/);
 });

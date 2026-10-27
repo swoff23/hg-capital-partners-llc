@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { UploadTarget } from "@/components/upload-queue";
 import { UploadEngine, capReason, type EngineDeps, type EngineNotice } from "./engine";
 import { MAX_ONLINE_TRIES, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
+import { WRONG_SIGN_IN } from "./queue-owner";
 import type { SendInput } from "./transfer";
 
 /**
@@ -778,6 +779,114 @@ test("two contractors on one phone: each one's queue picks up only their own lef
   await zackNext.engine.restore();
   await zackNext.flush();
   assert.deepEqual(recordedAsZack, ["zack.jpg"]);
+});
+
+test("the queue's owner goes with every send and every record step, so the server can refuse another sign-in", async () => {
+  const h = setup({ scope: "portal:c-zack" });
+  const owners: (string | undefined)[] = [];
+  const t = portalTarget({ record: async (f, owner) => (owners.push(owner), { ok: true, data: { id: "a1" } }) });
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.sent[0].owner, "portal:c-zack");
+  assert.deepEqual(owners, ["portal:c-zack"]);
+  assert.equal(h.engine.scope, "portal:c-zack");
+
+  // Where no one is signed in to a queue (a page outside both layouts) there is no owner to name.
+  const bare = setup();
+  const bareOwners: (string | undefined)[] = [];
+  bare.engine.add(target({ record: async (f, owner) => (bareOwners.push(owner), { ok: true, data: { id: "a1" } }) }), [file("b.jpg")]);
+  await bare.flush();
+  assert.equal(bare.sent[0].owner, undefined);
+  assert.deepEqual(bareOwners, [undefined]);
+});
+
+test("a record step that refuses the sign-in turns the tile red and keeps the file for its own person", async () => {
+  const outbox = memoryOutbox();
+  const h = setup({ outbox, scope: "portal:c-zack" });
+  const t = portalTarget({ record: async () => ({ ok: false, error: WRONG_SIGN_IN }) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("zack.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(tile.status, "failed");
+  assert.equal(tile.error, WRONG_SIGN_IN);
+  assert.equal(h.sent.length, 1, "no resend: a refusal of the person is not a bad blob");
+  const rows = await outbox.all();
+  assert.deepEqual(
+    rows.map((e) => [e.scope, e.name, e.pathname !== null]),
+    [["portal:c-zack", "zack.jpg", true]],
+  );
+
+  // Mike's queue on the same browser never touches it; Zack's, when he is signed in again, records the blob already up.
+  const mike = setup({ outbox, scope: "portal:c-mike" });
+  const asMike: string[] = [];
+  mike.engine.setTarget(portalTarget({ record: async (f) => (asMike.push(f.filename), { ok: true, data: { id: "a-m" } }) }));
+  await mike.engine.restore();
+  await mike.flush();
+  assert.deepEqual(asMike, []);
+
+  const zack = setup({ outbox, scope: "portal:c-zack" });
+  const asZack: string[] = [];
+  zack.engine.setTarget(portalTarget({ record: async (f) => (asZack.push(f.filename), { ok: true, data: { id: "a-z" } }) }));
+  await zack.engine.restore();
+  await zack.flush();
+  assert.deepEqual(asZack, ["zack.jpg"]);
+  assert.equal(zack.sent.length, 0, "the bytes were already up");
+});
+
+test("dispose: an original whose last bytes land as the queue stops still tells its row where they are", async () => {
+  const outbox = memoryOutbox();
+  const h = setup({ outbox, scope: "portal:c-zack" });
+  let land: () => void = () => {};
+  h.deps.transfer = (input) => {
+    h.sent.push(input);
+    // Ignores the abort, as a response already on its way does.
+    return new Promise((resolve) => (land = () => resolve({ pathname: `orig/${input.name}-up` })));
+  };
+  const recorded: string[] = [];
+  const t = portalTarget({ record: async (f) => (recorded.push(f.pathname), { ok: true, data: { id: "a1" } }) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("Kitchen walkthrough.mov", "video/quicktime")]);
+  await h.flush();
+  assert.equal(h.sent.length, 1, "going up");
+
+  h.engine.dispose();
+  land();
+  await h.flush();
+  assert.deepEqual(recorded, [], "nothing records under whoever signs in next");
+  const rows = await outbox.all();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].pathname, "orig/Kitchen walkthrough.mov-up", "the row knows its blob");
+
+  // The same person's next queue records that blob and sends nothing again.
+  const next = setup({ outbox, scope: "portal:c-zack" });
+  const again: string[] = [];
+  next.engine.setTarget(portalTarget({ record: async (f) => (again.push(f.pathname), { ok: true, data: { id: "a1" } }) }));
+  await next.engine.restore();
+  await next.flush();
+  assert.deepEqual(again, ["orig/Kitchen walkthrough.mov-up"]);
+  assert.equal(next.sent.length, 0);
+});
+
+test("dispose: a file that was removed first stays removed, even when its bytes land after", async () => {
+  const outbox = memoryOutbox();
+  const h = setup({ outbox, scope: "portal:c-zack" });
+  let land: () => void = () => {};
+  h.deps.transfer = (input) => {
+    h.sent.push(input);
+    return new Promise((resolve) => (land = () => resolve({ pathname: `orig/${input.name}-up` })));
+  };
+  const t = portalTarget();
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("gone.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  h.engine.remove(tile.key);
+  h.engine.dispose();
+  land();
+  await h.flush();
+  assert.equal((await outbox.all()).length, 0);
 });
 
 test("dispose: an upload in flight is aborted, its claim let go and its outbox row kept for the next queue", async () => {

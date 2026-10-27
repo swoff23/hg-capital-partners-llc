@@ -63,8 +63,12 @@ export type UploadTarget = {
   maxFiles?: number;
   /** "display" re-encodes a photo to a 2560px JPEG with no metadata before it goes up; "original" sends it as picked. */
   prepare: "original" | "display";
-  /** Writes the row once the bytes are up. The server checks the blob itself. */
-  record: (file: RecordMediaInput) => Promise<RecordMediaResult>;
+  /**
+   * Writes the row once the bytes are up. The server checks the blob itself. `owner` is the queue's scope
+   * (queue-owner.ts): a record step that attributes the file to someone sends it on, and the server refuses it when
+   * the signed-in person is not the queue's.
+   */
+  record: (file: RecordMediaInput, owner?: string) => Promise<RecordMediaResult>;
   /**
    * The new rows' ids each time a batch settles (everything in it has landed
    * or failed), while the page that set the target is mounted. A file that
@@ -289,6 +293,15 @@ const noSubscribe = () => () => {};
 /** The engine of the nearest UploadQueueProvider, for media-uploader.tsx; null outside one. */
 export function useUploadEngine(): UploadEngine | null {
   return useContext(QueueContext)?.engine ?? null;
+}
+
+/**
+ * Whose queue this is ("app:<user id>", "portal:<contact id>"), for the steps a page takes for its files after the
+ * engine records them (a contractor's post and its Undo): they name it to the server, which refuses them when the
+ * signed-in person is someone else (queue-owner.ts). Undefined outside a provider.
+ */
+export function useUploadScope(): string | undefined {
+  return useContext(QueueContext)?.engine.scope;
 }
 
 /**

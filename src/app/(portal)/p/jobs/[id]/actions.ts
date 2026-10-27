@@ -21,20 +21,6 @@ const updateSchema = z
   })
   .strict();
 
-// Where the browser put the file and what to call it, never its URL, size or
-// type: the service reads those from Blob itself.
-const uploadSchema = z
-  .object({
-    pathname: z.string().min(1).max(300),
-    filename: z.string().min(1).max(255),
-    width: z.number().int().positive().max(20000).nullish(),
-    height: z.number().int().positive().max(20000).nullish(),
-    durationSec: z.number().positive().max(24 * 3600).nullish(),
-    thumbPathname: z.string().min(1).max(300).nullish(),
-    posterPathname: z.string().min(1).max(300).nullish(),
-  })
-  .strict();
-
 export async function startJobAction(taskId: string): Promise<ActionResult> {
   return withResult("portal:startJob", async () => {
     await requirePortalPrincipal();
@@ -60,13 +46,5 @@ export async function setChecklistItemAction(itemId: string, done: boolean): Pro
   return withResult("portal:setChecklistItem", async () => {
     await requirePortalPrincipal();
     await jobs.setJobChecklistItem(id.parse(itemId), z.boolean().parse(done));
-  });
-}
-
-/** After the browser finished uploading straight to Blob. A result, not a throw, for the uploader's Retry. */
-export async function recordJobUploadAction(taskId: string, file: z.input<typeof uploadSchema>): Promise<ActionResult<{ id: string }>> {
-  return withResult("portal:recordJobUpload", async () => {
-    await requirePortalPrincipal();
-    return jobs.recordJobUpload(id.parse(taskId), uploadSchema.parse(file));
   });
 }
