@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { UploadTarget } from "@/components/upload-queue";
 import { UploadEngine, capReason, type EngineDeps, type EngineNotice } from "./engine";
-import { MAX_ONLINE_TRIES, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
+import { closedJobLine } from "./media";
+import { FinalRefusalError, MAX_ONLINE_TRIES, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
 import { WRONG_SIGN_IN } from "./queue-owner";
 import type { SendInput } from "./transfer";
 
@@ -844,6 +845,74 @@ test("away from the page, a mix keeps today's toast and its Retry, which goes fo
   await h.flush();
   assert.equal(other, 2, "the retryable one went again");
   assert.equal(h.engine.uploadsFor(t.key).find((u) => u.name === "late.jpg")!.status, "invalid");
+});
+
+// A job that closed before the file got a token: the bytes never went up, and the token route said so for good.
+
+test("a final refusal from the token route is the same Remove-only tile, with no record call and no second try", async () => {
+  const h = setup({ script: [new FinalRefusalError("This job is closed."), new FinalRefusalError("This job is closed.")] });
+  let calls = 0;
+  const t = target({ key: "portal-task:t9", whenAway: "post", record: async () => (calls++, { ok: true, data: { id: "a1" } }) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg"), file("b.jpg")]);
+  await h.flush();
+  const tiles = h.engine.uploadsFor(t.key);
+  assert.deepEqual(
+    tiles.map((u) => [u.status, u.error, u.final]),
+    [
+      ["invalid", "This job is closed.", true],
+      ["invalid", "This job is closed.", true],
+    ],
+  );
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, failed: 2, pendingKinds: [] });
+  assert.equal(calls, 0, "nothing to record: the bytes never went up");
+  // Neither Retry nor Retry all asks for another token, and no timer does.
+  h.engine.retry(tiles[0].key);
+  h.engine.retryAll(t.key);
+  await h.advance(120_000);
+  assert.equal(h.sent.length, 2, "no second token ask");
+  assert.deepEqual(h.engine.uploadsFor(t.key).map((u) => u.status), ["invalid", "invalid"]);
+  h.engine.remove(tiles[0].key);
+  h.engine.remove(tiles[1].key);
+  await h.flush();
+  assert.deepEqual(h.engine.uploadsFor(t.key), []);
+  assert.deepEqual(await h.outbox!.all(), []);
+});
+
+test("a final token refusal and a final record refusal share one tray: both Remove only, one line", async () => {
+  const h = setup({ script: [new FinalRefusalError("This job is closed.")] });
+  const t = target({ key: "portal-task:t9", whenAway: "post", record: async () => ({ ok: false, error: "This job is closed.", final: true }) });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("never-up.jpg"), file("was-up.jpg")]);
+  await h.flush();
+  const tiles = h.engine.uploadsFor(t.key);
+  assert.deepEqual(tiles.map((u) => [u.status, u.final]), [["invalid", true], ["invalid", true]]);
+  assert.equal(closedJobLine(tiles), "Job closed before 2 photos uploaded");
+});
+
+test("a token refusal that is not final keeps Retry, and Retry asks again", async () => {
+  const h = setup({ script: [new Error("Failed to retrieve the client token")] });
+  const t = target({ key: "portal-task:t9" });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(tile.status, "failed");
+  assert.equal(tile.final, undefined);
+  h.engine.retry(tile.key);
+  await h.flush();
+  assert.deepEqual(h.engine.uploadsFor(t.key), [], "the Retry went up and recorded");
+});
+
+test("away from the page, a token-final file says the job closed too, with no Retry in the toast", async () => {
+  const h = setup({ script: [new FinalRefusalError("This job is closed."), new FinalRefusalError("This job is closed.")] });
+  const t = target({ key: "portal-task:t9", whenAway: "post", allowed: ["image", "video"], onAway: () => {} });
+  const gone = h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg"), file("b.jpg")]);
+  gone();
+  await h.flush();
+  assert.deepEqual(h.notices.at(-1), { message: "Job closed before 2 photos uploaded", key: "upload-failed:portal-task:t9" });
+  assert.ok(!h.notices.some((n) => n.action?.label === "Retry"));
 });
 
 // ---------------------------------------------------------------------------

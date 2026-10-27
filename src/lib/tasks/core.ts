@@ -884,14 +884,16 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
  *
  * The portal's batch step (portal/job-uploads.ts postJobBatch) sends a job
  * here once it is no longer active; one reopened in the moment between posts
- * the same way. Access is checked first, then the task row is locked before
- * any email row, as every write that queues one.
+ * the same way. Access is checked first. The writes run in addComment's order
+ * (the update, the files, the task row's stamp, then the email rows), so a
+ * late send and an active send of the same files meet on the files' rows and
+ * never wait on each other crosswise; the stamp takes the task row before any
+ * email row, as every write that queues one.
  */
 export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentIds: string[], p: Principal, now = new Date()): Promise<TaskEvent> {
   if (p.kind !== "contractor") throw new TaskRuleError("Only a contractor's late photos post this way.");
-  if (attachmentIds.length === 0) throw new TaskRuleError("Write something or add a photo.");
   await assertContractorAccess(tx, taskId, p.contactId);
-  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  if (attachmentIds.length === 0) throw new TaskRuleError("Write something or add a photo.");
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   const visibility: Visibility = "SHARED";

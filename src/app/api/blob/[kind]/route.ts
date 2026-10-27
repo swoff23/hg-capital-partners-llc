@@ -1,5 +1,6 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
+import { isFinalRefusal } from "@/lib/attachments/access";
 import { propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
 import { appScope, ownerRefusal, portalScope } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
@@ -33,8 +34,10 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *
  * A 400 means the server said no (an UploadRefusal: the job closed, a type or
  * size that isn't allowed, a session that ended) and the uploader's tile turns
- * red. Anything else that goes wrong, a database blip included, is a 503, which
- * the uploader waits out and tries again (attachments/token-failure.ts).
+ * red. A closed job also says `final`, so the tile keeps only Remove, as the
+ * record step's answer does (access.ts isFinalRefusal). Anything else that goes
+ * wrong, a database blip included, is a 503, which the uploader waits out and
+ * tries again (attachments/token-failure.ts).
  *
  * The queue that asks says whose it is (`owner` in the payload, queue-owner.ts):
  * a tab still showing Zack's queue after Mike signed in elsewhere is refused
@@ -108,7 +111,7 @@ const KINDS: Record<string, UploadKind> = {
       const limits = taskLimits("portal-task-upload", taskId, pathname, payload);
       if (who.kind !== "contractor") throw new UploadRefusal("Not found");
       const refusal = await contractorUploadRefusal(taskId, who.contactId, { atMint: true, queuedAt: stringOrNull(payload.queuedAt) });
-      if (refusal) throw new UploadRefusal(refusal);
+      if (refusal) throw new UploadRefusal(refusal, isFinalRefusal(refusal));
       return limits;
     },
   },
@@ -210,6 +213,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
     // is a 503, so the file waits and tries again (token-failure.ts).
     const failure = tokenFailure(err, body.type);
     if (failure.status === 503) logError("blob:token", err, { kind });
-    return NextResponse.json({ error: failure.message }, { status: failure.status });
+    return NextResponse.json({ error: failure.message, ...(failure.final ? { final: true } : {}) }, { status: failure.status });
   }
 }

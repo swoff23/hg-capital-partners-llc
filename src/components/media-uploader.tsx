@@ -112,7 +112,7 @@ export type MediaUpload = {
   /** Why it failed, as the server or the check said it. */
   error?: string;
   /**
-   * Refused for good by the record step after its bytes went up (a job that closed first): status "invalid", so
+   * Refused for good by the token route or the record step (a job that closed first): status "invalid", so
    * Remove only, but it keeps the failed tile's look, since nothing is wrong with the file itself.
    */
   final?: boolean;
@@ -512,7 +512,7 @@ export function UploadTile({
  * only be removed, so it gets no Retry; with nothing to retry, the line keeps
  * the reason ("1 photo didn't upload: over the 25 MB photo limit"), since
  * it's the only place a sighted user sees why. When every red tile is one the
- * job closed on before it recorded (`final`), it is "Job closed before 2
+ * job closed on before it uploaded (`final`), it is "Job closed before 2
  * photos uploaded", also with no Retry. With nothing failed but files held
  * for a signal it is "No signal · 5 photos waiting" in `--fg-3` ("No signal ·
  * 5 waiting" under 360px). Nothing while all is well.

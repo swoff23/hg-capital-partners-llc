@@ -56,6 +56,18 @@ export class ServerBusyError extends Error {
   }
 }
 
+/**
+ * The token route refused the file for good (`final` in its 400: the job closed before the file got a token).
+ * Nothing about the file or the road is wrong and no Retry can change it, so the tile keeps only Remove,
+ * the same as the record step's final refusal (engine.ts). The message is the server's own words.
+ */
+export class FinalRefusalError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FinalRefusalError";
+  }
+}
+
 /** Whether an error is the connection (no signal, a dropped request, a stall) rather than anyone refusing the file. */
 export function classifyFailure(err: unknown, online: boolean): FailureKind {
   if (err instanceof StalledError) return "timeout";

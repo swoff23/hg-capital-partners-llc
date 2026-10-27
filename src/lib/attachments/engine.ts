@@ -5,6 +5,7 @@ import { usesMultipart, type FileKind } from "./content-types";
 import { checkMediaFile, closedJobLine, storedNames, uploadCountPhrase, uploadFailureReason, withExtension } from "./media";
 import {
   STALL_MS,
+  FinalRefusalError,
   ServerBusyError,
   StalledError,
   afterFailure,
@@ -77,7 +78,7 @@ type Job = {
   tries: number;
   waits: number;
   recordFailures: number;
-  /** The record step refused it for good (RecordMediaResult `final`, a job that closed first): Remove only. */
+  /** The server refused it for good (the record step's `final`, or the token route's: a job that closed first): Remove only. */
   final: boolean;
   /** Bytes are up and there is no record step yet: a reload put the file back before its page did. */
   needsRecord: boolean;
@@ -677,9 +678,10 @@ export class UploadEngine {
   }
 
   private fail(job: Job, err: unknown) {
-    if (err instanceof RecordRefused && err.final) {
-      // Refused for good (the job closed before it recorded): the Remove-only state the check's refusals use, with
-      // the server's reason and no Retry anywhere. Its row stays, as every red tile's does, until it is removed.
+    if (err instanceof FinalRefusalError || (err instanceof RecordRefused && err.final)) {
+      // Refused for good (the job closed before the file got a token or recorded): the Remove-only state the
+      // check's refusals use, with the server's reason and no Retry anywhere. Its row stays, as every red tile's
+      // does, until it is removed.
       this.patch(job, { status: "invalid", error: err.message, final: true });
       void this.save(job);
       if (this.isAway(job.key)) this.noticeFailure(job);

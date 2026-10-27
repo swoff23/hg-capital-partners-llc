@@ -549,18 +549,21 @@ test("addLateContractorBatch: one email line per partner for the batch, naming i
   }
 });
 
-test("addLateContractorBatch: access first, then the task row is locked, then written, all before any email row", async () => {
+test("addLateContractorBatch: access first, then addComment's order (update, files, task stamp), all before any email row", async () => {
   const { tx, calls } = doneTx();
   await addLateContractorBatch(tx, "t1", ["a1"], ZACK, POSTED);
   const at = (pred: (c: Call) => boolean) => calls.findIndex(pred);
   const access = at((c) => c.model === "taskAccess" && c.op === "findUnique");
-  const lock = at((c) => c.model === "$executeRaw" && /SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE/.test(c.op));
   const read = at((c) => c.model === "task" && c.op === "findUnique");
+  const event = at((c) => c.model === "taskEvent" && c.op === "create");
+  const link = at((c) => c.model === "taskAttachment" && c.op === "updateMany");
   const stamp = at((c) => c.model === "task" && c.op === "update");
   const firstInsert = at((c) => c.model === "$executeRaw" && c.op.includes("NotificationOutbox"));
   assert.equal(access, 0, "the access check is the first thing it does");
-  assert.ok(access < lock && lock < read && read < stamp && stamp < firstInsert, JSON.stringify({ access, lock, read, stamp, firstInsert }));
-  assert.deepEqual(calls[lock].args, ["t1"]);
+  assert.ok(access < read && read < event && event < link && link < stamp && stamp < firstInsert, JSON.stringify({ access, read, event, link, stamp, firstInsert }));
+  // The files' rows come before the task row's lock, as in addComment, so a late send and an active send of the same
+  // files can't each hold what the other wants. The stamp is the Task row's lock, taken before the first email row.
+  assert.ok(!calls.some((c) => c.model === "$executeRaw" && c.op.includes("FOR NO KEY UPDATE")), "no lock up front");
 });
 
 test("addLateContractorBatch: no access is refused before the job is touched", async () => {
@@ -575,7 +578,7 @@ test("addLateContractorBatch: staff, no files, or files another send already too
   assert.deepEqual(staff.calls, []);
   const none = doneTx();
   await assert.rejects(addLateContractorBatch(none.tx, "t1", [], ZACK, POSTED), /Write something or add a photo\./);
-  assert.deepEqual(none.calls, []);
+  assert.deepEqual(none.calls.map((c) => c.model), ["taskAccess"], "access is checked first, then nothing is read or written");
   // Two sends of the same files at once: the losing side links nothing and is refused, so its update rolls back.
   const taken = doneTx((model, op) => (model === "taskAttachment" && op === "updateMany" ? { count: 0 } : undefined));
   await assert.rejects(addLateContractorBatch(taken.tx, "t1", ["a1"], ZACK, POSTED), /Write something or add a photo\./);

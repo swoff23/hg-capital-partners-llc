@@ -132,7 +132,8 @@ function failedCount(failures: readonly Pick<UploadFailure, "name" | "kind">[]):
 
 /**
  * The status line when every red tile on a tray is one the job closed on
- * before it recorded (the record step's final refusal, uploads question 4):
+ * before it uploaded (the token route's or the record step's final refusal,
+ * uploads question 4):
  * "Job closed before 2 photos uploaded", the noun as uploadNotice has it. No
  * Retry goes with it. Empty when nothing is red, or any red tile is something
  * else (a Retry, or a file the check refused), which keeps today's line.

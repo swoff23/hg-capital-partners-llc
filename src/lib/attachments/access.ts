@@ -35,15 +35,24 @@ export function contractorMaySee(att: SeeableFile, contactId: string): boolean {
 export const JOB_CLOSED = "This job is closed.";
 
 /**
+ * Whether a refusal is one no Retry can change: the job closed before the file
+ * got a token or recorded. Every other refusal (no access, another sign-in, a
+ * bad file) is one a Retry may get past. The token route and the record step
+ * both ask this, so a closed job reads the same wherever the file meets it.
+ */
+export function isFinalRefusal(error: string | null | undefined): boolean {
+  return error === JOB_CLOSED;
+}
+
+/**
  * The portal record step's answer, final when the job closed before the file
  * recorded: no Retry can change that (the server has already let the blob
  * go), so the queue keeps only Remove on its tile and the line under the tray
  * says "Job closed before 2 photos uploaded" (engine.ts, uploads question 4).
- * Every other refusal (no access, another sign-in, a bad file) stays one a
- * Retry may get past.
+ * The token route says the same with `final` in its 400 (api/blob/[kind]).
  */
 export function withFinalRefusal<R extends { ok: boolean; error?: string }>(res: R): R & { final?: true } {
-  return !res.ok && res.error === JOB_CLOSED ? { ...res, final: true } : res;
+  return !res.ok && isFinalRefusal(res.error) ? { ...res, final: true } : res;
 }
 
 /**

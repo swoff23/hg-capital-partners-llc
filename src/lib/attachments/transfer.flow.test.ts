@@ -2,7 +2,7 @@ import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { ServerBusyError, classifyFailure, type MultipartState } from "./outbox";
+import { FinalRefusalError, ServerBusyError, classifyFailure, type MultipartState } from "./outbox";
 import { sendBlob, type SendInput } from "./transfer";
 
 /**
@@ -21,7 +21,7 @@ type Seen = { action: string; part?: number; bytes?: number; key?: string; uploa
 const seen: Seen[] = [];
 const tokenAsks: unknown[] = [];
 /** Makes the stand-in's token route answer with this status (after `delayMs`), for the next asks; null answers normally. */
-let tokenFault: { status: number; delayMs?: number; times?: number } | null = null;
+let tokenFault: { status: number; delayMs?: number; times?: number; body?: unknown } | null = null;
 /**
  * Makes a part's upload answer with an error instead of its etag. Given the part number and the token it came with;
  * returns the Blob API's error (status, code) or undefined for a normal answer. `waitUntil` holds the error back
@@ -66,7 +66,7 @@ before(async () => {
         const fault = tokenFault;
         if (fault.times !== undefined && --fault.times <= 0) tokenFault = null;
         if (fault.delayMs) await sleep(fault.delayMs);
-        return json({ error: "no" }, fault.status);
+        return json(fault.body ?? { error: "no" }, fault.status);
       }
       return json({ type: "blob.generate-client-token", clientToken: `vercel_blob_client_store_${tokenAsks.length}` });
     }
@@ -301,6 +301,32 @@ test("a 4xx from the token route is the server saying no, so it turns red", asyn
   } finally {
     tokenFault = null;
   }
+});
+
+test("a 400 that says final is a refusal no Retry can change: its own words, and still not busy", async () => {
+  tokenFault = { status: 400, body: { error: "This job is closed.", final: true } };
+  try {
+    const err = await sendBlob(input(blobOf(1 * MB), { name: "Kitchen.jpg", contentType: "image/jpeg", fileKind: "image" })).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    assert.ok(err instanceof FinalRefusalError, "the queue puts this tile in Remove only");
+    assert.equal(err.message, "This job is closed.");
+    assert.equal(classifyFailure(err, true), "refused");
+    // A 400 without it, or with it on something that isn't words, is today's plain refusal with its Retry.
+    for (const body of [{ error: "This job is closed." }, { error: "Not found", final: false }, { final: true }, null]) {
+      tokenFault = { status: 400, body };
+      const plain = await sendBlob(input(blobOf(1 * MB), { name: "Kitchen.jpg", contentType: "image/jpeg", fileKind: "image" })).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      assert.ok(plain instanceof Error && !(plain instanceof FinalRefusalError), JSON.stringify(body));
+      assert.match(plain.message, /client token/);
+    }
+  } finally {
+    tokenFault = null;
+  }
+  assert.equal(seen.length, 0, "no bytes went anywhere");
 });
 
 test("the stall watchdog's abort reaches a token request that is still waiting for the route", async () => {

@@ -7,6 +7,7 @@ import {
   ZIP_VIEWERS,
   acceptsContractorUpload,
   contractorMaySee,
+  isFinalRefusal,
   mayDownloadZip,
   parseQueuedAt,
   withFinalRefusal,
@@ -171,5 +172,12 @@ test("withFinalRefusal: the closed-job refusal is final, every other answer pass
     const out = withFinalRefusal(res);
     assert.deepEqual(out, res, JSON.stringify(res));
     assert.equal("final" in out, false);
+  }
+});
+
+test("isFinalRefusal: only the closed-job words, the one test the token route and the record step share", () => {
+  assert.equal(isFinalRefusal(JOB_CLOSED), true);
+  for (const error of ["You don't have access to this job.", "That job no longer exists.", "this job is closed", "", null, undefined]) {
+    assert.equal(isFinalRefusal(error), false, String(error));
   }
 });
