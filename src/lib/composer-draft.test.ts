@@ -151,7 +151,7 @@ test("adoptSharedDraft: the task page's old draft moves to the first partner's k
   const mine = personalDraftKey("task", "t1", "u-connor");
   const s = storage({ "hgos-task-draft:t1": old, "hgos-task-draft:t2": "other task" });
   adoptSharedDraft(s, mine);
-  assert.equal(s.map.get(mine), old, "moved whole, words, side and any pending send");
+  assert.equal(s.map.get(mine), old, "moved whole: the words and the side");
   assert.equal(s.map.has("hgos-task-draft:t1"), false);
   assert.equal(s.map.get("hgos-task-draft:t2"), "other task", "another task's draft waits for its own page");
   assert.deepEqual(parseDraft(s.map.get(mine)).draft.visibility, "INTERNAL");
@@ -162,6 +162,32 @@ test("adoptSharedDraft: the task page's old draft moves to the first partner's k
   adoptSharedDraft(s, theirs);
   assert.deepEqual(s.writes, []);
   assert.equal(s.map.has(theirs), false);
+});
+
+test("adoptSharedDraft: a plain-text draft from before drafts had sides moves as it was, and restores Internal", () => {
+  const mine = personalDraftKey("task", "t1", "u-connor");
+  const s = storage({ "hgos-task-draft:t1": "Ask Zack about the vanity" });
+  adoptSharedDraft(s, mine);
+  assert.equal(s.map.get(mine), "Ask Zack about the vanity");
+  assert.equal(s.map.has("hgos-task-draft:t1"), false);
+  const { draft, legacy } = parseDraft(s.map.get(mine));
+  assert.deepEqual([draft.text, draft.visibility, draft.pending, legacy], ["Ask Zack about the vanity", "INTERNAL", null, true]);
+});
+
+test("adoptSharedDraft: a message sent and not confirmed stays behind, so a Retry never carries someone else's id or files", () => {
+  const mine = personalDraftKey("task", "t1", "u-connor");
+  const pending = { clientId: "c-1", text: "Sent words", visibility: "SHARED", files: [{ id: "a1", filename: "quote.pdf" }], at: "2026-10-27T10:00:00.000Z" };
+  const withTyping = storage({ "hgos-task-draft:t1": JSON.stringify({ v: 2, text: "Typed since", visibility: "INTERNAL", pending }) });
+  adoptSharedDraft(withTyping, mine);
+  const adopted = parseDraft(withTyping.map.get(mine)).draft;
+  assert.deepEqual([adopted.text, adopted.visibility, adopted.pending], ["Typed since", "INTERNAL", null]);
+  assert.doesNotMatch(withTyping.map.get(mine) ?? "", /c-1|quote\.pdf/);
+  assert.equal(withTyping.map.has("hgos-task-draft:t1"), false);
+  // Nothing typed since: there is nothing to take, and the old entry still goes.
+  const onlyPending = storage({ "hgos-task-draft:t1": JSON.stringify({ v: 2, text: "", visibility: "SHARED", pending }) });
+  adoptSharedDraft(onlyPending, mine);
+  assert.equal(onlyPending.map.has(mine), false);
+  assert.equal(onlyPending.map.has("hgos-task-draft:t1"), false);
 });
 
 test("adoptSharedDraft: a draft already under the partner's key is theirs and stays; the old one goes", () => {

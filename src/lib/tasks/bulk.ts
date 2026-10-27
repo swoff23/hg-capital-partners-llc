@@ -1,5 +1,5 @@
 import "server-only";
-import { Prisma } from "@prisma/client";
+import { Prisma, type TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { toYmd, type Ymd } from "@/lib/dates";
@@ -42,19 +42,23 @@ function revalidate(rows: { id: string; propertyId: string | null; dealId: strin
  *   "due"    the due date (staff tasks, "Move all to today");
  *   "target" what a contractor sees (D7): a Scheduled job's visit date,
  *            otherwise its due date.
- * Closed tasks and dates already at `to` are skipped. Returns each moved
- * date as it was, for Undo.
+ * Closed tasks, tasks deleted since the list was drawn and dates already at
+ * `to` are skipped. Returns each moved date as it was, for Undo.
  */
 export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" | "target", p: core.Principal): Promise<DateChange[]> {
   const value = to === null ? null : toYmd(to);
   if (to !== null && !value) throw new core.TaskRuleError("That isn't a date.");
+  const unique = [...new Set(ids)];
+  if (!unique.length) return [];
   const { moved, rows } = await prisma.$transaction(async (tx) => {
-    const rows = await tx.task.findMany({
-      where: { id: { in: [...new Set(ids)] } },
-      select: { id: true, status: true, dueDate: true, scheduledFor: true, propertyId: true, dealId: true },
-      // One order for every batch, so two that share tasks (both partners' "Move all to today") take them the same way round.
-      orderBy: { id: "asc" },
-    });
+    // Locked as they are read, in the database's id order, so two batches that share tasks (both partners' "Move all
+    // to today") take them the same way round. Held from here, a task can't be deleted between this read and its
+    // patch, which would fail the whole batch, and its status is the one it has now: one closed first is skipped, not
+    // moved. A task deleted before the read isn't read, and is skipped. NO KEY UPDATE, the lock patchTask's update takes.
+    const rows = await tx.$queryRaw<
+      { id: string; status: TaskStatus; dueDate: Date | null; scheduledFor: Date | null; propertyId: string | null; dealId: string | null }[]
+    >`
+      SELECT "id", "status", "dueDate", "scheduledFor", "propertyId", "dealId" FROM "Task" WHERE "id" IN (${Prisma.join(unique)}) ORDER BY "id" FOR NO KEY UPDATE`;
     const moved: DateChange[] = [];
     for (const r of rows) {
       if (!isActiveStatus(r.status)) continue;

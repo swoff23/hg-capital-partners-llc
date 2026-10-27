@@ -89,6 +89,21 @@ test("raw SQL on the email outbox lives only in core.ts and the send run", () =>
   assert.deepEqual(naming.sort(), ["lib/notifications/outbox.ts", "lib/tasks/core.ts"]);
 });
 
+test("the portal's record step locks the job before it reads the job's status, so a close that lands first is seen", () => {
+  const attachments = read("lib", "tasks", "attachments.ts");
+  const body = fn(attachments, "recordPortalAttachment");
+  const txn = body.slice(body.indexOf("prisma.$transaction("));
+  assert.ok(txn.includes("core.lockTask(tx, taskId)"), "the in-transaction check runs under the Task lock");
+  const lock = txn.indexOf("core.lockTask(tx, taskId)");
+  const refusal = txn.indexOf("contractorUploadRefusal(taskId, portal.contactId, { queuedAt }, tx)");
+  const record = txn.indexOf("core.recordAttachment(tx, taskId");
+  assert.ok(lock >= 0 && refusal > lock && record > refusal, "lock, then the job's status and window, then the record");
+  // The lock is the one Task row lock core takes first everywhere, and names no email row.
+  const core = read("lib", "tasks", "core.ts");
+  assert.match(fn(core, "lockTask"), /SELECT 1 FROM "Task" WHERE "id" = \$\{taskId\} FOR NO KEY UPDATE/);
+  assert.doesNotMatch(fn(core, "lockTask"), /NotificationOutbox/);
+});
+
 test("the record step answers a Retry with its own earlier row, and staff Remove goes through core (fixes 7 and 9)", () => {
   const attachments = read("lib", "tasks", "attachments.ts");
   // Every way a record step can find its file attached (the check before head(), the unique pathname in a race)

@@ -265,7 +265,9 @@ export async function contractorUploadRefusal(
 /**
  * Contractor: the portal's record step, for uploads made through
  * /api/blob/portal-task-upload. Same checks as staff, plus the job rules
- * above, rechecked inside the transaction. Always Shared.
+ * above, rechecked inside the transaction once the job's row is locked (a
+ * close that lands first is seen; one that lands after waits for the file's
+ * line). Always Shared.
  */
 export async function recordPortalAttachment(
   taskId: string,
@@ -285,6 +287,9 @@ export async function recordPortalAttachment(
     return recordOnce(taskId, input, p, async () => {
       const meta = await verifiedAttachment(taskId, input, auth, UPLOAD_KIND_ALLOWED["portal-task-upload"]);
       return prisma.$transaction(async (tx) => {
+        // The job's lock first, then its status and window are read: a staff Approve or Cancel that lands after the
+        // early check above is waited for and then seen, so no file records on a job that has just closed.
+        await core.lockTask(tx, taskId);
         const refusal = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt }, tx);
         if (refusal) throw new core.TaskRuleError(refusal);
         return core.recordAttachment(tx, taskId, meta, p, { visibility: "SHARED", standalone: opts.standalone });

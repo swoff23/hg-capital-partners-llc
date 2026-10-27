@@ -5,6 +5,7 @@ import {
   addComment,
   commentSummary,
   findOwnUpload,
+  lockTask,
   recordAttachment,
   removeAttachment,
   renameAttachment,
@@ -386,6 +387,26 @@ test("recordAttachment: the task row is locked before the task is read, so a rea
   const inserts = outboxInserts(calls);
   assert.ok(inserts.some((c) => (c.args as unknown[]).includes("c-jose")), "Jose's email");
   assert.ok(!inserts.some((c) => (c.args as unknown[]).includes("c-zack")), "never the contractor who just lost the job");
+});
+
+test("lockTask: takes the Task row with FOR NO KEY UPDATE and reads and writes nothing else; recordAttachment then takes it again without a second row", async () => {
+  // The portal's record step (attachments.ts recordPortalAttachment) locks first, then reads the job's status and
+  // window, then records: a staff Approve or Cancel that lands in between waits for the file's line instead of
+  // closing the job under it.
+  const alone = fakeTx();
+  await lockTask(alone.tx, "t1");
+  assert.deepEqual(alone.calls.map((c) => [c.model, c.args]), [["$executeRaw", ["t1"]]]);
+  assert.match(alone.calls[0].op, /^SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  const { tx, calls } = fakeTx((model, op, args) => (model === "taskAttachment" && op === "create" ? { id: "a1", ...args.data } : undefined));
+  const meta = { url: "https://x.private.blob.vercel-storage.com/tasks/t1/orig/p.jpg", pathname: "tasks/t1/orig/p.jpg", filename: "p.jpg", size: 10, contentType: "image/jpeg" };
+  await lockTask(tx, "t1");
+  const held = calls.length;
+  await recordAttachment(tx, "t1", meta, ZACK, { standalone: false }, POSTED);
+  const locks = calls.filter((c) => c.model === "$executeRaw" && c.op.includes('FROM "Task"'));
+  assert.equal(locks.length, 2, "the same row, locked again by the record");
+  assert.deepEqual(locks.map((c) => c.args), [["t1"], ["t1"]]);
+  assert.equal(held, 1, "the caller's lock was the only thing before it");
+  assert.ok(!calls.some((c) => c.model === "$executeRaw" && c.op.includes("NotificationOutbox")), "no email row names the lock");
 });
 
 test("recordAttachment: a contractor who lost the job while the upload waited is refused under the lock, and nothing is written", async () => {

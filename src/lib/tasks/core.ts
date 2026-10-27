@@ -1368,6 +1368,19 @@ export interface AttachmentMeta {
   posterPathname?: string | null;
 }
 
+/**
+ * Take the Task row (FOR NO KEY UPDATE, the lock a task write takes) and hold
+ * it to the end of the transaction. For a caller that checks something about
+ * the job before it writes (tasks/attachments.ts recordPortalAttachment: is
+ * the job still open to a contractor's file) and must see what a concurrent
+ * Approve, Cancel or reassignment left, not what was there before it. The
+ * lock a function here takes again for itself is one the caller already
+ * holds, so it doesn't wait. Nothing else is read or written.
+ */
+export async function lockTask(tx: Tx, taskId: string): Promise<void> {
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+}
+
 const kindForType = (type: string | null) => (type?.startsWith("image/") ? "IMAGE" : type?.startsWith("video/") ? "VIDEO" : "FILE") as "IMAGE" | "VIDEO" | "FILE";
 
 /**
@@ -1391,7 +1404,7 @@ export async function recordAttachment(
   opts: { visibility?: Visibility; standalone?: boolean } = {},
   now = new Date(),
 ) {
-  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  await lockTask(tx, taskId);
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);

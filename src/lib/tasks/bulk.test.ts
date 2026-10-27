@@ -13,10 +13,20 @@ import { join } from "node:path";
 const code = readFileSync(join(import.meta.dirname, "bulk.ts"), "utf8").replace(/\/\/.*$/gm, "");
 const body = (name: string) => code.slice(code.indexOf(`export async function ${name}`), code.indexOf("\nexport ", code.indexOf(`export async function ${name}`) + 1) >>> 0);
 
-test("moveTaskDates patches its tasks in id order", () => {
+test("moveTaskDates locks its tasks as it reads them, in id order, and reads each status under the lock", () => {
   const move = body("moveTaskDates");
-  assert.match(move, /tx\.task\.findMany\(\{[\s\S]*?orderBy: \{ id: "asc" \}[\s\S]*?\}\);\s*const moved/);
+  // One statement that takes each row in id order as it reads it: a task can't be deleted between the read and its
+  // patch (which would fail the whole batch) or closed after the status check and still be moved.
+  assert.match(
+    move,
+    /tx\.\$queryRaw<[\s\S]*?>`\s*SELECT "id", "status", "dueDate", "scheduledFor", "propertyId", "dealId" FROM "Task" WHERE "id" IN \(\$\{Prisma\.join\(unique\)\}\) ORDER BY "id" FOR NO KEY UPDATE`;/,
+  );
+  assert.doesNotMatch(move, /tx\.task\.findMany/, "no unlocked read");
+  assert.doesNotMatch(move, /FOR UPDATE`/, "never FOR UPDATE, which the key-share locks of the lines it writes would wait on");
+  assert.ok(move.indexOf("$queryRaw") < move.indexOf("isActiveStatus"), "the status is read under the lock");
+  assert.ok(move.indexOf("$queryRaw") < move.indexOf("core.patchTask"), "locked before the first patch");
   assert.match(move, /for \(const r of rows\)/, "in the order the read returned");
+  assert.match(move, /if \(!unique\.length\) return \[\];/, "an empty list reads nothing (Prisma.join needs one id)");
 });
 
 test("restoreTaskDates locks its tasks as it reads them, in the same id order, whatever order the Undo's list came in", () => {

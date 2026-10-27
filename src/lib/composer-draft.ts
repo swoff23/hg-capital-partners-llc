@@ -55,14 +55,22 @@ export interface DraftStorage {
  * held (sharedDraftKey), once: a draft there moves to this key when this key
  * holds nothing, and the old entry is removed either way, so it opens for one
  * person and no read after finds it. A draft already under this key is the
- * person's own and wins.
+ * person's own and wins. The words and the side move; a sent-and-unconfirmed
+ * message (`pending`) does not, so a Retry never carries a `clientId` or
+ * draft files that were someone else's. The shared key only ever held the
+ * words as plain text, so that matters only to a browser that ran this
+ * format under it before drafts were per person.
  */
 export function adoptSharedDraft(storage: DraftStorage, key: string): void {
   const from = sharedDraftKey(key);
   if (!from) return;
   const old = storage.getItem(from);
   if (old === null) return;
-  if (storage.getItem(key) === null) storage.setItem(key, old);
+  if (storage.getItem(key) === null) {
+    const { draft } = parseDraft(old);
+    const adopted = draft.pending ? serializeDraft({ ...draft, pending: null }) : old;
+    if (adopted !== null) storage.setItem(key, adopted);
+  }
   storage.removeItem(from);
 }
 
