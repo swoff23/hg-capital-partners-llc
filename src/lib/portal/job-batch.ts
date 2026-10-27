@@ -31,14 +31,39 @@ export async function ownUnposted(tx: core.Tx, taskId: string, contactId: string
   });
 }
 
-/** Whether every id is a file this contractor already posted on this job: a send that came again. */
-async function allOwnPosted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<boolean> {
+/**
+ * Of the ids the browser sent, the files this contractor already posted on this job as a batch post (no text, the
+ * "3 photos posted" kind), with their kinds: a batch whose answer was lost comes back on the tray. Mark done counts
+ * these toward the photos it asks for (portal/jobs.ts), since HG heard of them with that post. A photo posted with a
+ * written update never counts, as before.
+ */
+export async function ownPosted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<{ id: string; kind: AttachmentKind }[]> {
+  if (ids.length === 0) return [];
+  return tx.taskAttachment.findMany({
+    where: {
+      id: { in: ids },
+      taskId,
+      uploadedByContactId: contactId,
+      eventId: { not: null },
+      event: { is: { data: { path: ["batch"], equals: true } } },
+      deletedAt: null,
+      asanaGid: null,
+    },
+    select: { id: true, kind: true },
+  });
+}
+
+/**
+ * Whether every id is a file of this contractor's on this job with nothing left to tell HG: posted already, or taken
+ * off the job since (HG deleted it). A send that came again, after its answer was lost, answers quietly on this.
+ */
+export async function allOwnPosted(tx: core.Tx, taskId: string, contactId: string, ids: string[]): Promise<boolean> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return false;
-  const posted = await tx.taskAttachment.count({
-    where: { id: { in: unique }, taskId, uploadedByContactId: contactId, eventId: { not: null }, deletedAt: null, asanaGid: null },
+  const done = await tx.taskAttachment.count({
+    where: { id: { in: unique }, taskId, uploadedByContactId: contactId, asanaGid: null, OR: [{ eventId: { not: null } }, { deletedAt: { not: null } }] },
   });
-  return posted === unique.length;
+  return done === unique.length;
 }
 
 /**
@@ -72,12 +97,13 @@ async function postLate(tx: core.Tx, taskId: string, p: Contractor, own: string[
 
 /**
  * One batch of recorded files, posted together. The access check comes first.
- * A send whose files are all this contractor's and posted already (one sent
- * again after its answer was lost) has nothing new to tell, on a job of any
- * status: it answers quietly, with no event and nothing linked, so the pieces
- * after it still go (record-and-post.ts posts a big batch in pieces and stops
- * at the first refused). Two sends of the same files at once still meet on
- * the files' rows, so the one that waited is refused and leaves nothing.
+ * A send whose files are all this contractor's and posted already, or taken
+ * off the job since (one sent again after its answer was lost) has nothing new
+ * to tell, on a job of any status: it answers quietly, with no event and
+ * nothing linked, so the pieces after it still go (record-and-post.ts posts a
+ * big batch in pieces and stops at the first refused). Two sends of the same
+ * files at once still meet on the files' rows, so the one that waited is
+ * refused and leaves nothing.
  * On an active job it is one update with no text, marked as a batch for the
  * Undo (core.addComment `batch`), and its event comes back for that Undo. On
  * a job HG has approved or canceled since the photos went up, the late

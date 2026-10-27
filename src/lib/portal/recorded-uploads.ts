@@ -71,15 +71,6 @@ export async function postInBatches<T>(items: readonly T[], post: (piece: T[]) =
 }
 
 /**
- * The job page's cap (the queue target's maxFiles) while a Send or Mark done holds its photos: no more than one post
- * takes, counting the ones already held, so a file past it gets the queue's "no more can be added here" tile instead
- * of being kept out of sight. Nothing holding them: no cap, since a batch that posts on its own goes in pieces.
- */
-export function trayRoom(holding: boolean, held: number): number | undefined {
-  return holding ? Math.max(0, MAX_FILES_PER_POST - held) : undefined;
-}
-
-/**
  * The files a post told HG of, for its toast: the ones it linked. A file kept from a post whose answer was lost
  * is on the job and was told of then, so it isn't counted again; with nothing new (every one was posted
  * already) the toast counts them all, since they are on the job as it says.

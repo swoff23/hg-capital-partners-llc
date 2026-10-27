@@ -8,7 +8,7 @@ import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { logSecurityEvent } from "./accounts";
-import { ownUnposted } from "./job-batch";
+import { allOwnPosted, ownPosted, ownUnposted } from "./job-batch";
 import { addMorePhotosLine, finishPhotoCount, finishPhotosNeeded } from "./job-view";
 import { requestIpHash } from "./request";
 import { requirePortalPrincipal, taskPrincipal, type PortalPrincipal } from "./session";
@@ -111,11 +111,20 @@ export interface JobUpdateInput {
   attachmentIds: string[];
 }
 
-/** An update from the composer: text, files, or both. Always Shared (core). Only the contractor's own unposted files go (job-batch.ts ownUnposted). */
+/**
+ * An update from the composer: text, files, or both. Always Shared (core). Only the contractor's own unposted files go
+ * (job-batch.ts ownUnposted). With no text, files that are all posted already (a batch post whose answer was lost put
+ * them back on the tray) have nothing new to tell HG: it answers quietly, so the page clears them instead of
+ * refusing every Send.
+ */
 export async function postJobUpdate(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
   await prisma.$transaction(async (tx) => {
     const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
+    if (!input.body.trim() && own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, input.attachmentIds))) {
+      await core.assertContractorAccess(tx, taskId, p.contactId);
+      return;
+    }
     await core.addComment(tx, taskId, { body: input.body, attachmentIds: own.map((f) => f.id) }, taskPrincipal(p));
   });
   revalidateJob(taskId);
@@ -126,9 +135,11 @@ export async function postJobUpdate(taskId: string, input: JobUpdateInput): Prom
  * update, then the job moves to Review (D6b). Both partners get one email
  * for the two (core bundles them). When the job's playbook asks for photos
  * (TaskTemplate.finishPhotosRequired, uploads 2.8), it needs that many of this
- * contractor's own, unposted photos and videos here (job-view finishPhotoCount,
- * what the sheet counts); the sheet holds the button until they are up, and
- * this is the same rule where the browser can't skip it.
+ * contractor's own photos and videos here (job-view finishPhotoCount, what the
+ * sheet counts): the unposted ones, which this update links, and any a batch
+ * post already told HG of whose answer was lost, which stay on that post's
+ * line (job-batch.ts ownPosted). The sheet holds the button until they are
+ * up, and this is the same rule where the browser can't skip it.
  */
 export async function markJobDone(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
@@ -138,7 +149,9 @@ export async function markJobDone(taskId: string, input: JobUpdateInput): Promis
       const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
       const template = await tx.task.findUnique({ where: { id: taskId }, select: { taskTemplate: { select: { finishPhotosRequired: true } } } });
       const required = finishPhotosNeeded(template?.taskTemplate?.finishPhotosRequired);
-      const photos = finishPhotoCount(own.map((f) => f.kind));
+      let photos = finishPhotoCount(own.map((f) => f.kind));
+      // Photos a batch post already told HG of, put back on the tray after its answer was lost, count too.
+      if (photos < required) photos += finishPhotoCount((await ownPosted(tx, taskId, p.contactId, input.attachmentIds)).map((f) => f.kind));
       if (photos < required) {
         throw new core.TaskRuleError(`${addMorePhotosLine(required - photos)} to mark this done.`);
       }

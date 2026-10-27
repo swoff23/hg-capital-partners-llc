@@ -32,9 +32,9 @@ function revalidateJob(taskId: string): void {
  * takes back. Returns the update's id for that Undo, and `linked`, the ids of
  * the files it linked (the page counts its toast from these). Two sends of the
  * same photos at once: the one that waited is refused, so it leaves no empty
- * update behind. A send whose photos were all posted already (sent again after
- * its answer was lost) answers quietly with no id and nothing linked, so the
- * next piece of a big batch still goes.
+ * update behind. A send whose photos were all posted already, or taken off the
+ * job since (sent again after its answer was lost), answers quietly with no id
+ * and nothing linked, so the next piece of a big batch still goes.
  *
  * A job HG has approved or canceled since the photos went up takes no batch
  * post, but the late photos are already recorded on it, so HG hears about

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { JOB_CLOSED } from "@/lib/attachments/access";
 import { addComment, type Tx } from "@/lib/tasks/core";
-import { postBatchIn } from "./job-batch";
+import { allOwnPosted, ownPosted, postBatchIn } from "./job-batch";
 import { MAX_FILES_PER_POST } from "./job-view";
 import { postInBatches } from "./recorded-uploads";
 
@@ -185,7 +185,54 @@ test("postBatchIn: a late send whose files are all posted already answers quietl
   assert.deepEqual(await postBatchIn(tx, "t1", ZACK, ["a1", "a2", "a2"]), { event: null, linked: [] }, "nothing new was told, so nothing is counted");
   assert.deepEqual(calls.filter(isWrite), []);
   const count = calls.find((c) => c.model === "taskAttachment" && c.op === "count")!.args;
-  assert.deepEqual(count.where, { id: { in: ["a1", "a2"] }, taskId: "t1", uploadedByContactId: "c-zack", eventId: { not: null }, deletedAt: null, asanaGid: null });
+  assert.deepEqual(count.where, {
+    id: { in: ["a1", "a2"] },
+    taskId: "t1",
+    uploadedByContactId: "c-zack",
+    asanaGid: null,
+    OR: [{ eventId: { not: null } }, { deletedAt: { not: null } }],
+  });
+});
+
+test("postBatchIn: a kept piece of posted files and one HG deleted since answers quietly, so the pieces after it still go", async () => {
+  // 49 posted by a post whose answer was lost, and one HG took off the job: neither is new, so there is nothing to tell.
+  const ids = Array.from({ length: MAX_FILES_PER_POST }, (_, i) => `a${i + 1}`);
+  for (const status of ["IN_PROGRESS", "DONE"]) {
+    const { tx, calls } = fakeTx({ statuses: [status], unposted: [], posted: MAX_FILES_PER_POST });
+    assert.deepEqual(await postBatchIn(tx, "t1", ZACK, ids), { event: null, linked: [] }, status);
+    assert.deepEqual(calls.filter(isWrite), [], status);
+  }
+});
+
+test("allOwnPosted takes only this contractor's own files on the job, never an imported one, and none for an empty list", async () => {
+  const some = fakeTx({ posted: 2 });
+  assert.equal(await allOwnPosted(some.tx, "t1", "c-zack", ["a1", "a2", "a1"]), true, "duplicates count once");
+  const where = some.calls.find((c) => c.model === "taskAttachment" && c.op === "count")!.args.where!;
+  assert.equal(where.uploadedByContactId, "c-zack");
+  assert.equal(where.taskId, "t1");
+  assert.equal(where.asanaGid, null, "an imported file is history, not a send");
+  assert.equal(await allOwnPosted(fakeTx({ posted: 1 }).tx, "t1", "c-zack", ["a1", "b9"]), false, "one that isn't his or isn't done");
+  const none = fakeTx();
+  assert.equal(await allOwnPosted(none.tx, "t1", "c-zack", []), false);
+  assert.deepEqual(none.calls, [], "nothing asked");
+});
+
+test("ownPosted: the contractor's own files already on a batch post, with their kinds, for Mark done's count; a written update's never", async () => {
+  const { tx, calls } = fakeTx({ unposted: ["a1", "a2"] });
+  assert.deepEqual(await ownPosted(tx, "t1", "c-zack", ["a1", "a2"]), [{ id: "a1", kind: "IMAGE" }, { id: "a2", kind: "IMAGE" }]);
+  const asked = calls.find((c) => c.model === "taskAttachment" && c.op === "findMany")!.args;
+  assert.deepEqual(asked.where, {
+    id: { in: ["a1", "a2"] },
+    taskId: "t1",
+    uploadedByContactId: "c-zack",
+    eventId: { not: null },
+    event: { is: { data: { path: ["batch"], equals: true } } },
+    deletedAt: null,
+    asanaGid: null,
+  });
+  const none = fakeTx();
+  assert.deepEqual(await ownPosted(none.tx, "t1", "c-zack", []), []);
+  assert.deepEqual(none.calls, [], "nothing asked");
 });
 
 test("postBatchIn: a send naming anything else posted or not this contractor's is still refused, late or active", async () => {

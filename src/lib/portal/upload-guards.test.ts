@@ -66,11 +66,28 @@ test("Mark done counts only this visit's photos and videos: no imported file, no
   const jobs = read("lib", "portal", "jobs.ts");
   assert.match(fn(jobs, "markJobDone"), /finishPhotoCount\(own\.map\(\(f\) => f\.kind\)\)/);
   // One copy of the rule: Mark done, a written update and the batch post all use the same one.
-  assert.match(jobs, /import \{ ownUnposted \} from "\.\/job-batch";/);
+  assert.match(jobs, /import \{ allOwnPosted, ownPosted, ownUnposted \} from "\.\/job-batch";/);
   for (const [name, source] of [["jobs.ts", jobs], ["job-uploads.ts", read("lib", "portal", "job-uploads.ts")]] as const) {
     assert.doesNotMatch(source, /function ownUnposted/, name);
   }
   assert.match(fn(batch, "postBatchIn"), /await ownUnposted\(tx, taskId, p\.contactId, attachmentIds\)/);
+});
+
+test("files a batch post already told HG of, sent again after its answer was lost, never stall a Send or a Mark done", () => {
+  const jobs = read("lib", "portal", "jobs.ts");
+  // A Send with no text and nothing new answers quietly, so the page clears its tray instead of being refused each tap.
+  assert.match(
+    fn(jobs, "postJobUpdate"),
+    /if \(!input\.body\.trim\(\) && own\.length === 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, input\.attachmentIds\)\)\) \{\s*await core\.assertContractorAccess\(tx, taskId, p\.contactId\);\s*return;\s*\}\s*await core\.addComment/,
+  );
+  // Mark done counts them toward the photos it asks for, but links only the unposted ones.
+  const done = fn(jobs, "markJobDone");
+  assert.match(done, /if \(photos < required\) photos \+= finishPhotoCount\(\(await ownPosted\(tx, taskId, p\.contactId, input\.attachmentIds\)\)\.map\(\(f\) => f\.kind\)\);/);
+  assert.match(done, /const attachmentIds = own\.map\(\(f\) => f\.id\);/);
+  // The service owns the check, with one copy of each rule.
+  const batch = read("lib", "portal", "job-batch.ts");
+  assert.match(batch, /export async function allOwnPosted\(/);
+  assert.match(batch, /OR: \[\{ eventId: \{ not: null \} \}, \{ deletedAt: \{ not: null \} \}\]/);
 });
 
 test("a batch post is marked as one, and its Undo is core's (fixes 1, 2, 3 and 10)", () => {
@@ -258,8 +275,9 @@ test("no post names more files than the actions take, and a kept batch can't sta
   assert.match(actions, /const room = Math\.max\(0, MAX_FILES_PER_POST - live\.current\.ready\.length\);\s*recordedUploads\.keep\(taskId, items\.slice\(room\)\);/);
   assert.match(actions, /putBack\(items\);/);
   assert.match(actions, /if \(left\.length > 0\) putBack\(left\);/);
-  // While a Send or Mark done holds them, the queue's cap is what's left of one post, so the 51st gets its tile.
-  assert.match(actions, /maxFiles: trayRoom\(sheetOpen \|\| body\.trim\(\) !== "", ready\.length\),/);
+  // A file past what the tray holds leaves it for the tab's registry (kept in order), and posts once the Send or Mark done went.
+  assert.match(actions, /recordedUploads\.take\(taskId, ids, MAX_FILES_PER_POST - held\.length\)/);
+  assert.doesNotMatch(actions, /maxFiles/, "no cap tile: the overflow is kept and posted, so the words never go stale");
   // What the tab kept posts once the Send or Mark done went, and as the page goes, so none is left unposted.
   assert.match(fn(shared, "postKept"), /const kept = recordedUploads\.take\(taskId, \[\]\);\s*return kept\.length === 0 \? \[\] : postRecordedBatch\(taskId, kept, toast, owner\);/);
   assert.match(actions, /const sendKept = async \(\) => \{\s*const left = await postKept\(taskId, toast, owner\);\s*if \(left\.length > 0\) putBack\(left\);/);
@@ -269,6 +287,16 @@ test("no post names more files than the actions take, and a kept batch can't sta
   // With the page gone, files that didn't post are all kept for the tab, never put into a tray that's gone.
   assert.match(actions, /if \(!mounted\.current\) \{\s*recordedUploads\.keep\(taskId, items\);\s*return;\s*\}/);
   assert.match(actions, /if \(!posted\.ok\) recordedUploads\.keep\(taskId, heldItems\);/);
+  // A Mark done that fails after the page went keeps its files too (the unmount left them out of its own post).
+  assert.match(actions, /toast\(\{ message: res\.error \}\);\s*\/\/[^\n]*\n\s*if \(!mounted\.current\) recordedUploads\.keep\(taskId, items\);\s*return;/);
+});
+
+test("a Send refused because HG closed the job posts the held photos the late way and refreshes the page", () => {
+  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
+  assert.match(
+    actions,
+    /if \(res\.error === JOB_CLOSED\) \{[^}]*?const left = items\.length > 0 \? await sendBatch\(items\) : \[\];\s*if \(left\.length > 0\) putBack\(left\);\s*router\.refresh\(\);\s*return;\s*\}\s*putBack\(items\);/,
+  );
 });
 
 test("a job page that stays open mounts its upload target again when the job's status changes", () => {
