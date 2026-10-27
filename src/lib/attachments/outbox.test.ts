@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BlobServiceNotAvailable } from "@vercel/blob";
+import { BlobClientTokenExpiredError, BlobServiceNotAvailable } from "@vercel/blob";
 import {
   MAX_ONLINE_TRIES,
   OUTBOX_MAX_AGE_MS,
@@ -10,9 +10,11 @@ import {
   StalledError,
   afterFailure,
   classifyFailure,
+  joinEntry,
   memoryOutbox,
   resumable,
   retryDelay,
+  splitEntry,
   type OutboxEntry,
   type RetryState,
 } from "./outbox";
@@ -31,6 +33,7 @@ test("classifyFailure: no signal is offline, a dropped request online is the net
   assert.equal(classifyFailure(new TypeError("Load failed"), true), "network");
   assert.equal(classifyFailure(new BlobServiceNotAvailable(), true), "network");
   assert.equal(classifyFailure(new ServerBusyError(), true), "network", "a 5xx from the token route is the road, not the file");
+  assert.equal(classifyFailure(new BlobClientTokenExpiredError(), true), "network", "an hour-old token is the clock, not the file");
   assert.equal(classifyFailure(new StalledError(), true), "timeout");
   assert.equal(classifyFailure(new StalledError(), false), "timeout");
   assert.equal(classifyFailure(new Error("Failed to retrieve the client token"), true), "refused");
@@ -136,4 +139,47 @@ test("memoryOutbox: put replaces by id, delete forgets, all lists", async () => 
   await box.delete("a");
   await box.delete("missing");
   assert.deepEqual((await box.all()).map((e) => e.id), ["b"]);
+});
+
+test("memoryOutbox: update writes the state and keeps the bytes the row already holds", async () => {
+  const box = memoryOutbox();
+  const first = entry("a", 1);
+  await box.put(first);
+  const mid = { ...entry("a", 2), tries: 1, pathname: "tasks/t1/orig/a.jpg", blob: new Blob(["a different file"]) };
+  await box.update(mid);
+  const [row] = await box.all();
+  assert.equal(row.tries, 1);
+  assert.equal(row.pathname, "tasks/t1/orig/a.jpg");
+  assert.equal(row.savedAt, 2);
+  assert.equal(row.blob, first.blob, "the bytes aren't taken from an update");
+});
+
+test("memoryOutbox: update of a row that is gone writes nothing, so a recorded file isn't brought back", async () => {
+  const box = memoryOutbox();
+  await box.put(entry("a", 1));
+  await box.delete("a");
+  await box.update(entry("a", 2));
+  assert.deepEqual(await box.all(), []);
+});
+
+test("a row is split into its state and its bytes, and joined again", () => {
+  const whole = { ...entry("a", 7), thumb: new Blob(["t"]), poster: new Blob(["p"]) };
+  const { state, bytes } = splitEntry(whole);
+  assert.ok(!("blob" in state) && !("thumb" in state) && !("poster" in state), "the state carries no bytes");
+  assert.equal(state.id, "a");
+  assert.equal(state.savedAt, 7);
+  assert.deepEqual(Object.keys(bytes).sort(), ["blob", "id", "poster", "thumb"]);
+  assert.deepEqual(joinEntry(state, bytes), whole);
+});
+
+test("a row an earlier version wrote, bytes and all, still joins; one with no bytes anywhere does not", () => {
+  const legacy = entry("old", 1);
+  // Version 1 kept everything in the one row.
+  assert.equal(joinEntry(legacy, undefined)?.blob, legacy.blob);
+  assert.equal(joinEntry(legacy, undefined)?.thumb, null);
+  const { state } = splitEntry(entry("new", 2));
+  assert.equal(joinEntry(state, undefined), null, "nothing to resume");
+  // The bytes' own record wins over bytes left in the row.
+  const own = { id: "old", blob: new Blob(["own"]), thumb: null, poster: null };
+  assert.equal(joinEntry(legacy, own)?.blob, own.blob);
 });

@@ -143,6 +143,13 @@ test("a gated file link comes back to the file after sign-in, and nothing else u
   for (const bad of [
     "/api/files/other/abc",
     "/api/files/task/abc/x",
+    "/api/files/zip/other/abc",
+    "/api/files/zip/property/abc",
+    "/api/files/zip/task/abc/x",
+    "/api/files/zip/task/",
+    "/api/files/zip/zip/task/abc",
+    "/api/files/zip/task/../../tasks",
+    "/api/files/zip/task/%2e%2e",
     "/api/files/task/",
     "/api/files/task/../../tasks",
     "/api/files/task/%2e%2e",
@@ -152,6 +159,17 @@ test("a gated file link comes back to the file after sign-in, and nothing else u
   ]) {
     assert.equal(staffReturnPath(bad), null, bad);
   }
+});
+
+test("Download all signed out comes back to the ZIP after sign-in, not to the dashboard", () => {
+  const zip = "/api/files/zip/task/cmh2x9k0a0001qz8f3v7w1y2z";
+  assert.equal(staffReturnPath(zip), zip);
+  assert.equal(safeStaffPath(zip), zip);
+  assert.equal(withNext("/login", staffReturnPath(zip)), `/login?next=${encodeURIComponent(zip)}`);
+  // The same words the ZIP route uses: its own pathname and query go through staffReturnPath.
+  assert.equal(staffReturnPath(`${zip}?x=1`), `${zip}?x=1`);
+  // A contractor's account never follows it.
+  assert.equal(safePortalPath(zip), null);
 });
 
 test("staff and portal paths never overlap, so each account only follows its own", () => {

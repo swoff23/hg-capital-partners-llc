@@ -79,6 +79,17 @@ const NO_BLOB_STORE = /not configured|Blob store/i;
  * single PUT rethrows the browser's own TypeError.
  */
 const BLOB_SERVICE_DOWN = /blob service is currently not available/i;
+/**
+ * @vercel/blob's BlobClientTokenExpiredError. A client token lasts an hour, so
+ * a big video on a weak signal can outlive it: that is the clock, not a
+ * refusal of the file.
+ */
+const TOKEN_EXPIRED = /client token has expired/i;
+
+/** Whether an upload failed because its client token ran out. transfer.ts asks for another and carries on. */
+export function isTokenExpired(e: unknown): boolean {
+  return e instanceof Error && TOKEN_EXPIRED.test(e.message);
+}
 
 export function shownReason(reason: string): string {
   if (TOKEN_REFUSED.test(reason)) return "the upload was refused. Reload and try again";

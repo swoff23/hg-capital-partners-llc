@@ -1,6 +1,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { isActiveStatus } from "@/lib/task-scope";
 import * as core from "@/lib/tasks/core";
 import { undoWindowOpen } from "./job-view";
 import { ownUnposted } from "./jobs";
@@ -32,15 +33,24 @@ function revalidateJob(taskId: string): void {
  * takes back. Returns the update's id for that Undo. A batch that was already
  * posted (two sends of the same photos at once) is refused, so the losing
  * side leaves no empty update behind.
+ *
+ * A job HG has approved since the photos went up (Done) takes no more
+ * updates, but the late photos are already recorded on it: they stay on the
+ * job as they are, with no update and no email, and the answer carries no
+ * `eventId` (there is nothing to Undo). The page then says they were added
+ * to the job. The job page refreshes, so they show in its photos.
  */
-export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string }> {
+export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null }> {
   const p = await requirePortalPrincipal();
   const event = await prisma.$transaction(async (tx) => {
+    await core.assertContractorAccess(tx, taskId, p.contactId);
+    const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
+    if (task && !isActiveStatus(task.status)) return null;
     const own = await ownUnposted(tx, taskId, p.contactId, attachmentIds);
     return core.addComment(tx, taskId, { body: "", attachmentIds: own.map((f) => f.id), batch: true }, taskPrincipal(p));
   });
   revalidateJob(taskId);
-  return { eventId: event.id };
+  return { eventId: event?.id ?? null };
 }
 
 /**

@@ -475,6 +475,76 @@ test("an old outbox row is dropped when the outbox loads", async () => {
   assert.deepEqual(await outbox.all(), []);
 });
 
+/** An outbox that counts how its rows were written: whole (`put`) or by state alone (`update`). */
+function countingOutbox() {
+  const inner = memoryOutbox();
+  const writes = { put: 0, update: 0 };
+  const store: OutboxStore = {
+    ...inner,
+    put: async (e) => {
+      writes.put++;
+      await inner.put(e);
+    },
+    update: async (e) => {
+      writes.update++;
+      await inner.update(e);
+    },
+  };
+  return { inner, store, writes };
+}
+
+test("every finished part writes only the file's small state to the outbox, never the file again", async () => {
+  const { inner, store, writes } = countingOutbox();
+  const h = setup({ outbox: store });
+  const video = file("Roof leak.mov", "video/quicktime", 5000);
+  const snapshots: { parts: number; bytes: number | undefined }[] = [];
+  h.deps.transfer = async (input) => {
+    if (input.role === "orig") {
+      // A big video in 63 parts: each one is reported to the outbox as it lands.
+      for (let n = 1; n <= 63; n++) {
+        input.onMultipart({ pathname: "tasks/t1/orig/roof.mov", key: "k", uploadId: "u", parts: Array.from({ length: n }, (_, i) => ({ etag: `e${i + 1}`, partNumber: i + 1 })) });
+        if (n === 30 || n === 63) {
+          await new Promise((r) => setImmediate(r));
+          const [row] = await inner.all();
+          snapshots.push({ parts: row.multipart?.parts.length ?? 0, bytes: row.blob?.size });
+        }
+      }
+      input.onMultipart(null);
+    }
+    input.onProgress(1);
+    return { pathname: `${input.role}/${input.name}` };
+  };
+  h.engine.add(target({ allowed: ["video"] }), [video]);
+  await h.flush();
+
+  // The row held its state and its bytes at once, all along.
+  assert.deepEqual(snapshots, [
+    { parts: 30, bytes: 5000 },
+    { parts: 63, bytes: 5000 },
+  ]);
+  // The file went in whole when it joined and when its prepared version replaced it, and not once more.
+  assert.equal(writes.put, 2);
+  assert.ok(writes.update >= 63, `a state write per part (${writes.update})`);
+  assert.deepEqual(await inner.all(), [], "recorded, so the row is gone");
+});
+
+test("a file put back by a reload is never written whole again", async () => {
+  const first = countingOutbox();
+  const a = setup({ outbox: first.store, online: false, script: [new TypeError("Failed to fetch")] });
+  a.engine.add(target(), [file("a.jpg")]);
+  await a.flush();
+  assert.equal(first.writes.put, 2, "joined, then prepared");
+
+  const second = countingOutbox();
+  await second.inner.put((await first.inner.all())[0]);
+  const b = setup({ outbox: second.store });
+  await b.engine.restore();
+  await b.flush();
+  assert.equal(b.sent.length, 1);
+  assert.equal(second.writes.put, 0, "its bytes were already there");
+  assert.ok(second.writes.update >= 1, "its progress was kept");
+});
+
 test("without an outbox the queue still works and says a reload would lose files", async () => {
   const h = setup({ outbox: null, online: false, script: [new TypeError("Failed to fetch")] });
   const t = target();

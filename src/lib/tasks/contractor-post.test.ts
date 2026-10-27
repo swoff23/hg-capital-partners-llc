@@ -7,6 +7,7 @@ import {
   findOwnUpload,
   recordAttachment,
   removeAttachment,
+  renameAttachment,
   takeBackContractorPost,
   withoutPostLine,
   type CommentInput,
@@ -451,4 +452,33 @@ test("removeAttachment: a remove that lost the race writes nothing, and a draft 
   const unnamed = fakeTx();
   await removeAttachment(unnamed.tx, file({}));
   assert.ok(!unnamed.calls.some((c) => c.model === "taskEvent"), "the composer unreadying its own draft");
+});
+
+// ---------------------------------------------------------------------------
+// Renaming a file: a write that belongs to core and counts as an edit in the app
+// ---------------------------------------------------------------------------
+
+test("renameAttachment: the file takes its new name and the task is stamped as edited in the app", async () => {
+  const now = new Date("2026-10-26T17:00:00Z");
+  const { tx, calls } = fakeTx((model, op) => (model === "taskAttachment" && op === "findUnique" ? { taskId: "t9", deletedAt: null } : undefined));
+  assert.deepEqual(await renameAttachment(tx, "a1", "Roof leak.jpg", CONNOR, now), { taskId: "t9" });
+  assert.deepEqual(
+    calls.filter((c) => c.model === "taskAttachment" && c.op === "update").map((c) => c.args),
+    [{ where: { id: "a1" }, data: { filename: "Roof leak.jpg" } }],
+  );
+  // Without the stamp a CSV row nobody else touched is deleted with its task (D25), file and all.
+  assert.deepEqual(
+    calls.filter((c) => c.model === "task" && c.op === "update").map((c) => c.args),
+    [{ where: { id: "t9" }, data: { appEditedAt: now } }],
+  );
+  assert.ok(!calls.some((c) => c.model === "taskEvent"), "no timeline line for a rename");
+  assert.equal(outboxInserts(calls).length, 0, "and nobody is emailed");
+});
+
+test("renameAttachment: a file that is gone is refused, and nothing is written", async () => {
+  for (const found of [null, { taskId: "t9", deletedAt: new Date() }]) {
+    const { tx, calls } = fakeTx((model, op) => (model === "taskAttachment" && op === "findUnique" ? found : undefined));
+    await assert.rejects(renameAttachment(tx, "a1", "x.jpg", CONNOR), /That file no longer exists\./);
+    assert.ok(!calls.some(isWrite));
+  }
 });

@@ -1105,6 +1105,21 @@ export async function removeAttachment(tx: Tx, att: RemovedFile, p?: Principal, 
   return true;
 }
 
+/**
+ * Staff give a file a new name (tasks/attachments.ts renameTaskAttachment,
+ * which settles what the name should be). It's an edit made in the app, so
+ * the task is stamped as edited (`appEditedAt`): a task left untouched since
+ * an import is cleaned up with its row (D25), and a renamed file on one must
+ * keep the task. Returns the file's task, to refresh its page.
+ */
+export async function renameAttachment(tx: Tx, attachmentId: string, filename: string, p: Principal, now = new Date()): Promise<{ taskId: string }> {
+  const att = await tx.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true, deletedAt: true } });
+  if (!att || att.deletedAt) throw new TaskRuleError("That file no longer exists.");
+  await tx.taskAttachment.update({ where: { id: attachmentId }, data: { filename } });
+  await tx.task.update({ where: { id: att.taskId }, data: editStamp(p, now) });
+  return { taskId: att.taskId };
+}
+
 export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p: Principal, now = new Date()) {
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { id: true, status: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");

@@ -218,9 +218,11 @@ export async function recordTaskAttachment(
  * within the hour (attachments/access.ts), which also keeps "Add photo/video"
  * working while HG reviews. A file queued before Mark done (`queuedAt`, from
  * the phone's outbox) still records, and still gets a token, within a day of
- * it: the late-upload rule, uploads question 4. `atMint` once held a token
- * back from a finished job; with the rule above a resumed upload needs one
- * after Mark done, so it no longer changes the answer.
+ * it while the job is in Review, if it was queued after the job last went to
+ * In progress: the late-upload rule, uploads question 4. A Done job takes only
+ * the hour. `atMint` once held a token back from a finished job; with the rule
+ * above a resumed upload needs one after Mark done, so it no longer changes
+ * the answer.
  */
 export async function contractorUploadRefusal(
   taskId: string,
@@ -245,7 +247,19 @@ export async function contractorUploadRefusal(
           select: { actorContactId: true, createdAt: true },
         })
       : null;
-  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt) ? null : "This job is closed.";
+  // The day's grace for a file queued before Mark done only counts one queued during this visit: after the job last
+  // went to In progress. Only a job in Review can use it, so only then is the question asked.
+  const startedAt =
+    task.status === "REVIEW" && opts.queuedAt
+      ? ((
+          await db.taskEvent.findFirst({
+            where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "IN_PROGRESS" } },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+          })
+        )?.createdAt ?? null)
+      : null;
+  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt, startedAt) ? null : "This job is closed.";
 }
 
 /**
@@ -314,14 +328,16 @@ export function renamedFile(name: string, contentType: string | null): string {
 /**
  * Staff only: gives a file a new name (Rename in a file row's menu). The
  * extension stays the type's, so a rename can't turn a PDF into something
- * else. A link keeps whatever the person types. Returns the saved name.
+ * else. A link keeps whatever the person types. The write is core's
+ * (core.renameAttachment), which also stamps the task as edited in the app.
+ * Returns the saved name.
  */
-export async function renameTaskAttachment(attachmentId: string, name: string): Promise<{ filename: string }> {
-  const att = await prisma.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true, kind: true, contentType: true } });
+export async function renameTaskAttachment(attachmentId: string, name: string, p: core.Principal): Promise<{ filename: string }> {
+  const att = await prisma.taskAttachment.findUnique({ where: { id: attachmentId }, select: { kind: true, contentType: true } });
   if (!att) throw new core.TaskRuleError("That file no longer exists.");
   const next = att.kind === "LINK" ? name.trim().slice(0, 255) : renamedFile(name, att.contentType);
   if (!next) throw new core.TaskRuleError("Enter a name.");
-  await prisma.taskAttachment.update({ where: { id: attachmentId }, data: { filename: next } });
-  revalidatePath(`/tasks/${att.taskId}`);
+  const { taskId } = await prisma.$transaction((tx) => core.renameAttachment(tx, attachmentId, next, p));
+  revalidatePath(`/tasks/${taskId}`);
   return { filename: next };
 }

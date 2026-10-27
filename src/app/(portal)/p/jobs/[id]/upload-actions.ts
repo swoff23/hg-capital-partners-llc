@@ -44,8 +44,11 @@ export async function recordJobUploadAction(taskId: string, file: z.input<typeof
   });
 }
 
-/** A batch of recorded files posted as one update. Returns its id, for the Undo. */
-export async function postJobBatchAction(taskId: string, attachmentIds: string[]): Promise<ActionResult<{ eventId: string }>> {
+/**
+ * A batch of recorded files posted as one update. Returns its id, for the Undo; null when the job was approved while
+ * the photos were going up, so they stay on the job with no update to post or take back.
+ */
+export async function postJobBatchAction(taskId: string, attachmentIds: string[]): Promise<ActionResult<{ eventId: string | null }>> {
   return withResult("portal:postJobBatch", async () => {
     await requirePortalPrincipal();
     return uploads.postJobBatch(id.parse(taskId), z.array(id).min(1).max(50).parse(attachmentIds));

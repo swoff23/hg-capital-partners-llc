@@ -3,7 +3,7 @@ import { Prisma, type AttachmentKind, type TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
-import { orderMedia } from "@/lib/tasks/media";
+import { MARK_DONE_WINDOW_MS, finishPhotoIds, orderMedia } from "@/lib/tasks/media";
 import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
 import { readLockboxCode } from "./access-code";
 import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, type JobCard, type JobsTab } from "./job-view";
@@ -203,6 +203,8 @@ export interface JobDetail {
   targetIsVisit: boolean;
   checklist: { id: string; title: string; done: boolean }[];
   media: JobMedia[];
+  /** The ids in `media` sent with the latest Mark done, which lead under "At finish" (uploads 2.5). Empty with no Mark done set. */
+  atFinish: string[];
   updates: JobUpdate[];
   /** D21: only for the assigned contractor while the job is active, else null. */
   lockbox: string | null;
@@ -251,6 +253,37 @@ function toMedia(p: PortalPrincipal, a: MediaRow): JobMedia {
   };
 }
 
+const markDoneEventSelect = { id: true, kind: true, data: true, createdAt: true, actorContactId: true } satisfies Prisma.TaskEventSelect;
+
+/**
+ * The ids among `media` that were sent with the latest Mark done (the "At
+ * finish" set, uploads 2.5): the photos posted on the comment the contractor
+ * wrote as they tapped Mark done, from the same rule the task page uses
+ * (lib/tasks/media.ts finishPhotoIds). It reads the latest move to Review by a
+ * contractor and that person's comments in the seconds before it, and nothing
+ * else of the job's events; only ids leave here, and only of files the page
+ * already shows this contractor. Empty with no Mark done, or one with no photos.
+ */
+async function finishSet(taskId: string, media: readonly { id: string; createdAt: Date; eventId: string | null }[]): Promise<string[]> {
+  if (media.length === 0) return [];
+  const review = await prisma.taskEvent.findFirst({
+    where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "REVIEW" }, actorContactId: { not: null } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: markDoneEventSelect,
+  });
+  if (!review) return [];
+  const comments = await prisma.taskEvent.findMany({
+    where: {
+      taskId,
+      kind: "COMMENT",
+      actorContactId: review.actorContactId,
+      createdAt: { gte: new Date(review.createdAt.getTime() - MARK_DONE_WINDOW_MS), lte: review.createdAt },
+    },
+    select: markDoneEventSelect,
+  });
+  return finishPhotoIds(media, [review, ...comments]);
+}
+
 /** The job, or null when this contact can't open it (no access, revoked, or closed before PORTAL_HISTORY_FROM). */
 export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDetail | null> {
   const task = await prisma.task.findFirst({
@@ -278,7 +311,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
   const [media, updates, lockbox, staffNames, marked] = await Promise.all([
     prisma.taskAttachment.findMany({
       where: { taskId, ...visibleFile(p.contactId, ["IMAGE", "VIDEO"]) },
-      select: mediaSelect,
+      select: { ...mediaSelect, eventId: true },
       orderBy: { createdAt: "asc" },
     }),
     jobUpdates(p, taskId),
@@ -294,6 +327,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
         })
       : null,
   ]);
+  const atFinish = await finishSet(taskId, media);
 
   return {
     id: task.id,
@@ -306,8 +340,9 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     target: toYmd(targetDate(task)),
     targetIsVisit: targetIsVisit(task),
     checklist: task.checklist,
-    // The grid's order, as on the task page (lib/tasks/media.ts).
-    media: orderMedia(media).map((a) => toMedia(p, a)),
+    // The grid's order, as on the task page (lib/tasks/media.ts): the Mark done set under "At finish" first, then newest first.
+    media: orderMedia(media, { atFinish }).map((a) => toMedia(p, a)),
+    atFinish,
     updates,
     lockbox,
     staffNames,

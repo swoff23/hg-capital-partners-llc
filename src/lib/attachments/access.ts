@@ -43,7 +43,10 @@ export const LATE_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
  * A file queued before Mark done still records with it, even from a phone that
  * only found a signal later (uploads question 4, the on-device outbox). The
  * outbox is a safety net for hours, not an archive, so the grace ends a day
- * after Mark done.
+ * after Mark done. It is for a job still in Review, not one HG has since
+ * approved, and only for a file queued during this visit: after the last time
+ * the job went to In progress. `queuedAt` comes from the phone, so it is not
+ * trusted to stretch the hour any further than that.
  */
 export const QUEUED_UPLOAD_GRACE_MS = 24 * 60 * 60 * 1000;
 
@@ -74,10 +77,12 @@ export interface LastReview {
  * May this contractor's upload be recorded on the task now? On a Done or
  * Review job only when this contractor finished it (Mark done, or completed
  * it): within the last hour, so photos still uploading behind the button
- * aren't lost and "Add photo/video" works while HG reviews, or, for a file
- * that was queued before Mark done (`queuedAt`, from the phone's outbox),
- * within a day of it (the late-upload rule). Otherwise while the job is
- * active; never once it's Canceled.
+ * aren't lost and "Add photo/video" works while HG reviews. While the job is
+ * still in Review, a file that was queued before Mark done (`queuedAt`, from
+ * the phone's outbox) and after the job last went to In progress (`startedAt`;
+ * with none known there is no lower bound, as the Review card's visit has it)
+ * gets a day from Mark done (the late-upload rule). A Done job takes only the
+ * hour. Otherwise while the job is active; never once it's Canceled.
  */
 export function acceptsContractorUpload(
   task: UploadWindowTask,
@@ -85,6 +90,7 @@ export function acceptsContractorUpload(
   contactId: string,
   now: Date,
   queuedAt?: Date | string | null,
+  startedAt: Date | null = null,
 ): boolean {
   if (task.status !== "DONE" && task.status !== "REVIEW") return isActiveStatus(task.status);
   const marked = [
@@ -92,8 +98,13 @@ export function acceptsContractorUpload(
     lastReview && lastReview.actorContactId === contactId ? lastReview.createdAt : null,
   ].filter((at): at is Date => at !== null);
   if (marked.some((at) => now.getTime() - at.getTime() <= LATE_UPLOAD_WINDOW_MS)) return true;
+  // The grace is for Review only: once HG has approved the job, a backdated queuedAt buys nothing past the hour.
+  if (task.status !== "REVIEW") return false;
   const queued = parseQueuedAt(queuedAt, now);
-  return !!queued && marked.some((at) => queued.getTime() <= at.getTime() && now.getTime() - at.getTime() <= QUEUED_UPLOAD_GRACE_MS);
+  if (!queued) return false;
+  // A file queued before this visit started belongs to an earlier one.
+  if (startedAt && queued.getTime() < startedAt.getTime()) return false;
+  return marked.some((at) => queued.getTime() <= at.getTime() && now.getTime() - at.getTime() <= QUEUED_UPLOAD_GRACE_MS);
 }
 
 /**

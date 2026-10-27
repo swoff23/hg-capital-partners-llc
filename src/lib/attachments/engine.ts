@@ -91,7 +91,16 @@ type Job = {
   lease: (() => void) | null;
   /** Its row is in the outbox, so a reload resumes it. A file whose write never went through is lost by a reload. */
   stored: boolean;
+  /**
+   * Whose bytes the outbox holds for this file: the file as picked, or the prepared one that replaced it. Null until
+   * a write got through. Only a change of bytes writes the row whole; everything else (a part finished, a try
+   * counted) writes its small state alone, so a big video isn't rewritten into storage at every part.
+   */
+  written: Prepared | typeof AS_PICKED | null;
 };
+
+/** Stands for "the file as picked" in Job.written, until it is prepared. */
+const AS_PICKED = Symbol("as picked");
 
 export type EngineNotice = {
   message: string;
@@ -391,6 +400,7 @@ export class UploadEngine {
         size: file.size,
         lease: null,
         stored: false,
+        written: null,
       });
     }
     // Every file goes in the outbox before any bytes move, the whole batch at once, so a tab closed
@@ -829,13 +839,23 @@ export class UploadEngine {
     };
   }
 
-  /** Writes a file's row. A write that fails (the quota, a private window) is ignored: the file still goes up, it just can't survive a reload. */
+  /**
+   * Writes a file's row. The whole row goes in when its bytes are new to the outbox (the file joining the queue, then
+   * the prepared one replacing it); after that only the small state does (a part finished, a try counted, a pathname).
+   * A write that fails (the quota, a private window) is ignored: the file still goes up, it just can't survive a reload.
+   */
   private async save(job: Job): Promise<void> {
     const outbox = this.deps.outbox;
     const entry = this.entryOf(job);
     if (!outbox || !entry || !this.jobs.has(job.id)) return;
+    const bytes = job.prepared ?? AS_PICKED;
     try {
-      await outbox.put(entry);
+      if (job.written === bytes) {
+        await outbox.update(entry);
+      } else {
+        await outbox.put(entry);
+        job.written = bytes;
+      }
       if (!job.stored) {
         job.stored = true;
         this.emit(job.key);
@@ -930,6 +950,7 @@ export class UploadEngine {
         size: e.blob.size,
         lease,
         stored: true,
+        written: prepared ?? AS_PICKED,
       });
       touched.add(e.key);
     }

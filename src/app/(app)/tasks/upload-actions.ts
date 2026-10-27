@@ -62,7 +62,7 @@ export async function removeTaskFile(attachmentId: string): Promise<ActionResult
 /** Renames a file on the task page; its extension stays its type's. Returns the saved name. */
 export async function renameTaskFile(attachmentId: string, name: string): Promise<ActionResult<{ filename: string }>> {
   return withResult("renameTaskFile", async () => {
-    await requireUser();
-    return tasks.renameTaskAttachment(id.parse(attachmentId), z.string().max(255).parse(name));
+    const user = await requireUser();
+    return tasks.renameTaskAttachment(id.parse(attachmentId), z.string().max(255).parse(name), tasks.staffPrincipal(user));
   });
 }

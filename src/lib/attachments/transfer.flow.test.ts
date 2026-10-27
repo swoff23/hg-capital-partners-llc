@@ -2,7 +2,7 @@ import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { MultipartState } from "./outbox";
+import { ServerBusyError, classifyFailure, type MultipartState } from "./outbox";
 import { sendBlob, type SendInput } from "./transfer";
 
 /**
@@ -20,6 +20,21 @@ type Seen = { action: string; part?: number; bytes?: number; key?: string; uploa
 
 const seen: Seen[] = [];
 const tokenAsks: unknown[] = [];
+/** Makes the stand-in's token route answer with this status (after `delayMs`), for the next asks; null answers normally. */
+let tokenFault: { status: number; delayMs?: number; times?: number } | null = null;
+/**
+ * Makes a part's upload answer with an error instead of its etag. Given the part number and the token it came with;
+ * returns the Blob API's error (status, code) or undefined for a normal answer. `waitUntil` holds the error back
+ * until it returns true (by events, not by the clock, so a busy machine can't reorder the run).
+ */
+let partFault: ((part: number, auth: string) => { status: number; code: string; waitUntil?: () => boolean } | undefined) | null = null;
+/** Normal part answers wait for this, so a test decides when (or whether) the other parts land. */
+let partHold: Promise<void> | null = null;
+/** The parts the stand-in has answered with an etag. */
+const answeredParts = new Set<number>();
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Lets requests an earlier test cut off finish arriving at the stand-in, so they are not counted in the next. */
+const settle = () => sleep(150);
 let server: Server;
 let base = "";
 const realFetch = globalThis.fetch;
@@ -47,6 +62,12 @@ before(async () => {
     const pathname = url.searchParams.get("pathname") ?? "";
     if (url.pathname.startsWith("/api/blob/")) {
       tokenAsks.push(JSON.parse(body.toString()));
+      if (tokenFault) {
+        const fault = tokenFault;
+        if (fault.times !== undefined && --fault.times <= 0) tokenFault = null;
+        if (fault.delayMs) await sleep(fault.delayMs);
+        return json({ error: "no" }, fault.status);
+      }
       return json({ type: "blob.generate-client-token", clientToken: `vercel_blob_client_store_${tokenAsks.length}` });
     }
     if (url.pathname === "/mpu") {
@@ -58,6 +79,17 @@ before(async () => {
       if (action === "upload") {
         const part = Number(h["x-mpu-part-number"]);
         seen.push({ action, part, bytes: body.length, key: decodeURIComponent(String(h["x-mpu-key"])), uploadId: String(h["x-mpu-upload-id"]), auth: String(h.authorization) });
+        const fault = partFault?.(part, String(h.authorization));
+        if (fault) {
+          if (fault.waitUntil) {
+            for (let i = 0; i < 500 && !fault.waitUntil(); i++) await sleep(10);
+            // The others' answers have been sent; give the client a moment to take them in before this one lands.
+            await sleep(60);
+          }
+          return json({ error: { code: fault.code, message: fault.code } }, fault.status);
+        }
+        if (partHold) await partHold;
+        answeredParts.add(part);
         return json({ etag: `etag-${part}` });
       }
       if (action === "complete") {
@@ -121,6 +153,7 @@ function input(blob: Blob, over: Partial<SendInput> = {}): SendInput & { states:
 const blobOf = (bytes: number) => new Blob([new Uint8Array(bytes)]);
 
 test("a small file goes in one request, with progress ending at 1", async () => {
+  await settle();
   seen.length = 0;
   const i = input(blobOf(1 * MB), { name: "Kitchen.jpg", contentType: "image/jpeg", fileKind: "image" });
   const sent = await sendBlob(i);
@@ -131,6 +164,7 @@ test("a small file goes in one request, with progress ending at 1", async () => 
 });
 
 test("a big file goes in 8 MB parts, reports each part, and completes them in order", async () => {
+  await settle();
   seen.length = 0;
   tokenAsks.length = 0;
   const i = input(blobOf(20 * MB));
@@ -158,6 +192,7 @@ test("a big file goes in 8 MB parts, reports each part, and completes them in or
 });
 
 test("a resume sends only the missing parts, with a fresh token, and creates nothing", async () => {
+  await settle();
   seen.length = 0;
   tokenAsks.length = 0;
   const resume: MultipartState = {
@@ -181,6 +216,7 @@ test("a resume sends only the missing parts, with a fresh token, and creates not
 });
 
 test("a state for another path is not resumed", async () => {
+  await settle();
   seen.length = 0;
   const resume: MultipartState = { pathname: "tasks/t1/orig/Other.mov", key: "k", uploadId: "old", parts: [{ etag: "e", partNumber: 1 }] };
   await sendBlob(input(blobOf(9 * MB), { resume }));
@@ -189,6 +225,7 @@ test("a state for another path is not resumed", async () => {
 });
 
 test("an abort stops it before the parts land", async () => {
+  await settle();
   seen.length = 0;
   const controller = new AbortController();
   controller.abort();
@@ -197,6 +234,7 @@ test("an abort stops it before the parts land", async () => {
 });
 
 test("cut off after a part lands, the parts that landed are handed over for the outbox and nothing completes", async () => {
+  await settle();
   seen.length = 0;
   const controller = new AbortController();
   const i = input(blobOf(40 * MB), { signal: controller.signal });
@@ -214,5 +252,155 @@ test("cut off after a part lands, the parts that landed are handed over for the 
   assert.ok(kept.at(-1)!.parts.length >= 1);
   assert.equal(kept.at(-1)!.uploadId, "upload-1");
   assert.equal(states.at(-1) === null, false, "never reported complete");
+  assert.equal(seen.filter((s) => s.action === "complete").length, 0);
+});
+
+/* ---------------- The token route, a token that runs out, and a part that fails ---------------- */
+
+test("a small file asks the token route for a single-request token, and sends with that token", async () => {
+  await settle();
+  seen.length = 0;
+  tokenAsks.length = 0;
+  await sendBlob(input(blobOf(1 * MB), { name: "Kitchen.jpg", contentType: "image/jpeg", fileKind: "image" }));
+  assert.equal(tokenAsks.length, 1);
+  const ask = tokenAsks[0] as { payload: { multipart: boolean; pathname: string } };
+  assert.equal(ask.payload.multipart, false);
+  assert.equal(ask.payload.pathname, "tasks/t1/orig/Kitchen.jpg");
+  assert.equal(seen.find((s) => s.action === "put")!.auth, "Bearer vercel_blob_client_store_1");
+});
+
+test("a 5xx from the token route on a small file is the road, so it waits and tries again", async () => {
+  await settle();
+  seen.length = 0;
+  try {
+    for (const status of [500, 503, 429]) {
+      tokenFault = { status };
+      const err = await sendBlob(input(blobOf(1 * MB), { name: "Kitchen.jpg", contentType: "image/jpeg", fileKind: "image" })).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      assert.ok(err instanceof ServerBusyError, `${status} reads as busy`);
+      assert.equal(classifyFailure(err, true), "network", `${status} waits, not red`);
+    }
+  } finally {
+    tokenFault = null;
+  }
+  assert.equal(seen.length, 0, "no bytes went anywhere");
+});
+
+test("a 4xx from the token route is the server saying no, so it turns red", async () => {
+  tokenFault = { status: 400 };
+  try {
+    const err = await sendBlob(input(blobOf(1 * MB), { name: "Kitchen.jpg", contentType: "image/jpeg", fileKind: "image" })).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    assert.ok(err instanceof Error && !(err instanceof ServerBusyError));
+    assert.match(err.message, /client token/);
+    assert.equal(classifyFailure(err, true), "refused");
+  } finally {
+    tokenFault = null;
+  }
+});
+
+test("the stall watchdog's abort reaches a token request that is still waiting for the route", async () => {
+  tokenFault = { status: 503, delayMs: 2000 };
+  const controller = new AbortController();
+  const started = Date.now();
+  setTimeout(() => controller.abort(), 30);
+  try {
+    await assert.rejects(
+      sendBlob(input(blobOf(1 * MB), { name: "Kitchen.jpg", contentType: "image/jpeg", fileKind: "image", signal: controller.signal })),
+    );
+  } finally {
+    tokenFault = null;
+  }
+  assert.ok(Date.now() - started < 1500, "cut off, not waited out");
+});
+
+test("a token that runs out mid-run is asked for again, and the parts already up are kept", async () => {
+  await settle();
+  seen.length = 0;
+  tokenAsks.length = 0;
+  // 25 MB is four parts. Part 2 is told the token expired once the other three have landed; the retry carries a new token.
+  answeredParts.clear();
+  partFault = (part, auth) =>
+    part === 2 && auth.endsWith("_1") ? { status: 401, code: "client_token_expired", waitUntil: () => [1, 3, 4].every((n) => answeredParts.has(n)) } : undefined;
+  const i = input(blobOf(25 * MB));
+  try {
+    const sent = await sendBlob(i);
+    assert.equal(sent.pathname, "tasks/t1/orig/Roof-leak-Rnd123.mov");
+  } finally {
+    partFault = null;
+  }
+  assert.equal(tokenAsks.length, 2, "a fresh token once the first ran out");
+  const uploads = seen.filter((s) => s.action === "upload");
+  const count = (n: number) => uploads.filter((s) => s.part === n).length;
+  assert.deepEqual([count(1), count(2), count(3), count(4)], [1, 2, 1, 1], "only the part that failed went again");
+  assert.equal(uploads.filter((s) => s.part === 2).at(-1)!.auth, "Bearer vercel_blob_client_store_2");
+  assert.equal(seen.filter((s) => s.action === "create").length, 1, "the multipart upload is the same one");
+  const done = seen.find((s) => s.action === "complete")!;
+  assert.equal(done.bytes, 4, "all four parts complete");
+  assert.equal(i.states.at(-1), null);
+});
+
+test("a token that keeps running out is the clock, not a refusal: it waits and resumes with the parts it has", async () => {
+  await settle();
+  seen.length = 0;
+  tokenAsks.length = 0;
+  answeredParts.clear();
+  partFault = (part) =>
+    part === 2 ? { status: 401, code: "client_token_expired", waitUntil: () => [1, 3, 4].every((n) => answeredParts.has(n)) } : undefined;
+  const i = input(blobOf(25 * MB));
+  let err: unknown = null;
+  try {
+    err = await sendBlob(i).then(
+      () => null,
+      (e: unknown) => e,
+    );
+  } finally {
+    partFault = null;
+  }
+  assert.ok(err instanceof Error);
+  assert.equal(classifyFailure(err, true), "network");
+  // The first token and three more, and then it gives up; what landed stays in the outbox's state.
+  assert.equal(tokenAsks.length, 4);
+  const kept = i.states.filter((s): s is MultipartState => s !== null);
+  assert.ok(kept.at(-1)!.parts.length >= 1);
+  assert.equal(seen.filter((s) => s.action === "complete").length, 0);
+});
+
+test("the first part to fail stops the other two, and nothing sends behind the retry", async () => {
+  await settle();
+  seen.length = 0;
+  // Part 2 is refused outright; parts 1 and 3 are held, so they can only end by being cut off.
+  partFault = (part) => (part === 2 ? { status: 400, code: "bad_request" } : undefined);
+  let release: () => void = () => {};
+  partHold = new Promise<void>((resolve) => (release = resolve));
+  const i = input(blobOf(40 * MB));
+  let err: unknown = null;
+  let progressAtFailure = -1;
+  let statesAtFailure = -1;
+  try {
+    err = await sendBlob(i).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    progressAtFailure = i.progress.length;
+    statesAtFailure = i.states.length;
+    await sleep(300);
+  } finally {
+    partFault = null;
+    partHold = null;
+    release();
+  }
+  assert.ok(err instanceof Error, "the failure comes back");
+  assert.deepEqual(
+    seen.filter((s) => s.action === "upload").map((s) => s.part).sort(),
+    [1, 2, 3],
+    "parts 4 and 5 were never started by the siblings",
+  );
+  assert.equal(i.progress.length, progressAtFailure, "no progress reported after the failure");
+  assert.equal(i.states.length, statesAtFailure, "no part state saved after the failure");
   assert.equal(seen.filter((s) => s.action === "complete").length, 0);
 });

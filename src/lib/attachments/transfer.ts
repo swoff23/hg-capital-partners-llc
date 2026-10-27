@@ -1,19 +1,24 @@
-import { completeMultipartUpload, createMultipartUpload, upload, uploadPart } from "@vercel/blob/client";
+import { completeMultipartUpload, createMultipartUpload, put, uploadPart } from "@vercel/blob/client";
 import { MULTIPART_THRESHOLD, usesMultipart, type FileKind } from "./content-types";
+import { isTokenExpired } from "./media";
 import { ServerBusyError, classifyFailure, type MultipartState } from "./outbox";
 import { uploadRequest, type UploadKind } from "./upload-kinds";
 import type { UploadRole } from "./paths";
 
 /**
  * Sends one blob to Vercel Blob straight from the browser: a token from
- * /api/blob/[kind], then the bytes. Small files go in one request through the
- * client's upload(). A file over 8 MB goes in parts through
- * createMultipartUpload, uploadPart and completeMultipartUpload (the
- * @vercel/blob 2.8 client), three parts at a time, and reports each finished
- * part so the outbox can resume at the last one (uploads 2.1, phase 3). A
- * resumed upload asks the token route for a fresh token. If the multipart
- * create is refused for a reason other than the connection, the whole file
- * goes the way it always did, through upload({ multipart: true }).
+ * /api/blob/[kind] (clientToken, which tells the road from a refusal: a 5xx
+ * from the route waits and tries again, a 4xx is the server saying no), then
+ * the bytes. Small files go in one request through the client's put(). A file
+ * over 8 MB goes in parts through createMultipartUpload, uploadPart and
+ * completeMultipartUpload (the @vercel/blob 2.8 client), three parts at a
+ * time, and reports each finished part so the outbox can resume at the last
+ * one (uploads 2.1, phase 3). A resumed upload asks the token route for a
+ * fresh token, and so does a run whose hour-long token runs out: the parts
+ * already up are kept. The first part that fails stops the other two, so none
+ * keeps sending behind the retry. If the multipart create is refused for a
+ * reason other than the connection, the whole file goes the way it always
+ * did, through put({ multipart: true }) on the same token.
  *
  * Needs a browser; the part arithmetic is pure and tested (transfer.test.ts).
  */
@@ -65,15 +70,20 @@ export type SendInput = {
 /** Whatever sends bytes: the browser's, or a fake in tests. */
 export type Transfer = (input: SendInput) => Promise<{ pathname: string }>;
 
-async function clientToken(kind: UploadKind, pathname: string, clientPayload: string, signal: AbortSignal): Promise<string> {
+/**
+ * A client token from the token route. A server error (or a busy one: 408,
+ * 429) is the road, not the file (the next push to main, a restart, a
+ * database blip): it waits and tries again. Any other refusal is the server
+ * saying no. `signal` cuts the request off with the rest of the upload.
+ */
+async function clientToken(kind: UploadKind, pathname: string, clientPayload: string, signal: AbortSignal, multipart: boolean): Promise<string> {
   const res = await fetch(`/api/blob/${kind}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ type: "blob.generate-client-token", payload: { pathname, clientPayload, multipart: true } }),
+    body: JSON.stringify({ type: "blob.generate-client-token", payload: { pathname, clientPayload, multipart } }),
     signal,
   });
-  // A server error is the road, not the file (the next push to main, a restart): it waits and tries again.
-  if (res.status >= 500) throw new ServerBusyError();
+  if (res.status >= 500 || res.status === 408 || res.status === 429) throw new ServerBusyError();
   // The words match upload()'s own, which media.ts shownReason turns into "the upload was refused. Reload and try again".
   if (!res.ok) throw new Error("Failed to retrieve the client token");
   const body = (await res.json().catch(() => null)) as { clientToken?: string } | null;
@@ -81,23 +91,30 @@ async function clientToken(kind: UploadKind, pathname: string, clientPayload: st
   return body.clientToken;
 }
 
-/** The whole file the way uploads have always gone: one call, multipart above 8 MB, retried part by part inside the client. */
-async function sendWhole(input: SendInput, pathname: string, clientPayload: string): Promise<{ pathname: string }> {
-  const blob = await upload(pathname, input.blob, {
+/**
+ * The whole file in one call: put(), multipart above 8 MB (retried part by part inside the client). The token is the
+ * route's, asked for here, so a 5xx from the route waits like any dropped request and the stall abort reaches it.
+ */
+async function sendWhole(input: SendInput, pathname: string, clientPayload: string, token?: string): Promise<{ pathname: string }> {
+  const multipart = usesMultipart(input.blob.size);
+  const blob = await put(pathname, input.blob, {
     access: input.access,
-    handleUploadUrl: `/api/blob/${input.uploadKind}`,
-    clientPayload,
+    token: token ?? (await clientToken(input.uploadKind, pathname, clientPayload, input.signal, multipart)),
     contentType: input.contentType,
-    multipart: usesMultipart(input.blob.size),
+    multipart,
     abortSignal: input.signal,
     onUploadProgress: ({ percentage }) => input.onProgress(Math.min(1, percentage / 100)),
   });
   return { pathname: blob.pathname };
 }
 
+/** A token that ran out is asked for again this many times in one run; a file that needs more has a problem of its own. */
+const MAX_REMINTS = 3;
+
 async function sendInParts(input: SendInput, pathname: string, clientPayload: string): Promise<{ pathname: string }> {
   const { access, contentType, signal } = input;
-  const token = await clientToken(input.uploadKind, pathname, clientPayload, signal);
+  const mint = () => clientToken(input.uploadKind, pathname, clientPayload, signal, true);
+  let token = await mint();
   let state = input.resume && input.resume.pathname === pathname ? input.resume : null;
   if (!state) {
     try {
@@ -106,7 +123,7 @@ async function sendInParts(input: SendInput, pathname: string, clientPayload: st
     } catch (err) {
       // The connection is the caller's to retry; anything else, and the old path is the safe one.
       if (signal.aborted || classifyFailure(err, true) !== "refused") throw err;
-      return sendWhole(input, pathname, clientPayload);
+      return sendWhole(input, pathname, clientPayload, token);
     }
     input.onMultipart(state);
   }
@@ -127,43 +144,82 @@ async function sendInParts(input: SendInput, pathname: string, clientPayload: st
   };
   report();
 
-  const todo = missingParts(size, parts);
-  let next = 0;
-  async function worker() {
-    while (next < todo.length) {
-      const range = todo[next++];
-      const part = await uploadPart(pathname, input.blob.slice(range.start, range.end), {
+  /**
+   * Sends the parts Blob doesn't hold yet, three at a time. The first part
+   * that fails stops the other two (a local signal, which also follows the
+   * upload's own), and this waits for them to stop before it throws: a
+   * sibling left running would keep sending, and keep reporting progress,
+   * behind the retry that follows. Parts that landed meanwhile stay in `parts`.
+   */
+  async function sendMissing(withToken: string): Promise<void> {
+    const local = new AbortController();
+    const follow = () => local.abort(signal.reason);
+    if (signal.aborted) follow();
+    else signal.addEventListener("abort", follow, { once: true });
+    const todo = missingParts(size, parts);
+    let next = 0;
+    const failures: unknown[] = [];
+    async function worker() {
+      while (failures.length === 0 && next < todo.length) {
+        const range = todo[next++];
+        try {
+          const part = await uploadPart(pathname, input.blob.slice(range.start, range.end), {
+            access,
+            token: withToken,
+            uploadId,
+            key,
+            partNumber: range.partNumber,
+            contentType,
+            abortSignal: local.signal,
+            onUploadProgress: ({ loaded }) => {
+              if (local.signal.aborted) return;
+              loadedBy.set(range.partNumber, loaded);
+              report();
+            },
+          });
+          loadedBy.delete(range.partNumber);
+          parts.push({ etag: part.etag, partNumber: part.partNumber });
+          input.onMultipart({ pathname, key, uploadId, parts: [...parts] });
+          report();
+        } catch (err) {
+          if (failures.length === 0) {
+            failures.push(err);
+            local.abort();
+          }
+          return;
+        }
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(PART_CONCURRENCY, todo.length) }, worker));
+    } finally {
+      signal.removeEventListener("abort", follow);
+    }
+    if (failures.length > 0) throw failures[0];
+  }
+
+  for (let reminted = 0; ; reminted++) {
+    try {
+      await sendMissing(token);
+      const done = await completeMultipartUpload(pathname, [...parts].sort((a, b) => a.partNumber - b.partNumber), {
         access,
         token,
         uploadId,
         key,
-        partNumber: range.partNumber,
         contentType,
         abortSignal: signal,
-        onUploadProgress: ({ loaded }) => {
-          loadedBy.set(range.partNumber, loaded);
-          report();
-        },
       });
-      loadedBy.delete(range.partNumber);
-      parts.push({ etag: part.etag, partNumber: part.partNumber });
-      input.onMultipart({ pathname, key, uploadId, parts: [...parts] });
-      report();
+      input.onMultipart(null);
+      input.onProgress(1);
+      return { pathname: done.pathname };
+    } catch (err) {
+      // The token lasts an hour and a big video on a weak signal can outlive it: ask for another and carry on
+      // with the parts already up, rather than turning the whole file red.
+      if (!isTokenExpired(err) || signal.aborted || reminted >= MAX_REMINTS) throw err;
+      loadedBy.clear();
+      token = await mint();
     }
   }
-  await Promise.all(Array.from({ length: Math.min(PART_CONCURRENCY, todo.length) }, worker));
-
-  const done = await completeMultipartUpload(pathname, [...parts].sort((a, b) => a.partNumber - b.partNumber), {
-    access,
-    token,
-    uploadId,
-    key,
-    contentType,
-    abortSignal: signal,
-  });
-  input.onMultipart(null);
-  input.onProgress(1);
-  return { pathname: done.pathname };
 }
 
 /** The browser's Transfer. */

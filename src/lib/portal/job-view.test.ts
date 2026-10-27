@@ -7,6 +7,7 @@ import {
   PORTAL_STATUS_UPDATES,
   addMorePhotosLine,
   addedText,
+  addedToJobText,
   addressLine,
   dayLabel,
   finishCountLabel,
@@ -334,6 +335,14 @@ test("a batch toast says what posted", () => {
   assert.equal(postedText(["video", "video"]), "2 videos posted");
   assert.equal(postedText(["image", "video"]), "2 files posted");
   assert.equal(postedText([null, null]), "2 files posted", "a kind the page couldn't read is a file");
+});
+
+test("files that land on an approved job say they were added to the job, with no 'posted'", () => {
+  assert.equal(addedToJobText(["image", "image", "image"]), "3 photos added to the job");
+  assert.equal(addedToJobText(["image"]), "1 photo added to the job");
+  assert.equal(addedToJobText(["video", "video"]), "2 videos added to the job");
+  assert.equal(addedToJobText(["image", "video"]), "2 files added to the job");
+  assert.equal(addedToJobText([null]), "1 file added to the job");
 });
 
 test("Add photo/video stays on for the server's hour after Mark done, then hides (question 4)", () => {

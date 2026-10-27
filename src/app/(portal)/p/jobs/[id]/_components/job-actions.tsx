@@ -23,7 +23,6 @@ import type { UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction } from "@/lib/action-result";
-import { contentTypeForName, fileKindForType } from "@/lib/attachments/content-types";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
   finishCountLabel,
@@ -34,13 +33,12 @@ import {
   lateUploadsOpen,
   markDoneButton,
   nextStep,
-  postedText,
   stripCounts,
 } from "@/lib/portal/job-view";
 import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
-import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "../upload-actions";
+import { postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -67,7 +65,10 @@ import { postJobBatchAction, recordJobUploadAction, undoJobPostAction } from "..
  * queue outlives the page, so "My jobs" and the payoff's "Back to my jobs"
  * don't ask (uploads 2.1; only Sign out does), and a batch that lands after
  * the contractor left posts on its own with the same Undo (choice 1 A; the
- * My jobs row says "Uploading 3 photos" meanwhile). Mark done waits for
+ * My jobs row says "Uploading 3 photos" meanwhile). If HG approved the job in
+ * the meantime the photos still land on it, with no update and no email:
+ * "3 photos added to the job" (record-and-post.ts), and late-uploads.tsx is the
+ * page that records them once the job has no composer. Mark done waits for
  * uploads, and for each failed photo to be retried or removed (decision 13):
  * in the bar and in the sheet it stays off over one line ("2 photos didn't
  * upload · Retry" in danger, or "Finishing 2 uploads…" in grey), and a failed
@@ -151,27 +152,7 @@ export function JobActions({
     });
 
   /** Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post. */
-  async function sendBatch(items: Recorded[]): Promise<boolean> {
-    const res = await callAction(() => postJobBatchAction(taskId, items.map((i) => i.id)));
-    if (!res.ok) {
-      toast({ message: res.error });
-      return false;
-    }
-    const { eventId } = res.data;
-    toast({
-      message: postedText(items.map((i) => i.kind)),
-      key: `job-post:${eventId}`,
-      action: {
-        label: "Undo",
-        onAction: () => {
-          void callAction(() => undoJobPostAction(taskId, eventId)).then((undone) => {
-            if (!undone.ok) toast({ message: undone.error });
-          });
-        },
-      },
-    });
-    return true;
-  }
+  const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast);
 
   /** A batch that posts on its own while the page is here. One that doesn't post goes back on the tray, to go with the next send. */
   const postBatch = (items: Recorded[]) =>
@@ -182,23 +163,9 @@ export function JobActions({
 
   /**
    * The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and
-   * the strip. Kept for the tab (recordedUploads), not this page: a batch that started under an earlier visit to the
-   * job lands here with that visit's files in it.
+   * the strip, for the tab and not this page (record-and-post.ts).
    */
-  async function record(file: RecordMediaInput): Promise<RecordMediaResult> {
-    const res = await recordJobUploadAction(taskId, file);
-    if (res.ok) {
-      const kind = fileKindForType(contentTypeForName(file.filename)) ?? (file.posterPathname ? "video" : null);
-      recordedUploads.note(taskId, {
-        id: res.data.id,
-        name: file.filename,
-        kind,
-        hasThumb: !!file.thumbPathname,
-        hasPoster: !!file.posterPathname,
-      });
-    }
-    return res;
-  }
+  const record = (file: RecordMediaInput): Promise<RecordMediaResult> => recordJobFile(taskId, file);
 
   function onRecorded(ids: string[]) {
     const { sheetOpen: holding, body: text, ready: held } = live.current;

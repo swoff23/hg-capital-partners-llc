@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { userMessage } from "@/lib/action-result";
 import { propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
+import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
 import { UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -29,6 +29,11 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  * without an entry fails typecheck. What each kind accepts is one table: the
  * uploader's check, this route's token and the record step's head() read the
  * same one (attachments/limits.ts, content-types.ts UPLOAD_RULES).
+ *
+ * A 400 means the server said no (an UploadRefusal: the job closed, a type or
+ * size that isn't allowed, a session that ended) and the uploader's tile turns
+ * red. Anything else that goes wrong, a database blip included, is a 503, which
+ * the uploader waits out and tries again (attachments/token-failure.ts).
  *
  * Every kind only accepts a path of its own (paths.ts, limits.ts): Blob can't
  * pick the path for us, only refuse the one asked for. Task and property
@@ -63,7 +68,7 @@ const stringOrNull = (v: unknown) => (typeof v === "string" ? v : null);
 /** The path must be this task's, the kind of file one this upload kind takes, and the type and size fit what the file says it is. */
 function taskLimits(kind: "task-upload" | "portal-task-upload", taskId: string, pathname: string, payload: Record<string, unknown>): Limits {
   const limits = uploadLimits(taskId, pathname, payload.fileKind, UPLOAD_KIND_ALLOWED[kind]);
-  if (typeof limits === "string") throw new Error(limits);
+  if (typeof limits === "string") throw new UploadRefusal(limits);
   return limits;
 }
 
@@ -75,8 +80,8 @@ async function propertyLimits(
   payload: Record<string, unknown>,
 ): Promise<Limits> {
   const limits = propertyUploadLimits(kind, propertyId, pathname, payload.fileKind);
-  if (typeof limits === "string") throw new Error(limits);
-  if (!(await propertyExists(propertyId))) throw new Error("Not found");
+  if (typeof limits === "string") throw new UploadRefusal(limits);
+  if (!(await propertyExists(propertyId))) throw new UploadRefusal("Not found");
   return limits;
 }
 
@@ -86,7 +91,7 @@ const KINDS: Record<string, UploadKind> = {
     idKey: "taskId",
     authorize: async (taskId, pathname, payload) => {
       const limits = taskLimits("task-upload", taskId, pathname, payload);
-      if (!(await prisma.task.findUnique({ where: { id: taskId }, select: { id: true } }))) throw new Error("Not found");
+      if (!(await prisma.task.findUnique({ where: { id: taskId }, select: { id: true } }))) throw new UploadRefusal("Not found");
       return limits;
     },
   },
@@ -95,9 +100,9 @@ const KINDS: Record<string, UploadKind> = {
     idKey: "taskId",
     authorize: async (taskId, pathname, payload, who) => {
       const limits = taskLimits("portal-task-upload", taskId, pathname, payload);
-      if (who.kind !== "contractor") throw new Error("Not found");
+      if (who.kind !== "contractor") throw new UploadRefusal("Not found");
       const refusal = await contractorUploadRefusal(taskId, who.contactId, { atMint: true, queuedAt: stringOrNull(payload.queuedAt) });
-      if (refusal) throw new Error(refusal);
+      if (refusal) throw new UploadRefusal(refusal);
       return limits;
     },
   },
@@ -140,7 +145,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
     return NextResponse.json({ error: "File uploads need a Blob store, and none is connected yet." }, { status: 503 });
   }
 
-  const body = (await request.json()) as HandleUploadBody;
+  let body: HandleUploadBody;
+  try {
+    body = (await request.json()) as HandleUploadBody;
+  } catch {
+    return NextResponse.json({ error: "That request isn't valid." }, { status: 400 });
+  }
 
   // A token request comes from a signed-in browser. The upload-completed
   // callback comes from Blob itself, signed, with no session; handleUpload
@@ -163,11 +173,16 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        if (!who) throw new Error("Not signed in");
-        const parsed: unknown = JSON.parse(clientPayload ?? "{}");
+        if (!who) throw new UploadRefusal("Not signed in");
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(clientPayload ?? "{}");
+        } catch {
+          throw new UploadRefusal("That request isn't valid.");
+        }
         const payload = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
         const id = payload[cfg.idKey];
-        if (typeof id !== "string" || !id) throw new Error(`Missing ${cfg.idKey}`);
+        if (typeof id !== "string" || !id) throw new UploadRefusal(`Missing ${cfg.idKey}`);
         const limits = await cfg.authorize(id, pathname, payload, who);
         return {
           addRandomSuffix: true,
@@ -182,8 +197,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
     return NextResponse.json(result);
   } catch (err) {
     // Contractors reach this route too: a database or Blob error is logged in
-    // full and answered with a generic line, never its own message.
-    logError("blob:token", err, { kind });
-    return NextResponse.json({ error: userMessage(err) }, { status: 400 });
+    // full and answered with a generic line, never its own message. A refusal
+    // is a 400 (the tile turns red); anything the route didn't throw on purpose
+    // is a 503, so the file waits and tries again (token-failure.ts).
+    const failure = tokenFailure(err, body.type);
+    if (failure.status === 503) logError("blob:token", err, { kind });
+    return NextResponse.json({ error: failure.message }, { status: failure.status });
   }
 }

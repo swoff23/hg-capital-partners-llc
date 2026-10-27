@@ -381,6 +381,17 @@ export function postedText(kinds: readonly (FileKind | null)[]): string {
   return `${n} ${noun}${n === 1 ? "" : "s"} posted`;
 }
 
+/**
+ * What the toast says when files land on a job that has been approved since:
+ * "3 photos added to the job". They are on the job, in its photos, but there
+ * is no update to post them as, so there is no Undo and nobody is emailed.
+ */
+export function addedToJobText(kinds: readonly (FileKind | null)[]): string {
+  const n = kinds.length;
+  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
+  return `${n} ${noun}${n === 1 ? "" : "s"} added to the job`;
+}
+
 // ---------------------------------------------------------------------------
 // Late uploads after Mark done (uploads question 4)
 // ---------------------------------------------------------------------------

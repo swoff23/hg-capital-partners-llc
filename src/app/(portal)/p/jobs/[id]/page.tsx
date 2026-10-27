@@ -19,6 +19,7 @@ import { JobActions } from "./_components/job-actions";
 import { DueDate } from "../../_components/due-date";
 import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
+import { LateUploads } from "./_components/late-uploads";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -103,7 +104,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
 
           {job.checklist.length > 0 && <JobChecklist items={job.checklist} editable={active} />}
 
-          <JobMediaSection media={job.media} />
+          <JobMediaSection media={job.media} atFinish={job.atFinish} />
 
           <Section title="Updates">
             {job.updates.length === 0 ? (
@@ -115,7 +116,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 ))}
               </ol>
             )}
-            {active && (
+            {active ? (
               <JobActions
                 taskId={job.id}
                 status={job.status}
@@ -125,6 +126,9 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 markedDoneAt={job.markedDoneAt}
                 property={place}
               />
+            ) : (
+              // An approved job has no composer, but photos queued before it was can still be waiting to record.
+              <LateUploads taskId={job.id} label={place?.label ?? "this job"} />
             )}
           </Section>
         </div>

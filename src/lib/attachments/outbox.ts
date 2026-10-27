@@ -1,6 +1,6 @@
 import { isOfflineError } from "@/lib/action-result";
 import type { FileKind } from "./content-types";
-import { uploadFailureReason } from "./media";
+import { isTokenExpired, uploadFailureReason } from "./media";
 import type { MediaMeta, PrepareMode } from "./prepare";
 import type { UploadKind } from "./upload-kinds";
 
@@ -17,7 +17,10 @@ import type { UploadKind } from "./upload-kinds";
  * seconds; it turns red only when the server refuses it, or after 4 failed
  * tries while online. Nothing is dropped on its own. The store is IndexedDB
  * behind a small interface, with a memory twin for tests; where IndexedDB is
- * missing or full the queue still works, it just can't survive a reload.
+ * missing or full the queue still works, it just can't survive a reload. A
+ * file's bytes sit in a store of their own and are written once; what changes
+ * while it goes up (a part finished, a try counted) is a small row beside
+ * them, so a 500 MB video doesn't rewrite itself into storage at every part.
  * Safari can clear a site's storage after 7 days without a visit, so this is
  * a safety net for hours, not an archive.
  */
@@ -58,6 +61,8 @@ export function classifyFailure(err: unknown, online: boolean): FailureKind {
   if (err instanceof StalledError) return "timeout";
   if (!online) return "offline";
   if (err instanceof ServerBusyError) return "network";
+  // An hour-old token is the clock, not the file: the next try mints another and resumes at the last part.
+  if (isTokenExpired(err)) return "network";
   if (uploadFailureReason(err) === "no connection" || isOfflineError(err)) return "network";
   return "refused";
 }
@@ -152,9 +157,43 @@ export function resumable(entries: readonly OutboxEntry[], now: number): OutboxE
   return entries.filter((e) => now - e.savedAt <= OUTBOX_MAX_AGE_MS).sort((a, b) => a.savedAt - b.savedAt);
 }
 
+/** A row without its bytes: what changes while a file goes up (a part finished, a try counted). */
+export type OutboxState = Omit<OutboxEntry, "blob" | "thumb" | "poster">;
+
+/** A row's bytes: the file that goes up, and the thumbnail and poster made for it. */
+export type OutboxBytes = { id: string; blob: Blob; thumb: Blob | null; poster: Blob | null };
+
+/** The row split into the small part that changes and the bytes that don't. */
+export function splitEntry(entry: OutboxEntry): { state: OutboxState; bytes: OutboxBytes } {
+  const { blob, thumb, poster, ...state } = entry;
+  return { state, bytes: { id: entry.id, blob, thumb, poster } };
+}
+
+/**
+ * The row put back together. A row an earlier version wrote still carries its
+ * bytes inside it, and those are used when the bytes' own record is missing.
+ * Null when the file's bytes are nowhere: there is nothing to resume.
+ */
+export function joinEntry(state: OutboxState, bytes: OutboxBytes | undefined): OutboxEntry | null {
+  const inline = state as Partial<OutboxEntry>;
+  const blob = bytes?.blob ?? inline.blob;
+  if (!blob) return null;
+  return { ...state, blob, thumb: bytes ? bytes.thumb : (inline.thumb ?? null), poster: bytes ? bytes.poster : (inline.poster ?? null) };
+}
+
+/**
+ * Where the on-device outbox keeps its rows. A file's bytes are written once
+ * (`put`, when it joins the queue and again when its prepared version
+ * replaces the one as picked); everything that changes after that is the
+ * small state beside them (`update`), so a big video's every finished part
+ * doesn't write the whole file into storage again.
+ */
 export interface OutboxStore {
   all(): Promise<OutboxEntry[]>;
+  /** Writes the whole row, bytes and state. */
   put(entry: OutboxEntry): Promise<void>;
+  /** Writes only the state of a row whose bytes are already stored. Nothing for a row that isn't there (it was recorded and removed meanwhile). */
+  update(entry: OutboxEntry): Promise<void>;
   delete(id: string): Promise<void>;
 }
 
@@ -166,6 +205,11 @@ export function memoryOutbox(): OutboxStore {
     put: async (e) => {
       rows.set(e.id, e);
     },
+    update: async (e) => {
+      const held = rows.get(e.id);
+      if (!held) return;
+      rows.set(e.id, { ...e, blob: held.blob, thumb: held.thumb, poster: held.poster });
+    },
     delete: async (id) => {
       rows.delete(id);
     },
@@ -173,7 +217,10 @@ export function memoryOutbox(): OutboxStore {
 }
 
 const DB_NAME = "hg-upload-outbox";
+/** Version 2 keeps a file's bytes in their own store, apart from its state. */
+const DB_VERSION = 2;
 const STORE = "entries";
+const BYTES = "bytes";
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -200,9 +247,21 @@ export function idbOutbox(): OutboxStore | null {
   let opened: Promise<IDBDatabase> | null = null;
   const open = () =>
     (opened ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: "id" });
-      req.onsuccess = () => resolve(req.result);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (event) => upgrade(req.result, req.transaction, event.oldVersion);
+      req.onsuccess = () => {
+        const db = req.result;
+        // A newer version of the page upgrading the database, or the browser clearing it, closes this connection
+        // rather than blocking: the next write opens it again.
+        db.onversionchange = () => {
+          db.close();
+          opened = null;
+        };
+        db.onclose = () => {
+          opened = null;
+        };
+        resolve(db);
+      };
       req.onerror = () => reject(req.error);
       req.onblocked = () => reject(new Error("The upload outbox is blocked."));
     }).catch((err) => {
@@ -212,19 +271,65 @@ export function idbOutbox(): OutboxStore | null {
   return {
     async all() {
       const db = await open();
-      return request<OutboxEntry[]>(db.transaction(STORE, "readonly").objectStore(STORE).getAll());
+      const tx = db.transaction([STORE, BYTES], "readonly");
+      const [states, bytes] = await Promise.all([
+        request<OutboxState[]>(tx.objectStore(STORE).getAll()),
+        request<OutboxBytes[]>(tx.objectStore(BYTES).getAll()),
+      ]);
+      const byId = new Map(bytes.map((b) => [b.id, b]));
+      return states.map((s) => joinEntry(s, byId.get(s.id))).filter((e): e is OutboxEntry => e !== null);
     },
     async put(entry) {
       const db = await open();
+      const { state, bytes } = splitEntry(entry);
+      const tx = db.transaction([STORE, BYTES], "readwrite");
+      tx.objectStore(BYTES).put(bytes);
+      tx.objectStore(STORE).put(state);
+      await done(tx);
+    },
+    async update(entry) {
+      const db = await open();
+      const { state } = splitEntry(entry);
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(entry);
+      const store = tx.objectStore(STORE);
+      // Only a row that is still there: one recorded and removed in the meantime stays removed.
+      const held = store.get(entry.id);
+      held.onsuccess = () => {
+        if (held.result) store.put(state);
+      };
       await done(tx);
     },
     async delete(id) {
       const db = await open();
-      const tx = db.transaction(STORE, "readwrite");
+      const tx = db.transaction([STORE, BYTES], "readwrite");
       tx.objectStore(STORE).delete(id);
+      tx.objectStore(BYTES).delete(id);
       await done(tx);
     },
+  };
+}
+
+/**
+ * Creates and migrates the database's stores. Version 1 had one store with
+ * each file's bytes inside its row; version 2 keeps the bytes in their own
+ * store, so a part finishing rewrites a few hundred bytes of state and not the
+ * file. Rows a version 1 page wrote are split in the upgrade itself.
+ */
+function upgrade(db: IDBDatabase, tx: IDBTransaction | null, oldVersion: number): void {
+  const entries = oldVersion < 1 || !tx ? db.createObjectStore(STORE, { keyPath: "id" }) : tx.objectStore(STORE);
+  if (oldVersion >= 2) return;
+  const bytes = db.createObjectStore(BYTES, { keyPath: "id" });
+  if (oldVersion < 1) return;
+  const cursor = entries.openCursor();
+  cursor.onsuccess = () => {
+    const at = cursor.result;
+    if (!at) return;
+    const row = at.value as OutboxEntry;
+    const { state, bytes: held } = splitEntry(row);
+    if (row.blob) {
+      bytes.put(held);
+      at.update(state);
+    }
+    at.continue();
   };
 }
