@@ -11,11 +11,13 @@ import type { MenuFollowUp } from "@/components/menu";
 import { StatusMenu } from "@/components/status-menu";
 import { useToast } from "@/components/toast";
 import { Button, FormField, Input, Textarea, tagClass } from "@/components/ui";
+import type { FieldErrors } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
 import { offersUnits, type PropertyOption } from "@/lib/picker-options-shape";
 import { firstOccurrence, type RepeatRule } from "@/lib/tasks/repeat";
 import { followDueDay } from "@/lib/tasks/repeat-choice";
 import { fmtShortDay } from "@/lib/tasks/activity";
+import { newTaskNotesProblem } from "@/lib/tasks/limits";
 import { afterCreate, isStillOnNewTask, newTaskDraftKey } from "@/lib/tasks/new-task";
 import { cn } from "@/lib/utils";
 import { createTask, type CreatedTask } from "./actions";
@@ -203,11 +205,12 @@ export function NewTaskForm({
       }}
       draftKey={newTaskDraftKey(meId, context)}
       fields={["title", "description"]}
-      check={(data) => {
+      check={(data): FieldErrors | null => {
         const title = String(data.get("title") ?? "").trim();
         if (title.length === 0) return { title: "Enter a title." };
         if (title.length < 2) return { title: "Enter at least 2 characters." };
-        return null;
+        const notes = newTaskNotesProblem(String(data.get("description") ?? ""));
+        return notes ? { description: notes } : null;
       }}
       action={createTask}
       onCreated={(task, more) => {
@@ -263,14 +266,18 @@ export function NewTaskForm({
             )}
           </FormField>
 
-          <FormField label="Notes" optional>
+          {/* Its line is the notes' limit, the one the task page saves within (lib/tasks/limits.ts). */}
+          <FormField label="Notes" optional error={errors.description}>
             {(p) => (
               <Textarea
                 {...p}
                 name="description"
                 rows={3}
                 value={values.notes}
-                onChange={(e) => set({ notes: e.target.value })}
+                onChange={(e) => {
+                  clear("description");
+                  set({ notes: e.target.value });
+                }}
                 className="field-sizing-content max-h-60 min-h-20"
               />
             )}
@@ -357,6 +364,9 @@ function WaitingStep({ initial, onSave, className }: { initial: string; onSave: 
         placeholder="City inspection, parts, the tenant"
         value={reason}
         autoFocus
+        // Free text, not a login: password managers keep their icon and menu off it.
+        autoComplete="off"
+        data-1p-ignore
         maxLength={300}
         onChange={(e) => setReason(e.target.value)}
       />

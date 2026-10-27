@@ -6,19 +6,10 @@ import { Sheet, SheetView, useSheet } from "@/components/sheet";
 import { pickContainer, type PickContainer } from "@/components/use-coarse-pointer";
 import type { PopoverProps } from "react-aria-components";
 
-/**
- * A closed trigger opens on Down or Up, as well as Enter and Space (selectors 2,
- * Keyboard). Spread it on a button that opens a layer without a `trigger`
- * (a field's calendar button); `PickerLayer` adds it to its own trigger.
- */
-export function openOnArrow(open: () => void) {
-  return (e: KeyboardEvent) => {
-    if (e.isDefaultPrevented() || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    e.preventDefault();
-    open();
-  };
-}
+import { openOnArrow } from "@/components/picker-keys";
+
+// Down and Up open a closed trigger; every other key goes on to the sheet or form around it (picker-keys.ts).
+export { openOnArrow };
 
 /**
  * The layer every picker opens (selectors 2 and 4.2 A): an anchored popover

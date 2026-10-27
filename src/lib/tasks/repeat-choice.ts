@@ -1,6 +1,6 @@
 import type { Ymd } from "@/lib/dates";
 import { weekdayOf } from "@/lib/quick-dates";
-import type { RepeatRule } from "./repeat";
+import { leapDayRule, type RepeatRule } from "./repeat";
 
 /**
  * The repeat editor's state and the stored rule, both ways (D27): Never,
@@ -85,10 +85,12 @@ const isYmd = (v: string | null | undefined): v is Ymd => !!v && /^\d{4}-\d{2}-\
  * came from it moves with it (Due Oct 23, Every month on the 23rd, then Due
  * Nov 15: Every month on the 15th; Due Thursday, Every week on Thursday, then
  * Due Monday: Every week on Monday). A day picked apart from the due date
- * stays.
+ * stays. A yearly rule's only pin is the leap day's (repeat.ts leapDayRule):
+ * it goes with a due date moved off Feb 29 and comes with one moved onto it.
  */
 export function followDueDay(rule: RepeatRule | null, prevDue: string | null | undefined, nextDue: string | null | undefined): RepeatRule | null {
   if (!rule || !isYmd(prevDue) || !isYmd(nextDue)) return rule;
+  if (rule.freq === "yearly") return leapDayRule({ freq: "yearly", interval: rule.interval }, nextDue);
   if (rule.dayOfMonth && rule.dayOfMonth === dayOf(prevDue)) return { ...rule, dayOfMonth: dayOf(nextDue) };
   if (rule.freq === "weeks" && rule.weekday !== undefined && rule.weekday === weekdayOf(prevDue)) return { ...rule, weekday: weekdayOf(nextDue) };
   return rule;

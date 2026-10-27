@@ -164,6 +164,9 @@ test("status updates read as a short phrase", () => {
   assert.equal(statusUpdateText("SCHEDULED", "IN_PROGRESS", { contractor: false }), "moved it to In progress");
   assert.equal(statusUpdateText("SCHEDULED", "IN_PROGRESS", { contractor: true }), "started the job");
   assert.equal(statusUpdateText("REVIEW", "IN_PROGRESS", { contractor: false }), "sent it back");
+  // Only the contractor marks it done; a partner moving it to Review changed its status, as the email says.
+  assert.equal(statusUpdateText("IN_PROGRESS", "REVIEW", { contractor: false }), "moved it to Review");
+  assert.equal(statusUpdateText("IN_PROGRESS", "REVIEW", { contractor: true }), "marked it done");
 });
 
 test("file posts say what was added", () => {

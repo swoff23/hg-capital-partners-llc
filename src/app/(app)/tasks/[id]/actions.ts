@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { withLog, withResult } from "@/lib/server-action";
+import { checklistItemText, commentText, notesText, titleText, unitText, waitingOnText } from "@/lib/tasks/limits";
 import { repeatRuleSchema } from "@/lib/tasks/repeat";
 import * as tasks from "@/lib/tasks/service";
 
@@ -20,16 +21,19 @@ const assignee = z.union([z.object({ userId: id }).strict(), z.object({ contactI
 
 const patchSchema = z
   .object({
-    title: z.string().max(300),
-    description: z.string().max(20_000).nullable(),
+    title: titleText,
+    description: notesText.nullable(),
+    // The notes the page loaded: a save from a stale page is refused (core.ts NotesChangedError). Only compared,
+    // so it isn't held to the notes' limit: notes made longer before New task had one can still be shortened here.
+    expectedDescription: z.string().max(100_000).nullable(),
     dueDate: ymd.nullable(),
     scheduledFor: ymd.nullable(),
     propertyId: id.nullable(),
-    unitLabel: z.string().max(100).nullable(),
+    unitLabel: unitText.nullable(),
     assignee,
     // The assignee the page showed: a reassignment from a stale page is refused.
     expectedAssignee: assignee,
-    waitingOn: z.string().max(300).nullable(),
+    waitingOn: waitingOnText.nullable(),
     repeatRule: repeatRuleSchema.nullable(),
   })
   .partial()
@@ -45,7 +49,7 @@ export async function updateTask(taskId: string, patch: z.input<typeof patchSche
 const statusSchema = z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW", "DONE", "CANCELED"]);
 const statusOptsSchema = z
   .object({
-    waitingOn: z.string().max(300).nullable(),
+    waitingOn: waitingOnText.nullable(),
     scheduledFor: ymd.nullable(),
     // Send back's note: 2,000 characters, the same on the banner, Today's rows and both servers (forms 4.4).
     note: z.string().max(2000).nullable(),
@@ -69,7 +73,7 @@ export async function setTaskStatus(
 
 const commentSchema = z
   .object({
-    body: z.string().max(20_000),
+    body: commentText,
     visibility: z.enum(["SHARED", "INTERNAL"]),
     attachmentIds: z.array(id).max(50).default([]),
     // Made in the browser per send, so a Retry that follows a post that did land writes nothing twice.
@@ -88,7 +92,7 @@ export async function addTaskComment(taskId: string, input: z.input<typeof comme
 export async function editTaskComment(eventId: string, body: string): Promise<ActionResult> {
   return withResult("editTaskComment", async () => {
     const user = await requireUser();
-    await tasks.editTaskComment(id.parse(eventId), z.string().max(20_000).parse(body), tasks.staffPrincipal(user));
+    await tasks.editTaskComment(id.parse(eventId), commentText.parse(body), tasks.staffPrincipal(user));
   });
 }
 
@@ -118,7 +122,7 @@ export async function setChecklistItem(itemId: string, done: boolean): Promise<A
 export async function addChecklistItem(taskId: string, title: string): Promise<ActionResult> {
   return withResult("addChecklistItem", async () => {
     const user = await requireUser();
-    await tasks.addChecklistItem(id.parse(taskId), z.string().trim().min(1).max(300).parse(title), tasks.staffPrincipal(user));
+    await tasks.addChecklistItem(id.parse(taskId), checklistItemText.parse(title), tasks.staffPrincipal(user));
   });
 }
 

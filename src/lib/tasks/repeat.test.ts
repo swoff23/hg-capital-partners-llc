@@ -7,6 +7,7 @@ import {
   describeRepeat,
   firstOccurrence,
   isUntouchedCopy,
+  leapDayRule,
   matchPreset,
   nextCopyDue,
   nextOccurrence,
@@ -388,4 +389,36 @@ test("nextCopyDue: never a date that has already passed, however late the copy i
   const on5 = { freq: "monthly" as const, interval: 1, dayOfMonth: 5 };
   // The Jul 5 copy, finished Oct 23: Nov 5, not Aug 5.
   assert.equal(nextCopyDue(on5, "2026-07-05", "2026-07-05", "2026-10-23"), "2026-11-05");
+});
+
+test("a Feb 29 yearly repeat lands on Feb 28 in the years between and comes back to Feb 29", () => {
+  // The menu's preset on a Feb 29 due date carries the leap-day pin, and says so.
+  const presets = repeatPresets("2028-02-29");
+  const yearly = presets[5].rule!;
+  assert.deepEqual(yearly, { freq: "yearly", interval: 1, dayOfMonth: 29 });
+  assert.equal(presets[5].label, "Every year on Feb 29");
+  // Each copy steps from the one before it, as finishing it does.
+  const dues: string[] = [];
+  let due = "2028-02-29";
+  for (let i = 0; i < 4; i++) dues.push((due = nextRepeatDue(yearly, due, due)));
+  assert.deepEqual(dues, ["2029-02-28", "2030-02-28", "2031-02-28", "2032-02-29"]);
+  // The copies in between still read as the leap-day rule, and their menu lists it apart from a plain Feb 28.
+  assert.equal(describeRepeat(yearly, { short: true, from: "2029-02-28" }), "Every year on Feb 29");
+  assert.equal(matchPreset(yearly, repeatPresets("2029-02-28")), null);
+  assert.equal(matchPreset(yearly, repeatPresets("2032-02-29"))?.key, "yearly");
+  // A copy moved off the leap day keeps its new day, as any yearly renewal does.
+  assert.equal(nextOccurrence(yearly, "2029-03-05"), "2030-03-05");
+  assert.equal(describeRepeat(yearly, { from: "2029-03-05" }), "Every year on Mar 5");
+});
+
+test("leapDayRule: only a yearly rule on Feb 29 gets the pin; every other rule and date stays as it is", () => {
+  assert.deepEqual(leapDayRule({ freq: "yearly", interval: 1 }, "2028-02-29"), { freq: "yearly", interval: 1, dayOfMonth: 29 });
+  assert.deepEqual(leapDayRule({ freq: "yearly", interval: 1 }, "2029-02-28"), { freq: "yearly", interval: 1 });
+  assert.deepEqual(leapDayRule({ freq: "yearly", interval: 1 }, null), { freq: "yearly", interval: 1 });
+  assert.deepEqual(leapDayRule({ freq: "monthly", interval: 1 }, "2028-02-29"), { freq: "monthly", interval: 1 });
+  assert.equal(leapDayRule(null, "2028-02-29"), null);
+  // A yearly rule saved on Feb 29 before the pin matches the pinned preset, so the menu shows one row, not two.
+  assert.equal(matchPreset({ freq: "yearly", interval: 1 }, repeatPresets("2028-02-29"))?.key, "yearly");
+  // Plain yearly dates are untouched: Oct 30 is still not pinned.
+  assert.deepEqual(repeatPresets("2026-10-30")[5].rule, { freq: "yearly", interval: 1 });
 });

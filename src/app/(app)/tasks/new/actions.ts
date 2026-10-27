@@ -1,10 +1,10 @@
 "use server";
-import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
 import { withResult } from "@/lib/server-action";
 import type { Assignee } from "@/lib/tasks/core";
+import { newTaskSchema } from "@/lib/tasks/new-task";
 import { repeatRuleSchema } from "@/lib/tasks/repeat";
 import * as tasks from "@/lib/tasks/service";
 
@@ -16,27 +16,9 @@ import * as tasks from "@/lib/tasks/service";
  * ("u:<id>", "c:<id>" or blank), `dueDate`, `repeatRule` (JSON), `status`,
  * `waitingOn`, `scheduledFor`, and now `unitLabel`. A refusal comes back as a
  * value (`withResult`): a zod failure puts its plain message on the field
- * that caused it, and nothing typed is lost.
+ * that caused it, and nothing typed is lost. The schema is new-task.ts
+ * newTaskSchema, held to the limits the task page saves within.
  */
-
-const taskSchema = z.object({
-  title: z.string({ error: "Enter a title." }).trim().min(2, "Enter at least 2 characters."),
-  description: z.string().optional(),
-  // The assignee picker: "u:<userId>", "c:<contactId>", or blank for nobody.
-  assignee: z.string().optional(),
-  assigneeUserId: z.string().optional(),
-  assigneeName: z.string().optional(),
-  dueDate: z.string().optional(),
-  priority: z.string().optional(),
-  propertyId: z.string().optional(),
-  unitLabel: z.string().optional(),
-  dealId: z.string().optional(),
-  status: z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING"], { error: "Pick a status." }).optional(),
-  waitingOn: z.string().optional(),
-  scheduledFor: z.string().optional(),
-  // JSON from the Repeat step in the due date's panel; blank for Doesn't repeat.
-  repeatRule: z.string().optional(),
-});
 
 function pickedAssignee(v: string | undefined, legacyUserId: string | undefined): Assignee {
   if (v?.startsWith("u:") && v.length > 2) return { userId: v.slice(2) };
@@ -61,7 +43,7 @@ export type CreatedTask = { id: string; title: string };
 export async function createTask(formData: FormData): Promise<ActionResult<CreatedTask>> {
   return withResult("createTask", async () => {
     const user = await requireUser();
-    const p = taskSchema.parse(formToObject(formData));
+    const p = newTaskSchema.parse(formToObject(formData));
     const assignee = pickedAssignee(p.assignee, p.assigneeUserId);
     if (p.status === "SCHEDULED" && !p.scheduledFor) throw new tasks.TaskRuleError("Pick the visit date.");
     const task = await tasks.createTask(

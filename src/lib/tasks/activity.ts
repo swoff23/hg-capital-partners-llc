@@ -144,12 +144,22 @@ function quoted(t: string | null): string {
   return t ? `“${t}”` : "";
 }
 
+/**
+ * What a move to Review says after the person's name, on the timeline and the
+ * Review banner. Mark done is the contractor's own move; a partner who moves a
+ * job to Review set a status, as the email says (core.ts statusSummary), so
+ * the line never reads as if the contractor finished the job.
+ */
+export function reviewMoveText(byContractor: boolean): string {
+  return byContractor ? "marked this done" : "set status to Review";
+}
+
 function statusLine(e: ActivityEvent, d: Data, today: Ymd): string {
   const a = who(e);
   const to = s(d.to) as TaskStatus | null;
   const from = s(d.from) as TaskStatus | null;
   if (!to || !(to in STATUS_LABEL)) return `${a} changed the status`;
-  if (to === "REVIEW") return `${a} marked this done`;
+  if (to === "REVIEW") return `${a} ${reviewMoveText(!!e.actorContactId)}`;
   if (from === "REVIEW" && to === "DONE") return `${a} approved this`;
   if (from === "REVIEW" && to === "IN_PROGRESS") return `${a} sent this back`;
   const waiting = s(d.waitingOn);
@@ -302,6 +312,22 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
       return { text: conflictLine(d, names, today) };
     case "COMMENT":
       return { text: e.body ?? "" };
+  }
+}
+
+/**
+ * The update a link points at, from the page's hash (`#update-<id>`, from a
+ * job email or Copy link), or null. A hash that isn't valid percent-encoding
+ * (a link an email client cut at a %) points at nothing, and the page opens
+ * as if it had no hash.
+ */
+export function linkedUpdateId(hash: string): string | null {
+  const m = /^#update-(.+)$/.exec(hash);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return null;
   }
 }
 

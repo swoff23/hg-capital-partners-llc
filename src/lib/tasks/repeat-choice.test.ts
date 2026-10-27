@@ -94,6 +94,10 @@ test("new task: a day taken from the due date moves with it; a day picked apart 
   assert.deepEqual(followDueDay(monthly23, "2026-10-23", ""), monthly23, "clearing the date leaves the rule");
   assert.deepEqual(followDueDay({ freq: "weeks", interval: 2 }, "2026-10-23", "2026-11-15"), { freq: "weeks", interval: 2 });
   assert.equal(followDueDay(null, "2026-10-23", "2026-11-15"), null);
+  // A yearly rule's leap-day pin goes with a due date moved off Feb 29 and comes with one moved onto it.
+  const leap = { freq: "yearly" as const, interval: 1, dayOfMonth: 29 };
+  assert.deepEqual(followDueDay(leap, "2028-02-29", "2028-03-05"), { freq: "yearly", interval: 1 });
+  assert.deepEqual(followDueDay({ freq: "yearly", interval: 1 }, "2028-03-05", "2028-02-29"), leap);
   // The form passes the last date the field held, so clearing it on the way still follows: 23, cleared, 1st, 15th.
   let rule: typeof monthly23 | null = monthly23;
   let last = "2026-10-23";

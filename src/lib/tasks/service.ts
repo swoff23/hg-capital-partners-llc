@@ -9,6 +9,7 @@ import { logError } from "@/lib/log";
 import { firstName } from "@/lib/names";
 import type { UnitRename } from "@/lib/property-types";
 import { activeTask } from "@/lib/task-scope";
+import { asEditorConflict } from "./conflicts";
 import * as core from "./core";
 import { contactsWhoSaw, deleteEmailNote, emailStatesIn } from "./delivery";
 
@@ -22,7 +23,7 @@ import { contactsWhoSaw, deleteEmailNote, emailStatesIn } from "./delivery";
  */
 
 export type { ChecklistSnapshot, Principal, NewTaskInput, TaskPatch, StatusOptions } from "./core";
-export { AssigneeChangedError, TaskChangedError, TaskRuleError, bucketFor } from "./core";
+export { AssigneeChangedError, NotesChangedError, TaskChangedError, TaskRuleError, bucketFor } from "./core";
 export { TEMPLATE_BUCKET };
 
 /** The signed-in staff user as the actor on a write. */
@@ -66,19 +67,24 @@ export async function setTaskStatus(id: string, to: TaskStatus, p: core.Principa
 }
 
 /**
- * Field edits. No-op when the task doesn't exist. A refused one (someone
- * reassigned it first) still refreshes the pages, so the screen that sent it
- * shows who has the task now.
+ * Field edits. A task deleted elsewhere is refused ("That task no longer
+ * exists."), never a quiet success: the screen would toast "Task renamed"
+ * over nothing saved. A refused one (deleted, someone reassigned it or saved
+ * the notes first) still refreshes the pages, so the screen that sent it
+ * shows where the task is now; a stale notes save comes back as the notes
+ * field's conflict (conflicts.ts).
  */
 export async function patchTask(id: string, patch: core.TaskPatch, p: core.Principal): Promise<void> {
-  const before = await prisma.task.findUnique({ where: { id }, select: { propertyId: true } });
-  if (!before) return;
   try {
-    const after = await prisma.$transaction((tx) => core.patchTask(tx, id, patch, p));
-    revalidateTask(after, [before.propertyId]);
+    const { after, propertyBefore } = await prisma.$transaction(async (tx) => {
+      // Read with the write, so the property page it leaves is the one it was on.
+      const was = await tx.task.findUnique({ where: { id }, select: { propertyId: true } });
+      return { after: await core.patchTask(tx, id, patch, p), propertyBefore: was?.propertyId ?? null };
+    });
+    revalidateTask(after, [propertyBefore]);
   } catch (err) {
     if (err instanceof core.TaskRuleError) revalidateTask({ id });
-    throw err;
+    throw asEditorConflict(err);
   }
 }
 

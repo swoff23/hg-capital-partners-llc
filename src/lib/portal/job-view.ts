@@ -168,8 +168,9 @@ export const PORTAL_STATUS_UPDATES = ["SCHEDULED", "IN_PROGRESS", "REVIEW", "DON
 
 /**
  * What a status update says after the person's name: "started the job".
- * Only a contractor starts the job; staff moving it to In progress is a
- * status change ("Connor moved it to In progress"), as in the email.
+ * Only a contractor starts the job or marks it done; staff moving it to In
+ * progress or Review is a status change ("Connor moved it to Review"), as in
+ * the email, so a partner's move never reads as the contractor's own.
  */
 export function statusUpdateText(from: string | null, to: string | null, by: { contractor: boolean } = { contractor: true }): string {
   switch (to) {
@@ -178,7 +179,7 @@ export function statusUpdateText(from: string | null, to: string | null, by: { c
     case "IN_PROGRESS":
       return from === "REVIEW" ? "sent it back" : by.contractor ? "started the job" : "moved it to In progress";
     case "REVIEW":
-      return "marked it done";
+      return by.contractor ? "marked it done" : "moved it to Review";
     case "DONE":
       return from === "REVIEW" ? "approved it" : "closed the job";
     default:

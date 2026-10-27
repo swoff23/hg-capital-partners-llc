@@ -12,6 +12,8 @@ import {
   groupByDay,
   groupHeadings,
   lastWordBy,
+  linkedUpdateId,
+  reviewMoveText,
   splitEarlier,
   type ActivityEntry,
   type ActivityEvent,
@@ -548,4 +550,23 @@ test("entryIsFresh looks inside decisions, batches and runs", () => {
   assert.equal(entryIsFresh(mine, "u-connor"), false);
   const [run] = build([ev("CHECKLIST", { itemId: "a", title: "a", done: true }, ZACK), ev("CHECKLIST", { itemId: "b", title: "b", done: true }, ZACK)]);
   assert.equal(entryIsFresh(run, "u-connor"), false, "ticks alone don't dot");
+});
+
+test("a partner moving a job to Review set a status; only the contractor marks it done", () => {
+  const line = (e: ActivityEvent) => eventLine(e, names, TODAY).text;
+  assert.equal(line(ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" })), "Connor set status to Review");
+  assert.equal(line(ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, ZACK)), "Zack marked this done");
+  // The Review banner says the same words after the name.
+  assert.equal(reviewMoveText(false), "set status to Review");
+  assert.equal(reviewMoveText(true), "marked this done");
+});
+
+test("linkedUpdateId: the update a link points at, and none for a hash that isn't percent-encoding", () => {
+  assert.equal(linkedUpdateId("#update-e001"), "e001");
+  assert.equal(linkedUpdateId("#update-pending-c%201"), "pending-c 1");
+  // An email client cut the link at a %: no anchor, and no crash that takes the whole task page down.
+  assert.equal(linkedUpdateId("#update-%E0%A4%A"), null);
+  assert.equal(linkedUpdateId("#update-%"), null);
+  assert.equal(linkedUpdateId("#new"), null);
+  assert.equal(linkedUpdateId(""), null);
 });

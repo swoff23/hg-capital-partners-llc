@@ -59,10 +59,37 @@ function occurrence(rule: RepeatRule, from: Ymd, k: number): Ymd {
       const total = m0 + months;
       const ny = y + Math.floor(total / 12);
       const nm0 = ((total % 12) + 12) % 12;
-      const day = Math.min(rule.dayOfMonth ?? d, daysInMonth(ny, nm0));
+      const day = Math.min(pinFrom(rule, y, m0, d) ?? d, daysInMonth(ny, nm0));
       return ymd(ny, nm0, day);
     }
   }
+}
+
+/**
+ * The day of the month a month step aims for from y-m0-d: the rule's pin, or
+ * null to keep `d`. A yearly rule's pin is only the leap day's (leapDayRule),
+ * and it counts only from a date on it (Feb 29, or the Feb 28 it clamped
+ * to): a copy someone moved off it keeps its new day, as every yearly rule does.
+ */
+function pinFrom(rule: RepeatRule, y: number, m0: number, d: number): number | null {
+  if (!rule.dayOfMonth) return null;
+  if (rule.freq !== "yearly") return rule.dayOfMonth;
+  return d === Math.min(rule.dayOfMonth, daysInMonth(y, m0)) ? rule.dayOfMonth : null;
+}
+
+/**
+ * A yearly rule on a Feb 29 due date, pinned to the 29th so the series
+ * comes back to the leap day: Feb 29, 2028 makes Feb 28 in 2029, 2030 and
+ * 2031, then Feb 29, 2032. Without the pin each copy steps from the Feb 28
+ * before it and the series stays on the 28th for good. Any other rule, or
+ * date, comes back as it is; yearly rules are otherwise never pinned (a pin
+ * would undo a renewal date someone moved). The repeat menu's yearly preset
+ * and the next copy (core.ts createNextRepeat) both go through it.
+ */
+export function leapDayRule<R extends RepeatRule | null>(rule: R, due: Ymd | null | undefined): R {
+  if (!rule || rule.freq !== "yearly" || rule.dayOfMonth) return rule;
+  const day = toYmd(due);
+  return day && day.slice(5) === "02-29" ? ({ ...rule, dayOfMonth: 29 } as R) : rule;
 }
 
 /**
@@ -178,7 +205,9 @@ export function describeRepeat(rule: RepeatRule, { short = false, from }: { shor
     case "quarterly":
       return (n === 1 ? "Every quarter" : `Every ${n} quarters`) + on;
     case "yearly": {
-      const day = date ? ` on ${MONTHS[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}` : "";
+      // A leap-day series reads as the day it aims for, Feb 29, on the Feb 28 copies in between too.
+      const [y, m, d] = date ? date.split("-").map(Number) : [0, 0, 0];
+      const day = date ? ` on ${MONTHS[m - 1]} ${pinFrom(rule, y, m - 1, d) ?? d}` : "";
       return (n === 1 ? "Every year" : `Every ${n} years`) + day;
     }
   }
@@ -203,7 +232,9 @@ export interface RepeatPreset {
  * none): the weekday and the day of the month come from it, so "Every week
  * on Fri" is the due date's own Friday. A repeat menu lists these in order,
  * then Custom (selectors 3.9). Yearly isn't pinned, as the editor never
- * pinned it: a pin would undo a renewal date someone moved. Each `next` is the
+ * pinned it: a pin would undo a renewal date someone moved. The one exception
+ * is the leap day (leapDayRule), so "Every year on Feb 29" comes back to the
+ * 29th in a leap year instead of staying on Feb 28. Each `next` is the
  * date finishing the task would give the copy (`nextRepeatDue`): with a due
  * date that is already late, pass `today` so it is never a day gone by.
  */
@@ -216,7 +247,7 @@ export function repeatPresets(from: Ymd, today: Ymd = from): RepeatPreset[] {
     { key: "biweekly", rule: { freq: "weeks", interval: 2, weekday } },
     { key: "monthly", rule: { freq: "monthly", interval: 1, dayOfMonth } },
     { key: "quarterly", rule: { freq: "quarterly", interval: 1, dayOfMonth } },
-    { key: "yearly", rule: { freq: "yearly", interval: 1 } },
+    { key: "yearly", rule: leapDayRule({ freq: "yearly", interval: 1 }, from) },
   ];
   return rules.map(({ key, rule }) => ({
     key,
@@ -229,7 +260,9 @@ export function repeatPresets(from: Ymd, today: Ymd = from): RepeatPreset[] {
 /** The preset a stored rule is, or null when it matches none ("Every 3 days", "Every 2 months", a weekday off the due date's). */
 export function matchPreset(rule: RepeatRule | null, presets: readonly RepeatPreset[]): RepeatPreset | null {
   const key = ruleKey(rule);
-  return presets.find((p) => ruleKey(p.rule) === key) ?? null;
+  // A yearly rule saved on Feb 29 before the leap-day pin is the pinned preset: its next copy gets the pin anyway.
+  const leap = rule?.freq === "yearly" && !rule.dayOfMonth ? ruleKey({ ...rule, dayOfMonth: 29 }) : null;
+  return presets.find((p) => ruleKey(p.rule) === key) ?? (leap ? (presets.find((p) => p.key === "yearly" && ruleKey(p.rule) === leap) ?? null) : null);
 }
 
 // ---------------------------------------------------------------------------

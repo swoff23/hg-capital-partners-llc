@@ -4,7 +4,7 @@ import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates
 import { firstName } from "@/lib/names";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
-import { hasPinnedDay, isUntouchedCopy, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
+import { hasPinnedDay, isUntouchedCopy, leapDayRule, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
 import { copySlot } from "./repeat-slot";
 import {
   APPROVAL_UNDO_MS,
@@ -80,7 +80,45 @@ export class AssigneeChangedError extends TaskRuleError {
   }
 }
 
+/**
+ * Someone saved the notes since the caller's screen loaded them (another tab,
+ * the other partner), so nothing was written: a stale screen never writes
+ * over newer notes, as with the status and the assignee. `by` is who saved
+ * them by first name (null when no line says), `mine` that it was the caller
+ * in another tab, `at` when, and `current` the notes as they are now, for the
+ * field's "Keep" and "Save mine".
+ */
+export class NotesChangedError extends TaskRuleError {
+  constructor(
+    readonly by: string | null,
+    readonly mine: boolean,
+    readonly at: Date,
+    readonly current: string,
+  ) {
+    super(`${mine ? "You" : by || "Someone"} changed the notes.`);
+    this.name = "NotesChangedError";
+  }
+}
+
 const kindOf = (p: Principal): PrincipalKind => p.kind;
+
+/**
+ * Who made a change the caller's screen didn't see, for a refusal's words:
+ * "You" when it was the caller (another tab of theirs, where two people
+ * share a first name the name alone reads as someone else), otherwise the
+ * first name on the line. Null when no line says.
+ */
+export function changedBy(p: Principal, line: { actorLabel: string; actorUserId?: string | null; actorContactId?: string | null } | null | undefined): string | null {
+  if (!line) return null;
+  if (isActor(p, line)) return "You";
+  return firstName(line.actorLabel) || null;
+}
+
+function isActor(p: Principal, line: { actorUserId?: string | null; actorContactId?: string | null }): boolean {
+  if (p.kind === "staff") return !!line.actorUserId && line.actorUserId === p.userId;
+  if (p.kind === "contractor") return !!line.actorContactId && line.actorContactId === p.contactId;
+  return false;
+}
 
 function actorFields(p: Principal) {
   return {
@@ -436,14 +474,18 @@ export interface StatusResult {
   emailsContractor: boolean;
 }
 
-/** The refusal for a change from a stale screen: whoever moved the task to where it is now, not a later change that didn't. */
-async function taskChanged(tx: Tx, taskId: string, current: TaskStatus): Promise<TaskChangedError> {
+/**
+ * The refusal for a change from a stale screen: whoever moved the task to
+ * where it is now, not a later change that didn't, and "You" when that was
+ * the caller in another tab.
+ */
+async function taskChanged(tx: Tx, taskId: string, current: TaskStatus, p: Principal): Promise<TaskChangedError> {
   const last = await tx.taskEvent.findFirst({
     where: { taskId, kind: "STATUS", deletedAt: null, data: { path: ["to"], equals: current } },
     orderBy: { createdAt: "desc" },
-    select: { actorLabel: true },
+    select: { actorLabel: true, actorUserId: true, actorContactId: true },
   });
-  return new TaskChangedError(current, firstName(last?.actorLabel));
+  return new TaskChangedError(current, changedBy(p, last));
 }
 
 export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Principal, opts: StatusOptions = {}, now = new Date()): Promise<StatusResult> {
@@ -456,7 +498,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
-  if (opts.expected && before.status !== opts.expected) throw await taskChanged(tx, taskId, before.status);
+  if (opts.expected && before.status !== opts.expected) throw await taskChanged(tx, taskId, before.status, p);
   if (!canSetStatus(kindOf(p), before.status, to)) {
     throw new TaskRuleError(p.kind === "contractor" ? "You can start a job or mark it done." : "That status change isn't allowed.");
   }
@@ -584,7 +626,7 @@ export async function undoApproval(tx: Tx, taskId: string, approvedEventId: stri
     select: { id: true },
   });
   if (undone) return { task: before };
-  if (before.status !== "DONE") throw await taskChanged(tx, taskId, before.status);
+  if (before.status !== "DONE") throw await taskChanged(tx, taskId, before.status, p);
   const latest = await tx.taskEvent.findFirst({
     where: { taskId, kind: "STATUS", deletedAt: null },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -669,11 +711,14 @@ async function repeatSlot(tx: Tx, taskId: string): Promise<Ymd | null> {
  * repeat never makes one that's already overdue. A rule with a pinned day
  * steps from the date the series gave the finished copy, not the date it was
  * moved to (repeatSlot), and every copy's CREATED line keeps the date it was given.
+ * A yearly rule finished on Feb 29 hands its copies the leap-day pin
+ * (repeat.ts leapDayRule), so the series comes back to the 29th in the next
+ * leap year instead of staying on Feb 28.
  * Exported for the Asana delta, which closes tasks completed in Asana
  * without going through setStatus.
  */
 export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Date): Promise<string | null> {
-  const rule = parseRepeatRule(done.repeatRule);
+  const rule = leapDayRule(parseRepeatRule(done.repeatRule), toYmd(done.dueDate));
   if (!rule) return null;
   const existing = await latestRepeatCopy(tx, done.id);
   if (existing) return existing.nextId;
@@ -780,12 +825,33 @@ export interface TaskPatch {
    * asked for).
    */
   expectedAssignee?: Assignee;
+  /**
+   * With `description`: the notes the caller's screen loaded (null or "" for
+   * none). When someone saved other notes since, nothing changes and
+   * NotesChangedError says who, when and what they hold now (unless they
+   * already hold the words being saved). Compared as stored: trimmed.
+   */
+  expectedDescription?: string | null;
   waitingOn?: string | null;
   repeatRule?: RepeatRule | null;
 }
 
+/** Notes as patchTask stores and compares them: trimmed, with "" for none. */
+const notesText = (v: string | null | undefined): string => v?.trim() || "";
+
+/** The refusal for a notes save from a stale screen: who saved the notes last and when, and what they say now. */
+async function notesChanged(tx: Tx, t: Task, p: Principal): Promise<NotesChangedError> {
+  const last = await tx.taskEvent.findFirst({
+    where: { taskId: t.id, kind: "NOTES", deletedAt: null },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { actorLabel: true, actorUserId: true, actorContactId: true, createdAt: true },
+  });
+  const mine = !!last && isActor(p, last);
+  return new NotesChangedError(mine ? null : changedBy(p, last), mine, last?.createdAt ?? t.updatedAt, notesText(t.description));
+}
+
 /** The refusal for a reassignment from a stale screen: who made the last assignment, and who has the task now. */
-async function assigneeChanged(tx: Tx, t: Task): Promise<AssigneeChangedError> {
+async function assigneeChanged(tx: Tx, t: Task, p: Principal): Promise<AssigneeChangedError> {
   // Whoever gave it to the person who has it now, not a later line that didn't
   // (an Asana story kept as a conflict, say), as setStatus filters on `to`.
   const to = t.assigneeUserId
@@ -796,26 +862,28 @@ async function assigneeChanged(tx: Tx, t: Task): Promise<AssigneeChangedError> {
   const last = await tx.taskEvent.findFirst({
     where: { taskId: t.id, kind: "ASSIGNED", ...to },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { actorLabel: true },
+    select: { actorLabel: true, actorUserId: true, actorContactId: true },
   });
   const user = t.assigneeUserId ? await tx.user.findUnique({ where: { id: t.assigneeUserId }, select: { name: true, email: true } }) : null;
   const contact = t.assigneeContactId ? await tx.contact.findUnique({ where: { id: t.assigneeContactId }, select: { fullName: true } }) : null;
   // A name-only assignee (an Asana pick the load couldn't match) still has a name.
   const name = user ? user.name || user.email : (contact?.fullName ?? t.assigneeName ?? null);
-  return new AssigneeChangedError(firstName(last?.actorLabel), name);
+  return new AssigneeChangedError(changedBy(p, last), name);
 }
 
 /**
  * Field edits. Only keys present are written; null clears. Each changed field
  * adds an internal timeline line; the contractor hears about assignment,
  * notes and a moved Target date. A reassignment can carry the assignee the
- * screen showed (`expectedAssignee`), and is refused when that's out of date.
+ * screen showed (`expectedAssignee`), and a notes save the notes it loaded
+ * (`expectedDescription`); each is refused when that's out of date.
  */
 export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Principal, now = new Date()): Promise<Task> {
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't edit job details.");
-  // A reassignment locks the row first, as setStatus does, so two at once (both
+  // A reassignment or a guarded notes save locks the row first, as setStatus does, so two at once (both
   // partners, two tabs) run one after the other and the second sees the first.
-  if (patch.assignee !== undefined) await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  const guarded = patch.assignee !== undefined || (patch.description !== undefined && patch.expectedDescription !== undefined);
+  if (guarded) await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
   if (
@@ -824,7 +892,12 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
     !isAssignee(before, patch.expectedAssignee) &&
     !isAssignee(before, patch.assignee)
   ) {
-    throw await assigneeChanged(tx, before);
+    throw await assigneeChanged(tx, before, p);
+  }
+  if (patch.description !== undefined && patch.expectedDescription !== undefined) {
+    const stored = notesText(before.description);
+    // Notes someone saved since the screen loaded them; already the words being saved is no conflict.
+    if (stored !== notesText(patch.expectedDescription) && stored !== notesText(patch.description)) throw await notesChanged(tx, before, p);
   }
 
   const data: Prisma.TaskUncheckedUpdateInput = {};

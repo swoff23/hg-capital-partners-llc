@@ -6,6 +6,7 @@ import { Avatar } from "@/components/avatar";
 import { MediaGrid, type MediaItem } from "@/components/media-grid";
 import { StatusMark } from "@/components/status-badge";
 import { Button, Card } from "@/components/ui";
+import { reviewMoveText } from "@/lib/tasks/activity";
 import { SendBackSheet } from "../send-back-sheet";
 import { approveTask, undoApprove } from "../list-actions";
 import { setTaskStatus } from "./actions";
@@ -134,7 +135,7 @@ function ReviewBanner({
         {/* One line at every width: a long name truncates first, never the verb. */}
         <p className="flex min-w-0 text-body text-fg-1">
           <span className="min-w-0 truncate font-medium">{name}</span>
-          <span className="shrink-0 whitespace-pre"> marked this done</span>
+          <span className="shrink-0 whitespace-pre"> {reviewMoveText(isContractor)}</span>
           <span className="shrink-0 whitespace-pre text-fg-3">
             <span aria-hidden="true">{" · "}</span>
             <ActivityTime at={markedAt} now={now} />

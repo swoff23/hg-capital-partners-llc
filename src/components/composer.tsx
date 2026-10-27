@@ -778,6 +778,9 @@ function ComposerBody({
           rows={1}
           value={text}
           placeholder={placeholder}
+          // A message, not a login: password managers keep their icon and menu off it.
+          autoComplete="off"
+          data-1p-ignore
           onChange={(e) => setText(e.target.value)}
           onFocus={onFieldFocus}
           onKeyDown={(e) => {

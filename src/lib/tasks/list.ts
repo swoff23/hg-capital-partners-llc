@@ -2,6 +2,7 @@ import type { TaskStatus } from "@prisma/client";
 import { daysUntil, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { OVERDUE_ELIGIBLE, isActiveStatus, statusRank } from "@/lib/task-scope";
+import { mergeLegacyNames, type PersonRef } from "./assignee-people";
 import { parseRepeatRule, type RepeatRule } from "./repeat";
 import { targetDate } from "./rules";
 
@@ -15,9 +16,15 @@ import { targetDate } from "./rules";
 
 export type ListAssignee =
   | { kind: "user"; id: string; name: string | null; email: string }
-  | { kind: "contact"; id: string; name: string }
-  /** Legacy free text from the CSV import, with no real person behind it. */
-  | { kind: "name"; name: string };
+  /** `hasLogin`: they can sign in to the portal (and the contact is active), so a send-back reaches them. */
+  | { kind: "contact"; id: string; name: string; hasLogin?: boolean }
+  /**
+   * Legacy free text from the CSV import, with no real person behind it.
+   * `person` is the teammate or contractor the name stands for, when it is
+   * one (mergeLegacyNames, the rule the Tasks filter counts by): Today files
+   * the row with them (withLegacyPeople).
+   */
+  | { kind: "name"; name: string; person?: { key: string; name: string } };
 
 /** One row, serializable from the server page to the client list. */
 export interface ListTask {
@@ -61,16 +68,31 @@ export interface ListTaskRecord {
   property: { id: string; address: string } | null;
   deal: { address: string } | null;
   assignee: { id: string; name: string | null; email: string } | null;
-  assigneeContact: { id: string; fullName: string } | null;
+  assigneeContact: { id: string; fullName: string; active?: boolean; portalAccount?: { status: string } | null } | null;
   /** The stored rule (Json); a row without one, or one that doesn't parse, doesn't repeat. */
   repeatRule?: unknown;
+}
+
+/**
+ * Whether a contractor can sign in: an active portal login, while the contact
+ * is active (sign-in refuses an inactive one). The rule the task page and
+ * core.ts email by, so a Send back from Today promises the note only when it
+ * reaches them.
+ */
+export function hasPortalLogin(c: { active?: boolean; portalAccount?: { status: string } | null }): boolean {
+  return c.active === true && c.portalAccount?.status === "ACTIVE";
+}
+
+/** Whether a send-back note reaches the row's contractor: an assigned contractor who can sign in. */
+export function canReceiveSendBack(a: ListAssignee | null): boolean {
+  return a?.kind === "contact" && a.hasLogin === true;
 }
 
 export function toListTask(r: ListTaskRecord): ListTask {
   const assignee: ListAssignee | null = r.assignee
     ? { kind: "user", id: r.assignee.id, name: r.assignee.name, email: r.assignee.email }
     : r.assigneeContact
-      ? { kind: "contact", id: r.assigneeContact.id, name: r.assigneeContact.fullName }
+      ? { kind: "contact", id: r.assigneeContact.id, name: r.assigneeContact.fullName, hasLogin: hasPortalLogin(r.assigneeContact) }
       : r.assigneeName
         ? { kind: "name", name: r.assigneeName }
         : null;
@@ -91,7 +113,36 @@ export function toListTask(r: ListTaskRecord): ListTask {
   };
 }
 
-export const isContractorJob = (t: ListTask) => t.assignee?.kind === "contact";
+/** A contractor's job: assigned to one, or an imported name that stands for one (withLegacyPeople), so it reads like the rest of their group. */
+export const isContractorJob = (t: ListTask) => t.assignee?.kind === "contact" || !!(t.assignee?.kind === "name" && t.assignee.person?.key.startsWith("c:"));
+
+/**
+ * Marks the imported names on these rows that stand for a person on offer
+ * with that person (mergeLegacyNames, the rule the Tasks filter's counts and
+ * picks follow), so Today files a row Asana gave Zack with Zack's jobs, and
+ * one it gave you with yours, instead of under Unassigned. A name that is
+ * nobody stays as it was.
+ */
+export function withLegacyPeople(tasks: ListTask[], people: readonly PersonRef[]): ListTask[] {
+  const names = [...new Set(tasks.flatMap((t) => (t.assignee?.kind === "name" ? [t.assignee.name] : [])))];
+  if (names.length === 0) return tasks;
+  const { merged } = mergeLegacyNames(names, people);
+  if (merged.size === 0) return tasks;
+  const nameOf = new Map(people.map((p) => [p.key, p.name]));
+  return tasks.map((t) => {
+    const a = t.assignee;
+    const key = a?.kind === "name" ? merged.get(a.name) : undefined;
+    return a?.kind === "name" && key ? { ...t, assignee: { ...a, person: { key, name: nameOf.get(key) ?? a.name } } } : t;
+  });
+}
+
+/** Whose the row is, as a picker key ("u:…", "c:…"): the assignee, or the person an imported name stands for. Null for nobody. */
+export function ownerKeyOf(a: ListAssignee | null): string | null {
+  if (!a) return null;
+  if (a.kind === "user") return `u:${a.id}`;
+  if (a.kind === "contact") return `c:${a.id}`;
+  return a.person?.key ?? null;
+}
 
 /** What a person's name reads as on a row. */
 export function assigneeName(a: ListAssignee | null): string | null {
@@ -169,7 +220,7 @@ export const compareByTarget = byDateThenStatus<ListTask>(targetOf);
 // ---------------------------------------------------------------------------
 
 export interface MineGroups {
-  /** Nobody real owns it (no user, no contractor), so both partners see it. */
+  /** Nobody owns it (no user, no contractor, no imported name that stands for one), so both partners see it. */
   unassigned: ListTask[];
   overdue: ListTask[];
   today: ListTask[];
@@ -183,19 +234,21 @@ export interface MineGroups {
  * today aren't on Today, assigned or not (a key-date reminder for next
  * spring waits on All). A Review task of their own that's past due sits in
  * Today, since Review is never overdue. Closed tasks and contractor jobs are
- * skipped.
+ * skipped. An imported name that stands for a person (withLegacyPeople) is
+ * that person's, as the Tasks filter counts it: yours in Mine, a contractor's
+ * in their group, never Unassigned.
  */
 export function groupMine(tasks: ListTask[], userId: string, today: Ymd): MineGroups {
   const g: MineGroups = { unassigned: [], overdue: [], today: [], waiting: [], noDate: [] };
   for (const t of tasks) {
     if (!isActiveStatus(t.status)) continue;
-    const a = t.assignee;
+    const owner = ownerKeyOf(t.assignee);
     const dueByToday = !t.due || (daysUntil(t.due, today) ?? 1) <= 0;
-    if (!a || a.kind === "name") {
+    if (!owner) {
       if (dueByToday || t.status === "WAITING") g.unassigned.push(t);
       continue;
     }
-    if (a.kind !== "user" || a.id !== userId) continue;
+    if (owner !== `u:${userId}`) continue;
     if (t.status === "WAITING") g.waiting.push(t);
     else if (isOverdue(t, today)) g.overdue.push(t);
     else if (!t.due) g.noDate.push(t);
@@ -226,17 +279,22 @@ export interface ContractorColumn {
  * Needs review on top, then one group per contractor with their other
  * active jobs by Target. Groups go in order of their soonest Target, so
  * whoever is due on site next comes first; undated groups last, by name.
+ * A row whose imported name stands for a contractor (withLegacyPeople) sits
+ * in their group under their own name. It is never in Needs review, which is
+ * a contractor's Mark done: an imported name has no portal to mark it from.
  */
 export function groupContractors(tasks: ListTask[]): ContractorColumn {
   const review: ListTask[] = [];
   const byContact = new Map<string, ContractorGroup>();
   for (const t of tasks) {
-    if (!isActiveStatus(t.status) || t.assignee?.kind !== "contact") continue;
-    if (t.status === "REVIEW") {
+    const a = t.assignee;
+    const who = a?.kind === "contact" ? { id: a.id, name: a.name } : a?.kind === "name" && a.person?.key.startsWith("c:") ? { id: a.person.key.slice(2), name: a.person.name } : null;
+    if (!isActiveStatus(t.status) || !who) continue;
+    if (t.status === "REVIEW" && a?.kind === "contact") {
       review.push(t);
       continue;
     }
-    const { id, name } = t.assignee;
+    const { id, name } = who;
     const group = byContact.get(id) ?? { contactId: id, name, jobs: [] };
     group.jobs.push(t);
     byContact.set(id, group);
