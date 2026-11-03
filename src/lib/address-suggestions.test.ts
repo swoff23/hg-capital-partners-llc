@@ -273,6 +273,22 @@ test("runAddresses answers suggestions and the match from both tables", async ()
   assert.deepEqual(await runAddresses(db, { q: "...", kind: "deal" }), { suggestions: [], match: null });
 });
 
+test("runAddresses takes a typed % or _ as typed, in the words and in the house number", async () => {
+  const seen: Where[] = [];
+  const spy = {
+    findMany: async ({ where }: { where: Where }) => {
+      seen.push(where);
+      return [];
+    },
+  };
+  await runAddresses({ property: spy, deal: spy } as unknown as AddressDb, { q: "1%a Ma_n", kind: "deal" });
+  const filters = JSON.stringify(seen);
+  // Unescaped, Postgres reads % as any run of characters and _ as any one.
+  assert.doesNotMatch(filters, /"contains":"1%a"/);
+  assert.match(filters, /"contains":"1\\\\%a"/);
+  assert.match(filters, /"contains":"ma\\\\_n"/);
+});
+
 test("answerAddresses is staff only, checks its params and hides a failure", async () => {
   assert.equal((await answerAddresses(null, new URLSearchParams("q=767"), db)).status, 401);
   assert.equal((await answerAddresses({ id: "u1" }, new URLSearchParams("q=767&kind=task"), db)).status, 400);

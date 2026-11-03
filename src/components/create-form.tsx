@@ -189,7 +189,8 @@ export function CreateForm<V, R>({
     clearDraft();
     setOpen(false);
     if (variant === "sheet") router.back();
-    else router.push(backHref);
+    // In place of the form, so Back doesn't return to the form just discarded.
+    else router.replace(backHref);
   }
 
   function submit(data: FormData) {

@@ -423,20 +423,36 @@ export function DeliveryLine({
  * its card, built from what the call said. "Didn't send: no connection ·
  * Retry" offline, "Didn't send · Retry" otherwise; a deal note says "save".
  * Retry sends the same text, visibility, files and `clientId`, so nothing
- * posts twice.
+ * posts twice. A refusal no Retry can change (`reason`, from
+ * lib/composer-draft.ts sendRefusal) is said in Retry's place: "Didn't send ·
+ * Shorten it to 20,000 characters.", and the card's Edit is the way on.
  */
 export function SendFailedLine({
   offline = false,
+  reason,
   verb = "send",
   onRetry,
   className,
 }: {
   offline?: boolean;
+  /** The server's refusal in its own words, when trying again can't help: shown instead of Retry. */
+  reason?: string | null;
   /** "save" for a deal note. */
   verb?: "send" | "save";
   onRetry: () => void;
   className?: string;
 }) {
+  if (reason) {
+    return (
+      <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-danger", className)}>
+        <span className="shrink-0">{`Didn't ${verb}`}</span>
+        <span aria-hidden="true">·</span>
+        <span className="truncate" title={reason}>
+          {reason}
+        </span>
+      </p>
+    );
+  }
   return (
     <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-danger", className)}>
       <span className="truncate">{offline ? `Didn't ${verb}: no connection` : `Didn't ${verb}`}</span>

@@ -9,7 +9,7 @@ import { MenuItem, MenuSeparator } from "@/components/menu";
 import { Money } from "@/components/money";
 import { useToast } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
-import { personalDraftKey } from "@/lib/composer-draft";
+import { personalDraftKey, sendRefusal } from "@/lib/composer-draft";
 import type { Ymd } from "@/lib/dates";
 import { LOG_SHOWN, groupLog, type ChangeEntry, type FieldRow, type LineEntry, type LogEntry, type NoteEntry } from "@/lib/deals/record-log";
 import { bodySegments } from "@/lib/tasks/body-links";
@@ -31,7 +31,10 @@ function subscribeToHash(onChange: () => void) {
  * The note box is the shared Composer without a switch or uploads. A note
  * shows at the top at once ("Sending…" after 200ms) and, if it can't be
  * saved, stays there with "Didn't save · Retry", the same message and the
- * same `clientId`, so a Retry that did post never posts twice. It posts
+ * same `clientId`, so a Retry that did post never posts twice. A note the
+ * service won't take as written, which no Retry can change, says why in
+ * Retry's place ("Didn't save · Keep the note under 5,000 characters.",
+ * `sendRefusal`), and the card's Edit is the way on. It posts
  * through addDealNote, which answers with a result instead of throwing. Your
  * own notes have Edit and Delete in their menu; Delete shows a toast with
  * Undo. A line from the deals sheet names no one (no avatar, no name), and a
@@ -180,9 +183,11 @@ function DealLogBody({
   );
 }
 
-/** A note on its way: the new card at the top while it saves, and on a failure the same message with Retry, Edit and Discard. */
+/** A note on its way: the new card at the top while it saves, and on a failure the same message with Retry (unless it was refused as written), Edit and Discard. */
 function InFlightNote({ send, author }: { send: PendingSend; author: string }) {
   const failed = send.status === "failed";
+  // A refusal a second try can't change (too long, the deal is gone) says why and offers no Retry; Edit is the way on.
+  const refusal = failed ? sendRefusal(send.error) : null;
   return (
     <CommentCard
       id={`pending-${send.clientId}`}
@@ -191,13 +196,15 @@ function InFlightNote({ send, author }: { send: PendingSend; author: string }) {
       at={send.at}
       body={send.body || null}
       sending={send.status === "sending"}
-      footer={failed ? <SendFailedLine verb="save" offline={isOfflineMessage(send.error)} onRetry={send.retry} /> : undefined}
+      footer={failed ? <SendFailedLine verb="save" offline={isOfflineMessage(send.error)} reason={refusal} onRetry={send.retry} /> : undefined}
       menuItems={
         failed ? (
           <>
-            <MenuItem id="retry" onAction={send.retry}>
-              Retry
-            </MenuItem>
+            {!refusal && (
+              <MenuItem id="retry" onAction={send.retry}>
+                Retry
+              </MenuItem>
+            )}
             <MenuItem id="edit" onAction={send.edit}>
               Edit
             </MenuItem>

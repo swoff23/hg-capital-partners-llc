@@ -1,6 +1,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { DEAL_MESSAGES, NOTE_MAX } from "./field-rules";
 
 /**
  * A deal's notes: what a partner writes on its timeline (`DealNote.source =
@@ -23,8 +24,8 @@ export interface NoteAuthor {
   email: string;
 }
 
-/** The longest note. A deal log holds sentences, not documents. */
-export const NOTE_MAX = 5000;
+/** The longest note (field-rules.ts, which New deal's first note and the note actions read too). */
+export { NOTE_MAX };
 
 /** A refusal with a line safe to show (the action's `withResult` hands it back as is). */
 export class NoteError extends Error {}
@@ -34,7 +35,7 @@ const clean = (body: string) => body.replace(/\r\n/g, "\n").trim();
 function checkBody(body: string): string {
   const text = clean(body);
   if (!text) throw new NoteError("Add some text, or delete the note.");
-  if (text.length > NOTE_MAX) throw new NoteError(`Keep the note under ${NOTE_MAX.toLocaleString("en-US")} characters.`);
+  if (text.length > NOTE_MAX) throw new NoteError(DEAL_MESSAGES.note);
   return text;
 }
 

@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
-import { everyTermMatches, matchQuality, searchTerms } from "@/lib/search";
+import { containsText, everyTermMatches, matchQuality, searchTerms } from "@/lib/search";
 import { SIGNED_OUT, type Answer, type Viewer } from "@/lib/search-results";
 import { matchesSearch } from "@/lib/text-match";
 
@@ -309,7 +309,7 @@ export async function runAddresses(
   const terms = searchTerms(q);
   // The house number narrows the rows the match is checked on, as findDuplicateDeal does.
   const lead = streetKey(q).split(" ")[0] ?? "";
-  const byNumber = /^\d/.test(lead) ? { address: { contains: lead, mode: "insensitive" as const } } : null;
+  const byNumber = /^\d/.test(lead) ? { address: containsText(lead) } : null;
   // Only punctuation typed: nothing to match on.
   if (terms.length === 0 && !byNumber) return { suggestions: [], match: null };
   const where = everyTermMatches(terms, (t) => [{ address: t }]);

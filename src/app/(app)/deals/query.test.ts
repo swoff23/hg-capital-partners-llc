@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DEAL_VIEWS,
+  dealSearchWhere,
   dealsWhere,
   emptyDeals,
   isFiltered,
@@ -100,6 +101,19 @@ test("search runs on the address, in any word order, Avenue or Ave", () => {
   assert.deepEqual(found(filters({ view: "all", q: "Prospect Avenue" })), ["high", "tbd", "pass"]);
   assert.deepEqual(found(filters({ view: "all", q: "ave prospect 647" })), ["tbd"]);
   assert.deepEqual(found(filters({ q: "prospect" })), ["high"], "inside Active only");
+});
+
+test("search: a typed % or _ is a character to find, not a wildcard", () => {
+  // Unescaped, "4_4" found 454 Colvin Ave and "1%a" found 285 deals.
+  assert.deepEqual(dealSearchWhere("4_4"), { AND: [{ OR: [{ address: { contains: "4\\_4", mode: "insensitive" } }] }] });
+  assert.deepEqual(dealSearchWhere("1%a"), { AND: [{ OR: [{ address: { contains: "1\\%a", mode: "insensitive" } }] }] });
+});
+
+test("search: only punctuation finds nothing, so the list says so instead of showing everything", () => {
+  assert.deepEqual(found(filters({ view: "all", q: "%" })), []);
+  assert.deepEqual(found(filters({ view: "all", q: " _ " })), []);
+  assert.deepEqual(found(filters({ view: "all", q: "" })).length, DEALS.length);
+  assert.equal(emptyDeals(filters({ view: "all", q: "%" }), counts(0)).line, "No deals match “%”.");
 });
 
 test("counts: each view sums its stages, with the search applied by the caller's grouping", () => {

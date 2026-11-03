@@ -9,8 +9,9 @@ import type { OptionItem } from "@/components/option-list";
 import { Select } from "@/components/select";
 import { useToast } from "@/components/toast";
 import { FieldRow, FormField, Input, Section, Textarea } from "@/components/ui";
-import { addressFromListingLink, looksLikeLink, withScheme } from "@/lib/address-suggestions";
+import { addressFromListingLink, looksLikeLink, tidyAddress, withScheme } from "@/lib/address-suggestions";
 import { DEAL_FIELD_LABEL, DEAL_STATUSES, DEFAULT_DEAL_STATUS, dealStageLabel } from "@/lib/config";
+import { dealPriceProblem } from "@/lib/deals/field-rules";
 import { shortAddress } from "@/lib/normalize";
 import { createDeal, type CreatedDeal } from "./actions";
 
@@ -29,6 +30,9 @@ const STAGES: OptionItem[] = DEAL_STATUSES.map((s) => ({
   label: dealStageLabel(s),
   leading: <DealStageMark stage={s} />,
 }));
+
+/** How a price will save, and nothing for one the save refuses (-5, $20 billion), so the line never promises it. */
+const priceHelper = (raw: string) => (dealPriceProblem(raw) ? undefined : numberHelper("money", raw, { allowText: true }));
 
 const blank = (address: string): Values => ({
   address,
@@ -81,7 +85,8 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
         const address = String(data.get("address") ?? "").trim();
         if (!address) return { address: "Enter the address." };
         if (looksLikeLink(address)) return { address: "That's a link. Enter the street address." };
-        if (address.length < 4) return { address: "Enter the full address, like 123 Main St." };
+        // Checked as it saves: "....." tidies to nothing, so it is no address.
+        if (tidyAddress(address).length < 4) return { address: "Enter the full address, like 123 Main St." };
         return null;
       }}
       action={createDeal}
@@ -132,7 +137,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
           <Section as="h3" title="Details (optional)">
             <div className="space-y-4">
               <FieldRow>
-                <FormField label={DEAL_FIELD_LABEL.theirPrice} helper={numberHelper("money", values.theirPriceRaw, { allowText: true })} error={errors.theirPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.theirPrice} helper={priceHelper(values.theirPriceRaw)} error={errors.theirPriceRaw}>
                   {(p) => (
                     <NumberInput
                       {...p}
@@ -147,7 +152,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
                     />
                   )}
                 </FormField>
-                <FormField label={DEAL_FIELD_LABEL.ourPrice} helper={numberHelper("money", values.ourPriceRaw, { allowText: true })} error={errors.ourPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.ourPrice} helper={priceHelper(values.ourPriceRaw)} error={errors.ourPriceRaw}>
                   {(p) => (
                     <NumberInput
                       {...p}

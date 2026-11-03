@@ -6,9 +6,10 @@ import { FieldError } from "@/lib/action-result";
 import { splitAddress } from "@/lib/address-suggestions";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
+import { containsText } from "@/lib/search";
 import type { DealStatus } from "@/lib/config";
 import { recordDealChanges, recordDealCreated } from "./log";
-import { dealConflict, dealPatchData, guardedDealFields, staleDealFields, type DealPatch } from "./edits";
+import { dealConflict, dealPatchData, guardedDealFields, refreshOnConflict, staleDealFields, type DealPatch } from "./edits";
 
 export type { DealPatch } from "./edits";
 
@@ -53,7 +54,7 @@ export async function findDuplicateDeal(address: string, opts: { excludeId?: str
   const lead = streetKey(address).split(" ")[0];
   if (!lead) return null;
   const candidates = await prisma.deal.findMany({
-    where: { address: { contains: lead, mode: "insensitive" }, ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
+    where: { address: containsText(lead), ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
     orderBy: { updatedAt: "desc" },
   });
   return candidates.find((d) => sameStreetAddress(d.address, address)) ?? null;
@@ -102,9 +103,17 @@ export async function createDeal(
  * it loaded for it (the deal rail sends it; the list's stage pick doesn't):
  * a field whose stored value has moved off that was saved by someone else
  * meanwhile, and nothing is written. Before this a stale deal page silently
- * wrote over a partner's newer edit.
+ * wrote over a partner's newer edit. A refused save still refreshes the
+ * deal's pages, so the page that sent it shows what is stored now.
  */
 export async function patchDeal(id: string, patch: DealPatch, actor: Actor, expected: Record<string, string> = {}): Promise<void> {
+  await refreshOnConflict(
+    () => writeDealPatch(id, patch, actor, expected),
+    () => revalidateDeal(id),
+  );
+}
+
+async function writeDealPatch(id: string, patch: DealPatch, actor: Actor, expected: Record<string, string>): Promise<void> {
   const before = await prisma.deal.findUniqueOrThrow({ where: { id }, include: { updatedByUser: { select: { name: true, email: true } } } });
   const data = dealPatchData(patch);
   if (Object.keys(data).length === 0) return;
@@ -118,12 +127,12 @@ export async function patchDeal(id: string, patch: DealPatch, actor: Actor, expe
   const guarded = guardedDealFields(patch, expected);
   if (guarded.length > 0) {
     const stale = staleDealFields(before, patch, expected);
-    if (stale.length > 0) throw dealConflict(before, stale);
+    if (stale.length > 0) throw dealConflict(before, stale, actor.id);
     // At the version just read, so a save that lands in between is refused too.
     const r = await prisma.deal.updateMany({ where: { id, updatedAt: before.updatedAt }, data: { ...data, ...stamp(actor) } });
     if (r.count === 0) {
       const now = await prisma.deal.findUniqueOrThrow({ where: { id }, include: { updatedByUser: { select: { name: true, email: true } } } });
-      throw dealConflict(now, guarded);
+      throw dealConflict(now, guarded, actor.id);
     }
   } else {
     await prisma.deal.update({ where: { id }, data: { ...data, ...stamp(actor) } });

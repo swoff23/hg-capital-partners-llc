@@ -39,18 +39,37 @@ function narrowest(spellings: string[]): string[] {
   return unique.filter((s) => !unique.some((other) => other !== s && s.includes(other)));
 }
 
+/**
+ * Typed text made safe for Prisma's `contains`, `startsWith` and `endsWith`,
+ * which on Postgres become ILIKE without escaping what's passed: a typed `_`
+ * matched any one character and `%` any run, so "4_4" found 454 Colvin Ave
+ * and "1%a" found 285 deals. A backslash is Postgres's escape character, so
+ * it's escaped too. Every search's Prisma text filter built from what
+ * someone typed goes through here (`everyTermMatches` does it for the lists,
+ * /api/search and the address suggestions).
+ */
+export function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/** Prisma's case-insensitive substring filter for one typed spelling, with LIKE's wildcards taken as typed. */
+export function containsText(text: string): TextMatch {
+  return { contains: escapeLike(text), mode: "insensitive" };
+}
+
 /** Prisma's case-insensitive substring filter for one spelling. */
 export type TextMatch = { contains: string; mode: "insensitive" };
 
 /**
  * A Prisma where clause that needs every term to match at least one field.
  * `fields` turns one spelling's filter into the field conditions to try,
- * e.g. `(t) => [{ title: t }, { property: { address: t } }]`.
+ * e.g. `(t) => [{ title: t }, { property: { address: t } }]`. The spellings
+ * are matched as typed (`containsText`).
  */
 export function everyTermMatches<W>(terms: string[][], fields: (text: TextMatch) => W[]): { AND: { OR: W[] }[] } {
   return {
     AND: terms.map((spellings) => ({
-      OR: spellings.flatMap((s) => fields({ contains: s, mode: "insensitive" })),
+      OR: spellings.flatMap((s) => fields(containsText(s))),
     })),
   };
 }

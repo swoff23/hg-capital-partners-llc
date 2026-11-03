@@ -12,7 +12,7 @@
  * silently, so a draft that is too short stays open with its reason.
  */
 
-import { tidyAddress } from "@/lib/address-suggestions";
+import { tidyAddress, withScheme } from "@/lib/address-suggestions";
 import { PHONE_INVALID, readPhone } from "@/lib/contractors/contact-fields";
 import { fmtDay } from "@/lib/dates";
 import { parseAmount, readNumber, type NumberKind } from "@/lib/money";
@@ -149,8 +149,10 @@ export function decideInlineEdit(
   const next = tidy(draft);
   if (r.kind === "same") return { kind: "same", value: next };
   if (r.kind === "short") return { kind: "problem", message: r.message, value: next };
-  const problem = inlineProblem(kind, r.value);
-  return problem ? { kind: "problem", message: problem, value: next } : { kind: "save", value: r.value };
+  // A link typed from "www." saves with https://, the way New deal saves one, so "www.zillow.com/..." opens.
+  const value = kind === "url" && /^www\./i.test(r.value) ? withScheme(r.value) : r.value;
+  const problem = inlineProblem(kind, value);
+  return problem ? { kind: "problem", message: problem, value: next } : { kind: "save", value };
 }
 
 /**

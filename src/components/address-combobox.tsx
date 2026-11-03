@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useReducer, useState, type ReactNode } from "react";
 import { ComboBox, Input as AriaInput, ListBox, ListBoxItem, type Key } from "react-aria-components";
 import { OptionRow } from "@/components/option-list";
 import { PopoverSurface } from "@/components/popover";
@@ -21,6 +21,23 @@ const DEBOUNCE_MS = 200;
 const AS_TYPED = "__as-typed__:";
 
 const KIND_WORD: Record<AddressKind, string> = { property: "Property", deal: "Deal" };
+
+/**
+ * One sync re-render after each change of the text. React Aria's combobox
+ * notes every keystroke's text in an effect, an update React leaves for
+ * later at default priority. While the list rebuilds on each keystroke, the
+ * rebuild takes that update in at once. With no list to rebuild (a link, or
+ * under three characters) it waits, and fast typing stacks one per
+ * keystroke until React counts 50 and reads them as an update loop: it
+ * throws error #185 and drops that keystroke ("Buffalo-NY" saved as
+ * "Buffalo-N"). This re-render takes the update in the way a rebuild does.
+ */
+function useSettleEachKeystroke(text: string) {
+  const [, settle] = useReducer((n: number) => n + 1, 0);
+  useLayoutEffect(() => {
+    settle();
+  }, [text]);
+}
 
 export type AddressComboboxProps = {
   /** What the address belongs to: which records count as "already" one (a property, or a deal and then a property). */
@@ -136,6 +153,7 @@ export function AddressCombobox({
   const [left, setLeft] = useState(false);
   // A pasted link was handed to `onLink`, so the line says where it went.
   const [moved, setMoved] = useState(false);
+  useSettleEachKeystroke(value);
 
   useEffect(() => {
     if (!active) return;

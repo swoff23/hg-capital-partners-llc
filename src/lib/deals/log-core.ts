@@ -140,6 +140,15 @@ export function changesPhrase(changes: readonly DealChange[]): string {
   return `changed the ${fieldWords(changes[0].field)} and ${rest} other ${rest === 1 ? "field" : "fields"}`;
 }
 
+/**
+ * A new deal's first log line, with the stage by the name the list and the
+ * rail use: "Deal created (stage TBD)", never the stored "5 - TBD". Stored as
+ * text, so lines written before this keep the stored name.
+ */
+export function dealCreatedLine(status: string): string {
+  return `Deal created (stage ${dealStageLabel(status)})`;
+}
+
 /** What a change row stores as `data`: the same three keys, nothing else. */
 export function changeData(c: DealChange): { field: DealChangeField; from: string | null; to: string | null } {
   return { field: c.field, from: c.from, to: c.to };
