@@ -208,9 +208,13 @@ async function syncAssigneeAccess(tx: Tx, taskId: string, contactId: string | nu
 export { syncAssigneeAccess as grantAssigneeAccess };
 
 /**
- * The refusal when a write would give a job to an archived contractor: a
- * picker loaded before they were archived (createTask, patchTask). Archive
- * itself is refused while they have open jobs (archive.ts).
+ * The refusal when a write would give an open job to an archived contractor:
+ * a picker loaded before they were archived (createTask, patchTask). Archive
+ * itself is refused while they have open jobs (archive.ts). A closed job (Done
+ * or Canceled) can go back to them: it's their record, Archive counts only
+ * open work, and a reopen starts it unassigned again (setStatus). So the Undo
+ * of a reassignment on their Done job, after a reopen's Undo or a second
+ * Approve left it unassigned, puts them back.
  */
 export const ARCHIVED_ASSIGNEE_LINE = "Archived. Pick someone else.";
 
@@ -412,8 +416,11 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
   const propertyId = input.propertyId || null;
   const assigneeUserId = input.assignee && "userId" in input.assignee ? input.assignee.userId : null;
   const assigneeContactId = input.assignee && "contactId" in input.assignee ? input.assignee.contactId : null;
-  // A picker loaded before the contractor was archived still offers them.
-  if (assigneeContactId && (await contactArchivedLocked(tx, assigneeContactId))) throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
+  // A picker loaded before the contractor was archived still offers them. Only open work is refused
+  // (ARCHIVED_ASSIGNEE_LINE); the lock is taken either way, so every assign keeps one order.
+  if (assigneeContactId && (await contactArchivedLocked(tx, assigneeContactId)) && isActiveStatus(status)) {
+    throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
+  }
 
   const task = await tx.task.create({
     data: {
@@ -1067,8 +1074,10 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
     const userId = patch.assignee && "userId" in patch.assignee ? patch.assignee.userId : null;
     const contactId = patch.assignee && "contactId" in patch.assignee ? patch.assignee.contactId : null;
     if (userId !== before.assigneeUserId || contactId !== before.assigneeContactId) {
-      // A picker loaded before the contractor was archived still offers them. One who already has the job keeps it.
-      if (contactId && contactId !== before.assigneeContactId && (await contactArchivedLocked(tx, contactId))) {
+      // A picker loaded before the contractor was archived still offers them. One who already has the job keeps it,
+      // and a closed job can go back to them: only open work is refused (ARCHIVED_ASSIGNEE_LINE). The row lock above
+      // holds the status read here until this commits, so a reopen runs after it and starts the job unassigned.
+      if (contactId && contactId !== before.assigneeContactId && (await contactArchivedLocked(tx, contactId)) && isActiveStatus(before.status)) {
         throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
       }
       // Exactly one kind of assignee; the legacy free text goes once a real one is chosen.

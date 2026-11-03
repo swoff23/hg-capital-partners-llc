@@ -292,3 +292,38 @@ test("the archived line is never paired away with the assignment it follows", ()
   assert.ok(texts.some((t) => t === "Unassigned because Zack Outlaw is archived"), JSON.stringify(texts));
   assert.ok(texts.some((t) => /assigned Zack Outlaw/.test(t)), JSON.stringify(texts));
 });
+
+/* ---------------- A closed job can go back to them (Nov 3 low 4) ---------------- */
+
+test("patchTask: an archived contractor's Done or Canceled job can go back to them, still locked task first", async () => {
+  // A reopen left Zack's Done job unassigned, and its Undo (or a second Approve) closed it again: the reassignment's
+  // Undo, or a pick on a page that still lists him, puts him back on his own record. Before, it was refused.
+  for (const status of ["DONE", "CANCELED"]) {
+    const { tx, calls } = fakeTx({ status, assigneeContactId: null });
+    const after = await patchTask(tx, "t1", { assignee: { contactId: "c-zack" }, expectedAssignee: null }, PIETER, NOW);
+    assert.equal(after.assigneeContactId, "c-zack", status);
+    const order = [calls.findIndex(isTaskLock), calls.findIndex(isContactLock), firstWrite(calls)];
+    assert.ok(order[0] === 0 && order[1] > order[0] && order[2] > order[1], `task lock, contact lock, then writes: ${order}`);
+    // He has no login (Archive needs it removed first), so nobody is emailed.
+    assert.ok(!calls.some(isEmailRow), status);
+  }
+});
+
+test("patchTask and createTask: every open status still refuses an archived contractor", async () => {
+  for (const status of ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW"]) {
+    const patch = fakeTx({ status, assigneeContactId: null });
+    await assert.rejects(
+      patchTask(patch.tx, "t1", { assignee: { contactId: "c-zack" } }, PIETER, NOW),
+      (e) => e instanceof TaskRuleError && e.message === ARCHIVED_ASSIGNEE_LINE,
+      status,
+    );
+    assert.equal(firstWrite(patch.calls), -1, `${status}: nothing written`);
+  }
+  const open = fakeTx({});
+  await assert.rejects(createTask(open.tx, { title: "Patch roof", status: "WAITING", waitingOn: "Parts", assignee: { contactId: "c-zack" } }, PIETER, NOW), (e) => e instanceof TaskRuleError);
+  // A task made closed (a record of work already done) can name them; the lock still comes before the insert.
+  const done = fakeTx({});
+  const made = await createTask(done.tx, { title: "Patched roof", status: "DONE", assignee: { contactId: "c-zack" } }, PIETER, NOW);
+  assert.equal(made.assigneeContactId, "c-zack");
+  assert.ok(done.calls.findIndex(isContactLock) < done.calls.findIndex((c) => c.model === "task" && c.op === "create"));
+});

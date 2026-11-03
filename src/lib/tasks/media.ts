@@ -128,6 +128,13 @@ export function orderMedia<T extends MediaOrderItem>(items: readonly T[], option
 /** A Mark done is a comment and a move to Review written in one transaction; their times differ by milliseconds, so this is generous. */
 export const MARK_DONE_WINDOW_MS = 30_000;
 
+/**
+ * When a Mark done's note began naming its move (`data.statusEventId`, core.setStatus): chunk 7's release to
+ * production, the instant read-state-core.ts READ_STATE_SINCE marks (media-tied.test.ts checks they agree). A move
+ * to Review from then on has a note only when one names it, so the timing below is only for a move from before.
+ */
+export const MARK_DONE_TIED_SINCE = new Date("2026-10-27T11:00:00.000Z");
+
 const toReview = (e: MediaEvent) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "REVIEW";
 
 /** What a comment's `data` says it is: the note of a status change, a composer send, a batch post or a late line. */
@@ -136,15 +143,16 @@ const commentData = (e: MediaEvent) => (e.data ?? {}) as { statusEventId?: unkno
 /**
  * The comment written with a move to Review (the Mark done sheet's note and photos), if it had one: the Review card's
  * note and the "At finish" set both come from it, so the two never name different comments.
- * Since chunk 7 that note names its move (`data.statusEventId`, core.setStatus), and only that comment is it: a
- * written update, a batch post or a late line sent in the seconds before a Mark done with no note of its own is not
- * that Mark done's. A contractor's Mark done before then has only the timing: the contractor's comment in the seconds
- * before the move, one that carries none of those marks.
+ * Since chunk 7 that note names its move (`data.statusEventId`, core.setStatus), and only that comment is it: any
+ * comment sent in the seconds before a Mark done with no note of its own (a written update, a batch post, a late
+ * line, or a send that carried no clientId) is not that Mark done's. A contractor's Mark done from before then
+ * (MARK_DONE_TIED_SINCE) has only the timing: the contractor's comment in the seconds before the move, one that
+ * carries none of those marks.
  */
 export function markDoneComment<T extends MediaEvent>(events: readonly T[], review: MediaEvent): T | null {
   const tied = events.find((e) => e.kind === "COMMENT" && commentData(e).statusEventId === review.id);
   if (tied) return tied;
-  if (review.actorContactId === null) return null;
+  if (review.actorContactId === null || review.createdAt.getTime() >= MARK_DONE_TIED_SINCE.getTime()) return null;
   return (
     events
       .filter((e) => {
