@@ -74,10 +74,16 @@ export function parseDealFilters(sp: Params): DealFilters {
   };
 }
 
-/** Every word must match the address, in any order: "Prospect Avenue" finds "Prospect Ave". */
+/**
+ * Every word must match the address, in any order: "Prospect Avenue" finds
+ * "Prospect Ave". A search of only punctuation ("%", "_") has no word to
+ * match, so it finds nothing and says "No deals match “%”." rather than
+ * quietly showing the whole list as if it weren't there.
+ */
 export function dealSearchWhere(q: string): Prisma.DealWhereInput {
   const terms = searchTerms(q);
-  return terms.length === 0 ? {} : everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }]);
+  if (terms.length === 0) return q.trim() ? { id: { in: [] } } : {};
+  return everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }]);
 }
 
 /** The deals the view, the Stage chip and the search leave. */

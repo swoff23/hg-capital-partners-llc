@@ -10,6 +10,7 @@ import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
 import { badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
+import { containsText } from "@/lib/search";
 import {
   countUnitRecords,
   parseBuildingCapex,
@@ -105,7 +106,7 @@ export async function findDuplicateProperty(address: string, opts: { excludeId?:
   const lead = streetKey(address).split(" ")[0];
   if (!lead) return null;
   const candidates = await prisma.property.findMany({
-    where: { address: { contains: lead, mode: "insensitive" }, ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
+    where: { address: containsText(lead), ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
     orderBy: { updatedAt: "desc" },
   });
   return candidates.find((p) => sameStreetAddress(p.address, address)) ?? null;

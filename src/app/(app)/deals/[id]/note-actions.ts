@@ -2,6 +2,7 @@
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
+import { DEAL_MESSAGES } from "@/lib/deals/field-rules";
 import * as notes from "@/lib/deals/notes";
 import { withResult } from "@/lib/server-action";
 
@@ -13,8 +14,8 @@ import { withResult } from "@/lib/server-action";
  */
 
 const id = z.string().min(1).max(64);
-// The cap is the service's (NOTE_MAX), which words its refusal; this only stops absurd posts.
-const text = z.string().max(20_000);
+// The cap is the service's (NOTE_MAX), which words its refusal; this only stops absurd posts, with the same line.
+const text = z.string().max(20_000, DEAL_MESSAGES.note);
 
 const addSchema = z.object({ body: text, clientId: z.string().min(1).max(64).optional() }).strict();
 

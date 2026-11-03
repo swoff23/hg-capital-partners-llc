@@ -130,6 +130,17 @@ test("decideInlineEdit: an email, a link and a phone are checked before they are
   assert.deepEqual(decideInlineEdit("phone", "555", "", {}).kind, "problem");
 });
 
+test("a listing link that starts with www. saves with https://, the way New deal saves it", () => {
+  // The deal page refused "www.zillow.com/..." that New deal took (break-the-app, deals).
+  assert.deepEqual(decideInlineEdit("url", " www.zillow.com/qa-test-oct27 ", "", {}), { kind: "save", value: "https://www.zillow.com/qa-test-oct27" });
+  assert.deepEqual(decideInlineEdit("url", "http://zillow.com/a", "", {}), { kind: "save", value: "http://zillow.com/a" });
+  // No scheme and no www. is still no link, and neither is a script.
+  assert.deepEqual(decideInlineEdit("url", "zillow.com/a", "", {}), { kind: "problem", message: URL_MESSAGE, value: "zillow.com/a" });
+  assert.equal(inlineProblem("url", "javascript:alert(1)"), URL_MESSAGE);
+  // The check on its own stays strict: a form that saves the text as typed (a listing's Zillow link) needs the scheme.
+  assert.equal(inlineProblem("url", "www.zillow.com/qa-test-oct27"), URL_MESSAGE);
+});
+
 test("decideInlineEdit: notes keep their line breaks and compare with Windows line endings", () => {
   assert.deepEqual(decideInlineEdit("multiline", "Roof done.\r\nGutters next.", "Roof done.\nGutters next.", {}), {
     kind: "same",

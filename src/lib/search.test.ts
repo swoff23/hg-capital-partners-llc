@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  escapeLike,
   everyTermMatches,
   foldAccents,
   looksLikeAddress,
@@ -89,6 +90,56 @@ test("search finds abbreviated addresses, words in any order and linked records"
   const contactFields = (t: TextMatch) => [{ fullName: t }, { company: t }, { trades: t }];
   assert.ok(find("José", contact, contactFields));
   assert.ok(find("alvarez roofing", contact, contactFields));
+});
+
+/**
+ * Postgres ILIKE as Prisma's `contains` runs it: the text goes between two %
+ * unescaped, so % and _ in it are wildcards unless a backslash escapes them.
+ */
+function ilike(value: string, contains: string): boolean {
+  const literal = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = `%${contains}%`;
+  let re = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === "\\" && i + 1 < pattern.length) re += literal(pattern[++i]);
+    else if (c === "%") re += "[\\s\\S]*";
+    else if (c === "_") re += "[\\s\\S]";
+    else re += literal(c);
+  }
+  return new RegExp(`^${re}$`, "i").test(value);
+}
+
+function likeMatches(row: Row, cond: Record<string, unknown>): boolean {
+  if ("AND" in cond) return (cond.AND as Row[]).every((c) => likeMatches(row, c));
+  if ("OR" in cond) return (cond.OR as Row[]).some((c) => likeMatches(row, c));
+  const [field, filter] = Object.entries(cond)[0] as [string, Row];
+  const value = row[field];
+  return typeof value === "string" && ilike(value, String(filter.contains));
+}
+
+test("a typed % or _ is matched as typed, not as a LIKE wildcard", () => {
+  // The stand-in itself: unescaped, % and _ are wildcards, as on Postgres.
+  assert.ok(ilike("454 Colvin Avenue", "4_4"));
+  assert.ok(!ilike("454 Colvin Avenue", "4\\_4"));
+
+  const byAddress = (t: TextMatch) => [{ address: t }];
+  const find = (q: string, address: string) => likeMatches({ address }, everyTermMatches(searchTerms(q), byAddress));
+  // "4_4" found 13 deals (454 Colvin, 484 Breckenridge, 444 Fargo) and "1%a" found 285.
+  assert.ok(!find("4_4", "454 Colvin Avenue"));
+  assert.ok(!find("4_4", "444 Fargo Avenue"));
+  assert.ok(!find("1%a", "118 Congress St, Buffalo, NY"));
+  assert.ok(find("4_4", "Lot 4_4 Main St"));
+  assert.ok(find("1%a", "Unit 1%a"));
+  // A backslash is Postgres's escape character, so it's taken as typed too.
+  assert.ok(!find("a\\", "a%"));
+  assert.ok(find("a\\", "path a\\b"));
+});
+
+test("escapeLike escapes only what LIKE reads", () => {
+  assert.equal(escapeLike("767 Prospect Ave"), "767 Prospect Ave");
+  assert.equal(escapeLike("4_4 1%a"), "4\\_4 1\\%a");
+  assert.equal(escapeLike("a\\b"), "a\\\\b");
 });
 
 /* ---------------- rankRows ---------------- */

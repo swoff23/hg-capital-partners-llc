@@ -6,6 +6,7 @@ import {
   changePhrase,
   changeText,
   changesPhrase,
+  dealCreatedLine,
   diffDealChanges,
   isNoopLine,
   normalizeValue,
@@ -140,4 +141,12 @@ test("change rows are written with their author and their data", () => {
 
 test("recordDealChanges writes only what diffDealChanges found", () => {
   assert.match(source, /diffDealChanges\(before, data\)/);
+});
+
+test("a new deal's first line names its stage the way the list does", () => {
+  // It read "Deal created (stage 5 - TBD)".
+  assert.equal(dealCreatedLine("5 - TBD"), "Deal created (stage TBD)");
+  assert.equal(dealCreatedLine("1 - High"), "Deal created (stage High)");
+  assert.equal(dealCreatedLine("CLOSED!"), "Deal created (stage Closed)");
+  assert.match(source, /logDealChanges\(deal\.id, actor, \[dealCreatedLine\(deal\.status\)\]\)/, "recordDealCreated writes it");
 });

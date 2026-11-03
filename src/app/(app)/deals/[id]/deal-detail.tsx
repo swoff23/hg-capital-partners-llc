@@ -7,6 +7,8 @@ import { StatusMenu } from "@/components/status-menu";
 import { buttonClass, chromeIconClass } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import { DEAL_FIELD_LABEL, DEAL_PASS_REASONS, dealStageLabel } from "@/lib/config";
+import { dealPriceProblem, dealUnitsProblem } from "@/lib/deals/field-rules";
+import { withStageConflictLine } from "@/lib/deals/save-conflict";
 import { cn } from "@/lib/utils";
 import { saveDealFields } from "../actions";
 
@@ -15,7 +17,9 @@ import { saveDealFields } from "../actions";
  * of the rail, the stage, the pass reason. Each is an `InlineField` saved
  * through `saveDealFields` with the text it loaded, so a partner's newer
  * change to that field refuses the save and says who made it and when, where
- * before a stale page silently wrote over it.
+ * before a stale page silently wrote over it. A refused save comes back with
+ * the page as stored (the service refreshes it), so every field and the
+ * stage show the current value.
  */
 
 /** The page's h1, with the address field's suggestions and its duplicate line. */
@@ -73,11 +77,13 @@ export function DealPrice({ id, which, raw }: { id: string; which: "their" | "ou
       allowText
       value={raw}
       empty={asking ? "Add asking price" : "Add target offer"}
+      // The server's rule, before anything is sent: zero or more, under $10 billion.
+      check={dealPriceProblem}
     />
   );
 }
 
-/** Units: a whole number of one or more, or nothing. */
+/** Units: a whole number from 1 to 10,000, or nothing. */
 export function DealUnits({ id, value }: { id: string; value: number | null }) {
   return (
     <RailFact label={DEAL_FIELD_LABEL.units}>
@@ -88,8 +94,8 @@ export function DealUnits({ id, value }: { id: string; value: number | null }) {
         context="Deal · Units"
         value={value == null ? "" : String(value)}
         empty="Add units"
-        // A deal has at least one unit; the New deal form asks for a positive number too.
-        check={(text) => (text !== "" && Number(text.replace(/,/g, "")) < 1 ? "Enter 1 or more." : null)}
+        // 1 to 10,000, the rule New deal and the server keep too, said before anything is sent.
+        check={dealUnitsProblem}
         onSave={(next, expected) => saveDealFields(id, { units: next === "" ? null : Number(next.replace(/,/g, "")) }, { units: expected })}
       />
     </RailFact>
@@ -137,6 +143,7 @@ export function DealPassReason({ id, value }: { id: string; value: string | null
       empty="Pick a reason"
       options={options}
       emptyLabel="No reason"
+      emptyText="No reason matches."
     />
   );
 }
@@ -144,7 +151,8 @@ export function DealPassReason({ id, value }: { id: string; value: string | null
 /**
  * The stage, as the menu every stage uses: its ring, its word and a chevron.
  * A pick shows at once and toasts with Undo; a refusal (someone moved it
- * first) says who and when in the toast, and the old stage stays.
+ * first) says who, when and what the stage is now in the toast, and the menu
+ * shows that stage, which the refused save's answer brings back.
  */
 export function DealStageRow({ id, status }: { id: string; status: string }) {
   const { run } = useRun();
@@ -152,11 +160,11 @@ export function DealStageRow({ id, status }: { id: string; status: string }) {
 
   function change(to: string) {
     if (to === status) return;
-    run(() => saveDealFields(id, { status: to }, { status }), {
+    run(() => saveDealFields(id, { status: to }, { status }).then((r) => withStageConflictLine(r)), {
       before: () => setShown(to),
       done: `${DEAL_FIELD_LABEL.status} set to ${dealStageLabel(to)}`,
       key: `deal:${id}:stage`,
-      undo: () => saveDealFields(id, { status }, { status: to }),
+      undo: () => saveDealFields(id, { status }, { status: to }).then((r) => withStageConflictLine(r)),
     });
   }
 

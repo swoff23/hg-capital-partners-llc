@@ -1,3 +1,4 @@
+import { ConflictError } from "@/lib/action-result";
 import { isDealStatus } from "@/lib/config";
 import { amountToDecimal } from "@/lib/money";
 import { fieldText, rowConflict, staleFields, type LastEditor } from "@/lib/properties/edits";
@@ -95,10 +96,35 @@ export function guardedDealFields(patch: DealPatch, expected: Record<string, str
   return Object.keys(expected).filter((k) => k in changes);
 }
 
-/** The refusal for a stale deal save: who saved last when the row says, when, and what each field holds now. */
+/**
+ * The refusal for a stale deal save: who saved last when the row says, when,
+ * and what each field holds now. When the last save was the same person's
+ * (another tab of theirs), it names no one ("This changed to $111 at 8:31
+ * AM", "Keep current"), where it read "Connor set this to $111" and "Keep
+ * Connor's" to Connor.
+ */
 export function dealConflict(
   row: Record<string, unknown> & { updatedAt: Date; updatedByUser?: LastEditor },
   fields: string[],
+  actorId?: string,
 ) {
-  return rowConflict(row, fields, { values: true });
+  const yours = actorId !== undefined && row.updatedByUserId === actorId;
+  return rowConflict(yours ? { ...row, updatedByUser: null } : row, fields, { values: true });
+}
+
+/**
+ * Runs a deal write and, when a newer save refuses it (`ConflictError`),
+ * runs `refresh` before the refusal goes back (forms 2.12). The service
+ * passes `revalidateDeal`, so the action's answer carries the page as stored
+ * and the stage menu and every field show the current value. The stale page
+ * used to keep the stage it loaded until a reload. Tasks do the same
+ * (tasks/service.ts setTaskStatus).
+ */
+export async function refreshOnConflict<T>(write: () => Promise<T>, refresh: () => void): Promise<T> {
+  try {
+    return await write();
+  } catch (err) {
+    if (err instanceof ConflictError) refresh();
+    throw err;
+  }
 }

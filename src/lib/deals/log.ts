@@ -2,8 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import type { Deal, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { dealStatusLabel } from "@/lib/config";
-import { changeData, changeText, diffDealChanges, type DealChange } from "./log-core";
+import { changeData, changeText, dealCreatedLine, diffDealChanges, type DealChange } from "./log-core";
 
 /**
  * Writes to a deal's activity timeline (`DealNote.source = "change"`).
@@ -75,7 +74,7 @@ export function diffDeal(before: Deal, data: Record<string, unknown>): string[] 
 
 /** The "Deal created" line, with the stage it started in. */
 export async function recordDealCreated(deal: Pick<Deal, "id" | "status">, actor: DealActor): Promise<void> {
-  await logDealChanges(deal.id, actor, [`Deal created (stage ${dealStatusLabel(deal.status)})`]);
+  await logDealChanges(deal.id, actor, [dealCreatedLine(deal.status)]);
 }
 
 /**

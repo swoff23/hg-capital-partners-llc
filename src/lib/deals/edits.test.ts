@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ConflictError } from "@/lib/action-result";
-import { dealConflict, dealPatchData, guardedDealFields, staleDealFields } from "./edits";
+import { readFileSync } from "node:fs";
+import { ConflictError, conflictKeepLabel, conflictValueLine } from "@/lib/action-result";
+import { dealConflict, dealPatchData, guardedDealFields, refreshOnConflict, staleDealFields } from "./edits";
 
 const stored = {
   address: "767 Prospect Ave",
@@ -67,4 +68,51 @@ test("dealConflict: names the person and carries what the field holds now; witho
   const without = dealConflict({ ...stored, updatedAt: at, updatedByUser: null }, ["theirPriceRaw"]);
   assert.equal(without.conflict.by, undefined);
   assert.match(without.message, /^This changed /);
+});
+
+test("dealConflict: your own save from another tab names no one, so it doesn't read as someone else's", () => {
+  const at = new Date("2026-10-27T12:31:00.000Z");
+  const row = { ...stored, theirPriceRaw: "111", updatedAt: at, updatedByUserId: "u_connor", updatedByUser: { name: "Connor Swofford", email: "connor@example.com" } };
+  const now = new Date("2026-10-27T13:00:00.000Z");
+  // It said "Connor set this to $111 at 8:31 AM" with "Keep Connor's", to Connor.
+  const yours = dealConflict(row, ["theirPriceRaw"], "u_connor");
+  assert.equal(yours.conflict.by, undefined);
+  assert.deepEqual(yours.conflict.theirs, { theirPriceRaw: "111" });
+  assert.equal(conflictValueLine(yours.conflict, "$111", now), "This changed to $111 at 8:31 AM");
+  assert.equal(conflictKeepLabel(yours.conflict), "Keep current");
+  // Someone else's still says who.
+  const theirs = dealConflict(row, ["theirPriceRaw"], "u_pieter");
+  assert.equal(theirs.conflict.by, "Connor Swofford");
+  assert.equal(conflictKeepLabel(theirs.conflict), "Keep Connor's");
+  assert.equal(dealConflict(row, ["theirPriceRaw"]).conflict.by, "Connor Swofford", "no actor given, as before");
+});
+
+test("refreshOnConflict: a refused save refreshes the page before the refusal goes back", async () => {
+  let refreshed = 0;
+  const refresh = () => {
+    refreshed++;
+  };
+  const conflict = new ConflictError({ fields: ["status"], by: "Pieter", at: new Date(), theirs: { status: "6 - Holding" } });
+  // The stale page kept showing Pass after the refusal, until a reload.
+  await assert.rejects(
+    refreshOnConflict(async () => {
+      throw conflict;
+    }, refresh),
+    (err) => err === conflict,
+  );
+  assert.equal(refreshed, 1);
+  // A save that went through refreshes on its own; any other refusal leaves the field as it is.
+  assert.equal(await refreshOnConflict(async () => "saved", refresh), "saved");
+  await assert.rejects(
+    refreshOnConflict(async () => {
+      throw new Error("Use 300 characters or fewer.");
+    }, refresh),
+  );
+  assert.equal(refreshed, 1);
+});
+
+test("patchDeal refreshes the deal's pages when a save is refused as stale, and words the refusal for its actor", () => {
+  const source = readFileSync(new URL("./service.ts", import.meta.url), "utf8");
+  assert.match(source, /refreshOnConflict\(\s*\(\) => writeDealPatch\(id, patch, actor, expected\),\s*\(\) => revalidateDeal\(id\),?\s*\)/);
+  assert.equal(source.match(/dealConflict\([^)]*, actor\.id\)/g)?.length, 2);
 });
