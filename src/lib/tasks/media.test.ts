@@ -5,6 +5,7 @@ import {
   finishPhotoIds,
   isDraftUpload,
   isMediaRow,
+  markDoneComment,
   mediaItem,
   orderMedia,
   reviewPhotoSummary,
@@ -12,6 +13,7 @@ import {
   taskMedia,
   taskMediaInclude,
   uploaderName,
+  visitStart,
   type MediaEvent,
   type TaskMediaRow,
 } from "./media";
@@ -178,6 +180,26 @@ test("finishPhotoIds: the latest Mark done only, and nothing without photos on i
   assert.deepEqual(finishPhotoIds(rows, []), []);
 });
 
+test("finishPhotoIds: the Mark done's note is the comment that names its move (chunk 7), never an update sent just before", () => {
+  // Zack posts a written update with two photos ten seconds before a Mark done with no note and no photos.
+  const rows = [row("progress-1", { createdAt: at(29), eventId: "c-update" }), row("progress-2", { createdAt: at(29), eventId: "c-update" })];
+  const update = evt("c-update", "COMMENT", new Date(at(30).getTime() - 10_000), { data: { clientId: "send-1" } });
+  assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), update, review("r1", 30)]), [], "a written update isn't the Mark done's");
+  // A batch post or a late line in the seconds before isn't either.
+  for (const data of [{ batch: true }, { late: true }]) {
+    assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), { ...update, data }, review("r1", 30)]), [], JSON.stringify(data));
+  }
+  // The note tied to the move by id is, however far from it, and an update in between doesn't take its place.
+  const tied = [row("finish", { createdAt: at(20), eventId: "c-done" }), ...rows];
+  const note = evt("c-done", "COMMENT", at(20), { data: { statusEventId: "r1" } });
+  assert.deepEqual(finishPhotoIds(tied, [started("s1", 0), note, update, review("r1", 30)]), ["finish"]);
+  // A note tied to an earlier move is that one's, not this Mark done's.
+  const earlier = evt("c-old", "COMMENT", new Date(at(30).getTime() - 5_000), { data: { statusEventId: "r0" } });
+  assert.deepEqual(finishPhotoIds([row("old", { createdAt: at(29), eventId: "c-old" })], [earlier, review("r1", 30)]), []);
+  // A job marked done before chunk 7: its note named nothing, so the comment just before the move still counts.
+  assert.deepEqual(finishPhotoIds([row("legacy", { createdAt: at(29), eventId: "c-legacy" })], [evt("c-legacy", "COMMENT", at(30)), review("r1", 30)]), ["legacy"]);
+});
+
 test("taskMedia: drafts stay out; photos newest first with the At finish set leading, then documents and links", () => {
   const rows = [
     row("p2", { createdAt: at(4), eventId: "c-mid" }),
@@ -244,4 +266,54 @@ test("reviewPhotos: a start after the latest Mark done belongs to a later visit 
     reviewPhotos(rows, { contactId: "zack", events }).map((r) => r.id),
     ["b", "a"],
   );
+});
+
+test("visitStart: the latest move to In progress before a time, the one rule Mark done and the Review card count a visit by", () => {
+  const events = [started("s1", 0), markDoneNote("c1", 30), review("r1", 30), started("s2", 41), evt("x", "STATUS", at(45), { data: { to: "WAITING" } })];
+  assert.deepEqual(visitStart(events), at(41), "Mark done, now: the visit that began at the latest start");
+  assert.deepEqual(visitStart(events, at(30).getTime()), at(0), "the Review card, before the latest Mark done");
+  assert.equal(visitStart([review("r1", 30)]), null, "an older job with no start: every file counts");
+  assert.equal(visitStart([]), null);
+});
+
+test("markDoneComment: the Review card's note is the same comment At finish takes its photos from", () => {
+  // Zack sends a written update ten seconds before a Mark done with no note: the card has no note, and At finish no photos.
+  const update = evt("c-update", "COMMENT", new Date(at(30).getTime() - 10_000), { data: { clientId: "send-1" } });
+  const done = review("r1", 30);
+  assert.equal(markDoneComment([started("s1", 0), update, done], done), null, "a written update isn't the Mark done's note");
+  for (const data of [{ batch: true }, { late: true }]) {
+    assert.equal(markDoneComment([{ ...update, data }, done], done), null, JSON.stringify(data));
+  }
+  // The note that names the move is it, however far before, and the card and At finish agree on which comment that is.
+  const note = evt("c-done", "COMMENT", at(20), { data: { statusEventId: "r1" } });
+  assert.equal(markDoneComment([started("s1", 0), note, update, done], done)?.id, "c-done");
+  const rows = [row("finish", { createdAt: at(20), eventId: "c-done" }), row("progress", { createdAt: at(29), eventId: "c-update" })];
+  assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), note, update, done]), ["finish"]);
+  // A staff move to Review is tied to its note by id too, but a staff member has no contractor comment just before it.
+  const staffMove = review("r2", 30, { actorContactId: null });
+  assert.equal(markDoneComment([evt("c-staff", "COMMENT", at(30), { actorContactId: null }), staffMove], staffMove), null);
+  assert.equal(markDoneComment([evt("c-staff", "COMMENT", at(25), { data: { statusEventId: "r2" }, actorContactId: null }), staffMove], staffMove)?.id, "c-staff");
+  // Before chunk 7 the note named nothing: the contractor's comment just before the move, the latest of them.
+  const legacy = [evt("c-a", "COMMENT", new Date(at(30).getTime() - 20_000)), evt("c-b", "COMMENT", new Date(at(30).getTime() - 2_000))];
+  assert.equal(markDoneComment(legacy, done)?.id, "c-b");
+  assert.equal(markDoneComment([evt("c-far", "COMMENT", at(10))], done), null);
+});
+
+test("finishPhotoIds: photos a batch post had told HG of that the Mark done counted are in the set, named on its move to Review", () => {
+  const rows = [
+    row("batch-1", { createdAt: at(20), eventId: "c-batch" }),
+    row("batch-2", { createdAt: at(21), eventId: "c-batch" }),
+    row("finish", { createdAt: at(29), eventId: "c-done" }),
+    row("other", { createdAt: at(22), eventId: "c-batch" }),
+  ];
+  const counted = review("r1", 30, { data: { to: "REVIEW", finishIds: ["batch-1", "batch-2", "gone"] } });
+  assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), markDoneNote("c-done", 30), counted]), ["batch-1", "batch-2", "finish"]);
+  // A Mark done with no note and no new photo: only the counted ones.
+  assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), counted]), ["batch-1", "batch-2"]);
+  // Only the latest Mark done's, and never a staff move to Review's.
+  assert.deepEqual(finishPhotoIds(rows, [counted, started("s2", 41), review("r2", 50)]), []);
+  assert.deepEqual(finishPhotoIds(rows, [review("r1", 30, { actorContactId: null, data: { to: "REVIEW", finishIds: ["batch-1"] } })]), []);
+  // The Review card leads with them too.
+  const photos = reviewPhotos(rows, { contactId: "zack", events: [started("s1", 0), markDoneNote("c-done", 30), counted] });
+  assert.deepEqual(photos.slice(0, 3).map((r) => r.id).sort(), ["batch-1", "batch-2", "finish"]);
 });

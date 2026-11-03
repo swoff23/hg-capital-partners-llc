@@ -25,24 +25,34 @@ import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { personalDraftKey } from "@/lib/composer-draft";
+import { JOB_CLOSED } from "@/lib/attachments/access";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
   MAX_FILES_REASON,
   finishCountLabel,
   finishPhotosNeeded,
   finishSlots,
+  finishable,
   joinNames,
   lateUploadsEndsIn,
   lateUploadsOpen,
   markDoneButton,
+  MAX_FILES_PER_POST,
   nextStep,
   postRoom,
+  backOnTray,
+  lostAfter,
+  sendOutcome,
+  settleLost,
   stripCounts,
+  unconfirmedIds,
+  type LostSend,
 } from "@/lib/portal/job-view";
-import { recordedUploads, type RecordedUpload } from "@/lib/portal/recorded-uploads";
+import { recordedUploadsOf, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
-import { postRecordedBatch, recordJobFile } from "./record-and-post";
+import { postJobBatchAction } from "../upload-actions";
+import { postKept, postOrKeepBatch, postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -61,9 +71,14 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  *
  * Photos picked from the bar post as one update once they're all up, unless
  * there's text in the composer: then they wait and go with it. While the Mark
- * done sheet is open they go with the Mark done instead. A batch that posts on
- * its own says "3 photos posted · Undo" for five seconds, and Undo takes the
- * update and its files back (uploads 2.7, question 5). Photos go up as a
+ * done sheet is open they go with the Mark done instead. The tray holds no
+ * more than one post takes (MAX_FILES_PER_POST), counting the photos held for
+ * it, so a pick of 55 sends 50 and refuses 5 with the reason ("only 50 at a
+ * time"). Any files the tab kept for the job post as their own batch once a
+ * Send or Mark done went, as the page opens and as it goes.
+ * A batch that posts on its own says "3 photos posted · Undo" for five
+ * seconds, and Undo takes the update and its files back (uploads 2.7,
+ * question 5), until the job goes to Review after it. Photos go up as a
  * `display` target: upright, a 2560px JPEG, no GPS, without the original
  * (question 3), and each carries when it joined the queue, so one taken before
  * Mark done still records after it, inside the hour (question 4). "Add
@@ -78,15 +93,30 @@ import { postRecordedBatch, recordJobFile } from "./record-and-post";
  * queue outlives the page, so "My jobs" and the payoff's "Back to my jobs"
  * don't ask (uploads 2.1; only Sign out does), and a batch that lands after
  * the contractor left posts on its own with the same Undo (choice 1 A; the
- * My jobs row says "Uploading 3 photos" meanwhile). If HG approved the job in
- * the meantime the photos still land on it, with no update and no email:
- * "3 photos added to the job" (record-and-post.ts), and late-uploads.tsx is the
- * page that records them once the job has no composer. Mark done waits for
- * uploads, and for each failed photo to be retried or removed (decision 13):
- * in the bar and in the sheet it stays off over one line ("2 photos didn't
- * upload · Retry" in danger, or "Finishing 2 uploads…" in grey), and a failed
- * tile keeps its place with the Retry pill. "Add photos" and the slots are
- * off while the Mark done is sending: a photo picked then wouldn't go with it.
+ * My jobs row says "Uploading 3 photos" meanwhile). If HG approved or
+ * canceled the job in the meantime the photos still land on it, and HG is
+ * told once for the batch, one line and one email line with no Undo: "3
+ * photos added to the job" (record-and-post.ts). Photos held here when that
+ * happens go the same way: at once when a Send is refused because the job
+ * closed (the page then refreshes to show it), or when the page goes, and
+ * late-uploads.tsx is the page that records them once the job has no
+ * composer. Files a send already posted, whose answer was lost, go back on the
+ * tray and clear with the next Send or Mark done (portal/job-send.ts). A
+ * written update's stay out of the Mark done sheet until a Send of it answers,
+ * or the page learns it never posted (job-view.ts lostAfter, settleLost): the
+ * server never counts a written update's photos, and a Send again of it posts
+ * the words once and any photo added since on its own (composer-draft.ts
+ * clientIdToReuse; the files it went with go back on the tray first,
+ * backOnTray). A Send made with no connection wrote nothing, so its photos
+ * stay for the Mark done (sendOutcome). Files kept for the
+ * tab whose post failed offline post again when the signal comes back
+ * (PortalUploadQueue). Mark done
+ * waits for uploads, and for each failed photo to be retried or removed
+ * (decision 13): in the bar and in the sheet it stays off over one line ("2
+ * photos didn't upload · Retry" in danger, or "Finishing 2 uploads…" in
+ * grey), and a failed tile keeps its place with the Retry pill. "Add photos"
+ * and the slots are off while the Mark done is sending: a photo picked then
+ * wouldn't go with it.
  *
  * The Mark done sheet (uploads 2.8) is the proof slots, on the upload tray's
  * `slots`: "Photos of the finished work" with "1 of 2" when the playbook asks
@@ -132,17 +162,24 @@ export function JobActions({
 }) {
   const { toast } = useToast();
   const owner = useUploadScope();
+  // What this tab recorded and kept, for this queue's owner only.
+  const tab = recordedUploadsOf(owner);
   const step = nextStep(status);
   const coarse = useCoarsePointer();
   const required = finishPhotosNeeded(finishPhotosRequired);
 
+  const router = useRouter();
   // The composer's words as they change (its draft is its own): photos picked while it's empty post on their own.
   const [body, setBody] = useState("");
   // Uploaded and recorded, not posted yet.
   const [ready, setReady] = useState<Recorded[]>([]);
-  // Files out in a post right now (a batch, or a Send). They leave the tray while it goes and come back to it if it
-  // fails, so they still count against the room: new picks meanwhile never add up to more than one post takes.
+  // Files out in a post right now (a batch, a Send, or a closed job's late post). They leave the tray while it goes
+  // and come back to it if it fails, so they still count against the room: new picks meanwhile never add up to more
+  // than one post takes.
   const [posting, setPosting] = useState(0);
+  // The written updates whose answer was lost: the tray's files they may have posted are left out of the Mark done sheet.
+  const [lost, setLost] = useState<LostSend[]>([]);
+  const unconfirmed = unconfirmedIds(lost);
   const [, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
@@ -160,38 +197,116 @@ export function JobActions({
   useEffect(() => {
     live.current = { body, sheetOpen, ready };
   });
+  // False once the page is gone (set in the unmount cleanup below).
+  const mounted = useRef(true);
+
+  // A Send whose answer was lost, once the signal is back: one refresh brings the page's own updates, and they say
+  // whether it posted (settleLost). Only the browser's own word that the signal is back starts it: a refresh with
+  // none could fail the whole page over. The refresh is ours, so what arrives next is read after the signal returned.
+  const hasLost = lost.length > 0;
+  const learning = useRef(false);
+  useEffect(() => {
+    if (!hasLost) return;
+    const back = () => {
+      if (navigator.onLine === false) return;
+      learning.current = true;
+      router.refresh();
+    };
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, [hasLost, router]);
+  useEffect(() => {
+    if (!learning.current) return;
+    learning.current = false;
+    setLost((l) => settleLost(l, sentClientIds ?? []));
+  }, [sentClientIds]);
+
+  /**
+   * Files that didn't post go back on the tray, to go with the next send, up to what one send takes
+   * (MAX_FILES_PER_POST: a written update and Mark done refuse more). They go in front of the files that landed
+   * since, so a Send again still has every file the first one went with and keeps its id; the newest files past the
+   * cap are kept for the tab, and the next batch for this job carries them (keep, backOnTray). With the page gone
+   * they are all kept: no tray is left.
+   */
+  const putBack = (items: Recorded[]) => {
+    if (!mounted.current) {
+      tab.keep(taskId, items);
+      return;
+    }
+    const { front, kept } = backOnTray(items, live.current.ready);
+    tab.keep(taskId, kept);
+    const off = new Set(kept.map((k) => k.id));
+    setReady((r) => [...front.filter((f) => !r.some((x) => x.id === f.id)), ...r.filter((x) => !off.has(x.id))]);
+  };
+
+  /**
+   * Once a Send or Mark done went, the files the tab kept for this job (past what the tray held, or from a post that
+   * didn't go through) post as their own batch, so none waits for one that may never come. Any that don't stay kept.
+   */
+  const sendKept = () => postKept(taskId, toast, owner);
+
+  /** Posts a batch as updates of up to MAX_FILES_PER_POST files: "3 photos posted", and five seconds to take it back. Answers the files that didn't post. */
+  const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast, owner);
+
+  /**
+   * HG closed the job under this page: the words can't go, but the photos are on the job and still reach HG, the
+   * late way (a line and an email line); the page then shows the closed job. Files that don't post go back on the
+   * tray, even when the call throws (a redirect).
+   */
+  const sendLate = (items: Recorded[]) => {
+    setPosting((n) => n + items.length);
+    startSending(async () => {
+      let left = items;
+      try {
+        left = items.length > 0 ? await sendBatch(items) : [];
+      } finally {
+        setPosting((n) => n - items.length);
+        if (left.length > 0) putBack(left);
+      }
+      router.refresh();
+    });
+  };
 
   // The composer's Send: the words and every held photo as one update. The composer runs it through callAction,
   // so with no signal it fails like a refusal (a toast), and the words stay in the box. The photos leave the tray
-  // while it sends and come back to it unless it posted.
+  // while it sends and come back to it unless it posted (putBack). Refused because HG closed the job, they take
+  // the late way instead. Once it posted, the files the tab kept for the job post as their own batch. With no
+  // answer at all it may have posted, so the Mark done sheet leaves its photos out until a Send of it answers or the
+  // page learns it never did (sendOutcome, settleLost): the server never counts a written update's photos toward the
+  // playbook's. A Send made with no connection never left the phone, so its photos stay for the Mark done.
   async function sendUpdate({ body: text, attachmentIds, clientId }: ComposerMessage): Promise<ActionResult> {
     const items = ready.filter((r) => attachmentIds.includes(r.id));
     setReady((r) => r.filter((x) => !attachmentIds.includes(x.id)));
     setPosting((n) => n + items.length);
-    let posted = false;
+    const offlineAtStart = navigator.onLine === false;
+    let res: ActionResult | null = null;
     try {
-      const res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId }, owner);
-      posted = res.ok;
+      res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId }, owner);
       return res;
     } finally {
       setPosting((n) => n - items.length);
-      if (!posted) setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
+      const outcome = sendOutcome(res, offlineAtStart);
+      setLost((l) => lostAfter(l, { clientId, ids: attachmentIds }, outcome));
+      if (res?.ok) startSending(sendKept);
+      else if (res && res.error === JOB_CLOSED) sendLate(items);
+      else putBack(items);
     }
   }
 
-  /** Posts a batch as one update: "3 photos posted", and five seconds to take it back. False when it didn't post. */
-  const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast, owner);
-
-  /** A batch that posts on its own while the page is here. One that doesn't post goes back on the tray, to go with the next send. */
+  /**
+   * A batch that posts on its own while the page is here. Files that don't post go back on the tray, to go with the
+   * next send, even when the call throws (a redirect).
+   */
   const postBatch = (items: Recorded[]) => {
     // Counted before the transition starts, in the same render that takes them off the tray.
     setPosting((n) => n + items.length);
     startSending(async () => {
+      let left = items;
       try {
-        if (await sendBatch(items)) return;
-        setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
+        left = await sendBatch(items);
       } finally {
         setPosting((n) => n - items.length);
+        if (left.length > 0) putBack(left);
       }
     });
   };
@@ -204,18 +319,24 @@ export function JobActions({
 
   function onRecorded(ids: string[]) {
     const { sheetOpen: holding, body: text, ready: held } = live.current;
-    const added = recordedUploads.take(taskId, ids);
     if (holding || text.trim()) {
-      setReady([...held, ...added]);
+      // Held for the Send or Mark done, which take MAX_FILES_PER_POST: any more wait, kept for the next batch.
+      setReady([...held, ...tab.take(taskId, ids, MAX_FILES_PER_POST - held.length)]);
       return;
     }
+    const added = tab.take(taskId, ids);
     setReady([]);
     postBatch([...held, ...added]);
   }
 
-  /** A batch that landed after the contractor left the page: it posts as its own update, with the same toast and Undo. */
+  /**
+   * A batch that landed after the contractor left the page: it posts as its own update, with the same toast and
+   * Undo. Files that don't post stay kept for the tab, even when the call throws (postOrKeepBatch), and the
+   * failure's Retry, the next batch for this job or the signal coming back carries them. A refusal for good (taken
+   * off the job) keeps none: trying again can't change it.
+   */
   function onAway(ids: string[]) {
-    void sendBatch(recordedUploads.take(taskId, ids));
+    void postOrKeepBatch(taskId, tab.take(taskId, ids), toast, owner);
   }
 
   const target: UploadTarget = {
@@ -239,8 +360,19 @@ export function JobActions({
     // The record step takes when each file joined the queue: one queued before Mark done still records inside the hour (question 4).
     sendQueuedAt: true,
   };
-  const uploader = useMediaUploader({ target });
+  // A job HG sends back to In progress or Review while this page stays open takes files again: tiles it refused for
+  // good get one more go when its status changes, as they do when the page opens.
+  const uploader = useMediaUploader({ target, reopenOn: status });
   const { pending, waiting, failed } = uploader;
+
+  // The first tile refused for good: one refresh, so a status that changed under this page (HG approved, or sent
+  // the job back) reaches the page and reopenOn.
+  const finals = uploader.uploads.filter((u) => u.final).length;
+  const hadFinal = useRef(false);
+  useEffect(() => {
+    if (finals > 0 && !hadFinal.current) router.refresh();
+    hadFinal.current = finals > 0;
+  }, [finals, router]);
 
   // The photos a Mark done is sending right now, so leaving mid-send doesn't
   // post them a second time as an empty update.
@@ -248,16 +380,42 @@ export function JobActions({
 
   // Moving to another page in the app: post what's still held, as its own
   // update (any unsent text stays unsent). Read at unmount on purpose, so it's
-  // the latest list; live is the same ref onRecorded reads.
+  // the latest list; live is the same ref onRecorded reads. The page also goes
+  // when HG approves or cancels the job while photos are held (the job page
+  // shows a closed job without this composer): the update is refused then, so
+  // the held photos take the batch step's late way and HG still hears of them.
+  // The files the tab kept for the job post too, as their own batch, here and
+  // as the page opens. Whatever doesn't post stays kept for the tab, for the
+  // next batch of this job.
+  const ownerNow = useRef(owner);
+  const toastNow = useRef(toast);
+  useEffect(() => {
+    ownerNow.current = owner;
+    toastNow.current = toast;
+  });
   useEffect(() => {
     const latest = live;
     const inFlight = finishingIds;
+    const queueOwner = ownerNow;
+    const toastLater = toastNow;
+    const here = mounted;
+    here.current = true;
+    void postKept(taskId, toastLater.current, queueOwner.current);
     return () => {
-      const held = latest.current.ready.map((r) => r.id).filter((id) => !inFlight.current.includes(id));
+      here.current = false;
+      void postKept(taskId, toastLater.current, queueOwner.current);
+      const registry = recordedUploadsOf(queueOwner.current);
+      const heldItems = latest.current.ready.filter((r) => !inFlight.current.includes(r.id));
+      const held = heldItems.map((r) => r.id);
+      if (held.length === 0) return;
       // Detached: nothing is left on this page to show a result, and a redirect needs no rethrow here.
-      if (held.length > 0) postJobUpdateAction(taskId, { body: "", attachmentIds: held }, owner).catch(() => {});
+      void (async () => {
+        const res = await postJobUpdateAction(taskId, { body: "", attachmentIds: held }, queueOwner.current);
+        const posted = !res.ok && res.error === JOB_CLOSED ? await postJobBatchAction(taskId, held, queueOwner.current) : res;
+        if (!posted.ok) registry.keep(taskId, heldItems);
+      })().catch(() => registry.keep(taskId, heldItems));
     };
-  }, [taskId, owner]);
+  }, [taskId]);
   useLeaveWarning(ready.length > 0);
 
   // Bring the upload tiles into view when uploads start from the bar.
@@ -301,14 +459,20 @@ export function JobActions({
     setSheetOpen(true);
   }
 
+  // What the Mark done sheet shows, counts and sends: the tray, less the photos a written update may have posted
+  // (they wait on the tray for its Send again; the server wouldn't count them).
+  const sheetReady = finishable(ready, unconfirmed);
+
   function finish() {
     startFinishing(async () => {
-      const items = ready;
+      const items = sheetReady;
       finishingIds.current = items.map((i) => i.id);
       try {
         const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: items.map((i) => i.id) }, owner));
         if (!res.ok) {
           toast({ message: res.error });
+          // The page went while this was sending (the unmount left these out of its own post): keep them for the tab.
+          if (!mounted.current) tab.keep(taskId, items);
           return;
         }
         setReady((r) => r.filter((x) => !items.some((i) => i.id === x.id)));
@@ -316,13 +480,15 @@ export function JobActions({
         setNote("");
         setMarkedNow(new Date().toISOString());
         setSheetState("sent");
+        // Its own transition, so the payoff can close while the kept files post.
+        startSending(sendKept);
       } finally {
         finishingIds.current = [];
       }
     });
   }
 
-  const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: ready.length, required });
+  const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: sheetReady.length, required });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
   const barButton = actionBarButton;
@@ -471,7 +637,7 @@ export function JobActions({
               <p className="min-w-0 text-body font-medium text-fg-1">
                 {required > 0 ? "Photos of the finished work" : "Add photos of the finished work?"}
               </p>
-              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, ready.length)}</span>}
+              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, sheetReady.length)}</span>}
             </div>
             {/* The photos already up, then the ones going up, then empty slots up to the count asked for (one on an
                 optional job), solid squares, never dashed; once the count is met, one add tile remains. */}
@@ -481,10 +647,10 @@ export function JobActions({
               notice={false}
               label="Photos of the finished work"
               slots={slots}
-              filled={ready.length}
+              filled={sheetReady.length}
               onSlot={openSlot}
               disabled={finishing}
-              leading={ready.map((r) => (
+              leading={sheetReady.map((r) => (
                 <UploadTile key={r.id} upload={readyUpload(r)} grid ready />
               ))}
             />

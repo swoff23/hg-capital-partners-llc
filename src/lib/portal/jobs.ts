@@ -8,8 +8,7 @@ import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { logSecurityEvent } from "./accounts";
-import { ownUnposted } from "./job-batch";
-import { addMorePhotosLine, finishPhotoCount, finishPhotosNeeded } from "./job-view";
+import { markDoneIn, postUpdateIn, type JobUpdateInput } from "./job-send";
 import { requestIpHash } from "./request";
 import { requirePortalPrincipal, taskPrincipal, type PortalPrincipal } from "./session";
 
@@ -105,55 +104,23 @@ async function refreshOnRefusal<T>(taskId: string, write: () => Promise<T>): Pro
   }
 }
 
-export interface JobUpdateInput {
-  body: string;
-  /** Files this contractor uploaded to the job and hasn't posted yet. */
-  attachmentIds: string[];
-  /**
-   * The id the browser made for this send. core.addComment answers a second
-   * write of the same id by this contractor on this job with the first, so a
-   * Retry after a timeout that did post never posts, or emails, twice.
-   */
-  clientId?: string;
-}
+export type { JobUpdateInput } from "./job-send";
 
-/** An update from the composer: text, files, or both. Always Shared (core). Only the contractor's own unposted files go (job-batch.ts ownUnposted). */
+/** An update from the composer: text, files, or both, as the signed-in contractor (job-send.ts postUpdateIn has the rules). */
 export async function postJobUpdate(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
-  await prisma.$transaction(async (tx) => {
-    const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
-    await core.addComment(tx, taskId, { body: input.body, attachmentIds: own.map((f) => f.id), clientId: input.clientId }, taskPrincipal(p));
-  });
+  await prisma.$transaction((tx) => postUpdateIn(tx, taskId, taskPrincipal(p), input));
   revalidateJob(taskId);
 }
 
 /**
- * Mark done: the job moves to Review (D6b) with the optional note and photos
- * of the finished work as the note core.setStatus writes beside it, tied to
- * the status line (`data.statusEventId`), so Activity shows the two as one
- * decision, as a partner's Send back does (activity 2.2 d). Both partners get
- * one email for the two: the note's line, then "marked it done" (core bundles
- * them). When the job's playbook asks for photos
- * (TaskTemplate.finishPhotosRequired, uploads 2.8), it needs that many of this
- * contractor's own, unposted photos and videos here (job-view finishPhotoCount,
- * what the sheet counts); the sheet holds the button until they are up, and
- * this is the same rule where the browser can't skip it.
+ * Mark done: the job moves to Review with the optional note and photos, as the signed-in contractor
+ * (job-send.ts markDoneIn has the rules: the task row first, then the photo count the playbook asks for). A
+ * refusal still refreshes the page.
  */
 export async function markJobDone(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
-  const principal = taskPrincipal(p);
-  await refreshOnRefusal(taskId, () =>
-    prisma.$transaction(async (tx) => {
-      const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
-      const template = await tx.task.findUnique({ where: { id: taskId }, select: { taskTemplate: { select: { finishPhotosRequired: true } } } });
-      const required = finishPhotosNeeded(template?.taskTemplate?.finishPhotosRequired);
-      const photos = finishPhotoCount(own.map((f) => f.kind));
-      if (photos < required) {
-        throw new core.TaskRuleError(`${addMorePhotosLine(required - photos)} to mark this done.`);
-      }
-      await core.setStatus(tx, taskId, "REVIEW", principal, { note: input.body, attachmentIds: own.map((f) => f.id) });
-    }),
-  );
+  await refreshOnRefusal(taskId, () => prisma.$transaction((tx) => markDoneIn(tx, taskId, taskPrincipal(p), input)));
   revalidateJob(taskId);
 }
 

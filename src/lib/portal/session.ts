@@ -160,7 +160,7 @@ export async function portalHomePath(next: string | null = null): Promise<string
 }
 
 /** The contractor as the actor on a task write (src/lib/tasks/core.ts). */
-export function taskPrincipal(p: PortalPrincipal): Principal {
+export function taskPrincipal(p: PortalPrincipal): Extract<Principal, { kind: "contractor" }> {
   return { kind: "contractor", contactId: p.contactId, label: p.label };
 }
 

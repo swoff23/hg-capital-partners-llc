@@ -29,20 +29,25 @@ function revalidateJob(taskId: string): void {
  * The files of one batch, posted together as one update with no text: "Zack
  * added 4 photos" on the timeline and one line in the partners' email. It's
  * marked as a batch (core.addComment `batch`), the only kind of post Undo
- * takes back. Returns the update's id for that Undo. The same photos sent
- * twice (two tabs at once, or again after an answer that never came) post
- * once: the other send answers `alreadyPosted`, leaves no empty update behind,
- * and the page says nothing.
+ * takes back. Returns the update's id for that Undo, and `linked`, the ids of
+ * the files it linked (the page counts its toast from these). The same photos
+ * sent twice (two tabs at once, or again after an answer that never came)
+ * post once: the other send answers with no id and nothing linked, leaves no
+ * empty update behind, and the page says nothing. So does a send whose photos
+ * were all taken off the job since, so the next piece of a big batch still
+ * goes.
  *
- * A job HG has approved since the photos went up (Done) takes no more
- * updates, but the late photos are already recorded on it: they stay on the
- * job as they are, with no update and no email, and the answer carries no
- * `eventId` (there is nothing to Undo). The page then says they were added
- * to the job. The job page refreshes, so they show in its photos. A batch that
- * waited on the task row behind HG's Approve gets the same answer, not an error
- * (job-batch.ts postBatchIn has the rules).
+ * A job HG has approved or canceled since the photos went up takes no batch
+ * post, but the late photos are already recorded on it, so HG hears about
+ * them once for the batch: the same line and one email line, which can't be
+ * taken back (core.addLateContractorBatch). The job keeps its status, and the
+ * answer carries no `eventId` (there is nothing to Undo), so the page says
+ * they were added to the job. The job page refreshes, so they show in its
+ * photos. The access check still comes first. A batch that waited on the task
+ * row behind HG's Approve takes the same late way (job-batch.ts postBatchIn
+ * has the rules).
  */
-export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null; alreadyPosted?: true }> {
+export async function postJobBatch(taskId: string, attachmentIds: string[]): Promise<{ eventId: string | null; linked: string[] }> {
   const p = await requirePortalPrincipal();
   let posted: BatchPosted;
   try {
@@ -50,10 +55,10 @@ export async function postJobBatch(taskId: string, attachmentIds: string[]): Pro
   } catch (err) {
     // Lost to the same photos posted a moment ago: its own update has rolled back, and nothing is missing.
     if (!(err instanceof BatchAlreadyPosted)) throw err;
-    posted = { event: null, alreadyPosted: true };
+    posted = { event: null, linked: [] };
   }
   revalidateJob(taskId);
-  return posted.alreadyPosted ? { eventId: null, alreadyPosted: true } : { eventId: posted.event?.id ?? null };
+  return { eventId: posted.event?.id ?? null, linked: posted.linked };
 }
 
 /**

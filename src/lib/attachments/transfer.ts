@@ -1,7 +1,7 @@
 import { completeMultipartUpload, createMultipartUpload, put, uploadPart } from "@vercel/blob/client";
 import { MULTIPART_THRESHOLD, usesMultipart, type FileKind } from "./content-types";
 import { isTokenExpired } from "./media";
-import { ServerBusyError, classifyFailure, type MultipartState } from "./outbox";
+import { FinalRefusalError, ServerBusyError, classifyFailure, type MultipartState } from "./outbox";
 import { uploadRequest, type UploadKind } from "./upload-kinds";
 import type { UploadRole } from "./paths";
 
@@ -99,8 +99,13 @@ async function clientToken(kind: UploadKind, pathname: string, clientPayload: st
     signal,
   });
   if (res.status >= 500 || res.status === 408 || res.status === 429) throw new ServerBusyError();
-  // The words match upload()'s own, which media.ts shownReason turns into "the upload was refused. Reload and try again".
-  if (!res.ok) throw new Error("Failed to retrieve the client token");
+  if (!res.ok) {
+    // A job that stopped taking files before this one got a token says so for good (`final`): no Retry can change it.
+    const refused = (await res.json().catch(() => null)) as { error?: unknown; final?: unknown } | null;
+    if (refused?.final === true && typeof refused.error === "string") throw new FinalRefusalError(refused.error);
+    // The words match upload()'s own, which media.ts shownReason turns into "the upload was refused. Reload and try again".
+    throw new Error("Failed to retrieve the client token");
+  }
   const body = (await res.json().catch(() => null)) as { clientToken?: string } | null;
   if (!body?.clientToken) throw new Error("Failed to retrieve the client token");
   return body.clientToken;

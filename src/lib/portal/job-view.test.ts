@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { TaskStatus } from "@prisma/client";
 import { uploadNotice } from "@/lib/attachments/media";
+import { clientIdToReuse } from "@/lib/composer-draft";
 import { STATUS_ORDER } from "@/lib/task-scope";
 import { statusEventVisibility } from "@/lib/tasks/rules";
 import {
@@ -14,11 +15,13 @@ import {
   addedText,
   addedToJobText,
   addressLine,
+  backOnTray,
   dayLabel,
   finishCountLabel,
   finishPhotoCount,
   finishPhotosNeeded,
   finishSlots,
+  finishable,
   finishingLabel,
   firstName,
   groupByDate,
@@ -27,6 +30,7 @@ import {
   joinNames,
   lateUploadsEndsIn,
   lateUploadsOpen,
+  lostAfter,
   markDoneButton,
   nextStep,
   parseJobsGroup,
@@ -34,10 +38,13 @@ import {
   portalActorLabel,
   postedText,
   rowUploadLine,
+  sendOutcome,
+  settleLost,
   statusUpdateText,
   stillUploading,
   dueDateParts,
   stripCounts,
+  unconfirmedIds,
   updateTimeLabel,
   type JobCard,
 } from "./job-view";
@@ -247,6 +254,78 @@ test("parsing the tab and the remembered grouping", () => {
 test("finishing label counts uploads", () => {
   assert.equal(finishingLabel(1), "Finishing 1 upload…");
   assert.equal(finishingLabel(3), "Finishing 3 uploads…");
+});
+
+test("the Mark done sheet leaves out photos a written update whose answer was lost may have posted, until a Send of it answers", () => {
+  const tray = [{ id: "A" }, { id: "B" }, { id: "C" }];
+  // "Tiles set" with A and B: no answer came back, so it may have posted, and the server never counts its photos.
+  let lost = lostAfter([], { clientId: "s1", ids: ["A", "B"] }, "lost");
+  assert.deepEqual(finishable(tray, unconfirmedIds(lost)), [{ id: "C" }], "only C counts toward the playbook's photos");
+  const required = 2;
+  assert.equal(markDoneButton({ pending: 0, waiting: 0, failed: 0, sending: false, uploaded: finishable(tray, unconfirmedIds(lost)).length, required }).enabled, false);
+  // A refusal wrote nothing, but the lost send before it still may have posted them.
+  lost = lostAfter(lost, { clientId: "s1", ids: ["A", "B"] }, "refused");
+  assert.deepEqual(unconfirmedIds(lost), ["A", "B"]);
+  // Send again answered that it went: A and B left the tray with it, and nothing stays held back.
+  lost = lostAfter(lost, { clientId: "s1", ids: ["A", "B", "C"] }, "posted");
+  assert.deepEqual(unconfirmedIds(lost), []);
+  assert.deepEqual(lost, []);
+  assert.deepEqual(finishable(tray, unconfirmedIds(lost)), tray);
+  // A lost send twice over holds each photo back once, under the one id.
+  assert.deepEqual(lostAfter([{ clientId: "s1", ids: ["A"] }], { clientId: "s1", ids: ["A", "B"] }, "lost"), [{ clientId: "s1", ids: ["A", "B"] }]);
+  // A send that answered it didn't go never holds anything back.
+  assert.deepEqual(lostAfter([], { clientId: "s2", ids: ["A"] }, "refused"), []);
+});
+
+test("a Send made with no connection never left the phone, so its photos stay for the Mark done; one made with a signal that failed may have posted", () => {
+  const tray = [{ id: "G" }, { id: "H" }];
+  // The server's answer is what it is, offline or not.
+  assert.equal(sendOutcome({ ok: true }, false), "posted");
+  assert.equal(sendOutcome({ ok: false }, false), "refused");
+  // No answer. Offline when it was sent: nothing was written (the contractor takes two finish photos, goes offline, Sends).
+  assert.equal(sendOutcome(null, true), "refused");
+  const offline = lostAfter([], { clientId: "s1", ids: ["G", "H"] }, sendOutcome(null, true));
+  assert.deepEqual(finishable(tray, unconfirmedIds(offline)), tray, "both photos still count and Mark done is on for them");
+  assert.equal(markDoneButton({ pending: 0, waiting: 0, failed: 0, sending: false, uploaded: finishable(tray, unconfirmedIds(offline)).length, required: 2 }).enabled, true);
+  // No answer from a send made with a signal: it may have reached the server, so they wait.
+  assert.equal(sendOutcome(null, false), "lost");
+  const dropped = lostAfter([], { clientId: "s2", ids: ["G", "H"] }, sendOutcome(null, false));
+  assert.deepEqual(finishable(tray, unconfirmedIds(dropped)), []);
+});
+
+test("once the signal is back, the page's own updates settle a lost send: one it holds posted, one it doesn't never did", () => {
+  const tray = [{ id: "A" }, { id: "B" }, { id: "C" }];
+  const lost = [
+    { clientId: "committed", ids: ["A"] },
+    { clientId: "never-reached", ids: ["B"] },
+  ];
+  // The page now lists the first (a reload applies the same rule to a pending message, resolvePending).
+  const settled = settleLost(lost, ["x1", "committed"]);
+  assert.deepEqual(settled, [{ clientId: "committed", ids: ["A"] }]);
+  assert.deepEqual(finishable(tray, unconfirmedIds(settled)), [{ id: "B" }, { id: "C" }], "B is unposted again and counts; A stays out");
+  assert.deepEqual(settleLost(lost, []), [], "neither committed");
+  assert.deepEqual(settleLost([], ["committed"]), []);
+});
+
+test("a failed send's files go back in front of the ones that landed since, so a Send again has every one it went with", () => {
+  const file = (id: string) => ({ id });
+  const sent = Array.from({ length: 30 }, (_, i) => file(`s${i}`));
+  // 25 photos landed on the tray while the send was away: 30 and 25 are more than one post takes.
+  const landed = Array.from({ length: 25 }, (_, i) => file(`n${i}`));
+  const { front, kept } = backOnTray(sent, landed);
+  const tray = [...front, ...landed.filter((l) => !kept.some((k) => k.id === l.id))];
+  assert.equal(tray.length, MAX_FILES_PER_POST);
+  assert.deepEqual(tray.slice(0, 30), sent, "the first send's files lead");
+  assert.deepEqual(kept.map((k) => k.id), ["n20", "n21", "n22", "n23", "n24"], "the newest files wait in the tab, not the first send's");
+  // The id is reused: the pending send's files are all among the next send's.
+  const draft = {
+    text: "All done here",
+    visibility: "SHARED" as const,
+    pending: { clientId: "first", text: "All done here", visibility: "SHARED" as const, files: sent.map((s) => ({ id: s.id, filename: "" })), at: "2026-11-03T12:00:00.000Z", held: true as const },
+  };
+  assert.equal(clientIdToReuse(draft, { body: "All done here", visibility: "SHARED", attachmentIds: tray.map((t) => t.id) }), "first");
+  // Room for all: nothing is kept, and one already on the tray isn't doubled.
+  assert.deepEqual(backOnTray([file("a"), file("b")], [file("b"), file("c")]), { front: [file("a")], kept: [] });
 });
 
 test("Mark done has no Skip: an optional job reads Mark done and is on, with or without photos", () => {

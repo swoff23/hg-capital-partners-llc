@@ -1,13 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  JOB_CLOSED,
   LATE_UPLOAD_WINDOW_MS,
   QUEUED_UPLOAD_GRACE_MS,
   ZIP_VIEWERS,
   acceptsContractorUpload,
   contractorMaySee,
+  TOO_LATE,
+  isFinalRefusal,
+  lateRefusal,
   mayDownloadZip,
   parseQueuedAt,
+  withFinalRefusal,
 } from "./access";
 
 const ME = "contact-me";
@@ -153,4 +158,45 @@ test("Download all (ZIP) is staff only, and only for a task", () => {
 test("Canceled jobs never take uploads", () => {
   const canceled = { status: "CANCELED" as const, completedByContactId: ME, completedAt: ago(1) };
   assert.equal(acceptsContractorUpload(canceled, { actorContactId: ME, createdAt: ago(1) }, ME, NOW), false);
+});
+
+test("withFinalRefusal: the closed-job and too-late refusals are final, every other answer passes through as it was", () => {
+  assert.equal(JOB_CLOSED, "This job is closed.");
+  assert.equal(TOO_LATE, "It's too late to add files to this job.");
+  assert.deepEqual(withFinalRefusal({ ok: false, error: JOB_CLOSED }), { ok: false, error: JOB_CLOSED, final: true });
+  assert.deepEqual(withFinalRefusal({ ok: false, error: TOO_LATE }), { ok: false, error: TOO_LATE, final: true });
+  for (const res of [
+    { ok: true, data: { id: "a1" } },
+    { ok: false, error: "You don't have access to this job." },
+    { ok: false, error: "That upload didn't finish. Try again." },
+    { ok: false, error: "That file is already attached." },
+    { ok: false, error: "this job is closed" },
+    { ok: false },
+  ]) {
+    const out = withFinalRefusal(res);
+    assert.deepEqual(out, res, JSON.stringify(res));
+    assert.equal("final" in out, false);
+  }
+});
+
+test("isFinalRefusal: only the two windows' words, the one test the token route and the record step share", () => {
+  assert.equal(isFinalRefusal(JOB_CLOSED), true);
+  assert.equal(isFinalRefusal(TOO_LATE), true);
+  for (const error of ["You don't have access to this job.", "That job no longer exists.", "this job is closed", "", null, undefined]) {
+    assert.equal(isFinalRefusal(error), false, String(error));
+  }
+});
+
+test("lateRefusal: a job still in Review is too late, never closed; Done and Canceled are closed", () => {
+  assert.equal(lateRefusal("REVIEW"), TOO_LATE);
+  assert.equal(lateRefusal("DONE"), JOB_CLOSED);
+  assert.equal(lateRefusal("CANCELED"), JOB_CLOSED);
+  // Review takes a written update, so its words never say the job closed.
+  assert.doesNotMatch(TOO_LATE, /closed/i);
+  // Every job that turns a file away past its window says one of the two, and both are final.
+  const marked = { completedByContactId: ME, completedAt: ago(LATE_UPLOAD_WINDOW_MS / 60_000 + 1) };
+  for (const status of ["REVIEW", "DONE", "CANCELED"] as const) {
+    assert.equal(acceptsContractorUpload({ status, ...marked }, { actorContactId: ME, createdAt: marked.completedAt }, ME, NOW), false, status);
+    assert.equal(isFinalRefusal(lateRefusal(status)), true, status);
+  }
 });

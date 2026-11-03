@@ -32,8 +32,32 @@ test("the portal's upload queue is each contractor's own, and a new person gets 
   const gate = fn(read("lib", "portal", "session.ts"), "requirePortalSession");
   assert.match(gate, /const state = await readSession\(\);/);
   assert.doesNotMatch(gate, /mustChangePassword/);
-  assert.match(layout, /<UploadQueueProvider key=\{scope\} scope=\{scope\}>/);
+  assert.match(layout, /<PortalUploadQueue key=\{scope\} scope=\{scope\}>/);
   assert.doesNotMatch(layout, /scope="portal"/, "one shared portal queue hands one contractor's files to the next");
+  // The portal's wrapper is the one queue, under that scope, and posts only that scope's kept files when it wakes.
+  const queue = read("app", "(portal)", "p", "_components", "portal-upload-queue.tsx");
+  assert.match(queue, /<UploadQueueProvider scope=\{scope\} onWake=\{\(\) => void postEveryKept\(toast, scope\)\}>/);
+});
+
+test("kept files post again when the signal or the tab comes back, on whatever portal page is open (S1)", () => {
+  const provider = fn(read("components", "upload-queue.tsx"), "UploadQueueProvider");
+  // The same two events that nudge the queue wake the layout's own work, the latest onWake, only with a signal.
+  assert.match(provider, /const wake = \(\) => \{\s*engine\.nudge\(\);\s*if \(navigator\.onLine !== false\) wakeNow\.current\?\.\(\);\s*\};/);
+  assert.match(provider, /if \(document\.visibilityState === "visible"\) wake\(\);/);
+  assert.match(provider, /window\.addEventListener\("online", wake\);/);
+  // Every job the tab kept files for drains, each the one-at-a-time way, with Retry on a post that failed.
+  const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
+  assert.match(fn(shared, "postEveryKept"), /return drainEveryKept\(owner, \(taskId, kept\) => postToKeep\(taskId, kept, toast, owner\)\);/);
+  assert.match(fn(shared, "retryKept"), /return \(\) => void postKept\(taskId, toast, owner\);/);
+  assert.match(fn(shared, "postPiece"), /toast\(failedPostToast\(res\.error, retry\)\);\s*return sendRefusal\(res\.error\) === null \? "failed" : "refused";/);
+  // Files with no tray keep only what another try may post: a refusal for good (the contractor was taken off the
+  // job) isn't kept, or every return to the tab would post it again and toast the same line.
+  assert.match(fn(shared, "postToKeep"), /return postKeepable\(items, \(piece\) => postPiece\(taskId, piece, toast, late, owner, retry\)\);/);
+  assert.match(fn(shared, "postOrKeepBatch"), /postToKeep\(taskId, batch, toast, owner\)/);
+  assert.doesNotMatch(shared, /postRecordedBatch\([^)]*retry/, "the tray's post has no Retry of its own");
+  // A finished job's page drains as it goes too, as the job page does.
+  const late = read("app", "(portal)", "p", "jobs", "[id]", "_components", "late-uploads.tsx");
+  assert.match(late, /void postKept\(taskId, toast, owner\);\s*return \(\) => void postKept\(taskId, toast, owner\);/);
 });
 
 test("the app's upload queue is each person's own too, keyed so a different sign-in gets a fresh one", () => {
@@ -49,13 +73,24 @@ test("the upload queue stops with its layout, so nothing records under the next 
   assert.match(provider, /if \(stopping\.current !== null\) clearTimeout\(stopping\.current\);/, "Strict Mode's rehearsal unmount doesn't stop it");
 });
 
-test("a job page keeps what it recorded for the tab, not for itself (fix 6)", () => {
+test("a job page keeps what it recorded for the tab and the queue's owner, not for itself (fix 6)", () => {
   const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
-  // The record step is shared with the finished job's page, so the tab's registry is written in one place.
-  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts"), /recordedUploads\.note\(taskId,/);
+  // The record step is shared with the finished job's page, so the tab's registry is written in one place, under the
+  // owner the queue named for the file.
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts"), /recordedUploadsOf\(owner\)\.note\(taskId,/);
   assert.match(actions, /recordJobFile\(taskId, file, from\)/);
-  assert.match(fn(actions, "JobActions"), /function onRecorded\(ids: string\[\]\) \{[\s\S]*?recordedUploads\.take\(taskId, ids\)/);
-  assert.match(actions, /function onAway\(ids: string\[\]\) \{\s*void sendBatch\(recordedUploads\.take\(taskId, ids\)\);/);
+  // Every page reads the registry of its own queue's owner, so one person's kept files never post for the next.
+  assert.match(actions, /const owner = useUploadScope\(\);[\s\S]*?const tab = recordedUploadsOf\(owner\);/);
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "late-uploads.tsx"), /const tab = recordedUploadsOf\(owner\);/);
+  assert.doesNotMatch(actions, /recordedUploads\./, "no registry shared by every owner");
+  const onRecorded = fn(actions, "JobActions").match(/function onRecorded\(ids: string\[\]\) \{[\s\S]*?\n  \}\n/)?.[0] ?? "";
+  // Held for a Send or Mark done it takes what one of them takes; posted on its own it takes the lot, and the post goes in pieces.
+  assert.match(onRecorded, /tab\.take\(taskId, ids, MAX_FILES_PER_POST - held\.length\)/);
+  assert.match(onRecorded, /const added = tab\.take\(taskId, ids\);/);
+  // A batch that lands away posts the tab's record of it, and keeps the files that didn't post for the next batch,
+  // even when the call throws (postOrKeepBatch's try and finally).
+  assert.match(actions, /function onAway\(ids: string\[\]\) \{\s*void postOrKeepBatch\(taskId, tab\.take\(taskId, ids\), toast, owner\);/);
+  assert.match(fn(read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts"), "postOrKeepBatch"), /return postOrKeep\(owner, taskId, items,/);
   assert.doesNotMatch(actions, /useRef\(new Map/, "a per-page map drops the files an earlier visit recorded");
 });
 
@@ -64,20 +99,67 @@ test("Mark done counts only this visit's photos and videos: no imported file, no
   const batch = read("lib", "portal", "job-batch.ts");
   const own = fn(batch, "ownUnposted");
   assert.match(own, /uploadedByContactId: contactId, eventId: null, deletedAt: null, asanaGid: null/);
-  const jobs = read("lib", "portal", "jobs.ts");
-  assert.match(fn(jobs, "markJobDone"), /finishPhotoCount\(own\.map\(\(f\) => f\.kind\)\)/);
+  const send = read("lib", "portal", "job-send.ts");
+  assert.match(fn(send, "markDoneIn"), /finishPhotoCount\(own\.map\(\(f\) => f\.kind\)\)/);
   // One copy of the rule: Mark done, a written update and the batch post all use the same one.
-  assert.match(jobs, /import \{ ownUnposted \} from "\.\/job-batch";/);
+  assert.match(send, /import \{ allOwnPosted, ownPosted, ownUnposted, postBatchIn \} from "\.\/job-batch";/);
   assert.match(fn(batch, "postBatchIn"), /await ownUnposted\(tx, taskId, p\.contactId, attachmentIds\)/);
-  for (const [name, source] of [["jobs.ts", jobs], ["job-uploads.ts", read("lib", "portal", "job-uploads.ts")]] as const) {
+  const jobs = read("lib", "portal", "jobs.ts");
+  for (const [name, source] of [["jobs.ts", jobs], ["job-send.ts", send], ["job-uploads.ts", read("lib", "portal", "job-uploads.ts")]] as const) {
     assert.doesNotMatch(source, /function ownUnposted/, name);
   }
+  // The session's half runs the rules on its transaction, as the signed-in contractor.
+  assert.match(fn(jobs, "postJobUpdate"), /prisma\.\$transaction\(\(tx\) => postUpdateIn\(tx, taskId, taskPrincipal\(p\), input\)\)/);
+  assert.match(fn(jobs, "markJobDone"), /prisma\.\$transaction\(\(tx\) => markDoneIn\(tx, taskId, taskPrincipal\(p\), input\)\)/);
+  assert.doesNotMatch(send, /^import "server-only";/m, "kept apart from the session so job-batch.test.ts can run it");
+  // Mark done takes the task row before it counts anything (S2), as every writer on a task takes it first.
+  assert.match(
+    fn(send, "markDoneIn"),
+    /\{\s*await core\.lockTask\(tx, taskId\);\s*\/\/[^\n]*\n\s*await core\.assertContractorAccess\(tx, taskId, p\.contactId\);\s*const own = await ownUnposted\(/,
+  );
+});
+
+test("files a batch post already told HG of, sent again after its answer was lost, never stall a Send or a Mark done", () => {
+  const send = read("lib", "portal", "job-send.ts");
+  // A Send with no text and nothing new answers quietly, so the page clears its tray instead of being refused each tap.
+  assert.match(
+    fn(send, "postUpdateIn"),
+    /if \(!input\.body\.trim\(\) && own\.length === 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, input\.attachmentIds\)\)\) \{\s*await core\.assertContractorAccess\(tx, taskId, p\.contactId\);\s*return;\s*\}\s*await core\.addComment/,
+  );
+  // A Send again whose first send did post (M1): the photos still unposted under addComment's lock go as their own
+  // batch, through the batch step, so the words are never written twice.
+  assert.match(
+    fn(send, "postUpdateIn"),
+    /const left = input\.clientId && own\.length > 0 \? await ownUnposted\(tx, taskId, p\.contactId, own\.map\(\(f\) => f\.id\)\) : \[\];\s*if \(left\.length > 0\) await postBatchIn\(tx, taskId, p, left\.map\(\(f\) => f\.id\)\);/,
+  );
+  // Mark done counts them toward the photos it asks for, only this visit's (the Review card's rule, visitStart), links
+  // only the unposted ones (with its note, chunk 7's setStatus), and names the ones it counted on the move to Review
+  // for "At finish".
+  const done = fn(send, "markDoneIn");
+  assert.match(
+    done,
+    /const posted = photos < required \? await ownPosted\(tx, taskId, p\.contactId, input\.attachmentIds, await visitStartOf\(tx, taskId\)\) : \[\];\s*photos \+= finishPhotoCount\(posted\.map\(\(f\) => f\.kind\)\);/,
+  );
+  assert.match(
+    done,
+    /core\.setStatus\(tx, taskId, "REVIEW", p, \{\s*note: input\.body,\s*attachmentIds: own\.map\(\(f\) => f\.id\),\s*finishIds: posted\.map\(\(f\) => f\.id\),\s*\}\)/,
+  );
+  assert.match(fn(send, "visitStartOf"), /return visitStart\(starts\);/);
+  const media = read("lib", "tasks", "media.ts");
+  assert.match(fn(media, "reviewPhotos"), /const started = visitStart\(events, done \? done\.review\.createdAt\.getTime\(\) : Infinity\);/, "one rule for the visit");
+  assert.match(fn(media, "finishPhotoIds"), /\.finishIds;/);
+  // The service owns the check, with one copy of each rule: the rows by id on the job, a missing one removed.
+  const batch = read("lib", "portal", "job-batch.ts");
+  const all = fn(batch, "allOwnPosted");
+  assert.match(all, /where: \{ id: \{ in: unique \}, taskId \},/);
+  assert.match(all, /return rows\.every\(\(f\) => f\.uploadedByContactId === contactId && f\.eventId !== null && f\.asanaGid === null\);/);
+  assert.doesNotMatch(all, /deletedAt/, "staff Remove deletes the row, and Undo keeps eventId");
 });
 
 test("a batch post is marked as one, and its Undo is core's (fixes 1, 2, 3 and 10)", () => {
   const uploads = read("lib", "portal", "job-uploads.ts");
   assert.match(fn(uploads, "postJobBatch"), /prisma\.\$transaction\(\(tx\) => postBatchIn\(tx, taskId, taskPrincipal\(p\), attachmentIds\)\)/);
-  assert.match(fn(read("lib", "portal", "job-batch.ts"), "postBatchIn"), /core\.addComment\(tx, taskId, \{ body: "", attachmentIds: own, batch: true \}, p\)/);
+  assert.match(fn(read("lib", "portal", "job-batch.ts"), "postActive"), /core\.addComment\(tx, taskId, \{ body: "", attachmentIds: own, batch: true \}, p\)/);
   assert.match(fn(uploads, "undoJobPost"), /core\.takeBackContractorPost\(/);
   for (const word of ["$executeRaw", "$queryRaw", "NotificationOutbox", "notificationOutbox", "taskEvent.", "taskAttachment."]) {
     assert.ok(!uploads.includes(word), `job-uploads.ts names ${word}; task writes go through core`);
@@ -158,25 +240,77 @@ test("the token route says no with a 400 only for a refusal; everything else is 
   assert.doesNotMatch(route, /userMessage/, "a database error's words never reach a contractor");
 });
 
-test("a job that is no longer active still gets its late photos recorded, without a post or an email", () => {
+test("a job that is no longer active still gets its late photos recorded, and HG hears once per batch", () => {
   // The page mounts the queue's record-only target when there is no composer.
   const page = read("app", "(portal)", "p", "jobs", "[id]", "page.tsx");
   assert.match(page, /\{active \? \(\s*<JobActions[\s\S]*?\) : \(\s*(?:\/\/[^\n]*\n\s*)?<LateUploads taskId=\{job\.id\}/);
   const late = read("app", "(portal)", "p", "jobs", "[id]", "_components", "late-uploads.tsx");
   assert.match(late, /key: `portal-task:\$\{taskId\}`/, "the same target key the composer uses, so files waiting for a page find it");
-  assert.match(late, /recordedUploads\.take\(taskId, ids\)/);
+  // Files whose post didn't go through stay kept for the tab, even when the call throws, so the next batch for this
+  // job carries them.
+  assert.match(late, /void postOrKeepBatch\(taskId, tab\.take\(taskId, ids\), toast, owner\);/);
   assert.match(late, /onRecorded: land,[\s\S]*?onAway: land,/);
-  // The server leaves the files as they are on a job that is closed to updates.
+  // And what the tab kept before the job closed (every failure path keeps) posts as this page opens and as it goes,
+  // not only when a new batch lands.
+  assert.match(late, /useEffect\(\(\) => \{\s*void postKept\(taskId, toast, owner\);\s*return \(\) => void postKept\(taskId, toast, owner\);\s*\}, \[taskId, toast, owner\]\);/);
+  // On a job closed to updates the batch step, access checked first, hands the own files to core's late line
+  // (one update, one email line, never a batch Undo takes back) and answers with no id. The behavior by status,
+  // and with an approve landing in between, is job-batch.test.ts.
   const batch = read("lib", "portal", "job-batch.ts");
-  assert.match(fn(batch, "postBatchIn"), /if \(task && !isActiveStatus\(task\.status\)\) return \{ event: null, alreadyPosted: false \};/);
-  assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /eventId: posted\.event\?\.id \?\? null/);
-  // And so does a batch that waited behind Approve and found the job Done under addComment's lock: core refuses
-  // before it writes, the same answer comes back. The message is core.addComment's (core.test.ts pins its words).
-  assert.match(batch, /export const JOB_CLOSED = "This job is closed\.";/);
-  assert.match(fn(batch, "postBatchIn"), /if \(err\.message === JOB_CLOSED\) return \{ event: null, alreadyPosted: false \};/);
-  // And the page says so, with nothing to undo.
+  const step = fn(batch, "postBatchIn");
+  const own = fn(batch, "postOwn");
+  assert.ok(step.indexOf("core.assertContractorAccess(tx, taskId, p.contactId)") < step.indexOf("tx.task.findUnique"), "the access check comes first");
+  // A send whose files are all posted already answers quietly whatever the job's status, so it can't stall the next piece.
+  assert.match(step, /if \(own\.length === 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, attachmentIds\)\)\) return \{ event: null, linked: \[\] \};/);
+  assert.ok(step.indexOf("allOwnPosted(") < step.indexOf("isActiveStatus("), "the quiet answer comes before the status branch");
+  assert.match(step, /return await postOwn\(tx, taskId, p, own, !task \|\| isActiveStatus\(task\.status\)\);/);
+  assert.match(own, /if \(!active\) \{\s*try \{\s*return await postLate\(tx, taskId, p, own\);/);
+  // A job HG reopened while the late line waited for the task row is refused under its lock, and the same files go
+  // the active way (the low on core.ts:1227).
+  assert.match(fn(read("lib", "tasks", "core.ts"), "addLateContractorBatch"), /await assertContractorAccess\(tx, taskId, p\.contactId\);\s*if \(isActiveStatus\(task\.status\)\) throw new TaskRuleError\(JOB_OPEN_AGAIN\);/);
+  assert.match(own, /err instanceof core\.TaskRuleError && err\.message === core\.JOB_OPEN_AGAIN\) return postActive\(tx, taskId, p, own\);/);
+  // A batch that waited behind Approve finds the job Done under addComment's lock: core refuses before it writes, in
+  // access.ts JOB_CLOSED's words (core.test.ts pins them), and the same files take the late way.
+  assert.match(batch, /import \{ JOB_CLOSED \} from "@\/lib\/attachments\/access";/);
+  assert.doesNotMatch(batch, /export const JOB_CLOSED/, "one copy of the words");
+  assert.match(own, /err instanceof core\.TaskRuleError && err\.message === JOB_CLOSED\) return postLate\(/);
+  // `linked` is what the post linked, read back from its event, never the earlier read of what was unposted.
+  assert.match(fn(batch, "postLate"), /const event = await core\.addLateContractorBatch\(tx, taskId, own, p\);\s*return \{ event: null, linked: await linkedTo\(tx, event\.id\) \};/);
+  assert.match(fn(batch, "postActive"), /return \{ event, linked: await linkedTo\(tx, event\.id\) \};/);
+  assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /eventId: posted\.event\?\.id \?\? null, linked: posted\.linked/);
+  // Held photos the composer still had when the job closed go the late way as the page goes.
+  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
+  assert.match(actions, /!res\.ok && res\.error === JOB_CLOSED \? await postJobBatchAction\(taskId, held, queueOwner\.current\)/);
+  // And the page says so, with nothing to undo, in one toast that counts every late piece of the batch; the next
+  // batch gets its own toast, and a quiet answer (nothing new to tell) gets none.
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
-  assert.match(shared, /if \(eventId === null\) \{\s*toast\(\{ message: addedToJobText\(kinds\)[\s\S]*?return true;/);
+  assert.match(shared, /const lateToastFor = \(taskId: string\): LateToast => \(\{ key: `job-added:\$\{taskId\}:\$\{\+\+lateToasts\}`, kinds: \[\] \}\);/);
+  assert.match(fn(shared, "postRecordedBatch"), /const late = lateToastFor\(taskId\);/);
+  assert.match(fn(shared, "postToKeep"), /const late = lateToastFor\(taskId\);/);
+  assert.match(
+    shared,
+    /if \(kinds\.length === 0\) return "posted";\s*if \(eventId === null\) \{\s*late\.kinds\.push\(\.\.\.kinds\);\s*toast\(\{ message: addedToJobText\(late\.kinds\), key: late\.key \}\);\s*return "posted";/,
+  );
+});
+
+test("past the window the record step's closed-job refusal is final, and only that one", () => {
+  const portal = read("app", "(portal)", "p", "jobs", "[id]", "upload-actions.ts");
+  assert.match(fn(portal, "recordJobUploadAction"), /return withFinalRefusal\(res\);/);
+  for (const name of ["postJobBatchAction", "undoJobPostAction"]) assert.doesNotMatch(fn(portal, name), /withFinalRefusal/, name);
+  // The refusal's words are the constants the final check reads, Review's apart from Done's and Canceled's.
+  assert.match(fn(read("lib", "tasks", "attachments.ts"), "contractorUploadRefusal"), /\? null : lateRefusal\(task\.status\);/);
+  // A Retry of a record that committed gets its row back before the job's window is asked (B), so a file whose
+  // answer was lost is never refused, and never sent again as a second copy.
+  const record = fn(read("lib", "tasks", "attachments.ts"), "recordPortalAttachment");
+  const mine = record.indexOf("const mine = await core.findOwnUpload(prisma, taskId, input.pathname, p);");
+  assert.ok(mine >= 0 && mine < record.indexOf("contractorUploadRefusal("), "the own row is looked for before the early refusal");
+  assert.match(record, /if \(mine\) return mine;/);
+  // But never before access (the portal data boundary): a contractor taken off the job gets no row back.
+  const access = record.indexOf("await core.assertContractorAccess(prisma, taskId, portal.contactId);");
+  assert.ok(access >= 0 && access < mine, "access first, then the own row, then the job's window");
+  // The queue's half (A, a final tile forgets its paths) is engine.test.ts: a restored final row sends its bytes again.
+  // The record step hands `final` to the queue as it came.
+  assert.match(read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts"), /const res = await recordJobUploadAction\(taskId, file, owner\);[\s\S]*?return res;/);
 });
 
 test("the day's grace needs the job's last start, asked only of a job in Review that has a queuedAt", () => {
@@ -228,7 +362,7 @@ test("a tab left open under another sign-in can't mint, record, post or undo as 
   assert.match(read("lib", "attachments", "transfer.ts"), /owner: input\.owner/);
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
   assert.match(shared, /recordJobUploadAction\(taskId, file, owner\)/);
-  assert.match(shared, /postJobBatchAction\(taskId, items\.map\(\(i\) => i\.id\), owner\)/);
+  assert.match(shared, /postJobBatchAction\(taskId, piece\.map\(\(i\) => i\.id\), owner\)/);
   assert.match(shared, /undoJobPostAction\(taskId, eventId, owner\)/);
   // No second copy of the record step without the check.
   assert.doesNotMatch(read("app", "(portal)", "p", "jobs", "[id]", "actions.ts"), /recordJobUploadAction/);
@@ -255,9 +389,17 @@ test("a job page holds no more photos than one post takes, and says why past tha
   const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
   // The files out in a post count too: they come back to the tray when it fails, so picks made meanwhile can't pass the cap.
   assert.match(actions, /maxFiles: postRoom\(ready\.length \+ posting\),\s*maxFilesReason: MAX_FILES_REASON,/);
-  const sendUpdate = actions.slice(actions.indexOf("async function sendUpdate"), actions.indexOf("const sendBatch"));
-  const postBatch = actions.slice(actions.indexOf("const postBatch"), actions.indexOf("const record ="));
+  const between = (from: string, to: string) => {
+    const start = actions.indexOf(from);
+    const end = actions.indexOf(to, start);
+    assert.ok(start >= 0 && end > start, `${from} comes before ${to}`);
+    return actions.slice(start, end);
+  };
+  const sendLate = between("const sendLate", "async function sendUpdate");
+  const sendUpdate = between("async function sendUpdate", "const postBatch");
+  const postBatch = between("const postBatch", "const record =");
   for (const [name, body] of [
+    ["sendLate", sendLate],
     ["sendUpdate", sendUpdate],
     ["postBatch", postBatch],
   ]) {
@@ -274,9 +416,13 @@ test("a job page holds no more photos than one post takes, and says why past tha
 
 test("the losing side of a double batch post says nothing, and the record step cuts a long name instead of refusing it", () => {
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
-  assert.match(shared, /if \(res\.data\.alreadyPosted\) return true;/);
-  assert.ok(shared.indexOf("if (res.data.alreadyPosted) return true;") < shared.indexOf("toast({\n    message: postedText(kinds)"), "before any toast");
-  assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /if \(!\(err instanceof BatchAlreadyPosted\)\) throw err;/);
+  // The loser answers with nothing linked (job-uploads.ts), and a piece that linked nothing says nothing.
+  assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /if \(!\(err instanceof BatchAlreadyPosted\)\) throw err;\s*posted = \{ event: null, linked: \[\] \};/);
+  assert.ok(shared.indexOf("if (kinds.length === 0) return true;") < shared.indexOf("toast({\n    message: postedText(kinds)"), "before any toast");
+  // A loser on a closed job (core.addLateContractorBatch links none) is the same quiet answer.
+  const step = fn(read("lib", "portal", "job-batch.ts"), "postBatchIn");
+  assert.match(step, /if \(own\.length > 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, own\)\)\) throw new BatchAlreadyPosted\(\);/);
+  assert.ok(step.indexOf("postOwn(") < step.indexOf("throw new BatchAlreadyPosted()"), "around both ways, active and late");
   assert.match(read("app", "(portal)", "p", "jobs", "[id]", "upload-actions.ts"), /filename: z\.string\(\)\.min\(1\)\.max\(MAX_FILENAME \* 4\),/);
 });
 
@@ -294,4 +440,89 @@ test("the staff record steps cut a long name too, instead of refusing a file who
   // Where the cut happens: the verified name, and the row's column.
   assert.match(read("lib", "attachments", "content-types.ts"), /if \(!canonical\) return \(clean \|\| "file"\)\.slice\(0, MAX_FILENAME\);/);
   assert.match(read("lib", "properties", "documents.ts"), /filename: filenameForType\(input\.filename, contentType\)\.slice\(0, 255\) \|\| "file",/);
+});
+
+test("no post names more files than the actions take, and a kept batch can't stall the ones after it", () => {
+  // One limit, read by the batch action, the written update and Mark done, and by the page that splits and holds.
+  const jobDir = ["app", "(portal)", "p", "jobs", "[id]"] as const;
+  assert.doesNotMatch(read(...jobDir, "upload-actions.ts"), /\.max\(50\)/);
+  assert.doesNotMatch(read(...jobDir, "actions.ts"), /\.max\(50\)/);
+  // Every post of recorded files goes through postInBatches, so a tab that kept 30 and then recorded 25 posts 50 and 5.
+  const shared = read(...jobDir, "_components", "record-and-post.ts");
+  assert.match(fn(shared, "postRecordedBatch"), /return postInBatches\(items, async \(piece\) => \(await postPiece\(taskId, piece, toast, late, owner\)\) === "posted"\);/);
+  // The tray holds what one Send or Mark done takes; files that don't fit, or didn't post, wait in the tab's registry.
+  const actions = read(...jobDir, "_components", "job-actions.tsx");
+  // The files the failed send went with lead the tray; the newest past the cap are the ones kept (backOnTray).
+  assert.match(
+    actions,
+    /const \{ front, kept \} = backOnTray\(items, live\.current\.ready\);\s*tab\.keep\(taskId, kept\);\s*const off = new Set\(kept\.map\(\(k\) => k\.id\)\);\s*setReady\(\(r\) => \[\.\.\.front\.filter\(\(f\) => !r\.some\(\(x\) => x\.id === f\.id\)\), \.\.\.r\.filter\(\(x\) => !off\.has\(x\.id\)\)\]\);/,
+  );
+  assert.match(actions, /if \(left\.length > 0\) putBack\(left\);/);
+  // A file past what the tray holds leaves it for the tab's registry (kept in order), and posts once the Send or Mark done went.
+  assert.match(actions, /tab\.take\(taskId, ids, MAX_FILES_PER_POST - held\.length\)/);
+  // What the tab kept posts as the page opens, once the Send or Mark done went, and as the page goes, so none is left
+  // unposted; one drain at a time for each job, and whatever doesn't post stays kept (recorded-uploads.ts drainKept).
+  assert.match(fn(shared, "postKept"), /return drainKept\(owner, taskId, \(kept\) => postToKeep\(taskId, kept, toast, owner\)\);/);
+  assert.match(actions, /const sendKept = \(\) => postKept\(taskId, toast, owner\);/);
+  assert.match(actions, /if \(res\?\.ok\) startSending\(sendKept\);/, "after a Send went");
+  assert.match(actions, /setSheetState\("sent"\);[\s\S]*?startSending\(sendKept\);/, "after a Mark done went");
+  assert.match(
+    actions,
+    /here\.current = true;\s*void postKept\(taskId, toastLater\.current, queueOwner\.current\);\s*return \(\) => \{\s*here\.current = false;\s*void postKept\(taskId, toastLater\.current, queueOwner\.current\);/,
+    "as the page opens, and as it goes",
+  );
+  // With the page gone, files that didn't post are all kept for the tab, never put into a tray that's gone.
+  assert.match(actions, /if \(!mounted\.current\) \{\s*tab\.keep\(taskId, items\);\s*return;\s*\}/);
+  assert.match(actions, /const registry = recordedUploadsOf\(queueOwner\.current\);/);
+  assert.match(actions, /postJobUpdateAction\(taskId, \{ body: "", attachmentIds: held \}, queueOwner\.current\)/, "as the queue's owner");
+  assert.match(actions, /if \(!posted\.ok\) registry\.keep\(taskId, heldItems\);/);
+  // A Mark done that fails after the page went keeps its files too (the unmount left them out of its own post).
+  assert.match(actions, /toast\(\{ message: res\.error \}\);\s*\/\/[^\n]*\n\s*if \(!mounted\.current\) tab\.keep\(taskId, items\);\s*return;/);
+});
+
+test("a Send refused because HG closed the job posts the held photos the late way and refreshes the page", () => {
+  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
+  const send = fn(actions, "sendUpdate");
+  // Posted: the kept files go. Closed: the held photos go the late way. Anything else: they go back on the tray.
+  assert.match(send, /if \(res\?\.ok\) startSending\(sendKept\);\s*else if \(res && res\.error === JOB_CLOSED\) sendLate\(items\);\s*else putBack\(items\);/);
+  // Files that don't post go back on the tray even when the call throws (a redirect), as drainKept keeps its own.
+  assert.match(
+    actions,
+    /const sendLate = \(items: Recorded\[\]\) => \{\s*setPosting\(\(n\) => n \+ items\.length\);\s*startSending\(async \(\) => \{\s*let left = items;\s*try \{\s*left = items\.length > 0 \? await sendBatch\(items\) : \[\];\s*\} finally \{\s*setPosting\(\(n\) => n - items\.length\);\s*if \(left\.length > 0\) putBack\(left\);\s*\}\s*router\.refresh\(\);\s*\}\);\s*\};/,
+  );
+  assert.match(
+    actions,
+    /const postBatch = \(items: Recorded\[\]\) => \{\s*\/\/[^\n]*\n\s*setPosting\(\(n\) => n \+ items\.length\);\s*startSending\(async \(\) => \{\s*let left = items;\s*try \{\s*left = await sendBatch\(items\);\s*\} finally \{\s*setPosting\(\(n\) => n - items\.length\);\s*if \(left\.length > 0\) putBack\(left\);\s*\}\s*\}\);\s*\};/,
+  );
+});
+
+test("the Mark done sheet shows, counts and sends the tray less what a written update whose answer was lost may have posted", () => {
+  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
+  const send = fn(actions, "sendUpdate");
+  // Whether the browser had a connection is read before the call: a Send made without one never left the phone, so
+  // its photos aren't held back (a send made with a signal that failed is).
+  assert.match(send, /const offlineAtStart = navigator\.onLine === false;\s*let res: ActionResult \| null = null;/);
+  assert.ok(send.indexOf("navigator.onLine") < send.indexOf("postJobUpdateAction("), "read before the call, not after it failed");
+  assert.match(send, /const outcome = sendOutcome\(res, offlineAtStart\);\s*setLost\(\(l\) => lostAfter\(l, \{ clientId, ids: attachmentIds \}, outcome\)\);/);
+  assert.doesNotMatch(send, /res\?\.ok \? "posted" : res \? "refused" : "lost"/, "the old outcome counted an offline send as lost");
+  // With a send whose answer was lost, the page learns what happened once the browser says the signal is back: one
+  // refresh, then the page's own updates settle it. Never a refresh without the browser's word that it is back.
+  assert.match(actions, /const unconfirmed = unconfirmedIds\(lost\);/);
+  assert.match(actions, /const back = \(\) => \{\s*if \(navigator\.onLine === false\) return;\s*learning\.current = true;\s*router\.refresh\(\);\s*\};\s*window\.addEventListener\("online", back\);/);
+  assert.match(actions, /if \(!learning\.current\) return;\s*learning\.current = false;\s*setLost\(\(l\) => settleLost\(l, sentClientIds \?\? \[\]\)\);\s*\}, \[sentClientIds\]\);/);
+  assert.match(actions, /const sheetReady = finishable\(ready, unconfirmed\);/);
+  assert.match(actions, /const items = sheetReady;/);
+  assert.match(actions, /uploaded: sheetReady\.length, required/);
+  assert.match(actions, /finishCountLabel\(required, sheetReady\.length\)/);
+  assert.match(actions, /filled=\{sheetReady\.length\}/);
+  assert.match(actions, /leading=\{sheetReady\.map\(/);
+});
+
+test("a job page that stays open mounts its upload target again when the job's status changes", () => {
+  // A tile the job refused for good gets its one more go when HG moves the job back, not only when the page opens.
+  assert.match(read("components", "media-uploader.tsx"), /useEffect\(\(\) => engine\.mount\(target\.key\), \[engine, target\.key, reopenOn\]\);/);
+  const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
+  assert.match(actions, /useMediaUploader\(\{ target, reopenOn: status \}\)/);
+  // The page learns of that change with one refresh when a tile is first refused for good.
+  assert.match(actions, /if \(finals > 0 && !hadFinal\.current\) router\.refresh\(\);\s*hadFinal\.current = finals > 0;/);
 });

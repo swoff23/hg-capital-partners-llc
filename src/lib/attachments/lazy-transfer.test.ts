@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { lazyTransfer } from "./lazy-transfer";
-import { ServerBusyError, UploadCodeMissingError, classifyFailure } from "./outbox";
+import { FinalRefusalError, ServerBusyError, UploadCodeMissingError, classifyFailure } from "./outbox";
 import type { SendInput, Transfer } from "./transfer";
 
 const input = { name: "a.jpg" } as unknown as SendInput;
@@ -93,7 +93,7 @@ test("lazyTransfer: what the transfer itself throws comes out as it is, so its o
   // BOTH-L2: a refusal (late-photos' FinalRefusalError, a token route's no) or a busy server must not be dressed up as
   // a missing chunk or a dropped connection; only the client's load is.
   class Refused extends Error {}
-  for (const thrown of [new ServerBusyError(), new Refused("This job is closed."), new TypeError("Failed to fetch")]) {
+  for (const thrown of [new ServerBusyError(), new FinalRefusalError("This job is closed."), new Refused("Failed to retrieve the client token"), new TypeError("Failed to fetch")]) {
     const t = lazyTransfer(async () => async () => {
       throw thrown;
     }, online);

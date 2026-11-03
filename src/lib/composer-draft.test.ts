@@ -85,17 +85,33 @@ test("a message held in the field (no timeline) keeps its id across a reload, an
   assert.deepEqual(resolvePending({ ...d, text: "Different now" }, ["c1"]), { action: "restore", draft: { text: "Different now", visibility: "INTERNAL", pending: null } });
 });
 
-test("failed, then Send again: the same message reuses its clientId; any change is a new send", () => {
+test("failed, then Send again: the same message reuses its clientId; changed words or a file left out is a new send", () => {
   const d: Draft = { text: "On my way", visibility: "INTERNAL", pending: held };
   const same = { body: "On my way", visibility: "INTERNAL" as const, attachmentIds: ["a1"] };
   assert.equal(clientIdToReuse(d, same), "c1");
   assert.equal(clientIdToReuse(d, { ...same, body: "On my way!" }), null, "edited words");
   assert.equal(clientIdToReuse(d, { ...same, visibility: "SHARED" }), null, "the other side of the switch");
-  assert.equal(clientIdToReuse(d, { ...same, attachmentIds: [] }), null, "a file taken off");
-  assert.equal(clientIdToReuse(d, { ...same, attachmentIds: ["a1", "a2"] }), null, "a file added");
+  assert.equal(clientIdToReuse(d, { ...same, attachmentIds: [] }), null, "a file it went with taken off");
   assert.equal(clientIdToReuse(EMPTY_DRAFT, same), null, "nothing held");
   // A timeline send waiting on its answer is not a held one: Retry has its own record of the message.
   assert.equal(clientIdToReuse({ ...d, pending }, same), null);
+});
+
+test("a photo that lands while a written update's answer is lost goes with the same send, so the words post once", () => {
+  // Zack sent "Tiles set" with photos A and B; it posted, the answer was lost, and A and B came back on the tray.
+  // Photo C landed while the words were still in the box, so the next Send names A, B and C.
+  const lost: Draft = {
+    text: "Tiles set",
+    visibility: "SHARED",
+    pending: { clientId: "c-tiles", text: "Tiles set", visibility: "SHARED", files: [{ id: "A", filename: "" }, { id: "B", filename: "" }], at: "", held: true },
+  };
+  const next = { body: "Tiles set", visibility: "SHARED" as const, attachmentIds: ["A", "B", "C"] };
+  assert.equal(clientIdToReuse(lost, next), "c-tiles", "the server finds the first send and posts C on its own");
+  assert.equal(clientIdToReuse(lost, { ...next, attachmentIds: ["C", "B", "A"] }), "c-tiles", "in any order");
+  assert.equal(clientIdToReuse(lost, { ...next, attachmentIds: ["A", "C"] }), null, "B left out: a different message");
+  // A held send of words alone takes photos added since too.
+  const words: Draft = { ...lost, pending: { ...lost.pending!, files: [] } };
+  assert.equal(clientIdToReuse(words, { ...next, attachmentIds: ["C"] }), "c-tiles");
 });
 
 test("the portal's job composer and the deal note box keep one draft per person, so a second sign-in on the device starts empty", () => {

@@ -350,6 +350,75 @@ export function markDoneButton(s: {
   return { label, enabled: true, busy: false, reason: null, line: null };
 }
 
+/**
+ * How a written update's Send ended, for the files it went with: `posted` (it answered that it went), `refused` (it
+ * wrote nothing: it answered that it didn't, or it was sent with no connection and never left the phone) or `lost`
+ * (a send that may have reached the server got no answer, so it may have posted).
+ */
+export type SendOutcome = "posted" | "refused" | "lost";
+
+/**
+ * How a Send ended, from what the page saw: the server's answer when there was one; with none, a call made while the
+ * browser knew it had no connection (`offlineAtStart`) never left the phone, so nothing was written, and one made
+ * with a signal that then failed may have reached the server and lost its answer.
+ */
+export function sendOutcome(answer: { ok: boolean } | null, offlineAtStart: boolean): SendOutcome {
+  if (answer) return answer.ok ? "posted" : "refused";
+  return offlineAtStart ? "refused" : "lost";
+}
+
+/** A written update whose answer was lost: the id it was sent with and the tray's files it went with. */
+export type LostSend = { clientId: string; ids: string[] };
+
+/**
+ * The written updates that may have posted, after a Send. Their files come back on the tray for that update's Send
+ * again, and Mark done never counts a written update's photos (the server counts unposted ones and a batch post's,
+ * portal/job-batch.ts ownPosted), so the sheet leaves them out (finishable) until a Send of theirs answers that it
+ * went, or the page learns the send never did (settleLost). A refusal changes nothing: it wrote nothing, but an
+ * earlier send of the same files whose answer was lost may still have posted them.
+ */
+export function lostAfter(prev: readonly LostSend[], sent: LostSend, outcome: SendOutcome): LostSend[] {
+  if (outcome === "posted") {
+    return prev.map((l) => ({ ...l, ids: l.ids.filter((id) => !sent.ids.includes(id)) })).filter((l) => l.ids.length > 0);
+  }
+  if (outcome === "refused") return [...prev];
+  const same = prev.find((l) => l.clientId === sent.clientId);
+  if (!same) return [...prev, { clientId: sent.clientId, ids: [...new Set(sent.ids)] }];
+  return prev.map((l) => (l === same ? { clientId: l.clientId, ids: [...new Set([...l.ids, ...sent.ids])] } : l));
+}
+
+/** The tray's files a written update may have posted (lostAfter): the ones the Mark done sheet leaves out. */
+export function unconfirmedIds(lost: readonly LostSend[]): string[] {
+  return [...new Set(lost.flatMap((l) => l.ids))];
+}
+
+/**
+ * What the page's own updates (`sentClientIds`, read after the signal came back) say of the sends whose answers were
+ * lost, the rule a reload applies to a pending message (composer-draft.ts resolvePending): one the page holds did
+ * post, so its files stay out of Mark done until a Send of them answers; one it doesn't hold never committed, so its
+ * files are unposted and count again.
+ */
+export function settleLost(lost: readonly LostSend[], sentClientIds: readonly string[]): LostSend[] {
+  return lost.filter((l) => sentClientIds.includes(l.clientId));
+}
+
+/** The tray's files the Mark done sheet shows, counts and sends: all but the ones a written update may have posted (unconfirmedIds). */
+export function finishable<T extends { id: string }>(ready: readonly T[], unconfirmed: readonly string[]): T[] {
+  return ready.filter((r) => !unconfirmed.includes(r.id));
+}
+
+/**
+ * Where a failed send's files go back: the front of the tray, ahead of the files that landed on it while the send was
+ * away, so a Send again still has every file the first one went with and keeps its `clientId`
+ * (composer-draft.ts clientIdToReuse; a missing one makes a new id, and a send that did post would post its words
+ * twice). The tray holds `max` (one post's worth): the newest files past it are `kept`, for the tab to post as their
+ * own batch. `front` are the sent files that fit and aren't on the tray already.
+ */
+export function backOnTray<T extends { id: string }>(sent: readonly T[], tray: readonly T[], max = MAX_FILES_PER_POST): { front: T[]; kept: T[] } {
+  const back = sent.filter((s) => !tray.some((t) => t.id === s.id));
+  return { front: back.slice(0, max), kept: [...back, ...tray].slice(max) };
+}
+
 // ---------------------------------------------------------------------------
 // Batch posts and Undo (uploads 2.7, question 5)
 // ---------------------------------------------------------------------------
@@ -358,7 +427,8 @@ export function markDoneButton(s: {
  * The most files one post takes: a batch post, a written update and Mark done each refuse more (their actions'
  * schemas read this). The job page's queue target holds no more than this unposted at once (maxFiles), so a pick of
  * 55 sends 50 and the other 5 get a refused tile with MAX_FILES_REASON instead of a post that fails; once those 50
- * post, more can go.
+ * post, more can go. Files a tab kept for the job (recorded-uploads.ts) can come to more, so every post of recorded
+ * files goes in pieces of this many (postInBatches), and a Send or Mark done never holds more.
  */
 export const MAX_FILES_PER_POST = 50;
 
@@ -405,9 +475,10 @@ export function postedText(kinds: readonly (FileKind | null)[]): string {
 }
 
 /**
- * What the toast says when files land on a job that has been approved since:
- * "3 photos added to the job". They are on the job, in its photos, but there
- * is no update to post them as, so there is no Undo and nobody is emailed.
+ * What the toast says when files land on a job that has been approved or
+ * canceled since: "3 photos added to the job". They are on the job, in its
+ * photos, and HG is told once (core.addLateContractorBatch), but the job
+ * takes no batch post, so there is no Undo.
  */
 export function addedToJobText(kinds: readonly (FileKind | null)[]): string {
   const n = kinds.length;
