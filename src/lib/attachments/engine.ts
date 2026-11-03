@@ -84,6 +84,8 @@ type Job = {
   retryTimer: unknown;
   stallTimer: unknown;
   stalled: boolean;
+  /** The away toast has said this file failed (OutboxEntry.noticed), so a page load that puts it back and fails it again stays quiet. */
+  noticed: boolean;
   /** The write of this file to the outbox that is under way (or done), so nothing is prepared or sent before it. */
   writing: Promise<void> | null;
   /** Bytes, for the tile and the row. */
@@ -422,6 +424,7 @@ export class UploadEngine {
         retryTimer: null,
         stallTimer: null,
         stalled: false,
+        noticed: false,
         writing: null,
         size: file.size,
         lease: null,
@@ -717,10 +720,14 @@ export class UploadEngine {
     }
     if (next.phase === "failed") {
       this.patch(job, { status: "failed", error: reason });
-      void this.save(job);
       // One the outbox put back (an earlier visit's, a closed tab's) too: the toast names where it was going, so it
-      // never reads as the open page's upload, and nobody waits on a file they don't know failed.
-      if (this.isAway(job.key)) this.noticeFailure(job);
+      // never reads as the open page's upload, and nobody waits on a file they don't know failed. Once: its row
+      // remembers, so a file the server keeps refusing, put back by every page load, doesn't toast on each of them.
+      // A Retry says so again (retry()).
+      const tell = this.isAway(job.key) && !job.noticed;
+      if (tell) job.noticed = true;
+      void this.save(job);
+      if (tell) this.noticeFailure(job);
       this.settle(job.batchId, job.key);
       return;
     }
@@ -835,6 +842,8 @@ export class UploadEngine {
     }
     job.tries = 0;
     job.waits = 0;
+    // A fresh try: if it fails again once its page is left, that is news again.
+    job.noticed = false;
     this.requeue(job);
     void this.prepareNext();
     this.pump();
@@ -887,6 +896,7 @@ export class UploadEngine {
       multipart: job.multipart,
       tries: job.tries,
       waits: job.waits,
+      noticed: job.noticed,
       savedAt: this.deps.now().getTime(),
     };
   }
@@ -999,6 +1009,7 @@ export class UploadEngine {
         retryTimer: null,
         stallTimer: null,
         stalled: false,
+        noticed: e.noticed === true,
         writing: null,
         size: e.blob.size,
         lease,

@@ -4,7 +4,7 @@ import type { UploadTarget } from "@/components/upload-queue";
 import { GENERIC_ERROR } from "@/lib/action-result";
 import { UploadEngine, capReason, failedAwayText, type EngineDeps, type EngineNotice } from "./engine";
 import { EMPTY_UPLOAD } from "./limits";
-import { MAX_ONLINE_TRIES, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
+import { MAX_ONLINE_TRIES, OUTBOX_MAX_AGE_MS, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
 import { NOT_A_VIDEO, PrepareError, UNREADABLE_PHOTO } from "./prepare";
 import { WRONG_SIGN_IN } from "./queue-owner";
 import type { SendInput } from "./transfer";
@@ -19,8 +19,8 @@ import type { SendInput } from "./transfer";
 
 type Step = "ok" | Error;
 
-function setup(opts: { outbox?: OutboxStore | null; script?: Step[]; online?: boolean; scope?: string; claim?: EngineDeps["claim"] } = {}) {
-  let clock = Date.UTC(2026, 9, 25, 18, 14, 30);
+function setup(opts: { outbox?: OutboxStore | null; script?: Step[]; online?: boolean; scope?: string; claim?: EngineDeps["claim"]; clock?: number } = {}) {
+  let clock = opts.clock ?? Date.UTC(2026, 9, 25, 18, 14, 30);
   let nextTimer = 1;
   const timers = new Map<number, { due: number; fn: () => void }>();
   const sent: SendInput[] = [];
@@ -1137,6 +1137,46 @@ test("a file an earlier visit left in the outbox that fails says so, naming wher
   await home.flush();
   assert.equal(home.notices.length, 2);
   assert.equal(home.notices[1].key, home.notices[0].key);
+});
+
+test("a file the server refuses for good, put back by every reload, toasts once and not on every page load", async () => {
+  const outbox = memoryOutbox();
+  const DAY = 24 * 60 * 60 * 1000;
+  const start = Date.UTC(2026, 9, 25, 18, 14, 30);
+  const key = "portal-task:j1";
+  const job = () => target({ key, uploadKind: "portal-task-upload", parentId: "j1", allowed: ["image"], whenAway: "post" });
+  // Picked with no signal, then the tab closed.
+  const first = setup({ outbox, scope: "portal", online: false, clock: start, script: [new TypeError("Failed to fetch")] });
+  first.engine.add(job(), [file("kitchen.jpg")]);
+  await first.flush();
+  first.engine.dispose();
+
+  // Each later page load puts it back and the token route refuses it again (the job was taken off this contractor).
+  const toasts: number[] = [];
+  for (let visit = 1; visit <= 4; visit++) {
+    const load = setup({ outbox, scope: "portal", clock: start + visit * 3 * DAY, script: [new Error("This job is closed.")] });
+    await load.engine.restore();
+    await load.flush();
+    assert.equal(load.engine.uploadsFor(key)[0]?.status, "failed", `visit ${visit}: its red tile is still there to Remove`);
+    toasts.push(load.notices.length);
+    if (visit === 1) {
+      assert.equal(load.notices[0].message, "1 photo didn't upload to 56 Tamarack St");
+      assert.equal(load.notices[0].action?.label, "Retry");
+    }
+    const [row] = await outbox.all();
+    assert.ok(Date.UTC(2026, 9, 25) + visit * 3 * DAY - row.savedAt < OUTBOX_MAX_AGE_MS, "the row is still the outbox's to keep");
+    load.engine.dispose();
+  }
+  assert.deepEqual(toasts, [1, 0, 0, 0], "told on the first load, not on every one after it");
+
+  // Its Retry from a page that opens later is a fresh try, so a refusal then says so again.
+  const again = setup({ outbox, scope: "portal", clock: start + 15 * DAY, script: [new Error("This job is closed."), new Error("This job is closed.")] });
+  await again.engine.restore();
+  await again.flush();
+  assert.equal(again.notices.length, 0);
+  again.engine.retry(again.engine.uploadsFor(key)[0].key);
+  await again.flush();
+  assert.equal(again.notices.length, 1, "a Retry that is refused again says so");
 });
 
 test("a cap counts files recorded in a batch that hasn't reached the page yet", async () => {

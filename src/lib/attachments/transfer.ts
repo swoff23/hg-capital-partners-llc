@@ -148,8 +148,11 @@ type Fallback = ReturnType<typeof streamFallback>;
 export const BLIND_BYTES_PER_SEC = 16 * 1024;
 
 /**
- * The most requests that share that line at once: the queue sends three files (engine.ts CONCURRENCY), one of them
- * maybe in parts, three at a time (PART_CONCURRENCY), so two whole files and three parts.
+ * The most requests that share that line at once on the usual path: the queue sends three files (engine.ts
+ * CONCURRENCY), one of them maybe in parts, three at a time (PART_CONCURRENCY), so two whole files and three parts.
+ * The exception is a big file whose multipart start was refused: sendWhole then hands it to put(), which sends up to
+ * six parts at once itself (@vercel/blob maxConcurrentUploads in a browser). With no streamed body as well, a line
+ * this slow can still cut that file off. Both have to happen together, so the budget isn't raised for it.
  */
 export const BLIND_SHARED_BY = 2 + PART_CONCURRENCY;
 
