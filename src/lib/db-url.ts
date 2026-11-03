@@ -103,24 +103,59 @@ export function runtimePoolConfig(env: DbEnv): {
   };
 }
 
+/** Which way a URL reaches the database: Supabase's transaction pooler, its session pooler, or straight to a server. */
+export type DbVia = "transaction pooler" | "session pooler" | "direct";
+
 /**
  * How this deployment reaches the database, for /api/health's detail: the
- * driver, whether it goes through the transaction pooler, and the pool size.
- * Read from the same settings src/lib/db.ts builds its client from.
+ * driver, the route (dbViaOf), and the pool size. Read from the same settings
+ * src/lib/db.ts builds its client from.
  */
 export function dbConnectionSummary(env: DbEnv): {
   dbDriver: "node-postgres" | "none";
-  dbVia: "transaction pooler" | "direct" | null;
+  dbVia: DbVia | null;
   dbPool: number | null;
 } {
   const pool = runtimePoolConfig(env);
   if (!pool) return { dbDriver: "none", dbVia: null, dbPool: null };
-  return { dbDriver: "node-postgres", dbVia: isTxPooler(pool.connectionString) ? "transaction pooler" : "direct", dbPool: pool.max };
+  return { dbDriver: "node-postgres", dbVia: dbViaOf(pool.connectionString), dbPool: pool.max };
+}
+
+export function dbViaOf(url: string): DbVia {
+  if (isTxPooler(url)) return "transaction pooler";
+  return isSessionPooler(url) ? "session pooler" : "direct";
 }
 
 /** Supabase's transaction pooler: the pooler host on port 6543. */
 export function isTxPooler(url: string): boolean {
   return /pooler\.supabase\.com:6543\//.test(url);
+}
+
+/** Supabase's session pooler: the pooler host on port 5432, which DATABASE_URL names. */
+export function isSessionPooler(url: string): boolean {
+  return /pooler\.supabase\.com:5432\//.test(url);
+}
+
+/**
+ * The error a Production deployment logs when its runtime URL isn't the
+ * transaction pooler, or null when it is (or the deployment isn't Production,
+ * or has no URL). Without POSTGRES_PRISMA_URL, chosenUrl falls back to
+ * DATABASE_URL, the session pooler, where every warm instance's pool of
+ * POOL_MAX holds server connections of its own against a limit of 15: the
+ * shape of the Oct 27 outage. The fallback keeps the site answering, so it
+ * stays, and src/lib/db-client.ts logs this once per instance so the Logs tab
+ * says so before the pooler fills up. The URL itself is never in it.
+ */
+export function productionPoolerWarning(env: DbEnv): { message: string; dbVia: DbVia; dbPool: number } | null {
+  if (env.VERCEL_ENV !== "production") return null;
+  const url = runtimeDatabaseUrl(env);
+  if (!url || isTxPooler(url)) return null;
+  const dbVia = dbViaOf(url);
+  const route = dbVia === "session pooler" ? "the session pooler" : "a direct connection";
+  const message = env.POSTGRES_PRISMA_URL
+    ? `POSTGRES_PRISMA_URL isn't the transaction pooler, so production reads through ${route}`
+    : `POSTGRES_PRISMA_URL is missing, so production reads DATABASE_URL through ${route}`;
+  return { message, dbVia, dbPool: POOL_MAX };
 }
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
@@ -136,10 +171,17 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
  * `prefer` fell back to plain text there, and forcing TLS on a unix socket or
  * a LAN server without it (a Docker or home-lab Postgres) only refused the
  * connection.
+ *
+ * An explicit `sslmode=prefer` on such a host means what none does, as it did
+ * to the engine, so it becomes `disable`. node-postgres has no fallback of its
+ * own: every other sslmode starts TLS and gives up when the server has none
+ * ("The server does not support SSL connections"). On a public host `prefer`
+ * keeps TLS (encrypted, certificate not checked), as before.
  */
 function withSsl(url: string): string {
   if (hasParam(url, "uselibpqcompat")) return url;
   const mode = paramValue(url, "sslmode");
+  if (mode === "prefer" && isPrivateHost(url)) return withParam(url, "sslmode", "disable");
   if (mode) return mode === "disable" ? url : withParam(url, "uselibpqcompat", "true");
   if (isPrivateHost(url)) return url;
   return withParam(withParam(url, "sslmode", "require"), "uselibpqcompat", "true");
