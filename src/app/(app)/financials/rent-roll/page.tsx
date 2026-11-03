@@ -31,7 +31,7 @@ const pinned =
  * one month at a time under a stepper.
  */
 export default async function RentRollPage({ searchParams }: PageProps<"/financials/rent-roll">) {
-  await requireUser(); // here as well as in the layout, which doesn't gate every render
+  await requireUser(); // the page checks; the layout doesn't
   const sp = await searchParams;
   // ?basis= is a one-off override; without it the basis chosen in Settings applies
   const roll = await getRentRoll(basisFromParam(sp.basis));

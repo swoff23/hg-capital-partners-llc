@@ -96,3 +96,18 @@ export function parseFacet(raw: string | null | undefined): string[] {
   }
   return [...seen];
 }
+
+/**
+ * The number on a filter bar's Filters button: the facets the query sets (a
+ * multi facet with a pick, a toggle that's on) and a sort of its own. The
+ * live bar and its loading screen's frame both read it, so the frame shows
+ * the number the bar lands with.
+ */
+export function setFilterCount(
+  query: { get(name: string): string | null },
+  facets: readonly { kind: "multi" | "toggle"; param: string }[],
+  sort?: { param: string; default: string },
+): number {
+  const set = facets.filter((f) => (f.kind === "multi" ? parseFacet(query.get(f.param)).length > 0 : query.get(f.param) === "1")).length;
+  return set + (sort && (query.get(sort.param) ?? sort.default) !== sort.default ? 1 : 0);
+}

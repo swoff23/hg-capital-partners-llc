@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { DueDatePicker } from "@/components/due-date-picker";
+import { LinkPending } from "@/components/link-pending";
+import { pendingRowFill } from "@/components/ui";
 import { StatusBadge, StatusMark } from "@/components/status-badge";
 import { isActiveStatus } from "@/lib/task-scope";
 import { assigneeName, isContractorJob, isOverdue, isTargetLate, targetField, targetOf, type ListTask } from "@/lib/tasks/list";
@@ -171,12 +173,13 @@ export function TaskRow({
       <Link
         href={unread ? `/tasks/${task.id}#new` : `/tasks/${task.id}`}
         title={waitingOn ? `Waiting on ${waitingOn}` : undefined}
-        className="absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1"
+        className={cn("absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1", pendingRowFill)}
       >
         <span className="sr-only">
           {task.title}
           {unread && ", new updates"}
         </span>
+        <LinkPending />
       </Link>
 
       {unread && (

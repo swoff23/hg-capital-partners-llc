@@ -3,11 +3,12 @@ import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ScopeButton } from "@/components/filter-bar";
-import { Badge, LinkButton, PageHeader, Table, Td, Th, EmptyState, chromeIconClass, textLinkClass } from "@/components/ui";
+import { Badge, LinkButton, PageHeader, Table, Td, Th, EmptyState, chromeIconClass, pendingRowFill, textLinkClass } from "@/components/ui";
+import { LinkPending } from "@/components/link-pending";
 import { cleanTrades, docOnFile, telHref } from "@/lib/contacts";
 import { cn } from "@/lib/utils";
-import { ContactLink } from "./contact-link";
-import { ContractorFilters } from "./filters";
+import { ContactLink } from "../contact-link";
+import { ContractorFilters } from "../filters";
 import {
   contractorsWhere,
   emptyContractors,
@@ -16,7 +17,7 @@ import {
   matchesTrades,
   parseContractorFilters,
   tradeOptions,
-} from "./query";
+} from "../query";
 
 /** An empty cell: the lone dash glyph in --fg-3 (docs/brand-guidelines.md, section 3). */
 const EMPTY = <span className="text-fg-3">—</span>;
@@ -114,10 +115,11 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                 return (
                   // The whole row opens the contractor, as TaskRow does: one link
                   // covers the row, and the phone and document links sit above it.
-                  <tr key={c.id} className="relative transition-colors hover:bg-fill-1">
+                  <tr key={c.id} className={cn("relative transition-colors hover:bg-fill-1", pendingRowFill)}>
                     <Td className="pl-0 max-sm:w-full max-sm:max-w-0">
                       <Link href={`/contractors/${c.id}`} className="absolute inset-0 -outline-offset-2">
                         <span className="sr-only">{c.fullName}</span>
+                        <LinkPending />
                       </Link>
                       {/* From sm the name keeps its longest word and the badges drop under it when the
                           column is narrow (a tablet), so a badge never sits on the name. */}

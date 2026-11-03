@@ -8,12 +8,12 @@ import { LinkButton, PageHeader, Table, Th, EmptyState, chromeIconClass } from "
 import { DEAL_FIELD_LABEL, DEAL_STATUSES } from "@/lib/config";
 import { todayYmdEastern } from "@/lib/dates";
 import { parseNoteAuthor } from "@/lib/deals/note-author";
-import { DealFilters } from "./filters";
-import { DealListRow } from "./deal-row";
-import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
-import { COLUMN_DROP } from "./columns";
-import { DEFAULT_DEAL_SORT, easternDay, noteDay } from "./format";
-import { dealSearchWhere, dealsWhere, emptyDeals, isFiltered, parseDealFilters, viewCounts } from "./query";
+import { DealFilters } from "../filters";
+import { DealListRow } from "../deal-row";
+import { ColumnWidthsProvider, Cols, ResizeHandle } from "../column-widths";
+import { COLUMN_DROP } from "../columns";
+import { DEFAULT_DEAL_SORT, easternDay, noteDay } from "../format";
+import { dealSearchWhere, dealsWhere, emptyDeals, isFiltered, parseDealFilters, viewCounts } from "../query";
 
 const CAP = 300;
 

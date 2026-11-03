@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { DealStageMark } from "@/components/deal-stage";
 import { FilterBar, FilterResults, FilterScope, ResultLine, type FilterFacet } from "@/components/filter-bar";
 import { dealStageLabel } from "@/lib/config";
@@ -81,5 +82,27 @@ export function DealFilters({ data, children }: { data: DealFilterData; children
         {children}
       </FilterResults>
     </FilterScope>
+  );
+}
+
+/** The bar as the loading screen draws it (deals/(list)/loading.tsx): the view from the URL, its Stage chip by name, inert, no counts. */
+export function DealFiltersPlaceholder() {
+  const params = useSearchParams();
+  const view = DEAL_VIEWS.find((v) => v.key === params.get("status"))?.key ?? DEFAULT_DEAL_VIEW;
+  return (
+    <FilterBar
+      placeholder
+      search={{ placeholder: "Search deals" }}
+      views={{
+        param: "status",
+        label: "Deal view",
+        default: DEFAULT_DEAL_VIEW,
+        options: DEAL_VIEWS.map((v) => ({ key: v.key, label: v.label })),
+        menu: { sheetTitle: "Show" },
+      }}
+      facets={hasStageChip(view) ? [{ kind: "multi", param: "statuses", label: "Stage" }] : []}
+      sort={{ param: "sort", default: DEFAULT_DEAL_SORT }}
+      wide="60rem"
+    />
   );
 }

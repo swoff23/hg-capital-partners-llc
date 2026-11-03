@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ScopeButton } from "@/components/filter-bar";
 import { SortHeader } from "@/components/sort-header";
-import { EmptyState, LinkButton, PageHeader, RowCell, Table, Td, Th } from "@/components/ui";
+import { EmptyState, LinkButton, PageHeader, RowCell, Table, Td, Th, pendingRowFill } from "@/components/ui";
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { shortAddress } from "@/lib/normalize";
@@ -12,9 +12,9 @@ import { parseBuildingCapex, parseUnits, propertyUnitCount } from "@/lib/propert
 import { getCapexRules } from "@/lib/capex-rules";
 import { cn, toMoneyNumber } from "@/lib/utils";
 import { isSold } from "@/lib/properties/figures";
-import { PortfolioCapexForecastCard } from "../portfolio-capex";
-import { PortfolioStrip } from "./portfolio-strip";
-import { PropertyFilters } from "./filters";
+import { PortfolioCapexForecastCard } from "../../portfolio-capex";
+import { PortfolioStrip } from "../portfolio-strip";
+import { PropertyFilters } from "../filters";
 import {
   DEFAULT_PROPERTY_SORT,
   filterByStatus,
@@ -22,8 +22,8 @@ import {
   parsePropertyFilters,
   sortProperties,
   statusOptions,
-} from "./list";
-import { PropertyStatus } from "./property-status";
+} from "../list";
+import { PropertyStatus } from "../property-status";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -170,7 +170,7 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                   {rows.map((r) => {
                     const href = `/properties/${r.id}`;
                     return (
-                      <tr key={r.id} className="transition-colors duration-fast hover:bg-fill-1">
+                      <tr key={r.id} className={cn("transition-colors duration-fast hover:bg-fill-1", pendingRowFill)}>
                         {/* The address column takes the room the others leave, so a long address truncates instead of widening the table. */}
                         <RowCell href={href} first cell="w-full max-w-0" className="pl-0">
                           {/* Decorative inside the link, which the address already names. */}

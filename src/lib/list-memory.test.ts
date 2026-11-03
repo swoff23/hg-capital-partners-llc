@@ -11,6 +11,7 @@ import {
   parseFacet,
   plainListHrefs,
   readListHrefs,
+  setFilterCount,
 } from "./list-memory";
 
 /** A cookie jar the way Next hands one to the layout: values already decoded. */
@@ -91,4 +92,23 @@ test("facets: a joined param survives a trip through the URL", () => {
   params.set("owner", joinFacet(["n:Smith, Bob", "u:x"]));
   const back = new URLSearchParams(params.toString());
   assert.deepEqual(parseFacet(back.get("owner")), ["n:Smith, Bob", "u:x"]);
+});
+
+test("setFilterCount: picked facets, toggles that are on and a sort of its own, as the Filters button counts them", () => {
+  const facets = [
+    { kind: "multi", param: "owner" },
+    { kind: "multi", param: "property" },
+    { kind: "toggle", param: "repeats" },
+  ] as const;
+  const sort = { param: "sort", default: "due" };
+  const count = (query: string) => setFilterCount(new URLSearchParams(query), facets, sort);
+  assert.equal(count(""), 0);
+  assert.equal(count("status=done&q=roof"), 0, "views and the search aren't filters");
+  assert.equal(count("owner=u:a,c:b"), 1, "several picks are one facet");
+  assert.equal(count("owner=&property=,"), 0, "an empty pick sets nothing");
+  assert.equal(count("repeats=1"), 1);
+  assert.equal(count("repeats=0"), 0);
+  assert.equal(count("sort=due"), 0, "the default sort isn't counted");
+  assert.equal(count("owner=u:a&property=p1&repeats=1&sort=title"), 4);
+  assert.equal(setFilterCount(new URLSearchParams("sort=title"), facets), 0, "a bar with no sort ignores the param");
 });

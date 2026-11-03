@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { getAppConfig } from "@/lib/app-config";
-import { CapexRulesEditor } from "./capex-rules-editor";
+import { CapexRulesEditor } from "../capex-rules-editor";
 
 export const dynamic = "force-dynamic";
 

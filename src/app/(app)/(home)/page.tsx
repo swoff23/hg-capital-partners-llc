@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 import { greetingLine, summaryLine } from "@/lib/home/summary";
 import { groupMine } from "@/lib/tasks/list";
 import { emailCapReached, todayTasks } from "@/lib/tasks/queries";
-import { NeedsYou } from "./needs-you";
-import { TaskListProvider } from "./tasks/task-list-context";
-import { TodayView } from "./tasks/today-view";
+import { NeedsYou } from "../needs-you";
+import { TaskListProvider } from "../tasks/task-list-context";
+import { TodayView } from "../tasks/today-view";
 
 export const dynamic = "force-dynamic";
 

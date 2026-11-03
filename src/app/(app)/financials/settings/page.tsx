@@ -44,7 +44,7 @@ const anchor = "scroll-mt-[calc(var(--app-bar-h)+1rem)]";
 export default async function FinancialsSettingsPage({
   searchParams,
 }: PageProps<"/financials/settings">) {
-  await requireUser(); // here as well as in the layout, which doesn't gate every render
+  await requireUser(); // the page checks; the layout doesn't
   const [conn, sp] = await Promise.all([getConnection(), searchParams]);
   // /api/quickbooks/callback lands here with ?connected=1 or ?error=<code>
   const oauth = oauthReturnLine({ connected: sp.connected, error: sp.error });

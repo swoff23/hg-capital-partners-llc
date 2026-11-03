@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LinkPending } from "@/components/link-pending";
 import { TableFrame } from "@/components/table-frame";
 import { Spinner } from "@/components/spinner";
 
@@ -726,7 +727,8 @@ export function PageHeader({
   actions,
 }: {
   title: string;
-  subtitle?: string;
+  /** A line under the title; a loading screen passes a `Block` for one that comes from data. */
+  subtitle?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
   return (
@@ -741,6 +743,13 @@ export function PageHeader({
 }
 
 /**
+ * A row's hover fill while one of its links waits on a page that wasn't
+ * prefetched (`LinkPending` in the link), on the element that carries the
+ * row's hover fill (docs/specs/performance.md 4.6).
+ */
+export const pendingRowFill = "has-[[data-link-pending]]:bg-fill-1";
+
+/**
  * One cell of a table row that is itself a link to a record, so the whole row
  * opens it (properties, deals). The first cell's link wraps its content, takes
  * focus and names the row. Every other cell keeps its value outside the link
@@ -749,7 +758,9 @@ export function PageHeader({
  * still reads. A single link stretched over the row would need the row as its
  * containing block, which not every engine gives a table row; a cell is one.
  * A control in such a cell (a stage menu) sits in `relative z-10`, above that
- * link. 56px with a mouse, 60 on touch (section 5 Density); a denser table
+ * link. Every link carries `LinkPending`, so the row's `tr` takes
+ * `pendingRowFill` beside its hover fill. 56px with a mouse, 60 on touch
+ * (section 5 Density); a denser table
  * passes `min-h-10 pointer-coarse:min-h-12` in `className`. `cell` styles the
  * cell (when it drops, the first column's width); `className` its content,
  * with pl-0 and pr-0 putting the edge cells on the gutter. `aside` is
@@ -787,13 +798,16 @@ export function RowCell({
         <>
           <Link href={href} className={cn(content, "-outline-offset-2")}>
             {children}
+            <LinkPending />
           </Link>
           {aside}
         </>
       ) : (
         <>
           <div className={content}>{children}</div>
-          <Link href={href} tabIndex={-1} aria-hidden="true" className="absolute inset-0" />
+          <Link href={href} tabIndex={-1} aria-hidden="true" className="absolute inset-0">
+            <LinkPending />
+          </Link>
         </>
       )}
     </Td>

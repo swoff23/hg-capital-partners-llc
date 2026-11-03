@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActivityNow, useActivityNow } from "@/components/activity-time";
@@ -288,6 +288,12 @@ export function ActivityDivider({
   children: ReactNode;
 }) {
   const anchor = id ?? (unread ? "new" : undefined);
+  // A link to it (a task or job row with news opens at `#new`) shows the page's loading screen
+  // first, where the router finds no such id and lets the scroll go, so the divider takes itself
+  // into view when it lands. The portal has no app shell to do it (AppShell's hash landing).
+  useEffect(() => {
+    if (anchor && window.location.hash === `#${anchor}`) document.getElementById(anchor)?.scrollIntoView({ block: "start" });
+  }, [anchor]);
   return (
     <li id={anchor} className={cn(ROW, anchor && ANCHOR, className)}>
       <MarkerCell marker={unread ? "unread" : "none"} align="line" />
