@@ -12,7 +12,7 @@ import { MenuItem, MenuSeparator } from "@/components/menu";
 import { Sheet } from "@/components/sheet";
 import { useToast } from "@/components/toast";
 import { Button, TextLink } from "@/components/ui";
-import { callAction } from "@/lib/action-result";
+import { callAction, conflictToastMessage } from "@/lib/action-result";
 import { sendRefusal } from "@/lib/composer-draft";
 import { todayYmdEastern, type Ymd } from "@/lib/dates";
 import { foldStart, firstNewIndex, groupHeadings, linkedUpdateId } from "@/lib/tasks/activity";
@@ -553,13 +553,25 @@ function PreviousNotes({
   if (viewing && viewing !== last) setLast(viewing);
   const shown = viewing ?? last;
 
+  // The button is disabled while the call runs, and a disabled button drops focus to the page behind the sheet, where
+  // Esc no longer reaches it. A refusal leaves the sheet open, so focus goes back to the button once it is enabled.
+  const restoreButton = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (saving || !refocus.current) return;
+    refocus.current = false;
+    restoreButton.current?.focus();
+  }, [saving]);
+
   async function restore() {
     if (!viewing) return;
+    const hadFocus = document.activeElement === restoreButton.current;
     setSaving(true);
     const res = await callAction(() => updateTask(taskId, { description: viewing.text || null, expectedDescription: notes }));
+    if (!res.ok && hadFocus) refocus.current = true;
     setSaving(false);
     if (!res.ok) {
-      toast({ message: res.error });
+      toast({ message: res.conflict ? conflictToastMessage(res.conflict) : res.error });
       if (res.conflict) router.refresh();
       return;
     }
@@ -577,7 +589,7 @@ function PreviousNotes({
       }}
       footer={
         <div className="flex justify-end">
-          <Button variant="secondary" pending={saving} onClick={() => void restore()}>
+          <Button ref={restoreButton} variant="secondary" pending={saving} onClick={() => void restore()}>
             Restore this version
           </Button>
         </div>

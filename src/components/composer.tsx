@@ -412,6 +412,7 @@ function ComposerBody({
   const [focused, setFocused] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  const heldTray = useRef<HTMLDivElement>(null);
   const internal = mode === "switch" && visibility === "INTERNAL";
   const pinned = pin === "phone";
   // What was sent, by clientId, so Retry and Edit can use it again.
@@ -721,7 +722,11 @@ function ComposerBody({
       ref={box}
       style={clearance ? { scrollMarginBottom: clearance } : undefined}
       data-active={active || undefined}
-      onFocus={() => setFocused(true)}
+      onFocus={(e) => {
+        // A held tray's tiles aren't writing: Chrome focuses a button on pointerdown, and opening the bar then moves the
+        // tiles under the finger, so the tap on a tile's × would land on the bar instead.
+        if (!heldTray.current?.contains(e.target as Node)) setFocused(true);
+      }}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
       }}
@@ -764,7 +769,11 @@ function ComposerBody({
         </ul>
       )}
       {api && <MediaUploadTray uploader={api} onFill={internal} className="px-4 pt-2.5 md:px-3" />}
-      {held?.tray && <div className="px-4 pt-2.5 md:px-3">{held.tray}</div>}
+      {held?.tray && (
+        <div ref={heldTray} className="px-4 pt-2.5 md:px-3">
+          {held.tray}
+        </div>
+      )}
       {/* On a phone the row sits on the 16px gutter, like the cards above it. */}
       <div className={cn("flex items-end gap-1 px-4 py-1.5 md:px-2", !api && "md:pl-2.5")}>
         {api && (

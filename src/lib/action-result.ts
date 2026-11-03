@@ -34,6 +34,7 @@
 import { unstable_rethrow } from "next/navigation";
 import { HG_TIME_ZONE, fmtDay, todayYmdEastern } from "./dates";
 import { firstName } from "./names";
+import { TOAST_PHONE_CHARS } from "./toast-line";
 
 /** One plain message per field name, for the field's own error line (forms 2.12). */
 export type FieldErrors = Record<string, string>;
@@ -100,6 +101,17 @@ export function conflictMessage(conflict: Pick<ActionConflict, "by" | "at">, now
   const when = conflictWhen(conflict.at, now);
   const tail = when ? ` ${when}` : " since you opened it";
   return who ? `${who} changed this${tail}.` : `This changed${tail}.`;
+}
+
+/**
+ * conflictMessage as a toast, which is one truncated line (toast-line.ts): when the whole line wouldn't show on a
+ * phone ("Pieter changed this at 3:07 PM." is one character over) the time goes, so who changed it is never cut.
+ */
+export function conflictToastMessage(conflict: Pick<ActionConflict, "by" | "at">, now: Date = new Date()): string {
+  const full = conflictMessage(conflict, now);
+  if (full.length <= TOAST_PHONE_CHARS) return full;
+  const who = conflictBy(conflict.by);
+  return who ? `${who} changed this.` : "This changed.";
 }
 
 /**

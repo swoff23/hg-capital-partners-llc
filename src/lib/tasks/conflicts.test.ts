@@ -37,6 +37,11 @@ test("a Restore from View previous carries the notes the page loaded, so it can'
   assert.match(restore, /updateTask\(taskId, \{ description: viewing\.text \|\| null, expectedDescription: notes \}\)/);
   // Refused, the page loads the newer notes, so a second Restore is a choice made over them.
   assert.match(restore, /if \(res\.conflict\) router\.refresh\(\);/);
+  // The refusal's toast shows whole on a phone (conflictToastMessage), and the Restore button, which was disabled while
+  // the call ran, gets focus back so Esc still closes the sheet.
+  assert.match(restore, /conflictToastMessage\(res\.conflict\)/);
+  assert.match(activity, /if \(!res\.ok && hadFocus\) refocus\.current = true;/);
+  assert.match(activity, /<Button ref=\{restoreButton\} variant="secondary" pending=\{saving\}/);
   assert.match(activity, /<PreviousNotes taskId=\{taskId\} notes=\{notes\}/);
   assert.match(readFileSync(join(page, "view.tsx"), "utf8"), /<TaskActivity taskId=\{task\.id\} notes=\{task\.description\}/);
 });

@@ -944,13 +944,15 @@ export class UploadEngine {
   /**
    * A failed file tries again from the start. A refused one (the check said no, or the job stopped taking files first)
    * can only be removed. A target's cap holds here as it does when files are added: with no room left (the files
-   * picked since filled it), the retried file is refused with the cap's reason instead of going past it.
+   * picked since filled it), the retried file is refused with the cap's reason instead of going past it. The cap is
+   * the page's, from its last render, so it holds only while the page is showing: once it is gone nothing holds a tray
+   * and the away rule takes the file (the away toast's Retry).
    */
   retry(id: string): void {
     const job = this.jobs.get(id);
     if (!job || job.status !== "failed" || job.controller) return;
     const target = this.targets.get(job.key);
-    if (target?.maxFiles !== undefined && target.maxFiles - this.holding(job.key) <= 0) {
+    if (!this.isAway(job.key) && target?.maxFiles !== undefined && target.maxFiles - this.holding(job.key) <= 0) {
       this.patch(job, { status: "invalid", error: target.maxFilesReason ?? capReason(0) });
       return;
     }

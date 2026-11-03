@@ -157,6 +157,7 @@ Desktop 1280, property record, a file dragged over the rail
 | Uploading | The ring fills | uploading, 40% |
 | Saving | The ring full | saving |
 | Waiting for signal (phase 3, **new**; the per-tile mark is invented) | The preview under the same 50% `--photo-scrim`, a 20px lucide `WifiOff` in `--on-photo`, no ring | waiting for signal |
+| Paused (**new**; the `Pause` mark is invented, a swap for `WifiOff` in the same slot) | The same scrim and slot as waiting for signal, a 20px lucide `Pause` in `--on-photo`. The upload code didn't load (`UploadCodeMissingError`), so the file waits without spending tries and goes when the code arrives or after a reload. A file row says "Paused" | paused |
 | Failed | The 2px inset `--danger` ring in place of the photo edge. Grid: the `RetryPill`. Row: the whole tile retries, now with `RotateCcw` to match the pill | couldn't upload: no connection |
 | Refused by the check | `TriangleAlert` on a 60% `--photo-scrim`, as today. Remove only | couldn't upload: over the 25 MB limit |
 | Ready (composer) | The thumbnail (`?v=thumb`), not the original | ready to send |
@@ -172,6 +173,7 @@ Desktop 1280, property record, a file dragged over the rail
 | Nothing can be retried | "1 photo didn't upload: over the 25 MB limit" in `--danger` |
 | Every red file is one the job stopped taking before it uploaded | "Job closed before 2 photos uploaded" (Done or Canceled) or "Too late to add 2 photos" (still in Review) in `--danger`, no Retry; each tile keeps its red ring with only Remove |
 | No signal (phase 3) | "No signal · 5 photos waiting" in `--fg-3`; "No signal · 5 waiting" below 360px |
+| Paused (the upload code didn't load) | "Uploads paused · Reload" in `--fg-3`, Reload underlined, 44px on touch; "Uploads paused, still trying" with no Reload where a reload would lose a file (one whose row never reached the outbox) |
 
 - **Layouts**, as today: `row` is 56px tiles in a wrapping row (the composer); `grid` is squares at least 88px wide (the job page and the Mark done sheet). The grid's phone gap goes from 6px to 8px, the brand's 4px scale.
 - **Keyboard.** Tab reaches Retry and Remove; both names carry the file's name.
@@ -487,10 +489,10 @@ Every line is one line at its component's normal width, with no em dashes. Items
 | Section header button | Add files |
 | Empty Documents | Add a lease, a policy or a loan statement. |
 | Stored names for camera files | Photo 2026-10-25 at 2.14 PM; Photo 2026-10-25 at 2.14 PM 2; Video 2026-10-25 at 2.14 PM |
-| Status line | 2 photos didn't upload · Retry; 1 photo didn't upload: over the 25 MB limit; Job closed before 2 photos uploaded; Too late to add 2 photos; No signal · 5 photos waiting (No signal · 5 waiting under 360px) |
+| Status line | 2 photos didn't upload · Retry; 1 photo didn't upload: over the 25 MB limit; Job closed before 2 photos uploaded; Too late to add 2 photos; No signal · 5 photos waiting (No signal · 5 waiting under 360px); Uploads paused · Reload; Uploads paused, still trying |
 | Document row | Uploading 40%; No connection; Over the 50 MB limit; This type can't be added |
-| My jobs row subline | Uploading 3 photos; 2 photos didn't upload |
-| Toasts | 3 photos posted [Undo]; 3 photos added to the job; No connection. Try again. [Retry] (photos the tab kept); 3 files ready to send [View]; 2 photos didn't upload to 56 Tamarack St [Retry]; Job closed before 2 photos uploaded to 56 Tamarack St; Too late to add 2 photos to 56 Tamarack St; Photo removed [Undo]; Unit 2 listing removed [Undo]; Saved · 8 photos on the site; Saved · Hidden from the site; Property photo set [Undo]; Preparing 14 files… |
+| My jobs row subline | Uploading 3 photos; 2 photos didn't upload; No signal · 3 photos waiting; Uploads paused · 3 photos waiting; Open to send 2 photos |
+| Toasts | 3 photos posted [Undo]; 3 photos added to the job; No connection. Try again. [Retry] (photos the tab kept); 3 files ready to send [View]; 2 photos didn't upload to 56 Tamarack St [Retry]; Uploads paused [Reload]; Uploads paused, still trying; Couldn't open it. [Reload]; Job closed before 2 photos uploaded to 56 Tamarack St; Too late to add 2 photos to 56 Tamarack St; Photo removed [Undo]; Unit 2 listing removed [Undo]; Saved · 8 photos on the site; Saved · Hidden from the site; Property photo set [Undo]; Preparing 14 files… |
 | Activity | Zack added 4 photos; Zack added 3 photos and 1 video |
 | Viewer | Can't preview this photo here.; XLSX · 48 KB · Connor · Oct 3; Download; Open |
 | Delete confirm | Delete this photo?; “Photo 2026-10-25 at 2.14 PM” goes for good.; Keep it; Delete photo |

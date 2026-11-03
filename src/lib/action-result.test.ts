@@ -12,6 +12,7 @@ import {
   conflictBy,
   conflictKeepLabel,
   conflictMessage,
+  conflictToastMessage,
   conflictValueLine,
   isOfflineError,
   isPlainMessage,
@@ -21,6 +22,7 @@ import {
   userMessage,
   zodFieldErrors,
 } from "./action-result";
+import { TOAST_PHONE_CHARS } from "./toast-line";
 
 test("zod's own defaults never reach the screen: the rule comes out in plain words", () => {
   const r = z.object({ address: z.string().min(4) }).safeParse({ address: "ab" });
@@ -337,6 +339,19 @@ test("conflictMessage: today is a time, an earlier day is the date", () => {
   // Late evening in Buffalo is the next day in UTC, and still today here.
   assert.match(conflictMessage({ at: "2026-10-27T01:30:00Z" }, new Date("2026-10-27T02:00:00Z")), /^This changed at 9:30\sPM\.$/);
   assert.equal(conflictMessage({ at: "not a date" }, NOW), "This changed since you opened it.");
+});
+
+test("conflictToastMessage: the whole line when it shows on a phone, otherwise who without the time", () => {
+  const at = "2026-10-26T18:14:00Z";
+  // "Zack changed this at 2:14 PM." is 29 characters: whole. "Pieter ..." is 31, one over, so the time goes.
+  assert.match(conflictToastMessage({ by: "Zack Outlaw", at }, NOW), /^Zack changed this at 2:14\sPM\.$/);
+  assert.equal(conflictToastMessage({ by: "Pieter Louw", at }, NOW), "Pieter changed this.");
+  assert.equal(conflictToastMessage({ by: "Pieter Louw", at: "2026-10-24T18:14:00Z" }, NOW), "Pieter changed this on Oct 24.");
+  // Nobody named (your own other tab): "This changed at 2:14 PM." fits; "...since you opened it." does not.
+  assert.match(conflictToastMessage({ at }, NOW), /^This changed at 2:14\sPM\.$/);
+  assert.equal(conflictToastMessage({ at: "not a date" }, NOW), "This changed.");
+  // A longer name still shows whole, since the time is what goes.
+  assert.ok(conflictToastMessage({ by: "Christopher Lamborghini", at }, NOW).length <= TOAST_PHONE_CHARS);
 });
 
 test("conflictValueLine: who set it, to what, and when; or what changed when the row doesn't say who", () => {

@@ -1626,3 +1626,28 @@ test("a Retry holds to the cap too: past it the file is refused with the cap's r
   await r.flush();
   assert.deepEqual(u.recorded, ["a.jpg"]);
 });
+
+test("a Retry once the page is gone holds to no cap: the page's last room is not a tray, and the away rule takes the file", async () => {
+  const h = setup({ script: [new Error("Failed to retrieve the client token"), new Error("Failed to retrieve the client token")] });
+  const away: string[][] = [];
+  const t = target({
+    key: "portal-task:t9",
+    allowed: ["image"],
+    maxFiles: 2,
+    maxFilesReason: "only 2 at a time",
+    whenAway: "post",
+    onAway: (ids) => away.push(ids),
+  });
+  const leave = h.engine.mount(t.key);
+  h.engine.add(t, [file("x.jpg"), file("y.jpg")]);
+  await h.flush();
+  assert.deepEqual(h.engine.uploadsFor(t.key).map((u) => u.status), ["failed", "failed"]);
+  // The tray then filled (the last render has no room), and the contractor left: the page posted what it held.
+  h.engine.setTarget({ ...t, maxFiles: 0 });
+  leave();
+  // The away toast's Retry.
+  h.engine.retryAll(t.key);
+  await h.flush();
+  assert.deepEqual(t.recorded.sort(), ["x.jpg", "y.jpg"], "both went, none refused by the stale cap");
+  assert.equal(away.length, 1, "the away rule took them");
+});
