@@ -1,5 +1,6 @@
 import "server-only";
-import type { QuickbooksConnection } from "@prisma/client";
+import { cache } from "react";
+import type { Prisma, QuickbooksConnection } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { qbo } from "./config";
 import { decryptSecret, encryptSecret } from "./crypto";
@@ -31,10 +32,38 @@ export class QboApiError extends Error {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** The single connection row, or null. */
+/** The single connection row, or null. With its tokens: only the sync and the writes that use them read it. */
 export function getConnection(): Promise<QuickbooksConnection | null> {
   return prisma.quickbooksConnection.findFirst({ orderBy: { createdAt: "desc" } });
 }
+
+/** What the Financials pages and a property's card show and filter by: never the tokens or their expiry. */
+const CONNECTION_SUMMARY = {
+  id: true,
+  realmId: true,
+  environment: true,
+  status: true,
+  companyName: true,
+  refreshTokenExpiresAt: true,
+  accountingMethod: true,
+  historyStart: true,
+  lastSyncAt: true,
+  lastSuccessfulSyncAt: true,
+  lastReconciledAt: true,
+  createdAt: true,
+} satisfies Prisma.QuickbooksConnectionSelect;
+
+export type ConnectionSummary = Prisma.QuickbooksConnectionGetPayload<{ select: typeof CONNECTION_SUMMARY }>;
+
+/**
+ * The connection row without its tokens, read once per request (React cache):
+ * Financials Settings and the overview it embeds, and a property's Financials
+ * card, ask for it separately.
+ */
+export const getConnectionSummary = cache(
+  (): Promise<ConnectionSummary | null> =>
+    prisma.quickbooksConnection.findFirst({ orderBy: { createdAt: "desc" }, select: CONNECTION_SUMMARY }),
+);
 
 export async function requireActiveConnection(): Promise<QuickbooksConnection> {
   const conn = await getConnection();

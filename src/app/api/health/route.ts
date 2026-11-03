@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { dbConnectionSummary } from "@/lib/db-url";
 import { getEnv } from "@/lib/env";
 import { healthDetailAllowed } from "@/lib/secrets";
 
@@ -12,7 +13,10 @@ export const dynamic = "force-dynamic";
  * Without a configured token, or without a matching one, it still answers but
  * only with { ok, db, env, commit, at } — enough to see if the site is up, not
  * enough to enumerate the schema. Fails closed: no token configured means
- * nobody gets the detail (see src/lib/secrets.ts).
+ * nobody gets the detail (see src/lib/secrets.ts). The detail also says how
+ * the database is reached (dbDriver, dbVia, dbPool), how long a SELECT 1
+ * took (dbMs), and the session's time zone (dbTimeZone), which must stay UTC
+ * for the driver to read a timestamptz right (src/lib/db.ts).
  *
  *   curl -s "$PROD/api/health?token=$HEALTH_TOKEN" | jq
  */
@@ -29,10 +33,17 @@ export async function GET(request: NextRequest) {
   let migrations: { name: string; appliedAt: string | null; rolledBackAt: string | null }[] = [];
   let dbError: string | null = null;
 
+  let dbMs: number | null = null;
+  let dbTimeZone: string | null = null;
   try {
+    const t0 = performance.now();
     await prisma.$queryRaw`SELECT 1`;
+    // One round trip, plus connecting when this instance had no open connection.
+    dbMs = Math.round((performance.now() - t0) * 10) / 10;
     db = "up";
     if (detailed) {
+      const [tz] = await prisma.$queryRaw<{ tz: string }[]>`SELECT current_setting('TimeZone') AS tz`;
+      dbTimeZone = tz?.tz ?? null;
       const rows = await prisma.$queryRaw<
         { migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }[]
       >`SELECT migration_name, finished_at, rolled_back_at
@@ -53,6 +64,10 @@ export async function GET(request: NextRequest) {
   if (dbError && detailed) body.dbError = dbError;
   if (detailed) {
     body.node = process.version;
+    // Which way the app reaches the database (src/lib/db.ts, src/lib/db-url.ts), and how fast it answered.
+    Object.assign(body, dbConnectionSummary(e));
+    body.dbMs = dbMs;
+    body.dbTimeZone = dbTimeZone;
     body.migrations = migrations;
     body.latestMigration = migrations.find((m) => m.appliedAt && !m.rolledBackAt)?.name ?? null;
   }

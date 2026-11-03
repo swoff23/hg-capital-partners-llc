@@ -22,6 +22,14 @@ const nextConfig: NextConfig = {
   // never locks or overwrites a regular build. Build config, so it reads
   // process.env directly rather than through src/lib/env.ts.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  experimental: {
+    // A page left less than 30 seconds ago opens from the router's memory, with no request
+    // (docs/specs/performance.md, fix 10; next/dist/docs staleTimes.md). Your own edits show at
+    // once: the services behind them call revalidatePath, which in a Server Action drops every
+    // kept page, and router.refresh() refetches the page it runs on. Someone else's change can
+    // take up to 30 seconds to show on a page you go back to.
+    staleTimes: { dynamic: 30 },
+  },
   images: { remotePatterns: blobImagePatterns() },
   async redirects() {
     return [

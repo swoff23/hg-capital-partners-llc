@@ -24,11 +24,17 @@ export const dynamic = "force-dynamic";
  * pick below lg.
  */
 export default async function HomePage() {
-  const user = await requireUser();
   const now = new Date();
   // Buffalo's today, decided once on the server so every section and label agrees.
   const today = todayYmdEastern(now);
-  const [tasks, capped, items] = await Promise.all([todayTasks(user.id), emailCapReached(today), needsYou(today, now)]);
+  // The reads that don't need the viewer start beside the session check; all of it is awaited together.
+  const userP = requireUser();
+  const [user, tasks, capped, items] = await Promise.all([
+    userP,
+    userP.then((u) => todayTasks(u.id)),
+    emailCapReached(today),
+    needsYou(today, now),
+  ]);
   // The Overdue section of the partner's own Mine column.
   const late = groupMine(tasks, user.id, today).overdue.length;
 

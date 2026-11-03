@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import type { TaskStatus } from "@prisma/client";
+import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/log";
@@ -36,10 +37,12 @@ export async function generateMetadata({ params }: PageProps<"/tasks/[id]">): Pr
  * reach the client; only unit labels and a lockbox state do.
  */
 export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
-  const user = await requireUser();
   const { id } = await params;
 
-  const task = await prisma.task.findUnique({
+  // The first wave: the task, each of its lists, and what needs only its id and the viewer, all at once.
+  // The session check runs beside them and is awaited with them, so nothing is shown without it.
+  const userP = requireUser();
+  const rowP = prisma.task.findUnique({
     where: { id },
     select: {
       id: true,
@@ -59,39 +62,64 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       assigneeName: true,
       createdBy: { select: { name: true, email: true } },
       assigneeContact: { select: { id: true, fullName: true, active: true } },
-      // Who can open the job right now: the delivery line only speaks for a contractor who still can.
-      access: { where: { revokedAt: null }, select: { contactId: true } },
-      checklist: { orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { id: true, title: true, done: true } },
-      // Posted and drafted files, oldest first (lib/tasks/media.ts).
-      attachments: taskMediaInclude,
-      // Deleted comments stay for their staff-only line; every other deleted event (an undone approval) is left out below.
-      events: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          kind: true,
-          visibility: true,
-          actorLabel: true,
-          actorUserId: true,
-          actorContactId: true,
-          audienceContactId: true,
-          body: true,
-          data: true,
-          source: true,
-          asanaStoryGid: true,
-          editedAt: true,
-          deletedAt: true,
-          createdAt: true,
-        },
-      },
     },
   });
-  if (!task) notFound();
+  const [user, row, access, checklist, attachments, events, staff, properties, previouslySeen, partnersSeen] = await Promise.all([
+    userP,
+    rowP,
+    // Who can open the job right now: the delivery line only speaks for a contractor who still can.
+    prisma.taskAccess.findMany({ where: { taskId: id, revokedAt: null }, select: { contactId: true } }),
+    prisma.taskChecklistItem.findMany({
+      where: { taskId: id },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      select: { id: true, title: true, done: true },
+    }),
+    // Posted and drafted files, oldest first (lib/tasks/media.ts).
+    prisma.taskAttachment.findMany({
+      where: { taskId: id, ...taskMediaInclude.where },
+      orderBy: taskMediaInclude.orderBy,
+      select: taskMediaInclude.select,
+    }),
+    // Deleted comments stay for their staff-only line; every other deleted event (an undone approval) is left out below.
+    prisma.taskEvent.findMany({
+      where: { taskId: id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        kind: true,
+        visibility: true,
+        actorLabel: true,
+        actorUserId: true,
+        actorContactId: true,
+        audienceContactId: true,
+        body: true,
+        data: true,
+        source: true,
+        asanaStoryGid: true,
+        editedAt: true,
+        deletedAt: true,
+        createdAt: true,
+      },
+    }),
+    // Who can sign in as staff: the people an Internal note is for.
+    prisma.user.findMany({ where: { passwordHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
+    // Every building as the pickers offer it: unit labels only, in street order. It starts as soon as the task
+    // lands, so the task's own building stays on offer, archived or not.
+    rowP.then((r) => propertyOptions([r?.propertyId])),
+    // When I last opened it, before this visit.
+    userP.then((u) => lastSeen(u.id, id)),
+    userP.then((u) => otherPartnersSeen(u.id, id)),
+  ]);
+  if (!row) notFound();
+  const task = { ...row, access, checklist, attachments, events };
   const now = new Date();
   // Puts it on top of this person's Recent in search, and notes the open for the New divider and the unread dot,
-  // once the response is out. The previous open is read first (below): it is the divider's baseline.
-  after(() => recordView(user.id, "TASK", task.id));
-  after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id })));
+  // once the response is out. The previous open is read first (above): it is the divider's baseline. The refresh
+  // after an edit or a tick isn't an open, so it writes neither again.
+  if (!(await isActionRender())) {
+    after(() => recordView(user.id, "TASK", task.id));
+    after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id })));
+  }
 
   const live = task.events.filter((e) => !e.deletedAt);
   const commentBodies = live.filter((e) => e.kind === "COMMENT" && e.body).map((e) => e.body!);
@@ -105,22 +133,15 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     .slice(-40)
     .map((e) => e.id);
 
-  const [{ users, contractors, recent }, staff, properties, propertyRow, repeatSlot, previouslySeen, partnersSeen, contractorSeen, linked, people, emailStates] =
+  const [{ users, contractors, recent }, propertyRow, repeatSlot, contractorSeen, linked, people, emailStates] =
     await Promise.all([
       // Recent: the people this viewer assigned last, for the assignee picker.
       assigneeOptions([task.assigneeContactId], user.id),
-      // Who can sign in as staff: the people an Internal note is for.
-      prisma.user.findMany({ where: { passwordHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
-      // Every building as the pickers offer it: unit labels only, in street order. The task's own stays, archived or not.
-      propertyOptions([task.propertyId]),
       // The lockbox state reads this task's own property's units, which stay on the server.
       task.propertyId ? prisma.property.findUnique({ where: { id: task.propertyId }, select: { units: true } }) : null,
       // The date the series gave this task when it is a repeat copy, so the repeat menu's "Next:" steps from it
       // as finishing does, not from wherever the copy was moved. Reads the same lines core.ts repeatSlot reads.
       copySlot(prisma, task.id, task.events.find((e) => e.kind === "CREATED")?.data),
-      // When I last opened it, before this visit.
-      lastSeen(user.id, task.id),
-      otherPartnersSeen(user.id, task.id),
       contactId ? prisma.taskReadState.findUnique({ where: { taskId_contactId: { taskId: task.id, contactId } }, select: { lastSeenAt: true } }) : null,
       // The tasks and Asana links the comments point at, by title and by import.
       pathIds.length || asanaGids.length

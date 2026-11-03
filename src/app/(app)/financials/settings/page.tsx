@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getConnection } from "@/lib/quickbooks/client";
+import { getConnectionSummary } from "@/lib/quickbooks/client";
 import { qbo } from "@/lib/quickbooks/config";
 import { getFinancialsOverview } from "@/lib/quickbooks/queries";
 import { propertyOptions } from "@/lib/picker-options";
@@ -47,8 +47,8 @@ const anchor = "scroll-mt-[calc(var(--app-bar-h)+1rem)]";
 export default async function FinancialsSettingsPage({
   searchParams,
 }: PageProps<"/financials/settings">) {
-  await requireUser(); // the page checks; the layout doesn't
-  const [conn, sp] = await Promise.all([getConnection(), searchParams]);
+  // The session check runs beside the first read and is awaited with it: the page checks; the layout doesn't.
+  const [, conn, sp] = await Promise.all([requireUser(), getConnectionSummary(), searchParams]);
   // /api/quickbooks/callback lands here with ?connected=1 or ?error=<code>; "Connected" needs a live connection too.
   const oauth = oauthReturnLine({ connected: sp.connected, error: sp.error }, conn);
 

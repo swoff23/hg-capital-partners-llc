@@ -28,26 +28,30 @@ export const metadata: Metadata = { title: "Tasks" };
  * comma-joined picks for the assignee and property filters.
  */
 export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
-  const user = await requireUser();
   const sp = await searchParams;
 
   // Today's Contractors column moved to Home with the rest of Today.
   if (sp.view === "contractors") redirect("/?view=contractors");
 
-  const mine = withoutAssigneeShortcut(sp, user.id);
-  if (mine) redirect(`/tasks?${mine}`);
-
   const filters = parseAllFilters(sp);
   // A page of rows at a time: the first TASK_PAGE, and Show more asks for another (?show=200).
   const take = taskLimit(sp);
-  const [{ users, contractors }, properties] = await Promise.all([
-    assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2))),
+  // The people on offer, the imported names and the buildings start beside the session check; all of it is
+  // awaited together, so nothing is shown without it.
+  const options = assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  const [user, { users, contractors }, legacy, properties] = await Promise.all([
+    requireUser(),
+    options,
+    // Imported names that are a person on offer count for that person; the rest list once as "Others".
+    legacyAssignees(options.then((o) => personRefs(o.users, o.contractors))),
     // An archived property stays on offer while the URL picks it (a property page's "All tasks"),
     // so withKnownFilters below keeps the pick instead of dropping it.
     propertyOptions(filters.property),
   ]);
-  // Imported names that are a person on offer count for that person; the rest list once as "Others".
-  const legacy = await legacyAssignees(personRefs(users, contractors));
+
+  const mine = withoutAssigneeShortcut(sp, user.id);
+  if (mine) redirect(`/tasks?${mine}`);
+
   const merged = withMergedOwners(sp, legacy.merged);
   if (merged) redirect(`/tasks?${merged}`);
   // A link naming a status, person or property the page doesn't have drops it, so the bar never shows a raw id.

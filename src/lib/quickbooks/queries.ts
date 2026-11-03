@@ -1,8 +1,10 @@
 import "server-only";
+import { cache } from "react";
 import type { QboBasis, QboCategory, QboTreatment } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern } from "@/lib/dates";
-import { getConnection } from "./client";
+import { getPropertyById } from "@/lib/properties/read";
+import { getConnectionSummary } from "./client";
 import { computeNoi, type ComputeLine, type NoiResult } from "./compute";
 import { buildDataQuality, type DataQualityReport } from "./data-quality";
 import { propertyTokens } from "./mapping";
@@ -184,7 +186,7 @@ export interface FinancialsOverview {
 export async function getFinancialsOverview(
   opts: { basis?: QboBasis; period?: PeriodKey } = {},
 ): Promise<FinancialsOverview | null> {
-  const conn = await getConnection();
+  const conn = await getConnectionSummary();
   if (!conn || conn.status === "REVOKED") return null;
   const basis = opts.basis ?? conn.accountingMethod;
   const periodKey = opts.period ?? "ytd";
@@ -363,11 +365,18 @@ export interface PropertyFinancials {
   lastSyncAt: Date | null;
 }
 
-export async function getPropertyFinancials(
+/**
+ * One property's P&L for its record. `cache()` de-dupes within a request, so
+ * the record page can start it beside its own reads (lib/preload.ts) and the
+ * Financials card gets the same answer.
+ */
+export const getPropertyFinancials = cache(loadPropertyFinancials);
+
+async function loadPropertyFinancials(
   propertyId: string,
   basisOverride?: QboBasis,
 ): Promise<PropertyFinancials | null> {
-  const conn = await getConnection();
+  const conn = await getConnectionSummary();
   if (!conn || conn.status === "REVOKED") return null;
   const basis = basisOverride ?? conn.accountingMethod;
   const t = clock(conn);
@@ -385,7 +394,7 @@ export async function getPropertyFinancials(
   const [allRows, mappedClass, property, recent] = await Promise.all([
     loadLines(conn.realmId, basis, propertyId),
     prisma.qboClass.findFirst({ where: { realmId: conn.realmId, propertyId, role: "PROPERTY" } }),
-    prisma.property.findUnique({ where: { id: propertyId }, select: { purchaseDate: true } }),
+    getPropertyById(propertyId),
     prisma.ledgerLine.findMany({
       where: { realmId: conn.realmId, basis, propertyId, treatment: { not: "EXCLUDED" }, ...COUNTED },
       orderBy: { txnDate: "desc" },
@@ -469,7 +478,7 @@ export interface RentRoll {
 }
 
 export async function getRentRoll(basisOverride?: QboBasis): Promise<RentRoll | null> {
-  const conn = await getConnection();
+  const conn = await getConnectionSummary();
   if (!conn || conn.status === "REVOKED") return null;
   const basis = basisOverride ?? conn.accountingMethod;
   const t = clock(conn);

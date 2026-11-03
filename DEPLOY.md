@@ -30,7 +30,12 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
 The Supabase integration also adds a dozen `SUPABASE_*` / `POSTGRES_*` /
-`NEXT_PUBLIC_SUPABASE_*` variables. The app reads none of them.
+`NEXT_PUBLIC_SUPABASE_*` variables. The app reads one of them: in Production
+only, `POSTGRES_PRISMA_URL`, the transaction pooler (port 6543), which every
+page and action goes through (`src/lib/db-url.ts`). Migrations keep
+`DATABASE_URL`. The app talks to it through node-postgres
+(`@prisma/adapter-pg`, `src/lib/db.ts`) and drops the URL's `pgbouncer` and
+`connection_limit` parameters, so nothing in Vercel needs changing.
 
 ## Preview deployments
 
@@ -54,6 +59,15 @@ environment or ignore previews.
 
 ```bash
 curl -s "https://www.hgcapitalpartners.com/api/health?token=$HEALTH_TOKEN" | jq '.commit, .latestMigration'
+```
+
+The same detail says how the app reaches the database. Production should read
+`"dbDriver": "node-postgres"`, `"dbVia": "transaction pooler"`, `"dbPool": 10`
+and `"dbTimeZone": "UTC"`, with `dbMs` (one `SELECT 1`) in single-digit
+milliseconds once the instance is warm.
+
+```bash
+curl -s "https://www.hgcapitalpartners.com/api/health?token=$HEALTH_TOKEN" | jq '{ok, dbDriver, dbVia, dbPool, dbTimeZone, dbMs}'
 ```
 
 Sessions issued before September 2026 used an older cookie format; users sign
