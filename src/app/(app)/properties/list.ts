@@ -1,6 +1,8 @@
 import { PROPERTY_STATUSES } from "@/lib/config";
 import { compareStreet } from "@/lib/normalize";
 import { parseFacet } from "@/lib/list-memory";
+import { isSold } from "@/lib/properties/figures";
+import { toMoneyNumber } from "@/lib/utils";
 
 /*
  * The Portfolio list's filter and sort (docs/specs/selectors.md 3.6, 4.1 and
@@ -92,6 +94,39 @@ export function propertySortPhrase(sort: string): string | null {
   const desc = sort.startsWith("-");
   const words = WORDS[desc ? sort.slice(1) : sort];
   return words ? (desc ? words.desc : words.asc) : null;
+}
+
+/** A row as the totals read it: its status, and the figures the footer sums. */
+export type TotalsRow = { status: string | null; units: number | null; openTasks: number; purchase: unknown; value: unknown };
+
+export type ListTotals = { label: string; count: number; units: number; openTasks: number; purchase: number; value: number };
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * What the footer (and the subtitle) count and sum (charts D4): the owned
+ * rows, so a sold property leaves the totals, labelled "10 owned" once one
+ * of the rows has sold ("11 properties" while none has). When every row is
+ * sold (the Status filter on Sold), the footer totals those rows as "1 sold"
+ * instead of reading "0 owned · $0" under them.
+ */
+export function listTotals(rows: readonly TotalsRow[]): ListTotals {
+  const owned = rows.filter((r) => !isSold(r.status));
+  const allSold = owned.length === 0 && rows.length > 0;
+  const counted = allSold ? rows : owned;
+  const t = counted.reduce(
+    (acc, r) => {
+      acc.units += r.units ?? 0;
+      acc.openTasks += r.openTasks;
+      acc.purchase += toMoneyNumber(r.purchase) ?? 0;
+      acc.value += toMoneyNumber(r.value) ?? 0;
+      return acc;
+    },
+    { units: 0, openTasks: 0, purchase: 0, value: 0 },
+  );
+  const n = counted.length;
+  const label = allSold ? `${n} sold` : owned.length < rows.length ? `${n} owned` : plural(n, "property", "properties");
+  return { label, count: n, ...t };
 }
 
 /** Whether the list is anything but its opening state. */

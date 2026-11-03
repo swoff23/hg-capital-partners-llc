@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
 import { splitAddress } from "@/lib/address-suggestions";
 import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
-import { badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
+import { RENT_LIMIT, RENT_MESSAGE, amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber, tooLargeMessage } from "@/lib/properties/numbers";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import {
@@ -20,7 +20,7 @@ import {
   type BuildingCapexEntry,
   type PropertyUnit,
 } from "@/lib/property-types";
-import { rowConflict, isAtVersion, staleFields } from "@/lib/properties/edits";
+import { rowConflict, isAtVersion, onConflict, staleFields } from "@/lib/properties/edits";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
 /**
@@ -177,23 +177,31 @@ export async function patchProperty(
 
   const data: Record<string, unknown> = {};
   const bad: string[] = [];
+  // Read as numbers but past what the column holds: refused with the limit, where the database used to fail.
+  const tooLarge: string[] = [];
   if (has("address") && s("address")) data.address = s("address");
   for (const k of TEXT_FIELDS) if (has(k)) data[k] = s(k);
   for (const k of MONEY_FIELDS) {
     if (!has(k)) continue;
-    const r = k === "loanRate" ? readRate(patch[k]) : readAmount(patch[k]);
+    const r = k === "loanRate" ? readRate(patch[k]) : readAmount(patch[k], amountLimit(k));
     if (r.ok) data[k] = r.value;
-    else bad.push(k);
+    else {
+      bad.push(k);
+      if (r.tooLarge) tooLarge.push(k);
+    }
   }
   for (const k of DATE_FIELDS) if (has(k)) data[k] = ymdToDate(s(k));
   if (has("loanEscrow")) data.loanEscrow = s("loanEscrow") === "yes";
   if (has("sqft")) {
     const r = readWholeNumber(patch.sqft);
     if (r.ok) data.sqft = r.value;
-    else bad.push("sqft");
+    else {
+      bad.push("sqft");
+      if (r.tooLarge) tooLarge.push("sqft");
+    }
   }
   // Nothing is written when a number didn't read: storing null would erase what's there.
-  if (bad.length) throw new Error(badNumbersMessage(bad));
+  if (bad.length) throw new Error(badNumbersMessage(bad, tooLarge));
 
   // A rename onto an address another property has is refused on the address field, like New property's.
   if (typeof data.address === "string") {
@@ -314,6 +322,17 @@ async function writeUnits(
   by: Editor,
   next: (stored: PropertyUnit[]) => PropertyUnit[],
 ): Promise<void> {
+  // Refused as stale, the page comes back on the latest with the refusal: the row behind the sheet never keeps a code that was changed.
+  await onConflict(() => writeUnitsAt(id, expectedVersion, p, by, next), () => revalidatePath(`/properties/${id}`));
+}
+
+async function writeUnitsAt(
+  id: string,
+  expectedVersion: string,
+  p: TaskPrincipal,
+  by: Editor,
+  next: (stored: PropertyUnit[]) => PropertyUnit[],
+): Promise<void> {
   const renamed = await prisma.$transaction(async (tx) => {
     const current = await tx.property.findUnique({
       where: { id },
@@ -375,6 +394,10 @@ export type BuildingCapexPatch = Record<string, { year?: string | null; type?: s
  * blank is an explicit clear.
  */
 export async function mergeBuildingCapex(id: string, patch: BuildingCapexPatch, expectedVersion: string, by: Editor): Promise<void> {
+  await onConflict(() => writeBuildingCapex(id, patch, expectedVersion, by), () => revalidatePath(`/properties/${id}`));
+}
+
+async function writeBuildingCapex(id: string, patch: BuildingCapexPatch, expectedVersion: string, by: Editor): Promise<void> {
   const current = await prisma.property.findUnique({
     where: { id },
     select: { buildingCapex: true, updatedAt: true, updatedByUser: { select: { name: true, email: true } } },
@@ -507,11 +530,11 @@ export async function deleteListing(propertyId: string, listingId: string, expec
  * that field, in the words of the field kit.
  */
 function cleanListing(l: ListingInput) {
-  const rent = readAmount(l.rent);
+  const rent = readAmount(l.rent, RENT_LIMIT);
   const sqft = readWholeNumber(l.sqft);
   const problems: Record<string, string> = {};
-  if (!rent.ok) problems.rent = "Enter an amount, like 1,500.";
-  if (!sqft.ok) problems.sqft = NUMBER_MESSAGE.integer;
+  if (!rent.ok) problems.rent = rent.tooLarge ? tooLargeMessage("rent") : RENT_MESSAGE;
+  if (!sqft.ok) problems.sqft = sqft.tooLarge ? tooLargeMessage("sqft") : NUMBER_MESSAGE.integer;
   if (Object.keys(problems).length > 0) throw new FieldError(problems);
   return {
     id: l.id ?? null,
@@ -535,7 +558,11 @@ async function touchAtVersion(tx: Prisma.TransactionClient, propertyId: string, 
   const touched = version
     ? await tx.property.updateMany({ where: { id: propertyId, updatedAt: version }, data: { updatedAt: new Date(), ...stamp(by) } })
     : { count: 0 };
-  if (touched.count === 0) throw await conflictOf(propertyId, ["listings"], { db: tx });
+  if (touched.count === 0) {
+    // The refused sheet's page comes back on the latest with the refusal.
+    revalidatePath(`/properties/${propertyId}`);
+    throw await conflictOf(propertyId, ["listings"], { db: tx });
+  }
 }
 
 /** Photo files that left a listing. A file already gone, or no token, isn't an error: the row is gone regardless. */

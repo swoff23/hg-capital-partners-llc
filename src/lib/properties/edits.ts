@@ -71,6 +71,23 @@ export function isAtVersion(updatedAt: Date, expectedVersion: string): boolean {
   return !Number.isNaN(pinned.getTime()) && pinned.getTime() === updatedAt.getTime();
 }
 
+/**
+ * Runs a guarded save, and when it's refused because the row moved on
+ * (`ConflictError`), runs `then` before the refusal goes on. The property
+ * service passes a revalidate, so the refused editor's page comes back on the
+ * latest with the refusal: the unit row behind a refused sheet shows the
+ * lockbox code saved meanwhile, never the stale one, and "Load the latest"
+ * has the latest to load.
+ */
+export async function onConflict<T>(save: () => Promise<T>, then: () => void): Promise<T> {
+  try {
+    return await save();
+  } catch (err) {
+    if (err instanceof ConflictError) then();
+    throw err;
+  }
+}
+
 /** The row's last editor, as the property and deal queries select it (`updatedByUser`). */
 export type LastEditor = { name: string | null; email: string } | null | undefined;
 

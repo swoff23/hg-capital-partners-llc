@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ConflictError } from "@/lib/action-result";
-import { changedFields, editorName, fieldText, isAtVersion, rowConflict, sameText, staleFields } from "./edits";
+import { switchSave } from "@/lib/inline-edit";
+import { changedFields, editorName, fieldText, isAtVersion, onConflict, rowConflict, sameText, staleFields } from "./edits";
 
 test("rowConflict: a field save names who saved last, when, and what the field holds now", () => {
   const at = new Date("2026-10-23T18:14:00.000Z");
@@ -94,4 +95,50 @@ test("isAtVersion: a refresh between Edit and Save refuses the save", () => {
   // Sending the refreshed prop instead of the pinned version would slip past the guard.
   assert.equal(isAtVersion(afterRefresh, afterRefresh.toISOString()), true);
   assert.equal(isAtVersion(atEdit, "not a date"), false);
+});
+
+/**
+ * Three quick taps on the Escrow switch, run against patchProperty's rule
+ * (staleFields) one at a time, as Next sends server actions. `shown` is what
+ * the switch shows after each tap; `rendered` is the page's value, which
+ * doesn't move until the saves come back.
+ */
+function tapEscrow(expectedOf: (shown: string, rendered: string) => string): string[] {
+  let stored = false;
+  const rendered = "no";
+  let shown = rendered;
+  const conflicts: string[] = [];
+  for (const selected of [true, false, true]) {
+    const { next } = switchSave(shown, selected);
+    const expected = expectedOf(shown, rendered);
+    shown = next;
+    const stale = staleFields({ loanEscrow: stored }, { changes: { loanEscrow: next }, expected: { loanEscrow: expected } });
+    if (stale.length > 0) conflicts.push(`tap to ${next}`);
+    else stored = next === "yes";
+  }
+  return conflicts;
+}
+
+test("switchSave: quick taps queue and the last wins, instead of refusing each other", () => {
+  // The switch's own value as expected: no conflict, and Escrow ends at Yes.
+  assert.deepEqual(tapEscrow((shown) => switchSave(shown, true).expected), []);
+  // What it used to send, the page's value: the second and third taps read as "Connor set this to Yes".
+  assert.deepEqual(tapEscrow((_shown, rendered) => rendered), ["tap to no"]);
+  assert.deepEqual(switchSave("yes", false), { next: "no", expected: "yes" });
+});
+
+test("onConflict: a refused save runs `then` (the page's revalidate) and still refuses", async () => {
+  let refreshed = 0;
+  const refusal = rowConflict({ updatedAt: new Date("2026-10-27T12:39:00.000Z"), updatedByUser: null }, ["units"]);
+  await assert.rejects(
+    onConflict(async () => {
+      throw refusal;
+    }, () => refreshed++),
+    (err) => err === refusal,
+  );
+  assert.equal(refreshed, 1);
+  // Any other failure, and a save that lands, leave the page alone.
+  await assert.rejects(onConflict(async () => Promise.reject(new Error("This property is gone.")), () => refreshed++));
+  assert.equal(await onConflict(async () => "saved", () => refreshed++), "saved");
+  assert.equal(refreshed, 1);
 });

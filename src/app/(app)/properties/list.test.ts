@@ -6,6 +6,7 @@ import {
   PROPERTY_SORT_CHOICES,
   filterByStatus,
   isPropertyListFiltered,
+  listTotals,
   parsePropertyFilters,
   propertySortPhrase,
   sortProperties,
@@ -85,4 +86,27 @@ test("the list is plain only in its opening state", () => {
   assert.equal(isPropertyListFiltered({ statuses: [], sort: DEFAULT_PROPERTY_SORT }), false);
   assert.equal(isPropertyListFiltered({ statuses: ["Sold"], sort: DEFAULT_PROPERTY_SORT }), true);
   assert.equal(isPropertyListFiltered({ statuses: [], sort: "-value" }), true);
+});
+
+const T = (status: string | null, units: number | null, value: unknown, over: { openTasks?: number; purchase?: unknown } = {}) => ({
+  status,
+  units,
+  value,
+  openTasks: over.openTasks ?? 0,
+  purchase: over.purchase ?? null,
+});
+
+test("listTotals: the owned rows, labelled 'owned' once one of the rows has sold", () => {
+  const rows = [T("Stabilized", 3, "410000.00", { openTasks: 2, purchase: 300_000 }), T(null, null, null), T("Sold", 2, 250_000)];
+  assert.deepEqual(listTotals(rows), { label: "2 owned", count: 2, units: 3, openTasks: 2, purchase: 300_000, value: 410_000 });
+  assert.equal(listTotals(rows.slice(0, 2)).label, "2 properties");
+  assert.equal(listTotals(rows.slice(0, 1)).label, "1 property");
+});
+
+test("listTotals: under the Sold filter the footer totals the sold rows it sits under", () => {
+  // The tester's /properties?status=Sold: one Sold row with 2 units and $250,000 read "0 owned 0 0 $0 $0".
+  const sold = [T("Sold", 2, "250000.00", { purchase: "180000.00" })];
+  assert.deepEqual(listTotals(sold), { label: "1 sold", count: 1, units: 2, openTasks: 0, purchase: 180_000, value: 250_000 });
+  assert.equal(listTotals([...sold, T("sold", 1, 90_000)]).label, "2 sold");
+  assert.deepEqual(listTotals([]), { label: "0 properties", count: 0, units: 0, openTasks: 0, purchase: 0, value: 0 });
 });

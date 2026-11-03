@@ -188,6 +188,18 @@ export function storedText(kind: InlineKind, text: string, opts: { allowText?: b
   }
 }
 
+/**
+ * What one tap on a yes or no switch saves (InlineSwitch: Escrow): the new
+ * value, sent with the value the switch shows as `expected`, not the one the
+ * page was rendered with. Saves go to the server one at a time, so the
+ * value shown is what's stored by the time this one runs: three quick taps
+ * queue and the last wins, where each tap used to send the page's stale
+ * value and be refused as someone else's change ("Connor set this to Yes").
+ */
+export function switchSave(shown: string, selected: boolean): { next: "yes" | "no"; expected: string } {
+  return { next: selected ? "yes" : "no", expected: shown };
+}
+
 /** Whether two number texts are the same number ("425000" and "$425,000"), so tidying a field isn't an edit. */
 export function sameNumberText(kind: NumberKind, a: string, b: string): boolean {
   const x = readNumber(kind, a);

@@ -52,10 +52,11 @@ export function ConfirmDialog({
     >
       <Modal className={`w-full ${several ? "max-w-md" : "max-w-sm"} rounded-xl border border-line-float bg-raised p-5 text-fg-1 shadow-overlay outline-none data-entering:animate-pop-in motion-reduce:animate-none`}>
         <Dialog role="alertdialog" className="outline-none">
-          <Heading slot="title" className="text-balance text-section text-fg-1">
+          {/* A name with no spaces in it (a 100-character unit name) breaks inside the dialog instead of running past its edge. */}
+          <Heading slot="title" className="text-balance text-section text-fg-1 [overflow-wrap:anywhere]">
             {title}
           </Heading>
-          {body && <div className="mt-1 text-body text-fg-2">{body}</div>}
+          {body && <div className="mt-1 text-body text-fg-2 [overflow-wrap:anywhere]">{body}</div>}
           <div className="mt-4 flex items-center justify-end gap-2 max-sm:flex-col-reverse max-sm:items-stretch">
             <Button size="sm" variant="secondary" disabled={busy} onClick={onClose} aria-keyshortcuts="Escape">
               {cancelLabel}

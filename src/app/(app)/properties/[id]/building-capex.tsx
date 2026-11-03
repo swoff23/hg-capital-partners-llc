@@ -1,11 +1,13 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { FormSheet } from "@/components/form-sheet";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
 import { NumberInput, numberHelper, numberProblem } from "@/components/number-input";
 import { FormField, Input, Section, Table, Td, Th } from "@/components/ui";
 import { useRun } from "@/components/use-run";
+import { stableJson } from "@/lib/drafts";
 import { cn, fmtMoney } from "@/lib/utils";
 import {
   lifecycleStatus,
@@ -17,7 +19,9 @@ import {
   type BuildingRule,
   type CapexRules,
 } from "@/lib/property-types";
+import { dueIn } from "@/lib/properties/capex";
 import { updateBuildingCapex } from "../actions";
+import { LoadLatest } from "@/components/load-latest";
 import { EquipmentStatusText, fmtAge } from "../capex-ui";
 
 const NOW = new Date().getFullYear();
@@ -82,7 +86,8 @@ export function BuildingCapexSection({
       status: lifecycleStatus(age, item.monitor, item.replace),
       cost,
       overridden: src?.costOverride != null && src.costOverride !== item.defaultCost,
-      due: projectedYear({ kind: "building", key: item.key, year: src?.year }, rules),
+      // "in 2032" while it's ahead; a year already past says nothing, the Replace status does.
+      due: dueIn(projectedYear({ kind: "building", key: item.key, year: src?.year }, rules), NOW),
     };
   };
 
@@ -135,7 +140,7 @@ export function BuildingCapexSection({
                     <>
                       <span className="whitespace-nowrap">
                         <Money value={rs.cost} />
-                        {rs.due != null && <span className="text-meta text-fg-3 max-[480px]:hidden"> in {rs.due}</span>}
+                        {rs.due && <span className="text-meta text-fg-3 max-[480px]:hidden"> {rs.due}</span>}
                       </span>
                       {/* An overridden cost says what it replaced, where the bare "*" used to. */}
                       {rs.overridden && <span className="block text-meta text-fg-3">Default {fmtMoney(item.defaultCost)}</span>}
@@ -156,6 +161,7 @@ export function BuildingCapexSection({
           key={sheet.id}
           propertyId={propertyId}
           version={sheet.version}
+          latest={version}
           item={current}
           initial={toDraft(initial, current.key)}
           isOpen={isOpen}
@@ -166,10 +172,16 @@ export function BuildingCapexSection({
   );
 }
 
-/** One system's sheet: Type, Year and Cost. Save is the one write, and it names what happened. */
+/**
+ * One system's sheet: Type, Year and Cost. Save is the one write, and it
+ * names what happened. Refused because the property moved on, the page
+ * behind comes back on the latest and "Load the latest" starts the sheet
+ * over on it, as the unit sheet does.
+ */
 function SystemSheet({
   propertyId,
   version,
+  latest,
   item,
   initial,
   isOpen,
@@ -177,14 +189,28 @@ function SystemSheet({
 }: {
   propertyId: string;
   version: string;
+  /** The page's version now, which "Load the latest" pins. */
+  latest: string;
   item: BuildingRule;
   initial: Draft;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const [base, setBase] = useState<Draft>(initial);
+  const [pinned, setPinned] = useState(version);
   const [draft, setDraft] = useState<Draft>(initial);
   const [tried, setTried] = useState(false);
   const run = useRun();
+  const router = useRouter();
+
+  function loadLatest() {
+    run.reset();
+    setTried(false);
+    setBase(initial);
+    setDraft(initial);
+    setPinned(latest);
+    router.refresh();
+  }
 
   const yearProblem = draft.year.trim() === "" ? null : numberProblem("year", draft.year);
   const costProblem = numberProblem("money", draft.cost);
@@ -204,7 +230,7 @@ function SystemSheet({
               costOverride: parseCapexCost(draft.cost),
             },
           },
-          version,
+          pinned,
         ),
       { failure: "inline", succeeded: () => onOpenChange(false), done: `${item.label} saved`, key: `capex:${propertyId}:${item.key}` },
     );
@@ -225,9 +251,11 @@ function SystemSheet({
       primary="Save"
       pending={run.pending}
       values={draft}
+      dirty={stableJson(draft) !== stableJson(base)}
       discardTitle={`Discard changes to ${item.label}?`}
       leaveTitle={`Leave ${item.label}?`}
       error={run.error && !serverYear ? run.error : undefined}
+      errorAction={run.conflict && <LoadLatest onClick={loadLatest} />}
       fieldErrors={run.fieldErrors}
     >
       <FormField label="Type" optional helper="Shingle, vinyl, copper">
