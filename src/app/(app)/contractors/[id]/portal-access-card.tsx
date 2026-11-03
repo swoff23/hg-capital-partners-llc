@@ -14,7 +14,7 @@ import { useRun } from "@/components/use-run";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { inlineProblem } from "@/lib/inline-edit";
 import { firstName } from "@/lib/names";
-import type { PortalAccessState } from "@/lib/portal/access-state";
+import { loginOffers, type PortalAccessState } from "@/lib/portal/access-state";
 import { loginTextBody, smsHref } from "@/lib/portal/login-text";
 import { cn } from "@/lib/utils";
 import {
@@ -70,6 +70,8 @@ type Shown = { email: string; password: string; phone: boolean };
  * sheet that says Zack signs in with it from now on, not an in-place edit,
  * since it changes how someone signs in. An inactive contact's login reads
  * Access off and drops Reset password and Sign out everywhere (decision 22).
+ * An archived contractor's card offers neither Create login nor Restore
+ * access (loginOffers): both wait for Restore on the page's Archived line.
  */
 export function PortalAccessCard({
   contactId,
@@ -79,6 +81,7 @@ export function PortalAccessCard({
   staffName,
   appUrl,
   account,
+  archived,
 }: {
   contactId: string;
   contactName: string;
@@ -87,6 +90,8 @@ export function PortalAccessCard({
   staffName: string;
   appUrl: string;
   account: PortalAccountView | null;
+  /** The contractor is archived: no new login and no restored access until they are restored. */
+  archived: boolean;
 }) {
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -100,6 +105,7 @@ export function PortalAccessCard({
   const [changeKey, setChangeKey] = useState(0);
   const [confirm, setConfirm] = useState<"reset" | "remove" | null>(null);
   const first = firstName(contactName) || contactName;
+  const offers = loginOffers(account, archived);
 
   function act<T>(action: () => Promise<ActionResult<T>>, onOk: (data: T) => void) {
     setError("");
@@ -151,14 +157,16 @@ export function PortalAccessCard({
         {!account && (
           <div className="space-y-2">
             <p className="text-meta text-fg-3">No login yet.</p>
-            <Button
-              onClick={() => {
-                setCreateKey((k) => k + 1);
-                setCreating(true);
-              }}
-            >
-              Create login
-            </Button>
+            {offers.create && (
+              <Button
+                onClick={() => {
+                  setCreateKey((k) => k + 1);
+                  setCreating(true);
+                }}
+              >
+                Create login
+              </Button>
+            )}
           </div>
         )}
 
@@ -197,14 +205,16 @@ export function PortalAccessCard({
               </div>
             )}
             {account.restorable ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={pending}
-                onClick={() => act(() => restorePortalAccess(account.id), () => toast({ message: account.contactActive ? `${first} can sign in again` : "Access restored" }))}
-              >
-                Restore access
-              </Button>
+              offers.restore && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => act(() => restorePortalAccess(account.id), () => toast({ message: account.contactActive ? `${first} can sign in again` : "Access restored" }))}
+                >
+                  Restore access
+                </Button>
+              )
             ) : (
               <div className={cn(account.state !== "off" && "border-t border-line pt-3")}>
                 <Button variant="danger" size="sm" disabled={pending} onClick={() => setConfirm("remove")}>
@@ -218,7 +228,7 @@ export function PortalAccessCard({
         {error && <p className="text-meta text-danger">{error}</p>}
       </div>
 
-      {!account && (
+      {offers.create && (
         <CreateLoginSheet
           key={createKey}
           contactId={contactId}

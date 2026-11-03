@@ -61,7 +61,7 @@ async function withUnread(userId: string, tasks: ListTask[]): Promise<ListTask[]
  * Grouping happens in list.ts (groupMine, groupContractors).
  */
 export async function todayTasks(userId: string): Promise<ListTask[]> {
-  const [rows, { users, contractors }] = await Promise.all([
+  const [rows, { users, contractors, archived }] = await Promise.all([
     prisma.task.findMany({
       where: {
         ...activeTask,
@@ -72,7 +72,7 @@ export async function todayTasks(userId: string): Promise<ListTask[]> {
     }),
     assigneeOptions(),
   ]);
-  return withUnread(userId, withLegacyPeople(rows.map(toListTask), personRefs(users, contractors)));
+  return withUnread(userId, withLegacyPeople(rows.map(toListTask), personRefs(users, contractors, archived)));
 }
 
 /**
@@ -184,6 +184,6 @@ export async function emailCapReached(today: Ymd): Promise<boolean> {
 export async function legacyNamesFor(owner: readonly string[]): Promise<LegacyNames> {
   if (!owner.some((k) => k.startsWith("u:") || k.startsWith("c:") || k === NONE)) return new Map();
   // The people the page lists: the team, the active contractors, and any inactive one picked.
-  const { users, contractors } = await assigneeOptions(owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
-  return (await legacyAssignees(personRefs(users, contractors))).merged;
+  const { users, contractors, archived } = await assigneeOptions(owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  return (await legacyAssignees(personRefs(users, contractors, archived))).merged;
 }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { TOAST_PHONE_CHARS } from "@/lib/toast-line";
-import { OPEN_FAILED_LINE, fetchModule, lazyModule, warmWhenIdle, type IdleEnv } from "./lazy-module";
+import { OPEN_FAILED_LINE, RELOAD_LABEL, fetchModule, isChunkLoadError, lazyModule, openFailedToast, reloadPage, warmWhenIdle, type IdleEnv } from "./lazy-module";
 
 test("lazyModule: nothing is fetched until it is asked for, then once for everyone", async () => {
   let fetched = 0;
@@ -89,9 +89,28 @@ test("fetchModule: a caller that has gone away is told nothing, arrived or faile
   assert.deepEqual(seen, []);
 });
 
-test("the line for a sheet that didn't open names the next step and fits a phone's toast", () => {
-  assert.equal(OPEN_FAILED_LINE, "Couldn't open it. Try again.");
+test("the toast for code that didn't open fits a phone, and its next step is Reload, not another tap", () => {
+  // Turbopack keeps a chunk that failed to load as failed for the page's life (every later import gets the same
+  // rejection), so "Try again" could never work: only loading the page again fetches it.
+  assert.equal(OPEN_FAILED_LINE, "Couldn't open it.");
   assert.ok(OPEN_FAILED_LINE.length <= TOAST_PHONE_CHARS && !OPEN_FAILED_LINE.includes("—"));
+  const t = openFailedToast();
+  assert.equal(t.message, OPEN_FAILED_LINE);
+  assert.equal(t.action.label, RELOAD_LABEL);
+  assert.equal(RELOAD_LABEL, "Reload");
+  assert.equal(t.action.onAction, reloadPage);
+  assert.equal(t.key, openFailedToast().key, "a second failure replaces the toast instead of stacking one");
+});
+
+test("isChunkLoadError: Turbopack's and webpack's chunk failures, and nothing else", () => {
+  const turbopack = Object.assign(new Error("Failed to load chunk /_next/static/chunks/0abc.js from module 123"), { name: "ChunkLoadError" });
+  assert.equal(isChunkLoadError(turbopack), true);
+  assert.equal(isChunkLoadError(new Error("Failed to load chunk /_next/static/chunks/0abc.js from module 1")), true, "the message alone");
+  assert.equal(isChunkLoadError(new Error("Loading chunk 7 failed.")), true);
+  assert.equal(isChunkLoadError(new Error("Loading CSS chunk app-layout failed.")), true);
+  for (const other of [new Error("Failed to fetch"), new TypeError("x is undefined"), new Error("chunk"), null, undefined, "Loading chunk 7 failed.", {}]) {
+    assert.equal(isChunkLoadError(other), false, String(other));
+  }
 });
 
 test("warmWhenIdle: starts the fetch when the browser is idle, or after a moment where it has no idle callback", () => {
@@ -120,4 +139,19 @@ test("warmWhenIdle: starts the fetch when the browser is idle, or after a moment
   // On the server there is no window: nothing happens and nothing throws.
   warmWhenIdle(source, undefined);
   assert.equal(warmed.length, 2);
+});
+
+test("warmWhenIdle: no warming while the device is offline, which would leave the chunk failed for the tap", () => {
+  const warmed: string[] = [];
+  const source = { warm: () => void warmed.push("warm") };
+  const timers: (() => void)[] = [];
+  const net = { onLine: false };
+  const env: IdleEnv = { setTimeout: (cb) => timers.push(cb), navigator: net };
+  warmWhenIdle(source, env);
+  timers[0]();
+  assert.deepEqual(warmed, [], "offline when the moment came");
+  net.onLine = true;
+  warmWhenIdle(source, env);
+  timers[1]();
+  assert.deepEqual(warmed, ["warm"]);
 });

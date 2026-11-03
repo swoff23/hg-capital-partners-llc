@@ -38,7 +38,7 @@ test("a sheet whose code can't be fetched closes with a toast instead of replaci
     const src = read(file);
     assert.match(
       src,
-      new RegExp(`useLazyModule\\(${sheet}, sheet !== null, \\(\\) => \\{\\s*setSheet\\(null\\);\\s*setIsOpen\\(false\\);\\s*run\\.toast\\(\\{ message: OPEN_FAILED_LINE \\}\\);\\s*\\}\\);`),
+      new RegExp(`useLazyModule\\(${sheet}, sheet !== null, \\(\\) => \\{\\s*setSheet\\(null\\);\\s*setIsOpen\\(false\\);\\s*run\\.toast\\(openFailedToast\\(\\)\\);\\s*\\}\\);`),
       `${file} closes the sheet and toasts`,
     );
     // And the code is fetched ahead of the tap: when the page is idle, and at hover, focus and press.

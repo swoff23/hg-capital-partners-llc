@@ -8,6 +8,7 @@ import { useLeaveWarning } from "@/components/use-leave-warning";
 import { NO_COUNTS, UploadEngine, type EngineDeps, type EngineNotice } from "@/lib/attachments/engine";
 import { idbOutbox } from "@/lib/attachments/outbox";
 import { lazyTransfer } from "@/lib/attachments/lazy-transfer";
+import { reloadPage, warmWhenIdle } from "@/lib/lazy-module";
 import type { FileKind } from "@/lib/attachments/content-types";
 import type { UploadKind } from "@/lib/attachments/upload-kinds";
 import { stillUploading } from "@/lib/portal/job-view";
@@ -256,19 +257,22 @@ function claimFile(id: string): Promise<(() => void) | null> {
 
 /**
  * The Blob client is most of what the queue weighs (its code and the crypto it
- * brings), and a page that never uploads shouldn't download it. It loads with
- * the first file instead (lib/attachments/lazy-transfer.ts); `preloadTransfer`
- * fetches it once the page is idle, on the pages that take uploads, so the
- * first file doesn't wait for it and a tab left open across a deploy still has it.
+ * brings), so it isn't part of the page's first load. It loads with the first
+ * file instead (lib/attachments/lazy-transfer.ts), and `preloadTransfer`
+ * fetches it once the page is idle: when the queue mounts (it may have files
+ * from the outbox to send) and on the pages that take uploads. So the first
+ * file doesn't wait for it, and a tab left open across a deploy has it before
+ * the deploy moves it.
  */
 const transfer = lazyTransfer(() => import("@/lib/attachments/transfer").then((m) => m.sendBlob));
 
-/** Starts fetching the upload code when the browser has a moment, for a page that takes files. Safe to call often. */
+/**
+ * Starts fetching the upload code when the browser has a moment. Safe to call often. Not while the device says it's
+ * offline (warmWhenIdle): the failed chunk would stay failed until a reload, where the first file might have found a
+ * signal.
+ */
 export function preloadTransfer(): void {
-  if (typeof window === "undefined") return;
-  const start = () => void transfer.get().catch(() => {});
-  if ("requestIdleCallback" in window) window.requestIdleCallback(start, { timeout: 4000 });
-  else setTimeout(start, 1500);
+  warmWhenIdle({ warm: () => void transfer.get().catch(() => {}) });
 }
 
 export function browserDeps(parts: {
@@ -285,6 +289,7 @@ export function browserDeps(parts: {
     outbox: parts.persist === false ? null : idbOutbox(),
     notify: parts.notify,
     navigate: parts.navigate,
+    reload: reloadPage,
     online: () => typeof navigator === "undefined" || navigator.onLine !== false,
     now: () => new Date(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
@@ -370,6 +375,9 @@ export function UploadQueueProvider({ children, scope }: { children: ReactNode; 
       stopping.current = setTimeout(() => engine.dispose(), 0);
     };
   }, [engine]);
+
+  // The upload code, ahead of the first file and of any the outbox puts back.
+  useEffect(() => preloadTransfer(), []);
 
   // Pick the outbox up, and try again when the signal or the tab comes back.
   useEffect(() => {

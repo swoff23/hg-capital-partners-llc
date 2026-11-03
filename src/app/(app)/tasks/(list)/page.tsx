@@ -43,7 +43,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
     requireUser(),
     options,
     // Imported names that are a person on offer count for that person; the rest list once as "Others".
-    legacyAssignees(options.then((o) => personRefs(o.users, o.contractors))),
+    legacyAssignees(options.then((o) => personRefs(o.users, o.contractors, o.archived))),
     // An archived property stays on offer while the URL picks it (a property page's "All tasks"),
     // so withKnownFilters below keeps the pick instead of dropping it.
     propertyOptions(filters.property),

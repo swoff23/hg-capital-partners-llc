@@ -14,8 +14,9 @@ import ts from "typescript";
  *    like lib/tasks/repeat-schema.ts, and the browser takes the hand-written
  *    twin beside them),
  *  - Prisma's client, a database library; types come in with `import type`,
- *  - the Blob client, which the upload queue fetches with the first file
- *    (components/upload-queue.tsx loadTransfer).
+ *  - the Blob client, which the upload queue fetches when idle or with the
+ *    first file (components/upload-queue.tsx `transfer` and `preloadTransfer`,
+ *    lib/attachments/lazy-transfer.ts).
  *
  * Type-only imports and `import()` are not followed: they ship nothing, or ship
  * as a chunk of their own. A "use server" file is not followed either; the
@@ -26,7 +27,7 @@ const SRC = path.join(__dirname, "..");
 const FORBIDDEN = [
   { match: (spec: string) => spec === "zod" || spec.startsWith("zod/"), why: "zod is server-only; split the schema from the helpers the browser takes" },
   { match: (spec: string) => spec === "@prisma/client" || spec.startsWith("@prisma/client/"), why: "Prisma is server-only; use `import type` for its types" },
-  { match: (spec: string) => spec === "@vercel/blob/client", why: "the Blob client loads with the first upload (upload-queue.tsx loadTransfer)" },
+  { match: (spec: string) => spec === "@vercel/blob/client", why: "the Blob client loads on demand (upload-queue.tsx `transfer`, lib/attachments/lazy-transfer.ts)" },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {

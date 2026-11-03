@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { lazyTransfer } from "./lazy-transfer";
-import { classifyFailure } from "./outbox";
+import { ServerBusyError, UploadCodeMissingError, classifyFailure } from "./outbox";
 import type { SendInput, Transfer } from "./transfer";
 
 const input = { name: "a.jpg" } as unknown as SendInput;
+const online = () => true;
+const offline = () => false;
 
 test("lazyTransfer: the client loads once, with the first file, and every file goes through it", async () => {
   let loads = 0;
@@ -13,7 +15,7 @@ test("lazyTransfer: the client loads once, with the first file, and every file g
     sent.push(i.name);
     return { pathname: `blob/${i.name}` };
   };
-  const t = lazyTransfer(async () => (loads++, real));
+  const t = lazyTransfer(async () => (loads++, real), online);
   assert.equal(loads, 0, "nothing is fetched until a file or a preload asks");
   const [a, b] = await Promise.all([t.send(input), t.send({ ...input, name: "b.jpg" } as SendInput)]);
   assert.deepEqual([a.pathname, b.pathname], ["blob/a.jpg", "blob/b.jpg"]);
@@ -24,26 +26,41 @@ test("lazyTransfer: the client loads once, with the first file, and every file g
 
 test("lazyTransfer: a preload and the first file share one fetch", async () => {
   let loads = 0;
-  const t = lazyTransfer(async () => (loads++, async () => ({ pathname: "p" })));
+  const t = lazyTransfer(async () => (loads++, async () => ({ pathname: "p" })), online);
   await t.get();
   await t.send(input);
   assert.equal(loads, 1);
 });
 
-test("lazyTransfer: a chunk that doesn't arrive fails like a dropped connection, and the next try fetches it again", async () => {
+test("lazyTransfer: a chunk that doesn't arrive while online is the page's code, not the road: the file waits uncounted", async () => {
+  // N2: the browser keeps a failed chunk failed until the page loads again, so counting tries only turned the file
+  // red as "no connection" after four fetches that couldn't succeed. Now it waits, and the engine offers Reload.
+  const t = lazyTransfer(async () => {
+    throw new Error("ChunkLoadError: Failed to load chunk /_next/static/chunks/0blob.js");
+  }, online);
+  const failure = await t.send(input).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  assert.ok(failure instanceof UploadCodeMissingError);
+  assert.equal(classifyFailure(failure, true), "offline", "no try is counted");
+  assert.equal(classifyFailure(failure, false), "offline");
+});
+
+test("lazyTransfer: offline, the same failure is the connection's, and the file waits for the signal", async () => {
   let loads = 0;
   const t = lazyTransfer(async () => {
     loads++;
     if (loads === 1) throw new Error("Loading chunk 123 failed.");
     return async () => ({ pathname: "p" });
-  });
+  }, offline);
   const failure = await t.send(input).then(
     () => null,
     (e: unknown) => e,
   );
   assert.ok(failure instanceof TypeError, "a TypeError, the shape of a dropped request");
-  assert.equal(classifyFailure(failure, true), "network", "online it counts as a try and waits");
   assert.equal(classifyFailure(failure, false), "offline", "offline it just waits");
+  // Where the runtime lets a second fetch through (not Turbopack), the next try gets the code.
   assert.deepEqual(await t.send(input), { pathname: "p" });
   assert.equal(loads, 2);
 });
@@ -51,6 +68,27 @@ test("lazyTransfer: a chunk that doesn't arrive fails like a dropped connection,
 test("lazyTransfer: a loader that throws at once is the same failure", async () => {
   const t = lazyTransfer(() => {
     throw new Error("boom");
-  });
-  await assert.rejects(t.send(input), TypeError);
+  }, online);
+  await assert.rejects(t.send(input), UploadCodeMissingError);
+  const away = lazyTransfer(() => {
+    throw new Error("boom");
+  }, offline);
+  await assert.rejects(away.send(input), TypeError);
+});
+
+test("lazyTransfer: what the transfer itself throws comes out as it is, so its own rules still apply", async () => {
+  // BOTH-L2: a refusal (late-photos' FinalRefusalError, a token route's no) or a busy server must not be dressed up as
+  // a missing chunk or a dropped connection; only the client's load is.
+  class Refused extends Error {}
+  for (const thrown of [new ServerBusyError(), new Refused("This job is closed."), new TypeError("Failed to fetch")]) {
+    const t = lazyTransfer(async () => async () => {
+      throw thrown;
+    }, online);
+    const out = await t.send(input).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    assert.equal(out, thrown, `${thrown.constructor.name} passes through unchanged`);
+  }
+  assert.equal(classifyFailure(new ServerBusyError(), true), "network", "a busy server still counts as a try");
 });

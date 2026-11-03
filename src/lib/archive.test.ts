@@ -108,7 +108,17 @@ function fakeTx(rows: { deal?: Row[]; property?: Row[]; contact?: Row[]; openJob
       return rows.openJobs ?? 0;
     },
   });
-  const tx = { deal: model("deal"), dealNote: model("dealNote"), property: model("property"), contact: model("contact"), task: model("task") };
+  const tx = {
+    deal: model("deal"),
+    dealNote: model("dealNote"),
+    property: model("property"),
+    contact: model("contact"),
+    task: model("task"),
+    async $executeRaw(sql: TemplateStringsArray, ...values: unknown[]) {
+      calls.push(["$executeRaw", sql.join("?"), values]);
+      return 1;
+    },
+  };
   return { tx: tx as unknown as ArchiveTx, calls, tables };
 }
 
@@ -191,6 +201,17 @@ test("a contractor whose access was removed can be archived; the login itself is
   assert.ok(!calls.some(([m]) => m === "portalAccount"), "portal accounts are never touched");
   const update = calls.find(([m, op]) => m === "contact" && op === "updateMany")?.[2] as { data: Row };
   assert.deepEqual(Object.keys(update.data).sort(), ["archivedAt", "archivedByUserId"], "active and the login stay as they are");
+});
+
+test("archiving a contractor locks their row FOR UPDATE before it counts jobs or reads the login", async () => {
+  // N3(c): without the lock the check and the write raced an assignment or a new login (their FK insert's KEY SHARE
+  // never waits on the archive's NO KEY UPDATE), so an open job or an active login could land on an archived contractor.
+  for (const archived of [true, false]) {
+    const { tx, calls } = fakeTx({ contact: [{ id: "c1", archivedAt: archived ? null : NOW, portalAccount: null }] });
+    await setContactArchived(tx, "c1", archived, BY, NOW);
+    assert.deepEqual(calls[0], ["$executeRaw", 'SELECT 1 FROM "Contact" WHERE "id" = ? FOR UPDATE', ["c1"]], "the first statement");
+    assert.equal(calls.filter(([m]) => m === "$executeRaw").length, 1, "the only lock it takes");
+  }
 });
 
 test("restoring a contractor always goes through, open jobs or not", async () => {

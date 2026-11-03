@@ -198,6 +198,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             phone={phone}
             staffName={me.name ?? me.email}
             appUrl={await signInOrigin()}
+            archived={!!c.archivedAt}
             account={
               c.portalAccount && access
                 ? {

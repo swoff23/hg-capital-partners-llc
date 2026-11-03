@@ -12,13 +12,18 @@
  * whose chunk arrived in 20 ms still opened 400 ms after the tap. Here the
  * caller renders the module once it has arrived, so nothing waits on that.
  *
- * `load` fetches once and everyone shares it. A fetch that fails (no signal,
- * a deploy that moved the chunk) is forgotten, so the next ask tries again.
+ * `load` fetches once and everyone shares it. A fetch that fails is
+ * forgotten here, so the next ask calls the importer again. In the browser
+ * that doesn't bring the code back: Turbopack's runtime keeps a chunk that
+ * failed to load (no signal, a deploy that moved it) as failed for the life
+ * of the page, and hands the same rejection to every later import of it. Only
+ * a reload fetches it again, so a failure says so (`openFailedToast`, and the
+ * error screen's Reload, `isChunkLoadError`).
  *
  * A sheet that is slow to arrive gives no sign until it opens, so its page
  * warms it ahead of the tap: `warmWhenIdle` once the page has settled, and
  * `warm` on a trigger's hover, focus and press. And a sheet whose code never
- * arrives is closed with a toast (`OPEN_FAILED_LINE`, via `fetchModule`'s
+ * arrives is closed with a toast (`openFailedToast`, via `fetchModule`'s
  * `failed`) rather than thrown to the error screen, which would replace the
  * whole record page.
  */
@@ -51,11 +56,42 @@ export function lazyModule<M>(importer: () => Promise<M>): LazyModule<M> {
 }
 
 /**
- * The toast when a sheet's code didn't arrive and the sheet was closed. Short
- * enough to show whole on a phone (TOAST_PHONE_CHARS in lib/toast-line.ts),
- * with the next step: the next tap asks for the code again.
+ * The toast when a sheet's or the viewer's code didn't arrive and it was
+ * closed. Short enough to show whole on a phone (TOAST_PHONE_CHARS in
+ * lib/toast-line.ts). The next step is the toast's Reload (RELOAD_LABEL): the
+ * failed chunk stays failed until the page loads again, so another tap would
+ * only fail the same way.
  */
-export const OPEN_FAILED_LINE = "Couldn't open it. Try again.";
+export const OPEN_FAILED_LINE = "Couldn't open it.";
+
+/** The action that brings a failed chunk back: the page, loaded again. */
+export const RELOAD_LABEL = "Reload";
+
+/** Loads the page again, which fetches every chunk afresh. */
+export function reloadPage(): void {
+  window.location.reload();
+}
+
+/**
+ * The toast for code that didn't arrive: OPEN_FAILED_LINE with Reload. One
+ * key, so a second failure replaces the first instead of stacking another.
+ */
+export function openFailedToast(): { message: string; key: string; action: { label: string; onAction: () => void } } {
+  return { message: OPEN_FAILED_LINE, key: "lazy-open-failed", action: { label: RELOAD_LABEL, onAction: reloadPage } };
+}
+
+/**
+ * Whether an error is a chunk of the page's own code that didn't load
+ * (Turbopack names it ChunkLoadError; webpack's message says "Loading chunk
+ * 123 failed"). Try again can't recover one, since the runtime keeps it
+ * failed, so the error screens offer Reload for it instead.
+ */
+export function isChunkLoadError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { name, message } = error as { name?: unknown; message?: unknown };
+  if (name === "ChunkLoadError") return true;
+  return typeof message === "string" && /\b(?:Failed to load chunk|Loading (?:CSS )?chunk \S+ failed)/.test(message);
+}
 
 /**
  * Fetches `source` for a caller that answers a failed fetch itself. Calls
@@ -85,16 +121,22 @@ export function fetchModule<M>(
 export type IdleEnv = {
   requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => unknown;
   setTimeout: (callback: () => void, ms: number) => unknown;
+  navigator?: { onLine?: boolean };
 };
 
 /**
  * Starts fetching when the browser has a moment (at most 4 seconds on), for a
  * page whose visitor will probably open the module soon: a property page's
- * edit sheets. Safe to call often, and on the server, where it does nothing.
+ * edit sheets, the photo viewer. Safe to call often, and on the server, where
+ * it does nothing. Not while the device says it's offline: the fetch would
+ * fail, and a failed chunk stays failed until the page loads again, so the
+ * tap that follows would fail with it when it might have found a signal.
  */
 export function warmWhenIdle(source: Pick<LazyModule<unknown>, "warm">, env: IdleEnv | undefined = typeof window === "undefined" ? undefined : window): void {
   if (!env) return;
-  const start = () => source.warm();
+  const start = () => {
+    if (env.navigator?.onLine !== false) source.warm();
+  };
   if (env.requestIdleCallback) env.requestIdleCallback(start, { timeout: 4000 });
   else env.setTimeout(start, 1500);
 }

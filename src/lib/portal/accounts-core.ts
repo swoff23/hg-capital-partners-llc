@@ -85,6 +85,14 @@ export type CreatedPortalAccount = Pick<PortalAccount, keyof typeof CREATED_ACCO
  * normalized and shaped like an email; `passwordHash` hashes the starting
  * password. The contractor is read in this transaction, and an archived one
  * is refused (ARCHIVED_CONTRACTOR_LINE).
+ *
+ * Their row is locked first, so an Archive at the same moment (archive.ts
+ * setContactArchived, FOR UPDATE) runs wholly before or after this: before,
+ * and the read below sees it archived; after, and Archive sees the login.
+ * FOR NO KEY UPDATE rather than FOR SHARE, because this can go on to write
+ * the same row (the empty email): two creates for one contractor each
+ * holding a share lock would deadlock on that write, where this way the
+ * second waits and finds the first one's login. No lock is taken before it.
  */
 export async function createPortalAccountIn(
   tx: Prisma.TransactionClient,
@@ -93,6 +101,7 @@ export async function createPortalAccountIn(
   passwordHash: string,
   createdByUser: Staff,
 ): Promise<CreatedPortalAccount> {
+  await tx.$executeRaw`SELECT 1 FROM "Contact" WHERE "id" = ${contactId} FOR NO KEY UPDATE`;
   const contact = await tx.contact.findUnique({
     where: { id: contactId },
     select: { id: true, email: true, archivedAt: true, portalAccount: { select: { id: true } } },
@@ -128,8 +137,16 @@ export async function createPortalAccountIn(
  * own value, read ACCOUNT_DISABLED as "access status changed" and go by
  * `data.action`; ACCOUNT_CREATED stays one row per login, so "created on"
  * views are right.
+ *
+ * The contractor's row is locked FOR SHARE first (found through the login,
+ * in one statement), so an Archive at the same moment runs wholly before or
+ * after: the read below then sees it archived, or Archive sees the active
+ * login and refuses. Contact, then PortalAccount, as createPortalAccountIn.
  */
 export async function enablePortalAccountIn(tx: Prisma.TransactionClient, accountId: string, byUser: Staff): Promise<void> {
+  await tx.$executeRaw`
+    SELECT 1 FROM "Contact" c JOIN "PortalAccount" a ON a."contactId" = c."id"
+    WHERE a."id" = ${accountId} FOR SHARE OF c`;
   const account = await tx.portalAccount.findUnique({
     where: { id: accountId },
     select: { id: true, contactId: true, contact: { select: { archivedAt: true } } },

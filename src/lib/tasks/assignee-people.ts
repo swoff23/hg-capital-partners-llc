@@ -47,6 +47,11 @@ export interface PersonRef {
   key: string;
   name: string;
   email?: string | null;
+  /**
+   * Not on offer (an archived contractor): their name and email still count
+   * when telling people apart, but nothing is filed under them.
+   */
+  hidden?: boolean;
 }
 
 /**
@@ -75,6 +80,11 @@ export function personKey(name: string): string {
  * when it is one, otherwise by its `personKey`; a name two people share
  * matches neither. `merged` maps each matched name to a person's key and
  * `others` is what's left, once each, in order, for an "Others" group.
+ *
+ * A `hidden` person (an archived contractor) is matched like anyone else,
+ * but a name that is theirs goes to `others`, never to someone on offer: an
+ * archived Zack and a live Zack share a name, so "Zack" is neither of them,
+ * as it was before the archived one left the list.
  */
 export function mergeLegacyNames(
   names: readonly string[],
@@ -82,6 +92,7 @@ export function mergeLegacyNames(
 ): { merged: Map<string, string>; others: string[] } {
   const byEmail = new Map<string, string>();
   const byName = new Map<string, string | null>();
+  const hidden = new Set(people.filter((p) => p.hidden).map((p) => p.key));
   for (const p of people) {
     const email = p.email?.trim().toLowerCase();
     if (email && !byEmail.has(email)) byEmail.set(email, p.key);
@@ -98,7 +109,7 @@ export function mergeLegacyNames(
     const name = raw.trim();
     if (!name) continue;
     const key = name.includes("@") ? byEmail.get(name.toLowerCase()) : (byName.get(personKey(name)) ?? undefined);
-    if (key) {
+    if (key && !hidden.has(key)) {
       merged.set(raw, key);
       continue;
     }

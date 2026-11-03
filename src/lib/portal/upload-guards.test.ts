@@ -26,8 +26,12 @@ function fn(source: string, name: string): string {
 
 test("the portal's upload queue is each contractor's own, and a new person gets a fresh one (fix 4)", () => {
   const layout = read("app", "(portal)", "p", "layout.tsx");
-  assert.match(layout, /getPortalPrincipal\(\{ allowStartingPassword: true \}\)/);
-  assert.match(layout, /principal \? portalScope\(principal\.contactId\) : "portal:signed-out"/);
+  // The layout's gate (session.ts requirePortalSession) answers signed out with /login, so there is always a principal,
+  // and it lets a starting password through (each page sends that on), so the queue is theirs then too.
+  assert.match(layout, /const principal = await requirePortalSession\(\);\n\s*const scope = portalScope\(principal\.contactId\);/);
+  const gate = fn(read("lib", "portal", "session.ts"), "requirePortalSession");
+  assert.match(gate, /const state = await readSession\(\);/);
+  assert.doesNotMatch(gate, /mustChangePassword/);
   assert.match(layout, /<UploadQueueProvider key=\{scope\} scope=\{scope\}>/);
   assert.doesNotMatch(layout, /scope="portal"/, "one shared portal queue hands one contractor's files to the next");
 });

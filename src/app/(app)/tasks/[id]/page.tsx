@@ -10,7 +10,8 @@ import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { propertyOptions } from "@/lib/picker-options";
 import { parseUnits } from "@/lib/property-types";
-import { easternDay } from "@/lib/tasks/activity";
+import { activityRecordIds, easternDay } from "@/lib/tasks/activity";
+import { activityRecordNames } from "@/lib/tasks/activity-names";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { asanaProfileGids, asanaTaskGids, taskIdsIn } from "@/lib/tasks/body-links";
 import { emailStatesIn } from "@/lib/tasks/delivery";
@@ -113,13 +114,13 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   if (!row) notFound();
   const task = { ...row, access, checklist, attachments, events };
   const now = new Date();
-  // Puts it on top of this person's Recent in search, and notes the open for the New divider and the unread dot,
-  // once the response is out. The previous open is read first (above): it is the divider's baseline. The refresh
-  // after an edit or a tick isn't an open, so it writes neither again.
-  if (!(await isActionRender())) {
-    after(() => recordView(user.id, "TASK", task.id));
-    after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id })));
-  }
+  // Puts it on top of this person's Recent in search, once the response is out; the refresh after an edit or a tick
+  // isn't an open, so it doesn't write that again. The read state (the New divider and the unread dot) is written on
+  // every render, that refresh too: it shows everything that came in since the open, so a comment that arrived while
+  // the page was up and showed with the refresh doesn't come back as unread. The previous open is read first (above):
+  // it is the divider's baseline, which the page keeps from its first render (activity.tsx), so the divider stays put.
+  if (!(await isActionRender())) after(() => recordView(user.id, "TASK", task.id));
+  after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id })));
 
   const live = task.events.filter((e) => !e.deletedAt);
   const commentBodies = live.filter((e) => e.kind === "COMMENT" && e.body).map((e) => e.body!);
@@ -133,7 +134,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     .slice(-40)
     .map((e) => e.id);
 
-  const [{ users, contractors, recent }, propertyRow, repeatSlot, contractorSeen, linked, people, emailStates] =
+  const [{ users, contractors, recent }, propertyRow, repeatSlot, contractorSeen, linked, people, emailStates, recordNames] =
     await Promise.all([
       // Recent: the people this viewer assigned last, for the assignee picker.
       assigneeOptions([task.assigneeContactId], user.id),
@@ -158,6 +159,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
           ])
         : null,
       contactId && emailed.length ? emailStatesIn(prisma, task.id, contactId, emailed) : new Map(),
+      // Who and where the lines name, archived or not: the pickers' lists above leave archived records out.
+      activityRecordNames(activityRecordIds(task.events)),
     ]);
 
   const today = todayYmdEastern(now);
@@ -195,8 +198,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
 
   const names = {
     users: Object.fromEntries(users.map((u) => [u.id, userName(u)])),
-    contacts: Object.fromEntries(contractors.map((c) => [c.id, c.name])),
-    properties: Object.fromEntries(properties.map((p) => [p.id, p.label])),
+    contacts: { ...recordNames.contacts, ...Object.fromEntries(contractors.map((c) => [c.id, c.name])) },
+    properties: { ...recordNames.properties, ...Object.fromEntries(properties.map((p) => [p.id, p.label])) },
   };
   const taskTitles = Object.fromEntries(linked.map((t) => [t.id, t.title]));
   const asanaTasks = Object.fromEntries(linked.flatMap((t) => (t.asanaId ? [[t.asanaId, t.id] as const] : [])));

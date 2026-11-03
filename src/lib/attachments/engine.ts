@@ -7,6 +7,7 @@ import {
   STALL_MS,
   ServerBusyError,
   StalledError,
+  UploadCodeMissingError,
   afterFailure,
   classifyFailure,
   resumable,
@@ -141,6 +142,11 @@ export type EngineDeps = {
    * tab holds it. Without it every file is ours.
    */
   claim?: (id: string) => Promise<(() => void) | null>;
+  /**
+   * Loads the page again: the way back when the upload code itself didn't load (UploadCodeMissingError), since the
+   * browser keeps a failed chunk failed until then. Without it that notice isn't shown.
+   */
+  reload?: () => void;
 };
 
 /** The tiles of a target with none: one shared array, so a server snapshot and an idle client one are the same. */
@@ -162,6 +168,12 @@ export function failedAwayText(kinds: readonly (FileKind | null)[], label: strin
   const where = label.trim();
   return `${uploadCountPhrase(kinds)} didn't upload${where ? ` to ${where}` : ""}`;
 }
+
+/**
+ * The one notice when the upload code didn't load while online (UploadCodeMissingError), with Reload: the files wait
+ * in the outbox, and the page's next load sends them.
+ */
+export const UPLOADS_PAUSED_LINE = "Uploads paused";
 
 /** The record step said no: the page has the reason. */
 class RecordRefused extends Error {}
@@ -199,6 +211,8 @@ export class UploadEngine {
   private readonly retained = new WeakSet<Job>();
   /** Keys that already told the person their files are waiting for a page to record them. */
   private readonly pageNoticed = new Set<string>();
+  /** Whether the "Uploads paused · Reload" notice has been shown: once, however many files wait on it. */
+  private codeNoticed = false;
 
   constructor(deps: EngineDeps) {
     this.deps = deps;
@@ -709,6 +723,7 @@ export class UploadEngine {
           : classifyFailure(err, online);
     const reason = ownWords ? err.message : failure === "refused" ? uploadFailureReason(err) : "no connection";
     const next = afterFailure({ tries: job.tries, waits: job.waits }, failure);
+    if (err instanceof UploadCodeMissingError) this.noticeCodeMissing();
     if (refusedByRecord) {
       // One record-only retry: a refusal may have discarded the blob, so after that it uploads again.
       job.recordFailures++;
@@ -807,6 +822,17 @@ export class UploadEngine {
         action: { label: "View", run: () => this.deps.navigate(href) },
       });
     }, 1500);
+  }
+
+  /**
+   * The upload code didn't load (UploadCodeMissingError): once, "Uploads paused · Reload". The files keep waiting
+   * without spending their tries, and go up after the reload.
+   */
+  private noticeCodeMissing() {
+    const reload = this.deps.reload;
+    if (this.codeNoticed || !reload) return;
+    this.codeNoticed = true;
+    this.deps.notify({ message: UPLOADS_PAUSED_LINE, key: "upload-code", action: { label: "Reload", run: () => reload() } });
   }
 
   /** "2 photos didn't upload to 56 Tamarack St · Retry": the page that's open isn't theirs, so the toast names where they were going. */

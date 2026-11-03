@@ -57,3 +57,16 @@ function seenLabel(at: Date, now: Date): string {
   // A clock a little ahead reads "today", never "tomorrow".
   return ago <= 0 ? "today" : relativeDays(day, today);
 }
+
+/**
+ * Whether the Portal access card offers Create login (no login yet) and
+ * Restore access (a login whose access was removed). Neither shows for an
+ * archived contractor: both are refused on the server until the contractor
+ * is restored (accounts-core.ts ARCHIVED_CONTRACTOR_LINE), and a button that
+ * can only refuse is a dead control. Restore on the page's Archived line is
+ * the way back, and the card offers them again after it.
+ */
+export function loginOffers(account: { restorable: boolean } | null, archived: boolean): { create: boolean; restore: boolean } {
+  if (archived) return { create: false, restore: false };
+  return { create: !account, restore: !!account?.restorable };
+}

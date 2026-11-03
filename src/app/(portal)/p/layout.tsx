@@ -4,7 +4,7 @@ import { ToastProvider } from "@/components/toast";
 import { UploadQueueProvider } from "@/components/upload-queue";
 import { portalScope } from "@/lib/attachments/queue-owner";
 import { BRAND } from "@/lib/brand";
-import { getPortalPrincipal } from "@/lib/portal/session";
+import { requirePortalSession } from "@/lib/portal/session";
 
 export const metadata: Metadata = {
   // absolute, so the app's "%s · HG" template (src/app/layout.tsx) leaves the portal's titles as they are.
@@ -13,9 +13,13 @@ export const metadata: Metadata = {
 };
 
 /**
- * The contractor portal (docs/asana-migration-plan.md §5.1). Deliberately no
- * auth here: every page calls requirePortalPrincipal() itself, because a
- * layout doesn't re-run on client navigation and isn't a security boundary.
+ * The contractor portal (docs/asana-migration-plan.md §5.1). The layout
+ * answers a first load before anything streams (requirePortalSession): a 404
+ * while the portal is off and /login when signed out, not a 200 with a
+ * page's loading skeleton. It isn't the security boundary: a layout doesn't
+ * re-run on client navigation, so every page and action still calls
+ * requirePortalPrincipal() itself, which also sends a starting password to
+ * the first-password page.
  * Code under (portal) never imports staff auth or the properties, deals or
  * QuickBooks modules (src/lib/auth-guard.test.ts). The portal has its own
  * toast region (AppShell holds the app's). The work surface is --surface;
@@ -31,16 +35,15 @@ export const metadata: Metadata = {
  * each partner's: two contractors who sign in on one phone, or share a job,
  * never pick up each other's leftover files, so a file is only ever recorded
  * and posted as the person who picked it. The key gives each person a fresh
- * queue. Reading the session here decides only whose queue it is; pages still
- * check it themselves. A second tab that keeps showing someone else's queue
+ * queue. A second tab that keeps showing someone else's queue
  * after another person signs in is stopped on the server: the queue names its
  * owner with every token, record, post and Undo, and a mismatch is refused
  * (attachments/queue-owner.ts), so its files wait in the outbox for their own
  * person.
  */
 export default async function PortalLayout({ children }: LayoutProps<"/p">) {
-  const principal = await getPortalPrincipal({ allowStartingPassword: true });
-  const scope = principal ? portalScope(principal.contactId) : "portal:signed-out";
+  const principal = await requirePortalSession();
+  const scope = portalScope(principal.contactId);
   return (
     <div className="min-h-screen bg-surface text-fg-1">
       <ToastProvider>

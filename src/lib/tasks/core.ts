@@ -207,6 +207,40 @@ async function syncAssigneeAccess(tx: Tx, taskId: string, contactId: string | nu
  */
 export { syncAssigneeAccess as grantAssigneeAccess };
 
+/**
+ * The refusal when a write would give a job to an archived contractor: a
+ * picker loaded before they were archived (createTask, patchTask). Archive
+ * itself is refused while they have open jobs (archive.ts).
+ */
+export const ARCHIVED_ASSIGNEE_LINE = "Archived. Pick someone else.";
+
+/**
+ * Whether a contractor is archived, read under a FOR SHARE lock on their
+ * Contact row, so the answer holds until this transaction ends. Every path
+ * that hands a job to a contractor asks it: after the Task row's lock (or,
+ * for a new task, before its insert), ahead of the task's child rows and
+ * email rows. Archive (archive.ts setContactArchived) locks the Contact FOR
+ * UPDATE first and takes nothing after it, so it either commits first and
+ * this reads archived, or waits for this transaction and then counts the
+ * job. A contact that isn't there reads as not archived: the foreign key
+ * refuses it, as before.
+ */
+async function contactArchivedLocked(tx: Tx, contactId: string): Promise<boolean> {
+  const rows = await tx.$queryRaw<{ archived: boolean }[]>`
+    SELECT ("archivedAt" IS NOT NULL) AS "archived" FROM "Contact" WHERE "id" = ${contactId} FOR SHARE`;
+  return rows[0]?.archived === true;
+}
+
+/**
+ * The internal line when a job goes back to work without its archived
+ * contractor (a reopen, Approve's Undo): an ASSIGNED line to nobody, marked
+ * `archived`, which the timeline words as "Unassigned because Zack Outlaw is
+ * archived" (activity.ts) and never folds or pairs with another assignment.
+ */
+function archivedAssigneeLine(contactId: string): EventInput {
+  return { kind: "ASSIGNED", data: { from: { userId: null, contactId, name: null }, to: { userId: null, contactId: null }, archived: true } };
+}
+
 // ---------------------------------------------------------------------------
 // Notifications (sent later by src/lib/notifications/outbox.ts)
 // ---------------------------------------------------------------------------
@@ -378,6 +412,8 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
   const propertyId = input.propertyId || null;
   const assigneeUserId = input.assignee && "userId" in input.assignee ? input.assignee.userId : null;
   const assigneeContactId = input.assignee && "contactId" in input.assignee ? input.assignee.contactId : null;
+  // A picker loaded before the contractor was archived still offers them.
+  if (assigneeContactId && (await contactArchivedLocked(tx, assigneeContactId))) throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
 
   const task = await tx.task.create({
     data: {
@@ -512,6 +548,12 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
 
   const closing = to === "DONE" || to === "CANCELED";
   const reopening = !isActiveStatus(before.status) && isActiveStatus(to);
+  // A reopened job never goes back to an archived contractor: it starts unassigned, with a line saying why, and
+  // neither does the next repeat a finish makes (createNextRepeat reads it under this lock). The contact is locked
+  // right after this task, before any child or email row, and holds off an Archive until the job is there to count.
+  const finishing = to === "DONE" && before.status !== "DONE";
+  const archivedNow = before.assigneeContactId && (reopening || finishing) ? await contactArchivedLocked(tx, before.assigneeContactId) : false;
+  const dropArchived = reopening && archivedNow;
   const task = await tx.task.update({
     where: { id: taskId },
     data: {
@@ -527,9 +569,14 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
         : reopening
           ? { completedAt: null, completedByUserId: null, completedByContactId: null }
           : {}),
+      ...(dropArchived ? { assigneeContactId: null } : {}),
       ...editStamp(p, now),
     },
   });
+  if (dropArchived && before.assigneeContactId) {
+    await addEvent(tx, taskId, p, archivedAssigneeLine(before.assigneeContactId));
+    await syncAssigneeAccess(tx, taskId, null, p, now);
+  }
 
   const visibility = statusEventVisibility(to, !!task.assigneeContactId);
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
@@ -570,7 +617,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   if (to === "DONE" || reopening) {
     await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now, to === "DONE" ? statusEvent.id : undefined);
   }
-  const nextTaskId = to === "DONE" && before.status !== "DONE" ? await createNextRepeat(tx, task, p, now) : null;
+  const nextTaskId = finishing ? await createNextRepeat(tx, task, p, now) : null;
   const nextDue = nextTaskId ? toYmd((await tx.task.findUnique({ where: { id: nextTaskId }, select: { dueDate: true } }))?.dueDate) : null;
   // Done to Canceled isn't a reopen: the copy stays.
   if (before.status === "DONE" && isActiveStatus(to)) await takeBackRepeat(tx, taskId);
@@ -613,9 +660,11 @@ export function approvalEmailRefusal(rows: readonly ApprovalEmail[]): string | n
  * sent or on its way (approvalEmailRefusal): by then Zack has been told, or
  * may be, and the status menu is the honest way back. A row the drain closed
  * without sending doesn't stop it. A retry of an Undo that already went
- * through is a quiet success. Lock order: this task, then its email rows
- * naming the approval (id order), then takeBackRepeat's copy and the copy's
- * email rows (id order). The drain locks email rows only.
+ * through is a quiet success. Lock order: this task, then its contractor's
+ * Contact (FOR SHARE: one archived since the approval doesn't get the job
+ * back, and the line says so), then its email rows naming the approval (id
+ * order), then takeBackRepeat's copy and the copy's email rows (id order).
+ * The drain locks email rows only.
  */
 export async function undoApproval(tx: Tx, taskId: string, approvedEventId: string, p: Principal, now = new Date()): Promise<{ task: Task }> {
   if (p.kind !== "staff") throw new TaskRuleError("Only staff can undo an approval.");
@@ -642,6 +691,9 @@ export async function undoApproval(tx: Tx, taskId: string, approvedEventId: stri
     throw new TaskRuleError(by ? `${by} approved this. Change the status.` : "Not yours to undo. Change the status.");
   }
   if (now.getTime() - latest.createdAt.getTime() > APPROVAL_UNDO_MS) throw new TaskRuleError("Too late to undo. Change the status.");
+  // Back in Review is open work: a contractor archived since the approval doesn't get it back (as setStatus's
+  // reopen). Their contact is locked after this task and before the email rows, the order every assigning path keeps.
+  const dropArchived = before.assigneeContactId ? await contactArchivedLocked(tx, before.assigneeContactId) : false;
   // The approval's email rows, locked so a send run can't claim one between this check and the soft delete
   // below (approvalEmailRefusal says which rows stop the Undo).
   const emails = await tx.$queryRaw<ApprovalEmail[]>`
@@ -652,8 +704,19 @@ export async function undoApproval(tx: Tx, taskId: string, approvedEventId: stri
   if (refusal) throw new TaskRuleError(refusal);
   const task = await tx.task.update({
     where: { id: taskId },
-    data: { status: "REVIEW", completedAt: null, completedByUserId: null, completedByContactId: null, ...editStamp(p, now) },
+    data: {
+      status: "REVIEW",
+      completedAt: null,
+      completedByUserId: null,
+      completedByContactId: null,
+      ...(dropArchived ? { assigneeContactId: null } : {}),
+      ...editStamp(p, now),
+    },
   });
+  if (dropArchived && before.assigneeContactId) {
+    await addEvent(tx, taskId, p, archivedAssigneeLine(before.assigneeContactId));
+    await syncAssigneeAccess(tx, taskId, null, p, now);
+  }
   await tx.taskEvent.update({ where: { id: approvedEventId }, data: { deletedAt: now } });
   const completedLine = task.dealId
     ? await tx.dealNote.updateMany({
@@ -716,6 +779,13 @@ async function repeatSlot(tx: Tx, taskId: string): Promise<Ymd | null> {
  * A yearly rule finished on Feb 29 hands its copies the leap-day pin
  * (repeat.ts leapDayRule), so the series comes back to the 29th in the next
  * leap year instead of staying on Feb 28.
+ * A copy never goes to an archived contractor: it starts unassigned, and
+ * its CREATED line names them (`archivedAssignee`, worded by activity.ts).
+ * Everything else it answers is as before. It reads `archivedAt` with a
+ * plain read and runs no raw SQL, as the importer requires of core
+ * (asana/import.test.ts); setStatus has locked the contact (FOR SHARE) right
+ * after the task before calling it, so in the app that read holds until the
+ * finish commits.
  * Exported for the Asana delta, which closes tasks completed in Asana
  * without going through setStatus.
  */
@@ -729,6 +799,8 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
   const due = nextRepeatDue(rule, repeatFrom(rule, slot, toYmd(done.dueDate), today), today);
   const seriesId = done.repeatSeriesId ?? done.id;
   if (!done.repeatSeriesId) await tx.task.update({ where: { id: done.id }, data: { repeatSeriesId: seriesId } });
+  const contact = done.assigneeContactId ? await tx.contact.findUnique({ where: { id: done.assigneeContactId }, select: { archivedAt: true } }) : null;
+  const archivedAssignee = contact?.archivedAt ? done.assigneeContactId : null;
 
   const next = await tx.task.create({
     data: {
@@ -739,7 +811,7 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
       propertyId: done.propertyId,
       unitLabel: done.unitLabel,
       assigneeUserId: done.assigneeUserId,
-      assigneeContactId: done.assigneeContactId,
+      assigneeContactId: archivedAssignee ? null : done.assigneeContactId,
       assigneeName: done.assigneeName,
       bucket: done.bucket,
       repeatRule: rule,
@@ -751,7 +823,12 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
   if (items.length) {
     await tx.taskChecklistItem.createMany({ data: items.map((i) => ({ taskId: next.id, title: i.title, position: i.position })) });
   }
-  await addEvent(tx, next.id, { kind: "system", label: "Repeats" }, { kind: "CREATED", data: { repeatOf: done.id, due } });
+  await addEvent(
+    tx,
+    next.id,
+    { kind: "system", label: "Repeats" },
+    { kind: "CREATED", data: { repeatOf: done.id, due, ...(archivedAssignee ? { archivedAssignee } : {}) } },
+  );
   await addEvent(tx, done.id, { kind: "system", label: "Repeats" }, { kind: "REPEAT_CREATED", data: { next: next.id, due } });
   if (next.assigneeContactId) {
     await syncAssigneeAccess(tx, next.id, next.assigneeContactId, p, now);
@@ -974,6 +1051,10 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
     const userId = patch.assignee && "userId" in patch.assignee ? patch.assignee.userId : null;
     const contactId = patch.assignee && "contactId" in patch.assignee ? patch.assignee.contactId : null;
     if (userId !== before.assigneeUserId || contactId !== before.assigneeContactId) {
+      // A picker loaded before the contractor was archived still offers them. One who already has the job keeps it.
+      if (contactId && contactId !== before.assigneeContactId && (await contactArchivedLocked(tx, contactId))) {
+        throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
+      }
       // Exactly one kind of assignee; the legacy free text goes once a real one is chosen.
       data.assigneeUserId = userId;
       data.assigneeContactId = contactId;

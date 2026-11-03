@@ -133,6 +133,22 @@ export async function requirePortalPrincipal(opts: { passwordPage?: boolean } = 
 }
 
 /**
+ * The portal layout's gate, which answers before anything streams: a 404
+ * while PORTAL_ENABLED is off and /login when signed out, as real responses
+ * (a page's own check runs inside its loading.tsx boundary, after a 200 and
+ * a skeleton are already out). A login still on its starting password
+ * passes: each page sends it to the first-password page (or, there, lets it
+ * stay) through requirePortalPrincipal, which stays every page's and
+ * action's real check, since a layout isn't re-run on client navigation.
+ */
+export async function requirePortalSession(): Promise<PortalPrincipal> {
+  if (!(await portalOnForRequest())) notFound();
+  const state = await readSession();
+  if (!state) redirect(withNext("/login", await requestedPortalPath()));
+  return state.principal;
+}
+
+/**
  * Where a signed-in contractor belongs, for /login to bounce them on: `next`
  * (already checked with portalReturnPath) or My jobs, by way of the
  * first-password page if need be. Null when signed out.

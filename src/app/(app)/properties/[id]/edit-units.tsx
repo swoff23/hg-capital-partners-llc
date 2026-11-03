@@ -22,7 +22,7 @@ import {
   projectedYear,
   utilityStatusTone,
 } from "@/lib/property-types";
-import { OPEN_FAILED_LINE, lazyModule, warmWhenIdle } from "@/lib/lazy-module";
+import { lazyModule, openFailedToast, warmWhenIdle } from "@/lib/lazy-module";
 import { removeUnitQuestion, unitRefKey, type UnitRefs } from "@/lib/properties/unit-refs";
 import { sheetUnitAt } from "@/lib/properties/unit-sheet";
 import { dueIn } from "@/lib/properties/capex";
@@ -98,11 +98,12 @@ export function UnitsSection({
   const [isOpen, setIsOpen] = useState(false);
   const [removing, setRemoving] = useState<Removing | null>(null);
   const run = useRun();
-  // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast, and the next tap asks again.
+  // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast whose Reload
+  // brings it back (a failed chunk stays failed until the page loads again, lib/lazy-module.ts).
   const editor = useLazyModule(unitSheet, sheet !== null, () => {
     setSheet(null);
     setIsOpen(false);
-    run.toast({ message: OPEN_FAILED_LINE });
+    run.toast(openFailedToast());
   });
   useEffect(() => warmWhenIdle(unitSheet), []);
 

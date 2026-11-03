@@ -106,9 +106,16 @@ type Login = { id: string; contactId: string; email: string; status: "ACTIVE" | 
 function fakeContractors(contacts: Contact[], logins: Login[] = []) {
   const writes: string[] = [];
   const events: { kind: string; data: unknown }[] = [];
+  /** Every lock and read, in order, so a test can say the contact was locked before anything was read. */
+  const order: string[] = [];
   const tx = {
+    $executeRaw: async (sql: TemplateStringsArray, ...values: unknown[]) => {
+      order.push(`lock ${sql.join("?").replace(/\s+/g, " ").trim()} [${values.join(",")}]`);
+      return 1;
+    },
     contact: {
       findUnique: async ({ where }: { where: { id: string } }) => {
+        order.push("read contact");
         const row = contacts.find((c) => c.id === where.id);
         return row ? { ...row } : null;
       },
@@ -122,6 +129,7 @@ function fakeContractors(contacts: Contact[], logins: Login[] = []) {
     user: { findFirst: async () => null },
     portalAccount: {
       findUnique: async ({ where }: { where: { id?: string; email?: string } }) => {
+        order.push("read login");
         const row = logins.find((a) => (where.id ? a.id === where.id : a.email === where.email));
         if (!row) return null;
         return { ...row, contact: { archivedAt: contacts.find((c) => c.id === row.contactId)?.archivedAt ?? null } };
@@ -144,7 +152,7 @@ function fakeContractors(contacts: Contact[], logins: Login[] = []) {
       },
     },
   } as unknown as Prisma.TransactionClient;
-  return { tx, contacts, logins, writes, events };
+  return { tx, contacts, logins, writes, events, order };
 }
 
 const ARCHIVED_AT = new Date("2026-10-30T14:00:00.000Z");
@@ -207,4 +215,25 @@ test("enablePortalAccountIn: a contractor who isn't archived gets access back, l
   assert.deepEqual(f.writes, ["status", "event"]);
   assert.deepEqual(f.events, [{ kind: "ACCOUNT_DISABLED", userId: "u-connor", contactId: "c-zed", ipHash: null, taskId: null, data: { action: "enabled" } }]);
   await assert.rejects(enablePortalAccountIn(f.tx, "nope", STAFF), /no longer exists/);
+});
+
+test("createPortalAccountIn and enablePortalAccountIn lock the contractor's row before they read it", async () => {
+  // N3(c): an Archive at the same moment locks the row FOR UPDATE (archive.ts), so with these locks one of the two
+  // runs wholly first and the other sees it. Without them both read "not archived" / "no login" and both wrote.
+  const made = fakeContractors([{ id: "c-zed", email: "zed@example.com", archivedAt: null, portalAccount: null }]);
+  await createPortalAccountIn(made.tx, "c-zed", "zed@example.com", "hash", STAFF);
+  assert.equal(made.order[0], 'lock SELECT 1 FROM "Contact" WHERE "id" = ? FOR NO KEY UPDATE [c-zed]', "the first statement");
+  assert.equal(made.order.filter((o) => o.startsWith("lock")).length, 1);
+
+  const back = fakeContractors(
+    [{ id: "c-zed", email: "zed@example.com", archivedAt: null, portalAccount: { id: "a-zed" } }],
+    [{ id: "a-zed", contactId: "c-zed", email: "zed@example.com", status: "DISABLED" }],
+  );
+  await enablePortalAccountIn(back.tx, "a-zed", STAFF);
+  assert.equal(
+    back.order[0],
+    'lock SELECT 1 FROM "Contact" c JOIN "PortalAccount" a ON a."contactId" = c."id" WHERE a."id" = ? FOR SHARE OF c [a-zed]',
+    "the contact, found through the login, before the login is read",
+  );
+  assert.deepEqual(back.order.slice(1), ["read login"]);
 });

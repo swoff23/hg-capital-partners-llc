@@ -1,7 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Client } from "pg";
-import { POOL_MAX, dbConnectionSummary, isTxPooler, runtimeDatabaseUrl, runtimePoolConfig } from "./db-url";
+import {
+  POOL_CONNECT_TIMEOUT_MS,
+  POOL_MAX,
+  TRANSACTION_MAX_WAIT_MS,
+  dbConnectionSummary,
+  isPrivateHost,
+  isTxPooler,
+  runtimeDatabaseUrl,
+  runtimePoolConfig,
+  runtimeSchema,
+} from "./db-url";
 
 const SESSION = "postgresql://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres";
 const TX = "postgres://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x";
@@ -80,4 +90,48 @@ test("the health detail names the driver, the route and the pool", () => {
   // Production without the integration's URL falls back to the session pooler, which health shows as direct.
   assert.equal(dbConnectionSummary({ VERCEL_ENV: "production", DATABASE_URL: SESSION }).dbVia, "direct");
   assert.deepEqual(dbConnectionSummary({ VERCEL_ENV: "preview", POSTGRES_PRISMA_URL: TX }), { dbDriver: "none", dbVia: null, dbPool: null });
+});
+
+test("ADP-4: a unix socket or a server on the local network stays plain, as the engine's prefer left it", () => {
+  for (const url of [
+    "postgresql://u@/hg?host=/var/run/postgresql",
+    "postgresql://u@/hg?host=%2Ftmp",
+    "postgresql://u@192.168.1.20:5432/hg",
+    "postgresql://u@10.0.0.5/hg",
+    "postgresql://u@172.20.0.3/hg",
+    "postgresql://u@169.254.10.1/hg",
+    "postgresql://u@[fd12:3456::1]:5432/hg",
+    "postgresql://u@[fe80::1]/hg",
+    "postgresql://u@db:5432/hg",
+    "postgresql://u@postgres.local/hg",
+    "postgresql://u@host.docker.internal/hg",
+    "postgresql://u@api.localhost/hg",
+  ]) {
+    assert.equal(runtimeDatabaseUrl({ DATABASE_URL: url }), url, url);
+  }
+  // Anything public still gets TLS.
+  for (const url of [SESSION, "postgresql://u@db.abcd.supabase.co:5432/postgres", "postgresql://u@172.32.0.1/hg", "postgresql://u@8.8.8.8/hg", "postgresql://u@[2001:db8::1]/hg"]) {
+    assert.ok(!isPrivateHost(url), url);
+    assert.match(runtimeDatabaseUrl({ DATABASE_URL: url }) ?? "", /sslmode=require&uselibpqcompat=true$/, url);
+  }
+});
+
+test("ADP-5: a schema= in the URL reaches the client and the session, and node-postgres never sees it", () => {
+  const url = "postgresql://u@localhost:5432/hg?schema=hg_test";
+  assert.equal(runtimeDatabaseUrl({ DATABASE_URL: url }), "postgresql://u@localhost:5432/hg");
+  assert.equal(runtimeSchema({ DATABASE_URL: url }), "hg_test");
+  assert.equal(runtimePoolConfig({ DATABASE_URL: url })?.options, "-c search_path=hg_test");
+  // public, none, or a name that isn't a plain identifier: nothing changes.
+  for (const plain of [`${SESSION}?schema=public`, SESSION, `${LOCAL}?schema=a%20b`, `${LOCAL}?schema=x;drop`]) {
+    assert.equal(runtimeSchema({ DATABASE_URL: plain }), null, plain);
+    assert.equal(runtimePoolConfig({ DATABASE_URL: plain })?.options, undefined, plain);
+  }
+  assert.doesNotMatch(runtimeDatabaseUrl({ DATABASE_URL: `${SESSION}?schema=public` }) ?? "", /schema=/);
+});
+
+test("maxWait: the client's default is the pool's connect timeout, the wait a transaction really gets", () => {
+  // Measured on the scratch database: with every connection busy, a transaction asked to wait 500 ms waited 5.7 s,
+  // because Prisma's maxWait doesn't reach the adapter's pool.connect; only POOL_CONNECT_TIMEOUT_MS bounds it.
+  assert.equal(TRANSACTION_MAX_WAIT_MS, POOL_CONNECT_TIMEOUT_MS);
+  assert.equal(runtimePoolConfig({ DATABASE_URL: LOCAL })?.connectionTimeoutMillis, TRANSACTION_MAX_WAIT_MS);
 });

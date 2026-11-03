@@ -9,7 +9,7 @@ import { PhotoThumb } from "@/components/photo-thumb";
 import { AddRow, Button, SaveError, Section, buttonClass, textLinkClass } from "@/components/ui";
 import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
-import { OPEN_FAILED_LINE, lazyModule, warmWhenIdle } from "@/lib/lazy-module";
+import { lazyModule, openFailedToast, warmWhenIdle } from "@/lib/lazy-module";
 import { cn } from "@/lib/utils";
 import { deletePropertyListing } from "../actions";
 import type { ListingPhotoDraft } from "./listing-photos";
@@ -78,11 +78,12 @@ export function ListingsSection({
   const [isOpen, setIsOpen] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const run = useRun();
-  // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast, and the next tap asks again.
+  // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast whose Reload
+  // brings it back (a failed chunk stays failed until the page loads again, lib/lazy-module.ts).
   const editor = useLazyModule(listingSheet, sheet !== null, () => {
     setSheet(null);
     setIsOpen(false);
-    run.toast({ message: OPEN_FAILED_LINE });
+    run.toast(openFailedToast());
   });
   useEffect(() => warmWhenIdle(listingSheet), []);
   const noUnits = unitLabels.length === 0;

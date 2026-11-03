@@ -102,6 +102,44 @@ export type ActivityEntry<E extends ActivityEvent = ActivityEvent> =
 
 type Data = Record<string, unknown>;
 const dataOf = (e: ActivityEvent): Data => (e.data && typeof e.data === "object" ? (e.data as Data) : {});
+
+/**
+ * The contractors and properties the lines name by id: an assignment's two
+ * sides (and a CREATED line's `to`), an archived contractor a line names, a
+ * move between properties, and what a sync conflict kept. The task page
+ * looks these up by id whatever their archive state, since the pickers'
+ * lists leave archived records out and a line naming one would otherwise
+ * read "assigned someone" or "moved this to another property"
+ * (activity-names.ts).
+ */
+export function activityRecordIds(events: readonly Pick<ActivityEvent, "kind" | "data">[]): { contacts: string[]; properties: string[] } {
+  const contacts = new Set<string>();
+  const properties = new Set<string>();
+  const side = (v: unknown) => (v && typeof v === "object" ? s((v as Data).contactId) : null);
+  const add = (set: Set<string>, id: string | null) => {
+    if (id) set.add(id);
+  };
+  for (const e of events) {
+    const d = dataOf(e as ActivityEvent);
+    switch (e.kind) {
+      case "ASSIGNED":
+      case "CREATED":
+        add(contacts, side(d.from));
+        add(contacts, side(d.to));
+        add(contacts, s(d.archivedAssignee));
+        break;
+      case "PROPERTY":
+        add(properties, s(d.from));
+        add(properties, s(d.to));
+        break;
+      case "CONFLICT":
+        if (s(d.field) === "assignee") add(contacts, side(d.app));
+        if (s(d.field) === "place" && d.app && typeof d.app === "object") add(properties, s((d.app as Data).propertyId));
+        break;
+    }
+  }
+  return { contacts: [...contacts], properties: [...properties] };
+}
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 /**
@@ -179,6 +217,11 @@ function assigneeName(to: unknown, names: ActivityNames): string | null {
   );
 }
 
+/** The archived contractor a line names: their name, else "the contractor". */
+function archivedName(contactId: string | null, names: ActivityNames): string {
+  return (contactId && names.contacts?.[contactId]) || "the contractor";
+}
+
 function propertyLine(e: ActivityEvent, d: Data, names: ActivityNames): string {
   const a = who(e);
   if ("unitTo" in d || "unitFrom" in d) {
@@ -247,9 +290,17 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
   switch (e.kind) {
     case "CREATED": {
       const of = s(d.repeatOf);
-      return of ? { text: "Created as the next repeat", href: `/tasks/${of}` } : { text: `${a} created this task` };
+      // A copy of a job whose contractor is archived starts unassigned (core.ts createNextRepeat).
+      const archived = s(d.archivedAssignee);
+      const why = archived ? `, unassigned because ${archivedName(archived, names)} is archived` : "";
+      return of ? { text: `Created as the next repeat${why}`, href: `/tasks/${of}` } : { text: `${a} created this task` };
     }
     case "ASSIGNED": {
+      // A job back at work without its archived contractor (a reopen, Approve's Undo; core.ts archivedAssigneeLine).
+      if (d.archived === true) {
+        const from = d.from && typeof d.from === "object" ? s((d.from as Data).contactId) : null;
+        return { text: `Unassigned because ${archivedName(from, names)} is archived` };
+      }
       const name = assigneeName(d.to, names);
       return { text: name ? `${a} assigned ${name}` : `${a} unassigned this` };
     }
@@ -398,6 +449,8 @@ function moveOf(e: ActivityEvent): { key: string; from: string; to: string } | n
       return from === null || to === null ? null : { key: "property", from, to };
     }
     case "ASSIGNED": {
+      // Unassigned because the contractor was archived: no one's change to undo.
+      if (d.archived === true) return null;
       const side = (x: unknown) => {
         const o = x && typeof x === "object" ? (x as Data) : {};
         return `${s(o.userId) ?? ""}|${s(o.contactId) ?? ""}`;
@@ -468,7 +521,7 @@ function groupKey(e: ActivityEvent): string {
     case "TITLE":
       return "title";
     case "ASSIGNED":
-      return "assigned";
+      return d.archived === true ? `solo:${e.id}` : "assigned";
     case "PROPERTY":
       return "unitTo" in d || "unitFrom" in d ? "unit" : "property";
     case "REPEAT":

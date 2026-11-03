@@ -96,7 +96,7 @@ export interface Archiver {
 }
 
 /** The part of a transaction the writes use. */
-export type ArchiveTx = Pick<Prisma.TransactionClient, "deal" | "dealNote" | "property" | "contact" | "task">;
+export type ArchiveTx = Pick<Prisma.TransactionClient, "deal" | "dealNote" | "property" | "contact" | "task" | "$executeRaw">;
 
 /** What a change writes on the row: who and when to archive, both cleared to restore. */
 function archiveColumns(archived: boolean, by: Archiver, now: Date) {
@@ -168,8 +168,18 @@ export async function contractorArchiveBlockers(tx: Pick<ArchiveTx, "task" | "co
  * Archive or restore a contractor. Archive is refused while they have open
  * jobs or a portal login (`contractorArchiveRefusal`); portal accounts are
  * never touched here. Restore always goes through.
+ *
+ * The contact's row is locked FOR UPDATE before anything is read, so the
+ * check and the write are one step against everything that gives them work
+ * or a login: assigning them (core.ts lockAssignableContact, after the Task
+ * row), making or restoring their login (portal/accounts-core.ts, first) and
+ * an insert that names them (a foreign key's KEY SHARE) all wait for it, and
+ * whichever runs second sees the first. Without it the archive's own update
+ * (NO KEY UPDATE) never waited on those, so a job or a login could land
+ * between the count and the write. It is the only lock this path takes.
  */
 export async function setContactArchived(tx: ArchiveTx, id: string, archived: boolean, by: Archiver, now: Date = new Date()): Promise<boolean> {
+  await tx.$executeRaw`SELECT 1 FROM "Contact" WHERE "id" = ${id} FOR UPDATE`;
   if (archived) {
     const blockers = await contractorArchiveBlockers(tx, id);
     if (!blockers) throw new Error("This contractor is gone.");

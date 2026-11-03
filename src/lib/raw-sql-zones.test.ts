@@ -40,6 +40,25 @@ export function bareTimestamptzColumns(text: string): { column: string; index: n
   return found;
 }
 
+/**
+ * Where a parameter is cast `::timestamptz` without being an ISO string. A
+ * Date handed to raw SQL goes to the driver as a timestamp with no offset, so
+ * the cast reads it in the session's time zone and AT TIME ZONE 'UTC' then
+ * shifts it. `${d.toISOString()}::timestamptz` carries the Z. A plain name is
+ * fine when the file sets it from `.toISOString()` (`const lease = new
+ * Date(...).toISOString();`).
+ */
+export function untypedInstants(text: string): { expr: string; index: number }[] {
+  const found: { expr: string; index: number }[] = [];
+  for (const m of text.matchAll(/\$\{([^}]*)\}::timestamptz/g)) {
+    const expr = m[1].trim();
+    if (/\.toISOString\(\)$/.test(expr)) continue;
+    if (/^[A-Za-z_$][\w$]*$/.test(expr) && new RegExp(`\\b(?:const|let)\\s+${expr.replace(/\$/g, "\\$")}\\s*=\\s*[^;\\n]*\\.toISOString\\(\\)\\s*;`).test(text)) continue;
+    found.push({ expr, index: m.index });
+  }
+  return found;
+}
+
 test("raw SQL never leaves an instant to the session's time zone", () => {
   const problems: string[] = [];
   for (const file of sourceFiles(SRC)) {
@@ -49,8 +68,22 @@ test("raw SQL never leaves an instant to the session's time zone", () => {
     for (const m of text.matchAll(/::timestamptz(?!\)?\s*AT TIME ZONE 'UTC')/g)) problems.push(`${at(m.index)} ::timestamptz without AT TIME ZONE 'UTC'`);
     for (const m of text.matchAll(/(?<![.\w])(now\(\)|CURRENT_TIMESTAMP|LOCALTIMESTAMP)/g)) problems.push(`${at(m.index)} ${m[1]} in SQL`);
     for (const c of bareTimestamptzColumns(text)) problems.push(`${at(c.index)} ${c.column} (a timestamptz column) without AT TIME ZONE 'UTC'`);
+    for (const p of untypedInstants(text)) problems.push(`${at(p.index)} \${${p.expr}}::timestamptz is not an ISO string (.toISOString())`);
   }
   assert.deepEqual(problems, []);
+});
+
+test("a parameter cast ::timestamptz must be an ISO string, or a name the file sets from one", () => {
+  // ADP-2: a Date reaches the driver with no offset, so the cast reads it in the session's zone.
+  assert.deepEqual(
+    untypedInstants("SET \"sendAfter\" = (${until}::timestamptz AT TIME ZONE 'UTC') WHERE \"at\" <= (${now}::timestamptz AT TIME ZONE 'UTC')").map((p) => p.expr),
+    ["until", "now"],
+  );
+  assert.deepEqual(untypedInstants("(${now.toISOString()}::timestamptz AT TIME ZONE 'UTC')"), []);
+  assert.deepEqual(untypedInstants("(${new Date(now.getTime() + 5).toISOString()}::timestamptz AT TIME ZONE 'UTC')"), []);
+  const named = "const lease = new Date(now.getTime() + LEASE_MS).toISOString();\n  sql`(${lease}::timestamptz AT TIME ZONE 'UTC')`";
+  assert.deepEqual(untypedInstants(named), []);
+  assert.deepEqual(untypedInstants("const lease = new Date(now.getTime() + LEASE_MS);\n  sql`(${lease}::timestamptz AT TIME ZONE 'UTC')`").map((p) => p.expr), ["lease"]);
 });
 
 test("a timestamptz column in a SELECT list is flagged until it is converted", () => {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { portalAccess, type PortalAccessFacts } from "./access-state";
+import { loginOffers, portalAccess, type PortalAccessFacts } from "./access-state";
 
 // 2pm Eastern on Fri Oct 23, 2026.
 const now = new Date("2026-10-23T18:00:00Z");
@@ -50,4 +50,15 @@ test("removed access or an inactive contact reads Access off (BCONTRACT-027)", (
   assert.deepEqual(portalAccess({ ...used, status: "DISABLED" }, true, now), { state: "off", line: null });
   assert.deepEqual(portalAccess(used, false, now), { state: "off", line: null });
   assert.deepEqual(portalAccess({ ...used, status: "DISABLED" }, false, now), { state: "off", line: null });
+});
+
+test("an archived contractor's card offers neither Create login nor Restore access; Restore on the page brings them back", () => {
+  // N3(a), (b): both are refused on the server while archived, so the buttons would only ever refuse.
+  assert.deepEqual(loginOffers(null, true), { create: false, restore: false });
+  assert.deepEqual(loginOffers({ restorable: true }, true), { create: false, restore: false });
+  assert.deepEqual(loginOffers({ restorable: false }, true), { create: false, restore: false });
+  // Not archived: as before.
+  assert.deepEqual(loginOffers(null, false), { create: true, restore: false });
+  assert.deepEqual(loginOffers({ restorable: true }, false), { create: false, restore: true });
+  assert.deepEqual(loginOffers({ restorable: false }, false), { create: false, restore: false });
 });
