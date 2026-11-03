@@ -5,6 +5,7 @@ import {
   archiveLogText,
   archiveToast,
   archivedLine,
+  contractorArchiveBlockers,
   contractorArchiveRefusal,
   readArchiveEvent,
   setContactArchived,
@@ -80,9 +81,9 @@ type Row = Record<string, unknown>;
  * reads the `archivedAt` state in its where (null, or { not: null }), as
  * Postgres would, so a repeat changes nothing.
  */
-function fakeTx(rows: { deal?: Row[]; property?: Row[]; contact?: Row[]; openJobs?: number }) {
+function fakeTx(rows: { deal?: Row[]; property?: Row[]; contact?: Row[]; user?: Row[]; openJobs?: number; named?: { assigneeName: string; count: number }[] }) {
   const calls: Call[] = [];
-  const tables: Record<string, Row[]> = { deal: rows.deal ?? [], property: rows.property ?? [], contact: rows.contact ?? [] };
+  const tables: Record<string, Row[]> = { deal: rows.deal ?? [], property: rows.property ?? [], contact: rows.contact ?? [], user: rows.user ?? [] };
   const inState = (row: Row, where: Row) => {
     if (row.id !== where.id) return false;
     if (!("archivedAt" in where)) return true;
@@ -107,6 +108,16 @@ function fakeTx(rows: { deal?: Row[]; property?: Row[]; contact?: Row[]; openJob
       calls.push([name, "count", args]);
       return rows.openJobs ?? 0;
     },
+    // The people an imported name is matched against: every row of the table, as the where would list them.
+    async findMany(args: unknown) {
+      calls.push([name, "findMany", args]);
+      return tables[name] ?? [];
+    },
+    // The open name-only tasks, one row per name.
+    async groupBy(args: unknown) {
+      calls.push([name, "groupBy", args]);
+      return (rows.named ?? []).map((n) => ({ assigneeName: n.assigneeName, _count: { _all: n.count } }));
+    },
   });
   const tx = {
     deal: model("deal"),
@@ -114,6 +125,7 @@ function fakeTx(rows: { deal?: Row[]; property?: Row[]; contact?: Row[]; openJob
     property: model("property"),
     contact: model("contact"),
     task: model("task"),
+    user: model("user"),
     async $executeRaw(sql: TemplateStringsArray, ...values: unknown[]) {
       calls.push(["$executeRaw", sql.join("?"), values]);
       return 1;
@@ -218,4 +230,56 @@ test("restoring a contractor always goes through, open jobs or not", async () =>
   const { tx, tables } = fakeTx({ contact: [{ id: "c1", archivedAt: NOW, portalAccount: { status: "ACTIVE" } }], openJobs: 2 });
   assert.equal(await setContactArchived(tx, "c1", false, BY, NOW), true);
   assert.equal(tables.contact[0].archivedAt, null);
+});
+
+/* ---------------- Open jobs that carry only their imported name (Nov 3 low 6) ---------------- */
+
+const ZACK = { id: "c1", fullName: "Zack Outlaw", email: "zack@outlaw.example", archivedAt: null, portalAccount: null };
+const TEAM = [{ id: "u-connor", name: "Connor Swofford", email: "connor@hg.example" }];
+
+test("an open job that carries only their imported name counts as theirs, the way the Tasks filter files it", async () => {
+  // NOV3-TASKS-4: Asana's "Zack Outlaw" and his email are filed under Zack on Today and in the Tasks filter, and
+  // Archive used to move them to Others without a word. Kenneth is nobody the list holds: not his.
+  const named = [
+    { assigneeName: "Zack Outlaw", count: 2 },
+    { assigneeName: "zack@outlaw.example", count: 1 },
+    { assigneeName: "Kenneth", count: 4 },
+  ];
+  const busy = fakeTx({ contact: [{ ...ZACK }], user: TEAM, named });
+  await assert.rejects(setContactArchived(busy.tx, "c1", true, BY, NOW), (err: unknown) => {
+    assert.ok(err instanceof ArchiveRefusedError);
+    assert.equal((err as Error).message, "Reassign their 3 jobs first.");
+    return true;
+  });
+  assert.equal(busy.tables.contact[0].archivedAt, null, "nothing written");
+  // Counted with the linked ones: one by id and one by name is two.
+  const both = fakeTx({ contact: [{ ...ZACK }], user: TEAM, openJobs: 1, named: [{ assigneeName: "Zack Outlaw ", count: 1 }] });
+  await assert.rejects(setContactArchived(both.tx, "c1", true, BY, NOW), /Reassign their 2 jobs first\./);
+  assert.deepEqual(await contractorArchiveBlockers(both.tx, "c1"), { openJobs: 2, hasLogin: false });
+
+  // Open name-only work only, never a playbook's template rows, read with the lock already taken.
+  const group = busy.calls.find(([m, op]) => m === "task" && op === "groupBy")?.[2] as { by: string[]; where: Row };
+  assert.deepEqual(group.by, ["assigneeName"]);
+  assert.deepEqual(group.where.status, { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW"] });
+  assert.deepEqual(group.where.bucket, { not: "Template" });
+  assert.equal(group.where.assigneeUserId, null);
+  assert.equal(group.where.assigneeContactId, null);
+  assert.equal(busy.calls.filter(([m]) => m === "$executeRaw").length, 1, "still the only lock");
+});
+
+test("a name that is someone else's, or shared, doesn't stop the archive", async () => {
+  // Another contractor named Zack makes "Zack" nobody's, as the Tasks filter reads it; a teammate's name is theirs.
+  const roofer = { id: "c2", fullName: "Zack (Roofing)", email: "roof@example.com", archivedAt: null };
+  const named = [
+    { assigneeName: "Zack", count: 3 },
+    { assigneeName: "Connor Swofford", count: 1 },
+  ];
+  const zackOutlaw = { ...ZACK, fullName: "Zack (Outlaw Carpentry)" };
+  const { tx, tables } = fakeTx({ contact: [zackOutlaw, roofer], user: TEAM, named });
+  assert.equal(await setContactArchived(tx, "c1", true, BY, NOW), true);
+  assert.equal(tables.contact[0].archivedAt, NOW);
+  // And with no name-only work at all, the people aren't read.
+  const quiet = fakeTx({ contact: [{ ...ZACK }], user: TEAM });
+  assert.deepEqual(await contractorArchiveBlockers(quiet.tx, "c1"), { openJobs: 0, hasLogin: false });
+  assert.ok(!quiet.calls.some(([, op]) => op === "findMany"));
 });

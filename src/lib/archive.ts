@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { daysUntil, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
+import { isArchived } from "@/lib/record-scope";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
+import { listedContactsWhere, mergeLegacyNames, personRefs } from "@/lib/tasks/assignee-people";
 
 /**
  * Archive and Restore for deals, properties and contractors (Linear's,
@@ -96,7 +98,7 @@ export interface Archiver {
 }
 
 /** The part of a transaction the writes use. */
-export type ArchiveTx = Pick<Prisma.TransactionClient, "deal" | "dealNote" | "property" | "contact" | "task" | "$executeRaw">;
+export type ArchiveTx = Pick<Prisma.TransactionClient, "deal" | "dealNote" | "property" | "contact" | "task" | "user" | "$executeRaw">;
 
 /** What a change writes on the row: who and when to archive, both cleared to restore. */
 function archiveColumns(archived: boolean, by: Archiver, now: Date) {
@@ -150,18 +152,55 @@ export async function setPropertyArchived(tx: ArchiveTx, id: string, archived: b
 /** Thrown when a contractor can't be archived yet; its message is the one line the toast shows. */
 export class ArchiveRefusedError extends Error {}
 
+/** What the open-job count reads: the tasks, and the people an imported name is matched against. */
+type BlockersTx = Pick<ArchiveTx, "task" | "contact" | "user">;
+
 /**
  * The open jobs and whether there's a login, for the refusal: tasks assigned
  * to them that are still open (never a playbook's template rows), and an
- * active portal account. A login whose access was removed isn't one.
+ * active portal account. A login whose access was removed isn't one. The
+ * contractor page's Archive line reads it too, so the menu and the toast agree.
+ *
+ * An open job counts whether it names them by id or only by an imported name
+ * that Today and the Tasks filter file under them (namedOpenJobs). Archive
+ * would move that one to Others without a word (NOV3-TASKS-4).
  */
-export async function contractorArchiveBlockers(tx: Pick<ArchiveTx, "task" | "contact">, id: string): Promise<{ openJobs: number; hasLogin: boolean } | null> {
-  const [contact, openJobs] = await Promise.all([
+export async function contractorArchiveBlockers(tx: BlockersTx, id: string): Promise<{ openJobs: number; hasLogin: boolean } | null> {
+  const [contact, linked, named] = await Promise.all([
     tx.contact.findUnique({ where: { id }, select: { portalAccount: { select: { status: true } } } }),
     tx.task.count({ where: { assigneeContactId: id, ...activeTask, ...excludeTemplateTasks } }),
+    namedOpenJobs(tx, id),
   ]);
   if (!contact) return null;
-  return { openJobs, hasLogin: contact.portalAccount?.status === "ACTIVE" };
+  return { openJobs: linked + named, hasLogin: contact.portalAccount?.status === "ACTIVE" };
+}
+
+/**
+ * Open tasks with no assignee but an imported name (`assigneeName`, the Asana
+ * load's unmatched pick) that stands for this contractor: the match the Tasks
+ * filter and Today make (tasks/assignee-people.ts mergeLegacyNames), against
+ * the people the assignee list holds (tasks/assignee-options.ts: every user,
+ * then the listed contacts with the archived ones hidden, in the same order).
+ * A name two people share is neither's, so it counts for no one.
+ */
+async function namedOpenJobs(tx: BlockersTx, id: string): Promise<number> {
+  const names = await tx.task.groupBy({
+    by: ["assigneeName"],
+    where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...activeTask, ...excludeTemplateTasks },
+    _count: { _all: true },
+  });
+  if (names.length === 0) return 0;
+  const [users, contacts] = await Promise.all([
+    tx.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
+    tx.contact.findMany({ where: listedContactsWhere, orderBy: { fullName: "asc" }, select: { id: true, fullName: true, email: true, archivedAt: true } }),
+  ]);
+  const person = (c: (typeof contacts)[number]) => ({ id: c.id, name: c.fullName, email: c.email });
+  const people = personRefs(users, contacts.filter((c) => !isArchived(c)).map(person), contacts.filter(isArchived).map(person));
+  const { merged } = mergeLegacyNames(
+    names.flatMap((n) => (n.assigneeName ? [n.assigneeName] : [])),
+    people,
+  );
+  return names.reduce((sum, n) => sum + (n.assigneeName && merged.get(n.assigneeName) === `c:${id}` ? n._count._all : 0), 0);
 }
 
 /**

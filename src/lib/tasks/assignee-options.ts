@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { isArchived } from "@/lib/record-scope";
 import { cleanTrades } from "@/lib/contacts";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
-import { recentAssigneeKeys } from "./assignee-people";
+import { listedContactsWhere, recentAssigneeKeys } from "./assignee-people";
 
 const isLive = (c: { archivedAt: Date | null }) => !isArchived(c);
 
@@ -45,7 +45,7 @@ export async function assigneeOptions(
       where: {
         OR: [
           // Archived ones too, for `archived`; they are split off below.
-          { active: true, OR: [{ trades: { not: null } }, { assignedTasks: { some: {} } }] },
+          listedContactsWhere,
           ...(extra.length ? [{ id: { in: extra } }] : []),
         ],
       },

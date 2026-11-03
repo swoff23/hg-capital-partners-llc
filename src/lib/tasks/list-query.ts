@@ -2,7 +2,6 @@ import { Prisma } from "@prisma/client";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
 import { everyTermMatches, searchTerms } from "@/lib/search";
 import { activeTask, closedTask, excludeTemplateTasks } from "@/lib/task-scope";
-import type { PersonRef } from "./assignee-people";
 
 /**
  * What the Tasks page asks of the database (docs/specs/selectors.md 3.7 and
@@ -318,18 +317,5 @@ export function propertyCounts(rows: readonly { propertyId: string | null; count
   return counts;
 }
 
-/**
- * The people legacy names are matched against: the team and the contractors the filter lists, by their picker keys,
- * and the archived contractors it doesn't (`hidden`), so a name that is theirs is never filed under someone else.
- */
-export function personRefs(
-  users: readonly { id: string; name: string | null; email: string }[],
-  contractors: readonly { id: string; name: string; email?: string | null }[],
-  archived: readonly { id: string; name: string; email?: string | null }[] = [],
-): PersonRef[] {
-  return [
-    ...users.map((u) => ({ key: `u:${u.id}`, name: u.name ?? u.email, email: u.email })),
-    ...contractors.map((c) => ({ key: `c:${c.id}`, name: c.name, email: c.email })),
-    ...archived.map((c) => ({ key: `c:${c.id}`, name: c.name, email: c.email, hidden: true })),
-  ];
-}
+/** The people legacy names are matched against (assignee-people.ts, where Archive's count reads it too). */
+export { personRefs } from "./assignee-people";

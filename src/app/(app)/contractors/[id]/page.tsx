@@ -12,13 +12,13 @@ import { Badge, Section, textLinkClass } from "@/components/ui";
 import { RailFact } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
 import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
-import { archivedLine, contractorArchiveRefusal } from "@/lib/archive";
+import { archivedLine, contractorArchiveBlockers, contractorArchiveRefusal } from "@/lib/archive";
 import { STATUS_TONE, StatusBadge, StatusMark } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
 import { dayLabel, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { portalAccess } from "@/lib/portal/access-state";
-import { STATUS_LABEL, activeTask, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
+import { STATUS_LABEL, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
 import { ContactName, ContactNotes, ContactSection } from "./contact-section";
@@ -83,8 +83,9 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
       take: JOBS_SHOWN,
     }),
     prisma.task.count({ where: jobsWhere }),
-    // For Archive's refusal: open jobs are reassigned first (lib/archive.ts).
-    prisma.task.count({ where: { ...jobsWhere, ...activeTask } }),
+    // For Archive's refusal: open jobs are reassigned first, counted as the archive counts them (lib/archive.ts),
+    // with the imported name-only ones the Tasks filter files under them.
+    contractorArchiveBlockers(prisma, id).then((b) => b?.openJobs ?? 0),
   ]);
   if (!c) notFound();
   // Puts them on top of this person's Recent in search, once the response is out (not again for an edit's refresh).
