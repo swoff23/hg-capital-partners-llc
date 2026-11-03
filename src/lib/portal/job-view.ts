@@ -365,8 +365,11 @@ export const MAX_FILES_PER_POST = 50;
 /** The refused tile's reason past the cap, short enough for the bar's line at 320: "5 photos didn't upload: only 50 at a time". */
 export const MAX_FILES_REASON = `only ${MAX_FILES_PER_POST} at a time`;
 
-/** The server's refusal of more files than one post takes, past a page that would have held them back. */
-export const TOO_MANY_FILES = `Send up to ${MAX_FILES_PER_POST} photos at a time.`;
+/**
+ * The server's refusal of more files than one post takes, past a page that would have held them back. No noun: it
+ * covers videos as well as photos, and it shows in a toast right after a send, so it fits one line at 320.
+ */
+export const TOO_MANY_FILES = `Send up to ${MAX_FILES_PER_POST} at a time.`;
 
 /** Room left for files on the job page's target: what one post takes, less the files recorded and waiting to post. */
 export function postRoom(unposted: number): number {

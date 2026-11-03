@@ -187,14 +187,16 @@ export function nextCopyDue(rule: RepeatRule, slot: Ymd | null, due: Ymd | null,
  * The first due date for a repeat that has none yet: the first day on or after
  * `today` the rule lands on. A pinned day of the month is this month's (clamped
  * to short months) unless it has passed, then next month's; a pinned weekday
- * is the next one, today included; any other rule starts today.
+ * is the next one, today included; any other rule starts today. A yearly
+ * rule's pin is only the leap day's (leapDayRule), never a day to start on,
+ * so clearing a Feb 29 task's date dates it today, not on this month's 29th.
  */
 export function firstOccurrence(rule: RepeatRule, today: Ymd): Ymd {
   if (rule.freq === "weeks" && rule.weekday !== undefined) {
     const [y, m, d] = today.split("-").map(Number);
     return ymd(y, m - 1, d + ((rule.weekday - weekdayOf(today) + 7) % 7));
   }
-  if (!rule.dayOfMonth) return today;
+  if (!rule.dayOfMonth || rule.freq === "yearly") return today;
   const [y, m, d] = today.split("-").map(Number);
   const thisMonth = Math.min(rule.dayOfMonth, daysInMonth(y, m - 1));
   if (thisMonth >= d) return ymd(y, m - 1, thisMonth);

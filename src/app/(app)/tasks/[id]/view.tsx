@@ -180,7 +180,7 @@ export function TaskPageView(p: TaskPageViewProps) {
             />
 
             <Section title="Activity">
-              <TaskActivity taskId={task.id} rows={p.rows} now={p.now} today={p.today} newSince={p.newSince} />
+              <TaskActivity taskId={task.id} notes={task.description} rows={p.rows} now={p.now} today={p.today} newSince={p.newSince} />
             </Section>
 
             {/* Without a login the composer reads as on a job with no contractor ("Shared", "Add a comment"): no reply reaches them yet. */}

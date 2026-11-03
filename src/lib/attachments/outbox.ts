@@ -163,6 +163,12 @@ export type OutboxEntry = {
   multipart: MultipartState | null;
   tries: number;
   waits: number;
+  /**
+   * The person was told this file failed (the toast naming where it was going). A file the server keeps refusing is
+   * put back by every page load and fails again, so without this each load would say so again. Absent on a row an
+   * earlier version wrote, which reads as not told.
+   */
+  noticed?: boolean;
   savedAt: number;
 };
 

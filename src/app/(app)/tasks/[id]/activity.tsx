@@ -45,12 +45,15 @@ const SHOWN = 15;
  */
 export function TaskActivity({
   taskId,
+  notes,
   rows,
   now,
   today,
   newSince,
 }: {
   taskId: string;
+  /** The task's notes as this page loaded them: a Restore from "View previous" is refused when they've changed since. */
+  notes: string | null;
   rows: ActivityRow[];
   /** When the page was rendered (ISO), so every time reads the same on the server and in the browser. */
   now: string;
@@ -157,7 +160,7 @@ export function TaskActivity({
           <InFlight key={s.clientId} send={s} author={sends?.author ?? ""} />
         ))}
       </ActivityTimeline>
-      <PreviousNotes taskId={taskId} viewing={viewing} onClose={() => setViewing(null)} />
+      <PreviousNotes taskId={taskId} notes={notes} viewing={viewing} onClose={() => setViewing(null)} />
     </>
   );
 }
@@ -526,8 +529,22 @@ function InFlight({ send, author }: { send: PendingSend; author: string }) {
 
 /* ---------------- View previous ---------------- */
 
-/** The notes as they were before an edit, with a way back to them (activity 2.3 rule 6). */
-function PreviousNotes({ taskId, viewing, onClose }: { taskId: string; viewing: { text: string; by: string } | null; onClose: () => void }) {
+/**
+ * The notes as they were before an edit, with a way back to them (activity 2.3 rule 6). Restore carries the notes
+ * the page loaded, as a save from the notes field does, so it never writes over notes someone saved since: the
+ * toast says who, and the page loads theirs, so a second Restore puts this version back over them on purpose.
+ */
+function PreviousNotes({
+  taskId,
+  notes,
+  viewing,
+  onClose,
+}: {
+  taskId: string;
+  notes: string | null;
+  viewing: { text: string; by: string } | null;
+  onClose: () => void;
+}) {
   const { toast } = useToast();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -539,9 +556,13 @@ function PreviousNotes({ taskId, viewing, onClose }: { taskId: string; viewing: 
   async function restore() {
     if (!viewing) return;
     setSaving(true);
-    const res = await callAction(() => updateTask(taskId, { description: viewing.text || null }));
+    const res = await callAction(() => updateTask(taskId, { description: viewing.text || null, expectedDescription: notes }));
     setSaving(false);
-    if (!res.ok) return toast({ message: res.error });
+    if (!res.ok) {
+      toast({ message: res.error });
+      if (res.conflict) router.refresh();
+      return;
+    }
     toast({ message: "Notes restored" });
     onClose();
     router.refresh();

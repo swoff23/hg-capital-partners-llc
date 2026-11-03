@@ -411,7 +411,8 @@ test("one post takes 50 files, and the job page's room is what's left of that", 
   assert.equal(postRoom(64), 0);
   assert.equal(MAX_FILES_REASON, "only 50 at a time");
   assert.equal(uploadNotice([1, 2, 3, 4, 5].map((n) => ({ name: `p${n}.jpg`, kind: "image" as const, reason: MAX_FILES_REASON }))), "5 photos didn't upload: only 50 at a time");
-  assert.equal(TOO_MANY_FILES, "Send up to 50 photos at a time.");
+  // Photos and videos alike, so it names neither.
+  assert.equal(TOO_MANY_FILES, "Send up to 50 at a time.");
   assert.ok(!/[—]/.test(MAX_FILES_REASON + TOO_MANY_FILES));
 });
 

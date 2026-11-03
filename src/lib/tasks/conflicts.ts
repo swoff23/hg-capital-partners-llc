@@ -4,8 +4,9 @@ import { NotesChangedError } from "./core";
 /**
  * A core refusal as the field editor's conflict (forms 2.8, 2.12). A stale
  * notes save (core.ts NotesChangedError) becomes a ConflictError on
- * `description`, so the notes field says who saved what and when, with
- * "Keep Pieter's" and "Save mine", the way a property's notes do. When the
+ * `description`, so the notes field says who saved them and when ("Pieter
+ * changed this at 2:14 PM"), with "Keep Pieter's" and "Save mine", the way
+ * a property's notes do. When the
  * newer notes came from the caller's own other tab it names nobody ("This
  * changed at 2:14 PM", "Keep current"): their first name would read as
  * someone else. Anything else comes back as it was. Pure; see conflicts.test.ts.

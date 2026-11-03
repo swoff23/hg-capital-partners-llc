@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
+import { MAX_FILENAME } from "@/lib/attachments/content-types";
 import { requireUser } from "@/lib/auth";
 import {
   discardListingUploads,
@@ -31,7 +32,8 @@ const pathname = z.string().min(1).max(400);
 const uploadedSchema = z
   .object({
     pathname,
-    filename: z.string().max(255).optional(),
+    // Not kept (a photo's name is its pathname's), so a long one from an older tab's outbox is no reason to refuse it.
+    filename: z.string().max(MAX_FILENAME * 4).optional(),
     width: z.number().nullish(),
     height: z.number().nullish(),
     durationSec: z.number().nullish(),

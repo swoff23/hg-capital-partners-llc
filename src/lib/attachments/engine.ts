@@ -1,7 +1,8 @@
-import { OFFLINE_ERROR, isOfflineError } from "@/lib/action-result";
+import { GENERIC_ERROR, OFFLINE_ERROR, isOfflineError } from "@/lib/action-result";
 import type { MediaUpload, RecordMediaInput, RecordMediaResult } from "@/components/media-uploader";
 import type { UploadCounts, UploadTarget } from "@/components/upload-queue";
 import { usesMultipart, type FileKind } from "./content-types";
+import { EMPTY_UPLOAD } from "./limits";
 import { checkMediaFile, storedNames, uploadCountPhrase, uploadFailureReason, withExtension } from "./media";
 import {
   STALL_MS,
@@ -89,6 +90,8 @@ type Job = {
   retryTimer: unknown;
   stallTimer: unknown;
   stalled: boolean;
+  /** The away toast has said this file failed (OutboxEntry.noticed), so a page load that puts it back and fails it again stays quiet. */
+  noticed: boolean;
   /** The write of this file to the outbox that is under way (or done), so nothing is prepared or sent before it. */
   writing: Promise<void> | null;
   /** Bytes, for the tile and the row. */
@@ -103,12 +106,6 @@ type Job = {
    * counted) writes its small state alone, so a big video isn't rewritten into storage at every part.
    */
   written: Prepared | typeof AS_PICKED | null;
-  /**
-   * Put back from the outbox by this page load (restore), not picked here: maybe in another tab, maybe days ago.
-   * If it fails while its page isn't open it says nothing, since a toast on whatever page is open would read as
-   * that page's upload; its red tile waits on its own page (and a My jobs row) with Retry.
-   */
-  restored: boolean;
 };
 
 /** Stands for "the file as picked" in Job.written, until it is prepared. */
@@ -466,12 +463,12 @@ export class UploadEngine {
         retryTimer: null,
         stallTimer: null,
         stalled: false,
+        noticed: false,
         writing: null,
         size: file.size,
         lease: null,
         stored: false,
         written: null,
-        restored: false,
       });
     }
     // Every file goes in the outbox before any bytes move, the whole batch at once, so a tab closed
@@ -519,18 +516,18 @@ export class UploadEngine {
       };
       const source = job.original instanceof File ? job.original : new File([job.original], job.name, { type: job.contentType });
       let prepared: Prepared;
+      // A refused file is out of its batch's way: the siblings that recorded before it go to the page now.
+      const refuse = (error: string) => {
+        if (!this.jobs.has(job.id)) return;
+        this.patch(job, { status: "invalid", error });
+        this.settle(job.batchId, job.key);
+      };
       try {
         prepared = await (this.deps.prepare ?? prepareFile)(source, input);
       } catch (err) {
-        if (err instanceof PrepareError) {
-          if (this.jobs.has(job.id)) this.patch(job, { status: "invalid", error: err.message });
-          return;
-        }
+        if (err instanceof PrepareError) return refuse(err.message);
         // A photo going public that couldn't be prepared for any other reason is refused too: as picked it would keep its GPS.
-        if (input.strict) {
-          if (this.jobs.has(job.id)) this.patch(job, { status: "invalid", error: UNREADABLE_PHOTO });
-          return;
-        }
+        if (input.strict) return refuse(UNREADABLE_PHOTO);
         // Anything else: it goes up as picked, with no preview.
         prepared = { blob: source, name: job.name, contentType: job.contentType, thumb: null, poster: null, meta: {} };
       }
@@ -702,6 +699,9 @@ export class UploadEngine {
     if (this.disposed) return;
     if (!res.ok || !res.data) {
       if (res.error === OFFLINE_ERROR) throw new TypeError("Failed to fetch");
+      // The generic line is the server failing, not saying no (a Blob outage under head(), a database blip): like a
+      // call that threw, it tries again, and nothing was discarded, so the bytes stay up for it.
+      if (res.error === GENERIC_ERROR) throw new RecordThrew("it couldn't be saved");
       throw new RecordRefused(res.error || "it couldn't be saved");
     }
     this.recorded(job, res.data.id);
@@ -751,18 +751,24 @@ export class UploadEngine {
     const codeMissing = err instanceof UploadCodeMissingError;
     if (codeMissing) this.noticeCodeMissing();
     if (refusedByRecord) {
-      // One record-only retry: a refusal may have discarded the blob, so after that it uploads again.
+      // One record-only retry: a refusal may have discarded the blob, so after that it uploads again. A blob that
+      // arrived empty is the upload breaking, and the record step deletes it, so that retry uploads again at once.
       job.recordFailures++;
-      if (job.recordFailures > 1) Object.assign(job, { pathname: null, thumbPathname: null, posterPathname: null });
+      if (job.recordFailures > 1 || err.message === EMPTY_UPLOAD) Object.assign(job, { pathname: null, thumbPathname: null, posterPathname: null });
     } else if (failure === "refused") {
       // Whatever was half sent is not trusted any more: a retry starts the file over.
       Object.assign(job, { pathname: null, thumbPathname: null, posterPathname: null, multipart: null });
     }
     if (next.phase === "failed") {
       this.patch(job, { status: "failed", error: reason, paused: false });
+      // One the outbox put back (an earlier visit's, a closed tab's) too: the toast names where it was going, so it
+      // never reads as the open page's upload, and nobody waits on a file they don't know failed. Once: its row
+      // remembers, so a file the server keeps refusing, put back by every page load, doesn't toast on each of them.
+      // A Retry says so again (retry()).
+      const tell = this.isAway(job.key) && !job.noticed;
+      if (tell) job.noticed = true;
       void this.save(job);
-      // Only for a file picked on this page load: one the outbox put back (another tab's, an earlier visit's) waits on its own page.
-      if (this.isAway(job.key) && !job.restored) this.noticeFailure(job);
+      if (tell) this.noticeFailure(job);
       this.settle(job.batchId, job.key);
       return;
     }
@@ -877,14 +883,23 @@ export class UploadEngine {
 
   /* ---------------- Controls ---------------- */
 
-  /** A failed file tries again from the start. A refused one (the check said no) can only be removed. */
+  /**
+   * A failed file tries again from the start. A refused one (the check said no) can only be removed. A target's cap
+   * holds here as it does when files are added: with no room left (the files picked since filled it), the retried
+   * file is refused with the cap's reason instead of going past it.
+   */
   retry(id: string): void {
     const job = this.jobs.get(id);
     if (!job || job.status !== "failed" || job.controller) return;
+    const target = this.targets.get(job.key);
+    if (target?.maxFiles !== undefined && target.maxFiles - this.holding(job.key) <= 0) {
+      this.patch(job, { status: "invalid", error: target.maxFilesReason ?? capReason(0) });
+      return;
+    }
     job.tries = 0;
     job.waits = 0;
-    // Retried here, so it is this page load's: if it fails again once its page is left, it says so.
-    job.restored = false;
+    // A fresh try: if it fails again once its page is left, that is news again.
+    job.noticed = false;
     this.requeue(job);
     void this.prepareNext();
     this.pump();
@@ -937,6 +952,7 @@ export class UploadEngine {
       multipart: job.multipart,
       tries: job.tries,
       waits: job.waits,
+      noticed: job.noticed,
       savedAt: this.deps.now().getTime(),
     };
   }
@@ -1050,12 +1066,12 @@ export class UploadEngine {
         retryTimer: null,
         stallTimer: null,
         stalled: false,
+        noticed: e.noticed === true,
         writing: null,
         size: e.blob.size,
         lease,
         stored: true,
         written: prepared ?? AS_PICKED,
-        restored: true,
       });
       touched.add(e.key);
     }

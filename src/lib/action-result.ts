@@ -354,6 +354,9 @@ export function userMessage(err: unknown): string {
     if (err.name.startsWith("PrismaClient")) return isNumberOverflow(err) ? NUMBER_TOO_BIG : GENERIC_ERROR;
     if (!err.message || err.message.length > 200) return GENERIC_ERROR;
     if (/ECONN|ETIMEDOUT|fetch failed|Invocation|Server Components render/i.test(err.message)) return GENERIC_ERROR;
+    // @vercel/blob's own errors ("Vercel Blob: The blob service is currently not available. Please try again.") read
+    // like sentences, but they're the storage service talking: an outage, a rate limit, a vendor's link.
+    if (/^Vercel Blob:/.test(err.message)) return GENERIC_ERROR;
     // Only a sentence written for people ("This job is closed."); a library's or a config check's text never shows.
     return isPlainMessage(err.message) ? err.message.trim() : GENERIC_ERROR;
   }
