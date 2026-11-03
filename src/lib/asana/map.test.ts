@@ -548,6 +548,47 @@ test("load: someone who gets a Contact after the load is linked on the next run,
   assert.deepEqual(kept.conflicts.map((c) => c.field), ["assignee"]);
 });
 
+// N4: the import never hands an archived contractor a job (core.ts ARCHIVED_ASSIGNEE_LINE).
+const ZED_ARCHIVED = CONTACTS.map((c) => (c.id === "c-zed" ? { ...c, archivedAt: new Date("2026-10-20T12:00:00Z") } : c));
+
+test("load: a job Asana gives an archived contractor keeps only the name and is listed; restored, the next run links it", () => {
+  const p = buildPlan(inputOf(snap), dbOf({ contacts: ZED_ARCHIVED }), opts);
+  const faucet = taskNamed(p, "Replace kitchen faucet");
+  assert.deepEqual([faucet.write.assigneeContactId, faucet.write.assigneeName, faucet.write.assigneeEmail, faucet.contactId], [null, "Zed Carpenter", null, null]);
+  assert.ok(p.report.archivedAssignees.some((a) => a.taskId === faucet.taskId && a.contactId === "c-zed"));
+  assert.ok(p.report.willSee.every((w) => w.contactId !== "c-zed"), "no access, so nothing for him to see");
+  assert.ok(p.tasks.every((t) => t.contactId !== "c-zed"));
+
+  // Still archived: the next run keeps the name and lists it again, with no conflict.
+  const rows = rowsAfter(p);
+  const next = buildPlan(inputOf(snap), dbOf({ tasks: rows, contacts: ZED_ARCHIVED }), opts);
+  const again = next.tasks.find((t) => t.taskId === faucet.taskId)!;
+  assert.deepEqual([again.write.assigneeContactId, again.write.assigneeName, again.contactId, again.conflicts], [null, "Zed Carpenter", null, []]);
+  assert.ok(next.report.archivedAssignees.some((a) => a.taskId === faucet.taskId));
+
+  // Restored in the app: Asana's assignee applies, and his access follows.
+  const restored = buildPlan(inputOf(snap), dbOf({ tasks: rows }), opts).tasks.find((t) => t.taskId === faucet.taskId)!;
+  assert.deepEqual([restored.write.assigneeContactId, restored.write.assigneeName, restored.contactId, restored.conflicts], ["c-zed", null, "c-zed", []]);
+});
+
+test("a closed job an archived contractor already had stays theirs; reopened in Asana, it leaves them", () => {
+  const rows = rowsAfter(plan);
+  const faucet = rows.find((r) => r.title === "Replace kitchen faucet")!;
+  assert.equal(faucet.assigneeContactId, "c-zed");
+  const doneInApp = rows.map((r) => (r.id === faucet.id ? { ...r, status: "DONE" as const } : r));
+  const kept = buildPlan(inputOf(snap), dbOf({ tasks: doneInApp, contacts: ZED_ARCHIVED }), opts).tasks.find((t) => t.taskId === faucet.id)!;
+  assert.deepEqual([kept.closed, kept.write.assigneeContactId, kept.contactId], [true, undefined, "c-zed"]);
+  assert.ok(!kept.notes.some((n) => /archived/.test(n)));
+
+  // Closed in Asana too, then reopened there: open work, so it goes back by name only.
+  const closedBoth = doneInApp.map((r) => (r.id === faucet.id ? { ...r, asanaLastSynced: { ...(r.asanaLastSynced as object), completed: true } } : r));
+  const reopened = buildPlan(inputOf(snap), dbOf({ tasks: closedBoth, contacts: ZED_ARCHIVED }), opts).tasks.find((t) => t.taskId === faucet.id)!;
+  assert.deepEqual(
+    [reopened.status, reopened.write.status, reopened.write.assigneeContactId, reopened.write.assigneeName, reopened.contactId],
+    ["reopen", "OPEN", null, "Zed Carpenter", null],
+  );
+});
+
 test("load: a contact people.json asks to create is planned first, and their jobs link to it", () => {
   const raeGid = snap.users.find((u) => u.name === "Rae Realtor")!.gid;
   const overrides = { [raeGid]: { createContact: { fullName: "Rae Realtor", email: "rae@realty.example" } } };

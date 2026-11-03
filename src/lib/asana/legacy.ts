@@ -110,6 +110,7 @@ export function planLegacyLinks(
   }
   const people = matchPeople(refOf.values(), db.users, db.contacts, opts);
   const names = new Map<string, string>([...db.users.map((u) => [u.id, u.name || u.email] as [string, string]), ...db.contacts.map((c) => [c.id, c.fullName] as [string, string])]);
+  const archived = new Set(db.contacts.filter((c) => c.archivedAt).map((c) => c.id));
 
   const out: LegacyPlanRow[] = rows.map((row) => {
     const person = people.get(refOf.get(keyOf(row))!.gid)!;
@@ -124,6 +125,9 @@ export function planLegacyLinks(
       decision = { kind: "leave", reason: `people.json creates ${m.create.fullName} as a contact during the Asana load; run the load first` };
     } else if (m.kind === "user") {
       decision = { kind: "link", assignee: { userId: m.userId }, to: names.get(m.userId) ?? m.userId, via: m.via };
+    } else if (m.kind === "contact" && archived.has(m.contactId)) {
+      // Only open jobs get here, and an open job never goes to an archived contractor (core.ts ARCHIVED_ASSIGNEE_LINE).
+      decision = { kind: "leave", reason: `${names.get(m.contactId) ?? m.contactId} is archived in the app: restore them first` };
     } else if (m.kind === "contact" && m.confirmed) {
       decision = { kind: "link", assignee: { contactId: m.contactId }, to: names.get(m.contactId) ?? m.contactId, via: m.via };
     } else if (m.kind === "contact") {

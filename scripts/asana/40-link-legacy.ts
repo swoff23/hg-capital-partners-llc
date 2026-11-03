@@ -21,7 +21,7 @@
  */
 import path from "node:path";
 import { prisma } from "../../src/lib/db";
-import { linkLegacyAssignee } from "../../src/lib/asana/import";
+import { ArchivedAssigneeError, linkLegacyAssignee } from "../../src/lib/asana/import";
 import { planLegacyLinks } from "../../src/lib/asana/legacy";
 import type { AsanaRef } from "../../src/lib/asana/map";
 import { isActiveStatus } from "../../src/lib/task-scope";
@@ -64,7 +64,7 @@ async function main() {
       orderBy: { createdAt: "asc" },
     }),
     prisma.user.findMany({ select: { id: true, email: true, name: true, asanaGid: true } }),
-    prisma.contact.findMany({ select: { id: true, fullName: true, email: true, asanaGid: true, active: true } }),
+    prisma.contact.findMany({ select: { id: true, fullName: true, email: true, asanaGid: true, active: true, archivedAt: true } }),
   ]);
   const plan = planLegacyLinks(
     rows.filter((r) => r.assigneeName?.trim()).map((r) => ({ ...r, assigneeName: r.assigneeName! })),
@@ -95,9 +95,14 @@ async function main() {
   for (const r of links) {
     if (r.decision.kind !== "link") continue;
     const { assignee } = r.decision;
-    const ok = await prisma.$transaction((tx) => linkLegacyAssignee(tx, { taskId: r.row.id, name: r.row.assigneeName, assignee }, now), TX);
-    if (ok) linked++;
-    else moved.push(`${r.row.title} (${r.row.id})`);
+    try {
+      const ok = await prisma.$transaction((tx) => linkLegacyAssignee(tx, { taskId: r.row.id, name: r.row.assigneeName, assignee }, now), TX);
+      if (ok) linked++;
+      else moved.push(`${r.row.title} (${r.row.id})`);
+    } catch (err) {
+      if (!(err instanceof ArchivedAssigneeError)) throw err;
+      moved.push(`${r.row.title} (${r.row.id}): its contractor was archived`);
+    }
   }
   log(`linked ${linked} of ${links.length}`);
   for (const m of moved) log(`! changed in the app since the plan, left alone: ${m}`);

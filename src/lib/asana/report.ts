@@ -137,6 +137,10 @@ export function formatReport(plan: ImportPlan, rawCtx: ReportContext): string {
     out.push("  Name-only matches wait for confirmation. To confirm, add to people.json (or pass --accept-name-matches):");
     out.push(`    ${JSON.stringify(Object.fromEntries(r.pendingNameMatches.map((p) => [p.gid, { contactId: p.contactId }])))}`);
   }
+  if (r.archivedAssignees.length) {
+    out.push(`  Archived in the app, so these ${r.archivedAssignees.length} jobs keep only the name. To link them, restore the contractor and re-run:`);
+    for (const a of r.archivedAssignees) out.push(`    ${a.name} (${a.contactId}): "${clip(a.title, 60)}" (${a.taskId})`);
+  }
 
   if (r.conflicts.length) {
     h(`Conflicts (${r.conflicts.length}): the app's value was kept`);

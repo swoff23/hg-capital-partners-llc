@@ -4,6 +4,8 @@
  * running pg_restore) and ask these functions. target.test.ts covers them.
  */
 
+import { runtimeDatabaseUrl } from "@/lib/db-url";
+
 /** The production Supabase project (docs/asana-migration-plan.md §5.5). The other one, named after the company, is empty. */
 export const PROD_REF = "ywdjaygwkqyrmbdnvaai";
 
@@ -24,6 +26,22 @@ export function describeDatabaseUrl(url: string): Target {
   const u = new URL(url);
   const isProdRef = url.includes(PROD_REF);
   return { host: u.hostname, database: u.pathname.replace(/^\//, ""), local: LOCAL_HOSTS.has(u.hostname) && !isProdRef, isProdRef };
+}
+
+/**
+ * Where this run's Prisma client connects (src/lib/db-url.ts runtimeDatabaseUrl): DATABASE_URL, except that
+ * VERCEL_ENV=production in the env file, as `vercel env pull` writes it, switches the client to
+ * POSTGRES_PRISMA_URL. The backup (backupCommand) still dumps DATABASE_URL, so the two must name the same
+ * database; this throws when they don't, or when DATABASE_URL is unset.
+ */
+export function describeRunTarget(env: { DATABASE_URL?: string; POSTGRES_PRISMA_URL?: string; VERCEL_ENV?: string }): Target {
+  if (!env.DATABASE_URL) throw new Error("DATABASE_URL is unset. Is .env filled in?");
+  const t = describeDatabaseUrl(runtimeDatabaseUrl(env)!);
+  const dump = describeDatabaseUrl(env.DATABASE_URL);
+  if (dump.isProdRef !== t.isProdRef || dump.local !== t.local || dump.database !== t.database) {
+    throw new Error(`the client writes to ${t.host}/${t.database} (POSTGRES_PRISMA_URL, as VERCEL_ENV=production), but the backup would dump ${dump.host}/${dump.database} (DATABASE_URL); point both at one database`);
+  }
+  return t;
 }
 
 /** Why writing to `t` is refused, or null when it's allowed. Anywhere but a local database needs `--confirm-prod` and the production URL. */

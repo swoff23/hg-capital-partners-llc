@@ -5,6 +5,7 @@ import path from "node:path";
 import type { Tx } from "@/lib/tasks/core";
 import { notifyAudience, type NotifyChange } from "@/lib/tasks/rules";
 import {
+  ArchivedAssigneeError,
   ASANA_PRINCIPAL,
   ContactExistsError,
   deleteCsvRows,
@@ -297,6 +298,32 @@ test("a task the app edited after planning is skipped, not overwritten", async (
   const writes = calls.filter((c) => c.model === "task" && /update/.test(c.op));
   assert.deepEqual(writes.map((c) => c.op), ["updateMany"]);
   assert.deepEqual((writes[0].args as { where: unknown }).where, { id: tp.taskId, appEditedAt: null });
+});
+
+test("a contractor archived after the plan: their job is refused at the write, before any timeline line or access", async () => {
+  const tp = plan.tasks.find((t) => t.contactId && !t.closed)!;
+  const archivedAt = new Date("2026-10-27T14:00:00Z");
+  const { tx, calls } = fakeTx();
+  await assert.rejects(writeTask(withReads(tx, "contact", { findUnique: () => ({ archivedAt }) }), tp), (e: unknown) => {
+    assert.ok(e instanceof ArchivedAssigneeError && e instanceof StalePlanError, "the load and delta skip it like an app edit");
+    assert.equal(e.contactId, tp.contactId);
+    return true;
+  });
+  assert.ok(!calls.some((c) => c.model === "taskEvent" || c.model === "taskAccess"));
+
+  // A closed job they already had is history: written, with no check.
+  const closed: TaskPlan = { ...tp, op: "update", rowAppEditedAt: null, closed: true, write: { title: tp.title } };
+  let asked = 0;
+  await writeTask(withReads(fakeTx().tx, "contact", { findUnique: () => (asked++, { archivedAt }) }), closed);
+  assert.equal(asked, 0);
+
+  // Linking a name to them is refused the same way, so the link rolls back.
+  const link = fakeTx({ task: { assigneeName: "José Alvarez" } });
+  await assert.rejects(
+    linkLegacyAssignee(withReads(link.tx, "contact", { findUnique: () => ({ archivedAt }) }), { taskId: "t9", name: "José Alvarez", assignee: { contactId: "c-jose" } }),
+    ArchivedAssigneeError,
+  );
+  assert.ok(!link.calls.some((c) => c.model === "taskEvent" || c.model === "taskAccess"));
 });
 
 test("a task copied from a playbook is linked to its template; a row that already has a link keeps it", async () => {

@@ -223,6 +223,8 @@ export interface DbContact {
   email: string | null;
   asanaGid: string | null;
   active: boolean;
+  /** Archived in the app (src/lib/archive.ts): the import never hands them a job. */
+  archivedAt?: Date | null;
 }
 
 /** A contractor with no Contact yet, added by the import (people.json "createContact"). No login, no invite, no email. */
@@ -1119,6 +1121,8 @@ export interface PlanReport {
   willSee: WillSee[];
   /** Name-only contact matches waiting for Connor (people.json or --accept-name-matches). */
   pendingNameMatches: Array<{ gid: string; name: string; contactId: string }>;
+  /** Jobs Asana gives an archived contractor: written with only their name (buildPlan says why). */
+  archivedAssignees: Array<{ taskId: string; title: string; contactId: string; name: string }>;
   unmatchedPropertySections: string[];
   links: { rewritten: number; unresolved: number };
   /** Rows synced before that the snapshot no longer has: left alone, listed. */
@@ -1209,6 +1213,7 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
     p.match.kind === "contact" && p.match.create ? [{ id: p.match.contactId, asanaGid: p.gid, ...p.match.create }] : [],
   );
   const contactName = new Map([...db.contacts.map((c) => [c.id, c.fullName] as const), ...newContacts.map((c) => [c.id, c.fullName] as const)]);
+  const archivedContacts = new Set(db.contacts.filter((c) => c.archivedAt).map((c) => c.id));
 
   const propertyIdByKey = new Map(db.properties.map((p) => [addressKey(p.address), p.id]));
   const propertyAddress = new Map(db.properties.map((p) => [p.id, p.address]));
@@ -1228,6 +1233,7 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
     lockbox: [],
     willSee: [],
     pendingNameMatches: [],
+    archivedAssignees: [],
     unmatchedPropertySections: [],
     links: { rewritten: 0, unresolved: 0 },
     goneFromAsana: [],
@@ -1408,6 +1414,19 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
       write.sectionRaw = section?.name ?? null;
       write.tags = t.tags?.length ? t.tags.map((x) => x.name).filter(Boolean).join(", ") : null;
       if (!base && t.created_at) write.createdAt = t.created_at;
+    }
+    // An archived contractor never gets a job here, as in the app: assigning one is refused (core.ts
+    // ARCHIVED_ASSIGNEE_LINE) and a reopened job leaves them. A job this would give them, or leave open with
+    // them, keeps only their name, and the report lists it. The baseline keeps that name too, so the next run
+    // reads Asana's assignee as new and links it once they're restored. A closed job they already had stays theirs.
+    const archivedId = final.assignee && "contactId" in final.assignee && archivedContacts.has(final.assignee.contactId) ? final.assignee.contactId : null;
+    let archivedName: AssigneeValue = null;
+    if (archivedId && !stale && (!final.completed || write.assigneeContactId === archivedId)) {
+      archivedName = { name: contactName.get(archivedId) ?? archivedId, email: null };
+      write = { ...write, ...assigneeWrite(archivedName) };
+      final = { ...final, assignee: archivedName };
+      report.archivedAssignees.push({ taskId, title: final.title, contactId: archivedId, name: archivedName.name });
+      notes.push(`${archivedName.name} is archived in the app; assigned by name only`);
     }
     const contactId = final.assignee && "contactId" in final.assignee ? final.assignee.contactId : null;
     const hasContractor = !!contactId;
@@ -1595,11 +1614,12 @@ export function buildPlan(input: PlanInput, db: PlanDb, opts: PlanOptions): Impo
     // Items from earlier syncs stay in the baseline, so a subtask missing from this input never loses its record.
     const checklistBase = subsIncomplete ? (base?.checklist ?? {}) : { ...(base?.checklist ?? {}), ...baselineChecklist };
     const where = { sectionGid: section?.gid ?? null, sectionName: section?.name ?? null, checklist: checklistBase, asOf: input.asOf };
-    const baseline: SyncedFields = stale
+    const synced: SyncedFields = stale
       ? base!
       : fresh
         ? { v: 1, ...incoming, ...where }
         : { ...base!, completed: t.completed, place: incoming.place, ...where };
+    const baseline: SyncedFields = archivedName ? { ...synced, assignee: archivedName } : synced;
     for (const c of conflicts) report.conflicts.push({ taskId, title: final.title, text: describeConflict(c) });
 
     tasks.push({
