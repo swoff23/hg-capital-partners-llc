@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { makeClient } from "./db-client";
-import { TRANSACTION_MAX_WAIT_MS } from "./db-url";
+import { POOL_MAX, TRANSACTION_MAX_WAIT_MS } from "./db-url";
 
 /**
  * ADP-1: a test against a real database built its client with a bare
@@ -19,6 +19,30 @@ test("makeClient builds the app's client: the node-postgres adapter, and the max
   assert.equal(config?.adapter?.adapterName, "@prisma/adapter-pg");
   assert.equal(config?.transactionOptions?.maxWait, TRANSACTION_MAX_WAIT_MS);
   await client.$disconnect();
+});
+
+test("lows 3: a Production client off the transaction pooler logs it once; on the pooler, or off Production, nothing", async (t) => {
+  const SESSION = "postgresql://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres";
+  const TX = "postgres://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true";
+  const errors = t.mock.method(console, "error", () => {});
+  // Built, never connected: the pool opens its first connection at the first query.
+  const clients = [
+    makeClient({ VERCEL_ENV: "production", DATABASE_URL: SESSION, POSTGRES_PRISMA_URL: TX }),
+    makeClient({ VERCEL_ENV: "preview", DATABASE_URL: SESSION }),
+    makeClient({ DATABASE_URL: SESSION }),
+  ];
+  assert.equal(errors.mock.callCount(), 0);
+  clients.push(makeClient({ VERCEL_ENV: "production", DATABASE_URL: SESSION }), makeClient({ VERCEL_ENV: "production", DATABASE_URL: SESSION }));
+  assert.equal(errors.mock.callCount(), 1);
+  const raw = String(errors.mock.calls[0]?.arguments[0]);
+  const line = JSON.parse(raw) as Record<string, unknown>;
+  assert.equal(line.level, "error");
+  assert.equal(line.scope, "db:pooler");
+  assert.equal(line.message, "POSTGRES_PRISMA_URL is missing, so production reads DATABASE_URL through the session pooler");
+  assert.equal(line.dbVia, "session pooler");
+  assert.equal(line.dbPool, POOL_MAX);
+  assert.doesNotMatch(raw, /:pw@|supabase\.com/);
+  await Promise.all(clients.map((c) => c.$disconnect()));
 });
 
 test("db.ts builds its client with makeClient, so the two never drift", () => {

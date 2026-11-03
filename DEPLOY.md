@@ -64,7 +64,9 @@ curl -s "https://www.hgcapitalpartners.com/api/health?token=$HEALTH_TOKEN" | jq 
 The same detail says how the app reaches the database. Production should read
 `"dbDriver": "node-postgres"`, `"dbVia": "transaction pooler"`, `"dbPool": 10`
 and `"dbTimeZone": "UTC"`, with `dbMs` (one `SELECT 1`) in single-digit
-milliseconds once the instance is warm.
+milliseconds once the instance is warm. `"session pooler"` or `"direct"` means
+`POSTGRES_PRISMA_URL` is missing or isn't the transaction pooler, the Oct 27
+outage's setup. Each instance then also logs one `db:pooler` error naming it.
 
 ```bash
 curl -s "https://www.hgcapitalpartners.com/api/health?token=$HEALTH_TOKEN" | jq '{ok, dbDriver, dbVia, dbPool, dbTimeZone, dbMs}'
