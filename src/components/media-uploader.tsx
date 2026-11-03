@@ -1,13 +1,13 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Camera, FileImage, FileSpreadsheet, FileText, ImagePlus, Play, RotateCcw, TriangleAlert, WifiOff, X } from "lucide-react";
+import { Camera, FileImage, FileSpreadsheet, FileText, ImagePlus, Pause, Play, RotateCcw, TriangleAlert, WifiOff, X } from "lucide-react";
 import { RetryPill } from "@/components/photo-thumb";
 import { useToast } from "@/components/toast";
 import { browserDeps, preloadTransfer, useUploadEngine, type UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { type FileKind } from "@/lib/attachments/content-types";
-import { NO_UPLOADS, UploadEngine } from "@/lib/attachments/engine";
+import { NO_UPLOADS, UPLOADS_PAUSED_LINE, UPLOADS_RETRYING_LINE, UploadEngine } from "@/lib/attachments/engine";
 import { CAMERA_ACCEPT, documentLook, pickerAccept, shownReason, uploadCountPhrase, uploadNotice } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ACCESS, uploadTargetKey, type UploadKind } from "@/lib/attachments/upload-kinds";
 import { cn } from "@/lib/utils";
@@ -111,6 +111,11 @@ export type MediaUpload = {
   batchId?: string;
   /** Bytes. */
   size?: number;
+  /**
+   * A `waiting` file held for the upload code (UploadCodeMissingError), not for a signal. Its tile reads "paused" and
+   * the bar says "Uploads paused" instead of "No signal".
+   */
+  paused?: boolean;
 };
 
 export type MediaUploaderApi = {
@@ -121,6 +126,11 @@ export type MediaUploaderApi = {
   waiting: number;
   /** Red tiles: files that didn't go up (failed, or refused by the check) and are still waiting for a Retry or a Remove. */
   failed: number;
+  /**
+   * Loads the page again, while files are paused for the upload code and a reload loses none of them (every file in
+   * flight is in the outbox); otherwise null. The bar's "Uploads paused · Reload".
+   */
+  reload: (() => void) | null;
   /** One line about what failed, or "". */
   notice: string;
   /** The notice's count alone ("2 photos didn't upload"), for a line with its own Retry; each tile's label keeps the reason. */
@@ -202,6 +212,7 @@ export function useMediaUploader(input: MediaUploaderOptions | MediaUploaderTarg
     pending,
     waiting,
     failed,
+    reload: uploads.some((u) => u.paused) && engine.canReload() ? engine.reload : null,
     notice,
     failedLine,
     takePhoto: () => cameraRef.current?.click(),
@@ -361,7 +372,7 @@ function stateLabel(u: MediaUpload, ready: boolean): string {
     case "saving":
       return "saving";
     case "waiting":
-      return "waiting for signal";
+      return u.paused ? "paused" : "waiting for signal";
     case "queued":
       return "waiting";
     default:
@@ -436,7 +447,7 @@ export function UploadTile({
         )}
         {!ready && u.status === "waiting" && (
           <div className="absolute inset-0 flex items-center justify-center bg-photo-scrim/50">
-            <WifiOff className="size-5 text-on-photo" aria-hidden="true" />
+            {u.paused ? <Pause className="size-5 text-on-photo" aria-hidden="true" /> : <WifiOff className="size-5 text-on-photo" aria-hidden="true" />}
           </div>
         )}
         {!ready && !failed && u.status !== "waiting" && (
@@ -505,12 +516,34 @@ export function UploadTile({
  * the reason ("1 photo didn't upload: over the 25 MB photo limit"), since
  * it's the only place a sighted user sees why. With nothing failed but files
  * held for a signal it is "No signal · 5 photos waiting" in `--fg-3` ("No
- * signal · 5 waiting" under 360px). Nothing while all is well.
+ * signal · 5 waiting" under 360px). Files held for the upload code instead
+ * (`paused`) read "Uploads paused · Reload", or "Uploads paused, still
+ * trying" where a reload would lose a file. Nothing while all is well.
  */
 export function UploadStatusLine({ uploader, className }: { uploader: MediaUploaderApi; className?: string }) {
   if (uploader.failed === 0) {
     if (uploader.waiting === 0) return null;
     const held = uploader.uploads.filter((u) => u.status === "waiting");
+    if (held.some((u) => u.paused)) {
+      const reload = uploader.reload;
+      return (
+        <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-fg-3", className)}>
+          <span className="truncate">{reload ? UPLOADS_PAUSED_LINE : UPLOADS_RETRYING_LINE}</span>
+          {reload && (
+            <>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                onClick={reload}
+                className="relative shrink-0 font-medium underline decoration-1 underline-offset-3 hover:decoration-2 pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
+              >
+                Reload
+              </button>
+            </>
+          )}
+        </p>
+      );
+    }
     return (
       <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-fg-3", className)}>
         <span className="truncate max-[359px]:hidden">No signal · {uploadCountPhrase(held.map((u) => u.kind))} waiting</span>

@@ -101,6 +101,11 @@ export type UploadCounts = {
   pending: number;
   /** Held for a signal (the outbox): they retry on their own. */
   waiting: number;
+  /**
+   * Of `waiting`, the files held for the upload code and not for a signal (UploadCodeMissingError): a My jobs row says
+   * "Uploads paused" for them and not "No signal".
+   */
+  paused: number;
   /** Refused or out of retries: each waits for a Retry or a Remove. */
   failed: number;
   /**
@@ -268,8 +273,7 @@ const transfer = lazyTransfer(() => import("@/lib/attachments/transfer").then((m
 
 /**
  * Starts fetching the upload code when the browser has a moment. Safe to call often. Not while the device says it's
- * offline (warmWhenIdle): the failed chunk would stay failed until a reload, where the first file might have found a
- * signal.
+ * offline (warmWhenIdle): the fetch would only fail, and the first file fetches it when there is a signal.
  */
 export function preloadTransfer(): void {
   warmWhenIdle({ warm: () => void transfer.get().catch(() => {}) });

@@ -58,10 +58,12 @@ export class ServerBusyError extends Error {
 
 /**
  * The page's own upload code (the Blob client, lazy-transfer.ts) didn't load
- * while the device was online. The browser keeps a chunk that failed to load
- * as failed until the page loads again, so no try can succeed: the file waits
- * without counting one (classifyFailure reads it as "offline"), and the
- * engine says once that a reload resumes it (UPLOADS_PAUSED_LINE).
+ * while the device was online. The next try fetches the chunk again, so a
+ * dropped request heals by itself; a deploy that removed the chunk is what no
+ * try fixes, and only a reload (the outbox survives it) brings the new page.
+ * Either way the file waits without counting a try (classifyFailure reads it
+ * as "offline"), and the engine says so (UPLOADS_PAUSED_LINE): once as a
+ * notice, and on the file's tile and the bar as "paused".
  */
 export class UploadCodeMissingError extends Error {
   constructor() {
@@ -71,7 +73,7 @@ export class UploadCodeMissingError extends Error {
 
 /** Whether an error is the connection (no signal, a dropped request, a stall) rather than anyone refusing the file. */
 export function classifyFailure(err: unknown, online: boolean): FailureKind {
-  // Not the file and not the road: it waits, uncounted, for the reload the engine asks for.
+  // Not the file and not the road: it waits, uncounted, until the code arrives (or the reload the engine offers).
   if (err instanceof UploadCodeMissingError) return "offline";
   if (err instanceof StalledError) return "timeout";
   if (!online) return "offline";

@@ -33,8 +33,9 @@ test("lazyTransfer: a preload and the first file share one fetch", async () => {
 });
 
 test("lazyTransfer: a chunk that doesn't arrive while online is the page's code, not the road: the file waits uncounted", async () => {
-  // N2: the browser keeps a failed chunk failed until the page loads again, so counting tries only turned the file
-  // red as "no connection" after four fetches that couldn't succeed. Now it waits, and the engine offers Reload.
+  // N2: counting tries turned the file red as "no connection" after four fetches in a row, though the page's code was
+  // what was missing (and after a deploy removed it, nothing fetches it). Now it waits uncounted, and the engine says
+  // "paused" and offers Reload.
   const t = lazyTransfer(async () => {
     throw new Error("ChunkLoadError: Failed to load chunk /_next/static/chunks/0blob.js");
   }, online);
@@ -60,9 +61,21 @@ test("lazyTransfer: offline, the same failure is the connection's, and the file 
   );
   assert.ok(failure instanceof TypeError, "a TypeError, the shape of a dropped request");
   assert.equal(classifyFailure(failure, false), "offline", "offline it just waits");
-  // Where the runtime lets a second fetch through (not Turbopack), the next try gets the code.
+  // The runtime forgets a failed chunk, so the next try fetches it again and gets the code.
   assert.deepEqual(await t.send(input), { pathname: "p" });
   assert.equal(loads, 2);
+});
+
+test("lazyTransfer: online too, the next try after a failed fetch gets the code, which is how a dropped request heals", async () => {
+  let loads = 0;
+  const t = lazyTransfer(async () => {
+    loads++;
+    if (loads === 1) throw new Error("ChunkLoadError: Failed to load chunk /_next/static/chunks/0blob.js");
+    return async () => ({ pathname: "p" });
+  }, online);
+  await assert.rejects(t.send(input), UploadCodeMissingError);
+  assert.deepEqual(await t.send(input), { pathname: "p" });
+  assert.equal(loads, 2, "the failure was forgotten, so the importer ran again");
 });
 
 test("lazyTransfer: a loader that throws at once is the same failure", async () => {

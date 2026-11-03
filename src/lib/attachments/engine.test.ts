@@ -118,7 +118,7 @@ test("a batch: camera names are dated, a refused file gets its reason, the rest 
   );
   assert.equal(tiles[2].error, "only photos, videos and documents can be added here");
   assert.equal(new Set(tiles.map((u) => u.batchId)).size, 1, "one batch");
-  assert.deepEqual(h.engine.counts(t.key), { pending: 3, waiting: 0, failed: 1, awaitingPage: 0, pendingKinds: ["image", "image", "file"] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 3, waiting: 0, paused: 0, failed: 1, awaitingPage: 0, pendingKinds: ["image", "image", "file"] });
 
   await h.flush();
   assert.deepEqual(t.recorded.sort(), ["Lease 2026.pdf", "Photo 2026-10-25 at 2.14 PM 2.jpg", "Photo 2026-10-25 at 2.14 PM.jpg"].sort());
@@ -126,7 +126,7 @@ test("a batch: camera names are dated, a refused file gets its reason, the rest 
   assert.deepEqual(h.engine.uploadsFor(t.key).map((u) => u.status), ["invalid"]);
   assert.equal(landed.length, 1);
   assert.equal(landed[0].length, 3);
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, failed: 1, awaitingPage: 0, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, paused: 0, failed: 1, awaitingPage: 0, pendingKinds: [] });
 });
 
 test("the record step gets the pathname, the stored name and no queuedAt unless the target asks", async () => {
@@ -168,7 +168,7 @@ test("no signal: the file waits, then goes the moment the signal is back", async
   h.engine.add(t, [file("a.jpg")]);
   await h.flush();
   assert.equal(h.engine.uploadsFor(t.key)[0].status, "waiting");
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 1, failed: 0, awaitingPage: 0, pendingKinds: ["image"] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 1, paused: 0, failed: 0, awaitingPage: 0, pendingKinds: ["image"] });
   assert.equal(h.sent.length, 1);
 
   h.state.online = true;
@@ -913,7 +913,7 @@ test("dispose: an upload in flight is aborted, its claim let go and its outbox r
   assert.equal(h.timers.size, 0, "no stall or retry timer left");
   assert.deepEqual(recorded, [], "nothing recorded");
   assert.equal((await outbox.all()).length, 1, "the row stays");
-  assert.deepEqual(h.engine.counts(), { pending: 0, waiting: 0, failed: 0, awaitingPage: 0, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(), { pending: 0, waiting: 0, paused: 0, failed: 0, awaitingPage: 0, pendingKinds: [] });
 
   // The same person's next queue picks it up.
   const next = setup({ outbox, claim: shared.claim, scope: "portal:c-zack" });

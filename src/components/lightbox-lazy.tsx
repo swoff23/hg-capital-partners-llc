@@ -16,7 +16,8 @@ const viewer = lazyModule(() => import("@/components/lightbox"));
  * draws one warms it once the page has settled, so the first tap finds it.
  *
  * Code that can't be fetched closes the viewer with one toast whose Reload
- * brings it back (lib/lazy-module.ts openFailedToast), instead of throwing to
+ * brings it back, whatever the cause (lib/lazy-module.ts openFailedToast),
+ * instead of throwing to
  * the error screen, which would replace the whole page. That open asks no
  * more: the next open, after this one has closed, asks again.
  */

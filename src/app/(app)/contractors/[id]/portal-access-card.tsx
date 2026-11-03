@@ -228,7 +228,10 @@ export function PortalAccessCard({
         {error && <p className="text-meta text-danger">{error}</p>}
       </div>
 
-      {offers.create && (
+      {/* Mounted on "no login yet", not on offers.create: a tab loaded before the contractor was archived can have this
+          open when the server refuses, and the refresh that follows must not take the sheet (and its inline "Restore
+          this contractor first.") away. On an archived page nothing opens it, since the button is gone. */}
+      {!account && (
         <CreateLoginSheet
           key={createKey}
           contactId={contactId}

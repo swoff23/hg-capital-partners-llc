@@ -386,6 +386,11 @@ test("a My jobs row says what its uploads are doing (uploads 2.1)", () => {
   assert.deepEqual(rowUploadLine({ ...none, waiting: 3, pendingKinds: ["image", "image", "image"] }), { text: "No signal · 3 photos waiting", tone: "info" });
   assert.deepEqual(rowUploadLine({ ...none, waiting: 1, pendingKinds: ["video"] }), { text: "No signal · 1 video waiting", tone: "info" });
   assert.equal(rowUploadLine({ ...none, pending: 1, waiting: 2, pendingKinds: ["image", "image", "image"] })?.text, "Uploading 1 photo");
+  // Held for the upload code, not a signal: not "No signal" (the files wait on the page, not the connection).
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 3, paused: 3, pendingKinds: ["image", "image", "image"] }), { text: "Uploads paused · 3 photos waiting", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 1, paused: 1, pendingKinds: ["video"] }), { text: "Uploads paused · 1 video waiting", tone: "info" });
+  assert.equal(rowUploadLine({ ...none, waiting: 2, paused: 0, pendingKinds: ["image", "image"] })?.text, "No signal · 2 photos waiting");
+  assert.equal(rowUploadLine({ ...none, failed: 1, waiting: 2, paused: 2, pendingKinds: ["image", "image"] })?.tone, "danger", "a failure still leads");
 });
 
 test("a My jobs row whose photos are up and only wait for the job to open says to open it, not Uploading", () => {

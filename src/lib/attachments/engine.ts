@@ -80,6 +80,11 @@ type Job = {
   recordFailures: number;
   /** Bytes are up and there is no record step yet: a reload put the file back before its page did. */
   needsRecord: boolean;
+  /**
+   * The last try failed because the upload code didn't load (UploadCodeMissingError). The file is Waiting, but for
+   * the code and not for a signal, so its tile and the bar say "paused" (MediaUpload.paused). Cleared by the next try.
+   */
+  paused: boolean;
   controller: AbortController | null;
   retryTimer: unknown;
   stallTimer: unknown;
@@ -143,8 +148,8 @@ export type EngineDeps = {
    */
   claim?: (id: string) => Promise<(() => void) | null>;
   /**
-   * Loads the page again: the way back when the upload code itself didn't load (UploadCodeMissingError), since the
-   * browser keeps a failed chunk failed until then. Without it that notice isn't shown.
+   * Loads the page again: the way back when the upload code itself didn't load (UploadCodeMissingError) and a deploy
+   * removed it, so no retry fetches it. Without it that notice isn't shown.
    */
   reload?: () => void;
 };
@@ -153,7 +158,7 @@ export type EngineDeps = {
 export const NO_UPLOADS: readonly MediaUpload[] = [];
 const EMPTY = NO_UPLOADS;
 /** The counts of a target with nothing in flight: shared, so a server snapshot and an idle client one are the same. */
-export const NO_COUNTS: UploadCounts = { pending: 0, waiting: 0, failed: 0, awaitingPage: 0, pendingKinds: [] };
+export const NO_COUNTS: UploadCounts = { pending: 0, waiting: 0, paused: 0, failed: 0, awaitingPage: 0, pendingKinds: [] };
 
 /** "no more can be added here", "only 3 more can be added here": the reason a file past a target's cap gives. */
 export function capReason(remaining: number): string {
@@ -171,9 +176,17 @@ export function failedAwayText(kinds: readonly (FileKind | null)[], label: strin
 
 /**
  * The one notice when the upload code didn't load while online (UploadCodeMissingError), with Reload: the files wait
- * in the outbox, and the page's next load sends them.
+ * in the outbox, and the page's next load sends them. The bar says it too (media-uploader.tsx UploadStatusLine), since
+ * the toast goes after a few seconds and a deploy that removed the chunk is a wait no retry ends.
  */
 export const UPLOADS_PAUSED_LINE = "Uploads paused";
+
+/**
+ * The same, when a reload would lose a file: one whose row never reached the outbox (needsLeaveWarning), so the
+ * notice offers no Reload. The files keep trying; a retry fetches the code again, which is enough after a dropped
+ * request.
+ */
+export const UPLOADS_RETRYING_LINE = "Uploads paused, still trying";
 
 /** The record step said no: the page has the reason. */
 class RecordRefused extends Error {}
@@ -298,6 +311,7 @@ export class UploadEngine {
         : {
             pending: pending.length,
             waiting: own.filter((j) => j.status === "waiting").length,
+            paused: own.filter((j) => j.status === "waiting" && j.paused).length,
             failed: own.filter((j) => j.status === "failed" || j.status === "invalid").length,
             awaitingPage: pending.filter((j) => j.needsRecord).length,
             pendingKinds: [...pending, ...own.filter((j) => j.status === "waiting")].map((j) => j.fileKind),
@@ -317,6 +331,15 @@ export class UploadEngine {
     return false;
   };
 
+  /**
+   * Whether the page can be loaded again without losing a file: there is a way to (deps.reload) and every file in
+   * flight is in the outbox, which a reload resumes. Not while one isn't, so Reload isn't offered where it costs a file.
+   */
+  canReload = (): boolean => !!this.deps.reload && !this.needsLeaveWarning();
+
+  /** Loads the page again (deps.reload). Callers check canReload first. */
+  reload = (): void => this.deps.reload?.();
+
   private view(j: Job): MediaUpload {
     return {
       key: j.id,
@@ -328,6 +351,7 @@ export class UploadEngine {
       error: j.error,
       batchId: j.batchId,
       size: j.size,
+      ...(j.status === "waiting" && j.paused ? { paused: true } : {}),
     };
   }
 
@@ -437,6 +461,7 @@ export class UploadEngine {
         waits: 0,
         recordFailures: 0,
         needsRecord: false,
+        paused: false,
         controller: null,
         retryTimer: null,
         stallTimer: null,
@@ -571,7 +596,7 @@ export class UploadEngine {
     const controller = new AbortController();
     job.controller = controller;
     job.stalled = false;
-    this.patch(job, { status: "uploading", progress: job.pathname ? 1 : 0, error: undefined });
+    this.patch(job, { status: "uploading", progress: job.pathname ? 1 : 0, error: undefined, paused: false });
     try {
       const prepared = job.prepared!;
       const progress = (fraction: number) => {
@@ -723,7 +748,8 @@ export class UploadEngine {
           : classifyFailure(err, online);
     const reason = ownWords ? err.message : failure === "refused" ? uploadFailureReason(err) : "no connection";
     const next = afterFailure({ tries: job.tries, waits: job.waits }, failure);
-    if (err instanceof UploadCodeMissingError) this.noticeCodeMissing();
+    const codeMissing = err instanceof UploadCodeMissingError;
+    if (codeMissing) this.noticeCodeMissing();
     if (refusedByRecord) {
       // One record-only retry: a refusal may have discarded the blob, so after that it uploads again.
       job.recordFailures++;
@@ -733,7 +759,7 @@ export class UploadEngine {
       Object.assign(job, { pathname: null, thumbPathname: null, posterPathname: null, multipart: null });
     }
     if (next.phase === "failed") {
-      this.patch(job, { status: "failed", error: reason });
+      this.patch(job, { status: "failed", error: reason, paused: false });
       void this.save(job);
       // Only for a file picked on this page load: one the outbox put back (another tab's, an earlier visit's) waits on its own page.
       if (this.isAway(job.key) && !job.restored) this.noticeFailure(job);
@@ -742,7 +768,7 @@ export class UploadEngine {
     }
     job.tries = next.tries;
     job.waits = next.waits;
-    this.patch(job, { status: "waiting", error: undefined });
+    this.patch(job, { status: "waiting", error: undefined, paused: codeMissing });
     void this.save(job);
     this.deps.clearTimer(job.retryTimer);
     job.retryTimer = this.deps.setTimer(() => {
@@ -826,13 +852,17 @@ export class UploadEngine {
 
   /**
    * The upload code didn't load (UploadCodeMissingError): once, "Uploads paused · Reload". The files keep waiting
-   * without spending their tries, and go up after the reload.
+   * without spending their tries, and go up when the code arrives or after the reload. Where a reload would lose a
+   * file (its row never reached the outbox) the notice says the files keep trying and offers no Reload (canReload).
    */
   private noticeCodeMissing() {
-    const reload = this.deps.reload;
-    if (this.codeNoticed || !reload) return;
+    if (this.codeNoticed || !this.deps.reload) return;
     this.codeNoticed = true;
-    this.deps.notify({ message: UPLOADS_PAUSED_LINE, key: "upload-code", action: { label: "Reload", run: () => reload() } });
+    if (!this.canReload()) {
+      this.deps.notify({ message: UPLOADS_RETRYING_LINE, key: "upload-code" });
+      return;
+    }
+    this.deps.notify({ message: UPLOADS_PAUSED_LINE, key: "upload-code", action: { label: "Reload", run: this.reload } });
   }
 
   /** "2 photos didn't upload to 56 Tamarack St · Retry": the page that's open isn't theirs, so the toast names where they were going. */
@@ -1015,6 +1045,7 @@ export class UploadEngine {
         waits: e.waits,
         recordFailures: 0,
         needsRecord: false,
+        paused: false,
         controller: null,
         retryTimer: null,
         stallTimer: null,

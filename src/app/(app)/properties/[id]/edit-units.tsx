@@ -99,7 +99,7 @@ export function UnitsSection({
   const [removing, setRemoving] = useState<Removing | null>(null);
   const run = useRun();
   // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast whose Reload
-  // brings it back (a failed chunk stays failed until the page loads again, lib/lazy-module.ts).
+  // brings it back, whatever the cause (lib/lazy-module.ts).
   const editor = useLazyModule(unitSheet, sheet !== null, () => {
     setSheet(null);
     setIsOpen(false);

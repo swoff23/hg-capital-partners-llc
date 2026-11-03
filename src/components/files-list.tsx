@@ -336,7 +336,9 @@ function UploadRow({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onRe
   const status = failed || refused
     ? rowReason(u.error)
     : u.status === "waiting"
-      ? "Waiting for signal"
+      ? u.paused
+        ? "Paused"
+        : "Waiting for signal"
       : u.status === "saving"
         ? "Saving"
         : u.status === "queued"

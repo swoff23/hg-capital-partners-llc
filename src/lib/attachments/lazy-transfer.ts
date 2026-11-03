@@ -12,15 +12,17 @@ const deviceOnline = () => typeof navigator === "undefined" || navigator.onLine 
  * (preloadTransfer, when the queue mounts and on a page that takes files);
  * `send` is the `transfer` the engine gets, and waits for it.
  *
- * A chunk that doesn't arrive stays failed in the browser until the page
- * loads again (Turbopack keeps the rejected load and hands it to every later
- * import), so a file that tries again can't get it. Offline, the failure is
- * the connection's: a TypeError, which classifyFailure (outbox.ts) reads as
- * "offline", and the file waits. Online it is UploadCodeMissingError: the
- * file waits without counting a try, and the engine shows one notice with
- * Reload (engine.ts), instead of spending the file's tries on a fetch that
- * can't succeed and turning it red as "no connection". Whatever the transfer
- * itself throws (a refusal, a busy server) passes through as it is.
+ * A chunk that doesn't arrive is forgotten by the browser's runtime, so the
+ * next `get` fetches it again and a file that tries again can get it (a
+ * dropped signal heals this way). Offline, the failure is the connection's: a
+ * TypeError, which classifyFailure (outbox.ts) reads as "offline", and the
+ * file waits. Online it is UploadCodeMissingError: the file waits too, without
+ * counting a try, since the page's code is what is missing and not the file
+ * or the road, and the engine says so (engine.ts: one notice, and the file's
+ * tile and the bar read "paused"). That is also the answer when a deploy
+ * removed the chunk, which no retry fixes: the notice and the bar offer
+ * Reload then. Whatever the transfer itself throws (a refusal, a busy server)
+ * passes through as it is.
  */
 export function lazyTransfer(load: () => Promise<Transfer>, online: () => boolean = deviceOnline): { get: () => Promise<Transfer>; send: Transfer } {
   const client = lazyModule(load);

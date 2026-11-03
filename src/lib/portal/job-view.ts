@@ -448,15 +448,18 @@ export function lateUploadsEndsIn(markedDoneAt: Date | string | null | undefined
  * A My jobs row's uploads line (uploads 2.1): "Uploading 3 photos" while any
  * file for the job is going up, "2 photos didn't upload" once some failed,
  * "No signal · 3 photos waiting" when the only ones left are held for a
- * signal, and "Open to send 2 photos" when their bytes are up but only the
- * job's page can record and post them (a sign-in or a reload put them back
- * from the outbox before it opened). Failed leads: it's the one that needs
- * the contractor. Null when the job has no uploads. The queue counts failed
+ * signal ("Uploads paused · 3 photos waiting" when it is the upload code they
+ * wait for, not a signal), and "Open to send 2 photos" when their bytes are
+ * up but only the job's page can record and post them (a sign-in or a reload
+ * put them back from the outbox before it opened). Failed leads: it's the one
+ * that needs the contractor. Null when the job has no uploads. The queue counts failed
  * and waiting-for-the-page files without their kinds, so those lines say photos.
  */
 export function rowUploadLine(c: {
   pending: number;
   waiting: number;
+  /** Of `waiting`, the files held for the upload code and not a signal. */
+  paused?: number;
   failed: number;
   awaitingPage?: number;
   pendingKinds: readonly (FileKind | null)[];
@@ -467,7 +470,7 @@ export function rowUploadLine(c: {
   const parked = Math.min(c.awaitingPage ?? 0, c.pending);
   const going = c.pending - parked;
   if (going > 0) return { text: `Uploading ${going} ${noun}${going === 1 ? "" : "s"}`, tone: "info" };
-  if (c.waiting > 0) return { text: `No signal · ${c.waiting} ${noun}${c.waiting === 1 ? "" : "s"} waiting`, tone: "info" };
+  if (c.waiting > 0) return { text: `${(c.paused ?? 0) > 0 ? "Uploads paused" : "No signal"} · ${c.waiting} ${noun}${c.waiting === 1 ? "" : "s"} waiting`, tone: "info" };
   if (parked > 0) return { text: `Open to send ${parked} ${parked === 1 ? "photo" : "photos"}`, tone: "info" };
   return null;
 }

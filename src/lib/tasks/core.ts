@@ -785,7 +785,11 @@ async function repeatSlot(tx: Tx, taskId: string): Promise<Ymd | null> {
  * plain read and runs no raw SQL, as the importer requires of core
  * (asana/import.test.ts); setStatus has locked the contact (FOR SHARE) right
  * after the task before calling it, so in the app that read holds until the
- * finish commits.
+ * finish commits. The importer's close takes no lock and needs none: its task
+ * stays the contractor's open job in every other transaction's view until it
+ * commits with the copy (and an assignment it makes holds the contact's row
+ * through the foreign key), so an Archive beside it either counts that job
+ * and refuses, or waits and counts the copy.
  * Exported for the Asana delta, which closes tasks completed in Asana
  * without going through setStatus.
  */

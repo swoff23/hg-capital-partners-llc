@@ -89,9 +89,9 @@ test("fetchModule: a caller that has gone away is told nothing, arrived or faile
   assert.deepEqual(seen, []);
 });
 
-test("the toast for code that didn't open fits a phone, and its next step is Reload, not another tap", () => {
-  // Turbopack keeps a chunk that failed to load as failed for the page's life (every later import gets the same
-  // rejection), so "Try again" could never work: only loading the page again fetches it.
+test("the toast for code that didn't open fits a phone, and its next step is Reload, which works whatever the cause", () => {
+  // Turbopack's runtime forgets a chunk that failed (after one quiet retry), so another tap would fetch it again and
+  // heal a dropped signal; after a deploy removed the chunk only a reload helps. Reload covers both.
   assert.equal(OPEN_FAILED_LINE, "Couldn't open it.");
   assert.ok(OPEN_FAILED_LINE.length <= TOAST_PHONE_CHARS && !OPEN_FAILED_LINE.includes("—"));
   const t = openFailedToast();

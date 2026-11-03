@@ -171,7 +171,7 @@ export async function contractorArchiveBlockers(tx: Pick<ArchiveTx, "task" | "co
  *
  * The contact's row is locked FOR UPDATE before anything is read, so the
  * check and the write are one step against everything that gives them work
- * or a login: assigning them (core.ts lockAssignableContact, after the Task
+ * or a login: assigning them (core.ts contactArchivedLocked, after the Task
  * row), making or restoring their login (portal/accounts-core.ts, first) and
  * an insert that names them (a foreign key's KEY SHARE) all wait for it, and
  * whichever runs second sees the first. Without it the archive's own update

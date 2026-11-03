@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Button as AriaButton, GridList, GridListItem, useDragAndDrop, type DropTarget } from "react-aria-components";
-import { GripVertical, ImagePlus, MoreHorizontal, TriangleAlert, WifiOff, X } from "lucide-react";
+import { GripVertical, ImagePlus, MoreHorizontal, Pause, TriangleAlert, WifiOff, X } from "lucide-react";
 import { Lightbox, type LightboxMenuItem, type MediaItem } from "@/components/lightbox";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
 import {
@@ -484,7 +484,9 @@ function PendingTile({ upload: u, onRetry, onRemove, first }: { upload: MediaUpl
       : u.status === "saving"
         ? "saving"
         : u.status === "waiting"
-          ? "waiting for signal"
+          ? u.paused
+            ? "paused"
+            : "waiting for signal"
           : u.status === "queued"
             ? "waiting"
             : `uploading, ${Math.round(u.progress * 100)}%`;
@@ -506,7 +508,7 @@ function PendingTile({ upload: u, onRetry, onRemove, first }: { upload: MediaUpl
       )}
       {u.status === "waiting" && (
         <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-photo-scrim/50">
-          <WifiOff className="size-5 text-on-photo" aria-hidden="true" />
+          {u.paused ? <Pause className="size-5 text-on-photo" aria-hidden="true" /> : <WifiOff className="size-5 text-on-photo" aria-hidden="true" />}
         </span>
       )}
       {refused && (
