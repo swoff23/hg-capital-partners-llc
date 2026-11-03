@@ -1,7 +1,9 @@
+import { cache } from "react";
 import type { FileLink } from "@/components/files-list";
 import { propertyFileUrl } from "@/lib/attachments/media";
 import { prisma } from "@/lib/db";
 import { shortAddress } from "@/lib/normalize";
+import { getPropertyById } from "@/lib/properties/read";
 import { PropertyDocumentsSection } from "./edit-documents";
 
 /**
@@ -14,20 +16,7 @@ import { PropertyDocumentsSection } from "./edit-documents";
  * section puts them on the upload queue (edit-documents.tsx).
  */
 export async function DocumentsSection({ propertyId }: { propertyId: string }) {
-  const [property, rows] = await Promise.all([
-    prisma.property.findUnique({ where: { id: propertyId }, select: { address: true } }),
-    prisma.propertyAttachment.findMany({
-      where: { propertyId },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        filename: true,
-        size: true,
-        createdAt: true,
-        uploadedByUser: { select: { name: true, email: true } },
-      },
-    }),
-  ]);
+  const [property, rows] = await Promise.all([getPropertyById(propertyId), propertyDocuments(propertyId)]);
   const files: FileLink[] = rows.map((a) => ({
     id: a.id,
     kind: "FILE",
@@ -40,3 +29,18 @@ export async function DocumentsSection({ propertyId }: { propertyId: string }) {
   }));
   return <PropertyDocumentsSection propertyId={propertyId} label={property ? shortAddress(property.address) : ""} files={files} />;
 }
+
+/** The property's files, oldest first. Once per request (React cache), so the record page can start it beside its own reads. */
+export const propertyDocuments = cache((propertyId: string) =>
+  prisma.propertyAttachment.findMany({
+    where: { propertyId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      filename: true,
+      size: true,
+      createdAt: true,
+      uploadedByUser: { select: { name: true, email: true } },
+    },
+  }),
+);

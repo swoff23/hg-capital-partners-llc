@@ -1,11 +1,11 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ScopeButton } from "@/components/filter-bar";
 import { SortHeader } from "@/components/sort-header";
 import { LinkButton, PageHeader, Table, Th, EmptyState, chromeIconClass } from "@/components/ui";
-import { DEAL_FIELD_LABEL, DEAL_STATUSES } from "@/lib/config";
+import { DEAL_FIELD_LABEL } from "@/lib/config";
 import { todayYmdEastern } from "@/lib/dates";
 import { parseNoteAuthor } from "@/lib/deals/note-author";
 import { DealFilters } from "./filters";
@@ -14,13 +14,9 @@ import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
 import { COLUMN_DROP } from "./columns";
 import { DEFAULT_DEAL_SORT, easternDay, noteDay } from "./format";
 import { dealSearchWhere, dealsWhere, emptyDeals, isFiltered, parseDealFilters, viewCounts } from "./query";
+import { firstByStage } from "./stage-order";
 
 const CAP = 300;
-
-// Status has no natural DB ordering (it's not alphabetical), so it's ranked by its position
-// in the pipeline (DEAL_STATUSES) and sorted in memory below.
-const STATUS_RANK = new Map(DEAL_STATUSES.map((s, i) => [s as string, i]));
-const statusRank = (status: string) => STATUS_RANK.get(status) ?? DEAL_STATUSES.length;
 
 const SORT_COLUMNS: Record<
   string,
@@ -34,57 +30,92 @@ const SORT_COLUMNS: Record<
   updated: (desc) => ({ updatedAt: desc ? "desc" : "asc" }),
 };
 
-/** DB-level order for the fetch. Status is re-sorted in memory afterward, so fetch order for it doesn't matter. */
+/** DB-level order for the fetch. Stage is ranked in stage-order.ts instead (shownDeals). */
 function dbOrderBy(field: string, desc: boolean): Prisma.DealOrderByWithRelationInput[] {
-  if (field === "status") return [{ updatedAt: "desc" }];
   const build = SORT_COLUMNS[field] ?? SORT_COLUMNS.updated;
   const primary = build(desc);
   return field === "updated" ? [primary] : [primary, { updatedAt: "desc" }];
 }
 
-function sortByStatus<T extends { status: string; updatedAt: Date }>(list: T[], desc: boolean): T[] {
-  return [...list].sort((a, b) => {
-    const diff = statusRank(a.status) - statusRank(b.status);
-    if (diff !== 0) return desc ? -diff : diff;
-    return b.updatedAt.getTime() - a.updatedAt.getTime();
-  });
+/** What a row shows. */
+const LIST_COLUMNS = {
+  id: true,
+  address: true,
+  status: true,
+  units: true,
+  theirPrice: true,
+  theirPriceRaw: true,
+  ourPrice: true,
+  ourPriceRaw: true,
+  nextAction: true,
+  sourceUrl: true,
+  updatedAt: true,
+} satisfies Prisma.DealSelect;
+
+type LatestNote = { dealId: string; body: string; noteDate: Date | null; source: string };
+
+/**
+ * Each shown deal's most recent note, typed here or imported from the spreadsheet, shown as a
+ * column so it's visible without opening each deal. Auto-logged "change" entries are excluded,
+ * and undated imported lines sort after every dated one. One row per deal (DISTINCT ON), for
+ * the shown deals only, so a long list doesn't load every note.
+ */
+async function latestNotes(dealIds: string[]): Promise<Map<string, LatestNote>> {
+  if (dealIds.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<LatestNote[]>`
+    SELECT DISTINCT ON ("dealId") "dealId", "body", "noteDate", "source"
+    FROM "DealNote"
+    WHERE "dealId" IN (${Prisma.join(dealIds)}) AND "source" <> 'change' AND "deletedAt" IS NULL
+    ORDER BY "dealId", "noteDate" DESC NULLS LAST, "createdAt" DESC, "id" DESC`;
+  return new Map(rows.map((r) => [r.dealId, r]));
+}
+
+/** The note without the author pasted into it, "(CS)" or "  ·  Connor", and its day. */
+function latestNote(note: LatestNote | undefined, today: string): { text: string; day: string | null } | null {
+  if (!note) return null;
+  // An undated imported line has no day of its own; its createdAt is the import run.
+  return { text: parseNoteAuthor(note.body).text, day: note.noteDate ? noteDay({ noteDate: note.noteDate, source: note.source }, today) : null };
+}
+
+/**
+ * The rows the list shows, at most CAP, with their latest notes. Every sort but Stage is a DB
+ * order that takes the cap directly. Stage has no DB order, so every match's id, stage and update
+ * time are read and ranked first (stage-order.ts), and only the CAP shown are read in full: the
+ * cap never cuts a stage group before the sort runs, and the rest are never loaded.
+ */
+async function shownDeals(where: Prisma.DealWhereInput, sortField: string, desc: boolean) {
+  if (sortField !== "status") {
+    const deals = await prisma.deal.findMany({ where, orderBy: dbOrderBy(sortField, desc), take: CAP, select: LIST_COLUMNS });
+    return { deals, notes: await latestNotes(deals.map((d) => d.id)) };
+  }
+  const keys = await prisma.deal.findMany({ where, select: { id: true, status: true, updatedAt: true } });
+  const ids = firstByStage(keys, desc, CAP);
+  const [rows, notes] = await Promise.all([
+    prisma.deal.findMany({ where: { id: { in: ids } }, select: LIST_COLUMNS }),
+    latestNotes(ids),
+  ]);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // A deal deleted between the two reads drops out.
+  return { deals: ids.flatMap((id) => byId.get(id) ?? []), notes };
 }
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
-  await requireUser();
   const f = parseDealFilters(await searchParams);
   const where = dealsWhere(f);
 
   const sortDesc = f.sort.startsWith("-");
   const sortField = (sortDesc ? f.sort.slice(1) : f.sort) || DEFAULT_DEAL_SORT;
 
-  // Sorting by stage happens in memory (see sortByStatus), so that fetch can't be `take`-limited
-  // up front: limiting by DB order first would silently drop whole stage groups before the
-  // real sort ever runs. Every other sort is a plain DB order, so it can take the cap directly.
-  const [dealsRaw, shown, byStageSearched, byStageAll] = await Promise.all([
-    prisma.deal.findMany({
-      where,
-      orderBy: dbOrderBy(sortField, sortDesc),
-      ...(sortField === "status" ? {} : { take: CAP }),
-      include: {
-        // The most recent note, typed here or imported from the spreadsheet, shown as a column so
-        // it's visible without opening each deal. Auto-logged "change" entries are excluded.
-        // Undated imported lines sort after every dated one.
-        notes: {
-          where: { source: { not: "change" }, deletedAt: null },
-          orderBy: [{ noteDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
-          take: 1,
-        },
-      },
-    }),
+  // The session check runs beside the reads and is awaited with them, so nothing is shown without it.
+  const [, { deals, notes }, shown, byStageSearched, byStageAll] = await Promise.all([
+    requireUser(),
+    shownDeals(where, sortField, sortDesc),
     prisma.deal.count({ where }),
     // Each view and stage counts the search's hits, so a hit outside the current view shows (DEALS-012).
     prisma.deal.groupBy({ by: ["status"], where: dealSearchWhere(f.q), _count: true }),
     // What "hidden by filters" is measured against: the whole view, whatever is typed.
     f.q ? prisma.deal.groupBy({ by: ["status"], _count: true }) : Promise.resolve(null),
   ]);
-  const sorted = sortField === "status" ? sortByStatus(dealsRaw, sortDesc) : dealsRaw;
-  const deals = sorted.slice(0, CAP);
   const truncated = shown > CAP;
   const today = todayYmdEastern();
 
@@ -217,14 +248,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                         nextAction: d.nextAction,
                         sourceUrl: d.sourceUrl,
                         updated: easternDay(d.updatedAt, today),
-                        // The note without the author pasted into it, "(CS)" or "  ·  Connor". An undated
-                        // imported line has no day of its own; its createdAt is the import run.
-                        latestNote: d.notes[0]
-                          ? {
-                              text: parseNoteAuthor(d.notes[0].body).text,
-                              day: d.notes[0].noteDate ? noteDay({ noteDate: d.notes[0].noteDate, source: d.notes[0].source }, today) : null,
-                            }
-                          : null,
+                        latestNote: latestNote(notes.get(d.id), today),
                       }}
                     />
                   ))}

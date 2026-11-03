@@ -80,12 +80,17 @@ export async function allTasks(
   viewerId?: string,
 ): Promise<{ tasks: ListTask[]; total: number }> {
   const where = allTasksWhere(f, legacy);
-  const [rows, total] = await Promise.all([
-    prisma.task.findMany({ where, orderBy: allTasksOrderBy(f.status), take, select: LIST_SELECT }),
+  // The unread check starts as soon as the rows are in, beside the count.
+  const [tasks, total] = await Promise.all([
+    prisma.task
+      .findMany({ where, orderBy: allTasksOrderBy(f.status), take, select: LIST_SELECT })
+      .then((rows) => {
+        const list = rows.map(toListTask);
+        return viewerId ? withUnread(viewerId, list) : list;
+      }),
     prisma.task.count({ where }),
   ]);
-  const tasks = rows.map(toListTask);
-  return { tasks: viewerId ? await withUnread(viewerId, tasks) : tasks, total };
+  return { tasks, total };
 }
 
 /** How many tasks the filters leave: the number on the Filters sheet's "Show 13 tasks". */
@@ -134,16 +139,20 @@ export async function taskViewCounts(f: AllFilters, legacy: LegacyNames): Promis
  * lists the people, and "Others" for names that are nobody it can name.
  */
 export async function legacyAssignees(
-  people: readonly PersonRef[],
+  people: readonly PersonRef[] | Promise<readonly PersonRef[]>,
 ): Promise<{ merged: LegacyNames; others: string[] }> {
-  const rows = await prisma.task.findMany({
-    where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...excludeTemplateTasks },
-    select: { assigneeName: true },
-    distinct: ["assigneeName"],
-    orderBy: { assigneeName: "asc" },
-  });
+  // The names are read while the people are still loading, when the caller passes them as a promise.
+  const [rows, refs] = await Promise.all([
+    prisma.task.findMany({
+      where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...excludeTemplateTasks },
+      select: { assigneeName: true },
+      distinct: ["assigneeName"],
+      orderBy: { assigneeName: "asc" },
+    }),
+    people,
+  ]);
   const names = rows.map((t) => t.assigneeName).filter((n): n is string => !!n);
-  const { merged, others } = mergeLegacyNames(names, people);
+  const { merged, others } = mergeLegacyNames(names, refs);
   const byPerson = new Map<string, string[]>();
   for (const [name, key] of merged) byPerson.set(key, [...(byPerson.get(key) ?? []), name]);
   return { merged: byPerson, others };

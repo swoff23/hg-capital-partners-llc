@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { ArrowUpRight } from "lucide-react";
+import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordView } from "@/lib/recent-views";
@@ -48,31 +49,22 @@ function DocLink({ href }: { href: string }) {
 }
 
 export default async function ContractorPage({ params }: PageProps<"/contractors/[id]">) {
-  const me = await requireUser();
   const { id } = await params;
-  const c = await prisma.contact.findUnique({
-    where: { id },
-    include: {
-      // Never the password hash: only what the Portal access card shows.
-      portalAccount: {
-        select: { id: true, email: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true },
-      },
-    },
-  });
-  if (!c) notFound();
-  // Puts them on top of this person's Recent in search, once the response is out.
-  after(() => recordView(me.id, "CONTACT", c.id));
-  const phone = c.phoneE164 ?? c.phone;
-  const access = c.portalAccount ? portalAccess(c.portalAccount, c.active) : null;
-  const w9OnFile = docOnFile(c.comments, "W-9");
-  const coiOnFile = docOnFile(c.comments, "Insurance");
-  // The import's "W-9 on file:" lines show as the W-9 and Insurance rows, not as notes.
-  const { notes } = splitDocLines(c.comments);
-
   // Their jobs: tasks actually assigned to this contact, never a playbook's
   // template rows. The list stops at JOBS_SHOWN and says so; the count is all of them.
-  const jobsWhere = { assigneeContactId: c.id, ...excludeTemplateTasks };
-  const [rows, jobCount] = await Promise.all([
+  const jobsWhere = { assigneeContactId: id, ...excludeTemplateTasks };
+  // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
+  const [me, c, rows, jobCount] = await Promise.all([
+    requireUser(),
+    prisma.contact.findUnique({
+      where: { id },
+      include: {
+        // Never the password hash: only what the Portal access card shows.
+        portalAccount: {
+          select: { id: true, email: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true },
+        },
+      },
+    }),
     prisma.task.findMany({
       where: jobsWhere,
       orderBy: [{ completedAt: { sort: "desc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }],
@@ -81,6 +73,16 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
     }),
     prisma.task.count({ where: jobsWhere }),
   ]);
+  if (!c) notFound();
+  // Puts them on top of this person's Recent in search, once the response is out (not again for an edit's refresh).
+  if (!(await isActionRender())) after(() => recordView(me.id, "CONTACT", c.id));
+  const phone = c.phoneE164 ?? c.phone;
+  const access = c.portalAccount ? portalAccess(c.portalAccount, c.active) : null;
+  const w9OnFile = docOnFile(c.comments, "W-9");
+  const coiOnFile = docOnFile(c.comments, "Insurance");
+  // The import's "W-9 on file:" lines show as the W-9 and Insurance rows, not as notes.
+  const { notes } = splitDocLines(c.comments);
+
   const tasks = rows.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   // Buffalo's calendar day, not the server's (UTC on Vercel rolls over at 8pm).
   const today = todayYmdEastern();

@@ -1,24 +1,30 @@
 import { notFound } from "next/navigation";
 import { after } from "next/server";
+import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { preload } from "@/lib/preload";
 import { recordView } from "@/lib/recent-views";
 import { Section, TextLink } from "@/components/ui";
 import { RailList } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
-import { DealActivity } from "./deal-activity";
+import { DealActivity, dealNotes } from "./deal-activity";
 import { DealAddress, DealFact, DealListingLink, DealPassReason, DealPrice, DealStageRow, DealUnits } from "./deal-detail";
 
 export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
-  const user = await requireUser();
   const { id } = await params;
-  const deal = await prisma.deal.findUnique({
-    where: { id },
-    include: { convertedProperty: { select: { id: true, address: true } } },
-  });
+  // Activity's notes start now, beside the deal; the session check runs with them and is awaited before anything shows.
+  preload(dealNotes(id));
+  const [user, deal] = await Promise.all([
+    requireUser(),
+    prisma.deal.findUnique({
+      where: { id },
+      include: { convertedProperty: { select: { id: true, address: true } } },
+    }),
+  ]);
   if (!deal) notFound();
-  // Puts it on top of this person's Recent in search, once the response is out.
-  after(() => recordView(user.id, "DEAL", deal.id));
+  // Puts it on top of this person's Recent in search, once the response is out (not again for an edit's refresh).
+  if (!(await isActionRender())) after(() => recordView(user.id, "DEAL", deal.id));
 
   return (
     // A record: 1200 wide at most, with the details in a 320 rail from lg (section 5).

@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { after } from "next/server";
+import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { preload } from "@/lib/preload";
+import { getPropertyById } from "@/lib/properties/read";
+import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
 import { toMoneyNumber } from "@/lib/utils";
@@ -16,7 +20,7 @@ import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
-import { DocumentsSection } from "./documents-section";
+import { DocumentsSection, propertyDocuments } from "./documents-section";
 import { PropertyLoanSection } from "./edit-loan";
 import { PropertyInsuranceSection } from "./edit-insurance";
 import { UnitsSection } from "./edit-units";
@@ -56,30 +60,33 @@ function taskAssignee(t: {
  * insurance) and the property's tasks, documents and notes.
  */
 export default async function PropertyPage({ params }: PageProps<"/properties/[id]">) {
-  const user = await requireUser();
   const { id } = await params;
-  const property = await prisma.property.findUnique({
-    where: { id },
-    include: {
-      tasks: {
-        where: { ...activeTask, ...excludeTemplateTasks },
-        orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
-        include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
-      },
-      sourceDeal: { select: { id: true, address: true } },
-      listings: {
-        orderBy: { createdAt: "asc" },
-        include: { photos: { orderBy: { sortOrder: "asc" } } },
-      },
-    },
-  });
+  // The Financials card and Documents read their own data further down; they start now, beside the page's reads.
+  preload(getPropertyFinancials(id));
+  preload(propertyDocuments(id));
+  // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
+  const [user, property, openTasks, sourceDeal, propertyListings, capexRules] = await Promise.all([
+    requireUser(),
+    getPropertyById(id),
+    prisma.task.findMany({
+      where: { propertyId: id, ...activeTask, ...excludeTemplateTasks },
+      orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
+      include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
+    }),
+    prisma.deal.findUnique({ where: { convertedPropertyId: id }, select: { id: true, address: true } }),
+    prisma.listing.findMany({
+      where: { propertyId: id },
+      orderBy: { createdAt: "asc" },
+      include: { photos: { orderBy: { sortOrder: "asc" } } },
+    }),
+    getCapexRules(),
+  ]);
   if (!property) notFound();
   // Puts it on top of this person's Recent in search, once the response is out.
-  after(() => recordView(user.id, "PROPERTY", property.id));
+  if (!(await isActionRender())) after(() => recordView(user.id, "PROPERTY", property.id));
   const units = parseUnits(property.units);
   const buildingCapex = parseBuildingCapex(property.buildingCapex);
-  const capexRules = await getCapexRules();
-  const listings: EditableListing[] = property.listings.map((l) => ({
+  const listings: EditableListing[] = propertyListings.map((l) => ({
     id: l.id,
     unitLabel: l.unitLabel,
     zillowUrl: l.zillowUrl ?? "",
@@ -99,7 +106,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   // A past Target reads red by Today's rule (isTargetLate: never Waiting or Review); it's
   // the date this list shows, so it's the date judged.
   const today = todayYmdEastern();
-  const tasks = property.tasks
+  const tasks = openTasks
     .map((t) => ({
       id: t.id,
       title: t.title,
@@ -162,7 +169,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             initial={withUnitIds(units)}
             rules={capexRules}
             // What names each unit, so removing one that's still in use asks first.
-            unitRefs={countUnitRefs(property.tasks, property.listings)}
+            unitRefs={countUnitRefs(openTasks, propertyListings)}
           />
 
           <ListingsSection propertyId={property.id} version={version} initial={listings} unitLabels={unitLabels} />
@@ -230,9 +237,9 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <DocumentsSection propertyId={property.id} />
 
           <PropertyNotesSection id={property.id} notes={property.notes} />
-          {property.sourceDeal && (
+          {sourceDeal && (
             <p className="text-meta text-fg-3">
-              From deal <TextLink href={`/deals/${property.sourceDeal.id}`}>{property.sourceDeal.address}</TextLink>
+              From deal <TextLink href={`/deals/${sourceDeal.id}`}>{sourceDeal.address}</TextLink>
             </p>
           )}
         </div>

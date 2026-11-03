@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { Section } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
@@ -15,23 +16,7 @@ import { DealLog } from "./deal-log";
  * counted change lines and helped no decision (DEALS-058).
  */
 export async function DealActivity({ dealId }: { dealId: string }) {
-  const [user, rows] = await Promise.all([
-    requireUser(),
-    prisma.dealNote.findMany({
-      where: { dealId, deletedAt: null },
-      select: {
-        id: true,
-        source: true,
-        body: true,
-        noteDate: true,
-        createdAt: true,
-        authorUserId: true,
-        editedAt: true,
-        data: true,
-        author: { select: { name: true, email: true } },
-      },
-    }),
-  ]);
+  const [user, rows] = await Promise.all([requireUser(), dealNotes(dealId)]);
   const now = new Date();
   const entries = buildDealLog(
     rows.map((r) => ({
@@ -60,3 +45,21 @@ export async function DealActivity({ dealId }: { dealId: string }) {
     </Section>
   );
 }
+
+/** The deal's notes that aren't deleted. Once per request (React cache), so the deal page can start it beside its own read. */
+export const dealNotes = cache((dealId: string) =>
+  prisma.dealNote.findMany({
+    where: { dealId, deletedAt: null },
+    select: {
+      id: true,
+      source: true,
+      body: true,
+      noteDate: true,
+      createdAt: true,
+      authorUserId: true,
+      editedAt: true,
+      data: true,
+      author: { select: { name: true, email: true } },
+    },
+  }),
+);

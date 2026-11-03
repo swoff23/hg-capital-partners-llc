@@ -25,29 +25,33 @@ const PAGE = 400;
  * comma-joined picks for the assignee and property filters.
  */
 export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
-  const user = await requireUser();
   const sp = await searchParams;
 
   // Today's Contractors column moved to Home with the rest of Today.
   if (sp.view === "contractors") redirect("/?view=contractors");
 
+  const filters = parseAllFilters(sp);
+  // The people on offer, the imported names and the buildings start beside the session check; all of it is
+  // awaited together, so nothing is shown without it.
+  const options = assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  const [user, { users, contractors }, legacy, properties] = await Promise.all([
+    requireUser(),
+    options,
+    // Imported names that are a person on offer count for that person; the rest list once as "Others".
+    legacyAssignees(options.then((o) => personRefs(o.users, o.contractors))),
+    propertyOptions(),
+  ]);
+
   const mine = withoutAssigneeShortcut(sp, user.id);
   if (mine) redirect(`/tasks?${mine}`);
 
-  const filters = parseAllFilters(sp);
-  const { users, contractors } = await assigneeOptions(
-    filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)),
-  );
-  // Imported names that are a person on offer count for that person; the rest list once as "Others".
-  const legacy = await legacyAssignees(personRefs(users, contractors));
   const merged = withMergedOwners(sp, legacy.merged);
   if (merged) redirect(`/tasks?${merged}`);
 
   const searching = filters.q !== "";
-  const [{ tasks, total }, counts, properties, viewCounts] = await Promise.all([
+  const [{ tasks, total }, counts, viewCounts] = await Promise.all([
     allTasks(filters, PAGE, legacy.merged, user.id),
     taskFilterCounts(filters, legacy.merged),
-    propertyOptions(),
     // While a query is typed, each view counts its hits, so one outside the current view shows.
     searching ? taskViewCounts(filters, legacy.merged) : Promise.resolve(null),
   ]);
