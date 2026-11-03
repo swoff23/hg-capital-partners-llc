@@ -6,6 +6,7 @@ import {
   cleanQuery,
   encodeListCookie,
   joinFacet,
+  listChange,
   listCookieString,
   listHref,
   parseFacet,
@@ -91,4 +92,35 @@ test("facets: a joined param survives a trip through the URL", () => {
   params.set("owner", joinFacet(["n:Smith, Bob", "u:x"]));
   const back = new URLSearchParams(params.toString());
   assert.deepEqual(parseFacet(back.get("owner")), ["n:Smith, Bob", "u:x"]);
+});
+
+/* ---------------- Params that are how a list is viewed ---------------- */
+
+const q = (s: string) => new URLSearchParams(s);
+
+test("listChange: a filter change starts the view over, so the first page shows again", () => {
+  // 200 rows out, then the person picks Done: the new filter opens at the first page.
+  assert.deepEqual(listChange(q("status=done&show=200"), q("show=200"), ["show"]), { url: "status=done", remembered: "status=done" });
+  // Clearing a search does the same.
+  assert.deepEqual(listChange(q("show=300"), q("q=roof&show=300"), ["show"]), { url: "", remembered: "" });
+});
+
+test("listChange: more rows with the same filters keeps the view, and the cookie never holds it", () => {
+  assert.deepEqual(listChange(q("status=done&show=300"), q("status=done&show=200"), ["show"]), {
+    url: "status=done&show=300",
+    remembered: "status=done",
+  });
+  assert.deepEqual(listChange(q("show=200"), q(""), ["show"]), { url: "show=200", remembered: "" });
+});
+
+test("listChange: the order a control writes its params in is not a change", () => {
+  assert.deepEqual(listChange(q("property=p1&owner=u1&show=200"), q("owner=u1&property=p1&show=100"), ["show"]), {
+    url: "property=p1&owner=u1&show=200",
+    remembered: "property=p1&owner=u1",
+  });
+});
+
+test("listChange: a list with no transient params writes its query as it is", () => {
+  assert.deepEqual(listChange(q("status=all&q=roof"), q("status=open"), []), { url: "status=all&q=roof", remembered: "status=all&q=roof" });
+  assert.deepEqual(listChange(q("q=roof"), q("q=roof"), []), { url: "q=roof", remembered: "q=roof" });
 });

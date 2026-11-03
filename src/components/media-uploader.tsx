@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import { Camera, FileImage, FileSpreadsheet, FileText, ImagePlus, Play, RotateCcw, TriangleAlert, WifiOff, X } from "lucide-react";
 import { RetryPill } from "@/components/photo-thumb";
 import { useToast } from "@/components/toast";
-import { browserDeps, useUploadEngine, type UploadTarget } from "@/components/upload-queue";
+import { browserDeps, preloadTransfer, useUploadEngine, type UploadTarget } from "@/components/upload-queue";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { type FileKind } from "@/lib/attachments/content-types";
@@ -157,6 +157,8 @@ export function useMediaUploader(input: MediaUploaderOptions | MediaUploaderTarg
   });
   // The page is here. Its files keep going when it isn't, and a batch that lands then is "away".
   useEffect(() => engine.mount(target.key), [engine, target.key]);
+  // A page that takes files fetches the upload code when idle; every other page never loads it (upload-queue.tsx).
+  useEffect(() => preloadTransfer(), []);
 
   const uploads = useSyncExternalStore(
     engine.subscribe,

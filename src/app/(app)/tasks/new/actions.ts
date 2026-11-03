@@ -4,8 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
 import { withResult } from "@/lib/server-action";
 import type { Assignee } from "@/lib/tasks/core";
-import { newTaskSchema } from "@/lib/tasks/new-task";
-import { repeatRuleSchema } from "@/lib/tasks/repeat";
+import { newTaskSchema } from "@/lib/tasks/new-task-schema";
+import { repeatRuleSchema } from "@/lib/tasks/repeat-schema";
 import * as tasks from "@/lib/tasks/service";
 
 /**
@@ -16,7 +16,7 @@ import * as tasks from "@/lib/tasks/service";
  * ("u:<id>", "c:<id>" or blank), `dueDate`, `repeatRule` (JSON), `status`,
  * `waitingOn`, `scheduledFor`, and now `unitLabel`. A refusal comes back as a
  * value (`withResult`): a zod failure puts its plain message on the field
- * that caused it, and nothing typed is lost. The schema is new-task.ts
+ * that caused it, and nothing typed is lost. The schema is new-task-schema.ts
  * newTaskSchema, held to the limits the task page saves within.
  */
 

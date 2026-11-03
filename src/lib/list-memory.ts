@@ -75,6 +75,34 @@ export function listCookieString(list: ListKey, query: string): string {
   return `${LIST_COOKIES[list]}=${encodeListCookie(query)}; path=/; max-age=31536000; samesite=lax`;
 }
 
+/**
+ * Where a list goes when its query becomes `next` (the filter bar's
+ * `FilterScope`). `transient` names params that are how the list is being
+ * viewed, not what it is filtered by: the Tasks list's `show`, how many rows
+ * are out. A change to anything else starts them over, so a new filter opens at
+ * the first page, and the cookie never keeps them, so the sidebar link does too.
+ * `url` is the query for the address, `remembered` the one for the cookie.
+ */
+export function listChange(
+  next: URLSearchParams,
+  current: URLSearchParams,
+  transient: readonly string[],
+): { url: string; remembered: string } {
+  const withoutTransient = (q: URLSearchParams) => {
+    const rest = new URLSearchParams(q);
+    for (const key of transient) rest.delete(key);
+    return rest;
+  };
+  // Compared sorted, so the order a control writes its params in doesn't count as a change.
+  const filtersOf = (q: URLSearchParams) => {
+    const rest = withoutTransient(q);
+    rest.sort();
+    return rest.toString();
+  };
+  const url = filtersOf(next) === filtersOf(current) ? new URLSearchParams(next) : withoutTransient(next);
+  return { url: url.toString(), remembered: withoutTransient(url).toString() };
+}
+
 /* ---------------- Comma-joined facets ---------------- */
 
 /**

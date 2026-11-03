@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { toFailure, userMessage } from "@/lib/action-result";
-import { NOTES_MAX, TOO_LONG, checklistItemText, commentText, newTaskNotesProblem, notesText, titleText } from "./limits";
-import { newTaskSchema } from "./new-task";
+import { NOTES_MAX, TOO_LONG, newTaskNotesProblem } from "./limits";
+import { checklistItemText, commentText, notesText, titleText } from "./limits-schema";
+import { newTaskSchema } from "./new-task-schema";
 
 const long = (n: number) => "x".repeat(n);
 

@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { containsText, everyTermMatches, matchQuality, searchTerms } from "@/lib/search";
-import { SIGNED_OUT, type Answer, type Viewer } from "@/lib/search-results";
+import { SIGNED_OUT, type Answer, type Viewer } from "@/lib/api-answer";
 import { matchesSearch } from "@/lib/text-match";
 
 /**

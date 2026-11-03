@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * How long a task's words may be, the same wherever they're written: New
  * task, the task page and its composer. New task once took any length, so a
@@ -7,6 +5,10 @@ import { z } from "zod";
  * refusal says how to fix it in plain words, which reach the screen as
  * written (lib/action-result.ts isPlainMessage) instead of zod's own "Too
  * big: expected string to have <=300 characters". Pure; see limits.test.ts.
+ *
+ * New task's form imports this file for its notes check, so it holds no zod:
+ * the schemas built on these limits are in limits-schema.ts, as
+ * repeat-schema.ts is to repeat.ts (client-weight.test.ts).
  */
 
 export const TITLE_MAX = 300;
@@ -27,14 +29,6 @@ export const TOO_LONG = {
   waitingOn: `Shorten the reason to ${n(WAITING_ON_MAX)} characters.`,
   unit: `Shorten the unit to ${n(UNIT_MAX)} characters.`,
 } as const;
-
-export const titleText = z.string().max(TITLE_MAX, TOO_LONG.title);
-export const notesText = z.string().max(NOTES_MAX, TOO_LONG.notes);
-export const commentText = z.string().max(COMMENT_MAX, TOO_LONG.comment);
-/** A new checklist item: trimmed, not empty, and within its limit. */
-export const checklistItemText = z.string().trim().min(1).max(CHECKLIST_ITEM_MAX, TOO_LONG.checklistItem);
-export const waitingOnText = z.string().max(WAITING_ON_MAX, TOO_LONG.waitingOn);
-export const unitText = z.string().max(UNIT_MAX, TOO_LONG.unit);
 
 /**
  * New task's own check before it posts, for the notes the server would

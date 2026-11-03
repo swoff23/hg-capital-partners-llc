@@ -7,7 +7,7 @@ import {
   type PageContext,
 } from "@/lib/commands";
 import { foldAccents, looksLikeAddress } from "@/lib/search";
-import { MIN_QUERY, SEARCH_TYPES, type SearchResponse, type SearchRow, type SearchType } from "@/lib/search-results";
+import { MIN_QUERY, SEARCH_TYPES, type SearchResponse, type SearchRow, type SearchType } from "@/lib/search-types";
 
 /**
  * What the command palette shows for the state it is in (docs/specs/search.md

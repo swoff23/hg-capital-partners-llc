@@ -4,8 +4,8 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { withLog, withResult } from "@/lib/server-action";
-import { checklistItemText, commentText, notesText, titleText, unitText, waitingOnText } from "@/lib/tasks/limits";
-import { repeatRuleSchema } from "@/lib/tasks/repeat";
+import { checklistItemText, commentText, notesText, titleText, unitText, waitingOnText } from "@/lib/tasks/limits-schema";
+import { repeatRuleSchema } from "@/lib/tasks/repeat-schema";
 import * as tasks from "@/lib/tasks/service";
 
 /**

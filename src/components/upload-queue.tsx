@@ -7,7 +7,7 @@ import { useToast } from "@/components/toast";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { NO_COUNTS, UploadEngine, type EngineDeps, type EngineNotice } from "@/lib/attachments/engine";
 import { idbOutbox } from "@/lib/attachments/outbox";
-import { sendBlob } from "@/lib/attachments/transfer";
+import { lazyTransfer } from "@/lib/attachments/lazy-transfer";
 import type { FileKind } from "@/lib/attachments/content-types";
 import type { UploadKind } from "@/lib/attachments/upload-kinds";
 import { stillUploading } from "@/lib/portal/job-view";
@@ -254,6 +254,23 @@ function claimFile(id: string): Promise<(() => void) | null> {
   });
 }
 
+/**
+ * The Blob client is most of what the queue weighs (its code and the crypto it
+ * brings), and a page that never uploads shouldn't download it. It loads with
+ * the first file instead (lib/attachments/lazy-transfer.ts); `preloadTransfer`
+ * fetches it once the page is idle, on the pages that take uploads, so the
+ * first file doesn't wait for it and a tab left open across a deploy still has it.
+ */
+const transfer = lazyTransfer(() => import("@/lib/attachments/transfer").then((m) => m.sendBlob));
+
+/** Starts fetching the upload code when the browser has a moment, for a page that takes files. Safe to call often. */
+export function preloadTransfer(): void {
+  if (typeof window === "undefined") return;
+  const start = () => void transfer.get().catch(() => {});
+  if ("requestIdleCallback" in window) window.requestIdleCallback(start, { timeout: 4000 });
+  else setTimeout(start, 1500);
+}
+
 export function browserDeps(parts: {
   notify: (n: EngineNotice) => void;
   navigate: (href: string) => void;
@@ -264,7 +281,7 @@ export function browserDeps(parts: {
   return {
     scope: parts.scope,
     claim: parts.persist === false ? undefined : claimFile,
-    transfer: sendBlob,
+    transfer: transfer.send,
     outbox: parts.persist === false ? null : idbOutbox(),
     notify: parts.notify,
     navigate: parts.navigate,

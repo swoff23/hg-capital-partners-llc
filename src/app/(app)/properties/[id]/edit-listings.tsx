@@ -3,19 +3,19 @@ import { useState } from "react";
 import { Button as AriaButton } from "react-aria-components";
 import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { DateField } from "@/components/due-date-picker";
-import { FormSheet } from "@/components/form-sheet";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
-import { NumberInput } from "@/components/number-input";
 import { PhotoThumb } from "@/components/photo-thumb";
-import { Select } from "@/components/select";
-import { AddRow, Button, FormField, Input, SaveError, Section, buttonClass, textLinkClass } from "@/components/ui";
+import { AddRow, Button, SaveError, Section, buttonClass, textLinkClass } from "@/components/ui";
+import { useLazyModule } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
-import { listingProblems } from "@/lib/properties/listing-checks";
+import { lazyModule } from "@/lib/lazy-module";
 import { cn } from "@/lib/utils";
-import { deletePropertyListing, savePropertyListing } from "../actions";
-import { LISTING_PHOTO_MAX, ListingPhotos, discardSessionUploads, type ListingPhotoDraft } from "./listing-photos";
+import { deletePropertyListing } from "../actions";
+import type { ListingPhotoDraft } from "./listing-photos";
+
+// The editor (its photo manager and drag and drop included) loads with the first open, not with the page (lib/lazy-module.ts).
+const listingSheet = lazyModule(() => import("./listing-sheet"));
 
 export type EditableListing = {
   id: string | null; // null = not yet saved
@@ -31,13 +31,11 @@ export type EditableListing = {
 };
 
 // A listing's status is a label, not a state, so its word stays neutral (fg-2, as on Portfolio).
-const STATUS_LABEL: Record<EditableListing["status"], string> = {
+export const STATUS_LABEL: Record<EditableListing["status"], string> = {
   AVAILABLE: "Available",
   LEASED: "Leased",
   HIDDEN: "Hidden",
 };
-
-const STATUS_ITEMS = (["HIDDEN", "AVAILABLE", "LEASED"] as const).map((id) => ({ id, label: STATUS_LABEL[id] }));
 
 function blankListing(): EditableListing {
   return {
@@ -80,6 +78,7 @@ export function ListingsSection({
   const [isOpen, setIsOpen] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const run = useRun();
+  const editor = useLazyModule(listingSheet, sheet !== null);
   const noUnits = unitLabels.length === 0;
 
   function openListing(index: number | null) {
@@ -121,8 +120,8 @@ export function ListingsSection({
       </AddRow>
       {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
 
-      {sheet && (
-        <ListingSheet
+      {sheet && editor && (
+        <editor.ListingSheet
           key={sheet.id}
           propertyId={propertyId}
           version={sheet.version}
@@ -227,157 +226,3 @@ function ReadListings({
   );
 }
 
-/* ---------------- The listing's sheet ---------------- */
-
-/**
- * One listing in a sheet (forms 4.2, 2.9): unit and status, the photos, the
- * link, when it's available, the rent and the rest. Save applies the fields
- * and the photo set together. While photos upload, Save waits and one line
- * beside it says how many ("2 photos uploading"); its label never changes.
- */
-function ListingSheet({
-  propertyId,
-  version,
-  listing,
-  unitLabels,
-  isOpen,
-  onOpenChange,
-}: {
-  propertyId: string;
-  version: string;
-  listing: EditableListing;
-  unitLabels: string[];
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const isNew = listing.id === null;
-  const [draft, setDraft] = useState<EditableListing>(() => structuredClone(listing));
-  const [tried, setTried] = useState(false);
-  const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
-  const [uploading, setUploading] = useState(0);
-  const run = useRun();
-
-  // Include the listing's current label even if it's since been renamed or removed from Units & access,
-  // so an existing pick never silently disappears.
-  const unitItems = [...new Set([listing.unitLabel, ...unitLabels].filter(Boolean))].map((u) => ({ id: u, label: u }));
-  const name = draft.unitLabel || "New listing";
-  // A field shows its line once it was left or Save was pressed (lib/properties/listing-checks.ts).
-  const problems = listingProblems(draft, listing);
-  const shows = (field: string) => (tried || left.has(field)) && problems[field] ? problems[field] : undefined;
-  const serverError = (field: string) => run.fieldErrors?.[field];
-  const leave = (field: string) => setLeft((s) => new Set(s).add(field));
-
-  function change(patch: Partial<EditableListing>) {
-    run.reset();
-    setDraft((d) => ({ ...d, ...patch }));
-  }
-
-  function submit() {
-    setTried(true);
-    if (Object.keys(problems).length > 0) return;
-    const photos = draft.photos;
-    run.run(() => savePropertyListing(propertyId, draft, version), {
-      failure: "inline",
-      succeeded: () => {
-        // Photos uploaded and then removed before this Save go; the saved set stays.
-        void discardSessionUploads(propertyId, photos);
-        onOpenChange(false);
-      },
-      done: isNew ? `Listing for ${draft.unitLabel} added` : `Listing for ${draft.unitLabel} saved`,
-      key: `listing:${propertyId}:${draft.id ?? "new"}`,
-    });
-  }
-
-  return (
-    <FormSheet
-      title={isNew ? "New listing" : name}
-      isOpen={isOpen}
-      onOpenChange={(open) => {
-        // Discard, Cancel, X or Esc: the photos this sheet uploaded go with the changes (G1D-026).
-        if (!open) void discardSessionUploads(propertyId);
-        onOpenChange(open);
-      }}
-      onSubmit={submit}
-      primary={isNew ? "Add listing" : "Save listing"}
-      pending={run.pending}
-      primaryDisabled={uploading > 0}
-      disabledReason={uploading > 0 ? `${uploading} ${uploading === 1 ? "photo" : "photos"} uploading` : undefined}
-      values={draft}
-      size="lg"
-      fullHeight
-      discardTitle={isNew ? "Discard the new listing?" : `Discard changes to the listing for ${name}?`}
-      leaveTitle={`Leave the ${name} listing?`}
-      error={run.error && Object.keys(run.fieldErrors ?? {}).length === 0 ? run.error : undefined}
-      fieldErrors={run.fieldErrors}
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Select
-          label="Unit"
-          items={unitItems}
-          value={draft.unitLabel || null}
-          placeholder="Choose a unit"
-          onChange={(v) => change({ unitLabel: v ?? "" })}
-          isInvalid={!!shows("unitLabel")}
-          errorMessage={shows("unitLabel")}
-        />
-        <Select
-          label="Status"
-          items={STATUS_ITEMS}
-          value={draft.status}
-          onChange={(v) => change({ status: (v ?? "HIDDEN") as EditableListing["status"] })}
-        />
-      </div>
-
-      <ListingPhotos
-        propertyId={propertyId}
-        name={name}
-        value={draft.photos}
-        onChange={(photos) => setDraft((d) => ({ ...d, photos }))}
-        max={LISTING_PHOTO_MAX}
-        onPendingChange={setUploading}
-      />
-
-      <FormField label="Zillow link" optional error={shows("zillowUrl") ?? serverError("zillowUrl")}>
-        {(p) => (
-          <Input
-            {...p}
-            type="text"
-            inputMode="url"
-            autoCapitalize="none"
-            spellCheck={false}
-            autoComplete="off"
-            value={draft.zillowUrl}
-            onBlur={() => leave("zillowUrl")}
-            onChange={(e) => change({ zillowUrl: e.target.value })}
-          />
-        )}
-      </FormField>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-meta font-medium text-fg-2">
-            Available from<span className="font-normal text-fg-3"> (optional)</span>
-          </span>
-          <DateField label="Available from" value={draft.availableDate || null} onChange={(v) => change({ availableDate: v ?? "" })} />
-        </div>
-        <FormField label="Rent" optional error={shows("rent") ?? serverError("rent")}>
-          {(p) => (
-            <NumberInput kind="money" suffix="/mo" {...p} value={draft.rent} onBlur={() => leave("rent")} onChange={(v) => change({ rent: v })} />
-          )}
-        </FormField>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <FormField label="Sq ft" optional error={shows("sqft") ?? serverError("sqft")}>
-          {(p) => <NumberInput kind="integer" {...p} value={draft.sqft} onBlur={() => leave("sqft")} onChange={(v) => change({ sqft: v })} />}
-        </FormField>
-        <FormField label="Beds" optional error={shows("beds")}>
-          {(p) => <NumberInput kind="integer" {...p} value={draft.beds} onBlur={() => leave("beds")} onChange={(v) => change({ beds: v })} />}
-        </FormField>
-        <FormField label="Baths" optional error={shows("baths")}>
-          {(p) => <NumberInput kind="decimal" {...p} value={draft.baths} onBlur={() => leave("baths")} onChange={(v) => change({ baths: v })} />}
-        </FormField>
-      </div>
-    </FormSheet>
-  );
-}

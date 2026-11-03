@@ -1,7 +1,9 @@
 "use client";
 import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { FileImage, ImageOff, Lock, Play } from "lucide-react";
-import { Lightbox, taskMediaUrl, useViewerLink, type LightboxMenuItem, type LightboxSurface, type MediaItem, type MediaUrlFor } from "@/components/lightbox";
+import type { LightboxMenuItem, LightboxSurface, MediaItem, MediaUrlFor } from "@/components/lightbox";
+import { LazyLightbox } from "@/components/lightbox-lazy";
+import { taskMediaUrl, useViewerLink } from "@/components/viewer-link";
 import { PhotoThumb } from "@/components/photo-thumb";
 import type { ActionResult } from "@/lib/action-result";
 import { fmtDuration, bylineName, bylineStamp, documentLook, uploadCountPhrase, visibleTiles } from "@/lib/attachments/media";
@@ -93,7 +95,7 @@ export function MediaGrid({
   const total = items.length;
   const noun = uploadCountPhrase(items.map((it) => (it.kind === "VIDEO" ? "video" : "image")));
   const lightbox = (
-    <Lightbox
+    <LazyLightbox
       items={items}
       index={viewer.index}
       onIndexChange={viewer.setIndex}

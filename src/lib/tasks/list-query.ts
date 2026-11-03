@@ -53,6 +53,22 @@ export function parseAllFilters(sp: Params): AllFilters {
   };
 }
 
+/** Rows the Tasks page opens with, and what Show more adds each time. */
+export const TASK_PAGE = 100;
+
+/** The most the page ever lists. Past it the filters are the way to the rest. */
+export const TASK_PAGE_MAX = 400;
+
+/**
+ * How many rows the URL asks for (`show`): whole pages of TASK_PAGE, from one
+ * to the most. Anything that isn't a number, or is out of range, is the first page.
+ */
+export function taskLimit(sp: Params): number {
+  const asked = Number.parseInt(str(sp.show), 10);
+  if (!Number.isFinite(asked)) return TASK_PAGE;
+  return Math.min(TASK_PAGE_MAX, Math.max(TASK_PAGE, Math.ceil(asked / TASK_PAGE) * TASK_PAGE));
+}
+
 /** Every value of every param, a repeated one kept, as a query to put back in a link. */
 export function toQuery(sp: Params): URLSearchParams {
   const qs = new URLSearchParams();

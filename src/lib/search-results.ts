@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient, RecentKind, TaskStatus } from "@prisma/client";
+import { SIGNED_OUT, type Answer, type Viewer } from "@/lib/api-answer";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
 import { cleanTrades } from "@/lib/contacts";
 import { toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
@@ -6,6 +7,23 @@ import { shortAddress } from "@/lib/normalize";
 import { propertyUnitCount } from "@/lib/property-types";
 import { liveRecord } from "@/lib/record-scope";
 import { everyTermMatches, rankRows, searchTerms, type Rankable } from "@/lib/search";
+import {
+  ALL_LIMIT,
+  MAX_QUERY,
+  MIN_QUERY,
+  RECENT_SHOWN,
+  SEARCH_TYPES,
+  TYPE_LIMIT,
+  type ContractorSearchRow,
+  type DealSearchRow,
+  type PropertySearchRow,
+  type RecentResponse,
+  type SearchGroup,
+  type SearchResponse,
+  type SearchRow,
+  type SearchType,
+  type TaskSearchRow,
+} from "@/lib/search-types";
 import { activeTask, closedTask, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { isOverdue } from "@/lib/tasks/list";
 import { paletteTaskWhere } from "@/lib/tasks/list-query";
@@ -19,83 +37,12 @@ import { paletteTaskWhere } from "@/lib/tasks/list-query";
  * property, deal or contractor is never found and leaves Recent
  * (lib/archive.ts); its page still opens from a link.
  *
- * Client code imports only the types from here.
+ * Server code only. The shapes and limits the browser reads are in
+ * search-types.ts (re-exported here), so the palette doesn't carry Prisma,
+ * the task rules or this file's queries.
  */
 
-export const SEARCH_TYPES = ["property", "task", "deal", "contractor"] as const;
-export type SearchType = (typeof SEARCH_TYPES)[number];
-
-/** Rows per group when searching everything, and when narrowed to one type. */
-export const ALL_LIMIT = 4;
-export const TYPE_LIMIT = 20;
-/** Fewest characters the server searches on. */
-export const MIN_QUERY = 2;
-/**
- * Most characters the server reads: longer than any title worth typing (300
- * is the task title's cap, and only the first six words count anyway), and
- * short enough that a pasted page of text stays one cheap query.
- */
-export const MAX_QUERY = 200;
-/** Records Recent shows. */
-export const RECENT_SHOWN = 5;
-
-export type PropertySearchRow = {
-  type: "property";
-  id: string;
-  href: string;
-  /** The short address, the name Portfolio uses. */
-  title: string;
-  units: number | null;
-  owner: string | null;
-  /** The property's front photo (public Blob); null until one is set, so the row shows the House tile. */
-  photoUrl: string | null;
-};
-
-export type TaskSearchRow = {
-  type: "task";
-  id: string;
-  href: string;
-  title: string;
-  status: TaskStatus;
-  due: Ymd | null;
-  overdue: boolean;
-  /** Short address of the property, or of the deal when there's no property. */
-  place: string | null;
-  assignee: { name: string; contractor: boolean } | null;
-};
-
-export type DealSearchRow = {
-  type: "deal";
-  id: string;
-  href: string;
-  title: string;
-  /** The stage as stored; the client prints it through dealStageLabel. */
-  stage: string;
-  /** The asking price as a plain number string, or null. */
-  asking: string | null;
-};
-
-export type ContractorSearchRow = {
-  type: "contractor";
-  id: string;
-  href: string;
-  title: string;
-  trade: string | null;
-  company: string | null;
-  active: boolean;
-};
-
-export type SearchRow = PropertySearchRow | TaskSearchRow | DealSearchRow | ContractorSearchRow;
-
-export type SearchGroup = {
-  type: SearchType;
-  /** Every match, for "See all 40 tasks". */
-  total: number;
-  rows: SearchRow[];
-};
-
-export type SearchResponse = { groups: SearchGroup[] };
-export type RecentResponse = { rows: SearchRow[] };
+export * from "@/lib/search-types";
 
 /** The database calls a search makes. */
 export type SearchDb = Pick<PrismaClient, "property" | "task" | "deal" | "contact">;
@@ -413,12 +360,8 @@ export async function recentRows(
 
 /* ---------------- Answers ---------------- */
 
-export type Answer<T> = { status: 200; body: T } | { status: 400 | 401 | 500; body: { error: string } };
-
-/** Who may search: a signed-in staff user. A contractor's portal session is a different cookie and never reaches this. */
-export type Viewer = { id: string } | null;
-
-export const SIGNED_OUT = { status: 401, body: { error: "signed-out" } } as const satisfies Answer<never>;
+// Answer, Viewer and SIGNED_OUT moved to api-answer.ts, which the address field reaches from the browser.
+export { SIGNED_OUT, type Answer, type Viewer } from "@/lib/api-answer";
 
 /** What was typed, trimmed and cut to MAX_QUERY characters, so any length costs the same. */
 export function boundQuery(q: string): string {

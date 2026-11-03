@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describeRepeat, nextOccurrence, repeatRuleSchema, ruleKey, type RepeatRule } from "./repeat";
+import { describeRepeat, nextOccurrence, ruleKey, type RepeatRule } from "./repeat";
+import { repeatRuleSchema } from "./repeat-schema";
 import {
   CUSTOM_UNITS,
   choiceFromRule,

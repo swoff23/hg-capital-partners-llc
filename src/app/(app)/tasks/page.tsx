@@ -6,7 +6,7 @@ import { todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { propertyOptions } from "@/lib/picker-options";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
-import { NONE, parseAllFilters, personRefs, withKnownFilters, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
+import { NONE, TASK_PAGE, TASK_PAGE_MAX, parseAllFilters, personRefs, taskLimit, withKnownFilters, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
 import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
 import { AllList } from "./all-list";
 import { TaskFilters } from "./filters";
@@ -15,8 +15,6 @@ import { TasksHeader } from "./tasks-header";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Tasks" };
-
-const PAGE = 400;
 
 /**
  * Tasks: every task, filtered, Done included. Today lives on Home now
@@ -40,6 +38,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   if (mine) redirect(`/tasks?${mine}`);
 
   const filters = parseAllFilters(sp);
+  // A page of rows at a time: the first TASK_PAGE, and Show more asks for another (?show=200).
+  const take = taskLimit(sp);
   const [{ users, contractors }, properties] = await Promise.all([
     assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2))),
     // An archived property stays on offer while the URL picks it (a property page's "All tasks"),
@@ -59,7 +59,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
 
   const searching = filters.q !== "";
   const [{ tasks, total }, counts, viewCounts] = await Promise.all([
-    allTasks(filters, PAGE, legacy.merged, user.id),
+    allTasks(filters, take, legacy.merged, user.id),
     taskFilterCounts(filters, legacy.merged),
     // While a query is typed, each view counts its hits, so one outside the current view shows.
     searching ? taskViewCounts(filters, legacy.merged) : Promise.resolve(null),
@@ -118,10 +118,15 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
             </TaskListProvider>
           </div>
         )}
-        {total > PAGE && (
-          <p className="mt-2 text-meta text-fg-3">
-            Showing first {PAGE} of {total}. Narrow the filters to see the rest.
-          </p>
+        {total > take && (
+          <div className="mt-4 flex items-center gap-3">
+            <p className="text-meta tabular-nums text-fg-3">
+              {take < TASK_PAGE_MAX
+                ? `Showing ${take} of ${total.toLocaleString("en-US")}`
+                : `Showing first ${TASK_PAGE_MAX} of ${total.toLocaleString("en-US")}. Narrow the filters to see the rest.`}
+            </p>
+            {take < TASK_PAGE_MAX && <ScopeButton changes={{ show: String(take + TASK_PAGE) }}>Show more</ScopeButton>}
+          </div>
         )}
       </TaskFilters>
     </>

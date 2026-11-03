@@ -24,7 +24,7 @@ import { Sheet } from "@/components/sheet";
 import { Switch } from "@/components/switch";
 import { useRememberList } from "@/components/list-memory";
 import { Badge, Button, buttonClass, chromeIconClass } from "@/components/ui";
-import { LIST_PATHS, joinFacet, parseFacet, type ListKey } from "@/lib/list-memory";
+import { LIST_PATHS, joinFacet, listChange, parseFacet, type ListKey } from "@/lib/list-memory";
 import { cn } from "@/lib/utils";
 
 /*
@@ -70,6 +70,8 @@ type Scope = {
 
 const ScopeContext = createContext<Scope | null>(null);
 
+const NO_PARAMS: readonly string[] = [];
+
 /** The list this control filters or sorts. Throws outside a `FilterScope`. */
 export function useFilterScope(): Scope {
   const scope = useContext(ScopeContext);
@@ -79,15 +81,21 @@ export function useFilterScope(): Scope {
 
 /**
  * Holds one list's query. `defaults` are the values the URL leaves out
- * ({ status: "open" }): picking one removes the param.
+ * ({ status: "open" }): picking one removes the param. `transient` names
+ * params that are only how the list is being viewed (the Tasks page's `show`,
+ * how many rows are out): any change to another param starts them over, and
+ * the list's cookie never keeps them, so the sidebar link opens the list at
+ * its first page.
  */
 export function FilterScope({
   list,
   defaults,
+  transient = NO_PARAMS,
   children,
 }: {
   list: ListKey;
   defaults?: Readonly<Record<string, string>>;
+  transient?: readonly string[];
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -99,14 +107,14 @@ export function FilterScope({
 
   const apply = useCallback(
     (next: URLSearchParams) => {
-      const qs = next.toString();
+      const { url, remembered } = listChange(next, query, transient);
       startTransition(() => {
-        setShown(qs);
-        router.replace(qs ? `${LIST_PATHS[list]}?${qs}` : LIST_PATHS[list], { scroll: false });
+        setShown(url);
+        router.replace(url ? `${LIST_PATHS[list]}?${url}` : LIST_PATHS[list], { scroll: false });
       });
-      remember(list, qs);
+      remember(list, remembered);
     },
-    [list, remember, router, setShown],
+    [list, query, remember, router, setShown, transient],
   );
 
   const update = useCallback(
