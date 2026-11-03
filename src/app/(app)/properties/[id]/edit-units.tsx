@@ -1,5 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Button as AriaButton } from "react-aria-components";
 import { ChevronRight, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Code } from "@/components/code";
@@ -8,7 +9,7 @@ import { FormSheet } from "@/components/form-sheet";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
-import { NumberInput, numberProblem } from "@/components/number-input";
+import { NumberInput } from "@/components/number-input";
 import { Select } from "@/components/select";
 import { AddRow, Button, FormField, Input, Section, Table, Td, Th, buttonClass } from "@/components/ui";
 import { useRun } from "@/components/use-run";
@@ -26,10 +27,22 @@ import {
   utilityStatusTone,
 } from "@/lib/property-types";
 import { removeUnitQuestion, unitRefKey, type UnitRefs } from "@/lib/properties/unit-refs";
+import {
+  EQUIPMENT_FOOTER,
+  equipmentProblems,
+  firstEquipmentProblem,
+  sheetUnitAt,
+  stillFailing,
+  unitSheetWords,
+  type EquipmentProblems,
+} from "@/lib/properties/unit-sheet";
+import { dueIn } from "@/lib/properties/capex";
+import { stableJson } from "@/lib/drafts";
 import { shortAddress } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import { deletePropertyUnit, savePropertyUnit } from "../actions";
 import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
+import { LoadLatest } from "@/components/load-latest";
 
 /** The account-number fields, read as codes and masked to their last four. */
 const isAccountField = (k: keyof UnitUtilities) => k.endsWith("Acct");
@@ -52,12 +65,17 @@ const THIS_YEAR = new Date().getFullYear();
 
 /** The year a Monitor or Replace cost falls due, when that's still ahead: "in 2032". */
 function dueNote(type: string, installYear: string | null | undefined, rules: CapexRules): string | null {
-  const due = projectedYear({ kind: "equipment", type, installYear }, rules);
-  return due != null && due >= THIS_YEAR ? `in ${due}` : null;
+  return dueIn(projectedYear({ kind: "equipment", type, installYear }, rules), THIS_YEAR);
 }
 
-type Sheet = { index: number | null; version: string; id: number };
-type Removing = { index: number; title: string; body: string };
+/**
+ * The sheet that is up: the unit it edits, by id and place (null for a new
+ * one, unit-sheet.ts sheetUnitAt), and as it was at open; the version it
+ * opened at; and a fresh `id` per open.
+ */
+type Sheet = { unitId: string | null; at: number | null; opened: PropertyUnit | null; version: string; id: number };
+/** The unit a Delete confirm is about, by id and place as the sheet finds its unit, so a refresh can't move it onto another. */
+type Removing = { unitId: string | null; at: number; label: string | null | undefined; name: string; title: string; body: string };
 
 /**
  * The property's units, one row each (docs/brand-guidelines.md, section 9
@@ -97,7 +115,8 @@ export function UnitsSection({
   const meters = indexed.filter(({ u }) => isHouseMeterRow(u));
 
   function openUnit(index: number | null) {
-    setSheet({ index, version, id: (sheet?.id ?? 0) + 1 });
+    const opened = index == null ? null : (initial[index] ?? null);
+    setSheet({ unitId: opened?.id ?? null, at: opened ? index : null, opened, version, id: (sheet?.id ?? 0) + 1 });
     setIsOpen(true);
   }
 
@@ -112,7 +131,10 @@ export function UnitsSection({
     const kept = initial.some((u, j) => j !== i && unitRefKey(u.label) === key);
     const question = key && !kept ? removeUnitQuestion(unit.label ?? "", unitRefs[key]) : null;
     setRemoving({
-      index: i,
+      unitId: unit.id ?? null,
+      at: i,
+      label: unit.label,
+      name: unitName(unit, i),
       title: `Delete ${unitName(unit, i)} at ${shortAddress(address)}?`,
       body: question?.body ?? "Its lockbox code, utilities and equipment go with it.",
     });
@@ -120,18 +142,21 @@ export function UnitsSection({
 
   function confirmDelete() {
     if (!removing) return;
-    const unit = initial[removing.index];
-    const name = unitName(unit, removing.index);
-    if (!unit.id) return;
-    const id = unit.id;
+    // A refused delete brings the page back on the latest; the unit is found again by id, never by its old place alone.
+    const unit = initial[sheetUnitAt(initial, removing)];
+    const id = unit?.id;
+    // Gone already (deleted elsewhere): nothing left to delete, and the list behind shows it.
+    if (!id) return setRemoving(null);
     run.run(() => deletePropertyUnit(propertyId, id, version), {
       failure: "inline",
       succeeded: () => setRemoving(null),
-      done: `${name} deleted`,
+      done: `${removing.name} deleted`,
     });
   }
 
-  const editing = sheet?.index != null ? initial[sheet.index] : undefined;
+  // Found by id (unit-sheet.ts sheetUnitAt), so a unit added or deleted elsewhere never moves the sheet onto another one.
+  const editingAt = sheet ? sheetUnitAt(initial, { unitId: sheet.unitId, at: sheet.at, label: sheet.opened?.label }) : -1;
+  const editing = editingAt >= 0 ? initial[editingAt] : undefined;
 
   return (
     <Section title="Units & access">
@@ -176,9 +201,11 @@ export function UnitsSection({
           key={sheet.id}
           propertyId={propertyId}
           version={sheet.version}
-          unit={editing ?? blankUnit()}
-          isNew={editing === undefined}
-          title={editing ? unitName(editing, sheet.index!) : "New unit"}
+          latest={version}
+          unit={editing ?? sheet.opened ?? blankUnit()}
+          isNew={sheet.opened === null}
+          gone={sheet.opened !== null && !editing}
+          title={editing ? unitName(editing, editingAt) : sheet.opened?.label?.trim() || "New unit"}
           rules={rules}
           isOpen={isOpen}
           onOpenChange={setIsOpen}
@@ -375,47 +402,62 @@ function blankUnit(): PropertyUnit {
   return { label: "", lockboxCode: "", utilities: {}, equipment: [] };
 }
 
-/** One equipment row's problems, keyed by field, found when Save is pressed. */
-type EquipmentProblems = Record<number, { type?: string; year?: string }>;
-
 /**
  * One unit in a sheet (forms 4.2, 2.9): its name and lockbox, its utilities
  * in three groups and its equipment, a table from md and a card per item
  * below it. Type is a pick from the CapEx rule types, so every appliance has
  * a rule and none drops out of the forecast; Year must be a year, where
  * "Old" used to save and then vanish from the forecast (PROPERTY-022). It
- * saves the one unit, pinned to the version it opened at, and a conflict shows
- * above Save.
+ * saves the one unit, pinned to the version it opened at. A conflict shows
+ * above Save with "Load the latest": the page behind already shows what was
+ * saved meanwhile (the service revalidates on a refusal), and the link
+ * starts the sheet over on it, at the new version.
  */
 function UnitSheet({
   propertyId,
   version,
+  latest,
   unit,
   isNew,
+  gone,
   title,
   rules,
   isOpen,
   onOpenChange,
 }: {
   propertyId: string;
+  /** The version the sheet opened at; the save is refused once the property has moved on. */
   version: string;
+  /** The page's version now: after a refusal the page re-renders on the latest, and "Load the latest" pins this. */
+  latest: string;
   unit: PropertyUnit;
   isNew: boolean;
+  /** The unit was deleted elsewhere: the latest has nothing to load. */
+  gone: boolean;
   title: string;
   rules: CapexRules;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  // The unit as the sheet last loaded it, and the version its save is checked against: both move on with "Load the latest".
+  const [base, setBase] = useState<PropertyUnit>(unit);
+  const [pinned, setPinned] = useState(version);
   const [draft, setDraft] = useState<PropertyUnit>(() => structuredClone(unit));
+  // What Save found. Once shown, a line clears as its row is fixed.
   const [problems, setProblems] = useState<EquipmentProblems | null>(null);
+  // The unit's name as the sheet opened, for the leave question (unit-sheet.ts unitSheetWords).
+  const [openedTitle] = useState(title);
   const run = useRun();
+  const router = useRouter();
   const types = rules.equipment.map((r) => ({ id: r.type, label: r.type }));
   const equipment = draft.equipment ?? [];
   // A year already stored is left as it is ("~2004"), so only one that was typed over has to read.
-  const stored = new Map((unit.equipment ?? []).map((e, j) => [j, e.installYear ?? ""]));
+  const stored = new Map((base.equipment ?? []).map((e, j) => [j, e.installYear ?? ""]));
+  const shown = problems ? stillFailing(problems, equipmentProblems(equipment, stored)) : null;
 
   function mutate(fn: (u: PropertyUnit) => void) {
-    run.reset();
+    // Only a line on screen needs clearing.
+    if (run.error) run.reset();
     setDraft((prev) => {
       const next = structuredClone(prev);
       fn(next);
@@ -423,24 +465,11 @@ function UnitSheet({
     });
   }
 
-  function check(): EquipmentProblems {
-    const found: EquipmentProblems = {};
-    equipment.forEach((e, j) => {
-      const used = !!(e.model?.trim() || e.installYear?.trim() || e.comment?.trim());
-      const row: { type?: string; year?: string } = {};
-      if (used && !e.type.trim()) row.type = "Choose a type.";
-      const year = e.installYear?.trim() ?? "";
-      if (year && year !== stored.get(j) && numberProblem("year", year)) row.year = numberProblem("year", year) ?? undefined;
-      if (row.type || row.year) found[j] = row;
-    });
-    return found;
-  }
-
   function submit() {
-    const found = check();
+    const found = equipmentProblems(equipment, stored);
     setProblems(found);
     if (Object.keys(found).length > 0) return;
-    run.run(() => savePropertyUnit(propertyId, draft, version), {
+    run.run(() => savePropertyUnit(propertyId, draft, pinned), {
       failure: "inline",
       succeeded: () => onOpenChange(false),
       done: isNew ? `${draft.label?.trim() || "Unit"} added` : `${title} saved`,
@@ -448,8 +477,31 @@ function UnitSheet({
     });
   }
 
+  /**
+   * After a refusal the page behind is already on the latest, so the sheet
+   * starts over on it. A new unit keeps what was typed (nothing of theirs is
+   * in it) and only moves to the new version. A unit deleted meanwhile has
+   * no latest: the sheet closes on the list that no longer has it, where a
+   * save would have added it back.
+   */
+  function loadLatest() {
+    if (gone) {
+      run.reset();
+      onOpenChange(false);
+      return;
+    }
+    run.reset();
+    setProblems(null);
+    setBase(unit);
+    setPinned(latest);
+    if (!isNew) setDraft(structuredClone(unit));
+    // In case the refusal's page didn't arrive with it; when it did, this is the same latest.
+    router.refresh();
+  }
+
   const label = draft.label?.trim() || title;
-  const firstProblem = problems ? Object.values(problems).flatMap((p) => [p.type, p.year]).find(Boolean) : undefined;
+  const words = unitSheetWords(isNew, openedTitle, label);
+  const firstProblem = firstEquipmentProblem(shown);
 
   return (
     <FormSheet
@@ -460,11 +512,14 @@ function UnitSheet({
       primary={isNew ? "Add unit" : "Save unit"}
       pending={run.pending}
       values={draft}
+      // Against what the sheet last loaded, so loading the latest doesn't read as a change of yours.
+      dirty={stableJson(draft) !== stableJson(base)}
       size="lg"
       fullHeight
-      discardTitle={isNew ? "Discard the new unit?" : `Discard changes to ${label}?`}
-      leaveTitle={`Leave ${label}?`}
-      error={run.error ?? (firstProblem ? "Check the equipment below." : undefined)}
+      discardTitle={words.discardTitle}
+      leaveTitle={words.leaveTitle}
+      error={run.error ?? (firstProblem ? EQUIPMENT_FOOTER : undefined)}
+      errorAction={run.conflict && <LoadLatest onClick={loadLatest} />}
       fieldErrors={run.fieldErrors}
     >
       <FieldGrid>
@@ -536,7 +591,7 @@ function UnitSheet({
                 item={e}
                 index={j}
                 types={types}
-                problems={problems?.[j]}
+                problems={shown?.[j]}
                 onChange={(patch) => mutate((u) => Object.assign(u.equipment![j], patch))}
                 onRemove={() => mutate((u) => void u.equipment!.splice(j, 1))}
               />

@@ -111,7 +111,12 @@ const SMALL_WORDS = new Set(["and", "of", "on", "at", "the"]);
 /** Words that start a unit after the street ("Apt 2"), which no comma sets apart from it. */
 const UNIT_WORDS = new Set(["apt", "apartment", "unit", "ste", "suite", "fl", "floor", "rm", "room", "bldg", "building", "upper", "lower", "rear", "front", "basement"]);
 
-/** A word to capitalise: all lower case, or all capitals longer than three letters ("PROSPECT"). */
+/**
+ * A word to capitalise: all lower case, or all capitals longer than three
+ * letters ("PROSPECT"). A capital follows a hyphen ("Wilkes-Barre"), and the
+ * Mc and O' of a name ("McKinley", "O'Brien"); never a slash, which made
+ * "</script>" read "</Script>".
+ */
 function capitalise(word: string, first: boolean): string {
   const letters = word.replace(/[^A-Za-z]/g, "");
   if (!letters) return word;
@@ -119,7 +124,26 @@ function capitalise(word: string, first: boolean): string {
   const shouting = letters === letters.toUpperCase() && letters.length > 3;
   if (!lower && !shouting) return word;
   if (lower && !first && SMALL_WORDS.has(word)) return word;
-  return word.toLowerCase().replace(/(^|[-/])([a-z])/g, (_m, edge: string, c: string) => edge + c.toUpperCase());
+  return word
+    .toLowerCase()
+    .replace(/(^|-)([a-z])/g, (_m, edge: string, c: string) => edge + c.toUpperCase())
+    .replace(/^(Mc|O')([a-z])/, (_m, lead: string, c: string) => lead + c.toUpperCase());
+}
+
+/**
+ * A word whose capitals were chosen: one after its first letter ("QA",
+ * "McDonald", "O'Brien"), where all capitals past three letters ("PROSPECT")
+ * is shouting and the state ("NY") is the house style's either way. When any
+ * word was typed like that, the person picked their capitals, and no word's
+ * case is changed: "QA test Oct27 portfolio 1 apt 4b" saves as typed, where
+ * it used to save as "QA Test Oct27 Portfolio 1 Apt 4b".
+ */
+function chosenCase(word: string, state: boolean): boolean {
+  if (state) return false;
+  const letters = word.replace(/[^A-Za-z]/g, "");
+  if (letters.length < 2) return false;
+  if (letters === letters.toUpperCase() && letters.length > 3) return false;
+  return /[A-Z]/.test(letters.slice(1));
 }
 
 /**
@@ -127,9 +151,10 @@ function capitalise(word: string, first: boolean): string {
  * 14209"): spacing and stray commas tidied, words typed all lower case or all
  * capitals given a capital, "Avenue", "Street", "Drive" and "Road" written as
  * Ave, St, Dr and Rd, a comma after the street and before the state, and NY
- * in capitals. Words typed with their own mix of cases stay as typed, and so
- * does everything else. It changes only how the address looks, never what
- * `sameStreetAddress` and `streetKey` make of it.
+ * in capitals. Once any word was typed with capitals of its own ("QA",
+ * "McDonald"), no word's case changes: the person chose them (`chosenCase`).
+ * Everything else stays as typed. It changes only how the address looks,
+ * never what `sameStreetAddress` and `streetKey` make of it.
  */
 export function tidyAddress(raw: string): string {
   let flat = raw
@@ -140,16 +165,20 @@ export function tidyAddress(raw: string): string {
   if (!flat) return "";
   // Typed in capitals throughout: read it as lower case, so "AVE" and "PROSPECT" are words like the rest.
   if (flat === flat.toUpperCase() && /[A-Z]{2}/.test(flat)) flat = flat.toLowerCase();
-  const words = flat.split(" ").map((w, i, all) => {
+  const parts = flat.split(" ").map((w, i, all) => {
     const comma = w.endsWith(",") ? "," : "";
     const bare = comma ? w.slice(0, -1) : w;
     const unpointed = bare.replace(/\.$/, "");
-    const short = SHORT_STREET[unpointed.toLowerCase()];
     // The state: two letters ahead of a ZIP, or the NY every address here is in.
     const state = /^ny$/i.test(unpointed) || (/^[A-Za-z]{2}$/.test(unpointed) && /^\d{5}(-\d{4})?$/.test(all[i + 1] ?? ""));
+    return { comma, unpointed, state };
+  });
+  const asTyped = parts.some((p) => chosenCase(p.unpointed, p.state));
+  const words = parts.map(({ comma, unpointed, state }, i) => {
+    const short = SHORT_STREET[unpointed.toLowerCase()];
     if (state) return unpointed.toUpperCase() + comma;
     if (short && i > 0) return short + comma;
-    return capitalise(unpointed, i === 0) + comma;
+    return (asTyped ? unpointed : capitalise(unpointed, i === 0)) + comma;
   });
   const joined = words.join(" ");
   const { street, place } = splitAddress(joined);

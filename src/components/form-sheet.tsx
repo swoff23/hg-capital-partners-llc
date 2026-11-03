@@ -7,6 +7,7 @@ import { Switch } from "@/components/switch";
 import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { Button, Kbd, SaveError } from "@/components/ui";
 import { stableJson } from "@/lib/drafts";
+import { returnFocusAfterSave } from "@/lib/focus";
 import { cn } from "@/lib/utils";
 
 export type FormSheetProps = {
@@ -30,6 +31,11 @@ export type FormSheetProps = {
    * conflict's line): one `--danger` line directly above the buttons.
    */
   error?: ReactNode;
+  /**
+   * What the person can do about `error`, after it on the same line (SaveError's
+   * `action`): "Load the latest" after a save lost to a newer one.
+   */
+  errorAction?: ReactNode;
   /** The primary can't act at all (not just "something's missing"): disabled, with `disabledReason` under it. */
   primaryDisabled?: boolean;
   /** One line under a disabled primary saying why. */
@@ -118,6 +124,7 @@ export function FormSheet({
   primary,
   pending = false,
   error,
+  errorAction,
   primaryDisabled = false,
   disabledReason,
   createMore,
@@ -188,6 +195,19 @@ export function FormSheet({
     return () => cancelAnimationFrame(frame);
   }, [errorKey]);
 
+  // A busy primary is disabled, and the browser drops focus from a disabled button to the page, where Esc
+  // and Tab no longer reach the sheet. When a save comes back refused, focus goes back to the primary.
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  const wasPending = useRef(pending);
+  useEffect(() => {
+    const was = wasPending.current;
+    wasPending.current = pending;
+    const button = primaryRef.current;
+    if (button && returnFocusAfterSave({ was, pending, isOpen, active: document.activeElement, body: document.body })) {
+      button.focus({ preventScroll: true });
+    }
+  }, [pending, isOpen]);
+
   function onKeyDown(e: KeyboardEvent<HTMLFormElement>) {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -212,7 +232,7 @@ export function FormSheet({
         className={className}
         footer={
           <div className="space-y-3">
-            {error && <SaveError>{error}</SaveError>}
+            {error && <SaveError action={errorAction}>{error}</SaveError>}
             <div className="flex items-center gap-2">
               {createMore && (
                 <Switch
@@ -233,6 +253,7 @@ export function FormSheet({
                 <Kbd aria-hidden="true">Esc</Kbd>
               </Button>
               <Button
+                ref={primaryRef}
                 type="submit"
                 form={formId}
                 pending={pending}

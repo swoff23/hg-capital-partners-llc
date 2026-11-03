@@ -40,6 +40,7 @@ import {
   inlineShown,
   numberKindOf,
   storedText,
+  switchSave,
   type InlineDecision,
   type InlineKind,
 } from "@/lib/inline-edit";
@@ -1080,7 +1081,15 @@ export function InlineSwitch(props: {
   const save = useFactSave({ kind: "choice", label, value, onSave: props.onSave, options });
   const router = useRouter();
   const lineId = useId();
+  // The tap a conflict turned down, to send again on "Save mine".
+  const [turnedDown, setTurnedDown] = useState<string | null>(null);
   const on = save.shown === "yes";
+  function toggle(selected: boolean) {
+    // Expected is what the switch shows, so quick taps queue behind each other instead of refusing each other.
+    const { next, expected } = switchSave(save.shown, selected);
+    setTurnedDown(null);
+    save.start(next, expected, { failed: () => setTurnedDown(next) });
+  }
   return (
     <div className={cn("flex min-w-0 flex-1 flex-col", props.className)}>
       <Switch
@@ -1088,7 +1097,7 @@ export function InlineSwitch(props: {
         aria-describedby={save.error || save.conflict ? lineId : undefined}
         label={on ? "Yes" : "No"}
         isSelected={on}
-        onChange={(selected) => save.start(selected ? "yes" : "no", value)}
+        onChange={toggle}
       />
       {(save.error || save.conflict) && (
         <>
@@ -1098,9 +1107,13 @@ export function InlineSwitch(props: {
             inRail
             onKeep={() => {
               save.reset();
+              setTurnedDown(null);
               router.refresh();
             }}
-            onSaveMine={() => save.start(value === "yes" ? "no" : "yes", (save.conflict && field ? save.conflict.theirs?.[field] : undefined) ?? "")}
+            onSaveMine={() => {
+              const theirs = (save.conflict && field ? save.conflict.theirs?.[field] : undefined) ?? "";
+              if (turnedDown !== null) save.start(turnedDown, theirs, { failed: () => setTurnedDown(turnedDown) });
+            }}
           />
         </>
       )}

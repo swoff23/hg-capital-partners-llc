@@ -97,6 +97,11 @@ export function rentableUnitLabels(units: unknown): string[] {
  */
 const PLACEHOLDER_ID = "unit-at-";
 
+/** Whether an id is the placeholder for a unit saved before ids existed, which the next units save swaps for a lasting one. */
+export function isPlaceholderUnitId(id: string | null | undefined): boolean {
+  return !!id && id.startsWith(PLACEHOLDER_ID);
+}
+
 /** Every unit with an id: its stored one, or a placeholder from its place in the list. */
 export function withUnitIds(units: readonly PropertyUnit[]): PropertyUnit[] {
   return units.map((u, i) => (u.id ? u : { ...u, id: `${PLACEHOLDER_ID}${i}` }));

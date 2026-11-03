@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { badNumbersMessage, readAmount, readRate, readWholeNumber } from "./numbers";
+import { RENT_LIMIT, amountProblem, badNumbersMessage, readAmount, readRate, readWholeNumber } from "./numbers";
 
 test("readAmount: blank clears, clean numbers store, typos are refused", () => {
   assert.deepEqual(readAmount(""), { ok: true, value: null });
@@ -42,4 +42,44 @@ test("badNumbersMessage: names the fields in one short line", () => {
   for (const m of [badNumbersMessage(["replacementCost"]), badNumbersMessage(["loanOriginalAmount", "loanPaymentMonthly"])]) {
     assert.ok(m.length <= 43, `${m} (${m.length}) fits a section card on one line`);
   }
+});
+
+test("readAmount: a number too large for its column is refused with the limit, not sent to fail in the database", () => {
+  // The tester's Value entries: both used to come back as "Something went wrong".
+  for (const big of ["99999999999999999999", "9007199254740993", "10,000,000,000", "$10000m", "9999999999.995"]) {
+    assert.deepEqual(readAmount(big), { ok: false, tooLarge: true }, big);
+  }
+  // The largest a Decimal(12,2) holds, and 2,147,483,648 (past int32), still save.
+  assert.deepEqual(readAmount("9,999,999,999.99"), { ok: true, value: "9999999999.99" });
+  assert.deepEqual(readAmount("2147483648"), { ok: true, value: "2147483648.00" });
+  // A listing's rent is Decimal(10,2).
+  assert.deepEqual(readAmount("100,000,000", RENT_LIMIT), { ok: false, tooLarge: true });
+  assert.deepEqual(readAmount("1,500", RENT_LIMIT), { ok: true, value: "1500.00" });
+});
+
+test("readWholeNumber: square feet past 10 million are refused with the limit", () => {
+  assert.deepEqual(readWholeNumber("99999999999"), { ok: false, tooLarge: true });
+  assert.deepEqual(readWholeNumber("9,999,999"), { ok: true, value: 9_999_999 });
+});
+
+test("badNumbersMessage: a number too large says the limit in one line", () => {
+  assert.equal(badNumbersMessage(["value"], ["value"]), "Keep it under $10 billion.");
+  assert.equal(badNumbersMessage(["currentLoan"], ["currentLoan"]), "Keep it under $10 billion.");
+  assert.equal(badNumbersMessage(["sqft"], ["sqft"]), "Keep it under 10,000,000.");
+  assert.equal(badNumbersMessage(["rehabMonths"], ["rehabMonths"]), "Keep it under 1,000,000.");
+  // Two fields still name both.
+  assert.equal(badNumbersMessage(["value", "sqft"], ["value"]), "Check Value and Sq ft.");
+});
+
+test("amountProblem: the rail's check before it sends, for money and square feet only", () => {
+  assert.equal(amountProblem("value", "99999999999999999999"), "Keep it under $10 billion.");
+  assert.equal(amountProblem("value", "425,000"), null);
+  assert.equal(amountProblem("value", ""), null);
+  // Text that isn't a number is the field kit's own line, not this one.
+  assert.equal(amountProblem("value", "abc"), null);
+  assert.equal(amountProblem("sqft", "99999999999"), "Keep it under 10,000,000.");
+  assert.equal(amountProblem("rehabMonths", "1000000"), "Keep it under 1,000,000.");
+  // Not a number field: nothing to say.
+  assert.equal(amountProblem("lender", "99999999999999999999"), null);
+  assert.equal(amountProblem("loanRate", "99999999999999999999"), null);
 });

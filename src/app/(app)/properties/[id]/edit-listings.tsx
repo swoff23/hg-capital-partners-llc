@@ -7,12 +7,12 @@ import { DateField } from "@/components/due-date-picker";
 import { FormSheet } from "@/components/form-sheet";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
-import { NumberInput, numberProblem } from "@/components/number-input";
+import { NumberInput } from "@/components/number-input";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { Select } from "@/components/select";
 import { AddRow, Button, FormField, Input, SaveError, Section, buttonClass, textLinkClass } from "@/components/ui";
 import { useRun } from "@/components/use-run";
-import { inlineProblem } from "@/lib/inline-edit";
+import { listingProblems } from "@/lib/properties/listing-checks";
 import { cn } from "@/lib/utils";
 import { deletePropertyListing, savePropertyListing } from "../actions";
 import { LISTING_PHOTO_MAX, ListingPhotos, discardSessionUploads, type ListingPhotoDraft } from "./listing-photos";
@@ -229,24 +229,6 @@ function ReadListings({
 
 /* ---------------- The listing's sheet ---------------- */
 
-/** The fields a sheet checks, by name. A field shows its line once it was left or Save was pressed. */
-function problemsOf(l: EditableListing, original: EditableListing): Record<string, string> {
-  const found: Record<string, string> = {};
-  if (!l.unitLabel.trim()) found.unitLabel = "Choose a unit.";
-  const url = inlineProblem("url", l.zillowUrl);
-  if (url) found.zillowUrl = url;
-  const rent = numberProblem("money", l.rent);
-  if (rent) found.rent = rent;
-  const sqft = numberProblem("integer", l.sqft);
-  if (sqft) found.sqft = sqft;
-  // A bed or bath count already stored ("Studio") is left as it is until someone types over it.
-  const beds = l.beds !== original.beds ? numberProblem("integer", l.beds) : null;
-  if (beds) found.beds = beds;
-  const baths = l.baths !== original.baths ? numberProblem("decimal", l.baths) : null;
-  if (baths) found.baths = baths;
-  return found;
-}
-
 /**
  * One listing in a sheet (forms 4.2, 2.9): unit and status, the photos, the
  * link, when it's available, the rent and the rest. Save applies the fields
@@ -279,7 +261,8 @@ function ListingSheet({
   // so an existing pick never silently disappears.
   const unitItems = [...new Set([listing.unitLabel, ...unitLabels].filter(Boolean))].map((u) => ({ id: u, label: u }));
   const name = draft.unitLabel || "New listing";
-  const problems = problemsOf(draft, listing);
+  // A field shows its line once it was left or Save was pressed (lib/properties/listing-checks.ts).
+  const problems = listingProblems(draft, listing);
   const shows = (field: string) => (tried || left.has(field)) && problems[field] ? problems[field] : undefined;
   const serverError = (field: string) => run.fieldErrors?.[field];
   const leave = (field: string) => setLeft((s) => new Set(s).add(field));

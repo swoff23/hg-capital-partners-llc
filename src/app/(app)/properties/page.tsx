@@ -19,6 +19,7 @@ import {
   DEFAULT_PROPERTY_SORT,
   filterByStatus,
   isPropertyListFiltered,
+  listTotals,
   parsePropertyFilters,
   sortProperties,
   statusOptions,
@@ -67,28 +68,11 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
     value: p.value,
   }));
 
-  // A sold property leaves every count and sum: the strip, the subtitle and the footer (charts D4).
-  const sum = (list: typeof all) =>
-    list
-      .filter((r) => !isSold(r.status))
-      .reduce(
-        (acc, r) => {
-          acc.count += 1;
-          acc.units += r.units ?? 0;
-          acc.purchase += toMoneyNumber(r.purchase) ?? 0;
-          acc.value += toMoneyNumber(r.value) ?? 0;
-          acc.openTasks += r.openTasks;
-          return acc;
-        },
-        { count: 0, units: 0, purchase: 0, value: 0, openTasks: 0 },
-      );
-  // "11 properties" while every one is owned; "10 owned" once one has sold.
-  const countLabel = (list: typeof all, n: number) =>
-    list.some((r) => isSold(r.status)) ? `${n} owned` : plural(n, "property", "properties");
+  // A sold property leaves every count and sum: the strip, the subtitle and the footer (charts D4), until the rows on show are all sold.
   // The footer counts and sums the rows on show; the portfolio strip and the subtitle stay whole.
   const rows = sortProperties(filterByStatus(all, filters.statuses), filters.sort);
-  const totals = sum(rows);
-  const whole = sum(all);
+  const totals = listTotals(rows);
+  const whole = listTotals(all);
 
   // A sold building leaves the CapEx forecast too (charts D4).
   const capexProperties = properties
@@ -105,7 +89,7 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
       <PageHeader
         title="Portfolio"
         subtitle={
-          all.length > 0 ? `${countLabel(all, whole.count)} · ${plural(whole.units, "unit", "units")}` : undefined
+          all.length > 0 ? `${whole.label} · ${plural(whole.units, "unit", "units")}` : undefined
         }
         actions={
           <LinkButton href="/properties/new" variant="primary">
@@ -122,6 +106,8 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
           {/* Purchase, units and open tasks are the footer's sums; the strip carries leverage (charts D4 A). */}
           <PortfolioStrip
             properties={properties.map((p) => ({
+              id: p.id,
+              name: shortAddress(p.address) || p.address,
               status: p.status,
               value: toMoneyNumber(p.value),
               balance: toMoneyNumber(p.currentLoan),
@@ -217,7 +203,7 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                 </tbody>
                 <tfoot>
                   <tr className="font-semibold">
-                    <Td className="border-t border-line-strong pl-0">{countLabel(rows, totals.count)}</Td>
+                    <Td className="border-t border-line-strong pl-0">{totals.label}</Td>
                     <Td numeric className="border-t border-line-strong max-[480px]:hidden">
                       {totals.units}
                     </Td>

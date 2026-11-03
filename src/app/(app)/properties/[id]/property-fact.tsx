@@ -8,6 +8,7 @@ import { RailFact } from "@/components/rail";
 import { buttonClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
+import { amountProblem } from "@/lib/properties/numbers";
 import { patchProperty } from "../actions";
 import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
 
@@ -45,6 +46,8 @@ export function PropertyFact({ id, field, label, name, anchor, value, ...rest }:
         label={name ?? label}
         field={field}
         value={value ?? ""}
+        // A number too large for its column says the limit before it's sent, as the service would.
+        check={(text) => amountProblem(field, text)}
         onSave={(next, expected) => patchProperty(id, { [field]: next }, { [field]: expected })}
         onRequest={(open) => onPropertyFieldRequest([field], open)}
       />

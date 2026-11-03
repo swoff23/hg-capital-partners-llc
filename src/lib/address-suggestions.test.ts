@@ -40,6 +40,23 @@ test("tidyAddress leaves what's already right, and words typed with their own ca
   assert.equal(tidyAddress("12 elm st apt 2"), "12 Elm St Apt 2");
 });
 
+test("tidyAddress keeps every word's case once the person chose capitals of their own", () => {
+  // The tester's 'Use "..." as typed' picks, which saved as "QA Test Oct27 Portfolio 1 Apt 4b" and "</Script>".
+  assert.equal(tidyAddress("QA test Oct27 portfolio 1 apt 4b"), "QA test Oct27 portfolio 1 apt 4b");
+  assert.equal(tidyAddress("QA test Oct27 portfolio 1 <script>alert(1)</script>"), "QA test Oct27 portfolio 1 <script>alert(1)</script>");
+  assert.equal(tidyAddress("12 McDonald Ave apt 4b"), "12 McDonald Ave apt 4b");
+  // The house style still applies: the street word, the state and the commas.
+  assert.equal(tidyAddress("12 McDonald Avenue buffalo ny 14209"), "12 McDonald Ave, buffalo, NY 14209");
+  // The state and a shouted word aren't chosen capitals.
+  assert.equal(tidyAddress("767 prospect ave buffalo NY 14209"), "767 Prospect Ave, Buffalo, NY 14209");
+  assert.equal(tidyAddress("767 PROSPECT ave"), "767 Prospect Ave");
+  // Typed all in lower case, a name gets its Mc and O' capitals, and a slash starts no capital.
+  assert.equal(tidyAddress("12 mcdonald st"), "12 McDonald St");
+  assert.equal(tidyAddress("5 o'brien st"), "5 O'Brien St");
+  assert.equal(tidyAddress("10 mckinley pkwy"), "10 McKinley Pkwy");
+  assert.equal(tidyAddress("1 a/b st"), "1 A/b St");
+});
+
 test("tidying never changes which building an address is", () => {
   const typed = ["767 prospect avenue buffalo ny 14209", "118 Congress St. Buffalo, NY 14213", "421 w delavan ave", "1404 payne avenue,  north tonawanda, ny 14120"];
   for (const t of typed) {
