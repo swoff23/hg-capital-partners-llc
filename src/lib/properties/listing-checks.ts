@@ -12,6 +12,15 @@ function problem(kind: NumberKind, text: string): string | null {
 }
 
 /**
+ * Why a Zillow link won't save, or null: the sheet's line and the server's
+ * (`cleanListing`), the same rule. It has to start with http:// or https://,
+ * since the public Rentals page links to it. Blank is fine.
+ */
+export function listingLinkProblem(text: string): string | null {
+  return inlineProblem("url", text);
+}
+
+/**
  * The listing sheet's field lines, by field name (forms 2.0), the same the
  * server's `cleanListing` gives: Rent says a monthly example ("like 1,500",
  * where the money kit's "like 425,000" reads as a price), and Rent and Sq ft
@@ -22,7 +31,7 @@ function problem(kind: NumberKind, text: string): string | null {
 export function listingProblems(l: ListingFields, original: ListingFields): Record<string, string> {
   const found: Record<string, string> = {};
   if (!l.unitLabel.trim()) found.unitLabel = "Choose a unit.";
-  const url = inlineProblem("url", l.zillowUrl);
+  const url = listingLinkProblem(l.zillowUrl);
   if (url) found.zillowUrl = url;
   const rent = readNumber("money", l.rent);
   if (!rent.ok) found.rent = RENT_MESSAGE;

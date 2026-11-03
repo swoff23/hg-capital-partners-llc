@@ -681,8 +681,8 @@ test("hidden by filters is measured against the whole view", () => {
 });
 
 test("Done sorts the newest finished first; Open and All keep the soonest due first", () => {
-  assert.deepEqual(allTasksOrderBy("done"), [{ completedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }]);
-  assert.deepEqual(allTasksOrderBy("open"), [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]);
+  assert.deepEqual(allTasksOrderBy("done"), [{ completedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }]);
+  assert.deepEqual(allTasksOrderBy("open"), [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }]);
   assert.deepEqual(allTasksOrderBy("all"), allTasksOrderBy("open"));
   // What that order does to three finished tasks, one with no finish time.
   const rows = [
@@ -697,6 +697,15 @@ test("Done sorts the newest finished first; Open and All keep the soonest due fi
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
   assert.deepEqual(sorted.map((r) => r.id), ["new", "old", "none"]);
+});
+
+test("every view's order ends on the id, so Show more adds rows below the ones on screen and never reshuffles them", () => {
+  for (const view of ["open", "done", "all"] as const) {
+    const order = allTasksOrderBy(view);
+    // Imported tasks share a due date and a created time (dates only, at midnight): without a unique last key
+    // Postgres may order those ties differently for LIMIT 200 than for LIMIT 100.
+    assert.deepEqual(order[order.length - 1], { id: "asc" }, `${view} ends on a unique key`);
+  }
 });
 
 test("counts beside the assignee rows: a person, Unassigned, and a legacy name folded into its person", () => {

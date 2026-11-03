@@ -57,6 +57,8 @@ export function RailFact({
       id={id}
       className={cn(
         "grid min-h-10 grid-cols-[var(--rail-label)_minmax(0,1fr)] items-start gap-x-3 py-1 [--rail-label:6rem] sm:[--rail-label:7rem] pointer-coarse:min-h-12 pointer-coarse:py-0.5",
+        // An anchored row lands below the sticky app bar, as the activity and comment anchors do.
+        id && "scroll-mt-[calc(var(--app-bar-h)+1rem)]",
         className,
       )}
     >

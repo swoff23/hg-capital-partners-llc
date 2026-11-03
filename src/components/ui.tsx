@@ -241,11 +241,14 @@ export function TextLink({ className, ...props }: React.ComponentProps<typeof Li
 export function AddRow({
   children,
   onClick,
+  onIntent,
   disabled,
   className,
 }: {
   children: React.ReactNode;
   onClick: () => void;
+  /** Runs when the pointer reaches the row, it takes focus or it is pressed: warm what the click opens (lib/lazy-module.ts). */
+  onIntent?: () => void;
   disabled?: boolean;
   className?: string;
 }) {
@@ -253,6 +256,9 @@ export function AddRow({
     <button
       type="button"
       onClick={onClick}
+      onPointerEnter={onIntent}
+      onFocus={onIntent}
+      onPointerDown={onIntent}
       disabled={disabled}
       className={cn(
         "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12",

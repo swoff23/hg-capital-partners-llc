@@ -2,12 +2,13 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
-import type { ListingStatus, Prisma, Property } from "@prisma/client";
+import type { Prisma, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
 import { splitAddress } from "@/lib/address-suggestions";
 import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
-import { RENT_LIMIT, RENT_MESSAGE, amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber, tooLargeMessage } from "@/lib/properties/numbers";
+import { amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
+import { cleanListing, type ListingInput } from "@/lib/properties/listing-clean";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { containsText } from "@/lib/search";
@@ -442,18 +443,8 @@ async function writeBuildingCapex(id: string, patch: BuildingCapexPatch, expecte
 
 /* ---------------- Listings (real rows, whole-set replace) ---------------- */
 
-export interface ListingInput {
-  id: string | null;
-  unitLabel: string;
-  zillowUrl: string;
-  rent: string;
-  beds: string;
-  baths: string;
-  sqft: string;
-  availableDate: string;
-  status: ListingStatus;
-  photos: { url: string; pathname: string }[];
-}
+// What a listing write reads from the sheet is in listing-clean.ts, where a test can reach it.
+export type { ListingInput };
 
 /**
  * Diff the submitted set against what's stored: missing rows are deleted
@@ -541,35 +532,6 @@ export async function deleteListing(propertyId: string, listingId: string, expec
   await deleteBlobs((row?.photos ?? []).map((p) => p.url));
   revalidatePath(`/properties/${propertyId}`);
   revalidatePath("/rentals");
-}
-
-/**
- * What a listing writes, read from what the sheet sent: a blank unit is
- * "Unit", rent and square feet must read as numbers (a blank clears), and
- * the photo set keeps its order. A number that doesn't read is a refusal on
- * that field, in the words of the field kit.
- */
-function cleanListing(l: ListingInput) {
-  const rent = readAmount(l.rent, RENT_LIMIT);
-  const sqft = readWholeNumber(l.sqft);
-  const problems: Record<string, string> = {};
-  if (!rent.ok) problems.rent = rent.tooLarge ? tooLargeMessage("rent") : RENT_MESSAGE;
-  if (!sqft.ok) problems.sqft = sqft.tooLarge ? tooLargeMessage("sqft") : NUMBER_MESSAGE.integer;
-  if (Object.keys(problems).length > 0) throw new FieldError(problems);
-  return {
-    id: l.id ?? null,
-    unitLabel: l.unitLabel.trim() || "Unit",
-    zillowUrl: l.zillowUrl.trim() || null,
-    rent: rent.ok ? rent.value : null,
-    beds: l.beds.trim() || null,
-    baths: l.baths.trim() || null,
-    sqft: sqft.ok ? sqft.value : null,
-    availableDate: ymdToDate(l.availableDate.trim() || null),
-    status: l.status,
-    photos: l.photos
-      .filter((p) => p.url.trim() && p.pathname.trim())
-      .map((p, sortOrder) => ({ url: p.url.trim(), pathname: p.pathname.trim(), sortOrder })),
-  };
 }
 
 /** Moves the property's version on inside a listing write, and refuses it when the editor's version is no longer current. */

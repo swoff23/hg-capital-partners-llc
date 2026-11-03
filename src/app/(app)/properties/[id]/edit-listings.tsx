@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button as AriaButton } from "react-aria-components";
 import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -7,14 +7,14 @@ import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { AddRow, Button, SaveError, Section, buttonClass, textLinkClass } from "@/components/ui";
-import { useLazyModule } from "@/components/use-lazy-module";
+import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
-import { lazyModule } from "@/lib/lazy-module";
+import { OPEN_FAILED_LINE, lazyModule, warmWhenIdle } from "@/lib/lazy-module";
 import { cn } from "@/lib/utils";
 import { deletePropertyListing } from "../actions";
 import type { ListingPhotoDraft } from "./listing-photos";
 
-// The editor (its photo manager and drag and drop included) loads with the first open, not with the page (lib/lazy-module.ts).
+// The editor (its photo manager and drag and drop included) loads after the page has settled or at the first hover, focus or press, not with the page (lib/lazy-module.ts).
 const listingSheet = lazyModule(() => import("./listing-sheet"));
 
 export type EditableListing = {
@@ -78,7 +78,13 @@ export function ListingsSection({
   const [isOpen, setIsOpen] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const run = useRun();
-  const editor = useLazyModule(listingSheet, sheet !== null);
+  // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast, and the next tap asks again.
+  const editor = useLazyModule(listingSheet, sheet !== null, () => {
+    setSheet(null);
+    setIsOpen(false);
+    run.toast({ message: OPEN_FAILED_LINE });
+  });
+  useEffect(() => warmWhenIdle(listingSheet), []);
   const noUnits = unitLabels.length === 0;
 
   function openListing(index: number | null) {
@@ -115,7 +121,7 @@ export function ListingsSection({
           }}
         />
       )}
-      <AddRow onClick={() => openListing(null)} disabled={noUnits}>
+      <AddRow onClick={() => openListing(null)} onIntent={listingSheet.warm} disabled={noUnits}>
         Add listing
       </AddRow>
       {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
@@ -171,6 +177,7 @@ function ReadListings({
             <button
               type="button"
               onClick={() => onEdit(i)}
+              {...warmOnIntent(listingSheet)}
               aria-label={`Edit the listing for ${name}`}
               className="min-w-0 flex-1 rounded-md text-left pointer-coarse:min-h-11"
             >
@@ -207,7 +214,13 @@ function ReadListings({
             {/* The status in one fixed column before the menu, whether or not a Zillow link sits before it. */}
             <span className="w-20 shrink-0 whitespace-nowrap text-meta font-medium text-fg-2 max-[480px]:hidden">{STATUS_LABEL[l.status]}</span>
             <MenuTrigger>
-              <AriaButton aria-label={`${name} actions`} className={buttonClass({ variant: "ghost", size: "sm", icon: true })}>
+              <AriaButton
+                aria-label={`${name} actions`}
+                onHoverStart={listingSheet.warm}
+                onFocus={listingSheet.warm}
+                onPressStart={listingSheet.warm}
+                className={buttonClass({ variant: "ghost", size: "sm", icon: true })}
+              >
                 <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
               </AriaButton>
               <Menu sheetTitle={name}>

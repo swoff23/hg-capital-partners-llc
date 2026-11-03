@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button as AriaButton } from "react-aria-components";
 import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Code } from "@/components/code";
@@ -8,7 +8,7 @@ import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
 import { AddRow, Button, Section, Table, Td, Th, buttonClass } from "@/components/ui";
-import { useLazyModule } from "@/components/use-lazy-module";
+import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
 import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
 import {
@@ -22,7 +22,7 @@ import {
   projectedYear,
   utilityStatusTone,
 } from "@/lib/property-types";
-import { lazyModule } from "@/lib/lazy-module";
+import { OPEN_FAILED_LINE, lazyModule, warmWhenIdle } from "@/lib/lazy-module";
 import { removeUnitQuestion, unitRefKey, type UnitRefs } from "@/lib/properties/unit-refs";
 import { sheetUnitAt } from "@/lib/properties/unit-sheet";
 import { dueIn } from "@/lib/properties/capex";
@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { deletePropertyUnit } from "../actions";
 import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
 
-// The editor loads with the first open, not with the page (lib/lazy-module.ts).
+// The editor loads after the page has settled or at the first hover, focus or press, not with the page (lib/lazy-module.ts).
 const unitSheet = lazyModule(() => import("./unit-sheet"));
 
 /** The account-number fields, read as codes and masked to their last four. */
@@ -98,7 +98,13 @@ export function UnitsSection({
   const [isOpen, setIsOpen] = useState(false);
   const [removing, setRemoving] = useState<Removing | null>(null);
   const run = useRun();
-  const editor = useLazyModule(unitSheet, sheet !== null);
+  // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast, and the next tap asks again.
+  const editor = useLazyModule(unitSheet, sheet !== null, () => {
+    setSheet(null);
+    setIsOpen(false);
+    run.toast({ message: OPEN_FAILED_LINE });
+  });
+  useEffect(() => warmWhenIdle(unitSheet), []);
 
   // The counted rows (the record's "3 units") and the house-meter rows, each with its place in the list.
   const indexed = initial.map((u, i) => ({ u, i }));
@@ -167,7 +173,9 @@ export function UnitsSection({
           ))}
         </ul>
       )}
-      <AddRow onClick={() => openUnit(null)}>Add unit</AddRow>
+      <AddRow onClick={() => openUnit(null)} onIntent={unitSheet.warm}>
+        Add unit
+      </AddRow>
       {/* The building's own meters aren't units, so they sit under the counted list, apart from it. */}
       {meters.length > 0 && (
         <div className="pt-4">
@@ -226,7 +234,13 @@ export function UnitsSection({
 function UnitMenu({ name, onEdit, onDelete }: { name: string; onEdit: () => void; onDelete: () => void }) {
   return (
     <MenuTrigger>
-      <AriaButton aria-label={`${name} actions`} className={buttonClass({ variant: "ghost", size: "sm", icon: true })}>
+      <AriaButton
+        aria-label={`${name} actions`}
+        onHoverStart={unitSheet.warm}
+        onFocus={unitSheet.warm}
+        onPressStart={unitSheet.warm}
+        className={buttonClass({ variant: "ghost", size: "sm", icon: true })}
+      >
         <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="h-4 w-4" />
       </AriaButton>
       <Menu sheetTitle={name}>
@@ -282,6 +296,7 @@ function ReadUnit({
         <button
           type="button"
           onClick={onEdit}
+          {...warmOnIntent(unitSheet)}
           aria-label={`Edit ${name}`}
           className="min-w-0 flex-1 truncate rounded-md text-left text-body text-fg-1 pointer-coarse:min-h-11 pointer-fine:hover:underline pointer-fine:underline-offset-3"
         >

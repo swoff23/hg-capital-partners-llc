@@ -60,12 +60,15 @@ export function archivedLine(by: { name: string | null; email: string } | null |
  * they can. Open jobs are reassigned first and a portal login (an active
  * account) has its access removed first, so archiving never strands a job
  * or leaves someone able to sign in to a contractor nobody can find.
+ *
+ * It names the step that comes first, jobs and then access, and the line
+ * under Archive changes once that is done. The line is also the toast after a
+ * tap, which is one truncated line, so each stays within TOAST_PHONE_CHARS
+ * (a line naming both steps was 48 characters and lost its ending on phones).
  */
 export function contractorArchiveRefusal({ openJobs, hasLogin }: { openJobs: number; hasLogin: boolean }): string | null {
-  const jobs = openJobs === 1 ? "their open job" : `their ${openJobs} open jobs`;
-  if (openJobs > 0 && hasLogin) return `Reassign ${jobs} and remove access first.`;
-  if (openJobs > 0) return `Reassign ${jobs} first.`;
-  if (hasLogin) return "Remove their portal access first.";
+  if (openJobs > 0) return openJobs === 1 ? "Reassign their open job first." : `Reassign their ${openJobs} jobs first.`;
+  if (hasLogin) return "Remove portal access first.";
   return null;
 }
 

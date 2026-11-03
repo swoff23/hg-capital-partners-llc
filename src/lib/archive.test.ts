@@ -12,6 +12,7 @@ import {
   setPropertyArchived,
   type ArchiveTx,
 } from "./archive";
+import { TOAST_PHONE_CHARS } from "@/lib/toast-line";
 
 const CONNOR = { name: "Connor Swofford", email: "connor@hg.example" };
 const at = (iso: string) => new Date(iso);
@@ -33,12 +34,26 @@ test("the record's line: an email's name when there's no name, and nobody once t
 
 test("a contractor's refusal names the next step, in one line", () => {
   assert.equal(contractorArchiveRefusal({ openJobs: 0, hasLogin: false }), null);
-  assert.equal(contractorArchiveRefusal({ openJobs: 3, hasLogin: false }), "Reassign their 3 open jobs first.");
+  assert.equal(contractorArchiveRefusal({ openJobs: 3, hasLogin: false }), "Reassign their 3 jobs first.");
   assert.equal(contractorArchiveRefusal({ openJobs: 1, hasLogin: false }), "Reassign their open job first.");
-  assert.equal(contractorArchiveRefusal({ openJobs: 0, hasLogin: true }), "Remove their portal access first.");
-  assert.equal(contractorArchiveRefusal({ openJobs: 2, hasLogin: true }), "Reassign their 2 open jobs and remove access first.");
-  for (const line of [contractorArchiveRefusal({ openJobs: 2, hasLogin: true }), contractorArchiveRefusal({ openJobs: 1, hasLogin: true })]) {
-    assert.ok(line && line.length <= 60 && !line.includes("—"), `"${line}" reads as one short line`);
+  assert.equal(contractorArchiveRefusal({ openJobs: 0, hasLogin: true }), "Remove portal access first.");
+  // Both: the step that comes first. The line under Archive changes to the other once it's done.
+  assert.equal(contractorArchiveRefusal({ openJobs: 2, hasLogin: true }), "Reassign their 2 jobs first.");
+  assert.equal(contractorArchiveRefusal({ openJobs: 1, hasLogin: true }), "Reassign their open job first.");
+});
+
+test("a contractor's refusal is also the toast, so every line shows whole on a phone", () => {
+  // 'Reassign their open job and remove access first.' lost its ending at 375: 'Reassign their open job and remove…'.
+  const lines = new Set<string>();
+  for (const openJobs of [0, 1, 2, 9, 12, 99, 100]) {
+    for (const hasLogin of [false, true]) {
+      const line = contractorArchiveRefusal({ openJobs, hasLogin });
+      if (line) lines.add(line);
+    }
+  }
+  assert.ok(lines.size >= 6);
+  for (const line of lines) {
+    assert.ok(line.length <= TOAST_PHONE_CHARS && !line.includes("—") && /first\.$/.test(line), `"${line}" is one short line that ends on the step`);
   }
 });
 
@@ -152,14 +167,14 @@ test("a contractor with open jobs or a login isn't archived, and the refusal is 
   const busy = fakeTx({ contact: [{ id: "c1", archivedAt: null, portalAccount: null }], openJobs: 3 });
   await assert.rejects(setContactArchived(busy.tx, "c1", true, BY, NOW), (err: unknown) => {
     assert.ok(err instanceof ArchiveRefusedError);
-    assert.equal((err as Error).message, "Reassign their 3 open jobs first.");
+    assert.equal((err as Error).message, "Reassign their 3 jobs first.");
     return true;
   });
   assert.equal(busy.tables.contact[0].archivedAt, null, "nothing written");
   assert.ok(!busy.calls.some(([, op]) => op === "updateMany"));
 
   const login = fakeTx({ contact: [{ id: "c1", archivedAt: null, portalAccount: { status: "ACTIVE" } }] });
-  await assert.rejects(setContactArchived(login.tx, "c1", true, BY, NOW), /Remove their portal access first\./);
+  await assert.rejects(setContactArchived(login.tx, "c1", true, BY, NOW), /Remove portal access first\./);
 
   // The open jobs are counted on open work only, never a playbook's template rows.
   const count = busy.calls.find(([m, op]) => m === "task" && op === "count")?.[2] as { where: Row };

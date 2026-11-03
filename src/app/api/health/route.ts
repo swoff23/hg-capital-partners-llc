@@ -44,9 +44,13 @@ export async function GET(request: NextRequest) {
     if (detailed) {
       const [tz] = await prisma.$queryRaw<{ tz: string }[]>`SELECT current_setting('TimeZone') AS tz`;
       dbTimeZone = tz?.tz ?? null;
+      // _prisma_migrations keeps timestamptz columns, which the driver reads as if the session were UTC
+      // (src/lib/db.ts); turning them into UTC timestamps here keeps the times right in any session zone.
       const rows = await prisma.$queryRaw<
         { migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }[]
-      >`SELECT migration_name, finished_at, rolled_back_at
+      >`SELECT migration_name,
+          finished_at AT TIME ZONE 'UTC' AS finished_at,
+          rolled_back_at AT TIME ZONE 'UTC' AS rolled_back_at
         FROM "_prisma_migrations"
         ORDER BY started_at DESC
         LIMIT 25`;

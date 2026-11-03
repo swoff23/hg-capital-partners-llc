@@ -265,10 +265,15 @@ export function viewScopeWhere(status: TaskView): Prisma.TaskWhereInput {
  * Open and All: soonest due first, undated last, newest made first among
  * equals. Done: the newest finished first (BTASKS-010), so recent work is on
  * top; a row with no finish time sorts last.
+ *
+ * Both end on `id`. Imported tasks share a due date and a created time (dates
+ * only, at midnight), and Postgres may return tied rows in a different order
+ * for LIMIT 200 than for LIMIT 100, so Show more reshuffled the rows already
+ * on screen. A unique last key makes every page a prefix of the next.
  */
 export function allTasksOrderBy(status: TaskView): Prisma.TaskOrderByWithRelationInput[] {
-  if (status === "done") return [{ completedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }];
-  return [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }];
+  if (status === "done") return [{ completedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }];
+  return [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }];
 }
 
 /* ---------------- Counts beside the filter rows ---------------- */

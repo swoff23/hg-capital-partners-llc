@@ -7,6 +7,7 @@ import { Button, buttonClass } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import type { ActionResult } from "@/lib/action-result";
 import { archiveToast, type ArchiveKind } from "@/lib/archive";
+import { focusRecordMenu } from "@/lib/record-menu-focus";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,14 +26,18 @@ import { cn } from "@/lib/utils";
 
 type ArchiveAction = (id: string, archived: boolean) => Promise<ActionResult>;
 
-/** Archive or restore, with the toast and its Undo. One toast per record, so a quick Undo replaces it. */
+/**
+ * Archive or restore, with the toast and its Undo. One toast per record, so a
+ * quick Undo replaces it. `succeeded` runs when the change went through.
+ */
 function useArchive(kind: ArchiveKind, id: string, action: ArchiveAction) {
   const { run, pending, toast } = useRun();
-  const change = (archived: boolean) =>
+  const change = (archived: boolean, succeeded?: () => void) =>
     run(() => action(id, archived), {
       done: archiveToast(kind, archived),
       key: `archive:${kind}:${id}`,
       undo: () => action(id, !archived),
+      succeeded,
     });
   return { change, pending, toast };
 }
@@ -51,7 +56,7 @@ export function RecordMoreMenu({
   /** The page's path, for Copy link: "/deals/abc". */
   href: string;
   archived: boolean;
-  /** Why Archive won't go through yet, named under it ("Reassign their 3 open jobs first."). */
+  /** Why Archive won't go through yet, named under it ("Reassign their 3 jobs first."). */
   refusal?: string | null;
   action: ArchiveAction;
 }) {
@@ -70,6 +75,7 @@ export function RecordMoreMenu({
     <MenuTrigger>
       <AriaButton
         aria-label="More actions"
+        data-record-menu=""
         className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3 data-pressed:bg-fill-1")}
       >
         <Ellipsis className="size-4" aria-hidden="true" />
@@ -94,7 +100,11 @@ export function RecordMoreMenu({
   );
 }
 
-/** Above an archived record: who archived it and when, and Restore. */
+/**
+ * Above an archived record: who archived it and when, and Restore. The notice
+ * goes when the restore lands, so focus moves on to the record's ⋯ button
+ * (lib/record-menu-focus.ts) instead of falling to the page.
+ */
 export function ArchivedNotice({
   kind,
   id,
@@ -115,7 +125,7 @@ export function ArchivedNotice({
       className={className}
       icon={<Archive aria-hidden="true" strokeWidth={1.75} className="size-4 shrink-0 text-fg-3" />}
       action={
-        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => change(false)}>
+        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => change(false, () => focusRecordMenu())}>
           Restore
         </Button>
       }
