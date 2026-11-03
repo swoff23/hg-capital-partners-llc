@@ -43,7 +43,8 @@ export function LateUploads({ taskId, label }: { taskId: string; label: string }
   /**
    * The batch landed: with this page open or gone, it is handed to the same step. Files whose post didn't go
    * through stay kept for the tab (postOrKeepBatch keeps them even when the call throws), and the failure's Retry,
-   * the next batch for this job, the signal coming back or the next time it opens carries them.
+   * the next batch for this job, the signal coming back or the next time it opens carries them. A refusal for good
+   * (taken off the job) keeps none: trying again can't change it.
    */
   const land = (ids: string[]) => {
     void postOrKeepBatch(taskId, tab.take(taskId, ids), toast, owner);

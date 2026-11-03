@@ -73,16 +73,41 @@ export class RecordedUploads {
   }
 }
 
+/** How one post of at most `size` files ended: it went, it failed in a way another try may fix (no signal, a hiccup), or it was refused for good. */
+export type PieceResult = "posted" | "failed" | "refused";
+
 /**
  * Posts files in pieces of at most `size` (the most one post takes), one piece after another, and stops at the
- * first piece that doesn't go through. Answers the files not posted, none when every piece went, so a caller
- * keeps just those. `post` answers whether its piece went.
+ * first piece that doesn't go through. Answers the files not posted (the piece that stopped it and every piece after
+ * it), none when every piece went, and whether that piece was refused for good.
+ */
+async function postPieces<T>(items: readonly T[], post: (piece: T[]) => Promise<PieceResult>, size: number): Promise<{ left: T[]; refused: boolean }> {
+  for (let at = 0; at < items.length; at += size) {
+    const result = await post(items.slice(at, at + size));
+    if (result !== "posted") return { left: items.slice(at), refused: result === "refused" };
+  }
+  return { left: [], refused: false };
+}
+
+/**
+ * Posts files in pieces of at most `size`, stopping at the first piece that doesn't go through. Answers the files
+ * not posted, none when every piece went, so a caller with a tray puts just those back. `post` answers whether its
+ * piece went.
  */
 export async function postInBatches<T>(items: readonly T[], post: (piece: T[]) => Promise<boolean>, size = MAX_FILES_PER_POST): Promise<T[]> {
-  for (let at = 0; at < items.length; at += size) {
-    if (!(await post(items.slice(at, at + size)))) return items.slice(at);
-  }
-  return [];
+  return (await postPieces(items, async (piece) => ((await post(piece)) ? "posted" : "failed"), size)).left;
+}
+
+/**
+ * Posts files that have no tray to go back to in pieces, and answers the ones worth keeping for another try: what a
+ * failure another try may fix left (no signal, a hiccup). A piece refused for good (no access to the job any more,
+ * the job gone, signed in as someone else) turns down the rest with it, and they are not kept: trying again can't
+ * change it, so every return to the tab would post them once more and toast the same refusal. They stay on the job,
+ * unposted, as after a reload.
+ */
+export async function postKeepable<T>(items: readonly T[], post: (piece: T[]) => Promise<PieceResult>, size = MAX_FILES_PER_POST): Promise<T[]> {
+  const { left, refused } = await postPieces(items, post, size);
+  return refused ? [] : left;
 }
 
 /**
@@ -112,9 +137,9 @@ export function recordedUploadsOf(scope: string | undefined): RecordedUploads {
 
 /**
  * Posts files that have no tray to go back to (a finished job's page, a batch that landed after its page went, what
- * the tab kept), and keeps the ones `post` answers didn't go, for the next batch or drain of the job. A post that
- * throws (the session ended, so the call redirects) answers nothing: everything stays kept for the next sign-in on
- * this tab. A piece that had already posted answers quietly when sent again.
+ * the tab kept), and keeps the ones `post` answers, for the next batch or drain of the job: the files another try may
+ * post (postKeepable). A post that throws (the session ended, so the call redirects) answers nothing: everything
+ * stays kept for the next sign-in on this tab. A piece that had already posted answers quietly when sent again.
  */
 export async function postOrKeep(
   scope: string | undefined,
@@ -134,10 +159,10 @@ export async function postOrKeep(
 const draining = new Set<string>();
 
 /**
- * Hands every file the tab kept for the job (keep) to `post`, and keeps again the ones it answers didn't go
- * (postOrKeep). One drain at a time for each scope and job: a call while one is running does nothing, since that one
- * took every kept file, so a page going as the next one opens (or a page and its own Send) makes one post of them,
- * not two at once.
+ * Hands every file the tab kept for the job (keep) to `post`, and keeps again the ones it answers, those another try
+ * may post (postOrKeep). One drain at a time for each scope and job: a call while one is running does nothing, since
+ * that one took every kept file, so a page going as the next one opens (or a page and its own Send) makes one post of
+ * them, not two at once.
  */
 export async function drainKept(
   scope: string | undefined,

@@ -17,7 +17,7 @@ import { lockboxState } from "@/lib/tasks/lockbox";
 import { lastSeen, markTaskSeen, otherPartnersSeen, seenBaseline } from "@/lib/tasks/read-state";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
 import { copySlot } from "@/lib/tasks/repeat-slot";
-import { isDraftUpload, mediaItem, reviewPhotos, taskMedia, taskMediaInclude } from "@/lib/tasks/media";
+import { isDraftUpload, markDoneComment, mediaItem, reviewPhotos, taskMedia, taskMediaInclude } from "@/lib/tasks/media";
 import { OVERDUE_ELIGIBLE, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { shapeActivity } from "./activity-rows";
 import type { ReviewDecision, ReviewProof } from "./review-banner";
@@ -217,21 +217,9 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     if (task.status !== "REVIEW") return null;
     const fullName = marked?.actorLabel ?? contractor?.fullName ?? "Someone";
     const markedBy = marked?.actorContactId ?? (marked ? null : (contractor?.id ?? null));
-    // The words written with Mark done: the comment tied to that move by id, or on older jobs the contractor's
-    // comment written just before it.
-    const note = marked
-      ? (live.find((e) => e.kind === "COMMENT" && (e.data as { statusEventId?: string } | null)?.statusEventId === marked.id) ??
-        [...live]
-          .reverse()
-          .find(
-            (e) =>
-              e.kind === "COMMENT" &&
-              e.actorContactId !== null &&
-              e.actorContactId === marked.actorContactId &&
-              e.createdAt <= marked.createdAt &&
-              marked.createdAt.getTime() - e.createdAt.getTime() <= MARK_DONE_WINDOW_MS,
-          ))
-      : null;
+    // The words written with Mark done: the same comment "At finish" takes its photos from (lib/tasks/media.ts
+    // markDoneComment), so a written update sent just before a Mark done with no note is not its note either.
+    const note = marked ? markDoneComment(live, marked) : null;
     return {
       name: firstName(fullName) || fullName,
       fullName,
@@ -306,8 +294,5 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
     />
   );
 }
-
-/** A contractor's Mark done note is written within this long of the move to Review (tasks/media.ts latestMarkDone). */
-const MARK_DONE_WINDOW_MS = 30_000;
 
 export const dynamic = "force-dynamic";

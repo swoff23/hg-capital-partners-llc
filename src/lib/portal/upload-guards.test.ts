@@ -43,9 +43,14 @@ test("kept files post again when the signal or the tab comes back, on whatever p
   assert.match(provider, /window\.addEventListener\("online", wake\);/);
   // Every job the tab kept files for drains, each the one-at-a-time way, with Retry on a post that failed.
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
-  assert.match(fn(shared, "postEveryKept"), /return drainEveryKept\(owner, \(taskId, kept\) => postRecordedBatch\(taskId, kept, toast, owner, retryKept\(taskId, toast, owner\)\)\);/);
+  assert.match(fn(shared, "postEveryKept"), /return drainEveryKept\(owner, \(taskId, kept\) => postToKeep\(taskId, kept, toast, owner\)\);/);
   assert.match(fn(shared, "retryKept"), /return \(\) => void postKept\(taskId, toast, owner\);/);
-  assert.match(fn(shared, "postPiece"), /toast\(failedPostToast\(res\.error, retry\)\);/);
+  assert.match(fn(shared, "postPiece"), /toast\(failedPostToast\(res\.error, retry\)\);\s*return sendRefusal\(res\.error\) === null \? "failed" : "refused";/);
+  // Files with no tray keep only what another try may post: a refusal for good (the contractor was taken off the
+  // job) isn't kept, or every return to the tab would post it again and toast the same line.
+  assert.match(fn(shared, "postToKeep"), /return postKeepable\(items, \(piece\) => postPiece\(taskId, piece, toast, late, owner, retry\)\);/);
+  assert.match(fn(shared, "postOrKeepBatch"), /postToKeep\(taskId, batch, toast, owner\)/);
+  assert.doesNotMatch(shared, /postRecordedBatch\([^)]*retry/, "the tray's post has no Retry of its own");
   // A finished job's page drains as it goes too, as the job page does.
   const late = read("app", "(portal)", "p", "jobs", "[id]", "_components", "late-uploads.tsx");
   assert.match(late, /void postKept\(taskId, toast, owner\);\s*return \(\) => void postKept\(taskId, toast, owner\);/);
@@ -275,10 +280,12 @@ test("a job that is no longer active still gets its late photos recorded, and HG
   // And the page says so, with nothing to undo, in one toast that counts every late piece of the batch; the next
   // batch gets its own toast, and a quiet answer (nothing new to tell) gets none.
   const shared = read("app", "(portal)", "p", "jobs", "[id]", "_components", "record-and-post.ts");
-  assert.match(fn(shared, "postRecordedBatch"), /const late: LateToast = \{ key: `job-added:\$\{taskId\}:\$\{\+\+lateToasts\}`, kinds: \[\] \};/);
+  assert.match(shared, /const lateToastFor = \(taskId: string\): LateToast => \(\{ key: `job-added:\$\{taskId\}:\$\{\+\+lateToasts\}`, kinds: \[\] \}\);/);
+  assert.match(fn(shared, "postRecordedBatch"), /const late = lateToastFor\(taskId\);/);
+  assert.match(fn(shared, "postToKeep"), /const late = lateToastFor\(taskId\);/);
   assert.match(
     shared,
-    /if \(kinds\.length === 0\) return true;\s*if \(eventId === null\) \{\s*late\.kinds\.push\(\.\.\.kinds\);\s*toast\(\{ message: addedToJobText\(late\.kinds\), key: late\.key \}\);\s*return true;/,
+    /if \(kinds\.length === 0\) return "posted";\s*if \(eventId === null\) \{\s*late\.kinds\.push\(\.\.\.kinds\);\s*toast\(\{ message: addedToJobText\(late\.kinds\), key: late\.key \}\);\s*return "posted";/,
   );
 });
 
@@ -404,16 +411,20 @@ test("no post names more files than the actions take, and a kept batch can't sta
   assert.doesNotMatch(read(...jobDir, "actions.ts"), /\.max\(50\)/);
   // Every post of recorded files goes through postInBatches, so a tab that kept 30 and then recorded 25 posts 50 and 5.
   const shared = read(...jobDir, "_components", "record-and-post.ts");
-  assert.match(fn(shared, "postRecordedBatch"), /return postInBatches\(items, \(piece\) => postPiece\(taskId, piece, toast, late, owner, retry\)\);/);
+  assert.match(fn(shared, "postRecordedBatch"), /return postInBatches\(items, async \(piece\) => \(await postPiece\(taskId, piece, toast, late, owner\)\) === "posted"\);/);
   // The tray holds what one Send or Mark done takes; files that don't fit, or didn't post, wait in the tab's registry.
   const actions = read(...jobDir, "_components", "job-actions.tsx");
-  assert.match(actions, /const room = Math\.max\(0, MAX_FILES_PER_POST - live\.current\.ready\.length\);\s*tab\.keep\(taskId, items\.slice\(room\)\);/);
+  // The files the failed send went with lead the tray; the newest past the cap are the ones kept (backOnTray).
+  assert.match(
+    actions,
+    /const \{ front, kept \} = backOnTray\(items, live\.current\.ready\);\s*tab\.keep\(taskId, kept\);\s*const off = new Set\(kept\.map\(\(k\) => k\.id\)\);\s*setReady\(\(r\) => \[\.\.\.front\.filter\(\(f\) => !r\.some\(\(x\) => x\.id === f\.id\)\), \.\.\.r\.filter\(\(x\) => !off\.has\(x\.id\)\)\]\);/,
+  );
   assert.match(actions, /if \(left\.length > 0\) putBack\(left\);/);
   // A file past what the tray holds leaves it for the tab's registry (kept in order), and posts once the Send or Mark done went.
   assert.match(actions, /tab\.take\(taskId, ids, MAX_FILES_PER_POST - held\.length\)/);
   // What the tab kept posts as the page opens, once the Send or Mark done went, and as the page goes, so none is left
   // unposted; one drain at a time for each job, and whatever doesn't post stays kept (recorded-uploads.ts drainKept).
-  assert.match(fn(shared, "postKept"), /return drainKept\(owner, taskId, \(kept\) => postRecordedBatch\(taskId, kept, toast, owner, retryKept\(taskId, toast, owner\)\)\);/);
+  assert.match(fn(shared, "postKept"), /return drainKept\(owner, taskId, \(kept\) => postToKeep\(taskId, kept, toast, owner\)\);/);
   assert.match(actions, /const sendKept = \(\) => postKept\(taskId, toast, owner\);/);
   assert.match(actions, /if \(res\?\.ok\) startSending\(sendKept\);/, "after a Send went");
   assert.match(actions, /setSheetState\("sent"\);[\s\S]*?startSending\(sendKept\);/, "after a Mark done went");
@@ -450,7 +461,17 @@ test("a Send refused because HG closed the job posts the held photos the late wa
 test("the Mark done sheet shows, counts and sends the tray less what a written update whose answer was lost may have posted", () => {
   const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
   const send = fn(actions, "sendUpdate");
-  assert.match(send, /const outcome = res\?\.ok \? "posted" : res \? "refused" : "lost";\s*setUnconfirmed\(\(u\) => unconfirmedAfter\(u, attachmentIds, outcome\)\);/);
+  // Whether the browser had a connection is read before the call: a Send made without one never left the phone, so
+  // its photos aren't held back (a send made with a signal that failed is).
+  assert.match(send, /const offlineAtStart = navigator\.onLine === false;\s*let res: ActionResult \| null = null;/);
+  assert.ok(send.indexOf("navigator.onLine") < send.indexOf("postJobUpdateAction("), "read before the call, not after it failed");
+  assert.match(send, /const outcome = sendOutcome\(res, offlineAtStart\);\s*setLost\(\(l\) => lostAfter\(l, \{ clientId, ids: attachmentIds \}, outcome\)\);/);
+  assert.doesNotMatch(send, /res\?\.ok \? "posted" : res \? "refused" : "lost"/, "the old outcome counted an offline send as lost");
+  // With a send whose answer was lost, the page learns what happened once the browser says the signal is back: one
+  // refresh, then the page's own updates settle it. Never a refresh without the browser's word that it is back.
+  assert.match(actions, /const unconfirmed = unconfirmedIds\(lost\);/);
+  assert.match(actions, /const back = \(\) => \{\s*if \(navigator\.onLine === false\) return;\s*learning\.current = true;\s*router\.refresh\(\);\s*\};\s*window\.addEventListener\("online", back\);/);
+  assert.match(actions, /if \(!learning\.current\) return;\s*learning\.current = false;\s*setLost\(\(l\) => settleLost\(l, sentClientIds \?\? \[\]\)\);\s*\}, \[sentClientIds\]\);/);
   assert.match(actions, /const sheetReady = finishable\(ready, unconfirmed\);/);
   assert.match(actions, /const items = sheetReady;/);
   assert.match(actions, /uploaded: sheetReady\.length, required/);

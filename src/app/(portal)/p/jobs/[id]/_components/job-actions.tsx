@@ -40,8 +40,13 @@ import {
   MAX_FILES_PER_POST,
   nextStep,
   postRoom,
+  backOnTray,
+  lostAfter,
+  sendOutcome,
+  settleLost,
   stripCounts,
-  unconfirmedAfter,
+  unconfirmedIds,
+  type LostSend,
 } from "@/lib/portal/job-view";
 import { recordedUploadsOf, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
@@ -97,10 +102,13 @@ import { postKept, postOrKeepBatch, postRecordedBatch, recordJobFile } from "./r
  * late-uploads.tsx is the page that records them once the job has no
  * composer. Files a send already posted, whose answer was lost, go back on the
  * tray and clear with the next Send or Mark done (portal/job-send.ts). A
- * written update's stay out of the Mark done sheet until a Send of it answers
- * (job-view.ts unconfirmedAfter): the server never counts a written update's
- * photos, and a Send again of it posts the words once and any photo added
- * since on its own (composer-draft.ts clientIdToReuse). Files kept for the
+ * written update's stay out of the Mark done sheet until a Send of it answers,
+ * or the page learns it never posted (job-view.ts lostAfter, settleLost): the
+ * server never counts a written update's photos, and a Send again of it posts
+ * the words once and any photo added since on its own (composer-draft.ts
+ * clientIdToReuse; the files it went with go back on the tray first,
+ * backOnTray). A Send made with no connection wrote nothing, so its photos
+ * stay for the Mark done (sendOutcome). Files kept for the
  * tab whose post failed offline post again when the signal comes back
  * (PortalUploadQueue). Mark done
  * waits for uploads, and for each failed photo to be retried or removed
@@ -165,8 +173,9 @@ export function JobActions({
   const [body, setBody] = useState("");
   // Uploaded and recorded, not posted yet.
   const [ready, setReady] = useState<Recorded[]>([]);
-  // Of those, the ones a written update whose answer was lost may have posted: the Mark done sheet leaves them out.
-  const [unconfirmed, setUnconfirmed] = useState<string[]>([]);
+  // The written updates whose answer was lost: the tray's files they may have posted are left out of the Mark done sheet.
+  const [lost, setLost] = useState<LostSend[]>([]);
+  const unconfirmed = unconfirmedIds(lost);
   const [, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
@@ -187,19 +196,43 @@ export function JobActions({
   // False once the page is gone (set in the unmount cleanup below).
   const mounted = useRef(true);
 
+  // A Send whose answer was lost, once the signal is back: one refresh brings the page's own updates, and they say
+  // whether it posted (settleLost). Only the browser's own word that the signal is back starts it: a refresh with
+  // none could fail the whole page over. The refresh is ours, so what arrives next is read after the signal returned.
+  const hasLost = lost.length > 0;
+  const learning = useRef(false);
+  useEffect(() => {
+    if (!hasLost) return;
+    const back = () => {
+      if (navigator.onLine === false) return;
+      learning.current = true;
+      router.refresh();
+    };
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, [hasLost, router]);
+  useEffect(() => {
+    if (!learning.current) return;
+    learning.current = false;
+    setLost((l) => settleLost(l, sentClientIds ?? []));
+  }, [sentClientIds]);
+
   /**
    * Files that didn't post go back on the tray, to go with the next send, up to what one send takes
-   * (MAX_FILES_PER_POST: a written update and Mark done refuse more). Any more are kept for the tab, and the next
-   * batch for this job carries them (keep). With the page gone they are all kept: no tray is left.
+   * (MAX_FILES_PER_POST: a written update and Mark done refuse more). They go in front of the files that landed
+   * since, so a Send again still has every file the first one went with and keeps its id; the newest files past the
+   * cap are kept for the tab, and the next batch for this job carries them (keep, backOnTray). With the page gone
+   * they are all kept: no tray is left.
    */
   const putBack = (items: Recorded[]) => {
     if (!mounted.current) {
       tab.keep(taskId, items);
       return;
     }
-    const room = Math.max(0, MAX_FILES_PER_POST - live.current.ready.length);
-    tab.keep(taskId, items.slice(room));
-    setReady((r) => [...r, ...items.slice(0, room).filter((i) => !r.some((x) => x.id === i.id))]);
+    const { front, kept } = backOnTray(items, live.current.ready);
+    tab.keep(taskId, kept);
+    const off = new Set(kept.map((k) => k.id));
+    setReady((r) => [...front.filter((f) => !r.some((x) => x.id === f.id)), ...r.filter((x) => !off.has(x.id))]);
   };
 
   /**
@@ -231,18 +264,20 @@ export function JobActions({
   // so with no signal it fails like a refusal (a toast), and the words stay in the box. The photos leave the tray
   // while it sends and come back to it unless it posted (putBack). Refused because HG closed the job, they take
   // the late way instead. Once it posted, the files the tab kept for the job post as their own batch. With no
-  // answer at all it may have posted, so the Mark done sheet leaves its photos out until a Send of it answers
-  // (unconfirmedAfter): the server never counts a written update's photos toward the playbook's.
+  // answer at all it may have posted, so the Mark done sheet leaves its photos out until a Send of it answers or the
+  // page learns it never did (sendOutcome, settleLost): the server never counts a written update's photos toward the
+  // playbook's. A Send made with no connection never left the phone, so its photos stay for the Mark done.
   async function sendUpdate({ body: text, attachmentIds, clientId }: ComposerMessage): Promise<ActionResult> {
     const items = ready.filter((r) => attachmentIds.includes(r.id));
     setReady((r) => r.filter((x) => !attachmentIds.includes(x.id)));
+    const offlineAtStart = navigator.onLine === false;
     let res: ActionResult | null = null;
     try {
       res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId }, owner);
       return res;
     } finally {
-      const outcome = res?.ok ? "posted" : res ? "refused" : "lost";
-      setUnconfirmed((u) => unconfirmedAfter(u, attachmentIds, outcome));
+      const outcome = sendOutcome(res, offlineAtStart);
+      setLost((l) => lostAfter(l, { clientId, ids: attachmentIds }, outcome));
       if (res?.ok) startSending(sendKept);
       else if (res && res.error === JOB_CLOSED) sendLate(items);
       else putBack(items);
@@ -284,7 +319,8 @@ export function JobActions({
   /**
    * A batch that landed after the contractor left the page: it posts as its own update, with the same toast and
    * Undo. Files that don't post stay kept for the tab, even when the call throws (postOrKeepBatch), and the
-   * failure's Retry, the next batch for this job or the signal coming back carries them.
+   * failure's Retry, the next batch for this job or the signal coming back carries them. A refusal for good (taken
+   * off the job) keeps none: trying again can't change it.
    */
   function onAway(ids: string[]) {
     void postOrKeepBatch(taskId, tab.take(taskId, ids), toast, owner);

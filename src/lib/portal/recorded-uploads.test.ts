@@ -7,10 +7,12 @@ import {
   drainKept,
   failedPostToast,
   postInBatches,
+  postKeepable,
   postOrKeep,
   RecordedUploads,
   recordedUploadsOf,
   toldOf,
+  type PieceResult,
   type RecordedUpload,
 } from "./recorded-uploads";
 
@@ -241,6 +243,50 @@ test("postOrKeep: a batch with no tray keeps what didn't post, and all of it whe
   let asked = false;
   await postOrKeep(scope, "t3", [], async () => ((asked = true), []));
   assert.equal(asked, false);
+});
+
+test("a file a refusal turned down for good is not kept, so a return to the tab doesn't post and toast it again; one that failed offline is", async () => {
+  const scope = "portal:c-final";
+  const tab = recordedUploadsOf(scope);
+  const posts: string[][] = [];
+  // The contractor was taken off the job: every post of its file answers "You don't have access to this job."
+  const refused = (piece: RecordedUpload[]) => (posts.push(piece.map((r) => r.id)), Promise.resolve("refused" as const));
+  const offline = (piece: RecordedUpload[]) => (posts.push(piece.map((r) => r.id)), Promise.resolve("failed" as const));
+  tab.keep("t-gone", [photo("g1")]);
+  await drainKept(scope, "t-gone", (kept) => postKeepable(kept, refused));
+  assert.deepEqual(tab.keptJobs(), [], "refused for good: not kept");
+  // Three returns to the tab post nothing more.
+  for (let i = 0; i < 3; i++) await drainEveryKept(scope, (taskId, kept) => postKeepable(kept, refused));
+  assert.deepEqual(posts, [["g1"]], "one post, one refusal, then nothing is left to post");
+  // No signal is a different failure: another try may work, so the file stays kept for the next wake.
+  tab.keep("t-flaky", [photo("f1")]);
+  await drainKept(scope, "t-flaky", (kept) => postKeepable(kept, offline));
+  assert.deepEqual(tab.keptJobs(), ["t-flaky"]);
+  assert.deepEqual(tab.take("t-flaky", []).map((r) => r.id), ["f1"]);
+  // A batch with no tray (postOrKeep) follows the same rule, and a throw (a redirect) still keeps everything.
+  await postOrKeep(scope, "t-away", [photo("a1")], (batch) => postKeepable(batch, refused));
+  assert.deepEqual(tab.keptJobs(), [], "the refused batch is not kept");
+  await postOrKeep(scope, "t-away", [photo("a2")], (batch) => postKeepable(batch, offline));
+  assert.deepEqual(tab.keptJobs(), ["t-away"]);
+  await assert.rejects(
+    postOrKeep(scope, "t-redirect", [photo("r1")], () => {
+      throw new Error("NEXT_REDIRECT");
+    }),
+  );
+  assert.deepEqual(tab.keptJobs().sort(), ["t-away", "t-redirect"]);
+});
+
+test("postKeepable: a piece refused for good turns down the rest with it; a piece that failed offline leaves it kept; every piece that went is gone", async () => {
+  const many = Array.from({ length: MAX_FILES_PER_POST + 10 }, (_, i) => photo(`p${i}`));
+  const results: PieceResult[] = ["posted", "refused"];
+  assert.deepEqual(await postKeepable(many, async () => results.shift() ?? "posted"), [], "the second piece's 10 files are turned down, none kept");
+  const flaky: PieceResult[] = ["posted", "failed"];
+  assert.deepEqual(
+    (await postKeepable(many, async () => flaky.shift() ?? "posted")).map((r) => r.id),
+    many.slice(MAX_FILES_PER_POST).map((r) => r.id),
+    "the 10 that didn't post stay for another try",
+  );
+  assert.deepEqual(await postKeepable(many, async () => "posted"), []);
 });
 
 test("drainEveryKept: the signal back drains every job the tab kept files for, once each, and keeps what still didn't go", async () => {
