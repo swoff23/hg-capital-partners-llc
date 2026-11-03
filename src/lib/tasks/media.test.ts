@@ -179,6 +179,26 @@ test("finishPhotoIds: the latest Mark done only, and nothing without photos on i
   assert.deepEqual(finishPhotoIds(rows, []), []);
 });
 
+test("finishPhotoIds: the Mark done's note is the comment that names its move (chunk 7), never an update sent just before", () => {
+  // Zack posts a written update with two photos ten seconds before a Mark done with no note and no photos.
+  const rows = [row("progress-1", { createdAt: at(29), eventId: "c-update" }), row("progress-2", { createdAt: at(29), eventId: "c-update" })];
+  const update = evt("c-update", "COMMENT", new Date(at(30).getTime() - 10_000), { data: { clientId: "send-1" } });
+  assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), update, review("r1", 30)]), [], "a written update isn't the Mark done's");
+  // A batch post or a late line in the seconds before isn't either.
+  for (const data of [{ batch: true }, { late: true }]) {
+    assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), { ...update, data }, review("r1", 30)]), [], JSON.stringify(data));
+  }
+  // The note tied to the move by id is, however far from it, and an update in between doesn't take its place.
+  const tied = [row("finish", { createdAt: at(20), eventId: "c-done" }), ...rows];
+  const note = evt("c-done", "COMMENT", at(20), { data: { statusEventId: "r1" } });
+  assert.deepEqual(finishPhotoIds(tied, [started("s1", 0), note, update, review("r1", 30)]), ["finish"]);
+  // A note tied to an earlier move is that one's, not this Mark done's.
+  const earlier = evt("c-old", "COMMENT", new Date(at(30).getTime() - 5_000), { data: { statusEventId: "r0" } });
+  assert.deepEqual(finishPhotoIds([row("old", { createdAt: at(29), eventId: "c-old" })], [earlier, review("r1", 30)]), []);
+  // A job marked done before chunk 7: its note named nothing, so the comment just before the move still counts.
+  assert.deepEqual(finishPhotoIds([row("legacy", { createdAt: at(29), eventId: "c-legacy" })], [evt("c-legacy", "COMMENT", at(30)), review("r1", 30)]), ["legacy"]);
+});
+
 test("taskMedia: drafts stay out; photos newest first with the At finish set leading, then documents and links", () => {
   const rows = [
     row("p2", { createdAt: at(4), eventId: "c-mid" }),

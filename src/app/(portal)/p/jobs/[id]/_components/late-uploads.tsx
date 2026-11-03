@@ -4,7 +4,7 @@ import { MediaUploadTray, useMediaUploader, type RecordMediaInput, type RecordMe
 import { useToast } from "@/components/toast";
 import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
 import { recordedUploadsOf } from "@/lib/portal/recorded-uploads";
-import { postKept, postRecordedBatch, recordJobFile } from "./record-and-post";
+import { postKept, postOrKeepBatch, recordJobFile } from "./record-and-post";
 
 /**
  * The queue's way onto a job that is no longer active (docs/specs/uploads-photos.md
@@ -23,27 +23,30 @@ import { postKept, postRecordedBatch, recordJobFile } from "./record-and-post";
  * tray says "Job closed before 2 photos uploaded". The tile gets one more go
  * each time this page opens again (engine.ts mount), in case HG sent the job
  * back. Files the tab kept for the job (a post that didn't go through before
- * HG closed it) post the same way as this page opens. It draws nothing while
- * no file is waiting: the tray is the composer's, and shows only when there is
- * a file.
+ * HG closed it) post the same way as this page opens and as it goes. It draws
+ * nothing while no file is waiting: the tray is the composer's, and shows only
+ * when there is a file.
  */
 export function LateUploads({ taskId, label }: { taskId: string; label: string }) {
   const { toast } = useToast();
   const owner = useUploadScope();
   const tab = recordedUploadsOf(owner);
 
-  // What the tab kept for this job posts now, the late way, rather than waiting for a batch that may never land.
+  // What the tab kept for this job posts now, the late way, rather than waiting for a batch that may never land, and
+  // again as the page goes, as the job page's own drain does.
   useEffect(() => {
     void postKept(taskId, toast, owner);
+    return () => void postKept(taskId, toast, owner);
   }, [taskId, toast, owner]);
 
   const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
   /**
    * The batch landed: with this page open or gone, it is handed to the same step. Files whose post didn't go
-   * through stay kept for the tab (keep), and the next batch for this job, or the next time it opens, carries them.
+   * through stay kept for the tab (postOrKeepBatch keeps them even when the call throws), and the failure's Retry,
+   * the next batch for this job, the signal coming back or the next time it opens carries them.
    */
   const land = (ids: string[]) => {
-    void postRecordedBatch(taskId, tab.take(taskId, ids), toast, owner).then((left) => tab.keep(taskId, left));
+    void postOrKeepBatch(taskId, tab.take(taskId, ids), toast, owner);
   };
 
   const target: UploadTarget = {

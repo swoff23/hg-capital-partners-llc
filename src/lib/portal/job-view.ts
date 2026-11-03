@@ -350,6 +350,30 @@ export function markDoneButton(s: {
   return { label, enabled: true, busy: false, reason: null, line: null };
 }
 
+/**
+ * How a written update's Send ended, for the files it went with: `posted` (it answered that it went), `refused` (it
+ * answered that it didn't, so nothing was written) or `lost` (no answer came back, so it may have posted).
+ */
+export type SendOutcome = "posted" | "refused" | "lost";
+
+/**
+ * The tray's files a written update may already have posted: the ones it went with when its answer was lost. They
+ * come back on the tray for that update's Send again, and Mark done never counts a written update's photos (the
+ * server counts unposted ones and a batch post's, portal/job-batch.ts ownPosted), so the sheet leaves them out
+ * (finishable) until a Send of theirs answers that it went. A refusal changes nothing: it wrote nothing, but an
+ * earlier send of the same files whose answer was lost may still have posted them.
+ */
+export function unconfirmedAfter(prev: readonly string[], sent: readonly string[], outcome: SendOutcome): string[] {
+  if (outcome === "posted") return prev.filter((id) => !sent.includes(id));
+  if (outcome === "lost") return [...new Set([...prev, ...sent])];
+  return [...prev];
+}
+
+/** The tray's files the Mark done sheet shows, counts and sends: all but the ones a written update may have posted (unconfirmedAfter). */
+export function finishable<T extends { id: string }>(ready: readonly T[], unconfirmed: readonly string[]): T[] {
+  return ready.filter((r) => !unconfirmed.includes(r.id));
+}
+
 // ---------------------------------------------------------------------------
 // Batch posts and Undo (uploads 2.7, question 5)
 // ---------------------------------------------------------------------------

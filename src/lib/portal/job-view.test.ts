@@ -19,6 +19,7 @@ import {
   finishPhotoCount,
   finishPhotosNeeded,
   finishSlots,
+  finishable,
   finishingLabel,
   firstName,
   groupByDate,
@@ -38,6 +39,7 @@ import {
   stillUploading,
   dueDateParts,
   stripCounts,
+  unconfirmedAfter,
   updateTimeLabel,
   type JobCard,
 } from "./job-view";
@@ -247,6 +249,26 @@ test("parsing the tab and the remembered grouping", () => {
 test("finishing label counts uploads", () => {
   assert.equal(finishingLabel(1), "Finishing 1 upload…");
   assert.equal(finishingLabel(3), "Finishing 3 uploads…");
+});
+
+test("the Mark done sheet leaves out photos a written update whose answer was lost may have posted, until a Send of it answers", () => {
+  const tray = [{ id: "A" }, { id: "B" }, { id: "C" }];
+  // "Tiles set" with A and B: no answer came back, so it may have posted, and the server never counts its photos.
+  let unconfirmed = unconfirmedAfter([], ["A", "B"], "lost");
+  assert.deepEqual(finishable(tray, unconfirmed), [{ id: "C" }], "only C counts toward the playbook's photos");
+  const required = 2;
+  assert.equal(markDoneButton({ pending: 0, waiting: 0, failed: 0, sending: false, uploaded: finishable(tray, unconfirmed).length, required }).enabled, false);
+  // A refusal wrote nothing, but the lost send before it still may have posted them.
+  unconfirmed = unconfirmedAfter(unconfirmed, ["A", "B"], "refused");
+  assert.deepEqual(unconfirmed, ["A", "B"]);
+  // Send again answered that it went: A and B left the tray with it, and nothing stays held back.
+  unconfirmed = unconfirmedAfter(unconfirmed, ["A", "B", "C"], "posted");
+  assert.deepEqual(unconfirmed, []);
+  assert.deepEqual(finishable(tray, unconfirmed), tray);
+  // A lost send twice over holds each photo back once.
+  assert.deepEqual(unconfirmedAfter(["A"], ["A", "B"], "lost"), ["A", "B"]);
+  // A send that answered it didn't go never holds anything back.
+  assert.deepEqual(unconfirmedAfter([], ["A"], "refused"), []);
 });
 
 test("Mark done has no Skip: an optional job reads Mark done and is on, with or without photos", () => {

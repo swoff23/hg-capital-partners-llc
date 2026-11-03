@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import * as core from "@/lib/tasks/core";
 import { BatchAlreadyPosted, postBatchIn } from "./job-batch";
+import { markDoneIn, postUpdateIn } from "./job-send";
 
 /**
  * The batch step's races on a real Postgres, which a fake transaction can't
@@ -217,7 +218,11 @@ test("an active send holding the files and a late send of the same files: the la
     hold.release();
     const [a, b] = await Promise.all([active, late]);
     assert.equal(a.ok, true, `the active send posts: ${JSON.stringify(a)}`);
-    assert.deepEqual(statuses(read.seen), ["DONE", "IN_PROGRESS"], "the late send's own read, then the late line's under the lock");
+    assert.deepEqual(
+      statuses(read.seen),
+      ["DONE", "IN_PROGRESS", "IN_PROGRESS"],
+      "the late send's own read, the late line's under the lock (open again, so it refuses), then addComment's",
+    );
     assert.deepEqual(b, LOST, "the files were taken, so it answers that they're posted and leaves nothing");
     const after = await lines(taskId);
     assert.deepEqual(after.events, [{ batch: true }], "one line, the active send's");
@@ -229,7 +234,7 @@ test("an active send holding the files and a late send of the same files: the la
   }
 });
 
-test("a late send holding the files and an active send of the same files: the active one waits, then rolls back whole", { skip, timeout }, async () => {
+test("a send that read the job closed takes the task row after HG reopened it: the undoable batch, and an active send of the same files waits, then rolls back whole", { skip, timeout }, async () => {
   // The late send read the job Done, then HG sent it back before it took the task row; the active send reads it open.
   const { taskId, files } = await jobWithFiles("DONE");
   const read = holdAfter("task", "findUnique");
@@ -244,15 +249,116 @@ test("a late send holding the files and an active send of the same files: the ac
     await someoneWaits(hold.pid());
     hold.release();
     const [l, a] = await Promise.all([late, active]);
-    assert.deepEqual(l, told(files), "the late send tells HG of both files, with nothing to undo");
+    // Under its lock the late line found the job open again and refused before writing, so the same files went as
+    // the batch post an Undo can take back, in the same transaction (core.JOB_OPEN_AGAIN).
+    assert.equal(l.ok, true, `the send that read it closed posts: ${JSON.stringify(l)}`);
+    const posted = (l as { value: { event: { id: string; data: unknown } | null; linked: string[] } }).value;
+    assert.deepEqual(posted.event?.data, { batch: true }, "an event to undo, since the job is open");
+    assert.deepEqual(posted.linked, [...files].sort());
+    assert.deepEqual(statuses(read.seen), ["DONE", "IN_PROGRESS", "IN_PROGRESS"], "its own read, the late line's under the lock, then addComment's");
     assert.deepEqual(a, LOST, "the files were taken, so it answers that they're posted and leaves nothing");
     const after = await lines(taskId);
-    assert.deepEqual(after.events, [{ late: true }], "one line, the late send's, never one an Undo takes back");
-    assert.deepEqual(after.emailLines, await perPartner(after.eventIds), "one email line per partner, the late send's");
+    assert.deepEqual(after.events, [{ batch: true }], "one line, never a late line on an open job");
+    assert.deepEqual(after.emailLines, await perPartner(after.eventIds), "one email line per partner");
   } finally {
     read.release();
     hold.release();
   }
+});
+
+test("a staff reopen holding the task row while a late send waits on it: the late line rechecks under the lock and the batch goes the active way", { skip, timeout }, async () => {
+  const { taskId, files } = await jobWithFiles("DONE");
+  // Held after the reopen wrote the task's new status: it holds the task row until it commits.
+  const hold = holdAfter("task", "update");
+  try {
+    const reopen = outcome(prisma.$transaction((tx) => core.setStatus(hold.wrap(tx), taskId, "IN_PROGRESS", staff, { note: "Redo the grout" }), LONG));
+    await reach(hold, reopen);
+    // The send reads the job Done (the reopen hasn't committed) and waits for the task row the reopen holds.
+    const reads = holdAfter("task", "findUnique");
+    reads.release();
+    const late = outcome(prisma.$transaction((tx) => postBatchIn(reads.wrap(tx), taskId, zack, files), LONG));
+    await someoneWaits(hold.pid());
+    hold.release();
+    const [r, l] = await Promise.all([reopen, late]);
+    assert.equal(r.ok, true, `the reopen goes through: ${JSON.stringify(r)}`);
+    assert.equal(l.ok, true, `the send posts: ${JSON.stringify(l)}`);
+    assert.deepEqual(statuses(reads.seen), ["DONE", "IN_PROGRESS", "IN_PROGRESS"], "read Done, then open under the lock");
+    const posted = (l as { value: { event: { data: unknown } | null } }).value;
+    assert.deepEqual(posted.event?.data, { batch: true }, "the undoable batch post, not a late line on an open job");
+    const after = await lines(taskId);
+    assert.ok(!after.events.some((d) => (d as { late?: boolean } | null)?.late), "no late line");
+  } finally {
+    hold.release();
+  }
+});
+
+test("Mark done waits for the task row a batch post of the same photos holds, then counts them as posted (S2)", { skip, timeout }, async () => {
+  const { taskId, files } = await jobWithFiles("IN_PROGRESS");
+  const template = await prisma.taskTemplate.create({ data: { name: `Two photos ${randomUUID().slice(0, 8)}`, finishPhotosRequired: 2 } });
+  await prisma.task.update({ where: { id: taskId }, data: { taskTemplateId: template.id } });
+  // The batch post holds the task row after it linked both photos (a second tab, or a batch that landed).
+  const hold = holdAfter("taskAttachment", "updateMany");
+  try {
+    const batch = outcome(prisma.$transaction((tx) => postBatchIn(hold.wrap(tx), taskId, zack, files), LONG));
+    await reach(hold, batch);
+    const done = outcome(prisma.$transaction((tx) => markDoneIn(tx, taskId, zack, { body: "All set", attachmentIds: files }), LONG));
+    await someoneWaits(hold.pid());
+    hold.release();
+    const [b, d] = await Promise.all([batch, done]);
+    assert.equal(b.ok, true, `the batch posts: ${JSON.stringify(b)}`);
+    assert.equal(d.ok, true, `Mark done goes through: ${JSON.stringify(d)}`);
+    // Counted before the lock, it saw two unposted photos and named none; under it, both are the batch's, named for At finish.
+    const review = await prisma.taskEvent.findFirstOrThrow({ where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "REVIEW" } }, select: { data: true } });
+    assert.deepEqual([...((review.data as { finishIds?: string[] }).finishIds ?? [])].sort(), [...files].sort(), "both photos named on the move to Review");
+  } finally {
+    hold.release();
+  }
+});
+
+test("Mark done waits for the task row a staff Remove holds, then counts what's left and refuses short (S2)", { skip, timeout }, async () => {
+  const { taskId, files } = await jobWithFiles("IN_PROGRESS");
+  const template = await prisma.taskTemplate.create({ data: { name: `Two photos ${randomUUID().slice(0, 8)}`, finishPhotosRequired: 2 } });
+  await prisma.task.update({ where: { id: taskId }, data: { taskTemplateId: template.id } });
+  const removed = await prisma.taskAttachment.findUniqueOrThrow({ where: { id: files[0] }, select: { id: true, taskId: true, asanaGid: true } });
+  // Held after the Remove read the file under the task row it took first.
+  const hold = holdAfter("taskAttachment", "findUnique");
+  try {
+    const remove = outcome(prisma.$transaction((tx) => core.removeAttachment(hold.wrap(tx), removed, staff), LONG));
+    await reach(hold, remove);
+    const done = outcome(prisma.$transaction((tx) => markDoneIn(tx, taskId, zack, { body: "", attachmentIds: files }), LONG));
+    await someoneWaits(hold.pid());
+    hold.release();
+    const [r, d] = await Promise.all([remove, done]);
+    assert.equal(r.ok, true, `the Remove goes through: ${JSON.stringify(r)}`);
+    assert.deepEqual(d, { ok: false, message: "Add 1 more photo to mark this done." }, "one photo left, so it's one short");
+    assert.equal((await prisma.task.findUnique({ where: { id: taskId }, select: { status: true } }))?.status, "IN_PROGRESS", "the job stays in progress");
+  } finally {
+    hold.release();
+  }
+});
+
+test("a written update sent again after its answer was lost, with a photo added since: the words once, the photo as its own batch (M1)", { skip, timeout }, async () => {
+  const { taskId, files } = await jobWithFiles("IN_PROGRESS", 3);
+  const [a, b, c] = files;
+  await prisma.$transaction((tx) => postUpdateIn(tx, taskId, zack, { body: "Tiles set", attachmentIds: [a, b], clientId: "c-tiles" }));
+  // The answer never reached the phone; Send again names the same words, A and B back on the tray, and C.
+  await prisma.$transaction((tx) => postUpdateIn(tx, taskId, zack, { body: "Tiles set", attachmentIds: [a, b, c], clientId: "c-tiles" }));
+  const comments = await prisma.taskEvent.findMany({ where: { taskId, kind: "COMMENT" }, orderBy: { createdAt: "asc" }, select: { id: true, body: true, data: true } });
+  assert.deepEqual(
+    comments.map((e) => [e.body, e.data]),
+    [
+      ["Tiles set", { clientId: "c-tiles" }],
+      [null, { batch: true }],
+    ],
+    "the words once, then C on its own",
+  );
+  const on = await prisma.taskAttachment.findMany({ where: { taskId }, select: { id: true, eventId: true } });
+  const by = new Map(on.map((f) => [f.id, f.eventId]));
+  assert.equal(by.get(a), comments[0].id);
+  assert.equal(by.get(b), comments[0].id);
+  assert.equal(by.get(c), comments[1].id);
+  const after = await lines(taskId);
+  assert.deepEqual(after.emailLines, await perPartner(comments.map((e) => e.id)), "one line for the words and one for C, per partner");
 });
 
 test("two late sends of the same files at once: one line and one email line each, the other rolls back", { skip, timeout }, async () => {

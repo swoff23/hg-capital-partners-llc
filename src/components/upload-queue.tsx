@@ -318,8 +318,10 @@ export function useUploadScope(): string | undefined {
  * The queue for everything under it. Mounted once per layout; a second one inside would split the counts.
  * `scope` says whose files it is: "app:<user id>" in the app, "portal:<contact id>" in the contractor portal. One browser
  * database serves both layouts and every person who signs in on it, so each queue picks up only its own.
+ * `onWake` runs where the queue tries again, when the signal comes back or the tab does with a signal, for what a
+ * layout keeps outside the queue (the portal's kept files, which no page may be open to post).
  */
-export function UploadQueueProvider({ children, scope }: { children: ReactNode; scope: string }) {
+export function UploadQueueProvider({ children, scope, onWake }: { children: ReactNode; scope: string; onWake?: () => void }) {
   const { toast } = useToast();
   const router = useRouter();
   const [value] = useState<QueueContextValue>(() => ({
@@ -354,12 +356,20 @@ export function UploadQueueProvider({ children, scope }: { children: ReactNode; 
     };
   }, [engine]);
 
-  // Pick the outbox up, and try again when the signal or the tab comes back.
+  // Pick the outbox up, and try again when the signal or the tab comes back: the queue's own files, then whatever
+  // the layout keeps outside it (onWake, the latest one), only with a signal.
+  const wakeNow = useRef(onWake);
+  useEffect(() => {
+    wakeNow.current = onWake;
+  });
   useEffect(() => {
     void engine.restore();
-    const wake = () => engine.nudge();
+    const wake = () => {
+      engine.nudge();
+      if (navigator.onLine !== false) wakeNow.current?.();
+    };
     const onVisible = () => {
-      if (document.visibilityState === "visible") engine.nudge();
+      if (document.visibilityState === "visible") wake();
     };
     window.addEventListener("online", wake);
     document.addEventListener("visibilitychange", onVisible);

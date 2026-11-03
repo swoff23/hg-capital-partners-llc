@@ -32,6 +32,7 @@ import {
   finishCountLabel,
   finishPhotosNeeded,
   finishSlots,
+  finishable,
   joinNames,
   lateUploadsEndsIn,
   lateUploadsOpen,
@@ -40,12 +41,13 @@ import {
   nextStep,
   postRoom,
   stripCounts,
+  unconfirmedAfter,
 } from "@/lib/portal/job-view";
 import { recordedUploadsOf, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
 import { postJobBatchAction } from "../upload-actions";
-import { postKept, postRecordedBatch, recordJobFile } from "./record-and-post";
+import { postKept, postOrKeepBatch, postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
  * The job page's writing half (§6, Job page): the update composer at the
@@ -94,7 +96,13 @@ import { postKept, postRecordedBatch, recordJobFile } from "./record-and-post";
  * closed (the page then refreshes to show it), or when the page goes, and
  * late-uploads.tsx is the page that records them once the job has no
  * composer. Files a send already posted, whose answer was lost, go back on the
- * tray and clear with the next Send or Mark done (portal/jobs.ts). Mark done
+ * tray and clear with the next Send or Mark done (portal/job-send.ts). A
+ * written update's stay out of the Mark done sheet until a Send of it answers
+ * (job-view.ts unconfirmedAfter): the server never counts a written update's
+ * photos, and a Send again of it posts the words once and any photo added
+ * since on its own (composer-draft.ts clientIdToReuse). Files kept for the
+ * tab whose post failed offline post again when the signal comes back
+ * (PortalUploadQueue). Mark done
  * waits for uploads, and for each failed photo to be retried or removed
  * (decision 13): in the bar and in the sheet it stays off over one line ("2
  * photos didn't upload · Retry" in danger, or "Finishing 2 uploads…" in
@@ -157,6 +165,8 @@ export function JobActions({
   const [body, setBody] = useState("");
   // Uploaded and recorded, not posted yet.
   const [ready, setReady] = useState<Recorded[]>([]);
+  // Of those, the ones a written update whose answer was lost may have posted: the Mark done sheet leaves them out.
+  const [unconfirmed, setUnconfirmed] = useState<string[]>([]);
   const [, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
@@ -203,19 +213,26 @@ export function JobActions({
 
   /**
    * HG closed the job under this page: the words can't go, but the photos are on the job and still reach HG, the
-   * late way (a line and an email line); the page then shows the closed job.
+   * late way (a line and an email line); the page then shows the closed job. Files that don't post go back on the
+   * tray, even when the call throws (a redirect).
    */
   const sendLate = (items: Recorded[]) =>
     startSending(async () => {
-      const left = items.length > 0 ? await sendBatch(items) : [];
-      if (left.length > 0) putBack(left);
+      let left = items;
+      try {
+        left = items.length > 0 ? await sendBatch(items) : [];
+      } finally {
+        if (left.length > 0) putBack(left);
+      }
       router.refresh();
     });
 
   // The composer's Send: the words and every held photo as one update. The composer runs it through callAction,
   // so with no signal it fails like a refusal (a toast), and the words stay in the box. The photos leave the tray
   // while it sends and come back to it unless it posted (putBack). Refused because HG closed the job, they take
-  // the late way instead. Once it posted, the files the tab kept for the job post as their own batch.
+  // the late way instead. Once it posted, the files the tab kept for the job post as their own batch. With no
+  // answer at all it may have posted, so the Mark done sheet leaves its photos out until a Send of it answers
+  // (unconfirmedAfter): the server never counts a written update's photos toward the playbook's.
   async function sendUpdate({ body: text, attachmentIds, clientId }: ComposerMessage): Promise<ActionResult> {
     const items = ready.filter((r) => attachmentIds.includes(r.id));
     setReady((r) => r.filter((x) => !attachmentIds.includes(x.id)));
@@ -224,17 +241,26 @@ export function JobActions({
       res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId }, owner);
       return res;
     } finally {
+      const outcome = res?.ok ? "posted" : res ? "refused" : "lost";
+      setUnconfirmed((u) => unconfirmedAfter(u, attachmentIds, outcome));
       if (res?.ok) startSending(sendKept);
       else if (res && res.error === JOB_CLOSED) sendLate(items);
       else putBack(items);
     }
   }
 
-  /** A batch that posts on its own while the page is here. Files that don't post go back on the tray, to go with the next send. */
+  /**
+   * A batch that posts on its own while the page is here. Files that don't post go back on the tray, to go with the
+   * next send, even when the call throws (a redirect).
+   */
   const postBatch = (items: Recorded[]) =>
     startSending(async () => {
-      const left = await sendBatch(items);
-      if (left.length > 0) putBack(left);
+      let left = items;
+      try {
+        left = await sendBatch(items);
+      } finally {
+        if (left.length > 0) putBack(left);
+      }
     });
 
   /**
@@ -257,10 +283,11 @@ export function JobActions({
 
   /**
    * A batch that landed after the contractor left the page: it posts as its own update, with the same toast and
-   * Undo. Files that don't post stay kept for the tab, and the next batch for this job carries them.
+   * Undo. Files that don't post stay kept for the tab, even when the call throws (postOrKeepBatch), and the
+   * failure's Retry, the next batch for this job or the signal coming back carries them.
    */
   function onAway(ids: string[]) {
-    void sendBatch(tab.take(taskId, ids)).then((left) => tab.keep(taskId, left));
+    void postOrKeepBatch(taskId, tab.take(taskId, ids), toast, owner);
   }
 
   const target: UploadTarget = {
@@ -382,9 +409,13 @@ export function JobActions({
     setSheetOpen(true);
   }
 
+  // What the Mark done sheet shows, counts and sends: the tray, less the photos a written update may have posted
+  // (they wait on the tray for its Send again; the server wouldn't count them).
+  const sheetReady = finishable(ready, unconfirmed);
+
   function finish() {
     startFinishing(async () => {
-      const items = ready;
+      const items = sheetReady;
       finishingIds.current = items.map((i) => i.id);
       try {
         const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: items.map((i) => i.id) }, owner));
@@ -407,7 +438,7 @@ export function JobActions({
     });
   }
 
-  const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: ready.length, required });
+  const done = markDoneButton({ pending, waiting, failed, sending: finishing, uploaded: sheetReady.length, required });
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
   const barButton = actionBarButton;
@@ -556,7 +587,7 @@ export function JobActions({
               <p className="min-w-0 text-body font-medium text-fg-1">
                 {required > 0 ? "Photos of the finished work" : "Add photos of the finished work?"}
               </p>
-              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, ready.length)}</span>}
+              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, sheetReady.length)}</span>}
             </div>
             {/* The photos already up, then the ones going up, then empty slots up to the count asked for (one on an
                 optional job), solid squares, never dashed; once the count is met, one add tile remains. */}
@@ -566,10 +597,10 @@ export function JobActions({
               notice={false}
               label="Photos of the finished work"
               slots={slots}
-              filled={ready.length}
+              filled={sheetReady.length}
               onSlot={openSlot}
               disabled={finishing}
-              leading={ready.map((r) => (
+              leading={sheetReady.map((r) => (
                 <UploadTile key={r.id} upload={readyUpload(r)} grid ready />
               ))}
             />

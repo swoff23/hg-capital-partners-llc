@@ -130,21 +130,31 @@ export const MARK_DONE_WINDOW_MS = 30_000;
 
 const toReview = (e: MediaEvent) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "REVIEW";
 
-/** The latest move to Review by a contractor, and the comment written with it (the Mark done sheet's note and photos), if it had one. */
+/** What a comment's `data` says it is: the note of a status change, a composer send, a batch post or a late line. */
+const commentData = (e: MediaEvent) => (e.data ?? {}) as { statusEventId?: unknown; clientId?: unknown; batch?: unknown; late?: unknown };
+
+/**
+ * The latest move to Review by a contractor, and the comment written with it (the Mark done sheet's note and photos), if it had one.
+ * Since chunk 7 that note names its move (`data.statusEventId`, core.setStatus), and only that comment is it: a
+ * written update, a batch post or a late line sent in the seconds before a Mark done with no note of its own is not
+ * that Mark done's. A job marked done before then has only the timing: the contractor's comment in the seconds
+ * before the move, one that carries none of those marks.
+ */
 function latestMarkDone(events: readonly MediaEvent[]): { review: MediaEvent; comment: MediaEvent | null } | null {
   const review = events.filter((e) => toReview(e) && e.actorContactId !== null).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
   if (!review) return null;
-  const comment =
+  const tied = events.find((e) => e.kind === "COMMENT" && commentData(e).statusEventId === review.id);
+  if (tied) return { review, comment: tied };
+  const older =
     events
-      .filter(
-        (e) =>
-          e.kind === "COMMENT" &&
-          e.actorContactId === review.actorContactId &&
-          e.createdAt.getTime() <= review.createdAt.getTime() &&
-          review.createdAt.getTime() - e.createdAt.getTime() <= MARK_DONE_WINDOW_MS,
-      )
+      .filter((e) => {
+        if (e.kind !== "COMMENT" || e.actorContactId !== review.actorContactId) return false;
+        const d = commentData(e);
+        if (d.statusEventId !== undefined || d.clientId !== undefined || d.batch !== undefined || d.late !== undefined) return false;
+        return e.createdAt.getTime() <= review.createdAt.getTime() && review.createdAt.getTime() - e.createdAt.getTime() <= MARK_DONE_WINDOW_MS;
+      })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
-  return { review, comment };
+  return { review, comment: older };
 }
 
 /**

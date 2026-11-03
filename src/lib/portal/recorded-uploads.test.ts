@@ -1,7 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { GENERIC_ERROR, OFFLINE_ERROR } from "@/lib/action-result";
 import { MAX_FILES_PER_POST } from "./job-view";
-import { drainKept, postInBatches, RecordedUploads, recordedUploadsOf, toldOf, type RecordedUpload } from "./recorded-uploads";
+import {
+  drainEveryKept,
+  drainKept,
+  failedPostToast,
+  postInBatches,
+  postOrKeep,
+  RecordedUploads,
+  recordedUploadsOf,
+  toldOf,
+  type RecordedUpload,
+} from "./recorded-uploads";
 
 // The job page's record step answers with an id alone, so each page notes what
 // it recorded. A batch can start under one visit to the job and land under the
@@ -211,4 +222,55 @@ test("drainKept lets go once it ends, even when the post throws, and keeps what 
   const seen: string[] = [];
   await drainKept(scope, "t1", async (kept) => (seen.push(...kept.map((r) => r.id)), []));
   assert.deepEqual(seen, ["a1", "a2"], "the next drain ran, and the file the throw left behind (a redirect on a session that ended) is still kept");
+});
+
+test("postOrKeep: a batch with no tray keeps what didn't post, and all of it when the post throws (a redirect)", async () => {
+  const scope = "portal:c-or-keep";
+  await postOrKeep(scope, "t1", [photo("a1"), photo("a2")], async () => [photo("a2")]);
+  assert.deepEqual(recordedUploadsOf(scope).keptJobs(), ["t1"]);
+  await assert.rejects(
+    postOrKeep(scope, "t2", [photo("b1")], async () => {
+      throw new Error("NEXT_REDIRECT");
+    }),
+  );
+  const seen: string[][] = [];
+  await drainEveryKept(scope, async (taskId, kept) => (seen.push([taskId, ...kept.map((r) => r.id)]), []));
+  assert.deepEqual(seen, [["t1", "a2"], ["t2", "b1"]], "the one that didn't post and the one the throw left are both kept");
+  assert.deepEqual(recordedUploadsOf(scope).keptJobs(), [], "both posted, nothing left");
+  // Nothing to post asks nothing.
+  let asked = false;
+  await postOrKeep(scope, "t3", [], async () => ((asked = true), []));
+  assert.equal(asked, false);
+});
+
+test("drainEveryKept: the signal back drains every job the tab kept files for, once each, and keeps what still didn't go", async () => {
+  const scope = "portal:c-every";
+  const tab = recordedUploadsOf(scope);
+  tab.keep("t1", [photo("a1")]);
+  tab.keep("t2", [photo("b1"), photo("b2")]);
+  recordedUploadsOf("portal:c-every-other").keep("t1", [photo("z1")]);
+  const posted: string[][] = [];
+  // Still no signal for t2's second photo.
+  await drainEveryKept(scope, async (taskId, kept) => {
+    posted.push([taskId, ...kept.map((r) => r.id)]);
+    return taskId === "t2" ? kept.filter((r) => r.id === "b2") : [];
+  });
+  assert.deepEqual(posted, [["t1", "a1"], ["t2", "b1", "b2"]], "each job once, and only this owner's");
+  assert.deepEqual(tab.keptJobs(), ["t2"]);
+  assert.deepEqual(tab.take("t2", []).map((r) => r.id), ["b2"]);
+  assert.deepEqual(recordedUploadsOf("portal:c-every-other").keptJobs(), ["t1"], "another owner's kept files wait for them");
+});
+
+test("failedPostToast: a post that failed offline or on a hiccup gets Retry; one trying again can't change says only why", () => {
+  let retried = 0;
+  const retry = () => void retried++;
+  const offline = failedPostToast(OFFLINE_ERROR, retry);
+  assert.equal(offline.message, OFFLINE_ERROR);
+  assert.equal(offline.action?.label, "Retry");
+  offline.action?.onAction();
+  assert.equal(retried, 1);
+  assert.equal(failedPostToast(GENERIC_ERROR, retry).action?.label, "Retry");
+  assert.deepEqual(failedPostToast("You don't have access to this job.", retry), { message: "You don't have access to this job." });
+  // A tray with a Send to try again from gets no Retry of its own.
+  assert.deepEqual(failedPostToast(OFFLINE_ERROR), { message: OFFLINE_ERROR });
 });

@@ -283,6 +283,9 @@ export async function recordPortalAttachment(
   // A refusal here (job closed, access gone, the hour after Mark done run out) discards the uploads too: they can never be recorded.
   // A recorded file is never discarded: discardUnrecorded skips every path a row uses.
   const att = await discardingOnRefusal(taskId, input, auth, async () => {
+    // Access first, as every portal step checks it: a contractor taken off the job learns nothing of it, not even
+    // whether an upload of theirs is still on it.
+    await core.assertContractorAccess(prisma, taskId, portal.contactId);
     // A Retry of a record that committed, whose answer never reached the phone, gets its row back even once the job
     // stopped taking files: the file is on the job already, so the tile finishes instead of going up again as a
     // second copy. The batch step that posts it checks access again (portal/job-batch.ts).

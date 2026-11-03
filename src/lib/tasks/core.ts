@@ -1197,6 +1197,13 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
 }
 
 /**
+ * addLateContractorBatch's refusal for a job HG reopened while it waited for
+ * the task row. The batch step (portal/job-batch.ts postOwn) takes it as the
+ * cue to post the same files the active way, so no screen shows it there.
+ */
+export const JOB_OPEN_AGAIN = "This job is open again. Try again.";
+
+/**
  * A contractor's photos that are posted after HG approved or canceled the job
  * (uploads question 4: recorded inside the hour after Mark done, or before
  * the cancel, or a phone's outbox catching up), told to HG once per batch:
@@ -1213,13 +1220,17 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
  * The portal's batch step (portal/job-batch.ts postBatchIn) sends a job here
  * once it is no longer active, and when an approve landed before addComment
  * took the task row (addComment then refuses under its lock, before writing
- * anything); one reopened in the moment between posts the same way.
+ * anything).
  * It takes the task row first, as addComment does, then reads the task and
  * checks access under that lock, so it runs in every writer's order: the task
  * row, then the update and its files, then the email rows. A late send and an
  * active send of the same files wait on each other at the task row, never
  * crosswise, and the one that waited finds the files taken and links none
  * (job-batch.pg.test.ts runs both races on Postgres).
+ * Under that lock it checks the job is still closed: one HG reopened while
+ * this waited is refused with JOB_OPEN_AGAIN before anything is written, as
+ * addComment refuses a job that closed with "This job is closed.", and the
+ * batch step posts the same files the active way in the same transaction.
  */
 export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentIds: string[], p: Principal, now = new Date()): Promise<TaskEvent> {
   if (p.kind !== "contractor") throw new TaskRuleError("Only a contractor's late photos post this way.");
@@ -1228,6 +1239,7 @@ export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentI
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   await assertContractorAccess(tx, taskId, p.contactId);
+  if (isActiveStatus(task.status)) throw new TaskRuleError(JOB_OPEN_AGAIN);
   const visibility: Visibility = "SHARED";
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
   const event = await addEvent(tx, taskId, p, { kind: "COMMENT", visibility, body: null, audienceContactId, data: { late: true } });

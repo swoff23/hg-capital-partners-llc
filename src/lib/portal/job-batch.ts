@@ -128,19 +128,35 @@ async function postLate(tx: core.Tx, taskId: string, p: Contractor, own: string[
  * addComment, or HG's late line once the job is approved or canceled. An
  * approve that landed before addComment took the task row is refused there
  * under its lock with "This job is closed." before anything is written, so
- * the same files take the late way in this same transaction. addComment and
- * addLateContractorBatch both take the task row before they read the job, so
- * an approve can't commit while either is writing.
+ * the same files take the late way in this same transaction. A reopen that
+ * landed before addLateContractorBatch took the task row is the same the
+ * other way round: refused there under its lock (core.JOB_OPEN_AGAIN), the
+ * files post as the undoable batch. addComment and addLateContractorBatch
+ * both take the task row before they read the job, so an approve or a reopen
+ * can't commit while either is writing, and the second try reads what the
+ * first read under the same lock.
  */
 async function postOwn(tx: core.Tx, taskId: string, p: Contractor, own: string[], active: boolean): Promise<BatchPosted> {
-  if (!active) return postLate(tx, taskId, p, own);
+  if (!active) {
+    try {
+      return await postLate(tx, taskId, p, own);
+    } catch (err) {
+      if (err instanceof core.TaskRuleError && err.message === core.JOB_OPEN_AGAIN) return postActive(tx, taskId, p, own);
+      throw err;
+    }
+  }
   try {
-    const event = await core.addComment(tx, taskId, { body: "", attachmentIds: own, batch: true }, p);
-    return { event, linked: await linkedTo(tx, event.id) };
+    return await postActive(tx, taskId, p, own);
   } catch (err) {
     if (err instanceof core.TaskRuleError && err.message === JOB_CLOSED) return postLate(tx, taskId, p, own);
     throw err;
   }
+}
+
+/** The undoable batch post on an active job: one update with no text, marked as a batch (core.addComment `batch`). */
+async function postActive(tx: core.Tx, taskId: string, p: Contractor, own: string[]): Promise<BatchPosted> {
+  const event = await core.addComment(tx, taskId, { body: "", attachmentIds: own, batch: true }, p);
+  return { event, linked: await linkedTo(tx, event.id) };
 }
 
 /**

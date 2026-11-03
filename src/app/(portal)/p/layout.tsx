@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { LeaveGuard } from "@/components/leave-guard";
 import { ToastProvider } from "@/components/toast";
-import { UploadQueueProvider } from "@/components/upload-queue";
 import { portalScope } from "@/lib/attachments/queue-owner";
 import { BRAND } from "@/lib/brand";
 import { getPortalPrincipal } from "@/lib/portal/session";
+import { PortalUploadQueue } from "./_components/portal-upload-queue";
 
 export const metadata: Metadata = {
   // absolute, so the app's "%s · HG" template (src/app/layout.tsx) leaves the portal's titles as they are.
@@ -23,9 +23,10 @@ export const metadata: Metadata = {
  *
  * One LeaveGuard for every portal page: the job page's photos still going up
  * hold "My jobs" and "Back to my jobs", and Sign out asks while the upload
- * queue holds it. The queue (UploadQueueProvider) sits under the guard and
- * the toasts, so uploads outlive the page that started them
- * (docs/specs/uploads-photos.md 2.1).
+ * queue holds it. The queue (UploadQueueProvider, through PortalUploadQueue,
+ * which also posts the files the tab kept for the contractor's jobs when the
+ * signal comes back) sits under the guard and the toasts, so uploads outlive
+ * the page that started them (docs/specs/uploads-photos.md 2.1).
  *
  * The queue is each contractor's own (`portal:<contact id>`), as the app's is
  * each partner's: two contractors who sign in on one phone, or share a job,
@@ -45,9 +46,9 @@ export default async function PortalLayout({ children }: LayoutProps<"/p">) {
     <div className="min-h-screen bg-surface text-fg-1">
       <ToastProvider>
         <LeaveGuard>
-          <UploadQueueProvider key={scope} scope={scope}>
+          <PortalUploadQueue key={scope} scope={scope}>
             {children}
-          </UploadQueueProvider>
+          </PortalUploadQueue>
         </LeaveGuard>
       </ToastProvider>
     </div>

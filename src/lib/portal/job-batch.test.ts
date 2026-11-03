@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { JOB_CLOSED } from "@/lib/attachments/access";
-import { TaskRuleError, addComment, type Tx } from "@/lib/tasks/core";
+import { JOB_OPEN_AGAIN, TaskRuleError, addComment, addLateContractorBatch, type Tx } from "@/lib/tasks/core";
 import { BatchAlreadyPosted, allOwnPosted, ownPosted, postBatchIn } from "./job-batch";
+import { markDoneIn, postUpdateIn } from "./job-send";
 import { MAX_FILES_PER_POST } from "./job-view";
 import { postInBatches } from "./recorded-uploads";
 
@@ -55,6 +56,12 @@ function fakeTx(
     access?: boolean;
     postedIds?: Set<string>;
     taken?: string[];
+    /** A comment this contractor already posted, which core's clientId lookup finds by its `data.clientId`. */
+    prior?: { id: string; data: { clientId: string } };
+    /** The job's playbook count for Mark done (TaskTemplate.finishPhotosRequired). */
+    finishPhotosRequired?: number;
+    /** The files a batch post of this visit already told HG of, as Mark done's ownPosted reads them. */
+    batchPosted?: string[];
   } = {},
 ) {
   const calls: Call[] = [];
@@ -67,13 +74,21 @@ function fakeTx(
     }
     if (model === "task" && op === "findUnique") {
       const status = statuses[Math.min(reads++, statuses.length - 1)];
-      return status === null ? null : { id: "t1", title: "Tile the bath", status, assigneeContactId: "c-zack" };
+      if (status === null) return null;
+      return { id: "t1", title: "Tile the bath", status, assigneeContactId: "c-zack", taskTemplate: { finishPhotosRequired: opts.finishPhotosRequired ?? null } };
+    }
+    if (model === "taskEvent" && op === "findFirst") {
+      const asked = args.where?.data as { path?: string[]; equals?: unknown } | undefined;
+      if (opts.prior && asked?.path?.[0] === "clientId" && asked.equals === opts.prior.data.clientId) return { kind: "COMMENT", ...opts.prior };
+      return null;
     }
     if (model === "taskAttachment" && op === "findMany") {
       // A post reading back the rows on its event.
       const eventId = args.where?.eventId;
       if (typeof eventId === "string") return (linkedBy.get(eventId) ?? []).map((id) => ({ id }));
       const ids = ((args.where?.id as { in: string[] } | undefined)?.in ?? []) as string[];
+      // Mark done's read of what a batch post of this visit already told HG of (ownPosted), when the test names them.
+      if (opts.batchPosted && eventId && typeof eventId === "object") return ids.filter((id) => opts.batchPosted!.includes(id)).map((id) => ({ id, kind: "IMAGE" }));
       // allOwnPosted: the rows on this task with these ids, whatever they are.
       if (args.select?.uploadedByContactId) return ids.map((id) => rowOf(id)).filter((r): r is FileRow => r !== null);
       if (opts.postedIds) return ids.filter((id) => !opts.postedIds!.has(id)).map((id) => ({ id, kind: "IMAGE" }));
@@ -89,7 +104,7 @@ function fakeTx(
       }
       return { count: ids.length };
     }
-    if (model === "taskEvent" && op === "create") return { id: `e-${calls.length}`, ...args.data };
+    if (model === "taskEvent" && op === "create") return { id: `e-${calls.length}`, createdAt: new Date(), ...args.data };
     if (model === "user" && op === "findMany") return [{ id: "u-connor" }, { id: "u-pieter" }];
     if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE" };
     if (op === "findUnique" || op === "findFirst") return null;
@@ -363,3 +378,98 @@ for (const status of ["IN_PROGRESS", "DONE"] as const) {
     assert.deepEqual((link.where?.id as { in: string[] }).in, ["a2", "a3"]);
   });
 }
+
+/* ---------------- A reopen under the late line's lock, a written update sent again, Mark done's lock ---------------- */
+
+test("addLateContractorBatch: a job HG reopened while it waited for the task row is refused under the lock, before any write", async () => {
+  for (const status of ["IN_PROGRESS", "REVIEW"]) {
+    const { tx, calls } = fakeTx({ statuses: [status] });
+    await assert.rejects(addLateContractorBatch(tx, "t1", ["a1"], ZACK), (err: Error) => err instanceof TaskRuleError && err.message === JOB_OPEN_AGAIN);
+    assert.ok(isTaskLock(calls[0]), `${status}: the task row first, then the read`);
+    assert.deepEqual(calls.filter(isWrite), [], `${status}: no late line on an open job`);
+  }
+});
+
+test("postBatchIn: HG reopens between the status read and the late line's, and the batch goes the active way in the same transaction", async () => {
+  // The step read the job Done; by the time the late line took the task row HG had sent it back to In progress.
+  const { tx, calls } = fakeTx({ statuses: ["DONE", "IN_PROGRESS"] });
+  const { event, linked } = await postBatchIn(tx, "t1", ZACK, ["a1", "a2"]);
+  assert.deepEqual(event?.data, { batch: true }, "the undoable batch post, its event back for the Undo");
+  assert.deepEqual(linked, ["a1", "a2"]);
+  const made = events(calls);
+  assert.equal(made.length, 1, "one line, and never the late one on an open job");
+  assert.deepEqual(made[0].data, { batch: true });
+  const reads = calls.filter((c) => c.model === "task" && c.op === "findUnique");
+  assert.equal(reads.length, 3, "the step's read, the late line's, then addComment's");
+  const locks = calls.map((c, i) => (isTaskLock(c) ? i : -1)).filter((i) => i >= 0);
+  assert.ok(locks[0] < calls.indexOf(reads[1]), "the late line reads the job only under its lock");
+  assert.ok(calls.findIndex(isWrite) > calls.indexOf(reads[2]), "nothing written before addComment's read under the same lock");
+  assert.equal(outboxInserts(calls).length, 2, "one email line per partner");
+});
+
+test("postUpdateIn: a written update sent again after its answer was lost posts its words once, and a photo added since on its own", async () => {
+  // "Tiles set" with A and B posted (c-tiles), its answer lost; C landed on the tray, and Send again reuses the id.
+  const postedIds = new Set(["A", "B"]);
+  const { tx, calls } = fakeTx({ postedIds, prior: { id: "e-first", data: { clientId: "c-tiles" } } });
+  await postUpdateIn(tx, "t1", ZACK, { body: "Tiles set", attachmentIds: ["A", "B", "C"], clientId: "c-tiles" });
+  const made = events(calls);
+  assert.equal(made.length, 1, "one new line: C's");
+  assert.ok(!made.some((e) => e.body === "Tiles set"), "the words are never written twice");
+  assert.equal(made[0].body, null);
+  assert.deepEqual(made[0].data, { batch: true }, "C goes as its own batch post");
+  assert.ok(postedIds.has("C"), "C is posted, so HG hears of it and the tray lets it go");
+  assert.equal(outboxInserts(calls).length, 2, "one email line per partner, C's, never a second one for the words");
+  assert.ok(calls.findIndex(isTaskLock) < calls.findIndex(isWrite), "the task row before any write");
+});
+
+test("postUpdateIn: sent again with nothing new, the first send stands and nothing is written", async () => {
+  const { tx, calls } = fakeTx({ postedIds: new Set(["A"]), prior: { id: "e-first", data: { clientId: "c-tiles" } } });
+  await postUpdateIn(tx, "t1", ZACK, { body: "Tiles set", attachmentIds: ["A"], clientId: "c-tiles" });
+  assert.deepEqual(calls.filter(isWrite), []);
+});
+
+test("postUpdateIn: a first send posts the words and every own photo on one update, and nothing on its own", async () => {
+  const postedIds = new Set<string>();
+  const { tx, calls } = fakeTx({ postedIds });
+  await postUpdateIn(tx, "t1", ZACK, { body: "Tiles set", attachmentIds: ["A", "C"], clientId: "c-new" });
+  const made = events(calls);
+  assert.equal(made.length, 1);
+  assert.equal(made[0].body, "Tiles set");
+  assert.deepEqual(made[0].data, { clientId: "c-new" });
+  assert.deepEqual([...postedIds].sort(), ["A", "C"]);
+});
+
+test("postUpdateIn: a photo added to a send that went before HG closed the job reaches HG the late way", async () => {
+  const postedIds = new Set(["A"]);
+  const { tx, calls } = fakeTx({ statuses: ["DONE"], postedIds, prior: { id: "e-first", data: { clientId: "c-tiles" } } });
+  await postUpdateIn(tx, "t1", ZACK, { body: "Tiles set", attachmentIds: ["A", "C"], clientId: "c-tiles" });
+  const made = events(calls);
+  assert.equal(made.length, 1);
+  assert.deepEqual(made[0].data, { late: true }, "one late line for C, and no second copy of the words");
+  assert.ok(postedIds.has("C"), "C is posted");
+});
+
+test("markDoneIn: the task row first, before the photos are counted or the playbook read", async () => {
+  const { tx, calls } = fakeTx({ finishPhotosRequired: 2 });
+  await markDoneIn(tx, "t1", ZACK, { body: "All set", attachmentIds: ["a1", "a2"] });
+  assert.ok(isTaskLock(calls[0]), "a batch post, a Remove or a send back that lands while this waits is what it counts");
+  const status = events(calls).find((e) => e.kind === "STATUS");
+  assert.equal((status?.data as { to?: string } | undefined)?.to, "REVIEW");
+});
+
+test("markDoneIn: short of the playbook's count it refuses after the lock, and writes nothing", async () => {
+  const { tx, calls } = fakeTx({ finishPhotosRequired: 2, unposted: ["a1"], batchPosted: [] });
+  await assert.rejects(markDoneIn(tx, "t1", ZACK, { body: "", attachmentIds: ["a1", "a2"] }), /^TaskRuleError: Add 1 more photo to mark this done\.$/);
+  assert.ok(isTaskLock(calls[0]), "the task row before the count");
+  assert.deepEqual(calls.filter(isWrite), []);
+});
+
+test("markDoneIn: a contractor taken off the job is refused for access before the job is counted or read", async () => {
+  const { tx, calls } = fakeTx({ access: false, finishPhotosRequired: 2, unposted: ["a1"], batchPosted: [] });
+  await assert.rejects(markDoneIn(tx, "t1", ZACK, { body: "", attachmentIds: ["a1"] }), /You don't have access to this job\./);
+  assert.deepEqual(
+    calls.map((c) => c.model),
+    ["$executeRaw", "taskAccess"],
+    "the lock, then access, and nothing about the job",
+  );
+});

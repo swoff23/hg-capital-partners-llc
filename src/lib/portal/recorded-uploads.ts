@@ -1,4 +1,5 @@
 import type { FileKind } from "@/lib/attachments/content-types";
+import { sendRefusal } from "@/lib/composer-draft";
 import { MAX_FILES_PER_POST } from "@/lib/portal/job-view";
 
 /** A file that's up and recorded, waiting to be posted: what the Mark done sheet shows in its slot and the payoff in its strip. */
@@ -65,6 +66,11 @@ export class RecordedUploads {
     for (const item of items) held.set(item.id, item);
     this.unsent.set(taskId, held);
   }
+
+  /** The jobs this tab kept files for (keep), for a drain of every one of them (drainEveryKept). */
+  keptJobs(): string[] {
+    return [...this.unsent.keys()];
+  }
 }
 
 /**
@@ -104,13 +110,34 @@ export function recordedUploadsOf(scope: string | undefined): RecordedUploads {
   return tab;
 }
 
+/**
+ * Posts files that have no tray to go back to (a finished job's page, a batch that landed after its page went, what
+ * the tab kept), and keeps the ones `post` answers didn't go, for the next batch or drain of the job. A post that
+ * throws (the session ended, so the call redirects) answers nothing: everything stays kept for the next sign-in on
+ * this tab. A piece that had already posted answers quietly when sent again.
+ */
+export async function postOrKeep(
+  scope: string | undefined,
+  taskId: string,
+  items: readonly RecordedUpload[],
+  post: (items: RecordedUpload[]) => Promise<RecordedUpload[]>,
+): Promise<void> {
+  let left: readonly RecordedUpload[] = items;
+  try {
+    if (items.length > 0) left = await post([...items]);
+  } finally {
+    recordedUploadsOf(scope).keep(taskId, left);
+  }
+}
+
 /** The jobs whose kept files are posting now, by scope and job: one drain at a time for each. */
 const draining = new Set<string>();
 
 /**
- * Hands every file the tab kept for the job (keep) to `post`, and keeps again the ones it answers didn't go. One
- * drain at a time for each scope and job: a call while one is running does nothing, since that one took every kept
- * file, so a page going as the next one opens (or a page and its own Send) makes one post of them, not two at once.
+ * Hands every file the tab kept for the job (keep) to `post`, and keeps again the ones it answers didn't go
+ * (postOrKeep). One drain at a time for each scope and job: a call while one is running does nothing, since that one
+ * took every kept file, so a page going as the next one opens (or a page and its own Send) makes one post of them,
+ * not two at once.
  */
 export async function drainKept(
   scope: string | undefined,
@@ -121,17 +148,28 @@ export async function drainKept(
   if (draining.has(job)) return;
   draining.add(job);
   try {
-    const tab = recordedUploadsOf(scope);
-    const kept = tab.take(taskId, []);
-    // A post that throws (the session ended, so the call redirects) answers nothing: everything it took stays kept for
-    // the next sign-in on this tab. A piece that had already posted answers quietly when sent again.
-    let left = kept;
-    try {
-      if (kept.length > 0) left = await post(kept);
-    } finally {
-      tab.keep(taskId, left);
-    }
+    await postOrKeep(scope, taskId, recordedUploadsOf(scope).take(taskId, []), post);
   } finally {
     draining.delete(job);
   }
+}
+
+/**
+ * Drains every job the tab kept files for, one after another (drainKept): the signal or the tab came back
+ * (UploadQueueProvider's `onWake`), so files a post couldn't send while it was gone go now, on whatever page is
+ * open, instead of waiting for that job's page to open again.
+ */
+export async function drainEveryKept(
+  scope: string | undefined,
+  post: (taskId: string, kept: RecordedUpload[]) => Promise<RecordedUpload[]>,
+): Promise<void> {
+  for (const taskId of recordedUploadsOf(scope).keptJobs()) await drainKept(scope, taskId, (kept) => post(taskId, kept));
+}
+
+/**
+ * The toast for a post of recorded files that didn't go: the server's line, with Retry when another try may work (no
+ * signal, a server hiccup) and the caller has one to give. A refusal trying again can't change says only why.
+ */
+export function failedPostToast(error: string, retry?: () => void): { message: string; action?: { label: string; onAction: () => void } } {
+  return retry && sendRefusal(error) === null ? { message: error, action: { label: "Retry", onAction: retry } } : { message: error };
 }

@@ -183,9 +183,12 @@ export function resolvePending(
 
 /**
  * The `clientId` for a Send: the one a held message already has, when this is
- * the same message (same words, same visibility, same files), so a Send after
- * a failure that did post is recognised by the server and answers with what is
- * there. A message changed in any way is a new send.
+ * the same message (same words, same visibility, and every file it went with
+ * still going), so a Send after a failure that did post is recognised by the
+ * server and answers with what is there. Files added since go with the same
+ * id: a server that finds the first send posted posts them on their own
+ * (portal/job-send.ts), so the words never post twice. Changed words, the
+ * other side of the switch, or a file it went with left out make a new send.
  */
 export function clientIdToReuse(
   draft: Draft,
@@ -194,7 +197,6 @@ export function clientIdToReuse(
   const p = draft.pending;
   if (!p?.held) return null;
   if (p.text !== next.body || p.visibility !== next.visibility) return null;
-  const had = p.files.map((f) => f.id);
-  if (had.length !== next.attachmentIds.length || had.some((id, i) => id !== next.attachmentIds[i])) return null;
+  if (p.files.some((f) => !next.attachmentIds.includes(f.id))) return null;
   return p.clientId;
 }
