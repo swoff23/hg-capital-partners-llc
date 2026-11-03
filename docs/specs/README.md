@@ -22,3 +22,5 @@ Six specs, researched on Mobbin, checked by a critic and approved by Connor on O
 Each chunk ships its own small migration.
 
 [tenant-contact.md](tenant-contact.md) puts the tenant's name and phone on jobs. It was planned with Connor on Oct 26, 2026, and waits for his "build it" before any of it is built.
+
+[error-alerts.md](error-alerts.md) sends Connor an alert when the app breaks: server and browser errors through Sentry, and site-down and stopped-job checks through Better Stack. It was planned with Connor on Nov 3, 2026, and waits for his "build it".
