@@ -80,6 +80,7 @@ const property = (id: string, address: string, extra: Row = {}): Row => ({
   unitCount: 4,
   units: [],
   photoUrl: null,
+  archivedAt: null,
   updatedAt: day(1),
   ...extra,
 });
@@ -105,6 +106,7 @@ const deal = (id: string, address: string, status: string, extra: Row = {}): Row
   status,
   theirPrice: null,
   convertedPropertyId: null,
+  archivedAt: null,
   updatedAt: day(1),
   ...extra,
 });
@@ -115,6 +117,7 @@ const contact = (id: string, fullName: string, extra: Row = {}): Row => ({
   company: null,
   trades: null,
   active: true,
+  archivedAt: null,
   updatedAt: day(1),
   ...extra,
 });
@@ -420,4 +423,34 @@ test("recent: nothing opened yet is an empty list, and a failed read is a 500", 
     throw new Error("db is down");
   });
   assert.equal(failed.status, 500);
+});
+
+test("an archived property, deal or contractor is never found, counted or recent", async () => {
+  const gone = { archivedAt: day(20) };
+  const { db } = fakeDb({
+    properties: [property("p1", "767 Prospect Ave, Buffalo"), property("p-gone", "765 Prospect Ave, Buffalo", gone)],
+    deals: [deal("d1", "99 Prospect Ave", "2 - Medium"), deal("d-gone", "41 Prospect Ave", "1 - High", gone)],
+    contacts: [contact("c1", "Prospect Plumbing"), contact("c-gone", "Prospect Painting", gone)],
+  });
+  const { groups } = await search(db, "prospect");
+  assert.deepEqual(ids(group(groups, "property")), ["p1"]);
+  assert.equal(group(groups, "property")?.total, 1);
+  assert.deepEqual(ids(group(groups, "deal")), ["d1"]);
+  assert.equal(group(groups, "deal")?.total, 1);
+  assert.deepEqual(ids(group(groups, "contractor")), ["c1"]);
+  assert.equal(group(groups, "contractor")?.total, 1);
+
+  // Narrowed to a type with nothing live, the others' totals leave the archived ones out too.
+  const only = await search(db, "painting", { type: "property" });
+  assert.deepEqual(only.groups, []);
+
+  const recent = await answerRecent({ id: "u1" }, db, async () => [
+    { kind: "PROPERTY", recordId: "p-gone" },
+    { kind: "DEAL", recordId: "d-gone" },
+    { kind: "CONTACT", recordId: "c-gone" },
+    { kind: "DEAL", recordId: "d1" },
+  ]);
+  assert.equal(recent.status, 200);
+  if (recent.status !== 200) return;
+  assert.deepEqual(recent.body.rows.map((r) => r.id), ["d1"]);
 });

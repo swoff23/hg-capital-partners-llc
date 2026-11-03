@@ -13,6 +13,7 @@ import { DealListRow } from "./deal-row";
 import { ColumnWidthsProvider, Cols, ResizeHandle } from "./column-widths";
 import { COLUMN_DROP } from "./columns";
 import { DEFAULT_DEAL_SORT, easternDay, noteDay } from "./format";
+import { archivedRecord, liveRecord } from "@/lib/record-scope";
 import { dealSearchWhere, dealsWhere, emptyDeals, isFiltered, parseDealFilters, viewCounts } from "./query";
 
 const CAP = 300;
@@ -61,7 +62,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   // Sorting by stage happens in memory (see sortByStatus), so that fetch can't be `take`-limited
   // up front: limiting by DB order first would silently drop whole stage groups before the
   // real sort ever runs. Every other sort is a plain DB order, so it can take the cap directly.
-  const [dealsRaw, shown, byStageSearched, byStageAll] = await Promise.all([
+  const [dealsRaw, shown, byStageSearched, byStageAll, archivedSearched, archivedAll] = await Promise.all([
     prisma.deal.findMany({
       where,
       orderBy: dbOrderBy(sortField, sortDesc),
@@ -79,9 +80,12 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     }),
     prisma.deal.count({ where }),
     // Each view and stage counts the search's hits, so a hit outside the current view shows (DEALS-012).
-    prisma.deal.groupBy({ by: ["status"], where: dealSearchWhere(f.q), _count: true }),
+    // The stage views count live deals; Archived counts the archived ones.
+    prisma.deal.groupBy({ by: ["status"], where: { AND: [liveRecord, dealSearchWhere(f.q)] }, _count: true }),
     // What "hidden by filters" is measured against: the whole view, whatever is typed.
-    f.q ? prisma.deal.groupBy({ by: ["status"], _count: true }) : Promise.resolve(null),
+    f.q ? prisma.deal.groupBy({ by: ["status"], where: liveRecord, _count: true }) : Promise.resolve(null),
+    prisma.deal.count({ where: { AND: [archivedRecord, dealSearchWhere(f.q)] } }),
+    f.q ? prisma.deal.count({ where: archivedRecord }) : Promise.resolve(null),
   ]);
   const sorted = sortField === "status" ? sortByStatus(dealsRaw, sortDesc) : dealsRaw;
   const deals = sorted.slice(0, CAP);
@@ -89,8 +93,8 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   const today = todayYmdEastern();
 
   const stageCounts = Object.fromEntries(byStageSearched.map((s) => [s.status, s._count]));
-  const counts = viewCounts(stageCounts);
-  const scope = byStageAll ? viewCounts(Object.fromEntries(byStageAll.map((s) => [s.status, s._count]))) : counts;
+  const counts = viewCounts(stageCounts, archivedSearched);
+  const scope = byStageAll ? viewCounts(Object.fromEntries(byStageAll.map((s) => [s.status, s._count])), archivedAll ?? 0) : counts;
   const empty = emptyDeals(f, counts);
 
   return (

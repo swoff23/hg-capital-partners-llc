@@ -14,13 +14,15 @@ import {
 
 type Row = Record<string, unknown>;
 
-/** A stand-in for Postgres over the clauses query.ts builds: AND, equality, `in` and `contains`. */
+/** A stand-in for Postgres over the clauses query.ts builds: AND, equality, null, `not`, `in` and `contains`. */
 function matches(row: Row, cond: Record<string, unknown>): boolean {
   return Object.entries(cond).every(([field, filter]) => {
     if (field === "AND") return (filter as Row[]).every((c) => matches(row, c));
     if (field === "OR") return (filter as Row[]).some((c) => matches(row, c));
     const value = row[field];
+    if (filter === null) return value === null || value === undefined;
     const f = filter as Row;
+    if ("not" in f) return f.not === null ? value !== null && value !== undefined : value !== f.not;
     if ("in" in f) return (f.in as unknown[]).includes(value);
     if ("contains" in f) return typeof value === "string" && value.toLowerCase().includes(String(f.contains).toLowerCase());
     return value === filter;
@@ -34,15 +36,28 @@ const DEALS: Row[] = [
   { id: "holding", status: "6 - Holding", address: "933 Lafayette Avenue, Buffalo" },
   { id: "closed", status: "CLOSED!", address: "58 Mariner St, Buffalo" },
   { id: "pass", status: "Pass", address: "22 Prospect Ave, Buffalo" },
+  // Archived: in no view but Archived, whatever its stage.
+  { id: "gone", status: "1 - High", address: "41 Prospect Ave, Buffalo", archivedAt: new Date("2026-10-27T14:00:00Z") },
+  { id: "gone-pass", status: "Pass", address: "9 Elm St, Buffalo", archivedAt: new Date("2026-10-20T14:00:00Z") },
 ];
 const filters = (over: Partial<DealFilters> = {}): DealFilters => ({ view: "active", stages: [], q: "", sort: "status", ...over });
-const found = (f: DealFilters) => DEALS.filter((d) => matches(d, dealsWhere(f) as Row)).map((d) => d.id);
+const found = (f: DealFilters) => DEALS.filter((d) => matches(d, dealsWhere(f) as Row)).map((d) => String(d.id));
 
-test("the six views, Active first", () => {
+test("the seven views, Active first and Archived last", () => {
   assert.deepEqual(
     DEAL_VIEWS.map((v) => v.label),
-    ["Active", "TBD", "Holding", "Closed", "Pass", "All"],
+    ["Active", "TBD", "Holding", "Closed", "Pass", "All", "Archived"],
   );
+});
+
+test("Archived holds the archived deals at every stage, and no other view has them", () => {
+  assert.deepEqual(found(filters({ view: "archived" })), ["gone", "gone-pass"]);
+  assert.deepEqual(found(filters({ view: "archived", q: "prospect" })), ["gone"], "the search runs inside it");
+  for (const v of DEAL_VIEWS.filter((x) => x.key !== "archived")) {
+    assert.ok(!found(filters({ view: v.key })).some((id) => id.startsWith("gone")), `${v.label} leaves archived deals out`);
+  }
+  assert.equal(parseDealFilters({ status: "archived" }).view, "archived");
+  assert.deepEqual(parseDealFilters({ status: "archived", statuses: "1 - High" }).stages, [], "no Stage chip in Archived");
 });
 
 test("parseDealFilters: Active by default, and a view never goes null under the chip", () => {
@@ -110,6 +125,9 @@ test("counts: each view sums its stages, with the search applied by the caller's
   assert.equal(counts["CLOSED!"], 11);
   assert.equal(counts.Pass, 428);
   assert.equal(counts.all, 668, "All counts a legacy stage too");
+  assert.equal(counts.archived, 0, "none archived unless the caller says");
+  assert.equal(viewCounts({ "1 - High": 1 }, 3).archived, 3);
+  assert.equal(viewCounts({ "1 - High": 1 }, 3).all, 1, "All is the live deals only");
 });
 
 test("isFiltered: only the opening state is plain", () => {
@@ -120,7 +138,7 @@ test("isFiltered: only the opening state is plain", () => {
   assert.equal(isFiltered(filters({ sort: "-updated" })), true);
 });
 
-const counts = (all: number): Record<DealView, number> => ({ active: 0, "5 - TBD": 0, "6 - Holding": 0, "CLOSED!": 0, Pass: 0, all });
+const counts = (all: number): Record<DealView, number> => ({ active: 0, "5 - TBD": 0, "6 - Holding": 0, "CLOSED!": 0, Pass: 0, all, archived: 0 });
 
 test("an empty list: a search that hits in another view offers those", () => {
   const e = emptyDeals(filters({ q: "prospect" }), counts(18));
@@ -151,4 +169,7 @@ test("an empty list: the chip alone offers Clear filters; a bare view has no way
   assert.deepEqual(chip.action, { kind: "clear-filters" });
   assert.deepEqual(emptyDeals(filters({ view: "6 - Holding" }), counts(0)), { line: "No deals in Holding.", action: null });
   assert.equal(emptyDeals(filters({ view: "all" }), counts(0)).line, "No deals yet. New ones show up here.");
+  assert.deepEqual(emptyDeals(filters({ view: "archived" }), counts(0)), { line: "No archived deals.", action: null });
+  // A search that misses in Archived but hits a live deal offers it.
+  assert.deepEqual(emptyDeals(filters({ view: "archived", q: "oxford" }), counts(1)).action, { kind: "show-all", count: 1 });
 });

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ContactLink } from "./contact-link";
 import { ContractorFilters } from "./filters";
 import {
+  contractorScope,
   contractorsWhere,
   emptyContractors,
   isNarrowed,
@@ -29,7 +30,8 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
   const f = parseContractorFilters(await searchParams);
   const [searched, everyone] = await Promise.all([
     prisma.contact.findMany({ where: contractorsWhere(f), orderBy: [{ active: "desc" }, { fullName: "asc" }] }),
-    prisma.contact.findMany({ select: { trades: true } }),
+    // The list's whole, for the count and every trade: the archived contractors under Archived, the rest otherwise.
+    prisma.contact.findMany({ where: contractorScope(f), select: { trades: true } }),
   ]);
   // Trades are free text and a W-9 can be named in the notes, so both read on the rows (query.ts).
   const found = searched.filter((c) => matchesNeedsW9(c, f));
@@ -40,13 +42,15 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
   const total = everyone.length;
   const narrowed = isNarrowed(f);
   const empty = emptyContractors(f, total);
+  const noun = f.archived ? "archived" : total === 1 ? "contractor" : "contractors";
 
   return (
     <>
       <PageHeader
         title="Contractors"
         // The count says why it changed: "4 of 52 contractors" while a search or a filter is on.
-        subtitle={narrowed ? `${contacts.length} of ${total} contractors` : `${total} contractor${total === 1 ? "" : "s"}`}
+        // Under Archived it counts those: "2 archived".
+        subtitle={narrowed ? `${contacts.length} of ${total} ${f.archived ? "archived" : "contractors"}` : `${total} ${noun}`}
         // Opens the New contractor sheet over the list (forms 4.6); a pasted link gets the same form as a page.
         actions={
           <LinkButton href="/contractors/new" variant="primary">
@@ -55,7 +59,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
           </LinkButton>
         }
       />
-      <ContractorFilters data={{ trades, shown: contacts.length, hidden: total - contacts.length, filtered: narrowed }}>
+      <ContractorFilters data={{ trades, shown: contacts.length, hidden: total - contacts.length, filtered: narrowed || f.archived }}>
         {contacts.length === 0 ? (
           <div className="mt-4">
             <EmptyState

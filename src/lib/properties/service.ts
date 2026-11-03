@@ -21,6 +21,7 @@ import {
   type PropertyUnit,
 } from "@/lib/property-types";
 import { rowConflict, isAtVersion, staleFields } from "@/lib/properties/edits";
+import { setPropertyArchived } from "@/lib/archive";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
 /**
@@ -39,6 +40,9 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  *     Property.updatedAt the editor pinned when Edit opened
  *   - every write records who made it (`updatedByUserId`), so a refusal can
  *     say "Pieter changed this at 2:14 PM" (forms 2.12)
+ *   - archive and restore (lib/archive.ts) record who did it; an archived
+ *     property leaves Portfolio, its totals, Home, search, the pickers and
+ *     the move-in form, and its tasks keep working
  */
 
 /**
@@ -187,6 +191,7 @@ export async function patchProperty(
   }
   for (const k of DATE_FIELDS) if (has(k)) data[k] = ymdToDate(s(k));
   if (has("loanEscrow")) data.loanEscrow = s("loanEscrow") === "yes";
+  if (has("showOnMoveInForm")) data.showOnMoveInForm = s("showOnMoveInForm") === "yes";
   if (has("sqft")) {
     const r = readWholeNumber(patch.sqft);
     if (r.ok) data.sqft = r.value;
@@ -222,6 +227,20 @@ export async function patchProperty(
   }
   if (KEY_DATE_FIELDS.some((k) => has(k))) await syncPropertyReminders(id);
   revalidateProperty(id);
+}
+
+/* ---------------- Archive ---------------- */
+
+/**
+ * Archive the property (`archived` true) or restore it, from its page's ⋯
+ * menu, its Archived line or the toast's Undo. Home's Needs you, the task
+ * pickers and filters, and the move-in form read it too.
+ */
+export async function setPropertyArchive(id: string, archived: boolean, by: { id: string }): Promise<void> {
+  await prisma.$transaction((tx) => setPropertyArchived(tx, id, archived, by));
+  revalidateProperty(id);
+  revalidatePath("/");
+  revalidatePath("/tasks", "layout");
 }
 
 /* ---------------- Auto key-date reminders ---------------- */

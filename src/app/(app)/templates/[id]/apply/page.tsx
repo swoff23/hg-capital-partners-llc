@@ -25,7 +25,8 @@ export default async function ApplyPlaybookPage({ params, searchParams }: PagePr
     // Active people only: someone gone since the playbook was written shows as
     // unassigned here, as the service would create it.
     assigneeOptions([], user.id),
-    propertyOptions(),
+    // The property it was opened from stays on offer, archived or not.
+    propertyOptions([sp.property]),
     // How many of this playbook's tasks are still open on each building, for the line above the list (BPLAY-V01).
     prisma.task.groupBy({
       by: ["propertyId"],

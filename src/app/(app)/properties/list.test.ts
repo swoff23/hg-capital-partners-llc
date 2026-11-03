@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  ARCHIVED,
   DEFAULT_PROPERTY_SORT,
   NO_STATUS,
   PROPERTY_SORT_CHOICES,
@@ -85,4 +86,29 @@ test("the list is plain only in its opening state", () => {
   assert.equal(isPropertyListFiltered({ statuses: [], sort: DEFAULT_PROPERTY_SORT }), false);
   assert.equal(isPropertyListFiltered({ statuses: ["Sold"], sort: DEFAULT_PROPERTY_SORT }), true);
   assert.equal(isPropertyListFiltered({ statuses: [], sort: "-value" }), true);
+});
+
+test("Archived is the Status chip's last pick, with its count, once a property is archived", () => {
+  const options = statusOptions(["Rehabbing", null], 2);
+  assert.deepEqual(
+    options.map((o) => [o.key, o.label, o.count]),
+    [
+      ["Rehabbing", "Rehabbing", 1],
+      [NO_STATUS, "No status", 1],
+      [ARCHIVED, "Archived", 2],
+    ],
+  );
+  assert.ok(!statusOptions(["Rehabbing"]).some((o) => o.key === ARCHIVED), "no Archived pick while none is");
+});
+
+test("an archived property is on the list only while Archived is picked", () => {
+  const rows = [
+    ...ROWS.map((r) => ({ ...r, archived: false })),
+    { id: "qa", address: "QA Test Oct27 Portfolio 1 Apt 4b", value: 1, units: 1, status: "Rehabbing", archived: true },
+  ];
+  assert.ok(!ids(filterByStatus(rows, [])).includes("qa"), "no picks: every live one, never an archived one");
+  assert.equal(filterByStatus(rows, []).length, ROWS.length);
+  assert.ok(!ids(filterByStatus(rows, ["Rehabbing"])).includes("qa"), "a status pick never reaches an archived one");
+  assert.deepEqual(ids(filterByStatus(rows, [ARCHIVED])), ["qa"]);
+  assert.deepEqual(ids(filterByStatus(rows, ["Rehabbing", ARCHIVED])), ["oxford15", "qa"]);
 });

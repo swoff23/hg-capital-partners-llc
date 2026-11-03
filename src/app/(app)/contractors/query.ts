@@ -1,14 +1,17 @@
 import type { Prisma } from "@prisma/client";
 import { cleanTrades, docOnFile } from "@/lib/contacts";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
+import { archivedRecord, liveRecord } from "@/lib/record-scope";
 import { everyTermMatches, searchTerms } from "@/lib/search";
 
 /*
  * What the Contractors page asks of the database (docs/specs/selectors.md 5,
  * search 2.11): a search over the name, company and trades; a Trade filter
  * with several picks; and two yes or no filters, "Has login" and "Needs W-9".
- * Pure, so query.test.ts checks it without a database. The URL: `q`, `trade`
- * (comma-joined), `login=1` and `w9=1`.
+ * A third, "Archived", swaps the list for the archived contractors, whom
+ * nothing else shows (lib/archive.ts). Pure, so query.test.ts checks it
+ * without a database. The URL: `q`, `trade` (comma-joined), `login=1`,
+ * `w9=1` and `archived=1`.
  */
 
 export interface ContractorFilters {
@@ -16,6 +19,8 @@ export interface ContractorFilters {
   trades: string[];
   hasLogin: boolean;
   needsW9: boolean;
+  /** The archived contractors instead of the rest. */
+  archived: boolean;
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -27,10 +32,14 @@ export function parseContractorFilters(sp: Params): ContractorFilters {
     trades: parseFacet(str(sp.trade)),
     hasLogin: str(sp.login) === "1",
     needsW9: str(sp.w9) === "1",
+    archived: str(sp.archived) === "1",
   };
 }
 
-/** Whether anything narrows the list: the subtitle reads "4 of 52" and the result line shows. */
+/** Who the list starts from: the archived contractors under Archived, everyone else otherwise. */
+export const contractorScope = (f: Pick<ContractorFilters, "archived">) => (f.archived ? archivedRecord : liveRecord);
+
+/** Whether anything narrows the list: the subtitle reads "4 of 52" and the result line shows. Archived is a different list, not a narrowing. */
 export const isNarrowed = (f: ContractorFilters) => f.q !== "" || f.trades.length > 0 || f.hasLogin || f.needsW9;
 
 /** The query as a URL query string, for tests and links. */
@@ -40,6 +49,7 @@ export function contractorQuery(f: ContractorFilters): string {
   if (f.trades.length) p.set("trade", joinFacet(f.trades));
   if (f.hasLogin) p.set("login", "1");
   if (f.needsW9) p.set("w9", "1");
+  if (f.archived) p.set("archived", "1");
   return p.toString();
 }
 
@@ -82,6 +92,7 @@ export function tradeOptions(rows: readonly { trades: string | null }[]): { key:
 export function contractorsWhere(f: ContractorFilters): Prisma.ContactWhereInput {
   const terms = searchTerms(f.q);
   const parts: Prisma.ContactWhereInput[] = [
+    contractorScope(f),
     terms.length > 0 ? everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }]) : {},
     f.hasLogin ? { portalAccount: { is: { status: "ACTIVE" } } } : {},
     f.needsW9 ? { w9Url: null } : {},
@@ -97,8 +108,9 @@ export function matchesNeedsW9(c: { w9Url: string | null; comments: string | nul
   return !f.needsW9 || (!c.w9Url && !docOnFile(c.comments, "W-9"));
 }
 
-/** The one sentence an empty list says, and the way out. */
+/** The one sentence an empty list says, and the way out. `total` is the list's whole: the archived ones under Archived. */
 export function emptyContractors(f: ContractorFilters, total: number): { line: string; clear: "search" | "filters" | null } {
+  if (f.archived && total === 0) return { line: "No archived contractors.", clear: "filters" };
   if (total === 0) return { line: "No contractors yet.", clear: null };
   if (f.q) return { line: `No contractors match “${f.q}”.`, clear: "search" };
   return { line: "No contractors match these filters.", clear: "filters" };

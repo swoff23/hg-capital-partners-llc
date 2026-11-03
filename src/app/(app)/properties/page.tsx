@@ -52,22 +52,26 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
   ]);
   const openMap = new Map(openByProp.map((r) => [r.propertyId, r._count]));
 
-  const all = properties.map((p) => ({
+  const listed = properties.map((p) => ({
     id: p.id,
     address: p.address,
     name: shortAddress(p.address) || p.address,
     entity: p.llcOwner?.trim() || null,
     status: p.status?.trim() || null,
+    archived: p.archivedAt !== null,
     units: propertyUnitCount(p),
     openTasks: openMap.get(p.id) ?? 0,
     purchase: p.purchasePrice,
     value: p.value,
   }));
+  // An archived property is on the list only under the Status chip's Archived, and in no count or sum (lib/archive.ts).
+  const all = listed.filter((r) => !r.archived);
+  const live = properties.filter((p) => p.archivedAt === null);
 
-  // A sold property leaves every count and sum: the strip, the subtitle and the footer (charts D4).
+  // A sold property leaves every count and sum: the strip, the subtitle and the footer (charts D4). So does an archived one.
   const sum = (list: typeof all) =>
     list
-      .filter((r) => !isSold(r.status))
+      .filter((r) => !isSold(r.status) && !r.archived)
       .reduce(
         (acc, r) => {
           acc.count += 1;
@@ -83,12 +87,13 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
   const countLabel = (list: typeof all, n: number) =>
     list.some((r) => isSold(r.status)) ? `${n} owned` : plural(n, "property", "properties");
   // The footer counts and sums the rows on show; the portfolio strip and the subtitle stay whole.
-  const rows = sortProperties(filterByStatus(all, filters.statuses), filters.sort);
+  const rows = sortProperties(filterByStatus(listed, filters.statuses), filters.sort);
+  const archivedCount = listed.length - all.length;
   const totals = sum(rows);
   const whole = sum(all);
 
-  // A sold building leaves the CapEx forecast too (charts D4).
-  const capexProperties = properties
+  // A sold or archived building leaves the CapEx forecast too (charts D4).
+  const capexProperties = live
     .filter((p) => !isSold(p.status))
     .map((p) => ({
       id: p.id,
@@ -112,13 +117,13 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
         }
       />
 
-      {all.length === 0 ? (
+      {listed.length === 0 ? (
         <EmptyState>Add your first property to track its loan, units and tasks here.</EmptyState>
       ) : (
         <>
           {/* Purchase, units and open tasks are the footer's sums; the strip carries leverage (charts D4 A). */}
           <PortfolioStrip
-            properties={properties.map((p) => ({
+            properties={live.map((p) => ({
               status: p.status,
               value: toMoneyNumber(p.value),
               balance: toMoneyNumber(p.currentLoan),
@@ -127,10 +132,10 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
 
           <PropertyFilters
             data={{
-              statuses: all.map((r) => r.status),
-              options: statusOptions(all.map((r) => r.status)),
+              statuses: listed.map((r) => ({ status: r.status, archived: r.archived })),
+              options: statusOptions(all.map((r) => r.status), archivedCount),
               shown: rows.length,
-              hidden: all.length - rows.length,
+              hidden: Math.max(0, all.length - rows.filter((r) => !r.archived).length),
               filtered: isPropertyListFiltered(filters),
             }}
           >
@@ -179,14 +184,21 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                           </span>
                           <span className="min-w-0">
                             <span className="block truncate text-body text-fg-1">{r.name}</span>
-                            {(r.entity || r.status) && (
+                            {(r.entity || r.status || r.archived) && (
                               <span className={cn("block truncate text-meta text-fg-3", !r.entity && "sm:hidden")}>
                                 {/* The status column drops below sm, so its word leads the subline. */}
-                                {r.status && (
+                                {r.archived ? (
                                   <span className="sm:hidden">
-                                    <PropertyStatus status={r.status} />
+                                    Archived
                                     {r.entity && " · "}
                                   </span>
+                                ) : (
+                                  r.status && (
+                                    <span className="sm:hidden">
+                                      <PropertyStatus status={r.status} />
+                                      {r.entity && " · "}
+                                    </span>
+                                  )
                                 )}
                                 {r.entity}
                               </span>
@@ -206,30 +218,39 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                           <Money value={r.value} />
                         </RowCell>
                         <RowCell href={href} cell="max-sm:hidden" className="whitespace-nowrap pr-0 text-meta">
-                          {r.status ? <PropertyStatus status={r.status} /> : <span className="text-fg-3">—</span>}
+                          {r.archived ? (
+                            <span className="text-fg-3">Archived</span>
+                          ) : r.status ? (
+                            <PropertyStatus status={r.status} />
+                          ) : (
+                            <span className="text-fg-3">—</span>
+                          )}
                         </RowCell>
                       </tr>
                     );
                   })}
                 </tbody>
-                <tfoot>
-                  <tr className="font-semibold">
-                    <Td className="border-t border-line-strong pl-0">{countLabel(rows, totals.count)}</Td>
-                    <Td numeric className="border-t border-line-strong max-[480px]:hidden">
-                      {totals.units}
-                    </Td>
-                    <Td numeric className="border-t border-line-strong max-sm:hidden">
-                      {totals.openTasks}
-                    </Td>
-                    <Td numeric className="border-t border-line-strong max-md:hidden">
-                      <Money value={totals.purchase} />
-                    </Td>
-                    <Td numeric className="border-t border-line-strong max-sm:pr-0">
-                      <Money value={totals.value} />
-                    </Td>
-                    <Td className="border-t border-line-strong pr-0 max-sm:hidden" />
-                  </tr>
-                </tfoot>
+                {/* No footer under archived rows alone: they're in no count or sum. */}
+                {rows.some((r) => !r.archived) && (
+                  <tfoot>
+                    <tr className="font-semibold">
+                      <Td className="border-t border-line-strong pl-0">{countLabel(rows, totals.count)}</Td>
+                      <Td numeric className="border-t border-line-strong max-[480px]:hidden">
+                        {totals.units}
+                      </Td>
+                      <Td numeric className="border-t border-line-strong max-sm:hidden">
+                        {totals.openTasks}
+                      </Td>
+                      <Td numeric className="border-t border-line-strong max-md:hidden">
+                        <Money value={totals.purchase} />
+                      </Td>
+                      <Td numeric className="border-t border-line-strong max-sm:pr-0">
+                        <Money value={totals.value} />
+                      </Td>
+                      <Td className="border-t border-line-strong pr-0 max-sm:hidden" />
+                    </tr>
+                  </tfoot>
+                )}
               </Table>
             )}
           </PropertyFilters>

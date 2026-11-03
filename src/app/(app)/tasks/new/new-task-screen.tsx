@@ -27,7 +27,8 @@ export async function NewTaskScreen({
 
   const [{ users, contractors, recent }, properties, deal] = await Promise.all([
     assigneeOptions([], user.id),
-    propertyOptions(),
+    // The property a New task was opened from stays on offer, archived or not.
+    propertyOptions([propertyId]),
     dealId ? prisma.deal.findUnique({ where: { id: dealId }, select: { id: true, address: true } }) : null,
   ]);
 

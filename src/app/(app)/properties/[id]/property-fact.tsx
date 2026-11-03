@@ -67,6 +67,25 @@ export function PropertyEscrow({ id, escrow }: { id: string; escrow: boolean }) 
 }
 
 /**
+ * Whether the public move-in form offers this property, as a switch in
+ * Details (an archived property is never offered, whatever it says). New
+ * properties start off.
+ */
+export function PropertyMoveInSwitch({ id, shown }: { id: string; shown: boolean }) {
+  return (
+    <RailFact label="Move-in form">
+      <InlineSwitch
+        label="Show on move-in form"
+        field="showOnMoveInForm"
+        value={shown ? "yes" : "no"}
+        message={(next) => (next === "yes" ? "Shown on the move-in form" : "Off the move-in form")}
+        onSave={(next, expected) => patchProperty(id, { showOnMoveInForm: next }, { showOnMoveInForm: expected })}
+      />
+    </RailFact>
+  );
+}
+
+/**
  * A key date: loan maturity, insurance renewal, tax due, registration expiry.
  * Shown even when it's missing, since its reminder task only exists once the
  * date is set (JOURNEYS-006): an empty one is a --warn verb. A past date reads

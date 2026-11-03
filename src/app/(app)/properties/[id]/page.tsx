@@ -14,6 +14,9 @@ import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "
 import { getCapexRules } from "@/lib/capex-rules";
 import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
+import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
+import { archivedLine } from "@/lib/archive";
+import { setPropertyArchived } from "../actions";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { DocumentsSection } from "./documents-section";
@@ -67,6 +70,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
         include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
       },
       sourceDeal: { select: { id: true, address: true } },
+      archivedByUser: { select: { name: true, email: true } },
       listings: {
         orderBy: { createdAt: "asc" },
         include: { photos: { orderBy: { sortOrder: "asc" } } },
@@ -134,10 +138,34 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               <PropertyStatus status={property.status} />
             </p>
           )}
-          <PropertyAddressField id={property.id} value={property.address} />
+          {/* The ⋯ menu is centered on the address's first line, as on a task's page: the heading's 4px padding and half its line, less half the 32px button (44 on touch). */}
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <PropertyAddressField id={property.id} value={property.address} />
+            </div>
+            <div className="shrink-0 pt-1 pointer-coarse:-mt-px pointer-coarse:pt-0">
+              <RecordMoreMenu
+                kind="property"
+                id={property.id}
+                href={`/properties/${property.id}`}
+                archived={!!property.archivedAt}
+                action={setPropertyArchived}
+              />
+            </div>
+          </div>
           {subline && <p className="text-meta text-fg-3">{subline}</p>}
         </div>
       </header>
+
+      {property.archivedAt && (
+        <ArchivedNotice
+          className="mt-4"
+          kind="property"
+          id={property.id}
+          line={archivedLine(property.archivedByUser, property.archivedAt)}
+          action={setPropertyArchived}
+        />
+      )}
 
       {/* Open tasks isn't repeated here: the Tasks section shows its count. */}
       <PropertyFactStrip
@@ -177,6 +205,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               llcOwner: property.llcOwner,
               attorney: property.attorney,
               status: property.status,
+              showOnMoveInForm: property.showOnMoveInForm,
               strategy: property.strategy,
               refiTarget: property.refiTarget,
               purchaseDate: ymd(property.purchaseDate),

@@ -6,7 +6,7 @@ import { shortAddress } from "@/lib/normalize";
 import type { OptionItem } from "@/components/option-list";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressHeading, PropertyNotes } from "./property-heading";
-import { PropertyFact, PropertyKeyDate } from "./property-fact";
+import { PropertyFact, PropertyKeyDate, PropertyMoveInSwitch } from "./property-fact";
 
 export type EditableProperty = {
   id: string;
@@ -14,6 +14,8 @@ export type EditableProperty = {
   llcOwner: string | null;
   attorney: string | null;
   status: string | null;
+  /** Offered on the public move-in form. */
+  showOnMoveInForm: boolean;
   strategy: string | null;
   refiTarget: string | null;
   purchaseDate: string | null;
@@ -83,6 +85,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
           emptyLabel="Not set"
           display={(text) => <PropertyStatus status={text} />}
         />
+        <PropertyMoveInSwitch id={p.id} shown={p.showOnMoveInForm} />
         {/* Rail labels fit 96px on a phone on one line: shorter words, not a smaller font. */}
         <PropertyKeyDate
           {...common}

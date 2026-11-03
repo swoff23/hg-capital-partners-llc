@@ -47,7 +47,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const [{ tasks, total }, counts, properties, viewCounts] = await Promise.all([
     allTasks(filters, PAGE, legacy.merged, user.id),
     taskFilterCounts(filters, legacy.merged),
-    propertyOptions(),
+    // An archived property stays on offer while the URL picks it (a property page's "All tasks").
+    propertyOptions(filters.property),
     // While a query is typed, each view counts its hits, so one outside the current view shows.
     searching ? taskViewCounts(filters, legacy.merged) : Promise.resolve(null),
   ]);

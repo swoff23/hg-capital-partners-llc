@@ -1,3 +1,4 @@
+import { archiveLogText, readArchiveEvent } from "@/lib/archive";
 import { DEAL_FIELD_LABEL } from "@/lib/config";
 import { daysUntil, todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { parseAmount } from "@/lib/money";
@@ -223,6 +224,18 @@ export function buildDealLog(rows: readonly LogSourceRow[]): LogEntry[] {
     }
 
     const edit = readEdit(r);
+    // Archive and Restore read as a sentence with the person first: "Connor archived this deal".
+    const archive = edit ? null : readArchiveEvent(r.data);
+    if (archive) {
+      flush();
+      const { day, at } = dayAndAt(r);
+      out.push({
+        ms: sortMs(r),
+        created: r.createdAt.getTime(),
+        entry: { type: "line", id: r.id, day, at, by: null, text: archiveLogText(namePart(r.authorName), archive) },
+      });
+      continue;
+    }
     if (!edit) {
       flush();
       const parsed = parseNoteAuthor(r.body);

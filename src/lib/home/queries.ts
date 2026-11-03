@@ -4,6 +4,7 @@ import { getCapexRules } from "@/lib/capex-rules";
 import type { Ymd } from "@/lib/dates";
 import { parseBuildingCapex, parseUnits, portfolioCapexForecast } from "@/lib/property-types";
 import { isSold } from "@/lib/properties/figures";
+import { liveRecord } from "@/lib/record-scope";
 import { capexItem, keyDateItems, needsYouList, quickbooksItem, type NeedsYouItem } from "./needs-you";
 
 /**
@@ -13,7 +14,9 @@ import { capexItem, keyDateItems, needsYouList, quickbooksItem, type NeedsYouIte
  */
 export async function needsYou(today: Ymd, now: Date = new Date()): Promise<NeedsYouItem[]> {
   const [properties, rules, conn] = await Promise.all([
+    // An archived property leaves Home (lib/archive.ts); its reminder tasks stay on Today.
     prisma.property.findMany({
+      where: liveRecord,
       select: {
         id: true,
         address: true,

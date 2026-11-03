@@ -1,6 +1,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { liveRecord } from "@/lib/record-scope";
 import type { Ymd } from "@/lib/dates";
 import { unitLabels } from "@/lib/picker-options-shape";
 import * as core from "./core";
@@ -48,7 +49,7 @@ export async function applyPlaybook(
     prisma.taskTemplate.findUnique({ where: { id: templateId }, select: { id: true } }),
     prisma.property.findUnique({ where: { id: input.propertyId }, select: { id: true, units: true } }),
     prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true } }),
-    prisma.contact.findMany({ where: { id: { in: contactIds }, active: true }, select: { id: true } }),
+    prisma.contact.findMany({ where: { id: { in: contactIds }, active: true, ...liveRecord }, select: { id: true } }),
   ]);
   if (!template) throw new core.TaskRuleError("That playbook no longer exists.");
   if (!property) throw new core.TaskRuleError("Choose a property.");

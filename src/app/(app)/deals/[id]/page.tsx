@@ -6,6 +6,9 @@ import { recordView } from "@/lib/recent-views";
 import { Section, TextLink } from "@/components/ui";
 import { RailList } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
+import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
+import { archivedLine } from "@/lib/archive";
+import { setDealArchived } from "../actions";
 import { DealActivity } from "./deal-activity";
 import { DealAddress, DealFact, DealListingLink, DealPassReason, DealPrice, DealStageRow, DealUnits } from "./deal-detail";
 
@@ -14,7 +17,10 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
   const deal = await prisma.deal.findUnique({
     where: { id },
-    include: { convertedProperty: { select: { id: true, address: true } } },
+    include: {
+      convertedProperty: { select: { id: true, address: true } },
+      archivedByUser: { select: { name: true, email: true } },
+    },
   });
   if (!deal) notFound();
   // Puts it on top of this person's Recent in search, once the response is out.
@@ -25,14 +31,29 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
     <div className="max-w-300">
       <div className="mb-8 pointer-coarse:mb-6">
         <BackLink fallback="/deals" label="Deals" />
-        <div className="mt-1">
-          <DealAddress id={deal.id} value={deal.address} />
+        {/* The ⋯ menu is centered on the title's first line, as on a task's page: the heading's 4px padding and half its line, less half the 32px button (44 on touch). */}
+        <div className="mt-1 flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <DealAddress id={deal.id} value={deal.address} />
+          </div>
+          <div className="shrink-0 pt-1 pointer-coarse:-mt-px pointer-coarse:pt-0">
+            <RecordMoreMenu kind="deal" id={deal.id} href={`/deals/${deal.id}`} archived={!!deal.archivedAt} action={setDealArchived} />
+          </div>
         </div>
         {deal.convertedProperty && (
           <p className="mt-1 text-meta text-fg-3">
             Converted to{" "}
             <TextLink href={`/properties/${deal.convertedProperty.id}`}>{deal.convertedProperty.address}</TextLink>
           </p>
+        )}
+        {deal.archivedAt && (
+          <ArchivedNotice
+            className="mt-4"
+            kind="deal"
+            id={deal.id}
+            line={archivedLine(deal.archivedByUser, deal.archivedAt)}
+            action={setDealArchived}
+          />
         )}
       </div>
 

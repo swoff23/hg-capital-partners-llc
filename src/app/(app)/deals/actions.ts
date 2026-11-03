@@ -72,3 +72,14 @@ export async function saveDealFields(
     );
   });
 }
+
+/**
+ * Archive the deal, or with `archived` false restore it: its page's ⋯ menu,
+ * its Archived line, and the toast's Undo for either.
+ */
+export async function setDealArchived(id: string, archived: boolean): Promise<ActionResult> {
+  return withResult("setDealArchived", async () => {
+    const user = await requireUser();
+    await deals.setDealArchive(z.string().min(1).parse(id), z.boolean().parse(archived), user);
+  });
+}

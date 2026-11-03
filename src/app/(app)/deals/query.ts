@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { ACTIVE_DEAL_STATUSES, DEAL_STATUSES, dealStageLabel, isDealStatus } from "@/lib/config";
 import { parseFacet } from "@/lib/list-memory";
+import { archivedRecord, liveRecord } from "@/lib/record-scope";
 import { everyTermMatches, searchTerms } from "@/lib/search";
 import { DEFAULT_DEAL_SORT } from "./format";
 
@@ -8,7 +9,8 @@ import { DEFAULT_DEAL_SORT } from "./format";
  * What the Deals page asks of the database (docs/specs/selectors.md 4.3 A):
  * six views that pick the part of the pipeline, a Stage chip that narrows
  * inside Active and All, and a search over the address. Pure, so
- * query.test.ts checks it without a database.
+ * query.test.ts checks it without a database. An archived deal is in none of
+ * them; the seventh view, Archived, holds those (lib/archive.ts).
  *
  * The URL: `status` is the view (Active is the default and stays out of it),
  * `statuses` the Stage chip's picks (comma-joined; it keeps the name old links
@@ -16,7 +18,7 @@ import { DEFAULT_DEAL_SORT } from "./format";
  * descending.
  */
 
-/** The views, Active first. A stage view is the stage as stored. */
+/** The views, Active first. A stage view is the stage as stored. All is every deal that isn't archived; Archived is the rest. */
 export const DEAL_VIEWS = [
   { key: "active", label: "Active" },
   { key: "5 - TBD", label: dealStageLabel("5 - TBD") },
@@ -24,6 +26,7 @@ export const DEAL_VIEWS = [
   { key: "CLOSED!", label: dealStageLabel("CLOSED!") },
   { key: "Pass", label: dealStageLabel("Pass") },
   { key: "all", label: "All" },
+  { key: "archived", label: "Archived" },
 ] as const;
 
 export type DealView = (typeof DEAL_VIEWS)[number]["key"];
@@ -32,9 +35,9 @@ export const DEFAULT_DEAL_VIEW: DealView = "active";
 
 const isView = (v: string): v is DealView => DEAL_VIEWS.some((x) => x.key === v);
 
-/** The stages a view holds: Active's four, a stage view's one, or every stage for All. */
+/** The stages a view holds: Active's four, a stage view's one, or every stage for All and Archived. */
 export function viewStages(view: DealView): readonly string[] {
-  return view === "active" ? ACTIVE_DEAL_STATUSES : view === "all" ? DEAL_STATUSES : [view];
+  return view === "active" ? ACTIVE_DEAL_STATUSES : view === "all" || view === "archived" ? DEAL_STATUSES : [view];
 }
 
 /** The Stage chip narrows inside Active and All; the other views hold a single stage. */
@@ -80,18 +83,22 @@ export function dealSearchWhere(q: string): Prisma.DealWhereInput {
   return terms.length === 0 ? {} : everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }]);
 }
 
-/** The deals the view, the Stage chip and the search leave. */
+/** The deals the view, the Stage chip and the search leave. Archived holds every stage, and only archived deals. */
 export function dealsWhere(f: DealFilters): Prisma.DealWhereInput {
   const parts: Prisma.DealWhereInput[] = [
-    f.view === "all" ? {} : { status: { in: [...viewStages(f.view)] } },
+    f.view === "archived" ? archivedRecord : liveRecord,
+    f.view === "all" || f.view === "archived" ? {} : { status: { in: [...viewStages(f.view)] } },
     f.stages.length > 0 ? { status: { in: f.stages } } : {},
     dealSearchWhere(f.q),
   ];
   return { AND: parts.filter((p) => Object.keys(p).length > 0) };
 }
 
-/** Deals per view, from the deals per stage: each view's count is the sum of its stages. */
-export function viewCounts(byStage: Readonly<Record<string, number>>): Record<DealView, number> {
+/**
+ * Deals per view, from the live deals per stage: each view's count is the sum
+ * of its stages. `archived` is how many archived deals there are, for its view.
+ */
+export function viewCounts(byStage: Readonly<Record<string, number>>, archived = 0): Record<DealView, number> {
   const sum = (stages: readonly string[]) => stages.reduce((n, s) => n + (byStage[s] ?? 0), 0);
   return {
     active: sum(ACTIVE_DEAL_STATUSES),
@@ -101,6 +108,7 @@ export function viewCounts(byStage: Readonly<Record<string, number>>): Record<De
     Pass: sum(["Pass"]),
     // All counts a stage the list doesn't know (the legacy "Active") too.
     all: Object.values(byStage).reduce((a, b) => a + b, 0),
+    archived,
   };
 }
 
@@ -139,5 +147,6 @@ export function emptyDeals(f: DealFilters, counts: Record<DealView, number>): Em
   }
   if (f.stages.length > 0) return { line: "No deals match these filters.", action: { kind: "clear-filters" } };
   if (f.view === "all") return { line: "No deals yet. New ones show up here.", action: null };
+  if (f.view === "archived") return { line: "No archived deals.", action: null };
   return { line: `No deals in ${viewLabel(f.view)}.`, action: null };
 }
