@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { todayYmdEastern } from "@/lib/dates";
 import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { rentableUnitLabels } from "@/lib/property-types";
+import { onMoveInForm } from "@/lib/record-scope";
 import { cn } from "@/lib/utils";
 import { LeaveLink } from "@/components/leave-link";
 import { MoveInForm } from "./move-in-form";
@@ -87,17 +88,16 @@ const CHECKLIST = [
 export default async function MovingInPage() {
   const [schema, rows] = await Promise.all([
     getMoveInFormSchema(),
+    // The buildings with "Show on move-in form" on in their Details, never an archived one. It started
+    // on for every one this form offered before (not a flip, not Sold, G2C-020), and starts off for a new one.
     prisma.property.findMany({
-      select: { id: true, address: true, units: true, strategy: true, status: true },
+      where: onMoveInForm,
+      select: { id: true, address: true, units: true },
       orderBy: { address: "asc" },
     }),
   ]);
-  // Nobody moves into a flip or a sold building, so they aren't offered (G2C-020). A property with no
-  // strategy or status yet stays: 767 Prospect, 415 Crescent and 765 Prospect have tenants.
-  const is = (v: string | null, word: string) => (v ?? "").trim().toLowerCase() === word;
-  const moveIn = rows.filter((p) => !is(p.strategy, "flip") && !is(p.status, "flip") && !is(p.status, "sold"));
   // Only unit labels reach this public page; lockbox codes and utility accounts never leave the server.
-  const properties = moveIn.map((p) => ({ id: p.id, address: p.address, units: rentableUnitLabels(p.units) }));
+  const properties = rows.map((p) => ({ id: p.id, address: p.address, units: rentableUnitLabels(p.units) }));
 
   return (
     <LeaveGuard surface="public">

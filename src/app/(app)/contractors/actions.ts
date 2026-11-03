@@ -60,6 +60,18 @@ export async function createContractor(input: z.input<typeof newContractorSchema
   });
 }
 
+/**
+ * Archive the contractor, or with `archived` false restore them: their page's
+ * ⋯ menu, their Archived line, and the toast's Undo for either. A refusal
+ * (open jobs, a portal login) comes back as its one line.
+ */
+export async function setContractorArchived(contactId: string, archived: boolean): Promise<ActionResult> {
+  return withResult("setContractorArchived", async () => {
+    const user = await requireUser();
+    await contractors.setContactArchive(id.parse(contactId), z.boolean().parse(archived), user);
+  });
+}
+
 /** Every contractor page shows its card's state; the account ids don't say which page that is. */
 const refresh = () => revalidatePath("/contractors/[id]", "page");
 

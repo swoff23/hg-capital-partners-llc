@@ -1071,6 +1071,8 @@ export function InlineSwitch(props: {
   value: string;
   onSave: (next: string, expected: string) => Promise<ActionResult<unknown>>;
   field?: string;
+  /** The toast for a save, by the new value, when "Escrow set to Yes" doesn't read ("Shown on the move-in form"). */
+  message?: (next: string) => string;
   className?: string;
 }) {
   const { label, value, field } = props;
@@ -1078,7 +1080,7 @@ export function InlineSwitch(props: {
     { id: "yes", label: "Yes" },
     { id: "no", label: "No" },
   ];
-  const save = useFactSave({ kind: "choice", label, value, onSave: props.onSave, options });
+  const save = useFactSave({ kind: "choice", label, value, onSave: props.onSave, options, message: props.message });
   const router = useRouter();
   const lineId = useId();
   // The tap a conflict turned down, to send again on "Save mine".

@@ -251,3 +251,21 @@ test("a day exactly 60 days back is still a day heading", () => {
   const entries = buildDealLog([row({ source: "manual", body: "x", at: "2026-08-27T15:00:00Z" })]);
   assert.equal(groupLog(entries, "2026-10-26")[0].kind, "day");
 });
+
+test("archive and restore read with the person first, and close a burst of edits", () => {
+  const entries = buildDealLog([
+    edit("2026-10-27T14:00:00Z", "status", "1 - High", "Pass"),
+    row({ at: "2026-10-27T14:05:00Z", body: "Deal archived", data: { event: "archived" } }),
+    row({ at: "2026-10-27T14:10:00Z", body: "Deal restored", data: { event: "restored" }, authorName: "Pieter Louw", authorUserId: "u2" }),
+    row({ at: "2026-10-27T14:12:00Z", body: "Deal archived", data: { event: "archived" }, authorName: null, authorUserId: null }),
+  ]);
+  assert.deepEqual(
+    entries.map((e) => [e.type, e.type === "line" ? e.text : e.type === "change" ? e.sentence : "", e.type === "line" ? e.by : undefined]),
+    [
+      ["line", "Someone archived this deal", null],
+      ["line", "Pieter restored this deal", null],
+      ["line", "Connor archived this deal", null],
+      ["change", "Connor changed the stage to Pass", undefined],
+    ],
+  );
+});

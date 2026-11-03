@@ -41,7 +41,8 @@ function count(value: string | null, unit: string): string | null {
 
 export default async function RentalsPage() {
   const rows = await prisma.listing.findMany({
-    where: { status: { in: ["AVAILABLE", "LEASED"] } },
+    // Never a listing at an archived property (lib/archive.ts).
+    where: { status: { in: ["AVAILABLE", "LEASED"] }, property: { archivedAt: null } },
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
     include: {
       property: { select: { address: true } },

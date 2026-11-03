@@ -8,6 +8,7 @@ import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
 import { containsText } from "@/lib/search";
 import type { DealStatus } from "@/lib/config";
+import { setDealArchived } from "@/lib/archive";
 import { recordDealChanges, recordDealCreated } from "./log";
 import { dealConflict, dealPatchData, guardedDealFields, refreshOnConflict, staleDealFields, type DealPatch } from "./edits";
 
@@ -26,6 +27,8 @@ export type { DealPatch } from "./edits";
  *   - every write records who made it (`updatedByUserId`), and a save from a
  *     page that has gone stale is refused with who changed it and when
  *     (edits.ts, forms 2.12)
+ *   - archive and restore (lib/archive.ts) record who did it and add a line
+ *     to the deal's log; an archived deal leaves every list, count and search
  */
 
 export interface Actor {
@@ -138,5 +141,15 @@ async function writeDealPatch(id: string, patch: DealPatch, actor: Actor, expect
     await prisma.deal.update({ where: { id }, data: { ...data, ...stamp(actor) } });
   }
   await recordDealChanges(id, actor, before, data);
+  revalidateDeal(id);
+}
+
+/**
+ * Archive the deal (`archived` true) or restore it, from its page's ⋯ menu,
+ * its Archived line or the toast's Undo. A repeat of the state it's in
+ * writes nothing.
+ */
+export async function setDealArchive(id: string, archived: boolean, actor: Actor): Promise<void> {
+  await prisma.$transaction((tx) => setDealArchived(tx, id, archived, actor));
   revalidateDeal(id);
 }

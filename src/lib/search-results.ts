@@ -4,6 +4,7 @@ import { cleanTrades } from "@/lib/contacts";
 import { toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { propertyUnitCount } from "@/lib/property-types";
+import { liveRecord } from "@/lib/record-scope";
 import { everyTermMatches, rankRows, searchTerms, type Rankable } from "@/lib/search";
 import { activeTask, closedTask, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { isOverdue } from "@/lib/tasks/list";
@@ -14,7 +15,9 @@ import { paletteTaskWhere } from "@/lib/tasks/list-query";
  * the total of every match, each row carrying the context to choose by.
  * `answerSearch` and `answerRecent` take the database and the signed-in person
  * as arguments, so route.test.ts runs them with neither a server nor Prisma;
- * the route files in src/app/api/search wire in the real ones.
+ * the route files in src/app/api/search wire in the real ones. An archived
+ * property, deal or contractor is never found and leaves Recent
+ * (lib/archive.ts); its page still opens from a link.
  *
  * Client code imports only the types from here.
  */
@@ -224,8 +227,11 @@ const CLOSED_STAGE = "CLOSED!";
 
 type Found = { rows: SearchRow[]; total: number };
 
+/** The words, on live records only. */
+const live = <T extends object>(where: T) => ({ AND: [liveRecord, where] });
+
 async function findProperties(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
-  const where = everyTermMatches<Prisma.PropertyWhereInput>(terms, (t) => [{ address: t }]);
+  const where = live(everyTermMatches<Prisma.PropertyWhereInput>(terms, (t) => [{ address: t }]));
   const [pool, total] = await Promise.all([
     db.property.findMany({ where, orderBy: newest, take: POOL, select: PROPERTY_SELECT }),
     db.property.count({ where }),
@@ -259,7 +265,7 @@ async function findTasks(db: SearchDb, q: string, limit: number): Promise<Found>
 }
 
 async function findDeals(db: SearchDb, q: string, terms: string[][], limit: number, foldInto: ReadonlySet<string>): Promise<Found> {
-  const where = everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }]);
+  const where = live(everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }]));
   // Searching everything, a CLOSED! deal already converted into a property in the Properties group folds
   // into it: one row per building. It stays in the Deals scope, and this group counts without it.
   const folds: Prisma.DealWhereInput = { status: CLOSED_STAGE, convertedPropertyId: { in: [...foldInto] } };
@@ -281,7 +287,7 @@ async function findDeals(db: SearchDb, q: string, terms: string[][], limit: numb
 }
 
 async function findContractors(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
-  const where = everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }]);
+  const where = live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }]));
   const [pool, total] = await Promise.all([
     db.contact.findMany({ where, orderBy: newest, take: POOL, select: CONTACT_SELECT }),
     db.contact.count({ where }),
@@ -301,16 +307,16 @@ async function countsOf(db: SearchDb, q: string, terms: string[][], types: reado
     types.map(async (type): Promise<[SearchType, number]> => {
       switch (type) {
         case "property":
-          return [type, await db.property.count({ where: everyTermMatches<Prisma.PropertyWhereInput>(terms, (t) => [{ address: t }]) })];
+          return [type, await db.property.count({ where: live(everyTermMatches<Prisma.PropertyWhereInput>(terms, (t) => [{ address: t }])) })];
         case "task":
           return [type, await db.task.count({ where: paletteTaskWhere(q) })];
         case "deal":
-          return [type, await db.deal.count({ where: everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }]) })];
+          return [type, await db.deal.count({ where: live(everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }])) })];
         case "contractor":
           return [
             type,
             await db.contact.count({
-              where: everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }]),
+              where: live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }])),
             }),
           ];
       }
@@ -374,8 +380,8 @@ function clampLimit(limit: number | undefined, fallback: number): number {
 
 /**
  * The records a person opened last as search rows, in the order they opened
- * them. A record deleted since is skipped, and so is a Template task (a
- * playbook, not work). `entries` come newest first; the result is cut to `take`.
+ * them. A record deleted or archived since is skipped, and so is a Template
+ * task (a playbook, not work). `entries` come newest first; the result is cut to `take`.
  */
 export async function recentRows(
   db: SearchDb,
@@ -385,13 +391,13 @@ export async function recentRows(
   const idsOf = (kind: RecentKind) => entries.filter((e) => e.kind === kind).map((e) => e.recordId);
   const [properties, tasks, deals, contacts] = await Promise.all([
     idsOf("PROPERTY").length
-      ? db.property.findMany({ where: { id: { in: idsOf("PROPERTY") } }, select: PROPERTY_SELECT })
+      ? db.property.findMany({ where: { id: { in: idsOf("PROPERTY") }, ...liveRecord }, select: PROPERTY_SELECT })
       : [],
     idsOf("TASK").length
       ? db.task.findMany({ where: { AND: [{ id: { in: idsOf("TASK") } }, excludeTemplateTasks] }, select: TASK_SELECT })
       : [],
-    idsOf("DEAL").length ? db.deal.findMany({ where: { id: { in: idsOf("DEAL") } }, select: DEAL_SELECT }) : [],
-    idsOf("CONTACT").length ? db.contact.findMany({ where: { id: { in: idsOf("CONTACT") } }, select: CONTACT_SELECT }) : [],
+    idsOf("DEAL").length ? db.deal.findMany({ where: { id: { in: idsOf("DEAL") }, ...liveRecord }, select: DEAL_SELECT }) : [],
+    idsOf("CONTACT").length ? db.contact.findMany({ where: { id: { in: idsOf("CONTACT") }, ...liveRecord }, select: CONTACT_SELECT }) : [],
   ]);
   const today = todayYmdEastern();
   const byKey = new Map<string, SearchRow>();

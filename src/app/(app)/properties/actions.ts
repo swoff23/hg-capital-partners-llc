@@ -140,3 +140,14 @@ export async function deletePropertyListing(propertyId: string, listingId: strin
     await properties.deleteListing(propertyId, z.string().min(1).parse(listingId), expectedVersion, me);
   });
 }
+
+/**
+ * Archive the property, or with `archived` false restore it: its page's ⋯
+ * menu, its Archived line, and the toast's Undo for either.
+ */
+export async function setPropertyArchived(id: string, archived: boolean): Promise<ActionResult> {
+  return withResult("setPropertyArchived", async () => {
+    const user = await requireUser();
+    await properties.setPropertyArchive(z.string().min(1).parse(id), z.boolean().parse(archived), user);
+  });
+}

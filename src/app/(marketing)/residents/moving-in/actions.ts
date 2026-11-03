@@ -10,6 +10,7 @@ import { getMoveInFormSchema } from "@/lib/move-in-form";
 import { firstName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { rentableUnitLabels } from "@/lib/property-types";
+import { onMoveInForm } from "@/lib/record-scope";
 import { withResult } from "@/lib/server-action";
 import { createTask, systemPrincipal } from "@/lib/tasks/service";
 import { headers } from "next/headers";
@@ -78,8 +79,10 @@ async function submitMoveInInspectionBody(input: unknown): Promise<ActionResult<
   if (!perIp.allow(ip).ok || !globalCap.allow("moving-in").ok) return { ok: false, error: RATE_LIMITED };
   perIp.prune();
 
-  const property = await prisma.property.findUnique({
-    where: { id: p.propertyId },
+  // Only a building the form offers: its switch on, not archived (a page loaded before either changed
+  // is turned down here, and the resident's draft keeps what they typed).
+  const property = await prisma.property.findFirst({
+    where: { id: p.propertyId, ...onMoveInForm },
     select: { id: true, address: true, units: true },
   });
   if (!property) return { ok: false, error: "Please select a valid property." };

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ConflictError, FieldError } from "@/lib/action-result";
 import { fieldText, staleFields } from "@/lib/properties/edits";
 import { joinDocLines, splitDocLines } from "@/lib/contacts";
+import { setContactArchived } from "@/lib/archive";
 import { CONTACT_FIELDS, readContactPatch, readNewContact } from "./contact-fields";
 
 /**
@@ -17,6 +18,8 @@ import { CONTACT_FIELDS, readContactPatch, readNewContact } from "./contact-fiel
  *   - what can change and how each field reads: contact-fields.ts
  *   - a save is refused when a field it changes moved after the editor
  *     loaded it, as the property editors are (src/lib/properties/edits.ts)
+ *   - archive is refused while they have open jobs or a portal login, and
+ *     never touches the login (src/lib/archive.ts)
  */
 
 /**
@@ -99,4 +102,14 @@ export async function createContact(input: Record<string, string>): Promise<{ id
   const created = await prisma.contact.create({ data: read.data, select: { id: true, fullName: true } });
   revalidateContact(created.id);
   return created;
+}
+
+/**
+ * Archive the contractor (`archived` true) or restore them, from their page's
+ * ⋯ menu, their Archived line or the toast's Undo. Archive is refused, with
+ * the next step as its message, while they have open jobs or a portal login.
+ */
+export async function setContactArchive(id: string, archived: boolean, by: { id: string }): Promise<void> {
+  await prisma.$transaction((tx) => setContactArchived(tx, id, archived, by));
+  revalidateContact(id);
 }

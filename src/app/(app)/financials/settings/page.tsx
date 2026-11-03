@@ -84,7 +84,8 @@ export default async function FinancialsSettingsPage({
       orderBy: [{ acctType: "asc" }, { fullyQualifiedName: "asc" }],
     }),
     prisma.qboEntity.findMany({ where: { realmId: conn.realmId }, orderBy: { sortOrder: "asc" } }),
-    propertyOptions(),
+    // Every building, archived ones too: a class keeps its books whatever the property's state.
+    propertyOptions("all"),
     prisma.qboSyncRun.findFirst({
       where: { realmId: conn.realmId },
       orderBy: { startedAt: "desc" },

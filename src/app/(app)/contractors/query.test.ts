@@ -26,6 +26,7 @@ function matches(row: Row, cond: Record<string, unknown>): boolean {
     if (filter === null) return value === null || value === undefined;
     if (typeof filter !== "object") return value === filter;
     const f = filter as Row;
+    if ("not" in f && f.not === null) return value !== null && value !== undefined;
     if ("is" in f) return value != null && matches(value as Row, f.is as Row);
     if ("contains" in f) return typeof value === "string" && value.toLowerCase().includes(String(f.contains).toLowerCase());
     return value != null && matches(value as Row, f);
@@ -37,8 +38,10 @@ const CONTACTS: Row[] = [
   { id: "luis", fullName: "Luis Ortega", company: null, trades: "Electric", w9Url: null, comments: "W-9 on file: ortega-w9.pdf", portalAccount: null },
   { id: "dana", fullName: "Dana Fox", company: "Fox Electrical", trades: "Electrical", w9Url: null, comments: "Prefers texts", portalAccount: { status: "INVITED" } },
   { id: "pat", fullName: "Pat Lee", company: null, trades: null, w9Url: null, comments: null, portalAccount: { status: "ACTIVE" } },
+  // Archived: only the Archived chip shows them.
+  { id: "old", fullName: "Olga Plumb", company: "Old Plumbing", trades: "Plumbing", w9Url: null, comments: null, portalAccount: null, archivedAt: new Date("2026-10-27T14:00:00Z") },
 ];
-const none: ContractorFilters = { q: "", trades: [], hasLogin: false, needsW9: false };
+const none: ContractorFilters = { q: "", trades: [], hasLogin: false, needsW9: false, archived: false };
 const row = (c: Row) => c as { w9Url: string | null; comments: string | null };
 const found = (f: Partial<ContractorFilters>) =>
   CONTACTS.filter((c) => matches(c, contractorsWhere({ ...none, ...f }) as Row))
@@ -47,13 +50,25 @@ const found = (f: Partial<ContractorFilters>) =>
 
 test("parseContractorFilters: everything off by default", () => {
   assert.deepEqual(parseContractorFilters({}), none);
-  assert.deepEqual(parseContractorFilters({ q: " luis ", trade: "Plumbing,HVAC", login: "1", w9: "1" }), {
+  assert.deepEqual(parseContractorFilters({ q: " luis ", trade: "Plumbing,HVAC", login: "1", w9: "1", archived: "1" }), {
     q: "luis",
     trades: ["Plumbing", "HVAC"],
     hasLogin: true,
     needsW9: true,
+    archived: true,
   });
   assert.equal(parseContractorFilters({ login: "0" }).hasLogin, false);
+});
+
+test("Archived swaps the list for the archived contractors, whom nothing else shows", () => {
+  assert.deepEqual(found({}), ["zack", "luis", "dana", "pat"]);
+  assert.deepEqual(found({ q: "plumb" }), ["zack"], "a search never reaches an archived one");
+  assert.deepEqual(found({ archived: true }), ["old"]);
+  assert.deepEqual(found({ archived: true, q: "olga" }), ["old"], "the search runs inside Archived");
+  assert.deepEqual(found({ archived: true, hasLogin: true }), []);
+  assert.equal(isNarrowed({ ...none, archived: true }), false, "a different list, not a narrowing");
+  assert.equal(contractorQuery({ ...none, archived: true }), "archived=1");
+  assert.deepEqual(emptyContractors({ ...none, archived: true }, 0), { line: "No archived contractors.", clear: "filters" });
 });
 
 test("the search reads the name, the company and the trades, in any word order", () => {
@@ -111,7 +126,7 @@ test("trade options: A to Z, once each whatever the case, with how many do it", 
 test("isNarrowed and the query string", () => {
   assert.equal(isNarrowed(none), false);
   assert.equal(isNarrowed({ ...none, hasLogin: true }), true);
-  assert.equal(contractorQuery({ q: "luis", trades: ["Plumbing", "A, B"], hasLogin: true, needsW9: false }), "q=luis&trade=Plumbing%2CA%252C+B&login=1");
+  assert.equal(contractorQuery({ q: "luis", trades: ["Plumbing", "A, B"], hasLogin: true, needsW9: false, archived: false }), "q=luis&trade=Plumbing%2CA%252C+B&login=1");
 });
 
 test("an empty list: a miss on a search is not an empty directory", () => {
@@ -132,4 +147,6 @@ test("the header counts the whole list; the result line says how many show", () 
   assert.equal(contractorsCount(30), "30 contractors");
   assert.equal(contractorsCount(1), "1 contractor");
   assert.equal(contractorsCount(0), "0 contractors");
+  assert.equal(contractorsCount(2, true), "2 archived", "under Archived the whole is the archived ones");
+  assert.equal(contractorsCount(1, true), "1 archived");
 });

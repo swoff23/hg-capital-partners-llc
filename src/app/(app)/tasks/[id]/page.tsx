@@ -111,8 +111,8 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       assigneeOptions([task.assigneeContactId], user.id),
       // Who can sign in as staff: the people an Internal note is for.
       prisma.user.findMany({ where: { passwordHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
-      // Every building as the pickers offer it: unit labels only, in street order.
-      propertyOptions(),
+      // Every building as the pickers offer it: unit labels only, in street order. The task's own stays, archived or not.
+      propertyOptions([task.propertyId]),
       // The lockbox state reads this task's own property's units, which stay on the server.
       task.propertyId ? prisma.property.findUnique({ where: { id: task.propertyId }, select: { units: true } }) : null,
       // The date the series gave this task when it is a repeat copy, so the repeat menu's "Next:" steps from it

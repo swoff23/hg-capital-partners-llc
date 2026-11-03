@@ -17,10 +17,10 @@ const noun = { one: "contractor", many: "contractors" };
 
 /**
  * The Contractors page's bar (selectors 5): a search over the name, the
- * company and the trades, a Trade filter with several picks, and two yes or
- * no chips, "Has login" and "Needs W-9" (no W-9 on file). With a mouse on a
- * wide page they are chips; elsewhere the search keeps the row beside one
- * Filters button. `children` is the table, which dims while a change loads.
+ * company and the trades, a Trade filter with several picks, and three yes
+ * or no chips, "Has login", "Needs W-9" (no W-9 on file) and "Archived" (the
+ * archived contractors instead of the rest). With a mouse on a wide page they
+ * are chips; elsewhere the search keeps the row beside one Filters button. `children` is the table, which dims while a change loads.
  */
 export function ContractorFilters({ data, children }: { data: ContractorFilterData; children: ReactNode }) {
   const facets = useMemo<FilterFacet[]>(
@@ -35,6 +35,7 @@ export function ContractorFilters({ data, children }: { data: ContractorFilterDa
       },
       { kind: "toggle", param: "login", label: "Has login" },
       { kind: "toggle", param: "w9", label: "Needs W-9" },
+      { kind: "toggle", param: "archived", label: "Archived" },
     ],
     [data.trades],
   );

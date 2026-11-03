@@ -51,6 +51,10 @@ model User {
   // Who wrote a deal note, so the deal's Activity names its author instead of
   // initials pasted into the text (activity 2.9, DEALS-044).
   dealNotes                   DealNote[]           @relation("DealNoteAuthor")
+  // Who archived a deal, property or contractor, for "Connor archived this on Oct 27."
+  archivedDeals               Deal[]               @relation("DealArchivedBy")
+  archivedProperties          Property[]           @relation("PropertyArchivedBy")
+  archivedContacts            Contact[]            @relation("ContactArchivedBy")
 
   qboConnections QuickbooksConnection[]
 }
@@ -100,6 +104,13 @@ model Deal {
   // rows from before it was recorded, and when that user is deleted.
   updatedByUser   User?    @relation("DealUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
   updatedByUserId String?
+
+  // Archived (src/lib/archive.ts): out of every list, count, search and picker, with its
+  // history kept, until Restore clears both. Who did it, for the record's line; null on a
+  // live deal, and when that user is deleted.
+  archivedAt       DateTime?
+  archivedByUser   User?     @relation("DealArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
+  archivedByUserId String?
 
   @@index([status])
   @@index([address])
@@ -209,6 +220,16 @@ model Property {
   updatedByUser   User?    @relation("PropertyUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
   updatedByUserId String?
 
+  // Archived, as on Deal: out of Portfolio and its totals, Home, search, the pickers and the
+  // public move-in form. Its tasks keep working and still link to it.
+  archivedAt       DateTime?
+  archivedByUser   User?     @relation("PropertyArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
+  archivedByUserId String?
+
+  // Offered on the public move-in form (/residents/moving-in) while on and not archived.
+  // New properties start off; Details has the switch.
+  showOnMoveInForm Boolean @default(false)
+
   @@index([address])
 }
 
@@ -230,7 +251,15 @@ model Contact {
   w9Url          String?
   coiUrl         String?
   comments       String? @db.Text
+  // The portal's sign-in gate and the pickers read it (an inactive contractor still lists and
+  // searches, ranked last). Archive is archivedAt below, not this.
   active         Boolean @default(true)
+
+  // Archived, as on Deal: out of the directory, search and the assignee pickers. Refused while
+  // they have open jobs or a portal login (src/lib/archive.ts). The portal doesn't read it.
+  archivedAt       DateTime?
+  archivedByUser   User?     @relation("ContactArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
+  archivedByUserId String?
 
   phoneE164 String? // "+17165551234", for "Text login details"
   asanaGid  String? @unique // Asana user gid, matched once by the import

@@ -9,10 +9,23 @@ import { cn } from "@/lib/utils";
    and 9; docs/specs/charts.md 2.6). Shared by Financials and the property
    record's Financials section. */
 
-/** A notice above the figures: --surface on a --line edge. A glyph carries any state. */
-export function Notice({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
+/**
+ * A notice above the figures: --surface on a --line edge. A glyph carries any
+ * state. `action` puts one control at the row's end, centered on the line
+ * (an archived record's Restore); the words truncate before it moves.
+ */
+export function Notice({ icon, action, className, children }: { icon?: ReactNode; action?: ReactNode; className?: string; children: ReactNode }) {
+  if (action) {
+    return (
+      <div className={cn("flex items-center gap-2 rounded-md border border-line bg-surface py-1.5 pl-3 pr-1.5 text-meta text-fg-1", className)}>
+        {icon}
+        <p className="min-w-0 flex-1 truncate">{children}</p>
+        <div className="shrink-0">{action}</div>
+      </div>
+    );
+  }
   return (
-    <p className="flex items-start gap-2 rounded-md border border-line bg-surface px-3 py-2 text-meta text-fg-1">
+    <p className={cn("flex items-start gap-2 rounded-md border border-line bg-surface px-3 py-2 text-meta text-fg-1", className)}>
       {icon}
       <span className="min-w-0">{children}</span>
     </p>

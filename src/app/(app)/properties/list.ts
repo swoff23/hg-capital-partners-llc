@@ -9,11 +9,18 @@ import { toMoneyNumber } from "@/lib/utils";
  * 5): a Status chip with several picks, and sort by Property (street, then
  * house number), Value or Units. Pure, so list.test.ts checks it without a
  * database. The URL: `status` (comma-joined, "none" for a property with no
- * status) and `sort` (a column, "-" for descending; Address is the default).
+ * status, "archived" for the archived ones) and `sort` (a column, "-" for
+ * descending; Address is the default).
+ *
+ * An archived property (lib/archive.ts) is on the list only while Archived
+ * is picked, and never in a count or a sum.
  */
 
 /** The pick that stands for a property with no status. */
 export const NO_STATUS = "none";
+
+/** The pick that shows the archived properties, listed last in the Status chip. */
+export const ARCHIVED = "archived";
 
 export const DEFAULT_PROPERTY_SORT = "address";
 
@@ -30,23 +37,31 @@ export const statusKey = (status: string | null | undefined) => status?.trim() |
 /**
  * The statuses that exist, in lifecycle order (Rehabbing to Sold), then any
  * typed before the list existed, A to Z, and "none" last when a property has
- * none. Each with how many properties carry it.
+ * none. Each with how many properties carry it. `statuses` are the live
+ * properties'; Archived follows with its count when any are archived.
  */
-export function statusOptions(statuses: readonly (string | null | undefined)[]): { key: string; label: string; count: number }[] {
+export function statusOptions(statuses: readonly (string | null | undefined)[], archived = 0): { key: string; label: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const s of statuses) counts.set(statusKey(s), (counts.get(statusKey(s)) ?? 0) + 1);
   const known = (PROPERTY_STATUSES as readonly string[]).filter((s) => counts.has(s));
   const other = [...counts.keys()].filter((k) => k !== NO_STATUS && !known.includes(k)).sort((a, b) => a.localeCompare(b));
-  return [...known, ...other, ...(counts.has(NO_STATUS) ? [NO_STATUS] : [])].map((key) => ({
+  const live = [...known, ...other, ...(counts.has(NO_STATUS) ? [NO_STATUS] : [])].map((key) => ({
     key,
     label: key === NO_STATUS ? "No status" : key,
     count: counts.get(key) ?? 0,
   }));
+  return archived > 0 ? [...live, { key: ARCHIVED, label: "Archived", count: archived }] : live;
 }
 
-/** The rows whose status is picked; no picks keeps them all. */
-export function filterByStatus<T extends { status: string | null }>(rows: readonly T[], picks: readonly string[]): T[] {
-  return picks.length === 0 ? [...rows] : rows.filter((r) => picks.includes(statusKey(r.status)));
+/**
+ * The rows the picks leave. No picks keeps every live one. A status pick
+ * keeps the live ones with it; Archived keeps the archived ones, which no
+ * other pick reaches.
+ */
+export function filterByStatus<T extends { status: string | null; archived?: boolean }>(rows: readonly T[], picks: readonly string[]): T[] {
+  const archived = picks.includes(ARCHIVED);
+  const statuses = picks.filter((p) => p !== ARCHIVED);
+  return rows.filter((r) => (r.archived ? archived : picks.length === 0 || statuses.includes(statusKey(r.status))));
 }
 
 export type PropertySortRow = { address: string; value: unknown; units: number | null };
@@ -96,8 +111,15 @@ export function propertySortPhrase(sort: string): string | null {
   return words ? (desc ? words.desc : words.asc) : null;
 }
 
-/** A row as the totals read it: its status, and the figures the footer sums. */
-export type TotalsRow = { status: string | null; units: number | null; openTasks: number; purchase: unknown; value: unknown };
+/** A row as the totals read it: its status, whether it's archived, and the figures the footer sums. */
+export type TotalsRow = {
+  status: string | null;
+  archived?: boolean;
+  units: number | null;
+  openTasks: number;
+  purchase: unknown;
+  value: unknown;
+};
 
 export type ListTotals = { label: string; count: number; units: number; openTasks: number; purchase: number; value: number };
 
@@ -108,9 +130,11 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * rows, so a sold property leaves the totals, labelled "10 owned" once one
  * of the rows has sold ("11 properties" while none has). When every row is
  * sold (the Status filter on Sold), the footer totals those rows as "1 sold"
- * instead of reading "0 owned · $0" under them.
+ * instead of reading "0 owned · $0" under them. An archived row is in no
+ * count or sum (lib/archive.ts), even under the Archived pick.
  */
-export function listTotals(rows: readonly TotalsRow[]): ListTotals {
+export function listTotals(shown: readonly TotalsRow[]): ListTotals {
+  const rows = shown.filter((r) => !r.archived);
   const owned = rows.filter((r) => !isSold(r.status));
   const allSold = owned.length === 0 && rows.length > 0;
   const counted = allSold ? rows : owned;

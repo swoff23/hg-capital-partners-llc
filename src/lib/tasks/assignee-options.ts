@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { liveRecord } from "@/lib/record-scope";
 import { cleanTrades } from "@/lib/contacts";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { recentAssigneeKeys } from "./assignee-people";
@@ -10,8 +11,8 @@ const RECENT = 3;
 
 /**
  * Who the assignee picker offers: the team (staff users), then contractors:
- * active contacts with a trade or any job, plus anyone in `include` (the
- * current assignee, even if inactive). `hasLogin` marks an active portal
+ * active contacts with a trade or any job who aren't archived, plus anyone in
+ * `include` (the current assignee, even if inactive or archived). `hasLogin` marks an active portal
  * login. Never selects a password hash.
  *
  * With `viewerId`, `recent` is the (up to 3) people that viewer assigned most
@@ -35,7 +36,7 @@ export async function assigneeOptions(
     prisma.contact.findMany({
       where: {
         OR: [
-          { active: true, OR: [{ trades: { not: null } }, { assignedTasks: { some: {} } }] },
+          { active: true, ...liveRecord, OR: [{ trades: { not: null } }, { assignedTasks: { some: {} } }] },
           ...(extra.length ? [{ id: { in: extra } }] : []),
         ],
       },

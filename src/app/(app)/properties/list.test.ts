@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  ARCHIVED,
   DEFAULT_PROPERTY_SORT,
   NO_STATUS,
   PROPERTY_SORT_CHOICES,
@@ -109,4 +110,38 @@ test("listTotals: under the Sold filter the footer totals the sold rows it sits 
   assert.deepEqual(listTotals(sold), { label: "1 sold", count: 1, units: 2, openTasks: 0, purchase: 180_000, value: 250_000 });
   assert.equal(listTotals([...sold, T("sold", 1, 90_000)]).label, "2 sold");
   assert.deepEqual(listTotals([]), { label: "0 properties", count: 0, units: 0, openTasks: 0, purchase: 0, value: 0 });
+});
+
+test("listTotals: an archived row is in no count or sum, even under the Archived pick", () => {
+  const live = T("Stabilized", 3, 410_000, { openTasks: 2, purchase: 300_000 });
+  const archived = { ...T("Rehabbing", 4, 900_000, { openTasks: 5, purchase: 700_000 }), archived: true };
+  assert.deepEqual(listTotals([live, archived]), listTotals([live]), "the archived row adds nothing");
+  assert.equal(listTotals([live, archived]).label, "1 property", "and doesn't turn the label into 'owned'");
+  assert.equal(listTotals([{ ...T("Sold", 2, 250_000), archived: true }, T("Sold", 1, 90_000)]).label, "1 sold");
+  assert.deepEqual(listTotals([archived]), { label: "0 properties", count: 0, units: 0, openTasks: 0, purchase: 0, value: 0 });
+});
+
+test("Archived is the Status chip's last pick, with its count, once a property is archived", () => {
+  const options = statusOptions(["Rehabbing", null], 2);
+  assert.deepEqual(
+    options.map((o) => [o.key, o.label, o.count]),
+    [
+      ["Rehabbing", "Rehabbing", 1],
+      [NO_STATUS, "No status", 1],
+      [ARCHIVED, "Archived", 2],
+    ],
+  );
+  assert.ok(!statusOptions(["Rehabbing"]).some((o) => o.key === ARCHIVED), "no Archived pick while none is");
+});
+
+test("an archived property is on the list only while Archived is picked", () => {
+  const rows = [
+    ...ROWS.map((r) => ({ ...r, archived: false })),
+    { id: "qa", address: "QA Test Oct27 Portfolio 1 Apt 4b", value: 1, units: 1, status: "Rehabbing", archived: true },
+  ];
+  assert.ok(!ids(filterByStatus(rows, [])).includes("qa"), "no picks: every live one, never an archived one");
+  assert.equal(filterByStatus(rows, []).length, ROWS.length);
+  assert.ok(!ids(filterByStatus(rows, ["Rehabbing"])).includes("qa"), "a status pick never reaches an archived one");
+  assert.deepEqual(ids(filterByStatus(rows, [ARCHIVED])), ["qa"]);
+  assert.deepEqual(ids(filterByStatus(rows, ["Rehabbing", ARCHIVED])), ["oxford15", "qa"]);
 });

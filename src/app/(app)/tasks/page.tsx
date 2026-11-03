@@ -42,7 +42,9 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const filters = parseAllFilters(sp);
   const [{ users, contractors }, properties] = await Promise.all([
     assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2))),
-    propertyOptions(),
+    // An archived property stays on offer while the URL picks it (a property page's "All tasks"),
+    // so withKnownFilters below keeps the pick instead of dropping it.
+    propertyOptions(filters.property),
   ]);
   // Imported names that are a person on offer count for that person; the rest list once as "Others".
   const legacy = await legacyAssignees(personRefs(users, contractors));

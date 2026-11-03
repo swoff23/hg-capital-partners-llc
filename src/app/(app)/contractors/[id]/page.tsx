@@ -10,16 +10,19 @@ import { getEnv } from "@/lib/env";
 import { Badge, Section, textLinkClass } from "@/components/ui";
 import { RailFact } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
+import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
+import { archivedLine, contractorArchiveRefusal } from "@/lib/archive";
 import { STATUS_TONE, StatusBadge, StatusMark } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
 import { dayLabel, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { portalAccess } from "@/lib/portal/access-state";
-import { STATUS_LABEL, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
+import { STATUS_LABEL, activeTask, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
 import { ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
+import { setContractorArchived } from "../actions";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
 
@@ -64,6 +67,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
       portalAccount: {
         select: { id: true, email: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true },
       },
+      archivedByUser: { select: { name: true, email: true } },
     },
   });
   if (!c) notFound();
@@ -79,7 +83,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   // Their jobs: tasks actually assigned to this contact, never a playbook's
   // template rows. The list stops at JOBS_SHOWN and says so; the count is all of them.
   const jobsWhere = { assigneeContactId: c.id, ...excludeTemplateTasks };
-  const [rows, jobCount] = await Promise.all([
+  const [rows, jobCount, openJobs] = await Promise.all([
     prisma.task.findMany({
       where: jobsWhere,
       orderBy: [{ completedAt: { sort: "desc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }],
@@ -87,6 +91,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
       take: JOBS_SHOWN,
     }),
     prisma.task.count({ where: jobsWhere }),
+    // For Archive's refusal: open jobs are reassigned first (lib/archive.ts).
+    prisma.task.count({ where: { ...jobsWhere, ...activeTask } }),
   ]);
   const tasks = rows.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   // Buffalo's calendar day, not the server's (UTC on Vercel rolls over at 8pm).
@@ -101,12 +107,36 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
     <div className="@container max-w-300">
       <BackLink fallback="/contractors" label="Contractors" />
       <div className="mt-2 mb-6">
-        <ContactName id={c.id} name={c.fullName} />
+        {/* The ⋯ menu is centered on the name's first line, as on a task's page: the heading's 4px padding and half its line, less half the 32px button (44 on touch). */}
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <ContactName id={c.id} name={c.fullName} />
+          </div>
+          <div className="shrink-0 pt-1 pointer-coarse:-mt-px pointer-coarse:pt-0">
+            <RecordMoreMenu
+              kind="contractor"
+              id={c.id}
+              href={`/contractors/${c.id}`}
+              archived={!!c.archivedAt}
+              refusal={contractorArchiveRefusal({ openJobs, hasLogin: c.portalAccount?.status === "ACTIVE" })}
+              action={setContractorArchived}
+            />
+          </div>
+        </div>
         {(c.company || c.tenantFixes) && (
           <div className="mt-1 flex min-w-0 items-center gap-2">
             {c.company && <p className="min-w-0 truncate text-meta text-fg-3">{c.company}</p>}
             {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
           </div>
+        )}
+        {c.archivedAt && (
+          <ArchivedNotice
+            className="mt-4"
+            kind="contractor"
+            id={c.id}
+            line={archivedLine(c.archivedByUser, c.archivedAt)}
+            action={setContractorArchived}
+          />
         )}
       </div>
 

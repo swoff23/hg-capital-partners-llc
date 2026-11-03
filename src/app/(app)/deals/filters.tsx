@@ -24,10 +24,10 @@ export type DealFilterData = {
 };
 
 /**
- * The Deals page's bar (selectors 4.3 A): a search over the address, six
- * views with their counts (Active first, never none), and a Stage chip that
- * narrows inside Active and All. A wide page (60rem) shows the six as
- * segments and the chip; anywhere else the views are a menu naming the
+ * The Deals page's bar (selectors 4.3 A): a search over the address, seven
+ * views with their counts (Active first, never none, Archived last), and a
+ * Stage chip that narrows inside Active and All. A wide page shows the views
+ * as segments and the chip; anywhere else the views are a menu naming the
  * current one, and the Filters sheet holds Stage and Sort. `children` is the
  * table the server renders, which dims while a change loads.
  */
