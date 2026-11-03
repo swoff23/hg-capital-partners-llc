@@ -16,10 +16,10 @@ import {
   repeatDue,
   repeatFrom,
   repeatPresets,
-  repeatRuleSchema,
   ruleKey,
   type RepeatCopyTrace,
 } from "./repeat";
+import { repeatRuleSchema } from "./repeat-schema";
 
 test("parseRepeatRule: valid rules, defaults, junk", () => {
   assert.deepEqual(parseRepeatRule({ freq: "monthly" }), { freq: "monthly", interval: 1 });

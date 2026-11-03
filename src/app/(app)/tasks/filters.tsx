@@ -17,6 +17,9 @@ const VIEWS: { key: TaskView; label: string }[] = [
 /** Open is the list's opening view, so it stays out of the URL. */
 const DEFAULTS = { status: "open" } as const;
 
+/** How many rows are out (`show`) is how the list is being viewed, not a filter: a change to a filter starts it over, and the sidebar link never keeps it. */
+const TRANSIENT = ["show"] as const;
+
 export type TaskFilterData = {
   users: AssigneeUser[];
   contractors: AssigneeContractor[];
@@ -84,7 +87,7 @@ export function TaskFilters({ data, children }: { data: TaskFilterData; children
   }, [data.ownerCounts, data.propertyCounts, users, contractors, others, properties, meId]);
 
   return (
-    <FilterScope list="tasks" defaults={DEFAULTS}>
+    <FilterScope list="tasks" defaults={DEFAULTS} transient={TRANSIENT}>
       <FilterBar
         noun={{ one: "task", many: "tasks" }}
         search={{ placeholder: "Search tasks" }}

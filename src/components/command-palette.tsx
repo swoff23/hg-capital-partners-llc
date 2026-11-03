@@ -66,7 +66,7 @@ import {
   type SearchResponse,
   type SearchRow as SearchRowData,
   type SearchType,
-} from "@/lib/search-results";
+} from "@/lib/search-types";
 import { STATUS_LABEL } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 
@@ -77,7 +77,7 @@ import { cn } from "@/lib/utils";
  * phone. SearchTrigger is the field-look button in the header that opens it,
  * and CommandPalette owns the open state and the keys that open it (Cmd+K,
  * Ctrl+K and "/"). The state each moment shows is composed in
- * lib/search-panel.ts, and what the server answers in lib/search-results.ts.
+ * lib/search-panel.ts, and what the server answers in lib/search-results.ts (the shapes: lib/search-types.ts).
  */
 
 /** Wait this long after the last keystroke before asking the server. */

@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { toYmd, type Ymd } from "@/lib/dates";
 import { weekdayOf } from "@/lib/quick-dates";
 
@@ -6,27 +5,59 @@ import { weekdayOf } from "@/lib/quick-dates";
  * Repeating tasks (docs/asana-migration-plan.md D27): when a task with a
  * repeat rule is done, the next copy is created, due on the next occurrence
  * that isn't already past. Pure; see repeat.test.ts.
+ *
+ * The repeat menu and the task rows import this file, so it holds no zod: the
+ * schema a form post is checked against is repeat-schema.ts, built from the
+ * limits below, and repeat.test.ts keeps the two giving the same answer.
  */
 
-export const repeatRuleSchema = z.object({
-  freq: z.enum(["days", "weeks", "monthly", "quarterly", "yearly"]),
-  interval: z.number().int().min(1).max(365).default(1),
+export const REPEAT_FREQS = ["days", "weeks", "monthly", "quarterly", "yearly"] as const;
+
+/** What a rule's numbers may be, inclusive. The hand check below and repeat-schema.ts both read these. */
+export const REPEAT_LIMITS = {
+  interval: { min: 1, max: 365 },
+  dayOfMonth: { min: 1, max: 31 },
+  weekday: { min: 0, max: 6 },
+} as const;
+
+export type RepeatRule = {
+  freq: (typeof REPEAT_FREQS)[number];
+  interval: number;
   /** Monthly/quarterly/yearly only: pin to this day of the month (clamped to short months). */
-  dayOfMonth: z.number().int().min(1).max(31).optional(),
+  dayOfMonth?: number | undefined;
   /**
    * Weekly only: pin to this day of the week, 0 Sunday to 6 Saturday, so
    * moving one copy doesn't move the series. A weekly rule saved before the
    * pin existed has none and steps from the last copy's due date.
    */
-  weekday: z.number().int().min(0).max(6).optional(),
-});
+  weekday?: number | undefined;
+};
 
-export type RepeatRule = z.infer<typeof repeatRuleSchema>;
+function isInt(v: unknown, { min, max }: { min: number; max: number }): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
+}
 
-/** A stored Task.repeatRule, or null when it's missing or malformed. */
+/**
+ * A stored Task.repeatRule, or null when it's missing or malformed. The same
+ * answer repeatRuleSchema gives: an unknown key is dropped, a missing interval
+ * is 1, and a number out of range or not whole makes the rule malformed.
+ */
 export function parseRepeatRule(v: unknown): RepeatRule | null {
-  const r = repeatRuleSchema.safeParse(v);
-  return r.success ? r.data : null;
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const r = v as Record<string, unknown>;
+  if (!(REPEAT_FREQS as readonly unknown[]).includes(r.freq)) return null;
+  const interval = r.interval === undefined ? 1 : r.interval;
+  if (!isInt(interval, REPEAT_LIMITS.interval)) return null;
+  const rule: RepeatRule = { freq: r.freq as RepeatRule["freq"], interval };
+  if (r.dayOfMonth !== undefined) {
+    if (!isInt(r.dayOfMonth, REPEAT_LIMITS.dayOfMonth)) return null;
+    rule.dayOfMonth = r.dayOfMonth;
+  }
+  if (r.weekday !== undefined) {
+    if (!isInt(r.weekday, REPEAT_LIMITS.weekday)) return null;
+    rule.weekday = r.weekday;
+  }
+  return rule;
 }
 
 function daysInMonth(y: number, m0: number): number {

@@ -3,7 +3,9 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { Download, Ellipsis, ExternalLink, FileImage, FileSpreadsheet, FileText, Lock, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Lightbox, useViewerLink, type MediaItem } from "@/components/lightbox";
+import type { MediaItem } from "@/components/lightbox";
+import { LazyLightbox } from "@/components/lightbox-lazy";
+import { useViewerLink } from "@/components/viewer-link";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { UploadStatusLine, type MediaUpload, type MediaUploaderApi } from "@/components/media-uploader";
 import { Button, Input, buttonClass } from "@/components/ui";
@@ -247,7 +249,7 @@ export function FilesList({
       </ul>
       {uploader && failedRows >= 2 && <UploadStatusLine uploader={uploader} className="mt-2 justify-start" />}
       {items.length > 0 && (
-        <Lightbox
+        <LazyLightbox
           items={items}
           index={viewer.index}
           onIndexChange={viewer.setIndex}

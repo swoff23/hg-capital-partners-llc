@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
 import { withResult } from "@/lib/server-action";
 import type { Assignee } from "@/lib/tasks/core";
-import { repeatRuleSchema } from "@/lib/tasks/repeat";
+import { repeatRuleSchema } from "@/lib/tasks/repeat-schema";
 import * as tasks from "@/lib/tasks/service";
 
 /**

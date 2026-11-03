@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { withLog, withResult } from "@/lib/server-action";
-import { repeatRuleSchema } from "@/lib/tasks/repeat";
+import { repeatRuleSchema } from "@/lib/tasks/repeat-schema";
 import * as tasks from "@/lib/tasks/service";
 
 /**

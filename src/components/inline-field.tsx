@@ -16,7 +16,7 @@ import { Pencil, Plus } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { AddressCombobox } from "@/components/address-combobox";
 import { Code } from "@/components/code";
-import { DatePanel } from "@/components/due-date-picker";
+import { DatePanel, warmDatePanel } from "@/components/due-date-picker";
 import { FormSheet } from "@/components/form-sheet";
 import { listOnScreen } from "@/components/list-on-screen";
 import { useHoldLeave } from "@/components/leave-guard";
@@ -978,6 +978,8 @@ function PickedFact(props: InlineFieldProps) {
     ref: triggerRef,
     "data-inline-value": "",
     "aria-busy": save.pending || undefined,
+    // A date's calendar loads on first use; hovering, focusing or pressing the value starts it so the open finds it ready.
+    ...(kind === "date" ? { onHoverStart: warmDatePanel, onFocus: warmDatePanel, onPressStart: warmDatePanel } : {}),
   };
 
   const trigger = verb ? (
