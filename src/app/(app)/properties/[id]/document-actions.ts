@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/lib/action-result";
+import { MAX_FILENAME } from "@/lib/attachments/content-types";
 import { appScope, assertQueueOwner } from "@/lib/attachments/queue-owner";
 import * as documents from "@/lib/properties/documents";
 import { withResult } from "@/lib/server-action";
@@ -21,7 +22,9 @@ const id = z.string().min(1).max(64);
 const recordedSchema = z
   .object({
     pathname: z.string().min(1).max(300),
-    filename: z.string().min(1).max(255),
+    // Cut to 255 by the record step (documents.ts), so a longer name from an older tab's outbox records instead of
+    // being refused with its bytes already up.
+    filename: z.string().min(1).max(MAX_FILENAME * 4),
     // The queue sends its display hints along; documents keep none of them.
     width: z.number().nullish(),
     height: z.number().nullish(),

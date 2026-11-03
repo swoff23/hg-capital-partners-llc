@@ -140,6 +140,9 @@ export function JobActions({
   const [body, setBody] = useState("");
   // Uploaded and recorded, not posted yet.
   const [ready, setReady] = useState<Recorded[]>([]);
+  // Files out in a post right now (a batch, or a Send). They leave the tray while it goes and come back to it if it
+  // fails, so they still count against the room: new picks meanwhile never add up to more than one post takes.
+  const [posting, setPosting] = useState(0);
   const [, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
@@ -164,12 +167,14 @@ export function JobActions({
   async function sendUpdate({ body: text, attachmentIds, clientId }: ComposerMessage): Promise<ActionResult> {
     const items = ready.filter((r) => attachmentIds.includes(r.id));
     setReady((r) => r.filter((x) => !attachmentIds.includes(x.id)));
+    setPosting((n) => n + items.length);
     let posted = false;
     try {
       const res = await postJobUpdateAction(taskId, { body: text, attachmentIds, clientId }, owner);
       posted = res.ok;
       return res;
     } finally {
+      setPosting((n) => n - items.length);
       if (!posted) setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
     }
   }
@@ -178,11 +183,18 @@ export function JobActions({
   const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast, owner);
 
   /** A batch that posts on its own while the page is here. One that doesn't post goes back on the tray, to go with the next send. */
-  const postBatch = (items: Recorded[]) =>
+  const postBatch = (items: Recorded[]) => {
+    // Counted before the transition starts, in the same render that takes them off the tray.
+    setPosting((n) => n + items.length);
     startSending(async () => {
-      if (await sendBatch(items)) return;
-      setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
+      try {
+        if (await sendBatch(items)) return;
+        setReady((r) => [...r, ...items.filter((i) => !r.some((x) => x.id === i.id))]);
+      } finally {
+        setPosting((n) => n - items.length);
+      }
     });
+  };
 
   /**
    * The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and
@@ -213,8 +225,9 @@ export function JobActions({
     parentId: taskId,
     access: "private",
     allowed: ["image", "video"],
-    // One post takes 50: the files held for it count, so a pick of 55 sends 50 and refuses 5 with the reason.
-    maxFiles: postRoom(ready.length),
+    // One post takes 50: the files held for it count, and so do the ones out in a post, so a pick of 55 sends 50 and
+    // refuses 5 with the reason. A Retry past it is refused the same way (engine.ts retry).
+    maxFiles: postRoom(ready.length + posting),
     maxFilesReason: MAX_FILES_REASON,
     // Photos go up upright, as a 2560px JPEG without GPS and without the original (question 3).
     prepare: "display",

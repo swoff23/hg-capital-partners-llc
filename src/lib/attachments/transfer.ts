@@ -147,9 +147,18 @@ type Fallback = ReturnType<typeof streamFallback>;
 /** The slowest a working connection is taken to send at, for a request that can't say how far it got. */
 export const BLIND_BYTES_PER_SEC = 16 * 1024;
 
-/** How long a request sent without progress keeps the stall watchdog fed: what its bytes take at BLIND_BYTES_PER_SEC. */
+/**
+ * The most requests that share that line at once: the queue sends three files (engine.ts CONCURRENCY), one of them
+ * maybe in parts, three at a time (PART_CONCURRENCY), so two whole files and three parts.
+ */
+export const BLIND_SHARED_BY = 2 + PART_CONCURRENCY;
+
+/**
+ * How long a request sent without progress keeps the stall watchdog fed: what its bytes take at its share of
+ * BLIND_BYTES_PER_SEC, so a slow line carrying the most requests at once never has a working one cut off.
+ */
 export function blindBudgetMs(bytes: number): number {
-  return Math.ceil((Math.max(0, bytes) / BLIND_BYTES_PER_SEC) * 1000);
+  return Math.ceil(((Math.max(0, bytes) * BLIND_SHARED_BY) / BLIND_BYTES_PER_SEC) * 1000);
 }
 
 /** How often a request with no progress feeds the watchdog, well inside its 30 seconds. */

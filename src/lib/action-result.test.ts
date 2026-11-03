@@ -147,6 +147,16 @@ test("infrastructure errors become the generic line", () => {
   assert.equal(userMessage(undefined), GENERIC_ERROR);
 });
 
+test("a Blob outage never shows the vendor's words, though they end like sentences", async () => {
+  // What @vercel/blob's head() throws when the store is down, rate limited or answers with a 5xx (BlobError's prefix).
+  const { BlobServiceNotAvailable, BlobServiceRateLimited, BlobUnknownError } = await import("@vercel/blob");
+  for (const err of [new BlobServiceNotAvailable(), new BlobServiceRateLimited(30), new BlobUnknownError()]) {
+    assert.match(err.message, /^Vercel Blob: .*\.$/);
+    assert.equal(userMessage(err), GENERIC_ERROR, err.message);
+    assert.deepEqual(toFailure(err), { ok: false, error: GENERIC_ERROR });
+  }
+});
+
 test("callAction passes a result through, ok or refused", async () => {
   assert.deepEqual(await callAction(async () => ({ ok: true, data: { id: "t1" } })), { ok: true, data: { id: "t1" } });
   assert.deepEqual(await callAction(async () => ({ ok: false, error: "This job is closed." })), {

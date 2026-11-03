@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
+import { MAX_FILENAME } from "@/lib/attachments/content-types";
 import { assertQueueOwner, appScope } from "@/lib/attachments/queue-owner";
 import { requireUser } from "@/lib/auth";
 import { withResult } from "@/lib/server-action";
@@ -23,7 +24,9 @@ const id = z.string().min(1).max(64);
 const uploadedSchema = z
   .object({
     pathname: z.string().min(1).max(300),
-    filename: z.string().min(1).max(255),
+    // The page cuts a long name to fit (media.ts storedNames) and the record step keeps 255 (filenameForType), so
+    // a longer one from an older tab's outbox is cut there instead of refused with its bytes already up.
+    filename: z.string().min(1).max(MAX_FILENAME * 4),
     width: z.number().nullish(),
     height: z.number().nullish(),
     durationSec: z.number().nullish(),

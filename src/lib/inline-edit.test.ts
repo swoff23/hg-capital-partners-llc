@@ -1,10 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   EMAIL_MESSAGE,
   URL_MESSAGE,
   decideInlineEdit,
   headingSave,
+  inlineConflictLine,
   inlineEdit,
   inlineEditCommit,
   inlineProblem,
@@ -81,6 +84,21 @@ test("inlineShown: each kind as a person reads it", () => {
   assert.equal(inlineShown("money", "low 400s"), "low 400s");
   assert.equal(inlineShown("text", ""), "");
   assert.equal(inlineShown("multiline", "x".repeat(60)).length, 40);
+});
+
+test("inlineConflictLine: a value says what it is now; a note says who changed it and when, so the line never cuts that off", () => {
+  const now = new Date("2026-10-26T20:00:00Z");
+  const at = "2026-10-26T18:14:00Z";
+  const notes = inlineShown("multiline", "Gutters cleaned on the north side, downspout reattached, tenant says the leak stopped");
+  assert.match(inlineConflictLine("money", { by: "Pieter Louw", at }, "$410,000", now), /^Pieter set this to \$410,000 at 2:14\sPM$/);
+  assert.match(inlineConflictLine("multiline", { by: "Pieter Louw", at }, notes, now), /^Pieter changed this at 2:14\sPM$/);
+  assert.match(inlineConflictLine("multiline", { at }, notes, now), /^This changed at 2:14\sPM$/);
+  assert.equal(inlineConflictLine("multiline", { by: "Pieter Louw", at: "2026-10-24T18:14:00Z" }, notes, now), "Pieter changed this on Oct 24");
+  // Cleared notes fit as they are.
+  assert.match(inlineConflictLine("multiline", { by: "Pieter Louw", at }, "", now), /^Pieter cleared this at 2:14\sPM$/);
+  // The field's line is this one, by the field's kind.
+  const field = readFileSync(join(import.meta.dirname, "..", "components", "inline-field.tsx"), "utf8");
+  assert.match(field, /: inlineConflictLine\(p\.kind, c, theirs\);/);
 });
 
 test("inlineSavedMessage: the toast names the change", () => {

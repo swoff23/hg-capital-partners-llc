@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { MULTIPART_THRESHOLD, usesMultipart } from "./content-types";
 import type { MultipartState } from "./outbox";
 import {
   BLIND_BYTES_PER_SEC,
+  BLIND_SHARED_BY,
   PART_BYTES,
   blindBudgetMs,
   blobTransfer,
@@ -62,13 +65,16 @@ test("streamFallback: any other failure is the caller's, and keeps the stream fo
   assert.equal(bodies.broken, false);
 });
 
-test("blindBudgetMs: how long a request with no progress may take, at a slow but working rate", () => {
+test("blindBudgetMs: how long a request with no progress may take, at its share of a slow but working line", () => {
   assert.equal(BLIND_BYTES_PER_SEC, 16 * 1024);
+  // Two whole files and a third in three parts can be on the line at once, so each request gets a fifth of it.
+  assert.equal(BLIND_SHARED_BY, 5);
+  assert.match(readFileSync(join(import.meta.dirname, "engine.ts"), "utf8"), /^const CONCURRENCY = 3;$/m, "the queue's three files at once");
   assert.equal(blindBudgetMs(0), 0);
   assert.equal(blindBudgetMs(-5), 0);
-  assert.equal(blindBudgetMs(16 * 1024), 1000);
-  // A whole 8 MB part: over eight minutes, so a slow line isn't cut off at the watchdog's 30 seconds.
-  assert.equal(blindBudgetMs(8 * MB), 512_000);
+  assert.equal(blindBudgetMs(16 * 1024), 5000);
+  // A whole 8 MB part, sharing the line with four other requests: over 42 minutes, not the eight it would take alone.
+  assert.equal(blindBudgetMs(8 * MB), 2_560_000);
 });
 
 /** A Blob client whose fetch is wrapped: any call that asks for progress (a streamed body) is refused before it sends. */

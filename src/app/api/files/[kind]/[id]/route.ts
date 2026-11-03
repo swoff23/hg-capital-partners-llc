@@ -46,7 +46,9 @@ export const maxDuration = 300;
  * uploads 2.6): the file comes through this route as an attachment, a video
  * included, since a redirect to Blob's host would play in a tab instead of
  * saving. Headers are in src/lib/attachments/headers.ts. A PDF opens in the
- * viewer's frame on a desktop (same origin, no X-Frame-Options anywhere).
+ * viewer's frame on a desktop: next.config.ts sends X-Frame-Options:
+ * SAMEORIGIN on every response, which lets our own pages frame it and no
+ * other site, and a PDF's CSP here names no frame-ancestors to undo that.
  */
 
 type Viewer = { kind: "staff" } | { kind: "contractor"; contactId: string };

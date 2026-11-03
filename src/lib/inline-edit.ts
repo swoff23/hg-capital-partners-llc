@@ -12,6 +12,7 @@
  * silently, so a draft that is too short stays open with its reason.
  */
 
+import { conflictMessage, conflictValueLine, type ActionConflict } from "@/lib/action-result";
 import { tidyAddress, withScheme } from "@/lib/address-suggestions";
 import { PHONE_INVALID, readPhone } from "@/lib/contractors/contact-fields";
 import { fmtDay } from "@/lib/dates";
@@ -238,6 +239,17 @@ export function inlineShown(kind: InlineKind, text: string, opts: { unit?: strin
       return line.length > 40 ? `${line.slice(0, 39).trimEnd()}…` : line;
     }
   }
+}
+
+/**
+ * The line on an open fact whose save lost to a newer one (forms 2.8): "Pieter set this to $410,000 at 2:14 PM". A
+ * note says "Pieter changed this at 2:14 PM" instead: its words would push who and when off the one line, and Keep
+ * Pieter's shows them. `theirs` is the value as the field shows it (inlineShown), "" when they cleared it.
+ */
+export function inlineConflictLine(kind: InlineKind, conflict: Pick<ActionConflict, "by" | "at">, theirs: string, now: Date = new Date()): string {
+  if (kind !== "multiline" || theirs === "") return conflictValueLine(conflict, theirs, now);
+  // conflictMessage's sentence, as a field's line: no period, like the other conflict lines.
+  return conflictMessage(conflict, now).replace(/\.$/, "");
 }
 
 /**

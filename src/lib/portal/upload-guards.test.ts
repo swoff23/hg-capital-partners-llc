@@ -249,7 +249,17 @@ test("the token route asks Blob for no upload-completed callback: the record act
 
 test("a job page holds no more photos than one post takes, and says why past that", () => {
   const actions = read("app", "(portal)", "p", "jobs", "[id]", "_components", "job-actions.tsx");
-  assert.match(actions, /maxFiles: postRoom\(ready\.length\),\s*maxFilesReason: MAX_FILES_REASON,/);
+  // The files out in a post count too: they come back to the tray when it fails, so picks made meanwhile can't pass the cap.
+  assert.match(actions, /maxFiles: postRoom\(ready\.length \+ posting\),\s*maxFilesReason: MAX_FILES_REASON,/);
+  const sendUpdate = actions.slice(actions.indexOf("async function sendUpdate"), actions.indexOf("const sendBatch"));
+  const postBatch = actions.slice(actions.indexOf("const postBatch"), actions.indexOf("const record ="));
+  for (const [name, body] of [
+    ["sendUpdate", sendUpdate],
+    ["postBatch", postBatch],
+  ]) {
+    assert.match(body, /setPosting\(\(n\) => n \+ items\.length\)/, `${name} counts what it sends`);
+    assert.match(body, /finally \{\s*setPosting\(\(n\) => n - items\.length\)/, `${name} lets go of the count however it ends`);
+  }
   // Every action that posts files refuses more than that in words, not zod's.
   const jobActions = read("app", "(portal)", "p", "jobs", "[id]", "actions.ts");
   assert.match(jobActions, /attachmentIds: z\.array\(id\)\.max\(MAX_FILES_PER_POST, TOO_MANY_FILES\)/);
@@ -264,4 +274,20 @@ test("the losing side of a double batch post says nothing, and the record step c
   assert.ok(shared.indexOf("if (res.data.alreadyPosted) return true;") < shared.indexOf("toast({\n    message: postedText(kinds)"), "before any toast");
   assert.match(fn(read("lib", "portal", "job-uploads.ts"), "postJobBatch"), /if \(!\(err instanceof BatchAlreadyPosted\)\) throw err;/);
   assert.match(read("app", "(portal)", "p", "jobs", "[id]", "upload-actions.ts"), /filename: z\.string\(\)\.min\(1\)\.max\(MAX_FILENAME \* 4\),/);
+});
+
+test("the staff record steps cut a long name too, instead of refusing a file whose bytes are already up", () => {
+  for (const parts of [
+    ["app", "(app)", "tasks", "upload-actions.ts"],
+    ["app", "(app)", "properties", "[id]", "document-actions.ts"],
+  ]) {
+    const src = read(...parts);
+    assert.match(src, /filename: z\.string\(\)\.min\(1\)\.max\(MAX_FILENAME \* 4\),/, parts.join("/"));
+    assert.doesNotMatch(src, /filename: z\.string\(\)\.min\(1\)\.max\(255\)/, parts.join("/"));
+  }
+  // The photo actions keep no name at all.
+  assert.match(read("app", "(app)", "properties", "[id]", "photo-actions.ts"), /filename: z\.string\(\)\.max\(MAX_FILENAME \* 4\)\.optional\(\),/);
+  // Where the cut happens: the verified name, and the row's column.
+  assert.match(read("lib", "attachments", "content-types.ts"), /if \(!canonical\) return \(clean \|\| "file"\)\.slice\(0, MAX_FILENAME\);/);
+  assert.match(read("lib", "properties", "documents.ts"), /filename: filenameForType\(input\.filename, contentType\)\.slice\(0, 255\) \|\| "file",/);
 });

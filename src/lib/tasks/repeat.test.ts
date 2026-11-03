@@ -19,6 +19,7 @@ import {
   repeatPresets,
   ruleKey,
   type RepeatCopyTrace,
+  type RepeatRule,
 } from "./repeat";
 import { repeatRuleSchema } from "./repeat-schema";
 
@@ -211,6 +212,18 @@ test("repeatDue: a repeating task never starts undated", () => {
   assert.equal(repeatDue({ freq: "weeks", interval: 1 }, undefined, "2026-10-23"), "2026-10-23");
   assert.equal(repeatDue(null, null, "2026-10-23"), null, "no repeat, no date");
   assert.equal(repeatDue(undefined, "2026-11-15", "2026-10-23"), "2026-11-15");
+});
+
+test("a leap-day yearly rule whose date is cleared starts today, not on this month's 29th", () => {
+  // Every year on Feb 29 carries the leap day's pin (leapDayRule); clearing the date used to read it as a monthly pin.
+  const leap = leapDayRule<RepeatRule>({ freq: "yearly", interval: 1 }, "2028-02-29");
+  assert.equal(leap.dayOfMonth, 29);
+  assert.equal(firstOccurrence(leap, "2026-11-03"), "2026-11-03");
+  assert.equal(repeatDue(leap, null, "2026-11-03"), "2026-11-03");
+  assert.equal(describeRepeat(leap, { from: repeatDue(leap, null, "2026-11-03") }), "Every year on Nov 3");
+  // The same on the 29th itself, and on a Feb 28 that isn't a leap year's: today either way.
+  assert.equal(firstOccurrence(leap, "2026-12-29"), "2026-12-29");
+  assert.equal(firstOccurrence(leap, "2027-02-28"), "2027-02-28");
 });
 
 test("describeRepeat", () => {

@@ -31,11 +31,12 @@ import { isCoarseNow } from "@/components/use-coarse-pointer";
 import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { useRun } from "@/components/use-run";
 import type { AddressKind } from "@/lib/address-suggestions";
-import { conflictKeepLabel, conflictValueLine, type ActionResult } from "@/lib/action-result";
+import { conflictKeepLabel, type ActionResult } from "@/lib/action-result";
 import { fmtDay, todayYmdEastern } from "@/lib/dates";
 import {
   decideInlineEdit,
   headingSave,
+  inlineConflictLine,
   inlineSavedMessage,
   inlineShown,
   numberKindOf,
@@ -222,7 +223,7 @@ function theirsOf(save: FactSave, p: Pick<InlineFieldProps, "kind" | "field" | "
 function conflictLine(save: FactSave, p: Pick<InlineFieldProps, "kind" | "field" | "unit">): string {
   const c = save.conflict!;
   const theirs = theirsOf(save, p);
-  return theirs === undefined ? (save.error ?? "This changed since you opened it.") : conflictValueLine(c, theirs);
+  return theirs === undefined ? (save.error ?? "This changed since you opened it.") : inlineConflictLine(p.kind, c, theirs);
 }
 
 /** Keep theirs, or save mine over it (forms 2.8): the two buttons under a conflict line. */

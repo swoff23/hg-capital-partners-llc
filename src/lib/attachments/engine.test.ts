@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { UploadTarget } from "@/components/upload-queue";
+import { GENERIC_ERROR } from "@/lib/action-result";
 import { UploadEngine, capReason, failedAwayText, type EngineDeps, type EngineNotice } from "./engine";
+import { EMPTY_UPLOAD } from "./limits";
 import { MAX_ONLINE_TRIES, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
+import { NOT_A_VIDEO, PrepareError, UNREADABLE_PHOTO } from "./prepare";
 import { WRONG_SIGN_IN } from "./queue-owner";
 import type { SendInput } from "./transfer";
 
@@ -294,6 +297,25 @@ test("a refused record step keeps the bytes once, then sends the file again", as
   assert.deepEqual(h.engine.uploadsFor(t.key), []);
 });
 
+test("a blob refused for arriving empty goes up again on its Retry: the record step deleted it, so recording it again can't work", async () => {
+  const h = setup();
+  let calls = 0;
+  const t = target({
+    record: async () => (++calls === 1 ? { ok: false, error: EMPTY_UPLOAD } : { ok: true, data: { id: "x" } }),
+  });
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  const [u] = h.engine.uploadsFor(t.key);
+  assert.equal(u.status, "failed");
+  assert.equal(u.error, EMPTY_UPLOAD);
+  h.engine.retry(u.key);
+  await h.flush();
+  assert.equal(h.sent.length, 2, "the bytes went again");
+  assert.notEqual(h.sent[1], h.sent[0]);
+  assert.equal(calls, 2);
+  assert.deepEqual(h.engine.uploadsFor(t.key), []);
+});
+
 test("removing a tile mid-flight aborts it and lets the batch settle", async () => {
   const h = setup();
   const aborted: boolean[] = [];
@@ -315,6 +337,33 @@ test("removing a tile mid-flight aborts it and lets the batch settle", async () 
   assert.equal(landed.length, 1);
   assert.equal(landed[0].length, 1);
   assert.equal(h.engine.uploadsFor(t.key).length, 0);
+});
+
+test("a file the prepare step refuses lets its batch settle, so the files that recorded before it reach the page", async () => {
+  for (const reason of [NOT_A_VIDEO, UNREADABLE_PHOTO]) {
+    const h = setup();
+    let refuse: () => void = () => {};
+    h.deps.prepare = async (f, input) => {
+      if (input.name !== "second.jpg") return { blob: f, name: input.name, contentType: input.contentType, thumb: null, poster: null, meta: {} };
+      // Refused only once the first file has recorded, so its batch is waiting on this one.
+      await new Promise<void>((resolve) => (refuse = resolve));
+      if (reason === NOT_A_VIDEO) throw new PrepareError(reason);
+      throw new Error("canvas is not available");
+    };
+    const landed: string[][] = [];
+    const t = target({ access: reason === NOT_A_VIDEO ? "private" : "public", onRecorded: (ids) => landed.push(ids) });
+    h.engine.mount(t.key);
+    h.engine.add(t, [file("first.jpg"), file("second.jpg")]);
+    await h.flush();
+    assert.deepEqual(t.recorded, ["first.jpg"]);
+    assert.equal(landed.length, 0, "the batch waits on the one being prepared");
+    refuse();
+    await h.flush();
+    const [tile] = h.engine.uploadsFor(t.key);
+    assert.equal(tile.status, "invalid");
+    assert.equal(tile.error, reason);
+    assert.deepEqual(landed, [["a1"]], `${reason}: the first file reaches the page`);
+  }
 });
 
 test("a file that failed reports on its own when a retry lands", async () => {
@@ -732,6 +781,27 @@ test("a record call that throws tries again like a dropped request, and turns re
   assert.equal(h.sent.length, 1, "the bytes went once; the tries were the record step alone");
 });
 
+test("a record step that answers with the generic line (a Blob outage under head()) waits and tries again, bytes kept", async () => {
+  const h = setup();
+  let calls = 0;
+  const t = target({
+    record: async () => {
+      calls++;
+      return calls === 1 ? { ok: false, error: GENERIC_ERROR } : { ok: true, data: { id: "a1" } };
+    },
+  });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(tile.status, "waiting", "not red at once");
+  assert.equal(tile.error, undefined, "no vendor words, and no refusal");
+  await h.advance(2000);
+  assert.equal(calls, 2);
+  assert.deepEqual(h.engine.uploadsFor(t.key), []);
+  assert.equal(h.sent.length, 1, "the bytes went once; the retry was the record step alone");
+});
+
 test("a record step that answers no is red at once", async () => {
   const h = setup();
   const t = target({ record: async () => ({ ok: false, error: "this job is closed" }) });
@@ -1044,26 +1114,29 @@ test("a failure after its page was left names where the file was going", async (
   assert.equal(failedAwayText(["image", "image"], ""), "2 photos didn't upload", "a target with no label says the count alone");
 });
 
-test("a file another tab or an earlier visit left in the outbox fails quietly: no toast on whatever page is open", async () => {
+test("a file an earlier visit left in the outbox that fails says so, naming where it was going", async () => {
   const outbox = memoryOutbox();
   const first = setup({ outbox, scope: "app:u1", online: false, script: [new TypeError("Failed to fetch")] });
   first.engine.add(target({ key: "property-photo:p1", uploadKind: "property-photo-upload", parentId: "p1", allowed: ["image"] }), [file("front.jpg")]);
   await first.flush();
   first.engine.dispose();
 
-  // Home in another tab: the outbox puts the photo back, it goes up and is refused.
+  // Home, after a reload: the outbox puts the photo back, it goes up and is refused.
   const home = setup({ outbox, scope: "app:u1", script: [new Error("Failed to retrieve the client token")] });
   await home.engine.restore();
   await home.flush();
   assert.equal(home.engine.uploadsFor("property-photo:p1")[0]?.status, "failed", "its red tile waits on its own page");
-  assert.equal(home.notices.length, 0, "nothing on Home that reads as Home's upload");
-
-  // Retried from its page and left again: now it is this page load's, so a second failure says so.
-  home.state.script.push(new Error("Failed to retrieve the client token"));
-  home.engine.retry(home.engine.uploadsFor("property-photo:p1")[0].key);
-  await home.flush();
+  // Named, so it never reads as Home's upload, and with Retry, so nobody waits on a photo they don't know failed.
   assert.equal(home.notices.length, 1);
   assert.equal(home.notices[0].message, "1 photo didn't upload to 56 Tamarack St");
+  assert.equal(home.notices[0].action?.label, "Retry");
+
+  // Retried from the toast and refused again: it says so again, under the same key.
+  home.state.script.push(new Error("Failed to retrieve the client token"));
+  home.notices[0].action!.run();
+  await home.flush();
+  assert.equal(home.notices.length, 2);
+  assert.equal(home.notices[1].key, home.notices[0].key);
 });
 
 test("a cap counts files recorded in a batch that hasn't reached the page yet", async () => {
@@ -1088,4 +1161,35 @@ test("a cap counts files recorded in a batch that hasn't reached the page yet", 
   finish();
   await h.flush();
   assert.equal(landed.length, 1);
+});
+
+test("a Retry holds to the cap too: past it the file is refused with the cap's reason, and with room it goes", async () => {
+  const h = setup({ script: [new Error("Failed to retrieve the client token")] });
+  // The job page's room is one post less what it holds: one photo here, and one more picked after it failed.
+  const t = target({ maxFiles: 2, maxFilesReason: "only 2 at a time", allowed: ["image"] });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg")]);
+  await h.flush();
+  const [failed] = h.engine.uploadsFor(t.key);
+  assert.equal(failed.status, "failed");
+  h.engine.add(t, [file("b.jpg")]);
+  await h.flush();
+  assert.deepEqual(t.recorded, ["b.jpg"]);
+  // The page now holds b.jpg, and a photo from earlier, so its room is none.
+  h.engine.setTarget({ ...t, maxFiles: 0 });
+  h.engine.retry(failed.key);
+  await h.flush();
+  const [refused] = h.engine.uploadsFor(t.key);
+  assert.equal(refused.status, "invalid");
+  assert.equal(refused.error, "only 2 at a time");
+  assert.equal(h.sent.length, 2, "nothing went up for it");
+
+  // With room, a Retry goes as it always did.
+  const r = setup({ script: [new Error("Failed to retrieve the client token")] });
+  const u = target({ maxFiles: 1, allowed: ["image"] });
+  r.engine.add(u, [file("a.jpg")]);
+  await r.flush();
+  r.engine.retry(r.engine.uploadsFor(u.key)[0].key);
+  await r.flush();
+  assert.deepEqual(u.recorded, ["a.jpg"]);
 });
