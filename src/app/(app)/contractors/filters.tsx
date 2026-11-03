@@ -57,3 +57,20 @@ export function ContractorFilters({ data, children }: { data: ContractorFilterDa
     </FilterScope>
   );
 }
+
+/** The bar as the loading screen draws it (contractors/(list)/loading.tsx): inert, no counts. */
+export function ContractorFiltersPlaceholder() {
+  return (
+    <FilterBar
+      placeholder
+      search={{ placeholder: "Search contractors" }}
+      facets={[
+        { kind: "multi", param: "trade", label: "Trade" },
+        { kind: "toggle", param: "login", label: "Has login" },
+        { kind: "toggle", param: "w9", label: "Needs W-9" },
+        { kind: "toggle", param: "archived", label: "Archived" },
+      ]}
+      wide="56rem"
+    />
+  );
+}

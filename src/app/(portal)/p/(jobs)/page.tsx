@@ -5,8 +5,8 @@ import { todayYmdEastern } from "@/lib/dates";
 import { JOBS_GROUP_COOKIE, firstName, parseJobsGroup, parseJobsTab } from "@/lib/portal/job-view";
 import { listMyJobs } from "@/lib/portal/queries";
 import { requirePortalPrincipal } from "@/lib/portal/session";
-import { AccountMenu } from "./_components/account-menu";
-import { MyJobs } from "./_components/my-jobs";
+import { AccountMenu } from "../_components/account-menu";
+import { MyJobs } from "../_components/my-jobs";
 
 // My jobs (docs/asana-migration-plan.md §6, D18, D31). The title comes from the layout.
 // A list, so it runs full width to 1600 with the 16 / 24 / 32 gutters (docs/brand-guidelines.md, section 5).

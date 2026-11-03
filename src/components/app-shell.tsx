@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Menu, Pin, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
+import { LOADING_SCREEN_SELECTOR } from "@/lib/loading-screen";
 import { focusHeadingAfter, isSheetPath } from "@/lib/sheet-routes";
 import { SIDEBAR_COOKIE, railState } from "@/lib/sidebar";
 import type { ListHrefs } from "@/lib/list-memory";
@@ -87,17 +88,53 @@ export function AppShell({
     lastPath.current = pathname;
     if (isSheetPath(pathname)) sheetOpenedOver.current = from;
     if (!focusHeadingAfter(from, pathname, sheetOpenedOver.current)) return;
-    // A page that puts focus in a field itself (New task's autofocus title) keeps it.
-    const here = document.activeElement;
-    if (here instanceof HTMLElement && mainRef.current?.contains(here) && here.matches("input, textarea, select, [contenteditable]")) {
+    const main = mainRef.current;
+    if (!main) return;
+    const focus = (target: HTMLElement) => {
+      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+      // A heading takes focus for the reader, not to be drawn on.
+      target.style.outline = "none";
+      target.focus({ preventScroll: true });
+    };
+    const focusPage = () => {
+      // A page that puts focus in a field itself (New task's autofocus title) keeps it.
+      const here = document.activeElement;
+      if (here instanceof HTMLElement && main.contains(here) && here.matches("input, textarea, select, [contenteditable]")) {
+        return;
+      }
+      focus(main.querySelector("h1") ?? main);
+    };
+    if (!main.querySelector(LOADING_SCREEN_SELECTOR)) {
+      focusPage();
       return;
     }
-    const target = mainRef.current?.querySelector("h1") ?? mainRef.current;
-    if (!target) return;
-    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-    // A heading takes focus for the reader, not to be drawn on.
-    target.style.outline = "none";
-    target.focus({ preventScroll: true });
+    // A loading screen holds the page's place first, and its h1 goes when the page lands. Focus
+    // waits on the main area, then moves to the page's h1, unless the reader has moved on meanwhile.
+    focus(main);
+    const observer = new MutationObserver(() => {
+      if (main.querySelector(LOADING_SCREEN_SELECTOR)) return;
+      observer.disconnect();
+      const here = document.activeElement;
+      if (here === main || here === document.body || here === null) focusPage();
+    });
+    observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  // A link to a place on a page (`/financials/settings#cleanup`, `/properties#capex`) lands on the
+  // page's loading screen first, where the router finds no such id and lets the scroll go, and a
+  // cold open streams the screen ahead of the page. Take the place into view once the page is in.
+  useEffect(() => {
+    const main = mainRef.current;
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!main || !id || !main.querySelector(LOADING_SCREEN_SELECTOR)) return;
+    const observer = new MutationObserver(() => {
+      if (main.querySelector(LOADING_SCREEN_SELECTOR)) return;
+      observer.disconnect();
+      document.getElementById(id)?.scrollIntoView({ block: "start" });
+    });
+    observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [pathname]);
 
   // Drop the drawer state once the viewport is back to desktop width.

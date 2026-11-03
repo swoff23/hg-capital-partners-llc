@@ -69,6 +69,8 @@ import {
 } from "@/lib/search-types";
 import { STATUS_LABEL } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
+// Three static rows shaped like the finished ones while a first load runs. No shimmer (brand section 7).
+import { SkeletonRows } from "@/components/skeleton";
 
 /**
  * Search and jump (docs/specs/search.md 2.1 to 2.8). One body, SearchPanel,
@@ -678,23 +680,6 @@ function Entry({
   }
 }
 
-/** Three static rows shaped like the finished ones. No shimmer (brand section 7). */
-function SkeletonRows({ rows, title }: { rows: number; title?: string }) {
-  return (
-    <div aria-hidden="true" className="p-1 max-md:p-2">
-      {title && <div className="flex h-7 items-center px-2 text-meta font-medium text-fg-3">{title}</div>}
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex h-15 items-center gap-3 px-2 @min-[30rem]:h-10 @min-[30rem]:pointer-coarse:h-12">
-          <span className="size-8 shrink-0 rounded-sm bg-fill-1" />
-          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="h-3 w-2/5 rounded-sm bg-fill-1" />
-            <span className="h-2.5 w-1/4 rounded-sm bg-fill-1 @min-[30rem]:hidden" />
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /* ---------------- A row ---------------- */
 

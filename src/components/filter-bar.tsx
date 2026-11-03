@@ -24,7 +24,7 @@ import { Sheet } from "@/components/sheet";
 import { Switch } from "@/components/switch";
 import { useRememberList } from "@/components/list-memory";
 import { Badge, Button, buttonClass, chromeIconClass } from "@/components/ui";
-import { LIST_PATHS, joinFacet, listChange, parseFacet, type ListKey } from "@/lib/list-memory";
+import { LIST_PATHS, joinFacet, listChange, parseFacet, setFilterCount, type ListKey } from "@/lib/list-memory";
 import { cn } from "@/lib/utils";
 
 /*
@@ -299,7 +299,29 @@ export type FilterBarProps = {
   className?: string;
 };
 
-export function FilterBar({ noun, search, views, facets = [], sort, wide, shown, count, className }: FilterBarProps) {
+/**
+ * What a loading screen passes for `placeholder`: the bar's shape, with no
+ * counts, no option lists and nothing to call (docs/specs/performance.md 4.2).
+ */
+export type FilterBarFrameProps = Pick<FilterBarProps, "search" | "wide" | "className"> & {
+  views?: Omit<NonNullable<FilterBarProps["views"]>, "options" | "resets"> & { options: readonly { key: string; label: string }[] };
+  facets?: readonly { kind: "multi" | "toggle"; param: string; label: string }[];
+  sort?: Pick<FilterSort, "param" | "default">;
+};
+
+/**
+ * The bar. `placeholder` draws its frame for a loading screen: the search
+ * with its placeholder and any text from the URL, the views with the one from
+ * the URL picked, the facet chips by name, idle and with no counts, and the
+ * Filters button with how many the URL sets. The same container query picks
+ * chips or the button, so it matches the bar that lands at every width. It is
+ * inert, and needs no FilterScope.
+ */
+export function FilterBar(props: (FilterBarProps & { placeholder?: false }) | (FilterBarFrameProps & { placeholder: true })) {
+  return props.placeholder ? <FilterBarFrame {...props} /> : <LiveFilterBar {...props} />;
+}
+
+function LiveFilterBar({ noun, search, views, facets = [], sort, wide, shown, count, className }: FilterBarProps) {
   const scope = useFilterScope();
   const { query, update } = scope;
   const classes = WIDE[wide];
@@ -325,10 +347,7 @@ export function FilterBar({ noun, search, views, facets = [], sort, wide, shown,
   }, [search, searchParam, text, urlText, update]);
 
   /* What's set: facets with a pick, toggles that are on, and a sort of its own. */
-  const sorted = sort ? (query.get(sort.param) ?? sort.default) : null;
-  const filterCount =
-    facets.filter((f) => (f.kind === "multi" ? parseFacet(query.get(f.param)).length > 0 : query.get(f.param) === "1")).length +
-    (sort && sorted !== sort.default ? 1 : 0);
+  const filterCount = setFilterCount(query, facets, sort);
 
   const view = views ? (query.get(views.param) ?? views.default) : null;
   function pickView(key: string) {
@@ -438,6 +457,84 @@ export function FilterBar({ noun, search, views, facets = [], sort, wide, shown,
           }}
         />
       )}
+    </div>
+  );
+}
+
+const ignore = () => {};
+
+/** The bar as a loading screen draws it: LiveFilterBar's boxes and classes, inert, read from the URL alone. */
+function FilterBarFrame({ search, views, facets = [], sort, wide, className }: FilterBarFrameProps) {
+  const params = useSearchParams();
+  const classes = WIDE[wide];
+  const view = views ? (params.get(views.param) ?? views.default) : null;
+  const current = views?.options.find((o) => o.key === view) ?? views?.options[0];
+  const filterCount = setFilterCount(params, facets, sort);
+  const hasSheet = facets.length > 0 || sort !== undefined;
+  const phoneRows = Boolean(search && views && !views.menu);
+
+  return (
+    <div inert className={cn("@container", className)}>
+      <div className={cn("flex items-center gap-2", phoneRows && "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto]")}>
+        {search && (
+          <SearchInput
+            size="sm"
+            placeholder={search.placeholder}
+            value={params.get(search.param ?? "q") ?? ""}
+            className={cn("min-w-0 flex-1", classes.search)}
+          />
+        )}
+
+        {views && (
+          <>
+            <SegmentedControl
+              aria-label={views.label}
+              options={views.options}
+              value={view}
+              onChange={ignore}
+              fullWidth={phoneRows ? "below-sm" : false}
+              className={cn(phoneRows && "max-sm:order-last max-sm:col-span-2", views.menu && cn("hidden", classes.inline))}
+            />
+            {views.menu && current && (
+              <span className={cn(buttonClass({ variant: "secondary", size: "sm" }), "min-w-0 shrink-0", classes.hide)}>
+                <span className="truncate">{current.label}</span>
+                <ChevronDown aria-hidden="true" className="size-3.5 text-fg-3" />
+              </span>
+            )}
+          </>
+        )}
+
+        <div className={cn("hidden min-w-0 shrink items-center gap-2", classes.show)}>
+          {facets.map((f) =>
+            f.kind === "multi" ? (
+              <span key={f.param} className={cn(chipEdge, "min-w-0 shrink border-line-strong")}>
+                <span className="flex h-full min-w-0 items-center gap-1.5 px-2.5">
+                  <Plus aria-hidden="true" className="size-3.5 shrink-0 text-fg-3" />
+                  <span className="shrink-0 text-fg-2">{f.label}</span>
+                </span>
+              </span>
+            ) : (
+              <span key={f.param} className={cn(chipEdge, "gap-1.5 border-line-strong px-2.5 text-fg-2")}>
+                {f.label}
+              </span>
+            ),
+          )}
+        </div>
+
+        {hasSheet && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            tabIndex={-1}
+            className={cn("shrink-0", views?.menu && "pointer-coarse:max-sm:min-w-11", classes.hide)}
+          >
+            <SlidersHorizontal aria-hidden="true" className={chromeIconClass} />
+            <span className={cn(views?.menu && "max-sm:sr-only")}>Filters</span>
+            {filterCount > 0 && <Badge className="num">{filterCount}</Badge>}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

@@ -53,8 +53,8 @@ const dense = "min-h-10 pointer-coarse:min-h-12";
  * its own 12 months, and picking a month there changes only its readout.
  */
 export default async function FinancialsOverviewPage({ searchParams }: PageProps<"/financials">) {
-  // Checked here as well as in the layout: a layout doesn't run for every
-  // render of the pages under it (docs/asana-migration-plan.md §5.1).
+  // Checked here, not in the layout: a layout doesn't run for every render
+  // of the pages under it (docs/asana-migration-plan.md §5.1).
   await requireUser();
   const sp = await searchParams;
   // ?basis= is a one-off override; without it the basis chosen in Settings applies.

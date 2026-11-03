@@ -8,10 +8,10 @@ import { propertyOptions } from "@/lib/picker-options";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { NONE, TASK_PAGE, TASK_PAGE_MAX, parseAllFilters, personRefs, taskLimit, withKnownFilters, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
 import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
-import { AllList } from "./all-list";
-import { TaskFilters } from "./filters";
-import { TaskListProvider } from "./task-list-context";
-import { TasksHeader } from "./tasks-header";
+import { AllList } from "../all-list";
+import { TaskFilters } from "../filters";
+import { TaskListProvider } from "../task-list-context";
+import { TasksHeader } from "../tasks-header";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Tasks" };

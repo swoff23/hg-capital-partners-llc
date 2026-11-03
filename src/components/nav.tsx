@@ -65,12 +65,16 @@ export function SideNav({
               TOUCH_HEIGHT,
               active
                 ? "bg-fill-2 text-fg-1 before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:bg-act"
-                : "text-fg-2 hover:bg-fill-1 hover:text-fg-1",
+                : cn(
+                    "text-fg-2 hover:bg-fill-1 hover:text-fg-1",
+                    // Tapped before its page was prefetched: the current look at once (LeaveLink's data-pending).
+                    "data-pending:bg-fill-2 data-pending:text-fg-1 data-pending:before:absolute data-pending:before:left-0 data-pending:before:top-1/2 data-pending:before:h-4 data-pending:before:w-0.5 data-pending:before:-translate-y-1/2 data-pending:before:bg-act",
+                  ),
             )}
           >
             <Icon
               aria-hidden="true"
-              className={cn(chromeIconClass, active ? "text-fg-1" : "text-fg-3 group-hover:text-fg-1")}
+              className={cn(chromeIconClass, active ? "text-fg-1" : "text-fg-3 group-hover:text-fg-1 group-data-pending:text-fg-1")}
             />
             <span className="truncate">{label}</span>
           </LeaveLink>
@@ -126,6 +130,8 @@ export function TopTabs({
               // eslint-disable-next-line hg/design-tokens -- the tab size is fixed
               "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-fg-1 sm:px-3",
               "aria-[current=page]:border-act aria-[current=page]:text-fg-1",
+              // Tapped before its page was prefetched: the picked look at once (LeaveLink's data-pending).
+              "data-pending:border-act data-pending:text-fg-1",
               TOUCH_HEIGHT,
             )}
           >

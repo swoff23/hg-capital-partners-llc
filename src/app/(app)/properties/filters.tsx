@@ -64,3 +64,16 @@ export function PropertyFilters({ data, children }: { data: PropertyFilterData; 
     </FilterScope>
   );
 }
+
+/** The bar as the loading screen draws it (properties/(list)/loading.tsx): inert, no counts. */
+export function PropertyFiltersPlaceholder() {
+  return (
+    <FilterBar
+      placeholder
+      facets={[{ kind: "multi", param: "status", label: "Status" }]}
+      sort={{ param: "sort", default: DEFAULT_PROPERTY_SORT }}
+      wide="56rem"
+      className="mt-6"
+    />
+  );
+}

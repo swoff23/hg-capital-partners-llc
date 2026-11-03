@@ -110,3 +110,20 @@ export function TaskFilters({ data, children }: { data: TaskFilterData; children
     </FilterScope>
   );
 }
+
+/** The bar as the loading screen draws it (tasks/(list)/loading.tsx): the same views and facet names, inert, no counts. */
+export function TaskFiltersPlaceholder() {
+  return (
+    <FilterBar
+      placeholder
+      search={{ placeholder: "Search tasks" }}
+      views={{ param: "status", label: "Status", default: "open", options: VIEWS }}
+      facets={[
+        { kind: "multi", param: "owner", label: "Assignee" },
+        { kind: "multi", param: "property", label: "Property" },
+        { kind: "toggle", param: "repeats", label: "Repeats" },
+      ]}
+      wide="56rem"
+    />
+  );
+}

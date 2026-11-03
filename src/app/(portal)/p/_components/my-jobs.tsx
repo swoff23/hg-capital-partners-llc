@@ -6,7 +6,8 @@ import { PhotoThumb } from "@/components/photo-thumb";
 import { SearchInput } from "@/components/search-field";
 import { SegmentedControl } from "@/components/segmented-control";
 import { StatusBadge } from "@/components/status-badge";
-import { Button, EmptyState, Section } from "@/components/ui";
+import { LinkPending } from "@/components/link-pending";
+import { Button, EmptyState, Section, pendingRowFill } from "@/components/ui";
 import { useUploadQueue } from "@/components/upload-queue";
 import type { Ymd } from "@/lib/dates";
 import {
@@ -176,8 +177,9 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
   return (
     <Link
       href={job.newCount > 0 ? `/p/jobs/${job.id}#new` : `/p/jobs/${job.id}`}
-      className="relative flex min-h-18 items-center gap-3 py-2.5 transition-colors hover:bg-fill-1 focus-visible:-outline-offset-2"
+      className={cn("relative flex min-h-18 items-center gap-3 py-2.5 transition-colors hover:bg-fill-1 focus-visible:-outline-offset-2", pendingRowFill)}
     >
+      <LinkPending />
       {job.newCount > 0 && (
         <span aria-hidden="true" className="absolute -left-2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-act" />
       )}

@@ -7,7 +7,7 @@ import { Money } from "@/components/money";
 import { StatusMenu } from "@/components/status-menu";
 import { Tooltip } from "@/components/tooltip";
 import { useToast } from "@/components/toast";
-import { RowCell } from "@/components/ui";
+import { RowCell, pendingRowFill } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { dealStageLabel } from "@/lib/config";
 import { cn } from "@/lib/utils";
@@ -100,7 +100,7 @@ export function DealListRow({ deal }: { deal: DealRow }) {
   const note = deal.latestNote ? (deal.latestNote.day ? `${deal.latestNote.day} · ${deal.latestNote.text}` : deal.latestNote.text) : null;
 
   return (
-    <tr className={cn("group/row transition-colors", flash ? "bg-ok-tint" : "hover:bg-fill-1")}>
+    <tr className={cn("group/row transition-colors", flash ? "bg-ok-tint" : cn("hover:bg-fill-1", pendingRowFill))}>
       {/* The first cell starts on the page gutter, under the title (section 5). */}
       <RowCell
         href={href}
