@@ -45,6 +45,7 @@ import {
   sendOutcome,
   settleLost,
   stripCounts,
+  TOO_MANY_FILES,
   unconfirmedIds,
   type LostSend,
 } from "@/lib/portal/job-view";
@@ -103,7 +104,8 @@ import { postKept, postOrKeepBatch, postRecordedBatch, recordJobFile } from "./r
  * composer. Files a send already posted, whose answer was lost, go back on the
  * tray and clear with the next Send or Mark done (portal/job-send.ts). A
  * written update's stay out of the Mark done sheet until a Send of it answers,
- * or the page learns it never posted (job-view.ts lostAfter, settleLost): the
+ * or the page learns it never posted (job-view.ts lostAfter, settleLost, once
+ * the signal is back or the server next answers): the
  * server never counts a written update's photos, and a Send again of it posts
  * the words once and any photo added since on its own (composer-draft.ts
  * clientIdToReuse; the files it went with go back on the tray first,
@@ -171,8 +173,8 @@ export function JobActions({
   const router = useRouter();
   // The composer's words as they change (its draft is its own): photos picked while it's empty post on their own.
   const [body, setBody] = useState("");
-  // Uploaded and recorded, not posted yet.
-  const [ready, setReady] = useState<Recorded[]>([]);
+  // Uploaded and recorded, not posted yet. Set through setReady below, which keeps `live` in step.
+  const [ready, setReadyState] = useState<Recorded[]>([]);
   // Files out in a post right now (a batch, a Send, or a closed job's late post). They leave the tray while it goes
   // and come back to it if it fails, so they still count against the room: new picks meanwhile never add up to more
   // than one post takes.
@@ -192,17 +194,31 @@ export function JobActions({
   // Set when this page marks the job done, so the hour starts at once without waiting for the page to refresh.
   const [markedNow, setMarkedNow] = useState<string | null>(null);
 
-  // onRecorded runs after the last upload lands, so it reads the latest of these.
+  // onRecorded runs after the last upload lands, so it reads the latest of these. The tray is written here as it is
+  // set (setReady), the words and the sheet after each render.
   const live = useRef({ body, sheetOpen, ready });
   useEffect(() => {
-    live.current = { body, sheetOpen, ready };
+    live.current = { ...live.current, body, sheetOpen };
   });
   // False once the page is gone (set in the unmount cleanup below).
   const mounted = useRef(true);
 
+  /**
+   * Sets the tray in the page's state and in `live` at once. What reads the tray outside a render (onRecorded,
+   * putBack, the unmount's post) reads `live`, and the render that would bring a new tray there may not come before
+   * the page goes: the unmount then read a file put back from a failed post as gone, and lost it, and one just taken
+   * off for a post as still held, and sent it again.
+   */
+  const setReady = (next: Recorded[] | ((r: Recorded[]) => Recorded[])) => {
+    const value = typeof next === "function" ? next(live.current.ready) : next;
+    live.current = { ...live.current, ready: value };
+    setReadyState(value);
+  };
+
   // A Send whose answer was lost, once the signal is back: one refresh brings the page's own updates, and they say
-  // whether it posted (settleLost). Only the browser's own word that the signal is back starts it: a refresh with
-  // none could fail the whole page over. The refresh is ours, so what arrives next is read after the signal returned.
+  // whether it posted (settleLost). Only the browser's own word that the signal is back starts it, or an answer from
+  // the server (heard, below): a refresh with no signal could fail the whole page over. The refresh is ours, so what
+  // arrives next is read after the signal returned.
   const hasLost = lost.length > 0;
   const learning = useRef(false);
   useEffect(() => {
@@ -220,6 +236,16 @@ export function JobActions({
     learning.current = false;
     setLost((l) => settleLost(l, sentClientIds ?? []));
   }, [sentClientIds]);
+  // The browser never says the signal is back where it never said it was gone (a phone with no data still reads
+  // online), so the next answer from the server says it too: the first one after a lost Send (sendUpdate) starts the
+  // same refresh, once for each loss.
+  const unasked = useRef(false);
+  const heard = () => {
+    if (!unasked.current || !mounted.current) return;
+    unasked.current = false;
+    learning.current = true;
+    router.refresh();
+  };
 
   /**
    * Files that didn't post go back on the tray, to go with the next send, up to what one send takes
@@ -287,6 +313,8 @@ export function JobActions({
       setPosting((n) => n - items.length);
       const outcome = sendOutcome(res, offlineAtStart);
       setLost((l) => lostAfter(l, { clientId, ids: attachmentIds }, outcome));
+      if (outcome === "lost") unasked.current = true;
+      else if (res) heard();
       if (res?.ok) startSending(sendKept);
       else if (res && res.error === JOB_CLOSED) sendLate(items);
       else putBack(items);
@@ -313,9 +341,14 @@ export function JobActions({
 
   /**
    * The record step for one file: it joins the job unposted, and its kind and previews are kept for the slot and
-   * the strip, for the tab and not this page (record-and-post.ts).
+   * the strip, for the tab and not this page (record-and-post.ts). Its answer is the server's, so it settles a lost
+   * Send (heard).
    */
-  const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> => recordJobFile(taskId, file, from);
+  const record = (file: RecordMediaInput, from?: string): Promise<RecordMediaResult> =>
+    recordJobFile(taskId, file, from).then((res) => {
+      heard();
+      return res;
+    });
 
   function onRecorded(ids: string[]) {
     const { sheetOpen: holding, body: text, ready: held } = live.current;
@@ -347,9 +380,10 @@ export function JobActions({
     access: "private",
     allowed: ["image", "video"],
     // One post takes 50: the files held for it count, and so do the ones out in a post, so a pick of 55 sends 50 and
-    // refuses 5 with the reason. A Retry past it is refused the same way (engine.ts retry).
+    // refuses 5 with the reason. A Retry past it keeps its failed tile and Retry, and toasts the way on (engine.ts retry).
     maxFiles: postRoom(ready.length + posting),
     maxFilesReason: MAX_FILES_REASON,
+    maxFilesNotice: TOO_MANY_FILES,
     // Photos go up upright, as a 2560px JPEG without GPS and without the original (question 3).
     prepare: "display",
     record,
@@ -467,8 +501,10 @@ export function JobActions({
     startFinishing(async () => {
       const items = sheetReady;
       finishingIds.current = items.map((i) => i.id);
+      let answered = false;
       try {
         const res = await callAction(() => markJobDoneAction(taskId, { body: note.trim(), attachmentIds: items.map((i) => i.id) }, owner));
+        answered = true;
         if (!res.ok) {
           toast({ message: res.error });
           // The page went while this was sending (the unmount left these out of its own post): keep them for the tab.
@@ -484,6 +520,8 @@ export function JobActions({
         startSending(sendKept);
       } finally {
         finishingIds.current = [];
+        // Thrown with the page gone (a redirect: the session ended): the unmount left these out of its own post too.
+        if (!answered && !mounted.current) tab.keep(taskId, items);
       }
     });
   }

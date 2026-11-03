@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { UploadTarget } from "@/components/upload-queue";
 import { UPLOADS_PAUSED_LINE, UPLOADS_RETRYING_LINE, UploadEngine, type EngineDeps, type EngineNotice } from "./engine";
+import { lazyTransfer } from "./lazy-transfer";
 import { MAX_ONLINE_TRIES, UploadCodeMissingError, memoryOutbox, type OutboxStore } from "./outbox";
 
 /**
@@ -13,7 +14,7 @@ import { MAX_ONLINE_TRIES, UploadCodeMissingError, memoryOutbox, type OutboxStor
  * nothing. On fakes, as engine.test.ts runs it.
  */
 
-function setup(opts: { outbox?: OutboxStore } = {}) {
+function setup(opts: { outbox?: OutboxStore; transfer?: EngineDeps["transfer"] } = {}) {
   let clock = Date.UTC(2026, 10, 3, 18, 0, 0);
   let nextTimer = 1;
   const timers = new Map<number, { due: number; fn: () => void }>();
@@ -25,12 +26,14 @@ function setup(opts: { outbox?: OutboxStore } = {}) {
   let sends = 0;
   let seq = 0;
   const deps: EngineDeps = {
-    transfer: async (input) => {
-      sends++;
-      if (code.missing) throw net.online ? new UploadCodeMissingError() : new TypeError("Failed to fetch");
-      input.onProgress(1);
-      return { pathname: `${input.role}/${input.name}` };
-    },
+    transfer:
+      opts.transfer ??
+      (async (input) => {
+        sends++;
+        if (code.missing) throw net.online ? new UploadCodeMissingError() : new TypeError("Failed to fetch");
+        input.onProgress(1);
+        return { pathname: `${input.role}/${input.name}` };
+      }),
     prepare: async (file, input) => ({ blob: file, name: input.name, contentType: input.contentType, thumb: null, poster: null, meta: {} }),
     outbox: opts.outbox ?? memoryOutbox(),
     notify: (n) => notices.push(n),
@@ -195,4 +198,49 @@ test("a file whose row never reached the outbox: the notice says the files keep 
 
 test("the notices fit a phone and carry no dash", () => {
   for (const line of [UPLOADS_PAUSED_LINE, UPLOADS_RETRYING_LINE]) assert.ok(line.length <= 40 && !line.includes("—"), line);
+});
+
+test("no data while the device reads online: the files wait as no signal, with no notice and no Reload, then pause once the server answers", async () => {
+  // Lows 7, through the real lazyTransfer: the chunk failed, and the app's server doesn't answer the probe either.
+  const road = { up: false };
+  const missing = lazyTransfer(
+    async () => {
+      throw new Error("ChunkLoadError: Failed to load chunk /_next/static/chunks/0blob.js");
+    },
+    () => true,
+    async () => road.up,
+  );
+  const h = setup({ transfer: missing.send });
+  const t = target();
+  h.engine.mount(t.key);
+  h.engine.add(t, [photo("a.jpg"), photo("b.jpg")]);
+  await h.flush();
+  for (let i = 0; i < 6; i++) await h.advance(60_000);
+  const tiles = h.engine.uploadsFor(t.key);
+  assert.ok(
+    tiles.every((u) => u.status !== "failed"),
+    "never red: the road was down, which spends no try",
+  );
+  assert.deepEqual(
+    tiles.filter((u) => u.status === "waiting").map((u) => u.paused),
+    [undefined, undefined],
+    "the no-signal wait, not paused",
+  );
+  assert.equal(h.engine.counts(t.key).paused, 0, "a My jobs row says No signal");
+  assert.equal(h.notices.length, 0, "no Uploads paused notice, so no Reload into the browser's offline page");
+
+  // The server answers again, and the code is still missing (the runtime keeps the failure until a reload).
+  road.up = true;
+  h.engine.nudge();
+  await h.flush();
+  assert.deepEqual(
+    h.engine.uploadsFor(t.key).map((u) => [u.status, u.paused]),
+    [
+      ["waiting", true],
+      ["waiting", true],
+    ],
+  );
+  const paused = h.notices.filter((n) => n.message === UPLOADS_PAUSED_LINE);
+  assert.equal(paused.length, 1);
+  assert.equal(paused[0].action?.label, "Reload");
 });

@@ -27,9 +27,10 @@ function causeOf(error: Error): "offline" | "save" | "unknown" {
  * or the device is offline; the generic title otherwise, including a page
  * that failed to render after a save that worked. The action is Try again,
  * which re-renders the segment (`retry`), except for a chunk of the page's
- * code that didn't load (`isChunkLoadError`): after a deploy moved the chunk,
- * Try again re-renders with the same URLs and would only fail again, so the
- * action is Reload. The digest matches the server log, so it stays, quietly,
+ * code that didn't load (`isChunkLoadError`): the browser's runtime keeps a
+ * failed chunk failed until the page loads again (lib/lazy-module.ts), after
+ * a deploy moved it or a dropped signal alike, so Try again would only fail
+ * again, and the action is Reload. The digest matches the server log, so it stays, quietly,
  * for whoever looks into it.
  */
 export function ErrorScreen({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
