@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
+import { withFinalRefusal } from "@/lib/attachments/access";
 import { MAX_FILENAME } from "@/lib/attachments/content-types";
 import { assertQueueOwner, portalScope } from "@/lib/attachments/queue-owner";
 import { MAX_FILES_PER_POST, TOO_MANY_FILES } from "@/lib/portal/job-view";
@@ -49,28 +50,33 @@ const uploadSchema = z
   })
   .strict();
 
-/** After the browser finished uploading straight to Blob. A result, not a throw, for the uploader's Retry. */
+/**
+ * After the browser finished uploading straight to Blob. A result, not a throw, for the uploader's Retry. A job
+ * that stopped taking files before this one recorded answers `final`: no Retry can change it, so the tile keeps only Remove.
+ */
 export async function recordJobUploadAction(
   taskId: string,
   file: z.input<typeof uploadSchema>,
   queueOwner?: string | null,
-): Promise<ActionResult<{ id: string }>> {
-  return withResult("portal:recordJobUpload", async () => {
+): Promise<ActionResult<{ id: string }> & { final?: true }> {
+  const res = await withResult("portal:recordJobUpload", async () => {
     const p = await requirePortalPrincipal();
     assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));
     return jobs.recordJobUpload(id.parse(taskId), uploadSchema.parse(file));
   });
+  return withFinalRefusal(res);
 }
 
 /**
- * A batch of recorded files posted as one update. Returns its id, for the Undo; null when the job was approved while
- * the photos were going up, so they stay on the job with no update to post or take back.
+ * A batch of recorded files posted as one update. Returns its id, for the Undo; null when the job was approved or
+ * canceled while the photos were going up: HG is told once, the job keeps its status, and there is nothing to take back.
+ * `linked` are the files it told HG of, for the toast's count.
  */
 export async function postJobBatchAction(
   taskId: string,
   attachmentIds: string[],
   queueOwner?: string | null,
-): Promise<ActionResult<{ eventId: string | null; alreadyPosted?: true }>> {
+): Promise<ActionResult<{ eventId: string | null; linked: string[] }>> {
   return withResult("portal:postJobBatch", async () => {
     const p = await requirePortalPrincipal();
     assertQueueOwner(owner.parse(queueOwner), portalScope(p.contactId));

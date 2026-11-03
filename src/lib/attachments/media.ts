@@ -1,5 +1,6 @@
 import { isOfflineError } from "@/lib/action-result";
 import { HG_TIME_ZONE, fmtDay, todayYmdEastern } from "@/lib/dates";
+import { JOB_CLOSED } from "./access";
 import {
   FILE_KINDS,
   UPLOAD_RULES,
@@ -128,19 +129,77 @@ export function uploadFailureReason(e: unknown): string {
  * a phone: "2 photos didn't upload: no connection". Nouns as addedText words
  * them (a mix is "files"); the names are on each tile. Empty when none did.
  * `reason: false` is the count alone, "2 photos didn't upload", for a line
- * that carries its own Retry (the contractor's Mark done).
+ * that carries its own Retry (the contractor's Mark done). `where` names the
+ * target, for a line shown on another page: "1 photo didn't upload to 56
+ * Tamarack St".
  */
-export function uploadNotice(failures: UploadFailure[], { reason: withReason = true }: { reason?: boolean } = {}): string {
+export function uploadNotice(
+  failures: UploadFailure[],
+  { reason: withReason = true, where = "" }: { reason?: boolean; where?: string } = {},
+): string {
   if (failures.length === 0) return "";
   if (failures.some((f) => NO_BLOB_STORE.test(f.reason))) return "File uploads aren't set up yet.";
-  const kinds = failures.map((f) => f.kind ?? fileKindForType(contentTypeForName(f.name)));
-  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
-  const count = `${failures.length} ${noun}${failures.length === 1 ? "" : "s"} didn't upload`;
+  const count = `${failedCount(failures)} didn't upload${toWhere(where)}`;
   if (!withReason) return count;
   const reason = shownReason(failures[0].reason);
   // Different reasons can't share one line; each tile's label has its own.
   const same = failures.every((f) => shownReason(f.reason) === reason);
   return same && reason ? `${count}: ${reason}` : count;
+}
+
+/** " to 56 Tamarack St", or nothing for a target with no label. */
+const toWhere = (where: string) => (where.trim() ? ` to ${where.trim()}` : "");
+
+/** "2 photos", "1 video", "3 files": the count the failure lines lead with, a mix of kinds being files. */
+function failedCount(failures: readonly Pick<UploadFailure, "name" | "kind">[]): string {
+  const kinds = failures.map((f) => f.kind ?? fileKindForType(contentTypeForName(f.name)));
+  const noun = kinds.every((k) => k === "image") ? "photo" : kinds.every((k) => k === "video") ? "video" : "file";
+  return `${failures.length} ${noun}${failures.length === 1 ? "" : "s"}`;
+}
+
+/** What the failure lines read of a tile: the engine's MediaUpload, or any list shaped like it. */
+type ShownTile = { name: string; kind: FileKind | null; status: string; error?: string; final?: boolean };
+
+const isRed = (u: ShownTile) => u.status === "failed" || u.status === "invalid";
+
+/**
+ * The status line when every red tile on a tray is one the job stopped
+ * taking before it uploaded (the token route's or the record step's final
+ * refusal, uploads question 4), the noun as uploadNotice has it: "Job closed
+ * before 2 photos uploaded" when the server said the job closed (Done or
+ * Canceled, access.ts JOB_CLOSED), and "Too late to add 2 photos" otherwise
+ * (a job still in Review past its window, TOO_LATE), which is true either
+ * way. No Retry goes with it. Empty when nothing is red, or any red tile is
+ * something else (a Retry, or a file the check refused), which keeps today's
+ * line. `where` names the target as uploadNotice does ("Too late to add 2
+ * photos to 56 Tamarack St").
+ */
+export function closedJobLine(uploads: readonly ShownTile[], where = ""): string {
+  const red = uploads.filter(isRed);
+  if (red.length === 0 || !red.every((u) => u.final)) return "";
+  const count = failedCount(red);
+  const to = toWhere(where);
+  return red.every((u) => u.error === JOB_CLOSED) ? `Job closed before ${count} uploaded${to}` : `Too late to add ${count}${to}`;
+}
+
+/**
+ * The one line about a target's red tiles, which the line under its tray
+ * (UploadStatusLine) and the toast its queue shows once the page is gone
+ * (engine.ts) both say, so the two always count alike: every red tile,
+ * final ones included, in uploadNotice's nouns. While any can go again it is
+ * "2 photos didn't upload" with a Retry for those; when every red tile is
+ * final, closedJobLine; otherwise uploadNotice's line with its reason when
+ * they share one ("1 photo didn't upload: over the 25 MB photo limit"). Null
+ * when nothing is red. The toast passes `where`, the target's label, since it
+ * shows on whatever page is open ("2 photos didn't upload to 56 Tamarack
+ * St"); the tray's own line needs none.
+ */
+export function redTilesLine(uploads: readonly ShownTile[], where = ""): { text: string; retry: boolean } | null {
+  const red = uploads.filter(isRed);
+  if (red.length === 0) return null;
+  const failures = red.map((u) => ({ name: u.name, kind: u.kind, reason: u.error ?? "" }));
+  if (red.some((u) => u.status === "failed")) return { text: uploadNotice(failures, { reason: false, where }), retry: true };
+  return { text: closedJobLine(red, where) || uploadNotice(failures, { where }), retry: false };
 }
 
 /** "0:07", "4:32", "1:02:03". Empty for a missing or nonsense length. */

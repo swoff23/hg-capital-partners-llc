@@ -391,7 +391,7 @@ test("D25 repeats its check in the delete, and only a task it deleted gives up i
 
 // A static check on top: no importer file names the outbox, and it takes from core only writes that never email.
 const NOTIFYING_NAME =
-  /notificationOutbox|NotificationOutbox|\benqueue\(|\bcore\.(createTask|setStatus|toggleDone|patchTask|addComment|recordAttachment|editComment|deleteComment|restoreComment|undoApproval|takeBackContractorPost|renameTaskUnits)\b/;
+  /notificationOutbox|NotificationOutbox|\benqueue\(|\bcore\.(createTask|setStatus|toggleDone|patchTask|addComment|addLateContractorBatch|recordAttachment|editComment|deleteComment|restoreComment|undoApproval|takeBackContractorPost|renameTaskUnits)\b/;
 /**
  * What the importer may name from core: the writes it uses, which never email
  * as the Asana principal (the test above), and their types. Nothing from
@@ -446,6 +446,8 @@ test("the static check catches a notifying import however it's spelled", () => {
     `import { undoApproval } from "@/lib/tasks/core";`,
     // It rewrites outbox rows: never the importer's.
     `import { takeBackContractorPost } from "@/lib/tasks/core";`,
+    // A contractor's late photos queue an email line.
+    `import { addLateContractorBatch } from "@/lib/tasks/core";`,
     // A unit rename moves each task through patchTask, which emails.
     `import { renameTaskUnits } from "@/lib/tasks/core";`,
     // Service's wrappers email, whatever they're called here.

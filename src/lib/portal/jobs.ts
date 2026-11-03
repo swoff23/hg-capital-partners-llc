@@ -6,9 +6,10 @@ import { prisma } from "@/lib/db";
 import { todayYmdEastern } from "@/lib/dates";
 import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
+import { visitStart } from "@/lib/tasks/media";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { logSecurityEvent } from "./accounts";
-import { ownUnposted } from "./job-batch";
+import { allOwnPosted, ownPosted, ownUnposted } from "./job-batch";
 import { addMorePhotosLine, finishPhotoCount, finishPhotosNeeded } from "./job-view";
 import { requestIpHash } from "./request";
 import { requirePortalPrincipal, taskPrincipal, type PortalPrincipal } from "./session";
@@ -117,11 +118,20 @@ export interface JobUpdateInput {
   clientId?: string;
 }
 
-/** An update from the composer: text, files, or both. Always Shared (core). Only the contractor's own unposted files go (job-batch.ts ownUnposted). */
+/**
+ * An update from the composer: text, files, or both. Always Shared (core). Only the contractor's own unposted files go
+ * (job-batch.ts ownUnposted). With no text, files that are all posted already (a batch post whose answer was lost put
+ * them back on the tray) have nothing new to tell HG: it answers quietly, so the page clears them instead of
+ * refusing every Send.
+ */
 export async function postJobUpdate(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
   await prisma.$transaction(async (tx) => {
     const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
+    if (!input.body.trim() && own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, input.attachmentIds))) {
+      await core.assertContractorAccess(tx, taskId, p.contactId);
+      return;
+    }
     await core.addComment(tx, taskId, { body: input.body, attachmentIds: own.map((f) => f.id), clientId: input.clientId }, taskPrincipal(p));
   });
   revalidateJob(taskId);
@@ -135,9 +145,14 @@ export async function postJobUpdate(taskId: string, input: JobUpdateInput): Prom
  * one email for the two: the note's line, then "marked it done" (core bundles
  * them). When the job's playbook asks for photos
  * (TaskTemplate.finishPhotosRequired, uploads 2.8), it needs that many of this
- * contractor's own, unposted photos and videos here (job-view finishPhotoCount,
- * what the sheet counts); the sheet holds the button until they are up, and
- * this is the same rule where the browser can't skip it.
+ * contractor's own photos and videos here (job-view finishPhotoCount, what the
+ * sheet counts): the unposted ones, which this update links, and any a batch
+ * post of this visit already told HG of whose answer was lost, which stay on
+ * that post's line (job-batch.ts ownPosted; the visit is the Review card's,
+ * lib/tasks/media.ts visitStart). Those are named on the move to Review
+ * (`finishIds`), so they show under "At finish" with the rest. The sheet holds
+ * the button until they are up, and this is the same rule where the browser
+ * can't skip it.
  */
 export async function markJobDone(taskId: string, input: JobUpdateInput): Promise<void> {
   const p = await requirePortalPrincipal();
@@ -147,14 +162,30 @@ export async function markJobDone(taskId: string, input: JobUpdateInput): Promis
       const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
       const template = await tx.task.findUnique({ where: { id: taskId }, select: { taskTemplate: { select: { finishPhotosRequired: true } } } });
       const required = finishPhotosNeeded(template?.taskTemplate?.finishPhotosRequired);
-      const photos = finishPhotoCount(own.map((f) => f.kind));
+      let photos = finishPhotoCount(own.map((f) => f.kind));
+      // Photos a batch post of this visit already told HG of, put back on the tray after its answer was lost, count too.
+      const posted = photos < required ? await ownPosted(tx, taskId, p.contactId, input.attachmentIds, await visitStartOf(tx, taskId)) : [];
+      photos += finishPhotoCount(posted.map((f) => f.kind));
       if (photos < required) {
         throw new core.TaskRuleError(`${addMorePhotosLine(required - photos)} to mark this done.`);
       }
-      await core.setStatus(tx, taskId, "REVIEW", principal, { note: input.body, attachmentIds: own.map((f) => f.id) });
+      await core.setStatus(tx, taskId, "REVIEW", principal, {
+        note: input.body,
+        attachmentIds: own.map((f) => f.id),
+        finishIds: posted.map((f) => f.id),
+      });
     }),
   );
   revalidateJob(taskId);
+}
+
+/** When this visit to the job started: the job's latest move to In progress (visitStart), or null for an older job with none. */
+async function visitStartOf(tx: core.Tx, taskId: string): Promise<Date | null> {
+  const starts = await tx.taskEvent.findMany({
+    where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "IN_PROGRESS" } },
+    select: { kind: true, data: true, createdAt: true },
+  });
+  return visitStart(starts);
 }
 
 /** Tick or untick a checklist item on an active job. */

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   POST_ITEM_SLACK_MS,
   addComment,
+  addLateContractorBatch,
   commentSummary,
   findOwnUpload,
   lockTask,
@@ -215,10 +216,15 @@ const bundles = [
   { id: "o2", items: [item({ eventId: "e-a" })] },
 ];
 
+/** The read of the job's latest move to Review, which the post's own lookup isn't. */
+const isReviewRead = (model: string, op: string, args: CallArgs) => model === "taskEvent" && op === "findFirst" && args.where?.kind === "STATUS";
+
+/** A job never moved to Review unless `over` says so. */
 function undoTx(over: Answer = () => undefined) {
   return fakeTx((model, op, args) => {
     const given = over(model, op, args);
     if (given !== undefined) return given;
+    if (isReviewRead(model, op, args)) return null;
     if (model === "taskEvent" && op === "findFirst") return BATCH_EVENT;
     if (model === "taskAttachment" && op === "updateMany") return { count: 2 };
     if (model === "$queryRaw" && op.includes('FROM "NotificationOutbox"')) return bundles;
@@ -331,6 +337,30 @@ test("takeBackContractorPost: the window is judged on the post's own time", asyn
   const { tx } = undoTx();
   await takeBackContractorPost(tx, "t1", "e-a", ZACK, { undoable: (at) => (seen.push(at), true) }, SECONDS(3));
   assert.deepEqual(seen, [POSTED]);
+});
+
+test("takeBackContractorPost: a post the job went to Review at or after is refused, since Mark done could count its photos", async () => {
+  for (const reviewedAt of [POSTED, SECONDS(2)]) {
+    const { tx, calls } = undoTx((model, op, args) =>
+      isReviewRead(model, op, args) ? { createdAt: reviewedAt } : model === "task" && op === "findUnique" ? { status: "REVIEW" } : undefined,
+    );
+    await assert.rejects(takeBackContractorPost(tx, "t1", "e-a", ZACK, within, SECONDS(3)), /It's too late to take that back\./, reviewedAt.toISOString());
+    assert.deepEqual(calls.filter(isWrite), [], "nothing written");
+    const read = calls.find((c) => isReviewRead(c.model, c.op, c.args as CallArgs))!.args as CallArgs & { orderBy?: unknown };
+    assert.deepEqual(read.where, { taskId: "t1", kind: "STATUS", data: { path: ["to"], equals: "REVIEW" } }, "the job's latest move to Review, by anyone");
+    assert.deepEqual(read.orderBy, { createdAt: "desc" });
+  }
+});
+
+test("takeBackContractorPost: a batch posted in the hour after Mark done can still be taken back", async () => {
+  const { tx, calls } = undoTx((model, op, args) =>
+    isReviewRead(model, op, args) ? { createdAt: new Date(POSTED.getTime() - 60_000) } : model === "task" && op === "findUnique" ? { status: "REVIEW" } : undefined,
+  );
+  await takeBackContractorPost(tx, "t1", "e-a", ZACK, within, SECONDS(3));
+  assert.ok(calls.some((c) => c.model === "taskEvent" && c.op === "update"), "the post goes");
+  // The lookups keep their order: the post first, then its window, then the move to Review.
+  const finds = calls.filter((c) => c.model === "taskEvent" && c.op === "findFirst").map((c) => ((c.args as CallArgs).where?.kind as string) ?? "");
+  assert.deepEqual(finds, ["COMMENT", "STATUS"]);
 });
 
 test("takeBackContractorPost: staff can't use it", async () => {
@@ -616,4 +646,129 @@ test("renameAttachment: a rename that waited on a delete finds the file gone und
   await assert.rejects(renameAttachment(tx, "a1", "x.jpg", CONNOR), /That file no longer exists\./);
   assert.ok(calls.some((c) => c.model === "$executeRaw"), "it waited on the task");
   assert.ok(!calls.some(isWrite));
+});
+
+// ---------------------------------------------------------------------------
+// Late photos on a job HG already approved: HG hears once per batch (uploads question 4)
+// ---------------------------------------------------------------------------
+
+/** A Done job: the task's own answer, everything else as fakeTx has it. */
+function doneTx(over: Answer = () => undefined) {
+  return fakeTx((model, op, args) => {
+    const given = over(model, op, args);
+    if (given !== undefined) return given;
+    if (model === "task" && op === "findUnique") return { id: "t1", title: "Tile the bath", status: "DONE", assigneeContactId: "c-zack" };
+    if (model === "taskEvent" && op === "create") return { id: "e-late", ...args.data };
+    if (model === "taskAttachment" && op === "updateMany") return { count: 3 };
+    return undefined;
+  });
+}
+
+test("addLateContractorBatch: one update with no text, the job left as it is", async () => {
+  const { tx, calls } = doneTx();
+  const event = await addLateContractorBatch(tx, "t1", ["a1", "a2", "a3"], ZACK, POSTED);
+  assert.equal(event.id, "e-late");
+  const created = calls.filter((c) => c.model === "taskEvent" && c.op === "create").map((c) => (c.args as CallArgs).data);
+  assert.equal(created.length, 1, "one timeline line for the batch, never one per file");
+  assert.deepEqual(created[0], {
+    taskId: "t1",
+    kind: "COMMENT",
+    visibility: "SHARED",
+    body: null,
+    data: { late: true },
+    asanaStoryGid: null,
+    audienceContactId: null,
+    actorUserId: null,
+    actorContactId: "c-zack",
+    actorLabel: "Zack Outlaw",
+    source: "PORTAL",
+  });
+  // The task row is stamped as edited, and nothing about its status changes.
+  assert.deepEqual(
+    calls.filter((c) => c.model === "task" && c.op === "update").map((c) => c.args),
+    [{ where: { id: "t1" }, data: { appEditedAt: POSTED } }],
+  );
+  assert.ok(!calls.some((c) => c.model === "taskEvent" && c.op === "create" && (c.args as CallArgs).data?.kind === "STATUS"));
+});
+
+test("addLateContractorBatch: only the contractor's own unposted files on this job are linked, Shared", async () => {
+  const { tx, calls } = doneTx();
+  await addLateContractorBatch(tx, "t1", ["a1", "a2", "a3"], ZACK, POSTED);
+  const link = calls.find((c) => c.model === "taskAttachment" && c.op === "updateMany")!.args as CallArgs;
+  assert.deepEqual(link, {
+    where: { id: { in: ["a1", "a2", "a3"] }, taskId: "t1", eventId: null, deletedAt: null, uploadedByContactId: "c-zack", asanaGid: null },
+    data: { eventId: "e-late", visibility: "SHARED", audienceContactId: null },
+  });
+});
+
+test("addLateContractorBatch: one email line per partner for the batch, naming its event", async () => {
+  const { tx, calls } = doneTx();
+  await addLateContractorBatch(tx, "t1", ["a1", "a2", "a3"], ZACK, POSTED);
+  const inserts = outboxInserts(calls);
+  assert.equal(inserts.length, 2, "one line for each partner, not one per file");
+  for (const c of inserts) {
+    assert.deepEqual(insertedItem(c), { kind: "COMMENT", actorLabel: "Zack Outlaw", summary: "added files (+3 files)", at: POSTED.toISOString(), eventId: "e-late" });
+    // Into the same 10-minute bundle as every other line for the task.
+    assert.match(c.op, /ON CONFLICT \("openKey"\) DO UPDATE SET/);
+  }
+});
+
+test("addLateContractorBatch: the task row first, as addComment takes it, then the job, access, the update, files and stamp, then email", async () => {
+  const { tx, calls } = doneTx();
+  await addLateContractorBatch(tx, "t1", ["a1"], ZACK, POSTED);
+  const at = (pred: (c: Call) => boolean) => calls.findIndex(pred);
+  const lock = at((c) => c.model === "$executeRaw" && c.op.includes("FOR NO KEY UPDATE"));
+  const read = at((c) => c.model === "task" && c.op === "findUnique");
+  const access = at((c) => c.model === "taskAccess" && c.op === "findUnique");
+  const event = at((c) => c.model === "taskEvent" && c.op === "create");
+  const link = at((c) => c.model === "taskAttachment" && c.op === "updateMany");
+  const stamp = at((c) => c.model === "task" && c.op === "update");
+  const firstInsert = at((c) => c.model === "$executeRaw" && c.op.includes("NotificationOutbox"));
+  // Every writer takes the task row before anything else (chunk 7's order), so a late send and an active send of the
+  // same files wait on each other there, never crosswise, and an approve can't commit while this writes.
+  assert.equal(lock, 0, "the task row is the first thing it takes");
+  assert.match(calls[0].op, /^SELECT 1 FROM "Task" WHERE "id" = \? FOR NO KEY UPDATE$/);
+  assert.deepEqual(calls[0].args, ["t1"]);
+  assert.ok(
+    lock < read && read < access && access < event && event < link && link < stamp && stamp < firstInsert,
+    JSON.stringify({ lock, read, access, event, link, stamp, firstInsert }),
+  );
+});
+
+test("addLateContractorBatch: no access is refused under the lock, before anything is written", async () => {
+  const { tx, calls } = doneTx((model, op) => (model === "taskAccess" && op === "findUnique" ? null : undefined));
+  await assert.rejects(addLateContractorBatch(tx, "t1", ["a1"], ZACK, POSTED), /You don't have access to this job\./);
+  assert.deepEqual(calls.map((c) => c.model), ["$executeRaw", "task", "taskAccess"]);
+  assert.ok(!calls.some(isWrite));
+});
+
+test("addLateContractorBatch: a job that's gone is refused under the lock, before access or any write", async () => {
+  const { tx, calls } = doneTx((model, op) => (model === "task" && op === "findUnique" ? null : undefined));
+  await assert.rejects(addLateContractorBatch(tx, "t1", ["a1"], ZACK, POSTED), /That task no longer exists\./);
+  assert.deepEqual(calls.map((c) => c.model), ["$executeRaw", "task"]);
+});
+
+test("addLateContractorBatch: staff, no files, or files another send already took are refused, and nothing is queued", async () => {
+  const staff = doneTx();
+  await assert.rejects(addLateContractorBatch(staff.tx, "t1", ["a1"], CONNOR, POSTED), /Only a contractor's late photos/);
+  assert.deepEqual(staff.calls, []);
+  const none = doneTx();
+  await assert.rejects(addLateContractorBatch(none.tx, "t1", [], ZACK, POSTED), /Write something or add a photo\./);
+  assert.deepEqual(none.calls, [], "nothing to post: refused before it takes the task row");
+  // Two sends of the same files at once: the losing side links nothing and is refused, so its update rolls back.
+  const taken = doneTx((model, op) => (model === "taskAttachment" && op === "updateMany" ? { count: 0 } : undefined));
+  await assert.rejects(addLateContractorBatch(taken.tx, "t1", ["a1"], ZACK, POSTED), /Write something or add a photo\./);
+  assert.equal(outboxInserts(taken.calls).length, 0);
+});
+
+test("addLateContractorBatch: its update is never one Undo takes back", async () => {
+  // Not marked as a batch, so the take-back's lookup (data.batch) can't find it ...
+  const { tx, calls } = doneTx();
+  await addLateContractorBatch(tx, "t1", ["a1"], ZACK, POSTED);
+  const data = (calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as CallArgs).data?.data as Record<string, unknown>;
+  assert.equal(data.batch, undefined);
+  // ... and a job that isn't active refuses a take-back before it looks.
+  const undo = doneTx();
+  await assert.rejects(takeBackContractorPost(undo.tx, "t1", "e-late", ZACK, within, SECONDS(3)), /This job is closed\./);
+  assert.ok(!undo.calls.some((c) => c.model === "taskEvent"));
 });

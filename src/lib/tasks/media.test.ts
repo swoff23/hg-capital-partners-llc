@@ -12,6 +12,7 @@ import {
   taskMedia,
   taskMediaInclude,
   uploaderName,
+  visitStart,
   type MediaEvent,
   type TaskMediaRow,
 } from "./media";
@@ -244,4 +245,31 @@ test("reviewPhotos: a start after the latest Mark done belongs to a later visit 
     reviewPhotos(rows, { contactId: "zack", events }).map((r) => r.id),
     ["b", "a"],
   );
+});
+
+test("visitStart: the latest move to In progress before a time, the one rule Mark done and the Review card count a visit by", () => {
+  const events = [started("s1", 0), markDoneNote("c1", 30), review("r1", 30), started("s2", 41), evt("x", "STATUS", at(45), { data: { to: "WAITING" } })];
+  assert.deepEqual(visitStart(events), at(41), "Mark done, now: the visit that began at the latest start");
+  assert.deepEqual(visitStart(events, at(30).getTime()), at(0), "the Review card, before the latest Mark done");
+  assert.equal(visitStart([review("r1", 30)]), null, "an older job with no start: every file counts");
+  assert.equal(visitStart([]), null);
+});
+
+test("finishPhotoIds: photos a batch post had told HG of that the Mark done counted are in the set, named on its move to Review", () => {
+  const rows = [
+    row("batch-1", { createdAt: at(20), eventId: "c-batch" }),
+    row("batch-2", { createdAt: at(21), eventId: "c-batch" }),
+    row("finish", { createdAt: at(29), eventId: "c-done" }),
+    row("other", { createdAt: at(22), eventId: "c-batch" }),
+  ];
+  const counted = review("r1", 30, { data: { to: "REVIEW", finishIds: ["batch-1", "batch-2", "gone"] } });
+  assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), markDoneNote("c-done", 30), counted]), ["batch-1", "batch-2", "finish"]);
+  // A Mark done with no note and no new photo: only the counted ones.
+  assert.deepEqual(finishPhotoIds(rows, [started("s1", 0), counted]), ["batch-1", "batch-2"]);
+  // Only the latest Mark done's, and never a staff move to Review's.
+  assert.deepEqual(finishPhotoIds(rows, [counted, started("s2", 41), review("r2", 50)]), []);
+  assert.deepEqual(finishPhotoIds(rows, [review("r1", 30, { actorContactId: null, data: { to: "REVIEW", finishIds: ["batch-1"] } })]), []);
+  // The Review card leads with them too.
+  const photos = reviewPhotos(rows, { contactId: "zack", events: [started("s1", 0), markDoneNote("c-done", 30), counted] });
+  assert.deepEqual(photos.slice(0, 3).map((r) => r.id).sort(), ["batch-1", "batch-2", "finish"]);
 });

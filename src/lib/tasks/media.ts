@@ -150,14 +150,32 @@ function latestMarkDone(events: readonly MediaEvent[]): { review: MediaEvent; co
 /**
  * The photos and videos sent with the latest Mark done (the "At finish"
  * set, uploads 2.5 and 2.8), among `rows`, from the task's events: the ones
- * posted on the comment the contractor wrote as they tapped Mark done. Empty
+ * posted on the comment the contractor wrote as they tapped Mark done, and
+ * the ones a batch post had already told HG of that the Mark done counted
+ * (their ids are on its move to Review, `finishIds`, portal/jobs.ts). Empty
  * with no Mark done, a Mark done with no photos, or a job a staff member
  * moved to Review.
  */
 export function finishPhotoIds(rows: readonly (MediaOrderItem & { eventId: string | null })[], events: readonly MediaEvent[]): string[] {
   const done = latestMarkDone(events);
-  if (!done?.comment) return [];
-  return rows.filter((r) => r.eventId === done.comment!.id).map((r) => r.id);
+  if (!done) return [];
+  const listed = (done.review.data as { finishIds?: unknown } | null)?.finishIds;
+  const counted = new Set(Array.isArray(listed) ? listed : []);
+  return rows.filter((r) => (done.comment !== null && r.eventId === done.comment.id) || counted.has(r.id)).map((r) => r.id);
+}
+
+/**
+ * When the visit that `before` falls in started: the job's latest move to In
+ * progress before then, or null for an older job with none (every file
+ * counts). The Review card reads it before the latest Mark done
+ * (reviewPhotos), and Mark done before now (portal/jobs.ts), so the two count
+ * the same visit.
+ */
+export function visitStart(events: readonly Pick<MediaEvent, "kind" | "data" | "createdAt">[], before = Infinity): Date | null {
+  const started = events
+    .filter((e) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "IN_PROGRESS" && e.createdAt.getTime() < before)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  return started?.createdAt ?? null;
 }
 
 /**
@@ -190,11 +208,8 @@ export function reviewPhotos<T extends MediaOrderItem & { kind: AttachmentKind; 
   if (!contactId) return [];
   const mine = rows.filter((a) => isMediaRow(a) && a.uploadedByContactId === contactId);
   const done = latestMarkDone(events);
-  const before = done ? done.review.createdAt.getTime() : Infinity;
-  const started = events
-    .filter((e) => e.kind === "STATUS" && (e.data as { to?: string } | null)?.to === "IN_PROGRESS" && e.createdAt.getTime() < before)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-  const visit = started ? mine.filter((a) => at(a.createdAt) >= started.createdAt.getTime()) : mine;
+  const started = visitStart(events, done ? done.review.createdAt.getTime() : Infinity);
+  const visit = started ? mine.filter((a) => at(a.createdAt) >= started.getTime()) : mine;
   const finish = finishPhotoIds(
     visit.map((a) => ({ id: a.id, createdAt: a.createdAt, eventId: a.eventId ?? null })),
     events,

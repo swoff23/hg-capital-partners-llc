@@ -2,7 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { BlobNotFoundError, del, head, type HeadBlobResult } from "@vercel/blob";
 import { Prisma, type Visibility } from "@prisma/client";
-import { acceptsContractorUpload } from "@/lib/attachments/access";
+import { acceptsContractorUpload, lateRefusal } from "@/lib/attachments/access";
 import { PREVIEW_RULE, UPLOAD_RULES, fileKindForType, filenameForType, normalizeContentType, type FileKind } from "@/lib/attachments/content-types";
 import { blobSizeRefusal, durationHint, pixelHint } from "@/lib/attachments/limits";
 import { isPrivateStoreUrl, storeIdFromToken, storedUploadRole, type UploadRole } from "@/lib/attachments/paths";
@@ -222,7 +222,8 @@ export async function recordTaskAttachment(
  * In progress: the late-upload rule, uploads question 4. A Done job takes only
  * the hour. `atMint` once held a token back from a finished job; with the rule
  * above a resumed upload needs one after Mark done, so it no longer changes
- * the answer.
+ * the answer. Past those windows a job in Review answers TOO_LATE and a Done
+ * or Canceled one JOB_CLOSED (access.ts lateRefusal); both are final.
  */
 export async function contractorUploadRefusal(
   taskId: string,
@@ -259,7 +260,8 @@ export async function contractorUploadRefusal(
           })
         )?.createdAt ?? null)
       : null;
-  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt, startedAt) ? null : "This job is closed.";
+  // Done and Canceled say the job closed; a job still in Review says it's too late, since it isn't closed.
+  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt, startedAt) ? null : lateRefusal(task.status);
 }
 
 /**
@@ -281,6 +283,11 @@ export async function recordPortalAttachment(
   // A refusal here (job closed, access gone, the hour after Mark done run out) discards the uploads too: they can never be recorded.
   // A recorded file is never discarded: discardUnrecorded skips every path a row uses.
   const att = await discardingOnRefusal(taskId, input, auth, async () => {
+    // A Retry of a record that committed, whose answer never reached the phone, gets its row back even once the job
+    // stopped taking files: the file is on the job already, so the tile finishes instead of going up again as a
+    // second copy. The batch step that posts it checks access again (portal/job-batch.ts).
+    const mine = await core.findOwnUpload(prisma, taskId, input.pathname, p);
+    if (mine) return mine;
     const early = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt });
     if (early) throw new core.TaskRuleError(early);
     // A Retry of a record that committed gets the same row back, so the tile finishes and no second copy is made.

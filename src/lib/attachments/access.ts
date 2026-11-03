@@ -31,6 +31,45 @@ export function contractorMaySee(att: SeeableFile, contactId: string): boolean {
   );
 }
 
+/** What a contractor's upload is told once a job HG approved or canceled no longer takes their files (contractorUploadRefusal). */
+export const JOB_CLOSED = "This job is closed.";
+
+/**
+ * What it is told by a job still in Review that no longer takes their files:
+ * past the hour after Mark done, past the day's grace for a file queued
+ * before it, or a job someone else marked done. The job isn't closed (it
+ * still takes a written update), so it never says so.
+ */
+export const TOO_LATE = "It's too late to add files to this job.";
+
+/** Which of the two a job that won't take a contractor's file gives: Review is too late, Done and Canceled are closed. */
+export function lateRefusal(status: TaskStatus): typeof JOB_CLOSED | typeof TOO_LATE {
+  return status === "REVIEW" ? TOO_LATE : JOB_CLOSED;
+}
+
+/**
+ * Whether a refusal is one no Retry can change: the job stopped taking this
+ * contractor's files (closed, or in Review past its window) before the file
+ * got a token or recorded. Every other refusal (no access, another sign-in, a
+ * bad file) is one a Retry may get past. The token route and the record step
+ * both ask this, so the job reads the same wherever the file meets it.
+ */
+export function isFinalRefusal(error: string | null | undefined): boolean {
+  return error === JOB_CLOSED || error === TOO_LATE;
+}
+
+/**
+ * The portal record step's answer, final when the job stopped taking the
+ * file before it recorded: no Retry can change that (the server has already
+ * let the blob go), so the queue keeps only Remove on its tile and the line
+ * under the tray says "Job closed before 2 photos uploaded", or "Too late to
+ * add 2 photos" on a job in Review (media.ts closedJobLine, uploads question
+ * 4). The token route says the same with `final` in its 400 (api/blob/[kind]).
+ */
+export function withFinalRefusal<R extends { ok: boolean; error?: string }>(res: R): R & { final?: true } {
+  return !res.ok && isFinalRefusal(res.error) ? { ...res, final: true } : res;
+}
+
 /**
  * Uploads still finishing after a contractor taps Mark done are kept for this
  * long (docs/asana-migration-plan.md §5.3), and the job page keeps "Add

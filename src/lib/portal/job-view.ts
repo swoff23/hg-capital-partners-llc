@@ -358,7 +358,8 @@ export function markDoneButton(s: {
  * The most files one post takes: a batch post, a written update and Mark done each refuse more (their actions'
  * schemas read this). The job page's queue target holds no more than this unposted at once (maxFiles), so a pick of
  * 55 sends 50 and the other 5 get a refused tile with MAX_FILES_REASON instead of a post that fails; once those 50
- * post, more can go.
+ * post, more can go. Files a tab kept for the job (recorded-uploads.ts) can come to more, so every post of recorded
+ * files goes in pieces of this many (postInBatches), and a Send or Mark done never holds more.
  */
 export const MAX_FILES_PER_POST = 50;
 
@@ -402,9 +403,10 @@ export function postedText(kinds: readonly (FileKind | null)[]): string {
 }
 
 /**
- * What the toast says when files land on a job that has been approved since:
- * "3 photos added to the job". They are on the job, in its photos, but there
- * is no update to post them as, so there is no Undo and nobody is emailed.
+ * What the toast says when files land on a job that has been approved or
+ * canceled since: "3 photos added to the job". They are on the job, in its
+ * photos, and HG is told once (core.addLateContractorBatch), but the job
+ * takes no batch post, so there is no Undo.
  */
 export function addedToJobText(kinds: readonly (FileKind | null)[]): string {
   const n = kinds.length;

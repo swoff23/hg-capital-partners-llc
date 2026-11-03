@@ -459,6 +459,12 @@ export interface StatusOptions {
    * nothing changes and TaskChangedError says who moved it.
    */
   expected?: TaskStatus;
+  /**
+   * A contractor's Mark done: the photos a batch post had already told HG of
+   * that it counted toward the playbook's (portal/jobs.ts), kept on the move to
+   * Review so they show under "At finish" (lib/tasks/media.ts finishPhotoIds).
+   */
+  finishIds?: string[];
 }
 
 export interface StatusResult {
@@ -537,7 +543,13 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
     kind: "STATUS",
     visibility,
     audienceContactId,
-    data: { from: before.status, to, ...(waitingOn ? { waitingOn } : {}), ...(to === "SCHEDULED" ? { scheduledFor: toYmd(scheduledFor) } : {}) },
+    data: {
+      from: before.status,
+      to,
+      ...(waitingOn ? { waitingOn } : {}),
+      ...(to === "SCHEDULED" ? { scheduledFor: toYmd(scheduledFor) } : {}),
+      ...(to === "REVIEW" && opts.finishIds?.length ? { finishIds: opts.finishIds } : {}),
+    },
   });
   // The note (and any photos) is its own comment, tied to the status by id so Activity shows the two as one decision.
   const note = opts.note?.trim();
@@ -1184,6 +1196,51 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   return event;
 }
 
+/**
+ * A contractor's photos that are posted after HG approved or canceled the job
+ * (uploads question 4: recorded inside the hour after Mark done, or before
+ * the cancel, or a phone's outbox catching up), told to HG once per batch:
+ * one update with no text ("Zack added 3 photos", the line a batch post
+ * makes) and one line in each partner's email bundle, through notify like
+ * any comment. The job's status doesn't change.
+ * It is never an update Undo takes back: it isn't marked `batch`, and
+ * takeBackContractorPost refuses a job that isn't active. It is written after
+ * the Mark done, so it is never the At finish set and never counts toward
+ * one. Only the contractor's own unposted files on this job are linked; with
+ * none left (another send took them) it is refused as addComment refuses, so
+ * the losing side leaves no empty update.
+ *
+ * The portal's batch step (portal/job-batch.ts postBatchIn) sends a job here
+ * once it is no longer active, and when an approve landed before addComment
+ * took the task row (addComment then refuses under its lock, before writing
+ * anything); one reopened in the moment between posts the same way.
+ * It takes the task row first, as addComment does, then reads the task and
+ * checks access under that lock, so it runs in every writer's order: the task
+ * row, then the update and its files, then the email rows. A late send and an
+ * active send of the same files wait on each other at the task row, never
+ * crosswise, and the one that waited finds the files taken and links none
+ * (job-batch.pg.test.ts runs both races on Postgres).
+ */
+export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentIds: string[], p: Principal, now = new Date()): Promise<TaskEvent> {
+  if (p.kind !== "contractor") throw new TaskRuleError("Only a contractor's late photos post this way.");
+  if (attachmentIds.length === 0) throw new TaskRuleError("Write something or add a photo.");
+  await lockTask(tx, taskId);
+  const task = await tx.task.findUnique({ where: { id: taskId } });
+  if (!task) throw new TaskRuleError("That task no longer exists.");
+  await assertContractorAccess(tx, taskId, p.contactId);
+  const visibility: Visibility = "SHARED";
+  const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
+  const event = await addEvent(tx, taskId, p, { kind: "COMMENT", visibility, body: null, audienceContactId, data: { late: true } });
+  const { count: linked } = await tx.taskAttachment.updateMany({
+    where: { id: { in: attachmentIds }, taskId, eventId: null, deletedAt: null, uploadedByContactId: p.contactId, asanaGid: null },
+    data: { eventId: event.id, visibility, audienceContactId },
+  });
+  if (linked === 0) throw new TaskRuleError("Write something or add a photo.");
+  await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
+  await notify(tx, task, p, { kind: "COMMENT", visibility }, commentSummary("", linked), now, { eventId: event.id });
+  return event;
+}
+
 // ---------------------------------------------------------------------------
 // Edit, delete and restore a comment (activity 2.5)
 // ---------------------------------------------------------------------------
@@ -1386,8 +1443,10 @@ async function dropPostLine(tx: Tx, taskId: string, post: PostLine): Promise<voi
  * the timeline, the grids and the "2 new" counts, and its line leaves the
  * unsent email (dropPostLine). Only their own post marked `batch` by
  * addComment (never a Mark done's photos or a written update), only on a job
- * still active, and only while `undoable` says the window is open
- * (portal/job-view.ts undoWindowOpen).
+ * still active, only while `undoable` says the window is open
+ * (portal/job-view.ts undoWindowOpen), and only while the job hasn't gone to
+ * Review since: a Mark done can have counted the post's photos. A batch posted
+ * in the hour after Mark done can still be taken back.
  *
  * The task row is locked first, as setStatus does: every write that queues an
  * email updates the task before it touches the outbox, so a post landing now
@@ -1422,6 +1481,12 @@ export async function takeBackContractorPost(
   });
   if (!event) throw new TaskRuleError("That update is already gone.");
   if (!opts.undoable(event.createdAt)) throw new TaskRuleError("It's too late to take that back.");
+  const review = await tx.taskEvent.findFirst({
+    where: { taskId, kind: "STATUS", data: { path: ["to"], equals: "REVIEW" } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  if (review && review.createdAt.getTime() >= event.createdAt.getTime()) throw new TaskRuleError("It's too late to take that back.");
   await tx.taskEvent.update({ where: { id: eventId }, data: { deletedAt: now } });
   const { count } = await tx.taskAttachment.updateMany({
     where: { eventId, taskId, uploadedByContactId: p.contactId, deletedAt: null },

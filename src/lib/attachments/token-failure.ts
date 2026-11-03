@@ -10,12 +10,18 @@
  *
  * Only an error the route threw on purpose, as an UploadRefusal, is a 400.
  * Anything else it didn't expect (a Prisma error among them) is a 503, so a
- * hiccup never reads as "the upload was refused". Pure; see token-failure.test.ts.
+ * hiccup never reads as "the upload was refused". A refusal no Retry can change
+ * (the job closed, or in Review past its window: attachments/access.ts
+ * isFinalRefusal) also says `final`, and
+ * the queue then keeps only Remove on its tile. Pure; see token-failure.test.ts.
  */
 
-/** A request the token route turns down on purpose: its message is shown to the person. */
+/** A request the token route turns down on purpose: its message is shown to the person. `final` when no Retry can change it. */
 export class UploadRefusal extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly final = false,
+  ) {
     super(message);
     this.name = "UploadRefusal";
   }
@@ -29,8 +35,8 @@ export const TOKEN_BUSY_MESSAGE = "The upload service is busy. It will try again
  * body's event type: Blob's upload-completed callback touches no database, so
  * whatever it throws (a missing or wrong signature) is a bad request.
  */
-export function tokenFailure(err: unknown, requestType?: unknown): { status: 400 | 503; message: string } {
-  if (err instanceof UploadRefusal) return { status: 400, message: err.message };
+export function tokenFailure(err: unknown, requestType?: unknown): { status: 400 | 503; message: string; final?: true } {
+  if (err instanceof UploadRefusal) return err.final ? { status: 400, message: err.message, final: true } : { status: 400, message: err.message };
   if (requestType === "blob.upload-completed") return { status: 400, message: "That callback isn't valid." };
   return { status: 503, message: TOKEN_BUSY_MESSAGE };
 }
