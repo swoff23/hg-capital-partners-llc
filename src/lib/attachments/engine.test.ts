@@ -9,6 +9,8 @@ import { closedJobLine, redTilesLine } from "./media";
 import { FinalRefusalError, MAX_ONLINE_TRIES, OUTBOX_MAX_AGE_MS, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
 import { NOT_A_VIDEO, PrepareError, UNREADABLE_PHOTO } from "./prepare";
 import { WRONG_SIGN_IN } from "./queue-owner";
+import { MAX_FILES_REASON, TOO_MANY_FILES } from "@/lib/portal/job-view";
+import { TOAST_PHONE_CHARS } from "@/lib/toast-line";
 import type { SendInput } from "./transfer";
 
 /**
@@ -1596,7 +1598,7 @@ test("a cap counts files recorded in a batch that hasn't reached the page yet", 
   assert.equal(landed.length, 1);
 });
 
-test("a Retry holds to the cap too: past it the file is refused with the cap's reason, and with room it goes", async () => {
+test("a Retry holds to the cap too: past it the file stays failed with its Retry and the cap's reason, and with room it goes", async () => {
   const h = setup({ script: [new Error("Failed to retrieve the client token")] });
   // The job page's room is one post less what it holds: one photo here, and one more picked after it failed.
   const t = target({ maxFiles: 2, maxFilesReason: "only 2 at a time", allowed: ["image"] });
@@ -1612,10 +1614,25 @@ test("a Retry holds to the cap too: past it the file is refused with the cap's r
   h.engine.setTarget({ ...t, maxFiles: 0 });
   h.engine.retry(failed.key);
   await h.flush();
-  const [refused] = h.engine.uploadsFor(t.key);
-  assert.equal(refused.status, "invalid");
-  assert.equal(refused.error, "only 2 at a time");
+  const [held] = h.engine.uploadsFor(t.key);
+  // Lows 1: not a refused tile, which is Remove only (and Remove drops the outbox's copy of a camera photo).
+  assert.equal(held.status, "failed", "still failed, so it keeps its Retry");
+  assert.equal(held.final, undefined);
+  assert.equal(held.error, "only 2 at a time");
   assert.equal(h.sent.length, 2, "nothing went up for it");
+  assert.deepEqual(
+    h.notices.filter((n) => n.key === `upload-cap:${t.key}`).map((n) => [n.message, n.action]),
+    [["Only 2 at a time.", undefined]],
+    "the tap says why (a target with no maxFilesNotice: its reason as a sentence), with nothing to tap again",
+  );
+  assert.equal(redTilesLine(h.engine.uploadsFor(t.key))?.retry, true, "the tray's line still offers Retry");
+
+  // Room again (the page posted what it held): the same tile's Retry goes.
+  h.engine.setTarget({ ...t, maxFiles: 2 });
+  h.engine.retry(held.key);
+  await h.flush();
+  assert.deepEqual(t.recorded.sort(), ["a.jpg", "b.jpg"]);
+  assert.deepEqual(h.engine.uploadsFor(t.key), []);
 
   // With room, a Retry goes as it always did.
   const r = setup({ script: [new Error("Failed to retrieve the client token")] });
@@ -1625,6 +1642,43 @@ test("a Retry holds to the cap too: past it the file is refused with the cap's r
   r.engine.retry(r.engine.uploadsFor(u.key)[0].key);
   await r.flush();
   assert.deepEqual(u.recorded, ["a.jpg"]);
+});
+
+test("a Retry of several with no room: each keeps its Retry and its outbox row, and one toast says the way on", async () => {
+  const token = () => new Error("Failed to retrieve the client token");
+  const h = setup({ script: [token(), token()] });
+  // The job page's target (job-actions.tsx): its reason on the tile, and its notice in the toast.
+  const t = target({
+    key: "portal-task:t7",
+    maxFiles: 50,
+    maxFilesReason: MAX_FILES_REASON,
+    maxFilesNotice: TOO_MANY_FILES,
+    allowed: ["image"],
+    whenAway: "post",
+  });
+  h.engine.mount(t.key);
+  h.engine.add(t, [file("a.jpg"), file("b.jpg")]);
+  await h.flush();
+  assert.deepEqual(h.engine.uploadsFor(t.key).map((u) => u.status), ["failed", "failed"]);
+  // The tray filled meanwhile, then the line's Retry (one retry per red tile, as UploadStatusLine runs it).
+  h.engine.setTarget({ ...t, maxFiles: 0 });
+  for (const u of h.engine.uploadsFor(t.key)) h.engine.retry(u.key);
+  await h.flush();
+  const tiles = h.engine.uploadsFor(t.key);
+  assert.deepEqual(tiles.map((u) => [u.status, u.error]), [
+    ["failed", "only 50 at a time"],
+    ["failed", "only 50 at a time"],
+  ]);
+  // The same words under the tray's one key, so the second toast replaces the first: one shows.
+  const said = h.notices.filter((n) => n.key === `upload-cap:${t.key}`);
+  assert.deepEqual([...new Set(said.map((n) => n.message))], ["Send up to 50 at a time."]);
+  assert.equal(new Set(said.map((n) => n.key)).size, 1);
+  // Whole on a phone: a toast is one cut-off line, so a longer one would lose the reason.
+  for (const n of said) assert.ok(n.message.length <= TOAST_PHONE_CHARS, n.message);
+  assert.ok("No more can be added here.".length <= TOAST_PHONE_CHARS, "the reason as a sentence fits too");
+  // Nothing was dropped: both rows are still in the outbox for a later Retry or a reload.
+  assert.deepEqual((await h.outbox!.all()).map((e) => e.id).sort(), tiles.map((u) => u.key).sort());
+  assert.equal(h.engine.counts(t.key).failed, 2);
 });
 
 test("a Retry once the page is gone holds to no cap: the page's last room is not a tray, and the away rule takes the file", async () => {

@@ -178,16 +178,19 @@ class RecordRefused extends Error {
 }
 
 /**
- * The one notice when the upload code didn't load while online (UploadCodeMissingError), with Reload: the files wait
- * in the outbox, and the page's next load sends them. The bar says it too (media-uploader.tsx UploadStatusLine), since
- * the toast goes after a few seconds and a deploy that removed the chunk is a wait no retry ends.
+ * The one notice when the upload code didn't load while the app's server answers (UploadCodeMissingError), with
+ * Reload: the files wait in the outbox, and the page's next load sends them. The bar says it too (media-uploader.tsx
+ * UploadStatusLine), since the toast goes after a few seconds and no retry ends this wait: the browser's runtime keeps
+ * the failed chunk until a reload, whether a deploy removed it or a dropped request failed it (lib/lazy-module.ts).
+ * With the server not answering either, the files wait for the signal instead and nothing offers Reload
+ * (NoConnectionError, lazy-transfer.ts).
  */
 export const UPLOADS_PAUSED_LINE = "Uploads paused";
 
 /**
  * The same, when a reload would lose a file: one whose row never reached the outbox (needsLeaveWarning), so the
- * notice offers no Reload. The files keep trying; a retry fetches the code again, which is enough after a dropped
- * request.
+ * notice offers no Reload. The files keep trying, but the runtime answers each try with the same failure until the
+ * page loads again (lib/lazy-module.ts), so in the browser this wait doesn't end on its own.
  */
 export const UPLOADS_RETRYING_LINE = "Uploads paused, still trying";
 
@@ -944,16 +947,19 @@ export class UploadEngine {
   /**
    * A failed file tries again from the start. A refused one (the check said no, or the job stopped taking files first)
    * can only be removed. A target's cap holds here as it does when files are added: with no room left (the files
-   * picked since filled it), the retried file is refused with the cap's reason instead of going past it. The cap is
-   * the page's, from its last render, so it holds only while the page is showing: once it is gone nothing holds a tray
-   * and the away rule takes the file (the away toast's Retry).
+   * picked since filled it), the retried file doesn't go past it. It stays failed, with its Retry for when there is
+   * room again: its tile takes the cap's reason, and a toast says it (the target's `maxFilesNotice`, "Send up to 50 at
+   * a time." on a contractor's job). Not a refused tile: that one is Remove only, and Remove drops the outbox's copy,
+   * the only one of a photo the camera input took (iOS doesn't save it to Photos). The cap is the page's, from its
+   * last render, so it holds only while the page is showing: once it is gone nothing holds a tray and the away rule
+   * takes the file (the away toast's Retry).
    */
   retry(id: string): void {
     const job = this.jobs.get(id);
     if (!job || job.status !== "failed" || job.controller) return;
     const target = this.targets.get(job.key);
     if (!this.isAway(job.key) && target?.maxFiles !== undefined && target.maxFiles - this.holding(job.key) <= 0) {
-      this.patch(job, { status: "invalid", error: target.maxFilesReason ?? capReason(0) });
+      this.noticeNoRoom(job, target);
       return;
     }
     job.tries = 0;
@@ -963,6 +969,20 @@ export class UploadEngine {
     this.requeue(job);
     void this.prepareNext();
     this.pump();
+  }
+
+  /**
+   * A Retry the cap turned back (retry): the tile keeps its Retry and takes the cap's reason, and a toast says it, the
+   * target's `maxFilesNotice` or else the reason as a sentence ("No more can be added here."). One key for the tray,
+   * and no count in the words, so a Retry of several (the line's) shows one toast. Short enough to show whole at 320.
+   */
+  private noticeNoRoom(job: Job, target: UploadTarget): void {
+    const reason = target.maxFilesReason ?? capReason(0);
+    this.patch(job, { error: reason });
+    this.deps.notify({
+      message: target.maxFilesNotice ?? `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`,
+      key: `upload-cap:${job.key}`,
+    });
   }
 
   retryAll(key: string): void {

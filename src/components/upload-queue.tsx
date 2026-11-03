@@ -59,7 +59,8 @@ export type UploadTarget = {
   /**
    * How many more files this target takes: the room left (a listing: 20 minus
    * what it holds). Files in flight count against it as they are added; one
-   * past it gets a refused tile.
+   * past it gets a refused tile. A Retry past it keeps its failed tile and
+   * Retry, with the reason, and toasts `maxFilesNotice` (engine.ts retry).
    */
   maxFiles?: number;
   /**
@@ -67,6 +68,11 @@ export type UploadTarget = {
    * a contractor's update takes 50 at a time, and more can follow once those post.
    */
   maxFilesReason?: string;
+  /**
+   * The toast when a Retry finds no room past `maxFiles`, one line at 320 (TOAST_PHONE_CHARS): a contractor's update
+   * says "Send up to 50 at a time.". Without it the toast is the reason as a sentence ("No more can be added here.").
+   */
+  maxFilesNotice?: string;
   /** "display" re-encodes a photo to a 2560px JPEG with no metadata before it goes up; "original" sends it as picked. */
   prepare: "original" | "display";
   /**

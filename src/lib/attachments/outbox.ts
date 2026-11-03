@@ -58,16 +58,32 @@ export class ServerBusyError extends Error {
 
 /**
  * The page's own upload code (the Blob client, lazy-transfer.ts) didn't load
- * while the device was online. The next try fetches the chunk again, so a
- * dropped request heals by itself; a deploy that removed the chunk is what no
- * try fixes, and only a reload (the outbox survives it) brings the new page.
- * Either way the file waits without counting a try (classifyFailure reads it
- * as "offline"), and the engine says so (UPLOADS_PAUSED_LINE): once as a
- * notice, and on the file's tile and the bar as "paused".
+ * while the app's server answers. No try fetches it again: the browser's
+ * runtime keeps a chunk that failed to load as failed until the page loads
+ * again (lib/lazy-module.ts), whether a dropped request or a deploy that
+ * removed the chunk failed it, so only a reload (the outbox survives it)
+ * brings the code. The file waits without counting a try (classifyFailure
+ * reads it as "offline"), and the engine says so (UPLOADS_PAUSED_LINE): once
+ * as a notice with Reload, and on the file's tile and the bar as "paused".
  */
 export class UploadCodeMissingError extends Error {
   constructor() {
     super("the upload code didn't load");
+  }
+}
+
+/**
+ * The upload code didn't load and the app's server didn't answer either, though the device says it is online (a phone
+ * with no data, a captive portal): the connection, not the code. The file waits for the signal as it does with the
+ * device offline, without counting a try (classifyFailure reads it as "offline"), and its tile and the bar say no
+ * signal, not "paused": a Reload now would only land on the browser's offline page. Once the server answers again and
+ * the code is still missing, the next try is UploadCodeMissingError, with its Reload. A TypeError, the shape of a
+ * dropped request, so anything else reading it reads no connection.
+ */
+export class NoConnectionError extends TypeError {
+  constructor() {
+    super("Failed to fetch");
+    this.name = "NoConnectionError";
   }
 }
 
@@ -87,6 +103,8 @@ export class FinalRefusalError extends Error {
 export function classifyFailure(err: unknown, online: boolean): FailureKind {
   // Not the file and not the road: it waits, uncounted, until the code arrives (or the reload the engine offers).
   if (err instanceof UploadCodeMissingError) return "offline";
+  // The road, and known to be down (the server didn't answer): it waits for the signal, uncounted, as offline does.
+  if (err instanceof NoConnectionError) return "offline";
   if (err instanceof StalledError) return "timeout";
   if (!online) return "offline";
   if (err instanceof ServerBusyError) return "network";
