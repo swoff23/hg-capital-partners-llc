@@ -575,6 +575,23 @@ test("the drop and the give-back stay unless the status lines written with them 
   const jose = { ...drop, data: { ...DROP.data, from: { userId: null, contactId: "c-jose", name: null } } };
   const [, , back] = canceledReopenAndUndo();
   assert.deepEqual(shown([jose, reopen, back, cancel]), ["Unassigned because Jose Alvarez is archived", "Assigned back to Zack Outlaw"]);
+  // The give-back goes with the drop whose reopen was paired with ITS Cancel, not with any drop that was held at all.
+  // One person inside two minutes: Cancel, reopen (drop), Undo (give-back, Cancel), reopen again (drop). The first
+  // reopen pairs with the first Cancel and the Undo's Cancel with the second reopen, so no drop and give-back pair
+  // went as one, and all three lines stay.
+  assert.deepEqual(
+    shown([
+      CANCELED_HISTORY[0],
+      ev("STATUS", { from: "OPEN", to: "CANCELED" }, "2026-10-23T14:59:30.000Z", { id: "e0" }),
+      ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "e1" }),
+      ev("STATUS", { from: "CANCELED", to: "OPEN" }, "2026-10-23T15:00:00.000Z", { id: "e2" }),
+      ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:20.000Z", { id: "e3" }),
+      ev("STATUS", { from: "OPEN", to: "CANCELED" }, "2026-10-23T15:00:20.000Z", { id: "e4" }),
+      ev("ASSIGNED", DROP.data, "2026-10-23T15:00:25.000Z", { id: "e5" }),
+      ev("STATUS", { from: "CANCELED", to: "OPEN" }, "2026-10-23T15:00:25.000Z", { id: "e6" }),
+    ]),
+    ["Pieter assigned Zack Outlaw", "Unassigned because Zack Outlaw is archived and made 2 more changes"],
+  );
   // Approve, its Undo and Approve again inside two minutes read as they always did: the Undo writes no status line.
   const review = ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, "2026-10-23T14:58:00.000Z", {
     id: "a1",
@@ -639,6 +656,17 @@ test("a drop or give-back line never leads a fold while the burst has a change o
     ["Unassigned because Zack Outlaw is archived", "Pieter set status to To do", "comment", "Pieter set status to Done and made 3 more changes"],
   );
   assert.deepEqual(p1b[3].type === "run" && p1b[3].lines.map((l) => l.text), folded);
+  // One person's reopen and Undo of a Done job, then a due date and a rename. The drop and the give-back ride with the
+  // statuses, so that group has sentences of its own and leads, however many of its lines are a drop or a give-back.
+  assert.deepEqual(
+    shown([
+      ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "e1" }),
+      ev("STATUS", REOPEN.data, "2026-10-23T15:00:00.000Z", { id: "e2" }),
+      ...undo,
+      ...edits(30),
+    ]),
+    ["Pieter set status to To do, then back to Done and made 2 more changes"],
+  );
   // Approve's Undo, a checklist tick, then Approve again; and Approve's Undo, a tick and a due date, left in Review.
   const approved = ev("STATUS", { from: "REVIEW", to: "DONE" }, "2026-10-23T14:59:30.000Z", { id: "a1", visibility: "SHARED", deletedAt: new Date("2026-10-23T15:00:00.000Z") });
   const dropped = ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "a2" });

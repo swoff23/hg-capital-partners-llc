@@ -730,8 +730,9 @@ export function buildActivity<E extends ActivityEvent>(events: readonly E[], nam
 /**
  * A reopen and its Undo in one burst, on a job whose contractor is archived: the line that took the job off them
  * (core.ts archivedAssigneeLine) and the `givenBack` line that put it back. Neither pairs (moveOf), so both stay
- * among the run's lines, but neither is a sentence of its own: they ride with the burst's status changes, and the
- * burst reads as any reopen and its Undo do. Only in a burst with a status change to ride with.
+ * among the run's lines (unless heldPairs left them out with a Canceled job's reversed reopen), but neither is a
+ * sentence of its own: they ride with the burst's status changes, and the burst reads as any reopen and its Undo do.
+ * Only in a burst with a status change to ride with.
  */
 function givenBackRiders(burst: readonly ActivityEvent[]): Set<string> {
   const riders = new Set<string>();
