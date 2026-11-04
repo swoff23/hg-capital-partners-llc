@@ -26,7 +26,8 @@ import { describeRepeat, parseRepeatRule } from "./repeat";
  *  - a change the same person reversed within 2 minutes doesn't show, when
  *    both were Internal (a reversed Shared change may already have been
  *    emailed or seen, so it stays), and neither do an archived contractor's
- *    drop and give-back written with a reversed reopen (heldPairs);
+ *    drop and give-back written with the two lines of one reversed status
+ *    change, in either order (heldPairs);
  *  - a status change and the note written with it (`data.statusEventId`) are
  *    one decision; files posted within 2 minutes of each other by one person
  *    are one batch line; a soft-deleted comment leaves a staff-only line,
@@ -511,23 +512,29 @@ function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
 /**
  * An archived contractor's drop (core.ts archivedAssigneeLine) and the `givenBack` line that gave the same contractor
  * the job back, left out when the status lines written with them (setStatus writes each right after its drop or
- * give-back, as the same person) were left out as one reversed pair (reversedPairs). That's a Canceled job's reopen
- * and its Undo: a Canceled line is Internal even with a contractor, so the four read as an unassigned Canceled job's
- * reopen and Undo do, as nothing. A Done job's Undo is Shared with him, so that pair stays, and the two lines ride
- * with it (givenBackRiders).
+ * give-back, as the same person) were left out as one reversed pair (reversedPairs), whichever came first. That's a
+ * Canceled job's reopen and its Undo (the drop, then the give-back), or a Cancel that gave the job back and its Undo
+ * (the give-back, then the drop): a Canceled line is Internal even with a contractor, so the four read as an
+ * unassigned Canceled job's reopen and Undo do, as nothing. A Done job's Undo is Shared with him, so that pair stays,
+ * and the two lines ride with it (givenBackRiders).
  */
 function heldPairs(events: readonly ActivityEvent[], pairs: ReadonlyMap<string, string>): Set<string> {
   const held = new Set<string>();
   const contactOf = (v: unknown) => (v && typeof v === "object" ? s((v as Data).contactId) : null);
-  // Each drop, by the paired status line written with it.
+  // Each drop and give-back not yet held, by the paired status line written with it.
   const drops = new Map<string, { id: string; contactId: string | null }>();
+  const gives = new Map<string, { id: string; contactId: string | null }>();
   events.forEach((e, i) => {
     const written = events[i + 1];
     if (e.kind !== "ASSIGNED" || written?.kind !== "STATUS" || actorKey(written) !== actorKey(e) || !pairs.has(written.id)) return;
     const d = dataOf(e);
-    if (d.archived === true) drops.set(written.id, { id: e.id, contactId: contactOf(d.from) });
-    const drop = d.givenBack === true ? drops.get(pairs.get(written.id) ?? "") : undefined;
-    if (drop && drop.contactId === contactOf(d.to)) held.add(drop.id).add(e.id);
+    const drop = d.archived === true;
+    if (!drop && d.givenBack !== true) return;
+    const own = { id: e.id, contactId: contactOf(drop ? d.from : d.to) };
+    // The other kind, written with this status line's partner, for the same contractor.
+    const other = (drop ? gives : drops).get(pairs.get(written.id) ?? "");
+    if (other && other.contactId === own.contactId) held.add(other.id).add(own.id);
+    else (drop ? drops : gives).set(written.id, own);
   });
   return held;
 }
@@ -730,8 +737,8 @@ export function buildActivity<E extends ActivityEvent>(events: readonly E[], nam
 /**
  * A reopen and its Undo in one burst, on a job whose contractor is archived: the line that took the job off them
  * (core.ts archivedAssigneeLine) and the `givenBack` line that put it back. Neither pairs (moveOf), so both stay
- * among the run's lines (unless heldPairs left them out with a Canceled job's reversed reopen), but neither is a
- * sentence of its own: they ride with the burst's status changes, and the burst reads as any reopen and its Undo do.
+ * among the run's lines (unless heldPairs left them out with a Canceled job's reversed status change), but neither is
+ * a sentence of its own: they ride with the burst's status changes, and the burst reads as any reopen and its Undo do.
  * Only in a burst with a status change to ride with.
  */
 function givenBackRiders(burst: readonly ActivityEvent[]): Set<string> {

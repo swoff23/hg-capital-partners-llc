@@ -50,6 +50,7 @@ const timeout = 30_000;
 
 let prisma: PrismaClient;
 let staff: core.Principal;
+let pieter: core.Principal;
 let zack: Extract<core.Principal, { kind: "contractor" }>;
 let propertyId: string;
 
@@ -58,8 +59,9 @@ before(async () => {
   prisma = makeClient({ DATABASE_URL: URL_ENV });
   const run = randomUUID().slice(0, 8);
   const connor = await prisma.user.create({ data: { email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" } });
-  await prisma.user.create({ data: { email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" } });
+  const pieterUser = await prisma.user.create({ data: { email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" } });
   staff = { kind: "staff", userId: connor.id, label: "Connor" };
+  pieter = { kind: "staff", userId: pieterUser.id, label: "Pieter" };
   const contact = await prisma.contact.create({ data: { fullName: "Zack Outlaw" } });
   // A login, so the approval and the next copy's "assigned you" are each an email row for Zack.
   await prisma.portalAccount.create({
@@ -248,6 +250,10 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   // A reopen starts the job unassigned; its Undo gives it back, marked, with his access row.
   for (const t of [reopenUndo, reopenLate, reopenCancel]) assert.equal((await status(t.id, "OPEN", "DONE")).task.assigneeContactId, null);
   assert.equal((await status(reopenCanceled.id, "OPEN", "CANCELED")).task.assigneeContactId, null);
+  // Each reopen's own line names who it dropped, read back through the adapter.
+  for (const t of [reopenUndo, reopenLate, reopenCancel, reopenCanceled]) {
+    assert.equal(await prisma.taskEvent.count({ where: { taskId: t.id, kind: "STATUS", data: { path: ["dropped"], equals: painter.id } } }), 1, t.title);
+  }
   const undone = await status(reopenUndo.id, "DONE", "OPEN");
   assert.equal(undone.task.assigneeContactId, painter.id);
   assert.equal(undone.emailsContractor, false);
@@ -302,4 +308,64 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   await status(reopenUndo.id, "IN_PROGRESS", "OPEN");
   assert.equal((await status(reopenUndo.id, "DONE", "IN_PROGRESS")).task.assigneeContactId, null);
   assert.equal(await prisma.notificationOutbox.count({ where: { recipientContactId: painter.id } }), 0, "no email ever queued for him");
+});
+
+test("a reopen gives back only the contractor it dropped itself, not a drop Approve's Undo left before a Cancel with no line", { skip, timeout }, async () => {
+  // The task session's third review, low 1, on the adapter: Approve, Archive, Approve's Undo (a drop and no status
+  // line), then the job Canceled with no line (service.ts cancelOpenAutoTask's write, made here directly: service.ts
+  // loads server-only). A reopen of the unassigned job drops nobody and marks nothing, so its Cancel inside the window
+  // closes it unassigned.
+  const roofer = await prisma.contact.create({ data: { fullName: "Lw Roofer", trades: "Roofing" } });
+  const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
+  const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Patch the roof", propertyId, assignee: { contactId: roofer.id } }, staff));
+  await status(task.id, "REVIEW", "OPEN");
+  const approved = await status(task.id, "DONE", "REVIEW");
+  await prisma.contact.update({ where: { id: roofer.id }, data: { archivedAt: new Date() } });
+  assert.equal((await undo(task.id, approved.statusEventId)).task.assigneeContactId, null);
+  await prisma.task.update({ where: { id: task.id }, data: { status: "CANCELED", completedAt: new Date() } });
+
+  const reopened = await status(task.id, "OPEN", "CANCELED");
+  assert.equal(reopened.task.assigneeContactId, null);
+  const line = await prisma.taskEvent.findUniqueOrThrow({ where: { id: reopened.statusEventId }, select: { data: true } });
+  assert.deepEqual(line.data, { from: "CANCELED", to: "OPEN" }, "it dropped nobody, so it marks nobody");
+  const canceled = await status(task.id, "CANCELED", "OPEN");
+  assert.equal(canceled.task.assigneeContactId, null, "closed unassigned");
+  assert.equal(await prisma.taskEvent.count({ where: { taskId: task.id, kind: "ASSIGNED", data: { path: ["givenBack"], equals: true } } }), 0);
+  assert.equal(await prisma.taskAccess.count({ where: { taskId: task.id, contactId: roofer.id, revokedAt: null } }), 0, "his access row stays revoked");
+});
+
+test("Connor's reopen, then Pieter's Cancel and its Undo: open and unassigned, and the timeline shows only Connor's reopen", { skip, timeout }, async () => {
+  // Low 2 on the adapter's rows: Pieter's Cancel gave the job back (inside the reopen's window) and his Undo took it
+  // off again, so his give-back and his drop go with his paired status lines, whichever came first.
+  const tiler = await prisma.contact.create({ data: { fullName: "Lw Tiler", trades: "Tile" } });
+  const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, p, { expected }));
+  const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Regrout the shower", propertyId, assignee: { contactId: tiler.id } }, staff));
+  await as(staff, task.id, "CANCELED", "OPEN");
+  // Canceled last week, so Connor's reopen isn't read as that Cancel's own reversal.
+  await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - interval '7 days' WHERE "taskId" = ${task.id}`;
+  await prisma.contact.update({ where: { id: tiler.id }, data: { archivedAt: new Date() } });
+
+  const connorsReopen = await as(staff, task.id, "OPEN", "CANCELED");
+  assert.equal(connorsReopen.task.assigneeContactId, null);
+  assert.equal((await as(pieter, task.id, "CANCELED", "OPEN")).task.assigneeContactId, tiler.id, "his Cancel gives it back");
+  const pietersUndo = await as(pieter, task.id, "OPEN", "CANCELED");
+  assert.equal(pietersUndo.task.assigneeContactId, null, "and its Undo takes it off him again");
+  for (const id of [connorsReopen.statusEventId, pietersUndo.statusEventId]) {
+    const { data } = await prisma.taskEvent.findUniqueOrThrow({ where: { id }, select: { data: true } });
+    assert.equal((data as { dropped?: unknown }).dropped, tiler.id, "each reopen names who it dropped");
+  }
+  assert.equal(await prisma.taskAccess.count({ where: { taskId: task.id, contactId: tiler.id, revokedAt: null } }), 0);
+
+  const rows = await prisma.taskEvent.findMany({ where: { taskId: task.id } });
+  const fresh = rows.filter((e) => e.createdAt.getTime() > Date.now() - 60_000 && (e.kind === "ASSIGNED" || e.kind === "STATUS"));
+  assert.equal(fresh.length, 6, "two drops, a give-back and three status lines");
+  const connors = fresh.filter((e) => e.actorUserId === (staff as { userId: string }).userId).map((e) => e.id);
+  assert.equal(connors.length, 2, "his drop and his reopen");
+  const shownIds = buildActivity(rows, {}, todayYmdEastern()).flatMap((e) => e.events.map((x) => x.id));
+  assert.deepEqual(
+    shownIds.filter((id) => fresh.some((e) => e.id === id)).sort(),
+    [...connors].sort(),
+  );
 });

@@ -253,12 +253,15 @@ function archivedAssigneeLine(contactId: string): EventInput {
  * the way back, read from the job's latest live assignment and status lines (newest first). Two cases, nothing else:
  *  - Approve's Undo writes no status line, so the drop is the latest line and the job is in Review. Approve again
  *    (Review to Done) gives it back, however much later: Review is still his Mark done. A Cancel doesn't.
- *  - A reopen writes its status line right after the drop. Only its Undo gives it back: back to the status it left
- *    (`to` is the reopen's `from`), while the reopen line is at most APPROVAL_UNDO_MS old, the toast's Undo, timed as
- *    undoApproval times its own (the caller's `now` against the line's createdAt). That holds for a Canceled job too,
- *    whose way back is Cancel: its reopen's Undo inside the window gives it back. Later, or to the other close (a Done
- *    job reopened, then Canceled; a Canceled job reopened, then Done), it's new work on a job the reopen left
- *    unassigned.
+ *  - A reopen that took the job off him marks its own status line with him (`dropped`, setStatus), written right after
+ *    the drop. Only its Undo gives it back: back to the status it left (`to` is the reopen's `from`), while the reopen
+ *    line is at most APPROVAL_UNDO_MS old, the toast's Undo, timed as undoApproval times its own (the caller's `now`
+ *    against the line's createdAt). That holds for a Canceled job too, whose way back is Cancel: its reopen's Undo
+ *    inside the window gives it back. Later, or to the other close (a Done job reopened, then Canceled; a Canceled job
+ *    reopened, then Done or approved), it's new work on a job the reopen left unassigned. The contractor comes from
+ *    that mark, and the line before it must be his drop as well. A reopen with no mark (it dropped nobody, or it was
+ *    written before the mark) gives nothing back, whatever drop sits before it: Approve's Undo and then a Cancel that
+ *    wrote no line (service.ts cancelOpenAutoTask) leave a drop that isn't the reopen's.
  * Null when anything moved the job or assigned it since.
  */
 function droppedArchivedAssignee(
@@ -276,12 +279,13 @@ function droppedArchivedAssignee(
     (ACTIVE_STATUSES as readonly unknown[]).includes(dataOf(latest).to);
   const drop = reopen ? prior : latest;
   if (drop?.kind !== "ASSIGNED" || dataOf(drop).archived !== true) return null;
+  const was = dataOf(drop).from;
+  const dropped = was && typeof was === "object" ? (was as { contactId?: unknown }).contactId : null;
+  const contactId = reopen ? dataOf(latest).dropped : dropped;
+  if (typeof contactId !== "string" || contactId !== dropped) return null;
   const late = reopen && now.getTime() - latest.createdAt.getTime() > APPROVAL_UNDO_MS;
   const wayBack = reopen ? to === left && !late : from === "REVIEW" && to === "DONE";
-  if (!wayBack) return null;
-  const was = dataOf(drop).from;
-  const contactId = was && typeof was === "object" ? (was as { contactId?: unknown }).contactId : null;
-  return typeof contactId === "string" ? contactId : null;
+  return wayBack ? contactId : null;
 }
 
 /**
@@ -673,6 +677,10 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
       ...(waitingOn ? { waitingOn } : {}),
       ...(to === "SCHEDULED" ? { scheduledFor: toYmd(scheduledFor) } : {}),
       ...(to === "REVIEW" && opts.finishIds?.length ? { finishIds: opts.finishIds } : {}),
+      // A reopen that took the job off an archived contractor names him, so only its own Undo gives it back
+      // (droppedArchivedAssignee). The line is Internal (the job has no contractor now), the portal reads only the keys
+      // it names (never this one), and the importer reads none of the app's own lines.
+      ...(dropArchived && before.assigneeContactId ? { dropped: before.assigneeContactId } : {}),
     },
   });
   // The note (and any photos) is its own comment, tied to the status by id so Activity shows the two as one decision.
