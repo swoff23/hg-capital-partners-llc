@@ -29,7 +29,8 @@ import { describeRepeat, parseRepeatRule } from "./repeat";
  *    keeps both, and a reversed Shared change may already have been emailed
  *    or seen, so it stays. Neither do an archived contractor's drop and
  *    give-back written with the two lines of one reversed status change, in
- *    either order (heldPairs);
+ *    either order, with nobody's pick of an assignee between them
+ *    (heldPairs);
  *  - a status change and the note written with it (`data.statusEventId`) are
  *    one decision; files posted within 2 minutes of each other by one person
  *    are one batch line; a soft-deleted comment leaves a staff-only line,
@@ -477,6 +478,12 @@ function moveOf(e: ActivityEvent): { key: string; from: string; to: string } | n
 }
 
 /**
+ * An archived contractor's drop (core.ts archivedAssigneeLine) or the line that gave the job back to them. Each moves
+ * the job's assignee, but nobody picked anyone, so neither is a change to undo (moveOf).
+ */
+const isDropOrGiveBack = (e: ActivityEvent) => e.kind === "ASSIGNED" && (dataOf(e).archived === true || dataOf(e).givenBack === true);
+
+/**
  * The events to leave out because the same person undid them inside two
  * minutes (due date there and back, a tick and an untick, an Approve taken
  * back), each by the id of the other in its pair. A change pairs only with
@@ -484,7 +491,10 @@ function moveOf(e: ActivityEvent): { key: string; from: string; to: string } | n
  * by anyone else in between (Connor's Cancel and his reopen a minute later,
  * with Pieter's reopen and Dana's Cancel between them) keeps both, since the
  * field didn't go there and back by one hand. A pair left out leaves the
- * field with no latest move, so the next change pairs with nothing. Only
+ * field with no latest move, so the next change pairs with nothing. So does a
+ * drop or give-back, which moves the assignee though it pairs with nothing:
+ * Pieter's pick of a contractor and his unassign of them, with a reopen's drop
+ * and another person's give-back between, are no there-and-back. Only
  * when both were Internal: a Shared change may already be in an email or on
  * the contractor's screen, so a reversal of it stays. A Done whose next
  * repeat was created is kept too, since that line still stands.
@@ -494,6 +504,7 @@ function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
   const repeatMade = events.filter((e) => e.kind === "REPEAT_CREATED").map((e) => e.createdAt.getTime());
   const last = new Map<string, { e: ActivityEvent; move: { from: string; to: string } }>();
   for (const e of events) {
+    if (isDropOrGiveBack(e)) last.delete("assigned");
     const move = moveOf(e);
     if (!move) continue;
     const key = move.key;
@@ -525,9 +536,11 @@ function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
  * whichever came first. That's a Canceled job's reopen and its Undo (the drop, then the give-back), or a Cancel that
  * gave the job back and its Undo (the give-back, then the drop): a Canceled line is Internal even with a contractor,
  * so the four read as an unassigned Canceled job's reopen and Undo do, as nothing. A Done job's Undo is Shared with
- * him, so that pair stays, and the two lines ride with it (givenBackRiders). `events` is every event in order,
- * soft-deleted ones too: the line written with a give-back can be an approval undone since, which pairs with nothing,
- * and the give-back isn't held because the next standing line happens to pair.
+ * him, so that pair stays, and the two lines ride with it (givenBackRiders). Only when nobody picked an assignee in
+ * between that stands (one that went there and back is already left out): Connor reassigns the job, Dana gives it to
+ * the archived contractor again, and the drop that follows took it from Dana's pick, not from the give-back. `events`
+ * is every event in order, soft-deleted ones too: the line written with a give-back can be an approval undone since,
+ * which pairs with nothing, and the give-back isn't held because the next standing line happens to pair.
  */
 function heldPairs(events: readonly ActivityEvent[], pairs: ReadonlyMap<string, string>): Set<string> {
   const held = new Set<string>();
@@ -536,6 +549,12 @@ function heldPairs(events: readonly ActivityEvent[], pairs: ReadonlyMap<string, 
   const drops = new Map<string, { id: string; contactId: string | null }>();
   const gives = new Map<string, { id: string; contactId: string | null }>();
   events.forEach((e, i) => {
+    // A pick that stands moved the job, so no drop or give-back waiting for its partner is half of a there-and-back.
+    if (e.kind === "ASSIGNED" && !e.deletedAt && !pairs.has(e.id) && !isDropOrGiveBack(e)) {
+      drops.clear();
+      gives.clear();
+      return;
+    }
     const written = events[i + 1];
     if (e.kind !== "ASSIGNED" || written?.kind !== "STATUS" || actorKey(written) !== actorKey(e) || !pairs.has(written.id)) return;
     const d = dataOf(e);
@@ -801,8 +820,7 @@ function burstEntries<E extends ActivityEvent>(burst: E[], names: ActivityNames,
     // Three sentences or more: the first, and how many changes sit behind it. A drop or give-back line names no one who
     // acted ("Assigned back to Zack Outlaw and made 3 more changes" reads as Zack's), so the first other sentence
     // leads, when there is one.
-    const held = (e: E) => e.kind === "ASSIGNED" && (dataOf(e).archived === true || dataOf(e).givenBack === true);
-    const [key, first] = list.find(([, evs]) => !evs.every(held)) ?? list[0];
+    const [key, first] = list.find(([, evs]) => !evs.every(isDropOrGiveBack)) ?? list[0];
     const more = burst.length - first.length;
     const lead = sentence(key, first);
     return [run(burst, { text: `${lead.text} and made ${more} more ${more === 1 ? "change" : "changes"}` })];

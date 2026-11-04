@@ -506,3 +506,69 @@ test("a reopen, then a Cancel that wrote no line, then Done inside 2 minutes: no
   }
   assert.equal(await prisma.notificationOutbox.count({ where: { recipientContactId: insurer.id } }), 0, "no email ever queued for him");
 });
+
+test("G1 on real rows: someone's pick between a give-back and the drop after it leaves the job open and nobody's, and the timeline ends on why", { skip, timeout }, async () => {
+  // The verify pass on the fourth review, finding 1, through the real setStatus and patchTask. Zack's Canceled job, Zack
+  // archived: Connor reopens it (a drop), Pieter cancels it (the give-back), Connor reassigns it to another contractor,
+  // Dana's picker (loaded before the archive) gives it to Zack again, and Pieter reopens it inside 2 minutes of his
+  // Cancel (a drop). Pieter's Cancel and reopen pair, but the give-back and that drop are no there-and-back.
+  const caulker = await prisma.contact.create({ data: { fullName: "Gp Caulker", trades: "Caulking" } });
+  const mason = await prisma.contact.create({ data: { fullName: "Gp Mason", trades: "Masonry" } });
+  const dana: core.Principal = {
+    kind: "staff",
+    userId: (await prisma.user.create({ data: { email: `dana-${randomUUID().slice(0, 8)}@example.test`, name: "Dana" } })).id,
+    label: "Dana",
+  };
+  const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, p, { expected }));
+  const pick = (p: core.Principal, taskId: string, to: string, from: string) =>
+    prisma.$transaction((tx) => core.patchTask(tx, taskId, { assignee: { contactId: to }, expectedAssignee: { contactId: from } }, p));
+  const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Caulk the tub", propertyId, assignee: { contactId: caulker.id } }, staff));
+  await as(staff, task.id, "CANCELED", "OPEN");
+  // Canceled last week, so no step below is read as that Cancel's own reversal.
+  await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - interval '7 days' WHERE "taskId" = ${task.id}`;
+  await prisma.contact.update({ where: { id: caulker.id }, data: { archivedAt: new Date() } });
+
+  assert.equal((await as(staff, task.id, "OPEN", "CANCELED")).task.assigneeContactId, null);
+  assert.equal((await as(pieter, task.id, "CANCELED", "OPEN")).task.assigneeContactId, caulker.id, "his Cancel gives it back");
+  assert.equal((await pick(staff, task.id, mason.id, caulker.id)).assigneeContactId, mason.id);
+  assert.equal((await pick(dana, task.id, caulker.id, mason.id)).assigneeContactId, caulker.id, "a closed job can go back to him");
+  const last = await as(pieter, task.id, "OPEN", "CANCELED");
+  assert.equal(last.task.status, "OPEN");
+  assert.equal(last.task.assigneeContactId, null, "the reopen took it off him again");
+  assert.equal(await prisma.taskAccess.count({ where: { taskId: task.id, contactId: caulker.id, revokedAt: null } }), 0);
+
+  const rows = await prisma.taskEvent.findMany({ where: { taskId: task.id } });
+  const timeline = buildActivity(rows, { contacts: { [caulker.id]: "Gp Caulker", [mason.id]: "Gp Mason" } }, todayYmdEastern());
+  assert.deepEqual(
+    timeline.slice(-4).map((e) => ("text" in e ? e.text : e.type)),
+    ["Assigned back to Gp Caulker", "Connor assigned Gp Mason", "Dana assigned Gp Caulker", "Unassigned because Gp Caulker is archived"],
+  );
+});
+
+test("G2 on real rows: a pick and its reversal don't pair across a drop and a give-back between them; the job ends canceled and nobody's", { skip, timeout }, async () => {
+  // The verify pass's finding 2, through the real setStatus and patchTask. A Canceled job nobody holds; a contractor who
+  // has been archived since a page loaded is picked for it, Pieter reopens it (a drop), Connor cancels it (the give-back),
+  // and Pieter unassigns it, all inside 2 minutes. The drop and the give-back moved the job between his pick and his
+  // unassign, so those two are no there-and-back, and the timeline ends on the unassign.
+  const tiler = await prisma.contact.create({ data: { fullName: "Gq Tiler", trades: "Tile" } });
+  const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Seal the grout", propertyId }, staff));
+  await prisma.$transaction((tx) => core.setStatus(tx, task.id, "CANCELED", staff, { expected: "OPEN" }));
+  await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - interval '7 days' WHERE "taskId" = ${task.id}`;
+  await prisma.contact.update({ where: { id: tiler.id }, data: { archivedAt: new Date() } });
+
+  const picked = await prisma.$transaction((tx) => core.patchTask(tx, task.id, { assignee: { contactId: tiler.id }, expectedAssignee: null }, pieter));
+  assert.equal(picked.assigneeContactId, tiler.id, "a closed job can be picked for him");
+  assert.equal((await prisma.$transaction((tx) => core.setStatus(tx, task.id, "REVIEW", pieter, { expected: "CANCELED" }))).task.assigneeContactId, null, "the reopen drops him");
+  const canceled = await prisma.$transaction((tx) => core.setStatus(tx, task.id, "CANCELED", staff, { expected: "REVIEW" }));
+  assert.equal(canceled.task.assigneeContactId, tiler.id, "Connor's Cancel is the reopen's Undo: the give-back");
+  const unassigned = await prisma.$transaction((tx) => core.patchTask(tx, task.id, { assignee: null, expectedAssignee: { contactId: tiler.id } }, pieter));
+  assert.equal(unassigned.assigneeContactId, null);
+  assert.equal(unassigned.status, "CANCELED");
+
+  const rows = await prisma.taskEvent.findMany({ where: { taskId: task.id } });
+  const timeline = buildActivity(rows, { contacts: { [tiler.id]: "Gq Tiler" } }, todayYmdEastern());
+  const texts = timeline.map((e) => ("text" in e ? e.text : e.type));
+  assert.equal(texts.at(-1), "Pieter unassigned this", JSON.stringify(texts));
+  assert.ok(texts.includes("Assigned back to Gq Tiler"), JSON.stringify(texts));
+});

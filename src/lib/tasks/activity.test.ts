@@ -338,6 +338,21 @@ test("a change pairs only with the field's latest move, and only when the same p
     ev("STATUS", { from: "IN_PROGRESS", to: "OPEN" }, { ...PIETER, createdAt: sec(60) }),
   ];
   assert.deepEqual(texts(build(nested)), ["Pieter set status to In progress, then back to To do"]);
+  // A pair leaves the field with no latest move, so a third flip by the same person pairs with nothing: tick, untick,
+  // tick leaves the tick, and In progress, To do, In progress leaves In progress. (Were the pair's second line kept as
+  // the latest move, the third would pair with it and the timeline would show nothing.)
+  const flips = [
+    ev("CHECKLIST", { itemId: "i1", title: "Caulk", done: true }, { ...PIETER, createdAt: sec(0) }),
+    ev("CHECKLIST", { itemId: "i1", title: "Caulk", done: false }, { ...PIETER, createdAt: sec(20) }),
+    ev("CHECKLIST", { itemId: "i1", title: "Caulk", done: true }, { ...PIETER, createdAt: sec(40) }),
+  ];
+  assert.deepEqual(texts(build(flips)), ["Pieter checked “Caulk”"]);
+  const moves = [
+    ev("STATUS", { from: "OPEN", to: "IN_PROGRESS" }, { ...PIETER, createdAt: sec(0) }),
+    ev("STATUS", { from: "IN_PROGRESS", to: "OPEN" }, { ...PIETER, createdAt: sec(20) }),
+    ev("STATUS", { from: "OPEN", to: "IN_PROGRESS" }, { ...PIETER, createdAt: sec(40) }),
+  ];
+  assert.deepEqual(texts(build(moves)), ["Pieter set status to In progress"]);
   // Only a move of the same field comes between: someone else's rename doesn't keep Pieter's due date there and back.
   const other = [
     ev("DUE", { from: "2026-10-24", to: "2026-10-30" }, { ...PIETER, createdAt: sec(0) }),

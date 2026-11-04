@@ -472,11 +472,15 @@ test("setStatus: no give-back for any other close, once the job moved or was ass
     ["assigned and unassigned since", "OPEN", "DONE", [unassigned, REOPEN, DROP]],
     ["a reopen that dropped nobody", "OPEN", "DONE", [{ ...REOPEN, data: { from: "DONE", to: "OPEN" } }, unassigned]],
     ["sent back after Approve's Undo", "IN_PROGRESS", "DONE", [{ kind: "STATUS", data: { from: "REVIEW", to: "IN_PROGRESS" }, createdAt: ago(10_000) }, DROP]],
-    // A Cancel that wrote no line (service.ts cancelOpenAutoTask, when a property's key date is cleared) moved the job
-    // since the reopen, so the reopen is still the latest line. The toast's Undo is refused (expected To do), and a
-    // close from Canceled isn't the Undo: a real one starts where the reopen left the job.
+    // A move that wrote no line (service.ts cancelOpenAutoTask's Cancel, when a property's key date is cleared; the
+    // hand-run Asana importer's writeTask) moved the job since the reopen, so the reopen is still the latest line. The
+    // toast's Undo is refused (it expects the status the reopen left), and a close from anywhere else isn't the Undo: a
+    // real one starts where the reopen left the job. Each kind of close and each place it can start from:
     ["a reopen, a Cancel with no line, then Done", "CANCELED", "DONE", [REOPEN, DROP]],
     ["a reopen to Review, a Cancel with no line, then Done", "CANCELED", "DONE", [{ ...REOPEN, data: { ...REOPEN.data, to: "REVIEW" } }, DROP]],
+    ["a reopen, a move to In progress with no line, then Done", "IN_PROGRESS", "DONE", [REOPEN, DROP]],
+    ["a Canceled job's reopen, a move to In progress with no line, then Canceled", "IN_PROGRESS", "CANCELED", [{ ...REOPEN, data: { ...REOPEN.data, from: "CANCELED" } }, DROP]],
+    ["a Canceled job's reopen, a Done with no line, then Canceled", "DONE", "CANCELED", [{ ...REOPEN, data: { ...REOPEN.data, from: "CANCELED" } }, DROP]],
     // A reopen gives back only the contractor it marked as its own drop.
     // Approve's Undo left a drop, a Cancel wrote no line (service.ts cancelOpenAutoTask), and the job, unassigned, was
     // reopened (no drop, no mark) and Canceled again inside the window: the drop isn't the reopen's.
@@ -484,6 +488,9 @@ test("setStatus: no give-back for any other close, once the job moved or was ass
     ["a reopen written before the mark", "OPEN", "DONE", [{ ...REOPEN, data: { from: "DONE", to: "OPEN" } }, DROP]],
     ["a marked reopen whose line before it isn't a drop", "OPEN", "DONE", [REOPEN, unassigned]],
     ["a marked reopen whose drop before it names someone else", "OPEN", "DONE", [REOPEN, jose]],
+    // Approve's rule needs the latest line to be an archived drop, not just any ASSIGNED line: a contractor unassigned by
+    // hand while the job was in Review, archived since, isn't given the job back when it is approved.
+    ["Approve after a contractor was unassigned by hand, then archived", "REVIEW", "DONE", [unassigned, MARK_DONE]],
   ];
   // Jose is archived here too, so a case can't pass just because the contractor it would wrongly give the job to
   // isn't: no contractor is even read (no Contact lock), since none of these is the way back.
@@ -954,4 +961,82 @@ test("flow D: Pieter's reopen and Cancel with Connor's between them stay; it rea
     "Connor set status to Review",
     "Pieter set status to Canceled",
   ]);
+});
+
+/* ---------------- Someone's assignment between a drop and a give-back (the verify pass on the fourth review) ---------------- */
+
+/** One person's pick of `to` (a contractor id, or null for nobody) on a job that `from` held, as patchTask writes it. */
+const picked = (id: string, at: string, by: Partial<ActivityEvent>, from: string | null, to: string | null) =>
+  ev("ASSIGNED", { from: { userId: null, contactId: from }, to: { userId: null, contactId: to } }, at, { id, ...by });
+
+test("G1: a pick of someone between a give-back and the drop that follows it keeps both; the job ends open and nobody's", () => {
+  // Zack's Canceled job, Zack archived. Connor reopens it (a drop), Pieter cancels inside 2 minutes (the give-back),
+  // Connor reassigns it to Jose, Dana's picker (loaded before Zack was archived) gives it to Zack again, and Pieter
+  // reopens inside 2 minutes of his Cancel (a drop). Pieter's Cancel and reopen pair, but the give-back and the drop are
+  // no there-and-back: two picks came between them. The job is open and unassigned, and the timeline ends on why.
+  const flow = [
+    ...CANCELED_HISTORY,
+    ...wrote("s1", step(0), CONNOR, "CANCELED", "OPEN", "drop"),
+    ...wrote("s2", step(1), {}, "OPEN", "CANCELED", "give"),
+    picked("s3", step(2), CONNOR, "c-zack", "c-jose"),
+    picked("s4", step(3), DANA, "c-jose", "c-zack"),
+    ...wrote("s5", step(4), {}, "CANCELED", "OPEN", "drop"),
+  ];
+  assert.deepEqual(shown(flow), [
+    "Pieter assigned Zack Outlaw",
+    "Pieter set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Connor set status to To do",
+    "Assigned back to Zack Outlaw",
+    "Connor assigned Jose Alvarez",
+    "Dana assigned Zack Outlaw",
+    "Unassigned because Zack Outlaw is archived",
+  ]);
+  // A pick and its reversal between them are no change: the give-back and the drop go together, as before.
+  assert.deepEqual(
+    shown([
+      ...CANCELED_HISTORY,
+      ...wrote("s1", step(0), CONNOR, "CANCELED", "OPEN", "drop"),
+      ...wrote("s2", step(1), {}, "OPEN", "CANCELED", "give"),
+      picked("s3", step(2), CONNOR, "c-zack", "c-jose"),
+      picked("s4", step(3), CONNOR, "c-jose", "c-zack"),
+      ...wrote("s5", step(4), {}, "CANCELED", "OPEN", "drop"),
+    ]),
+    ["Pieter assigned Zack Outlaw", "Pieter set status to Canceled", "Unassigned because Zack Outlaw is archived", "Connor set status to To do"],
+  );
+  // A pick that was taken out of the log never happened: it doesn't stand between them either.
+  assert.deepEqual(
+    shown([
+      ...CANCELED_HISTORY,
+      ...wrote("s1", step(0), CONNOR, "CANCELED", "OPEN", "drop"),
+      ...wrote("s2", step(1), {}, "OPEN", "CANCELED", "give"),
+      { ...picked("s3", step(2), CONNOR, "c-zack", "c-jose"), deletedAt: new Date("2026-10-23T15:01:00.000Z") },
+      ...wrote("s5", step(4), {}, "CANCELED", "OPEN", "drop"),
+    ]),
+    ["Pieter assigned Zack Outlaw", "Pieter set status to Canceled", "Unassigned because Zack Outlaw is archived", "Connor set status to To do"],
+  );
+});
+
+test("G2: a pick and its reversal don't pair across a drop and a give-back between them; the job ends canceled and nobody's", () => {
+  // Zack archived since. Pieter gives him the Canceled job with a picker loaded before that, reopens it to Review (a
+  // drop), Connor cancels it inside 2 minutes (the give-back), and Pieter unassigns it inside 2 minutes of his pick.
+  // The drop and the give-back moved the job in between, so the pick and the unassign are no there-and-back.
+  const flow = [
+    CANCELED_HISTORY[1],
+    picked("g1", step(0), {}, null, "c-zack"),
+    ...wrote("g2", step(4), {}, "CANCELED", "REVIEW", "drop"),
+    ...wrote("g3", step(7), CONNOR, "REVIEW", "CANCELED", "give"),
+    picked("g4", step(11), {}, "c-zack", null),
+  ];
+  assert.deepEqual(shown(flow), [
+    "Pieter set status to Canceled",
+    "Pieter assigned Zack Outlaw",
+    "Unassigned because Zack Outlaw is archived",
+    "Pieter set status to Review",
+    "Assigned back to Zack Outlaw",
+    "Connor set status to Canceled",
+    "Pieter unassigned this",
+  ]);
+  // Without the drop and the give-back, they still pair: Pieter's pick and unassign leave nothing.
+  assert.deepEqual(shown([CANCELED_HISTORY[1], picked("g1", step(0), {}, null, "c-zack"), picked("g4", step(11), {}, "c-zack", null)]), ["Pieter set status to Canceled"]);
 });

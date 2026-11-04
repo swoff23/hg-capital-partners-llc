@@ -263,7 +263,8 @@ function archivedAssigneeLine(contactId: string): EventInput {
  *    new work on a job the reopen left unassigned. The contractor comes from that mark, and the line before it must
  *    be his drop as well. A reopen with no mark (it dropped nobody, or it was written before the mark) gives nothing
  *    back, whatever drop sits before it: Approve's Undo and then a Cancel that wrote no line (cancelOpenAutoTask)
- *    leave a drop that isn't the reopen's.
+ *    leave a drop that isn't the reopen's. Two moves that wrote no line and ended back where the reopen left the job
+ *    can't be told from its Undo; no app path makes them.
  * Null when anything moved the job or assigned it since.
  */
 function droppedArchivedAssignee(
