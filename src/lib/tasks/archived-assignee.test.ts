@@ -378,20 +378,22 @@ test("setStatus: the reopen's Undo gives it back for APPROVAL_UNDO_MS after the 
   const late = await close("OPEN", "DONE", [reopenAt(APPROVAL_UNDO_MS + 1), DROP]);
   assert.equal(late.assignee, null, "a millisecond past it");
   assert.deepEqual(late.lines, [], "no ASSIGNED line nobody picked");
-  // A Canceled job reopened and undone goes back to Canceled, and to him.
-  const canceled = { ...REOPEN, data: { from: "CANCELED", to: "OPEN" } };
-  assert.equal((await close("OPEN", "CANCELED", [canceled, DROP])).assignee, "c-zack");
 });
 
 test("setStatus: Approve again after Approve's Undo gives the job back, however much later", async () => {
   // Approve's Undo writes no status line of its own (the Done line is soft-deleted): the drop is the latest line.
   for (const at of [ago(20_000), ago(APPROVAL_UNDO_MS + 1), ago(3 * 24 * 60 * 60_000)]) {
-    const { assignee, lines } = await close("REVIEW", "DONE", [{ ...DROP, createdAt: at }, MARK_DONE]);
+    const { assignee, lines, calls } = await close("REVIEW", "DONE", [{ ...DROP, createdAt: at }, MARK_DONE]);
     assert.equal(assignee, "c-zack", `Approve ${NOW.getTime() - at.getTime()} ms after the Undo`);
     assert.deepEqual(
       lines.map((e) => e.data),
       [GIVEN_BACK],
     );
+    // Task lock, then his contact, then the first write, as on the reopen path.
+    const lock = calls.findIndex(isContactLock);
+    assert.deepEqual(calls[lock].args, ["c-zack"]);
+    const order = [calls.findIndex(isTaskLock), lock, firstWrite(calls)];
+    assert.ok(order[0] === 0 && order[1] > order[0] && order[2] > order[1], `task lock, contact lock, then writes: ${order}`);
   }
 });
 
@@ -402,6 +404,13 @@ test("setStatus: no give-back for any other close, once the job moved or was ass
     ["a reopen older than the Undo's window", "OPEN", "DONE", [{ ...REOPEN, createdAt: ago(10 * 60_000) }, { ...DROP, createdAt: ago(10 * 60_000) }]],
     ["a reopen, then a different close (Cancel after reopening a Done job)", "OPEN", "CANCELED", [REOPEN, DROP]],
     ["a reopen of a Canceled job, then Done", "OPEN", "DONE", [{ ...REOPEN, data: { from: "CANCELED", to: "OPEN" } }, DROP]],
+    // A reopen followed by a Cancel never gives the job back, even a Canceled job's reopen undone within the window.
+    ...(["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW"] as const).map((open): [string, string, "DONE" | "CANCELED", Line[]] => [
+      `a reopen of a Canceled job to ${open}, then Canceled again`,
+      open,
+      "CANCELED",
+      [{ ...REOPEN, data: { from: "CANCELED", to: open } }, DROP],
+    ]),
     ["a Cancel after Approve's Undo", "REVIEW", "CANCELED", [DROP, MARK_DONE]],
     ["Approve's drop on a job no longer in Review", "OPEN", "DONE", [DROP, MARK_DONE]],
     ["moved since the reopen", "IN_PROGRESS", "DONE", [{ kind: "STATUS", data: { from: "OPEN", to: "IN_PROGRESS" }, createdAt: ago(10_000) }, REOPEN, DROP]],
@@ -450,6 +459,28 @@ test("a reopen and its Undo fold into one line again; the drop and the give-back
   assert.deepEqual(
     buildActivity([dropped, reopened], names, "2026-10-23").map((e) => ("text" in e ? e.text : e.type)),
     ["Unassigned because Zack Outlaw is archived", "Pieter set status to To do"],
+  );
+});
+
+test("the give-back rides only with the drop that took the job from the same contractor", () => {
+  // setStatus writes the give-back from the drop, so the two always name one contractor; the pairing still checks it.
+  const names = { contacts: { "c-zack": "Zack Outlaw", "c-jose": "Jose Alvarez" } };
+  const zackDropped = ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "e1" });
+  const joseDropped = ev("ASSIGNED", { ...DROP.data, from: { userId: null, contactId: "c-jose", name: null } }, "2026-10-23T15:00:00.000Z", { id: "e2" });
+  const reopened = ev("STATUS", REOPEN.data, "2026-10-23T15:00:00.000Z", { id: "e3" });
+  const back = ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:20.000Z", { id: "e4" });
+  const done = ev("STATUS", { from: "OPEN", to: "DONE" }, "2026-10-23T15:00:20.000Z", { id: "e5", visibility: "SHARED" });
+  const out = buildActivity([zackDropped, joseDropped, reopened, back, done], names, "2026-10-23");
+  // Zack's drop and his give-back fold into the Undo; Jose's drop stays a line of its own, not folded in with them.
+  assert.deepEqual(
+    out.map((e) => ("text" in e ? e.text : e.type)),
+    ["Pieter set status to To do, then back to Done", "Unassigned because Jose Alvarez is archived"],
+  );
+  const run = out[0];
+  assert.ok(run.type === "run");
+  assert.deepEqual(
+    run.lines.map((l) => l.text),
+    ["Unassigned because Zack Outlaw is archived", "Pieter set status to To do", "Assigned back to Zack Outlaw", "Pieter set status to Done"],
   );
 });
 

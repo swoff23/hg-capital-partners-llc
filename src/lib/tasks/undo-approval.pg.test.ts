@@ -227,9 +227,11 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   const reopenUndo = await job("Paint the porch");
   const reopenLate = await job("Paint the steps");
   const reopenCancel = await job("Paint the door");
+  const reopenCanceled = await job("Paint the gate");
   const approveLate = await job("Paint the railings");
   const approveCancel = await job("Paint the shutters");
   for (const t of [reopenUndo, reopenLate, reopenCancel]) await status(t.id, "DONE", "OPEN");
+  await status(reopenCanceled.id, "CANCELED", "OPEN");
   const approvals = new Map<string, string>();
   for (const t of [approveLate, approveCancel]) {
     await status(t.id, "REVIEW", "OPEN");
@@ -240,6 +242,7 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
 
   // A reopen starts the job unassigned; its Undo gives it back, marked, with his access row.
   for (const t of [reopenUndo, reopenLate, reopenCancel]) assert.equal((await status(t.id, "OPEN", "DONE")).task.assigneeContactId, null);
+  assert.equal((await status(reopenCanceled.id, "OPEN", "CANCELED")).task.assigneeContactId, null);
   const undone = await status(reopenUndo.id, "DONE", "OPEN");
   assert.equal(undone.task.assigneeContactId, painter.id);
   assert.equal(undone.emailsContractor, false);
@@ -255,6 +258,11 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   // So is a different close straight after the reopen.
   assert.equal((await status(reopenCancel.id, "CANCELED", "OPEN")).task.assigneeContactId, null);
   assert.equal(await givenBackLines(reopenCancel.id), 0);
+  assert.equal(await access(reopenCancel.id), 0);
+  // A Canceled job reopened and canceled again at once is a reopen followed by a Cancel: not given back either.
+  assert.equal((await status(reopenCanceled.id, "CANCELED", "OPEN")).task.assigneeContactId, null);
+  assert.equal(await givenBackLines(reopenCanceled.id), 0);
+  assert.equal(await access(reopenCanceled.id), 0);
 
   // Approve's Undo puts the job back in Review without him; Approve again gives it back, minutes later too.
   for (const t of [approveLate, approveCancel]) assert.equal((await undo(t.id, approvals.get(t.id)!)).task.assigneeContactId, null);
@@ -265,6 +273,7 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   // A Cancel from there closes it unassigned.
   assert.equal((await status(approveCancel.id, "CANCELED", "REVIEW")).task.assigneeContactId, null);
   assert.equal(await givenBackLines(approveCancel.id), 0);
+  assert.equal(await access(approveCancel.id), 0);
 
   // A reopen followed by any other move is new work too: closing it later leaves it unassigned.
   await status(reopenUndo.id, "OPEN", "DONE");
