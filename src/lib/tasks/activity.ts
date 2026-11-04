@@ -301,6 +301,11 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
         const from = d.from && typeof d.from === "object" ? s((d.from as Data).contactId) : null;
         return { text: `Unassigned because ${archivedName(from, names)} is archived` };
       }
+      // And back to them with the reopen's Undo, or Approve again after Approve's Undo (core.ts setStatus): nobody's pick.
+      if (d.givenBack === true) {
+        const to = d.to && typeof d.to === "object" ? s((d.to as Data).contactId) : null;
+        return { text: `Assigned back to ${archivedName(to, names)}` };
+      }
       const name = assigneeName(d.to, names);
       return { text: name ? `${a} assigned ${name}` : `${a} unassigned this` };
     }
@@ -449,8 +454,8 @@ function moveOf(e: ActivityEvent): { key: string; from: string; to: string } | n
       return from === null || to === null ? null : { key: "property", from, to };
     }
     case "ASSIGNED": {
-      // Unassigned because the contractor was archived: no one's change to undo.
-      if (d.archived === true) return null;
+      // Unassigned because the contractor was archived, or given back to them: no one's change to undo.
+      if (d.archived === true || d.givenBack === true) return null;
       const side = (x: unknown) => {
         const o = x && typeof x === "object" ? (x as Data) : {};
         return `${s(o.userId) ?? ""}|${s(o.contactId) ?? ""}`;
@@ -521,7 +526,7 @@ function groupKey(e: ActivityEvent): string {
     case "TITLE":
       return "title";
     case "ASSIGNED":
-      return d.archived === true ? `solo:${e.id}` : "assigned";
+      return d.archived === true || d.givenBack === true ? `solo:${e.id}` : "assigned";
     case "PROPERTY":
       return "unitTo" in d || "unitFrom" in d ? "unit" : "property";
     case "REPEAT":
@@ -695,11 +700,42 @@ export function buildActivity<E extends ActivityEvent>(events: readonly E[], nam
   return out;
 }
 
+/**
+ * A reopen and its Undo in one burst, on a job whose contractor is archived: the line that took the job off them
+ * (core.ts archivedAssigneeLine) and the `givenBack` line that put it back. Neither pairs (moveOf), so both stay
+ * among the run's lines, but neither is a sentence of its own: they ride with the burst's status changes, and the
+ * burst reads as any reopen and its Undo do. Only in a burst with a status change to ride with.
+ */
+function givenBackRiders(burst: readonly ActivityEvent[]): Set<string> {
+  const riders = new Set<string>();
+  if (!burst.some((e) => e.kind === "STATUS")) return riders;
+  const contactOf = (v: unknown) => (v && typeof v === "object" ? s((v as Data).contactId) : null);
+  burst.forEach((e, i) => {
+    if (e.kind !== "ASSIGNED" || dataOf(e).givenBack !== true) return;
+    const to = contactOf(dataOf(e).to);
+    const drop = burst
+      .slice(0, i)
+      .reverse()
+      .find((x) => x.kind === "ASSIGNED" && dataOf(x).archived === true && !riders.has(x.id) && contactOf(dataOf(x).from) === to);
+    if (drop) riders.add(drop.id).add(e.id);
+  });
+  return riders;
+}
+
 /** One person's burst as entries: sentences by kind, folded when it stands for more than one event. */
 function burstEntries<E extends ActivityEvent>(burst: E[], names: ActivityNames, today: Ymd, line: (e: E) => LineEntry<E>): ActivityEntry<E>[] {
   if (burst.length === 1) return [line(burst[0])];
+  const riders = givenBackRiders(burst);
+  const keyOf = (e: E) => (riders.has(e.id) ? "status" : groupKey(e));
   const groups = new Map<string, E[]>();
-  for (const e of burst) groups.set(groupKey(e), [...(groups.get(groupKey(e)) ?? []), e]);
+  for (const e of burst) groups.set(keyOf(e), [...(groups.get(keyOf(e)) ?? []), e]);
+  // What a group says: its own events, without the riders.
+  const sentence = (key: string, evs: E[]): { text: string; status?: TaskStatus; previousNotes?: string } => {
+    const own = evs.filter((e) => !riders.has(e.id));
+    if (own.length > 1) return mergedSentence(key, own, names, today);
+    const st = statusOf(own[0]);
+    return { text: eventLine(own[0], names, today).text, ...(st ? { status: st } : {}) };
+  };
   const imported = burst.every(isImported);
   const run = (evs: E[], sentence: { text: string; status?: TaskStatus; previousNotes?: string }): ActivityEntry<E> => ({
     type: "run",
@@ -718,10 +754,10 @@ function burstEntries<E extends ActivityEvent>(burst: E[], names: ActivityNames,
     // Three sentences or more: the first, and how many changes sit behind it.
     const [key, first] = list[0];
     const more = burst.length - first.length;
-    const lead = first.length === 1 ? { text: eventLine(first[0], names, today).text } : mergedSentence(key, first, names, today);
+    const lead = sentence(key, first);
     return [run(burst, { text: `${lead.text} and made ${more} more ${more === 1 ? "change" : "changes"}` })];
   }
-  return list.map(([key, evs]) => (evs.length === 1 ? line(evs[0]) : run(evs, mergedSentence(key, evs, names, today))));
+  return list.map(([key, evs]) => (evs.length === 1 ? line(evs[0]) : run(evs, sentence(key, evs))));
 }
 
 /* ---------------- Reading the timeline ---------------- */

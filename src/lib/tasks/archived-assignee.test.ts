@@ -4,6 +4,7 @@ import type { Task } from "@prisma/client";
 import { buildActivity, eventLine, type ActivityEvent } from "./activity";
 import { ARCHIVED_ASSIGNEE_LINE, TaskRuleError, createNextRepeat, createTask, patchTask, setStatus, undoApproval, type Principal, type Tx } from "./core";
 import { TOAST_PHONE_CHARS } from "@/lib/toast-line";
+import { APPROVAL_UNDO_MS } from "./rules";
 
 /**
  * N4 and N3(c) of the Nov 3 review: an open job never lands on an archived
@@ -329,30 +330,39 @@ test("patchTask and createTask: every open status still refuses an archived cont
   assert.ok(done.calls.findIndex(isContactLock) < done.calls.findIndex((c) => c.model === "task" && c.op === "create"));
 });
 
-/* ---------------- Closing straight back gives the job back (Nov 3 low 4, the residual) ---------------- */
+/* ---------------- Only an Undo gives the job back (Nov 3 low 4, the residual; the task session's ruling) ---------------- */
 
-// The job's latest live ASSIGNED and STATUS lines, newest first, as setStatus reads them before a close.
-const DROP = { kind: "ASSIGNED", data: { from: { userId: null, contactId: "c-zack", name: null }, to: { userId: null, contactId: null }, archived: true } };
-const REOPEN = { kind: "STATUS", data: { from: "DONE", to: "OPEN" } };
-const MARK_DONE = { kind: "STATUS", data: { from: "IN_PROGRESS", to: "REVIEW" } };
+// The job's latest live ASSIGNED and STATUS lines, newest first, as setStatus reads them before a close. NOW is 15:00:00.
+const ago = (ms: number) => new Date(NOW.getTime() - ms);
+const DROP = { kind: "ASSIGNED", data: { from: { userId: null, contactId: "c-zack", name: null }, to: { userId: null, contactId: null }, archived: true }, createdAt: ago(20_000) };
+const REOPEN = { kind: "STATUS", data: { from: "DONE", to: "OPEN" }, createdAt: ago(20_000) };
+const MARK_DONE = { kind: "STATUS", data: { from: "IN_PROGRESS", to: "REVIEW" }, createdAt: ago(60 * 60_000) };
+const GIVEN_BACK = { from: { userId: null, contactId: null, name: null }, to: { userId: null, contactId: "c-zack" }, givenBack: true };
+type Line = { kind: string; data: unknown; createdAt: Date };
 const isLinesRead = (model: string, op: string, args: Args) =>
   model === "taskEvent" && op === "findMany" && JSON.stringify(args.where?.kind) === JSON.stringify({ in: ["ASSIGNED", "STATUS"] });
 const latestLines =
-  (...rows: { kind: string; data: unknown }[]): Answer =>
+  (...rows: Line[]): Answer =>
   (model, op, args) =>
     isLinesRead(model, op, args) ? rows : undefined;
+/** A close of an unassigned job whose latest lines are `rows`: who has it after, and the ASSIGNED lines it wrote. */
+async function close(status: string, to: "DONE" | "CANCELED", rows: Line[], now = NOW) {
+  const { tx, calls } = fakeTx({ status, assigneeContactId: null }, latestLines(...rows));
+  const r = await setStatus(tx, "t1", to, PIETER, { expected: status as never }, now);
+  return { assignee: r.task.assigneeContactId, lines: events(calls).filter((e) => e.kind === "ASSIGNED"), calls, r };
+}
 
-test("setStatus: the reopen's Undo gives an archived contractor's Done job back; locks: task, then his contact", async () => {
+test("setStatus: the reopen's Undo gives an archived contractor's Done job back, marked; locks: task, then his contact", async () => {
   // The case: Zack (archived) had the Done job, Pieter reopened it, which left it unassigned, then tapped Undo.
-  const { tx, calls } = fakeTx({ status: "OPEN", assigneeContactId: null }, latestLines(REOPEN, DROP));
-  const r = await setStatus(tx, "t1", "DONE", PIETER, { expected: "OPEN" }, NOW);
-  assert.equal(r.task.assigneeContactId, "c-zack", "his closed job again, as before the reopen");
+  const { assignee, lines, calls, r } = await close("OPEN", "DONE", [REOPEN, DROP]);
+  assert.equal(assignee, "c-zack", "his closed job again, as before the reopen");
   const update = calls.find((c) => c.model === "task" && c.op === "update")!;
   assert.equal((update.args as { data: Record<string, unknown> }).data.assigneeContactId, "c-zack");
-  assert.deepEqual(events(calls).find((e) => e.kind === "ASSIGNED")?.data, {
-    from: { userId: null, contactId: null, name: null },
-    to: { userId: null, contactId: "c-zack" },
-  });
+  assert.deepEqual(
+    lines.map((e) => e.data),
+    [GIVEN_BACK],
+    "nobody picked him: the line says it was given back",
+  );
   assert.ok(calls.some((c) => c.model === "taskAccess" && c.op === "upsert"), "the automatic access row comes back with the job");
   assert.equal(r.emailsContractor, false, "he has no login (Archive needs it removed), so nobody is emailed");
   assert.ok(!calls.some(isEmailRow));
@@ -362,29 +372,49 @@ test("setStatus: the reopen's Undo gives an archived contractor's Done job back;
   assert.ok(order[0] === 0 && order[1] > order[0] && order[2] > order[1], `task lock, contact lock, then writes: ${order}`);
 });
 
-test("setStatus: a second Approve after Approve's Undo gives the job back too, and a Cancel straight after the reopen", async () => {
-  // Approve's Undo writes no status line of its own (the Done line is soft-deleted): the drop is the latest line.
-  const approve = fakeTx({ status: "REVIEW", assigneeContactId: null }, latestLines(DROP, MARK_DONE));
-  assert.equal((await setStatus(approve.tx, "t1", "DONE", PIETER, { expected: "REVIEW" }, NOW)).task.assigneeContactId, "c-zack");
-  const cancel = fakeTx({ status: "OPEN", assigneeContactId: null }, latestLines(REOPEN, DROP));
-  assert.equal((await setStatus(cancel.tx, "t1", "CANCELED", PIETER, { expected: "OPEN" }, NOW)).task.assigneeContactId, "c-zack");
+test("setStatus: the reopen's Undo gives it back for APPROVAL_UNDO_MS after the reopen, that instant included, as undoApproval counts", async () => {
+  const reopenAt = (ms: number) => ({ ...REOPEN, createdAt: ago(ms) });
+  assert.equal((await close("OPEN", "DONE", [reopenAt(APPROVAL_UNDO_MS), DROP])).assignee, "c-zack", "exactly at the limit");
+  const late = await close("OPEN", "DONE", [reopenAt(APPROVAL_UNDO_MS + 1), DROP]);
+  assert.equal(late.assignee, null, "a millisecond past it");
+  assert.deepEqual(late.lines, [], "no ASSIGNED line nobody picked");
+  // A Canceled job reopened and undone goes back to Canceled, and to him.
+  const canceled = { ...REOPEN, data: { from: "CANCELED", to: "OPEN" } };
+  assert.equal((await close("OPEN", "CANCELED", [canceled, DROP])).assignee, "c-zack");
 });
 
-test("setStatus: no give-back once the job moved or was assigned since, for a contractor restored since, or onto open work", async () => {
+test("setStatus: Approve again after Approve's Undo gives the job back, however much later", async () => {
+  // Approve's Undo writes no status line of its own (the Done line is soft-deleted): the drop is the latest line.
+  for (const at of [ago(20_000), ago(APPROVAL_UNDO_MS + 1), ago(3 * 24 * 60 * 60_000)]) {
+    const { assignee, lines } = await close("REVIEW", "DONE", [{ ...DROP, createdAt: at }, MARK_DONE]);
+    assert.equal(assignee, "c-zack", `Approve ${NOW.getTime() - at.getTime()} ms after the Undo`);
+    assert.deepEqual(
+      lines.map((e) => e.data),
+      [GIVEN_BACK],
+    );
+  }
+});
+
+test("setStatus: no give-back for any other close, once the job moved or was assigned since, or for a contractor restored since", async () => {
   const jose = { ...DROP, data: { ...DROP.data, from: { userId: null, contactId: "c-jose", name: null } } };
-  const unassigned = { kind: "ASSIGNED", data: { from: { userId: null, contactId: "c-jose" }, to: { userId: null, contactId: null } } };
-  const cases: [string, { kind: string; data: unknown }[]][] = [
-    ["moved since the reopen", [{ kind: "STATUS", data: { from: "OPEN", to: "IN_PROGRESS" } }, REOPEN, DROP]],
-    ["assigned and unassigned since", [unassigned, REOPEN, DROP]],
-    ["a reopen that dropped nobody", [REOPEN, unassigned]],
-    ["sent back after Approve's Undo", [{ kind: "STATUS", data: { from: "REVIEW", to: "IN_PROGRESS" } }, DROP]],
-    ["a contractor no longer archived (the picker offers him again)", [REOPEN, jose]],
+  const unassigned = { kind: "ASSIGNED", data: { from: { userId: null, contactId: "c-jose" }, to: { userId: null, contactId: null } }, createdAt: ago(10_000) };
+  const cases: [string, string, "DONE" | "CANCELED", Line[]][] = [
+    ["a reopen older than the Undo's window", "OPEN", "DONE", [{ ...REOPEN, createdAt: ago(10 * 60_000) }, { ...DROP, createdAt: ago(10 * 60_000) }]],
+    ["a reopen, then a different close (Cancel after reopening a Done job)", "OPEN", "CANCELED", [REOPEN, DROP]],
+    ["a reopen of a Canceled job, then Done", "OPEN", "DONE", [{ ...REOPEN, data: { from: "CANCELED", to: "OPEN" } }, DROP]],
+    ["a Cancel after Approve's Undo", "REVIEW", "CANCELED", [DROP, MARK_DONE]],
+    ["Approve's drop on a job no longer in Review", "OPEN", "DONE", [DROP, MARK_DONE]],
+    ["moved since the reopen", "IN_PROGRESS", "DONE", [{ kind: "STATUS", data: { from: "OPEN", to: "IN_PROGRESS" }, createdAt: ago(10_000) }, REOPEN, DROP]],
+    ["assigned and unassigned since", "OPEN", "DONE", [unassigned, REOPEN, DROP]],
+    ["a reopen that dropped nobody", "OPEN", "DONE", [REOPEN, unassigned]],
+    ["sent back after Approve's Undo", "IN_PROGRESS", "DONE", [{ kind: "STATUS", data: { from: "REVIEW", to: "IN_PROGRESS" }, createdAt: ago(10_000) }, DROP]],
+    ["a contractor no longer archived (the picker offers him again)", "OPEN", "DONE", [REOPEN, jose]],
   ];
-  for (const [why, rows] of cases) {
-    const { tx, calls } = fakeTx({ status: "OPEN", assigneeContactId: null }, latestLines(...rows));
-    const r = await setStatus(tx, "t1", "DONE", PIETER, {}, NOW);
-    assert.equal(r.task.assigneeContactId, null, why);
-    assert.ok(!events(calls).some((e) => e.kind === "ASSIGNED"), why);
+  for (const [why, status, to, rows] of cases) {
+    const { assignee, lines, calls } = await close(status, to, rows);
+    assert.equal(assignee, null, why);
+    assert.deepEqual(lines, [], `${why}: no ASSIGNED line nobody picked`);
+    assert.ok(!calls.some((c) => c.model === "taskAccess" && c.op === "upsert"), `${why}: no access row`);
   }
   // Nothing is looked up for a job that has an assignee, or for a move that doesn't close it.
   for (const [row, to] of [
@@ -397,4 +427,45 @@ test("setStatus: no give-back once the job moved or was assigned since, for a co
     assert.ok(!calls.some((c) => isLinesRead(c.model, c.op, c.args as Args)), `${JSON.stringify(row)} to ${to}`);
     assert.notEqual(r.task.assigneeContactId, "c-zack");
   }
+});
+
+test("a reopen and its Undo fold into one line again; the drop and the give-back stay inside it", () => {
+  const names = { contacts: { "c-zack": "Zack Outlaw" } };
+  const dropped = ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "e1" });
+  const reopened = ev("STATUS", REOPEN.data, "2026-10-23T15:00:00.000Z", { id: "e2" });
+  const back = ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:20.000Z", { id: "e3" });
+  const done = ev("STATUS", { from: "OPEN", to: "DONE" }, "2026-10-23T15:00:20.000Z", { id: "e4", visibility: "SHARED" });
+  const out = buildActivity([dropped, reopened, back, done], names, "2026-10-23");
+  assert.equal(out.length, 1, JSON.stringify(out.map((e) => ("text" in e ? e.text : e.type))));
+  const run = out[0];
+  assert.ok(run.type === "run");
+  // As any reopen and its Undo read (activity.test.ts), not "Unassigned because Zack Outlaw is archived and made 3 more changes".
+  assert.equal(run.text, "Pieter set status to To do, then back to Done");
+  assert.equal(run.status, "DONE");
+  assert.deepEqual(
+    run.lines.map((l) => l.text),
+    ["Unassigned because Zack Outlaw is archived", "Pieter set status to To do", "Assigned back to Zack Outlaw", "Pieter set status to Done"],
+  );
+  // A reopen left open still says why it's unassigned, as its own line.
+  assert.deepEqual(
+    buildActivity([dropped, reopened], names, "2026-10-23").map((e) => ("text" in e ? e.text : e.type)),
+    ["Unassigned because Zack Outlaw is archived", "Pieter set status to To do"],
+  );
+});
+
+test("the give-back line names who has the job again, and never pairs or merges with an assignment", () => {
+  const names = { contacts: { "c-zack": "Zack Outlaw", "c-jose": "Jose Alvarez" } };
+  const back = ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:00.000Z", { id: "e1" });
+  assert.equal(eventLine(back, names, "2026-10-23").text, "Assigned back to Zack Outlaw");
+  assert.equal(eventLine(back, {}, "2026-10-23").text, "Assigned back to the contractor");
+  const texts = (es: ActivityEvent[]) => buildActivity(es, names, "2026-10-23").map((e) => ("text" in e ? e.text : e.type));
+  // Pieter takes the job back off Zack a minute after Approve gave it back: nobody's pick to undo, so both lines stay.
+  const off = ev("ASSIGNED", { from: { userId: null, contactId: "c-zack", name: null }, to: { userId: null, contactId: null } }, "2026-10-23T15:01:00.000Z", { id: "e2" });
+  assert.deepEqual(texts([back, off]), ["Assigned back to Zack Outlaw", "Pieter unassigned this"]);
+  // A pick in the same burst is its own sentence; the give-back isn't folded under it.
+  const jose = ev("ASSIGNED", { from: { userId: null, contactId: "c-zack", name: null }, to: { userId: null, contactId: "c-jose" } }, "2026-10-23T15:01:00.000Z", { id: "e2" });
+  assert.deepEqual(texts([back, jose]), ["Assigned back to Zack Outlaw", "Pieter assigned Jose Alvarez"]);
+  // Approve's Undo, then Approve again: no status change in the burst to ride with, so the two lines stand.
+  const dropped = ev("ASSIGNED", DROP.data, "2026-10-23T14:59:00.000Z", { id: "e0" });
+  assert.deepEqual(texts([dropped, back]), ["Unassigned because Zack Outlaw is archived", "Assigned back to Zack Outlaw"]);
 });

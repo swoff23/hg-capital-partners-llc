@@ -211,37 +211,64 @@ test("Undo holds the approval's email row: a send run's claim waits for it, then
   assert.ok((await prisma.taskEvent.findUniqueOrThrow({ where: { id: approvedEventId } })).deletedAt);
 });
 
-test("closing straight back after a reopen or Approve's Undo gives an archived contractor's job back, in the lines' real order", { skip, timeout }, async () => {
-  // Nov 3 low 4's residual, on the adapter: the drop and the reopen are written in one transaction, and the give-back
-  // reads them back newest first (createdAt, then id), which a fake can't show. No login: Archive needs it removed.
+test("only the reopen's Undo, or Approve again after Approve's Undo, gives an archived contractor's job back, on the lines' real order and times", { skip, timeout }, async () => {
+  // Nov 3 low 4's residual as the task session ruled it, on the adapter: the drop and the reopen are written in one
+  // transaction, and the give-back reads them back newest first (createdAt, then id) with the reopen's createdAt as the
+  // adapter returns it, which a fake can't show. No login: Archive needs it removed.
   const painter = await prisma.contact.create({ data: { fullName: "Rv Painter", trades: "Painting" } });
   const job = (title: string) => prisma.$transaction((tx) => core.createTask(tx, { title, propertyId, assignee: { contactId: painter.id } }, staff));
   const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
     prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
-  const reopenCase = await job("Paint the porch");
-  const approveCase = await job("Paint the railings");
-  await status(reopenCase.id, "DONE", "OPEN");
-  await status(approveCase.id, "REVIEW", "OPEN");
-  const approved = await status(approveCase.id, "DONE", "REVIEW");
-  // Archived since (as Archive would, once both were closed or in Review; set here directly).
+  const backDate = (taskId: string, minutes: number) =>
+    prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - make_interval(mins => ${minutes}::int) WHERE "taskId" = ${taskId} AND "kind" IN ('STATUS', 'ASSIGNED')`;
+  const givenBackLines = (taskId: string) => prisma.taskEvent.count({ where: { taskId, kind: "ASSIGNED", data: { path: ["givenBack"], equals: true } } });
+  const access = (taskId: string) => prisma.taskAccess.count({ where: { taskId, contactId: painter.id, source: "ASSIGNEE", revokedAt: null } });
+
+  const reopenUndo = await job("Paint the porch");
+  const reopenLate = await job("Paint the steps");
+  const reopenCancel = await job("Paint the door");
+  const approveLate = await job("Paint the railings");
+  const approveCancel = await job("Paint the shutters");
+  for (const t of [reopenUndo, reopenLate, reopenCancel]) await status(t.id, "DONE", "OPEN");
+  const approvals = new Map<string, string>();
+  for (const t of [approveLate, approveCancel]) {
+    await status(t.id, "REVIEW", "OPEN");
+    approvals.set(t.id, (await status(t.id, "DONE", "REVIEW")).statusEventId);
+  }
+  // Archived since (as Archive would, once all were closed; set here directly).
   await prisma.contact.update({ where: { id: painter.id }, data: { archivedAt: new Date() } });
 
-  // A reopen starts the job unassigned; its Undo gives it back.
-  assert.equal((await status(reopenCase.id, "OPEN", "DONE")).task.assigneeContactId, null);
-  const undone = await status(reopenCase.id, "DONE", "OPEN");
+  // A reopen starts the job unassigned; its Undo gives it back, marked, with his access row.
+  for (const t of [reopenUndo, reopenLate, reopenCancel]) assert.equal((await status(t.id, "OPEN", "DONE")).task.assigneeContactId, null);
+  const undone = await status(reopenUndo.id, "DONE", "OPEN");
   assert.equal(undone.task.assigneeContactId, painter.id);
   assert.equal(undone.emailsContractor, false);
-  const access = (taskId: string) => prisma.taskAccess.count({ where: { taskId, contactId: painter.id, source: "ASSIGNEE", revokedAt: null } });
-  assert.equal(await access(reopenCase.id), 1, "his access row comes back with it");
+  assert.equal(await givenBackLines(reopenUndo.id), 1);
+  assert.equal(await access(reopenUndo.id), 1, "his access row comes back with it");
 
-  // Approve's Undo puts it back in Review without him; Approve again gives it back.
-  assert.equal((await undo(approveCase.id, approved.statusEventId)).task.assigneeContactId, null);
-  assert.equal((await status(approveCase.id, "DONE", "REVIEW")).task.assigneeContactId, painter.id);
-  assert.equal(await access(approveCase.id), 1);
+  // Past the Undo's window, the same close is new work: it closes unassigned, with no ASSIGNED line.
+  await backDate(reopenLate.id, 3);
+  const late = await status(reopenLate.id, "DONE", "OPEN");
+  assert.equal(late.task.assigneeContactId, null);
+  assert.equal(await givenBackLines(reopenLate.id), 0);
+  assert.equal(await access(reopenLate.id), 0);
+  // So is a different close straight after the reopen.
+  assert.equal((await status(reopenCancel.id, "CANCELED", "OPEN")).task.assigneeContactId, null);
+  assert.equal(await givenBackLines(reopenCancel.id), 0);
 
-  // A reopen followed by any other move is new work: closing it later leaves it unassigned.
-  await status(reopenCase.id, "OPEN", "DONE");
-  await status(reopenCase.id, "IN_PROGRESS", "OPEN");
-  assert.equal((await status(reopenCase.id, "DONE", "IN_PROGRESS")).task.assigneeContactId, null);
+  // Approve's Undo puts the job back in Review without him; Approve again gives it back, minutes later too.
+  for (const t of [approveLate, approveCancel]) assert.equal((await undo(t.id, approvals.get(t.id)!)).task.assigneeContactId, null);
+  await backDate(approveLate.id, 3);
+  assert.equal((await status(approveLate.id, "DONE", "REVIEW")).task.assigneeContactId, painter.id);
+  assert.equal(await givenBackLines(approveLate.id), 1);
+  assert.equal(await access(approveLate.id), 1);
+  // A Cancel from there closes it unassigned.
+  assert.equal((await status(approveCancel.id, "CANCELED", "REVIEW")).task.assigneeContactId, null);
+  assert.equal(await givenBackLines(approveCancel.id), 0);
+
+  // A reopen followed by any other move is new work too: closing it later leaves it unassigned.
+  await status(reopenUndo.id, "OPEN", "DONE");
+  await status(reopenUndo.id, "IN_PROGRESS", "OPEN");
+  assert.equal((await status(reopenUndo.id, "DONE", "IN_PROGRESS")).task.assigneeContactId, null);
   assert.equal(await prisma.notificationOutbox.count({ where: { recipientContactId: painter.id } }), 0, "no email ever queued for him");
 });
