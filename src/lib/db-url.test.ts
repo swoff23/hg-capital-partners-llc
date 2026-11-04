@@ -88,6 +88,20 @@ test("only the pooler host on 6543 counts as the transaction pooler", () => {
   assert.equal(isTxPooler(LOCAL), false);
 });
 
+test("a pooler URL with no database path still reads as its pooler, and another port as neither", () => {
+  // The integration's URLs carry /postgres today; one without it read as direct, and Production logged db:pooler.
+  const host = "postgres://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com";
+  assert.equal(isTxPooler(`${host}:6543?pgbouncer=true&sslmode=require`), true);
+  assert.equal(isTxPooler(`${host}:6543`), true);
+  assert.equal(dbViaOf(`${host}:6543#x`), "transaction pooler");
+  assert.equal(isSessionPooler(`${host}:5432?sslmode=require`), true);
+  assert.equal(dbViaOf(`${host}:5432`), "session pooler");
+  assert.equal(productionPoolerWarning({ VERCEL_ENV: "production", POSTGRES_PRISMA_URL: `${host}:6543?pgbouncer=true` }), null);
+  // A longer port that starts the same is neither.
+  assert.equal(isTxPooler(`${host}:65430/postgres`), false);
+  assert.equal(dbViaOf(`${host}:54321/postgres`), "direct");
+});
+
 test("the health detail names the driver, the route and the pool", () => {
   assert.deepEqual(dbConnectionSummary({ VERCEL_ENV: "production", DATABASE_URL: SESSION, POSTGRES_PRISMA_URL: TX }), {
     dbDriver: "node-postgres",

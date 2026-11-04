@@ -119,6 +119,25 @@ test("Approve then Undo: back in Review, the Done line hidden, the next copy and
   assert.equal(again.task.status, "REVIEW");
 });
 
+test("the Undo's 2-minute limit holds on the times the adapter reads back, whatever the session's zone", { skip, timeout }, async () => {
+  // Every other case undoes moments after approving, so a misread that made the approval look newer would pass them.
+  // The column holds UTC without a zone; read as local time on a New York session it would be hours off either way.
+  const { taskId, approvedEventId } = await approvedJob();
+  const [{ zone, stored }] = await prisma.$queryRaw<{ zone: string; stored: string }[]>`
+    SELECT current_setting('TimeZone') AS zone, to_char("createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS stored
+    FROM "TaskEvent" WHERE "id" = ${approvedEventId}`;
+  const read = await prisma.taskEvent.findUniqueOrThrow({ where: { id: approvedEventId }, select: { createdAt: true } });
+  assert.equal(read.createdAt.toISOString(), stored, `the stored UTC instant comes back as itself (session zone ${zone})`);
+
+  // Three minutes old: refused, and nothing changes.
+  await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - interval '3 minutes' WHERE "taskId" = ${taskId} AND "kind" = 'STATUS'`;
+  await assert.rejects(undo(taskId, approvedEventId), (e) => e instanceof core.TaskRuleError && e.message === "Too late to undo. Change the status.");
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: taskId } })).status, "DONE");
+  // One minute old: it goes through.
+  await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" + interval '2 minutes' WHERE "taskId" = ${taskId} AND "kind" = 'STATUS'`;
+  assert.equal((await undo(taskId, approvedEventId)).task.status, "REVIEW");
+});
+
 test("Undo is refused once the approval's email is claimed or sent, read through the adapter; nothing changes", { skip, timeout }, async () => {
   const { taskId, approvedEventId, copyId } = await approvedJob();
   const [row] = await approvalRows(taskId, approvedEventId);
@@ -190,4 +209,39 @@ test("Undo holds the approval's email row: a send run's claim waits for it, then
   assert.deepEqual(await claiming, [{ attempts: 1 }], "the claim goes through after the Undo commits");
   // What the drain then reads back for the approval's line: deleted, so it's left out of the email.
   assert.ok((await prisma.taskEvent.findUniqueOrThrow({ where: { id: approvedEventId } })).deletedAt);
+});
+
+test("closing straight back after a reopen or Approve's Undo gives an archived contractor's job back, in the lines' real order", { skip, timeout }, async () => {
+  // Nov 3 low 4's residual, on the adapter: the drop and the reopen are written in one transaction, and the give-back
+  // reads them back newest first (createdAt, then id), which a fake can't show. No login: Archive needs it removed.
+  const painter = await prisma.contact.create({ data: { fullName: "Rv Painter", trades: "Painting" } });
+  const job = (title: string) => prisma.$transaction((tx) => core.createTask(tx, { title, propertyId, assignee: { contactId: painter.id } }, staff));
+  const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
+  const reopenCase = await job("Paint the porch");
+  const approveCase = await job("Paint the railings");
+  await status(reopenCase.id, "DONE", "OPEN");
+  await status(approveCase.id, "REVIEW", "OPEN");
+  const approved = await status(approveCase.id, "DONE", "REVIEW");
+  // Archived since (as Archive would, once both were closed or in Review; set here directly).
+  await prisma.contact.update({ where: { id: painter.id }, data: { archivedAt: new Date() } });
+
+  // A reopen starts the job unassigned; its Undo gives it back.
+  assert.equal((await status(reopenCase.id, "OPEN", "DONE")).task.assigneeContactId, null);
+  const undone = await status(reopenCase.id, "DONE", "OPEN");
+  assert.equal(undone.task.assigneeContactId, painter.id);
+  assert.equal(undone.emailsContractor, false);
+  const access = (taskId: string) => prisma.taskAccess.count({ where: { taskId, contactId: painter.id, source: "ASSIGNEE", revokedAt: null } });
+  assert.equal(await access(reopenCase.id), 1, "his access row comes back with it");
+
+  // Approve's Undo puts it back in Review without him; Approve again gives it back.
+  assert.equal((await undo(approveCase.id, approved.statusEventId)).task.assigneeContactId, null);
+  assert.equal((await status(approveCase.id, "DONE", "REVIEW")).task.assigneeContactId, painter.id);
+  assert.equal(await access(approveCase.id), 1);
+
+  // A reopen followed by any other move is new work: closing it later leaves it unassigned.
+  await status(reopenCase.id, "OPEN", "DONE");
+  await status(reopenCase.id, "IN_PROGRESS", "OPEN");
+  assert.equal((await status(reopenCase.id, "DONE", "IN_PROGRESS")).task.assigneeContactId, null);
+  assert.equal(await prisma.notificationOutbox.count({ where: { recipientContactId: painter.id } }), 0, "no email ever queued for him");
 });

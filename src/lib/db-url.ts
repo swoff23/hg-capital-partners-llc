@@ -126,14 +126,14 @@ export function dbViaOf(url: string): DbVia {
   return isSessionPooler(url) ? "session pooler" : "direct";
 }
 
-/** Supabase's transaction pooler: the pooler host on port 6543. */
+/** Supabase's transaction pooler: the pooler host on port 6543, with or without a database path after it. */
 export function isTxPooler(url: string): boolean {
-  return /pooler\.supabase\.com:6543\//.test(url);
+  return /pooler\.supabase\.com:6543(?:[/?#]|$)/.test(url);
 }
 
-/** Supabase's session pooler: the pooler host on port 5432, which DATABASE_URL names. */
+/** Supabase's session pooler: the pooler host on port 5432, which DATABASE_URL names, with or without a path. */
 export function isSessionPooler(url: string): boolean {
-  return /pooler\.supabase\.com:5432\//.test(url);
+  return /pooler\.supabase\.com:5432(?:[/?#]|$)/.test(url);
 }
 
 /**
@@ -172,11 +172,15 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
  * a LAN server without it (a Docker or home-lab Postgres) only refused the
  * connection.
  *
- * An explicit `sslmode=prefer` on such a host means what none does, as it did
- * to the engine, so it becomes `disable`. node-postgres has no fallback of its
- * own: every other sslmode starts TLS and gives up when the server has none
- * ("The server does not support SSL connections"). On a public host `prefer`
- * keeps TLS (encrypted, certificate not checked), as before.
+ * An explicit `sslmode=prefer` on such a host becomes `disable`, the plain text
+ * the engine's `prefer` fell back to against a server without TLS.
+ * node-postgres has no fallback of its own: every other sslmode starts TLS and
+ * gives up when the server has none ("The server does not support SSL
+ * connections"). The cost: on a private host `prefer` now connects in plain
+ * text even when the server offers TLS, so a private server that requires it
+ * (a hostssl-only pg_hba, a managed database on a VPC address) needs
+ * `sslmode=require`. No deployment uses a private host. On a public host
+ * `prefer` keeps TLS (encrypted, certificate not checked), as before.
  */
 function withSsl(url: string): string {
   if (hasParam(url, "uselibpqcompat")) return url;

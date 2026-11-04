@@ -72,7 +72,8 @@ test('no query filters on the literal status "OPEN"', () => {
 test("every Task list, count and search query leaves Template rows out", () => {
   const root = path.join(__dirname, "..");
   const QUERY = /\.task\.(findMany|count|groupBy|aggregate|findFirst)\(/;
-  const FILTERED = /excludeTemplateTasks|paletteTaskWhere|allTasksWhere|viewScopeWhere/;
+  // contractorJobsWhere (lib/archive.ts) is a contractor page's jobs; archive.test.ts checks both its branches carry it.
+  const FILTERED = /excludeTemplateTasks|paletteTaskWhere|allTasksWhere|viewScopeWhere|contractorJobsWhere/;
   const EXEMPT: Record<string, string> = {
     "lib/tasks/core.ts": "renames a unit label on the tasks of one property, as a write",
     "lib/portal/queries.ts": "a contractor's jobs, only through the access rows they were given",

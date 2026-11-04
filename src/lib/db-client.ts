@@ -7,7 +7,12 @@ import { logError } from "@/lib/log";
 
 type ClientEnv = { DATABASE_URL?: string; POSTGRES_PRISMA_URL?: string; VERCEL_ENV?: string; NODE_ENV?: string };
 
-let poolerWarned = false;
+/**
+ * Whether this process has said it (warnOffTxPooler). On globalThis, not in a module variable: a production build
+ * loads this module once in the route handlers' runtime and again in the pages', so a module's own flag let one
+ * process log it twice.
+ */
+const pooler = globalThis as unknown as { __hgPoolerWarned?: boolean };
 
 /**
  * Once per instance, a Production client that isn't on the transaction pooler
@@ -15,10 +20,10 @@ let poolerWarned = false;
  * shows it only to someone who asks.
  */
 function warnOffTxPooler(env: ClientEnv): void {
-  if (poolerWarned) return;
+  if (pooler.__hgPoolerWarned) return;
   const warning = productionPoolerWarning(env);
   if (!warning) return;
-  poolerWarned = true;
+  pooler.__hgPoolerWarned = true;
   logError("db:pooler", new Error(warning.message), { dbVia: warning.dbVia, dbPool: warning.dbPool });
 }
 

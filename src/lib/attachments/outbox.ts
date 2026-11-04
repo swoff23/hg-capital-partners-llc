@@ -58,13 +58,13 @@ export class ServerBusyError extends Error {
 
 /**
  * The page's own upload code (the Blob client, lazy-transfer.ts) didn't load
- * while the app's server answers. No try fetches it again: the browser's
- * runtime keeps a chunk that failed to load as failed until the page loads
- * again (lib/lazy-module.ts), whether a dropped request or a deploy that
- * removed the chunk failed it, so only a reload (the outbox survives it)
- * brings the code. The file waits without counting a try (classifyFailure
- * reads it as "offline"), and the engine says so (UPLOADS_PAUSED_LINE): once
- * as a notice with Reload, and on the file's tile and the bar as "paused".
+ * while the app's server answers. The next try fetches the chunk again (the
+ * browser's runtime forgets a failed load, lib/lazy-module.ts), so a dropped
+ * request heals by itself; a deploy that removed the chunk (a 404) is what no
+ * try fixes, and only a reload (the outbox survives it) brings the new page.
+ * Either way the file waits without counting a try (classifyFailure reads it
+ * as "offline"), and the engine says so (UPLOADS_PAUSED_LINE): once as a
+ * notice with Reload, and on the file's tile and the bar as "paused".
  */
 export class UploadCodeMissingError extends Error {
   constructor() {
@@ -76,9 +76,9 @@ export class UploadCodeMissingError extends Error {
  * The upload code didn't load and the app's server didn't answer either, though the device says it is online (a phone
  * with no data, a captive portal): the connection, not the code. The file waits for the signal as it does with the
  * device offline, without counting a try (classifyFailure reads it as "offline"), and its tile and the bar say no
- * signal, not "paused": a Reload now would only land on the browser's offline page. Once the server answers again and
- * the code is still missing, the next try is UploadCodeMissingError, with its Reload. A TypeError, the shape of a
- * dropped request, so anything else reading it reads no connection.
+ * signal, not "paused": a Reload now would only land on the browser's offline page. Once the server answers again, the
+ * next try fetches the code again, and only a chunk a deploy removed still fails, as UploadCodeMissingError with its
+ * Reload. A TypeError, the shape of a dropped request, so anything else reading it reads no connection.
  */
 export class NoConnectionError extends TypeError {
   constructor() {

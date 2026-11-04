@@ -156,23 +156,44 @@ export class ArchiveRefusedError extends Error {}
 type BlockersTx = Pick<ArchiveTx, "task" | "contact" | "user">;
 
 /**
- * The open jobs and whether there's a login, for the refusal: tasks assigned
- * to them that are still open (never a playbook's template rows), and an
- * active portal account. A login whose access was removed isn't one. The
- * contractor page's Archive line reads it too, so the menu and the toast agree.
- *
- * An open job counts whether it names them by id or only by an imported name
- * that Today and the Tasks filter file under them (namedOpenJobs). Archive
- * would move that one to Others without a word (NOV3-TASKS-4).
+ * The open jobs and whether there's a login, for the refusal: the open jobs
+ * Archive counts (contractorOpenJobs), and an active portal account. A login
+ * whose access was removed isn't one.
  */
 export async function contractorArchiveBlockers(tx: BlockersTx, id: string): Promise<{ openJobs: number; hasLogin: boolean } | null> {
-  const [contact, linked, named] = await Promise.all([
+  const [contact, open] = await Promise.all([
     tx.contact.findUnique({ where: { id }, select: { portalAccount: { select: { status: true } } } }),
-    tx.task.count({ where: { assigneeContactId: id, ...activeTask, ...excludeTemplateTasks } }),
-    namedOpenJobs(tx, id),
+    contractorOpenJobs(tx, id),
   ]);
   if (!contact) return null;
-  return { openJobs: linked + named, hasLogin: contact.portalAccount?.status === "ACTIVE" };
+  return { openJobs: open.count, hasLogin: contact.portalAccount?.status === "ACTIVE" };
+}
+
+/**
+ * A contractor's open jobs as Archive counts them: tasks assigned to them that
+ * are still open (never a playbook's template rows), whether they name them by
+ * id or only by an imported name that Today and the Tasks filter file under
+ * them (namedOpenJobs). Archive would move that one to Others without a word
+ * (NOV3-TASKS-4). `names` are those imported names, so the contractor page
+ * lists the jobs it counts (contractorJobsWhere), and its Archive line reads
+ * this too, so the menu, the list and the toast agree.
+ */
+export async function contractorOpenJobs(tx: BlockersTx, id: string): Promise<{ count: number; names: string[] }> {
+  const [linked, named] = await Promise.all([tx.task.count({ where: { assigneeContactId: id, ...activeTask, ...excludeTemplateTasks } }), namedOpenJobs(tx, id)]);
+  return { count: linked + named.count, names: named.names };
+}
+
+/**
+ * The jobs a contractor's page lists: every task assigned to them by id, and
+ * the open ones only an imported name of theirs ties to them (`names`, from
+ * contractorOpenJobs), which Archive counts. Never a playbook's template rows.
+ */
+export function contractorJobsWhere(id: string, names: readonly string[]): Prisma.TaskWhereInput {
+  if (names.length === 0) return { assigneeContactId: id, ...excludeTemplateTasks };
+  return {
+    ...excludeTemplateTasks,
+    OR: [{ assigneeContactId: id }, { assigneeUserId: null, assigneeContactId: null, assigneeName: { in: [...names] }, ...activeTask }],
+  };
 }
 
 /**
@@ -181,15 +202,16 @@ export async function contractorArchiveBlockers(tx: BlockersTx, id: string): Pro
  * filter and Today make (tasks/assignee-people.ts mergeLegacyNames), against
  * the people the assignee list holds (tasks/assignee-options.ts: every user,
  * then the listed contacts with the archived ones hidden, in the same order).
- * A name two people share is neither's, so it counts for no one.
+ * A name two people share is neither's, so it counts for no one. Says which
+ * names are theirs, and how many open jobs carry them.
  */
-async function namedOpenJobs(tx: BlockersTx, id: string): Promise<number> {
+async function namedOpenJobs(tx: BlockersTx, id: string): Promise<{ count: number; names: string[] }> {
   const names = await tx.task.groupBy({
     by: ["assigneeName"],
     where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...activeTask, ...excludeTemplateTasks },
     _count: { _all: true },
   });
-  if (names.length === 0) return 0;
+  if (names.length === 0) return { count: 0, names: [] };
   const [users, contacts] = await Promise.all([
     tx.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
     tx.contact.findMany({ where: listedContactsWhere, orderBy: { fullName: "asc" }, select: { id: true, fullName: true, email: true, archivedAt: true } }),
@@ -200,7 +222,8 @@ async function namedOpenJobs(tx: BlockersTx, id: string): Promise<number> {
     names.flatMap((n) => (n.assigneeName ? [n.assigneeName] : [])),
     people,
   );
-  return names.reduce((sum, n) => sum + (n.assigneeName && merged.get(n.assigneeName) === `c:${id}` ? n._count._all : 0), 0);
+  const theirs = names.filter((n) => n.assigneeName && merged.get(n.assigneeName) === `c:${id}`);
+  return { count: theirs.reduce((sum, n) => sum + n._count._all, 0), names: theirs.flatMap((n) => (n.assigneeName ? [n.assigneeName] : [])) };
 }
 
 /**

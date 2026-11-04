@@ -42,7 +42,8 @@ test("a lost Send settles on the next answer from the server, not only on the br
   // Asking is the same refresh the online event starts, once for each loss, and never once the page is gone.
   assert.match(
     actions,
-    /const heard = \(\) => \{\s*if \(!unasked\.current \|\| !mounted\.current\) return;\s*unasked\.current = false;\s*learning\.current = true;\s*router\.refresh\(\);\s*\};/,
+    /const heard = \(\) => \{\s*if \(!unasked\.current \|\| !mounted\.current \|\| navigator\.onLine === false\) return;\s*unasked\.current = false;\s*learning\.current = true;\s*router\.refresh\(\);\s*\};/,
+    "and never while the browser says it's offline, where a failed refresh becomes a navigation to the offline page",
   );
   // And the refresh's answer is read the one way, whichever started it.
   assert.match(actions, /if \(!learning\.current\) return;\s*learning\.current = false;\s*setLost\(\(l\) => settleLost\(l, sentClientIds \?\? \[\]\)\);/);

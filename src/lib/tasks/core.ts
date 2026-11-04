@@ -3,7 +3,7 @@ import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type Ta
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
-import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
+import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { hasPinnedDay, isUntouchedCopy, leapDayRule, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
 import { copySlot } from "./repeat-slot";
 import {
@@ -212,9 +212,12 @@ export { syncAssigneeAccess as grantAssigneeAccess };
  * a picker loaded before they were archived (createTask, patchTask). Archive
  * itself is refused while they have open jobs (archive.ts). A closed job (Done
  * or Canceled) can go back to them: it's their record, Archive counts only
- * open work, and a reopen starts it unassigned again (setStatus). So the Undo
- * of a reassignment on their Done job, after a reopen's Undo or a second
- * Approve left it unassigned, puts them back.
+ * open work, and a reopen starts it unassigned again (setStatus). The task
+ * page's picker doesn't offer them, so here that is the Undo of a
+ * reassignment on a closed job they still held, or a picker loaded before
+ * they were archived. Closing a job straight back after a reopen or Approve's
+ * Undo took it off them gives it back without a pick (setStatus,
+ * archivedAssigneeToGiveBack).
  */
 export const ARCHIVED_ASSIGNEE_LINE = "Archived. Pick someone else.";
 
@@ -243,6 +246,45 @@ async function contactArchivedLocked(tx: Tx, contactId: string): Promise<boolean
  */
 function archivedAssigneeLine(contactId: string): EventInput {
   return { kind: "ASSIGNED", data: { from: { userId: null, contactId, name: null }, to: { userId: null, contactId: null }, archived: true } };
+}
+
+/**
+ * The archived contractor a reopen or Approve's Undo took this job from (archivedAssigneeLine), when the job's latest
+ * live assignment and status lines (newest first) end on that drop: the drop itself (Approve's Undo writes no status
+ * line), or the reopen it was written with, right after it. Null when anything moved the job or assigned it since:
+ * closing it then is new work, not the way back.
+ */
+function droppedArchivedAssignee(lines: readonly { kind: string; data: unknown }[]): string | null {
+  const dataOf = (e: { data: unknown } | undefined) => (e?.data && typeof e.data === "object" ? (e.data as Record<string, unknown>) : {});
+  const [latest, prior] = lines;
+  const from = dataOf(latest).from;
+  const to = dataOf(latest).to;
+  const reopen =
+    latest?.kind === "STATUS" &&
+    (CLOSED_STATUSES as readonly unknown[]).includes(from) &&
+    (ACTIVE_STATUSES as readonly unknown[]).includes(to);
+  const drop = reopen ? prior : latest;
+  if (drop?.kind !== "ASSIGNED" || dataOf(drop).archived !== true) return null;
+  const was = dataOf(drop).from;
+  const contactId = was && typeof was === "object" ? (was as { contactId?: unknown }).contactId : null;
+  return typeof contactId === "string" ? contactId : null;
+}
+
+/**
+ * Who gets an unassigned job back as it closes (setStatus): the archived contractor a reopen or Approve's Undo just
+ * took it from (droppedArchivedAssignee), so the reopen's Undo, or a second Approve after Approve's Undo, leaves the
+ * job theirs as it was. Only while they're still archived: one restored since is in the picker again. Their contact is
+ * locked FOR SHARE (contactArchivedLocked), after the task and before any write, as every assigning path does.
+ */
+async function archivedAssigneeToGiveBack(tx: Tx, taskId: string): Promise<string | null> {
+  const lines = await tx.taskEvent.findMany({
+    where: { taskId, kind: { in: ["ASSIGNED", "STATUS"] }, deletedAt: null },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 2,
+    select: { kind: true, data: true },
+  });
+  const contactId = droppedArchivedAssignee(lines);
+  return contactId && (await contactArchivedLocked(tx, contactId)) ? contactId : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -567,6 +609,9 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const finishing = to === "DONE" && before.status !== "DONE";
   const archivedNow = before.assigneeContactId && (reopening || finishing) ? await contactArchivedLocked(tx, before.assigneeContactId) : false;
   const dropArchived = reopening && archivedNow;
+  // And the way back: closing it straight after that drop (the reopen's Undo, or a second Approve after Approve's
+  // Undo) gives it back to the archived contractor, whose closed job it was (archivedAssigneeToGiveBack).
+  const giveBack = closing && !before.assigneeContactId && !before.assigneeUserId ? await archivedAssigneeToGiveBack(tx, taskId) : null;
   const task = await tx.task.update({
     where: { id: taskId },
     data: {
@@ -583,12 +628,20 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
           ? { completedAt: null, completedByUserId: null, completedByContactId: null }
           : {}),
       ...(dropArchived ? { assigneeContactId: null } : {}),
+      ...(giveBack ? { assigneeContactId: giveBack } : {}),
       ...editStamp(p, now),
     },
   });
   if (dropArchived && before.assigneeContactId) {
     await addEvent(tx, taskId, p, archivedAssigneeLine(before.assigneeContactId));
     await syncAssigneeAccess(tx, taskId, null, p, now);
+  }
+  if (giveBack) {
+    await addEvent(tx, taskId, p, {
+      kind: "ASSIGNED",
+      data: { from: { userId: null, contactId: null, name: before.assigneeName }, to: { userId: null, contactId: giveBack } },
+    });
+    await syncAssigneeAccess(tx, taskId, giveBack, p, now);
   }
 
   const visibility = statusEventVisibility(to, !!task.assigneeContactId);
@@ -615,8 +668,9 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
           audienceContactId,
           attachmentIds: opts.attachmentIds,
           data: { statusEventId: statusEvent.id },
-          // A contractor's Mark done note has always been written just before the move to Review, and the
-          // "At finish" photo set finds it that way (tasks/media.ts latestMarkDone): a millisecond ahead keeps it.
+          // A contractor's Mark done note is written a millisecond before the move to Review, as it always was, so
+          // Activity keeps that order. The "At finish" set finds it by its statusEventId; only a Mark done from
+          // before MARK_DONE_TIED_SINCE is found by that timing (tasks/media.ts markDoneComment).
           ...(p.kind === "contractor" ? { createdAt: new Date(statusEvent.createdAt.getTime() - 1) } : {}),
         })
       : null;

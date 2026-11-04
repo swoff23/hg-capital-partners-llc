@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { uploadFailureReason } from "./media";
 import { PROBE_PATH, lazyTransfer, originProbe, type ProbeEnv } from "./lazy-transfer";
 import { FinalRefusalError, NoConnectionError, ServerBusyError, UploadCodeMissingError, afterFailure, classifyFailure } from "./outbox";
@@ -62,13 +64,12 @@ test("lazyTransfer: offline, the same failure is the connection's, and the file 
   );
   assert.ok(failure instanceof TypeError, "a TypeError, the shape of a dropped request");
   assert.equal(classifyFailure(failure, false), "offline", "offline it just waits");
-  // lazyModule forgets the failure and runs the importer again. In the browser the runtime answers that with the same
-  // failure until a reload (lazy-module.ts); here the importer's second answer is the code.
+  // The runtime forgets a failed chunk, so the next try fetches it again and gets the code.
   assert.deepEqual(await t.send(input), { pathname: "p" });
   assert.equal(loads, 2);
 });
 
-test("lazyTransfer: online too, the next try runs the importer again (the browser's runtime answers it with the same failure until a reload)", async () => {
+test("lazyTransfer: online too, the next try after a failed fetch gets the code, which is how a dropped request heals", async () => {
   let loads = 0;
   const t = lazyTransfer(async () => {
     loads++;
@@ -77,7 +78,7 @@ test("lazyTransfer: online too, the next try runs the importer again (the browse
   }, online);
   await assert.rejects(t.send(input), UploadCodeMissingError);
   assert.deepEqual(await t.send(input), { pathname: "p" });
-  assert.equal(loads, 2, "the failure was forgotten here, so the importer ran again");
+  assert.equal(loads, 2, "the failure was forgotten, so the importer ran again");
 });
 
 test("lazyTransfer: a loader that throws at once is the same failure", async () => {
@@ -129,7 +130,7 @@ test("lazyTransfer: online with no answer from the server, a missing chunk is th
   assert.equal(uploadFailureReason(down), "no connection");
   assert.deepEqual(afterFailure({ tries: 3, waits: 6 }, classifyFailure(down, true)), { phase: "waiting", tries: 3, waits: 7, retryInMs: 60_000 }, "never red on its own");
 
-  // The server answers again and the chunk is still missing (the runtime keeps the failure): now it is the code, with Reload.
+  // The server answers again and the chunk is still missing (a deploy removed it): now it is the code, with Reload.
   road.up = true;
   await assert.rejects(t.send(input), UploadCodeMissingError);
   assert.equal(asked, 2, "asked once for each failed load");
@@ -184,7 +185,8 @@ test("originProbe: any answer is a connection, a failed request is none, and fil
   assert.deepEqual([a, b], [true, true], "a 503 still came back over a working connection");
   assert.equal(ok.calls.length, 1, "one request for both");
   assert.equal(ok.calls[0].url, PROBE_PATH);
-  assert.equal(PROBE_PATH, "/api/health");
+  assert.equal(PROBE_PATH, "/icon.svg", "a static file: no session, no database (a slow database isn't no signal)");
+  assert.ok(existsSync(join(__dirname, "..", "..", "app", PROBE_PATH)), "the app's own icon, so the answer is the file and not a 404 page");
   assert.equal(ok.calls[0].init.method, "HEAD");
   assert.equal(ok.calls[0].init.cache, "no-store", "never a cached answer");
   assert.equal(ok.timers.size, 0, "its timer is cleared");

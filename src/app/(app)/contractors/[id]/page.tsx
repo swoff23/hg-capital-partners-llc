@@ -12,13 +12,13 @@ import { Badge, Section, textLinkClass } from "@/components/ui";
 import { RailFact } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
 import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
-import { archivedLine, contractorArchiveBlockers, contractorArchiveRefusal } from "@/lib/archive";
+import { archivedLine, contractorArchiveRefusal, contractorJobsWhere, contractorOpenJobs } from "@/lib/archive";
 import { STATUS_TONE, StatusBadge, StatusMark } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
 import { dayLabel, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { portalAccess } from "@/lib/portal/access-state";
-import { STATUS_LABEL, excludeTemplateTasks, isActiveStatus, statusRank } from "@/lib/task-scope";
+import { STATUS_LABEL, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
 import { ContactName, ContactNotes, ContactSection } from "./contact-section";
@@ -60,11 +60,8 @@ function DocLink({ href }: { href: string }) {
 
 export default async function ContractorPage({ params }: PageProps<"/contractors/[id]">) {
   const { id } = await params;
-  // Their jobs: tasks actually assigned to this contact, never a playbook's
-  // template rows. The list stops at JOBS_SHOWN and says so; the count is all of them.
-  const jobsWhere = { assigneeContactId: id, ...excludeTemplateTasks };
-  // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
-  const [me, c, rows, jobCount, openJobs] = await Promise.all([
+  // The session check runs beside the first reads and is awaited with them, so nothing is shown without it.
+  const [me, c, open] = await Promise.all([
     requireUser(),
     prisma.contact.findUnique({
       where: { id },
@@ -76,6 +73,16 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
         archivedByUser: { select: { name: true, email: true } },
       },
     }),
+    // For Archive's refusal: open jobs are reassigned first, counted as the archive counts them (lib/archive.ts),
+    // with the imported name-only ones the Tasks filter files under them. Their names bring those jobs into the list.
+    contractorOpenJobs(prisma, id),
+  ]);
+  if (!c) notFound();
+  // Their jobs: tasks assigned to this contact, and the open ones only an imported name ties to them, so the list
+  // shows every job Archive's refusal counts. Never a playbook's template rows. The list stops at JOBS_SHOWN and
+  // says so; the count is all of them.
+  const jobsWhere = contractorJobsWhere(id, open.names);
+  const [rows, jobCount] = await Promise.all([
     prisma.task.findMany({
       where: jobsWhere,
       orderBy: [{ completedAt: { sort: "desc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }],
@@ -83,11 +90,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
       take: JOBS_SHOWN,
     }),
     prisma.task.count({ where: jobsWhere }),
-    // For Archive's refusal: open jobs are reassigned first, counted as the archive counts them (lib/archive.ts),
-    // with the imported name-only ones the Tasks filter files under them.
-    contractorArchiveBlockers(prisma, id).then((b) => b?.openJobs ?? 0),
   ]);
-  if (!c) notFound();
   // Puts them on top of this person's Recent in search, once the response is out (not again for an edit's refresh).
   if (!(await isActionRender())) after(() => recordView(me.id, "CONTACT", c.id));
   const phone = c.phoneE164 ?? c.phone;
@@ -121,7 +124,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               id={c.id}
               href={`/contractors/${c.id}`}
               archived={!!c.archivedAt}
-              refusal={contractorArchiveRefusal({ openJobs, hasLogin: c.portalAccount?.status === "ACTIVE" })}
+              refusal={contractorArchiveRefusal({ openJobs: open.count, hasLogin: c.portalAccount?.status === "ACTIVE" })}
               action={setContractorArchived}
             />
           </div>

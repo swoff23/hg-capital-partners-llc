@@ -7,6 +7,8 @@ import {
   archivedLine,
   contractorArchiveBlockers,
   contractorArchiveRefusal,
+  contractorJobsWhere,
+  contractorOpenJobs,
   readArchiveEvent,
   setContactArchived,
   setDealArchived,
@@ -282,4 +284,36 @@ test("a name that is someone else's, or shared, doesn't stop the archive", async
   const quiet = fakeTx({ contact: [{ ...ZACK }], user: TEAM });
   assert.deepEqual(await contractorArchiveBlockers(quiet.tx, "c1"), { openJobs: 0, hasLogin: false });
   assert.ok(!quiet.calls.some(([, op]) => op === "findMany"));
+});
+
+/* ---------------- The contractor page lists what Archive counts (Nov 3 low 6, follow-up) ---------------- */
+
+test("contractorOpenJobs names the imported names it counts, and the page's list reads them", async () => {
+  const named = [
+    { assigneeName: "Zack Outlaw", count: 2 },
+    { assigneeName: "zack@outlaw.example", count: 1 },
+    { assigneeName: "Kenneth", count: 4 },
+  ];
+  const { tx } = fakeTx({ contact: [{ ...ZACK }], user: TEAM, openJobs: 1, named });
+  const open = await contractorOpenJobs(tx, "c1");
+  assert.deepEqual(open, { count: 4, names: ["Zack Outlaw", "zack@outlaw.example"] }, "one by id and three by name; Kenneth is nobody's");
+  assert.deepEqual(await contractorArchiveBlockers(tx, "c1"), { openJobs: open.count, hasLogin: false }, "the toast's count is the list's");
+
+  // The list: every job linked by id, and the open ones those names carry, unassigned otherwise; never a template row.
+  assert.deepEqual(contractorJobsWhere("c1", open.names), {
+    bucket: { not: "Template" },
+    OR: [
+      { assigneeContactId: "c1" },
+      {
+        assigneeUserId: null,
+        assigneeContactId: null,
+        assigneeName: { in: ["Zack Outlaw", "zack@outlaw.example"] },
+        status: { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW"] },
+      },
+    ],
+  });
+  // With none, the list it always was.
+  assert.deepEqual(contractorJobsWhere("c1", []), { assigneeContactId: "c1", bucket: { not: "Template" } });
+  const quiet = fakeTx({ contact: [{ ...ZACK }], user: TEAM });
+  assert.deepEqual(await contractorOpenJobs(quiet.tx, "c1"), { count: 0, names: [] });
 });

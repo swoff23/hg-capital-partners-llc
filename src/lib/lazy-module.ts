@@ -13,15 +13,13 @@
  * caller renders the module once it has arrived, so nothing waits on that.
  *
  * `load` fetches once and everyone shares it. A fetch that fails is
- * forgotten here, so the next ask calls the importer again, but in the
- * browser that doesn't fetch the chunk again: Turbopack's runtime (Next
- * 16.3.3, .next/static/chunks/turbopack-*.js) retries a chunk that failed
- * once, 200 to 600 ms later, and then keeps the failed load in its module
- * map, which it never clears. Every later import() of that chunk answers
- * with the same failure until the page loads again, so neither a dropped
- * signal nor a deploy that removed the chunk (a 404) heals on the next tap or
- * retry: only a reload does. A failure says so (`openFailedToast`, and the
- * error screen's Reload, `isChunkLoadError`).
+ * forgotten here, so the next ask calls the importer again, and in the browser
+ * that fetches the chunk again: Turbopack's runtime (Next 16.3.3,
+ * .next/static/chunks/turbopack-*.js) retries a chunk that failed once, 200 to
+ * 600 ms later, then forgets the failure too. So a dropped signal heals on the
+ * next tap or retry. What no fetch fixes is a deploy that removed the chunk
+ * (a 404): only a reload brings the new page. A failure says so
+ * (`openFailedToast`, and the error screen's Reload, `isChunkLoadError`).
  *
  * A sheet that is slow to arrive gives no sign until it opens, so its page
  * warms it ahead of the tap: `warmWhenIdle` once the page has settled, and
@@ -62,8 +60,9 @@ export function lazyModule<M>(importer: () => Promise<M>): LazyModule<M> {
  * The toast when a sheet's or the viewer's code didn't arrive and it was
  * closed. Short enough to show whole on a phone (TOAST_PHONE_CHARS in
  * lib/toast-line.ts). The next step is the toast's Reload (RELOAD_LABEL),
- * which works whatever the cause. Not "Try again": another tap gets the
- * runtime's same failure until the page loads again (lazyModule above).
+ * which works whatever the cause. Another tap would fetch the chunk again
+ * ("Couldn't open it. Try again."): enough after a dropped signal, and no use
+ * after a deploy removed the chunk.
  */
 export const OPEN_FAILED_LINE = "Couldn't open it.";
 
@@ -101,8 +100,7 @@ export function isChunkLoadError(error: unknown): boolean {
  * Fetches `source` for a caller that answers a failed fetch itself. Calls
  * `arrived` with the module, or `failed` with the error, unless the returned
  * cancel ran first (the caller went away). A failed fetch is forgotten by the
- * module, so asking again calls the importer again, which in the browser
- * answers with the runtime's same failure until a reload (lazyModule above).
+ * module, so asking again retries.
  */
 export function fetchModule<M>(
   source: Pick<LazyModule<M>, "load">,
@@ -134,8 +132,7 @@ export type IdleEnv = {
  * page whose visitor will probably open the module soon: a property page's
  * edit sheets, the photo viewer. Safe to call often, and on the server, where
  * it does nothing. Not while the device says it's offline: the fetch would
- * only fail, and stay failed until a reload, while a chunk never asked for is
- * fetched by the tap that follows once there is a signal.
+ * only fail, and the tap that follows fetches the code when there is a signal.
  */
 export function warmWhenIdle(source: Pick<LazyModule<unknown>, "warm">, env: IdleEnv | undefined = typeof window === "undefined" ? undefined : window): void {
   if (!env) return;

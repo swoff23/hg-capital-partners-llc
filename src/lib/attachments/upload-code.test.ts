@@ -229,7 +229,7 @@ test("no data while the device reads online: the files wait as no signal, with n
   assert.equal(h.engine.counts(t.key).paused, 0, "a My jobs row says No signal");
   assert.equal(h.notices.length, 0, "no Uploads paused notice, so no Reload into the browser's offline page");
 
-  // The server answers again, and the code is still missing (the runtime keeps the failure until a reload).
+  // The server answers again, and the code is still missing (a deploy removed it).
   road.up = true;
   h.engine.nudge();
   await h.flush();

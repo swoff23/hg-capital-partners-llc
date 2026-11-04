@@ -45,6 +45,28 @@ test("lows 3: a Production client off the transaction pooler logs it once; on th
   await Promise.all(clients.map((c) => c.$disconnect()));
 });
 
+test("lows 3: once per process, not per copy of the module: the flag another copy set keeps this one quiet", async (t) => {
+  // A production build loads db-client once for the route handlers and once for the pages, each with its own module
+  // variables, so the line has to be remembered where both copies see it.
+  const SESSION = "postgresql://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres";
+  const flag = globalThis as unknown as { __hgPoolerWarned?: boolean };
+  const was = flag.__hgPoolerWarned;
+  const errors = t.mock.method(console, "error", () => {});
+  try {
+    flag.__hgPoolerWarned = true;
+    const client = makeClient({ VERCEL_ENV: "production", DATABASE_URL: SESSION });
+    assert.equal(errors.mock.callCount(), 0, "the other copy already said it");
+    await client.$disconnect();
+    flag.__hgPoolerWarned = false;
+    const next = makeClient({ VERCEL_ENV: "production", DATABASE_URL: SESSION });
+    assert.equal(errors.mock.callCount(), 1);
+    assert.equal(flag.__hgPoolerWarned, true, "and it marks the process, for the next copy");
+    await next.$disconnect();
+  } finally {
+    flag.__hgPoolerWarned = was;
+  }
+});
+
 test("db.ts builds its client with makeClient, so the two never drift", () => {
   const src = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
   assert.match(src, /export const prisma = globalForPrisma\.prisma \?\? makeClient\(getEnv\(\)\);/);

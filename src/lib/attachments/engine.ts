@@ -180,17 +180,16 @@ class RecordRefused extends Error {
 /**
  * The one notice when the upload code didn't load while the app's server answers (UploadCodeMissingError), with
  * Reload: the files wait in the outbox, and the page's next load sends them. The bar says it too (media-uploader.tsx
- * UploadStatusLine), since the toast goes after a few seconds and no retry ends this wait: the browser's runtime keeps
- * the failed chunk until a reload, whether a deploy removed it or a dropped request failed it (lib/lazy-module.ts).
- * With the server not answering either, the files wait for the signal instead and nothing offers Reload
+ * UploadStatusLine), since the toast goes after a few seconds and a deploy that removed the chunk is a wait no retry
+ * ends. With the server not answering either, the files wait for the signal instead and nothing offers Reload
  * (NoConnectionError, lazy-transfer.ts).
  */
 export const UPLOADS_PAUSED_LINE = "Uploads paused";
 
 /**
  * The same, when a reload would lose a file: one whose row never reached the outbox (needsLeaveWarning), so the
- * notice offers no Reload. The files keep trying, but the runtime answers each try with the same failure until the
- * page loads again (lib/lazy-module.ts), so in the browser this wait doesn't end on its own.
+ * notice offers no Reload. The files keep trying; a retry fetches the code again, which is enough after a dropped
+ * request.
  */
 export const UPLOADS_RETRYING_LINE = "Uploads paused, still trying";
 

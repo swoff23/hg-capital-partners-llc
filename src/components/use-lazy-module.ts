@@ -13,8 +13,7 @@ import { fetchModule, type LazyModule } from "@/lib/lazy-module";
  * nearest error boundary shows it, with Try again. That replaces the whole
  * page, so a caller that can say it another way passes `onFail` (close the
  * sheet, toast `OPEN_FAILED_LINE`) and nothing is thrown. Turn `wanted` off
- * in `onFail`, and the next tap that turns it on asks again, which in the
- * browser gets the runtime's same failure until a reload (lib/lazy-module.ts).
+ * in `onFail`, and the next tap that turns it on fetches again.
  */
 export function useLazyModule<M>(source: LazyModule<M>, wanted = true, onFail?: (error: unknown) => void): M | null {
   const [mod, setMod] = useState<M | null>(() => source.loaded());

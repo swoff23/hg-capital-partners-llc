@@ -18,7 +18,7 @@ const RECENT = 3;
  * login. Never selects a password hash.
  *
  * `archived` is who the contractors would also hold but for Archive. They are
- * never offered; the legacy-name matching reads them (list-query.ts
+ * never offered; the legacy-name matching reads them (assignee-people.ts
  * personRefs), so an imported "Zack" that is an archived Zack isn't filed
  * under a live one, and goes to Others.
  *

@@ -296,8 +296,9 @@ test("the archived line is never paired away with the assignment it follows", ()
 /* ---------------- A closed job can go back to them (Nov 3 low 4) ---------------- */
 
 test("patchTask: an archived contractor's Done or Canceled job can go back to them, still locked task first", async () => {
-  // A reopen left Zack's Done job unassigned, and its Undo (or a second Approve) closed it again: the reassignment's
-  // Undo, or a pick on a page that still lists him, puts him back on his own record. Before, it was refused.
+  // Zack's Done job went to Jose and the reassignment's Undo brings it back, or a page loaded before he was archived
+  // still lists him: either puts him back on his own record. Before, it was refused. (After a reopen's Undo or a
+  // second Approve the job is his again without a pick: setStatus, below.)
   for (const status of ["DONE", "CANCELED"]) {
     const { tx, calls } = fakeTx({ status, assigneeContactId: null });
     const after = await patchTask(tx, "t1", { assignee: { contactId: "c-zack" }, expectedAssignee: null }, PIETER, NOW);
@@ -326,4 +327,74 @@ test("patchTask and createTask: every open status still refuses an archived cont
   const made = await createTask(done.tx, { title: "Patched roof", status: "DONE", assignee: { contactId: "c-zack" } }, PIETER, NOW);
   assert.equal(made.assigneeContactId, "c-zack");
   assert.ok(done.calls.findIndex(isContactLock) < done.calls.findIndex((c) => c.model === "task" && c.op === "create"));
+});
+
+/* ---------------- Closing straight back gives the job back (Nov 3 low 4, the residual) ---------------- */
+
+// The job's latest live ASSIGNED and STATUS lines, newest first, as setStatus reads them before a close.
+const DROP = { kind: "ASSIGNED", data: { from: { userId: null, contactId: "c-zack", name: null }, to: { userId: null, contactId: null }, archived: true } };
+const REOPEN = { kind: "STATUS", data: { from: "DONE", to: "OPEN" } };
+const MARK_DONE = { kind: "STATUS", data: { from: "IN_PROGRESS", to: "REVIEW" } };
+const isLinesRead = (model: string, op: string, args: Args) =>
+  model === "taskEvent" && op === "findMany" && JSON.stringify(args.where?.kind) === JSON.stringify({ in: ["ASSIGNED", "STATUS"] });
+const latestLines =
+  (...rows: { kind: string; data: unknown }[]): Answer =>
+  (model, op, args) =>
+    isLinesRead(model, op, args) ? rows : undefined;
+
+test("setStatus: the reopen's Undo gives an archived contractor's Done job back; locks: task, then his contact", async () => {
+  // The case: Zack (archived) had the Done job, Pieter reopened it, which left it unassigned, then tapped Undo.
+  const { tx, calls } = fakeTx({ status: "OPEN", assigneeContactId: null }, latestLines(REOPEN, DROP));
+  const r = await setStatus(tx, "t1", "DONE", PIETER, { expected: "OPEN" }, NOW);
+  assert.equal(r.task.assigneeContactId, "c-zack", "his closed job again, as before the reopen");
+  const update = calls.find((c) => c.model === "task" && c.op === "update")!;
+  assert.equal((update.args as { data: Record<string, unknown> }).data.assigneeContactId, "c-zack");
+  assert.deepEqual(events(calls).find((e) => e.kind === "ASSIGNED")?.data, {
+    from: { userId: null, contactId: null, name: null },
+    to: { userId: null, contactId: "c-zack" },
+  });
+  assert.ok(calls.some((c) => c.model === "taskAccess" && c.op === "upsert"), "the automatic access row comes back with the job");
+  assert.equal(r.emailsContractor, false, "he has no login (Archive needs it removed), so nobody is emailed");
+  assert.ok(!calls.some(isEmailRow));
+  const lock = calls.findIndex(isContactLock);
+  assert.deepEqual(calls[lock].args, ["c-zack"]);
+  const order = [calls.findIndex(isTaskLock), lock, firstWrite(calls)];
+  assert.ok(order[0] === 0 && order[1] > order[0] && order[2] > order[1], `task lock, contact lock, then writes: ${order}`);
+});
+
+test("setStatus: a second Approve after Approve's Undo gives the job back too, and a Cancel straight after the reopen", async () => {
+  // Approve's Undo writes no status line of its own (the Done line is soft-deleted): the drop is the latest line.
+  const approve = fakeTx({ status: "REVIEW", assigneeContactId: null }, latestLines(DROP, MARK_DONE));
+  assert.equal((await setStatus(approve.tx, "t1", "DONE", PIETER, { expected: "REVIEW" }, NOW)).task.assigneeContactId, "c-zack");
+  const cancel = fakeTx({ status: "OPEN", assigneeContactId: null }, latestLines(REOPEN, DROP));
+  assert.equal((await setStatus(cancel.tx, "t1", "CANCELED", PIETER, { expected: "OPEN" }, NOW)).task.assigneeContactId, "c-zack");
+});
+
+test("setStatus: no give-back once the job moved or was assigned since, for a contractor restored since, or onto open work", async () => {
+  const jose = { ...DROP, data: { ...DROP.data, from: { userId: null, contactId: "c-jose", name: null } } };
+  const unassigned = { kind: "ASSIGNED", data: { from: { userId: null, contactId: "c-jose" }, to: { userId: null, contactId: null } } };
+  const cases: [string, { kind: string; data: unknown }[]][] = [
+    ["moved since the reopen", [{ kind: "STATUS", data: { from: "OPEN", to: "IN_PROGRESS" } }, REOPEN, DROP]],
+    ["assigned and unassigned since", [unassigned, REOPEN, DROP]],
+    ["a reopen that dropped nobody", [REOPEN, unassigned]],
+    ["sent back after Approve's Undo", [{ kind: "STATUS", data: { from: "REVIEW", to: "IN_PROGRESS" } }, DROP]],
+    ["a contractor no longer archived (the picker offers him again)", [REOPEN, jose]],
+  ];
+  for (const [why, rows] of cases) {
+    const { tx, calls } = fakeTx({ status: "OPEN", assigneeContactId: null }, latestLines(...rows));
+    const r = await setStatus(tx, "t1", "DONE", PIETER, {}, NOW);
+    assert.equal(r.task.assigneeContactId, null, why);
+    assert.ok(!events(calls).some((e) => e.kind === "ASSIGNED"), why);
+  }
+  // Nothing is looked up for a job that has an assignee, or for a move that doesn't close it.
+  for (const [row, to] of [
+    [{ status: "OPEN", assigneeContactId: "c-jose" }, "DONE"],
+    [{ status: "OPEN", assigneeUserId: "u-pieter" }, "DONE"],
+    [{ status: "OPEN", assigneeContactId: null }, "IN_PROGRESS"],
+  ] as const) {
+    const { tx, calls } = fakeTx(row, latestLines(REOPEN, DROP));
+    const r = await setStatus(tx, "t1", to, PIETER, {}, NOW);
+    assert.ok(!calls.some((c) => isLinesRead(c.model, c.op, c.args as Args)), `${JSON.stringify(row)} to ${to}`);
+    assert.notEqual(r.task.assigneeContactId, "c-zack");
+  }
 });

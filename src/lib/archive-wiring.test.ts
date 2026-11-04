@@ -14,10 +14,22 @@ const read = (path: string) => readFileSync(join(src, path), "utf8");
 
 test("the contractor page's Archive line counts open jobs as Archive does, so the menu and the toast agree", () => {
   const page = read("app/(app)/contractors/[id]/page.tsx");
-  assert.match(page, /contractorArchiveBlockers\(prisma, id\)\.then\(\(b\) => b\?\.openJobs \?\? 0\)/);
-  assert.match(page, /refusal=\{contractorArchiveRefusal\(\{ openJobs, hasLogin: c\.portalAccount\?\.status === "ACTIVE" \}\)\}/);
-  // Its own count of linked jobs only is gone.
-  assert.doesNotMatch(page, /prisma\.task\.count\(\{ where: \{ \.\.\.jobsWhere, \.\.\.activeTask \} \}\)/);
+  // The count Archive's toast reads (contractorArchiveBlockers is contractorOpenJobs plus the login), with the
+  // login from the contact the page already loaded, so the contact isn't read twice.
+  assert.match(page, /const \[me, c, open\] = await Promise\.all\(\[[\s\S]*?contractorOpenJobs\(prisma, id\),\s*\]\);/);
+  assert.match(page, /refusal=\{contractorArchiveRefusal\(\{ openJobs: open\.count, hasLogin: c\.portalAccount\?\.status === "ACTIVE" \}\)\}/);
+  assert.doesNotMatch(page, /contractorArchiveBlockers/);
+  assert.match(read("lib/archive.ts"), /const \[contact, open\] = await Promise\.all\(\[[\s\S]*?contractorOpenJobs\(tx, id\),\s*\]\);/);
+});
+
+test("the contractor page lists the jobs Archive counts: the name-only open ones too, so 'No jobs assigned yet.' is true", () => {
+  // Nov 3 low 6 follow-up: the menu said "Reassign their 4 jobs first." beside "No jobs assigned yet.", since the
+  // list read only the jobs linked by id. The list, its count and the empty line now read one filter.
+  const page = read("app/(app)/contractors/[id]/page.tsx");
+  assert.match(page, /const jobsWhere = contractorJobsWhere\(id, open\.names\);/);
+  assert.match(page, /prisma\.task\.findMany\(\{\s*where: jobsWhere,/);
+  assert.match(page, /prisma\.task\.count\(\{ where: jobsWhere \}\)/);
+  assert.doesNotMatch(page, /assigneeContactId: id/, "no list of its own that reads only the linked jobs");
 });
 
 test("the assignee list and Archive's count draw on one set of contacts", () => {

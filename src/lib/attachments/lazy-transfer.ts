@@ -5,12 +5,17 @@ import type { Transfer } from "./transfer";
 /** Whether the device says it is online; true where there is no navigator (the server, a test). */
 const deviceOnline = () => typeof navigator === "undefined" || navigator.onLine !== false;
 
-/** Where the probe asks whether the app's server answers: its own health route, which needs no session (a HEAD runs its GET, with no body). */
-export const PROBE_PATH = "/api/health";
+/**
+ * Where the probe asks whether the app's server answers: the app icon (app/icon.svg), a file served as it was built,
+ * with no session and no database. So a slow or busy database never reads as no signal, and a probe costs no query.
+ * Any answer counts, so the file needn't stay there for the probe to work.
+ */
+export const PROBE_PATH = "/icon.svg";
 
 /**
  * How long the probe waits for an answer before it counts the road as down. A slow signal then reads as no signal and
- * the file waits for it, which costs nothing: the next try asks again, and Reload comes once the server answers.
+ * the file waits for it, which costs nothing: the next try asks again, and Reload comes once the server answers. While
+ * a probe waits, the file's tile shows it uploading (engine.ts run), as a token request that hangs does.
  */
 export const PROBE_TIMEOUT_MS = 5_000;
 
@@ -71,10 +76,9 @@ const browserProbe = originProbe(
  * (preloadTransfer, when the queue mounts and on a page that takes files);
  * `send` is the `transfer` the engine gets, and waits for it.
  *
- * A chunk that doesn't arrive stays failed in the browser's runtime until the
- * page loads again (lib/lazy-module.ts): the next `get` runs the importer
- * again, and the runtime answers with the same failure, whether a dropped
- * request or a deploy that removed the chunk caused it. So what the failure
+ * A chunk that doesn't arrive is forgotten by the browser's runtime
+ * (lib/lazy-module.ts), so the next `get` fetches it again and a file that
+ * tries again can get it (a dropped signal heals this way). What the failure
  * means depends on the road. With the device offline it is the connection's:
  * a TypeError, which classifyFailure (outbox.ts) reads as "offline", and the
  * file waits. With the device online and the app's server not answering
@@ -85,8 +89,10 @@ const browserProbe = originProbe(
  * is UploadCodeMissingError: the file waits without counting a try, since the
  * page's code is what is missing and not the file or the road, and the engine
  * says so (engine.ts: one notice with Reload, and the file's tile and the bar
- * read "paused"), since only a reload brings the code. Whatever the transfer
- * itself throws (a refusal, a busy server) passes through as it is.
+ * read "paused"). That is also the answer when a deploy removed the chunk (a
+ * 404), which no retry fixes: the notice and the bar offer Reload then.
+ * Whatever the transfer itself throws (a refusal, a busy server) passes
+ * through as it is.
  */
 export function lazyTransfer(
   load: () => Promise<Transfer>,

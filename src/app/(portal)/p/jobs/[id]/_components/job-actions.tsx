@@ -238,10 +238,12 @@ export function JobActions({
   }, [sentClientIds]);
   // The browser never says the signal is back where it never said it was gone (a phone with no data still reads
   // online), so the next answer from the server says it too: the first one after a lost Send (sendUpdate) starts the
-  // same refresh, once for each loss.
+  // same refresh, once for each loss. Not while the browser says it's offline (the road dropped right after that
+  // answer): Next turns a failed refresh into a browser navigation, onto the offline page, so the loss stays unasked
+  // for the online event or the next answer.
   const unasked = useRef(false);
   const heard = () => {
-    if (!unasked.current || !mounted.current) return;
+    if (!unasked.current || !mounted.current || navigator.onLine === false) return;
     unasked.current = false;
     learning.current = true;
     router.refresh();
