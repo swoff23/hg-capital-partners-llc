@@ -109,6 +109,12 @@ test("closed tasks and CSV rows the load hasn't reconciled are left alone, whoev
   assert.match(csv.kind === "leave" ? csv.reason : "", /Asana load/);
 });
 
+test("an archived contractor's name stays a name: open work never goes to them", () => {
+  const archived = CONTACTS.map((c) => (c.id === "c-zack" ? { ...c, archivedAt: new Date("2026-10-20T12:00:00Z") } : c));
+  const [d] = planLegacyLinks([row({ assigneeName: "zack@carpentry.example" })], { users: USERS, contacts: archived }, ASANA).rows.map((r) => r.decision);
+  assert.deepEqual(d, { kind: "leave", reason: "Zack Reading is archived in the app: restore them first" });
+});
+
 test("the report counts open and closed tasks per name, open first", () => {
   const plan = planLegacyLinks(
     [

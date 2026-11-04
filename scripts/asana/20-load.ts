@@ -42,7 +42,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "../../src/lib/db";
 import { buildPlan } from "../../src/lib/asana/map";
-import { deleteCsvRows, StalePlanError, writeIdentity, writeNewContacts, writeTask, writeTemplate } from "../../src/lib/asana/import";
+import { ArchivedAssigneeError, deleteCsvRows, StalePlanError, writeIdentity, writeNewContacts, writeTask, writeTemplate } from "../../src/lib/asana/import";
 import { formatReport } from "../../src/lib/asana/report";
 import {
   assertBackup,
@@ -168,13 +168,13 @@ async function main() {
       if (r.nextRepeatId) log(`"${tp.title}" repeats: next copy ${r.nextRepeatId}`);
       if (r.joinedSeriesOf) log(`"${tp.title}" is Asana's next copy of repeating task ${r.joinedSeriesOf}; joined its series`);
     } catch (err) {
-      if (err instanceof StalePlanError) stale.push(`${tp.title} (${tp.taskId})`);
+      if (err instanceof StalePlanError) stale.push(`${tp.title} (${tp.taskId})${err instanceof ArchivedAssigneeError ? ": its contractor was archived" : ""}`);
       else failed.push(`${tp.title} (${tp.taskId}): ${err instanceof Error ? err.message : String(err)}`);
     }
     if ((i + 1) % 50 === 0) log(`tasks: ${i + 1}/${plan.tasks.length}`);
   }
   log(`tasks: ${plan.tasks.length - stale.length - failed.length} written (${created} new), ${events} timeline events added`);
-  for (const s of stale) log(`! edited in the app during this run, skipped (re-run to pick it up): ${s}`);
+  for (const s of stale) log(`! changed in the app during this run, skipped (re-run to pick it up): ${s}`);
   for (const f of failed) log(`! FAILED: ${f}`);
 
   // 6. Files, outside any transaction (uploads are slow). Each row is written right after its upload.

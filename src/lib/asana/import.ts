@@ -37,6 +37,29 @@ export class StalePlanError extends Error {
   }
 }
 
+/** The contractor the plan gives this job was archived after the plan was made. Skipped like an app edit; the next run plans it by name. */
+export class ArchivedAssigneeError extends StalePlanError {
+  constructor(taskId: string, readonly contactId: string) {
+    super(taskId);
+    this.message = `task ${taskId}: its contractor ${contactId} was archived after the plan was made`;
+    this.name = "ArchivedAssigneeError";
+  }
+}
+
+/**
+ * Refuse the job when its contractor is archived (the planner's rule, map.ts buildPlan, rechecked at the write).
+ * Called right after the Task row is written, the order every assigning path in core.ts keeps. A write that
+ * sets the contact takes its row's KEY SHARE lock through the foreign key, which an Archive's FOR UPDATE waits
+ * on, so this plain read sees any Archive that committed first, and one that comes later counts this job and
+ * is refused. A reopen that keeps the contact takes no such lock: an Archive committing between this read and
+ * the commit would miss it, a window of one transaction's tail that core's FOR SHARE closes and a plain read
+ * (no raw SQL, as import.test.ts requires) can't.
+ */
+async function assertNotArchived(tx: Tx, taskId: string, contactId: string): Promise<void> {
+  const c = await tx.contact.findUnique({ where: { id: contactId }, select: { archivedAt: true } });
+  if (c?.archivedAt) throw new ArchivedAssigneeError(taskId, contactId);
+}
+
 const instant = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
 const json = (v: unknown) => JSON.parse(JSON.stringify(v ?? null)) as Prisma.InputJsonValue;
 
@@ -130,6 +153,8 @@ export async function writeTask(tx: Tx, plan: TaskPlan, now = new Date()): Promi
     // A link the row already has stays.
     if (taskTemplateId) await tx.task.updateMany({ where: { id: plan.taskId, taskTemplateId: null }, data: { taskTemplateId } });
   }
+  // A job this gives the contractor, or leaves open with them.
+  if (plan.contactId && (!plan.closed || plan.write.assigneeContactId === plan.contactId)) await assertNotArchived(tx, plan.taskId, plan.contactId);
 
   // CREATED, once: the CSV rows had no timeline at all.
   const hasCreated = await tx.taskEvent.findFirst({ where: { taskId: plan.taskId, kind: "CREATED" }, select: { id: true } });
@@ -344,11 +369,13 @@ export async function writeIdentity(tx: Tx, people: readonly Person[]): Promise<
  * open task that still has nobody but that name, so a pick in the app since
  * the plan wins. The name moves into the ASSIGNED line, as a pick in the app
  * does, and the contractor gets the job's access (D12). Returns whether it
- * linked. It stamps appEditedAt, so a load or delta plan made before the
- * link fails writeTask's compare-and-set (StalePlanError) and is planned
- * again, instead of writing its stale null assignee and revoking the access
- * just granted. Merges are unaffected: a synced row merges against
- * asanaLastSynced, and mergeFields reads appEdited only without a baseline.
+ * linked; a contractor archived since the plan throws ArchivedAssigneeError,
+ * which rolls the link back. It stamps appEditedAt, so a load or delta plan
+ * made before the link fails writeTask's compare-and-set (StalePlanError)
+ * and is planned again, instead of writing its stale null assignee and
+ * revoking the access just granted. Merges are unaffected: a synced row
+ * merges against asanaLastSynced, and mergeFields reads appEdited only
+ * without a baseline.
  */
 export async function linkLegacyAssignee(
   tx: Tx,
@@ -361,6 +388,7 @@ export async function linkLegacyAssignee(
     data: { assigneeUserId: to.userId, assigneeContactId: to.contactId, assigneeName: null, assigneeEmail: null, appEditedAt: now },
   });
   if (r.count !== 1) return false;
+  if (to.contactId) await assertNotArchived(tx, link.taskId, to.contactId);
   await addEvent(tx, link.taskId, ASANA_PRINCIPAL, {
     kind: "ASSIGNED",
     data: json({ from: { userId: null, contactId: null, name: link.name }, to, linkedFromName: true }),

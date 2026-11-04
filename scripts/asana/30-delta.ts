@@ -41,7 +41,7 @@ import { prisma } from "../../src/lib/db";
 import { getEnv } from "../../src/lib/env";
 import { isAsanaHosted, safeFileName, snapshotStamp } from "../../src/lib/asana/snapshot-helpers";
 import { buildPlan, deltaScope, type AsanaAttachment, type AsanaRef, type AsanaStory, type AsanaTask, type PlanDb } from "../../src/lib/asana/map";
-import { StalePlanError, writeIdentity, writeNewContacts, writeTask } from "../../src/lib/asana/import";
+import { ArchivedAssigneeError, StalePlanError, writeIdentity, writeNewContacts, writeTask } from "../../src/lib/asana/import";
 import { formatReport } from "../../src/lib/asana/report";
 import { AsanaClient, AsanaError, downloadTo } from "./client";
 import {
@@ -320,12 +320,12 @@ async function main() {
       if (r.nextRepeatId) log(`"${tp.title}" repeats: next copy ${r.nextRepeatId}`);
       if (r.joinedSeriesOf) log(`"${tp.title}" is Asana's next copy of repeating task ${r.joinedSeriesOf}; joined its series`);
     } catch (err) {
-      if (err instanceof StalePlanError) stale.push(`${tp.title} (${tp.taskId})`);
+      if (err instanceof StalePlanError) stale.push(`${tp.title} (${tp.taskId})${err instanceof ArchivedAssigneeError ? ": its contractor was archived" : ""}`);
       else failed.push(`${tp.title} (${tp.taskId}): ${errText(err)}`);
     }
   }
   log(`tasks: ${plan.tasks.length - stale.length - failed.length} written (${plan.tasks.filter((t) => t.op === "create").length} new), ${events} timeline events added, ${plan.report.conflicts.length} conflicts`);
-  for (const s of stale) log(`! edited in the app during this run, skipped (the next run picks it up): ${s}`);
+  for (const s of stale) log(`! changed in the app during this run, skipped (the next run picks it up): ${s}`);
   for (const f of failed) log(`! FAILED: ${f}`);
   let fileFailures = 0;
   if (uploader) {

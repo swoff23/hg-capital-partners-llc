@@ -21,7 +21,7 @@ import { parseTemplateItems } from "../../src/lib/tasks/template-items";
 import {
   backupCommand,
   backupRefusal,
-  describeDatabaseUrl,
+  describeRunTarget,
   dumpDbname,
   envFileOf,
   inputRefusal,
@@ -68,10 +68,9 @@ export function assertKnownFlags(known: readonly string[]): void {
 // Target database
 // ---------------------------------------------------------------------------
 
+/** The database this run's client really writes to (target.ts describeRunTarget). */
 export function describeTarget(): Target {
-  const url = getEnv().DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is unset. Is .env filled in?");
-  return describeDatabaseUrl(url);
+  return describeRunTarget(getEnv());
 }
 
 /** A pg_dump command for the database this process writes to (see target.ts backupCommand). */
@@ -255,7 +254,7 @@ export function readOverrides(file: string | undefined): Record<string, PersonOv
 export async function loadPlanDb(prisma: PrismaClient): Promise<PlanDb> {
   const [users, contacts, properties, tasks, checklist, templates, events, atts] = await Promise.all([
     prisma.user.findMany({ select: { id: true, email: true, name: true, asanaGid: true } }),
-    prisma.contact.findMany({ select: { id: true, fullName: true, email: true, asanaGid: true, active: true } }),
+    prisma.contact.findMany({ select: { id: true, fullName: true, email: true, asanaGid: true, active: true, archivedAt: true } }),
     prisma.property.findMany({ select: { id: true, address: true } }),
     prisma.task.findMany({
       select: {

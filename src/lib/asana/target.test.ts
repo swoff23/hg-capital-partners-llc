@@ -5,6 +5,7 @@ import {
   backupCommand,
   backupRefusal,
   describeDatabaseUrl,
+  describeRunTarget,
   dumpDbname,
   envFileOf,
   HG_PROJECT_GID,
@@ -25,6 +26,18 @@ test("describeDatabaseUrl: a production URL is never local, even through a tunne
   assert.equal(describeDatabaseUrl(POOLER).local, false);
   assert.deepEqual(describeDatabaseUrl(TUNNEL), { host: "127.0.0.1", database: "postgres", local: false, isProdRef: true });
   assert.equal(describeDatabaseUrl("postgresql://u@[::1]:5432/x").local, true);
+});
+
+test("describeRunTarget: the URL the client uses, which VERCEL_ENV=production switches to POSTGRES_PRISMA_URL", () => {
+  const TX_POOLER = `postgresql://postgres.${PROD_REF}:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true`;
+  assert.deepEqual(describeRunTarget({ DATABASE_URL: LOCAL }), describeDatabaseUrl(LOCAL));
+  assert.deepEqual(describeRunTarget({ DATABASE_URL: LOCAL, POSTGRES_PRISMA_URL: TX_POOLER }), describeDatabaseUrl(LOCAL), "only a production env switches");
+  const prod = describeRunTarget({ DATABASE_URL: POOLER, POSTGRES_PRISMA_URL: TX_POOLER, VERCEL_ENV: "production" });
+  assert.deepEqual([prod.host, prod.database, prod.local, prod.isProdRef], ["aws-0-us-east-1.pooler.supabase.com", "postgres", false, true]);
+  // The backup dumps DATABASE_URL: a client pointed anywhere else is refused before anything runs.
+  assert.throws(() => describeRunTarget({ DATABASE_URL: LOCAL, POSTGRES_PRISMA_URL: TX_POOLER, VERCEL_ENV: "production" }), /the backup would dump localhost\/hg_wf_import/);
+  assert.throws(() => describeRunTarget({ DATABASE_URL: POOLER, POSTGRES_PRISMA_URL: OTHER, VERCEL_ENV: "production" }), /point both at one database/);
+  assert.throws(() => describeRunTarget({ POSTGRES_PRISMA_URL: TX_POOLER, VERCEL_ENV: "production" }), /DATABASE_URL is unset/);
 });
 
 test("writeRefusal: dry runs anywhere; writes need a local database or --confirm-prod and the production URL", () => {
