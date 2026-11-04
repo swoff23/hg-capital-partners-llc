@@ -23,11 +23,13 @@ import { describeRepeat, parseRepeatRule } from "./repeat";
  *    onto its original lines;
  *  - never folded: comments, Mark done, Approve, Send back, a contractor's
  *    Start, creation, the next repeat, access changes and sync conflicts;
- *  - a change the same person reversed within 2 minutes doesn't show, when
- *    both were Internal (a reversed Shared change may already have been
- *    emailed or seen, so it stays), and neither do an archived contractor's
- *    drop and give-back written with the two lines of one reversed status
- *    change, in either order (heldPairs);
+ *  - a change that reverses the field's latest move within 2 minutes doesn't
+ *    show, and neither does that move, when the same person made both and
+ *    both were Internal (reversedPairs). A move by anyone else in between
+ *    keeps both, and a reversed Shared change may already have been emailed
+ *    or seen, so it stays. Neither do an archived contractor's drop and
+ *    give-back written with the two lines of one reversed status change, in
+ *    either order (heldPairs);
  *  - a status change and the note written with it (`data.statusEventId`) are
  *    one decision; files posted within 2 minutes of each other by one person
  *    are one batch line; a soft-deleted comment leaves a staff-only line,
@@ -477,10 +479,15 @@ function moveOf(e: ActivityEvent): { key: string; from: string; to: string } | n
 /**
  * The events to leave out because the same person undid them inside two
  * minutes (due date there and back, a tick and an untick, an Approve taken
- * back), each by the id of the other in its pair. Only when both were
- * Internal: a Shared change may already be in an email or on the
- * contractor's screen, so a reversal of it stays. A Done whose next repeat
- * was created is kept too, since that line still stands.
+ * back), each by the id of the other in its pair. A change pairs only with
+ * the field's latest move, and only when the same person made both: a move
+ * by anyone else in between (Connor's Cancel and his reopen a minute later,
+ * with Pieter's reopen and Dana's Cancel between them) keeps both, since the
+ * field didn't go there and back by one hand. A pair left out leaves the
+ * field with no latest move, so the next change pairs with nothing. Only
+ * when both were Internal: a Shared change may already be in an email or on
+ * the contractor's screen, so a reversal of it stays. A Done whose next
+ * repeat was created is kept too, since that line still stands.
  */
 function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
   const hidden = new Map<string, string>();
@@ -489,10 +496,11 @@ function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
   for (const e of events) {
     const move = moveOf(e);
     if (!move) continue;
-    const key = `${actorKey(e)}|${move.key}`;
+    const key = move.key;
     const prev = last.get(key);
     const undoes =
       prev &&
+      actorKey(prev.e) === actorKey(e) &&
       prev.move.from === move.to &&
       prev.move.to === move.from &&
       e.createdAt.getTime() - prev.e.createdAt.getTime() <= TWO_MINUTES &&
@@ -512,13 +520,14 @@ function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
 /**
  * An archived contractor's drop (core.ts archivedAssigneeLine) and the `givenBack` line that gave the same contractor
  * the job back, left out when the status lines written with them (setStatus writes each right after its drop or
- * give-back, as the same person) were left out as one reversed pair (reversedPairs), whichever came first. That's a
- * Canceled job's reopen and its Undo (the drop, then the give-back), or a Cancel that gave the job back and its Undo
- * (the give-back, then the drop): a Canceled line is Internal even with a contractor, so the four read as an
- * unassigned Canceled job's reopen and Undo do, as nothing. A Done job's Undo is Shared with him, so that pair stays,
- * and the two lines ride with it (givenBackRiders). `events` is every event in order, soft-deleted ones too: the line
- * written with a give-back can be an approval undone since, which pairs with nothing, and the give-back isn't held
- * because the next standing line happens to pair.
+ * give-back, as the same person, so the line right after it must be a STATUS line) were left out as one reversed pair
+ * (reversedPairs: one person's status change and its reversal, with nobody else's status change between them),
+ * whichever came first. That's a Canceled job's reopen and its Undo (the drop, then the give-back), or a Cancel that
+ * gave the job back and its Undo (the give-back, then the drop): a Canceled line is Internal even with a contractor,
+ * so the four read as an unassigned Canceled job's reopen and Undo do, as nothing. A Done job's Undo is Shared with
+ * him, so that pair stays, and the two lines ride with it (givenBackRiders). `events` is every event in order,
+ * soft-deleted ones too: the line written with a give-back can be an approval undone since, which pairs with nothing,
+ * and the give-back isn't held because the next standing line happens to pair.
  */
 function heldPairs(events: readonly ActivityEvent[], pairs: ReadonlyMap<string, string>): Set<string> {
   const held = new Set<string>();

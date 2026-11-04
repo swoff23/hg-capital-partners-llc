@@ -254,14 +254,16 @@ function archivedAssigneeLine(contactId: string): EventInput {
  *  - Approve's Undo writes no status line, so the drop is the latest line and the job is in Review. Approve again
  *    (Review to Done) gives it back, however much later: Review is still his Mark done. A Cancel doesn't.
  *  - A reopen that took the job off him marks its own status line with him (`dropped`, setStatus), written right after
- *    the drop. Only its Undo gives it back: back to the status it left (`to` is the reopen's `from`), while the reopen
- *    line is at most APPROVAL_UNDO_MS old, the toast's Undo, timed as undoApproval times its own (the caller's `now`
- *    against the line's createdAt). That holds for a Canceled job too, whose way back is Cancel: its reopen's Undo
- *    inside the window gives it back. Later, or to the other close (a Done job reopened, then Canceled; a Canceled job
- *    reopened, then Done or approved), it's new work on a job the reopen left unassigned. The contractor comes from
- *    that mark, and the line before it must be his drop as well. A reopen with no mark (it dropped nobody, or it was
- *    written before the mark) gives nothing back, whatever drop sits before it: Approve's Undo and then a Cancel that
- *    wrote no line (service.ts cancelOpenAutoTask) leave a drop that isn't the reopen's.
+ *    the drop. Only its Undo gives it back: from where the reopen left the job (`from` is the reopen's `to`, so a
+ *    move that wrote no line since, such as service.ts cancelOpenAutoTask's Cancel, rules it out), back to the status
+ *    it left (`to` is the reopen's `from`), while the reopen line is at most APPROVAL_UNDO_MS old, the toast's Undo,
+ *    timed as undoApproval times its own (the caller's `now` against the line's createdAt). That holds for a Canceled
+ *    job too, whose way back is Cancel: its reopen's Undo inside the window gives it back. Later, from anywhere else,
+ *    or to the other close (a Done job reopened, then Canceled; a Canceled job reopened, then Done or approved), it's
+ *    new work on a job the reopen left unassigned. The contractor comes from that mark, and the line before it must
+ *    be his drop as well. A reopen with no mark (it dropped nobody, or it was written before the mark) gives nothing
+ *    back, whatever drop sits before it: Approve's Undo and then a Cancel that wrote no line (cancelOpenAutoTask)
+ *    leave a drop that isn't the reopen's.
  * Null when anything moved the job or assigned it since.
  */
 function droppedArchivedAssignee(
@@ -284,7 +286,7 @@ function droppedArchivedAssignee(
   const contactId = reopen ? dataOf(latest).dropped : dropped;
   if (typeof contactId !== "string" || contactId !== dropped) return null;
   const late = reopen && now.getTime() - latest.createdAt.getTime() > APPROVAL_UNDO_MS;
-  const wayBack = reopen ? to === left && !late : from === "REVIEW" && to === "DONE";
+  const wayBack = reopen ? from === dataOf(latest).to && to === left && !late : from === "REVIEW" && to === "DONE";
   return wayBack ? contactId : null;
 }
 

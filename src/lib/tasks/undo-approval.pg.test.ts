@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { todayYmdEastern } from "@/lib/dates";
 import { makeClient } from "@/lib/db-client";
+import { activeTask } from "@/lib/task-scope";
 import { buildActivity } from "./activity";
 import * as core from "./core";
 
@@ -406,4 +407,102 @@ test("a give-back whose approval was undone isn't hidden with the later reopen's
   assert.equal(assigned.length, 3, "two drops and the give-back");
   const shownIds = new Set(buildActivity(rows, {}, todayYmdEastern()).flatMap((e) => e.events.map((x) => x.id)));
   for (const e of assigned) assert.ok(shownIds.has(e.id), `${JSON.stringify(e.data)} stays on the timeline`);
+});
+
+test("flow B on real rows: three partners' reopens and Cancels end Done and unassigned, and the timeline says so", { skip, timeout }, async () => {
+  // The task session's fourth review, finding 1, through the real setStatus: Pieter reopens a Canceled job of an
+  // archived contractor's, Connor cancels it (which gives it back), Pieter reopens, Dana cancels (gives it back), and
+  // Connor reopens and finishes it, all inside 2 minutes. Connor's Cancel and his reopen have others' moves between
+  // them, so they aren't his there and back: every line stands, and the last say Done and unassigned.
+  const gutters = await prisma.contact.create({ data: { fullName: "Fb Gutters", trades: "Gutters" } });
+  // No sign-in: job-batch.pg.test.ts counts the partners who have one while its emails are written, and may be running
+  // alongside on the same database.
+  const dana: core.Principal = {
+    kind: "staff",
+    userId: (await prisma.user.create({ data: { email: `dana-${randomUUID().slice(0, 8)}@example.test`, name: "Dana" } })).id,
+    label: "Dana",
+  };
+  const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, p, { expected }));
+  const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Clear the gutters", propertyId, assignee: { contactId: gutters.id } }, staff));
+  await as(staff, task.id, "CANCELED", "OPEN");
+  // Canceled last week, so no step below is read as that Cancel's own reversal.
+  await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - interval '7 days' WHERE "taskId" = ${task.id}`;
+  await prisma.contact.update({ where: { id: gutters.id }, data: { archivedAt: new Date() } });
+
+  const steps: [core.Principal, Parameters<typeof core.setStatus>[2]][] = [
+    [pieter, "IN_PROGRESS"],
+    [staff, "CANCELED"],
+    [pieter, "OPEN"],
+    [dana, "CANCELED"],
+    [staff, "IN_PROGRESS"],
+    [staff, "DONE"],
+  ];
+  let at: Parameters<typeof core.setStatus>[2] = "CANCELED";
+  for (const [p, to] of steps) {
+    await as(p, task.id, to, at);
+    at = to;
+  }
+  const done = await prisma.task.findUniqueOrThrow({ where: { id: task.id } });
+  assert.equal(done.status, "DONE");
+  assert.equal(done.assigneeContactId, null, "Connor's reopen took it off him, and nothing gave it back");
+  assert.equal(await prisma.taskAccess.count({ where: { taskId: task.id, contactId: gutters.id, revokedAt: null } }), 0, "his access stays revoked");
+
+  const rows = await prisma.taskEvent.findMany({ where: { taskId: task.id } });
+  const timeline = buildActivity(rows, { contacts: { [gutters.id]: "Fb Gutters" } }, todayYmdEastern());
+  assert.deepEqual(
+    timeline.map((e) => ("text" in e ? e.text : e.type)),
+    [
+      "Connor created this task",
+      "Connor set status to Canceled",
+      "Unassigned because Fb Gutters is archived",
+      "Pieter set status to In progress",
+      "Assigned back to Fb Gutters",
+      "Connor set status to Canceled",
+      "Unassigned because Fb Gutters is archived",
+      "Pieter set status to To do",
+      "Assigned back to Fb Gutters",
+      "Dana set status to Canceled",
+      "Unassigned because Fb Gutters is archived",
+      "Connor changed the status 2 times, now Done",
+    ],
+  );
+});
+
+test("a reopen, then a Cancel that wrote no line, then Done inside 2 minutes: not the reopen's Undo, so it closes unassigned", { skip, timeout }, async () => {
+  // Finding 2: an auto task (a property reminder) held by a contractor is Done, and he is archived. A reopen drops him
+  // and marks its line. Clearing the property's key date then cancels the job with service.ts cancelOpenAutoTask's
+  // updateMany, which writes no line (service.ts loads server-only, so its statement runs here as written there). The
+  // reopen is still the latest line, the toast's Undo is refused, and a close from Canceled starts where no reopen
+  // left the job: it closes unassigned, with his access still revoked.
+  const insurer = await prisma.contact.create({ data: { fullName: "Fa Insurer", trades: "Insurance" } });
+  const reminder: core.Principal = { kind: "system", label: "Property reminder" };
+  const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
+  for (const open of ["OPEN", "REVIEW"] as const) {
+    const autoKey = `${propertyId}:insurance-${randomUUID().slice(0, 8)}`;
+    const task: { id: string } = await prisma.$transaction((tx) =>
+      core.createTask(tx, { title: `Renew the insurance (${open})`, propertyId, autoKey, assignee: { contactId: insurer.id } }, reminder),
+    );
+    await status(task.id, "DONE", "OPEN");
+    await prisma.contact.update({ where: { id: insurer.id }, data: { archivedAt: new Date() } });
+
+    const reopened = await status(task.id, open, "DONE");
+    assert.equal(reopened.task.assigneeContactId, null);
+    const line = await prisma.taskEvent.findUniqueOrThrow({ where: { id: reopened.statusEventId }, select: { data: true } });
+    assert.equal((line.data as { dropped?: unknown }).dropped, insurer.id, "the reopen marks its drop");
+    // cancelOpenAutoTask (service.ts), as written there.
+    const canceled = await prisma.task.updateMany({ where: { autoKey, ...activeTask }, data: { status: "CANCELED", autoKey: null, completedAt: new Date() } });
+    assert.equal(canceled.count, 1);
+    await assert.rejects(status(task.id, "DONE", open), (e) => e instanceof core.TaskChangedError, `${open}: the toast's Undo is refused`);
+
+    const closed = await status(task.id, "DONE", "CANCELED");
+    assert.equal(closed.task.status, "DONE");
+    assert.equal(closed.task.assigneeContactId, null, `${open}: not the reopen's Undo`);
+    assert.equal(closed.emailsContractor, false);
+    assert.equal(await prisma.taskEvent.count({ where: { taskId: task.id, kind: "ASSIGNED", data: { path: ["givenBack"], equals: true } } }), 0, open);
+    assert.equal(await prisma.taskAccess.count({ where: { taskId: task.id, contactId: insurer.id, revokedAt: null } }), 0, `${open}: his access stays revoked`);
+    await prisma.contact.update({ where: { id: insurer.id }, data: { archivedAt: null } });
+  }
+  assert.equal(await prisma.notificationOutbox.count({ where: { recipientContactId: insurer.id } }), 0, "no email ever queued for him");
 });

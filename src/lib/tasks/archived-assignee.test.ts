@@ -21,10 +21,10 @@ type Call = { model: string; op: string; args: unknown };
 type Args = { where?: Record<string, unknown>; data?: Record<string, unknown>; select?: Record<string, unknown> };
 type Answer = (model: string, op: string, args: Args) => unknown;
 
-/** Zack (c-zack) is archived; Jose (c-jose) isn't. `answer` overrides a call when it returns anything but undefined. */
-function fakeTx(row: Record<string, unknown>, answer?: Answer) {
+/** Zack (c-zack) is archived; Jose (c-jose) isn't, unless `archivedIds` says so. `answer` overrides a call when it returns anything but undefined. */
+function fakeTx(row: Record<string, unknown>, answer?: Answer, archivedIds: readonly string[] = ["c-zack"]) {
   const calls: Call[] = [];
-  const archived = new Set(["c-zack"]);
+  const archived = new Set(archivedIds);
   const stored = {
     id: "t1",
     title: "Hang drywall",
@@ -350,8 +350,8 @@ const latestLines =
   (model, op, args) =>
     isLinesRead(model, op, args) ? rows : undefined;
 /** A close of an unassigned job whose latest lines are `rows`: who has it after, and the ASSIGNED lines it wrote. */
-async function close(status: string, to: "DONE" | "CANCELED", rows: Line[], now = NOW) {
-  const { tx, calls } = fakeTx({ status, assigneeContactId: null }, latestLines(...rows));
+async function close(status: string, to: "DONE" | "CANCELED", rows: Line[], now = NOW, archivedIds?: readonly string[]) {
+  const { tx, calls } = fakeTx({ status, assigneeContactId: null }, latestLines(...rows), archivedIds);
   const r = await setStatus(tx, "t1", to, PIETER, { expected: status as never }, now);
   return { assignee: r.task.assigneeContactId, lines: events(calls).filter((e) => e.kind === "ASSIGNED"), calls, r };
 }
@@ -472,7 +472,11 @@ test("setStatus: no give-back for any other close, once the job moved or was ass
     ["assigned and unassigned since", "OPEN", "DONE", [unassigned, REOPEN, DROP]],
     ["a reopen that dropped nobody", "OPEN", "DONE", [{ ...REOPEN, data: { from: "DONE", to: "OPEN" } }, unassigned]],
     ["sent back after Approve's Undo", "IN_PROGRESS", "DONE", [{ kind: "STATUS", data: { from: "REVIEW", to: "IN_PROGRESS" }, createdAt: ago(10_000) }, DROP]],
-    ["a contractor no longer archived (the picker offers him again)", "OPEN", "DONE", [{ ...REOPEN, data: { ...REOPEN.data, dropped: "c-jose" } }, jose]],
+    // A Cancel that wrote no line (service.ts cancelOpenAutoTask, when a property's key date is cleared) moved the job
+    // since the reopen, so the reopen is still the latest line. The toast's Undo is refused (expected To do), and a
+    // close from Canceled isn't the Undo: a real one starts where the reopen left the job.
+    ["a reopen, a Cancel with no line, then Done", "CANCELED", "DONE", [REOPEN, DROP]],
+    ["a reopen to Review, a Cancel with no line, then Done", "CANCELED", "DONE", [{ ...REOPEN, data: { ...REOPEN.data, to: "REVIEW" } }, DROP]],
     // A reopen gives back only the contractor it marked as its own drop.
     // Approve's Undo left a drop, a Cancel wrote no line (service.ts cancelOpenAutoTask), and the job, unassigned, was
     // reopened (no drop, no mark) and Canceled again inside the window: the drop isn't the reopen's.
@@ -481,12 +485,20 @@ test("setStatus: no give-back for any other close, once the job moved or was ass
     ["a marked reopen whose line before it isn't a drop", "OPEN", "DONE", [REOPEN, unassigned]],
     ["a marked reopen whose drop before it names someone else", "OPEN", "DONE", [REOPEN, jose]],
   ];
+  // Jose is archived here too, so a case can't pass just because the contractor it would wrongly give the job to
+  // isn't: no contractor is even read (no Contact lock), since none of these is the way back.
   for (const [why, status, to, rows] of cases) {
-    const { assignee, lines, calls } = await close(status, to, rows);
+    const { assignee, lines, calls } = await close(status, to, rows, NOW, ["c-zack", "c-jose"]);
     assert.equal(assignee, null, why);
     assert.deepEqual(lines, [], `${why}: no ASSIGNED line nobody picked`);
     assert.ok(!calls.some((c) => c.model === "taskAccess" && c.op === "upsert"), `${why}: no access row`);
+    assert.ok(!calls.some(isContactLock), `${why}: no contractor read`);
   }
+  // A contractor restored since is in the picker again: his reopen's Undo reads him under the lock, as not archived.
+  const restored = await close("OPEN", "DONE", [{ ...REOPEN, data: { ...REOPEN.data, dropped: "c-jose" } }, jose]);
+  assert.equal(restored.assignee, null, "a contractor no longer archived");
+  assert.deepEqual(restored.lines, []);
+  assert.deepEqual(restored.calls.filter(isContactLock).map((c) => c.args), [["c-jose"]]);
   // Nothing is looked up for a job that has an assignee, or for a move that doesn't close it.
   for (const [row, to] of [
     [{ status: "OPEN", assigneeContactId: "c-jose" }, "DONE"],
@@ -669,11 +681,27 @@ test("a give-back and the drop that undid it go as one too, when the give-back c
   assert.deepEqual(shown([...flow.slice(0, 6), jose, flow[7]]).slice(4), ["Assigned back to Zack Outlaw", "Unassigned because Jose Alvarez is archived"]);
 });
 
-test("a drop and a give-back stay when the lines after them aren't their status lines, though those lines paired (M6)", () => {
+test("a drop and a give-back are held only with the status lines written right after them, not a paired rename", () => {
+  // Hand-built, all Pieter inside 2 minutes: a drop, a rename, then a give-back followed directly by the rename's
+  // reversal. The renames pair and go, but neither is a STATUS line, so neither was written with the drop or the
+  // give-back, and both stay.
+  assert.deepEqual(
+    shown([
+      ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "r1" }),
+      ev("TITLE", { from: "Patch roof", to: "Patch roof (east)" }, "2026-10-23T15:00:10.000Z", { id: "r2" }),
+      ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:20.000Z", { id: "r3" }),
+      ev("TITLE", { from: "Patch roof (east)", to: "Patch roof" }, "2026-10-23T15:00:30.000Z", { id: "r4" }),
+    ]),
+    ["Unassigned because Zack Outlaw is archived", "Assigned back to Zack Outlaw"],
+  );
+});
+
+test("a real flow, kept as a regression case: Approve's Undo, a rename, Approve again, a restore, its Undo, the rename undone", () => {
   // All Pieter: Approve, Zack archived, Approve's Undo (a drop, no status line), a rename, Approve again (the
   // give-back), Zack restored, that approval's Undo (no drop: he isn't archived), and the rename undone inside 2
   // minutes. The renames pair and hide; the drop and the give-back were written with no status line of a reversed
-  // pair, so both stay, and the job reads as his again.
+  // pair, so both stay, and the job reads as his again. (heldPairs reads undone lines too, so the line after the
+  // give-back is its own undone approval, which pairs with nothing: the case above pins the STATUS check.)
   const review = ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, "2026-10-23T14:58:00.000Z", {
     id: "m1",
     visibility: "SHARED",
@@ -811,4 +839,119 @@ test("a drop or give-back line never leads a fold while the burst has a change o
   // With nothing but such lines in the burst, the first still leads.
   const jose = ev("ASSIGNED", { ...DROP.data, from: { userId: null, contactId: "c-jose", name: null } }, "2026-10-23T15:00:50.000Z", { id: "a7" });
   assert.deepEqual(shown([dropped, givenBack, jose]), ["Unassigned because Zack Outlaw is archived and made 2 more changes"]);
+});
+
+/* ---------------- Someone else's status change between a change and its reversal (the task session's fourth review) ---------------- */
+
+const DANA = { actorLabel: "Dana Reyes", actorUserId: "u-dana" };
+/**
+ * The rows one setStatus wrote, as real runs on a scratch database wrote them (three staff, Zack archived, every step
+ * inside 2 minutes): its drop or give-back, then its STATUS line, which names the drop it wrote (`dropped`).
+ */
+function wrote(id: string, at: string, by: Partial<ActivityEvent>, from: string, to: string, first: "drop" | "give" | null, visibility: "INTERNAL" | "SHARED" = "INTERNAL") {
+  const status = ev("STATUS", { from, to, ...(first === "drop" ? { dropped: "c-zack" } : {}) }, at, { id: `${id}b`, visibility, ...by });
+  return first ? [ev("ASSIGNED", first === "drop" ? DROP.data : GIVEN_BACK, at, { id: `${id}a`, ...by }), status] : [status];
+}
+const step = (n: number) => `2026-10-23T15:00:${String(n * 5).padStart(2, "0")}.000Z`;
+
+test("flow B: a Cancel and the same person's reopen with others' moves between them stay; it reads Done and unassigned", () => {
+  // Pieter reopens Zack's Canceled job, Connor cancels it (gives it back), Pieter reopens, Dana cancels (gives it
+  // back), Connor reopens and finishes it. The job is Done and nobody's. Connor's Cancel and his reopen aren't one
+  // person's there and back: Pieter's reopen and Dana's Cancel came between.
+  const flow = [
+    ...CANCELED_HISTORY,
+    ...wrote("s1", step(0), {}, "CANCELED", "IN_PROGRESS", "drop"),
+    ...wrote("s2", step(1), CONNOR, "IN_PROGRESS", "CANCELED", "give"),
+    ...wrote("s3", step(2), {}, "CANCELED", "OPEN", "drop"),
+    ...wrote("s4", step(3), DANA, "OPEN", "CANCELED", "give"),
+    ...wrote("s5", step(4), CONNOR, "CANCELED", "IN_PROGRESS", "drop"),
+    ...wrote("s6", step(5), CONNOR, "IN_PROGRESS", "DONE", null),
+  ];
+  assert.deepEqual(shown(flow), [
+    "Pieter assigned Zack Outlaw",
+    "Pieter set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Pieter set status to In progress",
+    "Assigned back to Zack Outlaw",
+    "Connor set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Pieter set status to To do",
+    "Assigned back to Zack Outlaw",
+    "Dana set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Connor changed the status 2 times, now Done",
+  ]);
+});
+
+test("flow T2R: two partners, with a Done job's reopen and approval between Connor's Cancel and his reopen; it reads Review and unassigned", () => {
+  const flow = [
+    ...CANCELED_HISTORY,
+    ...wrote("s1", step(0), {}, "CANCELED", "REVIEW", "drop"),
+    ...wrote("s2", step(1), CONNOR, "REVIEW", "CANCELED", "give"),
+    ...wrote("s3", step(2), {}, "CANCELED", "DONE", null, "SHARED"),
+    ...wrote("s4", step(3), {}, "DONE", "REVIEW", "drop"),
+    ...wrote("s5", step(4), {}, "REVIEW", "DONE", "give", "SHARED"),
+    ...wrote("s6", step(5), {}, "DONE", "CANCELED", null),
+    ...wrote("s7", step(6), CONNOR, "CANCELED", "REVIEW", "drop"),
+  ];
+  assert.deepEqual(shown(flow), [
+    "Pieter assigned Zack Outlaw",
+    "Pieter set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Pieter set status to Review",
+    "Assigned back to Zack Outlaw",
+    "Connor set status to Canceled",
+    "Pieter set status to Done",
+    "Unassigned because Zack Outlaw is archived",
+    "Pieter set status to Review",
+    "Assigned back to Zack Outlaw",
+    "Pieter approved this",
+    "Pieter set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Connor set status to Review",
+  ]);
+});
+
+test("flow D: Pieter's reopen and Cancel with Connor's between them stay; it reads Canceled and Zack's, and Canceled on a job nobody held", () => {
+  // Pieter reopens to Review, Connor cancels (gives it back), reopens to To do and cancels again (his own there and
+  // back, which goes with its drop and give-back), reopens to Review, and Pieter cancels inside the reopen's window,
+  // which gives it back. The job is Canceled and Zack's.
+  const flow = [
+    ...CANCELED_HISTORY,
+    ...wrote("s1", step(0), {}, "CANCELED", "REVIEW", "drop"),
+    ...wrote("s2", step(1), CONNOR, "REVIEW", "CANCELED", "give"),
+    ...wrote("s3", step(2), CONNOR, "CANCELED", "OPEN", "drop"),
+    ...wrote("s4", step(3), CONNOR, "OPEN", "CANCELED", "give"),
+    ...wrote("s5", step(4), CONNOR, "CANCELED", "REVIEW", "drop"),
+    ...wrote("s6", step(5), {}, "REVIEW", "CANCELED", "give"),
+  ];
+  assert.deepEqual(shown(flow), [
+    "Pieter assigned Zack Outlaw",
+    "Pieter set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Pieter set status to Review",
+    "Assigned back to Zack Outlaw",
+    "Connor set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Connor set status to Review",
+    "Assigned back to Zack Outlaw",
+    "Pieter set status to Canceled",
+  ]);
+  // The control: the same six steps on a Canceled job nobody held write only status lines. It reads Canceled.
+  const nobodys = [
+    CANCELED_HISTORY[1],
+    ...wrote("s1", step(0), {}, "CANCELED", "REVIEW", null),
+    ...wrote("s2", step(1), CONNOR, "REVIEW", "CANCELED", null),
+    ...wrote("s3", step(2), CONNOR, "CANCELED", "OPEN", null),
+    ...wrote("s4", step(3), CONNOR, "OPEN", "CANCELED", null),
+    ...wrote("s5", step(4), CONNOR, "CANCELED", "REVIEW", null),
+    ...wrote("s6", step(5), {}, "REVIEW", "CANCELED", null),
+  ];
+  assert.deepEqual(shown(nobodys), [
+    "Pieter set status to Canceled",
+    "Pieter set status to Review",
+    "Connor set status to Canceled",
+    "Connor set status to Review",
+    "Pieter set status to Canceled",
+  ]);
 });

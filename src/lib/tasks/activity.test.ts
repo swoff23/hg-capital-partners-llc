@@ -310,6 +310,43 @@ test("a reversal stays when it took longer than two minutes, was by someone else
   assert.deepEqual(texts(build(items)), ["Connor checked 1 item and unchecked 1 item"]);
 });
 
+test("a change pairs only with the field's latest move, and only when the same person made both", () => {
+  const sec = (s: number) => new Date(at(10).getTime() + s * 1000);
+  const DANA = { actorLabel: "Dana Reyes", actorUserId: "u-dana" } as const;
+  // Pieter starts the job, Connor sets it Waiting, Dana puts it back In progress and Pieter back to To do, all inside
+  // two minutes. Pieter's second change reverses his first, but the field moved by other hands in between: all four
+  // stand, and the timeline ends where the job is, To do. (Paired by person, it lost Pieter's two and read In progress.)
+  const between = [
+    ev("STATUS", { from: "OPEN", to: "IN_PROGRESS" }, { ...PIETER, createdAt: sec(0) }),
+    ev("STATUS", { from: "IN_PROGRESS", to: "WAITING", waitingOn: "Parts" }, { createdAt: sec(20) }),
+    ev("STATUS", { from: "WAITING", to: "IN_PROGRESS" }, { ...DANA, createdAt: sec(40) }),
+    ev("STATUS", { from: "IN_PROGRESS", to: "OPEN" }, { ...PIETER, createdAt: sec(60) }),
+  ];
+  assert.deepEqual(texts(build(between)), [
+    "Pieter set status to In progress",
+    "Connor set status to Waiting on Parts",
+    "Dana set status to In progress",
+    "Pieter set status to To do",
+  ]);
+  // Nested: Connor's own Waiting and back, between Pieter's start and his move back to To do. Connor's pair goes, which
+  // leaves the field with no latest move, so Pieter's move back pairs with nothing: his two stand, one burst now that
+  // nothing of Connor's shows between them. (Paired by person, all four went.)
+  const nested = [
+    ev("STATUS", { from: "OPEN", to: "IN_PROGRESS" }, { ...PIETER, createdAt: sec(0) }),
+    ev("STATUS", { from: "IN_PROGRESS", to: "WAITING", waitingOn: "Parts" }, { createdAt: sec(20) }),
+    ev("STATUS", { from: "WAITING", to: "IN_PROGRESS" }, { createdAt: sec(40) }),
+    ev("STATUS", { from: "IN_PROGRESS", to: "OPEN" }, { ...PIETER, createdAt: sec(60) }),
+  ];
+  assert.deepEqual(texts(build(nested)), ["Pieter set status to In progress, then back to To do"]);
+  // Only a move of the same field comes between: someone else's rename doesn't keep Pieter's due date there and back.
+  const other = [
+    ev("DUE", { from: "2026-10-24", to: "2026-10-30" }, { ...PIETER, createdAt: sec(0) }),
+    ev("TITLE", { from: "Patch roof", to: "Patch the roof" }, { createdAt: sec(20) }),
+    ev("DUE", { from: "2026-10-30", to: "2026-10-24" }, { ...PIETER, createdAt: sec(40) }),
+  ];
+  assert.deepEqual(texts(build(other)), ["Connor renamed this from “Patch roof”"]);
+});
+
 test("a Shared change that was reversed stays: it may already be emailed or seen", () => {
   const e = [
     ev("STATUS", { from: "OPEN", to: "SCHEDULED", scheduledFor: "2026-10-30" }, { visibility: "SHARED", createdAt: at(10) }),
