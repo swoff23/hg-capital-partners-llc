@@ -516,7 +516,9 @@ function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
  * Canceled job's reopen and its Undo (the drop, then the give-back), or a Cancel that gave the job back and its Undo
  * (the give-back, then the drop): a Canceled line is Internal even with a contractor, so the four read as an
  * unassigned Canceled job's reopen and Undo do, as nothing. A Done job's Undo is Shared with him, so that pair stays,
- * and the two lines ride with it (givenBackRiders).
+ * and the two lines ride with it (givenBackRiders). `events` is every event in order, soft-deleted ones too: the line
+ * written with a give-back can be an approval undone since, which pairs with nothing, and the give-back isn't held
+ * because the next standing line happens to pair.
  */
 function heldPairs(events: readonly ActivityEvent[], pairs: ReadonlyMap<string, string>): Set<string> {
   const held = new Set<string>();
@@ -634,7 +636,8 @@ export function buildActivity<E extends ActivityEvent>(events: readonly E[], nam
   const live = sorted.filter((e) => !e.deletedAt || (e.kind === "COMMENT" && !takenBack(e)));
   const standing = live.filter((e) => !e.deletedAt);
   const pairs = reversedPairs(standing);
-  const hidden = new Set([...pairs.keys(), ...heldPairs(standing, pairs)]);
+  // Every event, undone approvals too: heldPairs needs the line each drop and give-back was written with.
+  const hidden = new Set([...pairs.keys(), ...heldPairs(sorted, pairs)]);
 
   // A note is paired with the status change it was written with, by id, never by adjacency.
   const statusIds = new Set(live.filter((e) => e.kind === "STATUS" && !hidden.has(e.id)).map((e) => e.id));

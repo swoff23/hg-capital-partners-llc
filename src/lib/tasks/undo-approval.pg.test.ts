@@ -231,11 +231,12 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   const reopenUndo = await job("Paint the porch");
   const reopenLate = await job("Paint the steps");
   const reopenCancel = await job("Paint the door");
+  const reopenReview = await job("Paint the trim");
   const reopenCanceled = await job("Paint the gate");
   const reopenCanceledDone = await job("Paint the fence");
   const approveLate = await job("Paint the railings");
   const approveCancel = await job("Paint the shutters");
-  for (const t of [reopenUndo, reopenLate, reopenCancel]) await status(t.id, "DONE", "OPEN");
+  for (const t of [reopenUndo, reopenLate, reopenCancel, reopenReview]) await status(t.id, "DONE", "OPEN");
   for (const t of [reopenCanceled, reopenCanceledDone]) await status(t.id, "CANCELED", "OPEN");
   // Canceled last week, so the reopen below isn't read as that Cancel's own reversal.
   for (const t of [reopenCanceled, reopenCanceledDone]) await backDate(t.id, 7 * 24 * 60);
@@ -259,6 +260,13 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   assert.equal(undone.emailsContractor, false);
   assert.equal(await givenBackLines(reopenUndo.id), 1);
   assert.equal(await access(reopenUndo.id), 1, "his access row comes back with it");
+  // A Done job reopened to Review is his again when approved at once: Approve is its way back to Done.
+  assert.equal((await status(reopenReview.id, "REVIEW", "DONE")).task.assigneeContactId, null);
+  const approvedAgain = await status(reopenReview.id, "DONE", "REVIEW");
+  assert.equal(approvedAgain.task.assigneeContactId, painter.id);
+  assert.equal(approvedAgain.emailsContractor, false);
+  assert.equal(await givenBackLines(reopenReview.id), 1);
+  assert.equal(await access(reopenReview.id), 1, "his access row comes back with it");
 
   // Past the Undo's window, the same close is new work: it closes unassigned, with no ASSIGNED line.
   await backDate(reopenLate.id, 3);
@@ -368,4 +376,34 @@ test("Connor's reopen, then Pieter's Cancel and its Undo: open and unassigned, a
     shownIds.filter((id) => fresh.some((e) => e.id === id)).sort(),
     [...connors].sort(),
   );
+});
+
+test("a give-back whose approval was undone isn't hidden with the later reopen's drop, on the rows as written", { skip, timeout }, async () => {
+  // The verify pass's finding 3 on the adapter, all by one person: Approve, Archive, Approve's Undo (a drop), Approve
+  // again (the give-back, written with that approval's line), Restore, that approval's Undo (its line soft-deleted, no
+  // drop), Cancel from Review, Archive, and a reopen to Review inside 2 minutes (a marked drop). The Cancel and the
+  // reopen pair; the give-back was written with the undone approval, so it and the reopen's drop both stay.
+  const glazer = await prisma.contact.create({ data: { fullName: "Vf Glazer", trades: "Glazing" } });
+  const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
+  const archive = (archivedAt: Date | null) => prisma.contact.update({ where: { id: glazer.id }, data: { archivedAt } });
+  const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Reglaze the sash", propertyId, assignee: { contactId: glazer.id } }, staff));
+  await status(task.id, "REVIEW", "OPEN");
+  const first = await status(task.id, "DONE", "REVIEW");
+  await archive(new Date());
+  assert.equal((await undo(task.id, first.statusEventId)).task.assigneeContactId, null, "Approve's Undo drops him");
+  const second = await status(task.id, "DONE", "REVIEW");
+  assert.equal(second.task.assigneeContactId, glazer.id, "Approve again gives it back");
+  await archive(null);
+  assert.equal((await undo(task.id, second.statusEventId)).task.assigneeContactId, glazer.id, "restored, so that Undo drops nobody");
+  await status(task.id, "CANCELED", "REVIEW");
+  await archive(new Date());
+  const reopened = await status(task.id, "REVIEW", "CANCELED");
+  assert.equal(reopened.task.assigneeContactId, null);
+
+  const rows = await prisma.taskEvent.findMany({ where: { taskId: task.id } });
+  const assigned = rows.filter((e) => e.kind === "ASSIGNED");
+  assert.equal(assigned.length, 3, "two drops and the give-back");
+  const shownIds = new Set(buildActivity(rows, {}, todayYmdEastern()).flatMap((e) => e.events.map((x) => x.id)));
+  for (const e of assigned) assert.ok(shownIds.has(e.id), `${JSON.stringify(e.data)} stays on the timeline`);
 });

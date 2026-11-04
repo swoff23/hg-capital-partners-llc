@@ -453,6 +453,13 @@ test("setStatus: no give-back for any other close, once the job moved or was ass
     ["a reopen of a Canceled job, then Done", "OPEN", "DONE", [{ ...REOPEN, data: { ...REOPEN.data, from: "CANCELED" } }, DROP]],
     // Approve matches Review to Done too: only the reopen's own rule decides after a reopen.
     ["a Canceled job reopened to Review, then approved", "REVIEW", "DONE", [{ ...REOPEN, data: { ...REOPEN.data, from: "CANCELED", to: "REVIEW" } }, DROP]],
+    // And the window still holds: a Done job reopened to Review is his again only for the Undo's 2 minutes.
+    [
+      "a Done job reopened to Review, approved past the window",
+      "REVIEW",
+      "DONE",
+      [{ ...REOPEN, data: { ...REOPEN.data, to: "REVIEW" }, createdAt: ago(APPROVAL_UNDO_MS + 1) }, { ...DROP, createdAt: ago(APPROVAL_UNDO_MS + 1) }],
+    ],
     [
       "a Canceled job's reopen older than the Undo's window",
       "OPEN",
@@ -607,20 +614,21 @@ test("the drop and the give-back stay unless the status lines written with them 
   // drop that was held at all. One person inside two minutes: Cancel, reopen (drop), Undo (give-back, Cancel), reopen
   // again (drop). The first reopen pairs with the first Cancel, which wrote no give-back, so that drop stays. The
   // Undo's Cancel pairs with the second reopen, so its give-back and that reopen's drop go as one. The job is open and
-  // unassigned, and the timeline says why.
-  assert.deepEqual(
-    shown([
-      CANCELED_HISTORY[0],
-      ev("STATUS", { from: "OPEN", to: "CANCELED" }, "2026-10-23T14:59:30.000Z", { id: "e0" }),
-      ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "e1" }),
-      ev("STATUS", { from: "CANCELED", to: "OPEN" }, "2026-10-23T15:00:00.000Z", { id: "e2" }),
-      ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:20.000Z", { id: "e3" }),
-      ev("STATUS", { from: "OPEN", to: "CANCELED" }, "2026-10-23T15:00:20.000Z", { id: "e4" }),
-      ev("ASSIGNED", DROP.data, "2026-10-23T15:00:25.000Z", { id: "e5" }),
-      ev("STATUS", { from: "CANCELED", to: "OPEN" }, "2026-10-23T15:00:25.000Z", { id: "e6" }),
-    ]),
-    ["Pieter assigned Zack Outlaw", "Unassigned because Zack Outlaw is archived"],
-  );
+  // unassigned, and the timeline says why. An internal comment between the Undo and the second reopen shows which
+  // drop stays: the first, before the comment, not the second, which a give-back held with any drop would leave.
+  const cancelReopenUndoReopen = [
+    CANCELED_HISTORY[0],
+    ev("STATUS", { from: "OPEN", to: "CANCELED" }, "2026-10-23T14:59:30.000Z", { id: "e0" }),
+    ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "e1" }),
+    ev("STATUS", { from: "CANCELED", to: "OPEN" }, "2026-10-23T15:00:00.000Z", { id: "e2" }),
+    ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:20.000Z", { id: "e3" }),
+    ev("STATUS", { from: "OPEN", to: "CANCELED" }, "2026-10-23T15:00:20.000Z", { id: "e4" }),
+    ev("ASSIGNED", DROP.data, "2026-10-23T15:00:25.000Z", { id: "e5" }),
+    ev("STATUS", { from: "CANCELED", to: "OPEN" }, "2026-10-23T15:00:25.000Z", { id: "e6" }),
+  ];
+  assert.deepEqual(shown(cancelReopenUndoReopen), ["Pieter assigned Zack Outlaw", "Unassigned because Zack Outlaw is archived"]);
+  const withComment = [...cancelReopenUndoReopen, ev("COMMENT", {}, "2026-10-23T15:00:22.000Z", { id: "e4a", body: "Hold on" })];
+  assert.deepEqual(shown(withComment), ["Pieter assigned Zack Outlaw", "Unassigned because Zack Outlaw is archived", "comment"]);
   // Approve, its Undo and Approve again inside two minutes read as they always did: the Undo writes no status line.
   const review = ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, "2026-10-23T14:58:00.000Z", {
     id: "a1",
@@ -687,6 +695,54 @@ test("a drop and a give-back stay when the lines after them aren't their status 
     ]),
     ["Zack marked this done", "Unassigned because Zack Outlaw is archived", "Assigned back to Zack Outlaw"],
   );
+});
+
+test("a give-back whose own approval was undone isn't held with a later drop, though the next line it stands before paired", () => {
+  // All Pieter: Approve, Zack archived, Approve's Undo (a drop, no status line), Approve again (the give-back, written
+  // with that approval's Done line), Zack restored, that approval's Undo (its Done line is soft-deleted, and no drop:
+  // he isn't archived), Cancel from Review, Zack archived again, and a reopen to Review inside 2 minutes (a marked
+  // drop). The Cancel and the reopen pair, but the give-back was written with the undone approval, not with the Cancel,
+  // so neither it nor the reopen's drop is held: all three lines show, as they did before low 2.
+  const review = ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, "2026-10-23T14:58:00.000Z", {
+    id: "n1",
+    visibility: "SHARED",
+    actorLabel: "Zack Outlaw",
+    actorUserId: null,
+    actorContactId: "c-zack",
+    source: "PORTAL",
+  });
+  const approved = (id: string, at: string, deletedAt: string) => ev("STATUS", { from: "REVIEW", to: "DONE" }, at, { id, visibility: "SHARED", deletedAt: new Date(deletedAt) });
+  const flow = [
+    review,
+    approved("n2", "2026-10-23T14:59:50.000Z", "2026-10-23T15:00:00.000Z"),
+    ev("ASSIGNED", DROP.data, "2026-10-23T15:00:00.000Z", { id: "n3" }),
+    ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:00:20.000Z", { id: "n4" }),
+    approved("n5", "2026-10-23T15:00:20.000Z", "2026-10-23T15:00:40.000Z"),
+    ev("STATUS", { from: "REVIEW", to: "CANCELED" }, "2026-10-23T15:00:50.000Z", { id: "n6" }),
+    ev("ASSIGNED", DROP.data, "2026-10-23T15:01:20.000Z", { id: "n7" }),
+    ev("STATUS", { from: "CANCELED", to: "REVIEW", dropped: "c-zack" }, "2026-10-23T15:01:20.000Z", { id: "n8" }),
+  ];
+  assert.deepEqual(shown(flow), ["Zack marked this done", "Unassigned because Zack Outlaw is archived and made 2 more changes"]);
+  const run = buildActivity(flow, NAMES, "2026-10-23")[1];
+  assert.ok(run.type === "run");
+  assert.deepEqual(
+    run.lines.map((l) => l.text),
+    ["Unassigned because Zack Outlaw is archived", "Assigned back to Zack Outlaw", "Unassigned because Zack Outlaw is archived"],
+  );
+  // A reassignment away from Zack and back between the Cancel and the reopen doesn't change it: the job is in Review and
+  // unassigned, and the timeline has to end on why, not on a pick it no longer has.
+  const picks = [
+    ev("ASSIGNED", { from: { userId: null, contactId: "c-zack" }, to: { userId: null, contactId: "c-jose" } }, "2026-10-23T15:01:00.000Z", { id: "n6a", ...CONNOR }),
+    ev("ASSIGNED", { from: { userId: null, contactId: "c-jose" }, to: { userId: null, contactId: "c-zack" } }, "2026-10-23T15:01:10.000Z", { id: "n6b" }),
+  ];
+  assert.deepEqual(shown([...flow.slice(0, 6), ...picks, ...flow.slice(6)]), [
+    "Zack marked this done",
+    "Unassigned because Zack Outlaw is archived",
+    "Assigned back to Zack Outlaw",
+    "Connor assigned Jose Alvarez",
+    "Pieter assigned Zack Outlaw",
+    "Unassigned because Zack Outlaw is archived",
+  ]);
 });
 
 test("a drop or give-back line never leads a fold while the burst has a change of someone's to lead with", () => {
