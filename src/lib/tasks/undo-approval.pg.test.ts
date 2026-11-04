@@ -2,7 +2,9 @@ import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
+import { todayYmdEastern } from "@/lib/dates";
 import { makeClient } from "@/lib/db-client";
+import { buildActivity } from "./activity";
 import * as core from "./core";
 
 /**
@@ -228,10 +230,13 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   const reopenLate = await job("Paint the steps");
   const reopenCancel = await job("Paint the door");
   const reopenCanceled = await job("Paint the gate");
+  const reopenCanceledDone = await job("Paint the fence");
   const approveLate = await job("Paint the railings");
   const approveCancel = await job("Paint the shutters");
   for (const t of [reopenUndo, reopenLate, reopenCancel]) await status(t.id, "DONE", "OPEN");
-  await status(reopenCanceled.id, "CANCELED", "OPEN");
+  for (const t of [reopenCanceled, reopenCanceledDone]) await status(t.id, "CANCELED", "OPEN");
+  // Canceled last week, so the reopen below isn't read as that Cancel's own reversal.
+  for (const t of [reopenCanceled, reopenCanceledDone]) await backDate(t.id, 7 * 24 * 60);
   const approvals = new Map<string, string>();
   for (const t of [approveLate, approveCancel]) {
     await status(t.id, "REVIEW", "OPEN");
@@ -259,10 +264,27 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   assert.equal((await status(reopenCancel.id, "CANCELED", "OPEN")).task.assigneeContactId, null);
   assert.equal(await givenBackLines(reopenCancel.id), 0);
   assert.equal(await access(reopenCancel.id), 0);
-  // A Canceled job reopened and canceled again at once is a reopen followed by a Cancel: not given back either.
-  assert.equal((await status(reopenCanceled.id, "CANCELED", "OPEN")).task.assigneeContactId, null);
-  assert.equal(await givenBackLines(reopenCanceled.id), 0);
-  assert.equal(await access(reopenCanceled.id), 0);
+  // A Canceled job's way back is Cancel: canceling it again at once is its reopen's Undo, and gives it back.
+  const recanceled = await status(reopenCanceled.id, "CANCELED", "OPEN");
+  assert.equal(recanceled.task.assigneeContactId, painter.id);
+  assert.equal(recanceled.emailsContractor, false);
+  assert.equal(await givenBackLines(reopenCanceled.id), 1);
+  assert.equal(await access(reopenCanceled.id), 1);
+  // And the timeline, read from the rows as written, shows none of the four lines (activity.ts heldPairs).
+  const rows = await prisma.taskEvent.findMany({ where: { taskId: reopenCanceled.id } });
+  const fresh = rows.filter((e) => e.createdAt.getTime() > Date.now() - 60_000 && (e.kind === "ASSIGNED" || e.kind === "STATUS")).map((e) => e.id);
+  assert.equal(fresh.length, 4, "the drop, the reopen, the give-back and the Cancel");
+  const timeline = buildActivity(rows, {}, todayYmdEastern());
+  assert.deepEqual(
+    timeline.flatMap((e) => e.events.map((x) => x.id)).filter((id) => fresh.includes(id)),
+    [],
+    "as an unassigned Canceled job's reopen and Undo show nothing",
+  );
+  // Reopened, then Done, it closes unassigned: Done isn't the way back to Canceled.
+  assert.equal((await status(reopenCanceledDone.id, "OPEN", "CANCELED")).task.assigneeContactId, null);
+  assert.equal((await status(reopenCanceledDone.id, "DONE", "OPEN")).task.assigneeContactId, null);
+  assert.equal(await givenBackLines(reopenCanceledDone.id), 0);
+  assert.equal(await access(reopenCanceledDone.id), 0);
 
   // Approve's Undo puts the job back in Review without him; Approve again gives it back, minutes later too.
   for (const t of [approveLate, approveCancel]) assert.equal((await undo(t.id, approvals.get(t.id)!)).task.assigneeContactId, null);

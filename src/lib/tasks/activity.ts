@@ -25,7 +25,8 @@ import { describeRepeat, parseRepeatRule } from "./repeat";
  *    Start, creation, the next repeat, access changes and sync conflicts;
  *  - a change the same person reversed within 2 minutes doesn't show, when
  *    both were Internal (a reversed Shared change may already have been
- *    emailed or seen, so it stays);
+ *    emailed or seen, so it stays), and neither do an archived contractor's
+ *    drop and give-back written with a reversed reopen (heldPairs);
  *  - a status change and the note written with it (`data.statusEventId`) are
  *    one decision; files posted within 2 minutes of each other by one person
  *    are one batch line; a soft-deleted comment leaves a staff-only line,
@@ -475,12 +476,13 @@ function moveOf(e: ActivityEvent): { key: string; from: string; to: string } | n
 /**
  * The events to leave out because the same person undid them inside two
  * minutes (due date there and back, a tick and an untick, an Approve taken
- * back). Only when both were Internal: a Shared change may already be in an
- * email or on the contractor's screen, so a reversal of it stays. A Done
- * whose next repeat was created is kept too, since that line still stands.
+ * back), each by the id of the other in its pair. Only when both were
+ * Internal: a Shared change may already be in an email or on the
+ * contractor's screen, so a reversal of it stays. A Done whose next repeat
+ * was created is kept too, since that line still stands.
  */
-function reversedPairs(events: readonly ActivityEvent[]): Set<string> {
-  const hidden = new Set<string>();
+function reversedPairs(events: readonly ActivityEvent[]): Map<string, string> {
+  const hidden = new Map<string, string>();
   const repeatMade = events.filter((e) => e.kind === "REPEAT_CREATED").map((e) => e.createdAt.getTime());
   const last = new Map<string, { e: ActivityEvent; move: { from: string; to: string } }>();
   for (const e of events) {
@@ -497,14 +499,37 @@ function reversedPairs(events: readonly ActivityEvent[]): Set<string> {
       e.visibility === "INTERNAL" &&
       !(statusOf(prev.e) === "DONE" && repeatMade.some((t) => t >= prev.e.createdAt.getTime() && t <= prev.e.createdAt.getTime() + 60_000));
     if (undoes) {
-      hidden.add(prev.e.id);
-      hidden.add(e.id);
+      hidden.set(prev.e.id, e.id).set(e.id, prev.e.id);
       last.delete(key);
     } else {
       last.set(key, { e, move });
     }
   }
   return hidden;
+}
+
+/**
+ * An archived contractor's drop (core.ts archivedAssigneeLine) and the `givenBack` line that gave the same contractor
+ * the job back, left out when the status lines written with them (setStatus writes each right after its drop or
+ * give-back, as the same person) were left out as one reversed pair (reversedPairs). That's a Canceled job's reopen
+ * and its Undo: a Canceled line is Internal even with a contractor, so the four read as an unassigned Canceled job's
+ * reopen and Undo do, as nothing. A Done job's Undo is Shared with him, so that pair stays, and the two lines ride
+ * with it (givenBackRiders).
+ */
+function heldPairs(events: readonly ActivityEvent[], pairs: ReadonlyMap<string, string>): Set<string> {
+  const held = new Set<string>();
+  const contactOf = (v: unknown) => (v && typeof v === "object" ? s((v as Data).contactId) : null);
+  // Each drop, by the paired status line written with it.
+  const drops = new Map<string, { id: string; contactId: string | null }>();
+  events.forEach((e, i) => {
+    const written = events[i + 1];
+    if (e.kind !== "ASSIGNED" || written?.kind !== "STATUS" || actorKey(written) !== actorKey(e) || !pairs.has(written.id)) return;
+    const d = dataOf(e);
+    if (d.archived === true) drops.set(written.id, { id: e.id, contactId: contactOf(d.from) });
+    const drop = d.givenBack === true ? drops.get(pairs.get(written.id) ?? "") : undefined;
+    if (drop && drop.contactId === contactOf(d.to)) held.add(drop.id).add(e.id);
+  });
+  return held;
 }
 
 /* ---------------- Bursts ---------------- */
@@ -600,7 +625,9 @@ export function buildActivity<E extends ActivityEvent>(events: readonly E[], nam
   // A deleted comment leaves a line; anything else deleted (an undone approval) is gone from the timeline, and so is a
   // post a contractor took back.
   const live = sorted.filter((e) => !e.deletedAt || (e.kind === "COMMENT" && !takenBack(e)));
-  const hidden = reversedPairs(live.filter((e) => !e.deletedAt));
+  const standing = live.filter((e) => !e.deletedAt);
+  const pairs = reversedPairs(standing);
+  const hidden = new Set([...pairs.keys(), ...heldPairs(standing, pairs)]);
 
   // A note is paired with the status change it was written with, by id, never by adjacency.
   const statusIds = new Set(live.filter((e) => e.kind === "STATUS" && !hidden.has(e.id)).map((e) => e.id));
@@ -751,8 +778,11 @@ function burstEntries<E extends ActivityEvent>(burst: E[], names: ActivityNames,
 
   const list = [...groups.entries()];
   if (list.length >= 3) {
-    // Three sentences or more: the first, and how many changes sit behind it.
-    const [key, first] = list[0];
+    // Three sentences or more: the first, and how many changes sit behind it. A drop or give-back line names no one who
+    // acted ("Assigned back to Zack Outlaw and made 3 more changes" reads as Zack's), so the first other sentence
+    // leads, when there is one.
+    const held = (e: E) => e.kind === "ASSIGNED" && (dataOf(e).archived === true || dataOf(e).givenBack === true);
+    const [key, first] = list.find(([, evs]) => !evs.every(held)) ?? list[0];
     const more = burst.length - first.length;
     const lead = sentence(key, first);
     return [run(burst, { text: `${lead.text} and made ${more} more ${more === 1 ? "change" : "changes"}` })];

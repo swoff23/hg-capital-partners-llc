@@ -215,9 +215,9 @@ export { syncAssigneeAccess as grantAssigneeAccess };
  * open work, and a reopen starts it unassigned again (setStatus). The task
  * page's picker doesn't offer them, so here that is the Undo of a
  * reassignment on a closed job they still held, or a picker loaded before
- * they were archived. The Undo of a Done job's reopen that took it off them,
- * or Approve again after Approve's Undo did, gives it back without a pick
- * (setStatus, archivedAssigneeToGiveBack).
+ * they were archived. The Undo of a reopen that took it off them (back to
+ * Done, or back to Canceled), or Approve again after Approve's Undo did,
+ * gives it back without a pick (setStatus, archivedAssigneeToGiveBack).
  */
 export const ARCHIVED_ASSIGNEE_LINE = "Archived. Pick someone else.";
 
@@ -255,9 +255,10 @@ function archivedAssigneeLine(contactId: string): EventInput {
  *    (Review to Done) gives it back, however much later: Review is still his Mark done. A Cancel doesn't.
  *  - A reopen writes its status line right after the drop. Only its Undo gives it back: back to the status it left
  *    (`to` is the reopen's `from`), while the reopen line is at most APPROVAL_UNDO_MS old, the toast's Undo, timed as
- *    undoApproval times its own (the caller's `now` against the line's createdAt). Later, to another close, or to
- *    Canceled (a reopen followed by a Cancel never gives it back, the same as after Approve's Undo), it's new work on
- *    a job the reopen left unassigned.
+ *    undoApproval times its own (the caller's `now` against the line's createdAt). That holds for a Canceled job too,
+ *    whose way back is Cancel: its reopen's Undo inside the window gives it back. Later, or to the other close (a Done
+ *    job reopened, then Canceled; a Canceled job reopened, then Done), it's new work on a job the reopen left
+ *    unassigned.
  * Null when anything moved the job or assigned it since.
  */
 function droppedArchivedAssignee(
@@ -276,7 +277,7 @@ function droppedArchivedAssignee(
   const drop = reopen ? prior : latest;
   if (drop?.kind !== "ASSIGNED" || dataOf(drop).archived !== true) return null;
   const late = reopen && now.getTime() - latest.createdAt.getTime() > APPROVAL_UNDO_MS;
-  const wayBack = reopen ? to === left && to !== "CANCELED" && !late : from === "REVIEW" && to === "DONE";
+  const wayBack = reopen ? to === left && !late : from === "REVIEW" && to === "DONE";
   if (!wayBack) return null;
   const was = dataOf(drop).from;
   const contactId = was && typeof was === "object" ? (was as { contactId?: unknown }).contactId : null;
@@ -285,10 +286,10 @@ function droppedArchivedAssignee(
 
 /**
  * Who gets an unassigned job back as it closes (setStatus): the archived contractor a reopen or Approve's Undo just
- * took it from, when this close is the way back (droppedArchivedAssignee: the Undo of a Done job's reopen, or Approve
- * again after Approve's Undo), so the job is theirs as it was. Only while they're still archived: one restored since
- * is in the picker again. Their contact is locked FOR SHARE (contactArchivedLocked), after the task and before any
- * write, as every assigning path does.
+ * took it from, when this close is the way back (droppedArchivedAssignee: a reopen's Undo, back to Done or back to
+ * Canceled, or Approve again after Approve's Undo), so the job is theirs as it was. Only while they're still archived:
+ * one restored since is in the picker again. Their contact is locked FOR SHARE (contactArchivedLocked), after the task
+ * and before any write, as every assigning path does.
  */
 async function archivedAssigneeToGiveBack(tx: Tx, taskId: string, from: TaskStatus, to: TaskStatus, now: Date): Promise<string | null> {
   const lines = await tx.taskEvent.findMany({
@@ -623,8 +624,9 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const finishing = to === "DONE" && before.status !== "DONE";
   const archivedNow = before.assigneeContactId && (reopening || finishing) ? await contactArchivedLocked(tx, before.assigneeContactId) : false;
   const dropArchived = reopening && archivedNow;
-  // And the way back: the Undo of a Done job's reopen, or Approve again after Approve's Undo, gives it back to the
-  // archived contractor, whose closed job it was (archivedAssigneeToGiveBack). Any other close leaves it unassigned.
+  // And the way back: a reopen's Undo (back to Done, or back to Canceled), or Approve again after Approve's Undo, gives
+  // it back to the archived contractor, whose closed job it was (archivedAssigneeToGiveBack). Any other close leaves it
+  // unassigned.
   const giveBack = closing && !before.assigneeContactId && !before.assigneeUserId ? await archivedAssigneeToGiveBack(tx, taskId, before.status, to, now) : null;
   const task = await tx.task.update({
     where: { id: taskId },
