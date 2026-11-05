@@ -1066,6 +1066,25 @@ test("G1: the give-back's own author picking someone between it and the drop kee
       "Unassigned because Zack Outlaw is archived",
     ],
   );
+  // His own earlier reopen and its Undo (a held drop of his) don't keep the hold either: the first flow behind them reads the same.
+  assert.deepEqual(
+    shown([
+      ...CANCELED_HISTORY,
+      ...wrote("p1", "2026-10-23T14:59:00.000Z", {}, "CANCELED", "OPEN", "drop"),
+      ...wrote("p2", "2026-10-23T14:59:05.000Z", {}, "OPEN", "CANCELED", "give"),
+      ...flow.slice(CANCELED_HISTORY.length),
+    ]),
+    [
+      "Pieter assigned Zack Outlaw",
+      "Pieter set status to Canceled",
+      "Unassigned because Zack Outlaw is archived",
+      "Connor set status to To do",
+      "Assigned back to Zack Outlaw",
+      "Pieter assigned Zack Outlaw",
+      "comment",
+      "Unassigned because Zack Outlaw is archived",
+    ],
+  );
 });
 
 test("G2: a pick and its reversal don't pair across a drop and a give-back between them; the job ends canceled and nobody's", () => {
