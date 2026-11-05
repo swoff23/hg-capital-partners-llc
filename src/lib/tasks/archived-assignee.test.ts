@@ -584,7 +584,7 @@ test("the give-back line names who has the job again, and never pairs or merges 
 
 /* ---------------- A Canceled job's reopen and its Undo, and what leads a fold (the task session's second ruling) ---------------- */
 
-const NAMES = { contacts: { "c-zack": "Zack Outlaw", "c-jose": "Jose Alvarez" } };
+const NAMES = { contacts: { "c-zack": "Zack Outlaw", "c-jose": "Jose Alvarez", "c-mike": "Mike Mason" } };
 const CONNOR = { actorLabel: "Connor Swofford", actorUserId: "u-connor" };
 const shown = (es: ActivityEvent[]) => buildActivity(es, NAMES, "2026-10-23").map((e) => ("text" in e ? e.text : e.type));
 
@@ -1014,6 +1014,57 @@ test("G1: a pick of someone between a give-back and the drop that follows it kee
       ...wrote("s5", step(4), {}, "CANCELED", "OPEN", "drop"),
     ]),
     ["Pieter assigned Zack Outlaw", "Pieter set status to Canceled", "Unassigned because Zack Outlaw is archived", "Connor set status to To do"],
+  );
+});
+
+// A pick by the person who wrote the waiting give-back stands too: the pick's own author doesn't keep the hold.
+test("G1: the give-back's own author picking someone between it and the drop keeps both; the job ends open and nobody's", () => {
+  // Zack's Canceled job, Zack archived. Connor reopens it (a drop), Pieter cancels inside 2 minutes (the give-back),
+  // gives it to Jose, then Mike, then Zack again from a tab loaded before Zack was archived, adds an Internal comment,
+  // and reopens inside 2 minutes of his Cancel (a drop). None of his picks pair, so the job moved between the two.
+  const flow = [
+    ...CANCELED_HISTORY,
+    ...wrote("s1", step(0), CONNOR, "CANCELED", "OPEN", "drop"),
+    ...wrote("s2", step(1), {}, "OPEN", "CANCELED", "give"),
+    picked("s3", step(2), {}, "c-zack", "c-jose"),
+    picked("s4", step(3), {}, "c-jose", "c-mike"),
+    picked("s5", step(4), {}, "c-mike", "c-zack"),
+    ev("COMMENT", {}, step(5), { id: "s6", body: "Back on his record" }),
+    ...wrote("s7", step(6), {}, "CANCELED", "OPEN", "drop"),
+  ];
+  assert.deepEqual(shown(flow), [
+    "Pieter assigned Zack Outlaw",
+    "Pieter set status to Canceled",
+    "Unassigned because Zack Outlaw is archived",
+    "Connor set status to To do",
+    "Assigned back to Zack Outlaw",
+    "Pieter assigned Zack Outlaw",
+    "comment",
+    "Unassigned because Zack Outlaw is archived",
+  ]);
+  // No stale tab: his pick of Jose, a pick of Mike and back to Jose (a pair), then the first pick's toast Undo to Zack.
+  assert.deepEqual(
+    shown([
+      ...CANCELED_HISTORY,
+      ...wrote("s1", step(0), CONNOR, "CANCELED", "OPEN", "drop"),
+      ...wrote("s2", step(1), {}, "OPEN", "CANCELED", "give"),
+      picked("s3", step(2), {}, "c-zack", "c-jose"),
+      picked("s4", step(3), {}, "c-jose", "c-mike"),
+      picked("s5", step(4), {}, "c-mike", "c-jose"),
+      picked("s6", step(5), {}, "c-jose", "c-zack"),
+      ev("COMMENT", {}, step(6), { id: "s7", body: "Back on his record" }),
+      ...wrote("s8", step(7), {}, "CANCELED", "OPEN", "drop"),
+    ]),
+    [
+      "Pieter assigned Zack Outlaw",
+      "Pieter set status to Canceled",
+      "Unassigned because Zack Outlaw is archived",
+      "Connor set status to To do",
+      "Assigned back to Zack Outlaw",
+      "Pieter assigned Zack Outlaw",
+      "comment",
+      "Unassigned because Zack Outlaw is archived",
+    ],
   );
 });
 

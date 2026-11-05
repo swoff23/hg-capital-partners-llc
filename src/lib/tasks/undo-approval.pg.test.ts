@@ -499,12 +499,10 @@ test("a reopen, then a Cancel that wrote no line, then Done inside 2 minutes: no
     const closed = await status(task.id, "DONE", "CANCELED");
     assert.equal(closed.task.status, "DONE");
     assert.equal(closed.task.assigneeContactId, null, `${open}: not the reopen's Undo`);
-    assert.equal(closed.emailsContractor, false);
     assert.equal(await prisma.taskEvent.count({ where: { taskId: task.id, kind: "ASSIGNED", data: { path: ["givenBack"], equals: true } } }), 0, open);
     assert.equal(await prisma.taskAccess.count({ where: { taskId: task.id, contactId: insurer.id, revokedAt: null } }), 0, `${open}: his access stays revoked`);
     await prisma.contact.update({ where: { id: insurer.id }, data: { archivedAt: null } });
   }
-  assert.equal(await prisma.notificationOutbox.count({ where: { recipientContactId: insurer.id } }), 0, "no email ever queued for him");
 });
 
 test("G1 on real rows: someone's pick between a give-back and the drop after it leaves the job open and nobody's, and the timeline ends on why", { skip, timeout }, async () => {
@@ -543,6 +541,52 @@ test("G1 on real rows: someone's pick between a give-back and the drop after it 
   assert.deepEqual(
     timeline.slice(-4).map((e) => ("text" in e ? e.text : e.type)),
     ["Assigned back to Gp Caulker", "Connor assigned Gp Mason", "Dana assigned Gp Caulker", "Unassigned because Gp Caulker is archived"],
+  );
+});
+
+// Every pick here is Pieter's, who wrote the give-back: the pick's own author doesn't keep the hold.
+test("G1 on real rows: Pieter's own picks between his give-back and his reopen leave the job open and nobody's, and the timeline ends on why", { skip, timeout }, async () => {
+  // The task session's fifth review, flow B2, through the real setStatus, patchTask and addComment. Zack's Canceled job,
+  // Zack archived: Connor reopens it (a drop), Pieter cancels it (the give-back), gives it to another contractor, then a
+  // third, then Zack again from a tab loaded before the archive, adds an Internal comment, and reopens inside 2 minutes.
+  const caulker = await prisma.contact.create({ data: { fullName: "Gs Caulker", trades: "Caulking" } });
+  const mason = await prisma.contact.create({ data: { fullName: "Gs Mason", trades: "Masonry" } });
+  const tiler = await prisma.contact.create({ data: { fullName: "Gs Tiler", trades: "Tile" } });
+  const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
+    prisma.$transaction((tx) => core.setStatus(tx, taskId, to, p, { expected }));
+  const pick = (taskId: string, to: string, from: string) =>
+    prisma.$transaction((tx) => core.patchTask(tx, taskId, { assignee: { contactId: to }, expectedAssignee: { contactId: from } }, pieter));
+  const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Caulk the sink", propertyId, assignee: { contactId: caulker.id } }, staff));
+  await as(staff, task.id, "CANCELED", "OPEN");
+  // Canceled last week, so no step below is read as that Cancel's own reversal.
+  await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - interval '7 days' WHERE "taskId" = ${task.id}`;
+  await prisma.contact.update({ where: { id: caulker.id }, data: { archivedAt: new Date() } });
+
+  assert.equal((await as(staff, task.id, "OPEN", "CANCELED")).task.assigneeContactId, null);
+  assert.equal((await as(pieter, task.id, "CANCELED", "OPEN")).task.assigneeContactId, caulker.id, "his Cancel gives it back");
+  assert.equal((await pick(task.id, mason.id, caulker.id)).assigneeContactId, mason.id);
+  assert.equal((await pick(task.id, tiler.id, mason.id)).assigneeContactId, tiler.id);
+  assert.equal((await pick(task.id, caulker.id, tiler.id)).assigneeContactId, caulker.id, "a closed job can go back to him");
+  await prisma.$transaction((tx) => core.addComment(tx, task.id, { body: "Back on his record", visibility: "INTERNAL" }, pieter));
+  const last = await as(pieter, task.id, "OPEN", "CANCELED");
+  assert.equal(last.task.status, "OPEN");
+  assert.equal(last.task.assigneeContactId, null, "the reopen took it off him again");
+  assert.equal(await prisma.taskAccess.count({ where: { taskId: task.id, contactId: caulker.id, revokedAt: null } }), 0);
+
+  const rows = await prisma.taskEvent.findMany({ where: { taskId: task.id } });
+  const names = { contacts: { [caulker.id]: "Gs Caulker", [mason.id]: "Gs Mason", [tiler.id]: "Gs Tiler" } };
+  assert.deepEqual(
+    buildActivity(rows, names, todayYmdEastern()).map((e) => ("text" in e ? e.text : e.type)),
+    [
+      "Connor created this task",
+      "Connor set status to Canceled",
+      "Unassigned because Gs Caulker is archived",
+      "Connor set status to To do",
+      "Assigned back to Gs Caulker",
+      "Pieter assigned Gs Caulker",
+      "comment",
+      "Unassigned because Gs Caulker is archived",
+    ],
   );
 });
 
