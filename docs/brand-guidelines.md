@@ -311,7 +311,7 @@ Plain, specific and warm, like a well-run property office that keeps good books.
 | "No QuickBooks lines for Sep yet. Last sync 6h ago." | "$0.00", or "Oops, something went wrong." |
 | "Delete Unit 3 at 767 Prospect Ave" | "Are you sure?" |
 
-The CLAUDE.md copy rules still apply: no em dashes, no filler, one-line helper text, no emoji, exclamation points only on a sent screen's thank-you heading, internal caveats in code comments.
+The rules in [copy-rules.md](copy-rules.md) still apply: no em dashes, no filler, one-line helper text, no emoji, exclamation points only on a sent screen's thank-you heading, errors that say what to do next, internal caveats in code comments.
 
 ## 9. Components
 

@@ -64,7 +64,7 @@ export async function submitMoveInInspection(input: unknown): Promise<ActionResu
   // Expected failures are returned by the body; anything thrown (DB down) is
   // logged and turned into the generic line rather than crashing the form.
   const r = await withResult("submitMoveInInspection", () => submitMoveInInspectionBody(input));
-  return r.ok ? r.data : { ok: false, error: "Something went wrong. Please try again in a moment." };
+  return r.ok ? r.data : { ok: false, error: "We couldn't send your report. Try again in a moment." };
 }
 
 async function submitMoveInInspectionBody(input: unknown): Promise<ActionResult<{ copied: boolean }>> {
