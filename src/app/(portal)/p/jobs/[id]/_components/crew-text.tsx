@@ -54,7 +54,7 @@ export function CrewText({ taskId, openOnLoad = false }: { taskId: string; openO
     askedOnLoad.current = true;
     const url = new URL(window.location.href);
     url.searchParams.delete("do");
-    window.history.replaceState(window.history.state, "", url);
+    window.history.replaceState(null, "", url);
     show();
     // Once per page load; show reads the latest state when it runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps

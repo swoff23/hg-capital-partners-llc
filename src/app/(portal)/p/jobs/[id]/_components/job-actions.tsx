@@ -512,7 +512,7 @@ export function JobActions({
     if (!openMarkDoneOnLoad) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("do");
-    window.history.replaceState(window.history.state, "", url);
+    window.history.replaceState(null, "", url);
   }, [openMarkDoneOnLoad]);
 
   // What the Mark done sheet shows, counts and sends: the tray, less the photos a written update may have posted

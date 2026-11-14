@@ -99,7 +99,7 @@ Lines follow `itemText` today where they exist. The headline is the bundle's mos
 | Approved | Connor approved it. Thanks, Zack. | See job |
 | Taken off, or canceled | You're off this job. No need to go. | none |
 | 8 am on the date | Due today. | next step |
-| 8 am the morning after | Due yesterday. Mark done or change the date. | Mark done, with Change date beside it |
+| 8 am the morning after | Due yesterday. | The next step (Start job or Mark done), with Change date beside it |
 
 The taken-off email carries only the job's title and address: no access, notes, photos or buttons, since the contractor no longer has the job.
 
@@ -179,7 +179,8 @@ The 8 am emails run from a cron. Vercel's schedules are UTC, so it runs at 12:00
 
 ## 7. The contractor sets the date (Q10)
 
-- **Where:** "Change date" in the email's Due row, and on the job page's date. Both open the job page's date sheet (`src/components/date-panel.tsx` `DatePanel`, as the status control's), titled "Due date".
+- **Where:** "Change date" in the email's Due row (`?do=date`), and the date in the job page's header, which is tap-to-edit (dotted underline; "Set a date" when there's none). Both open the date panel the task page's chips use (`DatePanel` in a `PickerLayer`: a popover with a mouse, a sheet on a phone), titled "Due date", with no "No date" (`_components/job-date.tsx`).
+- **The notice:** the job page's "what changed since you last looked" notice leaves out the contractor's own changes, so their new date isn't news to them.
 - **What it writes:** the job's due date. On a job that is Scheduled, the scheduled day too, so the two can't disagree. Earlier or later than before, no approval.
 - **Staff email:** "Zack moved the due date to Mon, Nov 23 (was Thu, Nov 19)."
 - **Effect:** the contractor's next subject, 8 am email and nudge follow the new date.
