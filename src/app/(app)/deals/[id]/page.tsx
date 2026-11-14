@@ -10,6 +10,7 @@ import { RailList } from "@/components/rail";
 import { BackLink } from "@/components/back-link";
 import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
 import { archivedLine } from "@/lib/archive";
+import { shortAddress } from "@/lib/normalize";
 import { setDealArchived } from "../actions";
 import { DealActivity, dealNotes } from "./deal-activity";
 import { DealAddress, DealFact, DealListingLink, DealPassReason, DealPrice, DealStageRow, DealUnits } from "./deal-detail";
@@ -56,7 +57,7 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
         {deal.convertedProperty && (
           <p className="mt-1 text-meta text-fg-3">
             Converted to{" "}
-            <TextLink href={`/properties/${deal.convertedProperty.id}`}>{deal.convertedProperty.address}</TextLink>
+            <TextLink href={`/properties/${deal.convertedProperty.id}`}>{shortAddress(deal.convertedProperty.address) || deal.convertedProperty.address}</TextLink>
           </p>
         )}
         {deal.archivedAt && (

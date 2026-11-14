@@ -9,7 +9,9 @@ import { amountToDecimal } from "@/lib/money";
 import { containsText } from "@/lib/search";
 import type { DealStatus } from "@/lib/config";
 import { setDealArchived } from "@/lib/archive";
+import { logError } from "@/lib/log";
 import { recordDealChanges, recordDealCreated } from "./log";
+import { CLOSED_STAGE, linkClosedDeal } from "./property-link";
 import { dealConflict, dealPatchData, guardedDealFields, refreshOnConflict, staleDealFields, type DealPatch } from "./edits";
 
 export type { DealPatch } from "./edits";
@@ -29,6 +31,8 @@ export type { DealPatch } from "./edits";
  *     (edits.ts, forms 2.12)
  *   - archive and restore (lib/archive.ts) record who did it and add a line
  *     to the deal's log; an archived deal leaves every list, count and search
+ *   - a deal that moves to Closed links to its property when exactly one
+ *     matches (property-link.ts), with a line in its log
  */
 
 export interface Actor {
@@ -141,7 +145,24 @@ async function writeDealPatch(id: string, patch: DealPatch, actor: Actor, expect
     await prisma.deal.update({ where: { id }, data: { ...data, ...stamp(actor) } });
   }
   await recordDealChanges(id, actor, before, data);
+  if (data.status === CLOSED_STAGE && before.status !== CLOSED_STAGE) await linkToProperty(id, actor);
   revalidateDeal(id);
+}
+
+/**
+ * Links a deal that just moved to Closed to its property, when exactly one
+ * matches (property-link.ts), and writes "Linked to 118 Congress St." in its
+ * log. The stage is saved by now, so a failure here is logged and never
+ * fails that save; the deal stays unlinked, as before this existed.
+ */
+async function linkToProperty(id: string, actor: Actor): Promise<void> {
+  try {
+    const linked = await prisma.$transaction((tx) => linkClosedDeal(tx, id, actor));
+    // The property's page gains its "From deal" line.
+    if (linked) revalidatePath(`/properties/${linked.propertyId}`);
+  } catch (err) {
+    logError("deals:link-property", err, { dealId: id });
+  }
 }
 
 /**

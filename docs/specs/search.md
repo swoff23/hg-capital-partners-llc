@@ -232,7 +232,7 @@ type SearchRow = { id: string; href: string; title: string } & (
 **What comes back**
 - Tasks spread `excludeTemplateTasks` from `src/lib/task-scope.ts` (the plan calls it `taskScope`), with the test `docs/asana-migration-plan.md:241` asks for. Template rows never appear.
 - Contractors: all of them, inactive ones ranked last and marked with a Tag.
-- Deals: every stage. In All, a CLOSED! deal whose `convertedPropertyId` points at a property already in the Properties group folds into that property: the deal row drops there and stays in the Deals scope. Today `convertedPropertyId` is empty on all 11 closed deals, so a backfill list goes to Connor first (IA-I13).
+- Deals: every stage. In All, a CLOSED! deal whose `convertedPropertyId` points at a property already in the Properties group folds into that property: the deal row drops there and stays in the Deals scope. The app sets `convertedPropertyId` on its own when a deal moves to Closed or a property is added, only on an exact one-to-one match by the duplicate check's test (`lib/deals/property-link.ts`). The 11 deals closed before that are still unlinked, so a one-time list goes to Connor first (IA-I13).
 
 **Ranking** (**new** `rankRows` in `lib/search.ts`, tested)
 1. Live before finished. Active tasks, then Done, then Canceled (`STATUS_ORDER`). Active contractors before inactive. Deals in `ACTIVE_DEAL_STATUSES` before the rest.

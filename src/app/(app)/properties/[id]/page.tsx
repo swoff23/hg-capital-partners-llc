@@ -20,6 +20,7 @@ import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
 import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
 import { archivedLine } from "@/lib/archive";
+import { shortAddress } from "@/lib/normalize";
 import { setPropertyArchived } from "../actions";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
@@ -280,7 +281,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           <PropertyNotesSection id={property.id} notes={property.notes} />
           {sourceDeal && (
             <p className="text-meta text-fg-3">
-              From deal <TextLink href={`/deals/${sourceDeal.id}`}>{sourceDeal.address}</TextLink>
+              From deal <TextLink href={`/deals/${sourceDeal.id}`}>{shortAddress(sourceDeal.address) || sourceDeal.address}</TextLink>
             </p>
           )}
         </div>

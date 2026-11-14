@@ -24,6 +24,8 @@ import {
 } from "@/lib/property-types";
 import { rowConflict, isAtVersion, onConflict, staleFields } from "@/lib/properties/edits";
 import { setPropertyArchived } from "@/lib/archive";
+import { linkProperty } from "@/lib/deals/property-link";
+import { logError } from "@/lib/log";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
 /**
@@ -46,6 +48,8 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  *   - archive and restore (lib/archive.ts) record who did it; an archived
  *     property leaves Portfolio, its totals, Home, search, the pickers and
  *     the move-in form, and its tasks keep working
+ *   - a new property links to its Closed deal when exactly one matches
+ *     (lib/deals/property-link.ts), with a line in that deal's log
  */
 
 /**
@@ -135,8 +139,28 @@ export async function createProperty(
   const property = await prisma.property.create({
     data: { address: input.address.trim(), llcOwner: input.llcOwner || null, status: input.status || null, ...stamp(by) },
   });
+  await linkToDeal(property.id, by);
   revalidatePath("/properties");
   return { property };
+}
+
+/**
+ * Links a property just added to its Closed deal, when exactly one matches
+ * (lib/deals/property-link.ts), and writes "Linked to 118 Congress St." in
+ * that deal's log. The property is saved by now, so a failure here is logged
+ * and never fails that save; the two stay unlinked, as before this existed.
+ */
+async function linkToDeal(id: string, by: Editor): Promise<void> {
+  try {
+    const linked = await prisma.$transaction((tx) => linkProperty(tx, id, by));
+    // The deal's page gains its "Converted to" line and its log the new line.
+    if (linked) {
+      revalidatePath(`/deals/${linked.dealId}`);
+      revalidatePath("/deals");
+    }
+  } catch (err) {
+    logError("properties:link-deal", err, { propertyId: id });
+  }
 }
 
 /* ---------------- Scalar details ---------------- */
