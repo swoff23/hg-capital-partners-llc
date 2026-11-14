@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ListChecks } from "lucide-react";
-import { ActionBar, SubmitKeycap, actionBarButton } from "@/components/action-bar";
+import { ActionBar, actionBarButton } from "@/components/action-bar";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DateField } from "@/components/date-field";
@@ -354,7 +354,6 @@ export function ApplyFlow({
         primary={
           <Button type="button" className={actionBarButton} pending={pending} onClick={create} aria-keyshortcuts="Meta+Enter Control+Enter">
             {createTasksLabel(count)}
-            <SubmitKeycap />
           </Button>
         }
       />

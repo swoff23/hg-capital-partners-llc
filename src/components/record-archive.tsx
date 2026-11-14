@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { Archive, ArchiveRestore, Ellipsis, Link2 } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
@@ -42,7 +43,10 @@ function useArchive(kind: ArchiveKind, id: string, action: ArchiveAction) {
   return { change, pending, toast };
 }
 
-/** The record's ⋯ menu: Copy link, then Archive, or Restore while it's archived. */
+/** A record's own verb in its ⋯ menu, above Copy link: the property's "Add listing". */
+export type RecordMenuAction = { label: string; icon: ReactNode; onAction: () => void };
+
+/** The record's ⋯ menu: the record's own verbs (`actions`), Copy link, then Archive, or Restore while it's archived. */
 export function RecordMoreMenu({
   kind,
   id,
@@ -50,6 +54,7 @@ export function RecordMoreMenu({
   archived,
   refusal,
   action,
+  actions,
 }: {
   kind: ArchiveKind;
   id: string;
@@ -59,6 +64,8 @@ export function RecordMoreMenu({
   /** Why Archive won't go through yet, named under it ("Reassign their 3 jobs first."). */
   refusal?: string | null;
   action: ArchiveAction;
+  /** Verbs of this record that have no place on the page right now, listed first. */
+  actions?: RecordMenuAction[];
 }) {
   const { change, pending, toast } = useArchive(kind, id, action);
 
@@ -81,6 +88,11 @@ export function RecordMoreMenu({
         <Ellipsis className="size-4" aria-hidden="true" />
       </AriaButton>
       <Menu>
+        {actions?.map((a) => (
+          <MenuItem key={a.label} icon={a.icon} onAction={a.onAction}>
+            {a.label}
+          </MenuItem>
+        ))}
         <MenuItem icon={<Link2 />} onAction={copyLink}>
           Copy link
         </MenuItem>

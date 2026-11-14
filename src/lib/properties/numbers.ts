@@ -25,6 +25,9 @@ const MONTHS_LIMIT = 1_000_000;
 /** Square feet: an Int column, held well under its 2^31 to a sane 10 million. */
 export const SQFT_LIMIT = 10_000_000;
 
+/** Beds and baths, a building's rooms: under 10,000 (baths' Decimal(6,2) holds up to 9,999.99). */
+export const ROOMS_LIMIT = 10_000;
+
 /** Money and months: "550,000", "$550k". `limit` is the first amount the column can't hold. */
 export function readAmount(raw: string | null | undefined, limit: number = AMOUNT_LIMIT): NumberRead<string> {
   const s = raw?.trim();
@@ -36,9 +39,11 @@ export function readAmount(raw: string | null | undefined, limit: number = AMOUN
   return { ok: true, value: toDecimalString(n) };
 }
 
-/** The limit for a money field by name: rehab months has its own column. */
+/** The limit for a field read with `readAmount`, by name: rehab months and baths have their own columns. */
 export function amountLimit(field: string): number {
-  return field === "rehabMonths" ? MONTHS_LIMIT : AMOUNT_LIMIT;
+  if (field === "rehabMonths") return MONTHS_LIMIT;
+  if (field === "baths") return ROOMS_LIMIT;
+  return AMOUNT_LIMIT;
 }
 
 /**
@@ -69,6 +74,7 @@ export const RENT_MESSAGE = "Enter an amount, like 1,500.";
 export function tooLargeMessage(field: string): string {
   if (field === "sqft") return "Keep it under 10,000,000.";
   if (field === "rehabMonths") return "Keep it under 1,000,000.";
+  if (field === "beds" || field === "baths") return "Keep it under 10,000.";
   if (field === "rent") return "Keep it under $100 million.";
   return "Keep it under $10 billion.";
 }
@@ -79,13 +85,20 @@ export function tooLargeMessage(field: string): string {
  * already refuses text that isn't a number. Null when it can save.
  */
 export function amountProblem(field: string, raw: string): string | null {
-  const r = field === "sqft" ? readWholeNumber(raw) : MONEY_FIELD_NAMES.has(field) ? readAmount(raw, amountLimit(field)) : null;
+  const r =
+    field === "sqft"
+      ? readWholeNumber(raw)
+      : field === "beds"
+        ? readWholeNumber(raw, ROOMS_LIMIT)
+        : MONEY_FIELD_NAMES.has(field)
+          ? readAmount(raw, amountLimit(field))
+          : null;
   return r && !r.ok && r.tooLarge ? tooLargeMessage(field) : null;
 }
 
 /** The fields `patchProperty` reads with `readAmount`. */
 const MONEY_FIELD_NAMES = new Set([
-  "value", "replacementCost", "purchasePrice", "closingCosts", "rehabAmount", "rehabMonths",
+  "value", "replacementCost", "purchasePrice", "rehabMonths", "baths",
   "loanOriginalAmount", "currentLoan", "loanPaymentMonthly",
   "insuranceCoverage", "insuranceDeductible", "insurancePremium",
 ]);
@@ -94,8 +107,6 @@ const LABELS: Record<string, string> = {
   value: "Value",
   replacementCost: "Replacement cost",
   purchasePrice: "Purchase price",
-  closingCosts: "Closing costs",
-  rehabAmount: "Rehab amount",
   rehabMonths: "Rehab months",
   loanOriginalAmount: "Original amount",
   currentLoan: "Balance",
@@ -104,7 +115,9 @@ const LABELS: Record<string, string> = {
   insuranceCoverage: "Coverage",
   insuranceDeductible: "Deductible",
   insurancePremium: "Premium",
-  sqft: "Sq ft",
+  sqft: "Square feet",
+  beds: "Beds",
+  baths: "Baths",
 };
 
 /**
@@ -117,7 +130,8 @@ export function badNumbersMessage(fields: string[], tooLarge: readonly string[] 
     const [f] = fields;
     if (tooLarge.includes(f)) return tooLargeMessage(f);
     if (f === "loanRate") return "Rate needs a percentage, like 6.875.";
-    if (f === "sqft") return "Sq ft isn't a whole number.";
+    if (f === "sqft") return "Square feet isn't a whole number.";
+    if (f === "beds") return "Beds isn't a whole number.";
     return `${LABELS[f] ?? f} isn't a number.`;
   }
   const labels = fields.map((f) => LABELS[f] ?? f);

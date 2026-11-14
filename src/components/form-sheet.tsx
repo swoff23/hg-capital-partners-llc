@@ -4,8 +4,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useHoldLeave } from "@/components/leave-guard";
 import { Sheet } from "@/components/sheet";
 import { Switch } from "@/components/switch";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
-import { Button, Kbd, SaveError } from "@/components/ui";
+import { Button, SaveError } from "@/components/ui";
 import { stableJson } from "@/lib/drafts";
 import { returnFocusAfterSave } from "@/lib/focus";
 import { cn } from "@/lib/utils";
@@ -90,8 +89,8 @@ const firstEmptyField =
  * thing, such as New task, a unit, a login. `Sheet` (a bottom sheet on
  * phones, a centered dialog from md), a `noValidate` form, and the footer:
  *
- *  - From md: "Create more" at the left (create sheets), then Cancel with its
- *    Esc keycap and the primary with ⌘↵, at the bottom right.
+ *  - From md: "Create more" at the left (create sheets), then Cancel and the
+ *    primary at the bottom right.
  *  - Below md: one full-width primary above the safe area and the keyboard;
  *    the header's X is the way out, so Cancel and Create more drop.
  *  - A form-level refusal is one `--danger` line above the buttons.
@@ -141,7 +140,6 @@ export function FormSheet({
   children,
 }: FormSheetProps) {
   const formId = useId();
-  const mod = useModKey();
   const json = stableJson(values ?? null);
 
   // What the values were when the sheet opened, taken again each time it opens.
@@ -250,7 +248,6 @@ export function FormSheet({
                 aria-keyshortcuts="Escape"
               >
                 Cancel
-                <Kbd aria-hidden="true">Esc</Kbd>
               </Button>
               <Button
                 ref={primaryRef}
@@ -262,9 +259,6 @@ export function FormSheet({
                 aria-keyshortcuts="Meta+Enter Control+Enter"
               >
                 {primary}
-                <Kbd tone="act" aria-hidden="true">
-                  {shortcutLabel(mod, "↵")}
-                </Kbd>
               </Button>
             </div>
             {primaryDisabled && disabledReason && (

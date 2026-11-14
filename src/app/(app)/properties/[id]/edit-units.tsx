@@ -34,7 +34,7 @@ import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
 // The editor loads after the page has settled or at the first hover, focus or press, not with the page (lib/lazy-module.ts).
 const unitSheet = lazyModule(() => import("./unit-sheet"));
 
-/** The account-number fields, read as codes and masked to their last four. */
+/** The account-number fields, read as codes and shown in full. */
 export const isAccountField = (k: keyof UnitUtilities) => k.endsWith("Acct");
 
 /** What a unit goes by in a row or a dialog: its label, or its place in the list. */
@@ -66,6 +66,8 @@ function dueNote(type: string, installYear: string | null | undefined, rules: Ca
 type Sheet = { unitId: string | null; at: number | null; opened: PropertyUnit | null; version: string; id: number };
 /** The unit a Delete confirm is about, by id and place as the sheet finds its unit, so a refresh can't move it onto another. */
 type Removing = { unitId: string | null; at: number; label: string | null | undefined; name: string; title: string; body: string };
+/** The equipment sheet that is up: its unit (found by id, as the unit sheet's is), the item's place, the version it opened at, a fresh `id` per open. */
+type ItemSheet = { unitId: string | null; at: number; label: string | null | undefined; index: number; version: string; id: number };
 
 /**
  * The property's units, one row each (docs/brand-guidelines.md, section 9
@@ -73,7 +75,8 @@ type Removing = { unitId: string | null; at: number; label: string | null | unde
  * menu, so the count shown on the record is always the rows here. A unit's
  * name, or "Edit unit" in its menu, opens it in a sheet (forms 4.2): its name
  * and lockbox, its utilities and its equipment, saved as that one unit at the
- * version the sheet opened at. Adding a unit opens an empty one.
+ * version the sheet opened at. Adding a unit opens an empty one. An equipment
+ * row opens that one item in a small sheet, as a building system's row does.
  */
 export function UnitsSection({
   propertyId,
@@ -97,12 +100,16 @@ export function UnitsSection({
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [removing, setRemoving] = useState<Removing | null>(null);
+  const [item, setItem] = useState<ItemSheet | null>(null);
+  const [itemOpen, setItemOpen] = useState(false);
   const run = useRun();
   // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast whose Reload
   // brings it back, whatever the cause (lib/lazy-module.ts).
-  const editor = useLazyModule(unitSheet, sheet !== null, () => {
+  const editor = useLazyModule(unitSheet, sheet !== null || item !== null, () => {
     setSheet(null);
     setIsOpen(false);
+    setItem(null);
+    setItemOpen(false);
     run.toast(openFailedToast());
   });
   useEffect(() => warmWhenIdle(unitSheet), []);
@@ -116,6 +123,12 @@ export function UnitsSection({
     const opened = index == null ? null : (initial[index] ?? null);
     setSheet({ unitId: opened?.id ?? null, at: opened ? index : null, opened, version, id: (sheet?.id ?? 0) + 1 });
     setIsOpen(true);
+  }
+
+  function openEquipment(i: number, index: number) {
+    const unit = initial[i];
+    setItem({ unitId: unit?.id ?? null, at: i, label: unit?.label, index, version, id: (item?.id ?? 0) + 1 });
+    setItemOpen(true);
   }
 
   /**
@@ -155,6 +168,8 @@ export function UnitsSection({
   // Found by id (unit-sheet.ts sheetUnitAt), so a unit added or deleted elsewhere never moves the sheet onto another one.
   const editingAt = sheet ? sheetUnitAt(initial, { unitId: sheet.unitId, at: sheet.at, label: sheet.opened?.label }) : -1;
   const editing = editingAt >= 0 ? initial[editingAt] : undefined;
+  const itemAt = item ? sheetUnitAt(initial, { unitId: item.unitId, at: item.at, label: item.label }) : -1;
+  const itemUnit = itemAt >= 0 ? initial[itemAt] : undefined;
 
   return (
     <Section title="Units & access">
@@ -169,6 +184,7 @@ export function UnitsSection({
               name={unitName(u, i)}
               rules={rules}
               onEdit={() => openUnit(i)}
+              onEditEquipment={(j) => openEquipment(i, j)}
               onDelete={() => askDelete(i)}
             />
           ))}
@@ -189,6 +205,7 @@ export function UnitsSection({
                 name={unitName(u, i)}
                 rules={rules}
                 onEdit={() => openUnit(i)}
+                onEditEquipment={(j) => openEquipment(i, j)}
                 onDelete={() => askDelete(i)}
               />
             ))}
@@ -209,6 +226,22 @@ export function UnitsSection({
           rules={rules}
           isOpen={isOpen}
           onOpenChange={setIsOpen}
+        />
+      )}
+
+      {item && editor && (
+        <editor.EquipmentSheet
+          key={item.id}
+          propertyId={propertyId}
+          version={item.version}
+          latest={version}
+          unit={itemUnit ?? blankUnit()}
+          unitName={itemUnit ? unitName(itemUnit, itemAt) : item.label?.trim() || "Unit"}
+          index={item.index}
+          gone={!itemUnit?.equipment?.[item.index]}
+          rules={rules}
+          isOpen={itemOpen}
+          onOpenChange={setItemOpen}
         />
       )}
 
@@ -278,12 +311,15 @@ function ReadUnit({
   name,
   rules,
   onEdit,
+  onEditEquipment,
   onDelete,
 }: {
   unit: PropertyUnit;
   name: string;
   rules: CapexRules;
   onEdit: () => void;
+  /** Opens one equipment item, by its place in the unit's list. */
+  onEditEquipment: (index: number) => void;
   onDelete: () => void;
 }) {
   const hasUtilities = UTILITY_GROUPS.some((g) => g.fields.some(([k]) => u.utilities?.[k]));
@@ -325,16 +361,18 @@ function ReadUnit({
                 const rows = g.fields.filter(([k]) => u.utilities?.[k]);
                 if (rows.length === 0) return null;
                 return (
-                  <div key={g.name}>
+                  <div key={g.name} className="min-w-0">
                     <p className="mb-1 text-meta font-medium text-fg-1">{g.name}</p>
                     <dl className="space-y-1">
                       {rows.map(([k, label]) => {
                         const v = u.utilities![k]!;
                         return (
-                          <div key={k} className="flex min-h-6 items-center justify-between gap-2 text-meta">
-                            <dt className="text-fg-3">{label}</dt>
+                          // Baseline, so a long account number that wraps keeps its label on its first line.
+                          <div key={k} className="flex min-h-6 items-baseline justify-between gap-2 text-meta">
+                            <dt className="shrink-0 text-fg-3">{label}</dt>
                             <dd className={cn("min-w-0", UTILITY_STATUS_FIELDS.has(k) ? utilityToneClass(utilityStatusTone(v)) : "text-fg-1")}>
-                              {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} mask /> : v}
+                              {/* Shown in full and wrapped in its column: imported ones hold several numbers and notes. */}
+                              {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} wrap className="min-w-0" /> : v}
                             </dd>
                           </div>
                         );
@@ -375,8 +413,18 @@ function ReadUnit({
                 const cost = equipmentReplacementCost(e.type, rules);
                 const due = status === "Monitor" || status === "Replace" ? dueNote(e.type, e.installYear, rules) : null;
                 return (
-                  <tr key={j}>
-                    <Td className="pl-0 text-fg-2">{e.type}</Td>
+                  // The row opens the item with a click, as a building system's does; the button is the keyboard's way in.
+                  <tr
+                    key={j}
+                    onClick={() => onEditEquipment(j)}
+                    onPointerEnter={unitSheet.warm}
+                    className="transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-fill-1"
+                  >
+                    <Td className="pl-0 text-fg-2">
+                      <button type="button" aria-label={`Edit ${e.type || `equipment ${j + 1}`}`} onFocus={unitSheet.warm} className="text-left">
+                        {e.type || <span className="text-fg-3">—</span>}
+                      </button>
+                    </Td>
                     <Td className="text-fg-1">{e.model || <span className="text-fg-3">—</span>}</Td>
                     <Td className="min-w-40 text-fg-2">{e.comment || <span className="text-fg-3">—</span>}</Td>
                     <Td className="num">{e.installYear || <span className="text-fg-3">—</span>}</Td>

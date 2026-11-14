@@ -1,104 +1,130 @@
-# Design foundation: shadcn/ui on React Aria
+# Design foundation: stock shadcn/ui on React Aria
 
-Draft for Connor: nothing is built, and building waits for an explicit "build it". Planned with Connor on Nov 14, 2026. Later that day Connor widened the goal: take every recommendation that standardizes the app, and remove as much custom design as possible. This draft still describes the zero-pixel plan; a revision for the wider goal comes next, and decisions 1 and 3 are reopened by it. Code counts and line numbers were checked at `e233e43` ("Job emails, step 4: reply by email"), main's head at 11:44 that day, after the trades and job-emails landings, and re-checked at `200093a`, which changed only docs. Doc counts are from `200093a`. A count from any other commit names it. Main is moving fast, so each landing rechecks the counts and section 7.5 first. Landings 1 and 2, and the first part of landing 3, change names only and no pixel: light, dark, print, the public site and email look the same. The second part of landing 3 moves 37 hand-built buttons and links and 2 hand-built fields onto the primitives and changes how they look, and each one is shown to Connor before it ships (decision 7).
+Draft for Connor: nothing is built, and building waits for an explicit "build it". Planned with Connor on Nov 14, 2026. The first draft, committed at `ff7d92b`, renamed HG's tokens and components to shadcn's names and kept HG's component code, with no pixel change. Later that day Connor picked stock components with HG's colors as the theme (decisions 10 and 11). He then asked for every recommendation that standardizes the app and removes custom design, without deciding each one. Decision 12 records those calls, and this revision rewrites the plan around them: landing 1, the zero-pixel color rename, stays first, and landings A to M replace the old landings 2 and 3, each reviewed by Connor before it ships.
+
+Landing 1's counts were checked at `e233e43` and `200093a`, and section 7.5 rechecks them at `3087530`. The stock map's counts are at `ff7d92b`, from a research pass that afternoon; main reached `0804aad` during it and `7e39219` by 15:00. A count from any other commit names it. Since `ff7d92b`, main has grown the fields family by about a third (`<FormField` went from 60 to 78 sites by a plain regex), so E's recount will be higher. Main takes about 50 commits every six hours, so each landing rechecks its counts on a fresh `origin/main`, and each call-site change ships as a codemod that can be re-run.
 
 ## 1. Summary
 
-**What HG has today.** HG already builds the way shadcn/ui does, on the stack shadcn's React Aria base uses: react-aria-components 1.21.1, Tailwind v4, `cn` (clsx plus a tailwind-merge config that knows HG's type scale, shadows and motion), class-variance-authority (installed, imported nowhere yet) and lucide-react. Components live in the repo as source, which is shadcn's model: `src/components/ui.tsx` holds the primitives and is imported by 141 files, and the larger pieces have a file each. The skin is Ink and Limestone ([brand-guidelines.md](../brand-guidelines.md)). What differs is the names. HG's color tokens (`fg-3`, `fill-1`, `act`) and components (`Sheet`, `Menu`, `FormField`, `Th`) don't match shadcn's, so a shadcn component or docs page can't be read straight into our code.
+**Today.** HG builds on the stack shadcn's React Aria base uses: react-aria-components 1.21.1, Tailwind v4, `cn`, class-variance-authority and lucide-react, with components kept as source in `src/components/`. HG's own code draws the Ink and Limestone look ([brand-guidelines.md](../brand-guidelines.md)).
 
-**What's decided.**
+**The goal.** Every component is shadcn/ui's aria-vega item, exactly as `npx shadcn add` writes it. HG keeps the theme: Ink and Limestone's colors, gold, the status colors and Geist. The public site goes stock too. Where stock has no item, HG composes stock parts with layout classes only. A few global rules in `globals.css` hold the accessibility floor stock misses (section 5.3).
 
-| # | Decision | Connor's pick |
-|---|---|---|
-| 1 | Foundation | shadcn/ui on its React Aria base (shipped July 2026). Ink and Limestone stays the look, and every shadcn token points at an HG value |
-| 2 | Naming | Full rename (A, over an alias layer or colors only). Color tokens, component names and parts take shadcn's names. HG roles shadcn has no name for keep HG names as additions: the third text tier, stronger lines, gold, ok and warn, photo, toast, the public site and the type scale |
-| 3 | Pixels | Zero change in the renames (landings 1 and 2, and landing 3's first part; decision 7 covers its second). The brand doc's sizes already match shadcn: buttons 32 `sm`, 36 default, 40 `lg`; 44 minimum on touch; rows 40 and 48; radius 4, 6, 8, 12. Any visual change found goes to Connor before it ships |
-| 4 | Button | `primary` to `default`, `secondary` to `outline`; `ghost` and `destructive` stay; `danger` stays as an HG addition; a new `link` variant absorbs the raw `<button className={textLinkClass}>` sites. Sizes: `sm` stays, `md` to `default`, a new `lg` (40px) absorbs the public site's `h-10` buttons |
-| 5 | Rules | shadcn on React Aria is the foundation. Missing pieces come from shadcn's aria registry, then Intent UI, then Mobbin research for jobs neither covers. docs/components.md becomes a shadcn-name inventory |
-| 6 | Rollout | Three landings (A), each checked and pushed alone: 1 colors, 2 components, 3 sweep. Each lands only when no other session is mid-landing |
-| 7 | Controls that can't move unchanged | Move them (B, over keeping them as they are). Landing 3's second part puts the 35 raw buttons and links that would change look, the 2 test-pinned links in `media-uploader.tsx`, the checklist's add field and the comment edit field onto the primitives, and takes the look change. Each site is shown to Connor before it ships; a group he doesn't approve stays as it is |
-| 8 | Parts | Add shadcn's parts beside HG's props (B, over props only). Both forms work: today's call sites keep their props, and pulled code keeps its parts. Landing 2 adds the 27 parts HG already draws; a part with no HG look yet is added when first needed, with its look shown to Connor |
-| 9 | Derived color names | Follow the base (A): `--primary-hover`, `--destructive-tint`, `--destructive-fill`, `--destructive-fill-hover` and `--destructive-foreground`, so no `act` or `danger` color name is left |
+**On screen,** across landings A to M: corners grow one step; buttons, fields, menus, dialogs, badges and tables take the stock look; dialogs become bottom sheets on phones; menus and pickers stay anchored; Select opens the native picker on touch; search opens a centered dialog; the sidebar becomes an icon rail from 768; the toast becomes a card on the popover color at bottom right; focus becomes a 3px half-ink halo; overlays fade and zoom; skeletons pulse; type moves to Tailwind's sizes, so phone body text drops from 16 to 14px. A few colors shift: status tints fold into the status color at 10%, public faint text lightens, progress bars fill ink, gold leaves hovers, and dark fields fill gray. **Unchanged:** every kept token's value in light, dark, print and on the public site; email; Geist; 44px touch targets and 16px fields on touch; reduced motion; the copy rules.
 
-**What changes.**
+| # | Decision | Pick | Status |
+|---|---|---|---|
+| 1 | Foundation | shadcn/ui on its React Aria base | Holds. Ink and Limestone is the theme only (10) |
+| 2 | Naming | Tokens and components take shadcn's names; roles shadcn lacks keep HG names | Holds. The toast, pill, public and type names retire with their components |
+| 3 | Pixels | Zero change in the renames | Holds for landing 1 only. Later landings go to Connor first |
+| 4 | Button | Superseded by 12.2: stock variants and sizes | Superseded |
+| 5 | Rules | shadcn's aria registry, then Intent UI, then Mobbin | Changed by 12.24: missing controls are composed from React Aria and stock parts |
+| 6 | Rollout | Three landings | Changed by 12.29: landing 1, then A to M |
+| 7 | Controls that can't move unchanged | Superseded by 12.2: raw controls move in their family's landing | Superseded |
+| 8 | Parts | Superseded by 12.2: call sites use stock parts, with no props beside them, except `FormField` and the compositions in 12.24 | Superseded |
+| 9 | Derived color names | Follow the base: `--primary-hover` and the `--destructive-*` family | Holds for landing 1; they retire as their components go stock |
+| 10 | How far to standardize | Stock shadcn with our colors (over stock with its colors). Ink and Limestone's colors, gold, the status colors and Geist stay as the theme | Holds |
+| 11 | Public site | Stock there too (over its own marketing look), with Tailwind type. Gold stays in the words, not in button hovers | Holds |
+| 12 | The calls that follow | Made Nov 14 on Connor's standing instruction: take every recommendation that standardizes the app (section 1.1) | Holds |
 
-- **Landing 1, colors.** 11 HG color tokens take shadcn's names, and 5 derived ones follow (decision 9): 1,012 class uses in 159 files, plus 10 in 3 for the derived ones, plus `globals.css`, the hex mirror in `brand-tokens.ts` (its keys, and their 29 uses in the email renderer) and the docs. shadcn names HG had no token for (`--card`, `--ring`, `--secondary`, the sidebar set) arrive as pointers to HG values. The lint rule flips: it accepts shadcn's names and rejects the old ones by name.
-- **Landing 2, components.** 232 import names in 96 files take shadcn's component and part names, and 27 of shadcn's parts arrive beside HG's props (decision 8). `Button` and `Badge` take shadcn's variant and size keys, built with cva. `components.json` arrives, so `npx shadcn add` works without touching `globals.css` or `cn`. docs/components.md becomes the shadcn-name inventory, and the living specs follow.
-- **Landing 3, sweep, in two parts.** First, 15 raw `<button>`s move onto `Button` with no pixel change: 9 `textLinkClass` sites and 2 hand-styled links to `variant="link"`, 2 public CTAs to `size="lg"`, and 2 ghost icon buttons in `src/components` that already wear `buttonClass`. Second, per decision 7, 37 more controls move and change look: the other 28 raw buttons under `src/app`, 7 hand-styled links inside `src/components` primitives (`RailVerb` among them), the 2 links in `media-uploader.tsx`, plus the checklist's borderless add field onto `Input` and the comment edit field onto `Textarea`. Each is shown to Connor before and after, at laptop, tablet and phone, before it ships. The other 16 raw fields under `src/app` are hidden inputs and stay raw.
+### 1.1 Decision 12: the settled calls
 
-**What doesn't change.**
+"Stock over" marks a call that took stock over a research recommendation leaning toward HG's own behavior.
 
-- Every pixel outside landing 3's second part: each token's value in light, dark, print and the public site's dark surface, and email, which reads the hex mirror.
-- HG's own code wherever shadcn's behaves differently. `Button` stays a native `<button>`, `LinkButton` stays `next/link`, `Table` stays a native `<table>`, `Tooltip` still opens on tap on touch, the toast keeps its engine, and `AlertDialog` (today's `ConfirmDialog`) still stays open while busy.
-- The type scale, the radius steps, elevation, motion, touch sizes (44px, and 48px on the public CTAs) and every Ink and Limestone rule.
-- No new runtime dependency: no `shadcn`, `cn`, `sonner` or `tw-animate-css` package. The CLI runs through `npx`, and a pulled item that brings a package HG doesn't have goes to Connor first (section 5.3).
-- No shadcn file is pasted over an HG one. Where a registry file name matches an HG file, HG's file stays and the pulled code is rewritten onto it (section 5.3).
-
-**The planning estimates, checked.** 1,310 HG color-token class uses in 168 files (not about 1,200 in 156); 1,012 of them in 159 files rename. 232 component import renames in 96 files, or 163 in 70 for the core set (not about 100). `ui.tsx` is imported by 141 files: 139 at `9a822de`, as the planning estimate said, and the trades and job-emails work added 2. Both counts include `rail.tsx`, which re-exports `SaveError`.
+| # | Call |
+|---|---|
+| | **Setup** |
+| 12.1 | Landing 1 stays first with its zero-pixel proof, minus the planned bans on Tailwind's shadows, white, black and backdrop blur, which stock uses. Its lint flip still lands |
+| 12.2 | The old landings 2 (component rename) and 3 (sweep) are dropped; each family's landing renames as it goes. Kept from them: `components.json`, the dead-export deletions (4.11), Rename Symbol over regex, and aliasing colliding React Aria names (`Dialog as AriaDialog`, `Command as CommandEntry`). Decisions 4, 7 and 8 are superseded: stock variants and sizes; raw buttons and fields move in their family's landing (4.10); call sites use stock parts, except `FormField`, which stays as thin wiring over stock Field parts, and the compositions under 12.24 that keep props: `LinkButton`, `ResponsiveDialog` and the touch `Select` |
+| 12.3 | Stock files live in `src/components/ui/`, unedited except `table.tsx`'s recorded edit (12.19), with one lint override. Only `npx shadcn@4.23.0 add`, and never `init` on the branch (one throwaway `init` in a scratch worktree, as a CSS reference). `components.json` is written by hand |
+| 12.4 | Packages: tw-animate-css and shadcn 4.23.0 as pinned devDependencies, importing `shadcn/tailwind.css` (stock over vendoring the file); sonner and next-themes with no ThemeProvider; the `cn` package; Node 24 locally and in `engines`; no `@base-ui/react` |
+| 12.5 | Stock files keep `import { cn } from "cn"` (stock over pointing them at HG's `cn`). HG's `cn` moves onto `cn/config`'s `createCn` until the type roles retire, then becomes the plain re-export. Until then no HG type, shadow or motion class goes into a stock part. Lint bans `"cn"` in app code |
+| 12.6 | Radius: stock `--radius: 0.625rem` and its scale, in landing A |
+| 12.7 | Global rules in `globals.css`, keyed on stock markup so stock files stay unedited: 44px heights on touch (48 on public CTAs), 16px fields on touch, a reduced-motion reset for tw-animate and `animate-pulse`, an inset ink ring on a picked toggle (above 3:1, WCAG 1.4.1), and HG's focus outline only on elements without `data-slot` (5.3) |
+| 12.8 | Dark mode stays on HG's `data-theme`. HG's opaque dark `--input` stays: a 4.03:1 field edge, against 1.55:1 for shadcn's white at 15% |
+| 12.9 | React Aria's `UNSAFE_PortalProvider` on the 3 public grounds, through a small client wrapper (5.5); `react-aria` becomes a direct dependency pinned at 3.52.1 |
+| 12.10 | Lint: the hex, palette and old-name bans apply everywhere; the white, black, shadow and blur bans in app code only; the text-size ban until the type roles retire |
+| | **Components** |
+| 12.11 | Button is the stock aria Button with React Aria's props (`onPress`, `isDisabled`, `isPending`, `excludeFromTabOrder`). Pending shows a stock Spinner at once (stock over HG's 200ms delay). `aria-keyshortcuts` and `aria-busy` are dropped (stock over forwarding them); the shortcut stays visible as `Kbd` text. Both HG reds become the stock destructive tint. `LinkButton` is `next/link` with `buttonVariants`, in a client file. Public CTAs take size `lg` |
+| 12.12 | Badge is stock; the warn and ok sites move to `StatusBadge` |
+| 12.13 | AlertDialog is stock. While busy, the confirm is a plain Button that doesn't close, Cancel is disabled and Esc is off |
+| 12.14 | Tooltip is stock. Its 4 tap-reliant sites show their text another way on touch |
+| 12.15 | Dialog from 768px up, Sheet `side="bottom"` below, switched by `use-mobile` (over shadcn's Drawer pattern, which adds Base UI) |
+| 12.16 | Menus, popovers and pickers are anchored at every size (stock over HG's phone picker sheets and its placement hook). Select uses NativeSelect on touch, and sites that need search use Combobox. Widths are stock, plus a width class where content needs it (stock over HG's size-to-content rule, which retires) |
+| 12.17 | ToggleGroup is stock, `variant="outline"` and `spacing={0}`, plus the pick ring (12.7) |
+| 12.18 | Fields use stock Field parts through `FormField`; InputGroup for prefix and suffix; NumberInput and SearchInput are composed from stock parts and React Aria |
+| 12.19 | Table is base-vega's plain HTML table with vega's classes. Its wrapper and sticky header are the one recorded edit to a stock file |
+| 12.20 | Avatar is stock; contractors keep a rounded square through call-site classes |
+| 12.21 | Toast is Sonner, with the Toaster's `theme` set from HG's theme. Toasts with an action stay 5 seconds; the corner and default duration are stock |
+| 12.22 | Also stock: Skeleton, Spinner, Kbd, Card, Empty, Alert, Progress (the 6 progress bars; the 2 chart bars stay chart content), Separator, Calendar (quick picks as list rows under it), Command at every width (stock over HG's full-screen phone search) and Sidebar at use-mobile's 768 with the icon rail (stock over HG's 1024 drawer, Pin and hover rail; the skip link and focus move stay). Route sections stay a labeled nav with `aria-current`, drawn to match stock Tabs' line variant |
+| 12.23 | HG compositions with no stock item become stock parts with layout classes only (section 4.10) |
+| 12.24 | A control the aria registry lacks is composed from React Aria and stock parts: `LinkButton`, `ResponsiveDialog`, the touch `Select`, `PublicSurface`, NumberInput, SearchInput, DateField and the date picker among them. Intent UI is an anatomy reference only |
+| | **Theme** |
+| 12.25 | The type roles retire to Tailwind sizes after the components: title `text-2xl font-semibold`, section `text-base font-semibold`, body and meta `text-sm`, label `text-sm font-medium`, micro `text-xs font-medium`, figure-m `text-xl font-medium`, figures `tabular-nums`. Phone body text drops from 16 to 14px; fields stay 16px on touch |
+| | Public: `publicType`'s 7 roles take Tailwind steps after shadcn's typography page: display `text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight`, eyebrow `text-xs font-medium uppercase tracking-widest text-gold`, the rest by nearest step (7.3, L) |
+| 12.26 | Kept for app content: `fg-2`, `line-strong`, `canvas`, gold, the status colors, the photo colors, `ink-tile`, `tile-edge`, `chart-1`, `chart-ref`. `warn-tint` and `ok-tint` fold into `bg-warn/10` (dark `/20`) and the same for ok. Retired as their components go stock: `line-float`, the toast and pill tokens, `scrim`, `pub-faint`, `pub-gold-hi`, `--select` and its `::selection` rule, HG's elevation shadows, the motion tokens, `ease-spring` and `public/type.module.css`. Content motion moves to tw-animate classes and Tailwind steps in L |
+| 12.27 | Public links take the stock link hover. Gold stays only as a text color |
+| | **Rules and rollout** |
+| 12.28 | The brand doc shrinks to the theme and page layout. CLAUDE.md defers to stock, keeping the accessibility floor and the content rules (section 6.4). A rule changes in the landing that first hits it; landing M consolidates |
+| 12.29 | Landings 1, then A to M (section 7.3), about 10 to 13 working days, each with one review round. Connor reviews every landing after 1 before it ships (section 7.4), which replaces the zero-pixel proof. design-calls-nov14 lands before landing 1 is cut |
 
 ## 2. Reuse check
 
 **Reused as is.**
 
-- **react-aria-components 1.21.1.** shadcn's aria base is built on it. The 62 aria-vega components import 130 React Aria names, and all of them exist in the installed 1.21.1: 81 as runtime exports (checked by importing the package) and 49 as types (found in its type files). The CLI skips a bare package request when `package.json` already declares the package (`update-dependencies.ts`), and aria-vega's style item asks for `react-aria-components` bare, so it stays on 1.21.1.
-- **Tailwind v4,** `@theme inline` and HG's `dark` custom variant (`[data-theme="dark"]` plus `[data-surface="public"]`, `globals.css:11`).
-- **`cn` in `src/lib/utils.ts`** and its tailwind-merge config. It treats every unknown `text-*` and `bg-*` value as a color, so shadcn's color names need no config change. No shadcn color name equals a type role, so `text-<color>` and `text-<role>` never collide.
-- **lucide-react,** set as the CLI's icon library.
-- **Every token value** in `src/app/globals.css`, and the hex mirror `src/lib/brand-tokens.ts` with its tests.
-- **Every HG component's code.** The names change; what draws them doesn't.
-- **The device check** (`npm run test:devices`), its report, and `tests/devices/known-issues.json`. That file is `{}` and keys by route, device and kind, never by class name, so renames can't break it.
+- **react-aria-components 1.21.1.** An inferred set of 38 items the research checked (drawer and chart among them; listed in the packages map) imports 115 React Aria names, all present in it, and the CLI won't bump a package that package.json already declares. Six items the plan pulls weren't in that set (section 10).
+- **Tailwind 4.3.3** and HG's `dark` custom variant (`globals.css:11`), which serves stock `dark:` classes with no `.dark` block.
+- **class-variance-authority 0.7.1,** and **lucide-react 1.37.0,** which has every icon stock items use.
+- **Every color value** in `globals.css`, the hex mirror `src/lib/brand-tokens.ts` with its tests, and email, which reads the mirror.
+- **Geist** through next/font. **The 16px touch field guard** (`globals.css:457`) and **the reduced-motion block** (`globals.css:437`).
+- **The device check** and `tests/devices/known-issues.json` (`{}`).
+- **HG behavior stock has no part for:** the list and filter engines, drafts, uploads and their offline states, edit-in-place, leave guards, the hooks.
 
 **Extended.**
 
-- **`Button`** takes the variant keys `default`, `outline`, `ghost`, `destructive`, `danger` and `link`, and the size keys `sm`, `default`, `lg`, `icon` and `icon-sm`. Its class map becomes cva's `buttonVariants`, built from today's strings. `secondary` is left out on purpose (section 4.5).
-- **`Badge`** takes `variant` instead of `tone` (`secondary`, its default, and `destructive`, plus HG's `warn` and `ok`), built as `badgeVariants`.
-- **`LinkButton` and `buttonVariants`** default to `default`, as shadcn's do. The 3 `LinkButton` sites that rely on today's secondary default say `variant="outline"`.
-- **Size keys:** `md` becomes `default` everywhere HG has one, so every size key uses shadcn's words: the fields (`Input`, `Select`, `Combobox`, `SearchInput`, `DateField`, `AddressCombobox`), `ToggleGroup` and the two financials toggles that wrap it (`BasisControl` and `PeriodControl` in `period-row.tsx`), `Dialog`, `FormDialog`, `CreateForm` and `Code`. `size="md"` is written at 9 sites in 6 files, all on fields and toggle groups.
-- **`hg/design-tokens`** in `eslint.config.mjs`: accepts shadcn's names, rejects the old ones with the new name in the message, and adds white, black, every Tailwind palette, Tailwind's shadow scale and the backdrop blur to the raw-value bans.
-- **`globals.css`** gets shadcn's pointer tokens and `--radius`, in the blocks the public site and print already use.
-- **`brand-tokens.ts`** keys follow the CSS names: all 11 keys whose token is renamed (`fg3` to `mutedForeground`, `fill1` to `muted` and the rest), and `brandTokensDark.line`.
-- **docs/components.md, docs/brand-guidelines.md, CLAUDE.md, README.md and the living specs** (section 6).
+- **`globals.css`:** pointer tokens (landing 1); the stock imports, base layer, radius scale and global rules (A).
+- **`src/lib/utils.ts`:** `cn` moves onto `cn/config`; the other helpers stay.
+- **`hg/design-tokens`:** the old-name and full palette bans (1); split into three scoped rules, with the stock-folder override, the app-only bans and the `cn` import ban (A).
+- **`FormField`**, **`Select`** and **HG's compositions** (sections 4.7 and 4.10), rebuilt on stock parts.
+- **The device check** gains a dark run, and **landing 1's base worktree** serves every review.
 
 **New.**
 
-- **`components.json`** (section 5.1), so the shadcn CLI can add components. References: [components.json](https://ui.shadcn.com/docs/components-json), [schema](https://ui.shadcn.com/schema.json).
-- **The CLI workflow:** `npx shadcn@4.23.0 add` only, never `init` (section 5.3). References: [CLI](https://ui.shadcn.com/docs/cli), [init source](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/init.ts), [add source](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/add.ts).
-- **shadcn's token names with no alias layer** ([theming](https://ui.shadcn.com/docs/theming)) and **component names from the aria pages** ([React Aria base](https://ui.shadcn.com/docs/changelog/2026-07-react-aria), [aria registry source](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/aria)).
-- **`scripts/token-renames.mjs`:** the old-to-new map and the class and variable patterns, as data with no side effects. `eslint.config.mjs`, `token-names.test.ts`, the rename script and the proof import it, so running lint or the tests never runs a rename.
-- **`scripts/rename-tokens.mjs`:** the one-pass rename CLI. It stays in the repo so a branch merged after landing 1 can be run through it.
-- **`scripts/zero-pixel-proof.mjs`:** the CSS, screenshot and email comparison each landing runs (section 7.1).
-- **`src/lib/token-names.test.ts`:** fails on an old color name in CSS, tests or the docs, which lint can't see.
-- **`src/components/parts.test.ts`** (landing 2): each component written with props and with parts renders the same HTML (section 4.6).
-- **`src/components/variants.test.ts`** (landing 2): every old `Button`, `Badge`, `Kbd` and public CTA key gives the same class set under its new key. Landing 3 adds a row per moved site.
-- **Intent UI** as the fallback registry ([installation](https://intentui.com/docs/getting-started/installation.md), [repo](https://github.com/irsyadadl/intentui)).
+- **Stock aria-vega components** in `src/components/ui/` ([React Aria base](https://ui.shadcn.com/docs/changelog/2026-07-react-aria), [registry](https://ui.shadcn.com/r/styles/aria-vega/registry.json), [components](https://ui.shadcn.com/docs/components)) and **base-vega's table** ([item](https://ui.shadcn.com/r/styles/base-vega/table.json)).
+- **`components.json`** ([docs](https://ui.shadcn.com/docs/components-json), [schema](https://ui.shadcn.com/schema.json)), **the `add`-only CLI workflow** ([CLI](https://ui.shadcn.com/docs/cli), [add](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/add.ts), [init](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/init.ts)) and **its snapshot** in `scripts/shadcn-snapshot/` (5.6).
+- **Four small compositions,** each with a docs/components.md row in its landing: `LinkButton` (`src/components/link-button.tsx`, B), after the As Link section of [shadcn's button page](https://ui.shadcn.com/docs/components/aria/button); `ResponsiveDialog` (`src/components/responsive-dialog.tsx`, F), after the Responsive example on [the drawer page](https://ui.shadcn.com/docs/components/aria/drawer) with stock Sheet in place of Drawer; the touch `Select` (H), after [the native-select page](https://ui.shadcn.com/docs/components/aria/native-select); and `PublicSurface` (`src/components/public/surface.tsx`, A), on React Aria's `UNSAFE_PortalProvider` (read from `node_modules/react-aria/dist/private/overlays/Overlay.mjs`).
+- **Packages** (section 5.1): [tw-animate-css](https://cdn.jsdelivr.net/npm/tw-animate-css@1.4.0/dist/tw-animate.css), shadcn for [`tailwind.css`](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/tailwind.css), [cn](https://ui.shadcn.com/docs/changelog/2026-09-cn), [sonner and next-themes](https://ui.shadcn.com/docs/components/aria/sonner), react-aria.
+- **shadcn's token names** ([theming](https://ui.shadcn.com/docs/theming)) and **landing 1's scripts:** `scripts/token-renames.mjs`, `scripts/rename-tokens.mjs`, `scripts/zero-pixel-proof.mjs`, `src/lib/token-names.test.ts`.
+- **One codemod per family** in `scripts/`, on the TypeScript compiler API (installed).
+- **The global rules' standards:** [Apple HIG](https://developer.apple.com/design/human-interface-guidelines/accessibility) and [WCAG 2.5.5](https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html) for 44px; [WCAG 1.4.1](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html) and [1.4.11](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html) for the pick ring; [2.3.3](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html) for motion; [APG tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/) for route nav; [React Aria Tooltip](https://react-aria.adobe.com/Tooltip.md) for touch; [shadcn's typography page](https://ui.shadcn.com/docs/components/aria/typography) for links in sentences and public type.
 
-## 3. Token map
+**Retired.** HG's primitives, overlays, menus, toast and pickers, family by family; `ui.tsx`, `sheet.tsx` and `popover.tsx` in K. clsx and tailwind-merge, whose only importer is `utils.ts`.
 
-Counts are utility classes in code: `src/**/*.{ts,tsx}`, not tests and not `globals.css`. Light and dark values are from `globals.css` and don't change.
+## 3. Token map (landing 1)
 
-### 3.1 Renamed to shadcn's names (landing 1)
+Counts are utility classes in `src/**/*.{ts,tsx}`, not tests and not `globals.css`, at `e233e43`. Values don't change.
+
+### 3.1 Renamed to shadcn's names
 
 | HG token | shadcn name | Light / dark | Uses (files) | Note |
 |---|---|---|---|---|
-| `--surface` | `--background` | `#ffffff` / `#0f141e` | 38 (26) | Work surface and `body`. `bg-surface` 36, `ring-surface` 1, `stroke-surface` 1 |
-| `--fg-1` | `--foreground` | `#152133` / `#ece9e4` | 193 (95) | Primary text. Frames that set a ground and its text can use the pair, as `bg-popover text-popover-foreground` |
-| `--raised` | `--popover` | `#ffffff` / `#161d28` | 9 (8) | Menus, popovers, dialogs, sheets, the skip link, the upload chip |
-| `--fill-1` | `--muted` | `#f2f0ec` / `#181e2a` | 77 (49) | Row and button hover, segmented track, meter track, keycap, skeleton. One to one, hovers included |
-| `--fill-2` | `--accent` | `#e7e5e0` / `#212835` | 41 (15) | Highlight inside raised layers and the current nav item: shadcn's accent job |
-| `--fg-3` | `--muted-foreground` | `#5b6576` / `#a19e98` | 398 (122) | Meta, placeholders, idle icons, the empty dash. The biggest rename |
-| `--act`, fills and states | `--primary` | `#152133` / `#ece9e4` | 30 (15) | Every `bg-act`, and every `border-act` or `ring-act` outside a focus variant: checked, pressed, selected, current and pending states and drop targets |
+| `--surface` | `--background` | `#ffffff` / `#0f141e` | 38 (26) | Work surface and `body` |
+| `--fg-1` | `--foreground` | `#152133` / `#ece9e4` | 193 (95) | Primary text |
+| `--raised` | `--popover` | `#ffffff` / `#161d28` | 9 (8) | Menus, popovers, dialogs, sheets |
+| `--fill-1` | `--muted` | `#f2f0ec` / `#181e2a` | 77 (49) | Hover fills, tracks, keycap, skeleton |
+| `--fill-2` | `--accent` | `#e7e5e0` / `#212835` | 41 (15) | Highlight in raised layers, current nav item |
+| `--fg-3` | `--muted-foreground` | `#5b6576` / `#a19e98` | 398 (122) | Meta, placeholders, idle icons |
+| `--act`, fills and states | `--primary` | `#152133` / `#ece9e4` | 30 (15) | Every `bg-act`, and `border-act` or `ring-act` outside a focus variant |
 | `--act`, focus | `--ring` | same | 24 (15) | Every `outline-act`, and `ring-act` or `border-act` under a focus variant |
-| `--on-act` | `--primary-foreground` | `#ffffff` / `#0f141e` | 11 (6) | Label and icon on the ink fill, `text-on-act/70` included |
-| `--danger` | `--destructive` | `#b91c1c` / `#f47b76` | 50 (30) | The red as text, edge and ring, `aria-invalid:` edges included |
-| `--line` | `--border` | `#e7e5e0` / `#212835` | 120 (75) | `border-line` 70, `divide-line` 47, `bg-line` 2, `text-line` 1. The one `var(--line)` in code (`financials/rent-roll/page.tsx:24`) is renamed by the variable pass, outside these 120 |
-| `--line-control` | `--input` | `#84817a` / `#6e7684` | 21 (13) | Field, checkbox and picker edges, the switch-off track. `--chart-ref` follows it |
-| `--chart-1` | `--chart-1` | `#384e6e` / `#d7d0c3` | 3 (2) | Same name in shadcn. No change |
+| `--on-act` | `--primary-foreground` | `#ffffff` / `#0f141e` | 11 (6) | Label and icon on ink |
+| `--danger` | `--destructive` | `#b91c1c` / `#f47b76` | 50 (30) | Red text, edges, rings |
+| `--line` | `--border` | `#e7e5e0` / `#212835` | 120 (75) | Rules and dividers. The one `var(--line)` (`financials/rent-roll/page.tsx:24`) is renamed by the variable pass |
+| `--line-control` | `--input` | `#84817a` / `#6e7684` | 21 (13) | Field and picker edges, the switch-off track |
+| `--chart-1` | `--chart-1` | `#384e6e` / `#d7d0c3` | 3 (2) | No change |
 
-The first twelve rows are 1,012 uses in 159 files. `--act` splits by context: the values are equal, so a wrong pick moves no pixel, and the rule is mechanical (section 7.2). `--ring` is a pointer to `--primary`, so CSS keeps one value.
+The first twelve rows are 1,012 uses in 159 files. `--act` splits by context; the values are equal, so a wrong pick moves no pixel.
 
-### 3.2 shadcn names added as pointers (landing 1)
-
-shadcn components read these, so each points at an HG token. In landing 1 only `--ring` gets HG classes (the 24 focus uses). The rest, `--secondary` included, wait for a pulled component: HG's `Badge` keeps its own classes (section 4.5).
+### 3.2 shadcn names added as pointers
 
 ```css
 :root,
@@ -120,256 +146,228 @@ shadcn components read these, so each points at an HG token. In landing 1 only `
   --sidebar-ring: var(--ring);
   --chart-ref: var(--input);
 }
-
-:root {
-  --radius: 0.5rem;
-}
 ```
 
-- **Where.** In today's `:root, [data-surface="public"]` block (`globals.css:153`, which holds `--chart-ref`). A var() resolves where it's declared, so on `:root` alone the public site would inherit the light values. Print needs nothing more: the print block restates the base tokens, and these resolve against them.
-- **`@theme inline`** maps each name as `--color-<name>: var(--<name>)`, and drops the old `--color-*` names.
-- **`--card` is `--background`.** HG's `Card` and the public fact tiles sit on the surface. Never point it at `--popover`.
-- **`--secondary` with `--fg-2` text** is HG's neutral badge look, which is shadcn's secondary badge.
-- **`--ring`** keeps HG's focus look: a 2px solid outline with a 2px offset. aria-vega's `focus-visible:ring-3 focus-visible:ring-ring/50` doesn't come in.
-- **The sidebar set** serves a pulled sidebar part. HG's nav keeps its own states (hover on `--muted`, current on `--accent`), since shadcn's sidebar uses one accent for both.
-- **`--chart-2` to `--chart-5` stay undefined.** shadcn uses them for categorical series, and the brand allows one series plus a reference (`--chart-ref`). An undefined one draws a black SVG fill, so a pulled chart that reads them goes to Connor.
+- **Where.** In today's `:root, [data-surface="public"]` block (`globals.css:153`). On `:root` alone the public site would inherit light values. Print resolves them against its restated base tokens.
+- **`@theme inline`** maps each as `--color-<name>` and drops the old `--color-*` names.
+- **In landing 1** only `--ring` gets HG classes (the 24 focus uses), and HG's 2px outline still draws focus. From landing B, stock parts draw a `ring-3 ring-ring/50` halo with a `border-ring` edge: 3.22:1 on white, 4.60:1 on the dark ground.
+- **`--card` is `--background`,** never `--popover`. **`--secondary` with `--fg-2` text** is HG's neutral badge, which stock's `secondary` badge draws. **The sidebar set** serves stock Sidebar in I. **`--chart-2` to `--chart-5` stay undefined:** HG doesn't pull the stock chart.
 
 ### 3.3 HG additions that keep HG names
 
-Decision 2 keeps these. shadcn has no slot for them.
-
-| Token | Light / dark | Uses (files) | Why it stays |
-|---|---|---|---|
-| `--fg-2` | `#424e61` / `#c0bdb7` | 110 (61) | The third text tier (labels, idle nav, codes). shadcn has two tiers. `--secondary-foreground` and `--sidebar-foreground` point at it |
-| `--line-strong` | `#d5d1ca` / `#323947` | 31 (11) | Outline button edge, table rules, tag and keycap edges. shadcn draws every edge with `--border` |
-| `--line-float` | `--line` / `--line-strong` | 6 (5) | Edge of every floating layer. Its light and dark values come from different tokens, so it can't be `--border` |
-| `--canvas` | `#f8f7f3` / `#0a0e17` | 10 (9) | App chrome, phone bars, and the public, login and not-found ground. Broader than `--sidebar`, which points at it |
-| `--warn`, `--warn-tint` | `#a54e09` / `#f7a059`; `#fff5ec` / `#321f0f` | 9 (7), 1 (1) | Status as text plus a badge ground. shadcn's `--warning` example is a ground with `-foreground` text, the opposite use |
-| `--ok`, `--ok-tint` | `#1d7038` / `#6ad18a`; `#eff9f1` / `#142619` | 9 (9), 2 (2) | Same as warn |
-| `--gold`, `--gold-deep` | `#c8a765`; `#86662c` | 12 (5), 0 | Brand. `--gold-deep` is read only by email, through `brandTokens.goldDeep` (both letterheads in `render.ts`). Never `--accent`, which is a hover fill |
-| `--ink-tile`, `--tile-edge` | `#152133` fixed; `--ink-tile` / `--line` | 1 (1), 1 (1) | Monogram ground and its dark edge. Equal to `--primary` in light only |
-| `--toast-bg`, `--toast-fg`, `--toast-fg-2`, `--toast-hover`, `--toast-edge` | `#152133` / `#212835` ground | 15 (2) | Toast and tooltip. aria-vega's tooltip is `bg-foreground`, which would turn limestone in dark |
-| `--pill-bg`, `--pill-fg` | fixed | 7 (4), 7 (4) | Status and Retry pills on photos |
-| `--on-photo`, `--photo-scrim`, `--photo-stage` | fixed | 34 (6), 15 (6), 3 (2) | Text and grounds over photos |
-| `--scrim` | `rgb(10 14 23 / 0.45)` / `rgb(0 0 0 / 0.6)` | 3 (3) | Modal backdrop. aria-vega's overlay is `bg-black/10` under a backdrop blur |
-| `--pub-faint`, `--pub-gold-hi` | fixed | 8 (4), 1 (1) | Public site only |
-| `--select` | `#e4e9f0` / `#2a3548` | 0 | `::selection` only |
-| `--chart-ref` | `var(--input)` | 0 | Reserved for the prior-year tick ([charts.md](charts.md)) |
-
-Also unchanged: the type scale (`text-title` through `text-code-l`), elevation (`shadow-float`, `shadow-overlay`, `inset-shadow-photo-edge`, `inset-shadow-rule`), motion (`duration-*`, `animate-*`, `ease-spring`), `--app-bar-h`, and `--font-sans` and `--font-mono` (already shadcn's names). The kept tokens are 288 uses in 92 files, `--chart-1` included.
-
-**Derived families follow their base (decision 9).** Their base token takes a shadcn name, so keeping their names would leave `act` and `danger` alive beside `primary` and `destructive`.
-
-| HG token | Light / dark | Uses (files) | New name | Why it can't fold into its base |
+| Token | Light / dark | Uses (files) | Job | After the stock landings (12.26) |
 |---|---|---|---|---|
-| `--act-hover` | `#28364d` / `#d3d1cb` | 4 (2) | `--primary-hover` | aria-vega hovers with `bg-primary/80`, about `#444d5c` / `#c0bebc` over the background |
-| `--danger-tint` | `#fff2f1` / `#341817` | 3 (2) | `--destructive-tint` | aria-vega uses `bg-destructive/10`, which doesn't equal these |
-| `--danger-fill` | `#b91c1c` / `#c92f33` | 1 (1) | `--destructive-fill` | Equal to `--destructive` in light, not in dark (`#f47b76`) |
-| `--danger-fill-hover` | `#a31818` / `#b3292d` | 1 (1) | `--destructive-fill-hover` | aria-vega's destructive button is a tint that hovers at `/20` |
-| `--on-danger` | `#ffffff` both | 1 (1) | `--destructive-foreground` | shadcn v3's name; aria-vega's tint needs no foreground token |
+| `--fg-2` | `#424e61` / `#c0bdb7` | 110 (61) | Third text tier | Kept for app content; component uses fold into stock tokens |
+| `--line-strong` | `#d5d1ca` / `#323947` | 31 (11) | Strong edges and table rules | Kept for statement rules and chart and timeline marks |
+| `--line-float` | `--line` / `--line-strong` | 6 (5) | Floating layer edge | Retires (F, G, I, K) |
+| `--canvas` | `#f8f7f3` / `#0a0e17` | 10 (9) | App chrome and the public, login and not-found ground | Kept; `--sidebar` points at it |
+| `--warn`, `--warn-tint` | `#a54e09` / `#f7a059`; `#fff5ec` / `#321f0f` | 9 (7), 1 (1) | Status text and badge ground | `--warn` kept. The tint folds into `bg-warn/10 dark:bg-warn/20` (4.92:1 light, 6.12:1 dark) |
+| `--ok`, `--ok-tint` | `#1d7038` / `#6ad18a`; `#eff9f1` / `#142619` | 9 (9), 2 (2) | Same as warn | `--ok` kept; the tint folds the same way (5.31:1, 6.46:1) |
+| `--gold`, `--gold-deep` | `#c8a765`; `#86662c` | 12 (5), 0 | Brand; `--gold-deep` is email only | Kept, as a text color |
+| `--ink-tile`, `--tile-edge` | `#152133` fixed; `--ink-tile` / `--line` | 1 (1), 1 (1) | Monogram | Kept |
+| `--toast-bg`, `--toast-fg`, `--toast-fg-2`, `--toast-hover`, `--toast-edge` | `#152133` / `#212835` ground | 15 (2) | Toast and tooltip | Retire (D, G) |
+| `--pill-bg`, `--pill-fg` | fixed | 7 (4), 7 (4) | Pills on photos | Retire (K) |
+| `--on-photo`, `--photo-scrim`, `--photo-stage` | fixed | 34 (6), 15 (6), 3 (2) | Over photos | Kept |
+| `--scrim` | `rgb(10 14 23 / 0.45)` / `rgb(0 0 0 / 0.6)` | 3 (3) | Modal backdrop | Retires (F, I) |
+| `--pub-faint`, `--pub-gold-hi` | fixed | 8 (4), 1 (1) | Public site | Retire (L); `--pub-faint`'s uses take `muted-foreground` |
+| `--select` | `#e4e9f0` / `#2a3548` | 0 | `::selection` | Not touched in landing 1. Retires in L with its `::selection` rule; the browser's selection color applies |
+| `--chart-ref` | `var(--input)` | 0 | Prior-year tick ([charts.md](charts.md)) | Kept |
 
-That's 10 uses in 3 files.
+Also unchanged in landing 1: the type scale, elevation, motion, `--app-bar-h`, `--font-sans` and `--font-mono`. Landing L retires the type scale, the elevation shadows and the motion tokens, after moving content motion to stock steps (7.3). Two shadows stay as content: `inset-shadow-photo-edge` on photos, and `inset-shadow-rule` under the table's sticky header.
 
-### 3.4 Radius
+### 3.4 Derived families follow their base (decision 9)
 
-- **HG uses Tailwind's own steps:** `rounded-sm` 4px, `md` 6, `lg` 8, `xl` 12. That's 182 class uses in 87 files, `rounded-t-xl` on the sheet included.
-- **shadcn's theming block derives the steps from one `--radius`:** `sm` ×0.6, `md` ×0.8, `lg` ×1, `xl` ×1.4. At 0.5rem that's 4.8, 6.4, 8 and 11.2px; at the CLI's default 0.625rem it's 6, 8, 10 and 14px. No single value gives 4, 6, 8 and 12, which needs ×0.5, ×0.75, ×1 and ×1.5.
-- **Decision.** Add `--radius: 0.5rem` on `:root`, so a shadcn component that reads it gets HG's card radius. Never write the `--radius-*` block, and keep the brand rule that `--radius-*` is never redefined. Keep `--radius` out of `@theme`, where Tailwind's own `--radius` drives the bare `rounded` class (unused in `src` today).
-- **Pulled components** carry `rounded-[min(var(--radius-md),10px)]` on `sm` buttons (8px on `xs`), `rounded-[2px]` on the tooltip arrow, `rounded-[4px]` on the checkbox, `rounded-4xl` on the badge, and `rounded-[calc(var(--radius)-5px)]` (3px at HG's `--radius`) in input-group, which select, combobox and command pull in. These move to HG's steps on import (section 5.4).
-
-### 3.5 Dark theme, print and the public site
-
-- **One dark block:** `:root[data-theme="dark"], [data-surface="public"]`, and the `dark` variant matches both. shadcn writes `.dark`. Nothing here adds a `.dark` block, and `shadcn init`, which would, never runs.
-- **Three places per token.** Each renamed token changes in the light `:root`, the dark and public block, and the print block (`@media print`, which restates the light hex under `:root[data-theme="dark"]`) together. `print-tokens.test.ts` checks the print block.
-- **Two-source edges** (`--line-float`, `--toast-edge`, `--tile-edge`) stay restated in each block, as today.
-- **Pairs that share a light value but split in dark stay apart.**
-  - `--destructive` (text, `#f47b76` dark) and `--danger-fill` (button fill, `#c92f33` dark). HG's confirm button is the solid fill; aria-vega's destructive button is a red tint, which section 5.4 maps.
-  - `--background` (`#0f141e` dark) and `--popover` (`#161d28` dark). aria-vega's Dialog, AlertDialog, Sheet, Popover and DropdownMenu already sit on `bg-popover`; its Card sits on `bg-card`, which points at `--background`.
-  - `--toast-bg` (`#212835` dark) and `--foreground` (`#ece9e4` dark).
-- **Pairs that share every value never merge,** because their jobs differ: `--border` and `--accent`, `--primary` and `--foreground`, `--primary-foreground` and `--background`. A later re-brand of the action color would drag the others with it.
-- **aria-vega's `dark:` classes come off pulled code:** `dark:bg-input/30`, `dark:hover:bg-input/50`, `dark:border-input`, `dark:hover:bg-muted/50`, `dark:bg-destructive/20` and the `dark:aria-invalid:` set. They assume a translucent `--input`; HG's is an opaque `#6e7684`. On the public site, where the dark variant always matches, they would paint gray washes. `src` has no `dark:` classes today.
-
-## 4. Component map
-
-Counts are importing files outside the component's own file, from an import scan at `e233e43`.
-
-### 4.1 Renamed to shadcn's names (landing 2)
-
-| HG (file) | shadcn name | Files | Not a pure rename |
+| HG token | Light / dark | Uses (files) | New name |
 |---|---|---|---|
-| `CardBody` (`ui.tsx`) | `CardContent` | 3 | |
-| `buttonClass` | `buttonVariants` | 23 | Default goes from secondary to `default`. Every external call already passes a variant |
-| `badgeToneClass`, `BadgeTone` | `badgeVariants`, `VariantProps<typeof badgeVariants>` | 0 | `Badge`'s `tone` becomes `variant`; 5 of 14 sites change (section 4.5) |
-| `FormField` | `Field` | 16 | Keeps its props (`label`, `optional`, `required`, `helper`, `error`, `hideLabel`, the render prop). `FieldLabel`, `FieldDescription` and `FieldError` also arrive as parts (section 4.6). The dead HG `Field` is deleted first |
-| `Th`, `Td` | `TableHead`, `TableCell` | 15, 15 | `numeric` stays an HG prop |
-| `EmptyState` | `Empty` | 11 | Keeps its children and `action` props. `SpotArt` fits shadcn's `EmptyMedia` slot later |
-| `ConfirmDialog` (`confirm-dialog.tsx`) | `AlertDialog` | 12 | Keeps its props (`title`, `body`, `actions`, `onClose`, `cancelLabel`, `busy`). shadcn's Action and Cancel close on press, which would break `busy` |
-| `Menu`, `MenuTrigger`, `MenuItem` (`menu.tsx`) | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuItem` | 17, 18, 19 | Same nesting as shadcn's aria base, where `DropdownMenu` is the content. `shortcut` and `icon` stay props; `description`, `current`, `checked`, `numberKeys`, `sheetTitle` and `followUp` stay HG; placement stays bottom end |
-| `MenuSection`, `MenuHeader`, `MenuSeparator` | `DropdownMenuGroup`, `DropdownMenuLabel`, `DropdownMenuSeparator` | 1, 3, 7 | `MenuSection`'s `title` and `MenuHeader`'s `detail` stay HG props |
-| `MenuFollowUp` (type) | `DropdownMenuFollowUp` | 3 | HG type, follows the component |
-| `Sheet`, `SheetView`, `useSheet` (`sheet.tsx`) | `Dialog`, `DialogView`, `useDialog` | 15, 4, 2 | HG's sheet is shadcn's Dialog from `md` and its Drawer on a phone. shadcn's Sheet is an edge panel HG never uses. The phone presentation stays HG behavior, and `title`, `footer`, `size`, `fullHeight`, `dirty`, `surface` and `layout` stay props |
-| `FormSheet` (`form-sheet.tsx`), `SheetRoute` (`create-form.tsx`) | `FormDialog`, `DialogRoute` | 7, 4 | HG compositions, following `Dialog`. `SheetRoute`'s 4 importers are the `@modal` intercepting pages, which `sheet-routes.test.ts` reads as text. `components/sheet-views.ts` and `lib/sheet-routes.ts` keep their names; only `sheet.tsx` and `app-shell.tsx` (and each file's own test) import them |
-| `Block` (`skeleton.tsx`) | `Skeleton` | 19 | Stays static on `--muted`; shadcn's pulses, and the brand has no shimmer |
-| `SegmentedControl`, `SegmentOption` | `ToggleGroup`, `ToggleGroupOption` | 11, 2 | Keeps native buttons with `aria-pressed` and its `options` prop. shadcn's is React Aria's toggle button group |
-| `Notice` (`source-line.tsx`) | `Alert` | 3 | No `role="alert"`: HG's is a static notice. `action` and `icon` stay props |
-| `SideNav` (`nav.tsx`) | `Sidebar` | 1 | One component, not shadcn's family of parts |
-| `CommandPalette` | `CommandDialog` | 1 | `SearchPanel` and `SearchRow` become `Command` and `CommandItem` inside the file (no external importers), after the file's `type Command` import from `@/lib/commands` becomes `Command as CommandEntry` (section 7.3) |
+| `--act-hover` | `#28364d` / `#d3d1cb` | 4 (2) | `--primary-hover` |
+| `--danger-tint` | `#fff2f1` / `#341817` | 3 (2) | `--destructive-tint` |
+| `--danger-fill` | `#b91c1c` / `#c92f33` | 1 (1) | `--destructive-fill` |
+| `--danger-fill-hover` | `#a31818` / `#b3292d` | 1 (1) | `--destructive-fill-hover` |
+| `--on-danger` | `#ffffff` both | 1 (1) | `--destructive-foreground` |
 
-Total: 232 import names in 96 files. The core set (`CardBody`, `buttonClass`, `FormField`, `Th`, `Td`, `EmptyState`, `ConfirmDialog` and the `Menu` family) is 163 in 70. Five component files are renamed: `sheet.tsx` to `dialog.tsx`, `form-sheet.tsx` to `form-dialog.tsx`, `confirm-dialog.tsx` to `alert-dialog.tsx`, `menu.tsx` to `dropdown-menu.tsx`, `segmented-control.tsx` to `toggle-group.tsx`. `command-palette.tsx`, `nav.tsx`, `source-line.tsx`, `skeleton.tsx` and `create-form.tsx` keep their names.
+None equals stock's `bg-primary/80` hover or `destructive/10` tint, so landing 1 can't fold them. All 10 uses are in `ui.tsx`, `menu.tsx` and `date-panel.tsx`, which go stock in B, C, G and H; L deletes the names. Email reads none of them.
 
-Two `Kbd` names carry an old color name and follow the tokens: `tone="act"` becomes `variant="primary"` (4 sites in 4 files: `action-bar.tsx`, `create-form.tsx`, `form-sheet.tsx`, `inline-field.tsx`), and `kbdActClass`, which has no importer outside `ui.tsx`, becomes `kbdPrimaryClass`.
+### 3.5 Radius, dark, print and the public site
 
-### 4.2 Same name, HG's code stays
+- **Radius.** Landing 1 adds none. Landing A adds `--radius: 0.625rem` on `:root` and `--radius-sm` to `--radius-4xl` (×0.6 to ×2.6) in `@theme inline`. Every corner moves one step, HG's own included: `sm` 4 to 6px, `md` 6 to 8, `lg` 8 to 10, `xl` 12 to 14, across 186 uses in 89 non-test files at `ff7d92b`.
+- **One dark block,** `:root[data-theme="dark"], [data-surface="public"]`, which the `dark` variant matches, so stock `dark:` classes apply in the dark theme and on every public page. No `.dark` block. `brand-tokens.test.ts` finds the block by its exact selector text.
+- **Three places per token:** the light `:root`, the dark and public block, and the print block, which `print-tokens.test.ts` checks.
+- **Pairs that split in dark stay apart** (`--destructive` and `--destructive-fill`, `--background` and `--popover`, `--toast-bg` and `--foreground`). **Pairs equal everywhere never merge** (`--border` and `--accent`, `--primary` and `--foreground`), because their jobs differ.
+- **Stock `dark:` classes stay** and assume a translucent `--input`. With HG's opaque one (12.8), dark fields and outline buttons fill `#2c313d` (1.42:1 on the ground) while the field edge keeps 4.03:1.
 
-| Name | Files | Why HG's code stays |
+## 4. Stock component map
+
+Counts are call sites outside the component's own file, tests excluded, from a TypeScript AST scan at `ff7d92b`, except in 4.10 and 4.12, which count files. Each landing reruns the scan. Stock items are aria-vega's unless a row says otherwise.
+
+### 4.1 Button and LinkButton (landing B)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `Button`, 109 sites in 46 files | `button`, `spinner` | `onClick` to `onPress` (102, none takes an argument); `disabled` to `isDisabled` (45); `pending` to `isPending` with a Spinner (15); `secondary` to `outline` (48); `danger` (3) and `destructive` (14) to `destructive`; the `icon` flag to an icon size (4); `tabIndex={-1}` to `excludeFromTabOrder` (1); `aria-keyshortcuts` (13) and `aria-busy` (2) removed. The 28 sites with no variant keep stock's default, HG's primary | Default buttons pad `px-2.5` (HG `px-3.5`) and hover at `primary/80`. Outline takes a `border` edge and `shadow-xs`. Both reds become one red tint, the solid confirm included. A press nudges 1px. Pending spins at once. Labels are 14px on touch, where HG's grew to 16 |
+| `buttonClass()`, 28 calls in 24 files | `buttonVariants` | `primary` to `default` (6), `secondary` to `outline` (4), `ghost` stays (18); `md` to `default`; the 17 `icon` flags, all expressions, become a conditional icon size (`cond ? "icon-sm" : "sm"`). The 14 direct React Aria Buttons that wear it become stock `Button`, and a call on a link becomes `LinkButton` | As above |
+| `LinkButton`, 13 sites in 12 files | `LinkButton`, a client composition (`src/components/link-button.tsx`, `"use client"`): `next/link` with `buttonVariants`, per shadcn's button page | 10 `variant="primary"` drop; 3 bare sites gain `variant="outline"` | Prefetch stays; stock's React Aria `LinkButton` has none and reloads pages without a root `RouterProvider` |
+| `publicCtaClass`, `publicSecondaryClass`, `authButtonClass` (27 mentions in 10 files) | `size="lg"` on `Button` or `LinkButton` | Classes replaced | 40px, 48 on touch; the gold hover goes |
+| Raw `<button>`, 38 in 30 `src/app` files | `button` | A variant and size each; a row or tile that isn't drawn as a button becomes a React Aria Button with layout classes only. Link-styled ones follow 4.12 | The stock look |
+
+`src/lib/tasks/conflicts.test.ts:44` pins `variant="secondary"`. 14 files without `"use client"` import Button, 11 of them route files. 11 files without `"use client"` call `buttonClass()` or use a public CTA class: `src/components/public/ui.tsx`, the root `not-found.tsx`, `join/[token]/page.tsx`, `(marketing)/welcome/page.tsx`, `(portal)/p/jobs/[id]/page.tsx` and `loading.tsx`, `login/_components/auth-frame.tsx`, `login/reset/page.tsx`, and the financials overview, rent-roll and settings pages. Stock `button.tsx` starts with `"use client"`, so calling `buttonVariants` from those files throws at render ("Attempted to call buttonVariants() from the server"). They render `LinkButton` or a stock `Button` instead, and only client files call `buttonVariants`.
+
+### 4.2 Other primitives (landing C)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `Badge`, 16 in 9 | `badge` | 10 bare sites gain `variant="secondary"` (stock's default is an ink pill); `danger` (3) to `destructive`; warn, ok and the onboarding expression (`contractors/status-badge.tsx:14`, which also imports `BadgeTone`) move to `StatusBadge`, and `BadgeTone` goes with them | A 20px pill in `text-xs font-medium` |
+| `Kbd`, 13 in 9 | `kbd` | `tone="act"` (4) goes, with `kbdActClass` | A muted keycap, inside ink buttons too |
+| `Card`, `CardHeader`, `CardBody` (6, 4, 4) | `card` | `CardBody` to `CardContent` | `rounded-xl`, a faint ring and `shadow-xs`, 24px padding |
+| `Block` and the loading screens, 121 in 20 | `skeleton` | `text` (82) becomes a height class; 26 inside a `span` get a `div` parent | Blocks pulse, and stop under reduced motion |
+| `Spinner`, 6 in 5 | `spinner` | `active` (3) becomes conditional rendering | No 200ms delay or 400ms hold |
+| `Avatar`, 13 in 9 | `avatar` | Initials into `AvatarFallback`; sizes 20 and 24 to `sm`, 28 and 32 to default; the 10 contractor sites take `rounded-sm` on the root, its `after:` edge, image and fallback | People round; sizes 20 and 28 go |
+| `EmptyState`, 16 in 11 | `empty` | Children into `EmptyHeader`, `EmptyTitle` or `EmptyDescription`, `EmptyContent`; `SpotArt` in `EmptyMedia` | Centered, `p-12` |
+| `Notice` (4), `SandboxNotice` (3), `ArchivedNotice` (3) | `alert` | `icon` and `action` into children and `AlertAction`; ArchivedNotice's Restore is the action | The stock box, announced as `role="alert"` |
+| `Meter`, the 6 labeled bars | `progress` | Label into the stock label part. The 2 chart bars keep `Meter` | A 6px round track with a `primary` fill (was `chart-1`) |
+
+### 4.3 Toast (landing D)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `useToast` (41 in 38), `toast()` (84 calls in 37 files), `ToastProvider` (3 mounts), `useToastInset` (2) | `sonner` | A codemod to sonner's `toast(message, options)`: `key` to `id` (15), `detail` to `description` (3), `duration: 5000` on each `action` (21), `sticky` (1) to `duration: Infinity`; `onDismiss` and `icon` keep their names; the 4 spread calls by hand. `phoneMessage` (1) goes, and that toast keeps its shorter text. A `<Toaster>` replaces each provider, with `theme` read from HG's `data-theme`, dark inside the public wrapper. The inset becomes the Toaster's `offset` | A card on the popover color at bottom right, 356px, 13px text, 3 visible, 4 seconds (5 with an action). The detail gets its own line. Esc collapses the stack only when focus is inside it |
+
+The `theme` prop matters because Sonner colors descriptions with fixed grays per theme (a wrong theme gives 1.61:1 on the dark popover). The stock file spreads props after `theme`, so the prop wins unedited. No ThemeProvider mounts, and `THEME_SCRIPT` keeps its jobs.
+
+### 4.4 Fields (landing E)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `Input`, 45 in 21 | `input` | `size="sm"` (5) goes; `prefix` and `suffix` (1 each) become `InputGroup` | 36px everywhere, `shadow-xs`, a gray fill in dark |
+| `Textarea`, 5 | `textarea` | None | Grows with content, 64px minimum |
+| `FormField`, 57 in 19 | `field` parts | None. It keeps its props and wires `id`, `aria-describedby`, `aria-invalid` and `aria-required` between the control and the stock parts (shadcn's field docs never set `aria-describedby`) | Stock label and help type |
+| `FieldRow` (2) | two `Field`s | Layout classes | None |
+| `Checkbox` (2) | `checkbox` in shadcn's Choice Card pattern (`FieldLabel` wrapping a horizontal `Field`) | `isSelected` and a boolean `onChange`; `large` goes | A 16px box in a row that is the whole target |
+| `Switch` (4) | `switch` in the same Choice Card pattern | `label` into the `FieldLabel`, so the whole row stays the target | The track is the control, inside a bordered row that tints when on |
+| `NumberInput` (17 in 8), `SearchInput` (7 in 5) | composed on `InputGroup`; SearchInput on React Aria `SearchField` | None. HG's money parser (`425k`, `1.2m`) and the Esc modes stay | Stock field look |
+| The checklist's add field (`tasks/[id]/checklist.tsx:209`), `comment-card.tsx:329` | `input`, `textarea` | Moved off hand-built markup | Stock edge and height |
+
+Of the 18 raw fields in 9 `src/app` files at `ff7d92b`, the checklist's add field moves here; the other 17 are hidden, file and honeypot inputs and stay raw. Of the 15 in 8 `src/components` files, `ui.tsx`'s go with their components (the native `Select` in A), `comment-card.tsx`'s moves here, `composer.tsx`'s and `inline-field.tsx`'s move in K, and the hidden, file and keyboard-proxy inputs in `address-combobox`, `select`, `media-uploader` and `command-palette` stay raw.
+
+### 4.5 Overlays (landing F)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `Sheet` (15 in 15; 18 files import `sheet.tsx`), `SheetView` (7), `useSheet` (2) | `dialog` from 768px, `sheet` bottom below, by `use-mobile`, through `ResponsiveDialog` | App call sites write `ResponsiveDialog` parts. `title`, `footer` (8), `size` and `fullHeight` move to parts and classes; `hideTitle` (2) to `sr-only`; `surface` (4) goes; `layout="palette"` moves to I. Views keep their job inside the composition. `sheet.tsx` keeps HG's code as `HgSheet` and `HgSheetView` for its 7 later importers (7.1) | Desktop: a centered card with an X, over `black/10` and a 4px blur, fading and zooming in. Phone: a stock bottom sheet with square corners and a height cap, no swipe. The iPad Mini gets the desktop dialog |
+| `FormSheet` (11 in 8), `CreateForm` (4), `SheetRoute` (4 `@modal` pages) | compositions on `ResponsiveDialog`, `Field`, `Button` | Renamed `FormDialog` and `DialogRoute`. Their behavior stays (dirty check, `LeaveGuard`, ⌘↵, pending label, error line, Create more). `sheet-routes.test.ts:17` follows | As above |
+| `ConfirmDialog`, 15 in 13 (`busy` 7) | `alert-dialog` parts at each site | `title`, `body`, `actions` and `cancelLabel` become parts. Busy sites use a plain `Button` confirm, `isDisabled` on Cancel, `isKeyboardDismissDisabled`, and a parent that ignores close while busy | `max-w-xs` below `sm`, full width at 320; a backdrop click no longer closes it |
+| React Aria `Dialog`, unaliased in 5 files | | `Dialog as AriaDialog` where it meets stock's | None |
+
+**`ResponsiveDialog`** exports `ResponsiveDialog`, `ResponsiveDialogContent`, `ResponsiveDialogHeader`, `ResponsiveDialogTitle`, `ResponsiveDialogDescription` and `ResponsiveDialogFooter`. Each renders the matching stock Dialog part from 768px and the Sheet part (`side="bottom"`, with a height cap class) below, chosen by `use-mobile`.
+
+### 4.6 Menus, popover and tooltip (landing G)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `Menu` (17), `MenuTrigger` (18), `MenuItem` (53 in 19), `MenuSection` (1), `MenuHeader` (3), `MenuSeparator` (10) | `dropdown-menu` | Stock names. `icon` (30) into children; `shortcut` into `DropdownMenuShortcut`; `description` (1) as a second line; `current` and checked items use stock selection; `followUp` (1) becomes `DropdownMenuSub`; `numberKeys` (1) and `sheetTitle` (8) go; a width class where content needs it | Anchored on phones too. Bottom start, so 12 menus flip from bottom end. At least 128px or the trigger's width. A right-hand check. A 100ms fade and zoom |
+| `StatusMenu` (4), `RecordMoreMenu` (3) | `dropdown-menu` | StatusMenu's items carry their `StatusMark`; RecordMoreMenu's are plain items | As above |
+| `AccountMenu` (2) with `AppearanceRow` (1) | `dropdown-menu` | Its menu moves here; I puts it in the Sidebar footer | As above |
+| `Popover` (3), `PopoverTrigger` (1), `PopoverSurface` (4 files) | `popover` | `capex-breakdown.tsx`, `menu.tsx` and `public/header.tsx` move to stock; HG's placement hook goes with them (held side, beside-when-short, height cap). `PopoverSurface` stays as `HgPopoverSurface` for `combobox`, `address-combobox` and `picker-layer` (H) and `filter-bar` (K) | 288px with 16px padding unless the site sets a width |
+| `Tooltip`, 6 in 5 | `tooltip` | `label` into the stock content part. The 4 tap sites (the deal row's note, the CapEx rules info label, two financials settings badges) show their text in place or in a Popover on touch | Opens at once on hover and focus, never on touch; limestone in dark |
+
+Two tests match `<MenuItem id="retry"`: `src/lib/composer-draft.test.ts:240` and `src/lib/deals/note-send.test.ts:18`.
+
+### 4.7 Select, combobox and date (landing H)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `Select`, 10 in 6 | `select`, `native-select` on touch, through the touch `Select` | Inside `FormField`. `onChange` gets `Key \| null` (10 inline handlers). The 6 `searchLabel` sites move to Combobox where their lists are long | A 36px trigger, a popover at the trigger's width; phones get the native picker |
+| `Combobox` (2), `AddressCombobox` (4 in 3), `TagsField` (2) | `combobox`, its chips | `allowCustom` to `allowsCustomValue`; chips with `showRemove={false}`, keeping `TagOverflow` and the checklist | Stock input, list and 22px chips |
+| `DatePicker` (4), `DatePanel` (5), `DateField` (3) | `popover` with `calendar`; React Aria `DateField` inside stock `InputGroup` | Quick picks and Repeat become list rows under the calendar; the phone sheets go | The stock month grid with month and year pickers; 32px cells, 44 on touch |
+| `PickerLayer` (11 in 9), `OptionList` (14 files) | `popover`, stock item parts | The sheet branch goes. OptionList keeps its engine (search from 10, pinned and alias rows, the Add row) | Anchored everywhere; 32px rows, 44 on touch |
+| The EntityPicker family (`entity-picker.tsx`; `AssigneePicker` 4, `PropertyPicker` 2, `UnitPicker` 2, `PropertyUnitPicker` 1) | `popover` over `OptionList` with stock item parts, or `combobox` | The trigger becomes an outline `Button` (4.12); the sheet branch goes | As PickerLayer |
+| `RepeatMenu` (2) | `popover` with `NumberInput` | Its phone sheet goes | Anchored |
+
+**The touch `Select`** (`src/components/select.tsx`, rebuilt) keeps today's `items` and `sections` props. With a mouse it renders stock `SelectItem` and `SelectGroup`; on touch, `NativeSelect` with `NativeSelectOption` and `NativeSelectOptGroup`.
+
+React Aria Buttons drop `aria-invalid` and `aria-required` today (`select.tsx:163`, `date-field.tsx:131`, `tags-field.tsx:246`). Stock Select, Combobox and DateField take `isInvalid` and `isRequired`, so this landing fixes it.
+
+### 4.8 Nav, sidebar, tabs and command (landing I)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `SegmentedControl`, 15 in 12 | `toggle-group`, `outline`, `spacing={0}` | `options` into `ToggleGroupItem`s; every group gets `selectionMode="single"` and `disallowEmptySelection`; `value` into `selectedKeys`, and `onSelectionChange` reads the one key from the Set; `size` and `fullWidth` into classes | One bordered group; the pick takes a `muted` fill and a 1px ink ring inside its edge; `radiogroup` and `aria-checked` replace `aria-pressed` |
+| `SideNav` in `AppShell` | `sidebar`, `collapsible="icon"` | The skip link and focus move stay. Pin, the hover float and HG's cookie go; stock keeps `sidebar_state` and toggles on ⌘B. `AccountMenu` sits in `SidebarFooter`, shadcn's nav-user pattern | 256px with a 48px rail; a left sheet below 768, so the iPad Mini gets the desktop sidebar; the active item in `font-medium` |
+| `TopTabs`, 2 sites | stays an HG composition | A labeled `<nav>` of links whose `aria-[current=page]` draws a 2px `foreground` `after:` underline, matching stock's line variant, with layout and theme classes only. Its `text-sm` stays under `nav.tsx`'s existing eslint-disable until L | A 2px `foreground` underline, today's ink |
+| `CommandPalette`, 928 lines | `command` | Data, rows and the ⌘K and `/` shortcuts stay. The file's `type Command` becomes `Command as CommandEntry` first | A centered dialog at every width, the list capped at 288px, menu semantics |
+
+### 4.9 Table (landing J)
+
+| HG piece | Stock item | Call-site edits | On screen |
+|---|---|---|---|
+| `Table` (15 in 14), `Th` (62), `Td` (85); raw `thead` (17), `tbody` (18), `tfoot` (5), `tr` (42 in 18 files) | base-vega `table` with the recorded edit | `TableHead` and `TableCell`; `numeric` (53) becomes `text-right tabular-nums`; raw sections become parts | Cells `p-2` and no-wrap, 40px heads, a `muted/50` footer |
+| `TableFrame`, `thClass` | the recorded edit | In `ui/table.tsx`, the wrapper becomes `TableFrame` (it drops sideways scroll while the table fits, so the header can stick) and `TableHead` gains HG's sticky classes and rule. `add --diff` by URL (5.6) shows only this | Headers still stick under the app bar |
+| `SortHeader` (10), `RowCell` (20), `flushTable` (5), `grandTotalRow` (6) | compositions | Layout and statement classes; the grand total's double rule stays | None |
+
+aria-vega's table is React Aria's grid, which would change roles on the financial statements, so base-vega's plain table is used. 10 of its importers are server route files.
+
+### 4.10 Compositions (landing K)
+
+Counts are importing files at `ff7d92b`.
+
+| Piece | Built from | Stays HG |
 |---|---|---|
-| `Button` | 42 | Native `<button>`: `onClick` at 90 of 97 sites, `disabled` at 35, HG's `pending` at 14. shadcn's aria Button is React Aria's (`onPress`, `isDisabled`, `type="button"` by default) |
-| `LinkButton` | 13 | `next/link` with prefetching. shadcn's is a React Aria `Link` |
-| `Card`, `CardHeader`, `CardTitle` | 5, 3, 0 | HG's flat card. shadcn's has a `size` prop, its own padding and a `shadow-xs` ring. `CardTitle` has no importer, but it is already shadcn's part name and aria-vega's `chart` pulls `card`, so it stays |
-| `Badge` | 8 | HG sizes; variants per section 4.5 |
-| `Kbd` | 9 | `variant="primary"` stays an HG addition |
-| `Spinner` | 4 | 200ms delay, 400ms minimum, `aria-hidden`. shadcn's has `role="status"` and no delay |
-| `Input`, `Textarea` | 18, 5 | `Input`'s `size` (`sm`, `default`), `prefix` and `suffix` stay; `Textarea` is a styled native `<textarea>`. shadcn's Input has no size; prefix and suffix are its InputGroup pattern |
-| `Checkbox` | 2 | Native input (`checked`, event `onChange`) and `large`. shadcn's is React Aria's |
-| `Table` | 14 | Native `<table>` inside `TableFrame`. shadcn's aria Table is React Aria's grid table |
-| `Popover`, `PopoverTrigger` | 3, 1 | Keeps its inner Dialog, required `aria-label`, and bottom start with offset 6. shadcn's aria Popover is HG's `PopoverSurface` |
-| `Tooltip` | 5 | `<Tooltip label>` that opens on tap on touch, as CLAUDE.md requires. shadcn's opens on hover and focus only, with the API inverted |
-| `Select` (`select.tsx`), `Combobox` | 6, 2 | Data props: `Select` takes `items` and `sections`, `Combobox` takes `items` and `allowCustom`. Several picks are `TagsField` (section 4.3). shadcn composes trigger, content, list and items |
-| `Switch` | 4 | `label` prop with the whole row pressable. shadcn's is the control alone, labeled through Field |
-| `Avatar` | 9 | `name`, `email`, numeric sizes 20 to 32, initials |
-| `DatePicker` | 3 | Already shadcn's name; shadcn's is a docs pattern, not an export |
+| `Section` (47), `PageHeader` (14) | Heading and actions over stock `Separator` | Layout only |
+| `StatusMark`, `StatusBadge`, `DealStageMark` (17) | `StatusBadge` is the mark plus a word | The glyphs and status tones |
+| `Money` (22), `Code` (7), `FactStrip` (7), `SourceLine` (4), `WarnMark` (2), `MoneyBars`, `MonthBars`, the 2 chart `Meter`s | App content; Code's copy button is a stock `Button` | Formatting, masking, the one-line source line, glyph plus word, charts, print |
+| `Monogram` (5), `SpotArt` (4) | Brand content, unchanged; `SpotArt` sits in `EmptyMedia` | The glyphs and gold |
+| `PhotoThumb` (11), `RetryPill`, `Lightbox`, `media-grid` | Photo pills become a stock `Badge` and `Button` | Photo stage, scrim, edge, zoom, swipe |
+| Upload tiles (`media-grid`, `media-uploader` and `upload-queue` reach 23 files), `FilesList` (6), `FileLink` (10) | Stock `attachment` and `item`, `ProgressRing` in the media slot. A file row that links renders `Item` without `href` around a `next/link`, since stock `Item` with `href` is a React Aria Link (the `LinkButton` rule, 12.11) | The offline states in the description ("No signal · 2 files waiting", "Uploads paused · Reload") |
+| `ActionBar` (6), `FilterBar` (9) | Stock Buttons; chips as outline `sm` Buttons, the panel a Popover over `OptionList` | Keyboard hide, safe area, ⌘↵; the URL engine and the one-line word collapse |
+| Activity timeline, `CommentCard`, `InlineField`, rail, `Composer` | Stock `marker`, `message`, `Input`, `Textarea`, `InputGroup`; the rail as a `dl` | Optimistic saves, Undo, conflicts, drafts, the keyboard inset |
+| `AddRow` (3), `addRowClass` and `rail-fold.tsx` (both new on main at `8aae1d7`), `BackLink` (13), `ErrorScreen` (2) | Ghost and link Buttons, `Empty` parts | AddRow's lazy-code warming |
+| Public site: `PublicHeader`, `PublicFooter` (3 each), `Eyebrow` (3), `publicContainer` (9), `publicLinkHover` (4), `publicTextLinkClass` (1) | Header and footer from stock `Button`, `LinkButton`, `DropdownMenu` and `Popover` (the header's popover moves in G). Links take the stock link hover (12.27); `publicType` moves in L | `publicContainer` as layout; `Eyebrow` in `text-gold` |
+| Behavior only: `LeaveGuard`, `LeaveLink`, `LinkPending`, `LoadLatest`, `RefreshOnReturn`, `UpdateNotice`, `ListMemoryProvider`, `ThemeToggle`, upload-queue's `DropLabel` | No change beyond their buttons and links: the link-styled ones move in B (4.12), the rest here | The behavior |
+| Raw controls inside compositions that B to J didn't move | Stock `Button` or the family's part | Nothing |
 
-### 4.3 HG-only, kept and marked HG in docs/components.md
+**Who moves raw controls.** At `ff7d92b` there are 83 raw `<button>`s in 53 files (38 in 30 under `src/app`, 45 in 23 under `src/components`) and 52 direct React Aria Buttons in 34 files. B moves the 38 under `src/app`, the 14 React Aria Buttons on `buttonClass`, the link-styled buttons (4.12) and any raw button in a file B already edits. Each family moves the raw buttons, React Aria Buttons and fields inside its own component files (E the field compositions, H the picker internals, and so on). K takes what's left inside compositions, by area.
 
-Files are importing files outside the piece's own file. Where a row names several pieces, the files any of them reach come first, then each piece's own count.
+K deletes `ui.tsx`, `sheet.tsx` and `popover.tsx`. `src/components/followups-wiring.test.ts:50` matches `Reload</button>` and follows.
 
-| Piece | Files | Why there's no shadcn name |
-|---|---|---|
-| `Section` | 47 | A heading and actions over a rule, with no box. shadcn's Card is a box |
-| `PageHeader` | 14 | shadcn has no page title row |
-| `TextLink`, `textLinkClass` | 30 (14, 18) | An inline underlined link with no size. `variant="link"` is for buttons |
-| `tagClass` | 4 | 22px with `px-2` and an inset ring; an outline Badge is 20px |
-| `Meter` | 7 | A meter, hidden when unlabeled. shadcn's Progress always announces a progress bar |
-| `ToastProvider`, `useToast` | 38 (3, 35) | shadcn's toast is the Sonner package, a global `toast()` beside a `<Toaster />`. HG keeps key replacement, the detail line and the inset |
-| `TopTabs` | 2 | Route links in a labeled nav with `aria-current`. shadcn's Tabs is a tablist with panels |
-| `OptionList` family | 14 | One list engine for Select, Combobox, FilterBar and the pickers; shadcn splits it per host |
-| `SaveError`, `FieldRow`, `CheckboxMark` | 12, 2, 2 | Section-level errors, two fields side by side, a checkbox look for a row that is the control. `SaveError`'s 12 import it from `ui.tsx`; `rail.tsx` also re-exports it |
-| `TableFrame`, `thClass`, `flushTable`, `grandTotalRow`, `RowCell`, `SortHeader` | 14 (1, 1, 5, 6, 3, 2) | Statement rules, linked rows, the sideways-scroll box, sorting |
-| `PopoverSurface`, `PickerLayer`, `pickContainer`, `useCoarsePointer` | 25 (4, 8, 4, 10) | A popover with a mouse and a sheet on a phone; shadcn ships that as a pattern only |
-| `SearchInput`, `NumberInput`, `DateField`, `DatePanel` | 20 (5, 8, 3, 6) | No shadcn search, number or segmented date field |
-| `TagsField`, `TagList`, `TagOverflow`, `TagsChecklist`, `DoneFooter`, `tagsLine`, `tagsOf` (`tags-field.tsx`) | 3 | The trades tags-and-checklist picker, new on main. shadcn's Combobox with chips is the nearest; HG's adds the checklist and the "+N" overflow |
-| `StatusMark`, `StatusBadge`, `DealStageMark` | 17 (13, 6, 4) | HG's status glyphs with fixed tones |
-| `Money`, `Code`, `FactStrip`, `MoneyBars`, `MonthBars`, `PhotoThumb`, `RetryPill`, `Monogram`, `SpotArt` | 44 (57 imports) | Money, chart and brand pieces |
-| `ActionBar`, `FilterBar`, `AppShell`, `AddRow` | 5, 4, 1, 3 | The docked bar, the list filter bar, the shell, the counted-list add row |
-| `TOUCH_HEIGHT`, `chromeIconClass`, `pendingRowFill`, `fieldClass`, `fieldSizeClass`, `pickerChipClass`, `pickerField`, `kbdClass` | 31 (2, 14, 6, 8, 6, 4, 4, 1) | HG touch, field, picker and keycap rules |
-| `PublicHeader`, `PublicFooter`, `publicCtaClass`, `publicSecondaryClass`, `Eyebrow`, `publicType` | 10 (25 imports) | The public site, kept by decision 2. The two CTA classes are rebuilt on `buttonVariants({ size: "lg" })` |
+### 4.11 Deleted with no importers (landing A)
 
-The rest of the compositions (record media, the activity timeline, edit-in-place, leave guards, the hooks) keep their names. docs/components.md lists them, and section 4.7 covers the exports beside the renamed components.
+`SectionCard`, `CardTitle`, the dead `Field` (it collides with stock's), the native `Select`, `selectTouchHeight`, `pickerChip` and the `Spinner` re-export in `ui.tsx`; `SheetTrigger`; `popoverSurface`; `badgeToneClass`; and `repeat-picker.tsx`. `BadgeTone` has an importer and goes in C (4.2). A rechecks each.
 
-### 4.4 Deleted (no importers)
+### 4.12 Other `ui.tsx` helpers
 
-These have no importers outside their own file, so deleting them changes nothing on screen: `SectionCard`, `Field` (a label over a value, which collides with shadcn's `Field`), the native `Select` (which collides with `select.tsx`'s), `selectTouchHeight`, `pickerChip` and the `Spinner` re-export from `ui.tsx`; `SheetTrigger` from `sheet.tsx` (React Aria's `DialogTrigger` under another name, used only in a doc comment there); and `popoverSurface` from `popover.tsx` (unused even inside it). `badgeToneClass` and `BadgeTone`, also unimported, give way to `badgeVariants` (section 4.1). docs/components.md already marks `SectionCard` and the native `Select` for deletion.
+Files are non-test files that use each at `ff7d92b`, `ui.tsx` excluded. K deletes `ui.tsx`, so each gets a home first.
 
-### 4.5 Button and Badge variants and sizes
+| HG piece | Files | Stock home | Landing |
+|---|---|---|---|
+| `TextLink`, `textLinkClass` | 17, 18 | A link in a sentence takes shadcn's typography link classes, `font-medium text-primary underline underline-offset-4`, on `next/link` or `<a>` | C |
+| The 9 raw `<button className={textLinkClass}>` (5 under `src/app`; `create-form`, `fact-strip`, `load-latest` and `money-bars` in `src/components`) and 2 hand-styled links that match it (`tasks/[id]/activity.tsx:288`, `filter-bar.tsx:198`), at `e233e43` | 11 | In a sentence, a React Aria Button with the typography link classes; standalone, stock `Button variant="link"` | B |
+| The 14 hand-styled links that don't match, at `e233e43`: 5 under `src/app`, `RailVerb` (`rail.tsx:96`) and `inline-field.tsx:628`, `back-link.tsx`, `command-palette.tsx:488`, `comment-card.tsx:466`, `files-list.tsx:390`, `toast.tsx:130`, and 2 in `media-uploader.tsx` | 14 | The same two homes | B for `src/app`, D for the toast, I for the palette, K for the rest, which updates `followups-wiring.test.ts:50` |
+| `SaveError` | 15 (`rail.tsx` re-exports it) | Stock `FieldError`, the stock error line (`role="alert"`, `text-sm text-destructive`), with any `action` inside it | E |
+| `CheckboxMark` | 2 (`menu`, `option-list`) | The stock item's own check, as DropdownMenu and Select items draw it | G, H |
+| `tagClass` | 5 | `Badge variant="outline"`; 22px becomes 20 | C |
+| `kbdClass`, `kbdActClass` | 1 (`menu.tsx`), 0 | Go with `Kbd`; `menu.tsx`'s keycap renders `Kbd` | C |
+| `chromeIconClass` | 13 | Stock icon sizing: inside a stock part the class goes (stock sizes icons at `size-4`), elsewhere `size-4`. Its touch growth and 1.5 stroke go | B in buttons, K elsewhere |
+| `fieldClass`, `fieldSizeClass` | 8, 6 | Classes from stock `Input`, `InputGroup` or `SelectTrigger` | Each file's landing: E (`search-field`), H (`select`, `combobox`, `address-combobox`, `date-field`, `tags-field`), I (`command-palette`), K (`inline-field`) |
+| `pickerField`, `pickerFieldChevron` | 4, 3 (one fewer each once A drops `repeat-picker.tsx`) | An outline `Button` with a trailing chevron, the trigger shadcn's date picker draws | H |
+| `pickerChipClass` | 4 (3 after A) | `Button variant="outline" size="sm"`; the 28px row chip becomes 32 | H |
+| `pendingRowFill` | 7 | Stays as a state class beside `RowCell`, on `bg-muted` | K |
+| `TOUCH_HEIGHT` | 2 (`nav.tsx`, `editor-controls.tsx`) | The global rule covers stock parts; the two files write `pointer-coarse:min-h-11` | I, K |
 
-**Button.** All 138 external call sites: 97 `<Button>` in 43 files (one is `ui.tsx`'s dead `SectionCard`), 14 `<LinkButton>` in 13, and 27 `buttonClass()` calls in 23.
+## 5. Setup (landing A, except where noted)
 
-| HG variant | shadcn variant | Button | LinkButton | buttonClass | Total |
-|---|---|---|---|---|---|
-| `primary` | `default` | 26, none written | 11 written | 6 written | 43 |
-| `secondary` | `outline` | 40 | 3 by LinkButton's default | 3 | 46 |
-| `ghost` | `ghost` | 16 | 0 | 18 | 34 |
-| `danger` | `danger` (HG) | 2 | 0 | 0 | 2 |
-| `destructive` | `destructive` | 13 | 0 | 0 | 13 |
-| raw `<button className={textLinkClass}>` | `link` (new) | | | | 9 sites in 9 files (landing 3) |
+### 5.1 Packages
 
-| HG size | shadcn size | Button | LinkButton | buttonClass | Total |
-|---|---|---|---|---|---|
-| `sm` (32) | `sm` | 56 | 3 | 16 | 75 |
-| `md` (36, the default) | `default` | 41 | 11 | 11 | 63 |
-| `icon` flag | `icon` (36) or `icon-sm` (32) | 4 | 0 | 17 | 21: 7 `icon`, 14 `icon-sm` |
-| `publicCtaClass`, `authButtonClass`, `publicSecondaryClass` (`h-10`) | `lg` (new, 40) | | | | 11 sites in 7 files |
+| Package | Version | Kind | Landing | Why |
+|---|---|---|---|---|
+| tw-animate-css | 1.4.0 | dev | A | Stock enter and exit motion; CSS only, MIT |
+| shadcn | 4.23.0 | dev | A | `shadcn/tailwind.css`: the `data-*` variants, `no-scrollbar`, `scroll-fade`, `shimmer`. With tw-animate-css, `package-lock.json` grows from 756 entries at `ff7d92b` to 925 (rollout map), all dev-only |
+| cn | 0.5.2 | runtime | A | Stock files import it; needs Node 22 or later |
+| react-aria | 3.52.1 | runtime | A | `UNSAFE_PortalProvider`; the version react-aria-components 1.21.1 pins |
+| sonner, next-themes | 2.0.8, 0.4.6 | runtime | D | The stock toast; its file imports `useTheme` |
+| Node | `"engines": { "node": "24.x" }` | | A | CI runs 24 (`ci.yml:22`); Node 20 ended Apr 30, 2026. Local Node moves from 20.20.1 to 24, and README's "Node 20+" becomes "Node 24" |
 
-- **The `md` and `lg` rows.** The `md` row's 11 `buttonClass` calls include `publicCtaClass` and `publicSecondaryClass` (`public/ui.tsx:28` and `:33`), which are rebuilt on `lg`, so 61 sites end on `default`. The `lg` row counts the sites that use the three classes, not `buttonVariants` calls.
-- **Edits.** No Button, LinkButton or buttonClass site writes `size="md"`, so only the type and the cva key change. `primary` is written at 17 sites (11 LinkButton, 6 buttonClass); the 26 bare Buttons need no edit. `secondary` is written at 43 sites, and the 3 bare `LinkButton`s gain `variant="outline"` (`properties/[id]/property-tasks.tsx` twice, `p/jobs/[id]/_components/job-details.tsx` once). The `icon` flag becomes a size at 21 sites.
-- **`secondary` is left out on purpose.** aria-vega's `secondary` is a filled neutral button HG doesn't draw, and HG's old `secondary` meant `outline`. With no `secondary` key, a site or a later branch written the old way fails typecheck instead of drawing the wrong button.
-- **Icon sizes** keep HG's `pointer-coarse:min-w-11`, so they stay square at 44 on touch.
-- **`pending` reads the size.** Today the branch that puts the Spinner in place of the icon checks the `icon` flag. It becomes `size === "icon" || size === "icon-sm"`. No site is both `pending` and an icon button at `e233e43`, so nothing breaks today; the check keeps the behavior for the next one.
-- **`lg`** is the public CTA exactly: `h-10 px-4.5`, with `pointer-coarse:min-h-12` (48px) in place of the 44px touch height the other sizes use. `publicCtaClass` keeps its gold hover on top.
-- **`link`** sits outside the shared base, the sizes and the touch height. `buttonVariants({ variant: "link" })` returns `textLinkClass` exactly (`text-foreground underline decoration-1 underline-offset-3 hover:decoration-2`), whatever size is passed, and `variants.test.ts` checks it. Sharing the base would turn an inline text link into `inline-flex items-center whitespace-nowrap rounded-md text-label`: long links would stop wrapping, and the six sites with no text size of their own (`portfolio-capex.tsx`, `capex-outlook.tsx`, `capex-rules-editor.tsx`, `move-in-form-editor.tsx`, `create-form.tsx`, `load-latest.tsx`) would take the label size and weight. Each site keeps its own size and touch classes.
-- **`outline`** keeps `border border-line-strong bg-background` with `hover:bg-muted`. aria-vega's outline also hovers on `bg-muted`, but draws its edge in `border-border` and adds `shadow-xs`; neither comes in.
-- **`ghost`** keeps `text-fg-2` with `hover:bg-muted hover:text-foreground`, which is aria-vega's ghost hover too.
-- **`destructive`** keeps HG's solid fill (`bg-danger-fill text-on-danger hover:bg-danger-fill-hover`, renamed per decision 9). aria-vega's `destructive` is a tint (`bg-destructive/10 text-destructive`), closer to HG's `danger`; section 5.4 maps pulled code.
+Not added: `@base-ui/react`, recharts, embla, shiki. Removed in A: clsx and tailwind-merge.
 
-**Badge.** 14 sites in 8 files: 9 pass no tone, 3 pass `tone="danger"`, 1 `warn` and 1 `ok`.
-
-| HG tone | shadcn variant | Sites |
-|---|---|---|
-| `neutral` (the default) | `secondary` (the default) | 9, none written |
-| `danger` | `destructive` | 3 |
-| `warn` | `warn` (HG) | 1 |
-| `ok` | `ok` (HG) | 1 |
-
-- **`defaultVariants` is `secondary`,** so the 9 bare badges keep today's neutral and only the 5 toned sites change (`tone` to `variant`). shadcn's own default is `default`, an ink fill the brand has no badge for. HG's `Badge` has no `default` key until Connor approves a look for one.
-- **Each variant keeps today's classes:** `secondary` stays `bg-accent text-fg-2` (today's `bg-fill-2 text-fg-2`, renamed), so no new utility arrives with landing 2.
-
-### 4.6 shadcn's parts and HG's props
-
-Decision 2 moves parts to shadcn's names. Where HG has the part, it takes shadcn's name: `CardContent`, `TableHead`, `TableCell`, `DropdownMenuItem`, `DropdownMenuGroup`, `DropdownMenuLabel`, `DropdownMenuSeparator`, `ToggleGroupOption`. Where shadcn composes parts and HG takes props, decision 8 adds shadcn's parts beside the props, so a dialog or field can be written either way. The parts below are aria-vega's exports at the time of writing.
-
-- **Landing 2 adds the 27 parts HG already draws,** so none brings a new look: `DialogTrigger`, `DialogHeader`, `DialogTitle`, `DialogFooter`, `DialogClose`; `AlertDialogTrigger`, `AlertDialogContent`, `AlertDialogHeader`, `AlertDialogTitle`, `AlertDialogDescription`, `AlertDialogFooter`, `AlertDialogAction`, `AlertDialogCancel`; `DropdownMenuShortcut`; `FieldLabel`, `FieldDescription`, `FieldError`; `EmptyDescription`, `EmptyContent`; `TableHeader`, `TableBody`, `TableFooter`, `TableRow`, `TableCaption`; `ToggleGroupItem`; `AlertDescription`, `AlertAction`.
-- **Each part renders the prop's own internals.** `DialogTitle` is the same `Heading slot="title"` the `title` prop draws, `DialogFooter` renders into the same pinned footer region through context (so it stays at the bottom of the phone sheet, as `footer` does), and `FieldError` is the same line that sets `aria-invalid` on the control. The table parts are the native `thead`, `tbody`, `tfoot`, `tr` and `caption`, which HG's `Table` already styles. A prop and its part never draw twice: the component draws a slot only when its prop is given.
-- **Behavior stays HG's.** `AlertDialogAction` doesn't close on press, so `busy` keeps working (shadcn's closes). `DialogTrigger` and `AlertDialogTrigger` are React Aria's `DialogTrigger`, exported again from `dialog.tsx` and `alert-dialog.tsx`; the 4 files that import it from React Aria (`capex-breakdown.tsx`, `picker-layer.tsx`, `popover.tsx`, `sheet.tsx`) can keep doing so. `title` becomes optional on `Dialog` and `AlertDialog`, and a dialog with neither `title` nor a `DialogTitle` gets React Aria's missing-label warning.
-- **Parts with no HG look yet** (`DialogDescription`, `CardDescription`, `CardAction`, `CardFooter`, `EmptyHeader`, `EmptyTitle`, `EmptyMedia`, `AlertTitle`, `AlertDialogMedia`, the popover header parts, and `Field`'s content, title, group, set, legend and separator) are added the first time a pulled component needs one. Its look goes to Connor first, with 2 or 3 options.
-- **Parts that would add behavior** (`DropdownMenuSub` and its trigger and content, the `Select` and `Combobox` composition parts, the `Avatar` image parts and `Sidebar`'s 22) are added only when a job needs them, as their own change.
-- **Proof.** `src/components/parts.test.ts` renders each non-overlay component both ways with `react-dom/server`'s `renderToStaticMarkup` and asserts the same HTML (Field, Empty, Table, Alert, ToggleGroup). Overlays render in a portal that server rendering skips, so one dialog, alert dialog and dropdown menu written with parts is opened beside its props twin at 375 and 1280 by hand.
-- **docs/components.md** shows both forms for each of these components, props first, since that's how today's screens are written.
-
-| shadcn (aria-vega) | Its parts | HG's equivalent |
-|---|---|---|
-| `Dialog` | `DialogTrigger`, `DialogTitle`, `DialogHeader`, `DialogDescription`, `DialogFooter`, `DialogClose`, `DialogOverlay` | React Aria's `DialogTrigger`, or `isOpen` and `onOpenChange`; `title` (and `hideTitle`); the built-in header row; the first line of `children`; `footer`; the built-in X, the render-prop `close` (`{({ close }) => …}`), or `useDialog()?.close()`; the built-in scrim |
-| `AlertDialog` | `AlertDialogContent`, `AlertDialogHeader`, `AlertDialogTitle`, `AlertDialogDescription`, `AlertDialogFooter`, `AlertDialogAction`, `AlertDialogCancel`, `AlertDialogMedia`, `AlertDialogOverlay`, `AlertDialogTrigger` | `title`, `body`, `actions` (the confirm buttons) and `cancelLabel`; content and overlay are built in, and the parent's state opens it; no media slot |
-| `DropdownMenu` | `DropdownMenuTrigger`, `DropdownMenuItem`, `DropdownMenuGroup`, `DropdownMenuLabel`, `DropdownMenuSeparator`, `DropdownMenuShortcut`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent` | The first five under these names; `shortcut` on the item; no submenu (`followUp` is HG's second step) |
-| `Field` | `FieldLabel`, `FieldDescription`, `FieldError`, `FieldContent`, `FieldTitle`, `FieldGroup`, `FieldSet`, `FieldLegend`, `FieldSeparator` | `label`, `helper` and `error`; `FieldRow` for two fields side by side; the rest have no HG piece |
-| `Empty` | `EmptyHeader`, `EmptyTitle`, `EmptyDescription`, `EmptyContent`, `EmptyMedia` | `children` (one sentence) and `action`; `SpotArt` can fill a media slot later |
-| `Table` | `TableHeader`, `TableBody`, `TableFooter`, `TableRow`, `TableHead`, `TableCell`, `TableCaption` | `TableHead` and `TableCell`; native `thead`, `tbody`, `tfoot`, `tr` and `caption` |
-| `Card` | `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter` | `CardHeader`, `CardTitle` and `CardContent`; no description, action or footer |
-| `ToggleGroup` | `ToggleGroupItem` | An entry in `options` (`ToggleGroupOption`) |
-| `Alert` | `AlertTitle`, `AlertDescription`, `AlertAction` | `children` and `action` |
-| `Popover` | `PopoverTrigger`, `PopoverHeader`, `PopoverTitle`, `PopoverDescription` | `PopoverTrigger`; the required `aria-label` |
-| `Select`, `Combobox` | Trigger, content, list, item, group and chip parts | `items` and `sections` (Select); `items` and `allowCustom` (Combobox); several picks are `TagsField` |
-| `Avatar` | `AvatarImage`, `AvatarFallback`, `AvatarGroup`, `AvatarGroupCount`, `AvatarBadge` | `name`, `email` and `size` |
-| `Sidebar` | 22 parts beside `Sidebar`, plus `useSidebar` | None: HG's is one component |
-| `Command` | `CommandDialog`, `CommandInput`, `CommandList`, `CommandEmpty`, `CommandGroup`, `CommandItem`, `CommandShortcut`, `CommandSeparator` | `CommandDialog`; `Command` and `CommandItem` stay inside `command-palette.tsx` |
-
-### 4.7 Exports beside the renamed components
-
-| Export (file) | Importers outside its file | Plan |
-|---|---|---|
-| `SheetProps` (`sheet.tsx`) | 0 | `DialogProps`. The file's React Aria `type DialogProps` import becomes `type DialogProps as AriaDialogProps` first |
-| `SheetTrigger` (`sheet.tsx`) | 0 | Deleted (section 4.4); the doc example uses React Aria's `DialogTrigger` |
-| `MenuProps` (`menu.tsx`) | 0 | `DropdownMenuProps`. React Aria's is already imported as `AriaMenuProps` |
-| `FormSheetProps` (`form-sheet.tsx`) | 0 | `FormDialogProps` |
-| `focusFirstInvalid` (`form-sheet.tsx`) | 0 | Moves with the file to `form-dialog.tsx` and keeps its name |
-| `CreateForm`, `CreateFormContext`, `CreateFormProps` (`create-form.tsx`) | 4, 0, 0 | HG, keep their names |
-| `SandboxNotice`, `WarnMark`, `SourceLine` (`source-line.tsx`) | 3, 2, 4 | HG, keep their names; `SandboxNotice` renders `Alert` |
-| `FormFieldControlProps` (`ui.tsx`) | 0 | `FieldControlProps` |
-| `SearchTrigger`, `SearchPanel`, `SearchRow` (`command-palette.tsx`) | 0 | `SearchTrigger` keeps its name (the header's field-look button, HG); the other two become `Command` and `CommandItem`. None needs exporting |
-| `popoverSurface` (`popover.tsx`) | 0 | Deleted (section 4.4) |
-| `pickerFieldChevron` (`ui.tsx`) | 3 | HG, beside `pickerField` |
-| `LoadingScreen`, `rowWidth`, `HeadingBlock`, `TaskRowSkeleton`, `Words`, `SkeletonRows` (`skeleton.tsx`) | 19, 13, 4, 2, 1, 1 | HG loading compositions around `Skeleton` |
-| `AutosizeTextarea`, `InlineSwitch`, `InlineTags` (`inline-field.tsx`) | 1, 3, 1 | HG edit-in-place pieces |
-| `ProgressRing` (`media-uploader.tsx`) | 1 | HG. shadcn's `Progress` is a labeled bar; the ring is an upload's own mark |
-| `BackLink` (`back-link.tsx`) | 13 | HG. shadcn's `Breadcrumb` is a trail; `BackLink` is one link back |
-| `publicContainer`, `publicLinkHover`, `publicTextLinkClass` (`public/ui.tsx`) | 9, 4, 1 | HG, the public site |
-
-docs/components.md marks each HG row.
-
-## 5. Setup
-
-### 5.1 components.json
-
-Landing 2 writes this by hand at the repo root.
+### 5.2 components.json
 
 ```json
 {
@@ -377,193 +375,99 @@ Landing 2 writes this by hand at the repo root.
   "style": "aria-vega",
   "rsc": true,
   "tsx": true,
-  "tailwind": {
-    "config": "",
-    "css": "src/app/globals.css",
-    "baseColor": "neutral",
-    "cssVariables": true
-  },
+  "tailwind": { "config": "", "css": "src/app/globals.css", "baseColor": "neutral", "cssVariables": true },
   "iconLibrary": "lucide",
   "rtl": false,
   "menuColor": "default",
   "menuAccent": "subtle",
   "aliases": {
     "components": "@/components",
-    "ui": "@/components",
+    "ui": "@/components/ui",
     "utils": "@/lib/utils",
     "lib": "@/lib",
-    "hooks": "@/components"
-  },
-  "registries": {
-    "@intentui": "https://intentui.com/r/{name}"
+    "hooks": "@/components/ui"
   }
 }
 ```
 
-- **`tailwind.config` is empty** for Tailwind v4, and `tailwind.css` names the file that imports Tailwind.
-- **`baseColor`** is required by the schema. With `cssVariables` on, `add` ignores it; it only matters to `init`, which never runs.
-- **`iconLibrary`** must be set. Registry source imports an `IconPlaceholder` from `@/app/(create)/components/icon-placeholder`, and the icon transformer (`transform-icons.ts`) swaps it for lucide only when `iconLibrary` names a library. Left out, the import stays and breaks the build. The docs page doesn't list `iconLibrary`, `menuColor`, `menuAccent` or `rtl`; the schema and the transformers do.
-- **`menuColor` stays `default`.** `inverted` swaps the registry's `cn-menu-target` placeholder for the `dark` class (`transform-menu.ts`), which HG's `dark` variant doesn't match.
-- **`aliases.ui` is `@/components`,** so a pulled component lands beside HG's component files (`src/components/slider.tsx`), the way HG lays them out. The default `@/components/ui` would create a `src/components/ui/` folder beside `ui.tsx`, and `@/components/ui` and `@/components/ui/button` would resolve to different places. The cost is name collisions with HG's files, handled in section 5.3.
-- **`aliases.hooks` is `@/components`,** where HG's hooks live (21 files export them there).
-- **`registries` names `@intentui` up front.** Without it, the first real `add @intentui/<name>` finds Intent UI in shadcn's registry directory and writes this entry into `components.json` itself.
+- **`aliases.ui`** is shadcn's default, so no stock file meets an HG name (9 would collide in `src/components`). `@/components/ui` still resolves to `ui.tsx` and `@/components/ui/button` to the folder, in TypeScript and in a Next 16.3.3 Turbopack build (checked in a scratch app).
+- **`aliases.hooks`** is the same folder, so `use-mobile` sits under the one override.
+- **`iconLibrary`** must be set, or `IconPlaceholder` imports break the build. **`menuColor`** stays `default`. **No `registries`:** Intent UI is never pulled. **No `--font-heading`,** so stock titles take Geist.
 
-### 5.2 Style: aria-vega
+### 5.3 globals.css
 
-The style only changes class strings. Exports and props are the same across styles.
+Written by hand on HG's selectors, with a throwaway `init` (aria base, Vega, neutral, Geist) in a scratch worktree as the reference.
 
-| Style | Button `sm` / default / `lg` | Radius | Fit |
+| Rule | Why |
+|---|---|
+| `@import "tw-animate-css"` and `@import "shadcn/tailwind.css"` | The style item asks for them |
+| Base layer `* { @apply border-border outline-ring/50 }` | Stock's bare `border-b` relies on it. 7 HG strings with a width and no color get checked. HG's `body` rule already matches stock's |
+| `--radius: 0.625rem` and the `--radius-*` scale | 12.6 |
+| `--default-transition-duration` and its timing function come out of `@theme` | Stock transitions run at Tailwind's 150ms, not HG's 120ms ease-out (12.26) |
+| Unlayered under `pointer: coarse`: `min-height: 44px` on `[data-variant][data-size]:is(button, a)`, the attributes stock Button always writes, so every Button-based part is covered whatever its slot (`AlertDialogAction`, `DialogClose`, `SidebarTrigger` and the combobox buttons rename theirs); `min-width: 44px` on `[data-size^="icon"]:is(button, a)`; the same height on the slots `input`, `textarea`, `input-group`, `native-select`, `select-trigger`, `toggle`, `toggle-group-item`, `tabs-trigger`, `dropdown-menu-item`, `dropdown-menu-sub-trigger`, `select-item`, `combobox-item`, `command-item`, `sidebar-menu-button`, and a choice-card label (`[data-slot="field-label"]:has(> [data-slot="field"])`); `--cell-size: 2.75rem` on `[data-slot="calendar"]`, which beats the root's utility and sizes its cells and nav buttons with no stock edit; 48px on `[data-surface="public"] [data-size="lg"]:is(button, a)`. `input-group-control` takes no height, since its group carries it. Each landing checks its family's slot names | Stock tops out at 40px. Apple's default is 44pt; WCAG 2.5.5 asks 44px |
+| Elements with no `data-slot` keep `pointer-coarse:min-h-11`: OptionList rows that don't render a stock item part, AddRow, rail rows and TopTabs links. L removes only the `pointer-coarse:` classes on elements the rule above covers | The rule can't see them |
+| The 16px field guard stays (`input, select, textarea` under `pointer: coarse`) | Stock fields drop to 14px from 768px, which zooms on iOS and fails the iPad Mini check |
+| Under reduced motion: tw-animate's `--tw-enter-*` and `--tw-exit-*` scale, translate, rotate and blur get neutral values with `!important`, and `.animate-pulse` stops | tw-animate-css has no reduced-motion rule. The block's 0.01ms transitions already stop the Sheet, sidebar and Sonner |
+| At every pointer, `outline: 1px solid var(--foreground); outline-offset: -2px` on `[data-slot="toggle-group-item"][data-selected]` and `[data-slot="toggle"][data-selected]` | Stock's `muted` pick is 1.14:1 in light, a fill alone (WCAG 1.4.1). Every outline item already has a 1px `--input` edge, so the pick needs a cue the others lack: an ink line just inside its edge, wider and darker than theirs. An outline leaves the box-shadow focus ring alone |
+| HG's `:focus-visible` outline (`globals.css:405`) becomes `:focus-visible:not([data-slot], [data-slot="calendar"] *)` | Stock parts and calendar cells draw only their own ring; HG elements keep the 2px outline |
+
+### 5.4 cn and lint
+
+- **Stock files** keep `import { cn } from "cn"`. Its default merge drops a color beside an HG type role (`twMerge("text-sm text-muted-foreground", "text-meta")` gives `text-sm text-meta`) and keeps `shadow-float` beside `shadow-xs`, so until L no HG type, shadow or motion class goes into a stock part.
+- **HG's `cn`** becomes `createCn` from `cn/config` with today's `extend` block. The helpers beside it stay (140 files import `utils.ts`). In L it becomes `export { cn } from "cn"`.
+- **Lint bans `"cn"` imports in app code.** The package is installed for stock files, so a stray app import builds and runs, quietly skipping HG's merge config. Only lint can catch it.
+- **A splits `hg/design-tokens`.** Today it is one rule with `schema: []`, so an override can only turn all of it on or off. A makes three: `hg/design-tokens` (hex, raw palette, old names; on everywhere), `hg/raw-type` (text sizes, arbitrary sizes, a ground color as text) and `hg/raw-effects` (white, black, the shadow scale, backdrop blur).
+- **The `cn` ban goes in three places.** `@typescript-eslint/no-restricted-imports` is configured in the main block, for `src/lib/sentry-browser.ts` and for `src/lib/report-server.ts`, and a later flat-config block replaces the rule's options. So paths `["cn"]` and patterns `["cn/*"]` join all three. The `src/components/ui/**` override and a new `src/lib/utils.ts` override each restate the HEIC and Sentry entries and leave out `cn`, since `utils.ts` imports `cn/config` in A and re-exports `cn` in L.
+
+| Lint rule | `src/components/ui/**` | `src/lib/utils.ts` | App code |
 |---|---|---|---|
-| aria-vega | 32 / 36 / 40 | `rounded-md` | HG's heights and 6px radius |
-| aria-maia, aria-luma | 32 / 36 / 40 | pill | Pill buttons, which the brand rules out |
-| aria-nova, aria-lyra, aria-rhea | 28 / 32 / 36 | `lg`, none, `2xl` | A step smaller |
-| aria-mira | 24 / 28 / 32 | `md` | Much smaller |
-| aria-sera | 36 / 40 / 44 | none | A step larger |
+| `hg/design-tokens`: hex, raw palette, old color names; the copy rules | On | On | On |
+| `hg/raw-type`: Tailwind text sizes | Off | On | On until L, then the pattern goes |
+| `hg/raw-type`: arbitrary text sizes; a ground color as text (`text-muted`, `text-accent`, `text-background`) | Off | On | On |
+| `hg/raw-effects`: white and black after a color utility, Tailwind's shadow scale, backdrop blur | Off | On | On, new in A |
+| `react-hooks/set-state-in-effect` | Off (`use-mobile`) | On | On |
+| Imports from `"cn"` and `"cn/*"` | Allowed | Allowed | Banned |
 
-Nova is the CLI's default preset, but `init --defaults` picks the Base UI base with it (base-nova), not aria-nova (`init.ts`, `preset/defaults.ts`). Decision 3's sizes and radius match Vega only (Maia and Luma share the heights but are pills), so Vega it is. It still isn't HG to the pixel: it puts `shadow-xs` on outline buttons, inputs, select triggers and cards, pads its `sm`, default and `lg` buttons `px-2.5` (HG's default is `px-3.5`), and uses `text-sm`. Section 5.4 puts HG's classes back on every pulled file.
+After landing 1, linting the 39 stock files the research checked gives about 80 errors (77 text sizes, 1 arbitrary size, 1 hook rule, and the `text-background` hits in tooltip and kbd), all cleared by the override. The new bans use the first draft's patterns: `(?<![\w-])(${UTIL})-(white|black)(?![\w-])` with an opacity allowed, `shadow-2xs` to `shadow-2xl` and `shadow-inner`, and `backdrop-blur` at any step. The bare word stays allowed, as in `ctx.fillStyle = "white"` (`src/lib/attachments/prepare.ts:167`).
 
-### 5.3 Adding a component
+### 5.5 Public overlays
 
-`components.json` must exist first. Without it, `shadcn add` offers to create one and runs `init` with force.
+Stock overlays portal to `body`, outside the public wrapper, so on `/rentals`, the move-in form and login they would draw light. Landing A adds `PublicSurface` (`src/components/public/surface.tsx`), a client component that renders the `data-surface="public"` div with a ref and wraps its children in `UNSAFE_PortalProvider` with `getContainer={() => ref.current}`. A server component can't create that function, so the 3 public grounds (`(marketing)/layout.tsx`, `login/_components/auth-frame.tsx`, the root `not-found.tsx`) render `PublicSurface` in place of their div. Stock Popover, Modal and Tooltip render through React Aria's `Overlay` and `OverlayContainer`, which read the provider, and so do HG's React Aria overlays until they go stock. Sonner renders in place, so a Toaster inside the wrapper is covered. HG's `surface="public"` prop (7 sites, threaded through 10 components) goes family by family.
 
-```sh
-npx shadcn@4.23.0 add <name> --dry-run   # every file and package it would write
-npx shadcn@4.23.0 add <name> --view      # the code, before anything is written
-npx shadcn@4.23.0 add <name>             # writes; answer No to every overwrite prompt
-git status --short                       # only the new file, package.json and package-lock.json
-```
-
-- **Never run** `shadcn init` (in any form, `--preset` included), `shadcn apply`, `add --overwrite` or `-o`, `add --all`, any `shadcn migrate` or `shadcn eject`.
-  - `init` overwrites `src/lib/utils.ts` in full with `export { cn } from "cn"`, deleting `fmtMoney`, `fmtDate`, `initials` and HG's merge config. No flag skips it.
-  - `init` rewrites `globals.css`: it replaces variables that share shadcn's names, adds a `.dark` block, the `--radius-*` block (6, 8, 10 and 14px), `@import "tw-animate-css"`, `@import "shadcn/tailwind.css"` and a base layer (`* { border-border outline-ring/50 }`).
-  - `init` also installs a font (Vega brings Inter) and edits `app/layout.tsx`.
-- **What `add` does.** It writes component files and installs their packages. It skips a bare package request when `package.json` already declares that package; a versioned request (aria-vega's `chart` asks for `recharts@3.8.0`) goes to npm as written, so the dry run is checked for version bumps. It writes to `globals.css` only for an item that carries CSS or CSS variables, which is why every run is checked.
-- **Packages HG doesn't have.** Most aria-vega items ask only for `cn`. A few bring more: `drawer` brings `@base-ui/react`, `chart` `recharts@3.8.0`, `sonner` `sonner` and `next-themes`, `message-scroller` and `questionnaire` `@shadcn/react`, and `carousel`, `input-otp` and `resizable` their own. Any of these goes to Connor before it's installed.
-- **After every run,** `src/app/globals.css`, `src/lib/utils.ts` and `src/app/layout.tsx` must show no diff. If one does, restore it with `git restore`.
-- **Name collisions.** After landing 2, 12 HG files carry a registry item's name: `alert-dialog`, `avatar`, `combobox`, `dialog`, `dropdown-menu`, `popover`, `select`, `skeleton`, `spinner`, `switch`, `toggle-group` and `tooltip`. Never `add` one of these by name: HG's file is the component. An item that lists one in its `registryDependencies` (aria-vega's `command` lists `dialog`; `sidebar` lists `skeleton` and `tooltip`; `calendar` lists `select`) prompts to overwrite it. Answer No. The pulled file's part imports (`DialogHeader`, `DialogTitle`) land on HG's parts. A part HG doesn't have yet fails typecheck, and is added to HG's file then (section 4.6).
-- **A registry dependency HG has under another file** arrives as a new file: `button`, `input`, `textarea`, `checkbox`, `card`, `table`, `badge` and `kbd` live in `ui.tsx`, and `sheet` is HG's `Dialog`. Delete the file the CLI wrote and point the import at HG's export.
-- **The `cn` package.** 58 of the 62 aria-vega items list it, so the CLI installs it. Uninstall it (`npm uninstall cn`): HG's `cn` is the one with the merge config, and `cn` 0.5.2 wants Node 22 where local Node is 20.20.1.
-
-### 5.4 Conforming a pulled component
-
-A pulled file ships only after these, and after lint, typecheck, tests and the device check pass. The strings below are aria-vega's.
-
-1. **Imports.** `cn` from `"cn"` becomes `@/lib/utils`; the CLI doesn't rewrite it, and without HG's merge config `cn("text-fg-2", "text-body")` drops the color. Dependencies HG has point at HG's exports, and parts keep their names, since HG exports them; a part HG doesn't have yet is added to HG's file first (section 4.6). Where pulled code needs React Aria props on a button (`onPress`, `slot`), it uses React Aria's `Button` with `buttonVariants` classes.
-2. **Type roles.** `text-sm font-medium` (buttons, labels) becomes `text-label`; `text-base md:text-sm` (inputs) becomes `text-body`, which is already 16px on touch; description `text-sm` becomes `text-meta`; `text-xs` becomes `text-micro`; a dialog title (`leading-none font-medium`, which takes its size from the content's `text-sm`) and an alert dialog title (`text-lg font-medium`) become `text-section`, and the dialog content's `text-sm` is dropped. Lint rejects the raw sizes.
-3. **Grounds and edges.**
-   - Dialog and alert dialog content: `rounded-xl bg-popover ring-1 ring-foreground/10` becomes `rounded-xl bg-popover border border-line-float shadow-overlay`, HG's Overlay level.
-   - Popover and dropdown menu content: `rounded-md bg-popover shadow-md ring-1 ring-foreground/10` becomes `rounded-lg bg-popover border border-line-float shadow-float`, the Float level.
-   - Card: `rounded-xl bg-card shadow-xs ring-1 ring-foreground/10` becomes `rounded-lg bg-card border border-border`, HG's flat card.
-   - Overlay: `bg-black/10 supports-backdrop-filter:backdrop-blur-xs` becomes `bg-scrim`, with no blur.
-   - Tooltip: `bg-foreground text-background`, and its arrow's `bg-foreground fill-foreground`, become `bg-toast-bg text-toast-fg border-toast-edge`.
-4. **Hover fills.** aria-vega's outline and ghost buttons already hover on `bg-muted`, and its menu items highlight on `focus:bg-accent` inside a raised layer, where `accent` stays. A pulled hover on `bg-accent` over the surface becomes `bg-muted`. The dropdown menu, context menu, select and combobox content's `**:data-[slot$=-item]:data-focused:bg-foreground/10` comes off, so items highlight on `accent`.
-5. **Shadows.** Strip `shadow-xs` and `shadow-sm`. `shadow-md` becomes `shadow-float`, and `shadow-lg` and `shadow-xl` become `shadow-overlay`.
-6. **Strip** every `dark:` class, `selection:bg-primary`, the focus ring (every `ring-*` and `border-ring` class under `focus-visible:`, `data-focus-visible:`, `focus-within:` or a `has-[…:focus-visible]:` variant, such as `focus-visible:ring-3 focus-visible:ring-ring/50` and the `ring-[3px]` form some items use; HG's global outline does focus), the press nudge `active:not-aria-[haspopup]:translate-y-px`, and the `color-mix()` hover on the `secondary` button.
-7. **Motion.** tw-animate-css classes (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`) become HG's (`animate-pop-in`, `animate-fade-in`, `duration-fast`, `ease-spring`). HG doesn't import tw-animate-css or `shadcn/tailwind.css`. Tailwind's own `data-*` variants match React Aria's attributes; a shadcn-only utility (`no-scrollbar`, `scroll-fade-*`, `shimmer`) is rewritten, or copied into `globals.css` by hand and reviewed.
-8. **Radius.** `rounded-[min(var(--radius-md),10px)]` and `rounded-[min(var(--radius-md),8px)]` become `rounded-md`; `rounded-[2px]`, `rounded-[4px]`, input-group's `rounded-[calc(var(--radius)-5px)]` and the badge's `rounded-4xl` move to HG's steps (4, 6, 8, 12).
-9. **Touch.** Every control reaches 44px on touch through `TOUCH_HEIGHT` or its own `pointer-coarse:` classes, and a tooltip's content is reachable by tap.
-10. **Keys HG doesn't have.**
-
-    | Pulled key | HG target |
-    |---|---|
-    | Button `default`, `outline`, `ghost`, `link` | Same key |
-    | Button `secondary` (a filled neutral button) | `outline`, HG's button for everything that isn't the one next step. A filled neutral look goes to Connor |
-    | Button `destructive` (aria-vega's red tint) | Reviewed per site: a confirm button that names what goes keeps `destructive` (HG's solid fill); anything else becomes `danger` |
-    | Size `default`, `sm`, `lg`, `icon`, `icon-sm` | Same key |
-    | Size `xs` and `icon-xs` (24px) | `sm` and `icon-sm`, HG's smallest (32, 44 on touch) |
-    | Size `icon-lg` (40px) | Goes to Connor: HG has no 40px icon button |
-    | Badge `secondary`, `destructive` | Same key; aria-vega's `destructive` badge is a tint, as HG's is |
-    | Badge `outline` | A span with `tagClass`, HG's neutral chip |
-    | Badge `default`, `ghost`, `link` | Go to Connor: HG has no ink, ghost or link badge |
-
-11. **Check.** Open every state at 375 and 320. A pulled component that brings a look HG doesn't have yet goes to Connor before it ships.
-
-### 5.5 Intent UI, the fallback
-
-For a job shadcn's aria registry lacks (it has 62 components; Intent UI has 87, including number field, search field, date field, tree, tag group, meter, color picker and drop zone).
+### 5.6 Adding a component
 
 ```sh
-npx shadcn@4.23.0 add @intentui/<name> --dry-run
-npx shadcn@4.23.0 add @intentui/<name>
+npx shadcn@4.23.0 add <name> --dry-run   # files and packages it would write
+npx shadcn@4.23.0 add <name> --view      # the code
+npx shadcn@4.23.0 add <name>             # writes into src/components/ui/
+npx shadcn@4.23.0 add <name> --diff      # later: drift from the live registry
 ```
 
-`@intentui` is in shadcn's built-in registry directory. Intent UI is MIT licensed and built on React Aria and Tailwind v4. It uses shadcn's token names for the shared roles (background, foreground, muted, primary, secondary, accent, border, input, ring, the sidebar set, chart-1 to chart-5), but not shadcn's component names or its `variant` prop. Each pull gets section 5.4 plus:
+- **`components.json` first.** Without it, `add`, `--dry-run` included, runs `init` with force.
+- **Never on the branch:** `init` in any form, `apply`, `add --all`, `migrate` or `eject`. `init` replaces `utils.ts`, overwrites `:root` with neutral oklch, adds a `.dark` block HG never matches, rewrites `--font-sans`, and always overwrites files.
+- **After every `add`:** no diff in `utils.ts` or `layout.tsx`, none in `globals.css` beyond the planned lines, and no version bump in the dry run.
+- **The table goes by URL, always:** `npx shadcn@4.23.0 add https://ui.shadcn.com/r/styles/base-vega/table.json`, with `--diff` or `--overwrite` the same way. `add table` by name resolves aria-vega's grid, so its diff shows the whole file and an overwrite would swap in the grid 12.19 rejected.
+- **Snapshot.** When an item is pulled, its registry JSON is saved as `scripts/shadcn-snapshot/<item>.json` and each written file's hash in `scripts/shadcn-snapshot/files.json`. Each landing compares every stock file with its recorded hash, which proves no local edit (`table.tsx` against its recorded edit). The registry is served live and unversioned, so a non-empty `add --diff` is read as an upstream change and goes to Connor as an update, not as a failure.
+- **Updates** run `add --overwrite` inside `src/components/ui/` only, then refresh the snapshot; `table.tsx`'s edit is reapplied after.
+- **Dependencies land in the same folder:** `select` brings `input-group`, which brings `button`, `input` and `textarea`; `command` brings `dialog`; `calendar` brings `select`; `field` brings `label` and `separator`; `sidebar` brings `sheet`, `skeleton`, `tooltip` and `use-mobile`. So B comes before fields, overlays and pickers.
+- **A stock file never takes HG classes,** except `table.tsx`'s recorded edit (12.19). Any other misfit goes to Connor.
+- **No item?** There's none for a number, search or date field, a date-picker root, tag group, meter, file trigger, drop zone or navigation menu. Compose from React Aria and stock parts. Intent UI's matching item is an anatomy reference only: its look differs, and it wants react-aria-components 1.22. Mobbin still decides screens, flows, page layouts, empty states and payoff moments at every size.
 
-- `intent` becomes `variant`, tailwind-variants `tv()` becomes cva, `cx` from `@/lib/primitive` becomes `cn`, and heroicons become lucide.
-- Its tokens HG doesn't define are mapped by hand, since Tailwind drops an unknown class and lint doesn't flag one. `overlay` and `overlay-foreground` become `popover` and `popover-foreground`. `danger` and `danger-subtle-foreground` become `destructive`. `danger-foreground` becomes `destructive-foreground`, and `danger-subtle` becomes `destructive-tint` (decision 9). `primary-subtle*`, `warning-subtle*`, `success-subtle*`, `info-subtle*` and `navbar*` go to Connor. A blind `danger` to `destructive` swap would leave `destructive-subtle-foreground`, which nothing defines.
-- Its button asks for `tailwind-variants` and `tailwindcss-react-aria-components` (bare), its `primitive` dependency writes `src/lib/primitive.ts`, and 25 of its 87 items, dialog and select among them, ask for `@heroicons/react`. After the conversion, run `npm uninstall tailwind-variants tailwindcss-react-aria-components @heroicons/react` (whichever the pull installed) and delete `src/lib/primitive.ts`, as section 5.3 does for `cn`.
-- Its items add CSS to `globals.css`: `@plugin "tailwindcss-react-aria-components"` on every item, `@utility touch-target`, the sheet's keyframes, and in 28 items CSS variables for `overlay` and the `*-subtle` tokens (light, dark and `@theme`). The base layer that colors every border comes only with its `theme-*` items, which are never pulled. Restore `globals.css` and copy in only what the component needs.
-- Its own package wants react-aria-components ^1.22.0 and HG is on 1.21.1. Its registry items ask for the package bare, so the CLI won't upgrade it; a component that needs 1.22 fails typecheck and waits for a separate React Aria upgrade.
+## 6. Rules
 
-### 5.6 When Mobbin still applies
+### 6.1 Landing 1's rule and doc edits
 
-- **Jobs neither registry covers:** screens, flows, page layouts, empty states, payoff moments, and compositions such as the filter bar.
-- **How a pattern behaves at each size.** A registry gives anatomy, not the phone and desktop versions of a screen. Mobbin and comparable products still decide those.
-- **When a pulled component's look differs from HG's,** the research goes with the options to Connor.
+- **CLAUDE.md, "One switch per job"** (`:53`): "the selected segment's surface fill and control edge" becomes "the selected segment's `--background` fill and `--input` edge", since the script doesn't match bare words. Landing I rewrites the bullet.
+- **CLAUDE.md, Personality** (`:38`): "…and the retired alias names under `src/`" becomes "…and the old HG color names under `src/`, naming the new one".
+- **CLAUDE.md, Enforce it in code** (`:78`): "CSS isn't linted, so check it by hand." becomes "CSS isn't linted. `src/lib/token-names.test.ts` catches old color names in CSS, tests and the docs; check the rest of CSS by hand."
+- **Brand doc section 4:** the intro says tokens use shadcn's names where shadcn has the role and HG names where it doesn't. It takes section 11's email rule (email reads the hex mirror, which a test keeps equal to `globals.css`) and the rule that a re-brand is a token swap (`eslint.config.mjs:58`); the three comments that cite "section 11" (`brand-tokens.ts:3`, `email/render.ts:12`, `eslint.config.mjs:59`) point at section 4. Its tables go through the script, "Act (ink)" becomes "Primary (ink)", the ring gets its own row, and the bare-word grounds (lines 101 to 195) are edited by hand.
+- **Brand doc sections 11 and 12** are replaced, before the script runs, by a short "11. History": the Oct 25 rollout landed in `4f45a1b`, and the Nov 14 rename is this spec. The old alias row maps these names to other tokens, so it can't stay. The script then changes 155 `--name` mentions in the file, plus 13 for the derived family.
+- **docs/components.md** goes through the script: 116 `--name` mentions and 1 class mention.
 
-## 6. Rules that change
+### 6.2 hg/design-tokens in landing 1
 
-### 6.1 CLAUDE.md and README.md
-
-**Design references, first bullet** (landing 2). Today: "…or the shadcn/ui component that does the job. shadcn/ui is a reference for anatomy and props only; we build in our own Tailwind primitives and don't add it as a dependency. Invent only when nothing fits, and say so when you do." New:
-
-> - **Never make UI up from scratch.** Our components are shadcn/ui on its React Aria base, in the Ink and Limestone skin, under shadcn's names. Every layout, control and interaction traces back to one of them. A missing component comes from shadcn's aria registry first, then Intent UI, and is conformed to our rules before it ships (docs/components.md). For a job neither covers, use a proven pattern from Mobbin, Apple HIG or Material, built on our primitives. Invent only when nothing fits, and say so when you do.
-
-**Design references, "Check Mobbin before designing anything new"** (landing 2, `CLAUDE.md:28`). Today it sends dialogs to Mobbin first. New:
-
-> - **Check the registries, then Mobbin.** A control or dialog comes from shadcn's aria registry or Intent UI first. Screens, redesigns, flows and empty states start on Mobbin: cover both the mobile and desktop versions of the pattern, and look at comparable products alongside it.
-
-**Design references, "Cite what you used"** (landing 2). New:
-
-> - **Cite what you used.** Link the references in the commit message or handoff notes, next to the components reused, and name any registry item pulled (`shadcn add dialog`, `@intentui/tree`).
-
-**Design references, "Adapt, don't copy"** (landing 2). New:
-
-> - **Adapt, don't copy.** References decide the pattern; the build uses our primitives and tokens. A component pulled from a registry takes our sizes, type roles and tokens before it ships.
-
-**Reuse first, steps 2 and 3** (landing 2). New:
-
-> 2. **Pull before you build.** If nothing here does the job, add it from shadcn's aria registry, or from Intent UI when shadcn has none, the way docs/components.md says. Research on Mobbin only for jobs neither covers. See Design references.
-> 3. **Leave it findable.** New general-purpose components go in `src/components/` under their shadcn name (primitives in `src/components/ui.tsx`) and get a row in docs/components.md in the same commit. Feature-only compositions stay beside their page and don't need a row.
-
-**Craft the edges, "One switch per job"** (`CLAUDE.md:53`). Landing 1: "the selected segment's surface fill and control edge" becomes "the selected segment's `--background` fill and `--input` edge", since the rename script doesn't match bare words. Landing 2: "Views and filters inside a page use the segmented control" becomes "Views and filters inside a page use `ToggleGroup` (the segmented control)".
-
-**Personality, first bullet** (landing 1): "…rejects raw palette classes, hex values, raw and arbitrary text sizes, and the retired alias names under `src/`" becomes "…rejects raw palette classes, white and black, Tailwind's own shadows and blur, hex values, raw and arbitrary text sizes, and the old HG color names under `src/`, naming the new one".
-
-**Enforce it in code, second bullet** (landing 1): "CSS isn't linted, so check it by hand." becomes "CSS isn't linted. `src/lib/token-names.test.ts` catches old color names in CSS, tests and the docs; check the rest of CSS by hand."
-
-**README.md, "Before you build" step 3** (landing 2). Today: "Nothing fits? Research the pattern on Mobbin, then build it." New: "**Nothing fits?** Add it from shadcn's aria registry, or Intent UI when shadcn has none (docs/components.md, Adding a component). Research on Mobbin only for jobs neither covers."
-
-**README.md, Stack** (landing 2): add "UI: shadcn/ui on its React Aria base, in the Ink and Limestone skin ([docs/brand-guidelines.md](docs/brand-guidelines.md)). Components live in `src/components/`, and `components.json` configures the shadcn CLI."
-
-The rule rewrite rides with landing 2 because it points at the CLI workflow and docs/components.md, which arrive there. Landing 1 changes the color and lint wording.
-
-### 6.2 docs/brand-guidelines.md
-
-- **Section 4 intro** (landing 1). Today: "Tokens live on `:root` (light) and `:root[data-theme="dark"]`, mapped in `@theme inline` as `--color-*`. Text tokens are `fg-*`, so utilities read `text-fg-2`." New: "Tokens use shadcn/ui's names where shadcn has the role (`--background`, `--foreground`, `--muted-foreground`, `--primary`, `--border` and the rest) and HG names where it doesn't (`--fg-2`, `--line-strong`, `--canvas`, status, brand, toast and photo). They live on `:root` (light) and `:root[data-theme="dark"], [data-surface="public"]`, mapped in `@theme inline` as `--color-*`, so utilities read `text-muted-foreground` and `text-fg-2`."
-- **Section 4 takes section 11's email rule that code cites** (landing 1): email can't read CSS variables, so it reads the hex mirror in `src/lib/brand-tokens.ts`, which a test keeps equal to `globals.css`. It also adds the rule `eslint.config.mjs:58` states: a re-brand is a token swap. The three comments that cite "section 11" (`src/lib/brand-tokens.ts:3`, `src/lib/email/render.ts:12`, `eslint.config.mjs:59`) point at section 4.
-- **Section 4 tables** (landing 1): token names through the rename script. "Act (ink)" becomes "Primary (ink)", and the focus ring moves to its own row: `--ring`, pointing at `--primary`. The contrast columns and notes name grounds as bare words ("vs surface", "light fill-2", "dark raised", the floor list "canvas, surface, raised, fill-1, fill-2, select"), which the script doesn't match. They're edited by hand (lines 101 to 195).
-- **Section 3** (landing 2): line 72's `Th` and `Td` become `TableHead` and `TableCell`.
-- **Section 5, Radius** (landing 1): after "never redefine `--radius-*`", add "`--radius` is 0.5rem, for shadcn components that read it."
-- **Section 5, Controls** (landing 2): line 232's "(md)" becomes "(default)".
-- **Section 9** (landing 2): the Buttons table takes `default`, `outline`, `ghost`, `danger`, `destructive` and `link`, and the sizes `sm`, `default` and `lg`, and the Buttons bullet (line 330) says `default` for `md`. Badge tones become variants, with `secondary` the default. "Dialogs and sheets" names `Dialog` and `AlertDialog`; the segmented control names `ToggleGroup`. "Tables and money" (lines 378 and 379) names `TableHead` and `TableCell`.
-- **Sections 11 and 12** (landing 1): replaced, before the rename script runs on the file, by a short "11. History" section. It says the Oct 25 rollout landed in `4f45a1b` and the Nov 14 rename is this spec. The old alias row maps the same names to other tokens (`--background` to `--fill-1`), so it can't stay beside the new names. The tables stay in git history.
-
-Sections 11 and 12 hold 10 of the file's 165 `--name` mentions and all 3 of its class mentions, so the rename script changes 155 and none (plus 13 for the derived family).
-
-### 6.3 docs/components.md (landing 2)
-
-- **Every row names its pick by its shadcn name,** linked to the shadcn aria docs page, with HG's file beside it. Pieces shadcn lacks carry an "HG" mark (sections 4.3 and 4.7).
-- **A "Formerly" column** holds each renamed piece's old name, so an old name from chat, memory or a dated doc still finds its row.
-- **A new "Adding a component" section** holds sections 5.3 and 5.4, and points to Intent UI and Mobbin.
-- **"Where things live"** adds `components.json` and says pulled components land in `src/components/`.
-- **Duplicates and Known gaps** take landing 3's counts in place of "about 55 raw `<button>`s" and "about 50 raw fields".
-- **Landing 1** runs the rename script over it first: 116 `--name` mentions and 1 class mention.
-
-### 6.4 hg/design-tokens (landing 1)
-
-- **Delete the "Retired alias" pattern.** It rejects `text-foreground`, `bg-background`, `border-border`, `bg-primary`, `bg-accent` and, through its `\b`, `text-muted-foreground`, so every renamed file would fail lint.
-- **Add the old-name ban.** The map lives once, in `scripts/token-renames.mjs`, a data module with no side effects. `eslint.config.mjs`, `token-names.test.ts`, `rename-tokens.mjs` and the proof import it; the CLI's file walk lives only in `rename-tokens.mjs`.
+- **Delete the "Retired alias" pattern.** It rejects `text-foreground`, `bg-background`, `border-border` and, through its `\b`, `text-muted-foreground`, so every renamed file would fail.
+- **Add the old-name ban,** from one data module with no side effects that `eslint.config.mjs`, `token-names.test.ts`, `rename-tokens.mjs` and the proof import:
 
 ```js
 // scripts/token-renames.mjs
@@ -580,239 +484,219 @@ export const OLD_CLASS = new RegExp(`(?<![\\w-])(${UTIL})-(${KEYS})(?![\\w-])`, 
 export const OLD_VAR = new RegExp(`(?<![\\w-])--(?:color-)?(${KEYS})(?![\\w-])`, "g");
 ```
 
-- **Messages name the new class:** `"text-fg-3" is the old name. Use "text-muted-foreground".` For `act`: `Use "ring-primary", or "ring-ring" for a focus ring.` Loop with `matchAll`, not `.test`, so a `g` regex keeps no state between strings.
-- **The lookahead** keeps `border-line` from flagging `border-line-strong`, and kept names (`fg-2`, `line-strong`, `toast-*`) stay out of the map.
-- **Keep a narrow ban on old meanings:** `text-muted`, `text-accent` and `text-background` with nothing after them. Until Oct 25 `text-muted` meant `fg-3`; after the rename it draws the `--muted` ground color as text, which nearly disappears. Message: "A ground color used as text. Use text-muted-foreground or text-foreground."
-- **Extend the raw-value bans,** which cost nothing today (0 utility uses in linted `src` files; `utils.test.ts` holds one `shadow-sm`, and lint skips tests):
-  - Every palette in Tailwind 4.3.3's `theme.css` in one pattern, not a list that misses some: `amber`, `blue`, `cyan`, `emerald`, `fuchsia`, `gray`, `green`, `indigo`, `lime`, `mauve`, `mist`, `neutral`, `olive`, `orange`, `pink`, `purple`, `red`, `rose`, `sky`, `slate`, `stone`, `taupe`, `teal`, `violet`, `yellow` and `zinc`, each followed by a step. Intent UI ships sky, indigo, emerald, teal, pink, rose, lime and cyan themes, none of them in today's list.
-  - `white` and `black` after any color utility in `UTIL` (the same prefix list as `OLD_CLASS`, so `border-t-white` and `caret-black` are covered too), as `(?<![\w-])(${UTIL})-(white|black)(?![\w-])` with a `/NN` opacity allowed ("Use a token: primary-foreground, foreground or scrim"). The bare word stays allowed: `ctx.fillStyle = "white"` in `src/lib/attachments/prepare.ts:167` paints a JPEG's canvas.
-  - `shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl` and `shadow-inner` ("Use shadow-float or shadow-overlay"). Bare `shadow` stays out: the rule reads every string, and the bare word can't be told apart from a sentence.
-  - `backdrop-blur` with any step ("No glass. Use a ground token"). aria-vega's overlay brings `backdrop-blur-xs`.
-  - Pulled shadcn code carries `bg-white`, `bg-black/10`, `shadow-xs` and `backdrop-blur-xs`.
-- **Update the messages** that name old tokens: the hex message's example becomes `text-fg-2, bg-canvas, border-border`, and the palette message becomes "foreground, muted-foreground, fg-2, muted, accent, border for neutrals; destructive, warn, ok for status".
-- **Keep the ban for good.** Specs, memory and habits carry the old names.
+- **Messages name the new class:** `"text-fg-3" is the old name. Use "text-muted-foreground".` For `act`: `Use "ring-primary", or "ring-ring" for a focus ring.` Loop with `matchAll`, so a `g` regex keeps no state between strings. The lookahead keeps `border-line` from flagging `border-line-strong`.
+- **A narrow ban on old meanings:** `text-muted`, `text-accent` and `text-background` alone draw a ground color as text, which nearly disappears. Until Oct 25 `text-muted` meant `fg-3`. Landing A moves this ban into `hg/raw-type`, scoped to app code, since the stock tooltip uses `text-background`.
+- **Every palette** in Tailwind 4.3.3's `theme.css`, in one pattern: `amber`, `blue`, `cyan`, `emerald`, `fuchsia`, `gray`, `green`, `indigo`, `lime`, `mauve`, `mist`, `neutral`, `olive`, `orange`, `pink`, `purple`, `red`, `rose`, `sky`, `slate`, `stone`, `taupe`, `teal`, `violet`, `yellow`, `zinc`.
+- **Not in landing 1:** the white, black, shadow and blur bans, which arrive in A for app code only (12.1).
+- **Updated messages:** the hex example becomes `text-fg-2, bg-canvas, border-border`; the palette message becomes "foreground, muted-foreground, fg-2, muted, accent, border for neutrals; destructive, warn, ok for status". The ban stays for good, since specs, memory and habits carry the old names.
 
-### 6.5 The living specs and plans (landing 2)
+### 6.3 Rule changes by landing
 
-Landing 1 renames tokens across the docs; landing 2 renames components there too. These docs name old components in code spans:
+| Rule today | Becomes | Landing |
+|---|---|---|
+| CLAUDE.md, Ask before visual changes | Adds: a stock component as `shadcn add` writes it needs no separate design ask, since its landing's review covers it; changing its classes does | A |
+| CLAUDE.md, Design references: shadcn is "a reference for anatomy and props only"; "Adapt, don't copy" | Components are stock aria-vega; the brand doc sets the theme; a stock file changes only through the global rules. "Adapt, don't copy" goes | A |
+| CLAUDE.md, "Check Mobbin…", "Cite what you used" | Controls come from the registry; Mobbin decides screens and flows. Citations name each item pulled | A |
+| CLAUDE.md, Reuse first | Pull from the registry, never `init`; compose, don't restyle; stock files in `src/components/ui/`, compositions in `src/components/` | A |
+| CLAUDE.md, "Motion is feedback. A short spring…" | Respect reduced motion: stock animates, and one block cuts it to a fade | A |
+| CLAUDE.md lint wording, README.md Stack and "Before you build" | The scoped bans; stock shadcn/ui, pull before you build; README's "Node 20+" becomes "Node 24" | A |
+| CLAUDE.md, Device check | Adds: it runs in light and dark | A |
+| Brand doc: the radius table and "never redefine `--radius-*`", the base layer, the 2px focus rule | Stock's radius scale, base layer and focus ring | A |
+| docs/components.md | Gains "Adding a component" (5.6). Each landing turns its rows to the stock item, with a "Formerly" column | A to K |
+| Brand doc rows for a family | Deleted in that family's landing | A to L |
+| CLAUDE.md, "tablet 768x1024 (gets the touch layout)" | Stock draws its desktop layout from 768; touch adds 44px targets and 16px fields | F |
+| CLAUDE.md, "Keep spacing tight. Menus and popovers size to their content" | Goes | G |
+| CLAUDE.md, "Touch has no hover…" | A tooltip never holds the only copy; tap-to-edit; no hover-only reveals | G |
+| CLAUDE.md, "One switch per job" | `TopTabs` for routes; `ToggleGroup` for views and filters, the pick marked by an inset ink ring as well as its fill | I |
+| CLAUDE.md, "State toggles use one weight… `aria-pressed`" and "never for state" | State lives in the markup: `aria-current="page"` on route nav, React Aria's selected state on stock toggles. The weight clauses go | I |
+| CLAUDE.md, "Sticky headers clip at a divider" | Goes; the table's recorded edit carries it | J |
+| CLAUDE.md, Typography | Geist is the font; page text uses Tailwind's sizes, figures `tabular-nums`. The text-size ban leaves the lint wording | L |
+| Brand doc: the type scale, elevation and motion tables | Go; page text uses Tailwind's sizes, and stock sets shadows and motion | L |
+| CLAUDE.md, "One Esc closes one layer" | Goes; React Aria does it | M |
+| CLAUDE.md, "Things that should line up" and "A mark's position carries meaning" | Fold into the brand doc's page layout | M |
+| All of the above, the brand doc, README.md and the living specs (205 old component names in 14 docs at `200093a`) | Consolidated | M |
 
-| Doc | Mentions |
-|---|---|
-| `docs/specs/selectors.md` | 48 |
-| `docs/specs/forms-editing.md` | 36 |
-| `docs/specs/search.md` | 27 |
-| `docs/specs/build-plan.md` | 22 |
-| `docs/specs/charts.md` | 17 |
-| `docs/specs/activity-comments.md` | 13 |
-| `docs/specs/tenant-contact.md` | 12 |
-| `docs/specs/uploads-photos.md` | 8 |
-| `docs/specs/contractor-trades.md` | 5 |
-| `docs/specs/view-as.md` | 5 |
-| `docs/contractor-invoices-plan.md` | 4 |
-| `docs/task-templates-plan.md` | 4 |
-| `docs/specs/performance.md` | 3 |
-| `docs/asana-migration-plan.md` | 1 |
+### 6.4 What the rules keep after M
 
-That's 205 in 14 docs, beside docs/components.md (79, rewritten) and the brand doc. A component pass in the rename script lists each name in a code span with its line, and each is renamed by hand: "Sheet", "Menu", "Block" and "Notice" are also words, and some spans name React Aria's own part (`selectors.md:44` says React Aria's `MenuTrigger`, which keeps its name). `docs/uiux-review/` (6 mentions in 4 files) stays as a dated audit, with the same header line as for tokens.
+- **CLAUDE.md's accessibility floor:** 44px touch targets, 16px fields on iOS, reduced motion, no information only in a tooltip, a picked toggle's ink ring (a mark beyond its fill, above 3:1), `aria-current` on route nav. A link inside a sentence stays underlined, in shadcn's typography link classes, because HG's link ink equals body ink (WCAG 1.4.1); public nav and footer links take the stock hover.
+- **CLAUDE.md's content rules:** [copy-rules.md](../copy-rules.md), real data in visuals, payoff moments, closing the loop, fixed status colors, rows of controls that never wrap.
+- **The brand doc:** the color tables with light, dark, print and contrast values; status as glyph plus word; gold's uses; photo tokens and the chart rule; Geist, figures, money and codes; the monogram and wordmarks; photography and payoff art; voice; and page layout (gutters 32, 24 and 16; records capped at 1200 with a 320 rail; the task-row layout; two-line phone rows; things that line up; a mark's position). It runs about 8,000 words today and should land under 4,400.
 
 ## 7. Rollout
 
 ### 7.1 Every landing
 
-**Coordination,** per CLAUDE.md's Landing work.
-
 1. Land only when no other session is mid-landing (section 7.5, rechecked first).
-2. Cut the branch from a freshly fetched `origin/main`, not the primary checkout's local `main`, which stopped at `f9ab3fb` on Oct 22 and is more than 250 commits behind.
-3. Run `npm run test:devices` in the landing worktree, since the commit gate (`scripts/device-check-gate.mjs`) holds back `git commit` while UI files are newer than the last complete run. Then commit on the branch and merge `origin/main` into it. Check main's new commits for overlap with the landing's files, keep both sides' unrelated pieces, and say what overlapped.
-4. Run the old-name check (`node scripts/rename-tokens.mjs --check`) on the merged tree. It sees class names and CSS variables only. A `brandTokens` key written the old way (`t.fg3`) is caught by typecheck, which is how the job-emails work would surface: it took `render.ts` from 7 old-key uses to 29.
-5. Run the checks below on the merged code.
-6. Say which files are about to land, then `git push origin HEAD:main`. Every push to main deploys to production in about two minutes.
+2. Cut the branch from a freshly fetched `origin/main`, not the primary checkout's `main` (stuck at `f9ab3fb`, 263 behind). Recheck the counts and run the landing's codemod there.
+3. Run `npm run test:devices` in the landing worktree, since the commit gate blocks `git commit` while UI files are newer than the last run. Commit, merge `origin/main` in, check main's new commits for overlap, keep both sides' unrelated pieces, and say what overlapped.
+4. On the merged code: `npm run typecheck`, `npm run lint`, `npm test`, and `node scripts/rename-tokens.mjs --check`. Landing 1 runs its proof (7.2). From A on, the device check also runs in dark, and every stock file matches its snapshot hash (5.6), `table.tsx` its recorded edit.
+5. Open every dialog, menu and state the landing touched at 375 and 320, public pages included. Update the tests that read source text (50 of 208 test files use `readFileSync`).
+6. Delete the old HG export in the same landing, so a late branch fails typecheck instead of drawing the old look. An export that a later landing's files still import stays, renamed with an `Hg` prefix, until its last importer's landing: F keeps `HgSheet` and `HgSheetView` in `sheet.tsx` for `menu` (G), `picker-layer`, `date-panel` and `entity-picker` (H), `command-palette` (I), and `repeat-menu` and `filter-bar` (K); G keeps `HgPopoverSurface` in `popover.tsx` for `combobox`, `address-combobox` and `picker-layer` (H) and `filter-bar` (K). K deletes both files with `ui.tsx`.
+7. From A on, Connor reviews it (7.4).
+8. Say which files are about to land, then `git push origin HEAD:main`, which deploys in about two minutes.
 
-**Checks on the merged code.**
+The gate doesn't match `utils.ts`, `brand-tokens.ts`, `eslint.config.mjs` or `components.json`, so the device check runs for every landing.
 
-1. `npm run typecheck`
-2. `npm run lint`
-3. `npm test`
-4. `node scripts/zero-pixel-proof.mjs`, the proof below, with its base runs.
-5. `npm run test:devices` in the landing worktree on the merged tree. It is the proof's step 3 landing run, not a second one. Then open every dialog, menu and state the landing touched at 375 and 320.
-
-The gate doesn't match `src/lib/utils.ts`, `src/lib/brand-tokens.ts`, `eslint.config.mjs` or `components.json`, so the device check runs for every landing whatever files it touches.
-
-**The base worktree.** The proof builds the base (origin/main at the merge) beside the landing, in a separate worktree (`git worktree add <scratch folder> <base>`), never a stash or a checkout in the landing worktree. It gets `npm ci`, a copy of every `.env*` file the landing worktree has (`.env`, and `.env.local` when there is one, since `next build` and `next start` read `.env.local` first), and `npx playwright install chromium webkit` if the browsers are missing. Before the first run, the proof checks that the base server, the landing server and both `setup.ts` runs resolve the same `DATABASE_URL` (`setup.ts` gets it from Prisma, which reads `.env` alone), and stops if they don't. Its device runs set `DEVICES_PORT=3101`, since `playwright.config.ts` starts its own server on 3100 and never reuses one, and they run one at a time: each run's setup replaces the portal fixtures' sessions in the shared database. Remove the worktree after the landing.
-
-**The zero-pixel proof.** The device check alone can't show it: it wipes `device-report/` at the start of each run, shoots default states only, in light only on app pages, as JPEG.
-
-1. **CSS, by resolved value.** Build both (`.next-devices/static/chunks/*.css`, 3 files) and parse them with lightningcss or postcss (both in `node_modules`). Resolve per element, not per block: light `:root`; `:root[data-theme="dark"]`; a `[data-surface="public"]` element under a light `:root`; and each of those under `@media print`. Compute each custom property on the element that declares it and inherit the computed value, as browsers do. Map the base's class selectors through the rename script's own class function, escaped forms such as `.text-on-act\/70` included, so `outline-act` maps to `outline-ring` as it does in the code. Then split every selector list and compare a multiset of (at-rule context, single selector, resolved declarations). The pointer declarations of section 3.2 are expected additions; any other difference stops the landing. Rules whose candidate appears in no non-test file under `src/` on that side are filtered out. Tailwind scans every file git doesn't ignore (there's no `@source`): docs, tests, scripts, `eslint.config.mjs` and CLAUDE.md, and landing 1 edits several of them.
-2. **Order.** Tailwind 4.3.3 sorts same-property utilities by variants, then property order, then count, and breaks the last tie by candidate name (`node_modules/tailwindcss/dist/lib.js`). A rename can flip which of two color classes wins, but only on an element that carries both. The proof lists each same-property pair whose order flips. It fails only when a literal or template that never passes through `cn()` carries both. A pair inside one `cn()` call is listed, not failed, since tailwind-merge keeps the last of a conflicting pair. At `200093a` that's 11 pairs in 9 `cn()` calls, all ternary alternatives, and none in a literal or template.
-3. **Screenshots.** Run the base's device check, copy its `device-report/shots/` to a scratch folder on this machine, and run the base a second time to list the shots that differ on their own (relative times, lazy photos). Then run the landing's. Pair the 186 shots (31 routes on 6 devices) by file name. Equal pixels give equal JPEG bytes, so compare checksums first, then decode the rest with sharp (in `node_modules`) and count differing pixels. The shots carry tenant, loan and P&L figures, so they never leave this machine, and the scratch copy is deleted after the landing.
-4. **Email.** Render `renderPlainEmail` with `render.test.ts`'s `input` plus items, closing and footnote, and `renderJobEmail` with its `job` and with its photo-strip fixture (photos, `morePhotos`, `job.photos`, `calendarUrl`, `accessUrl`) plus `dateUrl`, so every renamed key, `t.fill1` included, appears in the HTML. Do it in both worktrees and compare the HTML byte for byte. `render.test.ts` alone can't show it: it pins only `fg2`, `inkTile` and `goldDeep`, none of them renamed, and otherwise checks that each hex is some `brandTokens` value, so a key renamed to the wrong token (`t.muted` where `t.border` was meant) would still pass.
-5. **Each element** (landings 2 and 3). The CSS proof compares one global stylesheet, so an element that gains or loses a utility the stylesheet already has passes it unchanged, and the screenshots see only each route's default state in light. Before landing 2's cva rebuild, a one-off script records the class string of every old key: each `buttonClass` variant × size × icon, each `Badge` tone, both `Kbd` tones, and `publicCtaClass`, `publicSecondaryClass` and `authButtonClass`. `src/components/variants.test.ts` asserts that each new key (old keys mapped per section 4.5) gives the same class set. Landing 3's first part adds a row per moved site: its class string at the base and its new `Button` props, asserting `cn(buttonVariants(props), siteClass)` gives the same set. Its second part changes classes on purpose, so its sites are listed as expected differences instead (section 7.4). The test imports from `ui.tsx`; if `next/link` won't load under `tsx --test`, the class maps move to a plain module that `ui.tsx` re-exports.
-
-Any difference that isn't noise stops the landing and goes to Connor.
+**The base worktree.** The proof and every review build `origin/main` at the merge in a separate worktree (`git worktree add <scratch> <base>`), never a stash. It gets `npm ci`, copies of the landing's `.env*` files, and the Playwright browsers if missing. Both sides must resolve the same `DATABASE_URL`, or the run stops. Its device runs use `DEVICES_PORT=3101` and run one at a time, since each run's setup replaces the portal fixtures' sessions. The worktree is removed after.
 
 ### 7.2 Landing 1: colors
 
-**Scope.** The 11 tokens in section 3.1 take shadcn's names and the 5 in the derived family (decision 9). Pointer tokens and `--radius` arrive. The lint rule flips. Docs follow.
+**Scope.** The tokens in sections 3.1 and 3.4 take shadcn's names; the pointers arrive; lint flips (6.2); docs follow (6.1).
 
 **Files.**
 
-- 159 code files: 1,012 class uses (plus 10 uses in 3 files for the derived family).
-- `src/app/globals.css`: the light `:root`, the dark and public block, the print block, the pointer block, `@theme inline`, `:focus-visible` (to `--ring`, by hand after the script, which writes `--primary` for every `--act`), `accent-color` (to `--primary`), `body`, `::selection` and `--chart-ref`.
-- `src/lib/brand-tokens.ts`: every key whose CSS name changes. `surface`, `raised`, `fill1`, `fill2`, `line`, `lineControl`, `fg3`, `fg1`, `act`, `onAct` and `danger` become `background`, `popover`, `muted`, `accent`, `border`, `input`, `mutedForeground`, `foreground`, `primary`, `primaryForeground` and `destructive`, and `brandTokensDark.line` becomes `border`. `actHover`, `dangerTint`, `dangerFill`, `dangerFillHover` and `onDanger` follow (decision 9). `brand-tokens.test.ts` asserts the key set equals every hex token on the light `:root`, both ways, so a partial rename fails `npm test`. `canvas`, `fg2`, `gold`, `goldDeep` and `inkTile` stay, so `layout.tsx` and the 5 `themeColor` pages don't change.
-- **How the keys move:** TypeScript's Rename Symbol on each key, never a regex. `render.ts` has its own `line: string` field and `input.line` (lines 20, 82 and 103) beside `t.line`. Rename Symbol carries the 29 key uses in `src/lib/email/render.ts` (`t.fg3` 8, `t.fg1` 7, `t.line` 5, `t.act` 3, `t.surface` 3, `t.onAct` 2, `t.fill1` 1) and `brandTokensDark.line` in `monogram-art.ts:65`. It skips comments and strings, so the header's examples ("fill1 is --fill-1"), the `cssVarName` JSDoc and the section 11 citation are edited by hand.
-- 3 tests: `brand-tokens.test.ts` (the key set, and `cssVarName("fill1")` becomes `cssVarName("mutedForeground")`, "--muted-foreground"), `print-tokens.test.ts` (its 12 required names), `utils.test.ts` (4 class strings on lines 7 and 10: `text-fg-3` and `shadow-line`).
-- 8 more files change only in comments, through the script: `src/components/public/type.module.css` (4 names on lines 10, 15 and 33), `financials/rent-roll/grid-frame.tsx`, `login/_components/login-form.tsx`, `components/monogram.tsx`, `components/public/ui.tsx`, `lib/dates.ts`, `lib/home/needs-you.ts` and `lib/property-types.ts`. With the files above, the script touches 173 files under `src`; `render.ts` changes only through Rename Symbol and its hand-edited comments.
-- `eslint.config.mjs`, its section 11 comment included.
+- 159 code files: 1,012 class uses, plus 10 in 3 files for the derived family.
+- `src/app/globals.css`: the light, dark and public, print and pointer blocks, `@theme inline`, `:focus-visible` (to `--ring`, by hand after the script), `accent-color` (to `--primary`), `body`, `::selection` and `--chart-ref`.
+- `src/lib/brand-tokens.ts`: `surface`, `raised`, `fill1`, `fill2`, `line`, `lineControl`, `fg3`, `fg1`, `act`, `onAct` and `danger` become `background`, `popover`, `muted`, `accent`, `border`, `input`, `mutedForeground`, `foreground`, `primary`, `primaryForeground` and `destructive`; `brandTokensDark.line` becomes `border`; the derived keys follow. `canvas`, `fg2`, `gold`, `goldDeep` and `inkTile` stay. The keys move by Rename Symbol, never regex, since `render.ts` has its own `line` field beside `t.line`; that carries the 29 key uses in `src/lib/email/render.ts` and `monogram-art.ts:65`. Comments and strings are edited by hand.
+- 3 tests: `brand-tokens.test.ts`, `print-tokens.test.ts` (its 12 required names) and `utils.test.ts` (4 class strings).
+- 8 more files change only in comments; in all, the script touches 173 files under `src`. Also `eslint.config.mjs` and CLAUDE.md's three lines.
 - New: `scripts/token-renames.mjs`, `scripts/rename-tokens.mjs`, `scripts/zero-pixel-proof.mjs`, `src/lib/token-names.test.ts`.
-- CLAUDE.md (three lines, section 6.1).
-- Docs: the renamed tokens have 678 `--name` and 18 class mentions in 16 files. With sections 11 and 12 of the brand doc replaced first, the script changes 659 and 13 of them, in 13 files: brand-guidelines 155, components 116 and 1, and the specs uploads-photos 82 and 1, selectors 63 and 1, forms-editing 60 and 4, charts 59, activity-comments 55, search 43, build-plan 15 and 6, performance 8, tenant-contact 1, contractor-trades 1 and view-as 1. The derived family adds 15 (13 in the brand doc, 2 in selectors). The 3 `docs/uiux-review/` files (9 and 2) stay as a dated audit, with a header line saying their names are from before Nov 14. The brand doc's bare-word grounds are edited by hand (section 6.2).
+- Docs: with the brand doc's sections 11 and 12 replaced first, the script changes 659 `--name` and 13 class mentions in 13 files (brand-guidelines 155, components 116, uploads-photos 82, selectors 63, forms-editing 60, charts 59, activity-comments 55, search 43, build-plan 15, performance 8, and 1 each in tenant-contact, contractor-trades and view-as), plus 15 for the derived family. `docs/uiux-review/` stays as a dated audit, with a header line saying its names predate Nov 14.
 
-**The rename script.** One pass per file with a lookup callback, never a chain of `sed`s, so no name is renamed twice and token order doesn't matter.
+**The rename script.** One pass per file with a lookup callback, so no name is renamed twice.
 
-- **Classes:** `OLD_CLASS` from `token-renames.mjs`, replaced with the prefix plus `RENAMED[token]`. The lookbehind allows variant chains (`hover:`, `group-hover/row:`, `[&_svg]:`); the lookahead keeps `/70` opacity and stops `line` matching `line-strong`.
-- **Variables:** `OLD_VAR`, replaced with `--`, the `color-` prefix if present, and the new name.
-- **The `act` rule:** an `outline-act`, or a `ring-act` or `border-act` with `focus`, `focus-visible`, `focus-within`, `data-focus-visible` or `group-focus-visible` in its variant chain, becomes `ring`. Everything else becomes `primary`. That gives 24 in 15 files and 30 in 15.
-- **Scope, by glob:** `src/**/*.{ts,tsx,css}`, tests included; `docs/**/*.md`; CLAUDE.md. Excluded: `docs/uiux-review/` and this spec. A spec added after today is in scope without an edit, as `contractor-trades.md` is. `token-names.test.ts` scans the same globs plus `tests/`, and skips `tests/devices/gallery-reporter.ts`, which defines its own `--line` and `--muted` for the report page.
-- **What it never touches,** verified by a dry run at `9a822de` (1,320 class hits across every HG token, none at an import path, prop value or data attribute): `data-surface="public"`, `line-clamp`, `underline`, `line-through`, `select-none`, `variant="danger"`, `tone="danger"`, `@/lib/toast-line`, `@/components/source-line`, `whitespace-pre-line`, `eslint-disable-next-line`, the `<canvas>` element, and the `input, select, textarea` selector.
-- **`--check`** walks the same globs, prints every old name it would change and exits non-zero. It's how a later branch is checked. It can't see object keys; typecheck covers `brandTokens`.
+- **Classes and variables:** `OLD_CLASS` and `OLD_VAR`, replaced from `RENAMED`. The lookbehind allows variant chains; the lookahead keeps `/70` opacity and stops `line` matching `line-strong`.
+- **The `act` rule:** `outline-act`, and `ring-act` or `border-act` with a focus variant in its chain, become `ring` (24 in 15 files); the rest become `primary` (30 in 15).
+- **Scope:** `src/**/*.{ts,tsx,css}` with tests, `docs/**/*.md` and CLAUDE.md, except `docs/uiux-review/` and this spec. `token-names.test.ts` also scans `tests/`, skipping `tests/devices/gallery-reporter.ts`.
+- **What it never touches,** from a dry run at `9a822de` with no false hits: `data-surface="public"`, `line-clamp`, `underline`, `line-through`, `select-none`, `variant="danger"`, `tone="danger"`, `@/lib/toast-line`, `@/components/source-line`, `whitespace-pre-line`, `eslint-disable-next-line`, `<canvas>` and the `input, select, textarea` selector.
+- **`--check`** prints every old name it would change and exits non-zero.
 
-**Lands alongside.** The lint change (section 6.4), the three test updates, `token-names.test.ts`, the brand doc's section 4 and 5 lines, its bare-word edits and its history section, the three code comments that cite section 11, the docs rename, and CLAUDE.md's three lines.
+**The zero-pixel proof.** The device check alone can't show it: it wipes its last run and shoots default states only, light only on app pages, as JPEG.
 
-**Tailwind order.** 6 `className` template literals bypass `cn`, one of them (`(home)/loading.tsx:52`) taking its caller's `className`; no `clsx` call does (the only one is inside `cn`). The proof's order check covers them (section 7.1).
+1. **CSS by resolved value.** Build both sides and parse the CSS. Resolve per element (light `:root`, `:root[data-theme="dark"]`, a public element under a light root, each under `@media print`), inheriting computed custom properties. Map the base's class selectors through the script's class function, escaped forms included, then compare a multiset of (at-rule context, single selector, resolved declarations). The pointers are expected additions; any other difference stops the landing. Rules whose candidate appears in no non-test `src` file are filtered out, since Tailwind scans every file git doesn't ignore.
+2. **Order.** Tailwind 4.3.3 breaks a same-property tie by candidate name, so a rename can flip which of two color classes wins. The proof fails only when a literal or template outside `cn()` carries both. At `200093a` there are 11 such pairs, all inside `cn()` ternaries.
+3. **Screenshots.** Run the base twice (to list the shots that differ on their own) and the landing once. Pair the shots by name (186 at `200093a`; contractor onboarding has since added 2 routes), compare checksums, then decode the rest with sharp and count differing pixels. The shots stay on this machine.
+4. **Email.** Render `renderPlainEmail` and `renderJobEmail` with fixtures that use every renamed key, in both worktrees, and compare the HTML byte for byte.
 
-### 7.3 Landing 2: components
+Any difference that isn't noise stops the landing and goes to Connor. Landing 1 lands after design-calls-nov14 (7.5).
 
-**Scope.** Sections 4.1 to 4.7: component and part renames, the 27 parts of decision 8, `Button` and `Badge` variants and sizes on cva, size keys `md` to `default`, the dead exports in section 4.4, `components.json`, the CLI workflow, the docs/components.md rewrite, brand sections 3, 5 and 9, the living docs, and the CLAUDE.md and README wording.
+### 7.3 Landings A to M
 
-**Files.**
+Counts at `ff7d92b`. Effort is agent build time, calibrated on the Oct 23 to 25 brand rollout, and rough.
 
-- 96 files for 232 import renames, plus each component's own file, and the 5 renamed component files.
-- Variant edits: 17 `primary` to `default`, 43 `secondary` to `outline`, 3 `LinkButton`s gaining `variant="outline"`, 21 `icon` flags to sizes, 5 Badge sites, 4 `Kbd` sites.
-- `size="md"` on the other controls: written 9 times in 6 files (`BasisControl`, `PeriodControl`, `SearchInput`, `SegmentedControl` 4, `Select` 2). `DateField`, `AddressCombobox`, `Combobox`, `Input`, `Dialog`, `FormDialog`, `CreateForm` and `Code` default to `md` and are never written with it, so only their types change (the field ones through `FieldSize` and `fieldSizeClass` in `ui.tsx`).
-- The public CTAs: `publicCtaClass` and `publicSecondaryClass` in `components/public/ui.tsx` and `authButtonClass` in `login/_components/auth-frame.tsx`, rebuilt on `buttonVariants({ size: "lg" })`. Their 11 sites in 7 files keep their `className`.
-- 4 tests that match source text: `src/lib/tasks/conflicts.test.ts:44` (`variant="secondary"`), `src/lib/composer-draft.test.ts:240` and `src/lib/deals/note-send.test.ts:18` (`<MenuItem id="retry"`), and `src/lib/sheet-routes.test.ts:17`, which reads `<SheetRoute path="` in each of the 4 `@modal` intercepting pages.
-- Comments and JSDoc examples that name a renamed component or file are edited by hand, because Rename Symbol skips them. At `200093a` that is 32 comment lines in 18 `src` files that name one in code form (backticked, `<Name` or a file name), among them `@modal/default.tsx:11`, `lib/sheet-routes.ts:3`, `lib/focus.ts:3`, `popover.tsx:21`, `confirm-dialog.tsx:8`, `sheet-views.ts:2`, and the usage examples in `menu.tsx`, `form-sheet.tsx`, `sheet.tsx`, `ui.tsx`, `number-input.tsx` and `create-form.tsx`. Prose mentions such as "a Sheet" get a read-through as well.
-- New: `src/components/variants.test.ts` (section 7.1) and `src/components/parts.test.ts` (section 4.6).
-- `components.json` (new), docs/components.md, docs/brand-guidelines.md sections 3, 5 and 9, the 14 docs in section 6.5, CLAUDE.md and README.md.
+| Landing | Scope | Needs | Review set beyond the sweep | Checks beyond 7.1 | Effort |
+|---|---|---|---|---|---|
+| A. Stock base | Section 5, `PublicSurface` on the 3 public grounds, Node 24 locally, the dead exports (4.11), a dark device run (Playwright `colorScheme: "dark"`), A's rule lines (6.3). About 10 files plus the grounds | 1 | Only corners should move (186 uses in 89 files); the 7 bare-border strings; HG's `data-disabled:` uses; the public overlays inside the portal | After each `add`, no diff in `utils.ts`, `layout.tsx` or unplanned `globals.css` lines; lint finds no `"cn"` import in app code; `utils.test.ts` passes unchanged on `createCn` | 2 to 4 hours |
+| B. Button | 4.1 and 4.12's B rows: 67 files plus `ui.tsx`, and the 38 raw `<button>`s in 30 `src/app` files | A | Every button kind on every route, public included; pending; focus; each Button inside a parent that handles clicks | The codemod re-run on the merged tree is a no-op; no `disabled=` or `aria-keyshortcuts` left on a stock Button; no file without `"use client"` imports `buttonVariants`; `conflicts.test.ts:44` updated | 4 to 6 hours |
+| C. Primitives | 4.2 and 4.12's C rows; can split in two | B | Loading screens, badges, avatars, cards, empty states, notices, progress, links in sentences | No div-in-span warnings at the 26 Skeleton sites; `StatusBadge` has the moved statuses | 4 to 6 hours |
+| D. Toast | 4.3: 44 files, 3 mounts | A | Plain, Undo, detail, sticky and key-replaced toasts in the shell, portal and moving-in page; the longest toasts | No `useToast` import left; the codemod's own recount of calls and options (section 10) | 3 to 5 hours |
+| E. Fields | 4.4 and 4.12's E rows | B | Every form at 375 with the keyboard up; errors and help lines; dark fields; the choice-card rows | `ios-input-zoom` stays 0 on the iPhones and the iPad Mini; every `FormField` control has `aria-describedby` | 5 to 8 hours |
+| F. Overlays | 4.5: 18 files on `sheet.tsx`, 13 on `ConfirmDialog`, 8 on `FormSheet`; `HgSheet` stays for 7 importers (7.1) | B, E | Every dialog open, busy confirms, dirty close, Esc; the 4 create routes on a phone; the moving-in sheets | `sheet-routes.test.ts:17` passes; the first paint of the 4 create routes on an iPhone | 1 to 1.5 days |
+| G. Menus, popover, tooltip | 4.6 and 4.12's G rows; `HgPopoverSurface` stays for H and K (7.1) | B | Every menu and popover with widths; tooltips by mouse, keyboard and touch; the date chip opened near the screen edge at 375 and 320 | `composer-draft.test.ts:240` and `note-send.test.ts:18` updated | 4 to 6 hours |
+| H. Select, combobox, date | 4.7 and 4.12's H rows | B, E, F, G | Each picker; typing on an iPhone; the calendar and quick picks; the public pickers; the date chip near the screen edge | Select, Combobox and DateField render `aria-invalid` and `aria-required` | 1.5 to 2 days |
+| I. Nav, sidebar, command | 4.8 | All above | The shell at three sizes, the command dialog, every segmented control | The skip link and focus move still work; ⌘B and ⌘K don't collide | About 1 day |
+| J. Table | 4.9: 16 files | A | Every statement and list; sticky headers; wide tables at 375 | `table.tsx` matches its recorded edit; `add --diff` by URL shows only it | 4 to 6 hours |
+| K. Compositions | 4.10 and 4.12's K rows, split by area | B to J | Each area's pages and opened states; photo pills on light and dark photos | `ui.tsx`, `sheet.tsx` and `popover.tsx` are gone; `followups-wiring.test.ts:50` updated | 1.5 to 2 days |
+| L. Tokens and type | The table below. The touch type swap, the role hooks in `globals.css`, HG's merge config and the text-size ban go. `pointer-coarse:` classes on elements the global rule covers come out (of 348 in 107 files). Retired tokens leave CSS and `brand-tokens.ts`, and the print test's required list and floor of 20 change. The `--animate-*` lines leave the reduced-motion block, since the `--tw-enter` and `--tw-exit` reset covers them. Retired token, role and motion names join the old-name ban, so a late branch fails lint | K | Every route for type; the 314 meta sites at 375 and 320 for wraps; the job-done payoff's entrance | The brand-tokens and print-tokens tests pass with the new list and floor; no role, motion or retired token class left | 4 to 8 hours, scripted |
+| M. Rules | CLAUDE.md, the brand doc, docs/components.md, README.md, the living specs | L | Connor reads the docs | `token-names.test.ts` passes over the docs; the copy-rules.md checklist is run | 3 to 4 hours |
 
-**Approach.** Names are renamed with TypeScript's rename (the editor's Rename Symbol), not a regex. Case matters, and React Aria's own names sit right beside ours:
+**Landing L's mappings.** Content motion moves before the motion tokens go, since Tailwind drops an unknown class silently and lint runs after the deploy. The job-done payoff keeps an entrance, which the reduced-motion reset cuts to a fade.
 
-- `Button as AriaButton` is imported in 33 files, and `Input`, `Popover`, `Menu`, `MenuItem`, `MenuTrigger`, `Switch` and `DateField` come in as `Aria*` too. React Aria's import specifiers are never renamed.
-- React Aria exports `ComboBox` and `Dialog`. HG's `Combobox` differs only by case. React Aria's `Dialog` is imported unaliased in 5 files (`confirm-dialog.tsx`, `lightbox.tsx`, `menu.tsx`, `popover.tsx`, `sheet.tsx`). Two of them collide with HG's new `Dialog`: `sheet.tsx`, which defines it, and `menu.tsx`, which imports HG's `Sheet` (`menu.tsx:24`). Both take `Dialog as AriaDialog` first, and `sheet.tsx` also takes `type DialogProps as AriaDialogProps` before `SheetProps` becomes `DialogProps`.
-- `command-palette.tsx` imports `type Command` from `@/lib/commands` (line 47, used at 909). It becomes `Command as CommandEntry` before `SearchPanel` becomes `Command`.
-- Order: delete the dead exports (section 4.4) first, then rename, then change the variant and size unions. Typecheck lists every literal left on an old key. `size="md"` is changed per component type, never globally.
+| HG name | Becomes | Uses at `ff7d92b` |
+|---|---|---|
+| The app's type roles | 12.25; figure-l, code and code-l take `text-3xl font-medium`, `text-sm font-mono` and `text-3xl font-mono font-medium` | 601 in 139 files |
+| `publicType.display` | `text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-balance` | 1 |
+| `publicType.heading` | `text-2xl sm:text-3xl font-semibold tracking-tight text-balance` | 8 |
+| `publicType.lead` | `text-base sm:text-lg text-pretty` | 3 |
+| `publicType.eyebrow` | `text-xs font-medium uppercase tracking-widest text-gold` | 1 |
+| `publicType.wordmark` | `text-xs font-medium uppercase tracking-[0.28em] whitespace-nowrap`; the tracking is logo lettering, kept as brand | 1 |
+| `publicType.title`, `publicType.meta` | `text-base font-medium`, `text-sm` | 4, 12 |
+| `animate-pop-in` | `animate-in fade-in-0 zoom-in-95` | 6; 3 left after F and G (`job-actions.tsx` twice, on the job-done photo and SpotArt, and `upload-queue`) |
+| `animate-fade-in`, `animate-fade-out` | `animate-in fade-in-0`, `animate-out fade-out-0` | 9, 3 |
+| `ease-spring` | `ease-out` | 9 in 6 files |
+| `duration-fast` (120ms), `duration-base` (160ms) | `duration-150` | 9, 3 |
+| `duration-check` (180ms), `duration-photo` (200ms) | `duration-200` | 6, 2 |
+| `duration-sheet` (260ms) | `duration-300`, unless the sidebar takes it in I | 2 |
+| `--select` and `::selection` | Go; the browser's selection color applies | 0 classes |
 
-**Checks.** Section 7.1. The CSS proof should match once candidates found only outside `src`'s non-test files are filtered, but it can't show that each element kept its classes: `buttonClass` becomes cva's `buttonVariants`, Badge's tones become `badgeVariants`, and the public CTA classes are rebuilt on `lg`. `variants.test.ts` is that proof. Open every dialog, alert dialog, dropdown menu, toggle group and empty state at 375 and 320, and one dialog, alert dialog and dropdown menu written with parts beside its props twin at 375 and 1280.
+That's about 10 to 13 working days. B and F touch the busiest files (16 of 34 recent non-merge commits touched a Button-family file), so each is cut, built and landed in one sitting.
 
-**Lands after** landing 1 is live, when no other session is mid-landing.
+### 7.4 Connor's review (landings A to M)
 
-### 7.4 Landing 3: sweep
-
-**Scope.** Raw `<button>`s and the visible raw fields onto the primitives, in two parts. The first part moves the controls that already match a primitive's look, with no pixel change. The second part moves the rest and changes their look, per decision 7. The parts can land together or apart; the second waits on Connor's approval of each group.
-
-**Raw buttons: 36 in 28 files under `src/app`, and 43 in 23 files under `src/components`.** Most of the `src/components` ones are the insides of primitives (`AddRow`, the pickers) and stay; the ones in the tables below move.
-
-**First part: no pixel change (15 buttons).**
-
-| Group | Sites | Target | Files |
-|---|---|---|---|
-| `textLinkClass` on a raw button | 9 | `Button variant="link"` | `portfolio-capex.tsx`, `properties/[id]/capex-outlook.tsx`, `settings/capex-rules-editor.tsx`, `settings/move-in-form/move-in-form-editor.tsx`, `(marketing)/residents/moving-in/move-in-form.tsx`; and in `src/components`: `create-form.tsx`, `fact-strip.tsx`, `load-latest.tsx`, `money-bars.tsx` |
-| Hand-styled links that match `textLinkClass` | 2 | `Button variant="link"` with its own classes | `tasks/[id]/activity.tsx:288`: the same underline, with `text-fg-2` and `hover:text-fg-1` on top; `components/filter-bar.tsx:198` (Clear filters): `textLinkClass` written out, with `relative shrink-0 whitespace-nowrap` and its touch area |
-| Public CTA class on a raw button | 2 | `Button size="lg"` | `(marketing)/error.tsx` (`publicCtaClass`), `login/_components/auth-crash.tsx` (`authButtonClass`) |
-| Ghost icon button on `buttonClass` | 2 | `Button variant="ghost"`, `size="icon-sm"` or `size="icon"` | `components/files-list.tsx:376` (Remove, `sm`); `components/composer.tsx:885` (`IconButton`, `md`) |
-
-**Second part: the look changes (37 buttons and links, 2 fields).** Each group has a proposed target. Before it ships, Connor sees every site before and after at 1280x800, 768x1024 and 375x667, in light and dark, and approves it by group. Where the proposed target looks wrong for a site, the review shows 2 or 3 options with a recommendation, per CLAUDE.md, built only once one is picked. A group he doesn't approve stays raw, with a one-line comment naming its job.
-
-| Group | Sites | Proposed target | What changes |
-|---|---|---|---|
-| Hand-styled links that don't match `textLinkClass` | 14: 5 in `src/app`, 7 in `src/components`, 2 in `media-uploader.tsx` | `Button variant="link"`, keeping any color class the site sets | Underlined at rest, a 2px underline on hover, `--foreground` text where the site sets no color |
-| Row and value edit targets, disclosures | 7 | `Button variant="ghost"`, text left-aligned | `Button`'s height, padding, label size and hover fill |
-| Checkbox glyphs with `role="checkbox"` | 2 | `Checkbox` (`large` in the checklist) | The native checkbox look in place of the drawn glyph |
-| Photo tiles and photo controls | 7 | `Button variant="ghost"`, icon sizes for the controls, the on-photo colors kept on top | `Button`'s radius, hover fill and touch size over the photo |
-| Small icon buttons | 4 | `Button variant="ghost" size="icon-sm"` | A 32px box with a hover fill |
-| Chip and row toggles | 2 | `ToggleGroup` | The segmented control look |
-| Inline add | 1 button | `Button variant="ghost" size="sm"` | `Button`'s height and padding |
-| Hand-built fields | 2 | `Input size="sm"` (the checklist's add field), `Textarea` (`comment-card.tsx:329`, the comment edit field) | The checklist field gains an edge and a 32px height; the comment field takes `fieldClass` and the global focus outline |
-
-The links: `deals/[id]/deal-log.tsx:169`, `tasks/[id]/activity.tsx:117` and `settings/editor-controls.tsx:24` underline on hover only; `tasks/[id]/review-banner.tsx:206` has no `hover:decoration-2`; `p/welcome/password/page.tsx:29` (`authLinkClass`) has no underline. Inside `src/components` primitives: `railVerbClass` (`--fg-2` with a plus, underlined on hover) on `rail.tsx:96` (`RailVerb`) and `inline-field.tsx:628`; `back-link.tsx:43` and `command-palette.tsx:488` underline on hover only; `comment-card.tsx:466` has no color of its own; `files-list.tsx:390` (`RowRetry`) has no `hover:decoration-2`; `toast.tsx:130` takes the toast's colors. `media-uploader.tsx`'s two are already out of the sweep |. Moving the two `media-uploader.tsx` links updates `src/components/followups-wiring.test.ts:50`, which matches `Reload</button>` in that file's source, to match `</Button>`.
-
-The other groups:
-
-- **Row and value edit targets, disclosures (7):** `building-capex.tsx`, `edit-listings.tsx`, `edit-units.tsx`, `status-control.tsx`, `apply-flow.tsx`, `task-section.tsx` (a disclosure header), `needs-you.tsx` (the phone's "{N} more" reveal).
-- **Checkbox glyphs with `role="checkbox"` (2):** `tasks/[id]/checklist.tsx`, `tasks/task-checkbox.tsx`.
-- **Photo tiles and photo controls (7):** `listing-photos.tsx` (2), `property-photo.tsx` (2), `rentals/photo-carousel.tsx` (3).
-- **Small icon buttons (4):** `capex-rules-editor.tsx` (the "What … means" info button), `editor-controls.tsx` (delete), `tasks/new/new-task-fields.tsx` (remove), `login/_components/password-field.tsx` (show password).
-- **Chip and row toggles (2):** `financials/_components/period-row.tsx` (on `pickerChipClass`), `properties/capex-ui.tsx` (the `aria-pressed` year rows).
-- **Inline add (1):** the checklist's "Add item".
-
-**Raw fields: 17 in 8 files under `src/app`.** 16 stay raw: 12 are `type="hidden"` (9 in `tasks/new/new-task-fields.tsx`), 1 is a hidden email for password managers (`welcome-form.tsx`), 2 are hidden file inputs (`property-photo.tsx`, `job-actions.tsx`) and 1 is the move-in form's honeypot (`sr-only`, `aria-hidden`). They draw nothing, so there is no look to share. The 17th, the checklist's borderless add field, moves in the second part. `src/components` has 14 in 8 files: the primitives' own, which stay, and `comment-card.tsx:329`'s edit field, which moves in the second part.
-
-**Lands alongside.** docs/components.md's Duplicates rows for Button and Text field drop to what stays raw (the primitives' insides, the hidden fields and any group Connor keeps), and Known gaps' "Tap targets" line is rewritten. Brand doc section 9 notes any look the review settles that its Buttons table doesn't yet show.
-
-**Checks.** Section 7.1. The first part adds a row per moved site in `variants.test.ts`, asserting the same class set. The second part lists its sites as expected differences in the CSS proof and the screenshot pairs, and every other difference still stops the landing. Every moved site is opened at 375 and 320 by hand, since several never show in the sweep: `(marketing)/error.tsx` and `auth-crash.tsx` are error screens, the two CapEx "All {N} years" links clear a picked year, so they need one picked first, and the photo controls need a listing with photos.
+- **Runs.** The base and landing worktrees each run the device check in light and in dark, about 4 runs of 66 to 169 seconds plus builds. `THEME_SCRIPT` follows the OS when no theme is saved, so Playwright's dark scheme gives the dark theme.
+- **Captures.** The sweep plus the family's opened states, at 1280x800, 768x1024 and 375x667. Shots pair by name; identical pairs drop out, and the rest are the review set, before and after.
+- **Outcome.** Connor approves the landing or sends it back. A held landing doesn't ship, and its family stays on its old code.
+- **Privacy.** Shots carry tenant, loan and P&L figures, so they stay on this machine and are deleted after.
 
 ### 7.5 Branches open now
 
-Checked at 12:34 on Nov 14, with main at `3087530`. Since `200093a`, main has taken code as well as docs. Landing 1's class count is now 1,045 uses in 163 files, 33 more than section 3.1 counts: contractor onboarding adds 29 (17 in `p/setup/setup-steps.tsx`) and the new-task chips add 4 net. `SheetView` has 5 importers, not 4, since `entity-picker.tsx` now uses it, and the chips work added `PropertyUnitPicker` and moved `StepHeader` into `picker-layer.tsx` (both HG picker pieces that keep their names). docs/specs/tenant-contact.md now has 2 token and 11 component mentions where sections 6.5 and 7.2 count 1 and 12. Sessions are landing every few minutes, so recheck before each landing.
+Checked at 14:00 on Nov 14 (main at `0804aad`) and again at 15:00 (main at `7e39219`). At 12:34 (main at `3087530`), landing 1's count was 1,045 uses in 163 files, 33 over section 3.1: contractor onboarding added 29 and the new-task chips 4.
 
 | Branch (worktree) | State | Overlap |
 |---|---|---|
-| `design-calls-nov14` (`skills-grill-me-setup-a0e88f`) | 4 commits (`376d278`, `6a52728`, `1c457e5`, `04bbe4c`), 40 behind main, plus 9 uncommitted files | 88 `src` files changed; 10 add renamed token classes (15 uses). Four of its tests assert `text-fg-3` or `bg-fill-1` class strings (`list-page.test.ts`, `lists-loading-wiring.test.ts`, `menu-cap.test.ts`, `properties/property-page-wiring.test.ts`). Edits docs/brand-guidelines.md, docs/components.md and 4 specs. Let it land first, then cut landing 1 from the new main. If it lands later, run it through `rename-tokens.mjs`, tests included |
-| `claude/contractor-form-integration-55b2b4` (`copy-writing-standard-42a734`) | Landed: `eb3c671` and its merges are on main after `200093a`; clean at `b0bc4d2` | Adds 2 routes (`p/setup`, `join/[token]`), so the 31 routes and 186 shots in 7.1 move, and 29 old-name class uses in 5 files to landing 1's count. New docs/specs/contractor-onboarding.md, with no old token names |
-| `claude/shortcuts-placement-32e9a4` (`asana-migration-remaining-c49243`) | Landed: `cfb3ec4` is on main; clean | Adds 4 old-name class uses net (picker-layer 5, date-panel 3, entity-picker 1, repeat-menu 5 fewer) to landing 1's count. Its picker and `popover.tsx` changes and its docs/components.md and docs/specs/selectors.md edits are on main |
-| `claude/superadmin-impersonation-46f6c8` (`elated-leavitt-46bc8c`) | Landed as `ea70759` and `200093a` (spec only, build paused); clean at `200093a` | Its CLAUDE.md line (16) and docs/specs/README.md entry are on main. docs/specs/view-as.md adds 1 token mention to landing 1 and 5 component mentions to landing 2 |
-| `claude/remove-cancel-task-295ffe` (`remove-cancel-task-295ffe`) | At `e233e43`, 20 behind, 14 uncommitted files | 12 `src` files changed, the task page, `components/composer.tsx` and `inline-field.tsx` among them; 4 add old-name classes (11 uses). Edits docs/components.md and docs/specs/forms-editing.md. Active: treat it as mid-landing |
-| `claude/contractor-job-details-77b778` (`dev-environment-setup-5713a6`) | At `771b6ab`, 4 behind, 19 uncommitted files (1 new) | All 19 in `src`, none adding an old token class. `review-banner.tsx` and `back-link.tsx` hold landing 3 sites. Active: treat it as mid-landing |
-| `claude/error-monitoring-docs-abc5aa` (`error-monitoring-docs-abc5aa`) | 1 commit (`5936852`, a spec), 18 behind, plus `package.json` and `package-lock.json` uncommitted | Its docs/specs/README.md edit is the error-alerts entry, just above where this spec's entry goes. docs/specs/error-alerts.md has no old token or component names |
-| `claude/contractor-lockbox-tenant-access-fda6c9` (`contractor-lockbox-tenant-access-fda6c9`) | Landed: at `3087530`, main's head, clean | None |
-| `claude/hg-app-product-roadmap-623cf2` (`hg-app-product-roadmap-623cf2`) | Landed: at `1e0ed6d`, clean | New docs/roadmap.md, with no old token or component names |
-| `claude/refresh-toast-notification-dfd82e` (`vercel-secrets-cleanup-71c0be`) | At `b0bc4d2`, 1 behind, clean | None |
-| `claude/invoice-tracking-spec-e9ccf4` (`contractor-password-saved-message-6ed0f3`) | At `661d52c`, 21 behind, clean | None |
-| `claude/hg-capital-design-standard-e3c4ee` (`task-management-migration-4c9ddf`), this spec | At `9a822de`, 30 behind; this spec and its README entry uncommitted | Its docs/specs/README.md entry sits after error-alerts, where main added the contractor-trades and view-as entries. Merging conflicts there: keep all three. The contractor-job-emails entry, above error-alerts, merges cleanly |
+| `design-calls-nov14` (`skills-grill-me-setup-a0e88f`) | 7 ahead, 55 behind at 15:00, 1 untracked file | 92 `src` files, 15 in `src/components` (`ui.tsx`, `menu.tsx`, `toast.tsx`, `form-sheet.tsx`, `filter-bar.tsx` among them), so B, D, F, G, H and K. It adds old-name classes, and four of its tests assert `text-fg-3` or `bg-fill-1`. It lands before landing 1 is cut; later, it goes through every codemod |
+| `property-page-reformat-f3aacc` | Landed at 14:25 (`8aae1d7`); clean at `7e39219` | It added `addRowClass` to `ui.tsx` and `src/components/rail-fold.tsx` (both K) and edited the property edit forms |
+| The tenants landing (`a4b776d`, merged in `5480599`) | Landed at 13:25 | The Tenants nav link and 14 lines in `command-palette.tsx` (I), and `inline-field.tsx` changes (K) |
+| `sentry-nextjs-sdk-setup-c3c463` | Not in the worktree list at 15:00 | Recheck `package.json` before A, which edits it |
+| This spec's worktree (`task-management-migration-4c9ddf`) | 8 behind at 15:00, spec uncommitted | Its `docs/specs/README.md` entry |
+| The other worktrees, `remove-cancel-task-295ffe` among them (landed) | Clean | None |
 
 ## 8. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| 1. The lint rule bans the exact names the rename adopts | Landing 1 replaces the pattern in the same commit (section 6.4) |
-| 2. Stale classes fail silently: Tailwind drops an unknown class, and lint runs in CI after the deploy | Run `rename-tokens.mjs` on every branch merged after landing 1, `npm run lint` before every push, `token-names.test.ts` for CSS, tests and docs, and typecheck for `brandTokens` keys |
-| 3. Old aliases used these names with other meanings until Oct 25 (`text-muted` was `fg-3`, `bg-background` was `fill-1`) | Keep the narrow ban on ground names as text; rewrite the brand doc's section 11; run any revert or cherry-pick of a pre-Oct 25 commit through the script |
-| 4. `shadcn init` overwrites `utils.ts` and rewrites `globals.css` | Never run it; `components.json` is written by hand; every `add` is dry-run first and checked for those diffs (section 5.3) |
-| 5. shadcn's radius block moves 182 `rounded-*` uses | `--radius` only, on `:root`; never the `--radius-*` block |
-| 6. Pointer tokens on `:root` alone give the public site light values | Declared in `:root, [data-surface="public"]` (section 3.2) |
-| 7. Pairs equal in light but not in dark (`destructive` and `danger-fill`, `background` and `popover`, `toast-bg` and `foreground`) | Kept apart; pulled overlays, tooltips and destructive buttons conform per section 5.4 |
-| 8. Pulled components import `cn` from the `cn` package and skip HG's merge config | Imports rewritten to `@/lib/utils`; the `cn` package uninstalled |
-| 9. shadcn's aria Button, LinkButton and Table are React Aria parts with other events and roles | HG's implementations stay; only names, variant keys and size keys change |
-| 10. `LinkButton`'s default flips from secondary to default | The 3 bare sites say `variant="outline"` in the same commit |
-| 11. `lg` at 44 on touch would shrink the public CTAs from 48 | `lg` carries `pointer-coarse:min-h-12` |
-| 12. shadcn's Tooltip has no tap on touch; its AlertDialog closes while busy | HG's Tooltip and AlertDialog code stays |
-| 13. Renames reorder same-property utilities in Tailwind's sort | The proof fails only on a flipped pair in a literal or template outside `cn()`, where tailwind-merge can't settle it (section 7.1) |
-| 14. Bare-word replaces hit props, attributes and built-ins | Prefix-anchored regex in one pass, dry-run with no false hits; bare words in the brand doc are edited by hand |
-| 15. Component renames collide with React Aria names (`AriaButton`, `ComboBox`, `Dialog`), with an imported `Command` type, and with dead HG exports (`Field`, native `Select`) | TypeScript rename; the colliding imports aliased first; dead exports deleted first |
-| 16. aria-vega's `dark:` classes assume a translucent `--input` | Stripped from every pulled file |
-| 17. The device check shows light, default states only and wipes its last run | The CSS proof covers every state and theme in the stylesheet; `variants.test.ts` covers each element's classes; the base runs in its own worktree, and its first run is copied out |
-| 18. Tests that assert source text break | Listed per landing: 3 in landing 1, 4 in landing 2 |
-| 19. Another session lands token classes or `brandTokens` keys under the old names | Landing order in section 7.5; `--check` on every merge; typecheck for keys |
-| 20. A pulled item's dependency shares an HG file name | Answer No to the overwrite; point the pulled code at HG's file and parts (sections 4.6 and 5.3) |
-| 21. Pulled code uses keys HG lacks (`secondary`, `xs`, `icon-lg`, the destructive tint) | The key map in section 5.4; `secondary` is left out so it fails typecheck |
-| 22. The CSS proof reads the `act` split and the pointer block as differences | Compared by resolved value per element (light root, dark root, the public wrapper under a light root, each in print), with the pointer block as expected additions |
-| 23. Landing 3's second part changes the look of 37 buttons and links and 2 fields | Each site shown before and after at 1280, 768 and 375, light and dark, and approved by group; a group not approved stays raw; the proof treats only the approved sites as expected differences (section 7.4) |
-| 24. A dialog or field can be written two ways (decision 8) | Each part renders its prop's own internals, so both forms give the same screen; `parts.test.ts` compares the markup; docs/components.md shows the props form first |
+| 1. Counts go stale within the hour | Re-runnable codemods; counts rechecked first; B and F landed in one sitting |
+| 2. Stale classes fail silently (Tailwind drops an unknown class; lint runs after the deploy) | `--check` on every merge, lint before every push, `token-names.test.ts`, typecheck for `brandTokens` keys; L moves content motion before its tokens go and adds retired names to the old-name ban |
+| 3. Until Oct 25 these names meant other tokens | The narrow ground-as-text ban; the history section; reverts go through the script |
+| 4. Renames reorder same-property utilities | The proof fails on a flipped pair outside `cn()` |
+| 5. `init` replaces `utils.ts` and rewrites `globals.css`, and `add` without `components.json` runs it | Never on the branch; `components.json` first |
+| 6. The stock Button drops `aria-keyshortcuts`, `aria-busy`, `aria-invalid`, `aria-required`, `title` and `tabIndex` with no type error | B's codemod finds each one: `tabIndex={-1}` becomes `excludeFromTabOrder`; `aria-keyshortcuts` (13) and `aria-busy` (2) are removed, and the shortcut stays visible as `Kbd` text (12.11); any `aria-invalid`, `aria-required` or `title` is listed for a hand fix |
+| 7. `use-mobile` and the touch Select's pointer check return false until their effect runs, so a dialog mounted open on a phone (the 4 create routes) draws centered first | Checked on an iPhone in F; if it shows, `ResponsiveDialog` holds its first paint until the hook runs |
+| 8. The stock bottom Sheet has no keyboard inset or swipe | A height cap class; F's review opens each form with the iPhone keyboard up |
+| 9. `UNSAFE_PortalProvider` is an unstable API | `react-aria` pinned; rechecked on each React Aria upgrade |
+| 10. The base layer recolors borders that set no color; `shadcn/tailwind.css` lowers the specificity of HG's 6 `data-disabled:` and 4 `group-data-selected:` uses | Both checked in A's review |
+| 11. Stock parts are client components imported by server route files (14 for Button, 10 for the table). Calling `buttonVariants`, or any non-component export of a `"use client"` stock file, from a server file throws at render | A prop that can't cross fails at render, which the device check catches; each landing lists its server sites. B converts the 11 server callers of `buttonClass` and the CTA classes (4.1), and its check bans that import there |
+| 12. A stock string breaks the copy rules ("Toggle Sidebar" in title case) | Overridden from the call site where the part allows it; otherwise shown at I's review |
+| 13. `engines` sets Vercel's Node version | `24.x`, which CI's comment says production runs; A's first deploy log confirms |
+| 14. The registry JSON is unversioned | The CLI pinned at 4.23.0; each pull's JSON and file hashes saved (5.6); a non-empty `add --diff` goes to Connor as an update |
+| 15. Another session lands old names or old components after a landing | Old exports deleted or `Hg`-prefixed in the same landing (7.1), so typecheck fails a late branch; `--check` on every merge |
+| 16. Stock Popover drops the held side and beside-when-short, which the date chip uses | Checked in G's and H's review at 375 and 320, with the date chip opened near the screen edge |
+| 17. React Aria buttons stop press propagation, so a parent `onClick`, `onPointerDown` or `onMouseDown`, or a document-level outside-press listener (`inline-field`, `filter-bar`), may stop seeing the press | B's codemod lists every Button with such an ancestor or listener, and B's review opens each one |
 
-## 9. Decisions made after the first draft
+## 9. Decisions after the first draft
 
-1. **Decided Nov 14: the derived families follow the base** (decision 9, option A). `--act-hover` becomes `--primary-hover`, and the `--danger-*` family and `--on-danger` become `--destructive-*` and `--destructive-foreground` (section 3.3). Landing 1 renames them with the rest, and the old-name ban covers them.
-2. **Decided Nov 14: the controls that can't move unchanged move anyway** (decision 7, option B). Landing 3's second part moves them and takes the look change, each site shown to Connor at three sizes before it ships (section 7.4).
-3. **Decided Nov 14: parts beside props** (decision 8, option B). Landing 2 adds the 27 parts HG already draws; the rest arrive when first needed (section 4.6).
+1. **Nov 14: the derived families follow the base** (decision 9). Landing 1 renames them; they retire as their components go stock.
+2. **Nov 14: controls that can't move unchanged move anyway** (decision 7) and **parts sit beside props** (decision 8). Both superseded by decision 12.
+3. **Nov 14: stock shadcn with HG's colors** (decision 10) **and a stock public site** (decision 11).
+4. **Nov 14, on Connor's standing instruction: the 29 calls of decision 12** (section 1.1).
 
-Beyond these, any visual change found in any landing comes to Connor before it ships.
+**What still needs Connor:** an explicit "build it", then his review of each landing from A on (7.4). Nothing else is blocked on him. Landing 1 waits only for design-calls-nov14 to land, which is another session's work.
+
+## 10. Unverified
+
+- The research's set of 38 items is inferred. `native-select`, `attachment`, `item`, `marker`, `message` and base-vega's table weren't in it, so their React Aria names, lint results and registry dependencies weren't checked.
+- The busy AlertDialog pattern was read from React Aria's source, not run.
+- The stock bottom Sheet on iOS with the keyboard up, and with a height cap in a long form.
+- `UNSAFE_PortalProvider` was read from react-aria 3.52.1's files, not run.
+- The reduced-motion reset was read from tw-animate 1.4.0's CSS, not tested in a browser.
+- That Playwright's iPad Mini matches `pointer: coarse`, which the 44px rule and the 16px guard rely on.
+- Whether a `min-height` inside a fixed-height stock parent (the `h-9` tabs list, a toggle group) needs the parent raised, and which other stock parts write both `data-variant` and `data-size` on a button or link (toggle-group items, sidebar buttons and `Item` links do) and look right at 44px.
+- That the pick ring's unlayered `outline` beats stock's `outline-none` and draws inside the 1px edge in WebKit and Chromium.
+- No full build has run with the two stock CSS imports, and no stock file has been typechecked under HG's tsconfig.
+- `createCn` from `cn/config` wasn't run with HG's `extend` block, so `utils.test.ts` must pass unchanged in A.
+- Whether HG's `data-disabled:` and `group-data-selected:` uses look the same at `:where()` specificity, and whether the 7 bare-border strings get a color elsewhere.
+- Whether CLI 4.23.0 rewrites paths correctly when adding base-vega's table by URL, and whether `add --diff` accepts a URL.
+- That a stock Select shows its placeholder for a stored value missing from its list, and that the 10 `onChange` bodies compile with `Key | null`.
+- Sonner: that its options carry HG's (`sticky` as `Infinity`, the inset as `offset`); that its timer doesn't pause on Tab focus; how its theme-dependent parts look; and that a 90-character toast wraps to two lines (an estimate).
+- The toast counts differ between the AST scan (84 calls in 37 files; `action` 21, `key` 15) and a regex scan (93 in 41; 24 and 18), so D's codemod recounts.
+- Whether `StatusBadge` has entries for Connected, Needs mapping and the onboarding states. A missing one is shown at C's review.
+- That `followUp`'s second step fits `DropdownMenuSub`.
+- Whether `composer.tsx:694`'s `onMouseDown` keeps the phone keyboard up on a React Aria Button.
+- Which Button sites rely on a click bubbling to a parent or a document listener; React Aria's press propagation wasn't traced at each.
+- How wide a stock dropdown opened from an icon button draws; it comes from its class string, not a render.
+- Whether React Aria's `ProgressBar` warns about a missing label on the client.
+- `field-sizing-content` in iOS Safari.
+- Whether built-in stock strings ("Toggle Sidebar") can be overridden from the call site.
+- Vercel's production Node version; `/api/health` reports it only behind `HEALTH_TOKEN`.
+- Contrast ratios are computed from hex values, not measured in a browser. Effort estimates are rough.
+- Landing 1's counts weren't re-measured at `ff7d92b`.
 
 ## References
 
-- shadcn/ui: [docs](https://ui.shadcn.com/docs), [React Aria base](https://ui.shadcn.com/docs/changelog/2026-07-react-aria), [cn package change](https://ui.shadcn.com/docs/changelog/2026-09-cn), [CLI v4](https://ui.shadcn.com/docs/changelog/2026-03-cli-v4), [theming](https://ui.shadcn.com/docs/theming), [CLI](https://ui.shadcn.com/docs/cli), [components.json](https://ui.shadcn.com/docs/components-json), [schema](https://ui.shadcn.com/schema.json), [components](https://ui.shadcn.com/docs/components).
-- shadcn/ui aria pages: [button](https://ui.shadcn.com/docs/components/aria/button), [dialog](https://ui.shadcn.com/docs/components/aria/dialog), [dropdown menu](https://ui.shadcn.com/docs/components/aria/dropdown-menu), [tooltip](https://ui.shadcn.com/docs/components/aria/tooltip), [popover](https://ui.shadcn.com/docs/components/aria/popover), [select](https://ui.shadcn.com/docs/components/aria/select), [toast](https://ui.shadcn.com/docs/components/aria/toast).
-- aria-vega registry items (the class strings in sections 3, 4.5 and 5.4): [registry](https://ui.shadcn.com/r/styles/aria-vega/registry.json), [button](https://ui.shadcn.com/r/styles/aria-vega/button.json), [badge](https://ui.shadcn.com/r/styles/aria-vega/badge.json), [dialog](https://ui.shadcn.com/r/styles/aria-vega/dialog.json), [alert-dialog](https://ui.shadcn.com/r/styles/aria-vega/alert-dialog.json), [dropdown-menu](https://ui.shadcn.com/r/styles/aria-vega/dropdown-menu.json), [popover](https://ui.shadcn.com/r/styles/aria-vega/popover.json), [tooltip](https://ui.shadcn.com/r/styles/aria-vega/tooltip.json), [card](https://ui.shadcn.com/r/styles/aria-vega/card.json), [input](https://ui.shadcn.com/r/styles/aria-vega/input.json), [select](https://ui.shadcn.com/r/styles/aria-vega/select.json), [sheet](https://ui.shadcn.com/r/styles/aria-vega/sheet.json), [aria-nova utils](https://ui.shadcn.com/r/styles/aria-nova/utils.json), [registries](https://ui.shadcn.com/r/registries.json).
-- shadcn/ui styles: [shadcn create](https://ui.shadcn.com/docs/changelog/2025-12-shadcn-create), [Luma](https://ui.shadcn.com/docs/changelog/2026-03-luma), [Sera](https://ui.shadcn.com/docs/changelog/2026-04-sera), [Rhea](https://ui.shadcn.com/docs/changelog/2026-05-rhea).
-- shadcn/ui source: [aria base](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/aria), [init](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/init.ts), [add](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/add.ts), [preset defaults](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/preset/defaults.ts), [tailwind.css](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/tailwind.css), [CSS variable updater](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/updaters/update-css-vars.ts), [file updater](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/updaters/update-files.ts), [dependency updater](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/updaters/update-dependencies.ts), [import transformer](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/transformers/transform-import.ts), [icon transformer](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/transformers/transform-icons.ts), [menu transformer](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/transformers/transform-menu.ts), [cn](https://github.com/shadcn-ui/cn).
-- Intent UI: [introduction](https://intentui.com/docs/getting-started/introduction.md), [installation](https://intentui.com/docs/getting-started/installation.md), [registry](https://intentui.com/r/registry.json), [button](https://intentui.com/r/button), [primitive](https://intentui.com/r/primitive), [theme](https://intentui.com/r/theme-default), [repo](https://github.com/irsyadadl/intentui), [package.json](https://raw.githubusercontent.com/irsyadadl/intentui/4.x/package.json).
-- In the repo: `src/app/globals.css`, `eslint.config.mjs`, `src/lib/utils.ts`, `src/lib/brand-tokens.ts` and its tests, `src/lib/email/render.ts` and its test, `src/lib/print-tokens.test.ts`, `src/lib/sheet-routes.test.ts`, `src/components/ui.tsx`, `tests/devices/`, `playwright.config.ts`, `scripts/device-check-gate.mjs`, `node_modules/tailwindcss/theme.css`, `node_modules/tailwindcss/dist/lib.js`, and `git show 1ce1042` (the Oct 25 alias retirement).
+- shadcn/ui: [docs](https://ui.shadcn.com/docs), [React Aria base](https://ui.shadcn.com/docs/changelog/2026-07-react-aria), [cn change](https://ui.shadcn.com/docs/changelog/2026-09-cn), [CLI](https://ui.shadcn.com/docs/cli), [theming](https://ui.shadcn.com/docs/theming), [components.json](https://ui.shadcn.com/docs/components-json), [manual install](https://ui.shadcn.com/docs/installation/manual).
+- Aria pages: [button](https://ui.shadcn.com/docs/components/aria/button), [dialog](https://ui.shadcn.com/docs/components/aria/dialog), [sheet](https://ui.shadcn.com/docs/components/aria/sheet), [drawer](https://ui.shadcn.com/docs/components/aria/drawer), [alert dialog](https://ui.shadcn.com/docs/components/aria/alert-dialog), [dropdown menu](https://ui.shadcn.com/docs/components/aria/dropdown-menu), [tooltip](https://ui.shadcn.com/docs/components/aria/tooltip), [select](https://ui.shadcn.com/docs/components/aria/select), [native select](https://ui.shadcn.com/docs/components/aria/native-select), [field](https://ui.shadcn.com/docs/components/aria/field), [date picker](https://ui.shadcn.com/docs/components/aria/date-picker), [table](https://ui.shadcn.com/docs/components/aria/table), [sonner](https://ui.shadcn.com/docs/components/aria/sonner), [attachment](https://ui.shadcn.com/docs/components/aria/attachment), [typography](https://ui.shadcn.com/docs/components/aria/typography).
+- Registry items: [aria-vega registry](https://ui.shadcn.com/r/styles/aria-vega/registry.json), [style](https://ui.shadcn.com/r/styles/aria-vega/style.json), [button](https://ui.shadcn.com/r/styles/aria-vega/button.json), [toggle](https://ui.shadcn.com/r/styles/aria-vega/toggle.json), [toggle group](https://ui.shadcn.com/r/styles/aria-vega/toggle-group.json), [calendar](https://ui.shadcn.com/r/styles/aria-vega/calendar.json), [item](https://ui.shadcn.com/r/styles/aria-vega/item.json), [use-mobile](https://ui.shadcn.com/r/styles/aria-vega/use-mobile.json), [sidebar](https://ui.shadcn.com/r/styles/aria-vega/sidebar.json), [base-vega table](https://ui.shadcn.com/r/styles/base-vega/table.json).
+- Source: [aria base](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/aria), [init](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/init.ts), [add](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/commands/add.ts), [tailwind.css](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/src/tailwind.css), [CSS variable updater](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/updaters/update-css-vars.ts), [import transformer](https://github.com/shadcn-ui/ui/blob/main/packages/registry/src/transformers/transform-import.ts), [cn](https://github.com/shadcn-ui/cn), [sonner 2.0.8](https://unpkg.com/sonner@2.0.8/dist/index.mjs), [Node schedule](https://raw.githubusercontent.com/nodejs/Release/main/schedule.json).
+- Standards: [Apple HIG accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility), [WCAG 2.5.5](https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html), [1.4.1](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html), [1.4.11](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html), [2.3.3](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html), [APG tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/), [React Aria Tooltip](https://react-aria.adobe.com/Tooltip.md).
+- Intent UI, anatomy only: [registry](https://intentui.com/r/registry.json).
+- In the repo: `src/app/globals.css`, `eslint.config.mjs`, `src/lib/utils.ts`, `src/lib/brand-tokens.ts`, `src/lib/email/render.ts`, `src/components/ui.tsx`, `src/components/theme-toggle.tsx`, `tests/devices/`, `playwright.config.ts`, `scripts/device-check-gate.mjs`, `.github/workflows/ci.yml`, and `git show 1ce1042` (the Oct 25 alias retirement).

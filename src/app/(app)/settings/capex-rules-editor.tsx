@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
-import { ActionBar, SubmitKeycap, actionBarButton } from "@/components/action-bar";
+import { ActionBar, actionBarButton } from "@/components/action-bar";
 import { Combobox } from "@/components/combobox";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useHoldLeave } from "@/components/leave-guard";
@@ -552,7 +552,6 @@ export function CapexRulesEditor({
           primary={
             <Button type="button" className={actionBarButton} pending={pending} onClick={save} aria-keyshortcuts="Meta+Enter Control+Enter">
               Save
-              <SubmitKeycap />
             </Button>
           }
         />

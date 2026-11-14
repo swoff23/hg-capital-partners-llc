@@ -28,9 +28,8 @@ import { PickerLayer } from "@/components/picker-layer";
 import { railLineClass, railVerbClass } from "@/components/rail";
 import { Switch } from "@/components/switch";
 import { DoneFooter, TagList, TagsChecklist, tagsLine, tagsOf } from "@/components/tags-field";
-import { Button, FormField, Input, Kbd, fieldClass } from "@/components/ui";
+import { Button, FormField, Input, fieldClass } from "@/components/ui";
 import { isCoarseNow } from "@/components/use-coarse-pointer";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { useRun } from "@/components/use-run";
 import type { AddressKind } from "@/lib/address-suggestions";
 import { conflictKeepLabel, type ActionResult } from "@/lib/action-result";
@@ -109,6 +108,8 @@ export type InlineFieldProps = {
   emptyLabel?: string;
   /** `choice`: the line when a search of the options finds none ("No reason matches."). */
   emptyText?: string;
+  /** `choice`: the search always shows, and text that names no option adds it ('Add "Linwood Partners LLC"'), saved like a pick. */
+  allowAdd?: boolean;
   /** The least length for text and headings; 0, the default, lets a fact be emptied. */
   minLength?: number;
   /** The line for a blank heading: "Enter the address." */
@@ -377,7 +378,6 @@ function TextFact(props: InlineFieldProps) {
   const closing = useRef(false);
   const refocus = useRef(false);
   const lineId = useId();
-  const mod = useModKey();
   const shown = save.shown;
 
   function open() {
@@ -675,13 +675,9 @@ function TextFact(props: InlineFieldProps) {
         <div className="mt-2 flex justify-end gap-2">
           <Button size="sm" variant="secondary" onClick={cancel} aria-keyshortcuts="Escape">
             Cancel
-            <Kbd aria-hidden="true">Esc</Kbd>
           </Button>
           <Button size="sm" onClick={() => commit(save.conflict ? { expected: theirsText() } : undefined)} aria-keyshortcuts="Meta+Enter Control+Enter">
             Save
-            <Kbd tone="act" aria-hidden="true">
-              {shortcutLabel(mod, "↵")}
-            </Kbd>
           </Button>
         </div>
       )}
@@ -983,7 +979,7 @@ function HeadingFact(props: InlineFieldProps) {
 
 /** A date or a choice. The value opens its panel (a popover, a sheet on a phone) and a pick saves. */
 function PickedFact(props: InlineFieldProps) {
-  const { kind, label, value, field, empty, tone, helper, display, unit, options = [], emptyLabel, emptyText, allowNone = true, trailing, onRequest, className } = props;
+  const { kind, label, value, field, empty, tone, helper, display, unit, options = [], emptyLabel, emptyText, allowAdd, allowNone = true, trailing, onRequest, className } = props;
   const inRail = props.inRail ?? true;
   const save = useFactSave(props);
   const router = useRouter();
@@ -1065,6 +1061,14 @@ function PickedFact(props: InlineFieldProps) {
                 onTab={close}
                 searchLabel={`Search ${label.toLowerCase()}`}
                 emptyText={emptyText}
+                onCreate={
+                  allowAdd
+                    ? (text) => {
+                        close();
+                        pick(text);
+                      }
+                    : undefined
+                }
               />
             )
           }

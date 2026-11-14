@@ -169,6 +169,9 @@ model Property {
   rehabAmount     Decimal?  @db.Decimal(12, 2)
   rehabMonths     Decimal?  @db.Decimal(8, 2)
   sqft            Int?
+  // The building's bedrooms and bathrooms, all units together (Details and the header, Nov 14). Baths take halves: 1.5.
+  beds            Int?
+  baths           Decimal?  @db.Decimal(6, 2)
   unitCount       Int?
 
   // Loan — flat, one current loan per property (refi history is a later model).

@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AddressCombobox } from "@/components/address-combobox";
-import { Combobox } from "@/components/combobox";
 import { CreateForm } from "@/components/create-form";
+import { Select } from "@/components/select";
 import { useToast } from "@/components/toast";
 import { looksLikeLink } from "@/lib/address-suggestions";
 import { shortAddress } from "@/lib/normalize";
@@ -18,15 +18,18 @@ const BLANK: Values = { address: "", llcOwner: "" };
  * Portfolio, and the same form flat on `/properties/new` for a pasted link or
  * a reload. Two fields: the address, which suggests HG's own records, says
  * when it is already a property and shows what it will save as; and the
- * Entity, picked from the ones already on properties or typed new. Status is
+ * Entity, searched from `entities` or typed in new, or Not set. Status is
  * not asked: a property without one shows the rail's verb. "Create property"
  * opens the new record with "767 Prospect Ave added".
  */
-export function NewPropertyForm({ variant, entities }: { variant: "sheet" | "page"; entities: string[] }) {
+export function NewPropertyForm({ variant, entities }: { variant: "sheet" | "page"; entities: readonly string[] }) {
   const router = useRouter();
   const { toast } = useToast();
   const [values, setValues] = useState<Values>(BLANK);
   const set = (patch: Partial<Values>) => setValues((v) => ({ ...v, ...patch }));
+  // A name typed in with "Add", listed after the others so it reads as a row.
+  const [added, setAdded] = useState<string | null>(null);
+  const entityRows = [...entities, ...(added && !entities.includes(added) ? [added] : [])].map((name) => ({ id: name, label: name }));
 
   return (
     <CreateForm<Values, CreatedProperty>
@@ -71,15 +74,16 @@ export function NewPropertyForm({ variant, entities }: { variant: "sheet" | "pag
             isInvalid={!!errors.address}
             errorMessage={errors.address}
           />
-          <Combobox
+          <Select
             label="Entity (optional)"
             name="llcOwner"
-            items={entities}
-            allowCustom
-            value={values.llcOwner}
+            items={entityRows}
+            emptyLabel="Not set"
+            onCreate={setAdded}
+            value={values.llcOwner || null}
             onChange={(llcOwner) => {
               clear("llcOwner");
-              set({ llcOwner });
+              set({ llcOwner: llcOwner ?? "" });
             }}
             isInvalid={!!errors.llcOwner}
             errorMessage={errors.llcOwner}
