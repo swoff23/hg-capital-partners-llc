@@ -304,7 +304,7 @@ export type FilterBarProps = {
  * counts, no option lists and nothing to call (docs/specs/performance.md 4.2).
  */
 export type FilterBarFrameProps = Pick<FilterBarProps, "search" | "wide" | "className"> & {
-  views?: Omit<NonNullable<FilterBarProps["views"]>, "options" | "resets"> & { options: readonly { key: string; label: string }[] };
+  views?: Omit<NonNullable<FilterBarProps["views"]>, "options" | "resets"> & { options: readonly { key: string; label: string; mark?: ReactNode }[] };
   facets?: readonly { kind: "multi" | "toggle"; param: string; label: string }[];
   sort?: Pick<FilterSort, "param" | "default">;
 };
@@ -498,6 +498,8 @@ function FilterBarFrame({ search, views, facets = [], sort, wide, className }: F
             {views.menu && current && (
               <span className={cn(buttonClass({ variant: "secondary", size: "sm" }), "min-w-0 shrink-0", classes.hide)}>
                 <span className="truncate">{current.label}</span>
+                {/* The place the live button's count takes from sm up (ViewMenu), so the search field holds its width. */}
+                {current.mark && <span className="tabular-nums max-sm:hidden">{current.mark}</span>}
                 <ChevronDown aria-hidden="true" className="size-3.5 text-fg-3" />
               </span>
             )}
