@@ -38,6 +38,9 @@ type FactProps = Omit<InlineFieldProps, "label" | "value" | "onSave" | "kind" | 
   value: string | null | undefined;
 };
 
+/** A fact with nothing in it, for the rail's fold (components/rail-fold.tsx): nothing stored, or only spaces. */
+export const isBlank = (v: string | number | null | undefined) => v == null || String(v).trim() === "";
+
 export function PropertyFact({ id, field, label, name, anchor, value, ...rest }: FactProps) {
   return (
     <RailFact label={label} id={anchor}>

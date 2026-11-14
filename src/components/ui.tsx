@@ -241,6 +241,10 @@ export function TextLink({ className, ...props }: React.ComponentProps<typeof Li
  * the label in --fg-2 at text-label, over the list's --line rule; 40px, 48 on
  * touch. `className` adjusts it, e.g. an inset to line up with a table's text.
  */
+/** The foot row's look, shared with the rail's "7 more fields" (components/rail-fold.tsx). */
+export const addRowClass =
+  "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12";
+
 export function AddRow({
   children,
   onClick,
@@ -263,10 +267,7 @@ export function AddRow({
       onFocus={onIntent}
       onPointerDown={onIntent}
       disabled={disabled}
-      className={cn(
-        "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12",
-        className,
-      )}
+      className={cn(addRowClass, className)}
     >
       <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
       {children}

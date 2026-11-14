@@ -12,6 +12,7 @@ import { useRun } from "@/components/use-run";
 import { lazyModule, openFailedToast, warmWhenIdle } from "@/lib/lazy-module";
 import { cn } from "@/lib/utils";
 import { deletePropertyListing } from "../actions";
+import { onPropertyFieldRequest } from "./edit-field-event";
 import type { ListingPhotoDraft } from "./listing-photos";
 
 // The editor (its photo manager and drag and drop included) loads after the page has settled or at the first hover, focus or press, not with the page (lib/lazy-module.ts).
@@ -54,12 +55,19 @@ function blankListing(): EditableListing {
 
 type Sheet = { index: number | null; version: string; id: number };
 
+/** What the header's ⋯ "Add listing" asks for (openPropertyField), while the section isn't on the page. */
+export const NEW_LISTING = "newListing";
+
 /**
- * The rentals (forms 4.2): one row per listing, read at a glance. A row's
+ * Rental listings (forms 4.2): one row per listing, read at a glance. A row's
  * name, or "Edit listing" in its ⋯ menu, opens that listing in a sheet: its
  * unit, status, photos and facts, saved together as one write at the version
  * the sheet opened at, so a change anyone else made to the property meanwhile
  * refuses it. "Delete listing" asks first and says how many photos go with it.
+ *
+ * The section shows only once the property has a listing
+ * (docs/specs/property-page.md 2.3). Until then nothing of it is on the page
+ * but the sheet, which the header's ⋯ "Add listing" opens (NEW_LISTING).
  */
 export function ListingsSection({
   propertyId,
@@ -93,6 +101,14 @@ export function ListingsSection({
     setIsOpen(true);
   }
 
+  // The header's ⋯ "Add listing": the same sheet as the section's own row.
+  useEffect(() =>
+    onPropertyFieldRequest([NEW_LISTING], () => {
+      listingSheet.warm();
+      openListing(null);
+    }),
+  );
+
   const doomed = removing != null ? initial[removing] : null;
 
   function confirmDelete() {
@@ -108,24 +124,27 @@ export function ListingsSection({
 
   const editing = sheet?.index != null ? initial[sheet.index] : undefined;
 
+  // The sheet sits beside the section, not in it, so it stays the same sheet while the first listing saves and the
+  // section appears: it slides out instead of being remounted.
   return (
-    <Section title="Rentals">
-      {initial.length === 0 ? (
-        <p className="pb-2 text-body text-fg-3">No listings yet.</p>
-      ) : (
-        <ReadListings
-          listings={initial}
-          onEdit={openListing}
-          onDelete={(i) => {
-            run.reset();
-            setRemoving(i);
-          }}
-        />
+    <>
+      {initial.length > 0 && (
+        <Section title="Rental listings">
+          <ReadListings
+            listings={initial}
+            onEdit={openListing}
+            onDelete={(i) => {
+              run.reset();
+              setRemoving(i);
+            }}
+          />
+          <AddRow onClick={() => openListing(null)} onIntent={listingSheet.warm} disabled={noUnits}>
+            Add listing
+          </AddRow>
+          {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
+          {doomed && run.error && <SaveError className="mt-2">{run.error}</SaveError>}
+        </Section>
       )}
-      <AddRow onClick={() => openListing(null)} onIntent={listingSheet.warm} disabled={noUnits}>
-        Add listing
-      </AddRow>
-      {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
 
       {sheet && editor && (
         <editor.ListingSheet
@@ -153,8 +172,7 @@ export function ListingsSection({
           }
         />
       )}
-      {doomed && run.error && <SaveError className="mt-2">{run.error}</SaveError>}
-    </Section>
+    </>
   );
 }
 

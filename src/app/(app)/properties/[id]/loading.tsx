@@ -1,51 +1,36 @@
 import { BackLink } from "@/components/back-link";
 import { FactStrip } from "@/components/fact-strip";
 import { RailFact, RailList } from "@/components/rail";
-import { Block, HeadingBlock, LoadingScreen, rowWidth } from "@/components/skeleton";
-import { Section, Table, Td, Th } from "@/components/ui";
+import { Block, HeadingBlock, LoadingScreen, TaskRowSkeleton, rowWidth } from "@/components/skeleton";
+import { Section } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
 
-/** The rail's sections and their rows on every property, as edit-details, edit-loan and edit-insurance list them. */
+/**
+ * The rail's sections and the rows a property usually has in them, as
+ * edit-details, edit-loan and edit-insurance list them. Empty rows fold
+ * (components/rail-fold.tsx), so Loan and Insurance draw their reminder date,
+ * the rows most properties fill, and the fold's row (`fold`).
+ */
 const RAIL = [
   {
     title: "Details",
-    rows: [
-      "Value",
-      "Purchase date",
-      "Purchase price",
-      "Closing costs",
-      "Rehab amount",
-      "Refinance date",
-      "Refi target",
-      "Strategy",
-      "Sq ft",
-      "Entity",
-      "Attorney",
-      "Status",
-      "Move-in form",
-      "Registration",
-      "Tax due",
-    ],
+    rows: ["Value", "Purchase date", "Purchase price", "Refinance date", "Strategy", "Sq ft", "Entity", "Attorney", "Status", "Move-in form", "Registration", "Tax due"],
+    fold: false,
   },
-  {
-    title: "Loan",
-    rows: ["Maturity", "Balance", "Lender", "Servicer", "Loan #", "Loan type", "Original loan", "Rate", "Payment / mo", "Escrow", "Originated"],
-  },
-  { title: "Insurance", rows: ["Renewal", "Carrier", "Policy #", "Premium", "Replacement", "Coverage", "Deductible", "Liability"] },
+  { title: "Loan", rows: ["Maturity", "Balance", "Servicer", "Escrow"], fold: true },
+  { title: "Insurance", rows: ["Renewal", "Replacement"], fold: true },
 ];
-
-/** The default CapEx rules' building systems: Building CapEx lists one row each. */
-const SYSTEMS = 10;
 
 /**
  * A property while it loads (docs/specs/performance.md 4.3), on the page's
- * grid: Portfolio, the four figures' labels, the main column's 5-year CapEx
- * forecast (its years, from today, as the card counts them), Building CapEx
- * with its column headers, Units & access, and the rail's Details, Loan and
- * Insurance with every label draw at once; the photo, the status, the
- * address, the subline, the figures and the sections' values are --fill-1
- * blocks. The Financials card shows only once QuickBooks is connected, so it
- * stays out. Full width at 16:9 on a phone, the photo is 96x72 from sm.
+ * grid and in its order (docs/specs/property-page.md): Portfolio, the four
+ * figures' labels, then Tasks, Units & access and CapEx (its years, from
+ * today, as the card counts them, and the folded Building systems row) beside
+ * the rail's Details, Loan and Insurance with every label drawn at once; the
+ * photo, the status, the address, the subline, the figures and the sections'
+ * values are --fill-1 blocks. The Financials card shows only once QuickBooks
+ * is connected, and Rental listings only with a listing, so both stay out.
+ * Full width at 16:9 on a phone, the photo is 96x72 from sm.
  */
 export default function PropertyLoading() {
   const from = Number(todayYmdEastern().slice(0, 4));
@@ -73,9 +58,22 @@ export default function PropertyLoading() {
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10 pointer-coarse:mt-6">
         <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
-          {/* CapexForecastCard's boxes: the total, then ForecastYearBars' rows. */}
+          {/* PropertyTasksSection's rows, on its container query. */}
+          <Section title="Tasks">
+            <ul className="@container divide-y divide-line">
+              {Array.from({ length: 4 }, (_, i) => (
+                <TaskRowSkeleton key={i} i={i} />
+              ))}
+            </ul>
+          </Section>
+
+          <Section title="Units & access">
+            <SectionLines lines={2} />
+          </Section>
+
+          {/* CapexForecastCard's boxes: the total, ForecastYearBars' rows, then the folded Building systems row. */}
           <Section
-            title="5-year CapEx forecast"
+            title="CapEx"
             actions={
               <span className="num flex h-8 items-center text-meta text-fg-3">
                 {from} to {from + 4}
@@ -96,56 +94,8 @@ export default function PropertyLoading() {
                   </div>
                 ))}
               </div>
+              <FoldLine />
             </div>
-          </Section>
-
-          {/* BuildingCapexSection's boxes: the dated count and its meter, then the table. */}
-          <Section title="Building CapEx">
-            <div className="flex items-center gap-2">
-              <Block text="text-meta" className="w-32" />
-            </div>
-            <Table className="mt-2">
-              <thead>
-                <tr>
-                  <Th className="pl-0">Component</Th>
-                  <Th className="max-[480px]:hidden lg:max-xl:hidden">Type</Th>
-                  <Th>Year</Th>
-                  <Th className="max-[480px]:hidden">Age</Th>
-                  <Th>Status</Th>
-                  <Th numeric className="pr-0">
-                    Cost
-                  </Th>
-                </tr>
-              </thead>
-              <tbody aria-hidden="true" className="divide-y divide-line">
-                {Array.from({ length: SYSTEMS }, (_, i) => (
-                  <tr key={i}>
-                    <Td className="pl-0 align-middle">
-                      <Block text="text-body" className={rowWidth(i, ["w-16", "w-28", "w-20", "w-32"])} />
-                    </Td>
-                    <Td className="align-middle max-[480px]:hidden lg:max-xl:hidden">
-                      <Block text="text-body" className="w-14" />
-                    </Td>
-                    <Td className="align-middle">
-                      <Block text="text-body" className="w-8" />
-                    </Td>
-                    <Td className="align-middle max-[480px]:hidden">
-                      <Block text="text-body" className="w-8" />
-                    </Td>
-                    <Td className="align-middle">
-                      <Block text="text-body" className="w-14" />
-                    </Td>
-                    <Td numeric className="pr-0 align-middle">
-                      <Block text="text-body" className="ml-auto w-8" />
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Section>
-
-          <Section title="Units & access">
-            <SectionLines lines={2} />
           </Section>
         </div>
 
@@ -159,6 +109,7 @@ export default function PropertyLoading() {
                   </RailFact>
                 ))}
               </RailList>
+              {s.fold && <FoldLine />}
             </Section>
           ))}
         </div>
@@ -177,5 +128,14 @@ function SectionLines({ lines }: { lines: number }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A fold's foot row ("7 more fields", "Building systems"): 40px over a --line rule, 48 on touch. */
+function FoldLine() {
+  return (
+    <div aria-hidden="true" className="flex min-h-10 items-center border-t border-line pointer-coarse:min-h-12">
+      <Block text="text-label" className="w-28" />
+    </div>
   );
 }

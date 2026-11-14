@@ -51,7 +51,7 @@ The header and the fact strip don't change.
 ![Details with the Entity list open, Loan folded and opened, Insurance folded](property-page/02-rail.svg)
 
 - **Details** loses Closing costs, Rehab amount and Refi target, going from 16 rows to 12.
-- **Entity** opens the same picker Strategy uses: HG Capital Partners LLC, HG Buffalo Holding 1 LLC, HG Buffalo Holding 2 LLC, HG Buffalo Property Management LLC, BMK Property Group LLC, and "Not set". On a phone the picker is a titled sheet, as Strategy's is.
+- **Entity** opens the same picker Strategy uses, in a fixed order (the current pick no longer jumps to the top, which also steadies Strategy and Status): HG Capital Partners LLC, HG Buffalo Holding 1 LLC, HG Buffalo Holding 2 LLC, HG Buffalo Property Management LLC, BMK Property Group LLC, and "Not set". On a phone the picker is a titled sheet, as Strategy's is.
 - **Folding.** In Details, Loan and Insurance, a row with no value folds away. The last row of the section reads "7 more fields" with a chevron, and a tap opens the folded rows in place, in their usual order, ending with "Fewer fields". Rows stay 40px with a mouse and 48 on touch at every width, and nothing depends on hover.
 - **What never folds:** the reminder dates (Maturity, Renewal, Registration, Tax due), which stay in orange "+ Add" form because setting one creates its reminder task; switches (Escrow, Move-in form); and any field that has a value.
 - A field you fill counts as filled from then on, so it stays out of the fold after a reload. A field you clear stays visible until you leave the page, so it doesn't vanish under your finger.
@@ -86,7 +86,7 @@ The heading "Building CapEx" goes away. "5-year CapEx forecast" becomes "CapEx",
 - **The three removed fields.** The columns `refiTarget`, `closingCosts` and `rehabAmount` stay, with their values. `patchProperty` stops accepting writes to them, since nothing on screen can set them. In the local copy, Refi target is set on 3 properties ("-->HG1", "-->HG3"), and Closing costs and Rehab amount are empty on all 11.
 - **Entity values.** `patchProperty` accepts one of the five names, empty, or the value already stored (so a property nobody has touched is never refused).
 
-**Before building, read-only on production:** count the properties with Closing costs or Rehab amount filled, and list every distinct `llcOwner` value. Any value besides the five and the 58 Mariner text goes to Connor before the migration is written.
+**Checked on production, read-only, before the build (Nov 14):** 12 properties; Closing costs and Rehab amount are empty on all of them, Refi target is set on 3, and every `llcOwner` is one of the five, empty (1), or the 58 Mariner text (1).
 
 ## 5. Reuse check
 
@@ -100,7 +100,7 @@ The heading "Building CapEx" goes away. "5-year CapEx forecast" becomes "CapEx",
 | Extended | The header ⋯ menu | `components/record-archive.tsx` `RecordMoreMenu` gets an optional list of record actions above Copy link |
 | Extended | Rental listings | `edit-listings.tsx` `ListingsSection` renders its sheet but no section while there are no listings |
 | Extended | New property's Entity field | `properties/new/new-property-form.tsx` uses the five names instead of the free-text combobox |
-| New | The fold | A `RailFold` in `components/rail.tsx`: the "N more fields" row and the rows it holds, with a row in [components.md](../components.md). Pattern from [Attio](https://mobbin.com/screens/297adfeb-8312-496b-8acf-41839a6cf775) ("Show all values") and [Lightfield](https://mobbin.com/screens/edb25210-fb3c-4cd4-8736-85569882b93e) ("See more") |
+| New | The fold | `RailFold` in `components/rail-fold.tsx`, its rules in `lib/rail-fold.ts`: the "N more fields" row and the rows it holds, with a row in [components.md](../components.md). Pattern from [Attio](https://mobbin.com/screens/297adfeb-8312-496b-8acf-41839a6cf775) ("Show all values") and [Lightfield](https://mobbin.com/screens/edb25210-fb3c-4cd4-8736-85569882b93e) ("See more") |
 | New | The Building systems disclosure | A one-row disclosure at the foot of CapEx, the same anatomy as `RailFold` |
 
 Layout references: [Zillow Rentals](https://mobbin.com/screens/5cd12c32-2216-45f0-bf87-6ccd06b0476e) and [Shopify](https://mobbin.com/screens/46de7047-d628-4cf6-9a5a-bc6984f22a76) lead a record with its work and keep the facts in the side column.
@@ -110,10 +110,10 @@ Layout references: [Zillow Rentals](https://mobbin.com/screens/5cd12c32-2216-45f
 - `src/app/(app)/properties/[id]/page.tsx`, `loading.tsx` (skeleton in the new order)
 - `src/app/(app)/properties/[id]/edit-details.tsx`, `edit-loan.tsx`, `edit-insurance.tsx`, `property-fact.tsx`
 - `src/app/(app)/properties/[id]/capex-outlook.tsx`, `building-capex.tsx`, `edit-listings.tsx`
-- `src/components/rail.tsx`, `src/components/record-archive.tsx`
+- `src/components/rail-fold.tsx` (new), `src/lib/rail-fold.ts` (new), `src/components/ui.tsx` (`addRowClass`), `src/components/record-archive.tsx`, `src/app/(app)/properties/[id]/property-more-menu.tsx` (new)
 - `src/app/(app)/properties/new/new-property-form.tsx`, `new-property-screen.tsx`
-- `src/lib/properties/service.ts`, `src/lib/quickbooks/entities.ts` (export the names)
-- A migration for 58 Mariner; `docs/components.md`
+- `src/lib/properties/service.ts`, `src/lib/properties/entity.ts` (new), `src/lib/properties/numbers.ts`, `src/lib/quickbooks/entities.ts` (`ENTITY_NAMES`)
+- `prisma/migrations/20261115140000_bmk_entity` for 58 Mariner; `docs/components.md`
 
 **Overlap.** The "Tenant contact info" session's tenants work doesn't touch these files. Its later property-page Tenants section (after design-calls-nov14) will sit in the main column beside Units and access, and should start from this layout.
 

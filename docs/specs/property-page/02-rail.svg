@@ -46,7 +46,7 @@
 <g fill="#5b6576"><text x="0" y="298">Renewal</text><text x="0" y="326">Replacement</text></g>
 <text x="96" y="298" fill="#a54e09">+ Add renewal date</text><text x="96" y="326" fill="#152133">$700,000</text>
 <g stroke="#e7e5e0"><line x1="0" y1="308" x2="240" y2="308"/><line x1="0" y1="336" x2="240" y2="336"/></g>
-<text x="0" y="358" fill="#424e61">⌄  7 more fields</text>
+<text x="0" y="358" fill="#424e61">⌄  6 more fields</text>
 <line x1="0" y1="370" x2="240" y2="370" stroke="#e7e5e0"/>
 <text x="0" y="404" fill="#5b6576">Reminder dates (orange) never fold.</text>
 <text x="0" y="422" fill="#5b6576">Folded rows keep their order when shown.</text>

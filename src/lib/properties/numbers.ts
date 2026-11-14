@@ -85,7 +85,7 @@ export function amountProblem(field: string, raw: string): string | null {
 
 /** The fields `patchProperty` reads with `readAmount`. */
 const MONEY_FIELD_NAMES = new Set([
-  "value", "replacementCost", "purchasePrice", "closingCosts", "rehabAmount", "rehabMonths",
+  "value", "replacementCost", "purchasePrice", "rehabMonths",
   "loanOriginalAmount", "currentLoan", "loanPaymentMonthly",
   "insuranceCoverage", "insuranceDeductible", "insurancePremium",
 ]);
@@ -94,8 +94,6 @@ const LABELS: Record<string, string> = {
   value: "Value",
   replacementCost: "Replacement cost",
   purchasePrice: "Purchase price",
-  closingCosts: "Closing costs",
-  rehabAmount: "Rehab amount",
   rehabMonths: "Rehab months",
   loanOriginalAmount: "Original amount",
   currentLoan: "Balance",

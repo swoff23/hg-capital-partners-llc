@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { grandTotalRow, Section, Table, Td, Th, textLinkClass } from "@/components/ui";
 import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
@@ -20,15 +20,21 @@ import { fmtAge, ForecastYearBars } from "../capex-ui";
  * the list below a pick). Red means late only: an item past its replacement
  * age before this year reads "Past due" in --danger, and the total names how
  * much is; an item due this year reads its year like the rest.
+ *
+ * The page's one CapEx section (docs/specs/property-page.md 2.3): `children`
+ * is the folded Building systems row at its foot (building-capex.tsx).
  */
 export function CapexForecastCard({
   units,
   building,
   rules,
+  children,
 }: {
   units: PropertyUnit[];
   building?: BuildingCapexData;
   rules: CapexRules;
+  /** The folded Building systems row. */
+  children?: ReactNode;
 }) {
   const f = capexForecast(units, { years: 5, building, rules });
   const undatedNote = capexUndatedNote(f.unknownCount);
@@ -49,7 +55,7 @@ export function CapexForecastCard({
 
   return (
     <Section
-      title="5-year CapEx forecast"
+      title="CapEx"
       actions={
         // As tall as an Edit button, so this heading lines up with the rail's beside it.
         <span className="num flex h-8 items-center text-meta text-fg-3">
@@ -137,6 +143,8 @@ export function CapexForecastCard({
             </Table>
           </div>
         )}
+
+        {children}
       </div>
     </Section>
   );

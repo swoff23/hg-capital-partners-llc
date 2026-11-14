@@ -1,8 +1,9 @@
 "use client";
-import { RailList } from "@/components/rail";
+import { RailFold } from "@/components/rail-fold";
 import { Section } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
-import { ChangeCodeMenu, PropertyFact, PropertyKeyDate } from "./property-fact";
+import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { ChangeCodeMenu, PropertyFact, PropertyKeyDate, isBlank } from "./property-fact";
 
 export type EditableInsurance = {
   id: string;
@@ -21,8 +22,9 @@ export type EditableInsurance = {
 /**
  * Insurance (forms 4.2, 3.2 A): the renewal first and always shown, since a
  * lapse means a force-placed policy, then the carrier, the policy and the
- * amounts. Each is changed where it stands. The policy number is a code: one
- * tap copies it, and the section's ⋯ holds "Change policy number".
+ * amounts. Each is changed where it stands; the empty ones fold behind "N
+ * more fields" (docs/specs/property-page.md 2.2). The policy number is a
+ * code: one tap copies it, and the section's ⋯ holds "Change policy number".
  */
 export function PropertyInsuranceSection({ insurance: p }: { insurance: EditableInsurance }) {
   const context = `Insurance · ${shortAddress(p.address) || p.address}`;
@@ -30,41 +32,84 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
   const policy = p.insurancePolicyNo?.trim();
   return (
     <Section title="Insurance" actions={policy ? <ChangeCodeMenu title="Insurance" field="insurancePolicyNo" change="Change policy number" /> : undefined}>
-      <RailList>
-        <PropertyKeyDate
-          {...common}
-          field="insuranceRenewalDate"
-          label="Renewal"
-          name="Renewal date"
-          date={p.insuranceRenewalDate}
-          addLabel="Add renewal date"
-          leadDays={30}
-        />
-        <PropertyFact {...common} field="insuranceCarrier" label="Carrier" kind="text" value={p.insuranceCarrier} empty="Add carrier" />
-        <PropertyFact
-          {...common}
-          field="insurancePolicyNo"
-          label="Policy #"
-          name="Policy number"
-          kind="text"
-          code="Policy number"
-          value={p.insurancePolicyNo}
-          empty="Add policy number"
-        />
-        <PropertyFact {...common} field="insurancePremium" label="Premium" kind="money" value={p.insurancePremium} empty="Add premium" />
-        <PropertyFact
-          {...common}
-          field="replacementCost"
-          label="Replacement"
-          name="Replacement cost"
-          kind="money"
-          value={p.replacementCost}
-          empty="Add replacement cost"
-        />
-        <PropertyFact {...common} field="insuranceCoverage" label="Coverage" kind="money" value={p.insuranceCoverage} empty="Add coverage" />
-        <PropertyFact {...common} field="insuranceDeductible" label="Deductible" kind="money" value={p.insuranceDeductible} empty="Add deductible" />
-        <PropertyFact {...common} field="insuranceLiability" label="Liability" kind="text" value={p.insuranceLiability} empty="Add liability" />
-      </RailList>
+      <RailFold
+        listen={onPropertyFieldRequest}
+        reopen={openPropertyField}
+        rows={[
+          {
+            key: "insuranceRenewalDate",
+            empty: isBlank(p.insuranceRenewalDate),
+            keep: true,
+            node: (
+              <PropertyKeyDate
+                {...common}
+                field="insuranceRenewalDate"
+                label="Renewal"
+                name="Renewal date"
+                date={p.insuranceRenewalDate}
+                addLabel="Add renewal date"
+                leadDays={30}
+              />
+            ),
+          },
+          {
+            key: "insuranceCarrier",
+            empty: isBlank(p.insuranceCarrier),
+            node: <PropertyFact {...common} field="insuranceCarrier" label="Carrier" kind="text" value={p.insuranceCarrier} empty="Add carrier" />,
+          },
+          {
+            key: "insurancePolicyNo",
+            empty: isBlank(p.insurancePolicyNo),
+            node: (
+              <PropertyFact
+                {...common}
+                field="insurancePolicyNo"
+                label="Policy #"
+                name="Policy number"
+                kind="text"
+                code="Policy number"
+                value={p.insurancePolicyNo}
+                empty="Add policy number"
+              />
+            ),
+          },
+          {
+            key: "insurancePremium",
+            empty: isBlank(p.insurancePremium),
+            node: <PropertyFact {...common} field="insurancePremium" label="Premium" kind="money" value={p.insurancePremium} empty="Add premium" />,
+          },
+          {
+            key: "replacementCost",
+            empty: isBlank(p.replacementCost),
+            node: (
+              <PropertyFact
+                {...common}
+                field="replacementCost"
+                label="Replacement"
+                name="Replacement cost"
+                kind="money"
+                value={p.replacementCost}
+                empty="Add replacement cost"
+              />
+            ),
+          },
+          {
+            key: "insuranceCoverage",
+            empty: isBlank(p.insuranceCoverage),
+            node: <PropertyFact {...common} field="insuranceCoverage" label="Coverage" kind="money" value={p.insuranceCoverage} empty="Add coverage" />,
+          },
+          {
+            key: "insuranceDeductible",
+            empty: isBlank(p.insuranceDeductible),
+            node: <PropertyFact {...common} field="insuranceDeductible" label="Deductible" kind="money" value={p.insuranceDeductible} empty="Add deductible" />,
+          },
+          {
+            key: "insuranceLiability",
+            empty: isBlank(p.insuranceLiability),
+            node: <PropertyFact {...common} field="insuranceLiability" label="Liability" kind="text" value={p.insuranceLiability} empty="Add liability" />,
+          },
+        ]}
+      />
     </Section>
   );
 }
