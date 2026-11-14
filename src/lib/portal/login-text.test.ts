@@ -18,19 +18,21 @@ test("firstName uses the nickname someone goes by, never a company", () => {
   assert.equal(firstName("Mike Morris (Freedom Electric)"), "Mike");
 });
 
-test("the login text has the link, email and starting password, from the staff member", () => {
+test("the login text is three labeled lines: website, email, password", () => {
   const body = loginTextBody({
-    contactName: "Zack Reading",
-    staffName: "Connor Swofford",
-    appUrl: "https://hgcapitalpartners.com/",
+    appUrl: "https://www.hgcapitalpartners.com/",
     email: "zack@example.com",
     password: "maple-river-42",
   });
   assert.equal(
     body,
-    "Hi Zack, it's Connor. Your HG jobs: https://hgcapitalpartners.com/login. Email: zack@example.com. Starting password: maple-river-42. You'll pick your own when you sign in.",
+    "Login website: https://www.hgcapitalpartners.com/login\nYour Email: zack@example.com\nYour Password: maple-river-42",
   );
-  assert.ok(!body.includes("—"));
+  assert.ok(!body.includes("\u2014"));
+});
+
+test("smsHref keeps the login text's line breaks", () => {
+  assert.equal(smsHref(null, "a\nb"), "sms:?&body=a%0Ab");
 });
 
 test("smsHref keeps only the number's digits and encodes the body", () => {

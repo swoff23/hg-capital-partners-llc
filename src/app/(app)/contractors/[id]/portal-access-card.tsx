@@ -90,7 +90,6 @@ export function PortalAccessCard({
   contactName,
   defaultEmail,
   phone,
-  staffName,
   appUrl,
   account,
   archived,
@@ -99,7 +98,6 @@ export function PortalAccessCard({
   contactName: string;
   defaultEmail: string | null;
   phone: string | null;
-  staffName: string;
   appUrl: string;
   account: PortalAccountView | null;
   /** The contractor is archived: no new login and no restored access until they are restored. */
@@ -280,8 +278,6 @@ export function PortalAccessCard({
           shown={shown}
           first={first}
           phone={phone}
-          contactName={contactName}
-          staffName={staffName}
           appUrl={appUrl}
         />
       )}
@@ -492,8 +488,6 @@ function PayoffSheet({
   shown,
   first,
   phone,
-  contactName,
-  staffName,
   appUrl,
 }: {
   isOpen: boolean;
@@ -501,12 +495,10 @@ function PayoffSheet({
   shown: Shown;
   first: string;
   phone: string | null;
-  contactName: string;
-  staffName: string;
   appUrl: string;
 }) {
   const { toast } = useToast();
-  const body = loginTextBody({ contactName, staffName, appUrl, email: shown.email, password: shown.password });
+  const body = loginTextBody({ appUrl, email: shown.email, password: shown.password });
 
   async function copyMessage() {
     try {
