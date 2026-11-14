@@ -1,4 +1,3 @@
-import { cleanTrades } from "@/lib/contacts";
 import { looksLikeEmail, normalizeEmail } from "@/lib/portal/credentials";
 
 /**
@@ -7,8 +6,9 @@ import { looksLikeEmail, normalizeEmail } from "@/lib/portal/credentials";
  * contact-fields.test.ts. src/lib/contractors/service.ts writes the result,
  * and the editor runs the same check in the browser before it sends.
  *
- * Only the columns staff type. The W-9 and insurance links, `active` and the
- * portal login aren't here. An empty field saves as null; the name can't be
+ * Only the columns staff type. The W-9 and insurance links, `active`, the
+ * portal login and the trades (links to the Trade list, set by
+ * `setContactTrades`) aren't here. An empty field saves as null; the name can't be
  * empty. Field names are whitelisted, so a form can post whatever it likes.
  */
 
@@ -16,7 +16,6 @@ import { looksLikeEmail, normalizeEmail } from "@/lib/portal/credentials";
 export const CONTACT_FIELDS = [
   "fullName",
   "company",
-  "trades",
   "phone",
   "email",
   "mailingAddress",
@@ -31,7 +30,6 @@ export type ContactField = (typeof CONTACT_FIELDS)[number];
 export type ContactData = {
   fullName?: string;
   company?: string | null;
-  trades?: string | null;
   phone?: string | null;
   phoneE164?: string | null;
   email?: string | null;
@@ -50,7 +48,6 @@ type TextField = Exclude<ContactField, "tenantFixes">;
 const MAX_LENGTH: Record<TextField, number> = {
   fullName: 120,
   company: 200,
-  trades: 200,
   phone: 40,
   email: 254,
   mailingAddress: 500,
@@ -173,10 +170,6 @@ export function readContactPatch(patch: Partial<Record<string, string | null>>):
         data.phoneE164 = phone.phoneE164;
         break;
       }
-      case "trades":
-        // The same trade twice ("HVAC / HVAC") is kept once, as the directory shows it.
-        data.trades = cleanTrades(text);
-        break;
       default:
         data[field] = text || null;
     }

@@ -6,6 +6,8 @@ import { fieldText, staleFields } from "@/lib/properties/edits";
 import { joinDocLines, splitDocLines } from "@/lib/contacts";
 import { setContactArchived } from "@/lib/archive";
 import { CONTACT_FIELDS, readContactPatch, readNewContact } from "./contact-fields";
+import { splitTrades } from "./trade-map";
+import { ensureTrades, replaceContactTrades } from "./trade-links";
 
 /**
  * Contractor domain: staff edits to a Contact row go through here. Server
@@ -94,14 +96,31 @@ export async function patchContact(id: string, patch: Record<string, string>, ex
  * Add a contractor from the New contractor sheet (forms 4.6): the name, and
  * whatever else was filled in, read by the same rules as an edit. Every
  * problem comes back on its field. A phone is saved with its dialable
- * `phoneE164`, trades with the repeats folded out.
+ * `phoneE164`. `trades` is the picker's names on one line ("HVAC, Roofing");
+ * one no trade has yet is added to the list in the same transaction.
  */
 export async function createContact(input: Record<string, string>): Promise<{ id: string; fullName: string }> {
   const read = readNewContact(input);
   if (!read.ok) throw new FieldError(read.problems as Record<string, string>);
-  const created = await prisma.contact.create({ data: read.data, select: { id: true, fullName: true } });
+  const created = await prisma.$transaction(async (tx) => {
+    const contact = await tx.contact.create({ data: read.data, select: { id: true, fullName: true } });
+    const ids = await ensureTrades(tx, splitTrades(input.trades ?? ""));
+    if (ids.length > 0) await tx.contactTrade.createMany({ data: ids.map((tradeId) => ({ contactId: contact.id, tradeId })) });
+    return contact;
+  });
   revalidateContact(created.id);
   return created;
+}
+
+/**
+ * Set a contractor's trades: the checklist on their page, when it closes, and
+ * its toast's Undo. The rules are replaceContactTrades (trade-links.ts):
+ * names, refused when they changed since the page loaded, a new name added
+ * to the list, a trade left with no one taken off it.
+ */
+export async function setContactTrades(id: string, next: readonly string[], expected?: readonly string[]): Promise<void> {
+  await replaceContactTrades(prisma, id, next, expected);
+  revalidateContact(id);
 }
 
 /**

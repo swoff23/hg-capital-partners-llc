@@ -1,20 +1,22 @@
 "use client";
 import type { ReactNode } from "react";
 import { Mail, MapPin, MessageSquareText, Phone } from "lucide-react";
-import { InlineField, InlineSwitch, type InlineFieldProps } from "@/components/inline-field";
+import { InlineField, InlineSwitch, InlineTags, type InlineFieldProps } from "@/components/inline-field";
 import { RailFact, RailList } from "@/components/rail";
 import { Section, buttonClass } from "@/components/ui";
-import { cleanTrades, mailtoHref, mapsHref, telHref, textHref } from "@/lib/contacts";
+import { mailtoHref, mapsHref, telHref, textHref } from "@/lib/contacts";
+import { tradeName } from "@/lib/contractors/trade-map";
 import { firstName } from "@/lib/names";
 import { cn } from "@/lib/utils";
-import { patchContact } from "../actions";
+import { patchContact, saveContactTrades } from "../actions";
 
 /** The Contact columns staff can edit, as the page loaded them. */
 export type EditableContact = {
   id: string;
   fullName: string;
   company: string | null;
-  trades: string | null;
+  /** Their trades on one line, A to Z ("HVAC, Plumbing"); "" for none. */
+  trades: string;
   phone: string | null;
   /** The number Call and Text dial: the digits only, without an extension or a note like "cell". */
   phoneE164: string | null;
@@ -27,7 +29,7 @@ export type EditableContact = {
   comments: string | null;
 };
 
-type Field = "fullName" | "company" | "trades" | "phone" | "email" | "mailingAddress" | "billingInfo" | "availability" | "comments" | "tenantFixes";
+type Field = "fullName" | "company" | "phone" | "email" | "mailingAddress" | "billingInfo" | "availability" | "comments" | "tenantFixes";
 
 /** Saves one field with the text it loaded, so a partner's newer change refuses it and says so. */
 const saveField = (id: string, field: Field) => (next: string, expected: string) =>
@@ -35,6 +37,29 @@ const saveField = (id: string, field: Field) => (next: string, expected: string)
 
 /** A small link beside a value that does what the value used to do when it was the link: call, text, write, open Maps. */
 const actionLink = cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3");
+
+/**
+ * The contractor's company, on the line under their name, edited in place
+ * like the name: "Add company" when there's none. It reads as that line
+ * always has (text-meta, --fg-3); the page wraps it in -my-1, so the 32px
+ * button at rest and the 32px field open both sit in the line's 24px and
+ * nothing under them moves.
+ */
+export function ContactCompany({ id, fullName, company }: { id: string; fullName: string; company: string | null }) {
+  return (
+    <InlineField
+      kind="text"
+      label="Company"
+      field="company"
+      context={`Contact · ${fullName}`}
+      value={company ?? ""}
+      empty="Add company"
+      inRail={false}
+      className="text-meta text-fg-3"
+      onSave={saveField(id, "company")}
+    />
+  );
+}
 
 /** The contractor's name, the page's h1, edited in place. */
 export function ContactName({ id, name }: { id: string; name: string }) {
@@ -84,11 +109,14 @@ function Fact({
 export function ContactSection({
   contact,
   portalEmail,
+  tradeOptions,
   children,
 }: {
   contact: EditableContact;
   /** The portal sign-in email, which this section doesn't change; null without a login. */
   portalEmail: string | null;
+  /** Every trade, for the Trades checklist. */
+  tradeOptions: readonly string[];
   children?: ReactNode;
 }) {
   const phone = contact.phone?.trim() || null;
@@ -100,16 +128,19 @@ export function ContactSection({
   return (
     <Section title="Contact">
       <RailList>
-        <Fact contact={contact} field="company" label="Company" kind="text" empty="Add company" />
-        <Fact
-          contact={contact}
-          field="trades"
-          label="Trades"
-          kind="text"
-          empty="Add trades"
-          helper="Separate trades with a slash."
-          display={(text) => cleanTrades(text) ?? text}
-        />
+        <RailFact label="Trades">
+          <InlineTags
+            label="Trades"
+            field="trades"
+            value={contact.trades}
+            options={tradeOptions}
+            empty="Add trades"
+            normalize={tradeName}
+            emptyText="No trade matches."
+            message={() => `${first}'s trades saved`}
+            onSave={(next, expected) => saveContactTrades(contact.id, next, expected)}
+          />
+        </RailFact>
         <Fact
           contact={contact}
           field="phone"

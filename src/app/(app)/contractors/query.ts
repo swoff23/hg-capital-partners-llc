@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
-import { cleanTrades, docOnFile } from "@/lib/contacts";
+import { docOnFile } from "@/lib/contacts";
+import { tradeKey } from "@/lib/contractors/trade-map";
+import { hasTradeNamed } from "@/lib/contractors/trades";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
 import { archivedRecord, liveRecord } from "@/lib/record-scope";
 import { everyTermMatches, searchTerms } from "@/lib/search";
@@ -10,12 +12,13 @@ import { everyTermMatches, searchTerms } from "@/lib/search";
  * with several picks; and two yes or no filters, "Has login" and "Needs W-9".
  * A third, "Archived", swaps the list for the archived contractors, whom
  * nothing else shows (lib/archive.ts). Pure, so query.test.ts checks it
- * without a database. The URL: `q`, `trade` (comma-joined), `login=1`,
- * `w9=1` and `archived=1`.
+ * without a database. The URL: `q`, `trade` (trade ids, comma-joined),
+ * `login=1`, `w9=1` and `archived=1`.
  */
 
 export interface ContractorFilters {
   q: string;
+  /** Trade ids, or names from an older link until `resolveTradePicks` reads them. */
   trades: string[];
   hasLogin: boolean;
   needsW9: boolean;
@@ -53,47 +56,49 @@ export function contractorQuery(f: ContractorFilters): string {
   return p.toString();
 }
 
-/** The trades one contractor does, once each: "Plumbing / HVAC" is two. The import's repeats are folded first. */
-export function tradeTokens(trades: string | null | undefined): string[] {
-  const clean = cleanTrades(trades);
-  return clean ? clean.split("/").map((t) => t.trim()).filter(Boolean) : [];
+/**
+ * The Trade filter's picks as trade ids. An id stays; a name, from a link made
+ * before trades were a list ("?trade=Plumbing"), becomes its trade's id,
+ * ignoring case; anything else drops. The page sends a link with a name on to
+ * the same list by id, so the checklist shows the pick.
+ */
+export function resolveTradePicks(picks: readonly string[], trades: readonly { id: string; name: string }[]): string[] {
+  const byId = new Set(trades.map((t) => t.id));
+  const byKey = new Map(trades.map((t) => [tradeKey(t.name), t.id]));
+  const out = picks.map((p) => (byId.has(p) ? p : byKey.get(tradeKey(p)))).filter((id): id is string => !!id);
+  return [...new Set(out)];
 }
 
-/** Whether a contractor does any of the picked trades (exact words, any case); no picks keeps everyone. */
-export function matchesTrades(trades: string | null | undefined, picks: readonly string[]): boolean {
-  if (picks.length === 0) return true;
-  const has = new Set(tradeTokens(trades).map((t) => t.toLowerCase()));
-  return picks.some((p) => has.has(p.toLowerCase()));
+type TradeRow = { tradeLinks: readonly { trade: { id: string } }[] };
+
+/** Whether a contractor does any of the picked trades (ids); no picks keeps everyone. */
+export function matchesTrades(c: TradeRow, picks: readonly string[]): boolean {
+  return picks.length === 0 || c.tradeLinks.some((l) => picks.includes(l.trade.id));
 }
 
-/** Every trade in the rows, A to Z (case folded together, the first spelling kept), with how many contractors do it. */
-export function tradeOptions(rows: readonly { trades: string | null }[]): { key: string; label: string; count: number }[] {
-  const seen = new Map<string, { label: string; count: number }>();
-  for (const r of rows) {
-    for (const t of tradeTokens(r.trades)) {
-      const k = t.toLowerCase();
-      const prev = seen.get(k);
-      seen.set(k, { label: prev?.label ?? t, count: (prev?.count ?? 0) + 1 });
-    }
-  }
-  return [...seen.values()]
-    .sort((a, b) => a.label.localeCompare(b.label))
-    .map((v) => ({ key: v.label, label: v.label, count: v.count }));
+/** Every trade, A to Z, with how many of the rows do it. A zero stays listed. */
+export function tradeOptions(trades: readonly { id: string; name: string }[], rows: readonly TradeRow[]): { key: string; label: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) for (const l of r.tradeLinks) counts.set(l.trade.id, (counts.get(l.trade.id) ?? 0) + 1);
+  return [...trades]
+    .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }))
+    .map((t) => ({ key: t.id, label: t.name, count: counts.get(t.id) ?? 0 }));
 }
 
 /**
  * The search and "Has login" as a `where`, and "Needs W-9" as far as the
  * database can take it (no W-9 link). The Trade filter and the rest of
  * "Needs W-9" are applied on the rows (`matchesTrades`, `matchesNeedsW9`):
- * trades are free text, and a substring would find "Electric" in "Electrical";
- * a W-9 named in the notes is read by `docOnFile`, as the list's Docs column
- * reads it. A login is an active portal account.
+ * the rows without the Trade filter are what the checklist's counts come
+ * from, and a W-9 named in the notes is read by `docOnFile`, as the list's
+ * Docs column reads it. A login is an active portal account. The search
+ * matches a trade's name.
  */
 export function contractorsWhere(f: ContractorFilters): Prisma.ContactWhereInput {
   const terms = searchTerms(f.q);
   const parts: Prisma.ContactWhereInput[] = [
     contractorScope(f),
-    terms.length > 0 ? everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }]) : {},
+    terms.length > 0 ? everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)]) : {},
     f.hasLogin ? { portalAccount: { is: { status: "ACTIVE" } } } : {},
     f.needsW9 ? { w9Url: null } : {},
   ];

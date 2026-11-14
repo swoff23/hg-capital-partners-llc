@@ -37,6 +37,8 @@ function matches(row: Row, cond: Row): boolean {
       }
       if ("not" in filter) return have !== filter.not;
       if ("in" in filter) return (filter.in as unknown[]).includes(have);
+      // A to-many relation: one of its rows has to match.
+      if ("some" in filter) return Array.isArray(have) && have.some((r) => matches(r as Row, filter.some as Row));
       // A relation: the row it points at has to match.
       return have !== null && have !== undefined && matches(have as Row, filter);
     }
@@ -116,7 +118,7 @@ const contact = (id: string, fullName: string, extra: Row = {}): Row => ({
   id,
   fullName,
   company: null,
-  trades: null,
+  tradeLinks: [],
   active: true,
   archivedAt: null,
   updatedAt: day(1),
@@ -246,7 +248,7 @@ test("rows carry what to choose by", async () => {
       task("t2", "Late one", "OPEN", { dueDate: new Date(Date.UTC(2020, 0, 2)), assigneeContact: { fullName: "Luis Ortiz" } }),
     ],
     deals: [deal("d1", "99 Prospect Ave, Buffalo, NY 14213", "CLOSED!", { theirPrice: "425000" })],
-    contacts: [contact("c1", "Ana Prospect", { company: "Prospect Plumbing", trades: "Plumbing / Plumbing", active: false })],
+    contacts: [contact("c1", "Ana Prospect", { company: "Prospect Plumbing", tradeLinks: [{ trade: { id: "tr1", name: "Plumbing" } }], active: false })],
   });
   const { groups } = await search(db, "prospect");
   assert.deepEqual(group(groups, "property")?.rows[0], {

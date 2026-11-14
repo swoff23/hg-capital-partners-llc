@@ -241,7 +241,11 @@ model Contact {
   id             String  @id @default(cuid())
   fullName       String
   company        String?
-  trades         String? // "what they do"
+  // The old free text ("Plumbing / HVAC"), kept as a backup after the move to
+  // tradeLinks (docs/specs/contractor-trades.md 3.3). Nothing writes it; a
+  // later release drops it.
+  trades         String?
+  tradeLinks     ContactTrade[]
   tenantFixes    Boolean @default(false)
   phone          String?
   email          String?
@@ -281,6 +285,27 @@ model Contact {
   updatedAt DateTime @updatedAt
 
   @@index([fullName])
+}
+
+// What contractors do (docs/specs/contractor-trades.md): each trade once,
+// and who does which. Staff add a trade from the picker; the names follow
+// src/lib/contractors/trade-map.ts.
+model Trade {
+  id        String         @id @default(cuid())
+  name      String // "Plumbing", "Pest control"
+  key       String         @unique // the name lowercased, single spaces, no commas: tradeKey()
+  createdAt DateTime       @default(now())
+  contacts  ContactTrade[]
+}
+
+model ContactTrade {
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId String
+  trade     Trade   @relation(fields: [tradeId], references: [id], onDelete: Restrict)
+  tradeId   String
+
+  @@id([contactId, tradeId])
+  @@index([tradeId])
 }
 
 // ---------------------------------------------------------------------------

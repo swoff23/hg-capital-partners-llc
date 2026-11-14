@@ -26,6 +26,7 @@ import { OptionList, type OptionItem } from "@/components/option-list";
 import { PickerLayer } from "@/components/picker-layer";
 import { railLineClass, railVerbClass } from "@/components/rail";
 import { Switch } from "@/components/switch";
+import { DoneFooter, TagList, TagsChecklist, tagsLine, tagsOf } from "@/components/tags-field";
 import { Button, FormField, Input, Kbd, fieldClass } from "@/components/ui";
 import { isCoarseNow } from "@/components/use-coarse-pointer";
 import { shortcutLabel, useModKey } from "@/components/use-platform";
@@ -1107,6 +1108,117 @@ export function InlineSwitch(props: {
       {(save.error || save.conflict) && (
         <>
           <FactLine id={lineId} problem={null} save={save} p={{ kind: "choice", field }} inRail />
+          <ConflictButtons
+            save={save}
+            inRail
+            onKeep={() => {
+              save.reset();
+              setTurnedDown(null);
+              router.refresh();
+            }}
+            onSaveMine={() => {
+              const theirs = (save.conflict && field ? save.conflict.theirs?.[field] : undefined) ?? "";
+              if (turnedDown !== null) save.start(turnedDown, theirs, { failed: () => setTurnedDown(turnedDown) });
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Pick many: saved once, on close ---------------- */
+
+/**
+ * A record's pick-many value (a contractor's trades; docs/specs/
+ * contractor-trades.md 4.2): tags at rest, A to Z, and a click or tap
+ * anywhere on them opens the checklist under them, a sheet with Done on a
+ * phone. Ticks wait while it's open. Closing it (a click away, Esc, Tab or
+ * Done) saves once when the set changed, with one toast whose Undo puts back
+ * the set it opened with. `value` and `onSave`'s strings are the values on
+ * one line, "HVAC, Plumbing" (`tagsLine`), so the conflict line and Undo work
+ * as for any text fact.
+ */
+export function InlineTags(props: {
+  label: string;
+  /** The values on one line, as `tagsLine` writes them; "" for none. */
+  value: string;
+  /** Every value the checklist offers. */
+  options: readonly string[];
+  onSave: (next: string, expected: string) => Promise<ActionResult<unknown>>;
+  /** The verb for none: "Add trades". */
+  empty: string;
+  /** The server's name for the field, to read the other person's values from a conflict. */
+  field?: string;
+  /** Lets typed text add a value ('Add "Roofing"'), named by this; null refuses it. */
+  normalize?: (text: string) => string | null;
+  /** The toast after a save: "Zack's trades saved". */
+  message: (next: string) => string;
+  emptyText?: string;
+}) {
+  const { label, value, field, empty } = props;
+  const save = useFactSave({ kind: "text", label, value, onSave: props.onSave, message: props.message });
+  const router = useRouter();
+  const lineId = useId();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
+  // The set a conflict turned down, to send again on "Save mine".
+  const [turnedDown, setTurnedDown] = useState<string | null>(null);
+  const tags = tagsOf(save.shown);
+
+  function openChange(next: boolean) {
+    if (next) {
+      setDraft(tags);
+      setOpen(true);
+      return;
+    }
+    setOpen(false);
+    const line = tagsLine(draft);
+    if (line.toLowerCase() === tagsLine(tags).toLowerCase()) return;
+    setTurnedDown(null);
+    // Expected is what's shown, so a second change made while the first saves queues behind it.
+    save.start(line, save.shown, { failed: () => setTurnedDown(line) });
+  }
+
+  const shown = tagsLine(tags);
+  const trigger =
+    tags.length === 0 ? (
+      <AriaButton aria-busy={save.pending || undefined} className={railVerbClass()}>
+        <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0" />
+        {empty}
+      </AriaButton>
+    ) : (
+      <AriaButton aria-busy={save.pending || undefined} aria-label={`${label}, ${shown}, edit`} className={cn(valueButtonClass, "py-1.5")}>
+        <TagList tags={tags} />
+      </AriaButton>
+    );
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <PickerLayer
+        isOpen={open}
+        onOpenChange={openChange}
+        title={label}
+        popoverClassName="max-w-80"
+        sheetFooter={(close) => <DoneFooter close={close} />}
+        trigger={trigger}
+      >
+        {({ container, close }) => (
+          <TagsChecklist
+            label={label}
+            options={props.options}
+            value={draft}
+            onChange={setDraft}
+            normalize={props.normalize}
+            emptyText={props.emptyText}
+            container={container}
+            onTab={close}
+          />
+        )}
+      </PickerLayer>
+      {(save.error || save.conflict) && (
+        <>
+          <FactLine id={lineId} problem={null} save={save} p={{ kind: "text", field }} inRail />
           <ConflictButtons
             save={save}
             inRail

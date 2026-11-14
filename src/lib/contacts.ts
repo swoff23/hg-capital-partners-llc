@@ -2,6 +2,7 @@
  * How a contractor's contact details read and link on the Contractors pages.
  * Pure; see contacts.test.ts. Writes to Contact rows aren't here.
  */
+import { mappedTrade, tradeKey, tradeName } from "./contractors/trade-map";
 
 /** "tel:7165551234" for a phone number with 10 to 15 digits (a leading + kept), or null. */
 export function telHref(phone: string | null | undefined): string | null {
@@ -68,37 +69,14 @@ export function joinDocLines(notes: string | null | undefined, docLines: string[
   return parts.length ? parts.join("\n") : null;
 }
 
-/**
- * Trades with the repeats the import's merge left in ("HVAC / HVAC",
- * "Demo/Framing/Trim / Framing/General/Tile/Drywall/Trim"): split on "/",
- * keep the first spelling of each trade (case-insensitive), joined with
- * " / ". A value with no repeats comes back exactly as stored.
- */
-export function cleanTrades(trades: string | null | undefined): string | null {
-  const raw = trades?.trim();
-  if (!raw) return null;
-  const parts = raw
-    .split("/")
-    .map((t) => t.trim())
-    .filter(Boolean);
-  const seen = new Set<string>();
-  const unique = parts.filter((t) => {
-    const k = t.toLowerCase();
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-  return unique.length === parts.length ? raw : unique.join(" / ");
-}
-
 /** One contact's fix in scripts/cleanup-contacts.ts: only the fields that change. */
 export interface ContactFix {
   id: string;
   fullName: string;
   /** The name after, when it changes. */
   name?: string;
-  /** The trades before and after, when they change. */
-  trades?: { from: string | null; to: string | null };
+  /** A trade a hand fix adds, when they don't have it yet. */
+  addTrade?: string;
   /** The company before and after, when it changes (only Connor's hand fixes below). */
   company?: { from: string | null; to: string | null };
 }
@@ -119,23 +97,25 @@ function handFix(c: { fullName: string; company?: string | null }): { name?: str
 }
 
 /**
- * What scripts/cleanup-contacts.ts would change (ADMIN-023): repeated trades,
- * all-lowercase name words, and Connor's hand fixes above. Notes and
+ * What scripts/cleanup-contacts.ts would change (ADMIN-023): all-lowercase
+ * name words, and Connor's hand fixes above. `trades` are the contact's trade
+ * names; a trade a hand fix moves out of Company is mapped the way the old
+ * text was (Kim Lockett's "House Cleaner" is Cleaning). Repeated trades,
+ * the script's other old fix, can't happen with trades as a list. Notes and
  * anything else are left for Connor. Contacts that need nothing aren't listed.
  */
-export function planContactFixes(contacts: readonly { id: string; fullName: string; trades: string | null; company?: string | null }[]): ContactFix[] {
+export function planContactFixes(contacts: readonly { id: string; fullName: string; trades: readonly string[]; company?: string | null }[]): ContactFix[] {
   const out: ContactFix[] = [];
   for (const c of contacts) {
     const fix: ContactFix = { id: c.id, fullName: c.fullName };
     const hand = handFix(c);
     const name = hand?.name ?? capitalizedName(c.fullName);
     if (name) fix.name = name;
-    // cleanTrades keeps a value with no repeats as it is (trimmed), so this only lists repeats,
-    // and a trade moved in from Company that's already listed changes nothing.
-    const trades = cleanTrades(hand?.addTrade ? [c.trades, hand.addTrade].filter((t) => t?.trim()).join(" / ") : c.trades);
-    if ((c.trades !== null || hand?.addTrade) && trades !== (c.trades?.trim() ?? null)) fix.trades = { from: c.trades, to: trades };
+    // A trade moved in from Company that's already listed changes nothing.
+    const add = hand?.addTrade ? (mappedTrade(hand.addTrade) ?? tradeName(hand.addTrade)) : null;
+    if (add && !c.trades.some((t) => tradeKey(t) === tradeKey(add))) fix.addTrade = add;
     if (hand && hand.company !== (c.company ?? null)) fix.company = { from: c.company ?? null, to: hand.company };
-    if (fix.name || fix.trades || fix.company) out.push(fix);
+    if (fix.name || fix.addTrade || fix.company) out.push(fix);
   }
   return out;
 }

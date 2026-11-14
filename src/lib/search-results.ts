@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient, RecentKind, TaskStatus } from "@prisma/client";
 import { SIGNED_OUT, type Answer, type Viewer } from "@/lib/api-answer";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
-import { cleanTrades } from "@/lib/contacts";
+import { TRADE_LINKS, hasTradeNamed, tradeLine } from "@/lib/contractors/trades";
 import { toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { propertyUnitCount } from "@/lib/property-types";
@@ -85,7 +85,7 @@ const CONTACT_SELECT = {
   id: true,
   fullName: true,
   company: true,
-  trades: true,
+  tradeLinks: TRADE_LINKS,
   active: true,
   updatedAt: true,
 } satisfies Prisma.ContactSelect;
@@ -141,7 +141,7 @@ export function contractorRow(c: ContactRecord): ContractorSearchRow {
     id: c.id,
     href: `/contractors/${c.id}`,
     title: c.fullName,
-    trade: cleanTrades(c.trades),
+    trade: tradeLine(c.tradeLinks),
     company: c.company?.trim() || null,
     active: c.active,
   };
@@ -234,7 +234,7 @@ async function findDeals(db: SearchDb, q: string, terms: string[][], limit: numb
 }
 
 async function findContractors(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
-  const where = live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }]));
+  const where = live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)]));
   const [pool, total] = await Promise.all([
     db.contact.findMany({ where, orderBy: newest, take: POOL, select: CONTACT_SELECT }),
     db.contact.count({ where }),
@@ -263,7 +263,7 @@ async function countsOf(db: SearchDb, q: string, terms: string[][], types: reado
           return [
             type,
             await db.contact.count({
-              where: live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }])),
+              where: live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)])),
             }),
           ];
       }

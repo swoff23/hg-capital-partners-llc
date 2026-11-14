@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ScopeButton } from "@/components/filter-bar";
 import { Badge, LinkButton, PageHeader, Table, Td, Th, EmptyState, chromeIconClass, pendingRowFill, textLinkClass } from "@/components/ui";
 import { LinkPending } from "@/components/link-pending";
-import { cleanTrades, docOnFile, telHref } from "@/lib/contacts";
+import { TagOverflow } from "@/components/tags-field";
+import { docOnFile, telHref } from "@/lib/contacts";
+import { TRADE_LINKS, tradeLine, tradeNames } from "@/lib/contractors/trades";
 import { cn } from "@/lib/utils";
 import { ContactLink } from "../contact-link";
 import { ContractorFilters } from "../filters";
@@ -18,6 +21,8 @@ import {
   matchesNeedsW9,
   matchesTrades,
   parseContractorFilters,
+  contractorQuery,
+  resolveTradePicks,
   tradeOptions,
 } from "../query";
 import type { Metadata } from "next";
@@ -33,18 +38,24 @@ const docLink = cn(textLinkClass, "relative");
 export default async function ContractorsPage({ searchParams }: PageProps<"/contractors">) {
   await requireUser();
   const f = parseContractorFilters(await searchParams);
-  const [searched, everyone] = await Promise.all([
-    prisma.contact.findMany({ where: contractorsWhere(f), orderBy: [{ active: "desc" }, { fullName: "asc" }] }),
-    // The list's whole, for the count and every trade: the archived contractors under Archived, the rest otherwise.
-    prisma.contact.findMany({ where: contractorScope(f), select: { trades: true } }),
+  const [searched, total, allTrades] = await Promise.all([
+    prisma.contact.findMany({
+      where: contractorsWhere(f),
+      orderBy: [{ active: "desc" }, { fullName: "asc" }],
+      include: { tradeLinks: TRADE_LINKS },
+    }),
+    // The list's whole, for the count: the archived contractors under Archived, the rest otherwise.
+    prisma.contact.count({ where: contractorScope(f) }),
+    prisma.trade.findMany({ select: { id: true, name: true } }),
   ]);
-  // Trades are free text and a W-9 can be named in the notes, so both read on the rows (query.ts).
+  // A link from before trades were a list names them ("?trade=Plumbing"): the same list, by id, so the checklist shows the pick.
+  const picks = resolveTradePicks(f.trades, allTrades);
+  if (picks.join(",") !== f.trades.join(",")) redirect(`/contractors?${contractorQuery({ ...f, trades: picks })}`);
+  // A W-9 can be named in the notes, so "Needs W-9" reads on the rows, and so does the Trade filter, whose counts come from the rest (query.ts).
   const found = searched.filter((c) => matchesNeedsW9(c, f));
-  const contacts = found.filter((c) => matchesTrades(c.trades, f.trades));
+  const contacts = found.filter((c) => matchesTrades(c, f.trades));
   // Every trade stays listed, counting the contractors the search and the other filters leave.
-  const counted = new Map(tradeOptions(found).map((t) => [t.key, t.count]));
-  const trades = tradeOptions(everyone).map((t) => ({ ...t, count: counted.get(t.key) ?? 0 }));
-  const total = everyone.length;
+  const trades = tradeOptions(allTrades, found);
   const narrowed = isNarrowed(f);
   const empty = emptyContractors(f, total);
 
@@ -87,15 +98,16 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
               <tr>
                 <Th className="pl-0">Name</Th>
                 <Th className="hidden sm:table-cell">Company</Th>
-                <Th className="hidden sm:table-cell">Trades</Th>
+                {/* A share of the width: the tags take what the column has and end in "+2", never widen it. */}
+                <Th className="hidden w-1/3 sm:table-cell">Trades</Th>
                 <Th className="pr-0 sm:pr-3">Phone</Th>
                 <Th className="hidden pr-0 sm:table-cell">Docs</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {contacts.map((c) => {
-                const trades = cleanTrades(c.trades);
-                const subline = [c.company, trades].filter(Boolean).join(" · ");
+                const names = tradeNames(c.tradeLinks);
+                const subline = [c.company, tradeLine(c.tradeLinks)].filter(Boolean).join(" · ");
                 const badges = (c.tenantFixes || !c.active) && (
                   <>
                     {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
@@ -143,7 +155,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                       )}
                     </Td>
                     <Td className="hidden text-fg-2 sm:table-cell">{c.company ?? EMPTY}</Td>
-                    <Td className="hidden max-w-xs text-fg-2 sm:table-cell">{trades ?? EMPTY}</Td>
+                    <Td className="hidden sm:table-cell">{names.length > 0 ? <TagOverflow tags={names} /> : EMPTY}</Td>
                     <Td className="num whitespace-nowrap pr-0 sm:pr-3">
                       {c.phone ? (
                         <ContactLink href={telHref(c.phoneE164 ?? c.phone)} className="relative">

@@ -5,7 +5,6 @@ import { Section } from "@/components/ui";
 
 /** The Contact section's rows on every contractor (./contact-section.tsx), and the widths their values land in. */
 const FACTS = [
-  { label: "Company", block: "w-28" },
   { label: "Trades", block: "w-32" },
   { label: "Phone", block: "w-24" },
   { label: "Email", block: "w-36" },

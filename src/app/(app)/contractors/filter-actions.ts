@@ -12,6 +12,9 @@ import { contractorsWhere, matchesNeedsW9, matchesTrades, parseContractorFilters
 export async function countContractorsAction(query: string): Promise<number> {
   await requireUser();
   const filters = parseContractorFilters(Object.fromEntries(new URLSearchParams(countQuery.parse(query))));
-  const rows = await prisma.contact.findMany({ where: contractorsWhere(filters), select: { trades: true, w9Url: true, comments: true } });
-  return rows.filter((r) => matchesNeedsW9(r, filters) && matchesTrades(r.trades, filters.trades)).length;
+  const rows = await prisma.contact.findMany({
+    where: contractorsWhere(filters),
+    select: { w9Url: true, comments: true, tradeLinks: { select: { trade: { select: { id: true } } } } },
+  });
+  return rows.filter((r) => matchesNeedsW9(r, filters) && matchesTrades(r, filters.trades)).length;
 }
