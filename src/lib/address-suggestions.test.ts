@@ -4,6 +4,7 @@ import {
   SUGGEST_LIMIT,
   addressFromListingLink,
   answerAddresses,
+  duplicateSentence,
   findAddressMatch,
   looksLikeLink,
   parseAddressParams,
@@ -314,7 +315,7 @@ test("parseAddressParams reads q, kind and exclude", () => {
 
 /* ---------------- Against an in-memory database ---------------- */
 
-type Row = { id: string; address: string; updatedAt: Date; status?: string };
+type Row = { id: string; address: string; updatedAt: Date; status?: string; archivedAt?: Date | null };
 type Where = Record<string, unknown>;
 
 function matches(row: Row, where: Where): boolean {
@@ -391,4 +392,58 @@ test("answerAddresses is staff only, checks its params and hides a failure", asy
   const failed = await answerAddresses({ id: "u1" }, new URLSearchParams("q=prospect"), broken, (err) => (logged = err));
   assert.deepEqual(failed, { status: 500, body: { error: "failed" } });
   assert.ok(logged instanceof Error);
+});
+
+/* ---------------- Archived records (call 21) ---------------- */
+
+test("duplicateSentence says archived for an archived record, in the line and in the save's refusal", () => {
+  assert.equal(duplicateSentence("deal", "118 Congress St", true), "118 Congress St is an archived deal.");
+  assert.equal(duplicateSentence("property", "767 Prospect Ave", true), "767 Prospect Ave is an archived property.");
+  assert.equal(duplicateSentence("property", "767 Prospect Ave"), "767 Prospect Ave is already a property.");
+  assert.equal(duplicateSentence("deal", "118 Congress St", false), "118 Congress St is already a deal.");
+});
+
+test("an archived record leaves the suggestion rows but still is the match", () => {
+  const archived: AddressRecord[] = [
+    { kind: "deal", id: "d118", address: "118 Congress St, Buffalo, NY 14213", updatedAt: at(5), archived: true },
+    { kind: "property", id: "p400", address: "400 Elmwood Ave, Buffalo, NY 14222", updatedAt: at(4) },
+  ];
+  assert.deepEqual(suggestAddresses("118 congress", archived), []);
+  assert.deepEqual(suggestAddresses("elmwood", archived).map((r) => r.id), ["p400"]);
+  const match = findAddressMatch("118 Congress St", "deal", archived);
+  assert.equal(match?.id, "d118");
+  assert.equal(match?.archived, true);
+  // A live record's match carries no flag.
+  assert.equal("archived" in (findAddressMatch("400 Elmwood Ave", "property", archived) ?? {}), false);
+});
+
+test("an archived twin never hides the live row at its address, and a live match wins within a kind", () => {
+  const twins: AddressRecord[] = [
+    { kind: "deal", id: "old", address: "118 Congress St, Buffalo, NY 14213", updatedAt: at(9), archived: true },
+    { kind: "deal", id: "live", address: "118 Congress Street, Buffalo, NY 14213", updatedAt: at(1) },
+  ];
+  assert.deepEqual(suggestAddresses("118 congress", twins).map((r) => r.id), ["live"]);
+  const match = findAddressMatch("118 Congress St", "deal", twins);
+  assert.equal(match?.id, "live");
+  assert.equal(match?.archived, undefined);
+});
+
+test("runAddresses reads archived rows for the match and drops them from the rows", async () => {
+  const row = (id: string, address: string, archivedAt: Date | null) => ({ id, address, updatedAt: new Date(at(3)), archivedAt });
+  const archivedDb = {
+    property: table([row("pa", "767 Prospect Ave, Buffalo, NY 14213", new Date(at(2)))]),
+    deal: table([row("da", "118 Congress St, Buffalo, NY 14213", new Date(at(2)))]),
+  } as unknown as AddressDb;
+  const deal = await runAddresses(archivedDb, { q: "118 Congress St", kind: "deal" });
+  assert.deepEqual(deal.suggestions, []);
+  assert.equal(deal.match?.id, "da");
+  assert.equal(deal.match?.archived, true);
+  const property = await runAddresses(archivedDb, { q: "767 Prospect Ave", kind: "property" });
+  assert.deepEqual(property.suggestions, []);
+  assert.equal(property.match?.archived, true);
+  // The read asks for archivedAt, or every row would read as live.
+  const seen: unknown[] = [];
+  const spy = { findMany: async (args: unknown) => (seen.push(args), []) };
+  await runAddresses({ property: spy, deal: spy } as unknown as AddressDb, { q: "118 Congress", kind: "deal" });
+  assert.match(JSON.stringify(seen), /"archivedAt":true/);
 });

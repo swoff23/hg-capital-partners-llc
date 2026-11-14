@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
-import { looksLikeLink, runAddresses, splitAddress, tidyAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, looksLikeLink, runAddresses, splitAddress, tidyAddress } from "@/lib/address-suggestions";
 import { prisma } from "@/lib/db";
 import { withResult } from "@/lib/server-action";
 import * as properties from "@/lib/properties/service";
@@ -33,14 +33,14 @@ export async function createProperty(formData: FormData): Promise<ActionResult<C
   return withResult("createProperty", async () => {
     const user = await requireUser();
     const p = propertySchema.parse(formToObject(formData));
-    const taken = (street: string) =>
-      new z.ZodError([{ code: "custom", path: ["address"], message: `${street} is already a property.`, input: p.address }]);
+    const taken = (street: string, archived?: boolean) =>
+      new z.ZodError([{ code: "custom", path: ["address"], message: duplicateSentence("property", street, archived), input: p.address }]);
     // The same test the field's "is already a property" line runs, so what it warned about is what's refused.
     const { match } = await runAddresses(prisma, { q: p.address, kind: "property" });
-    if (match) throw taken(match.street);
+    if (match) throw taken(match.street, match.archived);
     // The creator is the record's first editor (updatedByUserId), so a later refusal can name them.
     const r = await properties.createProperty({ address: tidyAddress(p.address), llcOwner: p.llcOwner }, user);
-    if (r.duplicateOf) throw taken(splitAddress(r.duplicateOf.address).street);
+    if (r.duplicateOf) throw taken(splitAddress(r.duplicateOf.address).street, r.duplicateOf.archivedAt !== null);
     return { id: r.property.id, address: r.property.address };
   });
 }

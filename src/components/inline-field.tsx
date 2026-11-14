@@ -929,6 +929,7 @@ function HeadingFact(props: InlineFieldProps) {
           onChange={changed}
           isInvalid={!!problem || !!refusal}
           errorMessage={problem ?? refusal ?? undefined}
+          variant="heading"
           className="px-2"
         />
       ) : (

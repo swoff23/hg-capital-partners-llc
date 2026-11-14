@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import type { Deal } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
-import { splitAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, splitAddress } from "@/lib/address-suggestions";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
 import { containsText } from "@/lib/search";
@@ -124,7 +124,7 @@ async function writeDealPatch(id: string, patch: DealPatch, actor: Actor, expect
   // A rename onto an address another deal has is refused on the address field, like New deal's.
   if (typeof data.address === "string" && data.address !== before.address) {
     const duplicateOf = await findDuplicateDeal(data.address, { excludeId: id });
-    if (duplicateOf) throw new FieldError({ address: `${splitAddress(duplicateOf.address).street} is already a deal.` });
+    if (duplicateOf) throw new FieldError({ address: duplicateSentence("deal", splitAddress(duplicateOf.address).street, duplicateOf.archivedAt !== null) });
   }
 
   const guarded = guardedDealFields(patch, expected);

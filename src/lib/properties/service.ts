@@ -5,7 +5,7 @@ import { del } from "@vercel/blob";
 import type { Prisma, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
-import { splitAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, splitAddress } from "@/lib/address-suggestions";
 import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
 import { amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { cleanListing, type ListingInput } from "@/lib/properties/listing-clean";
@@ -218,7 +218,7 @@ export async function patchProperty(
     const stored = await prisma.property.findUnique({ where: { id }, select: { address: true } });
     if (stored && stored.address !== data.address) {
       const duplicateOf = await findDuplicateProperty(data.address, { excludeId: id });
-      if (duplicateOf) throw new FieldError({ address: `${splitAddress(duplicateOf.address).street} is already a property.` });
+      if (duplicateOf) throw new FieldError({ address: duplicateSentence("property", splitAddress(duplicateOf.address).street, duplicateOf.archivedAt !== null) });
     }
   }
 

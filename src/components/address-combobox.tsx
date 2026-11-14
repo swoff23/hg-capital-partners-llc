@@ -6,8 +6,10 @@ import { PopoverSurface } from "@/components/popover";
 import { FormField, TextLink, fieldClass, fieldSizeClass, type FieldSize } from "@/components/ui";
 import {
   SUGGEST_FROM,
+  duplicateSentence,
   looksLikeLink,
   savesAs,
+  tidyAddress,
   type AddressAnswer,
   type AddressKind,
   type AddressMatch,
@@ -19,6 +21,9 @@ const DEBOUNCE_MS = 200;
 
 /** The last row's key carries the text it keeps, so React Aria sees a new row for new text. */
 const AS_TYPED = "__as-typed__:";
+
+/** What the last row offers and a pick writes: the typing as the save will keep it (`tidyAddress`), or as typed when that tidies to nothing. */
+const asTypedText = (typed: string) => tidyAddress(typed) || typed;
 
 const KIND_WORD: Record<AddressKind, string> = { property: "Property", deal: "Deal" };
 
@@ -66,6 +71,20 @@ export type AddressComboboxProps = {
   isDisabled?: boolean;
   autoFocus?: boolean;
   size?: FieldSize;
+  /**
+   * `heading`: the field for a record's address heading, with a mouse. It
+   * takes the heading's own size (24px semibold in a 40px box, the way a
+   * task's title is edited) and reaches 8px past the column like the heading's
+   * hover fill, so opening it moves nothing. Only the field itself changes: the
+   * suggestion rows and the helper line keep their normal sizes.
+   */
+  variant?: "field" | "heading";
+  /**
+   * Keep one line's space under the field when it has no line, so the form
+   * doesn't grow between pressing and releasing Create when "Saves as" shows
+   * on leaving the field. For New property and New deal.
+   */
+  reserveLine?: boolean;
   /** "public" puts the dark public tokens on the list. */
   surface?: "app" | "public";
   /**
@@ -100,11 +119,13 @@ export type AddressComboboxProps = {
  * An address field that suggests HG's own properties and deals as you type
  * (forms 2.6, phase 1). From 3 characters, 200ms after the last keystroke, it
  * asks /api/addresses: up to six two-line rows, the street over "Buffalo, NY
- * 14209 · Property", then always 'Use "12 Elm St" as typed', so an address no
+ * 14209 · Property", then always 'Use "12 Elm St"' (the typing as the save
+ * will tidy it; a pick puts that text in the field), so an address no
  * list knows still works. Typing is never blocked: the text is the value.
  *
  * When the text is already a record (`sameStreetAddress`), the helper line
- * says so: "767 Prospect Ave is already a property. Open it", neutral while
+ * says so: "767 Prospect Ave is already a property. Open it" ("is an archived
+ * property" for an archived record, which the rows leave out), neutral while
  * typing, `--danger` once a save was refused (`isInvalid`). For a deal, an
  * existing deal is checked first, then a property HG owns.
  *
@@ -134,6 +155,8 @@ export function AddressCombobox({
   isDisabled = false,
   autoFocus,
   size = "md",
+  variant = "field",
+  reserveLine = false,
   surface = "app",
   flip = true,
   linkTarget,
@@ -180,9 +203,7 @@ export function AddressCombobox({
 
   const matchLine = match && (
     <span className="flex min-w-0 items-baseline gap-1">
-      <span className="truncate">
-        {match.street} is already a {match.kind}.
-      </span>
+      <span className="truncate">{duplicateSentence(match.kind, match.street, match.archived)}</span>
       <TextLink href={match.href} className="shrink-0">
         Open it
       </TextLink>
@@ -204,7 +225,12 @@ export function AddressCombobox({
     setPicked(key);
     if (key === null) return;
     const id = String(key);
-    if (id.startsWith(AS_TYPED)) return;
+    if (id.startsWith(AS_TYPED)) {
+      // The row says what the save will write, so a pick puts that text in the field.
+      const text = asTypedText(id.slice(AS_TYPED.length));
+      if (text !== value) onChange(text);
+      return;
+    }
     const row = suggestions.find((s) => `${s.kind}:${s.id}` === id);
     if (row && row.address !== value) onChange(row.address);
   }
@@ -216,6 +242,7 @@ export function AddressCombobox({
       required={isRequired}
       helper={matchLine || linkLine || (tidy ? `Saves as ${tidy}` : null) || helper}
       error={error}
+      reserveLine={reserveLine}
       className={className}
     >
       {(control) => (
@@ -240,7 +267,7 @@ export function AddressCombobox({
             isDisabled={isDisabled}
             isInvalid={isInvalid || !!errorMessage}
             aria-label={label ?? ariaLabel ?? "Address"}
-            className="relative"
+            className={cn("relative", variant === "heading" && "-mx-2")}
           >
             <AriaInput
               id={control.id}
@@ -259,7 +286,8 @@ export function AddressCombobox({
                 setMoved(true);
                 onLink(pasted.trim());
               }}
-              className={cn(fieldClass, fieldSizeClass[size])}
+              // The heading's 8px inset less the field's 1px edge, so the text sits where the heading's does.
+              className={cn(fieldClass, variant === "heading" ? "h-10 px-[7px] text-title font-semibold" : fieldSizeClass[size])}
             />
             <PopoverSurface surface={surface} motion="none" shouldFlip={flip} className={cn("w-(--trigger-width)", !active && "hidden")}>
               <ListBox
@@ -282,13 +310,13 @@ export function AddressCombobox({
                     // A new key per text: React Aria won't let a mounted item's id change.
                     key={AS_TYPED + typed}
                     id={AS_TYPED + typed}
-                    textValue={value}
+                    textValue={asTypedText(typed)}
                     className={cn(
                       "flex min-h-8 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-body outline-none pointer-coarse:min-h-11",
                       "data-focused:bg-fill-2 pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-fill-2 pointer-coarse:data-pressed:bg-fill-2",
                     )}
                   >
-                    <span className="truncate">Use &ldquo;{typed}&rdquo; as typed</span>
+                    <span className="truncate">Use &ldquo;{asTypedText(typed)}&rdquo;</span>
                   </ListBoxItem>,
                 ]}
               </ListBox>

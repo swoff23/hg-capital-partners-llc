@@ -118,6 +118,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
               set({ sourceUrl: withScheme(link), address: addressFromListingLink(link) ?? values.address });
             }}
             showSavesAs
+            reserveLine
             isRequired
             isInvalid={!!errors.address}
             errorMessage={errors.address}
@@ -137,7 +138,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
           <Section as="h3" title="Details (optional)">
             <div className="space-y-4">
               <FieldRow>
-                <FormField label={DEAL_FIELD_LABEL.theirPrice} helper={priceHelper(values.theirPriceRaw)} error={errors.theirPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.theirPrice} helper={priceHelper(values.theirPriceRaw)} error={errors.theirPriceRaw} reserveLine>
                   {(p) => (
                     <NumberInput
                       {...p}
@@ -152,7 +153,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
                     />
                   )}
                 </FormField>
-                <FormField label={DEAL_FIELD_LABEL.ourPrice} helper={priceHelper(values.ourPriceRaw)} error={errors.ourPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.ourPrice} helper={priceHelper(values.ourPriceRaw)} error={errors.ourPriceRaw} reserveLine>
                   {(p) => (
                     <NumberInput
                       {...p}

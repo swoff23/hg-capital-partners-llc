@@ -616,6 +616,7 @@ export function FormField({
   error,
   id: idProp,
   hideLabel = false,
+  reserveLine = false,
   className,
   children,
 }: {
@@ -636,6 +637,12 @@ export function FormField({
   id?: string;
   /** Keep the label for screen readers only (a field whose sheet title already names it). */
   hideLabel?: boolean;
+  /**
+   * Keep one line's space under the control while there is no line, so a
+   * line that comes and goes (a "Saves as" preview that shows on leaving the
+   * field) never moves what sits below it between a press and its release.
+   */
+  reserveLine?: boolean;
   className?: string;
   children: (control: FormFieldControlProps) => React.ReactNode;
 }) {
@@ -659,6 +666,11 @@ export function FormField({
       {line && (
         <p id={lineId} className={cn("truncate text-meta", invalid ? "text-danger" : "text-fg-3")}>
           {line}
+        </p>
+      )}
+      {!line && reserveLine && (
+        <p aria-hidden="true" className="text-meta">
+          &nbsp;
         </p>
       )}
     </div>

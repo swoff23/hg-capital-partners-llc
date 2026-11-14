@@ -67,6 +67,7 @@ export function NewPropertyForm({ variant, entities }: { variant: "sheet" | "pag
               set({ address });
             }}
             showSavesAs
+            reserveLine
             isRequired
             isInvalid={!!errors.address}
             errorMessage={errors.address}

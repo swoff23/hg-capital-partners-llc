@@ -36,7 +36,15 @@ export const SUGGEST_LIMIT = 6;
 const READ_LIMIT = 40;
 
 /** One record as the matcher sees it. */
-export type AddressRecord = { kind: AddressKind; id: string; address: string; updatedAt: Date | number; stage?: string | null };
+export type AddressRecord = {
+  kind: AddressKind;
+  id: string;
+  address: string;
+  updatedAt: Date | number;
+  stage?: string | null;
+  /** Archived: out of the suggestion rows, still a duplicate (the save refuses it). */
+  archived?: boolean;
+};
 
 /** A suggestion row: the street over "Buffalo, NY 14209 · Property". `address` is what a pick fills in. */
 export type AddressSuggestion = {
@@ -49,7 +57,16 @@ export type AddressSuggestion = {
 };
 
 /** The record a typed address already is. `stage` is a deal's stage as stored. */
-export type AddressMatch = { kind: AddressKind; id: string; address: string; street: string; href: string; stage?: string };
+export type AddressMatch = { kind: AddressKind; id: string; address: string; street: string; href: string; stage?: string; archived?: true };
+
+/**
+ * The sentence for a record the typed address already is, on the line under
+ * the field and in the save's refusal (which has no link): "767 Prospect Ave
+ * is already a property." or "767 Prospect Ave is an archived property."
+ */
+export function duplicateSentence(kind: AddressKind, street: string, archived?: boolean): string {
+  return `${street} is ${archived ? "an archived" : "already a"} ${kind}.`;
+}
 
 export type AddressAnswer = { suggestions: AddressSuggestion[]; match: AddressMatch | null };
 
@@ -267,7 +284,8 @@ export function suggestAddresses(
   const q = query.trim();
   if (q.length < SUGGEST_FROM) return [];
   const candidates = records
-    .filter((r) => r.id !== excludeId && r.address.trim() && matchesSearch(q, r.address))
+    // An archived record leaves every picker (archive.ts); the match below still counts it.
+    .filter((r) => !r.archived && r.id !== excludeId && r.address.trim() && matchesSearch(q, r.address))
     .map((r) => ({ r, ...splitAddress(r.address) }))
     .map((c) => ({ ...c, quality: matchQuality(c.street, q) }))
     .sort(
@@ -312,9 +330,10 @@ export function findAddressMatch(
   if (!/^\d/.test(streetKey(q))) return null;
   const order: AddressKind[] = kind === "property" ? ["property"] : ["deal", "property"];
   for (const k of order) {
+    // Within a kind a live record wins over an archived one, then the newest.
     const hit = records
       .filter((r) => r.kind === k && r.id !== excludeId && sameStreetAddress(r.address, q))
-      .sort((a, b) => time(b.updatedAt) - time(a.updatedAt))[0];
+      .sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || time(b.updatedAt) - time(a.updatedAt))[0];
     if (hit) {
       return {
         kind: hit.kind,
@@ -323,6 +342,7 @@ export function findAddressMatch(
         street: splitAddress(hit.address).street,
         href: hrefOf(hit.kind, hit.id),
         ...(hit.stage ? { stage: hit.stage } : {}),
+        ...(hit.archived ? { archived: true as const } : {}),
       };
     }
   }
@@ -356,20 +376,20 @@ export async function runAddresses(
   const [properties, deals] = await Promise.all([
     db.property.findMany({
       where: anyOf,
-      select: { id: true, address: true, updatedAt: true },
+      select: { id: true, address: true, updatedAt: true, archivedAt: true },
       orderBy: { updatedAt: "desc" },
       take: READ_LIMIT,
     }),
     db.deal.findMany({
       where: anyOf,
-      select: { id: true, address: true, updatedAt: true, status: true },
+      select: { id: true, address: true, updatedAt: true, status: true, archivedAt: true },
       orderBy: { updatedAt: "desc" },
       take: READ_LIMIT,
     }),
   ]);
   const records: AddressRecord[] = [
-    ...properties.map((p) => ({ kind: "property" as const, id: p.id, address: p.address, updatedAt: p.updatedAt })),
-    ...deals.map((d) => ({ kind: "deal" as const, id: d.id, address: d.address, updatedAt: d.updatedAt, stage: d.status })),
+    ...properties.map((p) => ({ kind: "property" as const, id: p.id, address: p.address, updatedAt: p.updatedAt, archived: p.archivedAt != null })),
+    ...deals.map((d) => ({ kind: "deal" as const, id: d.id, address: d.address, updatedAt: d.updatedAt, stage: d.status, archived: d.archivedAt != null })),
   ];
   return {
     suggestions: suggestAddresses(q, records, { excludeId, prefer: kind }),
