@@ -14,11 +14,11 @@ A contractor gets no job emails until they have signed in once, and each contrac
 
 ## Turn on error alerts
 
-The code is in and does nothing until Sentry is connected. It's free: Sentry's free plan, no card. What each alert means is in [alerts.md](alerts.md).
+Sentry is connected and reporting (Nov 14), on the free plan with no card. The background-jobs monitor checks in green every minute. What each alert means is in [alerts.md](alerts.md).
 
 - [x] In Vercel, add Sentry and connect it to the hg-capital-partners-llc-wy7r project on the free Developer plan. Done Nov 14: the keys are in, no log drain was added, and the redeploy uploaded source maps and turned reporting on.
-- [ ] In Sentry, under Settings, then Security & Privacy, turn on "Prevent storing of IP addresses".
-- [ ] Add one uptime monitor for `https://www.hgcapitalpartners.com/api/health` (with www: the bare domain redirects), every minute, and confirm the "new issue" email alert is on. The exact clicks are in [alerts.md](alerts.md), under "Setting up".
+- [x] In Sentry, under Settings, then Security & Privacy, turn on "Prevent storing of IP addresses".
+- [x] Add one uptime monitor for `https://www.hgcapitalpartners.com/api/health` (with www: the bare domain redirects), every minute, and confirm the "new issue" email alert is on. The exact clicks are in [alerts.md](alerts.md), under "Setting up".
 - [ ] Make Sentry's alert emails notify on your phone (a Gmail filter that marks them important, if Gmail notifies only for those).
 - [ ] In Resend, confirm the team email it notifies about a failing webhook is yours.
 - [ ] In Supabase (project ywdjaygwkqyrmbdnvaai), open Database, then Backups, and confirm daily backups are listed.
