@@ -124,7 +124,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   // the page was up and showed with the refresh doesn't come back as unread. The previous open is read first (above):
   // it is the divider's baseline, which the page keeps from its first render (activity.tsx), so the divider stays put.
   if (!(await isActionRender())) after(() => recordView(user.id, "TASK", task.id));
-  after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id })));
+  after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id }, { level: "warning" })));
 
   const live = task.events.filter((e) => !e.deletedAt);
   const commentBodies = live.filter((e) => e.kind === "COMMENT" && e.body).map((e) => e.body!);

@@ -1,4 +1,13 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
+
+/**
+ * Error alerts (docs/specs/error-alerts.md). Build config, so these read
+ * process.env directly. Only a production build reports and uploads source
+ * maps: the integration sets its keys for preview and development too.
+ */
+const productionBuild = process.env.VERCEL_ENV === "production";
+const uploadSourceMaps = productionBuild && !!process.env.SENTRY_AUTH_TOKEN;
 
 /**
  * Public Vercel Blob photos (listing photos, and property photos through
@@ -31,6 +40,14 @@ const nextConfig: NextConfig = {
     staleTimes: { dynamic: 30 },
   },
   images: { remotePatterns: blobImagePatterns() },
+  env: {
+    // What the browser's error catcher reads (src/instrumentation-client.ts). Empty outside a
+    // production build, so a local run, the device check and a preview never report. The DSN
+    // is public by design; src/lib/env.ts can't serve it to the browser, which has no
+    // process.env object, only names Next fills in at build time.
+    HG_BROWSER_SENTRY_DSN: productionBuild ? (process.env.NEXT_PUBLIC_SENTRY_DSN ?? "") : "",
+    HG_BROWSER_RELEASE: process.env.VERCEL_GIT_COMMIT_SHA ?? "",
+  },
   async redirects() {
     return [
       {
@@ -82,4 +99,20 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  telemetry: false,
+  // Under Turbopack the wrapper turns on browser source maps and deletes them after the
+  // upload. With no upload (no token, or not production) it must not make them at all, or
+  // the site would serve its own source.
+  sourcemaps: { disable: !uploadSourceMaps, deleteSourcemapsAfterUpload: true },
+  // Errors only: no build-time tracing hooks, no route manifest for transactions, and the
+  // browser uses @sentry/browser (src/lib/sentry-browser.ts), not this package's router hook.
+  buildTimeInstrumentation: false,
+  routeManifestInjection: false,
+  suppressOnRouterTransitionStartWarning: true,
+  bundleSizeOptimizations: { excludeDebugStatements: true },
+});

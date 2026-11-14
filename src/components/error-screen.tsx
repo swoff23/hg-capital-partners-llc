@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { Code } from "@/components/code";
 import { isOfflineError } from "@/lib/action-result";
+import { reportClientError } from "@/lib/client-errors";
 import { watchServerActions, writeFailedRecently } from "@/lib/failed-writes";
 import { RELOAD_LABEL, isChunkLoadError, reloadPage } from "@/lib/lazy-module";
 
@@ -36,6 +37,8 @@ function causeOf(error: Error): "offline" | "save" | "unknown" {
 export function ErrorScreen({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    // A browser error goes to Sentry; one with a digest came from the server, which reported it (lib/client-errors.ts).
+    reportClientError(error, "boundary");
   }, [error]);
 
   // Read once, when the boundary opens, so the words don't change under the reader.

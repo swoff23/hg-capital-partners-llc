@@ -136,7 +136,7 @@ export async function deleteTask(id: string, p: core.Principal): Promise<void> {
   const blobs = removed.attachments.flatMap((a) => [a.url, a.thumbPathname, a.posterPathname]).filter((x): x is string => !!x);
   const token = getEnv().BLOB_READ_WRITE_TOKEN;
   if (blobs.length && token) {
-    await del(blobs, { token }).catch((err) => logError("tasks:delete:blobs", err, { taskId: id, count: blobs.length }));
+    await del(blobs, { token }).catch((err) => logError("tasks:delete:blobs", err, { taskId: id, count: blobs.length }, { level: "warning" }));
   }
   revalidateTask(removed);
 }
