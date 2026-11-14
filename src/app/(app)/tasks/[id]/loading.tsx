@@ -28,24 +28,19 @@ export default function TaskLoading() {
         "lg:grid-cols-[minmax(0,1fr)_20rem] lg:[grid-template-areas:'head_fields'_'main_fields']"
       }
     >
-      <header
-        className={
-          "grid min-w-0 items-center gap-x-2 gap-y-1 [grid-area:head] " +
-          "grid-cols-[minmax(0,1fr)_auto_auto] [grid-template-areas:'back_status_more'_'title_title_title'] " +
-          "md:grid-cols-[auto_minmax(0,1fr)_auto] md:[grid-template-areas:'back_back_back'_'status_title_more']"
-        }
-      >
-        <div className="[grid-area:back]">
+      <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title']">
+        <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
           <BackLink fallback="/tasks" label="Tasks" />
+          <span aria-hidden="true" className="text-meta text-fg-3">
+            /
+          </span>
+          <Block className="ml-1.5 h-6 w-18 rounded-md" />
         </div>
-        <div className="flex min-w-0 items-center [grid-area:status] md:self-start md:pt-1">
-          <Block className="h-6 w-18 rounded-md" />
-        </div>
+        {/* The more menu's 32px slot. */}
+        <div className="size-8 [grid-area:more]" />
         <div className="min-w-0 [grid-area:title]">
           <HeadingBlock className="w-2/3 max-sm:w-full" phoneLines={2} />
         </div>
-        {/* The more menu's 32px slot. */}
-        <div className="size-8 [grid-area:more] md:self-start md:pt-1" />
       </header>
 
       <aside className="min-w-0 [grid-area:fields] lg:sticky lg:top-20 lg:self-start">

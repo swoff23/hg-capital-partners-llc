@@ -5,10 +5,10 @@ import { useRun } from "@/components/use-run";
 type Run = ReturnType<typeof useRun>;
 
 /**
- * One status change at a time on the task page. The status menu, the Review
- * banner and Cancel share one run, so while one change saves the others
- * wait instead of sending a status that's about to be out of date (core
- * refuses a change whose `expected` status no longer matches).
+ * One status change at a time on the task page. The status menu and the
+ * Review banner share one run, so while one change saves the other waits
+ * instead of sending a status that's about to be out of date (core refuses
+ * a change whose `expected` status no longer matches).
  */
 const StatusRun = createContext<Run | null>(null);
 

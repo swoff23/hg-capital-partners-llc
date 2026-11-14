@@ -1,16 +1,15 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Ban, Ellipsis, Link2, Trash2 } from "lucide-react";
+import { Ellipsis, Link2, Trash2 } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
-import type { TaskStatus } from "@prisma/client";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { InlineField } from "@/components/inline-field";
 import { Menu, MenuItem, MenuSeparator, MenuTrigger } from "@/components/menu";
+import { useToast } from "@/components/toast";
 import { Button, buttonClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
-import { deleteTask, setTaskStatus, updateTask } from "./actions";
-import { useStatusRun } from "./status-run";
+import { deleteTask, updateTask } from "./actions";
 
 /**
  * The title on the page title token, edited in place. At rest it's the
@@ -34,21 +33,9 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
   );
 }
 
-/** "…": Copy link, Cancel task, Delete. */
-export function MoreMenu({
-  taskId,
-  title,
-  active,
-  status,
-  waitingOn,
-}: {
-  taskId: string;
-  title: string;
-  active: boolean;
-  status: TaskStatus;
-  waitingOn: string | null;
-}) {
-  const { run, pending, toast } = useStatusRun();
+/** "…": Copy link, Delete. */
+export function MoreMenu({ taskId, title }: { taskId: string; title: string }) {
+  const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [deleting, startDelete] = useTransition();
 
@@ -85,20 +72,6 @@ export function MoreMenu({
           <MenuItem icon={<Link2 />} onAction={copyLink}>
             Copy link
           </MenuItem>
-          {active && (
-            <MenuItem
-              icon={<Ban />}
-              isDisabled={pending}
-              onAction={() =>
-                run(() => setTaskStatus(taskId, "CANCELED", { expected: status }), {
-                  done: "Task canceled",
-                  undo: () => setTaskStatus(taskId, status, { expected: "CANCELED", ...(status === "WAITING" ? { waitingOn } : {}) }),
-                })
-              }
-            >
-              Cancel task
-            </MenuItem>
-          )}
           <MenuSeparator />
           <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => setConfirming(true)}>
             Delete

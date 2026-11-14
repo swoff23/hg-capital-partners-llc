@@ -109,7 +109,7 @@ export interface ComposerProps {
    */
   clearance?: string;
   /**
-   * Placeholder per side: "Reply to Zack" or "Add a comment"; "Add an internal
+   * Placeholder per side: "Add comment…"; "Add an internal
    * note", which shortens to `internalShort` ("Internal note") below 480px.
    */
   placeholders: { shared: string; internal?: string; internalShort?: string };

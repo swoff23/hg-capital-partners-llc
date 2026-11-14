@@ -16,7 +16,7 @@ import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { asanaProfileGids, asanaTaskGids, taskIdsIn } from "@/lib/tasks/body-links";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { emailStatesIn } from "@/lib/tasks/delivery";
-import { lockboxState } from "@/lib/tasks/lockbox";
+import { lockboxState, resolveLockboxCode } from "@/lib/tasks/lockbox";
 import { lastSeen, markTaskSeen, otherPartnersSeen, seenBaseline } from "@/lib/tasks/read-state";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
 import { copySlot } from "@/lib/tasks/repeat-slot";
@@ -24,6 +24,7 @@ import { isDraftUpload, markDoneComment, mediaItem, reviewPhotos, taskMedia, tas
 import { OVERDUE_ELIGIBLE, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { shapeActivity } from "./activity-rows";
 import type { ReviewDecision, ReviewProof } from "./review-banner";
+import type { TaskLockbox } from "./fields";
 import { TaskPageView } from "./view";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
@@ -35,8 +36,8 @@ export async function generateMetadata({ params }: PageProps<"/tasks/[id]">): Pr
 
 /**
  * The staff task page: loads the task and shapes it for TaskPageView
- * (./view.tsx), which lays it out. Lockbox codes and password hashes never
- * reach the client; only unit labels and a lockbox state do.
+ * (./view.tsx), which lays it out. Password hashes never reach the client,
+ * and of the property's lockbox codes only the one this job shows does.
  */
 export default async function TaskPage({ params, searchParams }: PageProps<"/tasks/[id]">) {
   const { id } = await params;
@@ -183,10 +184,14 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   const contractorEmails = contractor ? jobEmailState(contractor.portalAccount, contractor.active) : "no-login";
   const property = propertyRow;
 
-  const lockbox = (() => {
+  const lockbox = ((): TaskLockbox | null => {
     if (!contractorFirst || !property || !active) return null;
-    const state = lockboxState(parseUnits(property.units), task.unitLabel);
-    return state === "none" ? null : { state, contractor: contractorFirst, hasLogin: contractorHasLogin };
+    const units = parseUnits(property.units);
+    const who = { contractor: contractorFirst, hasLogin: contractorHasLogin };
+    // The code the contractor's job shows; with none, a property with codes asks for a unit.
+    const code = resolveLockboxCode(units, task.unitLabel);
+    if (code) return { state: "shown", code, ...who };
+    return lockboxState(units, task.unitLabel) === "pick-unit" ? { state: "pick-unit", ...who } : null;
   })();
 
   const userName = (u: { name: string | null; email: string }) => u.name || u.email;
@@ -311,7 +316,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       contractorFirst={contractorFirst}
       contractorHasLogin={contractorHasLogin}
       contractor={
-        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin, getsEmail: contractorEmails === "on" } : null
+        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin, emails: contractorEmails } : null
       }
       staffFirstNames={staffFirstNames}
       review={review}

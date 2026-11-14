@@ -2,9 +2,9 @@
  * Which lockbox code a contractor's job shows (docs/asana-migration-plan.md
  * D21): the unit's code when the job has a unit; with no unit, the
  * property's code only when it has exactly one distinct code, as the portal
- * decides it (src/lib/portal/access-code.ts). The staff task page uses
- * the state to say whether the contractor will see a code; it never shows
- * the code itself. Pure; see lockbox.test.ts.
+ * decides it (src/lib/portal/access-code.ts). The staff task page shows
+ * that code with a Tag saying the contractor sees it, or asks for a unit
+ * when none resolves yet. Pure; see lockbox.test.ts.
  */
 
 export type UnitCode = { label?: string | null; lockboxCode?: string | null };
