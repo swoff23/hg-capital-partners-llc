@@ -15,6 +15,7 @@ import { requirePortalPrincipal } from "@/lib/portal/session";
 import { isActiveStatus } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { CrewText } from "./_components/crew-text";
+import { HashScroll } from "./_components/hash-scroll";
 import { JobActions } from "./_components/job-actions";
 import { JobDate } from "./_components/job-date";
 import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
@@ -84,6 +85,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
       </header>
 
       <main className={cn("mx-auto max-w-300", hasBar ? "pb-[calc(6.5rem+env(safe-area-inset-bottom))]" : "pb-12")}>
+        <HashScroll />
         {photoAlt && <PhotoThumb size="full" src={job.photoUrl} alt={photoAlt} className="rounded-none sm:hidden" />}
 
         <div className="space-y-8 px-4 pt-4 sm:px-6 sm:pt-8 lg:px-8 pointer-coarse:space-y-6">

@@ -6,10 +6,11 @@ import type { MediaItem } from "@/components/media-grid";
 import { ComposerDropZone, PendingSendsProvider } from "@/components/composer";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
+import type { JobEmailState } from "@/lib/portal/job-emails";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
 import { Composer, type ComposerDraft } from "./composer";
-import { TaskFields, type PropertyOption, type TaskFieldValues } from "./fields";
+import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox } from "./fields";
 import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
 import { ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
@@ -42,14 +43,14 @@ export interface TaskPageViewProps {
   recent: AssigneeValue[];
   /** The date the series gave this task when it is a repeat copy (its CREATED line), null otherwise. */
   repeatSlot: Ymd | null;
-  lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
+  lockbox: TaskLockbox | null;
   created: string;
   /** First name of the assigned contractor. */
   contractorFirst: string | null;
   /** The assigned contractor has a portal login; until then nothing here says they'll see it now. */
   contractorHasLogin: boolean;
   /** The assigned contractor, for the composer's line over the field. */
-  contractor: { id: string; first: string; hasLogin: boolean; getsEmail: boolean } | null;
+  contractor: { id: string; first: string; hasLogin: boolean; emails: JobEmailState } | null;
   /** The partners' first names: who sees an Internal note. */
   staffFirstNames: string[];
   /** The proof the Review banner shows while the job waits on staff, else null. */
@@ -77,8 +78,8 @@ export interface TaskPageViewProps {
 /**
  * The task page's layout (docs/asana-migration-plan.md §6, D31 "page with
  * side rail"). A record page: it caps at 1200px with a 320px rail
- * (docs/brand-guidelines.md, section 5). Main column: status and title,
- * review banner, notes, then flat sections for the checklist, photos and
+ * (docs/brand-guidelines.md, section 5). Main column: Tasks and the status
+ * over the title, review banner, notes, then flat sections for the checklist, photos and
  * files, and activity, and the composer. The fields sit in a sticky Details
  * rail from lg up and a chip row under the title below that; one grid,
  * rearranged by its template areas.
@@ -97,18 +98,14 @@ export function TaskPageView(p: TaskPageViewProps) {
           "lg:grid-cols-[minmax(0,1fr)_20rem] lg:[grid-template-areas:'head_fields'_'main_fields']"
         }
       >
-        <header
-          className={
-            "grid min-w-0 items-center gap-x-2 gap-y-1 [grid-area:head] " +
-            "grid-cols-[minmax(0,1fr)_auto_auto] [grid-template-areas:'back_status_more'_'title_title_title'_'reason_reason_reason'] " +
-            "md:grid-cols-[auto_minmax(0,1fr)_auto] md:[grid-template-areas:'back_back_back'_'status_title_more'_'._reason_.']"
-          }
-        >
-          <div className="[grid-area:back]">
+        {/* One layout at every size: Tasks, the status and the ⋯ on the first row, the title on its own line below,
+            flush with the notes and sections under it (Connor, Nov 14, option A). */}
+        <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title'_'reason_reason']">
+          <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
             <BackLink fallback="/tasks" label="Tasks" />
-          </div>
-          {/* Centered on the title's first line: the 32px menu button, not a 20px badge. */}
-          <div className="flex min-w-0 items-center gap-2 [grid-area:status] md:self-start md:pt-1">
+            <span aria-hidden="true" className="text-meta text-fg-3">
+              /
+            </span>
             <StatusControl
               taskId={task.id}
               status={task.status}
@@ -118,14 +115,14 @@ export function TaskPageView(p: TaskPageViewProps) {
               hasContractor={!!p.values.assignee && "contactId" in p.values.assignee}
             />
           </div>
+          <div className="[grid-area:more]">
+            <MoreMenu taskId={task.id} title={task.title} />
+          </div>
           <div className="min-w-0 [grid-area:title]">
             <TitleField taskId={task.id} title={task.title} closed={!p.active} />
           </div>
-          <div className="[grid-area:more] md:self-start md:pt-1">
-            <MoreMenu taskId={task.id} title={task.title} active={p.active} status={task.status} waitingOn={task.waitingOn} />
-          </div>
           {task.status === "WAITING" && task.waitingOn && (
-            <div className="min-w-0 [grid-area:reason]">
+            <div className="-mt-1 min-w-0 [grid-area:reason]">
               <WaitingReason taskId={task.id} waitingOn={task.waitingOn} />
             </div>
           )}
@@ -186,7 +183,7 @@ export function TaskPageView(p: TaskPageViewProps) {
               <TaskActivity taskId={task.id} notes={task.description} rows={p.rows} now={p.now} today={p.today} newSince={p.newSince} />
             </Section>
 
-            {/* Without a login the composer reads as on a job with no contractor ("Shared", "Add a comment"): no reply reaches them yet. */}
+            {/* Without a login the composer says the contractor needs one ("Zack needs a login to see this"): no reply reaches them yet. */}
             <Composer
               taskId={task.id}
               taskTitle={task.title}

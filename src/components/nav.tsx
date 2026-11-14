@@ -7,6 +7,7 @@ import {
   Settings2,
   SquareCheckBig,
   TrendingUp,
+  Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const LINKS: { href: string; label: string; icon: LucideIcon; list?: ListKey }[]
   { href: "/", label: "Home", icon: House },
   { href: "/deals", label: "Deals", icon: TrendingUp, list: "deals" },
   { href: "/properties", label: "Portfolio", icon: Building2, list: "properties" },
+  { href: "/tenants", label: "Tenants", icon: Users, list: "tenants" },
   { href: "/financials", label: "Financials", icon: ChartColumn },
   { href: "/tasks", label: "Tasks", icon: SquareCheckBig, list: "tasks" },
   { href: "/contractors", label: "Contractors", icon: Wrench, list: "contractors" },

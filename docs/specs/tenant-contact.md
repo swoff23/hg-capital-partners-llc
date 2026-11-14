@@ -1,5 +1,7 @@
 # Tenant contact on jobs
 
+> **Merged into [tenants.md](tenants.md) on Nov 14, 2026.** Connor asked for tenant and lease records with their own list, so tenants.md replaced this spec's data model (a tenancy stored on the unit, sections 2 and 5) with tenant and lease tables. Its rules for what a contractor sees at an occupied home (sections 3, 4, 6 and 7, Q21 to Q26) carry over as written, reading the unit's current lease. This file stays as the decision log.
+
 Planned with Connor on Oct 26, 2026 (Q1 to Q20), and reopened on Nov 14, 2026 when he asked for every decision to be argued again. The Nov 14 round changed six things (Q21 to Q26): a unit counts as occupied by move dates, an occupied unit shares the lockbox only with the tenants' permission to enter, the auto-switch of Q18 and Q20 is gone, applying the New Tenant and Move Out playbooks saves to the unit, and every tenant who lives in the unit shows, one row each.
 
 Connor said "build it after" on Nov 14: it builds once branch `design-calls-nov14` is on main. That branch and the Nov 14 job emails both change files cited here (the portal job page and its queries, `properties/service.ts`), so the build starts by re-reading every cited file and correcting the cites.

@@ -8,11 +8,12 @@ import {
   useState,
   type ComponentProps,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type Ref,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { AddressCombobox } from "@/components/address-combobox";
 import { Code } from "@/components/code";
@@ -692,13 +693,30 @@ function TextFact(props: InlineFieldProps) {
 /* ---------------- The heading ---------------- */
 
 // The page's h1 on the title token, editable or not. font-semibold repeats the token's weight so a caller's size override (the task title) keeps it.
-const headingText = "rounded-md px-2 py-1 pr-6 text-title font-semibold text-fg-1";
+// The 1px edge is there at rest too (transparent), so the field that replaces the title on a click has the same box and nothing moves.
+const headingText = "rounded-md border border-transparent px-2 py-1 text-title font-semibold text-fg-1 [overflow-wrap:anywhere]";
+
+/** Where in the heading's text a click landed, so the field opens with the cursor there; undefined from the keyboard. */
+function caretFromClick(e: ReactMouseEvent<HTMLElement>): number | undefined {
+  if (e.detail === 0) return undefined;
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+  };
+  const pos = doc.caretPositionFromPoint?.(e.clientX, e.clientY);
+  const range = pos ? null : document.caretRangeFromPoint?.(e.clientX, e.clientY);
+  const node = pos?.offsetNode ?? range?.startContainer;
+  const offset = pos?.offset ?? range?.startOffset;
+  if (!node || offset === undefined || node.nodeType !== Node.TEXT_NODE || !e.currentTarget.contains(node)) return undefined;
+  return offset;
+}
 
 /**
  * The page's h1: the address of a property or a deal, a task's title, a
- * contractor's name. A click opens the field in place (a bordered address
- * field with suggestions for an address), on touch the one-field sheet. Enter
- * or leaving commits, Esc puts the saved name back. A name too short says so
+ * contractor's name. With a mouse it reads as the rail's facts do: a fill and
+ * a text cursor on hover, no pencil. A click opens the field in the title's
+ * own box, with the cursor where the click landed (a bordered address field
+ * with suggestions for an address); on touch the one-field sheet. Enter or
+ * leaving commits, Esc puts the saved name back. A name too short says so
  * under the field instead of snapping back, and a refused rename never stays
  * on screen: the field reopens with what was typed and the reason.
  */
@@ -715,28 +733,32 @@ function HeadingFact(props: InlineFieldProps) {
   const area = useRef<HTMLTextAreaElement>(null);
   const closing = useRef(false);
   const refocus = useRef(false);
+  // Where the cursor goes when the field opens: the click's spot, or the end.
+  const caret = useRef<number | undefined>(undefined);
   const lineId = useId();
   const shown = save.shown;
 
-  function open() {
+  function open(at?: number) {
     if (save.pending) return;
     save.reset();
     setProblem(null);
     setDraft(value);
+    caret.current = at === undefined ? undefined : Math.min(at, value.length);
     closing.current = false;
     if (isCoarseNow()) {
       setSheetUsed(true);
       setMode("sheet");
     } else setMode("inline");
   }
-  useEffect(() => onRequest?.(open));
+  useEffect(() => onRequest?.(() => open()));
 
   useLayoutEffect(() => {
     if (mode !== "inline") return;
     const el = area.current ?? root.current?.querySelector<HTMLInputElement>("input");
     if (!el) return;
     el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    const at = caret.current ?? el.value.length;
+    el.setSelectionRange(at, at);
   }, [mode]);
 
   useEffect(() => {
@@ -877,29 +899,24 @@ function HeadingFact(props: InlineFieldProps) {
   );
 
   if (mode !== "inline") {
-    // A desktop hover cue only; touch has no hover, and a tap opens the field.
+    // The hover fill and text cursor are for a mouse only; touch has no hover, and a tap opens the sheet.
     return (
       <>
-        <h1 className="group/addr relative -mx-2 min-w-0">
+        <h1 className="-mx-2 min-w-0">
           <button
             ref={valueRef}
             type="button"
             data-inline-value=""
-            onClick={open}
+            onClick={(e) => open(caretFromClick(e))}
             aria-busy={save.pending || undefined}
             className={cn(
               headingText,
-              "text-balance text-left transition-colors [overflow-wrap:anywhere] pointer-fine:hover:bg-fill-1",
+              "block w-fit max-w-full text-left transition-colors pointer-fine:cursor-text pointer-fine:hover:bg-fill-1 aria-busy:cursor-progress",
               className,
             )}
           >
             {shown}
           </button>
-          <Pencil
-            aria-hidden="true"
-            strokeWidth={1.5}
-            className="pointer-events-none absolute right-2 top-3 h-4 w-4 text-fg-3 opacity-0 transition-opacity pointer-fine:group-hover/addr:opacity-100"
-          />
         </h1>
         {/* A refusal that landed after the field closed, under the heading and not inside it. */}
         {(save.error || save.conflict) && (
@@ -914,7 +931,7 @@ function HeadingFact(props: InlineFieldProps) {
   }
 
   return (
-    <div ref={root} className="-mx-2 w-full min-w-0" onKeyDown={address ? onKeyDown : undefined} onBlur={address ? (e) => !e.currentTarget.contains(e.relatedTarget) && onBlur() : undefined}>
+    <div ref={root} className="-mx-2 min-w-0" onKeyDown={address ? onKeyDown : undefined} onBlur={address ? (e) => !e.currentTarget.contains(e.relatedTarget) && onBlur() : undefined}>
       {address ? (
         <AddressCombobox
           kind={address.kind}
@@ -927,19 +944,32 @@ function HeadingFact(props: InlineFieldProps) {
           className="px-2"
         />
       ) : (
-        <AutosizeTextarea
-          ref={area}
-          aria-label={label}
-          aria-invalid={problem ? true : undefined}
-          aria-describedby={problem || save.error || save.conflict ? lineId : undefined}
-          rows={1}
-          value={draft}
-          onChange={(e) => changed(e.target.value)}
-          onKeyDown={onKeyDown}
-          onBlur={onBlur}
-          // Editing reads as a field: --surface with the focus edge, at the heading's size.
-          className={cn("w-full border-line-control px-2 py-1 text-title font-semibold", className)}
-        />
+        // The field takes the title's own box: an invisible copy of the text sizes it (wider as you type, up to the
+        // column, then onto more lines) and the textarea lies over it, with the same type, padding and edge, so the
+        // words stay put. Editing reads as a field: --surface with the focus edge.
+        <div className="relative w-fit max-w-full">
+          <span aria-hidden="true" className={cn(headingText, "invisible block whitespace-pre-wrap", className)}>
+            {draft}
+            {"\u200b"}
+          </span>
+          <textarea
+            ref={area}
+            aria-label={label}
+            aria-invalid={problem ? true : undefined}
+            aria-describedby={problem || save.error || save.conflict ? lineId : undefined}
+            rows={1}
+            value={draft}
+            onChange={(e) => changed(e.target.value)}
+            onKeyDown={onKeyDown}
+            onBlur={onBlur}
+            className={cn(
+              headingText,
+              "absolute inset-0 size-full resize-none overflow-hidden whitespace-pre-wrap border-line-control bg-surface outline-none",
+              "focus:border-act focus:ring-1 focus:ring-inset focus:ring-act aria-invalid:border-danger aria-invalid:focus:ring-danger",
+              className,
+            )}
+          />
+        </div>
       )}
       <div className="px-2">
         {!refusal && <FactLine id={lineId} problem={address ? null : problem} save={save} p={{ kind: "heading", field }} inRail={false} />}

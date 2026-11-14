@@ -24,7 +24,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   const { token } = await params;
   const query = new URL(request.url).searchParams;
   const link = await resolveJobLink(token);
-  if (!link || link.kind === "STAFF" || !link.contactId || !link.accountId) return seeOther("/login");
+  if (!link || (link.kind !== "EMAIL" && link.kind !== "CREW") || !link.contactId || !link.accountId) return seeOther("/login");
 
   const destination = jobLinkDestination(link.taskId, query.get("do"), query.get("u"));
   if (!link.opensJob) return seeOther(withNext("/login", destination));

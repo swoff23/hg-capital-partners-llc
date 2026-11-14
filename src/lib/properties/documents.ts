@@ -47,7 +47,7 @@ async function discard(url: string | null, pathname: string, token: string): Pro
   try {
     await del(url ?? pathname, { token });
   } catch (err) {
-    logError("properties:documents:discard", err, { pathname });
+    logError("properties:documents:discard", err, { pathname }, { level: "warning" });
   }
 }
 
@@ -116,7 +116,7 @@ export async function deletePropertyAttachment(attachmentId: string): Promise<vo
     await del(att.url, { token: getEnv().BLOB_READ_WRITE_TOKEN });
   } catch (err) {
     // The blob is already gone, or the token is missing: the row is dropped all the same.
-    logError("properties:documents:delete", err, { attachmentId });
+    logError("properties:documents:delete", err, { attachmentId }, { level: "warning" });
   }
   revalidatePath(`/properties/${att.propertyId}`);
 }

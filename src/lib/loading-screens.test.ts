@@ -51,6 +51,7 @@ const WITHOUT = new Set([
   "(app)/settings/[...missing]",
   "(app)/tasks/[...missing]",
   "(app)/templates/[...missing]",
+  "(app)/tenants/[...missing]",
 ]);
 
 /** The surfaces' own layouts: a click never re-runs them (partial rendering), so they may read the session. */

@@ -181,7 +181,8 @@ export type ContractorWho = { contactId: string; onlyTaskId?: string | null };
  * only its own job, whatever else the contact has.
  */
 export async function assertContractorAccess(tx: Tx, taskId: string, who: ContractorWho): Promise<void> {
-  if (who.onlyTaskId && who.onlyTaskId !== taskId) throw new TaskRuleError("You don't have access to this job.");
+  // A tab left on another job after a newer link (an email's or a crew text's) took over the session.
+  if (who.onlyTaskId && who.onlyTaskId !== taskId) throw new TaskRuleError("Open this job from its link again.");
   const contactId = who.contactId;
   const access = await tx.taskAccess.findUnique({
     where: { taskId_contactId: { taskId, contactId } },

@@ -6,6 +6,7 @@ import {
   deliveryFor,
   easternDayStart,
   jobSubject,
+  liveReminders,
   offItems,
   previewText,
   whatsNew,
@@ -723,4 +724,42 @@ test("with replies by email, the footer says what a reply does", () => {
   // Without replies by email: as before.
   assert.equal(taskEmail({ ...staffInput(), audience: "contractor", status: "IN_PROGRESS", staffNames: ["Connor", "Pieter"] }).footnote, "Reply in the job so Connor and Pieter both see it.");
   assert.ok(!("footnote" in taskEmail({ ...staffInput() })));
+});
+
+test("handed the job and taken off it inside one bundle: nothing goes", () => {
+  const assigned = item("ASSIGNED", `assigned you "${TITLE}"`);
+  const tookOff = item("OFF", `took you off "${TITLE}"`);
+  const canceled = item("OFF", `canceled "${TITLE}"`);
+  assert.deepEqual(offItems([assigned, tookOff], { hasAccess: false, canceled: false }), []);
+  assert.deepEqual(offItems([assigned, canceled], { hasAccess: true, canceled: true }), []);
+  // Told earlier, in another email: the off line still goes.
+  assert.deepEqual(offItems([tookOff], { hasAccess: false, canceled: false }), [tookOff]);
+});
+
+test("8 am lines go only while still true when they send", () => {
+  const today = { ...item("DUE_TODAY", "due today", "HG"), due: "2026-11-23" };
+  const comment = item("COMMENT", '"Doors"');
+  const live = { status: "IN_PROGRESS" as const, due: "2026-11-23", today: "2026-11-23" };
+  assert.deepEqual(liveReminders([today, comment], live), [today, comment]);
+  // The date moved, the job went to Review, or the day turned over: the line goes, the comment stays.
+  assert.deepEqual(liveReminders([today, comment], { ...live, due: "2026-11-25" }), [comment]);
+  assert.deepEqual(liveReminders([today, comment], { ...live, status: "REVIEW" }), [comment]);
+  assert.deepEqual(liveReminders([today], { ...live, today: "2026-11-24" }), []);
+  const overdue = { ...item("OVERDUE", "due yesterday", "HG"), due: "2026-11-22" };
+  assert.deepEqual(liveReminders([overdue], { status: "OPEN", due: "2026-11-22", today: "2026-11-23" }), [overdue]);
+});
+
+test("photos: none on a closed job's contractor email, and up to six of HG's in the job section", () => {
+  const T = "e".repeat(43);
+  const base = { ...staffInput(), audience: "contractor" as const, linkToken: T };
+  const closed = taskEmail({ ...base, status: "DONE", newPhotoIds: ["p1"], jobPhotoIds: ["h1"] });
+  assert.deepEqual([closed.photos, closed.job.photos], [[], []]);
+  const open = taskEmail({ ...base, status: "IN_PROGRESS", jobPhotoIds: ["h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8"] });
+  assert.equal(open.job.photos.length, 6);
+  assert.equal(open.job.morePhotos, 2);
+});
+
+test("an assignment handed over twice in one bundle reads once", () => {
+  const assigned = item("ASSIGNED", `assigned you "${TITLE}"`);
+  assert.deepEqual(itemLines([assigned, item("COMMENT", '"Doors"'), assigned], TITLE), ['Connor: "Doors"', "Connor assigned you this job"]);
 });

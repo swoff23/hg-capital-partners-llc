@@ -29,7 +29,7 @@ test("one all-day event on the job's date, ending the next day, named for the jo
 });
 
 test("text is escaped and long lines fold at 75 octets", () => {
-  assert.equal(icsText("a;b,c\\d\ne"), "a\;b\\,c\\\\d\\ne");
+  assert.equal(icsText("a;b,c\\d\ne"), "a\\;b\\,c\\\\d\\ne");
   const folded = foldIcsLine(`SUMMARY:${"x".repeat(200)}`);
   for (const part of folded.split("\r\n")) assert.ok(Buffer.byteLength(part, "utf8") <= 75);
   assert.equal(folded.replace(/\r\n /g, ""), `SUMMARY:${"x".repeat(200)}`);

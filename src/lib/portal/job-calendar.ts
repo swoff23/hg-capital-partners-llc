@@ -6,7 +6,7 @@
 
 /** RFC 5545 text: backslash, semicolon and comma escaped, line breaks as \n. */
 export function icsText(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r\n?|\n/g, "\\n");
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r\n?|\n/g, "\\n");
 }
 
 /** Lines over 75 octets fold onto continuation lines that start with a space (RFC 5545 3.1). */

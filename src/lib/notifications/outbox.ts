@@ -15,6 +15,7 @@ import {
   DAILY_EMAIL_CAP,
   deliveryFor,
   easternDayStart,
+  liveReminders,
   offItems,
   parseItems,
   reachedCapNow,
@@ -168,9 +169,10 @@ async function liveItems(
 /** HG's photos on a job the contractor may open, newest first: the job section's thumbnails. */
 async function hgPhotoIds(taskId: string, contactId: string, leaveOut: ReadonlySet<string>): Promise<string[]> {
   const rows = await prisma.taskAttachment.findMany({
-    where: { taskId, kind: "IMAGE", deletedAt: null, uploadedByContactId: null, thumbPathname: { not: null } },
+    where: { taskId, kind: "IMAGE", visibility: "SHARED", deletedAt: null, uploadedByContactId: null, thumbPathname: { not: null } },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    // Enough for six and a true "+N"; a job with more than this many photos reads "+" a little low.
+    take: 100,
     select: { ...SEEABLE_FILE, id: true },
   });
   return rows.filter((a) => !leaveOut.has(a.id) && contractorMaySee(a, contactId)).map((a) => a.id);
@@ -257,8 +259,28 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       recipientContactId: row.recipientContactId,
     });
     const photosByEvent = live.photosByEvent;
+    // The job's state and the recipient's access, read again now the row is claimed: the batch read before the claim can
+    // be a write behind (taken off and put back, canceled, a date moved), and these decide what goes.
+    const [fresh, accessRow] = await Promise.all([
+      prisma.task.findUnique({ where: { id: row.taskId }, select: { status: true, dueDate: true, scheduledFor: true } }),
+      delivery.audience === "contractor" && row.recipientContactId
+        ? prisma.taskAccess.findFirst({ where: { taskId: row.taskId, contactId: row.recipientContactId, revokedAt: null }, select: { id: true } })
+        : null,
+    ]);
+    if (!fresh) {
+      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "no task" } });
+      result.skipped++;
+      continue;
+    }
+    const task = { ...row.task, status: fresh.status, dueDate: fresh.dueDate, scheduledFor: fresh.scheduledFor };
     const items =
-      delivery.audience === "contractor" ? offItems(live.items, { hasAccess: contractorHasAccess, canceled: row.task.status === "CANCELED" }) : live.items;
+      delivery.audience === "contractor"
+        ? liveReminders(offItems(live.items, { hasAccess: !!accessRow, canceled: task.status === "CANCELED" }), {
+            status: task.status,
+            due: toYmd(targetDate(task)),
+            today: todayYmdEastern(now),
+          })
+        : live.items;
     const off = items.some((i) => i.kind === "OFF");
     if (items.length === 0) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
@@ -267,7 +289,6 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     }
 
     if (delivery.audience === "contractor") staffNames ??= await staffFirstNames();
-    const task = row.task;
     // The notes go to the contractor with this property's lockbox codes masked: the code itself stays behind the job's
     // own Lockbox section, where each view is logged (D21), not in an inbox.
     const notes =
@@ -365,9 +386,13 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
   }
 
   if (reachedCapNow(sentBefore, result.sent)) {
-    logError("notifications:daily-cap", new Error(`Daily email cap of ${DAILY_EMAIL_CAP} reached; the rest go out tomorrow`), {
-      sentToday: sentBefore + result.sent,
-    });
+    // A warning: the background jobs' check-in says "email_capped" and alerts (src/lib/jobs-health.ts).
+    logError(
+      "notifications:daily-cap",
+      new Error(`Daily email cap of ${DAILY_EMAIL_CAP} reached; the rest go out tomorrow`),
+      { sentToday: sentBefore + result.sent },
+      { level: "warning" },
+    );
   }
   return result;
 }

@@ -21,16 +21,22 @@ Six specs, researched on Mobbin, checked by a critic and approved by Connor on O
 
 Each chunk ships its own small migration.
 
-[tenant-contact.md](tenant-contact.md) puts every tenant's name and phone on jobs, shows the lockbox on an occupied unit only with the tenant's permission to enter, and dates each tenancy. It was planned with Connor on Oct 26, 2026, reopened on Nov 14, and builds once design-calls-nov14 lands.
+[tenants.md](tenants.md) brings every tenant into the app: a Tenants list, each property's current and past tenants, a lease page per household with rent, its Section 8 split, terms and the signed PDF, and an import from Baselane and the signed leases. It keeps tenant-contact.md's rules for what a contractor sees at an occupied home. It was planned with Connor on Nov 14, 2026; he said "build it", and the parts that touch the property page, tasks and the portal build once design-calls-nov14 lands.
+
+[tenant-contact.md](tenant-contact.md) is its decision log (Q1 to Q26): every tenant's name and phone on jobs, the lockbox on an occupied unit only with permission to enter, and move dates. Its data model, a tenancy stored on the unit, was replaced by tenants.md's tenant and lease records.
 
 [contractor-email-switch.md](contractor-email-switch.md) keeps a contractor's job emails quiet until their first sign-in and adds a "Job emails" switch to each contractor's Portal access card. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
 [contractor-job-emails.md](contractor-job-emails.md) makes a job email carry the whole job: What's new, the details, buttons that open the job with no sign-in, reply by email, "Text to my crew", three new emails (taken off a job, 8 am on the date, 8 am the morning after) and a date the contractor sets with the tenant. Connor and Pieter's copy gets the same treatment. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
-[error-alerts.md](error-alerts.md) sends Connor an alert when the app breaks: server and browser errors through Sentry, and site-down and stopped-job checks through Better Stack. It was planned with Connor on Nov 3, 2026, and waits for his "build it".
+[error-alerts.md](error-alerts.md) sends Connor an alert when the app breaks: server and browser errors, the site going down, and background jobs that stop. It runs on Sentry's free plan alone. It was planned with Connor on Nov 3, 2026, and reviewed on Nov 14, when he took Q13 to Q21. It waits for his "build it".
 
 [contractor-trades.md](contractor-trades.md) turns contractor trades into one list in the database and folds the 31 old spellings into 17 trades. It also gives the contractor page, the New contractor form and the list one tags-and-checklist picker. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
 [view-as.md](view-as.md) lets Connor open the contractor portal as any contractor sees it, view only, from the ⋯ menu on their page, with an ink "Viewing as" bar across the top. It was planned with Connor on Nov 14, 2026. The build was started and then paused before any code landed; re-check it against main first.
+
+[update-notice.md](update-notice.md) tells a tab left open that a new version is live: a sticky toast, "A new version is ready" with Reload, on staff and portal pages, and the next in-app link loads the new version. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
+
+[design-foundation.md](design-foundation.md) puts HG's components on shadcn/ui's React Aria base: the color tokens and components take shadcn's names, in three landings (colors, components, then a sweep that moves hand-built controls onto the shared ones, each look change shown to Connor first). It was planned with Connor on Nov 14, 2026, and waits for his "build it". A revision for his wider goal, removing as much custom design as possible, comes next.
 
 [property-page.md](property-page.md) reorders the property page to lead with Tasks and Units and access, folds empty fields behind "N more fields", merges the two CapEx sections, turns Entity into a list of the five QuickBooks companies, and shows Rental listings only once a listing exists. It was planned with Connor on Nov 14, 2026, and waits for his "build it".

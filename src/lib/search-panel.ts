@@ -66,12 +66,13 @@ export const SIGNED_OUT_LINE = "You're signed out.";
 
 const TITLES: Record<SearchType, string> = {
   property: "Properties",
+  tenant: "Tenants",
   task: "Tasks",
   deal: "Deals",
   contractor: "Contractors",
 };
-const PLURAL: Record<SearchType, string> = { property: "properties", task: "tasks", deal: "deals", contractor: "contractors" };
-const SINGULAR: Record<SearchType, string> = { property: "property", task: "task", deal: "deal", contractor: "contractor" };
+const PLURAL: Record<SearchType, string> = { property: "properties", tenant: "tenants", task: "tasks", deal: "deals", contractor: "contractors" };
+const SINGULAR: Record<SearchType, string> = { property: "property", tenant: "tenant", task: "task", deal: "deal", contractor: "contractor" };
 
 export const groupTitle = (type: SearchType): string => TITLES[type];
 const noun = (type: SearchType, n: number): string => (n === 1 ? SINGULAR[type] : PLURAL[type]);
@@ -89,6 +90,8 @@ const OPEN_IN: Partial<Record<SearchType, { path: string; label: string; params?
   // All statuses, so the page lists as many as "See all 40 tasks" counted.
   task: { path: "/tasks", label: "Open in Tasks", params: { status: "all" } },
   deal: { path: "/deals", label: "Open in Deals", params: { status: "all" } },
+  // All views, so the page lists as many as "See all 12 tenants" counted.
+  tenant: { path: "/tenants", label: "Open in Tenants", params: { view: "all" } },
   contractor: { path: "/contractors", label: "Open in Contractors" },
 };
 
@@ -116,7 +119,9 @@ function rowWords(row: SearchRow): string[] {
         ? [row.owner ?? ""]
         : row.type === "contractor"
           ? [row.trade ?? "", row.company ?? ""]
-          : [];
+          : row.type === "tenant"
+            ? [row.home ?? ""]
+            : [];
   return norm([row.title, ...extra].join(" ")).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
 
@@ -273,7 +278,7 @@ export function composePanel(input: PanelInput): PanelView {
     };
   }
 
-  // Everything, in the fixed order: Properties, Tasks, Deals, Contractors.
+  // Everything, in the fixed order: Properties, Tenants, Tasks, Deals, Contractors.
   const found = SEARCH_TYPES.map((type) => response.groups.find((g) => g.type === type)).filter(
     (g): g is NonNullable<typeof g> => g !== undefined && g.total > 0,
   );

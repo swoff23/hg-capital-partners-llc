@@ -2,12 +2,14 @@ import type { Viewport } from "next";
 import { cookies } from "next/headers";
 import { appScope } from "@/lib/attachments/queue-owner";
 import { requireUser } from "@/lib/auth";
+import { getEnv } from "@/lib/env";
 import { signOut } from "@/app/login/actions";
 import { readListHrefs } from "@/lib/list-memory";
 import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import { AppShell } from "@/components/app-shell";
 import { LeaveGuard } from "@/components/leave-guard";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
+import { UpdateNotice } from "@/components/update-notice";
 import { UploadQueueProvider } from "@/components/upload-queue";
 
 // Android Chrome resizes the page for its on-screen keyboard, so a sheet's
@@ -27,7 +29,9 @@ export const viewport: Viewport = { interactiveWidget: "resizes-content" };
  * page that started them and hold Sign out (uploads 2.1). The queue is the
  * signed-in person's own (`app:<user id>`) and keyed by it, so a different
  * person signing in gets a fresh one and the old one stops
- * (attachments/queue-owner.ts).
+ * (attachments/queue-owner.ts). `UpdateNotice` sits beside RefreshOnReturn:
+ * it needs the queue, the toasts and the guard above it, and gets the commit
+ * this page was built from (docs/specs/update-notice.md).
  */
 export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
   const user = await requireUser();
@@ -47,6 +51,7 @@ export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
       >
         <UploadQueueProvider key={scope} scope={scope}>
           <RefreshOnReturn />
+          <UpdateNotice version={getEnv().VERCEL_GIT_COMMIT_SHA ?? null} />
           {children}
           {modal}
         </UploadQueueProvider>

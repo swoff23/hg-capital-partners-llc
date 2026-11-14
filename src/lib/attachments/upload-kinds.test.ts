@@ -21,10 +21,10 @@ import { propertyUploadLimits, uploadLimits } from "./limits";
 const T = "cm1abc2def3ghi";
 const P = "cm9prop8erty7";
 
-test("UPLOAD_KINDS: the five token routes the uploads spec names and the contractor's documents, each with a parent and an access", () => {
+test("UPLOAD_KINDS: the five token routes the uploads spec names, the contractor's documents and signed leases, each with a parent and an access", () => {
   assert.deepEqual(
     [...UPLOAD_KINDS],
-    ["task-upload", "portal-task-upload", "property-upload", "listing-photo-upload", "property-photo-upload", "portal-contact-upload", "contact-upload"],
+    ["task-upload", "portal-task-upload", "property-upload", "listing-photo-upload", "property-photo-upload", "portal-contact-upload", "contact-upload", "lease-upload"],
   );
   for (const k of UPLOAD_KINDS) {
     assert.ok(UPLOAD_KIND_PARENT[k], k);
@@ -182,4 +182,22 @@ test("staff add a contractor's W-9 to the same folder, under their own queue tar
   assert.equal(UPLOAD_KIND_ACCESS["contact-upload"], "private");
   const req = uploadRequest("contact-upload", parent, { name: "w9.jpg", contentType: "image/jpeg", fileKind: "image" }, { owner: "app:u1" });
   assert.match(req.pathname, /^contacts\/c123\/w9\/[A-Za-z0-9._-]+$/);
+});
+
+test("lease-upload: one target per term, all in the lease's folder, a token the lease-upload rule accepts", async () => {
+  const { leaseDocParent, readLeaseDocParent, uploadRequest, uploadTargetHref, uploadTargetKey } = await import("./upload-kinds");
+  const { leaseUploadLimits, storedLeaseDocumentPath } = await import("./limits");
+  const parent = leaseDocParent("lease1", "term1");
+  assert.deepEqual(readLeaseDocParent(parent), { leaseId: "lease1", termId: "term1" });
+  assert.equal(readLeaseDocParent("lease1"), null);
+  assert.equal(uploadTargetKey("lease-upload", parent), "lease-doc:lease1:term1");
+  assert.equal(uploadTargetHref("lease-upload", parent), "/tenants/lease1");
+  const req = uploadRequest("lease-upload", parent, { name: "Lease 2026.pdf", contentType: "application/pdf", fileKind: "file" });
+  assert.equal(req.pathname, "leases/lease1/Lease-2026.pdf");
+  assert.deepEqual(JSON.parse(req.clientPayload), { leaseId: "lease1", termId: "term1", fileKind: "file" });
+  assert.equal(typeof leaseUploadLimits("lease1", req.pathname, "file"), "object");
+  assert.equal(typeof leaseUploadLimits("lease1", "leases/other/lease-2026.pdf", "file"), "string", "another lease's folder");
+  assert.equal(typeof leaseUploadLimits("lease1", req.pathname, "video"), "string");
+  assert.ok(storedLeaseDocumentPath("leases/lease1/lease-2026-AbC123.pdf", "lease1"));
+  assert.ok(!storedLeaseDocumentPath("leases/lease2/lease-2026.pdf", "lease1"));
 });

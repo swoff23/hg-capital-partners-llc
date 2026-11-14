@@ -133,8 +133,8 @@ export function StatusControl({
       hidden={hasContractor ? [] : ["REVIEW"]}
       onChange={(to) => commit(to)}
       followUp={followUp}
-      // The mark and word sit on the page's edge; the hover fill reaches past it.
-      className="-ml-2.5"
+      // Beside Tasks and its slash: the button's own padding is the gap, so pull the ring in a little.
+      className="-ml-1"
     />
   );
 }

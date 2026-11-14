@@ -5,6 +5,7 @@ import type { UploadTarget } from "@/components/upload-queue";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ALLOWED, uploadTargetHref, uploadTargetKey } from "@/lib/attachments/upload-kinds";
 import { personalDraftKey } from "@/lib/composer-draft";
+import type { JobEmailState } from "@/lib/portal/job-emails";
 import { joinNames } from "@/lib/portal/job-view";
 import { recordTaskAttachment } from "../upload-actions";
 import { addTaskComment, deleteTaskFile } from "./actions";
@@ -43,7 +44,7 @@ export function Composer({
    * portal login, and whether a reply emails them (docs/specs/contractor-email-switch.md: not before their first
    * sign-in, and not with their Job emails switch off).
    */
-  contractor: { id: string; first: string; hasLogin: boolean; getsEmail: boolean } | null;
+  contractor: { id: string; first: string; hasLogin: boolean; emails: JobEmailState } | null;
   /** The partners' first names: who sees an Internal note. */
   staff: readonly string[];
   /** My uploads on this task not yet sent with a message, oldest first. */
@@ -81,9 +82,9 @@ export function Composer({
       pin="phone"
       audience={{
         shared: reachable ? (
-          // Says when no email will go, the rarer case (Connor, Nov 14). The line under the sent comment says why:
-          // "Zack hasn't signed in yet" or "Zack's emails are off".
-          <AudienceText name={reachable.first} words={reachable.getsEmail ? "sees this and gets an email" : "won't get an email"} />
+          // Warns only when their Job emails switch is off (Connor, Nov 14). Before their first sign-in no email goes
+          // either, so the line doesn't promise one; the line under the sent comment says "Zack hasn't signed in yet".
+          <AudienceText name={reachable.first} words={audienceWords(reachable.emails)} />
         ) : contractor ? (
           <span className="flex min-w-0 items-baseline gap-2">
             <AudienceText name={contractor.first} words="needs a login to see this" />
@@ -98,7 +99,8 @@ export function Composer({
         internal: <AudienceText words={only} />,
       }}
       placeholders={{
-        shared: reachable ? `Reply to ${reachable.first}` : "Add a comment",
+        // One placeholder whoever is assigned: the line above already says who sees it (Connor, Nov 14).
+        shared: "Add comment…",
         internal: "Add an internal note",
         internalShort: "Internal note",
       }}
@@ -113,4 +115,11 @@ export function Composer({
       onSend={({ body, visibility, attachmentIds, clientId }) => addTaskComment(taskId, { body, visibility, attachmentIds, clientId })}
     />
   );
+}
+
+/** What the line over a Shared reply says after the contractor's name. */
+function audienceWords(emails: JobEmailState): string {
+  if (emails === "on") return "sees this and gets an email";
+  if (emails === "off") return "won't get an email";
+  return "sees this";
 }

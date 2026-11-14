@@ -55,6 +55,22 @@ const fillerCopyRule = copyRule(
 const HEIC_MESSAGE =
   "heic-to loads only through the dynamic import in src/lib/attachments/heic.ts (heicToJpeg), so it stays out of every page's bundle.";
 
+// Error alerts (docs/specs/error-alerts.md): each Sentry package has one file that may
+// import it, so the browser package stays a lazy chunk and the server one stays on the server.
+const SENTRY_BROWSER_MESSAGE =
+  "@sentry/browser loads only through src/lib/sentry-browser.ts, which src/instrumentation-client.ts imports with import() once the page is idle.";
+const SENTRY_SERVER_MESSAGE =
+  "@sentry/nextjs is used only in src/lib/report-server.ts (and next.config.ts), so it never reaches a page's bundle. Report through logError (src/lib/log.ts).";
+
+const HEIC_PATHS = [{ name: "heic-to", message: HEIC_MESSAGE, allowTypeImports: true }];
+const HEIC_PATTERNS = [{ group: ["heic-to/*"], message: HEIC_MESSAGE, allowTypeImports: true }];
+const SENTRY_BROWSER_PATHS = [{ name: "@sentry/browser", message: SENTRY_BROWSER_MESSAGE, allowTypeImports: true }];
+const SENTRY_SERVER_PATHS = [{ name: "@sentry/nextjs", message: SENTRY_SERVER_MESSAGE, allowTypeImports: true }];
+const SENTRY_PATTERNS = [
+  { group: ["@sentry/browser/*"], message: SENTRY_BROWSER_MESSAGE, allowTypeImports: true },
+  { group: ["@sentry/nextjs/*", "@sentry/node", "@sentry/node/*", "@sentry/react", "@sentry/react/*", "@sentry/core", "@sentry/core/*"], message: SENTRY_SERVER_MESSAGE, allowTypeImports: true },
+];
+
 // Brand values come from the tokens in src/app/globals.css, so a re-brand is a
 // token swap (docs/brand-guidelines.md, section 11). A value the tokens can't
 // carry (a fixed size the guidelines name) takes an eslint-disable-next-line
@@ -136,9 +152,29 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-restricted-imports": [
         "error",
         {
-          paths: [{ name: "heic-to", message: HEIC_MESSAGE, allowTypeImports: true }],
-          patterns: [{ group: ["heic-to/*"], message: HEIC_MESSAGE, allowTypeImports: true }],
+          paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS, ...SENTRY_SERVER_PATHS],
+          patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS],
         },
+      ],
+    },
+  },
+  // The one file each Sentry package may be imported from. A flat config's later block
+  // replaces the rule's options, so each lists everything except its own package.
+  {
+    files: ["src/lib/sentry-browser.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { paths: [...HEIC_PATHS, ...SENTRY_SERVER_PATHS], patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS.slice(1)] },
+      ],
+    },
+  },
+  {
+    files: ["src/lib/report-server.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS], patterns: [...HEIC_PATTERNS, SENTRY_PATTERNS[0]] },
       ],
     },
   },
