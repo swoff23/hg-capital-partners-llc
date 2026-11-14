@@ -2,14 +2,14 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import { ArrowUpRight } from "lucide-react";
 import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordView } from "@/lib/recent-views";
 import { getEnv } from "@/lib/env";
-import { Badge, Section, textLinkClass } from "@/components/ui";
+import { Badge, Section } from "@/components/ui";
 import { RailFact } from "@/components/rail";
+import { ContactDocFact } from "./contact-doc-fact";
 import { BackLink } from "@/components/back-link";
 import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
 import { archivedLine, contractorArchiveRefusal, contractorJobsWhere, contractorOpenJobs } from "@/lib/archive";
@@ -50,16 +50,6 @@ async function signInOrigin(): Promise<string> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   return host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : env.appUrl;
-}
-
-/** A document opened in a new tab, so the record stays open behind it. */
-function DocLink({ href }: { href: string }) {
-  return (
-    <a href={href} target="_blank" rel="noreferrer" className={textLinkClass}>
-      View
-      <ArrowUpRight className="ml-0.5 inline size-3.5 align-middle" aria-hidden="true" />
-    </a>
-  );
 }
 
 export default async function ContractorPage({ params }: PageProps<"/contractors/[id]">) {
@@ -202,17 +192,20 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             tradeOptions={allTrades.map((t) => t.name)}
             tradesNote={c.tradesNote}
           >
-            {/* What isn't edited here yet: the documents, which the uploads work takes. */}
-            <RailFact label="W-9">{w9Href ? <DocLink href={w9Href} /> : w9OnFile ? "On file" : null}</RailFact>
-            <RailFact
+            {/* The W-9 and the policy: View the newest, Replace with a newer one, or Add one that came by email. */}
+            <ContactDocFact contactId={c.id} kind="w9" label="W-9" name="W-9" href={w9Href} fallback={w9OnFile ? "On file" : null} warn={!c.archivedAt} />
+            <ContactDocFact
+              contactId={c.id}
+              kind="insurance"
               label={
                 <>
                   Insurance<span className="max-sm:hidden"> (COI)</span>
                 </>
               }
-            >
-              {coiHref ? <DocLink href={coiHref} /> : coiOnFile ? "On file" : c.noInsurance ? "No insurance" : null}
-            </RailFact>
+              name="Insurance"
+              href={coiHref}
+              fallback={coiOnFile ? "On file" : c.noInsurance ? "No insurance" : null}
+            />
             {/* Bank details live in Baselane, never here; for someone who signed up, this says the link went. */}
             {fromInvite && c.baselaneSentAt && <RailFact label="Bank">Baselane link sent {dayOf(c.baselaneSentAt)}</RailFact>}
           </ContactSection>

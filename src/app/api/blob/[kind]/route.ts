@@ -26,6 +26,7 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/listing-photo-upload   { propertyId }                     staff, public photos
  *   /api/blob/property-photo-upload  { propertyId }                     staff, the building's public photo
  *   /api/blob/portal-contact-upload  { contactId, docKind, fileKind }   contractor, their own W-9 or insurance
+ *   /api/blob/contact-upload         { contactId, docKind, fileKind }   staff, a contractor's W-9 or insurance
  *
  * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
  * uploaders send; the table below is typed against that list, so a kind
@@ -146,6 +147,18 @@ const KINDS: Record<string, UploadKind> = {
       if (who.kind !== "contractor" || who.onlyTaskId || who.contactId !== contactId) throw new UploadRefusal("Not found");
       const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { signupSource: true, archivedAt: true } });
       if (!contact || contact.archivedAt || contact.signupSource === "STAFF") throw new UploadRefusal("Not found", true);
+      return limits;
+    },
+  },
+  "contact-upload": {
+    principal: "staff",
+    idKey: "contactId",
+    // A W-9 or policy that came by email, added from the contractor's page: any contractor still in the directory.
+    authorize: async (contactId, pathname, payload) => {
+      const limits = contactUploadLimits(contactId, payload.docKind, pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { archivedAt: true } });
+      if (!contact || contact.archivedAt) throw new UploadRefusal("Not found", true);
       return limits;
     },
   },

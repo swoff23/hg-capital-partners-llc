@@ -1,15 +1,10 @@
 import "server-only";
-import { BlobNotFoundError, del, head, type HeadBlobResult } from "@vercel/blob";
 import type { ContactDocKind } from "@prisma/client";
 import { FieldError } from "@/lib/action-result";
-import { UPLOAD_RULES, fileKindForType, filenameForType, normalizeContentType } from "@/lib/attachments/content-types";
-import { blobSizeRefusal, storedContactDocumentPath } from "@/lib/attachments/limits";
-import { isPrivateStoreUrl, storeIdFromToken } from "@/lib/attachments/paths";
 import { readContactPatch } from "@/lib/contractors/contact-fields";
+import { ContactDocumentError, contactBlobAuth, discardContactBlob, storeContactDocument } from "@/lib/contractors/documents";
 import { furthestStep, inSetup, setupChecklist, setupComplete, SETUP_STEPS, type SetupFacts, type SetupStep } from "@/lib/contractors/onboarding";
 import { prisma } from "@/lib/db";
-import { getEnv } from "@/lib/env";
-import { logError } from "@/lib/log";
 
 /**
  * The contractor's own setup (docs/specs/contractor-onboarding.md, section 3): each step's save, their W-9 and
@@ -241,65 +236,18 @@ export async function saveInsuranceStep(contactId: string, input: { noInsurance:
 // Files
 // ---------------------------------------------------------------------------
 
-function blobAuth(): { token: string; storeId: string } {
-  const token = getEnv().BLOB_READ_WRITE_TOKEN;
-  const storeId = storeIdFromToken(token);
-  if (!token || !storeId) throw new SetupError("File uploads need a Blob store, and none is connected yet.");
-  return { token, storeId };
-}
-
-async function discard(url: string | null, pathname: string, token: string): Promise<void> {
-  try {
-    await del(url ?? pathname, { token });
-  } catch (err) {
-    logError("portal:setup:discard", err, { pathname });
-  }
-}
-
 /**
- * After the browser finished uploading straight to Blob: checks the blob itself (where it is, its type and size, as
- * property documents do) and records it on the contractor. Returns the new document's id.
+ * After the browser finished uploading straight to Blob: records the contractor's own W-9 or policy. The checks on
+ * the blob itself are lib/contractors/documents.ts, which staff uploads use too.
  */
 export async function recordContactDocument(contactId: string, docKind: "w9" | "insurance", input: { pathname: string; filename: string }): Promise<{ id: string }> {
   await assertSetupContact(contactId);
-  const { token, storeId } = blobAuth();
-  if (!storedContactDocumentPath(input.pathname, contactId, docKind)) throw new SetupError("That file isn't in your folder.");
-  if (await prisma.contactDocument.findUnique({ where: { pathname: input.pathname }, select: { id: true } })) {
-    throw new SetupError("That file is already added.");
-  }
-  let blob: HeadBlobResult;
   try {
-    blob = await head(input.pathname, { token });
+    return await storeContactDocument(contactId, docKind, input, { contactId });
   } catch (err) {
-    if (err instanceof BlobNotFoundError) throw new SetupError("That upload didn't finish. Try again.");
+    if (err instanceof ContactDocumentError) throw new SetupError(err.message);
     throw err;
   }
-  const refuse = async (message: string): Promise<never> => {
-    await discard(blob.pathname === input.pathname ? blob.url : null, input.pathname, token);
-    throw new SetupError(message);
-  };
-  if (blob.pathname !== input.pathname || !isPrivateStoreUrl(blob.url, storeId, input.pathname)) return refuse("That file isn't in our private storage.");
-  const contentType = normalizeContentType(blob.contentType);
-  const kind = fileKindForType(contentType);
-  if (!kind || kind === "video") return refuse("Add a photo or a PDF.");
-  const sizeRefusal = blobSizeRefusal(blob.size, UPLOAD_RULES[kind].maxBytes);
-  if (sizeRefusal) return refuse(sizeRefusal);
-  const row = await prisma.contactDocument.create({
-    data: {
-      contactId,
-      kind: docKind === "w9" ? "W9" : "INSURANCE",
-      url: blob.url,
-      pathname: input.pathname,
-      filename: filenameForType(input.filename, contentType).slice(0, 255) || "file",
-      size: Math.max(0, Math.trunc(blob.size)),
-      contentType,
-      uploadedByContactId: contactId,
-    },
-    select: { id: true },
-  });
-  // A policy on file answers the insurance question.
-  if (docKind === "insurance") await prisma.contact.update({ where: { id: contactId }, data: { noInsurance: false } });
-  return row;
 }
 
 /** Removes one of the contractor's own files, before they've finished setup only (staff keep what was sent). */
@@ -310,6 +258,11 @@ export async function removeContactDocument(contactId: string, documentId: strin
   if (!d || d.contactId !== contactId) throw new SetupError("That file is gone.");
   if (c.setupDoneAt) throw new SetupError("Ask HG Capital to change a file you already sent.");
   await prisma.contactDocument.delete({ where: { id: documentId } });
-  const { token } = blobAuth();
-  await discard(d.url, d.pathname, token);
+  try {
+    const { token } = contactBlobAuth();
+    await discardContactBlob(d.url, d.pathname, token);
+  } catch (err) {
+    if (err instanceof ContactDocumentError) throw new SetupError(err.message);
+    throw err;
+  }
 }

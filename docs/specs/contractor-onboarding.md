@@ -121,7 +121,7 @@ A popover from the header button (a sheet on a phone): the link in a `Code` that
   - Onboarding: "W-9 · 4 of 6".
   - Active, Access off: as today, with Reset password, Change login email, Sign out everywhere and Remove access unchanged.
 - **Trades:** the contractor's "didn't list" line shows under the tags as "Also does: Gutters, roof patches". Opening the trades checklist starts with that text in its search, so 'Add "Gutters"' is one tap.
-- **W-9 and Insurance** facts open the newest uploaded file in the viewer. An old Drive link still shows when nothing has been uploaded. "No insurance" when the contractor said so.
+- **W-9 and Insurance** rows (Connor, during the build): empty, the row is its verb ("Add W-9" in --warn, "Add insurance"), which opens the files, or the camera or files on a phone; with a file, **View** opens the newest and **Replace** adds a newer one (older ones stay). Any contractor, staff-added ones included. Otherwise today's `w9Url`/`coiUrl`/notes logic, and "No insurance" when they said so.
 - **Bank:** "Baselane link sent Nov 14", or nothing.
 - **Activity:** not built in this pass. The record's Onboarding badge, the progress line and the files cover it for now.
 
@@ -196,7 +196,7 @@ model ContactDocument {
 - **The shared link is rate limited** per IP (`RateLimiter`, as the move-in form) and per email. Every sign-up starts as New with no jobs, so a stranger sees only their own setup.
 - **No auto-matching.** A sign-up whose phone or email matches an existing contractor makes a separate New record and says so on the Needs you row. Attaching it to the existing record would let anyone who knows Zack's phone number see Zack's jobs.
 - **An email that already has a login** gets "That email already has an account. Sign in or reset your password." This tells a stranger that the email has an account, which is acceptable for this portal; the sign-in throttle still applies.
-- **Files** go to private Blob through a new upload kind (`portal-contact-upload`, the contractor's own; a staff upload from the contractor's page isn't built yet, and old Drive links still show) and are served through the files route: staff, or the contractor who owns them. W-9s carry tax IDs, so they never get a public URL.
+- **Files** go to private Blob through two upload kinds (`portal-contact-upload` for the contractor's own, `contact-upload` for staff adding one that came by email; both record through `lib/contractors/documents.ts`) and are served through the files route: staff, or the contractor who owns them. W-9s carry tax IDs, so they never get a public URL.
 - **Portal code boundaries** stay as they are (`src/lib/auth-guard.test.ts`). `/join` joins the guard test's allowlist of unauthenticated routes, beside login, password reset and the move-in form. While `PORTAL_ENABLED` is off it returns 404 like the rest of the portal.
 
 ## 7. Copy
