@@ -10,7 +10,7 @@
  * hands `readListHrefs` the cookie jar it already holds. See list-memory.test.ts.
  */
 
-export const LIST_KEYS = ["tasks", "deals", "properties", "contractors"] as const;
+export const LIST_KEYS = ["tasks", "deals", "properties", "tenants", "contractors"] as const;
 export type ListKey = (typeof LIST_KEYS)[number];
 
 /** Where each list lives. */
@@ -18,6 +18,7 @@ export const LIST_PATHS: Record<ListKey, string> = {
   tasks: "/tasks",
   deals: "/deals",
   properties: "/properties",
+  tenants: "/tenants",
   contractors: "/contractors",
 };
 
@@ -26,6 +27,7 @@ export const LIST_COOKIES: Record<ListKey, string> = {
   tasks: "hg-list-tasks",
   deals: "hg-list-deals",
   properties: "hg-list-properties",
+  tenants: "hg-list-tenants",
   contractors: "hg-list-contractors",
 };
 

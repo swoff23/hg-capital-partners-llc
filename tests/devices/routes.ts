@@ -18,6 +18,13 @@ export const PORTAL_FIXTURE_EMAIL = "device-check@hg.localhost";
 export const SAMPLE_PARAMS: Record<string, FindRow> = {
   "contractors/[id]": (db) => db.contact.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   "deals/[id]": (db) => db.deal.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // A lease page (docs/specs/tenants.md 6): the one with the most tenants on it, so a household of several and a
+  // long name or two are checked on a phone. Each machine's own import, or a lease made with New lease.
+  "tenants/[id]": async (db) => {
+    const leases = await db.lease.findMany({ select: { id: true, _count: { select: { tenants: true } } }, orderBy: { createdAt: "asc" } });
+    const pick = leases.reduce<(typeof leases)[number] | null>((best, l) => (!best || l._count.tenants > best._count.tenants ? l : best), null);
+    return pick ? { id: pick.id } : null;
+  },
   // The contractor portal's job page: the job setup.ts gives the fixture contractor.
   "jobs/[id]": (db) =>
     db.task.findFirst({

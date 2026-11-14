@@ -10,7 +10,8 @@
  *     auth or sessions, the staff task read helpers, staff pages, or the
  *     properties, deals or QuickBooks modules.
  *  3. Lockbox codes live in Property.units, which portal code reads in one
- *     place only: src/lib/portal/access-code.ts.
+ *     place only: src/lib/portal/access-code.ts. Tenants and leases are read
+ *     there too, and nowhere else in portal code (docs/specs/tenants.md 11).
  *
  * Static only: it parses the source with the TypeScript compiler, no Next,
  * no database.
@@ -333,6 +334,11 @@ const STAFF_ONLY = [
   "@/lib/properties",
   "@/lib/deals",
   "@/lib/quickbooks",
+  // Tenants and leases (docs/specs/tenants.md 11): the writes and the staff reads. The pure rules
+  // (status.ts, fields.ts) stay importable, for access-code.ts's one job's tenants.
+  "@/lib/tenants/service",
+  "@/lib/tenants/queries",
+  "@/lib/tenants/core",
   "@/app/(app)",
 ];
 
@@ -442,6 +448,17 @@ test("only access-code.ts in portal code mentions units", () => {
   const allowed = new Set(["src/lib/portal/access-code.ts", "src/lib/portal/access-code.test.ts"]);
   const bad = portalFiles.filter((f) => !allowed.has(rel(f)) && fs.readFileSync(f, "utf8").includes("units")).map(rel);
   assert.deepEqual(bad, [], "Property.units holds lockbox codes; read it only through src/lib/portal/access-code.ts");
+});
+
+// Rent, deposits, emails, emergency contacts and lease files never reach a contractor: portal code reads the
+// tenant and lease tables in access-code.ts alone, and only a job's living tenants' names and numbers there.
+const TENANT_TABLE = /\.(lease|leaseTenant|leaseTerm|leaseFile|tenant)\s*\./;
+
+test("only access-code.ts in portal code reads the tenant and lease tables", () => {
+  const allowed = new Set(["src/lib/portal/access-code.ts", "src/lib/portal/access-code.test.ts"]);
+  const bad = portalFiles.filter((f) => !allowed.has(rel(f)) && TENANT_TABLE.test(fs.readFileSync(f, "utf8"))).map(rel);
+  assert.deepEqual(bad, [], "Tenants and leases are staff records; portal code reads them only through src/lib/portal/access-code.ts");
+  assert.ok(TENANT_TABLE.test("await db.leaseTenant.findMany({})") && TENANT_TABLE.test("tx.tenant.findUnique") && !TENANT_TABLE.test("Please call the tenant."));
 });
 
 test("the boundary checks catch what they should", () => {

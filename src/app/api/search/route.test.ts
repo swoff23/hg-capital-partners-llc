@@ -14,6 +14,8 @@ import {
   runSearch,
   type SearchDb,
   type SearchGroup,
+  type SearchType,
+  type TenantSearchRow,
   type TaskSearchRow,
 } from "@/lib/search-results";
 
@@ -61,7 +63,7 @@ function table(rows: Row[], log: string[], name: string) {
   };
 }
 
-type Data = { properties?: Row[]; tasks?: Row[]; deals?: Row[]; contacts?: Row[] };
+type Data = { properties?: Row[]; tasks?: Row[]; deals?: Row[]; contacts?: Row[]; tenants?: Row[] };
 
 function fakeDb(data: Data = {}) {
   const log: string[] = [];
@@ -70,6 +72,7 @@ function fakeDb(data: Data = {}) {
     task: table(data.tasks ?? [], log, "task"),
     deal: table(data.deals ?? [], log, "deal"),
     contact: table(data.contacts ?? [], log, "contact"),
+    tenant: table(data.tenants ?? [], log, "tenant"),
   } as unknown as SearchDb;
   return { db, log };
 }
@@ -125,7 +128,25 @@ const contact = (id: string, fullName: string, extra: Row = {}): Row => ({
   ...extra,
 });
 
-const search = (db: SearchDb, q: string, extra: { type?: "property" | "task" | "deal" | "contractor"; limit?: number } = {}) =>
+const ymd = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
+
+type LeaseSpec = { id: string; address?: string; unit?: string | null; movesIn?: Date | null; movesOut?: Date | null };
+const onLease = ({ id, address = "647 Prospect Ave, Buffalo, NY 14213", unit = "Front", movesIn = ymd(2020, 1, 1), movesOut = null }: LeaseSpec): Row => ({
+  lease: { id, unitLabel: unit, movesIn, movesOut, property: { address } },
+});
+
+const tenant = (id: string, fullName: string, leases: Row[], extra: Row = {}): Row => ({
+  id,
+  fullName,
+  email: null,
+  phone: null,
+  phoneE164: null,
+  updatedAt: day(1),
+  leases,
+  ...extra,
+});
+
+const search = (db: SearchDb, q: string, extra: { type?: SearchType; limit?: number } = {}) =>
   runSearch(db, { q, ...extra });
 
 const ids = (g: SearchGroup | undefined) => g?.rows.map((r) => r.id);
@@ -389,7 +410,7 @@ test("the query is bounded: a pasted page of text costs what a title does", asyn
       return value;
     });
   const recording = { findMany: async (args: unknown) => (record(args), []), count: async (args: unknown) => (record(args), 0) };
-  const db = { property: recording, task: recording, deal: recording, contact: recording } as unknown as SearchDb;
+  const db = { property: recording, task: recording, deal: recording, contact: recording, tenant: recording } as unknown as SearchDb;
   await runSearch(db, { q: "y".repeat(5000) });
   assert.ok(seen.length > 0);
   assert.ok(seen.every((s) => s.length <= MAX_QUERY), `longest spelling ${Math.max(...seen.map((s) => s.length))}`);
@@ -481,4 +502,95 @@ test("an archived property, deal or contractor is never found, counted or recent
   assert.equal(recent.status, 200);
   if (recent.status !== 200) return;
   assert.deepEqual(recent.body.rows.map((r) => r.id), ["d1"]);
+});
+
+// ---------------------------------------------------------------------------
+// Tenants
+// ---------------------------------------------------------------------------
+
+const tenantRows = (g: SearchGroup | undefined) => (g?.rows ?? []) as TenantSearchRow[];
+
+test("a tenant is found by name, phone, email, or the address or unit of their lease", async () => {
+  const { db } = fakeDb({
+    tenants: [
+      tenant("t1", "Dana Whitfield", [onLease({ id: "L1" })], {
+        phone: "716-555-1234",
+        phoneE164: "+17165551234",
+        email: "dana@example.com",
+      }),
+      tenant("t2", "Omar Reyes", [onLease({ id: "L2", address: "12 Elmwood Ave, Buffalo, NY 14201", unit: "Upper" })]),
+    ],
+  });
+  const found = async (q: string) => ids(group((await search(db, q)).groups, "tenant")) ?? [];
+  assert.deepEqual(await found("whitfield"), ["t1"]);
+  assert.deepEqual(await found("dana whit"), ["t1"]);
+  assert.deepEqual(await found("555-1234"), ["t1"]);
+  assert.deepEqual(await found("7165551234"), ["t1"]);
+  assert.deepEqual(await found("dana@example"), ["t1"]);
+  assert.deepEqual(await found("prospect"), ["t1"]);
+  assert.deepEqual(await found("prospect front"), ["t1"]);
+  assert.deepEqual(await found("elmwood"), ["t2"]);
+  assert.deepEqual(await found("upper"), ["t2"]);
+  assert.deepEqual(await found("whitfield elmwood"), []);
+});
+
+test("a tenant row says where they live and opens that lease", async () => {
+  const { db } = fakeDb({
+    tenants: [
+      tenant("t1", "Dana Whitfield", [
+        onLease({ id: "old", unit: "Back", movesIn: ymd(2018, 1, 1), movesOut: ymd(2019, 12, 31) }),
+        onLease({ id: "now", unit: "Front", movesIn: ymd(2020, 1, 1) }),
+        onLease({ id: "next", unit: "Upper", movesIn: ymd(2999, 1, 1) }),
+      ]),
+    ],
+  });
+  const [row] = tenantRows(group((await search(db, "dana")).groups, "tenant"));
+  assert.equal(row.href, "/tenants/now");
+  assert.equal(row.home, "647 Prospect Ave · Front");
+  assert.equal(row.past, false);
+});
+
+test("with no current lease, the next one shows, else the latest past one", async () => {
+  const upcoming = { id: "next", movesIn: ymd(2999, 1, 1) };
+  const { db } = fakeDb({
+    tenants: [
+      tenant("up", "Una Upcoming", [onLease({ id: "a", movesIn: ymd(2999, 6, 1) }), onLease({ ...upcoming, unit: "Sooner" })]),
+      tenant("pa", "Paul Past", [
+        onLease({ id: "p1", unit: "Back", movesIn: ymd(2015, 1, 1), movesOut: ymd(2016, 1, 1) }),
+        onLease({ id: "p2", unit: "Front", movesIn: ymd(2017, 1, 1), movesOut: ymd(2019, 1, 1) }),
+      ]),
+    ],
+  });
+  const [up] = tenantRows(group((await search(db, "upcoming")).groups, "tenant"));
+  assert.equal(up.href, "/tenants/next");
+  assert.equal(up.past, false);
+  const [pa] = tenantRows(group((await search(db, "paul")).groups, "tenant"));
+  assert.equal(pa.href, "/tenants/p2");
+  assert.equal(pa.past, true);
+});
+
+test("a past tenant ranks after a current one, even when the name matches better", async () => {
+  const { db } = fakeDb({
+    tenants: [
+      tenant("gone", "Sam Lee", [onLease({ id: "g", movesIn: ymd(2015, 1, 1), movesOut: ymd(2016, 1, 1) })], { updatedAt: day(9) }),
+      tenant("here", "Pat Samuels", [onLease({ id: "h" })], { updatedAt: day(1) }),
+    ],
+  });
+  const tenants = group((await search(db, "sam")).groups, "tenant");
+  assert.deepEqual(ids(tenants), ["here", "gone"]);
+});
+
+test("a tenant on no lease has no page to open, so no row", async () => {
+  const { db } = fakeDb({ tenants: [tenant("t1", "Dana Whitfield", [])] });
+  assert.equal(group((await search(db, "dana")).groups, "tenant"), undefined);
+});
+
+test("Tenants come right after Properties", async () => {
+  const { db } = fakeDb({
+    properties: [property("p1", "647 Prospect Ave, Buffalo, NY 14213")],
+    tasks: [task("t1", "Prospect gutters", "OPEN")],
+    tenants: [tenant("n1", "Dana Prospect", [onLease({ id: "L1" })])],
+    contacts: [contact("c1", "Ana Prospect")],
+  });
+  assert.deepEqual((await search(db, "prospect")).groups.map((g) => g.type), ["property", "tenant", "task", "contractor"]);
 });

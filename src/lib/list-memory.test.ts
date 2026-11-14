@@ -26,6 +26,7 @@ test("defaults: no cookie leaves every list at its plain path", () => {
     tasks: "/tasks",
     deals: "/deals",
     properties: "/properties",
+    tenants: "/tenants",
     contractors: "/contractors",
   });
 });

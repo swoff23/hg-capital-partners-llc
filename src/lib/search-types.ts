@@ -10,7 +10,7 @@ import type { Ymd } from "@/lib/dates";
  * code and the tests keep importing from there.
  */
 
-export const SEARCH_TYPES = ["property", "task", "deal", "contractor"] as const;
+export const SEARCH_TYPES = ["property", "tenant", "task", "deal", "contractor"] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 /** Rows per group when searching everything, and when narrowed to one type. */
@@ -73,7 +73,19 @@ export type ContractorSearchRow = {
   active: boolean;
 };
 
-export type SearchRow = PropertySearchRow | TaskSearchRow | DealSearchRow | ContractorSearchRow;
+export type TenantSearchRow = {
+  type: "tenant";
+  /** The tenant's id; `href` opens the lease they're found by. */
+  id: string;
+  href: string;
+  title: string;
+  /** "647 Prospect · Front": the home of their current lease, else the next, else the latest past one. Null when they have no lease. */
+  home: string | null;
+  /** The lease shown has ended, so the row ranks after current tenants. */
+  past: boolean;
+};
+
+export type SearchRow = PropertySearchRow | TenantSearchRow | TaskSearchRow | DealSearchRow | ContractorSearchRow;
 
 export type SearchGroup = {
   type: SearchType;

@@ -73,7 +73,7 @@ export const STAFF_HOME = "/";
  * the folders, src/proxy.test.ts the matcher. A section missing here only
  * means its links land on Home.
  */
-export const STAFF_SECTIONS = ["contractors", "deals", "financials", "properties", "settings", "tasks", "templates"] as const;
+export const STAFF_SECTIONS = ["contractors", "deals", "financials", "properties", "settings", "tasks", "templates", "tenants"] as const;
 
 /**
  * Request header src/proxy.ts sets on every staff section request: the path
@@ -83,7 +83,7 @@ export const STAFF_SECTIONS = ["contractors", "deals", "financials", "properties
 export const STAFF_PATH_HEADER = "x-hg-app-path";
 
 /** A gated file (src/app/api/files), or the ZIP of a task's files (Download all): a signed-out link comes back to it after sign-in. */
-const FILE_PATH = /^\/api\/files\/(?:(?:task|property)|zip\/task)\/[A-Za-z0-9_-]{1,64}$/;
+const FILE_PATH = /^\/api\/files\/(?:(?:task|property|lease)|zip\/task)\/[A-Za-z0-9_-]{1,64}$/;
 
 function isStaffPath(path: string): boolean {
   return path === STAFF_HOME || FILE_PATH.test(path) || STAFF_SECTIONS.some((section) => path === `/${section}` || path.startsWith(`/${section}/`));

@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="860" height="560" viewBox="0 0 860 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The lease page at laptop 1280 and phone 375</title>
+<defs>
+<g id="icon"><circle r="11" fill="#ffffff" stroke="#d5d1ca"/><path d="M-4.5 -4.5 q0 9 9 9 l1.8-2.7-2.7-1.8-1.8 0.9 q-2.7-0.9-3.6-3.6 l0.9-1.8-1.8-2.7z" fill="none" stroke="#424e61" stroke-width="1.1" stroke-linejoin="round"/></g>
+</defs>
+<rect width="860" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">The lease page: one per household</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280, the Details rail on the right</text>
+<rect x="0" y="22" width="560" height="470" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="50" font-size="11" fill="#424e61">← Tenants  /</text>
+<circle cx="94" cy="46" r="5" fill="none" stroke="#424e61" stroke-width="1.4"/>
+<path d="M94 41 a5 5 0 0 1 0 10z" fill="#424e61"/>
+<text x="104" y="50" font-size="11" fill="#424e61">Current</text>
+<text x="540" y="50" font-size="13" text-anchor="end" fill="#5b6576">···</text>
+<text x="20" y="80" font-size="18" font-weight="600" fill="#152133">647 Prospect · Front</text>
+
+<text x="20" y="114" font-size="13" font-weight="600" fill="#152133">Tenants</text>
+<line x1="20" y1="122" x2="360" y2="122" stroke="#e7e5e0"/>
+<text x="20" y="144" font-size="12" fill="#152133">Tenant one</text>
+<rect x="88" y="133" width="44" height="16" rx="4" fill="#ffffff" stroke="#c9c4bb"/>
+<text x="94" y="145" font-size="10" fill="#424e61">Primary</text>
+<text x="20" y="160" font-size="11" fill="#5b6576">716-555-1234 · email on file</text>
+<text x="20" y="175" font-size="11" fill="#5b6576">Emergency: a relative, 716-555-0000</text>
+<use xlink:href="#icon" x="318" y="152"/><use xlink:href="#icon" x="346" y="152"/>
+<line x1="20" y1="188" x2="360" y2="188" stroke="#f2f0ec"/>
+<text x="20" y="210" font-size="12" fill="#152133">Tenant two</text>
+<text x="20" y="226" font-size="11" fill="#5b6576">716-555-9876</text>
+<use xlink:href="#icon" x="318" y="214"/>
+<line x1="20" y1="238" x2="360" y2="238" stroke="#f2f0ec"/>
+<text x="20" y="258" font-size="12" fill="#152133" text-decoration="underline">Add tenant</text>
+
+<text x="20" y="292" font-size="13" font-weight="600" fill="#152133">Terms</text>
+<text x="360" y="292" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Renew</text>
+<line x1="20" y1="300" x2="360" y2="300" stroke="#e7e5e0"/>
+<text x="20" y="322" font-size="12" fill="#152133">Mar 1, 2026 to Feb 28, 2027 · $1,900</text>
+<text x="20" y="338" font-size="11" fill="#5b6576">Tenant pays $400 · Housing authority $1,500</text>
+<text x="360" y="322" font-size="11" text-anchor="end" fill="#424e61">Lease 2026.pdf</text>
+<line x1="20" y1="350" x2="360" y2="350" stroke="#f2f0ec"/>
+<text x="20" y="372" font-size="12" fill="#152133">Mar 1, 2025 to Feb 28, 2026 · $1,850</text>
+<text x="360" y="372" font-size="11" text-anchor="end" fill="#424e61">Lease 2025.pdf</text>
+
+<text x="20" y="406" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<line x1="20" y1="414" x2="360" y2="414" stroke="#e7e5e0"/>
+<text x="20" y="434" font-size="11" fill="#5b6576">One dog. Parks in the back lot.</text>
+<text x="20" y="462" font-size="13" font-weight="600" fill="#152133">Earlier at this unit</text>
+<text x="20" y="480" font-size="11" fill="#424e61">Tenant six, Tenant seven · Mar 2023 to Feb 2025 · $1,750</text>
+
+<text x="384" y="114" font-size="13" font-weight="600" fill="#152133">Details</text>
+<line x1="384" y1="122" x2="540" y2="122" stroke="#e7e5e0"/>
+<g font-size="11">
+<text x="384" y="144" fill="#5b6576">Property</text><text x="466" y="144" fill="#152133">647 Prospect</text>
+<text x="384" y="170" fill="#5b6576">Unit</text><text x="466" y="170" fill="#152133">Front</text>
+<text x="384" y="196" fill="#5b6576">Moved in</text><text x="466" y="196" fill="#152133">Mar 1, 2025</text>
+<text x="384" y="222" fill="#5b6576">Moves out</text><text x="466" y="222" fill="#8a919c">Add date</text>
+<text x="384" y="248" fill="#5b6576">Rent</text><text x="466" y="248" fill="#152133">$1,900</text>
+<text x="384" y="274" fill="#5b6576">Tenant pays</text><text x="466" y="274" fill="#152133">$400</text>
+<text x="384" y="300" fill="#5b6576">Housing auth.</text><text x="466" y="300" fill="#152133">$1,500</text>
+<text x="384" y="326" fill="#5b6576">Deposit</text><text x="466" y="326" fill="#152133">$1,900</text>
+<text x="384" y="352" fill="#5b6576">Term ends</text><text x="466" y="352" fill="#152133">Feb 28, 2027</text>
+</g>
+<g stroke="#f2f0ec"><line x1="384" y1="154" x2="540" y2="154"/><line x1="384" y1="180" x2="540" y2="180"/><line x1="384" y1="206" x2="540" y2="206"/><line x1="384" y1="232" x2="540" y2="232"/><line x1="384" y1="258" x2="540" y2="258"/><line x1="384" y1="284" x2="540" y2="284"/><line x1="384" y1="310" x2="540" y2="310"/><line x1="384" y1="336" x2="540" y2="336"/></g>
+</g>
+
+<g transform="translate(624 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375</text>
+<rect x="0" y="22" width="204" height="470" rx="18" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="14" y="50" font-size="11" fill="#424e61">← Tenants / Current</text>
+<text x="14" y="76" font-size="15" font-weight="600" fill="#152133">647 Prospect · Front</text>
+<rect x="14" y="88" width="60" height="26" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="24" y="105" font-size="11" fill="#152133">$1,900</text>
+<rect x="80" y="88" width="78" height="26" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="90" y="105" font-size="11" fill="#152133">Mar 1, 2025</text>
+<rect x="164" y="88" width="40" height="26" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="176" y="105" font-size="11" fill="#5b6576">+5</text>
+<text x="14" y="140" font-size="13" font-weight="600" fill="#152133">Tenants</text>
+<line x1="14" y1="148" x2="190" y2="148" stroke="#e7e5e0"/>
+<text x="14" y="170" font-size="12" fill="#152133">Tenant one</text>
+<text x="14" y="186" font-size="11" fill="#5b6576">716-555-1234</text>
+<use xlink:href="#icon" x="146" y="174"/><use xlink:href="#icon" x="176" y="174"/>
+<line x1="14" y1="200" x2="190" y2="200" stroke="#f2f0ec"/>
+<text x="14" y="222" font-size="12" fill="#152133">Tenant two</text>
+<text x="14" y="238" font-size="11" fill="#5b6576">716-555-9876</text>
+<use xlink:href="#icon" x="146" y="226"/><use xlink:href="#icon" x="176" y="226"/>
+<text x="14" y="282" font-size="13" font-weight="600" fill="#152133">Terms</text>
+<line x1="14" y1="290" x2="190" y2="290" stroke="#e7e5e0"/>
+<text x="14" y="312" font-size="11" fill="#152133">Mar 2026 to Feb 2027</text>
+<text x="14" y="328" font-size="11" fill="#5b6576">$1,900 · Lease 2026.pdf</text>
+<text x="14" y="372" font-size="10" fill="#5b6576">The facts become the chip row under</text>
+<text x="14" y="386" font-size="10" fill="#5b6576">the title, as on the task page; it</text>
+<text x="14" y="400" font-size="10" fill="#5b6576">scrolls sideways at 320. Call and</text>
+<text x="14" y="414" font-size="10" fill="#5b6576">Text on touch; with a mouse, Call</text>
+<text x="14" y="428" font-size="10" fill="#5b6576">and Email.</text>
+</g>
+</svg>

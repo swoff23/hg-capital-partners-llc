@@ -21,7 +21,9 @@ Six specs, researched on Mobbin, checked by a critic and approved by Connor on O
 
 Each chunk ships its own small migration.
 
-[tenant-contact.md](tenant-contact.md) puts every tenant's name and phone on jobs, shows the lockbox on an occupied unit only with the tenant's permission to enter, and dates each tenancy. It was planned with Connor on Oct 26, 2026, reopened on Nov 14, and builds once design-calls-nov14 lands.
+[tenants.md](tenants.md) brings every tenant into the app: a Tenants list, each property's current and past tenants, a lease page per household with rent, its Section 8 split, terms and the signed PDF, and an import from Baselane and the signed leases. It keeps tenant-contact.md's rules for what a contractor sees at an occupied home. It was planned with Connor on Nov 14, 2026; he said "build it", and the parts that touch the property page, tasks and the portal build once design-calls-nov14 lands.
+
+[tenant-contact.md](tenant-contact.md) is its decision log (Q1 to Q26): every tenant's name and phone on jobs, the lockbox on an occupied unit only with permission to enter, and move dates. Its data model, a tenancy stored on the unit, was replaced by tenants.md's tenant and lease records.
 
 [contractor-email-switch.md](contractor-email-switch.md) keeps a contractor's job emails quiet until their first sign-in and adds a "Job emails" switch to each contractor's Portal access card. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 

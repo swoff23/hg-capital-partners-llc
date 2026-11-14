@@ -142,6 +142,8 @@ const LAZY: { file: string; staticImporters: string[]; why: string }[] = [
       "app/(app)/properties/[id]/listing-sheet.tsx",
       "app/(app)/templates/[id]/apply/apply-flow.tsx",
       "app/(marketing)/residents/moving-in/move-in-form.tsx",
+      // New lease draws Moves in, Starts and Ends at once (docs/specs/tenants.md 7).
+      "app/(app)/tenants/new/new-lease-form.tsx",
     ],
     why: "the typed field loads where a form draws it; a page of chips never needs it",
   },

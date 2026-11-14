@@ -27,7 +27,7 @@ export const maxDuration = 300;
 
 /**
  * Gated file delivery for private documents (property attachments, task
- * attachments). The stored blob URL is never sent to the browser; links
+ * attachments, signed leases). The stored blob URL is never sent to the browser; links
  * point here, and this checks who's asking before streaming the bytes.
  *
  * Who may fetch what (KIND_VIEWERS):
@@ -61,6 +61,8 @@ const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   property: ["staff"],
   // A contractor's W-9 or insurance (docs/specs/contractor-onboarding.md, section 6): staff, and the contractor it belongs to.
   contact: ["staff", "contractor"],
+  // A signed lease's PDF (docs/specs/tenants.md, section 11): staff only, never a contractor.
+  lease: ["staff"],
 };
 
 interface Served {
@@ -149,6 +151,13 @@ async function lookup(kind: string, id: string, variant: Variant | null, viewer:
     // Uploaded to the private store only (contact-documents.ts checks it), so there's no public fallback to try.
     if (!isPrivateStoreUrl(d.url, storeId, d.pathname)) return null;
     return { source: d.url, privatePathname: d.pathname, filename: d.filename, contentType: d.contentType, publicFallback: false };
+  }
+  if (kind === "lease" && viewer.kind === "staff" && !viewer.onlyTaskId && !variant) {
+    const f = await prisma.leaseFile.findUnique({ where: { id }, select: { url: true, pathname: true, filename: true, contentType: true } });
+    if (!f) return null;
+    // Uploaded to the private store only (the import and the lease page), so there's no public fallback to try.
+    if (!isPrivateStoreUrl(f.url, storeId, f.pathname)) return null;
+    return { source: f.url, privatePathname: f.pathname, filename: f.filename, contentType: f.contentType, publicFallback: false };
   }
   if (kind === "property" && viewer.kind === "staff" && !variant) {
     const a = await prisma.propertyAttachment.findUnique({ where: { id } });

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordTitle, type RecordKind } from "@/lib/record-title";
+import { homeLabel } from "@/lib/tenants/status";
 
 /**
  * generateMetadata for a record page: its tab title (record-title.ts), read
@@ -29,5 +30,10 @@ async function nameOf(kind: RecordKind, id: string): Promise<string | null> {
       return (await prisma.contact.findUnique({ where: { id }, select: { fullName: true } }))?.fullName ?? null;
     case "template":
       return (await prisma.taskTemplate.findUnique({ where: { id }, select: { name: true } }))?.name ?? null;
+    case "lease": {
+      // "647 Prospect · Front": the lease page's title, the household's home.
+      const lease = await prisma.lease.findUnique({ where: { id }, select: { unitLabel: true, property: { select: { address: true } } } });
+      return lease ? homeLabel(lease.property.address, lease.unitLabel) : null;
+    }
   }
 }

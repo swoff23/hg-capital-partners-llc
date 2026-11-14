@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { isFinalRefusal } from "@/lib/attachments/access";
-import { contactUploadLimits, propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
+import { contactUploadLimits, leaseUploadLimits, propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
 import { appScope, ownerRefusal, portalScope } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
 import { UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
@@ -27,6 +27,7 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/property-photo-upload  { propertyId }                     staff, the building's public photo
  *   /api/blob/portal-contact-upload  { contactId, docKind, fileKind }   contractor, their own W-9 or insurance
  *   /api/blob/contact-upload         { contactId, docKind, fileKind }   staff, a contractor's W-9 or insurance
+ *   /api/blob/lease-upload           { leaseId, termId, fileKind }      staff, a lease's signed term
  *
  * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
  * uploaders send; the table below is typed against that list, so a kind
@@ -68,7 +69,7 @@ interface UploadKind {
   /** Who may mint a token for this kind. */
   principal: Uploader["kind"];
   /** clientPayload key naming the parent row. */
-  idKey: "taskId" | "propertyId" | "contactId";
+  idKey: "taskId" | "propertyId" | "contactId" | "leaseId";
   /** Throws with a message the uploader can act on, or returns the token's limits. */
   authorize: (id: string, pathname: string, payload: Record<string, unknown>, who: Uploader) => Promise<Limits>;
 }
@@ -159,6 +160,17 @@ const KINDS: Record<string, UploadKind> = {
       if (typeof limits === "string") throw new UploadRefusal(limits);
       const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { archivedAt: true } });
       if (!contact || contact.archivedAt) throw new UploadRefusal("Not found", true);
+      return limits;
+    },
+  },
+  "lease-upload": {
+    principal: "staff",
+    idKey: "leaseId",
+    // A signed lease, added from the lease page (docs/specs/tenants.md): any lease still in the app.
+    authorize: async (leaseId, pathname, payload) => {
+      const limits = leaseUploadLimits(leaseId, pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      if (!(await prisma.lease.findUnique({ where: { id: leaseId }, select: { id: true } }))) throw new UploadRefusal("Not found", true);
       return limits;
     },
   },
