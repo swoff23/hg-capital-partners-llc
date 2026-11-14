@@ -113,6 +113,8 @@ The 100 ms figure is the point where a response still feels like the direct resu
 | JavaScript on a portal page | 300 KB compressed | 345 (`/p/jobs/[id]`) | The job page |
 | HTML at a page's default view | 300 KB decoded | 966 (`/tasks`), 413 (Home), 1.8 MB (`/deals` with all) | `/tasks`, Home, `/deals` all |
 | DOM nodes at a page's default view | 2,000 | 6,857 (`/tasks`), 2,756 (Home) | `/tasks`, Home |
+| Server work for a page | 6 queries in a row, 100 ms in the production model | 11 to 19 in a row; 183 (`/tasks`), 199 (`/p/jobs/[id]`) | `/tasks`, task, property and job pages |
+| Server work for a small edit | 10 SQL, no full-page re-render | 31 SQL and a full re-render | Every inline edit |
 
 **What the Nov 14 build measured for `/tasks` at 100 rows.** HTML: 496 KB at commit 13c8435, and 569,564 bytes decoded (32,552 as sent) on the Nov 14 build. DOM: 3,402 nodes at 13c8435 and 3,428 elements on the Nov 14 build (4,063 nodes of every kind). The budget is 300 KB and 2,000. The forecast for this change was about 250 KB and 1,800 (fix 4), so the build missed it. Back to `/tasks` at 100 rows, on the production build, 100 samples per profile over five runs, timed from `history.back()` to the start of the frame that draws the list:
 
@@ -122,8 +124,6 @@ The 100 ms figure is the point where a response still feels like the direct resu
 | Phone model (375x667, CPU 4x slower, 9 Mbps down, 1.5 up, 100 ms latency) | 100 ms | 106 ms | 108, 128, 89, 98, 122 | Not met, by a little (39 of 100 under 100) |
 
 No request was made on any Back. The phone number moved with how busy the machine was (89 and 98 in the two quietest runs); counting the frame's own style, layout and paint as well, the laptop reads 43 ms and the phone 128 ms. The phone profile is set through the DevTools Protocol rather than the proxy used earlier; Back makes no request, so that doesn't enter the number. No real handset was timed. Because the phone target was missed, **the `/tasks` budget lines above stay as they are** and the choice goes back to Connor: 50 rows (a 52-row filtered view took 25 ms laptop and 70 ms phone, at 345 KB and 1,832 elements, so the elements fit and the HTML is still over), or a visibly slimmer row (a layout change, which comes back with options at 1280, 768 and 375). Until he picks, `/tasks` stays at 100 rows with Show more.
-| Server work for a page | 6 queries in a row, 100 ms in the production model | 11 to 19 in a row; 183 (`/tasks`), 199 (`/p/jobs/[id]`) | `/tasks`, task, property and job pages |
-| Server work for a small edit | 10 SQL, no full-page re-render | 31 SQL and a full re-render | Every inline edit |
 
 Fix 1 alone doesn't move these numbers; it changes when the person sees something. Fixes 2 to 9 bring each route under its budget.
 

@@ -8,7 +8,7 @@ It builds on its own branch after the Nov 3 landing (land-nov3) is live, and bef
 
 ## 1. Summary
 
-**Why.** Nothing tells anyone when the app breaks. The four "Something went wrong" screens (`src/app/(app)/error.tsx`, `src/app/(marketing)/error.tsx`, `src/app/login/error.tsx`, `src/app/(portal)/p/welcome/error.tsx`) are seen only by the person who hit them. Server errors are logged as one JSON line each (`src/lib/log.ts`), so they show up in Vercel's Logs tab and nowhere else. `/api/health` reports the database, but nothing checks it. Once Asana is gone and contractors are on the portal, a broken page or a stuck email queue can go unnoticed for days.
+**Why.** Nothing tells anyone when the app breaks. The five "Something went wrong" screens (`src/app/(app)/error.tsx`, `src/app/(portal)/p/error.tsx`, `src/app/(marketing)/error.tsx`, `src/app/login/error.tsx`, `src/app/(portal)/p/welcome/error.tsx`) are seen only by the person who hit them. Server errors are logged as one JSON line each (`src/lib/log.ts`), so they show up in Vercel's Logs tab and nowhere else. `/api/health` reports the database, but nothing checks it. Once Asana is gone and contractors are on the portal, a broken page or a stuck email queue can go unnoticed for days.
 
 **What changes.**
 
@@ -44,7 +44,7 @@ It builds on its own branch after the Nov 3 landing (land-nov3) is live, and bef
 - `src/lib/server-action.ts` `withResult` and `withLog`: every server action passes through one of these except five files: `src/app/login/actions.ts`, `src/app/(portal)/p/actions.ts` and the three `filter-actions.ts`. That's harmless, because what those throw reaches `onRequestError`.
 - `src/lib/action-result.ts` `userMessage`: it already decides what's expected (ConflictError, FieldError, zod, a plain sentence) and what isn't (it returns `GENERIC_ERROR`). Q7's rule reuses that decision instead of inventing a second one.
 - `src/app/api/health/route.ts` and `src/lib/secrets.ts` `healthDetailAllowed`: the site-down check reads the public `{ ok, db }` answer, so it needs no token.
-- `NotificationOutbox` (`sendAfter`, `sentAt`, `attempts`, `lastError`) and `QboSyncRun` (`status`, `finishedAt`): the stuck-email and missed-sync checks read these. No schema change.
+- `NotificationOutbox` (`sendAfter`, `firstAt`, `sentAt`, `attempts`, `lastError`) and `QboSyncRun` (`status`, `finishedAt`): the stuck-email and missed-sync checks read these. No schema change.
 - `src/lib/env.ts`: the one place `process.env` is read. The server keys go there. The browser key can't (see Extended), which makes it the second stated exception to README.md "Rules of the road"; `next.config.ts` (lines 21 to 24) is the first.
 - `src/lib/lazy-module.ts` `lazyModule` and `warmWhenIdle` (docs/components.md row 22, landed in 13c8435): they already load a module once the page is idle. Sentry's browser package loads through them.
 

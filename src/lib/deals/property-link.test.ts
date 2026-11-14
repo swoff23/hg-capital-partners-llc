@@ -176,6 +176,21 @@ test("a deal that moved to Closed links to its one property, stamped and logged 
   assert.equal(calls.filter(([m, op]) => m === "deal" && op === "updateMany").length, 1);
 });
 
+test("a link write that changed no row (a lost race) adds no history line", async () => {
+  const { tx, tables } = fakeTx({
+    deal: [dealRow("d1", "58 Mariner Street Buffalo, NY 14201")],
+    property: [propertyRow("p1", "58 Mariner Street, Buffalo, NY 14201")],
+  });
+  (tx as unknown as { deal: { updateMany: () => Promise<{ count: number }> } }).deal.updateMany = async () => ({ count: 0 });
+  assert.equal(await linkClosedDeal(tx, "d1", BY, NOW), null);
+  assert.deepEqual(tables.dealNote, []);
+});
+
+test("a deal already linked to another property is never offered a second link", () => {
+  const d = deal("d1", "767 Prospect Ave Buffalo NY 14213", "p-other");
+  assert.equal(closedDealLink(d, [d], [property("p1", "767 Prospect Avenue, Buffalo, NY 14213")], NONE), "linked");
+});
+
 test("a property just added links to its one Closed deal", async () => {
   const { tx, tables } = fakeTx({
     deal: [dealRow("d1", "1067 Tonawanda St Buffalo, NY 14207 (with Josh, flip)")],

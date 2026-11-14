@@ -68,6 +68,11 @@ test("call 5: Create login and Change login email put every refusal that isn't a
   assert.equal(card.match(/fieldErrors=\{run\.fieldErrors\}\s*error=\{addressRefusal \? undefined : run\.error\}/g)?.length, 2);
   assert.equal(card.match(/\(tried && problem\) \|\| addressRefusal \|\| undefined/g)?.length, 2);
   assert.doesNotMatch(card, /run\.error \? \{ email: run\.error \}/, "no refusal is handed to the Email field by default");
+  // The service's own address refusals stay field errors on `email`.
+  const accounts = read("../lib/portal/accounts.ts");
+  assert.match(accounts, /throw new FieldError\(\{ email: "Enter a valid email\." \}\)/);
+  assert.match(accounts, /throw new FieldError\(\{ email: "Enter a full email, like name@example\.com\." \}\)/);
+  assert.match(accounts, /err\.code === "P2002"\) \{\s*throw new FieldError\(\{ email: "Another contractor already uses that email\." \}\)/);
 });
 
 test("call 3: a job's page, loading screen and error screen draw one header, and the shared error screen is untouched", () => {

@@ -68,6 +68,15 @@ export function duplicateSentence(kind: AddressKind, street: string, archived?: 
   return `${street} is ${archived ? "an archived" : "already a"} ${kind}.`;
 }
 
+/**
+ * Of the records at one address (newest first), the one the save's refusal
+ * names: a live record wins over an archived one, the same order the line
+ * under the field uses.
+ */
+export function liveFirst<T extends { archivedAt: Date | null }>(same: readonly T[]): T | null {
+  return same.find((r) => r.archivedAt === null) ?? same[0] ?? null;
+}
+
 export type AddressAnswer = { suggestions: AddressSuggestion[]; match: AddressMatch | null };
 
 export type AddressDb = Pick<PrismaClient, "property" | "deal">;

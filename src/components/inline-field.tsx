@@ -668,7 +668,7 @@ function TextFact(props: InlineFieldProps) {
       onOpenChange={(o) => {
         if (!o) cancel();
       }}
-      onSubmit={() => commit(save.conflict ? { expected: theirsText() } : undefined)}
+      onSubmit={(_data, form) => commit(save.conflict ? { expected: theirsText() } : undefined, suggest ? { text: typedIn(form) } : {})}
       primary={save.conflict ? "Save mine" : "Save"}
       pending={save.pending}
       values={draft}

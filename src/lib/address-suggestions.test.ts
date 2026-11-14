@@ -5,6 +5,7 @@ import {
   addressFromListingLink,
   answerAddresses,
   duplicateSentence,
+  liveFirst,
   findAddressMatch,
   looksLikeLink,
   parseAddressParams,
@@ -77,6 +78,7 @@ test("a Saint street keeps its name: no comma after St, and the record's short n
   assert.equal(tidyAddress("34 st james pl buffalo ny 14222"), "34 St James Pl, Buffalo, NY 14222");
   assert.equal(tidyAddress("34 ST JAMES PL BUFFALO NY 14222"), "34 St James Pl, Buffalo, NY 14222");
   assert.equal(tidyAddress("34 St James Pl, Buffalo, NY 14222"), "34 St James Pl, Buffalo, NY 14222", "already right stays");
+  assert.deepEqual(splitAddress("12-14 St James Pl Buffalo"), { street: "12-14 St James Pl", place: "Buffalo" });
   assert.equal(tidyAddress("77 St Marks Ave Buffalo NY 14214"), "77 St Marks Ave, Buffalo, NY 14214");
   assert.equal(tidyAddress("77 st marks avenue"), "77 St Marks Ave");
   assert.equal(tidyAddress("210 St Paul St Buffalo, NY 14209"), "210 St Paul St, Buffalo, NY 14209");
@@ -401,6 +403,14 @@ test("duplicateSentence says archived for an archived record, in the line and in
   assert.equal(duplicateSentence("property", "767 Prospect Ave", true), "767 Prospect Ave is an archived property.");
   assert.equal(duplicateSentence("property", "767 Prospect Ave"), "767 Prospect Ave is already a property.");
   assert.equal(duplicateSentence("deal", "118 Congress St", false), "118 Congress St is already a deal.");
+});
+
+test("the save's refusal names a live record before a newer archived one at the same address", () => {
+  const archivedNewer = { id: "archived", archivedAt: new Date() };
+  const live = { id: "live", archivedAt: null };
+  assert.equal(liveFirst([archivedNewer, live])?.id, "live");
+  assert.equal(liveFirst([archivedNewer])?.id, "archived");
+  assert.equal(liveFirst([]), null);
 });
 
 test("an archived record leaves the suggestion rows but still is the match", () => {

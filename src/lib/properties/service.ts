@@ -5,7 +5,7 @@ import { del } from "@vercel/blob";
 import type { Prisma, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
-import { duplicateSentence, splitAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, liveFirst, splitAddress } from "@/lib/address-suggestions";
 import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
 import { amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { cleanListing, type ListingInput } from "@/lib/properties/listing-clean";
@@ -121,7 +121,7 @@ export async function findDuplicateProperty(address: string, opts: { excludeId?:
     where: { address: containsText(lead), ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
     orderBy: { updatedAt: "desc" },
   });
-  return candidates.find((p) => sameStreetAddress(p.address, address)) ?? null;
+  return liveFirst(candidates.filter((p) => sameStreetAddress(p.address, address)));
 }
 
 export interface NewProperty {

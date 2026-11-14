@@ -99,6 +99,12 @@ export function ListingSheet({
   }
 
   function loadLatest() {
+    // The refusal's line can be drawn a beat before the refreshed page arrives. Until it does, the page's version is
+    // still the pinned one, so there is nothing to load yet: keep the line and the draft, and ask for the page.
+    if (!gone && latest === pinned) {
+      router.refresh();
+      return;
+    }
     run.reset();
     if (gone) {
       void discardSessionUploads(propertyId);

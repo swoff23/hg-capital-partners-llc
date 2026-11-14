@@ -53,4 +53,13 @@ test("the listing sheet offers Load the latest after a conflict, pins the page's
   const parent = read("../../app/(app)/properties/[id]/edit-listings.tsx");
   assert.match(parent, /latest=\{version\}/);
   assert.match(parent, /gone=\{/);
+  // What the sheet does with the answer (the lines a changed listing, a gone one and a pin depend on).
+  assert.match(sheet, /const \[pinned, setPinned\] = useState\(version\);/);
+  assert.match(sheet, /if \(gone\) \{\s*void discardSessionUploads\(propertyId\);\s*onOpenChange\(false\);\s*return;\s*\}/);
+  assert.match(sheet, /const next = loadLatestListing\(base, listing, draft\);\s*setBase\(next\.base\);\s*setPinned\(latest\);\s*if \(next\.reset\) \{[\s\S]*?setDraft\(next\.draft\);/);
+  // Tapped before the page behind has refreshed: keep the line and the draft, ask for the page.
+  assert.match(sheet, /if \(!gone && latest === pinned\) \{\s*router\.refresh\(\);\s*return;\s*\}/);
+  assert.match(parent, /gone=\{sheet\.listingId !== null && !editing\}/);
+  assert.match(parent, /initial\.find\(\(l\) => l\.id === sheet\.listingId\)/);
+  assert.match(parent, /setSheet\(\{ listingId: [^\n]*, version, id: /);
 });

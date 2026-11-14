@@ -21,8 +21,9 @@
  * (a 404): only a reload brings the new page. A failure says so
  * (`openFailedToast`, and the error screen's Reload, `isChunkLoadError`).
  *
- * A sheet that is slow to arrive gives no sign until it opens, so its page
- * warms it ahead of the tap: `warmWhenIdle` once the page has settled, and
+ * A sheet that is slow to arrive gives no sign until it opens (except a
+ * property's unit and listing rows, which take `sheetWaitingFill`), so its
+ * page warms it ahead of the tap: `warmWhenIdle` once the page has settled, and
  * `warm` on a trigger's hover, focus and press. And a sheet whose code never
  * arrives is closed with a toast (`openFailedToast`, via `fetchModule`'s
  * `failed`) rather than thrown to the error screen, which would replace the

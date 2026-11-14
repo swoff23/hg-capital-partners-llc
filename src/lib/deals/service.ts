@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import type { Deal } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
-import { duplicateSentence, splitAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, liveFirst, splitAddress } from "@/lib/address-suggestions";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
 import { containsText } from "@/lib/search";
@@ -64,7 +64,7 @@ export async function findDuplicateDeal(address: string, opts: { excludeId?: str
     where: { address: containsText(lead), ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
     orderBy: { updatedAt: "desc" },
   });
-  return candidates.find((d) => sameStreetAddress(d.address, address)) ?? null;
+  return liveFirst(candidates.filter((d) => sameStreetAddress(d.address, address)));
 }
 
 export interface NewDeal {

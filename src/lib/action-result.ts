@@ -121,13 +121,17 @@ export function conflictMessage(conflict: ConflictSubject, now: Date = new Date(
   return who ? `${who} changed this${tail}.` : `This changed${tail}.`;
 }
 
+const YOU_TOAST_CHARS = 28;
+
 /**
  * conflictMessage as a toast, which is one truncated line (toast-line.ts): when the whole line wouldn't show on a
  * phone ("Pieter changed this at 3:07 PM." is one character over) the time goes, so who changed it is never cut.
  */
 export function conflictToastMessage(conflict: ConflictSubject, now: Date = new Date()): string {
   const full = conflictMessage(conflict, now);
-  if (full.length <= TOAST_PHONE_CHARS) return full;
+  // Your own line is held to 28: a 320 phone's toast text is 216px, and "You changed this at 10:09 AM." (29) is 220px.
+  const room = conflict.mine ? YOU_TOAST_CHARS : TOAST_PHONE_CHARS;
+  if (full.length <= room) return full;
   const who = conflictWho(conflict);
   return who ? `${who} changed this.` : "This changed.";
 }

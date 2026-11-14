@@ -36,5 +36,6 @@ test("the test behind it: typed text that differs asks, the stored text retyped 
 test("the hook asks through beforeunload only while it is on, and takes the listener off after", () => {
   const hook = readFileSync(join(__dirname, "..", "components", "use-leave-warning.ts"), "utf8");
   assert.match(hook, /if \(!active\) return;/);
+  assert.match(hook, /e\.preventDefault\(\);\s*e\.returnValue = "";/);
   assert.match(hook, /window\.addEventListener\("beforeunload", warn\);\s*return \(\) => window\.removeEventListener\("beforeunload", warn\);/);
 });

@@ -195,6 +195,12 @@ test("createPortalAccountIn: the other refusals still read as before", async () 
   await assert.rejects(createPortalAccountIn(f.tx, "c-has", "x@example.com", "hash", STAFF), (e) => e instanceof PortalAccountError && /already has a login/.test(e.message));
   await assert.rejects(createPortalAccountIn(f.tx, "c-free", "has@example.com", "hash", STAFF), (e) => e instanceof FieldError && e.fieldErrors.email === "Another contractor already uses that email.");
   await assert.rejects(createPortalAccountIn(f.tx, "nope", "x@example.com", "hash", STAFF), (e) => e instanceof PortalAccountError && /no longer exists/.test(e.message));
+  // A staff address is refused on the Email field here too, the ruling's own example.
+  const staffFound = { ...f.tx, user: { findFirst: async () => ({ id: "u-staff" }) } };
+  await assert.rejects(
+    createPortalAccountIn(staffFound as unknown as typeof f.tx, "c-free", "connor@example.com", "hash", STAFF),
+    (e) => e instanceof FieldError && e.fieldErrors.email === "That email belongs to a staff login.",
+  );
   assert.deepEqual(toFailure(new PortalAccountError("This contractor already has a login.")), { ok: false, error: "This contractor already has a login." });
   assert.deepEqual(toFailure(new FieldError({ email: "That email belongs to a staff login." })), {
     ok: false,

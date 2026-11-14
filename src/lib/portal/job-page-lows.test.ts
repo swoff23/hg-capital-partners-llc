@@ -98,3 +98,14 @@ test("a Retry past the job page's cap toasts the way on, whole on a phone (lows 
   // The server's refusal of an oversize send keeps its rule.
   assert.equal(TOO_MANY_FILES, "Send up to 50 at a time.");
 });
+
+test("the My jobs row hands the queue's whole count to rowUploadLine, which is how refused reaches it", () => {
+  const row = readFileSync(join(__dirname, "..", "..", "app", "(portal)", "p", "_components", "my-jobs.tsx"), "utf8");
+  assert.match(row, /rowUploadLine\(useUploadQueue\(`portal-task:\$\{job\.id\}`\)\)/);
+});
+
+test("at 320 the My jobs row's upload line leaves the date whole: the separator and the place go under 360", () => {
+  const row = readFileSync(join(__dirname, "..", "..", "app", "(portal)", "p", "_components", "my-jobs.tsx"), "utf8");
+  assert.match(row, /className=\{cn\(uploading && "max-\[360px\]:hidden"\)\}/);
+  assert.match(row, /className=\{cn\("min-w-0 flex-1 truncate", uploading && "max-\[360px\]:hidden"\)\}/);
+});

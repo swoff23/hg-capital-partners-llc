@@ -52,15 +52,23 @@ test("call 14: the last row reads Use and the tidied address, and a pick writes 
 test("call 21: the line and every refusal use the one archived sentence", () => {
   assert.match(combobox, /duplicateSentence\(match\.kind, match\.street, match\.archived\)/);
   assert.doesNotMatch(combobox, /Restore/);
+  // Each refusal passes the archived flag; none can go back to "already a".
+  assert.match(read("../lib/deals/service.ts"), /duplicateSentence\("deal", splitAddress\(duplicateOf\.address\)\.street, duplicateOf\.archivedAt !== null\)/);
+  assert.match(read("../lib/properties/service.ts"), /duplicateSentence\("property", splitAddress\(duplicateOf\.address\)\.street, duplicateOf\.archivedAt !== null\)/);
+  assert.match(read("../app/(app)/deals/new/actions.ts"), /duplicateSentence\("deal", street, r\.duplicateOf\.archivedAt !== null\)/);
+  const newProperty = read("../app/(app)/properties/new/actions.ts");
+  assert.match(newProperty, /throw taken\(match\.street, match\.archived\)/);
+  assert.match(newProperty, /taken\(splitAddress\(r\.duplicateOf\.address\)\.street, r\.duplicateOf\.archivedAt !== null\)/);
+  for (const path of ["../lib/deals/service.ts", "../lib/properties/service.ts"]) {
+    assert.match(read(path), /liveFirst\(candidates\.filter\(/, path);
+  }
   for (const path of [
     "../lib/deals/service.ts",
     "../lib/properties/service.ts",
     "../app/(app)/deals/new/actions.ts",
     "../app/(app)/properties/new/actions.ts",
   ]) {
-    const src = read(path);
-    assert.match(src, /duplicateSentence\(/, path);
-    assert.doesNotMatch(src, /is already a (deal|property)\.`/, path);
+    assert.doesNotMatch(read(path), /is already a (deal|property)\.`/, path);
   }
 });
 

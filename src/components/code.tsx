@@ -69,7 +69,7 @@ export function Code({
       >
         {/* Never truncated: a code is read character by character, so the cell gives it room. A wrapping
             code breaks at its spaces, and inside a token only when that token alone is wider than the column. */}
-        <span className={cn(wrap && "min-w-0 break-words")}>{text}</span>
+        <span className={cn(wrap && "min-w-0 [overflow-wrap:anywhere]")}>{text}</span>
         {copyIcon && (
           <Copy
             aria-hidden="true"

@@ -212,13 +212,17 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
           {target && (
             <span className="min-w-0 truncate">
               <DueDate target={target} isVisit={job.targetIsVisit} today={today} shortBelow480 />
-              {where && <span aria-hidden="true"> ·</span>}
+              {where && (
+                <span aria-hidden="true" className={cn(uploading && "max-[360px]:hidden")}>
+                  {" "}·
+                </span>
+              )}
             </span>
           )}
           {/* The place fills what's left from a zero basis, so the date only shrinks once the
               place is gone. A shrink-999 place still left the date a fraction of a pixel short
               of its text, and that was enough to fire its ellipsis ("Due Toda…"). */}
-          {where && <span className="min-w-0 flex-1 truncate">{where}</span>}
+          {where && <span className={cn("min-w-0 flex-1 truncate", uploading && "max-[360px]:hidden")}>{where}</span>}
         </span>
       </span>
       <StatusBadge status={job.status} className="w-28 shrink-0 max-[479px]:hidden" />

@@ -129,9 +129,9 @@ export function uploadFailureReason(e: unknown): string {
  * a phone: "2 photos didn't upload: no connection". Nouns as addedText words
  * them (a mix is "files"); the names are on each tile. Empty when none did.
  * `reason: false` is the count alone, "2 photos didn't upload", for a line
- * that carries its own Retry (the contractor's Mark done). `where` names the
- * target, for a line shown on another page: "1 photo didn't upload to 56
- * Tamarack St".
+ * that carries its own Retry (the contractor's Mark done). `where` appends
+ * " to <place>"; the away toast no longer uses it, since the place trails as
+ * the toast's own detail (`redTilesLine`).
  */
 export function uploadNotice(
   failures: UploadFailure[],
@@ -171,8 +171,7 @@ const isRed = (u: ShownTile) => u.status === "failed" || u.status === "invalid";
  * (a job still in Review past its window, TOO_LATE), which is true either
  * way. No Retry goes with it. Empty when nothing is red, or any red tile is
  * something else (a Retry, or a file the check refused), which keeps today's
- * line. `where` names the target as uploadNotice does ("Too late to add 2
- * photos to 56 Tamarack St").
+ * line. `where` is the optional " to <place>" tail, as uploadNotice's.
  */
 export function closedJobLine(uploads: readonly ShownTile[], where = ""): string {
   const red = uploads.filter(isRed);

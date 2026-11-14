@@ -241,7 +241,7 @@ function SingleCombobox({
         <PopoverSurface
           surface={surface}
           motion="none"
-          className="min-w-(--trigger-width) max-w-80"
+          className="min-w-(--trigger-width) max-w-[min(20rem,calc(100vw_-_2rem))]"
         >
           <ListBox
             aria-label={label ?? ariaLabel ?? "Suggestions"}
@@ -379,7 +379,7 @@ function MultiCombobox({
             <ChevronDown aria-hidden="true" className="size-3.5" />
           </AriaButton>
         </div>
-        <PopoverSurface surface={surface} motion="none" className="min-w-(--trigger-width) max-w-80">
+        <PopoverSurface surface={surface} motion="none" className="min-w-(--trigger-width) max-w-[min(20rem,calc(100vw_-_2rem))]">
           <ListBox
             aria-label={label ?? ariaLabel ?? "Suggestions"}
             shouldFocusOnHover

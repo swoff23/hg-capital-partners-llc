@@ -348,7 +348,7 @@ test("conflictToastMessage: the whole line when it shows on a phone, otherwise w
   assert.match(conflictToastMessage({ by: "Zack Outlaw", at }, NOW), /^Zack changed this at 2:14\sPM\.$/);
   assert.equal(conflictToastMessage({ by: "Pieter Louw", at }, NOW), "Pieter changed this.");
   assert.equal(conflictToastMessage({ by: "Pieter Louw", at: "2026-10-24T18:14:00Z" }, NOW), "Pieter changed this on Oct 24.");
-  // Nobody named (your own other tab): "This changed at 2:14 PM." fits; "...since you opened it." does not.
+  // Nobody named (the row records no editor): "This changed at 2:14 PM." fits; "...since you opened it." does not.
   assert.match(conflictToastMessage({ at }, NOW), /^This changed at 2:14\sPM\.$/);
   assert.equal(conflictToastMessage({ at: "not a date" }, NOW), "This changed.");
   // A longer name still shows whole, since the time is what goes.
@@ -421,16 +421,17 @@ test("your own newer change says You: the conflict line, the field line, the sho
   assert.match(conflictValueLine({ at: "2026-10-26T18:14:00Z", mine: true }, "$410,000", NOW), /^You set this to \$410,000 at 2:14\sPM$/);
   assert.match(conflictValueLine({ at: "2026-10-26T18:14:00Z", mine: true }, "", NOW), /^You cleared this at 2:14\sPM$/);
   assert.equal(conflictKeepLabel({ mine: true }), "Keep current");
+  assert.equal(conflictKeepLabel({ by: "Connor Swofford", mine: true }), "Keep current");
   // With no time to give, the short line.
   assert.equal(conflictMessage({ at: "not a date", mine: true }, NOW), "You changed this.");
   assert.equal(conflictValueLine({ at: "not a date", mine: true }, "7.25%", NOW), "You set this to 7.25%");
 });
 
-test("the You line shows whole in a phone toast, and loses only the time when a far date makes it too long", () => {
-  // "You changed this at 10:09 AM." is 29 characters, the longest a time makes it.
-  const long = conflictToastMessage({ at: "2026-10-26T14:09:00Z", mine: true }, NOW);
-  assert.match(long, /^You changed this at 10:09\sAM\.$/);
-  assert.ok(long.length <= TOAST_PHONE_CHARS);
+test("the You line shows whole in a phone toast, and loses only the time when it is too long for 320", () => {
+  // A one-digit hour is 28 characters and fits the 216px a 320 phone gives a toast; "You changed this at 10:09 AM."
+  // is 29 and measured 220px, so a two-digit hour drops the time.
+  assert.match(conflictToastMessage({ at: "2026-10-26T13:09:00Z", mine: true }, NOW), /^You changed this at 9:09\sAM\.$/);
+  assert.equal(conflictToastMessage({ at: "2026-10-26T14:09:00Z", mine: true }, NOW), "You changed this.");
   assert.equal(conflictToastMessage({ at: "2026-10-24T18:14:00Z", mine: true }, NOW), "You changed this on Oct 24.");
   // "You changed this on Oct 24, 2025." is 33: the date goes, never the You.
   assert.equal(conflictToastMessage({ at: "2025-10-24T18:14:00Z", mine: true }, NOW), "You changed this.");

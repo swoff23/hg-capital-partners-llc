@@ -44,6 +44,7 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - [ ] To give old deal notes their author, Claude needs a way to write to the production database (the same `.env.prod-write` the Asana import needs). Until then, old notes keep the author in their text, as today.
 - [ ] Contractor invoices: confirm or correct the 11 defaults in [docs/contractor-invoices-plan.md](contractor-invoices-plan.md), then say "build it" after the cutover. Its section 9 lists the API key and DNS steps that come before the inbox.
 
+- [ ] Database certificate check (date to be set). Its own change: prove Supabase's certificate from a laptop with a read-only connection, then ship it behind one environment variable. A wrong setting fails every query, so the way back is a redeploy or a rollback. See fix 3 in [docs/specs/performance.md](specs/performance.md).
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
 - [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
 - [ ] In Vercel, turn on Skew Protection (Project Settings, Advanced). Now that you're on Pro, it keeps a page that was open during a deploy talking to the version it loaded, instead of failing its next save.
@@ -53,6 +54,10 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - On a 320px phone, the New task form's Repeats chip cuts off ("Every 2 week…"). Give Repeats its own row?
 - A yearly repeat's Done toast ("Done. Next due Oct 22, 2027") cuts off on a 320px phone.
 - Undoing a tick on a Canceled repeating task leaves the new copy open.
+
+## When QuickBooks is connected
+
+- **Build the Financials card's loading frame before you press Connect, and check it against the local database (already connected).** It switches itself on with the four QuickBooks keys, so nothing ships on the day. From the click every property page shifts by the card's height until the frame exists, and the loading screen leaves the card out today (`src/app/(app)/properties/[id]/loading.tsx`). Check a property with no QuickBooks class mapped too: it shows a one-line section.
 
 ## Done
 
@@ -67,7 +72,3 @@ Invites are on hold until you say go. The portal is on, but only your test contr
   - the Messages tab has nothing to keep;
   - Brandon gets added and Kenneth confirmed;
   - your recommendations are accepted and built, and the Active badge is gray.
-
-## When QuickBooks is connected
-
-- **Build and check the Financials card's loading frame the same day you press Connect.** Every property page shifts by the card's height from that moment, and the loading screen leaves the card out today (`src/app/(app)/properties/[id]/loading.tsx`). The frame can switch itself on with the four QuickBooks keys. A property with no QuickBooks class mapped shows a one-line section, so check one of those too.

@@ -22,6 +22,17 @@ test("Building CapEx below 360 drops the Status column and shows each row's stat
   assert.match(src, /const phoneHidden = "max-\[480px\]:hidden";/);
 });
 
+test("Entity's save path: a pick, Enter or leaving saves what was typed, a conflict is never saved over on blur, and the sheet's own submit reads the typed text", () => {
+  const field = read("../../components/inline-field.tsx");
+  assert.match(field, /decideInlineEdit\(kind, opts\.text \?\? draft, value, \{ minLength, tooShort, allowText \}\)/);
+  assert.match(field, /if \(!closing\.current\) saveWith\(typedIn\(root\.current\)\);/);
+  assert.match(field, /function settleOnLeave\(from: HTMLElement\) \{[\s\S]*?if \(save\.conflict\) return;\s*saveWith\(typedIn\(from\)\);/);
+  // The touch sheet, with a hardware keyboard: Cmd or Ctrl+Enter submits the form, so it must read the field's own text.
+  assert.match(field, /onSubmit=\{\(_data, form\) => commit\(save\.conflict \? \{ expected: theirsText\(\) \} : undefined, suggest \? \{ text: typedIn\(form\) \} : \{\}\)\}/);
+  // A refused save reopens with the typed text, not the stored value.
+  assert.match(read("../../components/combobox.tsx"), /useState\(initialText \?\? value\)/);
+});
+
 test("a building system's save says it was saved and offers no Undo", () => {
   const src = read(`${PAGE}building-capex.tsx`);
   assert.match(src, /done: `\$\{item\.label\} saved`/);
@@ -58,7 +69,7 @@ test("a tapped unit or listing row takes the fill while its sheet's code downloa
     // The store's answer, not the hook's: the hook only notices code that came in while idle one render after the tap.
     assert.match(src, new RegExp(`sheet !== null && !editor && ${sheet}\\.loaded\\(\\) === null \\? sheet : null`), `${file} reads the store`);
     assert.match(src, /sheetWaitingFill/, `${file} uses the shared fill`);
-    assert.match(src, /waiting=\{/, `${file} marks the Add row too`);
+    assert.match(src, /<AddRow[^\n]*waiting=\{waitingFor !== null && waitingFor\.(at|listingId) === null\}/, `${file} marks the Add row too`);
   }
   const ui = read("../../components/ui.tsx");
   assert.match(ui, /export const sheetWaitingFill = "bg-fill-1";/);
@@ -78,4 +89,11 @@ test("the move-in switch reads Shown and Hidden and keeps its label; Escrow keep
   assert.doesNotMatch(escrow, /words=/);
   const field = read("../../components/inline-field.tsx");
   assert.match(field, /label=\{on \? \(props\.words\?\.on \?\? "Yes"\) : \(props\.words\?\.off \?\? "No"\)\}/);
+});
+
+test("the Entity list and a long Acct # stay inside a 320 screen", () => {
+  const combobox = read("../../components/combobox.tsx");
+  assert.equal(combobox.match(/max-w-\[min\(20rem,calc\(100vw_-_2rem\)\)\]/g)?.length, 2);
+  assert.doesNotMatch(combobox, /max-w-80/);
+  assert.match(read("../../components/code.tsx"), /min-w-0 \[overflow-wrap:anywhere\]/);
 });

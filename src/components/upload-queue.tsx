@@ -70,7 +70,8 @@ export type UploadTarget = {
   maxFilesReason?: string;
   /**
    * The toast when a Retry finds no room past `maxFiles`, one line at 320 (TOAST_PHONE_CHARS): a contractor's update
-   * says "Send up to 50 at a time.". Without it the toast is the reason as a sentence ("No more can be added here.").
+   * says "Send these 50, then Retry." ("Close this and Send first." while the Mark done sheet
+   * is open). Without it the toast is the reason as a sentence ("No more can be added here.").
    */
   maxFilesNotice?: string;
   /** "display" re-encodes a photo to a 2560px JPEG with no metadata before it goes up; "original" sends it as picked. */
