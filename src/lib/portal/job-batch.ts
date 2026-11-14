@@ -178,7 +178,7 @@ async function postActive(tx: core.Tx, taskId: string, p: Contractor, own: strin
  * so its own update rolls back, and postJobBatch answers it quietly.
  */
 export async function postBatchIn(tx: core.Tx, taskId: string, p: Contractor, attachmentIds: string[]): Promise<BatchPosted> {
-  await core.assertContractorAccess(tx, taskId, p.contactId);
+  await core.assertContractorAccess(tx, taskId, p);
   const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
   const own = (await ownUnposted(tx, taskId, p.contactId, attachmentIds)).map((f) => f.id);
   if (own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, attachmentIds))) return { event: null, linked: [] };

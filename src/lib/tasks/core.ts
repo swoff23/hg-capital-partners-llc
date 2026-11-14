@@ -43,7 +43,8 @@ export type Tx = Prisma.TransactionClient;
 /** Who is acting. Labels are what the timeline and emails show. */
 export type Principal =
   | { kind: "staff"; userId: string; label: string }
-  | { kind: "contractor"; contactId: string; label: string }
+  // onlyTaskId: a session an email's job link started reaches that one job (docs/specs/contractor-job-emails.md, 3).
+  | { kind: "contractor"; contactId: string; label: string; onlyTaskId?: string | null }
   | { kind: "system"; label: string }
   | { kind: "asana"; label: string };
 
@@ -169,12 +170,18 @@ export function addEvent(tx: Tx, taskId: string, p: Principal, e: EventInput): P
 // Access
 // ---------------------------------------------------------------------------
 
+/** Who a contractor access check is for: the contact, and the one job a link session is held to, if it is. */
+export type ContractorWho = { contactId: string; onlyTaskId?: string | null };
+
 /**
  * A contractor may act on a task only through an unrevoked access row, with
  * an active contact and an active portal login. (The portal layer separately
- * checks the session itself.)
+ * checks the session itself.) A session an email's job link started reaches
+ * only its own job, whatever else the contact has.
  */
-export async function assertContractorAccess(tx: Tx, taskId: string, contactId: string): Promise<void> {
+export async function assertContractorAccess(tx: Tx, taskId: string, who: ContractorWho): Promise<void> {
+  if (who.onlyTaskId && who.onlyTaskId !== taskId) throw new TaskRuleError("You don't have access to this job.");
+  const contactId = who.contactId;
   const access = await tx.taskAccess.findUnique({
     where: { taskId_contactId: { taskId, contactId } },
     select: { revokedAt: true, contact: { select: { active: true, portalAccount: { select: { status: true } } } } },
@@ -618,7 +625,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
   if (opts.expected && before.status !== opts.expected) throw await taskChanged(tx, taskId, before.status, p);
   if (!canSetStatus(kindOf(p), before.status, to)) {
     // A contractor's refusal says where the job is now: their tab is usually stale (approved, or done in another tab).
@@ -1353,7 +1360,7 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
   if (input.clientId) {
     // After the access check, so a contractor who lost the job never gets an earlier post back. Before the
     // closed-job check, so a Retry of an update that did post before the job closed gets that post back instead
@@ -1421,7 +1428,7 @@ export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentI
   await lockTask(tx, taskId);
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  await assertContractorAccess(tx, taskId, p.contactId);
+  await assertContractorAccess(tx, taskId, p);
   if (isActiveStatus(task.status)) throw new TaskRuleError(JOB_OPEN_AGAIN);
   const visibility: Visibility = "SHARED";
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
@@ -1481,7 +1488,7 @@ async function ownComment(tx: Tx, eventId: string, p: Principal, { deleted }: { 
   if (!ev || ev.kind !== "COMMENT") throw new TaskRuleError("That comment no longer exists.");
   if (!isCommentAuthor(ev, p)) throw new TaskRuleError("You can only change your own comments.");
   if (deleted === false && ev.deletedAt) throw new TaskRuleError("That comment was deleted.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, ev.taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, ev.taskId, p);
   return ev;
 }
 
@@ -1660,7 +1667,7 @@ export async function takeBackContractorPost(
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  await assertContractorAccess(tx, taskId, p.contactId);
+  await assertContractorAccess(tx, taskId, p);
   if (!isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
   const event = await tx.taskEvent.findFirst({
     where: {
@@ -1742,7 +1749,7 @@ export async function recordAttachment(
   await lockTask(tx, taskId);
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (opts.visibility ?? "INTERNAL");
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
   const att = await tx.taskAttachment.create({
@@ -1880,7 +1887,7 @@ export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p:
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { id: true, status: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   if (p.kind === "contractor") {
-    await assertContractorAccess(tx, item.taskId, p.contactId);
+    await assertContractorAccess(tx, item.taskId, p);
     if (!isActiveStatus(item.task.status)) throw new TaskRuleError("This job is closed.");
   }
   if (item.done === done) return item;

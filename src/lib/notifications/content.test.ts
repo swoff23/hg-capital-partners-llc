@@ -27,6 +27,7 @@ import {
   type OutboxItem,
 } from "./content";
 
+
 const at = "2026-10-22T15:00:00.000Z";
 const item = (kind: string, summary: string, actorLabel = "Connor Swofford"): OutboxItem => ({ kind, actorLabel, summary, at });
 
@@ -214,6 +215,8 @@ test("the whole email: subject, preview, What's new, the next step's buttons and
     preview: 'Zack: "Uppers in"',
     headline: 'Zack: "Uppers in"',
     lines: [],
+    photos: [],
+    morePhotos: 0,
     primary: { label: "Open task", url: "https://hg.example.com/tasks/t1" },
     secondary: [],
     job: {
@@ -227,6 +230,10 @@ test("the whole email: subject, preview, What's new, the next step's buttons and
       checklist: [],
       contractor: "Zack Smith",
       checklistLine: "1 of 2 done",
+      accessUrl: null,
+      calendarUrl: null,
+      photos: [],
+      morePhotos: 0,
     },
     threadKey: "job-t1-2026-10-30",
   });
@@ -244,6 +251,8 @@ test("the whole email: subject, preview, What's new, the next step's buttons and
   // A partner's copy of a job waiting in Review asks for the decision.
   const review = taskEmail({ ...staffInput(), status: "REVIEW" });
   assert.deepEqual([review.primary.label, ...review.secondary.map((b) => b.label)], ["Approve", "Send back"]);
+  // Approve opens the task (it acts on one tap, so the link never presses it); Send back opens with its sheet up.
+  assert.deepEqual([review.primary.url, review.secondary[0].url], ["https://hg.example.com/tasks/t1?do=approve", "https://hg.example.com/tasks/t1?do=send-back"]);
   assert.equal(openUrl("https://hg.example.com", "contractor", "t1"), "https://hg.example.com/p/jobs/t1");
 });
 
@@ -604,4 +613,50 @@ test("a bundle with a comment and Mark done reads as before: the note, then mark
   assert.deepEqual(email.lines, ['Zack: "All done"']);
   assert.equal(email.preview, 'Zack marked it done. Zack: "All done"');
   assert.deepEqual([email.primary.label, ...email.secondary.map((b) => b.label)], ["Approve", "Send back"]);
+});
+
+test("with a job link, a contractor's buttons open the job as them, each ready for its step (spec 3)", () => {
+  const T = "a".repeat(43);
+  const base = { ...staffInput(), audience: "contractor" as const, linkToken: T, hasAccess: true };
+  const working = taskEmail({ ...base, status: "IN_PROGRESS" });
+  assert.deepEqual(
+    [working.primary, ...working.secondary],
+    [
+      { label: "Mark done", url: `https://hg.example.com/j/${T}?do=done` },
+      { label: "Add photos", url: `https://hg.example.com/j/${T}?do=photos` },
+      { label: "Text to my crew", url: `https://hg.example.com/j/${T}?do=share` },
+    ],
+  );
+  assert.equal(taskEmail({ ...base, status: "OPEN" }).primary.url, `https://hg.example.com/j/${T}`);
+  // See job opens at the first update, through the link.
+  const seen = taskEmail({ ...base, status: "DONE", items: [withEvent(item("STATUS", `approved "${TITLE}"`), "e8")] });
+  assert.equal(seen.primary.url, `https://hg.example.com/j/${T}?u=e8`);
+  // Show access only for a job with a code, Add to calendar only with a date, and neither once it's closed.
+  assert.equal(working.job.accessUrl, `https://hg.example.com/j/${T}?do=access`);
+  assert.equal(working.job.calendarUrl, `https://hg.example.com/j/${T}/calendar`);
+  assert.equal(taskEmail({ ...base, status: "IN_PROGRESS", hasAccess: false }).job.accessUrl, null);
+  assert.equal(taskEmail({ ...base, status: "IN_PROGRESS", due: null }).job.calendarUrl, null);
+  assert.equal(seen.job.accessUrl, null);
+  assert.equal(seen.job.calendarUrl, null);
+  // Without a link nothing changes: the portal's page, no crew text, no access or calendar.
+  const plain = taskEmail({ ...base, linkToken: null, status: "IN_PROGRESS" });
+  assert.deepEqual(plain.secondary.map((b) => b.label), ["Add photos"]);
+  assert.equal(plain.primary.url, "https://hg.example.com/p/jobs/t1");
+  assert.equal(plain.job.accessUrl, null);
+});
+
+test("photos: What's new shows the bundle's, four then +N; the job shows HG's others; both through the email's link", () => {
+  const T = "b".repeat(43);
+  const base = { ...staffInput(), audience: "contractor" as const, linkToken: T, status: "IN_PROGRESS" as const };
+  const email = taskEmail({ ...base, newPhotoIds: ["p1", "p2", "p3", "p4", "p5", "p6"], jobPhotoIds: ["h1"] });
+  assert.deepEqual(email.photos.map((p) => p.src), ["p1", "p2", "p3", "p4"].map((id) => `https://hg.example.com/api/files/task/${id}?v=thumb&l=${T}`));
+  assert.equal(email.morePhotos, 2);
+  assert.ok(email.photos.every((p) => p.href === `https://hg.example.com/j/${T}`));
+  assert.deepEqual(email.job.photos.map((p) => p.src), [`https://hg.example.com/api/files/task/h1?v=thumb&l=${T}`]);
+  // A partner's copy shows the bundle's photos, opening the task, and never the job's others.
+  const staff = taskEmail({ ...staffInput(), linkToken: T, newPhotoIds: ["p1"], jobPhotoIds: ["h1"] });
+  assert.deepEqual(staff.photos, [{ src: `https://hg.example.com/api/files/task/p1?v=thumb&l=${T}`, href: "https://hg.example.com/tasks/t1" }]);
+  assert.deepEqual(staff.job.photos, []);
+  // No link, no photos: a mail app can't open them without one.
+  assert.deepEqual(taskEmail({ ...base, linkToken: null, newPhotoIds: ["p1"] }).photos, []);
 });

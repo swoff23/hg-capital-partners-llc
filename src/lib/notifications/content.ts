@@ -3,6 +3,7 @@ import { HG_TIME_ZONE, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
+import { jobLinkUrl, type JobLinkStep } from "@/lib/portal/job-link-paths";
 import { addressLine, firstName, joinNames, nextStep } from "@/lib/portal/job-view";
 
 /**
@@ -386,6 +387,12 @@ export interface EmailButton {
   url: string;
 }
 
+/** A thumbnail in an email and where tapping it goes. */
+export interface EmailPhoto {
+  src: string;
+  href: string;
+}
+
 /** The job, under What's new and the buttons. */
 export interface JobFacts {
   title: string;
@@ -404,6 +411,13 @@ export interface JobFacts {
   contractor: string | null;
   /** Staff only: "2 of 3 done". */
   checklistLine: string | null;
+  /** Contractor only, with a job link: "Show access", which opens the job at its Lockbox. Null when it has no code. */
+  accessUrl: string | null;
+  /** Contractor only, with a job link and a date: the .ics for Add to calendar. */
+  calendarUrl: string | null;
+  /** Contractor only: HG's photos on the job, beyond the ones What's new shows. */
+  photos: EmailPhoto[];
+  morePhotos: number;
 }
 
 export interface TaskEmail {
@@ -413,6 +427,9 @@ export interface TaskEmail {
   /** What's new: the headline, then the other lines. */
   headline: string;
   lines: string[];
+  /** What's new's photos: the bundle's own, up to four, then "+N". */
+  photos: EmailPhoto[];
+  morePhotos: number;
   /** A contractor's approval thanks them: "Thanks, Zack." */
   closing?: string;
   primary: EmailButton;
@@ -443,26 +460,62 @@ export function replyLine(staffNames: readonly string[]): string {
 }
 
 /**
- * The buttons (spec 2.2, 8): the job's next step first. A contractor's are
- * Start job, Mark done or See job, with Add photos beside the first two while
- * the job takes them; a partner's are Approve and Send back while it waits in
- * Review, otherwise Open task. See job and Open task open at the first update
- * in the bundle (rows queued before items named one open the job).
+ * The buttons (spec 2.2, 3, 8): the job's next step first. A contractor's are
+ * Start job, Mark done or See job, with Add photos and Text to my crew beside
+ * the first two while the job takes them; a partner's are Approve and Send
+ * back while it waits in Review, otherwise Open task. See job and Open task
+ * open at the first update in the bundle (rows queued before items named one
+ * open the job).
+ *
+ * With a job link (`linkToken`, job-links.ts) a contractor's buttons open the
+ * job as them with no password, each ready for its step; without one they
+ * open the portal's job page, behind sign-in. A partner's open the task page,
+ * Approve and Send back with that step ready.
  */
-function buttons(input: { audience: Audience; status: TaskStatus; approved: boolean; appUrl: string; taskId: string; items: OutboxItem[] }): {
-  primary: EmailButton;
-  secondary: EmailButton[];
-} {
-  const page = openUrl(input.appUrl, input.audience, input.taskId);
-  const atUpdate = openUrl(input.appUrl, input.audience, input.taskId, firstUpdateId(input.items));
+function buttons(input: {
+  audience: Audience;
+  status: TaskStatus;
+  approved: boolean;
+  appUrl: string;
+  taskId: string;
+  items: OutboxItem[];
+  linkToken: string | null;
+}): { primary: EmailButton; secondary: EmailButton[] } {
+  const updateId = firstUpdateId(input.items);
   if (input.audience === "staff") {
-    if (input.status === "REVIEW") return { primary: { label: "Approve", url: page }, secondary: [{ label: "Send back", url: page }] };
-    return { primary: { label: "Open task", url: atUpdate }, secondary: [] };
+    const task = openUrl(input.appUrl, "staff", input.taskId);
+    if (input.status === "REVIEW") {
+      return { primary: { label: "Approve", url: `${task}?do=approve` }, secondary: [{ label: "Send back", url: `${task}?do=send-back` }] };
+    }
+    return { primary: { label: "Open task", url: openUrl(input.appUrl, "staff", input.taskId, updateId) }, secondary: [] };
   }
+  const token = input.linkToken;
+  const to = (step: JobLinkStep | null, update: string | null = null) =>
+    token ? jobLinkUrl(input.appUrl, token, step, update) : openUrl(input.appUrl, "contractor", input.taskId, update);
+  const extras: EmailButton[] = [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Text to my crew", url: to("share") }] : [])];
   const step = input.approved ? null : nextStep(input.status);
-  if (step === "start") return { primary: { label: "Start job", url: page }, secondary: [{ label: "Add photos", url: page }] };
-  if (step === "done") return { primary: { label: "Mark done", url: page }, secondary: [{ label: "Add photos", url: page }] };
-  return { primary: { label: "See job", url: atUpdate }, secondary: [] };
+  if (step === "start") return { primary: { label: "Start job", url: to(null) }, secondary: extras };
+  if (step === "done") return { primary: { label: "Mark done", url: to("done") }, secondary: extras };
+  return { primary: { label: "See job", url: to(null, updateId) }, secondary: [] };
+}
+
+/** The most thumbnails a strip shows before "+3". */
+export const EMAIL_PHOTO_MAX = 4;
+
+/**
+ * A photo's thumbnail in an email, through the private file route with the
+ * email's link as the key (`?l=`), since a mail app fetches it with no
+ * cookie: the route checks the link still reaches that job and file.
+ */
+export function emailPhotoUrl(appUrl: string, attachmentId: string, linkToken: string): string {
+  return `${appUrl.replace(/\/+$/, "")}/api/files/task/${encodeURIComponent(attachmentId)}?v=thumb&l=${linkToken}`;
+}
+
+/** Up to EMAIL_PHOTO_MAX thumbnails, each opening `href`, and how many more there are. */
+function photoStrip(ids: readonly string[], appUrl: string, linkToken: string | null, href: string): { photos: EmailPhoto[]; morePhotos: number } {
+  if (!linkToken || ids.length === 0) return { photos: [], morePhotos: 0 };
+  const shown = ids.slice(0, EMAIL_PHOTO_MAX);
+  return { photos: shown.map((id) => ({ src: emailPhotoUrl(appUrl, id, linkToken), href })), morePhotos: ids.length - shown.length };
 }
 
 /** "2 of 3 done", or null with no checklist. */
@@ -508,6 +561,14 @@ export function taskEmail(input: {
   recipientName?: string | null;
   /** First names of the partners, for a contractor's reply line. */
   staffNames?: readonly string[];
+  /** The email's own link (job-links.ts): a contractor's EMAIL link, a partner's STAFF link. Null sends plain links. */
+  linkToken?: string | null;
+  /** Contractor: the job has a lockbox code to show (never the code itself). */
+  hasAccess?: boolean;
+  /** The photos the bundle's updates carry, oldest first, as attachment ids the recipient may see. */
+  newPhotoIds?: readonly string[];
+  /** Contractor: HG's other photos on the job, newest first. */
+  jobPhotoIds?: readonly string[];
 }): TaskEmail {
   const street = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
   const where = addressLine(street || null, input.unitLabel ? oneLine(input.unitLabel) : null);
@@ -518,13 +579,21 @@ export function taskEmail(input: {
   const { headline, lines } = whatsNew(input.items, input.title);
   const checklist = input.checklist ?? [];
   const notes = input.notes?.trim() ? keepBreaks(input.notes) : null;
+  const token = input.linkToken ?? null;
+  const btns = buttons({ audience: input.audience, status: input.status, approved, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
+  // Tapping a photo opens the job: the contractor's through their link, a partner's on the task page.
+  const photoHref = contractor ? (token ? jobLinkUrl(input.appUrl, token, null, firstUpdateId(input.items)) : btns.primary.url) : openUrl(input.appUrl, "staff", input.taskId, firstUpdateId(input.items));
+  const fresh = photoStrip(input.newPhotoIds ?? [], input.appUrl, token, photoHref);
+  const older = contractor ? photoStrip(input.jobPhotoIds ?? [], input.appUrl, token, photoHref) : { photos: [], morePhotos: 0 };
   return {
     subject: jobSubject({ title: input.title, where, due }),
     preview: previewText(headline, lines),
     headline,
     lines,
+    photos: fresh.photos,
+    morePhotos: fresh.morePhotos,
     ...(approved ? { closing: thanksTo ? `Thanks, ${thanksTo}.` : "Thanks." } : {}),
-    ...buttons({ audience: input.audience, status: input.status, approved, appUrl: input.appUrl, taskId: input.taskId, items: input.items }),
+    ...btns,
     job: {
       title: oneLine(input.title),
       where,
@@ -535,6 +604,10 @@ export function taskEmail(input: {
       checklist: contractor ? checklist : [],
       contractor: contractor ? null : input.contractorName ? oneLine(input.contractorName) : null,
       checklistLine: contractor ? null : checklistLine(checklist),
+      accessUrl: contractor && token && input.hasAccess && isActiveStatus(input.status) ? jobLinkUrl(input.appUrl, token, "access") : null,
+      calendarUrl: contractor && token && input.due && isActiveStatus(input.status) ? `${jobLinkUrl(input.appUrl, token)}/calendar` : null,
+      photos: older.photos,
+      morePhotos: older.morePhotos,
     },
     ...(contractor && isActiveStatus(input.status) ? { footnote: replyLine(input.staffNames ?? []) } : {}),
     threadKey: threadKey(input.taskId, input.due ?? null),

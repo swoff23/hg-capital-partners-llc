@@ -19,6 +19,7 @@ import {
   type Db,
   type Staff,
 } from "./accounts-core";
+import { revokeJobLinksFor } from "./job-links";
 import type { PortalPrincipal } from "./session";
 import { generateStartingPassword } from "./tokens";
 
@@ -140,11 +141,13 @@ export async function disablePortalAccount(accountId: string, byUser: Staff): Pr
     await tx.portalAccount.update({ where: { id: accountId }, data: { status: "DISABLED" } });
     const revoked = await revokePortalSessions(tx, accountId, { at: now });
     await expireResetTokens(tx, accountId, now);
+    // The links in their job emails stop too, and stay stopped if access comes back (docs/specs/contractor-job-emails.md, 3).
+    const links = await revokeJobLinksFor(tx, account.contactId, now);
     await logSecurityEvent(tx, {
       kind: "ACCOUNT_DISABLED",
       userId: byUser.id,
       contactId: account.contactId,
-      data: { action: "disabled", sessionsRevoked: revoked },
+      data: { action: "disabled", sessionsRevoked: revoked, jobLinksRevoked: links },
     });
   });
 }
@@ -177,11 +180,13 @@ export async function signOutEverywhere(accountId: string, byUser?: Staff): Prom
   return prisma.$transaction(async (tx) => {
     const account = await accountOrThrow(tx, accountId);
     const revoked = await revokePortalSessions(tx, accountId);
+    // Every device includes the links in their job emails, which would otherwise sign a device in again.
+    const links = await revokeJobLinksFor(tx, account.contactId);
     await logSecurityEvent(tx, {
       kind: "SESSIONS_REVOKED",
       userId: byUser?.id ?? null,
       contactId: account.contactId,
-      data: { count: revoked },
+      data: { count: revoked, jobLinksRevoked: links },
     });
     return revoked;
   });

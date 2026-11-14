@@ -55,7 +55,7 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  * Mark done may still start, or resume, after the job moved to Review.
  */
 
-type Uploader = { kind: "staff"; userId: string } | { kind: "contractor"; contactId: string };
+type Uploader = { kind: "staff"; userId: string } | { kind: "contractor"; contactId: string; onlyTaskId: string | null };
 
 interface Limits {
   maximumSizeInBytes: number;
@@ -111,7 +111,7 @@ const KINDS: Record<string, UploadKind> = {
     authorize: async (taskId, pathname, payload, who) => {
       const limits = taskLimits("portal-task-upload", taskId, pathname, payload);
       if (who.kind !== "contractor") throw new UploadRefusal("Not found");
-      const refusal = await contractorUploadRefusal(taskId, who.contactId, { atMint: true, queuedAt: stringOrNull(payload.queuedAt) });
+      const refusal = await contractorUploadRefusal(taskId, who, { atMint: true, queuedAt: stringOrNull(payload.queuedAt) });
       if (refusal) throw new UploadRefusal(refusal, isFinalRefusal(refusal));
       return limits;
     },
@@ -142,7 +142,7 @@ async function currentUploader(kind: Uploader["kind"]): Promise<Uploader | null>
     return user ? { kind: "staff", userId: user.id } : null;
   }
   const portal = await getPortalPrincipal();
-  return portal ? { kind: "contractor", contactId: portal.contactId } : null;
+  return portal ? { kind: "contractor", contactId: portal.contactId, onlyTaskId: portal.onlyTaskId } : null;
 }
 
 export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]">): Promise<NextResponse> {

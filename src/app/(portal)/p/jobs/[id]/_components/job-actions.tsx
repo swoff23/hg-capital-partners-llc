@@ -148,6 +148,7 @@ export function JobActions({
   markedDoneAt,
   property,
   sentClientIds,
+  openMarkDoneOnLoad = false,
 }: {
   taskId: string;
   /** The signed-in contractor, whose draft the composer keeps. */
@@ -165,6 +166,11 @@ export function JobActions({
   property?: { label: string; photoUrl: string | null } | null;
   /** The contractor's own updates already on the page, by the id each was sent with: a reload mid-send drops one that did post. */
   sentClientIds?: readonly string[];
+  /**
+   * An email's Mark done button (`?do=done`, docs/specs/contractor-job-emails.md 3): the sheet opens once as the page
+   * loads, while Mark done is the job's next step. It only asks; nothing is sent until they tap Mark done in it.
+   */
+  openMarkDoneOnLoad?: boolean;
 }) {
   const { toast } = useToast();
   const owner = useUploadScope();
@@ -189,7 +195,8 @@ export function JobActions({
   const [, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // Open from the start when an email's Mark done opened the page and Mark done is the job's next step.
+  const [sheetOpen, setSheetOpen] = useState(() => openMarkDoneOnLoad && step === "done");
   const [sheetState, setSheetState] = useState<"ask" | "sent">("ask");
   const [note, setNote] = useState("");
   // What HG received, for the payoff's strip.
@@ -498,6 +505,15 @@ export function JobActions({
     setSheetState("ask");
     setSheetOpen(true);
   }
+
+  // An email's Mark done opened the page with the sheet up (sheetOpen's first value). The ?do= comes off the address,
+  // so a reload or Back doesn't open it again.
+  useEffect(() => {
+    if (!openMarkDoneOnLoad) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("do");
+    window.history.replaceState(window.history.state, "", url);
+  }, [openMarkDoneOnLoad]);
 
   // What the Mark done sheet shows, counts and sends: the tray, less the photos a written update may have posted
   // (they wait on the tray for its Send again; the server wouldn't count them).
