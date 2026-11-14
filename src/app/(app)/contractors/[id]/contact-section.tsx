@@ -38,6 +38,29 @@ const saveField = (id: string, field: Field) => (next: string, expected: string)
 /** A small link beside a value that does what the value used to do when it was the link: call, text, write, open Maps. */
 const actionLink = cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3");
 
+/**
+ * The contractor's company, on the line under their name, edited in place
+ * like the name: "Add company" when there's none. It reads as that line
+ * always has (text-meta, --fg-3); the page wraps it in -my-1, so the 32px
+ * button at rest and the 32px field open both sit in the line's 24px and
+ * nothing under them moves.
+ */
+export function ContactCompany({ id, fullName, company }: { id: string; fullName: string; company: string | null }) {
+  return (
+    <InlineField
+      kind="text"
+      label="Company"
+      field="company"
+      context={`Contact · ${fullName}`}
+      value={company ?? ""}
+      empty="Add company"
+      inRail={false}
+      className="text-meta text-fg-3"
+      onSave={saveField(id, "company")}
+    />
+  );
+}
+
 /** The contractor's name, the page's h1, edited in place. */
 export function ContactName({ id, name }: { id: string; name: string }) {
   return (
@@ -105,7 +128,6 @@ export function ContactSection({
   return (
     <Section title="Contact">
       <RailList>
-        <Fact contact={contact} field="company" label="Company" kind="text" empty="Add company" />
         <RailFact label="Trades">
           <InlineTags
             label="Trades"

@@ -22,7 +22,7 @@ import { STATUS_LABEL, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
-import { ContactName, ContactNotes, ContactSection } from "./contact-section";
+import { ContactCompany, ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
 import { setContractorArchived } from "../actions";
 import type { Metadata } from "next";
@@ -134,12 +134,13 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             />
           </div>
         </div>
-        {(c.company || c.tenantFixes) && (
-          <div className="mt-1 flex min-w-0 items-center gap-2">
-            {c.company && <p className="min-w-0 truncate text-meta text-fg-3">{c.company}</p>}
-            {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
+        {/* The company is edited here, not in Contact. At rest it is as wide as its words, so the badge sits beside it; open, it takes the line. */}
+        <div className="mt-1 flex min-w-0 items-center gap-2 text-meta">
+          <div className="-my-1 flex min-w-0 has-[input]:flex-1">
+            <ContactCompany id={c.id} fullName={c.fullName} company={c.company} />
           </div>
-        )}
+          {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
+        </div>
         {c.archivedAt && (
           <ArchivedNotice
             className="mt-4"
