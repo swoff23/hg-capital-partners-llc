@@ -1,12 +1,13 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { addDaysYmd } from "@/lib/quick-dates";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { easternDayStart, type Ymd } from "@/lib/dates";
+import { DAILY_EMAIL_CAP } from "@/lib/notifications/content";
+import { sentSince } from "@/lib/notifications/sent-count";
 import { mergeLegacyNames, type PersonRef } from "./assignee-people";
 import { assigneeOptions } from "./assignee-options";
-import { EMAIL_DAILY_CAP, toListTask, withLegacyPeople, type ListTask } from "./list";
+import { toListTask, withLegacyPeople, type ListTask } from "./list";
 import { unreadTaskIds } from "./read-state";
 import {
   NONE,
@@ -166,14 +167,13 @@ export async function legacyAssignees(
 }
 
 /**
- * True once 100 or more notification emails went out today, Buffalo time
- * (D30): Today shows staff a banner, since the rest wait for tomorrow.
+ * True once today's emails, Buffalo time, reached the daily cap (D30): Home
+ * shows staff a banner, since the rest wait for tomorrow. Counted by the send
+ * run's own rule (notifications/sent-count.ts sentSince), so a row closed
+ * unsent never counts and a password reset that went does.
  */
 export async function emailCapReached(today: Ymd): Promise<boolean> {
-  const sent = await prisma.notificationOutbox.count({
-    where: { sentAt: { gte: easternDayStart(today), lt: easternDayStart(addDaysYmd(today, 1)!) } },
-  });
-  return sent >= EMAIL_DAILY_CAP;
+  return (await sentSince(prisma, easternDayStart(today))) >= DAILY_EMAIL_CAP;
 }
 
 /**

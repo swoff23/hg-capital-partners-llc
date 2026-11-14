@@ -966,8 +966,8 @@ async function takeBackRepeat(tx: Tx, doneId: string): Promise<boolean> {
   if (locked.length === 0) return false;
   // And its email rows, in id order as every outbox lock here, so a send run can't take one between this read and
   // the delete.
-  const emails = await tx.$queryRaw<{ sentAt: Date | null; attempts: number }[]>`
-    SELECT "sentAt", "attempts" FROM "NotificationOutbox" WHERE "taskId" = ${made.nextId} ORDER BY "id" FOR UPDATE`;
+  const emails = await tx.$queryRaw<{ sentAt: Date | null; lastError: string | null; attempts: number }[]>`
+    SELECT "sentAt", "lastError", "attempts" FROM "NotificationOutbox" WHERE "taskId" = ${made.nextId} ORDER BY "id" FOR UPDATE`;
   const copy = await tx.task.findUnique({
     where: { id: made.nextId },
     select: {

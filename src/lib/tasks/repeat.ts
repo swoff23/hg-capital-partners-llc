@@ -1,5 +1,6 @@
 import { toYmd, type Ymd } from "@/lib/dates";
 import { weekdayOf } from "@/lib/quick-dates";
+import { emailStateOf } from "./delivery";
 
 /**
  * Repeating tasks (docs/asana-migration-plan.md D27): when a task with a
@@ -342,7 +343,7 @@ export interface RepeatCopyTrace {
   checkedItems: number;
   readStates: number;
   /** Its NotificationOutbox rows. */
-  emails: readonly { sentAt: Date | null; attempts: number }[];
+  emails: readonly { sentAt: Date | null; lastError: string | null; attempts: number }[];
 }
 
 /**
@@ -350,7 +351,9 @@ export interface RepeatCopyTrace {
  * reopening that task can take it back and leave no trace: still To do, never
  * edited here, nothing on its timeline but its own CREATED line, no files, no
  * checked items, never opened in the portal, and no email that went out or
- * that a send run has already taken (it may be on its way).
+ * that a send run has already taken (it may be on its way). Each email reads
+ * as delivery.ts emailStateOf says: a row the send run closed unsent (no
+ * login, emails off, gave up) carries an error and told nobody anything.
  */
 export function isUntouchedCopy(c: RepeatCopyTrace): boolean {
   return (
@@ -362,6 +365,9 @@ export function isUntouchedCopy(c: RepeatCopyTrace): boolean {
     c.attachments === 0 &&
     c.checkedItems === 0 &&
     c.readStates === 0 &&
-    c.emails.every((e) => e.sentAt === null && e.attempts === 0)
+    c.emails.every((e) => {
+      const state = emailStateOf(e);
+      return state === "queued" || state === null;
+    })
   );
 }

@@ -35,18 +35,26 @@ export function healthDetailAllowed(
 export type CronAuth = "ok" | "denied" | "unconfigured";
 
 /**
- * `/api/quickbooks/sync` — Vercel sends `Authorization: Bearer $CRON_SECRET`.
- * Unconfigured is its own state so the route can answer 503 (fix the env)
- * rather than 401 (fix the caller), and never runs the sync either way.
+ * The cron routes (`/api/cron/notifications`, `/api/quickbooks/sync`):
+ * Vercel sends `Authorization: Bearer $CRON_SECRET`. Unconfigured is its own
+ * state so the route can answer 503 (fix the env) rather than 401 (fix the
+ * caller), and never runs either way.
+ *
+ * Both sides are compared trimmed. The header's edges never carry whitespace
+ * (HTTP drops it, and the token is trimmed here too), so a secret saved with
+ * a stray space or newline could never match anyone, Vercel included: every
+ * run would be refused with nothing in the logs to say why. A secret that is
+ * only whitespace is unconfigured, so it still fails closed.
  */
 export function cronAuthorized(
   configuredSecret: string | undefined,
   authorizationHeader: string | null | undefined,
 ): CronAuth {
-  if (!configuredSecret) return "unconfigured";
+  const secret = configuredSecret?.trim();
+  if (!secret) return "unconfigured";
   const m = /^Bearer\s+(.+)$/i.exec(authorizationHeader ?? "");
   if (!m) return "denied";
-  return safeEqual(configuredSecret, m[1].trim()) ? "ok" : "denied";
+  return safeEqual(secret, m[1].trim()) ? "ok" : "denied";
 }
 
 /**

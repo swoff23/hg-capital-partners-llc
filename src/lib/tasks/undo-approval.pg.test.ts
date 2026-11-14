@@ -125,6 +125,24 @@ test("Approve then Undo: back in Review, the Done line hidden, the next copy and
   assert.equal(again.task.status, "REVIEW");
 });
 
+test("Undo still takes the copy back when the send run closed its email unsent; one that went keeps it", { skip, timeout }, async () => {
+  // The copy's "assigned you" row, closed as outbox.ts closeUnsent writes it: no email went, so it touched nothing.
+  const closeCopyEmail = (copyId: string, lastError: string | null) =>
+    prisma.notificationOutbox.updateMany({ where: { taskId: copyId }, data: { sentAt: new Date(), lastError, openKey: null } });
+
+  const closed = await approvedJob();
+  assert.equal((await closeCopyEmail(closed.copyId, "no login")).count, 1);
+  assert.equal((await undo(closed.taskId, closed.approvedEventId)).task.status, "REVIEW");
+  assert.equal(await prisma.task.count({ where: { id: closed.copyId } }), 0, "the copy is gone, read through the adapter");
+  assert.equal(await prisma.notificationOutbox.count({ where: { taskId: closed.copyId } }), 0, "with its closed row");
+
+  const went = await approvedJob();
+  await prisma.notificationOutbox.updateMany({ where: { taskId: went.copyId }, data: { attempts: 1 } });
+  assert.equal((await closeCopyEmail(went.copyId, null)).count, 1);
+  assert.equal((await undo(went.taskId, went.approvedEventId)).task.status, "REVIEW");
+  assert.equal(await prisma.task.count({ where: { id: went.copyId } }), 1, "Zack got its email, so the copy stays");
+});
+
 test("the Undo's 2-minute limit holds on the times the adapter reads back, whatever the session's zone", { skip, timeout }, async () => {
   // Every other case undoes moments after approving, so a misread that made the approval look newer would pass them.
   // The column holds UTC without a zone; read as local time on a New York session it would be hours off either way.
