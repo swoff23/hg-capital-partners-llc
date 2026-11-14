@@ -21,6 +21,7 @@ import {
   type EventSnapshot,
   type OutboxItem,
 } from "./content";
+import { sentSince } from "./sent-count";
 
 /**
  * Sends the task emails src/lib/tasks/core.ts queues in NotificationOutbox
@@ -58,25 +59,12 @@ export interface DrainResult {
 }
 
 /**
- * Emails sent since midnight in Buffalo: outbox rows (skipped and abandoned
- * ones carry an error and don't count) plus password-reset emails, which
- * src/lib/portal/reset.ts sends from the same Resend account and logs as a
- * PASSWORD_RESET_REQUESTED event with `sent: true`.
+ * Emails sent since midnight in Buffalo (sent-count.ts sentSince, which
+ * Home's banner counts with too): outbox rows sent with no error, plus
+ * password-reset emails that went.
  */
 export async function sentTodayCount(now = new Date()): Promise<number> {
-  const since = easternDayStart(now);
-  const [outbox, resets] = await Promise.all([
-    prisma.notificationOutbox.count({ where: { sentAt: { gte: since }, lastError: null } }),
-    prisma.securityEvent.count({
-      where: { kind: "PASSWORD_RESET_REQUESTED", createdAt: { gte: since }, data: { path: ["sent"], equals: true } },
-    }),
-  ]);
-  return outbox + resets;
-}
-
-/** True once today's emails reached the cap, for a staff banner. */
-export async function emailCapReached(now = new Date()): Promise<boolean> {
-  return (await sentTodayCount(now)) >= DAILY_EMAIL_CAP;
+  return sentSince(prisma, easternDayStart(now));
 }
 
 /** Close a row without sending: no login, no access, no recipient, no task. */

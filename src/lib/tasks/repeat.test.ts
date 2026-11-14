@@ -331,12 +331,34 @@ const fresh: RepeatCopyTrace = {
   attachments: 0,
   checkedItems: 0,
   readStates: 0,
-  emails: [{ sentAt: null, attempts: 0 }],
+  emails: [{ sentAt: null, lastError: null, attempts: 0 }],
 };
 
 test("isUntouchedCopy: a fresh copy, with or without its unsent email, can be taken back", () => {
   assert.equal(isUntouchedCopy(fresh), true);
   assert.equal(isUntouchedCopy({ ...fresh, emails: [] }), true);
+  // Resend refused for its quota: the try was given back and it waits, as unclaimed as before.
+  assert.equal(isUntouchedCopy({ ...fresh, emails: [{ sentAt: null, lastError: "Resend 429: daily quota", attempts: 0 }] }), true);
+});
+
+test("isUntouchedCopy: an email the send run closed without sending told nobody, so the copy can still go", () => {
+  // Closed rows carry sentAt and their reason (outbox.ts closeUnsent, the empty bundle, the fifth failure), as
+  // delivery.ts emailStateOf reads them. They used to count as an email that went, and the copy stayed.
+  const closed = new Date("2026-10-23T15:05:00Z");
+  for (const [lastError, attempts] of [
+    ["no login", 0],
+    ["no access", 0],
+    ["emails off", 0],
+    ["nothing to send", 1],
+    ["gave up: Resend 500: request failed", 5],
+  ] as const) {
+    assert.equal(isUntouchedCopy({ ...fresh, emails: [{ sentAt: closed, lastError, attempts }] }), true, lastError);
+  }
+  assert.equal(
+    isUntouchedCopy({ ...fresh, emails: [{ sentAt: closed, lastError: "no login", attempts: 0 }, { sentAt: closed, lastError: null, attempts: 1 }] }),
+    false,
+    "one that went still keeps it",
+  );
 });
 
 test("isUntouchedCopy: any sign of use keeps the copy", () => {
@@ -354,9 +376,13 @@ test("isUntouchedCopy: any sign of use keeps the copy", () => {
     ["a file", { attachments: 1 }],
     ["a checked item", { checkedItems: 1 }],
     ["opened in the portal", { readStates: 1 }],
-    ["an email that went out", { emails: [{ sentAt: new Date("2026-10-23T15:05:00Z"), attempts: 1 }] }],
-    ["an email a send run took", { emails: [{ sentAt: null, attempts: 1 }] }],
-    ["one of two emails sent", { emails: [{ sentAt: null, attempts: 0 }, { sentAt: new Date("2026-10-23T15:05:00Z"), attempts: 1 }] }],
+    ["an email that went out", { emails: [{ sentAt: new Date("2026-10-23T15:05:00Z"), lastError: null, attempts: 1 }] }],
+    ["an email a send run took", { emails: [{ sentAt: null, lastError: null, attempts: 1 }] }],
+    ["an email waiting to retry after a failed try", { emails: [{ sentAt: null, lastError: "Resend 500: request failed", attempts: 1 }] }],
+    [
+      "one of two emails sent",
+      { emails: [{ sentAt: null, lastError: null, attempts: 0 }, { sentAt: new Date("2026-10-23T15:05:00Z"), lastError: null, attempts: 1 }] },
+    ],
   ];
   for (const [why, change] of touched) assert.equal(isUntouchedCopy({ ...fresh, ...change }), false, why);
 });

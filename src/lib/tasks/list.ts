@@ -426,10 +426,3 @@ export function doneMessage(title: string, nextDue: Ymd | null, today: Ymd): str
   });
   return `Done. Next due ${date}`;
 }
-
-// ---------------------------------------------------------------------------
-// Email cap (D30)
-// ---------------------------------------------------------------------------
-
-/** Resend's free plan sends 100 emails a day. */
-export const EMAIL_DAILY_CAP = 100;

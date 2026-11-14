@@ -1137,6 +1137,8 @@ test("undoApproval takes the next repeat copy back through the same rule as a re
   // The copy's email rows in id order too, as every outbox lock takes them.
   const copyEmails = calls.find((c) => c.model === "$queryRaw" && c.op.includes('FROM "NotificationOutbox"') && !c.op.includes("@>"))!;
   assert.match(copyEmails.op, /WHERE "taskId" = \? ORDER BY "id" FOR UPDATE$/);
+  // With each row's error, so one closed unsent (repeat.ts isUntouchedCopy, delivery.ts emailStateOf) never counts as sent.
+  assert.match(copyEmails.op, /^\s*SELECT "sentAt", "lastError", "attempts" FROM "NotificationOutbox"/);
 });
 
 test("undoApproval: a touched copy stays, and the job still goes back to Review", async () => {

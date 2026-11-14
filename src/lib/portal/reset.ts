@@ -11,6 +11,7 @@ import { expireResetTokens, logSecurityEvent, revokePortalSessions } from "./acc
 import { checkNewPassword, looksLikeEmail, normalizeEmail, type PasswordProblem } from "./credentials";
 import { resetRequestAllowed, resetTokenExpiresAt, resetWindowStart } from "./limits";
 import { emailHash } from "./request";
+import { deliverResetEmail, type ResetRequestData } from "./reset-core";
 import type { PortalPrincipal } from "./session";
 import { hashToken, isWellFormedToken, newToken } from "./tokens";
 
@@ -49,7 +50,7 @@ export async function startPasswordReset(rawEmail: string, ipHash: string): Prom
   // Count and insert under per-email and per-IP locks held to commit, so a
   // burst of submissions for one email or IP is counted one at a time and the
   // limits hold (each allowed request can send an email: D30's daily cap).
-  const token = await prisma.$transaction(async (tx) => {
+  const request = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${RESET_LOCK_EMAIL}::int, hashtext(${keyed}))`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${RESET_LOCK_IP}::int, hashtext(${ipHash}))`;
 
@@ -73,27 +74,34 @@ export async function startPasswordReset(rawEmail: string, ipHash: string): Prom
         data: { accountId: account.id, tokenHash: hashToken(token), expiresAt: resetTokenExpiresAt(now) },
       });
     }
-    await logSecurityEvent(tx, {
+    // Not sent yet, for every address: the send after the response marks it once the email went (reset-core.ts).
+    const data: ResetRequestData = { emailHash: keyed, sent: false };
+    const event = await logSecurityEvent(tx, {
       kind: "PASSWORD_RESET_REQUESTED",
       contactId: account?.contactId ?? null,
       ipHash,
-      data: { emailHash: keyed, sent: !!token },
+      data,
     });
-    return token;
+    return token ? { token, eventId: event.id, data } : null;
   });
 
-  if (token) after(() => sendResetEmail(email, token));
+  if (request) after(() => sendResetEmail(email, request));
 }
 
-async function sendResetEmail(to: string, token: string): Promise<void> {
+async function sendResetEmail(to: string, request: { token: string; eventId: string; data: ResetRequestData }): Promise<void> {
   try {
     const { text, html } = renderPlainEmail({
       line: "Here's your link to choose a new password for HG jobs.",
       buttonLabel: "Choose a new password",
-      buttonUrl: `${getEnv().appUrl}${RESET_PATH}?token=${token}`,
+      buttonUrl: `${getEnv().appUrl}${RESET_PATH}?token=${request.token}`,
       footnote: "The link works for 30 minutes. If you didn't ask for it, you can ignore this email.",
     });
-    await sendEmail({ to, subject: "Reset your HG password", text, html });
+    // sendEmail logs a failure itself; the event stays `sent: false`.
+    await deliverResetEmail(prisma, sendEmail, {
+      eventId: request.eventId,
+      data: request.data,
+      msg: { to, subject: "Reset your HG password", text, html },
+    });
   } catch (err) {
     logError("portal:reset-email", err);
   }

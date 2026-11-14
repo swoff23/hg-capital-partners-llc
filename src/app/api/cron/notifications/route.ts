@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const auth = cronAuthorized(getEnv().CRON_SECRET, request.headers.get("authorization"));
   const refused = cronRefusal(auth);
   if (refused) {
-    if (auth === "unconfigured") console.warn("[cron:notifications] not run: CRON_SECRET is unset");
+    if (auth === "unconfigured") console.warn("[cron:notifications] not run: CRON_SECRET is unset or blank");
     return new NextResponse(refused.body, { status: refused.status });
   }
 
