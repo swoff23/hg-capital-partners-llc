@@ -52,6 +52,7 @@ const ALLOWLIST = new Set([
   "src/app/join/[token]/actions.ts#openInvite", // only stamps a first-open time on a live invite; the token is the check, returns nothing
   "/login/reset/submit", // the reset link's form; does nothing without a live single-use token
   "/api/health", // detail behind HEALTH_TOKEN
+  "/api/version", // only the live commit, which /api/health already shows anyone; no database (update-notice.tsx asks it)
   "/api/quickbooks/sync", // CRON_SECRET
   "/api/cron/notifications", // CRON_SECRET, the same check as /api/quickbooks/sync
   "/j/[token]/calendar", // a job email's link token (job-links.ts resolveJobLink): only while it still opens the job

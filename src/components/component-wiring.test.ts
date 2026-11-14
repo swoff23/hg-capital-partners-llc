@@ -48,3 +48,15 @@ test("a sheet whose code can't be fetched closes with a toast instead of replaci
     assert.match(src, new RegExp(`onPressStart=\\{${sheet}\\.warm\\}`), `${file} warms at the row's menu`);
   }
 });
+
+test("the staff app and the portal both tell a tab left open about a new version; the public site doesn't", () => {
+  // docs/specs/update-notice.md, decision 4.
+  for (const file of ["../app/(app)/layout.tsx", "../app/(portal)/p/layout.tsx"]) {
+    assert.match(read(file), /<UpdateNotice version=\{getEnv\(\)\.VERCEL_GIT_COMMIT_SHA \?\? null\} \/>/, file);
+  }
+  assert.doesNotMatch(read("../app/(marketing)/layout.tsx"), /UpdateNotice/);
+  // Reload asks through the guard with its own way out, and the toast stays until it's used.
+  const notice = read("./update-notice.tsx");
+  assert.match(notice, /useLeaveGuard\(\{ leaveLabel: RELOAD_ANYWAY \}\)/);
+  assert.match(notice, /sticky: true,/);
+});
