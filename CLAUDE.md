@@ -13,7 +13,7 @@ These apply to everyone working in this repo, people and agents alike. Claude Co
 ## Ask before visual changes
 
 - **Fix data, logic, money and wrong-copy bugs directly.** Ask before changing layout, visual style or where a component sits, even when a reference or mock disagrees with the build. Connor approves design changes.
-- **Offer 2 or 3 concrete options with a recommendation.** ASCII previews work. Say how each behaves at desktop, tablet and mobile, then build only the one that's picked. Unpicked options stay in chat, not in the code.
+- **Offer 2 or 3 concrete options with a recommendation.** Draw them as low-fi visual mockups, never ASCII or text sketches. Say how each behaves at desktop, tablet and mobile, then build only the one that's picked. Unpicked options stay in chat, not in the code.
 
 ## Reuse first
 
