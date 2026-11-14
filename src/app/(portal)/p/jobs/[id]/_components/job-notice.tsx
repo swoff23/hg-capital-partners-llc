@@ -31,7 +31,7 @@ export function JobNotice({ notice, now }: { notice: Notice; now: string }) {
         <div>
           <p className="flex min-w-0 items-center gap-2 text-body text-fg-1">
             <StatusMark status="IN_PROGRESS" />
-            <span className="min-w-0 truncate">{sentBack.by ?? "HG"} sent this back</span>
+            <span className="min-w-0 truncate">{sentBack.by ?? "HG Capital"} sent this back</span>
             <span className="shrink-0 text-meta text-fg-3 max-[480px]:hidden">
               <span aria-hidden="true">{"· "}</span>
               <ActivityTime at={sentBack.at} now={now} />

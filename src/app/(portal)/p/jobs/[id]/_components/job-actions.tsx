@@ -738,7 +738,7 @@ export function JobActions({
 
 /**
  * Who reads an update (activity 2.7): the partners its email goes to,
- * "Connor and Pieter get this by email", or "The HG team" from three on.
+ * "Connor and Pieter get this by email", or "The HG Capital team" from three on.
  */
 function audienceWords(staff: readonly string[]): string {
   if (staff.length === 1) return `${staff[0]} gets this by email`;

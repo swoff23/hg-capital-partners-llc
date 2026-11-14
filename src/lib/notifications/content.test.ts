@@ -324,7 +324,7 @@ test("contractor emails say where to reply, naming the partners; staff emails do
   assert.equal(replyLine(["Connor", "Pieter"]), "Reply in the job so Connor and Pieter both see it.");
   assert.equal(replyLine(["Connor"]), "Reply in the job so Connor sees it.");
   assert.equal(replyLine(["Connor", "Pieter", "Dana"]), "Reply in the job so Connor, Pieter and Dana all see it.");
-  assert.equal(replyLine([]), "Reply in the job so HG sees it.");
+  assert.equal(replyLine([]), "Reply in the job so HG Capital sees it.");
   const base = { items: [item("NOTES", "updated the notes")], title: TITLE, address: null, appUrl: "https://hg.example.com", taskId: "t1", ...STATUS_OPEN };
   assert.equal(
     taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"] }).footnote,
