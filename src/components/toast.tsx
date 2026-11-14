@@ -22,7 +22,8 @@ import { toastMs } from "@/lib/toast-time";
  * (role="status"), so screen readers hear each message.
  *
  * `detail` is the ripple clause after " · " in --toast-fg-2 ("CapEx rules
- * saved · Forecasts updated"). `key` names what the toast is about: a toast
+ * saved · Forecasts updated"), or where the news is about when the page is gone ("2 photos not added · 118
+ * Congress St."), so a phone cuts the place and not the news. `key` names what the toast is about: a toast
  * with the key of one still showing replaces it instead of stacking, so ten
  * quick edits on one record show one toast for the latest (forms 2.13).
  */
@@ -30,7 +31,7 @@ import { toastMs } from "@/lib/toast-time";
 export type ToastInput = {
   /** One line. */
   message: string;
-  /** The ripple clause, after " · " in --toast-fg-2: "Forecasts updated". */
+  /** The ripple clause, after " · " in --toast-fg-2: "Forecasts updated", or the place an away upload toast is about. */
   detail?: string;
   /** What it's about ("task:abc:due"): a new toast with a live toast's key replaces it. */
   key?: string;

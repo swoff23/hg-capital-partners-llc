@@ -60,3 +60,30 @@ test("N2: the upload code is fetched when the queue mounts, and the queue can re
   assert.match(queue, /reload: reloadPage,/);
   assert.match(queue, /export function preloadTransfer\(\): void \{\s*warmWhenIdle\(/, "never while offline");
 });
+
+test("call 5: Create login and Change login email put every refusal that isn't about the address on the sheet's own line", () => {
+  const card = read("../app/(app)/contractors/[id]/portal-access-card.tsx");
+  // Both sheets: only a FieldError on `email` marks the field, and the rest of run.error is the FormSheet's error line.
+  assert.equal(card.match(/const addressRefusal = run\.fieldErrors\?\.email;/g)?.length, 2);
+  assert.equal(card.match(/fieldErrors=\{run\.fieldErrors\}\s*error=\{addressRefusal \? undefined : run\.error\}/g)?.length, 2);
+  assert.equal(card.match(/\(tried && problem\) \|\| addressRefusal \|\| undefined/g)?.length, 2);
+  assert.doesNotMatch(card, /run\.error \? \{ email: run\.error \}/, "no refusal is handed to the Email field by default");
+});
+
+test("call 3: a job's page, loading screen and error screen draw one header, and the shared error screen is untouched", () => {
+  const dir = "../app/(portal)/p/jobs/[id]/";
+  for (const file of ["page.tsx", "loading.tsx", "error.tsx"]) assert.match(read(dir + file), /<JobHeader \/>/, file);
+  assert.doesNotMatch(read(dir + "page.tsx"), /<header/);
+  assert.doesNotMatch(read(dir + "loading.tsx"), /<header/);
+  const header = read(dir + "_components/job-header.tsx");
+  assert.match(header, /<BackLink fallback="\/p" label="My jobs"/);
+  assert.match(read(dir + "error.tsx"), /<ErrorScreen \{\.\.\.props\} \/>/);
+  // My jobs keeps the shared boundary: a link to itself would clear nothing there.
+  assert.doesNotMatch(read("../app/(portal)/p/error.tsx"), /JobHeader|Back to my jobs/);
+  assert.doesNotMatch(read("./error-screen.tsx"), /My jobs|JobHeader/);
+});
+
+test("call 1: the away toast's place reaches the toast as its second-tone detail", () => {
+  assert.match(read("./upload-queue.tsx"), /message: n\.message,\s*detail: n\.detail,/);
+  assert.match(read("../lib/attachments/engine.ts"), /message: line\.text,\s*\.\.\.\(line\.detail \? \{ detail: line\.detail \} : \{\}\),/);
+});

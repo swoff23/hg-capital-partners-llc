@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { TOAST_PHONE_CHARS } from "@/lib/toast-line";
-import { TOO_MANY_FILES, finishable, lostAfter, sendOutcome, settleLost, unconfirmedIds } from "./job-view";
+import { RETRY_PAST_CAP, RETRY_PAST_CAP_IN_SHEET, TOO_MANY_FILES, finishable, lostAfter, sendOutcome, settleLost, unconfirmedIds } from "./job-view";
 
 /**
  * Static guards for the Nov 3 review's lows on the contractor job page (job-actions.tsx), a client component, so its
@@ -91,7 +91,10 @@ test("a Mark done out when the page goes leaves its photos posted or kept, a thr
 
 test("a Retry past the job page's cap toasts the way on, whole on a phone (lows 1)", () => {
   // The engine keeps the tile failed with its Retry (engine.test.ts); the page gives the words.
-  assert.match(actions, /maxFilesReason: MAX_FILES_REASON,\s*maxFilesNotice: TOO_MANY_FILES,/);
+  assert.match(actions, /maxFilesReason: MAX_FILES_REASON,\s*maxFilesNotice: sheetOpen \? RETRY_PAST_CAP_IN_SHEET : RETRY_PAST_CAP,/);
+  assert.equal(RETRY_PAST_CAP, "Send these 50, then Retry.");
+  assert.equal(RETRY_PAST_CAP_IN_SHEET, "Close this and Send first.");
+  for (const line of [RETRY_PAST_CAP, RETRY_PAST_CAP_IN_SHEET]) assert.ok(line.length <= TOAST_PHONE_CHARS, line);
+  // The server's refusal of an oversize send keeps its rule.
   assert.equal(TOO_MANY_FILES, "Send up to 50 at a time.");
-  assert.ok(TOO_MANY_FILES.length <= TOAST_PHONE_CHARS);
 });

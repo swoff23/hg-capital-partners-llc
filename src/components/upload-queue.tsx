@@ -114,6 +114,8 @@ export type UploadCounts = {
   paused: number;
   /** Refused or out of retries: each waits for a Retry or a Remove. */
   failed: number;
+  /** Of `failed`, the files the job refused for good (final: closed, or too late): no Retry changes it, so a My jobs row says "not added". */
+  refused: number;
   /**
    * Of `pending`, the files whose bytes are up and wait for their page to record them: a reload or a new sign-in put
    * them back before that page opened (engine needsRecord). Nothing moves until it does, so a My jobs row says so.
@@ -368,6 +370,7 @@ export function UploadQueueProvider({ children, scope, onWake }: { children: Rea
       notify: (n) =>
         toast({
           message: n.message,
+          detail: n.detail,
           key: n.key,
           action: n.action && { label: n.action.label, onAction: n.action.run },
         }),

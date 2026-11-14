@@ -459,16 +459,23 @@ test("a My jobs row says what its uploads are doing (uploads 2.1)", () => {
   assert.deepEqual(rowUploadLine({ ...none, pending: 2, pendingKinds: ["image", "video"] }), { text: "Uploading 2 photos", tone: "info" });
   assert.deepEqual(rowUploadLine({ ...none, failed: 2 }), { text: "2 photos didn't upload", tone: "danger" });
   assert.deepEqual(rowUploadLine({ ...none, failed: 1 }), { text: "1 photo didn't upload", tone: "danger" });
+  // Every red photo one the job refused for good: "not added", in danger. Any one a Retry could change keeps today's line.
+  assert.deepEqual(rowUploadLine({ ...none, failed: 1, refused: 1 }), { text: "1 photo not added", tone: "danger" });
+  assert.deepEqual(rowUploadLine({ ...none, failed: 2, refused: 2 }), { text: "2 photos not added", tone: "danger" });
+  assert.deepEqual(rowUploadLine({ ...none, failed: 3, refused: 2 }), { text: "3 photos didn't upload", tone: "danger" });
+  assert.deepEqual(rowUploadLine({ ...none, failed: 2, refused: 0 }), { text: "2 photos didn't upload", tone: "danger" });
   // The one that needs the contractor leads.
   assert.equal(rowUploadLine({ pending: 2, waiting: 0, failed: 1, pendingKinds: ["image", "image"] })?.tone, "danger");
   // Files held for a signal say so, after the ones going up.
-  assert.deepEqual(rowUploadLine({ ...none, waiting: 3, pendingKinds: ["image", "image", "image"] }), { text: "No signal · 3 photos waiting", tone: "info" });
-  assert.deepEqual(rowUploadLine({ ...none, waiting: 1, pendingKinds: ["video"] }), { text: "No signal · 1 video waiting", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 3, pendingKinds: ["image", "image", "image"] }), { text: "3 photos waiting", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 1, pendingKinds: ["video"] }), { text: "1 video waiting", tone: "info" });
   assert.equal(rowUploadLine({ ...none, pending: 1, waiting: 2, pendingKinds: ["image", "image", "image"] })?.text, "Uploading 1 photo");
+  // The reason is the job page's bar to say; the row is short enough to keep the date (uploads call 2).
+  for (const text of ["3 photos waiting", "3 photos paused", "1 photo waiting", "1 photo paused"]) assert.ok(text.length <= 16, text);
   // Held for the upload code, not a signal: not "No signal" (the files wait on the page, not the connection).
-  assert.deepEqual(rowUploadLine({ ...none, waiting: 3, paused: 3, pendingKinds: ["image", "image", "image"] }), { text: "Uploads paused · 3 photos waiting", tone: "info" });
-  assert.deepEqual(rowUploadLine({ ...none, waiting: 1, paused: 1, pendingKinds: ["video"] }), { text: "Uploads paused · 1 video waiting", tone: "info" });
-  assert.equal(rowUploadLine({ ...none, waiting: 2, paused: 0, pendingKinds: ["image", "image"] })?.text, "No signal · 2 photos waiting");
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 3, paused: 3, pendingKinds: ["image", "image", "image"] }), { text: "3 photos paused", tone: "info" });
+  assert.deepEqual(rowUploadLine({ ...none, waiting: 1, paused: 1, pendingKinds: ["video"] }), { text: "1 video paused", tone: "info" });
+  assert.equal(rowUploadLine({ ...none, waiting: 2, paused: 0, pendingKinds: ["image", "image"] })?.text, "2 photos waiting");
   assert.equal(rowUploadLine({ ...none, failed: 1, waiting: 2, paused: 2, pendingKinds: ["image", "image"] })?.tone, "danger", "a failure still leads");
 });
 

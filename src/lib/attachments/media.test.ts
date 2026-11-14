@@ -188,22 +188,24 @@ test("closedJobLine: one line at 320, the longest count included, in both states
   }
 });
 
-test("redTilesLine with a target: the away toast says the tray's line and where the files were going", () => {
+test("redTilesLine with a target: the away toast leads with the news and the place trails as its detail", () => {
   const tile = (status: string, error?: string, final?: boolean) => ({ name: "a.jpg", kind: "image" as const, status, error, final });
   const where = "56 Tamarack St";
-  assert.deepEqual(redTilesLine([tile("failed", "no connection"), tile("failed")], where), { text: "2 photos didn't upload to 56 Tamarack St", retry: true });
-  assert.deepEqual(redTilesLine([tile("invalid", JOB_CLOSED, true)], where), { text: "Job closed before 1 photo uploaded to 56 Tamarack St", retry: false });
+  assert.deepEqual(redTilesLine([tile("failed", "no connection"), tile("failed")], where), { text: "2 photos didn't upload", retry: true, detail: where });
+  assert.deepEqual(redTilesLine([tile("invalid", JOB_CLOSED, true)], where), { text: "1 photo not added", retry: false, detail: where });
   assert.deepEqual(redTilesLine([tile("invalid", TOO_LATE, true), tile("invalid", TOO_LATE, true)], where), {
-    text: "Too late to add 2 photos to 56 Tamarack St",
+    text: "2 photos not added",
     retry: false,
+    detail: where,
   });
   assert.deepEqual(redTilesLine([tile("invalid", "over the 25 MB photo limit")], where), {
-    text: "1 photo didn't upload to 56 Tamarack St: over the 25 MB photo limit",
+    text: "1 photo didn't upload: over the 25 MB photo limit",
     retry: false,
+    detail: where,
   });
-  // No label, or only spaces, says the line alone; the tray under its own tiles passes none.
+  // No label, or only spaces, says the tray's line alone, with no detail; the tray under its own tiles passes none.
   for (const none of ["", "  ", undefined]) {
-    assert.equal(redTilesLine([tile("invalid", JOB_CLOSED, true)], none)!.text, "Job closed before 1 photo uploaded");
+    assert.deepEqual(redTilesLine([tile("invalid", JOB_CLOSED, true)], none), { text: "Job closed before 1 photo uploaded", retry: false });
     assert.equal(uploadNotice([{ name: "a.jpg", kind: "image", reason: "" }], { reason: false, where: none }), "1 photo didn't upload");
   }
 });

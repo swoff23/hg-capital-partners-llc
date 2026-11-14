@@ -1,4 +1,5 @@
 import type { Prisma, PortalAccount, SecurityEventKind, User } from "@prisma/client";
+import { FieldError } from "@/lib/action-result";
 import type { prisma } from "@/lib/db";
 
 /**
@@ -11,7 +12,10 @@ import type { prisma } from "@/lib/db";
 export type Db = Prisma.TransactionClient | typeof prisma;
 export type Staff = Pick<User, "id">;
 
-/** A refusal staff should see as-is ("That email belongs to a staff login."). */
+/**
+ * A refusal staff should see as-is ("That contractor no longer exists."). It belongs to no field, so a sheet shows it
+ * on its own error line. A refusal about the address is a FieldError on `email` instead, which marks the Email field.
+ */
 export class PortalAccountError extends Error {
   constructor(message: string) {
     super(message);
@@ -111,9 +115,9 @@ export async function createPortalAccountIn(
   if (contact.portalAccount) throw new PortalAccountError("This contractor already has a login.");
   // /login checks User first, so an address can't be both kinds of account.
   const staff = await tx.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } });
-  if (staff) throw new PortalAccountError("That email belongs to a staff login.");
+  if (staff) throw new FieldError({ email: "That email belongs to a staff login." });
   const taken = await tx.portalAccount.findUnique({ where: { email }, select: { id: true } });
-  if (taken) throw new PortalAccountError("Another contractor already uses that email.");
+  if (taken) throw new FieldError({ email: "Another contractor already uses that email." });
 
   const created = await tx.portalAccount.create({
     data: { contactId, email, passwordHash, mustChangePassword: true, createdByUserId: createdByUser.id },
@@ -177,9 +181,9 @@ export async function changePortalEmailIn(tx: Prisma.TransactionClient, accountI
   if (!account) throw new PortalAccountError("That login no longer exists.");
   if (account.email === email) return;
   const staff = await tx.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } });
-  if (staff) throw new PortalAccountError("That email belongs to a staff login.");
+  if (staff) throw new FieldError({ email: "That email belongs to a staff login." });
   const taken = await tx.portalAccount.findUnique({ where: { email }, select: { id: true } });
-  if (taken && taken.id !== accountId) throw new PortalAccountError("Another contractor already uses that email.");
+  if (taken && taken.id !== accountId) throw new FieldError({ email: "Another contractor already uses that email." });
   await tx.portalAccount.update({ where: { id: accountId }, data: { email } });
   await expireResetTokens(tx, accountId);
   await logSecurityEvent(tx, {
