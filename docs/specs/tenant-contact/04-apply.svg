@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="440" viewBox="0 0 860 440" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Applying the New Tenant and Move Out playbooks saves to the unit</title>
+<rect width="860" height="440" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Apply a playbook: save to the unit</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">New Tenant, laptop 1280 and tablet 768</text>
+<rect x="0" y="22" width="500" height="250" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<g font-size="11" fill="#424e61"><text x="20" y="50">Property</text><text x="256" y="50">Unit</text><text x="20" y="106">Move-in date</text><text x="20" y="162">Tenant</text><text x="256" y="162">Tenant number</text></g>
+<g fill="#ffffff" stroke="#84817a"><rect x="20" y="56" width="224" height="30" rx="7"/><rect x="256" y="56" width="224" height="30" rx="7"/><rect x="20" y="112" width="224" height="30" rx="7"/><rect x="20" y="168" width="224" height="30" rx="7"/><rect x="256" y="168" width="224" height="30" rx="7"/></g>
+<g font-size="12" fill="#152133"><text x="30" y="76">Property address</text><text x="266" y="76">Unit 2</text><text x="30" y="132">Feb 1</text><text x="30" y="188">Tenant name</text><text x="266" y="188">716-555-0142</text></g>
+<rect x="20" y="220" width="16" height="16" rx="4" fill="#152133"/>
+<path d="M24 228 l3 3 6-7" fill="none" stroke="#ffffff" stroke-width="1.6"/>
+<text x="46" y="233" font-size="12" fill="#152133">Save Tenant name to Unit 2, moving in Feb 1</text>
+<text x="0" y="298" font-size="11" fill="#5b6576">Someone still lives there: "Save Tenant name as Unit 2's next tenant, from Feb 1".</text>
+<text x="0" y="313" font-size="11" fill="#5b6576">A next tenant already on file: "Replace Next tenant with Tenant name as Unit 2's next tenant".</text>
+<text x="0" y="328" font-size="11" fill="#5b6576">The box shows once a unit resolves and both the name and number are filled. Ticked by default.</text>
+<text x="0" y="343" font-size="11" fill="#5b6576">Toast: "10 tasks created for Property address. Tenant name saved to Unit 2."</text>
+</g>
+
+<g transform="translate(580 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Move Out, phone 375 (fields stack)</text>
+<rect x="0" y="22" width="220" height="250" rx="16" fill="#ffffff" stroke="#d5d1ca"/>
+<g font-size="11" fill="#424e61"><text x="14" y="52">Property</text><text x="14" y="100">Unit</text><text x="14" y="148">Move-out date</text></g>
+<g fill="#ffffff" stroke="#84817a"><rect x="14" y="58" width="192" height="28" rx="7"/><rect x="14" y="106" width="192" height="28" rx="7"/><rect x="14" y="154" width="192" height="28" rx="7"/></g>
+<g font-size="12" fill="#152133"><text x="24" y="77">Property address</text><text x="24" y="125">Unit 2</text><text x="24" y="173">Jan 31</text></g>
+<rect x="14" y="200" width="16" height="16" rx="4" fill="#152133"/>
+<path d="M18 208 l3 3 6-7" fill="none" stroke="#ffffff" stroke-width="1.6"/>
+<text x="38" y="208" font-size="12" fill="#152133">Set Tenant name to</text>
+<text x="38" y="223" font-size="12" fill="#152133">move out Jan 31</text>
+<text x="0" y="298" font-size="11" fill="#5b6576">Shows only when the unit has</text>
+<text x="0" y="313" font-size="11" fill="#5b6576">a current tenant. Ticked by default.</text>
+</g>
+</svg>
