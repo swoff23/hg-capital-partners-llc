@@ -20,11 +20,12 @@ export type EditableInsurance = {
 };
 
 /**
- * Insurance (forms 4.2, 3.2 A): the renewal first and always shown, since a
- * lapse means a force-placed policy, then the carrier, the policy and the
- * amounts. Each is changed where it stands; the empty ones fold behind "N
- * more fields" (docs/specs/property-page.md 2.2). The policy number is a
- * code: one tap copies it, and the section's ⋯ holds "Change policy number".
+ * Insurance (forms 4.2, 3.2 A): the renewal first, since a lapse means a
+ * force-placed policy, then the premium and the replacement cost, always
+ * shown and each changed where it stands. Carrier, policy number, coverage,
+ * deductible and liability fold behind "5 more fields", filled or not
+ * (docs/specs/property-page.md 2.2). The policy number is a code: one tap
+ * copies it, and the section's ⋯ holds "Change policy number".
  */
 export function PropertyInsuranceSection({ insurance: p }: { insurance: EditableInsurance }) {
   const context = `Insurance · ${shortAddress(p.address) || p.address}`;
@@ -55,11 +56,13 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
           {
             key: "insuranceCarrier",
             empty: isBlank(p.insuranceCarrier),
+            fold: true,
             node: <PropertyFact {...common} field="insuranceCarrier" label="Carrier" kind="text" value={p.insuranceCarrier} empty="Add carrier" />,
           },
           {
             key: "insurancePolicyNo",
             empty: isBlank(p.insurancePolicyNo),
+            fold: true,
             node: (
               <PropertyFact
                 {...common}
@@ -76,11 +79,13 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
           {
             key: "insurancePremium",
             empty: isBlank(p.insurancePremium),
+            keep: true,
             node: <PropertyFact {...common} field="insurancePremium" label="Premium" kind="money" value={p.insurancePremium} empty="Add premium" />,
           },
           {
             key: "replacementCost",
             empty: isBlank(p.replacementCost),
+            keep: true,
             node: (
               <PropertyFact
                 {...common}
@@ -96,16 +101,19 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
           {
             key: "insuranceCoverage",
             empty: isBlank(p.insuranceCoverage),
+            fold: true,
             node: <PropertyFact {...common} field="insuranceCoverage" label="Coverage" kind="money" value={p.insuranceCoverage} empty="Add coverage" />,
           },
           {
             key: "insuranceDeductible",
             empty: isBlank(p.insuranceDeductible),
+            fold: true,
             node: <PropertyFact {...common} field="insuranceDeductible" label="Deductible" kind="money" value={p.insuranceDeductible} empty="Add deductible" />,
           },
           {
             key: "insuranceLiability",
             empty: isBlank(p.insuranceLiability),
+            fold: true,
             node: <PropertyFact {...common} field="insuranceLiability" label="Liability" kind="text" value={p.insuranceLiability} empty="Add liability" />,
           },
         ]}
