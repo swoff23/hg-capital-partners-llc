@@ -152,7 +152,7 @@ test("an email's job link survives sign-in and the first-password step", () => {
   const formNext = portalReturnPath(nextOf(login)); // the login page's hidden field
   const welcome = afterPortalSignIn(true, portalReturnPath(formNext)); // the login action
   const passwordFormNext = portalReturnPath(nextOf(welcome)); // the welcome page's hidden field
-  assert.equal(portalReturnPath(passwordFormNext) ?? "/p?saved=1", job); // chooseOwnPassword
+  assert.equal(portalReturnPath(passwordFormNext) ?? "/p", job); // chooseOwnPassword
 
   // Signed in already, but still on the starting password: the job page
   // sends them to the welcome page, which carries the job on.

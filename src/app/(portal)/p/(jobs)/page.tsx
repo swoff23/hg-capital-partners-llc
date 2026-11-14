@@ -12,7 +12,7 @@ import { MyJobs } from "../_components/my-jobs";
 // A list, so it runs full width to 1600 with the 16 / 24 / 32 gutters (docs/brand-guidelines.md, section 5).
 export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
   const principal = await requirePortalPrincipal();
-  const { saved, view } = (await searchParams) as { saved?: string; view?: string };
+  const { view } = (await searchParams) as { view?: string };
   const tab = parseJobsTab(view);
   const group = parseJobsGroup((await cookies()).get(JOBS_GROUP_COOKIE)?.value);
   const jobs = await listMyJobs(principal, tab);
@@ -30,11 +30,6 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
       </header>
 
       <main className="mx-auto max-w-400 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        {saved === "1" && (
-          <p role="status" className="mb-4 w-fit max-w-full rounded-md border border-line bg-surface px-3 py-2 text-meta text-fg-1">
-            Password saved for next sign-in.
-          </p>
-        )}
         <h1 className="mb-4 text-title text-balance text-fg-1">Hi {firstName(principal.label)}</h1>
         <MyJobs jobs={jobs} tab={tab} initialGroup={group} today={todayYmdEastern()} />
       </main>
