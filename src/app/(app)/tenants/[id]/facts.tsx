@@ -1,9 +1,12 @@
 "use client";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Mail } from "lucide-react";
 import { InlineField } from "@/components/inline-field";
 import { Money } from "@/components/money";
 import { RailVerb } from "@/components/rail";
+import { buttonClass } from "@/components/ui";
+import { mailtoHref } from "@/lib/contacts";
 import { fmtDay, type Ymd } from "@/lib/dates";
 import { tenantShare } from "@/lib/tenants/fields";
 import type { LeaseStatus } from "@/lib/tenants/status";
@@ -28,6 +31,10 @@ export type FactValues = {
     id: string;
     rent: string;
     subsidy: string;
+    /** Who pays the share and their contact (the Section 8 caseworker); shown only with a share. */
+    subsidyFrom: string;
+    subsidyContact: string;
+    subsidyEmail: string;
     endsOn: Ymd | null;
   } | null;
 };
@@ -139,6 +146,55 @@ export function LeaseFacts(v: FactValues) {
           <span className="text-fg-3">—</span>
         )}
       </Row>
+      {v.term && share !== null && (
+        <>
+          <Row label="Who pays">
+            <InlineField
+              kind="text"
+              label="Who pays"
+              field="subsidyFrom"
+              context={ctx}
+              value={v.term.subsidyFrom}
+              empty="Add who pays"
+              onSave={(next) => saveLeaseTerm(v.leaseId, v.term!.id, { subsidyFrom: next || null })}
+            />
+          </Row>
+          <Row label="Contact">
+            <InlineField
+              kind="text"
+              label="Contact"
+              field="subsidyContact"
+              context={ctx}
+              value={v.term.subsidyContact}
+              empty="Add contact"
+              onSave={(next) => saveLeaseTerm(v.leaseId, v.term!.id, { subsidyContact: next || null })}
+            />
+          </Row>
+          <Row label="Contact email">
+            <InlineField
+              kind="email"
+              label="Contact email"
+              field="subsidyEmail"
+              context={ctx}
+              value={v.term.subsidyEmail}
+              empty="Add email"
+              trailing={
+                mailtoHref(v.term.subsidyEmail) && (
+                  <a
+                    href={mailtoHref(v.term.subsidyEmail)!}
+                    aria-label={`Email ${v.term.subsidyContact || "the housing authority"}`}
+                    title="Write"
+                    className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3")}
+                  >
+                    <Mail aria-hidden="true" className="size-4" />
+                  </a>
+                )
+              }
+              onSave={(next) => saveLeaseTerm(v.leaseId, v.term!.id, { subsidyEmail: next || null })}
+            />
+          </Row>
+        </>
+      )}
       <Row label="Deposit">
         <InlineField
           kind="money"

@@ -185,8 +185,15 @@ test("addTerm and patchTerm: no overlap, the share at most the rent", { skip }, 
   assert.deepEqual(await refusal(addTerm(prisma, id, { startsOn: "2027-01-01", rent: "2000" })), { startsOn: TERMS_OVERLAP });
   assert.deepEqual(await refusal(patchTerm(prisma, renewal.id, { subsidy: "2500" })), { subsidy: SUBSIDY_OVER_RENT });
   await patchTerm(prisma, renewal.id, { subsidy: "1500", subsidyFrom: "BMHA" });
+  // One fact at a time, as the rail saves: the contact keeps the share and who pays.
+  await patchTerm(prisma, renewal.id, { subsidyContact: "Pat Case" });
+  await patchTerm(prisma, renewal.id, { subsidyEmail: "Pat@BMHA.org" });
   const t = await prisma.leaseTerm.findUniqueOrThrow({ where: { id: renewal.id } });
-  assert.equal(t.subsidy?.toString(), "1500");
+  assert.deepEqual([t.subsidy?.toString(), t.subsidyFrom, t.subsidyContact, t.subsidyEmail], ["1500", "BMHA", "Pat Case", "pat@bmha.org"]);
+  // Clearing the share clears who pays and the contact with it.
+  await patchTerm(prisma, renewal.id, { subsidy: "" });
+  const cleared = await prisma.leaseTerm.findUniqueOrThrow({ where: { id: renewal.id } });
+  assert.deepEqual([cleared.subsidy, cleared.subsidyFrom, cleared.subsidyContact, cleared.subsidyEmail], [null, null, null, null]);
 });
 
 test("deleteLease keeps its tenants; unitHasTenants sees current and upcoming, not past", { skip }, async () => {

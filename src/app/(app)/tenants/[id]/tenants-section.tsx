@@ -34,7 +34,6 @@ export function TenantsSection({ leaseId, tenants }: { leaseId: string; tenants:
           const mail = mailtoHref(t.email);
           const first = firstName(t.fullName) || t.fullName;
           const meta = [t.phone, t.email].filter(Boolean).join(" · ");
-          const emergency = [t.emergencyName, t.emergencyPhone].filter(Boolean).join(", ");
           return (
             <li key={t.id} className="flex items-center gap-1 border-b border-line">
               <button
@@ -48,7 +47,6 @@ export function TenantsSection({ leaseId, tenants }: { leaseId: string; tenants:
                   {t.primary && <span className={tagClass}>Primary</span>}
                 </span>
                 {meta && <span className="num max-w-full truncate text-meta text-fg-3">{meta}</span>}
-                {emergency && <span className="max-w-full truncate text-meta text-fg-3">Emergency: {emergency}</span>}
               </button>
               <div className="flex shrink-0 items-center">
                 {tel && (

@@ -12,7 +12,7 @@ import type { FieldErrors } from "@/lib/action-result";
 import { fmtDay, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
-import { MAX_TENANTS, readDeposit, readStay, readTenant, readTerm } from "@/lib/tenants/fields";
+import { MAX_TENANTS, readDeposit, readStay, readTenant, readTerm, rentFromParts } from "@/lib/tenants/fields";
 import { createNewLease } from "./actions";
 
 /** A rentable unit as the form needs it: the id a lease points at, and the label the picker shows. */
@@ -31,6 +31,8 @@ type Values = {
   rent: string;
   subsidy: string;
   subsidyFrom: string;
+  subsidyContact: string;
+  subsidyEmail: string;
   deposit: string;
 };
 
@@ -47,6 +49,8 @@ function blank(initial: { propertyId: string | null; unitLabel: string | null })
     rent: "",
     subsidy: "",
     subsidyFrom: "",
+    subsidyContact: "",
+    subsidyEmail: "",
     deposit: "",
   };
 }
@@ -62,6 +66,8 @@ const FIELDS: readonly string[] = [
   "rent",
   "subsidy",
   "subsidyFrom",
+  "subsidyContact",
+  "subsidyEmail",
   "deposit",
   ...Array.from({ length: MAX_TENANTS }, (_, i) => ["fullName", "phone", "email"].map((f) => `tenants.${i}.${f}`)).flat(),
 ];
@@ -79,14 +85,22 @@ function problemsOf(v: Values, units: readonly LeaseUnit[]): FieldErrors | null 
   });
   const stay = readStay({ movesIn: dayText(v.movesIn) });
   if (!stay.ok) Object.assign(found, stay.problems);
+  // The field named rent holds what the tenant pays; the term keeps the whole rent, that plus the share (Connor, Nov 14).
+  const parts = rentFromParts(v.rent, v.subsidy);
+  if (!parts.ok) {
+    if (parts.problems.tenantPays) found.rent = parts.problems.tenantPays;
+    if (parts.problems.subsidy) found.subsidy = parts.problems.subsidy;
+  }
   const term = readTerm({
     startsOn: dayText(v.startsOn),
     endsOn: v.monthToMonth ? "" : dayText(v.endsOn),
-    rent: v.rent,
+    rent: parts.ok ? parts.data.rent : "",
     subsidy: v.subsidy,
     subsidyFrom: v.subsidyFrom,
+    subsidyContact: v.subsidyContact,
+    subsidyEmail: v.subsidyEmail,
   });
-  if (!term.ok) Object.assign(found, term.problems);
+  if (!term.ok) for (const [field, line] of Object.entries(term.problems)) found[field] ??= line;
   const deposit = readDeposit(v.deposit);
   if (!deposit.ok) Object.assign(found, deposit.problems);
   return Object.keys(found).length > 0 ? found : null;
@@ -179,9 +193,15 @@ export function NewLeaseForm({
           deposit: values.deposit,
           startsOn: dayText(values.startsOn),
           endsOn: values.monthToMonth ? "" : dayText(values.endsOn),
-          rent: values.rent,
+          // The whole rent: what the tenant pays plus the housing authority's share.
+          rent: (() => {
+            const parts = rentFromParts(values.rent, values.subsidy);
+            return parts.ok ? parts.data.rent : values.rent;
+          })(),
           subsidy: values.subsidy,
           subsidyFrom: values.subsidy.trim() ? values.subsidyFrom : "",
+          subsidyContact: values.subsidy.trim() ? values.subsidyContact : "",
+          subsidyEmail: values.subsidy.trim() ? values.subsidyEmail : "",
         })
       }
       onCreated={(created) => {
@@ -368,7 +388,7 @@ export function NewLeaseForm({
             <Section as="h3" title="Money">
               <div className="space-y-4">
                 <FieldRow>
-                  <FormField label="Rent" required error={errors.rent}>
+                  <FormField label="Tenant pays" required error={errors.rent}>
                     {(p) => (
                       <NumberInput kind="money" suffix="/mo" {...p} value={values.rent} onChange={(rent) => change({ rent }, "rent", "subsidy")} />
                     )}
@@ -396,6 +416,34 @@ export function NewLeaseForm({
                     </FormField>
                   )}
                 </FieldRow>
+                {hasSubsidy && (
+                  // The housing authority's contact, the Section 8 caseworker (Connor, Nov 14).
+                  <FieldRow>
+                    <FormField label="Contact name" optional error={errors.subsidyContact}>
+                      {(p) => (
+                        <Input
+                          {...p}
+                          autoComplete="off"
+                          value={values.subsidyContact}
+                          onChange={(e) => change({ subsidyContact: e.target.value }, "subsidyContact")}
+                        />
+                      )}
+                    </FormField>
+                    <FormField label="Contact email" optional error={errors.subsidyEmail}>
+                      {(p) => (
+                        <Input
+                          {...p}
+                          type="email"
+                          autoComplete="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          value={values.subsidyEmail}
+                          onChange={(e) => change({ subsidyEmail: e.target.value }, "subsidyEmail")}
+                        />
+                      )}
+                    </FormField>
+                  </FieldRow>
+                )}
               </div>
             </Section>
           </>
