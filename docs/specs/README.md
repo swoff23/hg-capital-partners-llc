@@ -21,7 +21,7 @@ Six specs, researched on Mobbin, checked by a critic and approved by Connor on O
 
 Each chunk ships its own small migration.
 
-[tenant-contact.md](tenant-contact.md) puts the tenant's name and phone on jobs. It was planned with Connor on Oct 26, 2026, and waits for his "build it" before any of it is built.
+[tenant-contact.md](tenant-contact.md) puts every tenant's name and phone on jobs, shows the lockbox on an occupied unit only with the tenant's permission to enter, and dates each tenancy. It was planned with Connor on Oct 26, 2026, reopened on Nov 14, and builds once design-calls-nov14 lands.
 
 [contractor-email-switch.md](contractor-email-switch.md) keeps a contractor's job emails quiet until their first sign-in and adds a "Job emails" switch to each contractor's Portal access card. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 

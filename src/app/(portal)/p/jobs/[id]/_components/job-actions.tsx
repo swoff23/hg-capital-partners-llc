@@ -630,7 +630,7 @@ export function JobActions({
                     twice. */}
                 <span className="truncate min-[390px]:hidden">In review</span>
                 <span className="truncate max-[390px]:hidden sm:hidden">Waiting for review</span>
-                <span className="truncate max-sm:hidden">Waiting for HG to review</span>
+                <span className="truncate max-sm:hidden">Waiting for HG Capital to review</span>
               </Button>
             ) : step === "start" ? (
               <Button className={barButton} disabled={starting} onClick={start}>
@@ -738,12 +738,12 @@ export function JobActions({
 
 /**
  * Who reads an update (activity 2.7): the partners its email goes to,
- * "Connor and Pieter get this by email", or "The HG team" from three on.
+ * "Connor and Pieter get this by email", or "The HG Capital team" from three on.
  */
 function audienceWords(staff: readonly string[]): string {
   if (staff.length === 1) return `${staff[0]} gets this by email`;
   if (staff.length === 2) return `${joinNames([...staff])} get this by email`;
-  return "The HG team gets this by email";
+  return "The HG Capital team gets this by email";
 }
 
 /** Where a recorded photo or video's picture is: its thumbnail, or the poster of a video, from the task file route. */
@@ -777,7 +777,7 @@ function Payoff({
   received: Recorded[];
   property: { label: string; photoUrl: string | null } | null;
 }) {
-  const to = joinNames(staffNames) || "HG";
+  const to = joinNames(staffNames) || "HG Capital";
   // The button that opened this view is gone: move focus here, so it's read
   // out and Esc still closes the sheet.
   const heading = useRef<HTMLHeadingElement>(null);

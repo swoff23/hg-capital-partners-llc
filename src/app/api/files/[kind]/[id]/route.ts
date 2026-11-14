@@ -35,9 +35,10 @@ export const maxDuration = 300;
  *   private are still public blobs, so for staff `get` is tried with private
  *   access first, then public, until "Move documents to private storage"
  *   (Settings → Storage) has re-uploaded them.
- * - Contractors get task files only: Shared, not removed, on a job they can
+ * - Contractors get task files: Shared, not removed, on a job they can
  *   open (core.assertContractorAccess), and only from our private store.
- *   Never property documents, never the public fallback.
+ *   Never property documents, never the public fallback. And their own W-9
+ *   and insurance (`contact`), which staff see too.
  *
  * `?v=thumb` / `?v=poster` serve the row's thumbnail or video poster,
  * authorized by the row itself. A LINK row has no bytes here (the UI links
@@ -58,6 +59,8 @@ type Viewer = { kind: "staff"; onlyTaskId?: string | null } | { kind: "contracto
 const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   task: ["staff", "contractor"],
   property: ["staff"],
+  // A contractor's W-9 or insurance (docs/specs/contractor-onboarding.md, section 6): staff, and the contractor it belongs to.
+  contact: ["staff", "contractor"],
 };
 
 interface Served {
@@ -137,6 +140,15 @@ async function lookup(kind: string, id: string, variant: Variant | null, viewer:
       contentType: a.contentType,
       publicFallback: viewer.kind === "staff",
     };
+  }
+  if (kind === "contact" && !variant) {
+    const d = await prisma.contactDocument.findUnique({ where: { id }, select: { contactId: true, url: true, pathname: true, filename: true, contentType: true } });
+    if (!d) return null;
+    if (viewer.kind === "contractor" && (viewer.onlyTaskId || d.contactId !== viewer.contactId)) return null;
+    if (viewer.kind === "staff" && viewer.onlyTaskId) return null;
+    // Uploaded to the private store only (contact-documents.ts checks it), so there's no public fallback to try.
+    if (!isPrivateStoreUrl(d.url, storeId, d.pathname)) return null;
+    return { source: d.url, privatePathname: d.pathname, filename: d.filename, contentType: d.contentType, publicFallback: false };
   }
   if (kind === "property" && viewer.kind === "staff" && !variant) {
     const a = await prisma.propertyAttachment.findUnique({ where: { id } });

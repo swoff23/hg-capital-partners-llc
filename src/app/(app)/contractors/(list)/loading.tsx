@@ -1,8 +1,8 @@
-import { Plus } from "lucide-react";
 import { Block, LoadingScreen, Words, rowWidth } from "@/components/skeleton";
-import { LinkButton, PageHeader, Table, Td, Th, chromeIconClass } from "@/components/ui";
+import { PageHeader, Table, Td, Th } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ContractorFiltersPlaceholder } from "../filters";
+import { ContractorHeaderActions } from "../invite-sheet";
 
 /**
  * Eight rows' words, at the lengths names and companies run to, so the
@@ -23,7 +23,7 @@ const ROWS: { name: string[]; company: string[]; trades: string[] }[] = [
 
 /**
  * Contractors while the list loads (docs/specs/performance.md 4.3): the title,
- * New contractor, the filter bar and Name, Company, Trades, Phone and Docs
+ * Sign-up link and Invite contractor, the filter bar and Name, Company, Trades, Phone and Docs
  * draw at once, with the page's own hiding classes; the count and 8 rows are
  * --fill-1 blocks in the page's cells, the name over its subline below sm.
  */
@@ -33,12 +33,7 @@ export default function ContractorsLoading() {
       <PageHeader
         title="Contractors"
         subtitle={<Block text="text-body" className="w-28" />}
-        actions={
-          <LinkButton href="/contractors/new" variant="primary">
-            <Plus aria-hidden="true" className={chromeIconClass} />
-            New contractor
-          </LinkButton>
-        }
+        actions={<ContractorHeaderActions />}
       />
       <ContractorFiltersPlaceholder />
       <Table className="mt-4">

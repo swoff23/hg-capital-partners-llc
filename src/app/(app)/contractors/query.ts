@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { docOnFile } from "@/lib/contacts";
 import { tradeKey } from "@/lib/contractors/trade-map";
+import { isOnboardingStatus, onboardingStatus, type OnboardingStatus, type SignupSourceValue } from "@/lib/contractors/onboarding";
 import { hasTradeNamed } from "@/lib/contractors/trades";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
 import { archivedRecord, liveRecord } from "@/lib/record-scope";
@@ -9,17 +10,20 @@ import { everyTermMatches, searchTerms } from "@/lib/search";
 /*
  * What the Contractors page asks of the database (docs/specs/selectors.md 5,
  * search 2.11): a search over the name, company and trades; a Trade filter
- * with several picks; and two yes or no filters, "Has login" and "Needs W-9".
+ * with several picks; a Status filter (New, Invited, Opened, Onboarding: the
+ * badge beside the name); and two yes or no filters, "Has login" and "Needs W-9".
  * A third, "Archived", swaps the list for the archived contractors, whom
  * nothing else shows (lib/archive.ts). Pure, so query.test.ts checks it
  * without a database. The URL: `q`, `trade` (trade ids, comma-joined),
- * `login=1`, `w9=1` and `archived=1`.
+ * `status` (comma-joined), `login=1`, `w9=1` and `archived=1`.
  */
 
 export interface ContractorFilters {
   q: string;
   /** Trade ids, or names from an older link until `resolveTradePicks` reads them. */
   trades: string[];
+  /** Onboarding statuses: a row passes when its badge is one of them. Empty keeps everyone. */
+  status: OnboardingStatus[];
   hasLogin: boolean;
   needsW9: boolean;
   /** The archived contractors instead of the rest. */
@@ -33,6 +37,7 @@ export function parseContractorFilters(sp: Params): ContractorFilters {
   return {
     q: str(sp.q).trim(),
     trades: parseFacet(str(sp.trade)),
+    status: parseFacet(str(sp.status)).filter(isOnboardingStatus),
     hasLogin: str(sp.login) === "1",
     needsW9: str(sp.w9) === "1",
     archived: str(sp.archived) === "1",
@@ -43,13 +48,14 @@ export function parseContractorFilters(sp: Params): ContractorFilters {
 export const contractorScope = (f: Pick<ContractorFilters, "archived">) => (f.archived ? archivedRecord : liveRecord);
 
 /** Whether anything narrows the list: the subtitle reads "4 of 52" and the result line shows. Archived is a different list, not a narrowing. */
-export const isNarrowed = (f: ContractorFilters) => f.q !== "" || f.trades.length > 0 || f.hasLogin || f.needsW9;
+export const isNarrowed = (f: ContractorFilters) => f.q !== "" || f.trades.length > 0 || f.status.length > 0 || f.hasLogin || f.needsW9;
 
 /** The query as a URL query string, for tests and links. */
 export function contractorQuery(f: ContractorFilters): string {
   const p = new URLSearchParams();
   if (f.q) p.set("q", f.q);
   if (f.trades.length) p.set("trade", joinFacet(f.trades));
+  if (f.status.length) p.set("status", joinFacet(f.status));
   if (f.hasLogin) p.set("login", "1");
   if (f.needsW9) p.set("w9", "1");
   if (f.archived) p.set("archived", "1");
@@ -87,8 +93,9 @@ export function tradeOptions(trades: readonly { id: string; name: string }[], ro
 
 /**
  * The search and "Has login" as a `where`, and "Needs W-9" as far as the
- * database can take it (no W-9 link). The Trade filter and the rest of
- * "Needs W-9" are applied on the rows (`matchesTrades`, `matchesNeedsW9`):
+ * database can take it (no W-9 link, and no W-9 uploaded). The Trade and Status
+ * filters and the rest of "Needs W-9" are applied on the rows (`matchesTrades`,
+ * `matchesStatus`, `matchesNeedsW9`):
  * the rows without the Trade filter are what the checklist's counts come
  * from, and a W-9 named in the notes is read by `docOnFile`, as the list's
  * Docs column reads it. A login is an active portal account. The search
@@ -100,30 +107,71 @@ export function contractorsWhere(f: ContractorFilters): Prisma.ContactWhereInput
     contractorScope(f),
     terms.length > 0 ? everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)]) : {},
     f.hasLogin ? { portalAccount: { is: { status: "ACTIVE" } } } : {},
-    f.needsW9 ? { w9Url: null } : {},
+    f.needsW9 ? { w9Url: null, documents: { none: { kind: "W9" } } } : {},
   ];
   return { AND: parts.filter((p) => Object.keys(p).length > 0) };
 }
 
 /**
- * Whether a contractor passes "Needs W-9": no link, and no "W-9 on file:" line
- * with a name after it in the notes. The same rule the Docs column shows.
+ * Whether a contractor passes "Needs W-9": no link, no uploaded W-9, and no
+ * "W-9 on file:" line with a name after it in the notes. The same rule the
+ * Docs column shows.
  */
-export function matchesNeedsW9(c: { w9Url: string | null; comments: string | null }, f: Pick<ContractorFilters, "needsW9">): boolean {
-  return !f.needsW9 || (!c.w9Url && !docOnFile(c.comments, "W-9"));
+export function matchesNeedsW9(
+  c: { w9Url: string | null; comments: string | null; documents?: readonly { kind: string }[] },
+  f: Pick<ContractorFilters, "needsW9">,
+): boolean {
+  return !f.needsW9 || (!c.w9Url && !c.documents?.some((d) => d.kind === "W9") && !docOnFile(c.comments, "W-9"));
+}
+
+/** What the onboarding badge reads: the invite, the login and the setup fields (include `STATUS_INCLUDE` for them). */
+export type StatusRow = {
+  signupSource: SignupSourceValue;
+  needsReview: boolean;
+  setupDoneAt: Date | null;
+  portalAccount: { id: string } | null;
+  /** Their newest personal invite, alone. */
+  portalInvites: readonly { openedAt: Date | null }[];
+  /** Archived: no badge (an archived sign-up keeps needsReview so Undo brings them back as New). */
+  archivedAt?: Date | null;
+};
+
+/** The relations a row needs for `statusOf`: the login's id and the newest personal invite's opened time. */
+export const STATUS_INCLUDE = {
+  portalAccount: { select: { id: true } },
+  portalInvites: { where: { shared: false }, orderBy: { createdAt: "desc" }, take: 1, select: { openedAt: true } },
+} as const satisfies Prisma.ContactInclude;
+
+/** The badge a row carries (New, Invited, Opened, Onboarding), or null. The list and the filter both read it. */
+export function statusOf(c: StatusRow): OnboardingStatus | null {
+  if (c.archivedAt) return null;
+  return onboardingStatus({
+    signupSource: c.signupSource,
+    needsReview: c.needsReview,
+    setupDoneAt: c.setupDoneAt,
+    hasLogin: !!c.portalAccount,
+    inviteOpened: !!c.portalInvites[0]?.openedAt,
+  });
+}
+
+/** Whether a contractor's badge is one of the picked statuses; no picks keeps everyone. */
+export function matchesStatus(c: StatusRow, picks: readonly OnboardingStatus[]): boolean {
+  if (picks.length === 0) return true;
+  const s = statusOf(c);
+  return !!s && picks.includes(s);
 }
 
 /**
  * The one sentence an empty list says, and the way out. `total` is the
  * list's whole: the archived ones under Archived. A search with a filter on
- * (Has login, Needs W-9, a trade) blames neither alone: "these filters", and
+ * (Has login, Needs W-9, a trade, a status) blames neither alone: "these filters", and
  * Clear filters takes off both, as the Tasks and Deals lists do. Blaming the
  * search offered Clear search, which only led to a second empty list.
  */
 export function emptyContractors(f: ContractorFilters, total: number): { line: string; clear: "search" | "filters" | null } {
   if (f.archived && total === 0) return { line: "No archived contractors.", clear: "filters" };
   if (total === 0) return { line: "No contractors yet.", clear: null };
-  const filtered = f.trades.length > 0 || f.hasLogin || f.needsW9;
+  const filtered = f.trades.length > 0 || f.status.length > 0 || f.hasLogin || f.needsW9;
   if (f.q && !filtered) return { line: `No contractors match “${f.q}”.`, clear: "search" };
   return { line: "No contractors match these filters.", clear: "filters" };
 }

@@ -57,6 +57,9 @@ model User {
   archivedContacts            Contact[]            @relation("ContactArchivedBy")
   // A partner's job-email links, which only show that email's photos.
   jobLinks                    JobLink[]            @relation("JobLinkUser")
+  // Contractor onboarding (docs/specs/contractor-onboarding.md): invites a partner sent, and a contractor's Keep or Baselane note.
+  sentPortalInvites           PortalInvite[]       @relation("PortalInviteCreatedBy")
+  uploadedContactDocuments    ContactDocument[]    @relation("ContactDocumentUploadedByUser")
 
   qboConnections QuickbooksConnection[]
 }
@@ -284,6 +287,24 @@ model Contact {
   taskReadStates      TaskReadState[]
   notifications       NotificationOutbox[]
 
+  // Onboarding (docs/specs/contractor-onboarding.md, section 5). Only people who came in by a personal invite or the
+  // shared sign-up link are ever in setup; every row from before it, and anyone staff add, is STAFF and never is.
+  signupSource   SignupSource      @default(STAFF)
+  // A sign-up from the shared link waits for a partner's Keep (the New badge and Home's Needs you row).
+  needsReview    Boolean           @default(false)
+  // The furthest setup step saved ("details", "trades", "w9", "insurance"), for "W-9 · 4 of 6".
+  setupStep      String?
+  // Details, trades and a W-9 are in: the contractor is Active, and Needs you asks for the Baselane link.
+  setupDoneAt    DateTime?
+  // "Anything we didn't list?" on the trades step.
+  tradesNote     String?
+  // "I don't carry business insurance".
+  noInsurance    Boolean           @default(false)
+  // When a partner sent Baselane's bank-details link (Needs you, Sent).
+  baselaneSentAt DateTime?
+  portalInvites  PortalInvite[]
+  documents      ContactDocument[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -293,6 +314,64 @@ model Contact {
 // What contractors do (docs/specs/contractor-trades.md): each trade once,
 // and who does which. Staff add a trade from the picker; the names follow
 // src/lib/contractors/trade-map.ts.
+// A personal invite, or the one shared sign-up link (docs/specs/contractor-onboarding.md, sections 3 and 6). The
+// token goes only into the text or email; this keeps its SHA-256, as for reset links (lib/portal/tokens.ts).
+model PortalInvite {
+  id              String    @id @default(cuid())
+  // The person a personal invite is for. Null on the shared link.
+  contact         Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId       String?
+  shared          Boolean   @default(false)
+  tokenHash       String    @unique
+  // What the partner typed, prefilled on the account step.
+  email           String?
+  phone           String?
+  createdBy       User?     @relation("PortalInviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+  // Set from the browser after the page loads, so a link preview's fetch doesn't count (section 6).
+  openedAt        DateTime?
+  // A personal invite works once.
+  usedAt          DateTime?
+  // A personal invite lasts 14 days. Resend, or Reset link for the shared one, sets it to now.
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([contactId])
+  @@index([shared])
+}
+
+// A contractor's W-9 or insurance file, uploaded during setup (or later, from the account menu). Private Blob; served
+// to staff and to the contractor it belongs to.
+model ContactDocument {
+  id                  String         @id @default(cuid())
+  contact             Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId           String
+  kind                ContactDocKind
+  url                 String
+  pathname            String         @unique
+  filename            String
+  size                Int
+  contentType         String?
+  // The contractor, from the portal (no relation: a contact's own file).
+  uploadedByContactId String?
+  uploadedByUser      User?          @relation("ContactDocumentUploadedByUser", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  uploadedByUserId    String?
+  createdAt           DateTime       @default(now())
+
+  @@index([contactId, kind])
+}
+
+enum SignupSource {
+  STAFF
+  INVITE
+  LINK
+}
+
+enum ContactDocKind {
+  W9
+  INSURANCE
+}
+
 model Trade {
   id        String         @id @default(cuid())
   name      String // "Plumbing", "Pest control"

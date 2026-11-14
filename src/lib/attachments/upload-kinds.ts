@@ -14,6 +14,11 @@ import type { FileKind } from "./content-types";
  *   property-upload        staff, a property's documents    { propertyId, fileKind }
  *   listing-photo-upload   staff, a listing's public photos { propertyId }
  *   property-photo-upload  staff, the building's photo      { propertyId }
+ *   portal-contact-upload  a contractor, their W-9 or insurance { contactId, docKind, fileKind }
+ *   contact-upload         staff, a contractor's W-9 or insurance { contactId, docKind, fileKind }
+ *
+ * A contact document's parentId is "<contactId>:<docKind>" (contactDocParent), so the W-9 and the insurance are
+ * two targets in the queue, each with its own folder.
  */
 export const UPLOAD_KINDS = [
   "task-upload",
@@ -21,17 +26,21 @@ export const UPLOAD_KINDS = [
   "property-upload",
   "listing-photo-upload",
   "property-photo-upload",
+  "portal-contact-upload",
+  "contact-upload",
 ] as const;
 
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
 
 /** The clientPayload key naming the row each kind uploads to, which the token route checks. */
-export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId"> = {
+export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "contactId"> = {
   "task-upload": "taskId",
   "portal-task-upload": "taskId",
   "property-upload": "propertyId",
   "listing-photo-upload": "propertyId",
   "property-photo-upload": "propertyId",
+  "portal-contact-upload": "contactId",
+  "contact-upload": "contactId",
 };
 
 /** Listing and property photos are public Blob (the public site and PhotoThumb read them); everything else is private. */
@@ -41,6 +50,8 @@ export const UPLOAD_KIND_ACCESS: Record<UploadKind, "private" | "public"> = {
   "property-upload": "private",
   "listing-photo-upload": "public",
   "property-photo-upload": "public",
+  "portal-contact-upload": "private",
+  "contact-upload": "private",
 };
 
 /**
@@ -57,6 +68,10 @@ export const UPLOAD_KIND_ALLOWED: Record<UploadKind, readonly FileKind[]> = {
   "property-upload": ["image", "file"],
   "listing-photo-upload": ["image"],
   "property-photo-upload": ["image"],
+  // A W-9 or a policy: a phone photo or a PDF.
+  "portal-contact-upload": ["image", "file"],
+  // One that came by email: a phone photo or a PDF, as the contractor's own.
+  "contact-upload": ["image", "file"],
 };
 
 /** The kinds whose record step keeps a thumbnail and a video poster (TaskAttachment.thumbPathname, posterPathname). */
@@ -66,6 +81,8 @@ export const UPLOAD_KIND_PREVIEWS: Record<UploadKind, boolean> = {
   "property-upload": false,
   "listing-photo-upload": false,
   "property-photo-upload": false,
+  "portal-contact-upload": false,
+  "contact-upload": false,
 };
 
 export function isUploadKind(kind: unknown): kind is UploadKind {
@@ -85,6 +102,8 @@ export function uploadTargetKey(kind: UploadKind, parentId: string): string {
     "property-upload": "property-doc",
     "listing-photo-upload": "listing",
     "property-photo-upload": "property-photo",
+    "portal-contact-upload": "portal-contact",
+    "contact-upload": "contact-doc",
   };
   return `${prefix[kind]}:${parentId}`;
 }
@@ -97,6 +116,10 @@ export function uploadTargetHref(kind: UploadKind, parentId: string): string {
       return `/tasks/${id}`;
     case "portal-task-upload":
       return `/p/jobs/${id}`;
+    case "portal-contact-upload":
+      return "/p/setup";
+    case "contact-upload":
+      return `/contractors/${encodeURIComponent(readContactDocParent(parentId)?.contactId ?? "")}`;
     default:
       return `/properties/${id}`;
   }
@@ -143,5 +166,25 @@ export function uploadRequest(
       return { pathname: slug, clientPayload: owned({ propertyId: parentId }) };
     case "property-photo-upload":
       return { pathname: `properties/${parentId}/photo/${slug}`, clientPayload: owned({ propertyId: parentId }) };
+    case "portal-contact-upload":
+    case "contact-upload": {
+      const parent = readContactDocParent(parentId);
+      const contactId = parent?.contactId ?? "";
+      const docKind = parent?.docKind ?? "w9";
+      return { pathname: `contacts/${contactId}/${docKind}/${slug}`, clientPayload: owned({ contactId, docKind, fileKind: file.fileKind }) };
+    }
   }
+}
+
+/** A contractor document's folder name: "w9" or "insurance". */
+export type ContactDocFolder = "w9" | "insurance";
+
+/** The parentId of a contractor's W-9 or insurance upload target. */
+export function contactDocParent(contactId: string, docKind: ContactDocFolder): string {
+  return `${contactId}:${docKind}`;
+}
+
+export function readContactDocParent(parentId: string): { contactId: string; docKind: ContactDocFolder } | null {
+  const m = /^([A-Za-z0-9_-]{1,64}):(w9|insurance)$/.exec(parentId);
+  return m ? { contactId: m[1], docKind: m[2] as ContactDocFolder } : null;
 }

@@ -23,6 +23,14 @@ The code is in and does nothing until Sentry is connected. It's free: Sentry's f
 - [ ] In Resend, confirm the team email it notifies about a failing webhook is yours.
 - [ ] In Supabase (project ywdjaygwkqyrmbdnvaai), open Database, then Backups, and confirm daily backups are listed.
 
+## Retire the contractor Google Form
+
+Contractor onboarding is live (Nov 14, [contractor-onboarding.md](specs/contractor-onboarding.md)): Invite contractor and the Sign-up link on the Contractors page, and new people set up their own account, trades, W-9 and insurance in the portal. Bank details go through Baselane's own link.
+
+- [ ] Try it once: send yourself an invite, sign up on your phone, and upload a W-9. Uploads couldn't be tried before launch, so this is the first real one.
+- [ ] Turn off responses on the Google Form ("HG Capital – Contractor Onboarding Form").
+- [ ] Delete the five bank columns (H to L of "Contractor Info": bank name, account type, name on account, routing and account number) from its responses sheet, or lock the sheet to you only. It's the most exposed copy of contractors' bank numbers you hold.
+
 ## Asana import
 
 Asana access ends around **Nov 1**, so these need doing by about **Thu Oct 29**.
@@ -57,7 +65,6 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
 - [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
-- [ ] In Vercel, turn on Skew Protection (Project Settings, Advanced). Now that you're on Pro, it keeps a page that was open during a deploy talking to the version it loaded, instead of failing its next save.
 
 ## Small calls (no rush)
 
@@ -68,6 +75,8 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 ## Done
 
 - Nov 14: email turned on. `CRON_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` and `EMAIL_REPLY_TO` are in Vercel, and `mail.hgcapitalpartners.com` is set up in Resend.
+- Nov 14: Skew Protection is on in Vercel with a 12-hour max age. It starts with the next deploy.
+- Nov 14: `CONNOR_PASSWORD` and `PIETER_PASSWORD` deleted from Vercel. Both passwords were already saved in the database, so sign-in is unchanged.
 
 - Oct 25: the Ink and Limestone brand and Home as Today, built and landed. The guidelines are in [brand-guidelines.md](brand-guidelines.md).
 - Oct 25: approved the six component specs with every recommendation. "Our price" on deals means the target offer. They build in seven chunks.

@@ -30,7 +30,7 @@ const GROUPS = [
 
 /**
  * My jobs while it loads (docs/specs/performance.md 4.3): the bar's monogram
- * and HG Jobs draw at once; the account button, the greeting (it carries the
+ * and the wordmark draw at once; the account button, the greeting (it carries the
  * contractor's name), the two switches and 4 job rows (photo, title, address
  * and date) are --fill-1 blocks on the page's own boxes. Nothing here reads
  * the session or a job.

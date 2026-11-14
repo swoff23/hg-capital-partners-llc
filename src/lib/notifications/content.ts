@@ -483,7 +483,7 @@ export function replyLine(staffNames: readonly string[]): string {
   const names = joinNames([...staffNames]);
   if (staffNames.length > 2) return `Reply in the job so ${names} all see it.`;
   if (staffNames.length === 2) return `Reply in the job so ${names} both see it.`;
-  return `Reply in the job so ${names || "HG"} sees it.`;
+  return `Reply in the job so ${names || "HG Capital"} sees it.`;
 }
 
 /**
@@ -572,7 +572,7 @@ function footnoteFor(input: {
   const open = isActiveStatus(input.status);
   if (input.audience === "contractor") {
     if (!input.replyByEmail) return open ? { footnote: replyLine(input.staffNames ?? []) } : {};
-    return { footnote: open ? "Reply to add a comment. Photos you attach go on the job." : `Reply to reach ${joinNames([...(input.staffNames ?? [])]) || "HG"}.` };
+    return { footnote: open ? "Reply to add a comment. Photos you attach go on the job." : `Reply to reach ${joinNames([...(input.staffNames ?? [])]) || "HG Capital"}.` };
   }
   const name = greetingName(input.contractorName);
   return input.replyByEmail && name ? { footnote: `Reply to answer ${name}. It goes on the job.` } : {};

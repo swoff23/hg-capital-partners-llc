@@ -27,6 +27,7 @@ import {
   setPortalJobEmails,
   signOutPortalEverywhere,
 } from "../actions";
+import { ResendInviteSheet } from "../invite-sheet";
 
 export type PortalAccountView = {
   id: string;
@@ -53,6 +54,15 @@ const BADGE: Record<PortalAccessState, string> = {
   invited: "Invited",
   active: "Active",
   off: "Access off",
+};
+
+/** Someone who came in by an invite and hasn't made their account: where the invite stands (docs/specs/contractor-onboarding.md, 4.4). */
+export type InviteView = {
+  state: "invited" | "opened";
+  /** "Sent Nov 14 · not opened" or "Opened Nov 15 · no account yet". */
+  line: string;
+  /** They have an email on file, so Email invite works from Resend. */
+  hasEmail: boolean;
 };
 
 /** A fact beside its label, on the same 112px label column (96 on phones) as the Contact rail above. */
@@ -93,6 +103,8 @@ export function PortalAccessCard({
   appUrl,
   account,
   archived,
+  invite = null,
+  setupLine = null,
 }: {
   contactId: string;
   contactName: string;
@@ -102,6 +114,10 @@ export function PortalAccessCard({
   account: PortalAccountView | null;
   /** The contractor is archived: no new login and no restored access until they are restored. */
   archived: boolean;
+  /** An invited contractor with no login yet: replaces "No login yet" with where the invite stands, and Resend. */
+  invite?: InviteView | null;
+  /** A contractor who signed up and hasn't finished setup: "W-9 · 4 of 6". Their login works as any other. */
+  setupLine?: string | null;
 }) {
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -113,6 +129,8 @@ export function PortalAccessCard({
   const [createKey, setCreateKey] = useState(0);
   const [changing, setChanging] = useState(false);
   const [changeKey, setChangeKey] = useState(0);
+  const [resending, setResending] = useState(false);
+  const [resendKey, setResendKey] = useState(0);
   const [confirm, setConfirm] = useState<"reset" | "remove" | null>(null);
   const first = firstName(contactName) || contactName;
   const offers = loginOffers(account, archived);
@@ -136,9 +154,12 @@ export function PortalAccessCard({
     <Section
       title="Portal access"
       actions={
-        account && (
+        !account && invite ? (
+          <Badge>{invite.state === "opened" ? "Opened" : "Invited"}</Badge>
+        ) : (
+          account && (
           <>
-            <Badge>{BADGE[account.state]}</Badge>
+            <Badge>{setupLine && account.state !== "off" ? "Onboarding" : BADGE[account.state]}</Badge>
             <MenuTrigger>
               <AriaButton
                 aria-label="Portal access actions"
@@ -159,12 +180,30 @@ export function PortalAccessCard({
               </Menu>
             </MenuTrigger>
           </>
+          )
         )
       }
       className="@container"
     >
       <div className="space-y-3">
-        {!account && (
+        {!account && invite && (
+          <div className="space-y-2">
+            <p className="text-meta text-fg-3">{invite.line}</p>
+            {!archived && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setResendKey((k) => k + 1);
+                  setResending(true);
+                }}
+              >
+                Resend
+              </Button>
+            )}
+          </div>
+        )}
+        {!account && !invite && (
           <div className="space-y-2">
             <p className="text-meta text-fg-3">No login yet.</p>
             {offers.create && (
@@ -190,6 +229,12 @@ export function PortalAccessCard({
                 {account.line && <p className="truncate text-meta text-fg-3">{account.line}</p>}
               </dd>
             </dl>
+            {setupLine && account.state !== "off" && (
+              <dl className={detailRow}>
+                <dt className="text-meta text-fg-3">Setup</dt>
+                <dd className="min-w-0 text-body text-fg-1">{setupLine}</dd>
+              </dl>
+            )}
             {account.state !== "off" && (
               <div>
                 <dl className={cn(detailRow, "items-center")}>
@@ -257,6 +302,9 @@ export function PortalAccessCard({
       {/* Mounted on "no login yet", not on offers.create: a tab loaded before the contractor was archived can have this
           open when the server refuses, and the refresh that follows must not take the sheet (and its inline "Restore
           this contractor first.") away. On an archived page nothing opens it, since the button is gone. */}
+      {!account && invite && (
+        <ResendInviteSheet key={resendKey} contactId={contactId} first={first} hasEmail={invite.hasEmail} isOpen={resending} onOpenChange={setResending} />
+      )}
       {!account && (
         <CreateLoginSheet
           key={createKey}

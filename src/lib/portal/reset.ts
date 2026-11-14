@@ -91,7 +91,7 @@ export async function startPasswordReset(rawEmail: string, ipHash: string): Prom
 async function sendResetEmail(to: string, request: { token: string; eventId: string; data: ResetRequestData }): Promise<void> {
   try {
     const { text, html } = renderPlainEmail({
-      line: "Here's your link to choose a new password for HG jobs.",
+      line: "Here's your link to choose a new password for HG Capital jobs.",
       buttonLabel: "Choose a new password",
       buttonUrl: `${getEnv().appUrl}${RESET_PATH}?token=${request.token}`,
       footnote: "The link works for 30 minutes. If you didn't ask for it, you can ignore this email.",
@@ -100,7 +100,7 @@ async function sendResetEmail(to: string, request: { token: string; eventId: str
     await deliverResetEmail(prisma, sendEmail, {
       eventId: request.eventId,
       data: request.data,
-      msg: { to, subject: "Reset your HG password", text, html },
+      msg: { to, subject: "Reset your HG Capital password", text, html },
     });
   } catch (err) {
     logError("portal:reset-email", err);

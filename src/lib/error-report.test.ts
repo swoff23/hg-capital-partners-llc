@@ -12,6 +12,12 @@ test("a one-tap job link's token never leaves, wherever the address appears", ()
   assert.equal(scrubText("Failed for /j/tok123 and /j/tok456"), "Failed for /j/[token] and /j/[token]");
 });
 
+test("a contractor invite or sign-up link's token never leaves either", () => {
+  assert.equal(scrubText("https://hgcapitalpartners.com/join/inviteTOKEN42"), "https://hgcapitalpartners.com/join/[token]");
+  assert.equal(scrubText("POST /join/abc?x=1"), "POST /join/[token]?x=1");
+  assert.equal(scrubText("/joined/abc"), "/joined/abc", "only the /join/ route");
+});
+
 test("a token, an OAuth code or a secret in a query value is redacted; other values stay", () => {
   assert.equal(scrubText("/login/reset?token=s3cret&next=%2Ftasks"), "/login/reset?token=[redacted]&next=%2Ftasks");
   assert.equal(scrubText("/api/quickbooks/callback?code=AB12&state=xyz&realmId=9"), "/api/quickbooks/callback?code=[redacted]&state=[redacted]&realmId=9");
@@ -114,6 +120,7 @@ test("the area comes from the address, and `/` is left open", () => {
   assert.equal(areaOfPath("/p/jobs/abc"), "portal");
   assert.equal(areaOfPath("/p"), "portal");
   assert.equal(areaOfPath("/j/tok"), "portal");
+  assert.equal(areaOfPath("/join/tok"), "portal");
   assert.equal(areaOfPath("/login/reset?token=x"), "sign-in");
   assert.equal(areaOfPath("/residents/moving-in"), "public");
   assert.equal(areaOfPath("/rentals"), "public");

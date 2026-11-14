@@ -1,6 +1,6 @@
 # Copy rules
 
-These rules cover every string a person sees in HG Capital OS, the HG Jobs portal and the public site: labels, buttons, helper text, tooltips, toasts, errors, empty states, emails and public pages. People and agents both follow them. [CLAUDE.md](../CLAUDE.md) carries the short version, and [brand-guidelines.md](brand-guidelines.md), section 8, has the voice with before-and-after pairs.
+These rules cover every string a person sees in HG Capital OS, the contractor portal and the public site: labels, buttons, helper text, tooltips, toasts, errors, empty states, emails and public pages. People and agents both follow them. [CLAUDE.md](../CLAUDE.md) carries the short version, and [brand-guidelines.md](brand-guidelines.md), section 8, has the voice with before-and-after pairs.
 
 The aim is copy that reads like someone at a well-run property office wrote it. Cut anything that's filler, sounds AI-written, or doesn't help the reader do something.
 

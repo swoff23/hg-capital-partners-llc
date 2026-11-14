@@ -8,8 +8,9 @@ import type { Breadcrumb, BrowserOptions, Event } from "@sentry/browser";
  *
  * - Request bodies, cookies, query objects, headers other than the user
  *   agent, and IP addresses never leave.
- * - A token in a one-tap job link (/j/<token>) or in a query value
- *   (?token=, an OAuth ?code=) is replaced wherever it appears: the page
+ * - A token in a one-tap job link (/j/<token>), an invite or sign-up link
+ *   (/join/<token>) or a query value (?token=, an OAuth ?code=) is
+ *   replaced wherever it appears: the page
  *   address, the route name, the message, the click trail.
  * - The user is reduced to an ID. Extra fields pass only through an
  *   allowlist, so a field added to a log call later sends nothing until
@@ -38,13 +39,14 @@ export const DATA_COLLECTION: NonNullable<BrowserOptions["dataCollection"]> = {
   stackFrameVariables: false,
 };
 
-const JOB_LINK = /\/j\/(?!\[token\])[^/?#\s"'<>]+/g;
+/** One-tap job links (/j/<token>) and contractor invite and sign-up links (/join/<token>) carry a working token in the path. */
+const TOKEN_PATH = /\/(j|join)\/(?!\[token\])[^/?#\s"'<>]+/g;
 const SECRET_QUERY = /([?&](?:token|code|state|access_token|refresh_token|secret|signature|sig|key)=)[^&#\s"'<>]*/gi;
 const REDACTED = "[redacted]";
 
 /** Removes the tokens that work as a sign-in or a grant from any text that may hold an address. */
 export function scrubText(text: string): string {
-  return text.replace(JOB_LINK, "/j/[token]").replace(SECRET_QUERY, `$1${REDACTED}`);
+  return text.replace(TOKEN_PATH, "/$1/[token]").replace(SECRET_QUERY, `$1${REDACTED}`);
 }
 
 /** Extra fields that may leave: IDs, counts and kinds. Anything else, a subject line or a file name, stays home. */
@@ -165,7 +167,7 @@ function underAny(path: string, prefixes: string[]): boolean {
 export function areaOfPath(pathname: string): Area | null {
   const path = pathname.split(/[?#]/)[0] || "/";
   if (path === "/") return null;
-  if (underAny(path, ["/p", "/j"])) return "portal";
+  if (underAny(path, ["/p", "/j", "/join"])) return "portal";
   if (underAny(path, ["/login"])) return "sign-in";
   if (underAny(path, ["/api"])) return "api";
   if (underAny(path, PUBLIC_PREFIXES)) return "public";

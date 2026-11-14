@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { isFinalRefusal } from "@/lib/attachments/access";
-import { propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
+import { contactUploadLimits, propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
 import { appScope, ownerRefusal, portalScope } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
 import { UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
@@ -25,6 +25,8 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/property-upload        { propertyId, fileKind }           staff, documents and photos
  *   /api/blob/listing-photo-upload   { propertyId }                     staff, public photos
  *   /api/blob/property-photo-upload  { propertyId }                     staff, the building's public photo
+ *   /api/blob/portal-contact-upload  { contactId, docKind, fileKind }   contractor, their own W-9 or insurance
+ *   /api/blob/contact-upload         { contactId, docKind, fileKind }   staff, a contractor's W-9 or insurance
  *
  * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
  * uploaders send; the table below is typed against that list, so a kind
@@ -66,7 +68,7 @@ interface UploadKind {
   /** Who may mint a token for this kind. */
   principal: Uploader["kind"];
   /** clientPayload key naming the parent row. */
-  idKey: "taskId" | "propertyId";
+  idKey: "taskId" | "propertyId" | "contactId";
   /** Throws with a message the uploader can act on, or returns the token's limits. */
   authorize: (id: string, pathname: string, payload: Record<string, unknown>, who: Uploader) => Promise<Limits>;
 }
@@ -133,6 +135,32 @@ const KINDS: Record<string, UploadKind> = {
     principal: "staff",
     idKey: "propertyId",
     authorize: (id, pathname, payload) => propertyLimits("property-photo-upload", id, pathname, payload),
+  },
+  "portal-contact-upload": {
+    principal: "contractor",
+    idKey: "contactId",
+    // Their own record only, from a full sign-in (not a job link), and only someone who came in by an invite or the
+    // sign-up link: setup is theirs (docs/specs/contractor-onboarding.md, section 6).
+    authorize: async (contactId, pathname, payload, who) => {
+      const limits = contactUploadLimits(contactId, payload.docKind, pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      if (who.kind !== "contractor" || who.onlyTaskId || who.contactId !== contactId) throw new UploadRefusal("Not found");
+      const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { signupSource: true, archivedAt: true } });
+      if (!contact || contact.archivedAt || contact.signupSource === "STAFF") throw new UploadRefusal("Not found", true);
+      return limits;
+    },
+  },
+  "contact-upload": {
+    principal: "staff",
+    idKey: "contactId",
+    // A W-9 or policy that came by email, added from the contractor's page: any contractor still in the directory.
+    authorize: async (contactId, pathname, payload) => {
+      const limits = contactUploadLimits(contactId, payload.docKind, pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { archivedAt: true } });
+      if (!contact || contact.archivedAt) throw new UploadRefusal("Not found", true);
+      return limits;
+    },
   },
 } satisfies Record<UploadKindKey, UploadKind>;
 

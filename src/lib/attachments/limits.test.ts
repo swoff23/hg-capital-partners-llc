@@ -5,10 +5,12 @@ import {
   EMPTY_UPLOAD,
   PUBLIC_PHOTO_RULE,
   blobSizeRefusal,
+  contactUploadLimits,
   durationHint,
   mediaHint,
   pixelHint,
   propertyUploadLimits,
+  storedContactDocumentPath,
   storedPropertyDocumentPath,
   uploadLimits,
 } from "./limits";
@@ -163,4 +165,18 @@ test("blobSizeRefusal: the record step refuses a blob that arrived empty, and on
   assert.equal(blobSizeRefusal(1, cap), null);
   assert.equal(blobSizeRefusal(cap, cap), null);
   assert.equal(blobSizeRefusal(cap + 1, cap), "That file is over the 25 MB limit.");
+});
+
+test("contactUploadLimits: a contractor's W-9 or insurance, a photo or a document, in its own folder", () => {
+  const ok = contactUploadLimits("c123", "w9", "contacts/c123/w9/w9-signed.pdf", "file");
+  assert.equal(typeof ok, "object");
+  assert.equal(typeof contactUploadLimits("c123", "insurance", "contacts/c123/insurance/policy.jpg", "image"), "object");
+  assert.equal(typeof contactUploadLimits("c123", "w9", "contacts/c999/w9/w9.pdf", "file"), "string", "another contractor's folder");
+  assert.equal(typeof contactUploadLimits("c123", "w9", "contacts/c123/insurance/w9.pdf", "file"), "string", "the other document's folder");
+  assert.equal(typeof contactUploadLimits("c123", "passport", "contacts/c123/passport/p.pdf", "file"), "string");
+  assert.equal(typeof contactUploadLimits("c123", "w9", "contacts/c123/w9/clip.mp4", "video"), "string", "no videos");
+  assert.equal(typeof contactUploadLimits("c123", "w9", "contacts/c123/w9/w9.pdf", "image"), "string", "the name must match its kind");
+  assert.equal(storedContactDocumentPath("contacts/c123/w9/w9-signed-AbC123.pdf", "c123", "w9"), true);
+  assert.equal(storedContactDocumentPath("contacts/c123/w9/../x.pdf", "c123", "w9"), false);
+  assert.equal(storedContactDocumentPath("contacts/c123/insurance/p.pdf", "c123", "w9"), false);
 });

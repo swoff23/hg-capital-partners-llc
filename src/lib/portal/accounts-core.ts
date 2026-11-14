@@ -99,7 +99,10 @@ export async function createPortalAccountIn(
   contactId: string,
   email: string,
   passwordHash: string,
-  createdByUser: Staff,
+  createdByUser: Staff | null,
+  // A login from an invite or the sign-up link carries the password the contractor chose (contractor-onboarding.md):
+  // no first-password page, and the audit row names how it was made instead of a partner.
+  opts: { chosenPassword?: boolean; via?: "invite" | "link" } = {},
 ): Promise<CreatedPortalAccount> {
   await tx.$executeRaw`SELECT 1 FROM "Contact" WHERE "id" = ${contactId} FOR NO KEY UPDATE`;
   const contact = await tx.contact.findUnique({
@@ -116,10 +119,15 @@ export async function createPortalAccountIn(
   if (taken) throw new PortalAccountError("Another contractor already uses that email.");
 
   const created = await tx.portalAccount.create({
-    data: { contactId, email, passwordHash, mustChangePassword: true, createdByUserId: createdByUser.id },
+    data: { contactId, email, passwordHash, mustChangePassword: !opts.chosenPassword, createdByUserId: createdByUser?.id ?? null },
     select: CREATED_ACCOUNT_SELECT,
   });
-  await logSecurityEvent(tx, { kind: "ACCOUNT_CREATED", userId: createdByUser.id, contactId });
+  await logSecurityEvent(tx, {
+    kind: "ACCOUNT_CREATED",
+    userId: createdByUser?.id ?? null,
+    contactId,
+    ...(opts.via ? { data: { via: opts.via } } : {}),
+  });
   // A contact with no email gets the login's, so staff can reach them without a second step.
   // Written only while the email is still the empty one read above, so a save that lands in between is kept.
   if (!contact.email?.trim()) await tx.contact.updateMany({ where: { id: contactId, email: contact.email }, data: { email } });

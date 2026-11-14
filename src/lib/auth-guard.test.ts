@@ -48,6 +48,8 @@ const ALLOWLIST = new Set([
   "src/app/login/actions.ts#signOut", // only clears the caller's own cookie
   "src/app/login/actions.ts#requestPasswordReset", // same answer for every email; DB rate limit
   "src/app/(marketing)/residents/moving-in/actions.ts#submitMoveInInspection", // public form; IP and global caps
+  "src/app/join/[token]/actions.ts#createAccount", // a contractor's invite or the sign-up link; the single-use or resettable 32-byte token is the check, per-IP limit
+  "src/app/join/[token]/actions.ts#openInvite", // only stamps a first-open time on a live invite; the token is the check, returns nothing
   "/login/reset/submit", // the reset link's form; does nothing without a live single-use token
   "/api/health", // detail behind HEALTH_TOKEN
   "/api/quickbooks/sync", // CRON_SECRET

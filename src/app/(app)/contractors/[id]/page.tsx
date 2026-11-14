@@ -2,14 +2,14 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import { ArrowUpRight } from "lucide-react";
 import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordView } from "@/lib/recent-views";
 import { getEnv } from "@/lib/env";
-import { Badge, Section, textLinkClass } from "@/components/ui";
+import { Badge, Section } from "@/components/ui";
 import { RailFact } from "@/components/rail";
+import { ContactDocFact } from "./contact-doc-fact";
 import { BackLink } from "@/components/back-link";
 import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
 import { archivedLine, contractorArchiveRefusal, contractorJobsWhere, contractorOpenJobs } from "@/lib/archive";
@@ -21,9 +21,12 @@ import { portalAccess } from "@/lib/portal/access-state";
 import { STATUS_LABEL, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
+import { setupProgressLine } from "@/lib/contractors/onboarding";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import { ContactCompany, ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
+import { OnboardingBadge } from "../status-badge";
+import { statusOf } from "../query";
 import { setContractorArchived } from "../actions";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
@@ -49,16 +52,6 @@ async function signInOrigin(): Promise<string> {
   return host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : env.appUrl;
 }
 
-/** A document opened in a new tab, so the record stays open behind it. */
-function DocLink({ href }: { href: string }) {
-  return (
-    <a href={href} target="_blank" rel="noreferrer" className={textLinkClass}>
-      View
-      <ArrowUpRight className="ml-0.5 inline size-3.5 align-middle" aria-hidden="true" />
-    </a>
-  );
-}
-
 export default async function ContractorPage({ params }: PageProps<"/contractors/[id]">) {
   const { id } = await params;
   // The session check runs beside the first reads and is awaited with them, so nothing is shown without it.
@@ -73,6 +66,10 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
         },
         archivedByUser: { select: { name: true, email: true } },
         tradeLinks: TRADE_LINKS,
+        // The newest personal invite: when it was sent, opened, and whether it still works (the badge and the card's lines).
+        portalInvites: { where: { shared: false }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, openedAt: true, expiresAt: true } },
+        // The newest upload of each kind opens in the W-9 and Insurance facts.
+        documents: { orderBy: { createdAt: "desc" }, select: { id: true, kind: true } },
       },
     }),
     // For Archive's refusal: open jobs are reassigned first, counted as the archive counts them (lib/archive.ts),
@@ -100,10 +97,31 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   if (!(await isActionRender())) after(() => recordView(me.id, "CONTACT", c.id));
   const phone = c.phoneE164 ?? c.phone;
   const access = c.portalAccount ? portalAccess(c.portalAccount, c.active) : null;
+  const status = statusOf(c);
   const w9OnFile = docOnFile(c.comments, "W-9");
+  // An uploaded file (the files route, staff only) wins over an old Drive link, which wins over a name in the notes.
+  const w9Upload = c.documents.find((d) => d.kind === "W9");
+  const coiUpload = c.documents.find((d) => d.kind === "INSURANCE");
+  const w9Href = w9Upload ? `/api/files/contact/${w9Upload.id}` : c.w9Url;
+  const coiHref = coiUpload ? `/api/files/contact/${coiUpload.id}` : c.coiUrl;
+  const fromInvite = c.signupSource !== "STAFF";
   const coiOnFile = docOnFile(c.comments, "Insurance");
   // The import's "W-9 on file:" lines show as the W-9 and Insurance rows, not as notes.
   const { notes } = splitDocLines(c.comments);
+
+  // Buffalo's calendar day for each date the card and the Bank fact name ("Nov 14").
+  const todayDay = todayYmdEastern();
+  const dayOf = (d: Date) => fmtDay(todayYmdEastern(d), { year: "auto", now: todayDay });
+  const invite = c.portalInvites[0] ?? null;
+  const inviteView =
+    fromInvite && !c.portalAccount && invite
+      ? invite.openedAt
+        ? { state: "opened" as const, line: `Opened ${dayOf(invite.openedAt)} · no account yet` }
+        : {
+            state: "invited" as const,
+            line: invite.expiresAt && invite.expiresAt <= new Date() ? `Sent ${dayOf(invite.createdAt)} · expired` : `Sent ${dayOf(invite.createdAt)} · not opened`,
+          }
+      : null;
 
   const tasks = rows.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   // Buffalo's calendar day, not the server's (UTC on Vercel rolls over at 8pm).
@@ -139,6 +157,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
           <div className="-my-1 flex min-w-0 has-[input]:flex-1">
             <ContactCompany id={c.id} fullName={c.fullName} company={c.company} />
           </div>
+          {status && <OnboardingBadge status={status} className="shrink-0" />}
           {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
         </div>
         {c.archivedAt && (
@@ -171,18 +190,24 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             }}
             portalEmail={c.portalAccount?.email ?? null}
             tradeOptions={allTrades.map((t) => t.name)}
+            tradesNote={c.tradesNote}
           >
-            {/* What isn't edited here yet: the documents, which the uploads work takes. */}
-            <RailFact label="W-9">{c.w9Url ? <DocLink href={c.w9Url} /> : w9OnFile ? "On file" : null}</RailFact>
-            <RailFact
+            {/* The W-9 and the policy: View the newest, Replace with a newer one, or Add one that came by email. */}
+            <ContactDocFact contactId={c.id} kind="w9" label="W-9" name="W-9" href={w9Href} fallback={w9OnFile ? "On file" : null} warn={!c.archivedAt} />
+            <ContactDocFact
+              contactId={c.id}
+              kind="insurance"
               label={
                 <>
                   Insurance<span className="max-sm:hidden"> (COI)</span>
                 </>
               }
-            >
-              {c.coiUrl ? <DocLink href={c.coiUrl} /> : coiOnFile ? "On file" : null}
-            </RailFact>
+              name="Insurance"
+              href={coiHref}
+              fallback={coiOnFile ? "On file" : c.noInsurance ? "No insurance" : null}
+            />
+            {/* Bank details live in Baselane, never here; for someone who signed up, this says the link went. */}
+            {fromInvite && c.baselaneSentAt && <RailFact label="Bank">Baselane link sent {dayOf(c.baselaneSentAt)}</RailFact>}
           </ContactSection>
 
           <ContactNotes
@@ -209,6 +234,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             phone={phone}
             appUrl={await signInOrigin()}
             archived={!!c.archivedAt}
+            invite={inviteView ? { ...inviteView, hasEmail: !!c.email } : null}
+            setupLine={fromInvite && c.portalAccount && !c.setupDoneAt ? setupProgressLine(c.setupStep) : null}
             account={
               c.portalAccount && access
                 ? {

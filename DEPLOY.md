@@ -21,7 +21,7 @@ production builds only).
 | `RESEND_API_KEY`, `EMAIL_FROM` | for email | Resend key and a verified sender, e.g. `HG Capital <jobs@mail.hgcapitalpartners.com>`. Both or nothing; without them production sends no email. Task emails also need `CRON_SECRET`; password reset and the move-in report don't. |
 | `EMAIL_REPLY_TO` | optional | A plain address replies go to, e.g. `office@hgcapitalpartners.com`. Unset, replies go to `EMAIL_FROM`. |
 | `APP_URL` | for email | Origin for links in emails, `https://www.hgcapitalpartners.com`. Sending fails in production without it. |
-| `CONNOR_PASSWORD`, `PIETER_PASSWORD` | one-time | Hashed into the DB by the build (only when the user's hash is empty). Safe to delete once both users can sign in. |
+| `CONNOR_PASSWORD`, `PIETER_PASSWORD` | one-time | Hashed into the DB by the build (only when the user's hash is empty). Deleted from production on 2026-11-14 once both hashes were saved. Set one only while adding a user (README runbook), then delete it after the next build. |
 
 Generate a secret:
 

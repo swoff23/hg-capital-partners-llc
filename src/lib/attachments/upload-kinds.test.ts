@@ -8,7 +8,9 @@ import {
   UPLOAD_KIND_ALLOWED,
   UPLOAD_KIND_PARENT,
   UPLOAD_KIND_PREVIEWS,
+  contactDocParent,
   isUploadKind,
+  readContactDocParent,
   uploadRequest,
   uploadTargetHref,
   uploadTargetKey,
@@ -19,10 +21,10 @@ import { propertyUploadLimits, uploadLimits } from "./limits";
 const T = "cm1abc2def3ghi";
 const P = "cm9prop8erty7";
 
-test("UPLOAD_KINDS: the five token routes the uploads spec names, each with a parent and an access", () => {
+test("UPLOAD_KINDS: the five token routes the uploads spec names and the contractor's documents, each with a parent and an access", () => {
   assert.deepEqual(
     [...UPLOAD_KINDS],
-    ["task-upload", "portal-task-upload", "property-upload", "listing-photo-upload", "property-photo-upload"],
+    ["task-upload", "portal-task-upload", "property-upload", "listing-photo-upload", "property-photo-upload", "portal-contact-upload", "contact-upload"],
   );
   for (const k of UPLOAD_KINDS) {
     assert.ok(UPLOAD_KIND_PARENT[k], k);
@@ -157,4 +159,27 @@ test("uploadRequest: a contractor's token request carries queuedAt, nobody else'
   assert.deepEqual(JSON.parse(uploadRequest("portal-task-upload", T, file, { queuedAt: at }).clientPayload), { taskId: T, fileKind: "image", queuedAt: at });
   assert.deepEqual(JSON.parse(uploadRequest("portal-task-upload", T, file).clientPayload), { taskId: T, fileKind: "image" });
   assert.deepEqual(JSON.parse(uploadRequest("task-upload", T, file, { queuedAt: at }).clientPayload), { taskId: T, fileKind: "image" });
+});
+
+test("a contractor's W-9 and insurance are two targets, each in its own private folder", () => {
+  const w9 = contactDocParent("c123", "w9");
+  assert.equal(w9, "c123:w9");
+  assert.deepEqual(readContactDocParent(w9), { contactId: "c123", docKind: "w9" });
+  assert.deepEqual(readContactDocParent("c123:insurance"), { contactId: "c123", docKind: "insurance" });
+  assert.equal(readContactDocParent("c123:passport"), null);
+  assert.equal(readContactDocParent("../x:w9"), null);
+  assert.notEqual(uploadTargetKey("portal-contact-upload", w9), uploadTargetKey("portal-contact-upload", contactDocParent("c123", "insurance")));
+  assert.equal(UPLOAD_KIND_ACCESS["portal-contact-upload"], "private");
+  const req = uploadRequest("portal-contact-upload", w9, { name: "W9 signed.pdf", contentType: "application/pdf", fileKind: "file" }, { owner: "portal:c123" });
+  assert.match(req.pathname, /^contacts\/c123\/w9\/[A-Za-z0-9._-]+$/);
+  assert.deepEqual(JSON.parse(req.clientPayload), { contactId: "c123", docKind: "w9", fileKind: "file", owner: "portal:c123" });
+});
+
+test("staff add a contractor's W-9 to the same folder, under their own queue target, landing on the contractor's page", () => {
+  const parent = contactDocParent("c123", "w9");
+  assert.notEqual(uploadTargetKey("contact-upload", parent), uploadTargetKey("portal-contact-upload", parent));
+  assert.equal(uploadTargetHref("contact-upload", parent), "/contractors/c123");
+  assert.equal(UPLOAD_KIND_ACCESS["contact-upload"], "private");
+  const req = uploadRequest("contact-upload", parent, { name: "w9.jpg", contentType: "image/jpeg", fileKind: "image" }, { owner: "app:u1" });
+  assert.match(req.pathname, /^contacts\/c123\/w9\/[A-Za-z0-9._-]+$/);
 });
