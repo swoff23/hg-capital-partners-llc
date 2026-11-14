@@ -273,6 +273,7 @@ export function CommentEditor({
   note,
   hasFiles = false,
   noun = "comment",
+  maxLength = 20_000,
   onSave,
   onCancel,
 }: {
@@ -283,6 +284,8 @@ export function CommentEditor({
   hasFiles?: boolean;
   /** What the field and its refusal call it: "comment", or "note" on a deal ("Add some text, or delete the note"). */
   noun?: "comment" | "note";
+  /** The most the field takes, the caller's own limit: a task comment's 20,000 (the default), a deal note's 5,000. */
+  maxLength?: number;
   onSave: (body: string) => Promise<ActionResult<unknown>>;
   onCancel: () => void;
 }) {
@@ -331,7 +334,7 @@ export function CommentEditor({
         aria-label={`Edit ${noun}`}
         rows={1}
         value={value}
-        maxLength={20_000}
+        maxLength={maxLength}
         onChange={(e) => {
           setValue(e.target.value);
           setError(null);

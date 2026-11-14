@@ -28,6 +28,7 @@ import { railLineClass, railVerbClass } from "@/components/rail";
 import { Switch } from "@/components/switch";
 import { Button, FormField, Input, Kbd, fieldClass } from "@/components/ui";
 import { isCoarseNow } from "@/components/use-coarse-pointer";
+import { useLeaveWarning } from "@/components/use-leave-warning";
 import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { useRun } from "@/components/use-run";
 import type { AddressKind } from "@/lib/address-suggestions";
@@ -65,7 +66,9 @@ export type { InlineKind };
  * Commit: Enter, Tab (saves and moves to the next value; Enter opens it),
  * blur with a mouse, a pick, or Save in the sheet. A note (`multiline`)
  * commits only on Save or ⌘↵, never on blur, so a stray click can't rewrite a
- * tenant's text; a changed one holds the LeaveGuard. Esc puts the old value
+ * tenant's text; a changed one holds the LeaveGuard and, open in place, has
+ * the browser ask before a reload or a closed tab (useLeaveWarning; never on
+ * iOS, and never for a one-line fact, which saves on blur). Esc puts the old value
  * back, closes the field and returns focus to the value. Only a real edit
  * saves, sent with the value it loaded (`expected`), so a partner's newer
  * change refuses it.
@@ -411,6 +414,9 @@ function TextFact(props: InlineFieldProps) {
 
   const dirty = mode === "inline" && multiline && decideInlineEdit(kind, draft, value, {}).kind !== "same";
   useHoldLeave(dirty ? { title: `Leave without saving ${label.toLowerCase()}?`, stay: "Keep editing" } : null);
+  // The same test holds a reload or a closed tab: a note saves only on Save, so a paragraph can sit unsaved.
+  // One-line facts save when focus leaves them and never ask. Laptops only: iOS Safari never shows the question.
+  useLeaveWarning(dirty);
 
   function leave(returnFocus: boolean) {
     closing.current = true;

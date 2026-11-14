@@ -44,9 +44,14 @@ export type FieldErrors = Record<string, string>;
  * stale fields, who saved them when the row records it (a name; absent when
  * it doesn't), when (an ISO instant), and their values as text (forms 2.12).
  * The line on the one open field reads from it ("Pieter set this to $410,000
- * at 2:14 PM", with "Keep Pieter's" and "Save mine").
+ * at 2:14 PM", with "Keep Pieter's" and "Save mine"). `mine` is set when the
+ * newer change was the reader's own (their other tab, their phone): the lines
+ * then say "You" and carry no name (`conflictWho`).
  */
-export type ActionConflict = { fields: string[]; by?: string; at: string; theirs?: Record<string, string> };
+export type ActionConflict = { fields: string[]; by?: string; mine?: true; at: string; theirs?: Record<string, string> };
+
+/** What a conflict's lines read: who and when, and whether it was the reader's own change. */
+type ConflictSubject = Pick<ActionConflict, "by" | "at" | "mine">;
 
 /**
  * A failure carries one line in `error`, which every caller can show as it
@@ -91,14 +96,27 @@ export function conflictBy(by: string | null | undefined): string | undefined {
 }
 
 /**
+ * The subject of every conflict line, decided here for every area (properties, deals, task notes, Settings):
+ * "You" when the newer change was the reader's own, since their first name would read as someone else and the
+ * server knows the person, never the tab or the phone; otherwise the other person's first name; undefined when
+ * the row doesn't say who.
+ */
+export function conflictWho(conflict: Pick<ActionConflict, "by" | "mine">): string | undefined {
+  return conflict.mine ? "You" : conflictBy(conflict.by);
+}
+
+/**
  * The one-line form of a conflict, for a toast or the line above a primary:
- * "Pieter changed this at 2:14 PM." or, when the row doesn't say who,
+ * "Pieter changed this at 2:14 PM.", "You changed this at 2:14 PM." when the
+ * newer change was the reader's own, or, when the row doesn't say who,
  * "This changed at 2:14 PM." The field-level line with the value and the
  * Keep and Save mine buttons is the editor's (forms 2.8).
  */
-export function conflictMessage(conflict: Pick<ActionConflict, "by" | "at">, now: Date = new Date()): string {
-  const who = conflictBy(conflict.by);
+export function conflictMessage(conflict: ConflictSubject, now: Date = new Date()): string {
+  const who = conflictWho(conflict);
   const when = conflictWhen(conflict.at, now);
+  // Your own change with no time to give reads "You changed this."
+  if (conflict.mine) return when ? `You changed this ${when}.` : "You changed this.";
   const tail = when ? ` ${when}` : " since you opened it";
   return who ? `${who} changed this${tail}.` : `This changed${tail}.`;
 }
@@ -107,30 +125,31 @@ export function conflictMessage(conflict: Pick<ActionConflict, "by" | "at">, now
  * conflictMessage as a toast, which is one truncated line (toast-line.ts): when the whole line wouldn't show on a
  * phone ("Pieter changed this at 3:07 PM." is one character over) the time goes, so who changed it is never cut.
  */
-export function conflictToastMessage(conflict: Pick<ActionConflict, "by" | "at">, now: Date = new Date()): string {
+export function conflictToastMessage(conflict: ConflictSubject, now: Date = new Date()): string {
   const full = conflictMessage(conflict, now);
   if (full.length <= TOAST_PHONE_CHARS) return full;
-  const who = conflictBy(conflict.by);
+  const who = conflictWho(conflict);
   return who ? `${who} changed this.` : "This changed.";
 }
 
 /**
  * The line on the one open field when its save lost to a newer one (forms
- * 2.8, 2.12): "Pieter set this to $410,000 at 2:14 PM", or, when the row
- * doesn't record who, "This changed to $410,000 at 2:14 PM". `theirs` is what
- * the field holds now, as the field shows it ("" when they cleared it).
+ * 2.8, 2.12): "Pieter set this to $410,000 at 2:14 PM", "You set this to
+ * $410,000 at 2:14 PM" when the newer change was the reader's own, or, when
+ * the row doesn't record who, "This changed to $410,000 at 2:14 PM". `theirs`
+ * is what the field holds now, as the field shows it ("" when it was cleared).
  */
-export function conflictValueLine(conflict: Pick<ActionConflict, "by" | "at">, theirs: string, now: Date = new Date()): string {
-  const who = conflictBy(conflict.by);
+export function conflictValueLine(conflict: ConflictSubject, theirs: string, now: Date = new Date()): string {
+  const who = conflictWho(conflict);
   const when = conflictWhen(conflict.at, now);
   const tail = when ? ` ${when}` : "";
   if (theirs === "") return who ? `${who} cleared this${tail}` : `This was cleared${tail}`;
   return who ? `${who} set this to ${theirs}${tail}` : `This changed to ${theirs}${tail}`;
 }
 
-/** The button that takes the other person's value: "Keep Pieter's", or "Keep current" when the row doesn't say who. */
-export function conflictKeepLabel(conflict: Pick<ActionConflict, "by">): string {
-  const who = conflictBy(conflict.by);
+/** The button that takes the other value: "Keep Pieter's", or "Keep current" when it was the reader's own or the row doesn't say who. */
+export function conflictKeepLabel(conflict: Pick<ActionConflict, "by" | "mine">): string {
+  const who = conflict.mine ? undefined : conflictBy(conflict.by);
   return who ? `Keep ${who}'s` : "Keep current";
 }
 
@@ -140,26 +159,31 @@ export function conflictKeepLabel(conflict: Pick<ActionConflict, "by">): string 
  * (`staleFields` knows them), who saved them when the row records it
  * (`updatedByUser` on Property and Deal, `AppConfig.updatedBy`), when, and
  * their stored values as text. `withResult` turns it into a failed result
- * with `conflict` set and `error` the one-line `conflictMessage`.
+ * with `conflict` set and `error` the one-line `conflictMessage`. `mine` says
+ * the newer change was the caller's own: the lines then say "You", and the
+ * name is left out so it can never show.
  *
  *   throw new ConflictError({ fields: ["loanRate"], by: row.updatedByUser?.name, at: row.updatedAt, theirs: { loanRate: "7.25" } });
  */
 export class ConflictError extends Error {
   readonly fields: string[];
   readonly by?: string;
+  readonly mine: boolean;
   readonly at: string;
   readonly theirs?: Record<string, string>;
 
   constructor(
-    c: { fields: string[]; by?: string | null; at: Date | string; theirs?: Record<string, string> },
+    c: { fields: string[]; by?: string | null; mine?: boolean; at: Date | string; theirs?: Record<string, string> },
     message?: string,
   ) {
     const at = typeof c.at === "string" ? c.at : c.at.toISOString();
-    const by = c.by?.trim() || undefined;
-    super(message ?? conflictMessage({ by, at }));
+    const mine = c.mine === true;
+    const by = mine ? undefined : c.by?.trim() || undefined;
+    super(message ?? conflictMessage({ by, at, ...(mine ? { mine } : {}) }));
     this.name = "ConflictError";
     this.fields = [...c.fields];
     this.by = by;
+    this.mine = mine;
     this.at = at;
     if (c.theirs) this.theirs = { ...c.theirs };
   }
@@ -170,6 +194,7 @@ export class ConflictError extends Error {
       fields: this.fields,
       at: this.at,
       ...(this.by ? { by: this.by } : {}),
+      ...(this.mine ? { mine: true as const } : {}),
       ...(this.theirs ? { theirs: this.theirs } : {}),
     };
   }
@@ -193,7 +218,12 @@ export class FieldError extends Error {
   }
 }
 
-export const GENERIC_ERROR = "Something went wrong saving that. Try again; if it keeps happening, reload the page.";
+/**
+ * The line for a failure that isn't the person's to fix (a bug, the database, a library's own words). Short enough
+ * to sit on one line in a sheet's footer at 320 (288px of room), with the first step inside the 30 characters a
+ * phone toast shows (toast-line.ts). It replaced an 84-character sentence that wrapped in every sheet.
+ */
+export const GENERIC_ERROR = "Couldn't save. Try again or reload the page.";
 
 /** A server action call that never reached the server, or whose answer never came back. One line at 320. */
 export const OFFLINE_ERROR = "No connection. Try again.";

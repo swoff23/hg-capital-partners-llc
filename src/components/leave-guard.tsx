@@ -42,7 +42,8 @@ import { hasUnsavedWork, holdFor, setHold, type HoldEntry, type LeaveScope, type
  * the question on the public site's dark tokens, for the public move-in page.
  *
  * In-app links never fire beforeunload, so a reload or a closed tab is
- * useLeaveWarning's job (media-uploader.tsx), and useDraft's. The browser's
+ * useLeaveWarning's job (media-uploader.tsx, and inline-field.tsx for an
+ * unsaved multi-line note), and useDraft's. The browser's
  * own Back isn't caught here.
  */
 

@@ -276,7 +276,7 @@ model RecentView {
 - **One matcher.** /tasks `q` matches the title, the property and deal address and the assignee, through `searchTerms` and `everyTermMatches` with the same fields as `/api/search`. /deals `q` runs the address through `searchTerms`, so "Prospect Avenue" finds "Prospect Ave". /contractors does the same on name, company and trades. "See all 40 tasks" then opens a page showing those 40.
 - **/deals counts.** While `q` is set, the segment counts come from the same `where` with the query applied, so they change as you type (DEALS-012). The view stays as picked.
 - **/contractors count.** With `q` set the subtitle reads "4 of 52 contractors", so the number never changes without a reason.
-- **Cap lines.** /deals reads "Showing first 300 of 675. Search or filter to see the rest.", with the live total (today it points at "the address filter", which the new field no longer names). /tasks keeps "Showing first 400 of N. Narrow the filters to see the rest."
+- **Cap lines.** /deals reads "Showing first 300 of 675. Search or filter to see the rest.", with the live total (today it points at "the address filter", which the new field no longer names). /tasks read "Showing first 400 of N. Narrow the filters to see the rest." until Nov 14; it now reads "First 400 of N. Search or filter for more." on one line at every width, from the shared `ListFooter` (`src/lib/list-page.ts` holds the words).
 - **No-result states.** `EmptyState`: one sentence, then one secondary sm action. Linear's "16 issues hidden by filters" with Clear filters and Stripe's Clear filters are the pattern.
 
 | Page | Query set | Filters only | Nothing at all |

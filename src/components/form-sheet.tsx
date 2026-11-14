@@ -94,7 +94,9 @@ const firstEmptyField =
  *    Esc keycap and the primary with ⌘↵, at the bottom right.
  *  - Below md: one full-width primary above the safe area and the keyboard;
  *    the header's X is the way out, so Cancel and Create more drop.
- *  - A form-level refusal is one `--danger` line above the buttons.
+ *  - A form-level refusal is one `--danger` line above the buttons. From md
+ *    the sheet is as wide as its content, and this line never counts toward
+ *    that: a long refusal wraps inside the sheet and can't widen it.
  *
  * It opens with focus in the first empty field, and ⌘↵ submits from any
  * field. It compares `values` with what it opened with: Cancel, X and Esc
@@ -232,7 +234,12 @@ export function FormSheet({
         className={className}
         footer={
           <div className="space-y-3">
-            {error && <SaveError action={errorAction}>{error}</SaveError>}
+            {/* w-0 min-w-full: the line takes the sheet's width and adds nothing to it, so a refusal that arrives can't resize the sheet. */}
+            {error && (
+              <SaveError action={errorAction} className="w-0 min-w-full">
+                {error}
+              </SaveError>
+            )}
             <div className="flex items-center gap-2">
               {createMore && (
                 <Switch

@@ -41,7 +41,8 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  *   - whole-blob saves (units, building CapEx, listings) are guarded by the
  *     Property.updatedAt the editor pinned when Edit opened
  *   - every write records who made it (`updatedByUserId`), so a refusal can
- *     say "Pieter changed this at 2:14 PM" (forms 2.12)
+ *     say "Pieter changed this at 2:14 PM" (forms 2.12), or "You changed
+ *     this at 2:14 PM." when the newer save was the caller's own
  *   - archive and restore (lib/archive.ts) record who did it; an archived
  *     property leaves Portfolio, its totals, Home, search, the pickers and
  *     the move-in form, and its tasks keep working
@@ -66,11 +67,13 @@ function revalidateProperty(id: string): void {
 /**
  * The refusal for a save that lost to a newer one: reads the row as it is
  * now, so the line can say who saved and when (and, for a field save, what
- * the fields hold now).
+ * the fields hold now). `by` is who is saving: when the newer save was their
+ * own, the line says "You changed this" (edits.ts `rowConflict`).
  */
 async function conflictOf(
   id: string,
   fields: string[],
+  by: Editor,
   opts: { values?: boolean; db?: Pick<typeof prisma, "property"> } = {},
 ): Promise<Error> {
   // Inside a transaction the read goes through it: a second connection would wait on the one the transaction holds.
@@ -79,7 +82,7 @@ async function conflictOf(
     include: { updatedByUser: { select: { name: true, email: true } } },
   });
   if (!row) return new Error("This property is gone.");
-  return rowConflict(row, fields, opts);
+  return rowConflict(row, fields, { values: opts.values, actorId: by?.id });
 }
 
 function versionDate(expectedVersion: string): Date | null {
@@ -96,7 +99,7 @@ async function updateAtVersion(
 ): Promise<void> {
   const version = versionDate(expectedVersion);
   const r = version ? await prisma.property.updateMany({ where: { id, updatedAt: version }, data: { ...data, ...stamp(by) } }) : { count: 0 };
-  if (r.count === 0) throw await conflictOf(id, [field]);
+  if (r.count === 0) throw await conflictOf(id, [field], by);
 }
 
 /* ---------------- Create ---------------- */
@@ -228,10 +231,10 @@ export async function patchProperty(
       expected: Object.fromEntries(guarded.map((k) => [k, expected[k]])),
     };
     const stale = staleFields(current, edits);
-    if (stale.length > 0) throw rowConflict(current, stale, { values: true });
+    if (stale.length > 0) throw rowConflict(current, stale, { values: true, actorId: by?.id });
     // At the version just read, so a save that lands in between is refused too.
     const r = await prisma.property.updateMany({ where: { id, updatedAt: current.updatedAt }, data: { ...data, ...stamp(by) } });
-    if (r.count === 0) throw await conflictOf(id, guarded, { values: true });
+    if (r.count === 0) throw await conflictOf(id, guarded, by, { values: true });
   } else if (Object.keys(data).length > 0) {
     await prisma.property.update({ where: { id }, data: { ...data, ...stamp(by) } });
   }
@@ -357,10 +360,10 @@ async function writeUnitsAt(
   const renamed = await prisma.$transaction(async (tx) => {
     const current = await tx.property.findUnique({
       where: { id },
-      select: { units: true, unitCount: true, updatedAt: true, updatedByUser: { select: { name: true, email: true } } },
+      select: { units: true, unitCount: true, updatedAt: true, updatedByUserId: true, updatedByUser: { select: { name: true, email: true } } },
     });
     if (!current) throw new Error("This property is gone.");
-    if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["units"]);
+    if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["units"], { actorId: by?.id });
     const before = parseUnits(current.units);
     // With ids, placeholders included, as the page showed them to the editor.
     const clean: PropertyUnit[] = next(withUnitIds(before)).map((u) => ({
@@ -384,7 +387,7 @@ async function writeUnitsAt(
       where: { id, updatedAt: current.updatedAt },
       data: { units: stored as unknown as object, unitCount, ...stamp(by) },
     });
-    if (r.count === 0) throw await conflictOf(id, ["units"], { db: tx });
+    if (r.count === 0) throw await conflictOf(id, ["units"], by, { db: tx });
     const countChanged = unitCount !== current.unitCount;
     if (renames.length === 0) return { listings: 0, tasks: [], countChanged };
     // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
@@ -421,10 +424,10 @@ export async function mergeBuildingCapex(id: string, patch: BuildingCapexPatch, 
 async function writeBuildingCapex(id: string, patch: BuildingCapexPatch, expectedVersion: string, by: Editor): Promise<void> {
   const current = await prisma.property.findUnique({
     where: { id },
-    select: { buildingCapex: true, updatedAt: true, updatedByUser: { select: { name: true, email: true } } },
+    select: { buildingCapex: true, updatedAt: true, updatedByUserId: true, updatedByUser: { select: { name: true, email: true } } },
   });
   if (!current) throw new Error("This property is gone.");
-  if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["buildingCapex"]);
+  if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["buildingCapex"], { actorId: by?.id });
 
   const clean: Record<string, BuildingCapexEntry> = { ...(parseBuildingCapex(current.buildingCapex) as Record<string, BuildingCapexEntry>) };
   for (const [key, v] of Object.entries(patch)) {
@@ -543,7 +546,7 @@ async function touchAtVersion(tx: Prisma.TransactionClient, propertyId: string, 
   if (touched.count === 0) {
     // The refused sheet's page comes back on the latest with the refusal.
     revalidatePath(`/properties/${propertyId}`);
-    throw await conflictOf(propertyId, ["listings"], { db: tx });
+    throw await conflictOf(propertyId, ["listings"], by, { db: tx });
   }
 }
 

@@ -16,7 +16,7 @@ import {
   type AddressDb,
   type AddressRecord,
 } from "./address-suggestions";
-import { sameStreetAddress, streetKey } from "./normalize";
+import { sameStreetAddress, shortAddress, streetKey } from "./normalize";
 
 test("tidyAddress: the form an address saves in, Saves as 767 Prospect Ave, Buffalo, NY 14209", () => {
   assert.equal(tidyAddress("767 prospect avenue buffalo ny 14209"), "767 Prospect Ave, Buffalo, NY 14209");
@@ -63,6 +63,81 @@ test("tidying never changes which building an address is", () => {
     assert.equal(streetKey(tidyAddress(t)), streetKey(t), t);
     assert.equal(sameStreetAddress(tidyAddress(t), t), true, t);
   }
+});
+
+// The Saint-street bug (found Nov 14, live on New property, New deal and every rename): "34 St James Pl Buffalo, NY
+// 14222" saved as "34 St, James Pl Buffalo, NY 14222", and the record then showed as "34 St". The cause was
+// splitAddress ending the street at the first street-type word after the house number, which on a Saint street is
+// the name's own "St".
+
+test("a Saint street keeps its name: no comma after St, and the record's short name is the whole street", () => {
+  assert.equal(tidyAddress("34 St James Pl Buffalo, NY 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(shortAddress(tidyAddress("34 St James Pl Buffalo, NY 14222")), "34 St James Pl");
+  assert.equal(tidyAddress("34 st james pl buffalo ny 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(tidyAddress("34 ST JAMES PL BUFFALO NY 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(tidyAddress("34 St James Pl, Buffalo, NY 14222"), "34 St James Pl, Buffalo, NY 14222", "already right stays");
+  assert.equal(tidyAddress("77 St Marks Ave Buffalo NY 14214"), "77 St Marks Ave, Buffalo, NY 14214");
+  assert.equal(tidyAddress("77 st marks avenue"), "77 St Marks Ave");
+  assert.equal(tidyAddress("210 St Paul St Buffalo, NY 14209"), "210 St Paul St, Buffalo, NY 14209");
+  assert.equal(tidyAddress("210 st paul street buffalo ny"), "210 St Paul St, Buffalo, NY");
+  // With no street type typed, the comma that was typed still sets the town apart.
+  assert.equal(tidyAddress("34 st james, buffalo ny"), "34 St James, Buffalo, NY");
+  assert.equal(tidyAddress("34 St James"), "34 St James");
+  // While it is being typed.
+  assert.equal(tidyAddress("34 st"), "34 St");
+  assert.equal(savesAs("34 st james pl buffalo ny 14222"), "34 St James Pl, Buffalo, NY 14222");
+});
+
+test("St. with a period is the same Saint street, and the period goes as it does everywhere", () => {
+  assert.equal(tidyAddress("34 St. James Pl Buffalo, NY 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(tidyAddress("210 St. Paul St. Buffalo NY 14209"), "210 St Paul St, Buffalo, NY 14209");
+  // A stored address keeps its words in the two suggestion lines.
+  assert.deepEqual(splitAddress("34 St. James Pl, Buffalo, NY 14222"), { street: "34 St. James Pl", place: "Buffalo, NY 14222" });
+});
+
+test("a street really ending in St is unchanged: the comma still goes after it", () => {
+  assert.equal(tidyAddress("12 Main St"), "12 Main St");
+  assert.equal(tidyAddress("12 main st buffalo ny 14201"), "12 Main St, Buffalo, NY 14201");
+  assert.equal(tidyAddress("12 Main St. Buffalo, NY 14201"), "12 Main St, Buffalo, NY 14201");
+  assert.equal(tidyAddress("12 main street buffalo ny"), "12 Main St, Buffalo, NY");
+  assert.deepEqual(splitAddress("12 Main St Buffalo, NY 14201"), { street: "12 Main St", place: "Buffalo, NY 14201" });
+  // A street named for a type word, then its type: the pair stays together as it always did.
+  assert.equal(tidyAddress("12 court st buffalo ny 14202"), "12 Court St, Buffalo, NY 14202");
+  assert.deepEqual(splitAddress("12 Court St Buffalo, NY 14202"), { street: "12 Court St", place: "Buffalo, NY 14202" });
+  // No house number: the first type word still ends the street.
+  assert.deepEqual(splitAddress("Main St Buffalo, NY"), { street: "Main St", place: "Buffalo, NY" });
+  assert.equal(tidyAddress("lot on main street buffalo ny"), "Lot on Main St, Buffalo, NY");
+  // A comma right after the word closes the street there, as typed.
+  assert.deepEqual(splitAddress("34 St, Buffalo, NY"), { street: "34 St", place: "Buffalo, NY" });
+});
+
+test("splitAddress: a Saint street's two lines are the street and the place", () => {
+  assert.deepEqual(splitAddress("34 St James Pl Buffalo, NY 14222"), { street: "34 St James Pl", place: "Buffalo, NY 14222" });
+  assert.deepEqual(splitAddress("34 St James Pl, Buffalo, NY 14222"), { street: "34 St James Pl", place: "Buffalo, NY 14222" });
+  assert.deepEqual(splitAddress("77 St Marks Ave"), { street: "77 St Marks Ave", place: "" });
+  assert.deepEqual(splitAddress("210 St Paul St Buffalo NY 14209"), { street: "210 St Paul St", place: "Buffalo NY 14209" });
+  assert.deepEqual(splitAddress("765/767 St James Pl, Buffalo"), { street: "765/767 St James Pl", place: "Buffalo" });
+  assert.deepEqual(splitAddress("34A St James Pl Buffalo"), { street: "34A St James Pl", place: "Buffalo" });
+});
+
+test("a Saint street tidies once and stays: a second tidy changes nothing, and the building it is never changes", () => {
+  const typed = [
+    "34 St James Pl Buffalo, NY 14222",
+    "34 st. james pl buffalo ny 14222",
+    "77 St Marks Ave Buffalo NY 14214",
+    "210 St Paul St Buffalo, NY 14209",
+    "34 st james, buffalo ny",
+    "12 Main St Buffalo NY 14201",
+    "12 court st buffalo ny 14202",
+    "10 Avenue D",
+  ];
+  for (const t of typed) {
+    const once = tidyAddress(t);
+    assert.equal(tidyAddress(once), once, t);
+    assert.equal(streetKey(once), streetKey(t), t);
+    assert.equal(sameStreetAddress(once, t), true, t);
+  }
+  assert.equal(streetKey(tidyAddress("34 St James Pl Buffalo, NY 14222")), "34 st james");
 });
 
 test("savesAs: the line under the field, only when saving would change the typing", () => {

@@ -5,8 +5,9 @@ import { useEffect } from "react";
  * While `active`, the browser asks before the page goes away: a reload,
  * closing the tab, a typed URL. In-app links don't fire beforeunload, and iOS
  * Safari never asks. Shared by the upload queue (files that a reload would
- * lose, when the outbox can't keep them) and by anything else a reload would
- * lose; media-uploader.tsx re-exports it under its old path.
+ * lose, when the outbox can't keep them), by a multi-line note open in place
+ * with unsaved text (inline-field.tsx; one-line fields save on blur and never
+ * ask), and by anything else a reload would lose.
  */
 export function useLeaveWarning(active: boolean) {
   useEffect(() => {

@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addToast, type QueuedToast } from "@/components/toast-queue";
+import { toastMs } from "@/lib/toast-time";
 
 /**
  * Short confirmations with an optional action, usually Undo:
@@ -12,9 +13,10 @@ import { addToast, type QueuedToast } from "@/components/toast-queue";
  *
  * One region per surface: AppShell mounts a ToastProvider, and the portal
  * layout mounts its own. Bottom-left on a computer; full width on a phone,
- * lifted above a sticky bottom bar by useToastInset(). Each toast goes after
- * about 5 seconds, held while the pointer or focus is on it; Esc closes the
- * one that has focus. On a coarse pointer a toast with an action draws no ×
+ * lifted above a sticky bottom bar by useToastInset(). A toast with a button
+ * goes after 8 seconds and one without after 5 (lib/toast-time.ts), held
+ * while the pointer or focus is on it; Esc closes the one that has focus. On
+ * a coarse pointer a toast with an action draws no ×
  * (it closes itself, and the message gets the room), but keeps the Dismiss
  * button for assistive tech. The region is a polite live region
  * (role="status"), so screen readers hear each message.
@@ -45,7 +47,6 @@ type ToastApi = {
 
 const ToastContext = createContext<(ToastApi & { setInset: (px: number) => void }) | null>(null);
 
-const DURATION_MS = 5000;
 const MAX_SHOWN = 3;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -91,13 +92,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => void }) {
   const [held, setHeld] = useState(false);
   const { id, version } = item;
+  // A button needs the tap, and a finger can't hold the toast open: 8 seconds with one, 5 without.
+  const stays = toastMs(item.action !== undefined);
 
-  // A replacement (a new version under the same key) starts the 5 seconds over.
+  // A replacement (a new version under the same key) starts the time over.
   useEffect(() => {
     if (held) return;
-    const timer = setTimeout(() => dismiss(id), DURATION_MS);
+    const timer = setTimeout(() => dismiss(id), stays);
     return () => clearTimeout(timer);
-  }, [held, dismiss, id, version]);
+  }, [held, dismiss, id, version, stays]);
   const onDismiss = () => dismiss(id);
 
   return (

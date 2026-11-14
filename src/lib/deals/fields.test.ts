@@ -100,7 +100,7 @@ test("the list's stage pick is parsed like the deal page: a direct call can't st
 });
 
 test("a note over the limit says the service's own line on New deal and in the note box alike", () => {
-  assert.equal(DEAL_MESSAGES.note, "Keep the note under 5,000 characters.");
+  assert.equal(DEAL_MESSAGES.note, "Shorten it to 5,000 characters.");
   assert.deepEqual(lines(newDealSchema, { address: "767 Prospect Ave", note: "x".repeat(NOTE_MAX + 1) })?.fields, { note: DEAL_MESSAGES.note });
   // The note actions' own cap (20,000) words its refusal the same way, never as zod's "Too big".
   const actions = readFileSync(new URL("../../app/(app)/deals/[id]/note-actions.ts", import.meta.url), "utf8");

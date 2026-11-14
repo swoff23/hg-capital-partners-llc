@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { EmptyState, Section, TextLink } from "@/components/ui";
 import { ScopeButton } from "@/components/filter-bar";
+import { ListFooter } from "@/components/list-footer";
 import { todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { propertyOptions } from "@/lib/picker-options";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
-import { NONE, TASK_PAGE, TASK_PAGE_MAX, parseAllFilters, personRefs, taskLimit, withKnownFilters, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
+import { NONE, TASK_PAGE_MAX, parseAllFilters, personRefs, taskLimit, withKnownFilters, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
 import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
 import { AllList } from "../all-list";
 import { TaskFilters } from "../filters";
@@ -34,7 +35,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   if (sp.view === "contractors") redirect("/?view=contractors");
 
   const filters = parseAllFilters(sp);
-  // A page of rows at a time: the first TASK_PAGE, and Show more asks for another (?show=200).
+  // A page of rows at a time: the first page, and the footer's Show more asks for another (?show=200).
   const take = taskLimit(sp);
   // The people on offer, the imported names and the buildings start beside the session check; all of it is
   // awaited together, so nothing is shown without it.
@@ -122,16 +123,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
             </TaskListProvider>
           </div>
         )}
-        {total > take && (
-          <div className="mt-4 flex items-center gap-3">
-            <p className="text-meta tabular-nums text-fg-3">
-              {take < TASK_PAGE_MAX
-                ? `Showing ${take} of ${total.toLocaleString("en-US")}`
-                : `Showing first ${TASK_PAGE_MAX} of ${total.toLocaleString("en-US")}. Narrow the filters to see the rest.`}
-            </p>
-            {take < TASK_PAGE_MAX && <ScopeButton changes={{ show: String(take + TASK_PAGE) }}>Show more</ScopeButton>}
-          </div>
-        )}
+        <ListFooter shown={take} total={total} ceiling={TASK_PAGE_MAX} />
       </TaskFilters>
     </>
   );

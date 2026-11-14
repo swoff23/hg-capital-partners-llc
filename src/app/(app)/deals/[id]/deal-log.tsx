@@ -11,6 +11,7 @@ import { useToast } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
 import { personalDraftKey, sendRefusal } from "@/lib/composer-draft";
 import type { Ymd } from "@/lib/dates";
+import { NOTE_MAX } from "@/lib/deals/field-rules";
 import { LOG_SHOWN, groupLog, type ChangeEntry, type FieldRow, type LineEntry, type LogEntry, type NoteEntry } from "@/lib/deals/record-log";
 import { bodySegments } from "@/lib/tasks/body-links";
 import { addDealNote, deleteDealNoteAction, editDealNoteAction, restoreDealNoteAction } from "./note-actions";
@@ -33,7 +34,7 @@ function subscribeToHash(onChange: () => void) {
  * saved, stays there with "Didn't save · Retry", the same message and the
  * same `clientId`, so a Retry that did post never posts twice. A note the
  * service won't take as written, which no Retry can change, says why in
- * Retry's place ("Didn't save · Keep the note under 5,000 characters.",
+ * Retry's place ("Didn't save · Shorten it to 5,000 characters.",
  * `sendRefusal`), and the card's Edit is the way on. It posts
  * through addDealNote, which answers with a result instead of throwing. Your
  * own notes have Edit and Delete in their menu; Delete shows a toast with
@@ -308,7 +309,10 @@ function NoteRow({
       // Links in the text open (activity 2.2 a); the edit opens in place, with Esc and the mod key and Enter.
       body={<CommentBody segments={bodySegments(note.text)} />}
       editor={
-        editing ? <CommentEditor initial={note.text} noun="note" onCancel={() => onEdit(null)} onSave={(text) => editDealNoteAction(dealId, note.id, text)} /> : undefined
+        editing ? (
+          // The editor stops at the length the service takes (notes.ts checkBody), where it used to allow 20,000 and the save then refused.
+          <CommentEditor initial={note.text} noun="note" maxLength={NOTE_MAX} onCancel={() => onEdit(null)} onSave={(text) => editDealNoteAction(dealId, note.id, text)} />
+        ) : undefined
       }
       menuItems={
         editing ? undefined : (

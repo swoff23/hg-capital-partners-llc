@@ -73,18 +73,27 @@ const tidy = (s: string) =>
     .replace(/^[\s,]+|[\s,.]+$/g, "")
     .trim();
 
+/** A house number as it starts an address: "34", "34A", "765/767", "12-14". */
+const HOUSE_NUMBER = /^\d+[a-z]?(?:[/-]\d+[a-z]?)?$/i;
+
 /**
  * Splits a stored address into its two suggestion lines: the street ("767
  * Prospect Avenue") and the place ("Buffalo, NY 14213"). The street runs to
- * the first street-type word after the house number (two in a row stay
+ * the first street-type word after the street's name (two in a row stay
  * together, "Baynes St Street"), or to the first comma when there's none.
+ * A street-type word right after the house number is the name, never the
+ * end: the "St" of a Saint street ("34 St James Pl", which used to split as
+ * "34 St" and save as "34 St, James Pl"), the "Court" of "12 Court St".
  * Spacing and stray commas are tidied; the words are kept as stored.
  */
 export function splitAddress(raw: string): { street: string; place: string } {
   const text = raw.replace(/\n/g, " ").trim();
   const words = text.split(/\s+/);
+  // A street is called something before its type, so the word after a house number is never where it ends,
+  // unless a comma closes it there ("34 St, ..." is left exactly as it was typed or stored).
+  const named = HOUSE_NUMBER.test(words[0]) && words.length > 1 && !words[1].endsWith(",") && STREET_TYPE_WORDS.has(words[1].toLowerCase().replace(/\.+$/, ""));
   let end = -1;
-  for (let i = 1; i < words.length; i++) {
+  for (let i = named ? 2 : 1; i < words.length; i++) {
     const w = words[i].toLowerCase().replace(/[.,]+$/, "");
     if (STREET_TYPE_WORDS.has(w)) {
       end = i;

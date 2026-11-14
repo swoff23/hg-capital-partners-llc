@@ -37,7 +37,8 @@ export const DEAL_MESSAGES = {
   unitsMax: "Enter a smaller number.",
   link: URL_MESSAGE,
   stage: "Pick a stage.",
-  note: `Keep the note under ${NOTE_MAX.toLocaleString("en-US")} characters.`,
+  // Exactly NOTE_MAX is accepted, so "under" was one off; the same sentence a task comment gets (tasks/limits.ts).
+  note: `Shorten it to ${NOTE_MAX.toLocaleString("en-US")} characters.`,
 } as const;
 
 /** "Use 300 characters or fewer." */

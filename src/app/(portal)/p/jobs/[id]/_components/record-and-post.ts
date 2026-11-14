@@ -58,7 +58,7 @@ const lateToastFor = (taskId: string): LateToast => ({ key: `job-added:${taskId}
 
 /**
  * Posts a batch as updates of at most MAX_FILES_PER_POST files each (a tab that kept an earlier batch carries it
- * with the next one, so a long wait can hold more than one post takes): "3 photos posted", and five seconds to take
+ * with the next one, so a long wait can hold more than one post takes): "3 photos posted", and eight seconds to take
  * it back. Answers the files that didn't post, none when all did, so the caller puts just those back on its tray. A
  * piece that fails stops the rest, which wait with it.
  * A job approved or canceled while the photos were going up keeps its status: the server tells HG once (one line,

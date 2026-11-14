@@ -14,6 +14,7 @@ import {
   conflictMessage,
   conflictToastMessage,
   conflictValueLine,
+  conflictWho,
   isOfflineError,
   isPlainMessage,
   NUMBER_TOO_BIG,
@@ -387,4 +388,77 @@ test("conflictBy: a first name, or an email's name part", () => {
   assert.equal(conflictBy("pieter@hgcapital.com"), "Pieter");
   assert.equal(conflictBy(""), undefined);
   assert.equal(conflictBy(null), undefined);
+});
+
+test("the app-wide error line is short enough for one line in a sheet's footer, with the first step where a phone toast shows it (design call 11)", () => {
+  assert.equal(GENERIC_ERROR, "Couldn't save. Try again or reload the page.");
+  // 84 characters wrapped in every sheet; 44 is 275px at the phone's 14px, inside the 288px a 320 sheet's footer has.
+  assert.equal(GENERIC_ERROR.length, 44);
+  // A toast is one truncated line: "Couldn't save. Try again or r…" still says what to do.
+  assert.ok(GENERIC_ERROR.slice(0, TOAST_PHONE_CHARS).includes("Try again"));
+  assert.equal(GENERIC_ERROR.includes(String.fromCharCode(8212)), false, "no em dash");
+});
+
+test("a sheet's error line takes the sheet's width and adds nothing to it, so a refusal can't widen the sheet (design call 11)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const sheet = readFileSync(new URL("../components/form-sheet.tsx", import.meta.url), "utf8");
+  // width 0 keeps the line out of the sheet's content width (a dialog from md is as wide as its content);
+  // min-width 100% then gives it the width the rest of the content made.
+  assert.match(sheet, /\{error && \(\s*<SaveError action=\{errorAction\} className="w-0 min-w-full">\s*\{error\}\s*<\/SaveError>\s*\)\}/);
+  assert.equal(sheet.match(/<SaveError/g)?.length, 1, "the footer's is the sheet's only error line");
+});
+
+// Design call 19 (Nov 14): when the newer change was the reader's own, every area says "You". The words are decided
+// here, once, for properties, deals, task notes and Settings.
+
+test("your own newer change says You: the conflict line, the field line, the short toast and Keep current", () => {
+  const at = "2026-10-26T13:09:00Z"; // 9:09 AM in Buffalo
+  const mine = { at, mine: true as const };
+  assert.equal(conflictWho(mine), "You");
+  assert.equal(conflictWho({ by: "Pieter Louw" }), "Pieter");
+  assert.equal(conflictWho({}), undefined);
+  assert.match(conflictMessage(mine, NOW), /^You changed this at 9:09\sAM\.$/);
+  assert.match(conflictValueLine({ at: "2026-10-26T18:14:00Z", mine: true }, "$410,000", NOW), /^You set this to \$410,000 at 2:14\sPM$/);
+  assert.match(conflictValueLine({ at: "2026-10-26T18:14:00Z", mine: true }, "", NOW), /^You cleared this at 2:14\sPM$/);
+  assert.equal(conflictKeepLabel({ mine: true }), "Keep current");
+  // With no time to give, the short line.
+  assert.equal(conflictMessage({ at: "not a date", mine: true }, NOW), "You changed this.");
+  assert.equal(conflictValueLine({ at: "not a date", mine: true }, "7.25%", NOW), "You set this to 7.25%");
+});
+
+test("the You line shows whole in a phone toast, and loses only the time when a far date makes it too long", () => {
+  // "You changed this at 10:09 AM." is 29 characters, the longest a time makes it.
+  const long = conflictToastMessage({ at: "2026-10-26T14:09:00Z", mine: true }, NOW);
+  assert.match(long, /^You changed this at 10:09\sAM\.$/);
+  assert.ok(long.length <= TOAST_PHONE_CHARS);
+  assert.equal(conflictToastMessage({ at: "2026-10-24T18:14:00Z", mine: true }, NOW), "You changed this on Oct 24.");
+  // "You changed this on Oct 24, 2025." is 33: the date goes, never the You.
+  assert.equal(conflictToastMessage({ at: "2025-10-24T18:14:00Z", mine: true }, NOW), "You changed this.");
+});
+
+test("a conflict marked mine never carries or shows the name, whatever name came with it", (t) => {
+  pinClock(t);
+  const err = new ConflictError({ fields: ["loanRate"], by: "Connor Swofford", mine: true, at: "2026-10-26T18:14:00.000Z", theirs: { loanRate: "7.25" } });
+  assert.match(err.message, /^You changed this at 2:14\sPM\.$/);
+  assert.equal(err.by, undefined);
+  assert.equal(err.mine, true);
+  assert.deepEqual(err.conflict, { fields: ["loanRate"], at: "2026-10-26T18:14:00.000Z", mine: true, theirs: { loanRate: "7.25" } });
+  const failure = toFailure(err);
+  assert.equal(failure.error, err.message);
+  assert.equal(conflictKeepLabel(failure.conflict!), "Keep current");
+  // Someone else's is as it was: no `mine` on the wire, and their name in the line.
+  const theirs = new ConflictError({ fields: ["loanRate"], by: "Pieter Smith", mine: false, at: "2026-10-26T18:14:00.000Z" });
+  assert.equal("mine" in theirs.conflict, false);
+  assert.match(theirs.message, /^Pieter changed this /);
+});
+
+test("Settings saves say You for the caller's own newer save: the write compares the row's last saver with the caller", async () => {
+  // app-config-write.ts is server-only, so its source is read.
+  const { readFileSync } = await import("node:fs");
+  const write = readFileSync(new URL("./app-config-write.ts", import.meta.url), "utf8");
+  assert.match(write, /new ConflictError\(\{ fields: \[column\], by: existing\.updatedBy, mine: existing\.updatedBy === updatedBy, at: existing\.updatedAt \}\)/);
+  // Both Settings editors hand it the same name they store, so the comparison is like with like.
+  for (const actions of ["../app/(app)/settings/actions.ts", "../app/(app)/settings/move-in-form/actions.ts"]) {
+    assert.match(readFileSync(new URL(actions, import.meta.url), "utf8"), /saveAppConfigColumn\(\s*"[a-zA-Z]+",\s*expectedVersion,\s*[^,]+,\s*user\.name \?\? user\.email,\s*\)/);
+  }
 });

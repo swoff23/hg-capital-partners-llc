@@ -12,6 +12,7 @@ import type { UploadTarget } from "@/components/upload-queue";
 import { callAction } from "@/lib/action-result";
 import { pickerAccept, taskFileUrl } from "@/lib/attachments/media";
 import { shortAddress } from "@/lib/normalize";
+import { TOAST_ACTION_MS } from "@/lib/toast-time";
 import type { TakenHerePhoto } from "@/lib/properties/photo";
 import {
   discardPropertyPhotoAction,
@@ -41,8 +42,8 @@ import {
  * "Set as property photo" on a task photo (uploads 2.10, wired in phase 2).
  */
 
-/** The old file stays this long after a change, a beat longer than the toast's five seconds. */
-const KEEP_OLD_MS = 7_000;
+/** The old file stays this long after a change, a beat longer than its toast, which carries Undo (lib/toast-time.ts). */
+const KEEP_OLD_MS = TOAST_ACTION_MS + 2_000;
 
 type PhotoRef = { url: string; pathname: string };
 

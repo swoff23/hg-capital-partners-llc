@@ -4,6 +4,7 @@ import type { FileKind } from "@/lib/attachments/content-types";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
+import { TOAST_ACTION_MS } from "@/lib/toast-time";
 
 /**
  * How the contractor portal words and arranges a job (docs/asana-migration-plan.md
@@ -446,13 +447,13 @@ export function postRoom(unposted: number): number {
   return Math.max(0, MAX_FILES_PER_POST - Math.max(0, unposted));
 }
 
-/** How long "3 photos posted · Undo" stays (the toast's own five seconds). */
-export const POST_UNDO_MS = 5_000;
+/** How long "3 photos posted · Undo" stays: the time of a toast with a button (lib/toast-time.ts). */
+export const POST_UNDO_MS = TOAST_ACTION_MS;
 
 /**
  * The server accepts an Undo a little after the toast has gone: the tap spends
  * part of the window in flight on a weak signal, and a toast held under the
- * pointer or focus (toast.tsx) lasts longer than five seconds.
+ * pointer or focus (toast.tsx) lasts longer than its eight seconds.
  */
 export const POST_UNDO_GRACE_MS = 10_000;
 

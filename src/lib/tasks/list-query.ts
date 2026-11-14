@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
+import { LIST_CEILING, LIST_PAGE, listLimit } from "@/lib/list-page";
 import { everyTermMatches, searchTerms } from "@/lib/search";
 import { activeTask, closedTask, excludeTemplateTasks } from "@/lib/task-scope";
 
@@ -52,20 +53,19 @@ export function parseAllFilters(sp: Params): AllFilters {
   };
 }
 
-/** Rows the Tasks page opens with, and what Show more adds each time. */
-export const TASK_PAGE = 100;
+/** Rows the Tasks page opens with, and what Show more adds each time: the shared page size (lib/list-page.ts). */
+export const TASK_PAGE = LIST_PAGE;
 
-/** The most the page ever lists. Past it the filters are the way to the rest. */
-export const TASK_PAGE_MAX = 400;
+/** The most the page ever lists: the shared ceiling. Past it the search box and the filters are the way to the rest. */
+export const TASK_PAGE_MAX = LIST_CEILING;
 
 /**
  * How many rows the URL asks for (`show`): whole pages of TASK_PAGE, from one
  * to the most. Anything that isn't a number, or is out of range, is the first page.
+ * The rule is `listLimit`'s, shared with every list that pages this way.
  */
 export function taskLimit(sp: Params): number {
-  const asked = Number.parseInt(str(sp.show), 10);
-  if (!Number.isFinite(asked)) return TASK_PAGE;
-  return Math.min(TASK_PAGE_MAX, Math.max(TASK_PAGE, Math.ceil(asked / TASK_PAGE) * TASK_PAGE));
+  return listLimit(str(sp.show), { ceiling: TASK_PAGE_MAX });
 }
 
 /** Every value of every param, a repeated one kept, as a query to put back in a link. */
