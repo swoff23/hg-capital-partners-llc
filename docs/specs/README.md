@@ -34,3 +34,5 @@ Each chunk ships its own small migration.
 [view-as.md](view-as.md) lets Connor open the contractor portal as any contractor sees it, view only, from the ⋯ menu on their page, with an ink "Viewing as" bar across the top. It was planned with Connor on Nov 14, 2026. The build was started and then paused before any code landed; re-check it against main first.
 
 [update-notice.md](update-notice.md) tells a tab left open that a new version is live: a sticky toast, "A new version is ready" with Reload, on staff and portal pages, and the next in-app link loads the new version. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
+
+[design-foundation.md](design-foundation.md) puts HG's components on shadcn/ui's React Aria base: the color tokens and components take shadcn's names, in three landings (colors, components, then a sweep that moves hand-built controls onto the shared ones, each look change shown to Connor first). It was planned with Connor on Nov 14, 2026, and waits for his "build it". A revision for his wider goal, removing as much custom design as possible, comes next.
