@@ -85,6 +85,8 @@ export type CreateFormProps<V, R> = {
   /** Offer "Create more" in the sheet's footer. */
   createMore?: boolean;
   size?: "md" | "lg";
+  /** Classes for the sheet itself, such as a fixed width so it doesn't resize as its chips change. */
+  sheetClassName?: string;
   fullHeight?: boolean;
   children: (ctx: CreateFormContext) => ReactNode;
 };
@@ -129,6 +131,7 @@ export function CreateForm<V, R>({
   onCreated,
   createMore = false,
   size,
+  sheetClassName,
   fullHeight,
   children,
 }: CreateFormProps<V, R>) {
@@ -262,6 +265,7 @@ export function CreateForm<V, R>({
         leaveTitle={leaveTitle}
         size={size}
         fullHeight={fullHeight}
+        className={sheetClassName}
       >
         {fieldsBody}
       </FormSheet>

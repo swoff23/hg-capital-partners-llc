@@ -5,17 +5,19 @@ import { Button as AriaButton } from "react-aria-components";
 import { Avatar } from "@/components/avatar";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { OptionList, SEARCH_FROM, countOptions, type OptionItem, type OptionSection } from "@/components/option-list";
-import { PickerLayer } from "@/components/picker-layer";
+import { PickerLayer, StepHeader } from "@/components/picker-layer";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { SheetView } from "@/components/sheet";
 import { pickerChipClass, pickerField, pickerFieldChevron, type PickerChipSize } from "@/components/ui";
 import { assigneeKey, youFirst } from "@/lib/tasks/assignee-people";
-import { propertySubline, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
+import { offersUnits, propertySubline, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
 import { cn } from "@/lib/utils";
 
 /**
  * Pick a person or a building fast, with no doubt about who or where
  * (docs/specs/selectors.md 3.3): `AssigneePicker`, `PropertyPicker` and
- * `UnitPicker`, thin wrappers on one `EntityPicker` over `OptionList`.
+ * `UnitPicker`, thin wrappers on one `EntityPicker` over `OptionList`, and
+ * `PropertyUnitPicker`, both in one chip for a row with no room for two.
  *
  * Two triggers. A **chip** (the default) for list rows, the record rail and
  * create forms: a leading Avatar 20 or lucide icon, then the name, truncated;
@@ -42,6 +44,8 @@ export type EntityDisplay = {
   shortText?: string;
   /** After `shortText`, in --fg-3 and never cut: "(you)". A field drops it below 360px, where the name needs the room. */
   shortSuffix?: string;
+  /** After the name and a dot, at every width, never cut: the unit in "118 Congress St. · Unit 2". */
+  suffix?: string;
   /** Nothing is picked: the placeholder, in --fg-3. */
   empty: boolean;
 };
@@ -88,7 +92,6 @@ export function EntityPicker({
   className,
 }: EntityPickerProps) {
   const [open, setOpen] = useState(false);
-  const field = trigger === "field";
   // A list with a search field needs room to type; a short one is as wide as its widest row or the trigger.
   const searchable = countOptions({ pinned, items, sections }) >= SEARCH_FROM;
   return (
@@ -98,40 +101,7 @@ export function EntityPicker({
       title={label}
       surface={surface}
       popoverClassName={searchable ? "min-w-64 max-w-80" : "min-w-[min(var(--trigger-width),20rem)] max-w-80"}
-      trigger={
-        <AriaButton
-          isDisabled={isDisabled}
-          data-placeholder={display.empty || undefined}
-          className={cn(
-            field ? pickerField : pickerChipClass({ size }),
-            field ? !display.empty && "pl-2" : cn("pl-1", display.empty && "pl-2"),
-            display.empty && "text-fg-3",
-            className,
-          )}
-        >
-          {/* The name comes from the text shown, so it holds what's on screen at every width
-              ("Assignee: Connor (you)" below sm), for voice control (WCAG 2.5.3). */}
-          <span className="sr-only">{`${label}${subject ? ` for ${subject}` : ""}: `}</span>
-          {display.leading}
-          {display.shortText ? (
-            <>
-              <span className={cn("flex min-w-0 items-baseline gap-1 sm:hidden", field && "flex-1")}>
-                <span className="truncate">{display.shortText}</span>
-                {display.shortSuffix && (
-                  <>
-                    {" "}
-                    <span className={cn("shrink-0 text-fg-3", field && "max-[360px]:hidden")}>{display.shortSuffix}</span>
-                  </>
-                )}
-              </span>
-              <span className={cn("truncate max-sm:hidden", field && "flex-1")}>{display.text}</span>
-            </>
-          ) : (
-            <span className={cn("truncate", field && "flex-1")}>{display.text}</span>
-          )}
-          {field && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
-        </AriaButton>
-      }
+      trigger={entityTrigger({ label, subject, display, trigger, size, isDisabled, className })}
     >
       {({ container, close }) => (
         <OptionList
@@ -151,6 +121,65 @@ export function EntityPicker({
         />
       )}
     </PickerLayer>
+  );
+}
+
+/**
+ * The button that opens a picker: the visual, the name (cut to fit) and a
+ * suffix kept whole. An element, not a component, so the layer's key handler
+ * lands on the button itself.
+ */
+function entityTrigger({
+  label,
+  subject,
+  display,
+  trigger = "chip",
+  size = "sm",
+  isDisabled,
+  className,
+}: Pick<EntityPickerProps, "label" | "subject" | "display" | "trigger" | "size" | "isDisabled" | "className">) {
+  const field = trigger === "field";
+  return (
+    <AriaButton
+      isDisabled={isDisabled}
+      data-placeholder={display.empty || undefined}
+      className={cn(
+        field ? pickerField : pickerChipClass({ size }),
+        field ? !display.empty && "pl-2" : cn("pl-1", display.empty && "pl-2"),
+        display.empty && "text-fg-3",
+        className,
+      )}
+    >
+      {/* The name comes from the text shown, so it holds what's on screen at every width
+          ("Assignee: Connor (you)" below sm), for voice control (WCAG 2.5.3). */}
+      <span className="sr-only">{`${label}${subject ? ` for ${subject}` : ""}: `}</span>
+      {display.leading}
+      {display.shortText ? (
+        <>
+          <span className={cn("flex min-w-0 items-baseline gap-1 sm:hidden", field && "flex-1")}>
+            <span className="truncate">{display.shortText}</span>
+            {display.shortSuffix && (
+              <>
+                {" "}
+                <span className={cn("shrink-0 text-fg-3", field && "max-[360px]:hidden")}>{display.shortSuffix}</span>
+              </>
+            )}
+          </span>
+          <span className={cn("truncate max-sm:hidden", field && "flex-1")}>{display.text}</span>
+        </>
+      ) : (
+        <span className={cn("truncate", field && "flex-1")}>{display.text}</span>
+      )}
+      {display.suffix && (
+        <>
+          <span aria-hidden="true" className="-mx-0.5 shrink-0 text-fg-3">
+            ·
+          </span>
+          <span className="shrink-0">{display.suffix}</span>
+        </>
+      )}
+      {field && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
+    </AriaButton>
   );
 }
 
@@ -181,8 +210,8 @@ const RECENT_PREFIX = "recent:";
 /**
  * The assignee rows: "Unassigned" pinned first; Recent (up to 3, only while
  * the search is empty); Team with you first and "(you)" after your name;
- * Contractors with a square avatar, the trade under the name and a "Has login"
- * Tag. Search matches name, trade and email. `counts` (open tasks per key)
+ * Contractors with a square avatar and the trade under the name (no login
+ * Tag: Connor, Nov 14). Search matches name, trade and email. `counts` (open tasks per key)
  * adds the trailing count of filter mode.
  */
 export function assigneeRows({
@@ -213,7 +242,6 @@ export function assigneeRows({
     label: c.name,
     searchText: [c.trade, c.email].filter(Boolean).join(" "),
     description: c.trade ?? undefined,
-    tag: c.hasLogin ? "Has login" : undefined,
     leading: <Avatar name={c.name} size={24} outline />,
     count: count(`c:${c.id}`),
     ...extra,
@@ -511,5 +539,135 @@ export function UnitPicker({
       surface={surface}
       className={className}
     />
+  );
+}
+
+/* ---------------- Property and unit in one chip ---------------- */
+
+/**
+ * The building and its unit in one chip, "118 Congress St. · Unit 2", for a
+ * row of chips with no room for a second one (New task). Picking a building
+ * with units (`offersUnits`) sets it at once and steps to its units in the
+ * same layer: under a back chevron in a popover, as a view with the sheet's
+ * back arrow on a phone. Closing there leaves the building with no unit. A
+ * building with one unit or none commits and closes. Opened on a building with
+ * units, it starts on the units, since that is the pick a building hides; Back
+ * lists the buildings. Esc closes the whole layer.
+ */
+export function PropertyUnitPicker({
+  propertyId,
+  unitLabel,
+  properties,
+  onChange,
+  label = "Property",
+  size,
+  className,
+}: {
+  propertyId: string | null;
+  unitLabel: string | null;
+  properties: PropertyOption[];
+  onChange: (next: { propertyId: string | null; unitLabel: string | null }) => void;
+  label?: string;
+  size?: PickerChipSize;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  // The building whose units are listed; null lists the buildings.
+  const [unitsOf, setUnitsOf] = useState<string | null>(null);
+  const current = propertyId ? properties.find((p) => p.id === propertyId) : undefined;
+  const listed = unitsOf ? properties.find((p) => p.id === unitsOf) : undefined;
+  const buildings = propertyRows({ properties });
+  const units = listed && unitRows({ units: listed.units, current: unitLabel });
+
+  function openChange(next: boolean) {
+    if (next) setUnitsOf(current && offersUnits(current.units, unitLabel) ? current.id : null);
+    setOpen(next);
+  }
+
+  function pickBuilding(key: string, close: () => void) {
+    if (key === NO_PROPERTY) {
+      close();
+      if (propertyId) onChange({ propertyId: null, unitLabel: null });
+      return;
+    }
+    const next = properties.find((p) => p.id === key);
+    const same = key === propertyId;
+    if (!same) onChange({ propertyId: key, unitLabel: null });
+    if (next && offersUnits(next.units, same ? unitLabel : null)) setUnitsOf(key);
+    else close();
+  }
+
+  return (
+    <PickerLayer
+      isOpen={open}
+      onOpenChange={openChange}
+      title={label}
+      popoverClassName="min-w-64 max-w-80"
+      trigger={entityTrigger({
+        label,
+        display: {
+          leading: current ? <House aria-hidden="true" /> : emptyMark,
+          text: current?.label ?? "No property",
+          suffix: current && unitLabel ? unitDisplay(unitLabel) : undefined,
+          empty: !current,
+        },
+        size,
+        className,
+      })}
+    >
+      {({ container, close }) => {
+        const buildingList = (
+          <OptionList
+            aria-label={label}
+            container={container}
+            pinned={buildings.pinned}
+            items={buildings.items}
+            selectedKey={propertyId ?? NO_PROPERTY}
+            onPick={(key) => pickBuilding(key, close)}
+            onTab={close}
+            searchLabel="Search properties"
+            emptyText="No property matches."
+          />
+        );
+        const unitList = listed && units && (
+          <OptionList
+            aria-label={`Unit at ${listed.label}`}
+            container={container}
+            pinned={units.pinned}
+            items={units.items}
+            selectedKey={unitLabel ?? NO_UNIT}
+            onPick={(key) => {
+              close();
+              const next = key === NO_UNIT ? null : key;
+              if (next !== unitLabel) onChange({ propertyId: listed.id, unitLabel: next });
+            }}
+            onTab={close}
+            searchLabel="Search units"
+            emptyText="No unit matches."
+            autoFocus
+          />
+        );
+        if (container === "sheet") {
+          return (
+            <>
+              {buildingList}
+              {listed && (
+                <SheetView title={listed.label} onBack={() => setUnitsOf(null)} escape="close">
+                  {unitList}
+                </SheetView>
+              )}
+            </>
+          );
+        }
+        return listed ? (
+          <div>
+            <StepHeader title={listed.label} onBack={() => setUnitsOf(null)} />
+            {unitList}
+          </div>
+        ) : (
+          buildingList
+        );
+      }}
+    </PickerLayer>
   );
 }
