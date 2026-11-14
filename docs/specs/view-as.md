@@ -1,6 +1,8 @@
 # View as a contractor
 
-Planned with Connor on Nov 14, 2026. Nothing here gets built until Connor says "build it" in chat.
+Planned with Connor on Nov 14, 2026. He said "build it" the same day, then paused the build before any code landed: it is not a priority right now.
+
+**Paused, and older than main.** This spec was checked against main at 041eaea. Main has since gained one-tap job links (661d52c: `/j/<token>`, job-held portal sessions, and new controls on the job page such as the contractor's own date, Add to calendar and Text to my crew), which change `src/lib/portal/session.ts` and the job page that this design builds on. Before building, re-check sections 2.3, 5 and 6 against main, and give the view's migration a timestamp later than main's latest (20261114200000_job_links or after).
 
 ## Summary
 
