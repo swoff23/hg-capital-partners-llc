@@ -1,31 +1,22 @@
 import { firstName } from "@/lib/names";
 
 /**
- * The text message staff send a contractor with their new login (the Portal
- * access card on a contractor's page, docs/asana-migration-plan.md §5.1).
- * It goes out from the staff member's own phone through an sms: link, so
- * nothing here sends anything. Pure; see login-text.test.ts.
+ * The login details staff send a contractor (the Portal access card on a
+ * contractor's page, docs/asana-migration-plan.md §5.1): "Copy message" on a
+ * computer, or "Text login details" on a phone through an sms: link, so
+ * nothing here sends anything. Three labeled lines and nothing else, the way
+ * Connor wants it pasted (Nov 14). Pure; see login-text.test.ts.
  */
 
 export { firstName };
 
-export function loginTextBody(input: {
-  contactName: string;
-  staffName: string;
-  appUrl: string;
-  email: string;
-  password: string;
-}): string {
-  const hi = firstName(input.contactName);
-  const from = firstName(input.staffName);
+export function loginTextBody(input: { appUrl: string; email: string; password: string }): string {
   const url = `${input.appUrl.replace(/\/+$/, "")}/login`;
   return [
-    `Hi${hi ? ` ${hi}` : ""}, it's ${from || "HG"}.`,
-    `Your HG jobs: ${url}.`,
-    `Email: ${input.email}.`,
-    `Starting password: ${input.password}.`,
-    "You'll pick your own when you sign in.",
-  ].join(" ");
+    `Login website: ${url}`,
+    `Your Email: ${input.email}`,
+    `Your Password: ${input.password}`,
+  ].join("\n");
 }
 
 /**
