@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { loginThrottle } from "@/lib/login-throttle";
 import { hashPassword, verifyPassword } from "@/lib/password";
-import { checkNewPassword, looksLikeEmail, normalizeEmail, type PasswordProblem } from "./credentials";
+import { checkPasswordChange, looksLikeEmail, normalizeEmail, type PasswordProblem } from "./credentials";
 import {
   PortalAccountError,
   changePortalEmailIn,
@@ -227,14 +227,13 @@ export async function changeOwnPassword(
   next: string,
 ): Promise<{ ok: true } | { ok: false; error: PasswordProblem }> {
   if (loginThrottle.check(principal.email).locked) return { ok: false, error: "locked" };
-  const problem = checkNewPassword(next, { current, email: principal.email });
-  if (problem) return { ok: false, error: problem };
-
   const account = await prisma.portalAccount.findUnique({ where: { id: principal.accountId }, select: { passwordHash: true } });
-  if (!(await verifyPassword(current, account?.passwordHash))) {
+  const problem = await checkPasswordChange({ current, next, email: principal.email }, () => verifyPassword(current, account?.passwordHash));
+  if (problem === "wrong-current") {
     const locked = loginThrottle.recordFailure(principal.email);
     return { ok: false, error: locked ? "locked" : "wrong-current" };
   }
+  if (problem) return { ok: false, error: problem };
 
   const passwordHash = await hashPassword(next);
   await prisma.$transaction(async (tx) => {

@@ -48,6 +48,26 @@ export function checkNewPassword(
 }
 
 /**
+ * A contractor's own password change, in the order its answers are true:
+ * the new password's own problems first (a weak one spends no strike), then
+ * whether the current password is right, and only once it is, whether the
+ * new one repeats it. Asked before the current password was checked, "same"
+ * only meant the two boxes matched, so the new password typed into both
+ * (read as new and confirm) was told it matched the starting one, when the
+ * starting one was never typed. `currentIsRight` is called once, and only
+ * when the new password passes.
+ */
+export async function checkPasswordChange(
+  input: { current: string; next: string; email: string },
+  currentIsRight: () => Promise<boolean>,
+): Promise<PasswordProblem | null> {
+  const weak = checkNewPassword(input.next, { email: input.email });
+  if (weak) return weak;
+  if (!(await currentIsRight())) return "wrong-current";
+  return checkNewPassword(input.next, { current: input.current });
+}
+
+/**
  * Whether a starting password someone sent is a try at all. An empty one is
  * the form posted unfilled (no script, or a skipped check), not a guess, so
  * it is refused before the sign-in throttle and never spends one of the
