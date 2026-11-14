@@ -54,10 +54,13 @@ export function ReviewSlot({
   contractor,
   hasLogin,
   now,
+  openSendBack = false,
 }: {
   taskId: string;
   review: ReviewProof | null;
   decision: ReviewDecision | null;
+  /** An email's Send back: the banner's sheet starts open, and the ?do= comes off the address. */
+  openSendBack?: boolean;
   /** The contractor's first name when one is assigned: who Send back goes to, and who hears of Approve. */
   contractor: string | null;
   /** The contractor can sign in, so Approve and Send back reach them by email. */
@@ -74,7 +77,7 @@ export function ReviewSlot({
     const active = document.activeElement;
     if (showsOutcome && (!active || active === document.body)) outcome.current?.focus();
   }, [showsOutcome]);
-  if (review) return <ReviewBanner taskId={taskId} contractor={contractor} hasLogin={hasLogin} now={now} {...review} />;
+  if (review) return <ReviewBanner taskId={taskId} contractor={contractor} hasLogin={hasLogin} now={now} openSendBack={openSendBack} {...review} />;
   if (!heldBanner || !decision) return null;
   return (
     <p ref={outcome} tabIndex={-1} role="status" className="flex min-w-0 items-center gap-2 text-meta text-fg-3 outline-none">
@@ -108,9 +111,16 @@ function ReviewBanner({
   contractor,
   hasLogin,
   now,
-}: ReviewProof & { taskId: string; contractor: string | null; hasLogin: boolean; now: string }) {
+  openSendBack,
+}: ReviewProof & { taskId: string; contractor: string | null; hasLogin: boolean; now: string; openSendBack: boolean }) {
   const { run, pending, toast } = useStatusRun();
-  const [sendingBack, setSendingBack] = useState(false);
+  const [sendingBack, setSendingBack] = useState(openSendBack);
+  useEffect(() => {
+    if (!openSendBack) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("do");
+    window.history.replaceState(null, "", url);
+  }, [openSendBack]);
   // A note that didn't go through (or a sheet closed on it): the sheet starts with it next time.
   const [draft, setDraft] = useState("");
 

@@ -115,7 +115,7 @@ test("Mark done counts only this visit's photos and videos: no imported file, no
   // Mark done takes the task row before it counts anything (S2), as every writer on a task takes it first.
   assert.match(
     fn(send, "markDoneIn"),
-    /\{\s*await core\.lockTask\(tx, taskId\);\s*\/\/[^\n]*\n\s*await core\.assertContractorAccess\(tx, taskId, p\.contactId\);\s*const own = await ownUnposted\(/,
+    /\{\s*await core\.lockTask\(tx, taskId\);\s*\/\/[^\n]*\n\s*await core\.assertContractorAccess\(tx, taskId, p\);\s*const own = await ownUnposted\(/,
   );
 });
 
@@ -124,7 +124,7 @@ test("files a batch post already told HG of, sent again after its answer was los
   // A Send with no text and nothing new answers quietly, so the page clears its tray instead of being refused each tap.
   assert.match(
     fn(send, "postUpdateIn"),
-    /if \(!input\.body\.trim\(\) && own\.length === 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, input\.attachmentIds\)\)\) \{\s*await core\.assertContractorAccess\(tx, taskId, p\.contactId\);\s*return;\s*\}\s*await core\.addComment/,
+    /if \(!input\.body\.trim\(\) && own\.length === 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, input\.attachmentIds\)\)\) \{\s*await core\.assertContractorAccess\(tx, taskId, p\);\s*return;\s*\}\s*await core\.addComment/,
   );
   // A Send again whose first send did post (M1): the photos still unposted under addComment's lock go as their own
   // batch, through the batch step, so the words are never written twice.
@@ -192,7 +192,7 @@ test("the portal's record step locks the job before it reads the job's status, s
   const txn = body.slice(body.indexOf("prisma.$transaction("));
   assert.ok(txn.includes("core.lockTask(tx, taskId)"), "the in-transaction check runs under the Task lock");
   const lock = txn.indexOf("core.lockTask(tx, taskId)");
-  const refusal = txn.indexOf("contractorUploadRefusal(taskId, portal.contactId, { queuedAt }, tx)");
+  const refusal = txn.indexOf("contractorUploadRefusal(taskId, portal, { queuedAt }, tx)");
   const record = txn.indexOf("core.recordAttachment(tx, taskId");
   assert.ok(lock >= 0 && refusal > lock && record > refusal, "lock, then the job's status and window, then the record");
   // The lock is the one Task row lock core takes first everywhere, and names no email row.
@@ -259,7 +259,7 @@ test("a job that is no longer active still gets its late photos recorded, and HG
   const batch = read("lib", "portal", "job-batch.ts");
   const step = fn(batch, "postBatchIn");
   const own = fn(batch, "postOwn");
-  assert.ok(step.indexOf("core.assertContractorAccess(tx, taskId, p.contactId)") < step.indexOf("tx.task.findUnique"), "the access check comes first");
+  assert.ok(step.indexOf("core.assertContractorAccess(tx, taskId, p)") < step.indexOf("tx.task.findUnique"), "the access check comes first");
   // A send whose files are all posted already answers quietly whatever the job's status, so it can't stall the next piece.
   assert.match(step, /if \(own\.length === 0 && \(await allOwnPosted\(tx, taskId, p\.contactId, attachmentIds\)\)\) return \{ event: null, linked: \[\] \};/);
   assert.ok(step.indexOf("allOwnPosted(") < step.indexOf("isActiveStatus("), "the quiet answer comes before the status branch");
@@ -267,7 +267,7 @@ test("a job that is no longer active still gets its late photos recorded, and HG
   assert.match(own, /if \(!active\) \{\s*try \{\s*return await postLate\(tx, taskId, p, own\);/);
   // A job HG reopened while the late line waited for the task row is refused under its lock, and the same files go
   // the active way (the low on core.ts:1227).
-  assert.match(fn(read("lib", "tasks", "core.ts"), "addLateContractorBatch"), /await assertContractorAccess\(tx, taskId, p\.contactId\);\s*if \(isActiveStatus\(task\.status\)\) throw new TaskRuleError\(JOB_OPEN_AGAIN\);/);
+  assert.match(fn(read("lib", "tasks", "core.ts"), "addLateContractorBatch"), /await assertContractorAccess\(tx, taskId, p\);\s*if \(isActiveStatus\(task\.status\)\) throw new TaskRuleError\(JOB_OPEN_AGAIN\);/);
   assert.match(own, /err instanceof core\.TaskRuleError && err\.message === core\.JOB_OPEN_AGAIN\) return postActive\(tx, taskId, p, own\);/);
   // A batch that waited behind Approve finds the job Done under addComment's lock: core refuses before it writes, in
   // access.ts JOB_CLOSED's words (core.test.ts pins them), and the same files take the late way.
@@ -306,7 +306,7 @@ test("past the window the record step's closed-job refusal is final, and only th
   assert.ok(mine >= 0 && mine < record.indexOf("contractorUploadRefusal("), "the own row is looked for before the early refusal");
   assert.match(record, /if \(mine\) return mine;/);
   // But never before access (the portal data boundary): a contractor taken off the job gets no row back.
-  const access = record.indexOf("await core.assertContractorAccess(prisma, taskId, portal.contactId);");
+  const access = record.indexOf("await core.assertContractorAccess(prisma, taskId, portal);");
   assert.ok(access >= 0 && access < mine, "access first, then the own row, then the job's window");
   // The queue's half (A, a final tile forgets its paths) is engine.test.ts: a restored final row sends its bytes again.
   // The record step hands `final` to the queue as it came.
@@ -317,7 +317,7 @@ test("the day's grace needs the job's last start, asked only of a job in Review 
   const refusal = fn(read("lib", "tasks", "attachments.ts"), "contractorUploadRefusal");
   assert.match(refusal, /task\.status === "REVIEW" && opts\.queuedAt/);
   assert.match(refusal, /data: \{ path: \["to"\], equals: "IN_PROGRESS" \}/);
-  assert.match(refusal, /acceptsContractorUpload\(task, lastReview, contactId, now, opts\.queuedAt, startedAt\)/);
+  assert.match(refusal, /acceptsContractorUpload\(task, lastReview, who\.contactId, now, opts\.queuedAt, startedAt\)/);
 });
 
 test("renaming a file is core's write (it stamps the task), not a bare update", () => {

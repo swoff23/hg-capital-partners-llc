@@ -16,6 +16,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
+import { resolveJobLink } from "@/lib/portal/job-links";
 import { getPortalPrincipal } from "@/lib/portal/session";
 import { assertContractorAccess } from "@/lib/tasks/core";
 
@@ -51,7 +52,8 @@ export const maxDuration = 300;
  * other site, and a PDF's CSP here names no frame-ancestors to undo that.
  */
 
-type Viewer = { kind: "staff" } | { kind: "contractor"; contactId: string };
+// onlyTaskId: a viewer let in by a job email's link (`?l=`) sees that job's files only.
+type Viewer = { kind: "staff"; onlyTaskId?: string | null } | { kind: "contractor"; contactId: string; onlyTaskId: string | null };
 
 const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   task: ["staff", "contractor"],
@@ -71,11 +73,24 @@ interface Served {
 
 type Variant = "thumb" | "poster";
 
+/**
+ * A thumbnail in a job email (docs/specs/contractor-job-emails.md, section 3): a mail app fetches it with no cookie,
+ * so the email's link is the key. Thumbnails of task files only. A contractor's link sees what they could see on that
+ * job while it still opens it (job-links.ts opensJob); a partner's STAFF link sees that job's files.
+ */
+async function linkViewer(kind: string, token: string, variant: string | null): Promise<Viewer | null> {
+  if (kind !== "task" || variant !== "thumb") return null;
+  const link = await resolveJobLink(token);
+  if (!link) return null;
+  if (link.kind === "STAFF") return link.userId ? { kind: "staff", onlyTaskId: link.taskId } : null;
+  return link.opensJob && link.contactId ? { kind: "contractor", contactId: link.contactId, onlyTaskId: link.taskId } : null;
+}
+
 async function currentViewer(allowed: readonly Viewer["kind"][]): Promise<Viewer | null> {
   if (allowed.includes("staff") && (await getCurrentUser())) return { kind: "staff" };
   if (allowed.includes("contractor")) {
     const portal = await getPortalPrincipal();
-    if (portal) return { kind: "contractor", contactId: portal.contactId };
+    if (portal) return { kind: "contractor", contactId: portal.contactId, onlyTaskId: portal.onlyTaskId };
   }
   return null;
 }
@@ -101,11 +116,12 @@ async function lookup(kind: string, id: string, variant: Variant | null, viewer:
       },
     });
     if (!a || a.kind === "LINK" || !a.url) return null;
+    if (viewer.onlyTaskId && a.taskId !== viewer.onlyTaskId) return null;
     const isPrivate = !!a.pathname && isPrivateStoreUrl(a.url, storeId, a.pathname);
     if (viewer.kind === "contractor") {
       if (!contractorMaySee(a, viewer.contactId) || !isPrivate) return null;
       try {
-        await assertContractorAccess(prisma, a.taskId, viewer.contactId);
+        await assertContractorAccess(prisma, a.taskId, viewer);
       } catch {
         return null;
       }
@@ -153,6 +169,12 @@ export async function GET(req: Request, ctx: RouteContext<"/api/files/[kind]/[id
   const { kind, id } = await ctx.params;
   if (!Object.hasOwn(KIND_VIEWERS, kind)) return fail("Not found", 404);
   const allowed = KIND_VIEWERS[kind];
+  const linkToken = new URL(req.url).searchParams.get("l");
+  if (linkToken !== null) {
+    const byLink = await linkViewer(kind, linkToken, new URL(req.url).searchParams.get("v"));
+    if (!byLink) return fail("Not found", 404);
+    return serve(req, kind, id, byLink);
+  }
   const viewer = await currentViewer(allowed);
   if (!viewer) {
     // A file link opened in the browser (a pasted link, a tab left open past
@@ -163,7 +185,11 @@ export async function GET(req: Request, ctx: RouteContext<"/api/files/[kind]/[id
     }
     return fail("Unauthorized", 401);
   }
+  return serve(req, kind, id, viewer);
+}
 
+/** The file for a viewer already let in: its bytes, a signed redirect for a video, or a 404. */
+async function serve(req: Request, kind: string, id: string, viewer: Viewer): Promise<NextResponse> {
   const query = new URL(req.url).searchParams;
   const v = query.get("v");
   if (v !== null && v !== "thumb" && v !== "poster") return fail("Not found", 404);

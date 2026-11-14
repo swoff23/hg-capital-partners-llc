@@ -122,14 +122,23 @@ export interface JobEmailButton {
   url: string;
 }
 
+export interface JobEmailPhoto {
+  src: string;
+  href: string;
+}
+
 export interface JobEmailInput {
   /** The hidden inbox preview line. */
   preview: string;
   /** What's new: the headline, then the other lines. */
   headline: string;
   lines: string[];
+  /** What's new's photos, then how many more. */
+  photos?: JobEmailPhoto[];
+  morePhotos?: number;
   closing?: string;
-  primary: JobEmailButton;
+  /** Null on an email with nothing to do (taken off the job): no buttons. */
+  primary: JobEmailButton | null;
   secondary: JobEmailButton[];
   job: {
     title: string;
@@ -141,6 +150,14 @@ export interface JobEmailInput {
     checklist: { title: string; done: boolean }[];
     contractor: string | null;
     checklistLine: string | null;
+    /** "Show access": opens the job at its Lockbox. */
+    accessUrl?: string | null;
+    /** Add to calendar's .ics. */
+    calendarUrl?: string | null;
+    /** Change date: the contractor's own date (opens the job's date sheet). */
+    dateUrl?: string | null;
+    photos?: JobEmailPhoto[];
+    morePhotos?: number;
   };
   footnote?: string;
 }
@@ -169,6 +186,23 @@ function factRow(label: string, valueHtml: string): string {
   return `<tr><td valign="top" width="88" style="width:88px;padding:8px 12px 8px 0;border-top:1px solid ${t.line};font-size:13px;line-height:22px;color:${t.fg3};">${escapeHtml(label)}</td><td valign="top" style="padding:8px 0;border-top:1px solid ${t.line};font-size:15px;line-height:22px;color:${t.fg1};">${valueHtml}</td></tr>`;
 }
 
+/** A row of thumbnails, each a link, then "+3" when there are more. */
+function photoStripHtml(photos: readonly JobEmailPhoto[], more: number): string {
+  const tiles = photos
+    .map(
+      (ph) =>
+        `<a href="${escapeHtml(safeUrl(ph.href))}" style="display:inline-block;margin:0 6px 6px 0;text-decoration:none;"><img src="${escapeHtml(safeUrl(ph.src))}" alt="Photo" width="72" height="54" style="display:block;width:72px;height:54px;object-fit:cover;border-radius:4px;border:0;background:${t.fill1};"></a>`,
+    )
+    .join("");
+  const rest = more > 0 ? `<span style="display:inline-block;vertical-align:top;line-height:54px;font-size:14px;color:${t.fg3};">+${more}</span>` : "";
+  return `${tiles}${rest}`;
+}
+
+/** A link inside a fact's value. */
+function inlineLink(label: string, url: string): string {
+  return `<a href="${escapeHtml(safeUrl(url))}" style="${LINK}">${escapeHtml(label)}</a>`;
+}
+
 const PRIMARY = `display:block;text-align:center;background:${t.act};color:${t.onAct};text-decoration:none;font-size:15px;font-weight:600;padding:13px 22px;border-radius:6px;`;
 const SECONDARY = `display:inline-block;background:${t.surface};color:${t.fg1};text-decoration:none;font-size:15px;font-weight:600;padding:11px 18px;border-radius:6px;border:1px solid ${t.lineStrong};margin:8px 8px 0 0;`;
 const LINK = `color:${t.act};text-decoration:underline;`;
@@ -181,7 +215,7 @@ const LINK = `color:${t.act};text-decoration:underline;`;
  * same sections in the same order, each button as a labeled link.
  */
 export function renderJobEmail(input: JobEmailInput): RenderedEmail {
-  const primaryUrl = safeUrl(input.primary.url);
+  const primaryUrl = input.primary ? safeUrl(input.primary.url) : null;
   const secondary = input.secondary.map((b) => ({ label: b.label, url: safeUrl(b.url) }));
   const directions = input.job.directionsUrl ? safeUrl(input.job.directionsUrl) : null;
   const photo = input.job.photoUrl ? safeUrl(input.job.photoUrl) : null;
@@ -189,7 +223,22 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
 
   const facts: { label: string; text: string; html: string }[] = [];
   if (job.contractor) facts.push({ label: "Contractor", text: job.contractor, html: escapeHtml(job.contractor) });
-  if (job.due) facts.push({ label: "Due", text: job.due, html: escapeHtml(job.due) });
+  if (job.due || job.dateUrl) {
+    const calendar = job.calendarUrl ? safeUrl(job.calendarUrl) : null;
+    const change = job.dateUrl ? safeUrl(job.dateUrl) : null;
+    const links = [calendar ? { label: "Add to calendar", url: calendar } : null, change ? { label: job.due ? "Change date" : "Set a date", url: change } : null].filter(
+      (l): l is { label: string; url: string } => !!l,
+    );
+    facts.push({
+      label: "Due",
+      text: [job.due ?? "No date", ...links.map((l) => `${l.label}: ${l.url}`)].join("\n"),
+      html: [job.due ? escapeHtml(job.due) : "No date", ...links.map((l) => inlineLink(l.label, l.url))].join(" &middot; "),
+    });
+  }
+  if (job.accessUrl) {
+    const access = safeUrl(job.accessUrl);
+    facts.push({ label: "Access", text: `Show access: ${access}`, html: inlineLink("Show access", access) });
+  }
   if (job.checklistLine) facts.push({ label: "Checklist", text: job.checklistLine, html: escapeHtml(job.checklistLine) });
   if (job.notes) facts.push({ label: "Notes", text: job.notes, html: escapeWithBreaks(job.notes) });
   if (job.checklist.length) {
@@ -204,6 +253,11 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
         .join(""),
     });
   }
+  if (job.photos?.length) {
+    const n = job.photos.length + (job.morePhotos ?? 0);
+    facts.push({ label: "Photos", text: `${n} on the job`, html: photoStripHtml(job.photos, job.morePhotos ?? 0) });
+  }
+  const newPhotos = input.photos ?? [];
 
   const text = [
     BRAND.company,
@@ -212,8 +266,7 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
     input.headline,
     ...input.lines,
     ...(input.closing ? ["", input.closing] : []),
-    "",
-    `${input.primary.label}: ${primaryUrl}`,
+    ...(input.primary && primaryUrl ? ["", `${input.primary.label}: ${primaryUrl}`] : []),
     ...secondary.map((b) => `${b.label}: ${b.url}`),
     "",
     "The job",
@@ -242,11 +295,15 @@ ${previewHtml(input.preview)}
 <tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.goldDeep};">${LETTERHEAD}</td></tr>
 <tr><td style="padding:24px 0 0;${LABEL}">What's new</td></tr>
 <tr><td style="padding:4px 0 0;font-size:18px;line-height:1.4;font-weight:600;color:${t.fg1};">${escapeWithBreaks(input.headline)}</td></tr>
-${input.lines.map((l) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(l)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
+${input.lines.map((l) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(l)}</td></tr>\n`).join("")}${newPhotos.length ? `<tr><td style="padding:10px 0 0;font-size:0;line-height:0;">${photoStripHtml(newPhotos, input.morePhotos ?? 0)}</td></tr>\n` : ""}${input.closing ? `<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}${
+    input.primary && primaryUrl
+      ? `<tr><td style="padding:24px 0 0;">
 <a href="${escapeHtml(primaryUrl)}" style="${PRIMARY}">${escapeHtml(input.primary.label)}</a>
 ${secondary.map((b) => `<a href="${escapeHtml(b.url)}" style="${SECONDARY}">${escapeHtml(b.label)}</a>`).join("\n")}
 </td></tr>
-<tr><td style="padding:28px 0 0;"><div style="border-top:1px solid ${t.line};"></div></td></tr>
+`
+      : ""
+  }<tr><td style="padding:28px 0 0;"><div style="border-top:1px solid ${t.line};"></div></td></tr>
 <tr><td style="padding:20px 0 0;${LABEL}">The job</td></tr>
 ${photo ? `<tr><td style="padding:8px 0 0;"><img src="${escapeHtml(photo)}" alt="" width="430" style="display:block;width:100%;max-width:430px;height:auto;border-radius:6px;border:0;"></td></tr>\n` : ""}<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.4;font-weight:600;color:${t.fg1};">${escapeHtml(job.title)}</td></tr>
 ${whereLine ? `<tr><td style="padding:2px 0 0;font-size:14px;line-height:1.5;color:${t.fg3};">${whereLine}</td></tr>\n` : ""}${

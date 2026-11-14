@@ -3,6 +3,7 @@ import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type Ta
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
+import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { hasPinnedDay, isUntouchedCopy, leapDayRule, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
@@ -43,7 +44,8 @@ export type Tx = Prisma.TransactionClient;
 /** Who is acting. Labels are what the timeline and emails show. */
 export type Principal =
   | { kind: "staff"; userId: string; label: string }
-  | { kind: "contractor"; contactId: string; label: string }
+  // onlyTaskId: a session an email's job link started reaches that one job (docs/specs/contractor-job-emails.md, 3).
+  | { kind: "contractor"; contactId: string; label: string; onlyTaskId?: string | null }
   | { kind: "system"; label: string }
   | { kind: "asana"; label: string };
 
@@ -169,12 +171,18 @@ export function addEvent(tx: Tx, taskId: string, p: Principal, e: EventInput): P
 // Access
 // ---------------------------------------------------------------------------
 
+/** Who a contractor access check is for: the contact, and the one job a link session is held to, if it is. */
+export type ContractorWho = { contactId: string; onlyTaskId?: string | null };
+
 /**
  * A contractor may act on a task only through an unrevoked access row, with
  * an active contact and an active portal login. (The portal layer separately
- * checks the session itself.)
+ * checks the session itself.) A session an email's job link started reaches
+ * only its own job, whatever else the contact has.
  */
-export async function assertContractorAccess(tx: Tx, taskId: string, contactId: string): Promise<void> {
+export async function assertContractorAccess(tx: Tx, taskId: string, who: ContractorWho): Promise<void> {
+  if (who.onlyTaskId && who.onlyTaskId !== taskId) throw new TaskRuleError("You don't have access to this job.");
+  const contactId = who.contactId;
   const access = await tx.taskAccess.findUnique({
     where: { taskId_contactId: { taskId, contactId } },
     select: { revokedAt: true, contact: { select: { active: true, portalAccount: { select: { status: true } } } } },
@@ -315,7 +323,8 @@ async function archivedAssigneeToGiveBack(tx: Tx, taskId: string, from: TaskStat
 // ---------------------------------------------------------------------------
 
 export interface OutboxItem {
-  kind: NotifyChange["kind"];
+  // OFF: taken off the job or canceled (notifyOff); DUE_TODAY and OVERDUE: the 8 am emails (notifications/reminders.ts).
+  kind: NotifyChange["kind"] | "OFF" | "DUE_TODAY" | "OVERDUE";
   actorLabel: string;
   summary: string;
   at: string;
@@ -333,6 +342,8 @@ export interface OutboxItem {
   noteEventId?: string;
   /** TARGET: the date that moved is the booked visit, not the due date ("moved the visit to Fri, Oct 30"). */
   visit?: boolean;
+  /** DUE_TODAY and OVERDUE (notifications/reminders.ts): the date the reminder is for, which keeps it to once per date. */
+  due?: string;
 }
 
 /** What a line carries beside its summary (OutboxItem's optional fields). */
@@ -420,6 +431,51 @@ async function notify(
     for (const s of staff) await enqueue(tx, { userId: s.id }, task.id, item, now);
   }
   return audience;
+}
+
+/**
+ * "You're off this job" (docs/specs/contractor-job-emails.md, section 6): a
+ * partner took the contractor off an open job, or canceled it. Queued for
+ * that contractor under the same email rules as any staff change (a login,
+ * a first sign-in, their switch on). The send run delivers it though their
+ * access is gone, and carries nothing else about the job.
+ */
+async function notifyOff(tx: Tx, task: NotifyTask, contactId: string, p: Principal, summary: string, now: Date): Promise<void> {
+  if (p.kind !== "staff" || !(await contractorGetsEmail(tx, contactId))) return;
+  await enqueue(tx, { contactId }, task.id, { kind: "OFF", actorLabel: p.label, summary, at: now.toISOString() }, now);
+}
+
+/** Advisory-lock namespace for the 8 am reminders (portal uses 7301 to 7303). */
+const REMINDER_LOCK = 7304;
+
+/**
+ * One 8 am email (docs/specs/contractor-job-emails.md, section 6): "Due
+ * today" on the job's date, "Due yesterday" the morning after, under the same
+ * rules as any email to a contractor (a login, a first sign-in, their switch
+ * on). Once per job, contractor and date: a reminder already queued or sent
+ * for that date is found in the outbox and not queued again, under a lock so
+ * two runs at once queue one. It bundles with anything else waiting for them
+ * on the job. Returns whether it queued.
+ */
+export async function queueDueReminder(
+  tx: Tx,
+  task: { id: string; assigneeContactId: string },
+  kind: "DUE_TODAY" | "OVERDUE",
+  due: Ymd,
+  now: Date,
+): Promise<boolean> {
+  const contactId = task.assigneeContactId;
+  if (!(await contractorGetsEmail(tx, contactId))) return false;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REMINDER_LOCK}::int, hashtext(${`${contactId}:${task.id}`}))`;
+  const marker = JSON.stringify([{ kind, due }]);
+  const seen = await tx.$queryRaw<{ one: number }[]>`
+    SELECT 1 AS one FROM "NotificationOutbox"
+    WHERE "recipientContactId" = ${contactId} AND "taskId" = ${task.id} AND "items" @> ${marker}::jsonb
+    LIMIT 1`;
+  if (seen.length > 0) return false;
+  const summary = kind === "DUE_TODAY" ? "due today" : "due yesterday";
+  await enqueue(tx, { contactId }, task.id, { kind, actorLabel: "HG", summary, at: now.toISOString(), due }, now);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -618,7 +674,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
   if (opts.expected && before.status !== opts.expected) throw await taskChanged(tx, taskId, before.status, p);
   if (!canSetStatus(kindOf(p), before.status, to)) {
     // A contractor's refusal says where the job is now: their tab is usually stale (approved, or done in another tab).
@@ -721,6 +777,10 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
     eventId: statusEvent.id,
     ...(noteEvent && p.kind !== "contractor" && note ? { noteEventId: noteEvent.event.id } : {}),
   });
+  // A canceled open job tells its contractor there's no need to go (the Canceled line itself stays Internal).
+  if (to === "CANCELED" && isActiveStatus(before.status) && task.assigneeContactId) {
+    await notifyOff(tx, task, task.assigneeContactId, p, `canceled "${task.title}"`, now);
+  }
 
   if (to === "DONE" || reopening) {
     await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now, to === "DONE" ? statusEvent.id : undefined);
@@ -1189,6 +1249,8 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
   if (newContactId !== undefined) {
     await syncAssigneeAccess(tx, taskId, newContactId, p, now);
     if (newContactId) await notify(tx, after, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(after, now), now);
+    // The contractor taken off an open job hears so, so nobody makes the trip (docs/specs/contractor-job-emails.md 6).
+    if (before.assigneeContactId && isActiveStatus(before.status)) await notifyOff(tx, after, before.assigneeContactId, p, `took you off "${after.title}"`, now);
   } else if (after.assigneeContactId) {
     // Same contractor: tell them about what they can see change.
     const targetBefore = toYmd(targetDate(before));
@@ -1206,6 +1268,40 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
   }
   return after;
 }
+
+/**
+ * A contractor sets the day they agreed with the tenant (docs/specs/contractor-job-emails.md, section 7, Connor's
+ * call): it becomes the job's due date, and a Scheduled job's day too, so the two can't disagree. Earlier or later, no
+ * approval. Only on a job waiting on them (To do, Scheduled, Waiting, In progress). Both partners get "Zack moved the
+ * due date to Mon, Nov 23 (was Thu, Nov 19)". Marks the task edited in the app, so the Asana sync holds it back.
+ */
+export async function setDateByContractor(tx: Tx, taskId: string, date: Ymd, p: Extract<Principal, { kind: "contractor" }>, now = new Date()): Promise<Task> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !ymdToDate(date)) throw new TaskRuleError("Pick a date.");
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  await assertContractorAccess(tx, taskId, p);
+  const before = await tx.task.findUnique({ where: { id: taskId } });
+  if (!before) throw new TaskRuleError("That job no longer exists.");
+  if (!contractorMaySetDate(before.status)) throw new TaskRuleError("This job's date can't change now.");
+  const from = toYmd(targetDate(before));
+  if (from === date) return before;
+  const d = ymdToDate(date);
+  const data: Prisma.TaskUncheckedUpdateInput = {};
+  const events: EventInput[] = [];
+  if (toYmd(before.dueDate) !== date) {
+    data.dueDate = d;
+    events.push({ kind: "DUE", data: { from: toYmd(before.dueDate), to: date } });
+  }
+  if (before.status === "SCHEDULED" && toYmd(before.scheduledFor) !== date) {
+    data.scheduledFor = d;
+    events.push({ kind: "SCHEDULED", data: { from: toYmd(before.scheduledFor), to: date } });
+  }
+  const after = await tx.task.update({ where: { id: taskId }, data: { ...data, ...editStamp(p, now) } });
+  for (const e of events) await addEvent(tx, taskId, p, e);
+  const was = from ? ` (was ${emailDay(from, now)})` : "";
+  await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { visit: false });
+  return after;
+}
+
 
 /**
  * A unit renamed on its property (properties/service.ts replaceUnits): every
@@ -1353,7 +1449,7 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
   if (input.clientId) {
     // After the access check, so a contractor who lost the job never gets an earlier post back. Before the
     // closed-job check, so a Retry of an update that did post before the job closed gets that post back instead
@@ -1421,7 +1517,7 @@ export async function addLateContractorBatch(tx: Tx, taskId: string, attachmentI
   await lockTask(tx, taskId);
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  await assertContractorAccess(tx, taskId, p.contactId);
+  await assertContractorAccess(tx, taskId, p);
   if (isActiveStatus(task.status)) throw new TaskRuleError(JOB_OPEN_AGAIN);
   const visibility: Visibility = "SHARED";
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
@@ -1481,7 +1577,7 @@ async function ownComment(tx: Tx, eventId: string, p: Principal, { deleted }: { 
   if (!ev || ev.kind !== "COMMENT") throw new TaskRuleError("That comment no longer exists.");
   if (!isCommentAuthor(ev, p)) throw new TaskRuleError("You can only change your own comments.");
   if (deleted === false && ev.deletedAt) throw new TaskRuleError("That comment was deleted.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, ev.taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, ev.taskId, p);
   return ev;
 }
 
@@ -1660,7 +1756,7 @@ export async function takeBackContractorPost(
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  await assertContractorAccess(tx, taskId, p.contactId);
+  await assertContractorAccess(tx, taskId, p);
   if (!isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
   const event = await tx.taskEvent.findFirst({
     where: {
@@ -1742,7 +1838,7 @@ export async function recordAttachment(
   await lockTask(tx, taskId);
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
-  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p.contactId);
+  if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (opts.visibility ?? "INTERNAL");
   const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
   const att = await tx.taskAttachment.create({
@@ -1880,7 +1976,7 @@ export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p:
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { id: true, status: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   if (p.kind === "contractor") {
-    await assertContractorAccess(tx, item.taskId, p.contactId);
+    await assertContractorAccess(tx, item.taskId, p);
     if (!isActiveStatus(item.task.status)) throw new TaskRuleError("This job is closed.");
   }
   if (item.done === done) return item;

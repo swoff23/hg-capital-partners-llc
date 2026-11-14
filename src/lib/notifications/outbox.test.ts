@@ -24,7 +24,7 @@ test("the drain re-reads each item's event after it claims the row, not before",
 test("it reads in one query per row, scoped to the row's task, only for items that name events", () => {
   assert.equal((code.match(/taskEvent\.findMany/g) ?? []).length, 1);
   assert.match(code, /where: \{ id: \{ in: ids \}, taskId \}/);
-  assert.match(code, /if \(ids\.length === 0\) return stored;/, "a row of old items sends as stored, with no read");
+  assert.match(code, /if \(ids\.length === 0\) return \{ items: stored, photosByEvent: new Map\(\) \};/, "a row of old items sends as stored, with no read");
   // A file taken off a comment is not counted.
   assert.match(code, /attachments: \{ where: \{ deletedAt: null \}/);
 });

@@ -430,6 +430,8 @@ async function finishSet(taskId: string, media: readonly { id: string; createdAt
 
 /** The job, or null when this contact can't open it (no access, revoked, or closed before PORTAL_HISTORY_FROM). */
 export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDetail | null> {
+  // A link session opens its one job (session.ts onlyTaskId).
+  if (p.onlyTaskId && p.onlyTaskId !== taskId) return null;
   const task = await prisma.task.findFirst({
     where: { id: taskId, ...accessibleTo(p.contactId) },
     select: {
@@ -558,6 +560,8 @@ async function jobNotice(
       WHERE e."taskId" = ${task.id} AND e."deletedAt" IS NULL
         AND e."kind" IN ('DUE', 'SCHEDULED', 'STATUS', 'NOTES')
         AND e."createdAt" > ${utc(since)}
+        -- What others changed: a date the contractor set themselves (Change date) isn't news to them.
+        AND e."actorContactId" IS DISTINCT FROM ${p.contactId}
       ORDER BY e."createdAt" ASC, e."id" ASC`,
   ]);
   const change: DateChange | null = dateChange(

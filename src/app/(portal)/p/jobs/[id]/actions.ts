@@ -63,3 +63,19 @@ export async function setChecklistItemAction(itemId: string, done: boolean): Pro
     await jobs.setJobChecklistItem(id.parse(itemId), z.boolean().parse(done));
   });
 }
+
+/** "Text to my crew": the text to send, with a link of its own (jobs.ts crewTextFor). */
+export async function crewTextAction(taskId: string): Promise<ActionResult<string>> {
+  return withResult("portal:crewText", async () => {
+    await requirePortalPrincipal();
+    return jobs.crewTextFor(id.parse(taskId));
+  });
+}
+
+/** Change date: the job's new due date, as the contractor agreed it with the tenant (jobs.ts setJobDate). */
+export async function setJobDateAction(taskId: string, date: string): Promise<ActionResult> {
+  return withResult("portal:setJobDate", async () => {
+    await requirePortalPrincipal();
+    await jobs.setJobDate(id.parse(taskId), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.").parse(date));
+  });
+}

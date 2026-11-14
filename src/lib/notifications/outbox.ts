@@ -1,17 +1,21 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { replyAddress } from "@/lib/email/inbound";
 import { renderJobEmail } from "@/lib/email/render";
 import { todayYmdEastern, toYmd } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
-import { CODE_MASK, lockboxMasker } from "@/lib/portal/access-code";
+import { SEEABLE_FILE, contractorMaySee } from "@/lib/attachments/access";
+import { CODE_MASK, lockboxMasker, readLockboxCode } from "@/lib/portal/access-code";
+import { mintJobLink } from "@/lib/portal/job-links";
 import { staffFirstNames } from "@/lib/portal/queries";
 import { targetDate } from "@/lib/tasks/rules";
 import {
   DAILY_EMAIL_CAP,
   deliveryFor,
   easternDayStart,
+  offItems,
   parseItems,
   reachedCapNow,
   reconcileItems,
@@ -122,9 +126,9 @@ async function liveItems(
   taskId: string,
   stored: OutboxItem[],
   row: { audience: "staff" | "contractor"; recipientContactId: string | null },
-): Promise<OutboxItem[]> {
+): Promise<{ items: OutboxItem[]; photosByEvent: Map<string, string[]> }> {
   const ids = [...new Set(stored.flatMap((i) => [i.eventId, i.noteEventId].filter((x): x is string => !!x)))];
-  if (ids.length === 0) return stored;
+  if (ids.length === 0) return { items: stored, photosByEvent: new Map() };
   const found = await prisma.taskEvent.findMany({
     where: { id: { in: ids }, taskId },
     select: {
@@ -133,7 +137,7 @@ async function liveItems(
       deletedAt: true,
       body: true,
       audienceContactId: true,
-      attachments: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, select: { kind: true } },
+      attachments: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, select: { ...SEEABLE_FILE, id: true, thumbPathname: true } },
     },
   });
   const events = new Map<string, EventSnapshot>(
@@ -149,7 +153,27 @@ async function liveItems(
       },
     ]),
   );
-  return reconcileItems(stored, events, row);
+  // The photos each event carries that this recipient may open, for What's new's thumbnails (thumbnail made only).
+  const photosByEvent = new Map(
+    found.map((e) => [
+      e.id,
+      e.attachments
+        .filter((a) => a.kind === "IMAGE" && a.thumbPathname && (row.audience === "staff" || (row.recipientContactId && contractorMaySee(a, row.recipientContactId))))
+        .map((a) => a.id),
+    ]),
+  );
+  return { items: reconcileItems(stored, events, row), photosByEvent };
+}
+
+/** HG's photos on a job the contractor may open, newest first: the job section's thumbnails. */
+async function hgPhotoIds(taskId: string, contactId: string, leaveOut: ReadonlySet<string>): Promise<string[]> {
+  const rows = await prisma.taskAttachment.findMany({
+    where: { taskId, kind: "IMAGE", deletedAt: null, uploadedByContactId: null, thumbPathname: { not: null } },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: { ...SEEABLE_FILE, id: true },
+  });
+  return rows.filter((a) => !leaveOut.has(a.id) && contractorMaySee(a, contactId)).map((a) => a.id);
 }
 
 /**
@@ -173,6 +197,9 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       id: true,
       taskId: true,
       recipientContactId: true,
+      recipientUserId: true,
+      // Read before the claim only to see whether it says they're off the job (offItems); what's sent is the claim's.
+      items: true,
       task: {
         select: {
           title: true,
@@ -210,7 +237,9 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     if (Date.now() - started > TIME_BUDGET_MS) break;
 
     const contractorHasAccess = !!row.recipientContactId && !!row.task?.access.some((a) => a.contactId === row.recipientContactId);
-    const delivery = deliveryFor(row, { contractorHasAccess });
+    // "You're off this job" goes though their access has just ended: it says only that (offItems).
+    const tellsOff = !contractorHasAccess && parseItems(row.items).some((i) => i.kind === "OFF");
+    const delivery = deliveryFor(row, { contractorHasAccess: contractorHasAccess || tellsOff });
     if (!row.task || !row.taskId || !delivery.ok) {
       await closeUnsent(row.id, now, !row.task ? "no task" : delivery.ok ? "no recipient" : delivery.reason);
       result.skipped++;
@@ -223,7 +252,14 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
 
     const claimed = await claim(row.id, now);
     if (!claimed) continue;
-    const items = await liveItems(row.taskId, parseItems(claimed.items), { audience: delivery.audience, recipientContactId: row.recipientContactId });
+    const live = await liveItems(row.taskId, parseItems(claimed.items), {
+      audience: delivery.audience,
+      recipientContactId: row.recipientContactId,
+    });
+    const photosByEvent = live.photosByEvent;
+    const items =
+      delivery.audience === "contractor" ? offItems(live.items, { hasAccess: contractorHasAccess, canceled: row.task.status === "CANCELED" }) : live.items;
+    const off = items.some((i) => i.kind === "OFF");
     if (items.length === 0) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
       result.skipped++;
@@ -238,8 +274,29 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       delivery.audience === "contractor" && task.description?.trim()
         ? (await lockboxMasker(prisma, task.propertyId))(task.description).map((part) => ("text" in part ? part.text : CODE_MASK)).join("")
         : null;
+    // The bundle's photos, in the order its lines are.
+    const newPhotoIds = off ? [] : [...new Set(items.flatMap((i) => (i.eventId ? (photosByEvent.get(i.eventId) ?? []) : [])))];
+    // Off the job: no link, photos or lockbox (content.ts offEmail).
+    const contractorId = delivery.audience === "contractor" && !off ? row.recipientContactId : null;
+    const jobPhotoIds = contractorId ? await hgPhotoIds(row.taskId, contractorId, new Set(newPhotoIds)) : [];
+    // The email's own link (job-links.ts): a contractor's opens the job as them; a partner's only shows its photos, so
+    // it's made only when there are some.
+    const linkToken = contractorId
+      ? await mintJobLink(prisma, { taskId: row.taskId, kind: "EMAIL", contactId: contractorId })
+      : row.recipientUserId && newPhotoIds.length
+        ? await mintJobLink(prisma, { taskId: row.taskId, kind: "STAFF", userId: row.recipientUserId })
+        : null;
+    const hasAccess = !!contractorId && !!(await readLockboxCode(prisma, task.propertyId, task.unitLabel));
+    // Its own reply address, while replies by email are on (section 5): a reply posts to this job as this recipient.
+    const replyConfig = getEnv().email;
+    const replyWho = row.recipientContactId ? { contactId: row.recipientContactId } : row.recipientUserId ? { userId: row.recipientUserId } : null;
+    const replyToken = replyConfig?.webhookSecret && !off && replyWho ? await mintJobLink(prisma, { taskId: row.taskId, kind: "REPLY", ...replyWho }) : null;
     const email = taskEmail({
       items,
+      linkToken,
+      hasAccess,
+      newPhotoIds,
+      jobPhotoIds,
       title: task.title,
       address: task.property?.address ?? null,
       unitLabel: task.unitLabel,
@@ -255,12 +312,20 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       contractorName: task.assigneeContact?.fullName ?? null,
       recipientName: row.recipientContact?.fullName,
       staffNames: staffNames ?? [],
+      replyByEmail: !!replyToken,
     });
     const rendered = renderJobEmail(email);
     const wait = lastSendAt + SEND_GAP_MS - Date.now();
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     lastSendAt = Date.now();
-    const res = await sendEmail({ to: delivery.to, subject: email.subject, text: rendered.text, html: rendered.html, threadKey: email.threadKey });
+    const res = await sendEmail({
+      to: delivery.to,
+      subject: email.subject,
+      text: rendered.text,
+      html: rendered.html,
+      threadKey: email.threadKey,
+      ...(replyToken && replyConfig ? { replyTo: replyAddress(replyToken, replyConfig.from) } : {}),
+    });
 
     if (res.ok) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });

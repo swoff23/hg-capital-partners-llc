@@ -56,6 +56,8 @@ export interface TaskPageViewProps {
   review: ReviewProof | null;
   /** Who decided, while nothing has moved since: the banner's one-line outcome. */
   decision: ReviewDecision | null;
+  /** An email's Send back (`?do=send-back`, docs/specs/contractor-job-emails.md 8): the banner opens its sheet once. */
+  openSendBack?: boolean;
   checklist: ChecklistRow[];
   media: MediaItem[];
   files: FileLink[];
@@ -161,6 +163,7 @@ export function TaskPageView(p: TaskPageViewProps) {
               contractor={p.contractorFirst}
               hasLogin={p.contractorHasLogin}
               now={p.now}
+              openSendBack={p.openSendBack}
             />
 
             <div>

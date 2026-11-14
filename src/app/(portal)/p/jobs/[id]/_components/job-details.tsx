@@ -64,7 +64,7 @@ export function AddressActions({ address }: { address: string }) {
  */
 export function LockboxSection({ code }: { code: string }) {
   return (
-    <Section title="Lockbox">
+    <Section id="lockbox" title="Lockbox">
       <Code value={code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
     </Section>
   );

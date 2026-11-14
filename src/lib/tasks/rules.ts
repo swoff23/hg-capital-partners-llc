@@ -100,7 +100,8 @@ export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null
 export type NotifyChange = { kind: TaskEventKind | "TARGET"; visibility: Visibility };
 
 const STAFF_TO_CONTRACTOR: ReadonlySet<NotifyChange["kind"]> = new Set(["ASSIGNED", "TARGET", "NOTES"]);
-const CONTRACTOR_TO_STAFF: ReadonlySet<NotifyChange["kind"]> = new Set(["COMMENT", "ATTACHMENT", "STATUS"]);
+// TARGET: the day a contractor agreed with the tenant (core.ts setDateByContractor).
+const CONTRACTOR_TO_STAFF: ReadonlySet<NotifyChange["kind"]> = new Set(["COMMENT", "ATTACHMENT", "STATUS", "TARGET"]);
 
 export function notifyAudience(
   actor: PrincipalKind,

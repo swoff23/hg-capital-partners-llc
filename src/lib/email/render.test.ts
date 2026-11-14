@@ -176,3 +176,37 @@ test("job email: user text is escaped, comments keep their breaks, and colors ar
   const tokens = new Set(Object.values(brandTokens).map((v) => String(v).toLowerCase()));
   for (const hex of hexes) assert.ok(tokens.has(hex), `${hex} is not a brand token`);
 });
+
+test("job email: photo strips link each thumbnail, Due carries Add to calendar, and Access says Show access", () => {
+  const T = "https://hg.example.com/j/tok";
+  const { html, text } = renderJobEmail({
+    ...job,
+    photos: [{ src: "https://hg.example.com/api/files/task/p1?v=thumb&l=tok", href: T }],
+    morePhotos: 3,
+    job: {
+      ...job.job,
+      calendarUrl: `${T}/calendar`,
+      accessUrl: `${T}?do=access`,
+      photos: [{ src: "https://hg.example.com/api/files/task/h1?v=thumb&l=tok", href: T }],
+      morePhotos: 0,
+    },
+  });
+  assert.ok(html.includes(`<a href="${T}" style="display:inline-block;margin:0 6px 6px 0;text-decoration:none;"><img src="https://hg.example.com/api/files/task/p1?v=thumb&amp;l=tok"`));
+  assert.ok(html.includes(">+3</span>"));
+  assert.ok(html.indexOf(">Add to calendar</a>") > html.indexOf("Mon, Nov 23"));
+  assert.ok(html.includes(`href="${T}?do=access"`) && html.includes(">Show access</a>"));
+  assert.ok(html.indexOf("api/files/task/h1") > html.indexOf(">Photos<"));
+  assert.ok(text.includes(`Add to calendar: ${T}/calendar`));
+  assert.ok(text.includes(`Show access: ${T}?do=access`));
+  // The photos' lines never put a thumbnail's own URL in the text.
+  assert.ok(!text.includes("v=thumb"));
+});
+
+test("job email: an email with nothing to do has no buttons, and the Due row can offer Change date", () => {
+  const off = renderJobEmail({ ...job, primary: null, secondary: [], footnote: undefined });
+  assert.equal([...off.html.matchAll(/<a href="/g)].length, 1, "only Directions");
+  assert.ok(!off.text.includes("Start job"));
+  const dated = renderJobEmail({ ...job, job: { ...job.job, dateUrl: "https://hg.example.com/j/tok?do=date" } });
+  assert.ok(dated.html.includes(">Change date</a>"));
+  assert.ok(dated.text.includes("Change date: https://hg.example.com/j/tok?do=date"));
+});
