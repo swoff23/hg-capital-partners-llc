@@ -47,8 +47,9 @@ export function PropertyAddressField({ id, value }: { id: string; value: string 
  * Details (forms 4.2): the facts of the purchase, the plan and the dates, each
  * changed where it stands. Money, dates, a count and two lists; the empty ones
  * are verbs ("Add purchase price"). The fact strip's "Add value" opens Value.
+ * Entity offers the entities already on properties, as New property does, and takes a new one.
  */
-export function PropertyDetailsSection({ property: p }: { property: EditableProperty }) {
+export function PropertyDetailsSection({ property: p, entities }: { property: EditableProperty; entities: readonly string[] }) {
   const context = `Details · ${shortAddress(p.address) || p.address}`;
   const common = { id: p.id, context };
   return (
@@ -72,7 +73,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
           emptyLabel="Not set"
         />
         <PropertyFact {...common} field="sqft" label="Sq ft" kind="integer" unit="sq ft" value={p.sqft == null ? "" : String(p.sqft)} empty="Add sq ft" />
-        <PropertyFact {...common} field="llcOwner" label="Entity" kind="text" value={p.llcOwner} empty="Add entity" />
+        <PropertyFact {...common} field="llcOwner" label="Entity" kind="text" suggestions={entities} value={p.llcOwner} empty="Add entity" />
         <PropertyFact {...common} field="attorney" label="Attorney" kind="text" value={p.attorney} empty="Add attorney" />
         <PropertyFact
           {...common}

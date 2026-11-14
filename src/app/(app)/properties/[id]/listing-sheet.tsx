@@ -1,12 +1,16 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { DateField } from "@/components/date-field";
 import { FormSheet } from "@/components/form-sheet";
+import { LoadLatest } from "@/components/load-latest";
 import { NumberInput } from "@/components/number-input";
 import { Select } from "@/components/select";
 import { FormField, Input } from "@/components/ui";
 import { useRun } from "@/components/use-run";
+import { stableJson } from "@/lib/drafts";
 import { listingProblems } from "@/lib/properties/listing-checks";
+import { loadLatestListing } from "@/lib/properties/listing-latest";
 import { savePropertyListing } from "../actions";
 import { STATUS_LABEL, type EditableListing } from "./edit-listings";
 import { LISTING_PHOTO_MAX, ListingPhotos, discardSessionUploads } from "./listing-photos";
@@ -24,28 +28,44 @@ const STATUS_ITEMS = (["HIDDEN", "AVAILABLE", "LEASED"] as const).map((id) => ({
  * link, when it's available, the rent and the rest. Save applies the fields
  * and the photo set together. While photos upload, Save waits and one line
  * beside it says how many ("2 photos uploading"); its label never changes.
+ * Refused because the property moved on (any fact on it, not only this
+ * listing), "Load the latest" moves the save to the page's version and keeps
+ * the draft and its photos; only a listing that changed itself starts over
+ * on the new one (lib/properties/listing-latest.ts).
  */
 export function ListingSheet({
   propertyId,
   version,
+  latest,
   listing,
+  gone,
   unitLabels,
   isOpen,
   onOpenChange,
 }: {
   propertyId: string;
+  /** The version the sheet opened at; the save is refused once the property has moved on. */
   version: string;
+  /** The page's version now: after a refusal the page re-renders on the latest, and "Load the latest" pins this. */
+  latest: string;
+  /** The listing as the page holds it now. */
   listing: EditableListing;
+  /** The listing was deleted elsewhere: the latest has nothing to load. */
+  gone: boolean;
   unitLabels: string[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const isNew = listing.id === null;
+  // The listing as the sheet last loaded it, and the version its save is checked against: both move on with "Load the latest".
+  const [base, setBase] = useState<EditableListing>(() => structuredClone(listing));
+  const [pinned, setPinned] = useState(version);
   const [draft, setDraft] = useState<EditableListing>(() => structuredClone(listing));
   const [tried, setTried] = useState(false);
   const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
   const [uploading, setUploading] = useState(0);
   const run = useRun();
+  const router = useRouter();
 
   // Include the listing's current label even if it's since been renamed or removed from Units & access,
   // so an existing pick never silently disappears.
@@ -66,7 +86,7 @@ export function ListingSheet({
     setTried(true);
     if (Object.keys(problems).length > 0) return;
     const photos = draft.photos;
-    run.run(() => savePropertyListing(propertyId, draft, version), {
+    run.run(() => savePropertyListing(propertyId, draft, pinned), {
       failure: "inline",
       succeeded: () => {
         // Photos uploaded and then removed before this Save go; the saved set stays.
@@ -76,6 +96,26 @@ export function ListingSheet({
       done: isNew ? `Listing for ${draft.unitLabel} added` : `Listing for ${draft.unitLabel} saved`,
       key: `listing:${propertyId}:${draft.id ?? "new"}`,
     });
+  }
+
+  function loadLatest() {
+    run.reset();
+    if (gone) {
+      void discardSessionUploads(propertyId);
+      onOpenChange(false);
+      return;
+    }
+    const next = loadLatestListing(base, listing, draft);
+    setBase(next.base);
+    setPinned(latest);
+    if (next.reset) {
+      // The listing itself changed: the photos uploaded here belong to a draft that is gone, and go when the sheet closes or saves.
+      setDraft(next.draft);
+      setTried(false);
+      setLeft(new Set());
+    }
+    // In case the refusal's page didn't arrive with it; when it did, this is the same latest.
+    router.refresh();
   }
 
   return (
@@ -93,11 +133,14 @@ export function ListingSheet({
       primaryDisabled={uploading > 0}
       disabledReason={uploading > 0 ? `${uploading} ${uploading === 1 ? "photo" : "photos"} uploading` : undefined}
       values={draft}
+      // Against what the sheet last loaded, so loading the latest doesn't read as a change of yours.
+      dirty={stableJson(draft) !== stableJson(base)}
       size="lg"
       fullHeight
       discardTitle={isNew ? "Discard the new listing?" : `Discard changes to the listing for ${name}?`}
       leaveTitle={`Leave the ${name} listing?`}
       error={run.error && Object.keys(run.fieldErrors ?? {}).length === 0 ? run.error : undefined}
+      errorAction={run.conflict && <LoadLatest onClick={loadLatest} />}
       fieldErrors={run.fieldErrors}
     >
       <div className="grid gap-4 sm:grid-cols-2">

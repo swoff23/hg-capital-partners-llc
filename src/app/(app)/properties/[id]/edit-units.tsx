@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
-import { AddRow, Button, Section, Table, Td, Th, buttonClass } from "@/components/ui";
+import { AddRow, Button, Section, Table, Td, Th, buttonClass, sheetWaitingFill } from "@/components/ui";
 import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
 import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
@@ -155,6 +155,9 @@ export function UnitsSection({
   // Found by id (unit-sheet.ts sheetUnitAt), so a unit added or deleted elsewhere never moves the sheet onto another one.
   const editingAt = sheet ? sheetUnitAt(initial, { unitId: sheet.unitId, at: sheet.at, label: sheet.opened?.label }) : -1;
   const editing = editingAt >= 0 ? initial[editingAt] : undefined;
+  // Tapped and its code is still on the way: that row (or Add unit) takes the fill a tapped list row takes. Read from
+  // the shared store, not the hook, which only notices code that came in while idle one render after the tap.
+  const waitingFor = sheet !== null && !editor && unitSheet.loaded() === null ? sheet : null;
 
   return (
     <Section title="Units & access">
@@ -168,13 +171,14 @@ export function UnitsSection({
               unit={u}
               name={unitName(u, i)}
               rules={rules}
+              waiting={waitingFor !== null && waitingFor.at === i}
               onEdit={() => openUnit(i)}
               onDelete={() => askDelete(i)}
             />
           ))}
         </ul>
       )}
-      <AddRow onClick={() => openUnit(null)} onIntent={unitSheet.warm}>
+      <AddRow onClick={() => openUnit(null)} onIntent={unitSheet.warm} waiting={waitingFor !== null && waitingFor.at === null}>
         Add unit
       </AddRow>
       {/* The building's own meters aren't units, so they sit under the counted list, apart from it. */}
@@ -188,6 +192,7 @@ export function UnitsSection({
                 unit={u}
                 name={unitName(u, i)}
                 rules={rules}
+                waiting={waitingFor !== null && waitingFor.at === i}
                 onEdit={() => openUnit(i)}
                 onDelete={() => askDelete(i)}
               />
@@ -277,12 +282,15 @@ function ReadUnit({
   unit: u,
   name,
   rules,
+  waiting,
   onEdit,
   onDelete,
 }: {
   unit: PropertyUnit;
   name: string;
   rules: CapexRules;
+  /** Its sheet was tapped and the code is still arriving: the name takes `sheetWaitingFill`. */
+  waiting: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -299,7 +307,11 @@ function ReadUnit({
           onClick={onEdit}
           {...warmOnIntent(unitSheet)}
           aria-label={`Edit ${name}`}
-          className="min-w-0 flex-1 truncate rounded-md text-left text-body text-fg-1 pointer-coarse:min-h-11 pointer-fine:hover:underline pointer-fine:underline-offset-3"
+          aria-busy={waiting || undefined}
+          className={cn(
+            "-mx-2 min-w-0 flex-1 truncate rounded-md px-2 text-left text-body text-fg-1 transition-colors pointer-coarse:min-h-11 pointer-fine:hover:underline pointer-fine:underline-offset-3",
+            waiting && sheetWaitingFill,
+          )}
         >
           {name}
         </button>
@@ -332,9 +344,10 @@ function ReadUnit({
                         const v = u.utilities![k]!;
                         return (
                           <div key={k} className="flex min-h-6 items-center justify-between gap-2 text-meta">
-                            <dt className="text-fg-3">{label}</dt>
+                            {/* The label never gives way to the value: "Acct #" stays on one line and a long number wraps inside its own column. */}
+                            <dt className="shrink-0 whitespace-nowrap text-fg-3">{label}</dt>
                             <dd className={cn("min-w-0", UTILITY_STATUS_FIELDS.has(k) ? utilityToneClass(utilityStatusTone(v)) : "text-fg-1")}>
-                              {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} mask /> : v}
+                              {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} mask wrap /> : v}
                             </dd>
                           </div>
                         );

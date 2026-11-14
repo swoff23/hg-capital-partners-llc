@@ -243,6 +243,7 @@ export function AddRow({
   onClick,
   onIntent,
   disabled,
+  waiting,
   className,
 }: {
   children: React.ReactNode;
@@ -250,18 +251,23 @@ export function AddRow({
   /** Runs when the pointer reaches the row, it takes focus or it is pressed: warm what the click opens (lib/lazy-module.ts). */
   onIntent?: () => void;
   disabled?: boolean;
+  /** The sheet this row opens was tapped and its code is still arriving: the row takes `sheetWaitingFill`. */
+  waiting?: boolean;
   className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-busy={waiting || undefined}
       onPointerEnter={onIntent}
       onFocus={onIntent}
       onPointerDown={onIntent}
       disabled={disabled}
       className={cn(
         "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12",
+        // The fill reaches 8px past the text, as a list row's does, and the divider above it steps aside while it shows.
+        waiting && cn(sheetWaitingFill, "-mx-2 rounded-md border-transparent px-2"),
         className,
       )}
     >
@@ -766,6 +772,14 @@ export function PageHeader({
  * row's hover fill (docs/specs/performance.md 4.6).
  */
 export const pendingRowFill = "has-[[data-link-pending]]:bg-fill-1";
+
+/**
+ * The same fill for a row that opens a sheet whose code is still downloading
+ * after the tap (lib/lazy-module.ts `loaded`): the tapped row, or `AddRow`
+ * with `waiting`. No spinner, no words, and nothing moves. The row's own
+ * text stays where it is, so a row that takes it carries `-mx-2 px-2` always.
+ */
+export const sheetWaitingFill = "bg-fill-1";
 
 /**
  * One cell of a table row that is itself a link to a record, so the whole row

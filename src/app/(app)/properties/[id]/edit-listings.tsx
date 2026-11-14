@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
 import { PhotoThumb } from "@/components/photo-thumb";
-import { AddRow, Button, SaveError, Section, buttonClass, textLinkClass } from "@/components/ui";
+import { AddRow, Button, SaveError, Section, buttonClass, sheetWaitingFill, textLinkClass } from "@/components/ui";
 import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
 import { lazyModule, openFailedToast, warmWhenIdle } from "@/lib/lazy-module";
@@ -52,7 +52,8 @@ function blankListing(): EditableListing {
   };
 }
 
-type Sheet = { index: number | null; version: string; id: number };
+/** The sheet that is up: the listing it edits by id (null for a new one, so a listing added or deleted elsewhere never moves it onto another), the version it opened at, and a fresh `id` per open. */
+type Sheet = { listingId: string | null; version: string; id: number };
 
 /**
  * The rentals (forms 4.2): one row per listing, read at a glance. A row's
@@ -89,7 +90,7 @@ export function ListingsSection({
   const noUnits = unitLabels.length === 0;
 
   function openListing(index: number | null) {
-    setSheet({ index, version, id: (sheet?.id ?? 0) + 1 });
+    setSheet({ listingId: index == null ? null : (initial[index]?.id ?? null), version, id: (sheet?.id ?? 0) + 1 });
     setIsOpen(true);
   }
 
@@ -106,7 +107,10 @@ export function ListingsSection({
     });
   }
 
-  const editing = sheet?.index != null ? initial[sheet.index] : undefined;
+  const editing = sheet?.listingId != null ? initial.find((l) => l.id === sheet.listingId) : undefined;
+  // Tapped and its code is still on the way: that row (or Add listing) takes the fill a tapped list row takes. Read
+  // from the shared store, not the hook, which only notices code that came in while idle one render after the tap.
+  const waitingFor = sheet !== null && !editor && listingSheet.loaded() === null ? sheet : null;
 
   return (
     <Section title="Rentals">
@@ -115,6 +119,7 @@ export function ListingsSection({
       ) : (
         <ReadListings
           listings={initial}
+          waitingId={waitingFor && waitingFor.listingId}
           onEdit={openListing}
           onDelete={(i) => {
             run.reset();
@@ -122,7 +127,7 @@ export function ListingsSection({
           }}
         />
       )}
-      <AddRow onClick={() => openListing(null)} onIntent={listingSheet.warm} disabled={noUnits}>
+      <AddRow onClick={() => openListing(null)} onIntent={listingSheet.warm} disabled={noUnits} waiting={waitingFor !== null && waitingFor.listingId === null}>
         Add listing
       </AddRow>
       {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
@@ -132,7 +137,9 @@ export function ListingsSection({
           key={sheet.id}
           propertyId={propertyId}
           version={sheet.version}
+          latest={version}
           listing={editing ?? blankListing()}
+          gone={sheet.listingId !== null && !editing}
           unitLabels={unitLabels}
           isOpen={isOpen}
           onOpenChange={setIsOpen}
@@ -160,10 +167,13 @@ export function ListingsSection({
 
 function ReadListings({
   listings,
+  waitingId,
   onEdit,
   onDelete,
 }: {
   listings: EditableListing[];
+  /** The listing whose sheet's code is still arriving after its tap; null or undefined when none is. */
+  waitingId?: string | null;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
 }) {
@@ -180,7 +190,8 @@ function ReadListings({
               onClick={() => onEdit(i)}
               {...warmOnIntent(listingSheet)}
               aria-label={`Edit the listing for ${name}`}
-              className="min-w-0 flex-1 rounded-md text-left pointer-coarse:min-h-11"
+              aria-busy={l.id === waitingId || undefined}
+              className={cn("-mx-2 min-w-0 flex-1 rounded-md px-2 text-left transition-colors pointer-coarse:min-h-11", l.id === waitingId && sheetWaitingFill)}
             >
               <p className="truncate text-body text-fg-1">{name}</p>
               <p className="truncate text-meta text-fg-3">

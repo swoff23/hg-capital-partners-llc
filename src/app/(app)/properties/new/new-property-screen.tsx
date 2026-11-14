@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getEntityNames } from "@/lib/properties/read";
 import { NewPropertyForm } from "./new-property-form";
 
 /**
@@ -9,12 +9,6 @@ import { NewPropertyForm } from "./new-property-form";
  */
 export async function NewPropertyScreen({ variant }: { variant: "sheet" | "page" }) {
   await requireUser();
-  const rows = await prisma.property.findMany({
-    where: { llcOwner: { not: null } },
-    select: { llcOwner: true },
-    distinct: ["llcOwner"],
-    orderBy: { llcOwner: "asc" },
-  });
-  const entities = rows.map((r) => r.llcOwner?.trim() ?? "").filter(Boolean);
-  return <NewPropertyForm variant={variant} entities={[...new Set(entities)]} />;
+  const entities = await getEntityNames();
+  return <NewPropertyForm variant={variant} entities={entities} />;
 }

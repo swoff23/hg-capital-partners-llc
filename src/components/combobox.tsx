@@ -47,7 +47,13 @@ type Common = {
 
 export type ComboboxProps = Common &
   (
-    | { multiple?: false; value: string; onChange: (value: string) => void }
+    | {
+        multiple?: false;
+        value: string;
+        onChange: (value: string) => void;
+        /** The text the field opens with when it isn't the saved value: an edit a refused save put back. */
+        initialText?: string;
+      }
     | { multiple: true; value: readonly string[]; onChange: (values: string[]) => void }
   );
 
@@ -137,14 +143,15 @@ function SingleCombobox({
   className,
   value,
   onChange,
-}: Common & { value: string; onChange: (value: string) => void }) {
+  initialText,
+}: Common & { value: string; onChange: (value: string) => void; initialText?: string }) {
   const { contains } = useFilter({ sensitivity: "base" });
   const rows = items.map(toItem);
   const ids = useId();
   const inputId = `${ids}-input`;
 
   // The typed text is a draft; `value` is what was saved.
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(initialText ?? value);
   const [seen, setSeen] = useState(value);
   if (value !== seen) {
     setSeen(value);

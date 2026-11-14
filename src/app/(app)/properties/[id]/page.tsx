@@ -4,7 +4,7 @@ import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { preload } from "@/lib/preload";
-import { getPropertyById } from "@/lib/properties/read";
+import { getEntityNames, getPropertyById } from "@/lib/properties/read";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
@@ -75,7 +75,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   preload(getPropertyFinancials(id));
   preload(propertyDocuments(id));
   // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
-  const [user, property, openTasks, sourceDeal, propertyListings, capexRules] = await Promise.all([
+  const [user, property, openTasks, sourceDeal, propertyListings, capexRules, entities] = await Promise.all([
     requireUser(),
     getPropertyById(id),
     prisma.task.findMany({
@@ -90,6 +90,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       include: { photos: { orderBy: { sortOrder: "asc" } } },
     }),
     getCapexRules(),
+    getEntityNames(),
   ]);
   if (!property) notFound();
   // Who archived it, for the notice: read only for an archived property, so a live one costs no extra query.
@@ -216,6 +217,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
         {/* The facts rail, then the property's tasks, documents and notes. Sections sit 32px apart, 24 on touch. */}
         <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
           <PropertyDetailsSection
+            entities={entities}
             property={{
               id: property.id,
               address: property.address,

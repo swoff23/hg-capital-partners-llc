@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
@@ -16,6 +17,7 @@ import { Pencil, Plus } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { AddressCombobox } from "@/components/address-combobox";
 import { Code } from "@/components/code";
+import { Combobox } from "@/components/combobox";
 import { DatePanel, warmDatePanel } from "@/components/due-date-picker";
 import { FormSheet } from "@/components/form-sheet";
 import { listOnScreen } from "@/components/list-on-screen";
@@ -108,6 +110,8 @@ export type InlineFieldProps = {
   options?: OptionItem[];
   /** `choice`: the named empty value ("No reason"), listed first. */
   emptyLabel?: string;
+  /** `text`: values already in use, listed under the field; a new one can still be typed (an entity). In place and in the touch sheet. */
+  suggestions?: readonly string[];
   /** `choice`: the line when a search of the options finds none ("No reason matches."). */
   emptyText?: string;
   /** The least length for text and headings; 0, the default, lets a fact be emptied. */
@@ -361,9 +365,11 @@ type Mode = "rest" | "inline" | "sheet";
 
 /** Text, a note, a number, an email, a phone or a link. */
 function TextFact(props: InlineFieldProps) {
-  const { kind, label, value, field, context, empty, tone, helper, display, unit, minLength, tooShort, allowText, check, code, trailing, onRequest, wrap, className } = props;
+  const { kind, label, value, field, context, empty, tone, helper, display, unit, minLength, tooShort, allowText, check, code, trailing, onRequest, wrap, suggestions, className } = props;
   const multiline = kind === "multiline";
   const nk = numberKindOf(kind);
+  // A text fact with a list of what's in use (an entity) is a Combobox that takes a new value too.
+  const suggest = kind === "text" ? suggestions : undefined;
   const inRail = props.inRail ?? !multiline;
   const save = useFactSave(props);
   const router = useRouter();
@@ -398,7 +404,7 @@ function TextFact(props: InlineFieldProps) {
   // Opened in place: focus it, numbers selected so typing replaces them, text with the caret at the end.
   useLayoutEffect(() => {
     if (mode !== "inline") return;
-    const el = control.current;
+    const el = control.current ?? root.current?.querySelector("input");
     if (!el) return;
     el.focus();
     if (nk) el.select();
@@ -432,8 +438,9 @@ function TextFact(props: InlineFieldProps) {
   }
 
   /** Leaves the field, saving a real edit. Returns whether it left (a draft that can't be read stays open). */
-  function commit(force?: { expected: string }, opts: { toNext?: boolean } = {}): boolean {
-    const d: InlineDecision = decideInlineEdit(kind, draft, value, { minLength, tooShort, allowText });
+  function commit(force?: { expected: string }, opts: { toNext?: boolean; text?: string } = {}): boolean {
+    // `text` is what a suggestions field was left with: it keeps its own draft, so the one kept here may be behind.
+    const d: InlineDecision = decideInlineEdit(kind, opts.text ?? draft, value, { minLength, tooShort, allowText });
     if (d.kind === "problem") {
       setProblem(d.message);
       return false;
@@ -510,6 +517,49 @@ function TextFact(props: InlineFieldProps) {
     commit();
   }
 
+  /** What a suggestions field was left with: its own input's text (the field keeps a draft of its own). */
+  const typedIn = (from: HTMLElement | null) => from?.querySelector("input")?.value;
+  const saveWith = (text: string | undefined, opts: { toNext?: boolean } = {}) =>
+    commit(save.conflict ? { expected: theirsText() } : undefined, { ...opts, text });
+
+  // A suggestions field saves on a pick, Enter or leaving, as every one-line fact does. The field itself says when
+  // the text differs from the saved one; these only close it when nothing changed, and own Esc and Tab.
+  function onSuggestKeyDown(e: KeyboardEvent<HTMLElement>) {
+    if (e.nativeEvent.isComposing) return;
+    const input = e.target as HTMLElement;
+    const picking = !!input.getAttribute("aria-activedescendant");
+    if (e.key === "Escape") {
+      // The list is a layer of its own: one Esc closes it, the next closes the field.
+      if (listOnScreen(input)) return;
+      e.preventDefault();
+      cancel();
+    } else if (e.key === "Enter" && !picking) {
+      // A changed text was already saved by the field's own Enter, which closed this one.
+      if (!closing.current) saveWith(typedIn(root.current));
+    } else if (e.key === "Tab" && !e.shiftKey && !picking) {
+      const next = nextValue(root.current);
+      const left = saveWith(typedIn(root.current), { toNext: true });
+      if (!left) e.preventDefault();
+      else if (next) {
+        e.preventDefault();
+        requestAnimationFrame(() => next.focus());
+      }
+    }
+  }
+  function onSuggestBlur(e: FocusEvent<HTMLElement>) {
+    // Between the input and its own buttons is still inside the field.
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    settleOnLeave(e.currentTarget);
+  }
+  function settleOnLeave(from: HTMLElement) {
+    if (closing.current) {
+      closing.current = false;
+      return;
+    }
+    if (save.conflict) return;
+    saveWith(typedIn(from));
+  }
+
   function changed(next: string) {
     setDraft(next);
     // Once a line shows, the field re-checks as you type and clears it the moment it reads.
@@ -537,7 +587,20 @@ function TextFact(props: InlineFieldProps) {
   } as const;
 
   let controlNode: ReactNode;
-  if (multiline) {
+  if (suggest) {
+    // Opens on what was typed when a refused save put the field back; leaving, a pick or Enter saves (onSuggest...).
+    controlNode = (
+      <Combobox
+        aria-label={label}
+        size="sm"
+        items={suggest}
+        allowCustom
+        value={value}
+        initialText={draft}
+        onChange={(next) => saveWith(next)}
+      />
+    );
+  } else if (multiline) {
     controlNode = (
       <AutosizeTextarea
         ref={control as Ref<HTMLTextAreaElement>}
@@ -584,6 +647,8 @@ function TextFact(props: InlineFieldProps) {
   // The sheet's field is at 44px on touch from Input itself, and the sheet's title stands in for the label.
   const sheetControl = (p: { id: string; "aria-describedby"?: string; "aria-invalid"?: true }) => {
     const common = { id: p.id, "aria-describedby": p["aria-describedby"], "aria-invalid": p["aria-invalid"], value: draft, autoComplete: "off" } as const;
+    // The list is the field's own, so in the sheet its pick or Enter sets the draft and Save sends it.
+    if (suggest) return <Combobox aria-label={label} items={suggest} allowCustom value={draft} onChange={changed} />;
     if (multiline) return <AutosizeTextarea {...common} rows={5} onChange={(e) => changed(e.target.value)} className="min-h-32 text-body" />;
     if (nk) return <NumberInput kind={nk} suffix={unit} allowText={allowText} {...common} enterKeyHint="done" onChange={changed} />;
     return (
@@ -673,7 +738,12 @@ function TextFact(props: InlineFieldProps) {
 
   // Open in place with a mouse.
   return (
-    <div ref={root} className={cn("min-w-0 flex-1", multiline && "w-full")}>
+    <div
+      ref={root}
+      className={cn("min-w-0 flex-1", multiline && "w-full")}
+      onKeyDown={suggest ? onSuggestKeyDown : undefined}
+      onBlur={suggest ? onSuggestBlur : undefined}
+    >
       {controlNode}
       {multiline && (
         <div className="mt-2 flex justify-end gap-2">
@@ -1083,6 +1153,8 @@ export function InlineSwitch(props: {
   field?: string;
   /** The toast for a save, by the new value, when "Escrow set to Yes" doesn't read ("Shown on the move-in form"). */
   message?: (next: string) => string;
+  /** The two words beside the switch when "Yes" and "No" don't say what it does ("Shown", "Hidden"). */
+  words?: { on: string; off: string };
   className?: string;
 }) {
   const { label, value, field } = props;
@@ -1107,7 +1179,7 @@ export function InlineSwitch(props: {
       <Switch
         aria-label={label}
         aria-describedby={save.error || save.conflict ? lineId : undefined}
-        label={on ? "Yes" : "No"}
+        label={on ? (props.words?.on ?? "Yes") : (props.words?.off ?? "No")}
         isSelected={on}
         onChange={toggle}
       />
