@@ -713,3 +713,14 @@ test("a contractor's new date reads with the old one in the partners' email", ()
   const line = itemLines([{ ...item("TARGET", `moved "${TITLE}" to Mon, Nov 23 (was Thu, Nov 19)`, "Zack Reading"), visit: false }])[0];
   assert.equal(line, "Zack moved the due date to Mon, Nov 23 (was Thu, Nov 19)");
 });
+
+test("with replies by email, the footer says what a reply does", () => {
+  const open = taskEmail({ ...staffInput(), audience: "contractor", status: "IN_PROGRESS", staffNames: ["Connor", "Pieter"], replyByEmail: true });
+  assert.equal(open.footnote, "Reply to add a comment. Photos you attach go on the job.");
+  const closed = taskEmail({ ...staffInput(), audience: "contractor", status: "DONE", staffNames: ["Connor", "Pieter"], replyByEmail: true });
+  assert.equal(closed.footnote, "Reply to reach Connor and Pieter.");
+  assert.equal(taskEmail({ ...staffInput(), replyByEmail: true }).footnote, "Reply to answer Zack. It goes on the job.");
+  // Without replies by email: as before.
+  assert.equal(taskEmail({ ...staffInput(), audience: "contractor", status: "IN_PROGRESS", staffNames: ["Connor", "Pieter"] }).footnote, "Reply in the job so Connor and Pieter both see it.");
+  assert.ok(!("footnote" in taskEmail({ ...staffInput() })));
+});

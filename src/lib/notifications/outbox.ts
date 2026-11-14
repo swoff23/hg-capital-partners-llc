@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { replyAddress } from "@/lib/email/inbound";
 import { renderJobEmail } from "@/lib/email/render";
 import { todayYmdEastern, toYmd } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
@@ -286,6 +287,10 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         ? await mintJobLink(prisma, { taskId: row.taskId, kind: "STAFF", userId: row.recipientUserId })
         : null;
     const hasAccess = !!contractorId && !!(await readLockboxCode(prisma, task.propertyId, task.unitLabel));
+    // Its own reply address, while replies by email are on (section 5): a reply posts to this job as this recipient.
+    const replyConfig = getEnv().email;
+    const replyWho = row.recipientContactId ? { contactId: row.recipientContactId } : row.recipientUserId ? { userId: row.recipientUserId } : null;
+    const replyToken = replyConfig?.webhookSecret && !off && replyWho ? await mintJobLink(prisma, { taskId: row.taskId, kind: "REPLY", ...replyWho }) : null;
     const email = taskEmail({
       items,
       linkToken,
@@ -307,12 +312,20 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       contractorName: task.assigneeContact?.fullName ?? null,
       recipientName: row.recipientContact?.fullName,
       staffNames: staffNames ?? [],
+      replyByEmail: !!replyToken,
     });
     const rendered = renderJobEmail(email);
     const wait = lastSendAt + SEND_GAP_MS - Date.now();
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     lastSendAt = Date.now();
-    const res = await sendEmail({ to: delivery.to, subject: email.subject, text: rendered.text, html: rendered.html, threadKey: email.threadKey });
+    const res = await sendEmail({
+      to: delivery.to,
+      subject: email.subject,
+      text: rendered.text,
+      html: rendered.html,
+      threadKey: email.threadKey,
+      ...(replyToken && replyConfig ? { replyTo: replyAddress(replyToken, replyConfig.from) } : {}),
+    });
 
     if (res.ok) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });

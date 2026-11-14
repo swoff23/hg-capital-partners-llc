@@ -151,6 +151,8 @@ The taken-off email carries only the job's title and address: no access, notes, 
 | Says "done" | A comment only. A reply never changes status |
 | Clutter | Quoted email, "Sent from my iPhone" and signatures are cut. Out-of-office and empty replies are ignored |
 
+**How it's built.** Each job email carries a REPLY link (`JobLink` kind `REPLY`) as its reply address; it lets a reply post to that job as the person the email went to and never opens the job. The webhook (`src/app/api/email/inbound/route.ts`) checks Resend's Svix signature with `RESEND_WEBHOOK_SECRET`, then `src/lib/email/replies.ts` fetches the email and its files from Resend and posts them (`core.addComment`, once per email by its id). Rule 2's sender shows as a last line, "From mike@gmail.com", which everyone on the job sees. Files that post: the portal's photos and videos, and the staff side's documents too (PDFs, an invoice), within each kind's size cap; a signature's small inline logo is left out. Files sent by email have no thumbnail (the server can't make one), so the app shows the full picture. A reply to plain `jobs@` is matched by its thread only when the sender's domain passes DMARC, since a From line and a References header can be forged.
+
 **Staff replies (Q9).** A reply to Connor or Pieter's copy posts as their Shared comment, addressed to the contractor, who gets it by email as any staff comment today. Their copy's footer says so: "Reply to answer Zack."
 
 Attachments go through the same pipeline as portal uploads (thumbnail, display JPEG, Blob), as files on the comment.

@@ -700,6 +700,7 @@ enum JobLinkKind {
   EMAIL // a contractor's job email
   CREW // the contractor's "Text to my crew"
   STAFF // a partner's job email: photos only
+  REPLY // a job email's reply address: lets a reply post to the job, never opens it
 }
 
 model PasswordResetToken {

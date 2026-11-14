@@ -556,6 +556,29 @@ export function checklistLine(items: readonly { done: boolean }[]): string | nul
 }
 
 /**
+ * The line under the job (spec 5). With replies by email: a contractor's open
+ * job says a reply adds a comment and its photos go on the job, a closed one
+ * that a reply reaches the partners (it's forwarded, not posted), a partner's
+ * copy that a reply answers the contractor. Without: a contractor's open job
+ * says to reply in the job (BCONTRACT-002), and nothing else carries a line.
+ */
+function footnoteFor(input: {
+  audience: Audience;
+  status: TaskStatus;
+  staffNames?: readonly string[];
+  contractorName?: string | null;
+  replyByEmail?: boolean;
+}): { footnote?: string } {
+  const open = isActiveStatus(input.status);
+  if (input.audience === "contractor") {
+    if (!input.replyByEmail) return open ? { footnote: replyLine(input.staffNames ?? []) } : {};
+    return { footnote: open ? "Reply to add a comment. Photos you attach go on the job." : `Reply to reach ${joinNames([...(input.staffNames ?? [])]) || "HG"}.` };
+  }
+  const name = greetingName(input.contractorName);
+  return input.replyByEmail && name ? { footnote: `Reply to answer ${name}. It goes on the job.` } : {};
+}
+
+/**
  * Taken off a job, or it was canceled (spec 2.3, 6): what it was and where,
  * and that there's no need to go. No date (the subject would send them
  * there), no access, notes, photos or buttons: the job isn't theirs now.
@@ -638,6 +661,8 @@ export function taskEmail(input: {
   newPhotoIds?: readonly string[];
   /** Contractor: HG's other photos on the job, newest first. */
   jobPhotoIds?: readonly string[];
+  /** The email has its own reply address (replies post to the job, section 5): the footer says what a reply does. */
+  replyByEmail?: boolean;
 }): TaskEmail {
   const street = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
   const where = addressLine(street || null, input.unitLabel ? oneLine(input.unitLabel) : null);
@@ -680,7 +705,7 @@ export function taskEmail(input: {
       photos: older.photos,
       morePhotos: older.morePhotos,
     },
-    ...(contractor && isActiveStatus(input.status) ? { footnote: replyLine(input.staffNames ?? []) } : {}),
+    ...footnoteFor(input),
     threadKey: threadKey(input.taskId, input.due ?? null),
   };
 }
