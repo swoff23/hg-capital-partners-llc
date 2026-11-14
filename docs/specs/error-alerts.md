@@ -108,7 +108,7 @@ Free Developer plan: 1 user, 5,000 errors a month, 30 days of history, 1 uptime 
 | Check | What | Alerts after |
 |---|---|---|
 | New error | Issue alert "a new issue is created" or "a resolved issue comes back", production only, level error or above (so Q13's warnings never email), email to Connor | The first time each kind happens, and again if it returns after being resolved |
-| Site | Uptime monitor: `GET https://hgcapitalpartners.com/api/health` every minute, expects 200 | 3 misses in a row (about 3 minutes) |
+| Site | Uptime monitor: `GET https://www.hgcapitalpartners.com/api/health` every minute (with www: the bare domain answers with a redirect), expects 200 | 3 misses in a row (about 3 minutes) |
 | Background jobs | Cron monitor: schedule every minute, 1 minute of margin, `failureIssueThreshold` 5, `recoveryThreshold` 1 | 5 missed or "error" check-ins in a row (about 5 minutes) |
 
 The cron monitor's settings travel with each check-in (`monitorConfig`), which should create the monitor on the first one. Sentry's JavaScript docs show the config but don't spell out that it creates the monitor, so the branch confirms it, and if it doesn't, Connor adds the monitor by hand with the same settings. Sentry asks for a margin no longer than the schedule, which is why "stopped" is counted in check-ins in a row.

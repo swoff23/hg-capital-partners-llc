@@ -4,6 +4,15 @@ What each alert email means and what to send Claude. Every alert comes from Sent
 
 For any of them, the quickest help is to forward the alert email to Claude, or paste its link.
 
+## Setting up
+
+Once, in Sentry, after the integration is connected. Menu names follow Sentry's docs and may read a little differently on screen.
+
+1. **Privacy.** Settings, then Security & Privacy: turn on "Prevent Storing of IP Addresses". Leave "Data Scrubber" on.
+2. **New errors.** Alerts, then Create Alert, then Issues. When: "A new issue is created" or "The issue changes state from resolved to unresolved". If: the event's level is error or higher, and the environment is `production`. Then: send an email to you. Name it "New error".
+3. **Site down.** Monitors, then Uptime, then Add Monitor. URL `https://www.hgcapitalpartners.com/api/health` (with www: the bare domain answers with a redirect), method GET, every 1 minute, environment `production`. Alert after 3 failures in a row, and notify you by email.
+4. **Background jobs.** Monitors, then Crons. `background-jobs` appears by itself within a minute or two of the first run, with a green check-in each minute. Open it and set its alert to email you. If it hasn't appeared after 10 minutes, tell Claude.
+
 ## A new error
 
 **The email:** "New issue" with an error name, the file and line, and a tag for the area: `staff`, `portal`, `public`, `sign-in` or `api`.
