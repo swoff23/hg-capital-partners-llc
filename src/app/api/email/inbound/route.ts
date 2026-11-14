@@ -25,7 +25,15 @@ export async function POST(request: Request): Promise<Response> {
     { id: request.headers.get("svix-id"), timestamp: request.headers.get("svix-timestamp"), signature: request.headers.get("svix-signature") },
     secret,
   );
-  if (!signed) return new NextResponse("Unauthorized", { status: 401 });
+  if (!signed) {
+    // Resend's own headers with a signature that doesn't hold means our RESEND_WEBHOOK_SECRET is
+    // wrong, and every reply would bounce off this 401 for a day of retries with no other sign
+    // (docs/specs/error-alerts.md, Q19). A stranger's post without them stays quiet.
+    if (request.headers.get("svix-signature")) {
+      logError("email:inbound-signature", new Error("A Resend webhook failed its signature check; RESEND_WEBHOOK_SECRET may not match Resend's"));
+    }
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   let event: { type?: unknown; data?: { email_id?: unknown } };
   try {

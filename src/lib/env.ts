@@ -71,6 +71,11 @@ const schema = z.object({
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   // Origin for links in emails, e.g. "https://hgcapitalpartners.com".
   APP_URL: z.string().url().optional(),
+  // Sentry (docs/specs/error-alerts.md). Set by Sentry's Vercel integration; public by design.
+  // The server reads it here and reports only in production (src/lib/report-server.ts). The
+  // browser gets its own copy from next.config.ts, filled in only for production builds.
+  // A plain string on purpose: a malformed DSN must not stop the app from parsing its environment.
+  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
 });
 
 type Raw = z.infer<typeof schema>;

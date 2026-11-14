@@ -1,8 +1,10 @@
 import "server-only";
 import { put } from "@vercel/blob";
-import { UPLOAD_RULES, contentTypeForName, fileKindForType, normalizeContentType, type FileKind } from "@/lib/attachments/content-types";
+import { UPLOAD_RULES, fileKindForType, uploadContentType, type FileKind } from "@/lib/attachments/content-types";
 import { taskUploadPath } from "@/lib/attachments/paths";
 import { prisma } from "@/lib/db";
+import { MAX_FILES_PER_POST } from "@/lib/portal/job-view";
+import { escapeLike } from "@/lib/search";
 import { getEnv, type EmailEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { jobLinkUrl } from "@/lib/portal/job-link-paths";
@@ -10,7 +12,7 @@ import { mintJobLink, resolveJobLink } from "@/lib/portal/job-links";
 import { isActiveStatus } from "@/lib/task-scope";
 import * as core from "@/lib/tasks/core";
 import { renderPlainEmail } from "./render";
-import { htmlToText, isAutoReply, replyBody, replyToken, threadTaskId } from "./inbound";
+import { fromAddress, htmlToText, isAutoReply, replyBody, replyToken, singleAddress, threadTaskId } from "./inbound";
 import { sendEmail } from "./send";
 
 /**
@@ -28,7 +30,9 @@ import { sendEmail } from "./send";
  *  3. On a closed job: not posted (closed jobs are read-only); it goes to both
  *     partners as an email with its files.
  *  4. A video too big for email (left out, or sent as an iCloud or Drive
- *     link): the rest posts, and one short email back says to add it on the job.
+ *     link): the rest posts, and one short email to the contractor's own
+ *     login (never to an unproven sender: it carries a link that opens the
+ *     job) says to add it on the job.
  *  5. A reply never changes a job's status: "done" is only words.
  *  6. Quoted text, "Sent from my iPhone" and signatures are cut; out-of-office
  *     and other automatic replies, and replies with nothing in them, are dropped.
@@ -80,7 +84,7 @@ async function resendGet<T>(config: EmailEnv, path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-const bare = (address: string) => (/<([^>]+)>/.exec(address)?.[1] ?? address).trim().toLowerCase();
+const bare = fromAddress;
 
 /** Who a reply posts as: the person its email went to, by its reply address, or (sent to plain jobs@) by the sender. */
 async function replier(email: ReceivedEmail, from: string): Promise<{ taskId: string; p: core.Principal; loginEmail: string } | null> {
@@ -94,12 +98,17 @@ async function replier(email: ReceivedEmail, from: string): Promise<{ taskId: st
   // A From line and a References header are easy to forge, so this way in needs the sender's domain to vouch for the
   // From (DMARC pass). The r+ address above needs no such check: its token is the secret.
   if (email.authentication?.dmarc !== "pass") return null;
+  // One address in the From line, or no way in: a display name that holds another address is a disguise.
+  if (!singleAddress(email.from)) return null;
   const headers = email.headers ?? {};
   const taskId = threadTaskId(`${headers["references"] ?? ""} ${headers["in-reply-to"] ?? ""}`);
   if (!taskId) return null;
-  const user = await prisma.user.findFirst({ where: { email: { equals: from, mode: "insensitive" }, passwordHash: { not: null } }, select: { id: true } });
+  // Exact, case-insensitive: Prisma's insensitive equals is an ILIKE, so `_` and `%` in an address are escaped, or
+  // za_k@outlook.com would match zack@outlook.com.
+  const exactly = { equals: escapeLike(from), mode: "insensitive" as const };
+  const user = await prisma.user.findFirst({ where: { email: exactly, passwordHash: { not: null } }, select: { id: true } });
   if (user) return principalFor(taskId, { userId: user.id, contactId: null });
-  const account = await prisma.portalAccount.findFirst({ where: { email: { equals: from, mode: "insensitive" } }, select: { contactId: true } });
+  const account = await prisma.portalAccount.findFirst({ where: { email: exactly }, select: { contactId: true } });
   return account ? principalFor(taskId, { contactId: account.contactId, userId: null }) : null;
 }
 
@@ -119,7 +128,8 @@ async function principalFor(
 
 /** What a file is, and whether it may post: photos, videos and documents, within each kind's size cap. */
 function sortFile(a: ReceivedAttachment): { kind: FileKind; type: string } | { tooBig: true } | null {
-  const type = normalizeContentType(a.content_type) || contentTypeForName(a.filename ?? "") || "";
+  // The name's extension when the mail app sent a generic type (application/octet-stream, image/jpg), as uploads do.
+  const type = uploadContentType(a.filename ?? "", a.content_type) ?? "";
   const kind = fileKindForType(type);
   if (!kind) return null;
   const rule = UPLOAD_RULES[kind];
@@ -149,9 +159,13 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
   const words = from && from !== who.loginEmail ? [written, `From ${from}`].filter(Boolean).join("\n\n") : written;
   const list = await resendGet<{ data: ReceivedAttachment[] }>(config, `/emails/receiving/${encodeURIComponent(emailId)}/attachments?limit=100`);
   const sorted = list.data.map((a) => ({ a, s: sortFile(a) }));
-  const files = sorted.filter((x): x is { a: ReceivedAttachment; s: { kind: FileKind; type: string } } => !!x.s && !("tooBig" in x.s));
+  // As many as one post from the job page takes (MAX_FILES_PER_POST); the rest are left out, as a portal post refuses them.
+  const allowed = sorted.filter((x): x is { a: ReceivedAttachment; s: { kind: FileKind; type: string } } => !!x.s && !("tooBig" in x.s));
+  const files = allowed.slice(0, MAX_FILES_PER_POST);
+  const tooMany = allowed.length > files.length;
   const tooBig = sorted.some((x) => x.s && "tooBig" in x.s) || LINKED_FILE.test(written);
-  if (!words && files.length === 0) return { outcome: "ignored", reason: "empty" };
+  // Rule 6: nothing written and nothing attached (a "From x" line alone is not a reply).
+  if (!written && files.length === 0) return { outcome: "ignored", reason: "empty" };
 
   const task = await prisma.task.findUnique({ where: { id: taskId }, select: { title: true, status: true } });
   if (!task) return { outcome: "ignored", reason: "no job" };
@@ -163,41 +177,59 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
     }
     // Rule 3: a closed job is read-only, so the reply reaches the partners as an email instead.
     if (!isActiveStatus(task.status)) {
-      await forwardToPartners({ taskId, title: task.title, who: p.label, words, files: files.map((f) => f.a) });
+      await forwardToPartners({ emailId, taskId, title: task.title, who: p.label, words, files: files.map((f) => f.a) });
       return { outcome: "forwarded", taskId };
     }
   }
 
   const token = env.BLOB_READ_WRITE_TOKEN;
   if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is unset: a reply's files have nowhere to go");
-  const attachmentIds: string[] = [];
-  for (const { a, s } of files) {
+  // The files go up first (no lock held while they download), then one transaction under the job's lock records them
+  // and posts the comment, checking inside it that this email hasn't posted: a retry or a second delivery running
+  // alongside this one posts nothing twice. Its blobs, if it lost the race, are only unreferenced copies.
+  const uploaded: core.AttachmentMeta[] = [];
+  for (const { a, s: sorted } of files) {
     const res = await fetch(a.download_url, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`Couldn't download ${a.filename ?? a.id}: ${res.status}`);
     const bytes = Buffer.from(await res.arrayBuffer());
     const filename = a.filename?.trim() || `email-${a.id}`;
-    const blob = await put(taskUploadPath(taskId, filename, "orig", s.type), bytes, { access: "private", token, contentType: s.type, addRandomSuffix: true });
-    const att = await prisma.$transaction((tx) =>
-      core.recordAttachment(tx, taskId, { url: blob.url, pathname: blob.pathname, filename, size: bytes.length, contentType: s.type }, p, {
-        visibility: "SHARED",
-        standalone: false,
-      }),
-    );
-    attachmentIds.push(att.id);
+    const blob = await put(taskUploadPath(taskId, filename, "orig", sorted.type), bytes, { access: "private", token, contentType: sorted.type, addRandomSuffix: true });
+    uploaded.push({ url: blob.url, pathname: blob.pathname, filename, size: bytes.length, contentType: sorted.type });
   }
-  // Rule 1 (and 5: the words never change the job's status).
-  await prisma.$transaction((tx) => core.addComment(tx, taskId, { body: words, visibility: "SHARED", attachmentIds, clientId }, p));
+  // Several round trips a file, so more room than the 5-second default, as tasks/bulk.ts gives its batches.
+  const postedNow = await prisma.$transaction(async (tx) => {
+    await core.lockTask(tx, taskId);
+    const already = await tx.taskEvent.findFirst({ where: { taskId, kind: "COMMENT", data: { path: ["clientId"], equals: clientId } }, select: { id: true } });
+    if (already) return false;
+    const attachmentIds: string[] = [];
+    for (const meta of uploaded) attachmentIds.push((await core.recordAttachment(tx, taskId, meta, p, { visibility: "SHARED", standalone: false })).id);
+    // Rule 1 (and 5: the words never change the job's status).
+    await core.addComment(tx, taskId, { body: words, visibility: "SHARED", attachmentIds, clientId }, p);
+    return true;
+  }, { timeout: 30_000, maxWait: 10_000 });
+  if (!postedNow) return { outcome: "ignored", reason: "already posted" };
 
   // Rule 4: one short email back about the file that didn't come through.
-  if (tooBig && p.kind === "contractor") await tellTooBig(env.appUrl, { taskId, contactId: p.contactId, to: from || who.loginEmail });
-  return { outcome: "posted", taskId, files: attachmentIds.length, skipped: list.data.length - attachmentIds.length };
+  // To their own login only: the note carries a link that opens the job, and a reply's From isn't proof of anyone.
+  if ((tooBig || tooMany) && p.kind === "contractor") {
+    await tellTooBig(env.appUrl, {
+      emailId,
+      taskId,
+      contactId: p.contactId,
+      to: who.loginEmail,
+      line: tooMany
+        ? `Only ${MAX_FILES_PER_POST} photos fit in one reply. Add the rest on the job.`
+        : "Your video was too big for email. Add it on the job.",
+    });
+  }
+  return { outcome: "posted", taskId, files: uploaded.length, skipped: list.data.length - uploaded.length };
 }
 
 /** A reply on a closed job, to both partners, with its files attached by Resend from their download links. */
 async function forwardToPartners(
-  input: { taskId: string; title: string; who: string; words: string; files: ReceivedAttachment[] },
+  input: { emailId: string; taskId: string; title: string; who: string; words: string; files: ReceivedAttachment[] },
 ): Promise<void> {
-  const partners = await prisma.user.findMany({ where: { passwordHash: { not: null } }, select: { email: true }, orderBy: { id: "asc" } });
+  const partners = await prisma.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true, email: true }, orderBy: { id: "asc" } });
   const first = input.who.split(/\s+/)[0] || input.who;
   const url = `${getEnv().appUrl}/tasks/${input.taskId}`;
   const rendered = renderPlainEmail({
@@ -207,6 +239,7 @@ async function forwardToPartners(
     buttonUrl: url,
     footnote: input.files.length ? `${input.files.length === 1 ? "Their file is" : `Their ${input.files.length} files are`} attached.` : undefined,
   });
+  let failed = 0;
   for (const partner of partners) {
     const res = await sendEmail({
       to: partner.email,
@@ -214,19 +247,35 @@ async function forwardToPartners(
       text: rendered.text,
       html: rendered.html,
       attachments: input.files.map((f) => ({ filename: f.filename ?? "file", path: f.download_url })),
+      // Once per email and partner: a redelivered webhook re-runs this, and Resend sends a repeated key only once.
+      idempotencyKey: `reply-forward/${input.emailId}/${partner.id}`,
     });
-    if (!res.ok) logError("email:reply-forward", new Error(res.error ?? "send failed"), { taskId: input.taskId });
+    // 409 on a keyed send: Resend already has this key (sent, or sending now). A retry's body differs, since the
+    // attachments' download links are re-signed each time, so Resend refuses it rather than sending it twice.
+    if (!res.ok && res.status !== 409) {
+      failed++;
+      logError("email:reply-forward", new Error(res.error ?? "send failed"), { taskId: input.taskId });
+    }
   }
+  // Anyone missed it: fail, so the webhook answers 500 and Resend delivers the reply again. The idempotency keys keep
+  // the partners who already have it from getting it twice.
+  if (failed > 0) throw new Error(`The reply on a closed job didn't reach ${failed} of ${partners.length} partners`);
 }
 
-/** "Your video was too big for email. Add it on the job." with Add photos through a fresh job link. */
-async function tellTooBig(appUrl: string, input: { taskId: string; contactId: string; to: string }): Promise<void> {
+/** A file that didn't come through (too big, sent as a link, or past the 50 a post takes), with Add photos through a fresh job link. */
+async function tellTooBig(appUrl: string, input: { emailId: string; taskId: string; contactId: string; to: string; line: string }): Promise<void> {
   const token = await mintJobLink(prisma, { taskId: input.taskId, kind: "EMAIL", contactId: input.contactId });
   const rendered = renderPlainEmail({
-    line: "Your video was too big for email. Add it on the job.",
+    line: input.line,
     buttonLabel: "Add photos",
     buttonUrl: jobLinkUrl(appUrl, token, "photos"),
   });
-  const res = await sendEmail({ to: input.to, subject: "Your video didn't come through", text: rendered.text, html: rendered.html });
-  if (!res.ok) logError("email:reply-too-big", new Error(res.error ?? "send failed"), { taskId: input.taskId });
+  const res = await sendEmail({
+    to: input.to,
+    subject: input.line.startsWith("Only") ? "Some of your photos didn't come through" : "Your video didn't come through",
+    text: rendered.text,
+    html: rendered.html,
+    idempotencyKey: `reply-too-big/${input.emailId}`,
+  });
+  if (!res.ok && res.status !== 409) logError("email:reply-too-big", new Error(res.error ?? "send failed"), { taskId: input.taskId });
 }

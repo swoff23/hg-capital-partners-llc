@@ -49,7 +49,11 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
   try {
     const res = await fetch(RESEND_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+        ...(msg.idempotencyKey ? { "Idempotency-Key": msg.idempotencyKey.slice(0, 256) } : {}),
+      },
       body: JSON.stringify(resendBody(config, msg)),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });

@@ -47,6 +47,29 @@ export function verifyWebhook(
 // Which job a reply is for
 // ---------------------------------------------------------------------------
 
+/**
+ * The address in a From line, lowercased: the angle-addr at its end ("Zack <zack@x.com>"), or the line itself. Never
+ * the first <…>, which a display name can hold (`"<pieter@hg.com>" <attacker@x.com>`).
+ */
+export function fromAddress(from: string): string {
+  // A trailing comment ("zack@x.com (Zack Reading)") isn't part of the address.
+  const line = from.replace(/\s*\([^()]*\)\s*$/, "");
+  return (/<([^<>]+)>\s*$/.exec(line)?.[1] ?? line).trim().toLowerCase();
+}
+
+/**
+ * A From line that names one address, however often: `"zack@x.com" <zack@x.com>` is one; a display name holding
+ * another address (`"pieter@hg.com" <attacker@x.com>`) is a disguise, and so is a line with two.
+ */
+export function singleAddress(from: string | null | undefined): boolean {
+  const line = from ?? "";
+  const matches = line.match(/[^\s<>"(),;:]+@[^\s<>"(),;:]+/g) ?? [];
+  // An @ the pattern can't place (a quoted local part, a comment or a space before it) is an address it can't see.
+  if ((line.match(/@/g) ?? []).length !== matches.length) return false;
+  const found = new Set(matches.map((a) => a.toLowerCase()));
+  return found.size === 1 && found.has(fromAddress(line));
+}
+
 /** A reply address's token: `r+<token>@<domain>` (any case for the `r`, the token as minted). */
 export function replyToken(addresses: readonly string[]): string | null {
   for (const raw of addresses) {

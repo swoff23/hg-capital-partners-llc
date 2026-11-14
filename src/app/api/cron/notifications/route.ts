@@ -1,5 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { getEnv } from "@/lib/env";
+import { checkInBackgroundJobs } from "@/lib/jobs-check-in";
 import { drainDue } from "@/lib/notifications/outbox";
 import { queueDueReminders } from "@/lib/notifications/reminders";
 import { cronAuthorized, cronRefusal } from "@/lib/secrets";
@@ -15,6 +16,11 @@ export const maxDuration = 60;
  * 503 and sends nothing while CRON_SECRET is unset, and 401 to anyone else.
  * Neither body says why (cronRefusal); the unset secret goes to the logs.
  *
+ * After a run it checks in with Sentry's "background-jobs" monitor, which is
+ * how a stopped job, a stuck queue or a stale QuickBooks sync reaches Connor
+ * (docs/specs/error-alerts.md, Q14). A run that throws never checks in, and
+ * five missed check-ins alert on their own.
+ *
  *   curl -s -H "Authorization: Bearer $CRON_SECRET" "$PROD/api/cron/notifications" | jq
  */
 export async function GET(request: NextRequest) {
@@ -29,5 +35,6 @@ export async function GET(request: NextRequest) {
   // The 8 am emails join the outbox first (they send a bundle's quiet minutes later), then the run sends what's due.
   const reminders = await queueDueReminders(now);
   const result = await drainDue(now);
+  after(() => checkInBackgroundJobs(new Date()));
   return NextResponse.json({ ...result, reminders: reminders.queued });
 }

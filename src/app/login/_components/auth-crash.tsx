@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { OFFLINE_ERROR, isOfflineError } from "@/lib/action-result";
+import { reportClientError } from "@/lib/client-errors";
 import { AuthError, AuthFrame, authButtonClass } from "./auth-frame";
 
 /**
@@ -15,6 +16,8 @@ import { AuthError, AuthFrame, authButtonClass } from "./auth-frame";
 export function AuthCrash({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    // A browser error goes to Sentry; one with a digest came from the server, which reported it (lib/client-errors.ts).
+    reportClientError(error, "boundary");
   }, [error]);
 
   return (

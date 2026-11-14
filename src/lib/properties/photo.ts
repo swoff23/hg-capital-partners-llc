@@ -84,7 +84,7 @@ async function deleteBlobs(targets: readonly string[], auth?: BlobAuth): Promise
   try {
     await del([...targets], { token });
   } catch (err) {
-    logError("properties:photo:delete", err, { count: targets.length });
+    logError("properties:photo:delete", err, { count: targets.length }, { level: "warning" });
   }
 }
 

@@ -16,6 +16,11 @@ export interface EmailMessage {
   /** Files Resend fetches by URL and attaches (a reply on a closed job, forwarded to the partners). */
   attachments?: { filename: string; path: string }[];
   /**
+   * Resend's Idempotency-Key (an HTTP header on the send, kept 24 hours): the same key sends once, so a step that can
+   * run again (a redelivered webhook) never emails twice. Never part of the body.
+   */
+  idempotencyKey?: string;
+  /**
    * Keeps one job's emails in one thread (content.ts threadKey): every email
    * with the same key points at the same parent, so mail apps that thread on
    * headers keep them together, and Gmail does while the subject matches too.

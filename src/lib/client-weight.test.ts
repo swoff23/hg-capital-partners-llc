@@ -28,6 +28,10 @@ const FORBIDDEN = [
   { match: (spec: string) => spec === "zod" || spec.startsWith("zod/"), why: "zod is server-only; split the schema from the helpers the browser takes" },
   { match: (spec: string) => spec === "@prisma/client" || spec.startsWith("@prisma/client/"), why: "Prisma is server-only; use `import type` for its types" },
   { match: (spec: string) => spec === "@vercel/blob/client", why: "the Blob client loads on demand (upload-queue.tsx `transfer`, lib/attachments/lazy-transfer.ts)" },
+  {
+    match: (spec: string) => spec.startsWith("@sentry/"),
+    why: "Sentry loads once the page is idle, through import() in instrumentation-client.ts (lib/sentry-browser.ts); errors before then wait in lib/client-errors.ts",
+  },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -110,9 +114,10 @@ function findForbidden(root: string): { chain: string[]; why: string } | null {
   return visit(root, []);
 }
 
-test("no client component reaches zod, Prisma or the Blob client through its imports", () => {
+test("no client component reaches zod, Prisma, the Blob client or Sentry through its imports", () => {
   const rel = (f: string) => path.relative(SRC, f);
-  const roots = walk(SRC).filter((f) => parse(f).directive === "client");
+  // instrumentation-client.ts has no directive but runs in every page before hydration.
+  const roots = walk(SRC).filter((f) => parse(f).directive === "client" || f === path.join(SRC, "instrumentation-client.ts"));
   assert.ok(roots.length > 50, "found the client components");
   const failures: string[] = [];
   const reported = new Set<string>();
@@ -150,6 +155,7 @@ const LAZY: { file: string; staticImporters: string[]; why: string }[] = [
   { file: "components/lightbox.tsx", staticImporters: ["app/(app)/properties/[id]/listing-photos.tsx"], why: "the viewer loads with the first open (lightbox-lazy.tsx)" },
   { file: "app/(app)/properties/[id]/listing-sheet.tsx", staticImporters: [], why: "the listing editor loads with the first open" },
   { file: "app/(app)/properties/[id]/unit-sheet.tsx", staticImporters: [], why: "the unit editor loads with the first open" },
+  { file: "lib/sentry-browser.ts", staticImporters: [], why: "Sentry's browser package loads once the page is idle (instrumentation-client.ts)" },
 ];
 
 test("what loads on first use is imported only through import(), apart from the files that draw it at once", () => {

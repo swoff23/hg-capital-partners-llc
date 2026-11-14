@@ -37,8 +37,8 @@ export type ResolvedJobLink = {
   contactId: string | null;
   userId: string | null;
   /**
-   * A contractor's link that still opens the job: the contact is active with an ACTIVE login and an unrevoked
-   * access row (as core.ts assertContractorAccess asks), and the job is still open. False for a STAFF link.
+   * A contractor's EMAIL or CREW link that still opens the job: the contact is active with an ACTIVE login and an
+   * unrevoked access row (as core.ts assertContractorAccess asks), and the job is still open. False for STAFF and REPLY.
    */
   opensJob: boolean;
   /** The contractor's login, for the session a link starts. */
@@ -70,8 +70,10 @@ export async function resolveJobLink(token: string): Promise<ResolvedJobLink | n
   if (!link || link.revokedAt) return null;
   const contact = link.contact;
   const account = contact?.portalAccount ?? null;
+  // Only the button links open the job. A STAFF link shows photos; a REPLY link (the email's reply address, which
+  // travels in To and CC lines and address books) only lets a reply post (spec section 5).
   const opensJob =
-    link.kind !== "STAFF" &&
+    (link.kind === "EMAIL" || link.kind === "CREW") &&
     !!contact?.active &&
     account?.status === "ACTIVE" &&
     contact.taskAccess.some((a) => a.taskId === link.taskId) &&

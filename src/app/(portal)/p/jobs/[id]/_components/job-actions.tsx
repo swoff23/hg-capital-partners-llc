@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Camera, ImagePlus, Play } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
@@ -196,7 +196,10 @@ export function JobActions({
   const [starting, startStarting] = useTransition();
 
   // Open from the start when an email's Mark done opened the page and Mark done is the job's next step.
-  const [sheetOpen, setSheetOpen] = useState(() => openMarkDoneOnLoad && step === "done");
+  // Only while the address still asks, read from the router (current during a client-side move, unlike
+  // window.location): Back to a page whose ?do= was taken off doesn't reopen it.
+  const asked = useSearchParams().get("do") === "done";
+  const [sheetOpen, setSheetOpen] = useState(() => openMarkDoneOnLoad && step === "done" && asked);
   const [sheetState, setSheetState] = useState<"ask" | "sent">("ask");
   const [note, setNote] = useState("");
   // What HG received, for the payoff's strip.

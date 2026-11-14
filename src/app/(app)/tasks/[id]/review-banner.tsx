@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TaskStatus } from "@prisma/client";
+import { useSearchParams } from "next/navigation";
 import { ActivityTime } from "@/components/activity-time";
 import { Avatar } from "@/components/avatar";
 import { MediaGrid, type MediaItem } from "@/components/media-grid";
@@ -114,7 +115,10 @@ function ReviewBanner({
   openSendBack,
 }: ReviewProof & { taskId: string; contractor: string | null; hasLogin: boolean; now: string; openSendBack: boolean }) {
   const { run, pending, toast } = useStatusRun();
-  const [sendingBack, setSendingBack] = useState(openSendBack);
+  // Only while the address still asks, read from the router (current during a client-side move, unlike
+  // window.location): Back to a page whose ?do= was taken off doesn't reopen it.
+  const asked = useSearchParams().get("do") === "send-back";
+  const [sendingBack, setSendingBack] = useState(() => openSendBack && asked);
   useEffect(() => {
     if (!openSendBack) return;
     const url = new URL(window.location.href);

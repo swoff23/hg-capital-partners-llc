@@ -17,8 +17,22 @@ import { cn } from "@/lib/utils";
 function cameFromApp(): boolean {
   if (window.history.length <= 1) return false;
   const loadedAt = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.name;
-  if (loadedAt && loadedAt !== window.location.href) return true;
+  if (loadedAt && withoutAsk(loadedAt) !== withoutAsk(window.location.href)) return true;
   return document.referrer.startsWith(window.location.origin);
+}
+
+/**
+ * A URL without the `?do=` an email's button adds, which the page takes off its own address once it has opened what
+ * was asked (job-link-paths.ts): that is the same page, not a move inside the app. The hash stays, as before.
+ */
+function withoutAsk(href: string): string {
+  try {
+    const url = new URL(href);
+    url.searchParams.delete("do");
+    return url.toString();
+  } catch {
+    return href;
+  }
 }
 
 /**
