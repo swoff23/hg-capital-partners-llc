@@ -5,6 +5,7 @@ import { Button as AriaButton } from "react-aria-components";
 import { Code } from "@/components/code";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormSheet } from "@/components/form-sheet";
+import { InlineSwitch } from "@/components/inline-field";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Sheet } from "@/components/sheet";
 import { useToast } from "@/components/toast";
@@ -23,6 +24,7 @@ import {
   removePortalAccess,
   resetPortalPassword,
   restorePortalAccess,
+  setPortalJobEmails,
   signOutPortalEverywhere,
 } from "../actions";
 
@@ -37,6 +39,8 @@ export type PortalAccountView = {
   restorable: boolean;
   /** The contact is active. Restoring an inactive contact's login doesn't let them sign in yet. */
   contactActive: boolean;
+  /** The "Job emails" switch: HG's changes to their jobs email them (docs/specs/contractor-email-switch.md). */
+  jobEmails: boolean;
 };
 
 /**
@@ -72,6 +76,14 @@ type Shown = { email: string; password: string; phone: boolean };
  * Access off and drops Reset password and Sign out everywhere (decision 22).
  * An archived contractor's card offers neither Create login nor Restore
  * access (loginOffers): both wait for Restore on the page's Archived line.
+ *
+ * "Job emails" (docs/specs/contractor-email-switch.md, layout A) is a switch
+ * under the Email fact, on the same label column: off stops every task email
+ * to them. It saves on the tap with a toast and Undo, like any yes or no fact
+ * (InlineSwitch). No job email goes before their first sign-in either; the
+ * Email fact's "Not signed in yet" already says they haven't, so the switch
+ * adds no line of its own (Connor, Nov 14). Access off hides it, as it hides
+ * Reset password: nothing reaches a login that can't sign in.
  */
 export function PortalAccessCard({
   contactId,
@@ -180,6 +192,22 @@ export function PortalAccessCard({
                 {account.line && <p className="truncate text-meta text-fg-3">{account.line}</p>}
               </dd>
             </dl>
+            {account.state !== "off" && (
+              <div>
+                <dl className={cn(detailRow, "items-center")}>
+                  <dt className="text-meta text-fg-3">Job emails</dt>
+                  <dd className="min-w-0">
+                    <InlineSwitch
+                      label="Job emails"
+                      field="jobEmails"
+                      value={account.jobEmails ? "yes" : "no"}
+                      message={(next) => `${first}'s job emails are ${next === "yes" ? "on" : "off"}`}
+                      onSave={(next) => setPortalJobEmails(account.id, next)}
+                    />
+                  </dd>
+                </dl>
+              </div>
+            )}
             {account.state !== "off" && (
               // Side by side where they fit, stacked full width where they don't,
               // so neither label wraps. At touch sizes the pair needs 326px, so

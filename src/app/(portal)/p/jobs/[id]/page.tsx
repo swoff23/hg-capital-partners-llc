@@ -127,6 +127,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 status={job.status}
                 firstName={firstName(principal.label)}
                 staffNames={job.staffNames}
+                getsEmail={job.getsEmail}
                 finishPhotosRequired={job.finishPhotosRequired}
                 markedDoneAt={job.markedDoneAt}
                 property={place}

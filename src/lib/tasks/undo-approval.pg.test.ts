@@ -66,7 +66,8 @@ before(async () => {
   const contact = await prisma.contact.create({ data: { fullName: "Zack Outlaw" } });
   // A login, so the approval and the next copy's "assigned you" are each an email row for Zack.
   await prisma.portalAccount.create({
-    data: { contactId: contact.id, email: `zack-${run}@example.test`, passwordHash: "scrypt$x", mustChangePassword: false, status: "ACTIVE" },
+    // Signed in once, so HG's changes email him (src/lib/portal/job-emails.ts).
+    data: { contactId: contact.id, email: `zack-${run}@example.test`, passwordHash: "scrypt$x", mustChangePassword: false, status: "ACTIVE", lastSignInAt: new Date() },
   });
   zack = { kind: "contractor", contactId: contact.id, label: "Zack Outlaw" };
   propertyId = (await prisma.property.create({ data: { address: `${run} Sherwood St, Buffalo, NY 14213` } })).id;

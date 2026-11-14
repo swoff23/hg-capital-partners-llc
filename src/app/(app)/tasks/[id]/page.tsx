@@ -14,6 +14,7 @@ import { activityRecordIds, easternDay } from "@/lib/tasks/activity";
 import { activityRecordNames } from "@/lib/tasks/activity-names";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { asanaProfileGids, asanaTaskGids, taskIdsIn } from "@/lib/tasks/body-links";
+import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { emailStatesIn } from "@/lib/tasks/delivery";
 import { lockboxState } from "@/lib/tasks/lockbox";
 import { lastSeen, markTaskSeen, otherPartnersSeen, seenBaseline } from "@/lib/tasks/read-state";
@@ -62,7 +63,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       assigneeContactId: true,
       assigneeName: true,
       createdBy: { select: { name: true, email: true } },
-      assigneeContact: { select: { id: true, fullName: true, active: true } },
+      assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: JOB_EMAIL_SELECT } } },
     },
   });
   const [user, row, access, checklist, attachments, events, staff, properties, previouslySeen, partnersSeen] = await Promise.all([
@@ -174,6 +175,9 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   // contact is active, since sign-in refuses an inactive one (the card's Access
   // off). Nothing else about the account is read.
   const contractorHasLogin = !!contractor?.active && contractors.some((c) => c.id === contractor.id && c.hasLogin);
+  // Whether a change here emails them, or why not: no login, never signed in, or their Job emails switch is off
+  // (docs/specs/contractor-email-switch.md). The same rule core.ts queues by.
+  const contractorEmails = contractor ? jobEmailState(contractor.portalAccount, contractor.active) : "no-login";
   const property = propertyRow;
 
   const lockbox = (() => {
@@ -219,7 +223,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
         ? {
             id: contractor.id,
             first: contractorFirst ?? contractor.fullName,
-            hasLogin: contractorHasLogin,
+            emails: contractorEmails,
             accessActive: task.access.some((a) => a.contactId === contactId),
             seenAt: contractorSeen?.lastSeenAt ?? null,
           }
@@ -302,7 +306,9 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       created={created}
       contractorFirst={contractorFirst}
       contractorHasLogin={contractorHasLogin}
-      contractor={contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin } : null}
+      contractor={
+        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin, getsEmail: contractorEmails === "on" } : null
+      }
       staffFirstNames={staffFirstNames}
       review={review}
       decision={decision}

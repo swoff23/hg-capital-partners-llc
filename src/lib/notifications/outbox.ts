@@ -195,7 +195,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         },
       },
       recipientUser: { select: { email: true } },
-      recipientContact: { select: { active: true, fullName: true, portalAccount: { select: { email: true, status: true } } } },
+      recipientContact: { select: { active: true, fullName: true, portalAccount: { select: { email: true, status: true, jobEmails: true } } } },
     },
   });
   if (rows.length === 0) return result;

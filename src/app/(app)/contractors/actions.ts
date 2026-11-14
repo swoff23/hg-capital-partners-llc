@@ -104,6 +104,18 @@ export async function changePortalLoginEmail(accountId: string, email: string): 
   });
 }
 
+/**
+ * The card's "Job emails" switch (docs/specs/contractor-email-switch.md): `on` is "yes" or "no", as InlineSwitch
+ * saves a yes or no. Setting it to what it already is changes nothing and isn't a refusal, so two partners
+ * flipping it the same way both see it saved.
+ */
+export async function setPortalJobEmails(accountId: string, on: string): Promise<ActionResult> {
+  return withResult("setPortalJobEmails", async () => {
+    const user = await requireUser();
+    await thenRefresh(() => accounts.setPortalJobEmails(id.parse(accountId), z.enum(["yes", "no"]).parse(on) === "yes", user));
+  });
+}
+
 export async function resetPortalPassword(accountId: string): Promise<ActionResult<{ password: string }>> {
   return withResult("resetPortalPassword", async () => {
     const user = await requireUser();

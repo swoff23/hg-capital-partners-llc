@@ -17,8 +17,8 @@ test("emailStateOf: queued until it is sent; sent with no error is emailed; clos
 });
 
 test("deliveryLine: no login, then seen, then the email, else nothing", () => {
-  const base = { to: "Zack", hasLogin: true, email: null, seenAt: null, eventAt: "2026-10-23T15:00:00Z" } as const;
-  assert.deepEqual(deliveryLine({ ...base, hasLogin: false, email: "queued" }), { state: "no-login", to: "Zack" });
+  const base = { to: "Zack", emails: "on", email: null, seenAt: null, eventAt: "2026-10-23T15:00:00Z" } as const;
+  assert.deepEqual(deliveryLine({ ...base, emails: "no-login", email: "queued" }), { state: "no-login", to: "Zack" });
   assert.deepEqual(deliveryLine({ ...base, email: "queued" }), { state: "queued", to: "Zack" });
   assert.deepEqual(deliveryLine({ ...base, email: "emailed" }), { state: "emailed", to: "Zack" });
   assert.equal(deliveryLine(base), null, "an entry with no email on record says nothing");
@@ -39,8 +39,34 @@ test("deleteEmailNote: what the delete toast says about the email", () => {
 });
 
 test("deliveryLine: an email a run is sending still reads as one on its way", () => {
-  const line = deliveryLine({ to: "Zack", hasLogin: true, email: "sending", seenAt: null, eventAt: "2026-10-23T15:00:00Z" });
+  const line = deliveryLine({ to: "Zack", emails: "on", email: "sending", seenAt: null, eventAt: "2026-10-23T15:00:00Z" });
   assert.deepEqual(line, { state: "queued", to: "Zack" });
+});
+
+// docs/specs/contractor-email-switch.md, section 4: the line says why no email went.
+test("deliveryLine: a login that never signed in says so, and nothing else", () => {
+  const base = { to: "Zack", emails: "not-signed-in", email: null, seenAt: null, eventAt: "2026-10-23T15:00:00Z" } as const;
+  assert.deepEqual(deliveryLine(base), { state: "not-signed-in", to: "Zack" });
+  // Whatever the outbox holds, no email goes before the first sign-in, so the line never promises one.
+  assert.deepEqual(deliveryLine({ ...base, email: "queued" }), { state: "not-signed-in", to: "Zack" });
+});
+
+test("deliveryLine: Job emails off says so, under an entry with no email and under one still waiting", () => {
+  const base = { to: "Zack", emails: "off", email: null, seenAt: null, eventAt: "2026-10-23T15:00:00Z" } as const;
+  assert.deepEqual(deliveryLine(base), { state: "emails-off", to: "Zack" });
+  // A line still in its wait when the switch went off is dropped by the send run: never "gets an email".
+  assert.deepEqual(deliveryLine({ ...base, email: "queued" }), { state: "emails-off", to: "Zack" });
+  assert.deepEqual(deliveryLine({ ...base, email: "sending" }), { state: "emails-off", to: "Zack" });
+});
+
+test("deliveryLine: with Job emails off, an email that already went and a later visit still read as they did", () => {
+  const base = { to: "Zack", emails: "off", email: null, seenAt: null, eventAt: "2026-10-23T15:00:00Z" } as const;
+  // Sent before the switch went off: it did reach him.
+  assert.deepEqual(deliveryLine({ ...base, email: "emailed" }), { state: "emailed", to: "Zack" });
+  // He opened the job after the entry: Seen is the later fact, email or no email.
+  assert.deepEqual(deliveryLine({ ...base, seenAt: new Date("2026-10-23T18:14:00Z") }), { state: "seen", to: "Zack", at: "2026-10-23T18:14:00.000Z" });
+  // Opened only before it: still "emails are off".
+  assert.deepEqual(deliveryLine({ ...base, seenAt: "2026-10-23T14:00:00Z" }), { state: "emails-off", to: "Zack" });
 });
 
 const wrote = new Date("2026-10-23T15:00:00Z");

@@ -13,12 +13,12 @@ production builds only).
 | `DATABASE_URL` | yes | Supabase connection string. Use the **session** pooler or direct URL so migrations can run; the transaction pooler (port 6543) skips them. |
 | `SESSION_SECRET` | yes | 32+ random chars. Signs the login cookie and the QuickBooks OAuth state. Rotating it signs everyone out. |
 | `HEALTH_TOKEN` | recommended | Unlocks the detailed `/api/health` payload. Without it the probe still answers, but only `{ ok, db, env, commit, at }`. |
-| `CRON_SECRET` | before QuickBooks | Vercel sends it as `Authorization: Bearer …` on the nightly cron. Until it is set, `/api/quickbooks/sync` answers 503 and never runs. |
+| `CRON_SECRET` | for email and QuickBooks | Vercel sends it as `Authorization: Bearer …` on both crons: the once-a-minute email job (`/api/cron/notifications`, the only thing that sends task emails) and the nightly QuickBooks sync (`/api/quickbooks/sync`). Until it is set, both answer 503 and never run. |
 | `BLOB_READ_WRITE_TOKEN` | yes | Added automatically when the Blob store is connected under Storage. |
 | `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `QBO_REDIRECT_URI`, `QBO_TOKEN_SECRET` | for Financials | Intuit production keys; redirect URI is `https://www.hgcapitalpartners.com/api/quickbooks/callback`; token secret is 32 random bytes base64. All four or nothing — the Connect button appears only when all are present. |
 | `QBO_ENVIRONMENT` | for Financials | `production` (defaults to `sandbox`). |
 | `QBO_HISTORY_START` | optional | First month to pull, `YYYY-MM`. Defaults to `2026-01`. |
-| `RESEND_API_KEY`, `EMAIL_FROM` | for email | Resend key and a verified sender, e.g. `HG Capital <jobs@mail.hgcapitalpartners.com>`. Both or nothing; without them production sends no email. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | for email | Resend key and a verified sender, e.g. `HG Capital <jobs@mail.hgcapitalpartners.com>`. Both or nothing; without them production sends no email. Task emails also need `CRON_SECRET`; password reset and the move-in report don't. |
 | `EMAIL_REPLY_TO` | optional | A plain address replies go to, e.g. `office@hgcapitalpartners.com`. Unset, replies go to `EMAIL_FROM`. |
 | `APP_URL` | for email | Origin for links in emails, `https://www.hgcapitalpartners.com`. Sending fails in production without it. |
 | `CONNOR_PASSWORD`, `PIETER_PASSWORD` | one-time | Hashed into the DB by the build (only when the user's hash is empty). Safe to delete once both users can sign in. |

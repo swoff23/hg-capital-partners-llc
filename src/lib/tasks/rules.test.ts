@@ -99,7 +99,7 @@ test("targetDate: visit date while Scheduled, otherwise due", () => {
 });
 
 test("email only crosses the staff/contractor line", () => {
-  const login = { contractorHasLogin: true };
+  const login = { contractorGetsEmail: true };
   // Staff -> contractor
   assert.equal(notifyAudience("staff", { kind: "COMMENT", visibility: "SHARED" }, login), "contractor");
   assert.equal(notifyAudience("staff", { kind: "COMMENT", visibility: "INTERNAL" }, login), null);
@@ -108,7 +108,7 @@ test("email only crosses the staff/contractor line", () => {
   assert.equal(notifyAudience("staff", { kind: "STATUS", visibility: "SHARED" }, login), "contractor");
   assert.equal(notifyAudience("staff", { kind: "STATUS", visibility: "INTERNAL" }, login), null);
   assert.equal(notifyAudience("staff", { kind: "TITLE", visibility: "INTERNAL" }, login), null);
-  assert.equal(notifyAudience("staff", { kind: "COMMENT", visibility: "SHARED" }, { contractorHasLogin: false }), null);
+  assert.equal(notifyAudience("staff", { kind: "COMMENT", visibility: "SHARED" }, { contractorGetsEmail: false }), null);
   // Contractor -> staff
   assert.equal(notifyAudience("contractor", { kind: "COMMENT", visibility: "SHARED" }, login), "staff");
   assert.equal(notifyAudience("contractor", { kind: "ATTACHMENT", visibility: "SHARED" }, login), "staff");
@@ -126,4 +126,17 @@ test("bundleSendAfter: 3 minutes after the latest change, at most 10 after the f
   assert.equal(bundleSendAfter(first, later).getTime(), later.getTime() + BUNDLE_QUIET_MS);
   const muchLater = new Date(first.getTime() + 9 * 60_000);
   assert.equal(bundleSendAfter(first, muchLater).getTime(), first.getTime() + BUNDLE_MAX_MS);
+});
+
+// docs/specs/contractor-email-switch.md: quiet until the first sign-in, or with Job emails off.
+test("a contractor who gets no task emails is queued nothing by staff, and still reaches the partners", () => {
+  const quiet = { contractorGetsEmail: false };
+  for (const kind of ["ASSIGNED", "TARGET", "NOTES"] as const) {
+    assert.equal(notifyAudience("staff", { kind, visibility: "INTERNAL" }, quiet), null, kind);
+  }
+  for (const kind of ["COMMENT", "ATTACHMENT", "STATUS"] as const) {
+    assert.equal(notifyAudience("staff", { kind, visibility: "SHARED" }, quiet), null, kind);
+    // What the contractor does goes to the partners either way: the switch is about email to them, not from them.
+    assert.equal(notifyAudience("contractor", { kind, visibility: "SHARED" }, quiet), "staff", kind);
+  }
 });

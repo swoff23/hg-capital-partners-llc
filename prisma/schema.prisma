@@ -604,6 +604,10 @@ model PortalAccount {
   passwordHash       String // scrypt, same format as User.passwordHash (src/lib/password.ts)
   mustChangePassword Boolean             @default(true) // a starting password set by staff
   status             PortalAccountStatus @default(ACTIVE)
+  // The "Job emails" switch on the contractor's Portal access card (docs/specs/contractor-email-switch.md).
+  // Off stops every task email to them. Emails also wait for the first sign-in (lastSignInAt below);
+  // the rule that reads both is src/lib/portal/job-emails.ts.
+  jobEmails          Boolean             @default(true)
   createdBy          User?               @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdByUserId    String?
   lastSignInAt       DateTime?

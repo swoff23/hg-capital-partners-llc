@@ -39,6 +39,7 @@ import {
   markDoneButton,
   MAX_FILES_PER_POST,
   nextStep,
+  payoffLine,
   postRoom,
   backOnTray,
   lostAfter,
@@ -142,6 +143,7 @@ export function JobActions({
   status,
   firstName,
   staffNames,
+  getsEmail,
   finishPhotosRequired,
   markedDoneAt,
   property,
@@ -153,6 +155,8 @@ export function JobActions({
   status: TaskStatus;
   firstName: string;
   staffNames: string[];
+  /** HG's changes email this contractor, so the payoff promises one (docs/specs/contractor-email-switch.md). */
+  getsEmail: boolean;
   /** Photos Mark done asks for, from the job's playbook (TaskTemplate.finishPhotosRequired). Null or 0: optional, as every job starts. */
   finishPhotosRequired?: number | null;
   /** When this contractor marked the job done (ISO), while it's in Review: "Add photo/video" hides an hour later. Without it, it stays. */
@@ -709,7 +713,7 @@ export function JobActions({
             </div>
           </div>
         ) : (
-          <Payoff firstName={firstName} staffNames={staffNames} received={received} property={property ?? null} />
+          <Payoff firstName={firstName} staffNames={staffNames} getsEmail={getsEmail} received={received} property={property ?? null} />
         )}
       </Sheet>
     </>
@@ -747,11 +751,13 @@ function readyUpload(item: Recorded): MediaUpload {
 function Payoff({
   firstName,
   staffNames,
+  getsEmail,
   received,
   property,
 }: {
   firstName: string;
   staffNames: string[];
+  getsEmail: boolean;
   received: Recorded[];
   property: { label: string; photoUrl: string | null } | null;
 }) {
@@ -784,9 +790,7 @@ function Payoff({
           {more > 0 && <li className="text-meta tabular-nums text-fg-3">+{more}</li>}
         </ul>
       )}
-      <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">
-        Sent to {to}. You&apos;ll get an email if anything else is needed.
-      </p>
+      <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">{payoffLine(to, getsEmail)}</p>
       <LinkButton
         href="/p"
         variant="primary"

@@ -49,7 +49,7 @@ export interface TaskPageViewProps {
   /** The assigned contractor has a portal login; until then nothing here says they'll see it now. */
   contractorHasLogin: boolean;
   /** The assigned contractor, for the composer's line over the field. */
-  contractor: { id: string; first: string; hasLogin: boolean } | null;
+  contractor: { id: string; first: string; hasLogin: boolean; getsEmail: boolean } | null;
   /** The partners' first names: who sees an Internal note. */
   staffFirstNames: string[];
   /** The proof the Review banner shows while the job waits on staff, else null. */

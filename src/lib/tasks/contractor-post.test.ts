@@ -51,7 +51,7 @@ function fakeTx(answer?: Answer) {
     if (model === "taskAccess" && op === "findUnique") {
       return { revokedAt: null, contact: { active: true, portalAccount: { status: "ACTIVE" } } };
     }
-    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE" };
+    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE", lastSignInAt: new Date("2026-10-01T12:00:00Z"), jobEmails: true };
     if (model === "user" && op === "findMany") return [{ id: "u-connor" }, { id: "u-pieter" }];
     if (op === "findUnique" || op === "findFirst") return null;
     if (op === "findMany") return [];
