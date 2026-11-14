@@ -201,3 +201,12 @@ test("job email: photo strips link each thumbnail, Due carries Add to calendar, 
   // The photos' lines never put a thumbnail's own URL in the text.
   assert.ok(!text.includes("v=thumb"));
 });
+
+test("job email: an email with nothing to do has no buttons, and the Due row can offer Change date", () => {
+  const off = renderJobEmail({ ...job, primary: null, secondary: [], footnote: undefined });
+  assert.equal([...off.html.matchAll(/<a href="/g)].length, 1, "only Directions");
+  assert.ok(!off.text.includes("Start job"));
+  const dated = renderJobEmail({ ...job, job: { ...job.job, dateUrl: "https://hg.example.com/j/tok?do=date" } });
+  assert.ok(dated.html.includes(">Change date</a>"));
+  assert.ok(dated.text.includes("Change date: https://hg.example.com/j/tok?do=date"));
+});

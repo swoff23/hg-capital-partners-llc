@@ -560,6 +560,8 @@ async function jobNotice(
       WHERE e."taskId" = ${task.id} AND e."deletedAt" IS NULL
         AND e."kind" IN ('DUE', 'SCHEDULED', 'STATUS', 'NOTES')
         AND e."createdAt" > ${utc(since)}
+        -- What others changed: a date the contractor set themselves (Change date) isn't news to them.
+        AND e."actorContactId" IS DISTINCT FROM ${p.contactId}
       ORDER BY e."createdAt" ASC, e."id" ASC`,
   ]);
   const change: DateChange | null = dateChange(

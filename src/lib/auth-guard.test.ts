@@ -55,6 +55,7 @@ const ALLOWLIST = new Set([
   "/api/quickbooks/sync", // CRON_SECRET
   "/api/cron/notifications", // CRON_SECRET, the same check as /api/quickbooks/sync
   "/j/[token]/calendar", // a job email's link token (job-links.ts resolveJobLink): only while it still opens the job
+  "/api/email/inbound", // Resend's webhook signature (RESEND_WEBHOOK_SECRET), checked before anything is read
 ]);
 
 /**

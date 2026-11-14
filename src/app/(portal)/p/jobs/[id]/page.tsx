@@ -6,7 +6,7 @@ import { PhotoThumb } from "@/components/photo-thumb";
 import { StatusBadge } from "@/components/status-badge";
 import { Section, buttonClass } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
-import { jobLinkStep } from "@/lib/portal/job-link-paths";
+import { contractorMaySetDate, jobLinkStep } from "@/lib/portal/job-link-paths";
 import { addressLine, firstName, nextStep } from "@/lib/portal/job-view";
 import { noteJobViewed } from "@/lib/portal/jobs";
 import { officeTelHref } from "@/lib/portal/office";
@@ -16,7 +16,7 @@ import { isActiveStatus } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { CrewText } from "./_components/crew-text";
 import { JobActions } from "./_components/job-actions";
-import { DueDate } from "../../_components/due-date";
+import { JobDate } from "./_components/job-date";
 import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
 import { JobNotice } from "./_components/job-notice";
@@ -93,10 +93,15 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <StatusBadge status={job.status} className="shrink-0" />
-                  {job.target && active && (
-                    <span className="truncate text-meta text-fg-3">
-                      <DueDate target={job.target} isVisit={job.targetIsVisit} today={today} />
-                    </span>
+                  {active && (
+                    <JobDate
+                      taskId={job.id}
+                      target={job.target}
+                      isVisit={job.targetIsVisit}
+                      today={today}
+                      editable={contractorMaySetDate(job.status)}
+                      openOnLoad={ask === "date"}
+                    />
                   )}
                 </div>
                 <h1 className="mt-1 text-title text-balance break-words text-fg-1">{job.title}</h1>

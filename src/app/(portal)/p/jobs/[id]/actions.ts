@@ -71,3 +71,11 @@ export async function crewTextAction(taskId: string): Promise<ActionResult<strin
     return jobs.crewTextFor(id.parse(taskId));
   });
 }
+
+/** Change date: the job's new due date, as the contractor agreed it with the tenant (jobs.ts setJobDate). */
+export async function setJobDateAction(taskId: string, date: string): Promise<ActionResult> {
+  return withResult("portal:setJobDate", async () => {
+    await requirePortalPrincipal();
+    await jobs.setJobDate(id.parse(taskId), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.").parse(date));
+  });
+}

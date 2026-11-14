@@ -5,7 +5,7 @@
  */
 
 /** What a button asks the job page to have ready. Nothing acts until the contractor taps on the page. */
-export const JOB_LINK_STEPS = ["done", "photos", "access", "share"] as const;
+export const JOB_LINK_STEPS = ["done", "photos", "access", "share", "date"] as const;
 export type JobLinkStep = (typeof JOB_LINK_STEPS)[number];
 
 export function jobLinkStep(value: string | null | undefined): JobLinkStep | null {
@@ -14,8 +14,9 @@ export function jobLinkStep(value: string | null | undefined): JobLinkStep | nul
 
 /**
  * The job page a link opens, `/p/jobs/<id>`, ready for the button's step:
- *  - done and share: `?do=` asks the page to open the Mark done sheet or the
- *    crew text (it opens nothing the job can't take, and asks before acting);
+ *  - done, share and date: `?do=` asks the page to open the Mark done sheet,
+ *    the crew text or the date (it opens nothing the job can't take, and asks
+ *    before acting);
  *  - access: `#lockbox`, the Lockbox section;
  *  - photos: `#updates`, the Updates section with the composer;
  *  - no step: `#update-<id>` for the update the email opens at.
@@ -24,7 +25,7 @@ export function jobLinkStep(value: string | null | undefined): JobLinkStep | nul
 export function jobLinkDestination(taskId: string, step: string | null, updateId: string | null = null): string {
   const s = jobLinkStep(step);
   const page = `/p/jobs/${encodeURIComponent(taskId)}`;
-  if (s === "done" || s === "share") return `${page}?do=${s}`;
+  if (s === "done" || s === "share" || s === "date") return `${page}?do=${s}`;
   if (s === "access") return `${page}#lockbox`;
   if (s === "photos") return `${page}#updates`;
   return updateId && /^[A-Za-z0-9_-]{1,64}$/.test(updateId) ? `${page}#update-${updateId}` : page;
@@ -51,4 +52,11 @@ export function jobLinkUrl(appUrl: string, token: string, step: JobLinkStep | nu
   if (updateId) query.set("u", updateId);
   const q = query.toString();
   return q ? `${base}?${q}` : base;
+}
+
+/** The statuses a contractor may set the date in: waiting on them, not yet marked done (core.ts setDateByContractor). */
+export const CONTRACTOR_DATE_STATUSES = ["OPEN", "SCHEDULED", "WAITING", "IN_PROGRESS"] as const;
+
+export function contractorMaySetDate(status: string): boolean {
+  return (CONTRACTOR_DATE_STATUSES as readonly string[]).includes(status);
 }

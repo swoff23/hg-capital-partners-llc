@@ -119,7 +119,7 @@ function ReviewBanner({
     if (!openSendBack) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("do");
-    window.history.replaceState(window.history.state, "", url);
+    window.history.replaceState(null, "", url);
   }, [openSendBack]);
   // A note that didn't go through (or a sheet closed on it): the sheet starts with it next time.
   const [draft, setDraft] = useState("");

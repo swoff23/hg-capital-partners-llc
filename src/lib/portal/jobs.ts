@@ -189,3 +189,13 @@ export async function crewTextFor(taskId: string): Promise<string> {
     url: jobLinkUrl(getEnv().appUrl, token),
   });
 }
+
+/**
+ * Change date (docs/specs/contractor-job-emails.md, section 7): the day the contractor agreed with the tenant becomes
+ * the job's due date, and both partners hear of it (core.ts setDateByContractor has the rules).
+ */
+export async function setJobDate(taskId: string, date: string): Promise<void> {
+  const p = await requirePortalPrincipal();
+  await refreshOnRefusal(taskId, () => prisma.$transaction((tx) => core.setDateByContractor(tx, taskId, date, taskPrincipal(p))));
+  revalidateJob(taskId);
+}

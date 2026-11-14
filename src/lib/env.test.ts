@@ -78,7 +78,15 @@ test("email is null unless both Resend keys are present", () => {
     apiKey: "re_x",
     from: "HG <a@b.c>",
     replyTo: null,
+    webhookSecret: null,
   });
+});
+
+test("RESEND_WEBHOOK_SECRET turns replies by email on, and a blank one leaves them off", () => {
+  const resend = { ...base, RESEND_API_KEY: "re_x", EMAIL_FROM: "HG <jobs@mail.hg.com>" };
+  assert.equal(parseEnv({ ...resend, RESEND_WEBHOOK_SECRET: "whsec_abc" }).email?.webhookSecret, "whsec_abc");
+  assert.equal(parseEnv({ ...resend, RESEND_WEBHOOK_SECRET: "  " }).email?.webhookSecret, null);
+  assert.equal(parseEnv({ ...base, RESEND_WEBHOOK_SECRET: "whsec_abc" }).email, null);
 });
 
 test("EMAIL_REPLY_TO is optional, rides along in the email config, and must be an address", () => {
@@ -89,6 +97,7 @@ test("EMAIL_REPLY_TO is optional, rides along in the email config, and must be a
     apiKey: "re_x",
     from: "HG <jobs@mail.hg.com>",
     replyTo: "office@hg.com",
+    webhookSecret: null,
   });
   // Without Resend there's no email config to carry it.
   assert.equal(parseEnv({ ...base, EMAIL_REPLY_TO: "office@hg.com" }).email, null);

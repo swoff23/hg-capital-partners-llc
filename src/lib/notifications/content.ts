@@ -3,7 +3,7 @@ import { HG_TIME_ZONE, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
-import { jobLinkUrl, type JobLinkStep } from "@/lib/portal/job-link-paths";
+import { contractorMaySetDate, jobLinkUrl, type JobLinkStep } from "@/lib/portal/job-link-paths";
 import { addressLine, firstName, joinNames, nextStep } from "@/lib/portal/job-view";
 
 /**
@@ -32,7 +32,12 @@ export interface OutboxItem {
   noteEventId?: string;
   /** TARGET: the date that moved is the booked visit. Absent on old rows, which read neutrally. */
   visit?: boolean;
+  /** DUE_TODAY and OVERDUE (reminders.ts): the date the reminder is for. */
+  due?: string;
 }
+
+/** Lines that are the job's own news, with nobody's name in front: the 8 am emails. */
+const UNSIGNED_KINDS = new Set(["DUE_TODAY", "OVERDUE"]);
 
 /** The items column, keeping only well-formed entries. */
 export function parseItems(json: unknown): OutboxItem[] {
@@ -206,6 +211,17 @@ function withSendBackNote(item: OutboxItem, note: EventSnapshot | undefined): Ou
   return { ...item, summary: `sent ${m[1]} back${text ? `: ${text}` : ""}` };
 }
 
+/**
+ * The off-the-job line (core.ts notifyOff) at send time. Taken off the job
+ * (no access now): that line alone goes, and nothing else about a job that
+ * isn't theirs. Still on it: a "took you off" undone by putting them back is
+ * dropped, and "canceled" goes only while the job is still canceled.
+ */
+export function offItems(items: readonly OutboxItem[], now: { hasAccess: boolean; canceled: boolean }): OutboxItem[] {
+  if (!now.hasAccess) return items.filter((i) => i.kind === "OFF");
+  return items.filter((i) => i.kind !== "OFF" || (now.canceled && /^canceled /.test(oneLine(i.summary))));
+}
+
 /** The update an email's button opens at: the first comment, status or file post the recipient can see. */
 export function firstUpdateId(items: readonly OutboxItem[]): string | null {
   return items.find((i) => i.eventId && (i.kind === "COMMENT" || i.kind === "STATUS" || i.kind === "ATTACHMENT"))?.eventId ?? null;
@@ -274,6 +290,12 @@ export function itemText(item: OutboxItem, title?: string): string {
       if (tail !== null) return `sent it back${tail}`;
       return s.replace(/"[^"]*"/, "it");
     }
+    case "DUE_TODAY":
+      return "Due today";
+    case "OVERDUE":
+      return "Due yesterday";
+    case "OFF":
+      return /^canceled /.test(s) ? "canceled this job" : "took you off this job";
     default:
       return s;
   }
@@ -309,6 +331,7 @@ function sendBackTail(s: string, title?: string): string | null {
 /** "Connor moved the target to Fri, Oct 30", 'Zack: "Uppers in"'. */
 export function itemLine(item: OutboxItem, title?: string): string {
   const text = itemText(item, title);
+  if (UNSIGNED_KINDS.has(item.kind)) return text;
   const name = firstName(item.actorLabel);
   return text.startsWith(":") ? `${name}${text}` : `${name} ${text}`;
 }
@@ -345,6 +368,7 @@ export function whatsNew(items: OutboxItem[], title?: string): { headline: strin
   const kept = latestOnly(items);
   let at = kept.findLastIndex((i) => i.kind === "STATUS");
   if (at < 0) at = kept.findIndex((i) => i.kind === "ASSIGNED");
+  if (at < 0) at = kept.findLastIndex((i) => UNSIGNED_KINDS.has(i.kind));
   if (at < 0) at = kept.findLastIndex((i) => i.kind === "TARGET");
   if (at < 0) at = 0;
   const lines = kept.map((it) => asSentence(itemLine(it, title)));
@@ -415,6 +439,8 @@ export interface JobFacts {
   accessUrl: string | null;
   /** Contractor only, with a job link and a date: the .ics for Add to calendar. */
   calendarUrl: string | null;
+  /** Contractor only, with a job link, while the job takes a new date: Change date (section 7). */
+  dateUrl: string | null;
   /** Contractor only: HG's photos on the job, beyond the ones What's new shows. */
   photos: EmailPhoto[];
   morePhotos: number;
@@ -432,7 +458,8 @@ export interface TaskEmail {
   morePhotos: number;
   /** A contractor's approval thanks them: "Thanks, Zack." */
   closing?: string;
-  primary: EmailButton;
+  /** The next step; null on an email with nothing left to do (taken off the job). */
+  primary: EmailButton | null;
   secondary: EmailButton[];
   job: JobFacts;
   /** Contractors only: where to answer, so a reply to the email isn't lost. */
@@ -480,7 +507,7 @@ function buttons(input: {
   taskId: string;
   items: OutboxItem[];
   linkToken: string | null;
-}): { primary: EmailButton; secondary: EmailButton[] } {
+}): { primary: EmailButton | null; secondary: EmailButton[] } {
   const updateId = firstUpdateId(input.items);
   if (input.audience === "staff") {
     const task = openUrl(input.appUrl, "staff", input.taskId);
@@ -492,7 +519,12 @@ function buttons(input: {
   const token = input.linkToken;
   const to = (step: JobLinkStep | null, update: string | null = null) =>
     token ? jobLinkUrl(input.appUrl, token, step, update) : openUrl(input.appUrl, "contractor", input.taskId, update);
-  const extras: EmailButton[] = [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Text to my crew", url: to("share") }] : [])];
+  // The morning after the due date (reminders.ts): the next step, or a new date, and nothing else.
+  const overdue = input.items.some((i) => i.kind === "OVERDUE");
+  const extras: EmailButton[] =
+    overdue && token && contractorMaySetDate(input.status)
+      ? [{ label: "Change date", url: to("date") }]
+      : [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Text to my crew", url: to("share") }] : [])];
   const step = input.approved ? null : nextStep(input.status);
   if (step === "start") return { primary: { label: "Start job", url: to(null) }, secondary: extras };
   if (step === "done") return { primary: { label: "Mark done", url: to("done") }, secondary: extras };
@@ -521,6 +553,66 @@ function photoStrip(ids: readonly string[], appUrl: string, linkToken: string | 
 /** "2 of 3 done", or null with no checklist. */
 export function checklistLine(items: readonly { done: boolean }[]): string | null {
   return items.length ? `${items.filter((i) => i.done).length} of ${items.length} done` : null;
+}
+
+/**
+ * The line under the job (spec 5). With replies by email: a contractor's open
+ * job says a reply adds a comment and its photos go on the job, a closed one
+ * that a reply reaches the partners (it's forwarded, not posted), a partner's
+ * copy that a reply answers the contractor. Without: a contractor's open job
+ * says to reply in the job (BCONTRACT-002), and nothing else carries a line.
+ */
+function footnoteFor(input: {
+  audience: Audience;
+  status: TaskStatus;
+  staffNames?: readonly string[];
+  contractorName?: string | null;
+  replyByEmail?: boolean;
+}): { footnote?: string } {
+  const open = isActiveStatus(input.status);
+  if (input.audience === "contractor") {
+    if (!input.replyByEmail) return open ? { footnote: replyLine(input.staffNames ?? []) } : {};
+    return { footnote: open ? "Reply to add a comment. Photos you attach go on the job." : `Reply to reach ${joinNames([...(input.staffNames ?? [])]) || "HG"}.` };
+  }
+  const name = greetingName(input.contractorName);
+  return input.replyByEmail && name ? { footnote: `Reply to answer ${name}. It goes on the job.` } : {};
+}
+
+/**
+ * Taken off a job, or it was canceled (spec 2.3, 6): what it was and where,
+ * and that there's no need to go. No date (the subject would send them
+ * there), no access, notes, photos or buttons: the job isn't theirs now.
+ */
+export function offEmail(title: string, where: string, taskId: string): TaskEmail {
+  const what = [oneLine(title) || "A job", where].filter(Boolean).join(", ");
+  const headline = "You're off this job. No need to go.";
+  return {
+    subject: `Off this job: ${what}`,
+    preview: headline,
+    headline,
+    lines: [],
+    photos: [],
+    morePhotos: 0,
+    primary: null,
+    secondary: [],
+    job: {
+      title: oneLine(title),
+      where,
+      directionsUrl: null,
+      photoUrl: null,
+      due: null,
+      notes: null,
+      checklist: [],
+      contractor: null,
+      checklistLine: null,
+      accessUrl: null,
+      calendarUrl: null,
+      dateUrl: null,
+      photos: [],
+      morePhotos: 0,
+    },
+    threadKey: `job-${taskId}-off`,
+  };
 }
 
 /**
@@ -569,6 +661,8 @@ export function taskEmail(input: {
   newPhotoIds?: readonly string[];
   /** Contractor: HG's other photos on the job, newest first. */
   jobPhotoIds?: readonly string[];
+  /** The email has its own reply address (replies post to the job, section 5): the footer says what a reply does. */
+  replyByEmail?: boolean;
 }): TaskEmail {
   const street = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
   const where = addressLine(street || null, input.unitLabel ? oneLine(input.unitLabel) : null);
@@ -579,10 +673,11 @@ export function taskEmail(input: {
   const { headline, lines } = whatsNew(input.items, input.title);
   const checklist = input.checklist ?? [];
   const notes = input.notes?.trim() ? keepBreaks(input.notes) : null;
+  if (contractor && input.items.some((i) => i.kind === "OFF")) return offEmail(input.title, where, input.taskId);
   const token = input.linkToken ?? null;
   const btns = buttons({ audience: input.audience, status: input.status, approved, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
   // Tapping a photo opens the job: the contractor's through their link, a partner's on the task page.
-  const photoHref = contractor ? (token ? jobLinkUrl(input.appUrl, token, null, firstUpdateId(input.items)) : btns.primary.url) : openUrl(input.appUrl, "staff", input.taskId, firstUpdateId(input.items));
+  const photoHref = contractor ? (token ? jobLinkUrl(input.appUrl, token, null, firstUpdateId(input.items)) : openUrl(input.appUrl, "contractor", input.taskId)) : openUrl(input.appUrl, "staff", input.taskId, firstUpdateId(input.items));
   const fresh = photoStrip(input.newPhotoIds ?? [], input.appUrl, token, photoHref);
   const older = contractor ? photoStrip(input.jobPhotoIds ?? [], input.appUrl, token, photoHref) : { photos: [], morePhotos: 0 };
   return {
@@ -606,10 +701,11 @@ export function taskEmail(input: {
       checklistLine: contractor ? null : checklistLine(checklist),
       accessUrl: contractor && token && input.hasAccess && isActiveStatus(input.status) ? jobLinkUrl(input.appUrl, token, "access") : null,
       calendarUrl: contractor && token && input.due && isActiveStatus(input.status) ? `${jobLinkUrl(input.appUrl, token)}/calendar` : null,
+      dateUrl: contractor && token && contractorMaySetDate(input.status) ? jobLinkUrl(input.appUrl, token, "date") : null,
       photos: older.photos,
       morePhotos: older.morePhotos,
     },
-    ...(contractor && isActiveStatus(input.status) ? { footnote: replyLine(input.staffNames ?? []) } : {}),
+    ...footnoteFor(input),
     threadKey: threadKey(input.taskId, input.due ?? null),
   };
 }

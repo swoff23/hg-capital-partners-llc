@@ -11,6 +11,10 @@ export interface EmailMessage {
   subject: string;
   text: string;
   html?: string;
+  /** This email's own Reply-To (a job email's reply address, inbound.ts replyAddress); overrides EMAIL_REPLY_TO. */
+  replyTo?: string;
+  /** Files Resend fetches by URL and attaches (a reply on a closed job, forwarded to the partners). */
+  attachments?: { filename: string; path: string }[];
   /**
    * Keeps one job's emails in one thread (content.ts threadKey): every email
    * with the same key points at the same parent, so mail apps that thread on
@@ -43,7 +47,8 @@ export function resendBody(config: Pick<EmailEnv, "from" | "replyTo">, msg: Emai
     subject: msg.subject,
     text: msg.text,
     ...(msg.html ? { html: msg.html } : {}),
-    ...(config.replyTo ? { reply_to: config.replyTo } : {}),
+    ...(msg.replyTo || config.replyTo ? { reply_to: msg.replyTo ?? config.replyTo } : {}),
+    ...(msg.attachments?.length ? { attachments: msg.attachments } : {}),
     ...(parent ? { headers: { "In-Reply-To": parent, References: parent } } : {}),
   };
 }
