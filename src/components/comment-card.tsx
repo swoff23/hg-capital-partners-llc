@@ -7,8 +7,7 @@ import { ActivityTime, useActivityNow } from "@/components/activity-time";
 import { Menu, MenuHeader, MenuTrigger } from "@/components/menu";
 import { Tooltip } from "@/components/tooltip";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
-import { Button, Kbd, TextLink, buttonClass, textLinkClass } from "@/components/ui";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
+import { Button, TextLink, buttonClass, textLinkClass } from "@/components/ui";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { fmtDay, fullStamp, seenTime, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
@@ -290,7 +289,6 @@ export function CommentEditor({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
-  const mod = useModKey();
 
   useEffect(() => {
     const el = field.current;
@@ -358,11 +356,9 @@ export function CommentEditor({
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} aria-keyshortcuts="Escape">
           Cancel
-          <Kbd aria-hidden="true">Esc</Kbd>
         </Button>
         <Button type="button" variant="secondary" size="sm" onClick={() => void save()} pending={saving} aria-keyshortcuts="Meta+Enter Control+Enter">
           Save
-          <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>
         </Button>
       </div>
     </div>

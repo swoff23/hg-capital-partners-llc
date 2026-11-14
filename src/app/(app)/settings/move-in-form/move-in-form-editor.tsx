@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ActionBar, SubmitKeycap, actionBarButton } from "@/components/action-bar";
+import { ActionBar, actionBarButton } from "@/components/action-bar";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useHoldLeave } from "@/components/leave-guard";
 import { NumberInput } from "@/components/number-input";
@@ -282,7 +282,6 @@ export function MoveInFormEditor({
           primary={
             <Button type="button" className={actionBarButton} pending={pending} onClick={save} aria-keyshortcuts="Meta+Enter Control+Enter">
               Save
-              <SubmitKeycap />
             </Button>
           }
         />

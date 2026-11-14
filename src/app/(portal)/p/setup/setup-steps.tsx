@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, ClipboardList, Landmark } from "lucide-react";
-import { ActionBar, SubmitKeycap, actionBarButton } from "@/components/action-bar";
+import { ActionBar, actionBarButton } from "@/components/action-bar";
 import { FilesList, type FileLink } from "@/components/files-list";
 import { Meter } from "@/components/meter";
 import { UploadStatusLine, useMediaUploader } from "@/components/media-uploader";
@@ -278,7 +278,7 @@ export function SetupSteps({
           }
           primary={
             <Button type="button" className={actionBarButton} pending={saving} disabled={uploading > 0} onClick={next} aria-keyshortcuts="Meta+Enter Control+Enter">
-              Next <SubmitKeycap />
+              Next
             </Button>
           }
           error={refusal ? <p role="alert" className="truncate text-center text-meta text-danger lg:text-right">{refusal}</p> : undefined}

@@ -28,9 +28,8 @@ import { PickerLayer } from "@/components/picker-layer";
 import { railLineClass, railVerbClass } from "@/components/rail";
 import { Switch } from "@/components/switch";
 import { DoneFooter, TagList, TagsChecklist, tagsLine, tagsOf } from "@/components/tags-field";
-import { Button, FormField, Input, Kbd, fieldClass } from "@/components/ui";
+import { Button, FormField, Input, fieldClass } from "@/components/ui";
 import { isCoarseNow } from "@/components/use-coarse-pointer";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { useRun } from "@/components/use-run";
 import type { AddressKind } from "@/lib/address-suggestions";
 import { conflictKeepLabel, type ActionResult } from "@/lib/action-result";
@@ -377,7 +376,6 @@ function TextFact(props: InlineFieldProps) {
   const closing = useRef(false);
   const refocus = useRef(false);
   const lineId = useId();
-  const mod = useModKey();
   const shown = save.shown;
 
   function open() {
@@ -675,13 +673,9 @@ function TextFact(props: InlineFieldProps) {
         <div className="mt-2 flex justify-end gap-2">
           <Button size="sm" variant="secondary" onClick={cancel} aria-keyshortcuts="Escape">
             Cancel
-            <Kbd aria-hidden="true">Esc</Kbd>
           </Button>
           <Button size="sm" onClick={() => commit(save.conflict ? { expected: theirsText() } : undefined)} aria-keyshortcuts="Meta+Enter Control+Enter">
             Save
-            <Kbd tone="act" aria-hidden="true">
-              {shortcutLabel(mod, "↵")}
-            </Kbd>
           </Button>
         </div>
       )}
