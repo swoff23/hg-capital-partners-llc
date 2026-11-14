@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isArchived } from "@/lib/record-scope";
-import { cleanTrades } from "@/lib/contacts";
+import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { listedContactsWhere, recentAssigneeKeys } from "./assignee-people";
 
@@ -50,7 +50,7 @@ export async function assigneeOptions(
         ],
       },
       orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true, email: true, trades: true, archivedAt: true, portalAccount: { select: { status: true } } },
+      select: { id: true, fullName: true, email: true, tradeLinks: TRADE_LINKS, archivedAt: true, portalAccount: { select: { status: true } } },
     }),
     viewerId
       ? prisma.taskEvent.findMany({
@@ -73,7 +73,7 @@ export async function assigneeOptions(
     id: c.id,
     name: c.fullName,
     email: c.email,
-    trade: cleanTrades(c.trades),
+    trade: tradeLine(c.tradeLinks),
     hasLogin: c.portalAccount?.status === "ACTIVE",
   }));
 

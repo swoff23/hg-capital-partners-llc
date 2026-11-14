@@ -38,6 +38,7 @@ export function PickerLayer({
   placement = "bottom start",
   motion = "none",
   popoverClassName,
+  sheetFooter,
   children,
 }: {
   isOpen: boolean;
@@ -58,6 +59,11 @@ export function PickerLayer({
   /** Lists appear at once ("none", the default); a panel holding more than a list pops in ("pop"). */
   motion?: PopoverMotion;
   popoverClassName?: string;
+  /**
+   * On a phone, pinned under the list: a pick-many list's Done, which closes
+   * it (the popover closes on a click away and needs none).
+   */
+  sheetFooter?: (close: () => void) => ReactNode;
   children: (layer: { container: PickContainer; close: () => void }) => ReactNode;
 }) {
   const sheet = useSheet();
@@ -73,12 +79,18 @@ export function PickerLayer({
   if (container === "sheet") {
     layer = sheet ? (
       isOpen ? (
-        <SheetView title={title} onBack={close}>
+        <SheetView title={title} onBack={close} footer={sheetFooter?.(close)}>
           {children({ container, close })}
         </SheetView>
       ) : null
     ) : (
-      <Sheet title={title} surface={surface} isOpen={trigger ? undefined : isOpen} onOpenChange={trigger ? undefined : onOpenChange}>
+      <Sheet
+        title={title}
+        surface={surface}
+        isOpen={trigger ? undefined : isOpen}
+        onOpenChange={trigger ? undefined : onOpenChange}
+        footer={sheetFooter?.(close)}
+      >
         {children({ container, close })}
       </Sheet>
     );

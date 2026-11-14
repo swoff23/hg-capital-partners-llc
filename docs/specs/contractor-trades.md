@@ -37,7 +37,8 @@ The spec for standardizing contractor trades and editing them with one multi-pic
 ```prisma
 model Trade {
   id        String         @id @default(cuid())
-  name      String         // "Plumbing"; unique ignoring case (index below)
+  name      String         // "Plumbing", "Pest control"
+  key       String         @unique // the name lowercased, single spaces, no commas: tradeKey()
   createdAt DateTime       @default(now())
   contacts  ContactTrade[]
 }
@@ -53,7 +54,8 @@ model ContactTrade {
 ```
 
 - `Contact` gains `tradeLinks ContactTrade[]`. `Contact.trades` (the text) stays for one release as a read-only backup. Nothing writes it after the deploy, and a later migration drops it.
-- The migration adds `CREATE UNIQUE INDEX "Trade_name_lower_key" ON "Trade" (lower("name"))`, so "plumbing" can never sit beside "Plumbing".
+- `key` keeps "plumbing" from ever sitting beside "Plumbing". It's a column Prisma knows rather than an index on `lower(name)`, which Prisma can't describe and a later `migrate dev` would drop.
+- A trade that no contractor has any more (archived ones count) comes off the list when the save that left it empty runs, so a mistyped "Roofng" doesn't stay behind. Adding it again, or Undo, brings it back.
 - Both tables `ENABLE ROW LEVEL SECURITY` (README, Rules of the road). `src/lib/db-rls.test.ts` checks it.
 - The list lives in the database, not in code, so a second business would start with its own (docs/other-businesses-later.md).
 
@@ -80,12 +82,12 @@ model ContactTrade {
 | Trim | Trim |
 
 - Matching ignores case and surrounding spaces, and splits on "/" like `cleanTrades` does today.
-- The map lives in one module, `src/lib/contractors/trade-map.ts`. The migration's SQL is generated from it, and so are the cleanup script and the spreadsheet import, so all three read the same table.
+- The map lives in one module, `src/lib/contractors/trade-map.ts`. The migration's SQL holds the same table, and `trade-map.test.ts` fails if the two differ. The dry run, the cleanup script and the spreadsheet import read the module.
 - "minor", "only" and "Exterior" are dropped on purpose (decision 2). The dry run prints every before and after.
 
 ### 3.3 Rollout (decision 8)
 
-1. **Dry run.** `npm run trades:dry-run` reads `PROD_DATABASE_URL` read-only and prints three things: every distinct spelling with its trade and contractor count, every spelling the map doesn't cover, and each contractor's trades before and after. It writes nothing.
+1. **Dry run.** `scripts/trades-dry-run.ts` reads a database and prints every distinct spelling with its trade and contractor count, every spelling the map doesn't cover, each contractor's trades before and after, and the list the migration leaves. It only selects and writes nothing. `npm run trades:dry-run` reads the local database; for prod, `npx tsx --env-file=<the prod env file> scripts/trades-dry-run.ts`. Prod's run on Nov 14 matched the local import, plus one spelling the map doesn't cover: "Test", on the test contractor.
 2. **Connor approves.** Any uncovered spelling gets a row in the map, or Connor says it becomes its own trade.
 3. **One deploy.** The migration creates both tables, inserts the 17 trades plus any approved extras, and links every contractor from its current text. A spelling still not in the map becomes its own trade, with its first letter capitalized, so nothing is lost. The production build applies it (`scripts/prebuild.mjs`), and the code that reads links ships in the same push.
 4. **Later release.** A migration drops `Contact.trades` once Connor has looked at prod.
@@ -115,8 +117,8 @@ All three use one checklist: `OptionList selectionMode="multiple"` inside `Picke
 
 - The Trades field takes the `Select` trigger's field look: label "Trades", placeholder "Add trades" and a chevron. Once trades are picked, they show as tags inside the field, which grows to a second line if it needs one.
 - A click opens the same checklist, with the Add row, as a popover or, on a phone, the sheet. Picks apply as they're ticked, because the form saves on Create.
-- The form sends trade ids, plus the names of any trades added in the picker, which the create service makes in the same transaction.
-- The draft (`useDraft`) keeps the picks by id. A draft that names an id that no longer exists drops it.
+- The form sends the picked names on one line ("HVAC, Roofing"). The create service matches them to the list ignoring case and adds any it doesn't have, in the same transaction as the contractor.
+- The draft (`useDraft`) keeps the picks by name.
 
 ### 4.4 Contractor list (decision 6)
 
@@ -126,7 +128,7 @@ All three use one checklist: `OptionList selectionMode="multiple"` inside `Picke
 
 ### 4.5 Filter, search and the assignee picker
 
-- **Trade filter:** it keeps its look (your first screenshot). The URL becomes `?trade=<id>,<id>`, and the server filters with `tradeLinks: { some: { tradeId: { in } } }`, so `matchesTrades` and the substring caveat in `query.ts` go away. Counts come from one `groupBy` on `ContactTrade` under the other filters, and a trade with zero still lists. An old `?trade=Plumbing` link maps by name, ignoring case, so bookmarks keep working.
+- **Trade filter:** it keeps its look (your first screenshot). The URL becomes `?trade=<id>,<id>`, and `matchesTrades` compares ids, so the substring caveat in `query.ts` goes away. Counts come from the rows the other filters leave (the same rows "Needs W-9" already reads), and a trade with zero still lists. An old `?trade=Plumbing` link redirects to the same list by id, so bookmarks keep working and the checklist shows the pick.
 - **Search** (`search-results.ts`, the command palette): it matches a trade name through the link, and the result line reads "Plumbing, HVAC".
 - **Assignee picker:** the contractor's line under the name reads "Plumbing, HVAC", and its search matches trade names. Who counts as a contractor ("has a trade or any job", `assignee-people.ts`) becomes `tradeLinks: { some: {} }`.
 
@@ -138,24 +140,26 @@ All three use one checklist: `OptionList selectionMode="multiple"` inside `Picke
 - `OptionList` with `selectionMode="multiple"` and `CheckboxMark`: the checklist rows the filter already uses.
 - `tagClass`: the tag look.
 - `useFactSave`: its toast, Undo, pending state and conflict handling, plus `FactLine` and `ConflictButtons`.
-- `useToast`, `Sheet`'s footer slot, `CreateForm`, `useDraft`, `FilterBar`'s multi facet, `Table`, `Th`, `Td`.
+- `useToast`, `Sheet`'s and `SheetView`'s footer slot, `CreateForm`, `useDraft`, `FilterBar`'s multi facet, `Table`, `Th`, `Td`, `Block` (the list's loading tags).
 
 **Extended**
 
 - `OptionList` gets `onCreate` with `createLabel`: the 'Add "…"' row, lifted from `Combobox allowCustom` so the two share the rule and the copy.
-- `InlineField` gets `kind="tags"`. It's a sibling of the date and choice pickers in `PickedFact`, but it holds picks until close and saves once.
+- `inline-field.tsx` gets `InlineTags`, a sibling of `InlineSwitch` on the same `useFactSave`. It holds picks until close and saves once.
 - `Select`'s trigger look is reused by a multi field. It's the same field chrome, with tags inside instead of one label.
+- `PickerLayer` gets `sheetFooter`, for the phone sheet's Done.
 
 **New**
 
-- `TagsField` in `src/components/tags-field.tsx`: the form field from 4.3. It gets a row in docs/components.md ("Pick many in a form or on a record"), so any later multi-value field uses it.
+- `TagsField`, `TagsChecklist` and `TagList` in `src/components/tags-field.tsx`: the form field from 4.3 and the checklist both screens share. They get a row in docs/components.md ("Pick many"), so any later multi-value field uses them.
 - `TagOverflow` in the same file: one line of tags with "+N". There's no existing pattern; it follows Attio's table cells (section 6).
-- `Trade`, `ContactTrade`, `trade-map.ts`, `setContactTrades` (in `lib/contractors/service.ts`, since services own writes) and `trades:dry-run`.
+- `Trade`, `ContactTrade`, `trade-map.ts`, `trades.ts` (the select and the one-line form), `trade-links.ts` (the write, on any client, so a scratch-database test reaches it) behind `setContactTrades` in `lib/contractors/service.ts` (services own writes), and `trades:dry-run`.
 
 **Retired**
 
 - `Combobox`'s `multiple` mode, whose only user was the New contractor form. Its docs/components.md row loses the `multiple` sentence. `allowCustom` stays for single values (CapEx systems, property entity).
-- The "Separate trades with a slash." helper. `cleanTrades`, `tradeTokens`, `matchesTrades` and `tradeOptions` go, once nothing reads the text. `cleanTrades` stays only inside the map module, to split the old text.
+- The "Separate trades with a slash." helper, `cleanTrades` and `tradeTokens`. The map module splits the old text where something still reads it (the import, the dry run). `matchesTrades` and `tradeOptions` stay, now on ids.
+- The cleanup script's repeated-trades fix (ADMIN-023), which a list can't need. Its hand fixes now add a trade link ("House Cleaner" is Cleaning).
 
 ## 6. References
 
@@ -174,7 +178,7 @@ All three use one checklist: `OptionList selectionMode="multiple"` inside `Picke
 
 ## 8. Checks
 
-- **Unit tests:** the map (every local spelling lands where section 3.2 says, and an unknown spelling is kept), the name rule for new trades, the filter query by id and the old-name redirect, the counts, `setContactTrades` (save, no change, conflict), and the RLS test for both tables.
+- **Unit tests:** the map (every local spelling lands where section 3.2 says, an unknown spelling is kept, and the migration's table equals the module's), the name rule for new trades, the filter by id and the old-name mapping, the counts, and the RLS test for both tables. `trade-links.pg.test.ts` runs the save on a scratch Postgres (save with a new name, conflict, a trade left with no one, Undo, clear); like the repo's other `.pg` tests it's opt-in.
 - **Device check:** `npm run test:devices` over `/contractors`, `/contractors/[id]` and `/contractors/new`. By hand at 375 and 320: the checklist sheet, the Add row, the toast and Undo, a contractor with six trades on the page and in the list, and the form field with tags on two lines.
 - **Landing:** typecheck, lint and `npm test` on the merged code. Then the dry run against prod and Connor's OK on the map before the push to main.
 

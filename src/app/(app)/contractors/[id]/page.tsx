@@ -21,6 +21,7 @@ import { portalAccess } from "@/lib/portal/access-state";
 import { STATUS_LABEL, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { isTargetLate, targetOf } from "@/lib/tasks/list";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
+import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import { ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
 import { setContractorArchived } from "../actions";
@@ -71,6 +72,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
           select: { id: true, email: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true, jobEmails: true },
         },
         archivedByUser: { select: { name: true, email: true } },
+        tradeLinks: TRADE_LINKS,
       },
     }),
     // For Archive's refusal: open jobs are reassigned first, counted as the archive counts them (lib/archive.ts),
@@ -78,11 +80,12 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
     contractorOpenJobs(prisma, id),
   ]);
   if (!c) notFound();
+  const trades = tradeLine(c.tradeLinks) ?? "";
   // Their jobs: tasks assigned to this contact, and the open ones only an imported name ties to them, so the list
   // shows every job Archive's refusal counts. Never a playbook's template rows. The list stops at JOBS_SHOWN and
   // says so; the count is all of them.
   const jobsWhere = contractorJobsWhere(id, open.names);
-  const [rows, jobCount] = await Promise.all([
+  const [rows, jobCount, allTrades] = await Promise.all([
     prisma.task.findMany({
       where: jobsWhere,
       orderBy: [{ completedAt: { sort: "desc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }],
@@ -90,6 +93,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
       take: JOBS_SHOWN,
     }),
     prisma.task.count({ where: jobsWhere }),
+    // What the Trades checklist offers.
+    prisma.trade.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
   ]);
   // Puts them on top of this person's Recent in search, once the response is out (not again for an edit's refresh).
   if (!(await isActionRender())) after(() => recordView(me.id, "CONTACT", c.id));
@@ -153,7 +158,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               id: c.id,
               fullName: c.fullName,
               company: c.company,
-              trades: c.trades,
+              trades,
               phone: c.phone,
               phoneE164: c.phoneE164,
               email: c.email,
@@ -164,6 +169,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               comments: notes,
             }}
             portalEmail={c.portalAccount?.email ?? null}
+            tradeOptions={allTrades.map((t) => t.name)}
           >
             {/* What isn't edited here yet: the documents, which the uploads work takes. */}
             <RailFact label="W-9">{c.w9Url ? <DocLink href={c.w9Url} /> : w9OnFile ? "On file" : null}</RailFact>
@@ -183,7 +189,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               id: c.id,
               fullName: c.fullName,
               company: c.company,
-              trades: c.trades,
+              trades,
               phone: c.phone,
               phoneE164: c.phoneE164,
               email: c.email,

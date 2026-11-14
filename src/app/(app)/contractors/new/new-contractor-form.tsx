@@ -1,16 +1,17 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Combobox } from "@/components/combobox";
 import { CreateForm } from "@/components/create-form";
 import { AutosizeTextarea } from "@/components/inline-field";
+import { TagsField, tagsLine } from "@/components/tags-field";
 import { useToast } from "@/components/toast";
 import { FormField, Input, Section } from "@/components/ui";
 import type { FieldErrors } from "@/lib/action-result";
 import { inlineProblem } from "@/lib/inline-edit";
+import { tradeName } from "@/lib/contractors/trade-map";
 import { createContractor } from "../actions";
 
-/** What the form holds, as typed. Trades are a list here and join with " / " on the way out. */
+/** What the form holds, as typed. Trades are a list of names here and travel on one line ("HVAC, Roofing"). */
 type Values = {
   fullName: string;
   phone: string;
@@ -49,11 +50,11 @@ function problemsOf(v: Values): FieldErrors | null {
   return Object.keys(found).length > 0 ? found : null;
 }
 
-/** The action's input: every field as typed, the trades in the directory's "Plumbing / HVAC" text. */
+/** The action's input: every field as typed, the trades on one line ("HVAC, Roofing"); a new one is added to the list. */
 function inputOf(v: Values) {
   return {
     ...Object.fromEntries(FIELDS.filter((f) => f !== "trades").map((f) => [f, v[f] as string])),
-    trades: v.trades.join(" / "),
+    trades: tagsLine(v.trades),
   };
 }
 
@@ -62,8 +63,8 @@ function inputOf(v: Values) {
  * them and what they do, saved as a new Contact. Phone, email and address are
  * one group, "Contact (optional)", and company, trades, billing and
  * availability another, "Work (optional)", so only the name asks for
- * anything. Trades are picked from the ones already in the directory or
- * typed. On `CreateForm`, like New task, deal and property: a sheet over the
+ * anything. Trades are picked from the list's checklist, where a trade it
+ * doesn't have yet can be added (docs/specs/contractor-trades.md 4.3). On `CreateForm`, like New task, deal and property: a sheet over the
  * Contractors list from a click (the intercepting route in the `@modal` slot)
  * and the same form flat on `/contractors/new` from a pasted link or a
  * reload, with the draft, the discard question and Create more. A success
@@ -158,14 +159,14 @@ export function NewContractorForm({ variant, trades }: { variant: "sheet" | "pag
                 <FormField label="Company" error={errors.company}>
                   {(p) => <Input {...p} autoComplete="off" value={values.company} onChange={(e) => change("company", e.target.value)} />}
                 </FormField>
-                <Combobox
-                  multiple
-                  allowCustom
+                <TagsField
                   label="Trades"
-                  items={trades}
+                  options={trades}
                   value={values.trades}
                   onChange={(next) => change("trades", next)}
-                  placeholder="Add a trade"
+                  placeholder="Add trades"
+                  normalize={tradeName}
+                  emptyText="No trade matches."
                   isInvalid={!!errors.trades}
                   errorMessage={errors.trades}
                 />

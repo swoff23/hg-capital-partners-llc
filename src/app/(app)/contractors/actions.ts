@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import * as contractors from "@/lib/contractors/service";
+import { splitTrades } from "@/lib/contractors/trade-map";
 import * as accounts from "@/lib/portal/accounts";
 import { withResult } from "@/lib/server-action";
 
@@ -30,6 +31,20 @@ export async function patchContact(contactId: string, changes: Record<string, st
   return withResult("patchContact", async () => {
     await requireUser();
     await contractors.patchContact(id.parse(contactId), fieldsSchema.parse(changes), fieldsSchema.parse(expected));
+  });
+}
+
+/**
+ * Save a contractor's trades from the checklist on their page (docs/specs/
+ * contractor-trades.md 4.2). `next` and `expected` are names on one line
+ * ("HVAC, Plumbing"), as the inline field holds them; `expected` is what the
+ * page loaded, so a change someone made meanwhile refuses the save.
+ */
+export async function saveContactTrades(contactId: string, next: string, expected: string): Promise<ActionResult> {
+  return withResult("saveContactTrades", async () => {
+    await requireUser();
+    const line = z.string().max(5_000);
+    await contractors.setContactTrades(id.parse(contactId), splitTrades(line.parse(next)), splitTrades(line.parse(expected)));
   });
 }
 

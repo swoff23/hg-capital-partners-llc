@@ -1,23 +1,24 @@
 import { Plus } from "lucide-react";
 import { Block, LoadingScreen, Words, rowWidth } from "@/components/skeleton";
 import { LinkButton, PageHeader, Table, Td, Th, chromeIconClass } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { ContractorFiltersPlaceholder } from "../filters";
 
 /**
- * Eight rows' words, at the lengths names, companies and trades run to, so
- * the columns size as they will for the real ones: a name is two words, a
- * company is often a dash, and a list of trades can be one long word
- * ("Framing/Tile/Drywall") that sets its column's narrowest width.
+ * Eight rows' words, at the lengths names and companies run to, so the
+ * columns size as they will for the real ones: a name is two words and a
+ * company is often a dash. Trades are tags, one to three of them, in a
+ * column that takes a third of the width whatever they hold.
  */
 const ROWS: { name: string[]; company: string[]; trades: string[] }[] = [
-  { name: ["w-12", "w-16"], company: ["w-3"], trades: ["w-16", "w-16"] },
-  { name: ["w-16", "w-12"], company: ["w-8", "w-10", "w-10"], trades: ["w-64"] },
-  { name: ["w-12", "w-18"], company: ["w-3"], trades: ["w-28", "w-4", "w-16"] },
-  { name: ["w-10", "w-14"], company: ["w-8", "w-24", "w-6"], trades: ["w-10"] },
-  { name: ["w-14", "w-14"], company: ["w-3"], trades: ["w-24", "w-24"] },
+  { name: ["w-12", "w-16"], company: ["w-3"], trades: ["w-12", "w-16"] },
+  { name: ["w-16", "w-12"], company: ["w-8", "w-10", "w-10"], trades: ["w-14", "w-12", "w-10"] },
+  { name: ["w-12", "w-18"], company: ["w-3"], trades: ["w-16"] },
+  { name: ["w-10", "w-14"], company: ["w-8", "w-24", "w-6"], trades: ["w-12"] },
+  { name: ["w-14", "w-14"], company: ["w-3"], trades: ["w-10", "w-16"] },
   { name: ["w-16", "w-18", "w-8"], company: ["w-12", "w-8", "w-14"], trades: ["w-20"] },
-  { name: ["w-12", "w-16"], company: ["w-3"], trades: ["w-32", "w-4", "w-18"] },
-  { name: ["w-18", "w-12"], company: ["w-12", "w-20"], trades: ["w-14"] },
+  { name: ["w-12", "w-16"], company: ["w-3"], trades: ["w-14", "w-10", "w-12"] },
+  { name: ["w-18", "w-12"], company: ["w-12", "w-20"], trades: ["w-12"] },
 ];
 
 /**
@@ -45,7 +46,7 @@ export default function ContractorsLoading() {
           <tr>
             <Th className="pl-0">Name</Th>
             <Th className="hidden sm:table-cell">Company</Th>
-            <Th className="hidden sm:table-cell">Trades</Th>
+            <Th className="hidden w-1/3 sm:table-cell">Trades</Th>
             <Th className="pr-0 sm:pr-3">Phone</Th>
             <Th className="hidden pr-0 sm:table-cell">Docs</Th>
           </tr>
@@ -62,8 +63,13 @@ export default function ContractorsLoading() {
               <Td className="hidden sm:table-cell">
                 <Words text="text-body" widths={r.company} />
               </Td>
-              <Td className="hidden max-w-xs sm:table-cell">
-                <Words text="text-body" widths={r.trades} />
+              <Td className="hidden sm:table-cell">
+                {/* Tag-shaped, at a tag's height (tagClass). */}
+                <span className="flex w-0 min-w-full gap-1 overflow-hidden">
+                  {r.trades.map((w, k) => (
+                    <Block key={k} className={cn("h-5.5 shrink-0 rounded-sm", w)} />
+                  ))}
+                </span>
               </Td>
               <Td className="pr-0 sm:pr-3">
                 <Block text="text-body" className="w-20 pointer-coarse:w-27" />

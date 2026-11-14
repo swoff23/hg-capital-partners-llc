@@ -1,9 +1,9 @@
 /**
  * Tidy the contractor records the spreadsheet import left messy (ADMIN-023):
- * trades the import's merge repeated ("HVAC / HVAC") and name words typed in
- * lowercase ("John detzler"). Plus Connor's three hand fixes (cutover
- * decision 31): "Electric" (Jeremiah Anderson) and "House Cleaner" (Kim
- * Lockett) move from Company to Trades, and "Mike Morris (Freedom Electric)"
+ * name words typed in lowercase ("John detzler"). Plus Connor's three hand
+ * fixes (cutover decision 31): "Electric" (Jeremiah Anderson) and "House
+ * Cleaner" (Kim Lockett, which is the Cleaning trade) move from Company to
+ * their trades, and "Mike Morris (Freedom Electric)"
  * becomes Mike Morris at Freedom Electric; each matches only that record's
  * exact current name and company. The rules are src/lib/contacts.ts
  * planContactFixes. Notes and anything else that needs a judgment call are
@@ -24,6 +24,8 @@
  */
 import { prisma } from "../src/lib/db";
 import { planContactFixes } from "../src/lib/contacts";
+import { tradeKey } from "../src/lib/contractors/trade-map";
+import { TRADE_LINKS, tradeNames } from "../src/lib/contractors/trades";
 import { TX, assertBackup, assertKnownFlags, flagValue, guardTarget, hasFlag, log as logger } from "./asana/_import-lib";
 
 const TAG = "cleanup-contacts";
@@ -36,14 +38,15 @@ async function main() {
   const target = await guardTarget(prisma, { apply, tag: TAG });
   if (apply && !target.local) assertBackup(flagValue("--backup"), target, TAG);
 
-  const contacts = await prisma.contact.findMany({ select: { id: true, fullName: true, trades: true, company: true }, orderBy: { fullName: "asc" } });
+  const rows = await prisma.contact.findMany({ select: { id: true, fullName: true, tradeLinks: TRADE_LINKS, company: true }, orderBy: { fullName: "asc" } });
+  const contacts = rows.map((c) => ({ id: c.id, fullName: c.fullName, company: c.company, trades: tradeNames(c.tradeLinks) }));
   const plan = planContactFixes(contacts);
   log(`${contacts.length} contacts, ${plan.length} to change.`);
   const shown = (v: string | null) => (v === null ? "(none)" : `"${v}"`);
   for (const f of plan) {
     const lines = [
       f.name ? `name: "${f.fullName}" to "${f.name}"` : null,
-      f.trades ? `trades: ${shown(f.trades.from)} to ${shown(f.trades.to)}` : null,
+      f.addTrade ? `adds the trade "${f.addTrade}"` : null,
       f.company ? `company: ${shown(f.company.from)} to ${shown(f.company.to)}` : null,
     ].filter(Boolean);
     log(`  ${f.fullName} (${f.id}): ${lines.join("; ")}`);
@@ -61,11 +64,19 @@ async function main() {
       const was = before.get(f.id)!;
       const r = await tx.contact.updateMany({
         // Only while the row still holds what the plan read.
-        where: { id: f.id, fullName: was.fullName, trades: was.trades, company: was.company },
-        data: { ...(f.name ? { fullName: f.name } : {}), ...(f.trades ? { trades: f.trades.to } : {}), ...(f.company ? { company: f.company.to } : {}) },
+        where: { id: f.id, fullName: was.fullName, company: was.company },
+        data: { ...(f.name ? { fullName: f.name } : {}), ...(f.company ? { company: f.company.to } : {}) },
       });
-      if (r.count) written++;
-      else skipped++;
+      if (!r.count) {
+        skipped++;
+        continue;
+      }
+      if (f.addTrade) {
+        const key = tradeKey(f.addTrade);
+        const trade = await tx.trade.upsert({ where: { key }, create: { key, name: f.addTrade }, update: {}, select: { id: true } });
+        await tx.contactTrade.createMany({ data: [{ contactId: f.id, tradeId: trade.id }], skipDuplicates: true });
+      }
+      written++;
     }
   }, TX);
   log(`Wrote ${written}.${skipped ? ` Skipped ${skipped} that changed since the plan was read; run again to see them.` : ""}`);

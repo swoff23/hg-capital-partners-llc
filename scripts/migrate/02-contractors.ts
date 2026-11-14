@@ -7,7 +7,7 @@
  * Idempotent: upserts keyed by a stable slug of the person's name.
  */
 import { prisma } from "../../src/lib/db";
-import { cleanTrades } from "../../src/lib/contacts";
+import { tradeKey, tradesFromText } from "../../src/lib/contractors/trade-map";
 import { readPhone } from "../../src/lib/contractors/contact-fields";
 import { report } from "./_report";
 import {
@@ -35,6 +35,28 @@ type Draft = {
   comments: string[];
   updatedAt: Date | null;
 };
+
+/** Two sheets' trade text as one, in the sheets' own "Plumbing / HVAC" form; the map folds the repeats when it's read. */
+function joinOld(a: string | null, b: string | null | undefined): string | null {
+  return [a, b].filter((t) => t?.trim()).join(" / ") || null;
+}
+
+/**
+ * The contact's trades from the sheets' text, through the map
+ * (src/lib/contractors/trade-map.ts): "Plumber/minor HVAC" is Plumbing and
+ * HVAC, and a spelling the map doesn't know becomes its own trade. Replaces
+ * whatever trades they had, as a re-run replaces every other field.
+ */
+async function setTrades(contactId: string, text: string | null): Promise<void> {
+  const names = tradesFromText(text);
+  for (const name of names) {
+    const key = tradeKey(name);
+    await prisma.trade.upsert({ where: { key }, create: { key, name }, update: {} });
+  }
+  const ids = (await prisma.trade.findMany({ where: { key: { in: names.map(tradeKey) } }, select: { id: true } })).map((t) => t.id);
+  await prisma.contactTrade.deleteMany({ where: { contactId, tradeId: { notIn: ids } } });
+  await prisma.contactTrade.createMany({ data: ids.map((tradeId) => ({ contactId, tradeId })), skipDuplicates: true });
+}
 
 function nameSlug(name: string): string {
   return name
@@ -80,7 +102,7 @@ export async function migrateContractors() {
     const newer = (d.updatedAt?.getTime() ?? 0) >= (existing.updatedAt?.getTime() ?? 0);
     existing.fullName = newer && d.fullName ? d.fullName.trim() : existing.fullName;
     existing.company ??= d.company ?? null;
-    existing.trades = cleanTrades([existing.trades, d.trades].filter(Boolean).join(" / "));
+    existing.trades = joinOld(existing.trades, d.trades);
     existing.tenantFixes ||= d.tenantFixes ?? false;
     existing.phoneDigits ??= d.phoneDigits ?? null;
     existing.email ??= d.email ?? null;
@@ -154,7 +176,7 @@ export async function migrateContractors() {
     if (hit) {
       // merge d into hit
       hit.company ??= d.company;
-      hit.trades = cleanTrades([hit.trades, d.trades].filter(Boolean).join(" / "));
+      hit.trades = joinOld(hit.trades, d.trades);
       hit.tenantFixes ||= d.tenantFixes;
       hit.phoneDigits ??= d.phoneDigits;
       hit.email ??= d.email;
@@ -183,7 +205,6 @@ export async function migrateContractors() {
     const data = {
       fullName: d.fullName,
       company: d.company,
-      trades: d.trades,
       tenantFixes: d.tenantFixes,
       phone,
       // Written with `phone`, as the Contact edit does, so the Call and Text links never dial an older number.
@@ -202,9 +223,11 @@ export async function migrateContractors() {
     });
     if (existing) {
       await prisma.contact.update({ where: { id: existing.id }, data });
+      await setTrades(existing.id, d.trades);
       updated++;
     } else {
-      await prisma.contact.create({ data });
+      const made = await prisma.contact.create({ data, select: { id: true } });
+      await setTrades(made.id, d.trades);
       created++;
     }
   }

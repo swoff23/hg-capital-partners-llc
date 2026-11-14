@@ -9,8 +9,8 @@ import {
   matchesNeedsW9,
   matchesTrades,
   parseContractorFilters,
+  resolveTradePicks,
   tradeOptions,
-  tradeTokens,
   type ContractorFilters,
 } from "./query";
 
@@ -28,18 +28,27 @@ function matches(row: Row, cond: Record<string, unknown>): boolean {
     const f = filter as Row;
     if ("not" in f && f.not === null) return value !== null && value !== undefined;
     if ("is" in f) return value != null && matches(value as Row, f.is as Row);
+    if ("some" in f) return Array.isArray(value) && value.some((v) => matches(v as Row, f.some as Row));
     if ("contains" in f) return typeof value === "string" && value.toLowerCase().includes(String(f.contains).toLowerCase());
     return value != null && matches(value as Row, f);
   });
 }
 
+const TRADES = {
+  plumbing: { id: "t-plumb", name: "Plumbing" },
+  hvac: { id: "t-hvac", name: "HVAC" },
+  electric: { id: "t-elec", name: "Electric" },
+  electrical: { id: "t-elecl", name: "Electrical" },
+};
+const links = (...t: { id: string; name: string }[]) => t.map((trade) => ({ trade }));
+
 const CONTACTS: Row[] = [
-  { id: "zack", fullName: "Zack Reading", company: "Reading Plumbing", trades: "Plumbing / HVAC", w9Url: "https://x/w9.pdf", comments: null, portalAccount: { status: "ACTIVE" } },
-  { id: "luis", fullName: "Luis Ortega", company: null, trades: "Electric", w9Url: null, comments: "W-9 on file: ortega-w9.pdf", portalAccount: null },
-  { id: "dana", fullName: "Dana Fox", company: "Fox Electrical", trades: "Electrical", w9Url: null, comments: "Prefers texts", portalAccount: { status: "INVITED" } },
-  { id: "pat", fullName: "Pat Lee", company: null, trades: null, w9Url: null, comments: null, portalAccount: { status: "ACTIVE" } },
+  { id: "zack", fullName: "Zack Reading", company: "Reading Plumbing", tradeLinks: links(TRADES.plumbing, TRADES.hvac), w9Url: "https://x/w9.pdf", comments: null, portalAccount: { status: "ACTIVE" } },
+  { id: "luis", fullName: "Luis Ortega", company: null, tradeLinks: links(TRADES.electric), w9Url: null, comments: "W-9 on file: ortega-w9.pdf", portalAccount: null },
+  { id: "dana", fullName: "Dana Fox", company: "Fox Electrical", tradeLinks: links(TRADES.electrical), w9Url: null, comments: "Prefers texts", portalAccount: { status: "INVITED" } },
+  { id: "pat", fullName: "Pat Lee", company: null, tradeLinks: [], w9Url: null, comments: null, portalAccount: { status: "ACTIVE" } },
   // Archived: only the Archived chip shows them.
-  { id: "old", fullName: "Olga Plumb", company: "Old Plumbing", trades: "Plumbing", w9Url: null, comments: null, portalAccount: null, archivedAt: new Date("2026-10-27T14:00:00Z") },
+  { id: "old", fullName: "Olga Plumb", company: "Old Plumbing", tradeLinks: links(TRADES.plumbing), w9Url: null, comments: null, portalAccount: null, archivedAt: new Date("2026-10-27T14:00:00Z") },
 ];
 const none: ContractorFilters = { q: "", trades: [], hasLogin: false, needsW9: false, archived: false };
 const row = (c: Row) => c as { w9Url: string | null; comments: string | null };
@@ -101,26 +110,29 @@ test("the filters narrow together", () => {
   assert.deepEqual(found({ q: "plumbing", hasLogin: true }), ["zack"]);
 });
 
-test("trades split on the slash, folded, and match whole words", () => {
-  assert.deepEqual(tradeTokens("Plumbing / HVAC"), ["Plumbing", "HVAC"]);
-  assert.deepEqual(tradeTokens("HVAC / HVAC"), ["HVAC"], "the import's repeats fold");
-  assert.deepEqual(tradeTokens(null), []);
-  assert.equal(matchesTrades("Electrical", ["Electric"]), false, "Electric isn't a piece of Electrical");
-  assert.equal(matchesTrades("Plumbing / HVAC", ["hvac"]), true);
-  assert.equal(matchesTrades(null, ["Plumbing"]), false);
-  assert.equal(matchesTrades(null, []), true, "no picks keeps everyone");
+test("the Trade filter matches trade ids; a name from an older link finds its trade", () => {
+  const zack = CONTACTS[0] as { tradeLinks: { trade: { id: string } }[] };
+  const dana = CONTACTS[2] as { tradeLinks: { trade: { id: string } }[] };
+  assert.equal(matchesTrades(zack, ["t-hvac"]), true);
+  assert.equal(matchesTrades(dana, ["t-elec"]), false, "Electric isn't Electrical");
+  assert.equal(matchesTrades({ tradeLinks: [] }, ["t-plumb"]), false);
+  assert.equal(matchesTrades({ tradeLinks: [] }, []), true, "no picks keeps everyone");
+  const all = Object.values(TRADES);
+  assert.deepEqual(resolveTradePicks(["t-plumb", "hvac", "Roofing", "t-plumb"], all), ["t-plumb", "t-hvac"], "an id stays, a name maps, the rest drops");
 });
 
-test("trade options: A to Z, once each whatever the case, with how many do it", () => {
-  const options = tradeOptions([{ trades: "Plumbing / HVAC" }, { trades: "plumbing" }, { trades: "Electric" }, { trades: null }]);
+test("trade options: every trade A to Z, counting the rows that do it, a zero kept", () => {
+  const options = tradeOptions(Object.values(TRADES), CONTACTS.slice(0, 4) as { tradeLinks: { trade: { id: string } }[] }[]);
   assert.deepEqual(
     options.map((o) => [o.label, o.count]),
     [
       ["Electric", 1],
+      ["Electrical", 1],
       ["HVAC", 1],
-      ["Plumbing", 2],
+      ["Plumbing", 1],
     ],
   );
+  assert.equal(tradeOptions([{ id: "t-tile", name: "Tile" }], [])[0].count, 0);
 });
 
 test("isNarrowed and the query string", () => {
