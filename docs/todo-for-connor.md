@@ -46,7 +46,6 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
 - [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
-- [ ] In Vercel, turn on Skew Protection (Project Settings, Advanced). Now that you're on Pro, it keeps a page that was open during a deploy talking to the version it loaded, instead of failing its next save.
 
 ## Small calls (no rush)
 
@@ -57,6 +56,8 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 ## Done
 
 - Nov 14: email turned on. `CRON_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` and `EMAIL_REPLY_TO` are in Vercel, and `mail.hgcapitalpartners.com` is set up in Resend.
+- Nov 14: Skew Protection is on in Vercel with a 12-hour max age. It starts with the next deploy.
+- Nov 14: `CONNOR_PASSWORD` and `PIETER_PASSWORD` deleted from Vercel. Both passwords were already saved in the database, so sign-in is unchanged.
 
 - Oct 25: the Ink and Limestone brand and Home as Today, built and landed. The guidelines are in [brand-guidelines.md](brand-guidelines.md).
 - Oct 25: approved the six component specs with every recommendation. "Our price" on deals means the target offer. They build in seven chunks.
