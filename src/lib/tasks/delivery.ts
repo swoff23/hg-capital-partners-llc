@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import type { JobEmailState } from "@/lib/portal/job-emails";
 
 /**
  * What happened to a message after it posted (docs/specs/activity-comments.md
@@ -77,29 +78,42 @@ export async function emailStatesIn(db: Db, taskId: string, contactId: string, e
 }
 
 /** The line under a staff entry for the contractor it is addressed to. */
-export type Delivery = { state: "no-login" | "queued" | "emailed" | "seen"; to: string | string[]; at?: string };
+export type Delivery = { state: "no-login" | "not-signed-in" | "emails-off" | "queued" | "emailed" | "seen"; to: string | string[]; at?: string };
 
 /**
- * The delivery line for one entry the contractor can see. No login says so
- * and nothing else (no email will go). Opened after the entry wins over the
- * email states, since it is the later fact. Otherwise the email: waiting, or
- * sent. Nothing for an entry with no email on record (one posted before the
- * outbox named its events).
+ * The delivery line for one entry the contractor can see, the first that
+ * applies (docs/specs/contractor-email-switch.md, section 4):
+ *
+ *  1. No login says so and nothing else (no email will go).
+ *  2. Neither does a login that has never signed in: emails wait for that.
+ *  3. Opened after the entry wins over the email states, since it is the
+ *     later fact.
+ *  4. An email that went says so, whatever the switch says now.
+ *  5. "Job emails" off says so. That covers a line still waiting, which the
+ *     send run drops, and an entry no email was ever queued for.
+ *  6. Otherwise the email that is waiting.
+ *
+ * Nothing for an entry with no email on record while emails are on (one
+ * posted before the outbox named its events).
  */
 export function deliveryLine(input: {
   to: string;
-  hasLogin: boolean;
+  /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts). */
+  emails: JobEmailState;
   email: EmailState | null;
   /** When the contractor last opened the job. */
   seenAt: Date | string | null;
   /** When the entry was written. */
   eventAt: Date | string;
 }): Delivery | null {
-  if (!input.hasLogin) return { state: "no-login", to: input.to };
+  if (input.emails === "no-login") return { state: "no-login", to: input.to };
+  if (input.emails === "not-signed-in") return { state: "not-signed-in", to: input.to };
   const seen = input.seenAt ? new Date(input.seenAt) : null;
   if (seen && seen.getTime() > new Date(input.eventAt).getTime()) return { state: "seen", to: input.to, at: seen.toISOString() };
+  if (input.email === "emailed") return { state: "emailed", to: input.to };
+  if (input.emails === "off") return { state: "emails-off", to: input.to };
   // A row a run is sending is still "gets an email" to the person reading.
-  if (input.email) return { state: input.email === "sending" ? "queued" : input.email, to: input.to };
+  if (input.email) return { state: "queued", to: input.to };
   return null;
 }
 

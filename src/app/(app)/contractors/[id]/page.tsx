@@ -68,7 +68,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
       include: {
         // Never the password hash: only what the Portal access card shows.
         portalAccount: {
-          select: { id: true, email: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true },
+          select: { id: true, email: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true, jobEmails: true },
         },
         archivedByUser: { select: { name: true, email: true } },
       },
@@ -212,6 +212,9 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                     line: access.line,
                     restorable: c.portalAccount.status !== "ACTIVE",
                     contactActive: c.active,
+                    jobEmails: c.portalAccount.jobEmails,
+                    // The first sign-in job emails wait for (src/lib/portal/job-emails.ts reads the same column).
+                    signedIn: c.portalAccount.lastSignInAt !== null,
                   }
                 : null
             }

@@ -49,10 +49,12 @@ export type Audience = "staff" | "contractor";
 
 export interface RowRecipient {
   recipientUser: { email: string } | null;
-  recipientContact: { active: boolean; portalAccount: { email: string; status: string } | null } | null;
+  recipientContact: { active: boolean; portalAccount: { email: string; status: string; jobEmails: boolean } | null } | null;
 }
 
-export type Delivery = { ok: true; to: string; audience: Audience } | { ok: false; reason: "no login" | "no recipient" | "no access" };
+export type Delivery =
+  | { ok: true; to: string; audience: Audience }
+  | { ok: false; reason: "no login" | "no recipient" | "no access" | "emails off" };
 
 /**
  * A row goes to a staff User, or to a contractor with an active contact and
@@ -64,12 +66,18 @@ export type Delivery = { ok: true; to: string; audience: Audience } | { ok: fals
  * taken off a job minutes after a change would still get its title, address
  * and Shared comments by email. `contractorHasAccess` is an unrevoked
  * TaskAccess row for the recipient on the row's task.
+ *
+ * Their "Job emails" switch is read again here too
+ * (docs/specs/contractor-email-switch.md): a line still waiting when staff
+ * turn it off is dropped, not sent. The first sign-in isn't: a row is only
+ * ever queued for someone who has signed in (tasks/core.ts notify).
  */
 export function deliveryFor(row: RowRecipient, opts: { contractorHasAccess: boolean }): Delivery {
   if (row.recipientUser) return { ok: true, to: row.recipientUser.email, audience: "staff" };
   const c = row.recipientContact;
   if (!c) return { ok: false, reason: "no recipient" };
   if (!c.active || c.portalAccount?.status !== "ACTIVE") return { ok: false, reason: "no login" };
+  if (!c.portalAccount.jobEmails) return { ok: false, reason: "emails off" };
   if (!opts.contractorHasAccess) return { ok: false, reason: "no access" };
   return { ok: true, to: c.portalAccount.email, audience: "contractor" };
 }

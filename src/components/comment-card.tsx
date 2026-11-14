@@ -375,7 +375,9 @@ export function CommentEditor({
  * most two per timeline. The fixed words stay under 35 characters, and a
  * long name truncates before the line could wrap ("Seen by Maximilian… · Tue").
  *
- *   no-login  "Zack has no login yet"
+ *   no-login       "Zack has no login yet"
+ *   not-signed-in  "Zack hasn't signed in yet" (task emails wait for a first sign-in)
+ *   emails-off     "Zack's emails are off" (the Job emails switch on their Portal access card)
  *   queued    "Zack gets an email", "Connor and Pieter get an email"
  *   emailed   "Emailed to Zack"
  *   seen      "Seen by Zack · 2:14 PM" (the clock time today, then the
@@ -387,7 +389,7 @@ export function DeliveryLine({
   at,
   className,
 }: {
-  state: "no-login" | "queued" | "emailed" | "seen";
+  state: "no-login" | "not-signed-in" | "emails-off" | "queued" | "emailed" | "seen";
   /** First names: one person, or the partners an update emails ("Connor and Pieter"). */
   to: string | readonly string[];
   /** When they last opened the record, for `seen`. */
@@ -401,6 +403,10 @@ export function DeliveryLine({
     switch (state) {
       case "no-login":
         return ["", " has no login yet"];
+      case "not-signed-in":
+        return ["", " hasn't signed in yet"];
+      case "emails-off":
+        return ["", "'s emails are off"];
       case "queued":
         return ["", names.length > 1 ? " get an email" : " gets an email"];
       case "emailed":

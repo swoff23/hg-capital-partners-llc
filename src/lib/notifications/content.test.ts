@@ -303,19 +303,23 @@ test("recipients: staff, a contractor with an active login and access, or skippe
     to: "c@hg.com",
     audience: "staff",
   });
-  const contact = (active: boolean, status: string | null) => ({
+  const contact = (active: boolean, status: string | null, jobEmails = true) => ({
     recipientUser: null,
-    recipientContact: { active, portalAccount: status ? { email: "zack@x.com", status } : null },
+    recipientContact: { active, portalAccount: status ? { email: "zack@x.com", status, jobEmails } : null },
   });
   assert.deepEqual(deliveryFor(contact(true, "ACTIVE"), access), { ok: true, to: "zack@x.com", audience: "contractor" });
   assert.deepEqual(deliveryFor(contact(true, null), access), { ok: false, reason: "no login" });
   assert.deepEqual(deliveryFor(contact(true, "DISABLED"), access), { ok: false, reason: "no login" });
   assert.deepEqual(deliveryFor(contact(false, "ACTIVE"), access), { ok: false, reason: "no login" });
   assert.deepEqual(deliveryFor({ recipientUser: null, recipientContact: null }, access), { ok: false, reason: "no recipient" });
+  // Job emails switched off after the line was queued: the send run drops it (docs/specs/contractor-email-switch.md).
+  assert.deepEqual(deliveryFor(contact(true, "ACTIVE", false), access), { ok: false, reason: "emails off" });
+  // A login that can't sign in reads "no login" first, whatever its switch says.
+  assert.deepEqual(deliveryFor(contact(true, "DISABLED", false), access), { ok: false, reason: "no login" });
 });
 
 test("recipients: a contractor taken off the job before the send gets nothing (D12)", () => {
-  const zack = { recipientUser: null, recipientContact: { active: true, portalAccount: { email: "zack@x.com", status: "ACTIVE" } } };
+  const zack = { recipientUser: null, recipientContact: { active: true, portalAccount: { email: "zack@x.com", status: "ACTIVE", jobEmails: true } } };
   assert.deepEqual(deliveryFor(zack, { contractorHasAccess: false }), { ok: false, reason: "no access" });
   // Staff rows don't depend on contractor access.
   assert.deepEqual(deliveryFor({ recipientUser: { email: "c@hg.com" }, recipientContact: null }, { contractorHasAccess: false }), {

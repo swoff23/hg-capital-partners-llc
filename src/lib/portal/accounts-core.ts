@@ -163,6 +163,30 @@ export async function enablePortalAccountIn(tx: Prisma.TransactionClient, accoun
 }
 
 /**
+ * The write of setPortalJobEmails, inside the caller's transaction: the
+ * "Job emails" switch on the Portal access card
+ * (docs/specs/contractor-email-switch.md). Answers whether anything changed.
+ * A switch already where it was asked to go writes nothing and logs nothing,
+ * so two partners turning it off at once leave one audit row.
+ *
+ * Logged like the login's other changes, as an ACCOUNT_DISABLED row with an
+ * `action` (see changePortalEmail in accounts.ts on why that kind).
+ */
+export async function setJobEmailsIn(tx: Prisma.TransactionClient, accountId: string, on: boolean, byUser: Staff): Promise<boolean> {
+  const account = await tx.portalAccount.findUnique({ where: { id: accountId }, select: { id: true, contactId: true } });
+  if (!account) throw new PortalAccountError("That login no longer exists.");
+  const { count } = await tx.portalAccount.updateMany({ where: { id: accountId, jobEmails: !on }, data: { jobEmails: on } });
+  if (count === 0) return false;
+  await logSecurityEvent(tx, {
+    kind: "ACCOUNT_DISABLED",
+    userId: byUser.id,
+    contactId: account.contactId,
+    data: { action: on ? "job-emails-on" : "job-emails-off" },
+  });
+  return true;
+}
+
+/**
  * The checks and writes of changePortalEmail, inside the caller's
  * transaction (see accounts.ts for what it promises). `email` is already
  * normalized and shaped like an email.

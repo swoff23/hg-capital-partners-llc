@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
+import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { hasPinnedDay, isUntouchedCopy, leapDayRule, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
@@ -349,10 +350,16 @@ const emailDay = (d: Date | Ymd, now: Date) => fmtDay(d, { weekday: true, year: 
 const assignedSummary = (t: Pick<Task, "title" | "status" | "scheduledFor">, now: Date) =>
   t.status === "SCHEDULED" && t.scheduledFor ? `assigned you "${t.title}" for ${emailDay(t.scheduledFor, now)}` : `assigned you "${t.title}"`;
 
-async function contractorHasLogin(tx: Tx, contactId: string | null): Promise<boolean> {
+/**
+ * Whether a staff change to this contractor's job queues them an email: an
+ * active login, a first sign-in behind them, and their "Job emails" switch on
+ * (src/lib/portal/job-emails.ts). The send run checks the switch again, so a
+ * line still waiting when it goes off is dropped.
+ */
+async function contractorGetsEmail(tx: Tx, contactId: string | null): Promise<boolean> {
   if (!contactId) return false;
-  const acct = await tx.portalAccount.findUnique({ where: { contactId }, select: { status: true } });
-  return acct?.status === "ACTIVE";
+  const acct = await tx.portalAccount.findUnique({ where: { contactId }, select: JOB_EMAIL_SELECT });
+  return jobEmailState(acct) === "on";
 }
 
 /**
@@ -401,8 +408,8 @@ async function notify(
   now: Date,
   refs: ItemRefs = {},
 ): Promise<"contractor" | "staff" | null> {
-  const hasLogin = await contractorHasLogin(tx, task.assigneeContactId);
-  const audience = notifyAudience(kindOf(p), change, { contractorHasLogin: hasLogin });
+  const getsEmail = await contractorGetsEmail(tx, task.assigneeContactId);
+  const audience = notifyAudience(kindOf(p), change, { contractorGetsEmail: getsEmail });
   if (!audience) return null;
   const item: OutboxItem = { kind: change.kind, actorLabel: p.label, summary, at: now.toISOString(), ...refs };
   if (audience === "contractor" && task.assigneeContactId) {

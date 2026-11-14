@@ -38,8 +38,12 @@ export function Composer({
   taskTitle: string;
   /** The signed-in partner, whose draft this box keeps. */
   viewerId: string;
-  /** The assigned contractor, if any: their first name, their contact id (for "Set up login") and whether they have a portal login. */
-  contractor: { id: string; first: string; hasLogin: boolean } | null;
+  /**
+   * The assigned contractor, if any: their first name, their contact id (for "Set up login"), whether they have a
+   * portal login, and whether a reply emails them (docs/specs/contractor-email-switch.md: not before their first
+   * sign-in, and not with their Job emails switch off).
+   */
+  contractor: { id: string; first: string; hasLogin: boolean; getsEmail: boolean } | null;
   /** The partners' first names: who sees an Internal note. */
   staff: readonly string[];
   /** My uploads on this task not yet sent with a message, oldest first. */
@@ -77,7 +81,8 @@ export function Composer({
       pin="phone"
       audience={{
         shared: reachable ? (
-          <AudienceText name={reachable.first} words="sees this and gets an email" />
+          // The email is promised only when one goes; the line under the sent comment says why when it doesn't.
+          <AudienceText name={reachable.first} words={reachable.getsEmail ? "sees this and gets an email" : "sees this"} />
         ) : contractor ? (
           <span className="flex min-w-0 items-baseline gap-2">
             <AudienceText name={contractor.first} words="needs a login to see this" />

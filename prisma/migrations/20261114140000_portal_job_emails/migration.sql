@@ -1,0 +1,16 @@
+-- "Job emails" switch per contractor login (docs/specs/contractor-email-switch.md,
+-- approved by Connor on Nov 14).
+--
+-- jobEmails on PortalAccount, default true: off stops every task email to that
+-- contractor. The other half of the rule needs no column: a contractor gets no
+-- task email until they have signed in once, which lastSignInAt already says.
+--
+-- Additive only: one boolean with a constant default. Every login that exists
+-- starts on, which is what it had before. Nothing is altered, dropped, renamed
+-- or tightened, so the code in production runs on it unchanged.
+--
+-- It must be in place before the code that ships with it serves a request:
+-- that code reads the column whenever a task change is queued or sent. It
+-- reaches production through `prisma migrate deploy` in the production build's
+-- prebuild (scripts/prebuild.mjs), which runs before `next build`.
+ALTER TABLE "PortalAccount" ADD COLUMN "jobEmails" BOOLEAN NOT NULL DEFAULT true;

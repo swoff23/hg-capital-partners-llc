@@ -14,6 +14,7 @@ import {
   expireResetTokens,
   logSecurityEvent,
   revokePortalSessions,
+  setJobEmailsIn,
   type CreatedPortalAccount,
   type Db,
   type Staff,
@@ -156,6 +157,19 @@ export async function disablePortalAccount(accountId: string, byUser: Staff): Pr
  */
 export async function enablePortalAccount(accountId: string, byUser: Staff): Promise<void> {
   await prisma.$transaction((tx) => enablePortalAccountIn(tx, accountId, byUser));
+}
+
+/**
+ * Turn a contractor's task emails on or off: the "Job emails" switch on the
+ * Portal access card (docs/specs/contractor-email-switch.md). Off stops every
+ * task email to them, and the send run drops a line still waiting; on starts
+ * with the next change, with nothing sent to catch them up. Either way they
+ * get none before their first sign-in (job-emails.ts), a reset link they ask
+ * for still sends, and the partners still hear about what they do. Their
+ * password and signed-in devices are untouched.
+ */
+export async function setPortalJobEmails(accountId: string, on: boolean, byUser: Staff): Promise<void> {
+  await prisma.$transaction((tx) => setJobEmailsIn(tx, accountId, on, byUser));
 }
 
 /** Sign the contractor out on every device. Staff pass themselves as `byUser`. */

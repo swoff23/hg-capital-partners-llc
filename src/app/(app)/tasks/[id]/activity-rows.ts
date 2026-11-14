@@ -3,6 +3,7 @@ import type { FileLink } from "@/components/files-list";
 import type { MediaItem } from "@/components/media-grid";
 import type { Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
+import type { JobEmailState } from "@/lib/portal/job-emails";
 import {
   buildActivity,
   easternDay,
@@ -112,7 +113,8 @@ export interface ShapeInput {
   contractor: {
     id: string;
     first: string;
-    hasLogin: boolean;
+    /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts). */
+    emails: JobEmailState;
     /** Their access to the job is unrevoked. */
     accessActive: boolean;
     /** When they last opened the job, from their own read state. */
@@ -200,7 +202,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
   if (contractor && target) {
     const line = deliveryLine({
       to: contractor.first,
-      hasLogin: contractor.hasLogin,
+      emails: contractor.emails,
       email: input.emailStates.get(target.eventId) ?? null,
       seenAt: contractor.seenAt,
       eventAt: target.at,

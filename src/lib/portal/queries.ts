@@ -7,6 +7,7 @@ import { partnersEmailState } from "@/lib/tasks/delivery";
 import { MARK_DONE_WINDOW_MS, finishPhotoIds, orderMedia } from "@/lib/tasks/media";
 import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
 import { lockboxMasker, readLockboxCode, type BodyPart } from "./access-code";
+import { JOB_EMAIL_SELECT, jobEmailState } from "./job-emails";
 import { NO_NOTICE, dateChange, dateChangeText, noticeCount, sendBackStands, type DateChange, type DateEvent, type JobNotice } from "./job-notice";
 import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, type JobCard, type JobsTab } from "./job-view";
 import type { PortalPrincipal } from "./session";
@@ -346,6 +347,8 @@ export interface JobDetail {
   lockbox: string | null;
   /** First names of the partners a Mark done goes to, for the payoff line. */
   staffNames: string[];
+  /** HG's changes to their jobs email this contractor (job-emails.ts), so the payoff can say "You'll get an email". */
+  getsEmail: boolean;
   /** Photos Mark done asks for, from the job's playbook (TaskTemplate.finishPhotosRequired); null or 0 means optional. */
   finishPhotosRequired: number | null;
   /** When this contractor last sent the job to Review (ISO), while it is in Review: "Add photo/video" hides an hour later. Else null. */
@@ -452,7 +455,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
   // Where they last looked (the New divider and the notice) and the filter for codes in imported comments.
   const [since, mask] = await Promise.all([lastLooked(p, taskId), lockboxMasker(prisma, task.propertyId)]);
 
-  const [media, updates, lockbox, staffNames, marked, notice] = await Promise.all([
+  const [media, updates, lockbox, staffNames, marked, notice, account] = await Promise.all([
     prisma.taskAttachment.findMany({
       where: { taskId, ...visibleFile(p.contactId, ["IMAGE", "VIDEO"]) },
       select: { ...mediaSelect, eventId: true },
@@ -472,6 +475,8 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
       : null,
     // Only an open job has anything to tell: a closed one is read-only history.
     active ? jobNotice(p, task, since) : NO_NOTICE,
+    // Whether HG's changes email them, for the payoff's "what happens next".
+    prisma.portalAccount.findUnique({ where: { id: p.accountId }, select: JOB_EMAIL_SELECT }),
   ]);
   const atFinish = await finishSet(taskId, media);
   const delivery = await deliveryFor(taskId, updates);
@@ -496,6 +501,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     notice,
     lockbox,
     staffNames,
+    getsEmail: jobEmailState(account) === "on",
     finishPhotosRequired: task.taskTemplate?.finishPhotosRequired ?? null,
     markedDoneAt: marked && marked.actorContactId === p.contactId ? marked.createdAt.toISOString() : null,
   };

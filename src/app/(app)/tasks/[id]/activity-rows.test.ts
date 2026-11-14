@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { TaskEventKind } from "@prisma/client";
+import type { JobEmailState } from "@/lib/portal/job-emails";
 import type { ActivityEvent } from "@/lib/tasks/activity";
 import type { EmailState } from "@/lib/tasks/delivery";
 import { shapeActivity, type ActivityRow, type ShapeInput } from "./activity-rows";
@@ -27,7 +28,7 @@ function ev(kind: TaskEventKind, data: Record<string, unknown> = {}, over: Parti
 const ZACK = { actorLabel: "Zack (Outlaw)", actorUserId: null, actorContactId: "c-zack", source: "PORTAL", visibility: "SHARED" } as const;
 const SHARED_TO_ZACK = { visibility: "SHARED", audienceContactId: "c-zack" } as const;
 
-const zack = { id: "c-zack", first: "Zack", hasLogin: true, accessActive: true, seenAt: null as Date | null };
+const zack = { id: "c-zack", first: "Zack", emails: "on" as JobEmailState, accessActive: true, seenAt: null as Date | null };
 function shape(events: ActivityEvent[], over: Partial<ShapeInput> = {}): ActivityRow[] {
   return shapeActivity({
     events,
@@ -64,7 +65,10 @@ test("Seen wins once he opened the job after the entry", () => {
 
 test("without a login the line says so; without live access, or any email on record, it says nothing", () => {
   const c = ev("COMMENT", {}, { ...SHARED_TO_ZACK, body: "Hi" });
-  assert.deepEqual(shape([c], { contractor: { ...zack, hasLogin: false } })[0].delivery, { state: "no-login", to: "Zack" });
+  assert.deepEqual(shape([c], { contractor: { ...zack, emails: "no-login" } })[0].delivery, { state: "no-login", to: "Zack" });
+  // A login that never signed in, and one with Job emails off: the line says which (docs/specs/contractor-email-switch.md).
+  assert.deepEqual(shape([c], { contractor: { ...zack, emails: "not-signed-in" } })[0].delivery, { state: "not-signed-in", to: "Zack" });
+  assert.deepEqual(shape([c], { contractor: { ...zack, emails: "off" } })[0].delivery, { state: "emails-off", to: "Zack" });
   assert.equal(shape([c], { contractor: { ...zack, accessActive: false } })[0].delivery, null);
   assert.equal(shape([c])[0].delivery, null, "a comment posted before the outbox named its events");
   assert.equal(shape([c], { contractor: null })[0].delivery, null);
@@ -75,7 +79,7 @@ test("never a line under a reply written to someone else, or an Internal note, o
   const internal = ev("COMMENT", {}, { visibility: "INTERNAL", body: "Between us" });
   const theirs = ev("COMMENT", {}, { ...ZACK, body: "On my way" });
   // Jose has the job now: a reply written to Zack is not his, so nothing says "Jose gets an email" under it.
-  const jose = { id: "c-jose", first: "Jose", hasLogin: true, accessActive: true, seenAt: null };
+  const jose = { id: "c-jose", first: "Jose", emails: "on" as JobEmailState, accessActive: true, seenAt: null };
   assert.deepEqual(delivery(shape([toZack], { contractor: jose, emailStates: new Map<string, EmailState>([[toZack.id, "emailed"]]) })), [null]);
   // Zack's job: the newest entry he can see is the earlier staff one; the internal note and his own comment are skipped.
   const rows = shape([toZack, internal, theirs], { emailStates: new Map<string, EmailState>([[toZack.id, "queued"]]) });

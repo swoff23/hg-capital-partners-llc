@@ -467,6 +467,16 @@ export function undoWindowOpen(postedAt: Date | string, now: Date): boolean {
   return now.getTime() - at <= POST_UNDO_MS + POST_UNDO_GRACE_MS;
 }
 
+/**
+ * The line on the Mark done payoff: who it went to and what happens next. An
+ * email is promised only to a contractor who gets them
+ * (src/lib/portal/job-emails.ts); with their Job emails switch off, the next
+ * word from HG is here in the portal.
+ */
+export function payoffLine(to: string, getsEmail: boolean): string {
+  return getsEmail ? `Sent to ${to}. You'll get an email if anything else is needed.` : `Sent to ${to}. Check back here if anything else is needed.`;
+}
+
 /** What the toast says after a batch posts: "3 photos posted", "1 video posted", "2 files posted". */
 export function postedText(kinds: readonly (FileKind | null)[]): string {
   const n = kinds.length;
