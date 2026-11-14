@@ -63,3 +63,11 @@ export async function setChecklistItemAction(itemId: string, done: boolean): Pro
     await jobs.setJobChecklistItem(id.parse(itemId), z.boolean().parse(done));
   });
 }
+
+/** "Text to my crew": the text to send, with a link of its own (jobs.ts crewTextFor). */
+export async function crewTextAction(taskId: string): Promise<ActionResult<string>> {
+  return withResult("portal:crewText", async () => {
+    await requirePortalPrincipal();
+    return jobs.crewTextFor(id.parse(taskId));
+  });
+}

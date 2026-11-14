@@ -430,6 +430,8 @@ async function finishSet(taskId: string, media: readonly { id: string; createdAt
 
 /** The job, or null when this contact can't open it (no access, revoked, or closed before PORTAL_HISTORY_FROM). */
 export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDetail | null> {
+  // A link session opens its one job (session.ts onlyTaskId).
+  if (p.onlyTaskId && p.onlyTaskId !== taskId) return null;
   const task = await prisma.task.findFirst({
     where: { id: taskId, ...accessibleTo(p.contactId) },
     select: {

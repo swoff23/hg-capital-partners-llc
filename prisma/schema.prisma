@@ -55,6 +55,8 @@ model User {
   archivedDeals               Deal[]               @relation("DealArchivedBy")
   archivedProperties          Property[]           @relation("PropertyArchivedBy")
   archivedContacts            Contact[]            @relation("ContactArchivedBy")
+  // A partner's job-email links, which only show that email's photos.
+  jobLinks                    JobLink[]            @relation("JobLinkUser")
 
   qboConnections QuickbooksConnection[]
 }
@@ -238,7 +240,7 @@ model Property {
 // v1: contractors only. Bank/routing numbers are NEVER imported.
 // ---------------------------------------------------------------------------
 model Contact {
-  id             String  @id @default(cuid())
+  id             String         @id @default(cuid())
   fullName       String
   company        String?
   // The old free text ("Plumbing / HVAC"), kept as a backup after the move to
@@ -246,7 +248,7 @@ model Contact {
   // later release drops it.
   trades         String?
   tradeLinks     ContactTrade[]
-  tenantFixes    Boolean @default(false)
+  tenantFixes    Boolean        @default(false)
   phone          String?
   email          String?
   mailingAddress String?
@@ -254,10 +256,10 @@ model Contact {
   availability   String?
   w9Url          String?
   coiUrl         String?
-  comments       String? @db.Text
+  comments       String?        @db.Text
   // The portal's sign-in gate and the pickers read it (an inactive contractor still lists and
   // searches, ranked last). Archive is archivedAt below, not this.
-  active         Boolean @default(true)
+  active         Boolean        @default(true)
 
   // Archived, as on Deal: out of the directory, search and the assignee pickers. Refused while
   // they have open jobs or a portal login (src/lib/archive.ts). The portal doesn't read it.
@@ -273,6 +275,7 @@ model Contact {
   // A contractor's portal login and what it can see (docs/asana-migration-plan.md §5.1).
   portalAccount       PortalAccount?
   taskAccess          TaskAccess[]
+  jobLinks            JobLink[]
   assignedTasks       Task[]               @relation("TaskAssigneeContact")
   completedTasks      Task[]               @relation("TaskCompletedByContact")
   taskEvents          TaskEvent[]
@@ -387,6 +390,8 @@ model Task {
   events        TaskEvent[]
   checklist     TaskChecklistItem[]
   access        TaskAccess[]
+  jobLinks      JobLink[]
+  linkSessions  PortalSession[]      @relation("PortalSessionOnlyTask")
   readStates    TaskReadState[]
   notifications NotificationOutbox[]
 
@@ -490,34 +495,34 @@ enum EventSource {
 // System kinds are always INTERNAL; the portal shows contractors a fixed
 // allowlist (src/lib/portal/queries.ts).
 model TaskEvent {
-  id             String        @id @default(cuid())
-  task           Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  taskId         String
-  kind           TaskEventKind
-  visibility     Visibility    @default(INTERNAL)
-  actorUser      User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
-  actorUserId    String?
-  actorContact   Contact?      @relation(fields: [actorContactId], references: [id], onDelete: SetNull)
-  actorContactId String?
-  actorLabel     String // kept even if the person is later deleted: "Connor Swofford", "Zack (Outlaw Carpentry)", "Property reminder"
+  id                String        @id @default(cuid())
+  task              Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId            String
+  kind              TaskEventKind
+  visibility        Visibility    @default(INTERNAL)
+  actorUser         User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorUserId       String?
+  actorContact      Contact?      @relation(fields: [actorContactId], references: [id], onDelete: SetNull)
+  actorContactId    String?
+  actorLabel        String // kept even if the person is later deleted: "Connor Swofford", "Zack (Outlaw Carpentry)", "Property reminder"
   // On a Shared staff or system event: the contractor assigned when it was
   // written, so a reply to Zack never reaches whoever gets the job next
   // (src/lib/portal/queries.ts). Null when no contractor was assigned, and on
   // contractor and imported rows. No foreign key, as on TaskAttachment.
   audienceContactId String?
-  body           String?       @db.Text
-  data           Json          @default("{}") // from/to values, imported HTML
-  source         EventSource   @default(APP)
-  asanaStoryGid  String?       @unique
-  editedAt       DateTime?
+  body              String?       @db.Text
+  data              Json          @default("{}") // from/to values, imported HTML
+  source            EventSource   @default(APP)
+  asanaStoryGid     String?       @unique
+  editedAt          DateTime?
   // A soft delete. On a COMMENT, its author deleted it (or a contractor took
   // back a photo post, `data.batch`). On any other kind it means an undone
   // approval: only core.ts undoApproval soft-deletes a non-COMMENT event, so
   // "STATUS with deletedAt set" reads as "approval undone". markedDoneAt and
   // lastReview read to=REVIEW lines with no deletedAt filter, which holds only
   // while no Mark done can be undone.
-  deletedAt      DateTime?
-  createdAt      DateTime      @default(now())
+  deletedAt         DateTime?
+  createdAt         DateTime      @default(now())
 
   attachments TaskAttachment[]
 
@@ -657,8 +662,44 @@ model PortalSession {
   expiresAt  DateTime
   userAgent  String?
   revokedAt  DateTime?
+  // Set when an email's job link started the session: it opens this one job and nothing else
+  // (docs/specs/contractor-job-emails.md, section 3). Null for a session from signing in.
+  onlyTask   Task?         @relation("PortalSessionOnlyTask", fields: [onlyTaskId], references: [id], onDelete: Cascade)
+  onlyTaskId String?
+  jobLink    JobLink?      @relation(fields: [jobLinkId], references: [id], onDelete: SetNull)
+  jobLinkId  String?
 
   @@index([accountId])
+}
+
+/// A link in a job email (docs/specs/contractor-job-emails.md, section 3). The token is only in the email; this keeps
+/// its SHA-256. A contractor's EMAIL or CREW link opens the job as them; a partner's STAFF link only shows the
+/// email's photos. Revoked by Remove access and Sign out everywhere; a link for a job they've lost, or that closed,
+/// stops on its own.
+model JobLink {
+  id         String      @id @default(cuid())
+  tokenHash  String      @unique
+  kind       JobLinkKind
+  task       Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId     String
+  contact    Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId  String?
+  user       User?       @relation("JobLinkUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId     String?
+  createdAt  DateTime    @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  sessions PortalSession[]
+
+  @@index([taskId])
+  @@index([contactId])
+}
+
+enum JobLinkKind {
+  EMAIL // a contractor's job email
+  CREW // the contractor's "Text to my crew"
+  STAFF // a partner's job email: photos only
 }
 
 model PasswordResetToken {

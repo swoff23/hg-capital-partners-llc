@@ -227,13 +227,13 @@ export async function recordTaskAttachment(
  */
 export async function contractorUploadRefusal(
   taskId: string,
-  contactId: string,
+  who: core.ContractorWho,
   opts: { atMint?: boolean; queuedAt?: string | null } = {},
   db: core.Tx = prisma,
   now = new Date(),
 ): Promise<string | null> {
   try {
-    await core.assertContractorAccess(db, taskId, contactId);
+    await core.assertContractorAccess(db, taskId, who);
   } catch (err) {
     if (err instanceof core.TaskRuleError) return err.message;
     throw err;
@@ -261,7 +261,7 @@ export async function contractorUploadRefusal(
         )?.createdAt ?? null)
       : null;
   // Done and Canceled say the job closed; a job still in Review says it's too late, since it isn't closed.
-  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt, startedAt) ? null : lateRefusal(task.status);
+  return acceptsContractorUpload(task, lastReview, who.contactId, now, opts.queuedAt, startedAt) ? null : lateRefusal(task.status);
 }
 
 /**
@@ -285,13 +285,13 @@ export async function recordPortalAttachment(
   const att = await discardingOnRefusal(taskId, input, auth, async () => {
     // Access first, as every portal step checks it: a contractor taken off the job learns nothing of it, not even
     // whether an upload of theirs is still on it.
-    await core.assertContractorAccess(prisma, taskId, portal.contactId);
+    await core.assertContractorAccess(prisma, taskId, portal);
     // A Retry of a record that committed, whose answer never reached the phone, gets its row back even once the job
     // stopped taking files: the file is on the job already, so the tile finishes instead of going up again as a
     // second copy. The batch step that posts it checks access again (portal/job-batch.ts).
     const mine = await core.findOwnUpload(prisma, taskId, input.pathname, p);
     if (mine) return mine;
-    const early = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt });
+    const early = await contractorUploadRefusal(taskId, portal, { queuedAt });
     if (early) throw new core.TaskRuleError(early);
     // A Retry of a record that committed gets the same row back, so the tile finishes and no second copy is made.
     return recordOnce(taskId, input, p, async () => {
@@ -300,7 +300,7 @@ export async function recordPortalAttachment(
         // The job's lock first, then its status and window are read: a staff Approve or Cancel that lands after the
         // early check above is waited for and then seen, so no file records on a job that has just closed.
         await core.lockTask(tx, taskId);
-        const refusal = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt }, tx);
+        const refusal = await contractorUploadRefusal(taskId, portal, { queuedAt }, tx);
         if (refusal) throw new core.TaskRuleError(refusal);
         return core.recordAttachment(tx, taskId, meta, p, { visibility: "SHARED", standalone: opts.standalone });
       });

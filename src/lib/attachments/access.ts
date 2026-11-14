@@ -17,6 +17,16 @@ export interface SeeableFile {
   audienceContactId: string | null;
 }
 
+/** The columns contractorMaySee reads, as a Prisma select. */
+export const SEEABLE_FILE = {
+  kind: true,
+  visibility: true,
+  deletedAt: true,
+  uploadedByContactId: true,
+  asanaGid: true,
+  audienceContactId: true,
+} as const satisfies Record<keyof SeeableFile, true>;
+
 /**
  * A contractor sees a file only when it's Shared, not removed, has bytes here
  * (not a LINK), and is theirs, imported from Asana, or a staff upload

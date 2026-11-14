@@ -39,6 +39,7 @@ export function Section({
   children,
   as: Heading = "h2",
   className,
+  id,
 }: {
   title: React.ReactNode;
   /** Buttons or links at the heading's right end. */
@@ -47,10 +48,12 @@ export function Section({
   /** The heading level; h2 under the page's h1. */
   as?: "h2" | "h3";
   className?: string;
+  /** An anchor a link can open at (`#lockbox`); the section then stops clear of the sticky app bar. */
+  id?: string;
 }) {
   const headingId = React.useId();
   return (
-    <section aria-labelledby={headingId} className={className}>
+    <section id={id} aria-labelledby={headingId} className={cn(id && "scroll-mt-[calc(var(--app-bar-h)+1rem)]", className)}>
       <div className="flex min-h-[2.5625rem] items-center justify-between gap-3 border-b border-line pb-2">
         <Heading id={headingId} className="min-w-0 text-section text-fg-1">
           {title}

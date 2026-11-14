@@ -27,3 +27,14 @@ test("EMAIL_REPLY_TO set: replies go there", () => {
 test("html is left out when there is none", () => {
   assert.equal("html" in resendBody({ from: "a@b.c", replyTo: null }, { to: "x@y.z", subject: "s", text: "t" }), false);
 });
+
+test("a bare EMAIL_FROM gets the company's name; one that names itself is kept", () => {
+  assert.equal(resendBody({ from: "jobs@mail.hg.com", replyTo: null }, { to: "x@y.z", subject: "s", text: "t" }).from, "HG Capital Partners <jobs@mail.hg.com>");
+  assert.equal(resendBody({ from: "HG <jobs@mail.hg.com>", replyTo: null }, { to: "x@y.z", subject: "s", text: "t" }).from, "HG <jobs@mail.hg.com>");
+});
+
+test("a thread key points every email for a job at one parent on the sending domain", () => {
+  const body = resendBody({ from: "HG <jobs@mail.hg.com>", replyTo: null }, { to: "x@y.z", subject: "s", text: "t", threadKey: "job-t1-2026-10-30" });
+  assert.deepEqual(body.headers, { "In-Reply-To": "<job-t1-2026-10-30@mail.hg.com>", References: "<job-t1-2026-10-30@mail.hg.com>" });
+  assert.equal("headers" in resendBody({ from: "jobs@mail.hg.com", replyTo: null }, { to: "x@y.z", subject: "s", text: "t" }), false);
+});

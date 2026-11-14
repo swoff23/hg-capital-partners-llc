@@ -1,11 +1,15 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { renderPlainEmail } from "@/lib/email/render";
+import { renderJobEmail } from "@/lib/email/render";
+import { todayYmdEastern, toYmd } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
+import { SEEABLE_FILE, contractorMaySee } from "@/lib/attachments/access";
+import { CODE_MASK, lockboxMasker, readLockboxCode } from "@/lib/portal/access-code";
+import { mintJobLink } from "@/lib/portal/job-links";
 import { staffFirstNames } from "@/lib/portal/queries";
-import { isActiveStatus } from "@/lib/task-scope";
+import { targetDate } from "@/lib/tasks/rules";
 import {
   DAILY_EMAIL_CAP,
   deliveryFor,
@@ -120,9 +124,9 @@ async function liveItems(
   taskId: string,
   stored: OutboxItem[],
   row: { audience: "staff" | "contractor"; recipientContactId: string | null },
-): Promise<OutboxItem[]> {
+): Promise<{ items: OutboxItem[]; photosByEvent: Map<string, string[]> }> {
   const ids = [...new Set(stored.flatMap((i) => [i.eventId, i.noteEventId].filter((x): x is string => !!x)))];
-  if (ids.length === 0) return stored;
+  if (ids.length === 0) return { items: stored, photosByEvent: new Map() };
   const found = await prisma.taskEvent.findMany({
     where: { id: { in: ids }, taskId },
     select: {
@@ -131,7 +135,7 @@ async function liveItems(
       deletedAt: true,
       body: true,
       audienceContactId: true,
-      attachments: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, select: { kind: true } },
+      attachments: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, select: { ...SEEABLE_FILE, id: true, thumbPathname: true } },
     },
   });
   const events = new Map<string, EventSnapshot>(
@@ -147,7 +151,27 @@ async function liveItems(
       },
     ]),
   );
-  return reconcileItems(stored, events, row);
+  // The photos each event carries that this recipient may open, for What's new's thumbnails (thumbnail made only).
+  const photosByEvent = new Map(
+    found.map((e) => [
+      e.id,
+      e.attachments
+        .filter((a) => a.kind === "IMAGE" && a.thumbPathname && (row.audience === "staff" || (row.recipientContactId && contractorMaySee(a, row.recipientContactId))))
+        .map((a) => a.id),
+    ]),
+  );
+  return { items: reconcileItems(stored, events, row), photosByEvent };
+}
+
+/** HG's photos on a job the contractor may open, newest first: the job section's thumbnails. */
+async function hgPhotoIds(taskId: string, contactId: string, leaveOut: ReadonlySet<string>): Promise<string[]> {
+  const rows = await prisma.taskAttachment.findMany({
+    where: { taskId, kind: "IMAGE", deletedAt: null, uploadedByContactId: null, thumbPathname: { not: null } },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: { ...SEEABLE_FILE, id: true },
+  });
+  return rows.filter((a) => !leaveOut.has(a.id) && contractorMaySee(a, contactId)).map((a) => a.id);
 }
 
 /**
@@ -171,13 +195,21 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       id: true,
       taskId: true,
       recipientContactId: true,
+      recipientUserId: true,
       task: {
         select: {
           title: true,
           unitLabel: true,
-          // Read at send time: the reply line goes only on a job still open.
+          // Read at send time: the buttons follow the job's next step, and the reply line goes only on a job still open.
           status: true,
-          property: { select: { address: true } },
+          // The job as it stands when the email goes (docs/specs/contractor-job-emails.md 2.2).
+          dueDate: true,
+          scheduledFor: true,
+          description: true,
+          propertyId: true,
+          checklist: { select: { title: true, done: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
+          assigneeContact: { select: { fullName: true } },
+          property: { select: { address: true, photoUrl: true } },
           // Who can open the job right now (D12), checked again at send time.
           access: { where: { revokedAt: null }, select: { contactId: true } },
         },
@@ -214,7 +246,10 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
 
     const claimed = await claim(row.id, now);
     if (!claimed) continue;
-    const items = await liveItems(row.taskId, parseItems(claimed.items), { audience: delivery.audience, recipientContactId: row.recipientContactId });
+    const { items, photosByEvent } = await liveItems(row.taskId, parseItems(claimed.items), {
+      audience: delivery.audience,
+      recipientContactId: row.recipientContactId,
+    });
     if (items.length === 0) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
       result.skipped++;
@@ -222,30 +257,52 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     }
 
     if (delivery.audience === "contractor") staffNames ??= await staffFirstNames();
+    const task = row.task;
+    // The notes go to the contractor with this property's lockbox codes masked: the code itself stays behind the job's
+    // own Lockbox section, where each view is logged (D21), not in an inbox.
+    const notes =
+      delivery.audience === "contractor" && task.description?.trim()
+        ? (await lockboxMasker(prisma, task.propertyId))(task.description).map((part) => ("text" in part ? part.text : CODE_MASK)).join("")
+        : null;
+    // The bundle's photos, in the order its lines are.
+    const newPhotoIds = [...new Set(items.flatMap((i) => (i.eventId ? (photosByEvent.get(i.eventId) ?? []) : [])))];
+    const contractorId = delivery.audience === "contractor" ? row.recipientContactId : null;
+    const jobPhotoIds = contractorId ? await hgPhotoIds(row.taskId, contractorId, new Set(newPhotoIds)) : [];
+    // The email's own link (job-links.ts): a contractor's opens the job as them; a partner's only shows its photos, so
+    // it's made only when there are some.
+    const linkToken = contractorId
+      ? await mintJobLink(prisma, { taskId: row.taskId, kind: "EMAIL", contactId: contractorId })
+      : row.recipientUserId && newPhotoIds.length
+        ? await mintJobLink(prisma, { taskId: row.taskId, kind: "STAFF", userId: row.recipientUserId })
+        : null;
+    const hasAccess = !!contractorId && !!(await readLockboxCode(prisma, task.propertyId, task.unitLabel));
     const email = taskEmail({
       items,
-      title: row.task.title,
-      address: row.task.property?.address ?? null,
-      unitLabel: row.task.unitLabel,
+      linkToken,
+      hasAccess,
+      newPhotoIds,
+      jobPhotoIds,
+      title: task.title,
+      address: task.property?.address ?? null,
+      unitLabel: task.unitLabel,
       audience: delivery.audience,
       appUrl,
       taskId: row.taskId,
+      status: task.status,
+      due: toYmd(targetDate(task)),
+      today: todayYmdEastern(now),
+      notes,
+      checklist: task.checklist,
+      photoUrl: task.property?.photoUrl ?? null,
+      contractorName: task.assigneeContact?.fullName ?? null,
       recipientName: row.recipientContact?.fullName,
       staffNames: staffNames ?? [],
-      jobOpen: isActiveStatus(row.task.status),
     });
-    const rendered = renderPlainEmail({
-      line: email.line,
-      items: email.items,
-      closing: email.closing,
-      buttonLabel: email.buttonLabel,
-      buttonUrl: email.buttonUrl,
-      footnote: email.footnote,
-    });
+    const rendered = renderJobEmail(email);
     const wait = lastSendAt + SEND_GAP_MS - Date.now();
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     lastSendAt = Date.now();
-    const res = await sendEmail({ to: delivery.to, subject: email.subject, text: rendered.text, html: rendered.html });
+    const res = await sendEmail({ to: delivery.to, subject: email.subject, text: rendered.text, html: rendered.html, threadKey: email.threadKey });
 
     if (res.ok) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });

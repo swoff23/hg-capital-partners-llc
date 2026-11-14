@@ -38,8 +38,11 @@ export async function generateMetadata({ params }: PageProps<"/tasks/[id]">): Pr
  * (./view.tsx), which lays it out. Lockbox codes and password hashes never
  * reach the client; only unit labels and a lockbox state do.
  */
-export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
+export default async function TaskPage({ params, searchParams }: PageProps<"/tasks/[id]">) {
   const { id } = await params;
+  // A partner's email asked for Send back (docs/specs/contractor-job-emails.md, section 8). Approve opens the page as
+  // is: it acts on one tap, so a link never presses it.
+  const openSendBack = (await searchParams).do === "send-back";
 
   // The first wave: the task, each of its lists, and what needs only its id and the viewer, all at once.
   // The session check runs beside them and is awaited with them, so nothing is shown without it.
@@ -272,6 +275,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
 
   return (
     <TaskPageView
+      openSendBack={openSendBack}
       task={{
         id: task.id,
         title: task.title,

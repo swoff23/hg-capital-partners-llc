@@ -39,7 +39,7 @@ export interface JobUpdateInput {
 export async function postUpdateIn(tx: core.Tx, taskId: string, p: Contractor, input: JobUpdateInput): Promise<void> {
   const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
   if (!input.body.trim() && own.length === 0 && (await allOwnPosted(tx, taskId, p.contactId, input.attachmentIds))) {
-    await core.assertContractorAccess(tx, taskId, p.contactId);
+    await core.assertContractorAccess(tx, taskId, p);
     return;
   }
   await core.addComment(tx, taskId, { body: input.body, attachmentIds: own.map((f) => f.id), clientId: input.clientId }, p);
@@ -73,7 +73,7 @@ export async function postUpdateIn(tx: core.Tx, taskId: string, p: Contractor, i
 export async function markDoneIn(tx: core.Tx, taskId: string, p: Contractor, input: JobUpdateInput): Promise<void> {
   await core.lockTask(tx, taskId);
   // Access before anything about the job is read or said, so a contractor taken off it never hears its photo count.
-  await core.assertContractorAccess(tx, taskId, p.contactId);
+  await core.assertContractorAccess(tx, taskId, p);
   const own = await ownUnposted(tx, taskId, p.contactId, input.attachmentIds);
   const template = await tx.task.findUnique({ where: { id: taskId }, select: { taskTemplate: { select: { finishPhotosRequired: true } } } });
   const required = finishPhotosNeeded(template?.taskTemplate?.finishPhotosRequired);
