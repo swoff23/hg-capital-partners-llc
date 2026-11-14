@@ -35,7 +35,7 @@ These apply to everyone working in this repo, people and agents alike. Claude Co
 
 HG should feel like a well-run property company, not a generic AI template. Calm and premium in visuals, plain and credible in words.
 
-- **Visual rules live in [docs/brand-guidelines.md](docs/brand-guidelines.md)** ("Ink and Limestone"): type, color tokens, shape, elevation, icons, photography, motion, components and the public site. Use its tokens and utilities only; the `hg/design-tokens` lint rule rejects raw palette classes, hex values, raw and arbitrary text sizes, and the retired alias names under `src/`. No stock gradient blobs, glass on every surface, emoji decoration, or sparkles on things that aren't AI.
+- **Visual rules live in [docs/brand-guidelines.md](docs/brand-guidelines.md)** ("Ink and Limestone"): type, color tokens, shape, elevation, icons, photography, motion, components and the public site. Use its tokens and utilities only; the `hg/design-tokens` lint rule rejects raw palette classes, hex values, raw and arbitrary text sizes, and the old HG color names under `src/`, naming the new one. No stock gradient blobs, glass on every surface, emoji decoration, or sparkles on things that aren't AI.
 - **Every color has a job.** Color marks identity or state. Statuses keep fixed colors (the `StatusMark` tones) that no other mark in the same view reuses. All-gray-on-white reads unfinished; color without a job reads as slop.
 - **Make payoff moments count.** When someone sends, saves or finishes something (a move-in report, a maintenance request, a closed task), show what happened and what's next: the property photo or `SpotArt`, a warm heading and the concrete next step. Don't end on a generic check icon.
 - **Close the loop.** Show people their input mattered: what happens to it next, its status once it's in the system, and a record of what was done.
@@ -50,7 +50,7 @@ HG should feel like a well-run property company, not a generic AI template. Calm
 - **One Esc closes one layer.**
 - **Touch has no hover.** Hover cues are desktop only, and anything a tooltip carries still needs a tap on touch. Don't fix a hover-only cue by making it permanent on touch: no edit pencil beside every field, use tap-to-edit instead.
 - **A mark's position carries meaning.** A dot in a card's top-right corner means new or unread, nothing else. Per-item status sits in one fixed, skimmable spot on every card.
-- **One switch per job.** Page sections that are separate routes use `TopTabs`. Views and filters inside a page use the segmented control, where the selected segment's surface fill and control edge mark the pick (never a fill alone).
+- **One switch per job.** Page sections that are separate routes use `TopTabs`. Views and filters inside a page use the segmented control, where the selected segment's `--background` fill and `--input` edge mark the pick (never a fill alone).
 - **Rows of controls never wrap at any width from 320 to 1920.** Shorten the labels or collapse them into a Filters button.
 
 ## Typography
@@ -75,7 +75,7 @@ The full standard, with a review checklist to run before a string ships, is [doc
 ## Enforce it in code
 
 - **Rules that can be lint rules should be.** `eslint.config.mjs` rejects em dashes and vague error copy (`hg/vague-copy`) in string literals, template strings and JSX text under `src/`, and (`hg/design-tokens`) any styling outside the brand tokens. Filler words are a warning (`hg/filler-copy`) to read case by case. Comments, tests and a lone "—" for an empty value stay allowed.
-- **Lint runs in CI, not in the build.** Next 16's `next build` doesn't lint, so a violation fails CI on the push to main but still deploys. Run `npm run lint` before you push. CSS isn't linted, so check it by hand.
+- **Lint runs in CI, not in the build.** Next 16's `next build` doesn't lint, so a violation fails CI on the push to main but still deploys. Run `npm run lint` before you push. CSS isn't linted. `src/lib/token-names.test.ts` catches old color names in CSS, tests and the docs; check the rest of CSS by hand.
 
 ## Device check (definition of done for UI)
 

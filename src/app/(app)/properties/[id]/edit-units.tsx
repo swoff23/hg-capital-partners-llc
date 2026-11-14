@@ -159,9 +159,9 @@ export function UnitsSection({
   return (
     <Section title="Units & access">
       {rentable.length === 0 ? (
-        <p className="pb-2 text-body text-fg-3">Add each unit to keep its lockbox code, utilities and equipment here.</p>
+        <p className="pb-2 text-body text-muted-foreground">Add each unit to keep its lockbox code, utilities and equipment here.</p>
       ) : (
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-border">
           {rentable.map(({ u, i }) => (
             <ReadUnit
               key={u.id ?? i}
@@ -181,7 +181,7 @@ export function UnitsSection({
       {meters.length > 0 && (
         <div className="pt-4">
           <p className="text-meta font-medium text-fg-2">House meters</p>
-          <ul className="divide-y divide-line">
+          <ul className="divide-y divide-border">
             {meters.map(({ u, i }) => (
               <ReadUnit
                 key={u.id ?? i}
@@ -226,7 +226,7 @@ export function UnitsSection({
           }
         />
       )}
-      {removing && run.error && <p className="mt-2 text-meta text-danger">{run.error}</p>}
+      {removing && run.error && <p className="mt-2 text-meta text-destructive">{run.error}</p>}
     </Section>
   );
 }
@@ -260,11 +260,11 @@ function UnitMenu({ name, onEdit, onDelete }: { name: string; onEdit: () => void
 function Disclosure({ title, children }: { title: string; children: ReactNode }) {
   return (
     <details className="group/d">
-      <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center gap-1.5 text-meta font-medium text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center gap-1.5 text-meta font-medium text-fg-2 transition-colors hover:text-foreground pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden="true"
           strokeWidth={1.5}
-          className="h-3.5 w-3.5 shrink-0 text-fg-3 transition-transform duration-fast group-open/d:rotate-90 motion-reduce:transition-none"
+          className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-fast group-open/d:rotate-90 motion-reduce:transition-none"
         />
         {title}
       </summary>
@@ -299,13 +299,13 @@ function ReadUnit({
           onClick={onEdit}
           {...warmOnIntent(unitSheet)}
           aria-label={`Edit ${name}`}
-          className="min-w-0 flex-1 truncate rounded-md text-left text-body text-fg-1 pointer-coarse:min-h-11 pointer-fine:hover:underline pointer-fine:underline-offset-3"
+          className="min-w-0 flex-1 truncate rounded-md text-left text-body text-foreground pointer-coarse:min-h-11 pointer-fine:hover:underline pointer-fine:underline-offset-3"
         >
           {name}
         </button>
         {lockbox && (
           <span className="flex shrink-0 items-center gap-1.5">
-            <span className="text-meta text-fg-3 max-[480px]:hidden">Lockbox</span>
+            <span className="text-meta text-muted-foreground max-[480px]:hidden">Lockbox</span>
             <Code value={lockbox.code} label="Lockbox code" />
           </span>
         )}
@@ -313,7 +313,7 @@ function ReadUnit({
       </div>
       {/* Where the box is: its own line, so a long note never pushes the code or the menu off screen. */}
       {lockbox?.note && (
-        <p title={lockbox.note} className="-mt-1 truncate pb-1 text-meta text-fg-3">
+        <p title={lockbox.note} className="-mt-1 truncate pb-1 text-meta text-muted-foreground">
           Lockbox at {lockbox.note}
         </p>
       )}
@@ -326,14 +326,14 @@ function ReadUnit({
                 if (rows.length === 0) return null;
                 return (
                   <div key={g.name}>
-                    <p className="mb-1 text-meta font-medium text-fg-1">{g.name}</p>
+                    <p className="mb-1 text-meta font-medium text-foreground">{g.name}</p>
                     <dl className="space-y-1">
                       {rows.map(([k, label]) => {
                         const v = u.utilities![k]!;
                         return (
                           <div key={k} className="flex min-h-6 items-center justify-between gap-2 text-meta">
-                            <dt className="text-fg-3">{label}</dt>
-                            <dd className={cn("min-w-0", UTILITY_STATUS_FIELDS.has(k) ? utilityToneClass(utilityStatusTone(v)) : "text-fg-1")}>
+                            <dt className="text-muted-foreground">{label}</dt>
+                            <dd className={cn("min-w-0", UTILITY_STATUS_FIELDS.has(k) ? utilityToneClass(utilityStatusTone(v)) : "text-foreground")}>
                               {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} mask /> : v}
                             </dd>
                           </div>
@@ -349,7 +349,7 @@ function ReadUnit({
       )}
       {equipment.length > 0 && (
         <Disclosure title="Equipment">
-          <p className="num mb-1 flex items-center gap-2 text-meta text-fg-3">
+          <p className="num mb-1 flex items-center gap-2 text-meta text-muted-foreground">
             <span>
               {datedCount} of {equipment.length} dated
             </span>
@@ -369,7 +369,7 @@ function ReadUnit({
                 </Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="divide-y divide-border">
               {equipment.map((e, j) => {
                 const status = equipmentStatus(e.type, e.installYear, rules);
                 const cost = equipmentReplacementCost(e.type, rules);
@@ -377,9 +377,9 @@ function ReadUnit({
                 return (
                   <tr key={j}>
                     <Td className="pl-0 text-fg-2">{e.type}</Td>
-                    <Td className="text-fg-1">{e.model || <span className="text-fg-3">—</span>}</Td>
-                    <Td className="min-w-40 text-fg-2">{e.comment || <span className="text-fg-3">—</span>}</Td>
-                    <Td className="num">{e.installYear || <span className="text-fg-3">—</span>}</Td>
+                    <Td className="text-foreground">{e.model || <span className="text-muted-foreground">—</span>}</Td>
+                    <Td className="min-w-40 text-fg-2">{e.comment || <span className="text-muted-foreground">—</span>}</Td>
+                    <Td className="num">{e.installYear || <span className="text-muted-foreground">—</span>}</Td>
                     <Td className="num whitespace-nowrap">{fmtAge(equipmentAge(e.installYear))}</Td>
                     <Td className="whitespace-nowrap">
                       <EquipmentStatusText status={status} />
@@ -388,7 +388,7 @@ function ReadUnit({
                       {(status === "Replace" || status === "Monitor") && cost != null ? (
                         <>
                           <Money value={cost} />
-                          {due && <span className="text-meta text-fg-3"> {due}</span>}
+                          {due && <span className="text-meta text-muted-foreground"> {due}</span>}
                         </>
                       ) : null}
                     </Td>

@@ -31,9 +31,9 @@ const LINKS: { href: string; label: string; icon: LucideIcon; list?: ListKey }[]
 
 /**
  * The app's sections, in the sidebar and the phone drawer. Items are 32px
- * with a mouse and 44px on touch. Idle: label --fg-2, icon --fg-3, --fill-1
- * on hover. The current item is --fill-2 with label and icon in --fg-1, and
- * the 2px by 16px --act notch at its left edge is its 3:1 mark, since the
+ * with a mouse and 44px on touch. Idle: label --fg-2, icon --muted-foreground, --muted
+ * on hover. The current item is --accent with label and icon in --foreground, and
+ * the 2px by 16px --primary notch at its left edge is its 3:1 mark, since the
  * fill alone is about 1.2:1 (section 9). The lists link to where they were
  * left (their last filters and sort), read from the layout's cookies and kept
  * current as a filter bar changes (components/list-memory.tsx).
@@ -66,17 +66,17 @@ export function SideNav({
               "group relative flex h-8 items-center gap-3 rounded-md px-4 text-label transition-colors pointer-coarse:px-3.5",
               TOUCH_HEIGHT,
               active
-                ? "bg-fill-2 text-fg-1 before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:bg-act"
+                ? "bg-accent text-foreground before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:bg-primary"
                 : cn(
-                    "text-fg-2 hover:bg-fill-1 hover:text-fg-1",
+                    "text-fg-2 hover:bg-muted hover:text-foreground",
                     // Tapped before its page was prefetched: the current look at once (LeaveLink's data-pending).
-                    "data-pending:bg-fill-2 data-pending:text-fg-1 data-pending:before:absolute data-pending:before:left-0 data-pending:before:top-1/2 data-pending:before:h-4 data-pending:before:w-0.5 data-pending:before:-translate-y-1/2 data-pending:before:bg-act",
+                    "data-pending:bg-accent data-pending:text-foreground data-pending:before:absolute data-pending:before:left-0 data-pending:before:top-1/2 data-pending:before:h-4 data-pending:before:w-0.5 data-pending:before:-translate-y-1/2 data-pending:before:bg-primary",
                   ),
             )}
           >
             <Icon
               aria-hidden="true"
-              className={cn(chromeIconClass, active ? "text-fg-1" : "text-fg-3 group-hover:text-fg-1 group-data-pending:text-fg-1")}
+              className={cn(chromeIconClass, active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground group-data-pending:text-foreground")}
             />
             <span className="truncate">{label}</span>
           </LeaveLink>
@@ -88,8 +88,8 @@ export function SideNav({
 
 /**
  * Page sections that are separate routes (CLAUDE.md, One switch per job):
- * underline tabs over a --line divider (docs/brand-guidelines.md, section 9).
- * Idle --fg-2, selected --fg-1 with the 2px --act underline, one weight for
+ * underline tabs over a --border divider (docs/brand-guidelines.md, section 9).
+ * Idle --fg-2, selected --foreground with the 2px --primary underline, one weight for
  * both. They are links in a labeled `<nav>`: the page you're on carries
  * `aria-current="page"` and the styles read it, so a screen reader hears
  * "current page" rather than a tab choice (selectors question 8). 44px on
@@ -116,7 +116,7 @@ export function TopTabs({
   }
   const query = carried.toString();
   return (
-    <nav aria-label={label} className="flex gap-1 border-b border-line">
+    <nav aria-label={label} className="flex gap-1 border-b border-border">
       {tabs.map((t) => {
         const path = `${base}${t.href}`;
         const href = query ? `${path}?${query}` : path;
@@ -130,10 +130,10 @@ export function TopTabs({
               // 8px sides below sm, so Settings' three tabs keep one line at 320. A fixed
               // 14 / 20 at every size: text-label grows to 16 on touch (section 9).
               // eslint-disable-next-line hg/design-tokens -- the tab size is fixed
-              "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-fg-1 sm:px-3",
-              "aria-[current=page]:border-act aria-[current=page]:text-fg-1",
+              "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-foreground sm:px-3",
+              "aria-[current=page]:border-primary aria-[current=page]:text-foreground",
               // Tapped before its page was prefetched: the picked look at once (LeaveLink's data-pending).
-              "data-pending:border-act data-pending:text-fg-1",
+              "data-pending:border-primary data-pending:text-foreground",
               TOUCH_HEIGHT,
             )}
           >

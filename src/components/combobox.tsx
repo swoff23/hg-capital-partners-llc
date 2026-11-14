@@ -71,7 +71,7 @@ const fieldFrame = (size: FieldSize, extra?: string) =>
   );
 
 const iconButton =
-  "flex size-7 items-center justify-center rounded-sm text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:size-11";
+  "flex size-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground pointer-coarse:size-11";
 
 function Shell({
   label,
@@ -105,7 +105,7 @@ function Shell({
       )}
       {children}
       {description && !invalid && (
-        <span id={helpId} className="truncate text-meta text-fg-3">
+        <span id={helpId} className="truncate text-meta text-muted-foreground">
           {description}
         </span>
       )}
@@ -234,7 +234,7 @@ function SingleCombobox({
           <ListBox
             aria-label={label ?? ariaLabel ?? "Suggestions"}
             shouldFocusOnHover
-            renderEmptyState={() => <p className="px-2 py-3 text-body text-fg-3">No match.</p>}
+            renderEmptyState={() => <p className="px-2 py-3 text-body text-muted-foreground">No match.</p>}
             className="max-h-80 overflow-y-auto p-1 outline-none pointer-coarse:max-h-[60dvh]"
           >
             {rows.map((o) => (
@@ -246,7 +246,7 @@ function SingleCombobox({
                 key={ADD + typed}
                 id={ADD + typed}
                 textValue={draft}
-                className="flex min-h-8 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-body outline-none data-focused:bg-fill-2 pointer-coarse:min-h-11"
+                className="flex min-h-8 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-body outline-none data-focused:bg-accent pointer-coarse:min-h-11"
               >
                 <span className="truncate">{addRowLabel(typed)}</span>
               </ListBoxItem>

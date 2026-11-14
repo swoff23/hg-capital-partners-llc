@@ -21,8 +21,8 @@ export default function MarketingError({
   return (
     <main className={cn(publicContainer, "flex flex-1 flex-col items-center justify-center py-16 text-center")}>
       {/* The public pages only read, so a failure here is always the page itself. */}
-      <h1 className={cn(publicType.heading, "text-fg-1")}>That page didn&rsquo;t load</h1>
-      <p className={cn(publicType.lead, "mt-3 max-w-sm text-fg-3")}>Please try again in a moment.</p>
+      <h1 className={cn(publicType.heading, "text-foreground")}>That page didn&rsquo;t load</h1>
+      <p className={cn(publicType.lead, "mt-3 max-w-sm text-muted-foreground")}>Please try again in a moment.</p>
       <button type="button" onClick={() => retry()} className={cn(publicCtaClass, "mt-8")}>
         Try again
       </button>

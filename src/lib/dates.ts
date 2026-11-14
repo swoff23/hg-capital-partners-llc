@@ -177,7 +177,7 @@ export function relativeDays(v: Date | string | null | undefined, now: Now = new
  * "tomorrow", the weekday name within six days, then the calendar date, with
  * the year only when it isn't this one. A past date is the real date, so a
  * task 40 days late doesn't read like one a day late, and a row that isn't
- * counted late (Review, Waiting) never says "late"; the chip's --danger is
+ * counted late (Review, Waiting) never says "late"; the chip's --destructive is
  * the caller's call. "" for blank/invalid.
  */
 export function dueLabel(v: Date | string | null | undefined, now: Now = new Date()): string {

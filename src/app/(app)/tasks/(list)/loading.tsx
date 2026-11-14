@@ -14,7 +14,7 @@ export default function TasksLoading() {
       <TasksHeader />
       <TaskFiltersPlaceholder />
       <div className="mt-4">
-        <ul className="@container divide-y divide-line">
+        <ul className="@container divide-y divide-border">
           {Array.from({ length: 12 }, (_, i) => (
             <TaskRowSkeleton key={i} i={i} />
           ))}

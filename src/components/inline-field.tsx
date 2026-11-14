@@ -197,7 +197,7 @@ function FactLine({
   const text = problem ?? (save.conflict ? null : save.error);
   if (text) {
     return (
-      <p id={id} role="alert" className={cn(base, "text-danger")}>
+      <p id={id} role="alert" className={cn(base, "text-destructive")}>
         {text}
       </p>
     );
@@ -210,7 +210,7 @@ function FactLine({
     );
   }
   return helper ? (
-    <p id={id} className={cn(base, "text-fg-3")}>
+    <p id={id} className={cn(base, "text-muted-foreground")}>
       {helper}
     </p>
   ) : null;
@@ -296,7 +296,7 @@ function restDisplay(kind: InlineKind, text: string, o: { unit?: string; choiceL
 
 /** The value as a button that reads as text: a fill and a text cursor on hover with a mouse, no pencil. */
 const valueButtonClass =
-  "flex min-h-8 min-w-0 flex-1 items-center gap-x-2 rounded-md -mx-2 px-2 text-left text-body text-fg-1 transition-colors pointer-fine:cursor-text pointer-fine:hover:bg-fill-1 pointer-coarse:min-h-11 aria-busy:cursor-progress";
+  "flex min-h-8 min-w-0 flex-1 items-center gap-x-2 rounded-md -mx-2 px-2 text-left text-body text-foreground transition-colors pointer-fine:cursor-text pointer-fine:hover:bg-muted pointer-coarse:min-h-11 aria-busy:cursor-progress";
 
 const INPUT_MODE = { email: "email", phone: "tel", url: "url" } as const;
 
@@ -606,7 +606,7 @@ function TextFact(props: InlineFieldProps) {
       discard="silent"
       error={!problem && !save.conflict ? save.error : undefined}
     >
-      {context && <p className="-mt-1 text-meta text-fg-3">{context}</p>}
+      {context && <p className="-mt-1 text-meta text-muted-foreground">{context}</p>}
       <FormField label={label} hideLabel helper={line} error={problem ?? undefined}>
         {sheetControl}
       </FormField>
@@ -648,7 +648,7 @@ function TextFact(props: InlineFieldProps) {
                 className={cn(valueButtonClass, multiline && "items-start py-1.5", className)}
               >
                 <span className={cn("min-w-0", multiline || wrap ? "whitespace-pre-wrap text-pretty [overflow-wrap:anywhere]" : "truncate")}>
-                  {content || <span className="text-fg-3">—</span>}
+                  {content || <span className="text-muted-foreground">—</span>}
                 </span>
               </button>
             )}
@@ -694,7 +694,7 @@ function TextFact(props: InlineFieldProps) {
 
 // The page's h1 on the title token, editable or not. font-semibold repeats the token's weight so a caller's size override (the task title) keeps it.
 // The 1px edge is there at rest too (transparent), so the field that replaces the title on a click has the same box and nothing moves.
-const headingText = "rounded-md border border-transparent px-2 py-1 text-title font-semibold text-fg-1 [overflow-wrap:anywhere]";
+const headingText = "rounded-md border border-transparent px-2 py-1 text-title font-semibold text-foreground [overflow-wrap:anywhere]";
 
 /** Where in the heading's text a click landed, so the field opens with the cursor there; undefined from the keyboard. */
 function caretFromClick(e: ReactMouseEvent<HTMLElement>): number | undefined {
@@ -822,7 +822,7 @@ function HeadingFact(props: InlineFieldProps) {
   }
 
   // An address field owns its refusal: the rename was turned down ("29 Livingston St is already a deal."), and
-  // the field says so in --danger where the duplicate line was, with the link to the record that has it (forms 2.6).
+  // the field says so in --destructive where the duplicate line was, with the link to the record that has it (forms 2.6).
   const refusal = address && !save.conflict ? save.error : null;
 
   function changed(next: string) {
@@ -874,7 +874,7 @@ function HeadingFact(props: InlineFieldProps) {
       className={address ? "md:min-h-104" : undefined}
       error={!problem && !save.conflict && !refusal ? save.error : undefined}
     >
-      {context && <p className="-mt-1 text-meta text-fg-3">{context}</p>}
+      {context && <p className="-mt-1 text-meta text-muted-foreground">{context}</p>}
       {address ? (
         <AddressCombobox
           kind={address.kind}
@@ -911,7 +911,7 @@ function HeadingFact(props: InlineFieldProps) {
             aria-busy={save.pending || undefined}
             className={cn(
               headingText,
-              "block w-fit max-w-full text-left transition-colors pointer-fine:cursor-text pointer-fine:hover:bg-fill-1 aria-busy:cursor-progress",
+              "block w-fit max-w-full text-left transition-colors pointer-fine:cursor-text pointer-fine:hover:bg-muted aria-busy:cursor-progress",
               className,
             )}
           >
@@ -946,7 +946,7 @@ function HeadingFact(props: InlineFieldProps) {
       ) : (
         // The field takes the title's own box: an invisible copy of the text sizes it (wider as you type, up to the
         // column, then onto more lines) and the textarea lies over it, with the same type, padding and edge, so the
-        // words stay put. Editing reads as a field: --surface with the focus edge.
+        // words stay put. Editing reads as a field: --background with the focus edge.
         <div className="relative w-fit max-w-full">
           <span aria-hidden="true" className={cn(headingText, "invisible block whitespace-pre-wrap", className)}>
             {draft}
@@ -964,8 +964,8 @@ function HeadingFact(props: InlineFieldProps) {
             onBlur={onBlur}
             className={cn(
               headingText,
-              "absolute inset-0 size-full resize-none overflow-hidden whitespace-pre-wrap border-line-control bg-surface outline-none",
-              "focus:border-act focus:ring-1 focus:ring-inset focus:ring-act aria-invalid:border-danger aria-invalid:focus:ring-danger",
+              "absolute inset-0 size-full resize-none overflow-hidden whitespace-pre-wrap border-input bg-background outline-none",
+              "focus:border-ring focus:ring-1 focus:ring-inset focus:ring-ring aria-invalid:border-destructive aria-invalid:focus:ring-destructive",
               className,
             )}
           />
@@ -1025,7 +1025,7 @@ function PickedFact(props: InlineFieldProps) {
     </AriaButton>
   ) : (
     <AriaButton {...triggerProps} aria-label={`${label}, ${text ? inlineShown(kind, text, { label: (t) => options.find((o) => o.id === t)?.label }) : "empty"}, edit`} className={cn(valueButtonClass, className)}>
-      <span className="min-w-0 truncate">{content || <span className="text-fg-3">{emptyLabel ?? "—"}</span>}</span>
+      <span className="min-w-0 truncate">{content || <span className="text-muted-foreground">{emptyLabel ?? "—"}</span>}</span>
     </AriaButton>
   );
 
@@ -1049,7 +1049,7 @@ function PickedFact(props: InlineFieldProps) {
                   }}
                 />
                 {/* What the date does ("Adds a reminder 60 days before"), where it is being picked. */}
-                {helper && <p className="truncate border-t border-line px-3 py-2 text-meta text-fg-3">{helper}</p>}
+                {helper && <p className="truncate border-t border-border px-3 py-2 text-meta text-muted-foreground">{helper}</p>}
               </>
             ) : (
               <OptionList

@@ -14,7 +14,7 @@ import { PasswordField } from "./password-field";
  * shows. A wrong password or a lockout comes back as state rather than a
  * redirect, so the email stays filled in (defaultValue survives React's reset
  * of the form after the action) and focus moves to the password; the reason
- * is one `--danger` line above Sign in. `next` is the page to go back to,
+ * is one `--destructive` line above Sign in. `next` is the page to go back to,
  * already checked by the page.
  */
 /**

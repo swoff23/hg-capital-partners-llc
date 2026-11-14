@@ -147,7 +147,7 @@ export default async function FinancialsOverviewPage({ searchParams }: PageProps
           <FactStrip size={figures.some((c) => figureWidth(c) > 8) ? "m" : "l"} facts={facts} />
         ) : (
           // Four $0 figures would read as a portfolio that earned nothing (section 3: a missing feed is a sentence).
-          <p className="text-body text-fg-3">
+          <p className="text-body text-muted-foreground">
             {anyLines ? `No QuickBooks lines for ${periodText}.` : "No QuickBooks activity yet."}
           </p>
         )}
@@ -216,23 +216,23 @@ export default async function FinancialsOverviewPage({ searchParams }: PageProps
                 </Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="divide-y divide-border">
               {data.byProperty.map((row) => {
                 const href = `/properties/${row.propertyId}`;
                 // a mapped property with no lines shows the dash, not $0
                 const money = (cents: number) =>
-                  row.hasActivity ? <MoneyCents cents={cents} /> : <span className="text-fg-3">—</span>;
+                  row.hasActivity ? <MoneyCents cents={cents} /> : <span className="text-muted-foreground">—</span>;
                 // "Bought Aug 2026" only when the purchase falls inside the period, so a short row reads why.
                 const bought = row.purchaseMonth && inSpan(row.purchaseMonth, span) ? row.purchaseMonth : null;
                 return (
-                  <tr key={row.propertyId} className="transition-colors duration-fast hover:bg-fill-1">
+                  <tr key={row.propertyId} className="transition-colors duration-fast hover:bg-muted">
                     <RowCell href={href} first className={cn(dense, "block py-2.5 pl-0 pointer-coarse:py-3")}>
-                      <span className="text-fg-1">{row.address}</span>
+                      <span className="text-foreground">{row.address}</span>
                       {!row.hasActivity ? (
-                        <span className="whitespace-nowrap text-meta text-fg-3 max-sm:block sm:ml-2">No activity</span>
+                        <span className="whitespace-nowrap text-meta text-muted-foreground max-sm:block sm:ml-2">No activity</span>
                       ) : (
                         bought && (
-                          <span className="whitespace-nowrap text-meta text-fg-3 max-sm:block sm:ml-2">
+                          <span className="whitespace-nowrap text-meta text-muted-foreground max-sm:block sm:ml-2">
                             Bought {fmtMonthYear(bought)}
                           </span>
                         )
@@ -251,7 +251,7 @@ export default async function FinancialsOverviewPage({ searchParams }: PageProps
                       {row.hasActivity && row.noi.noiMargin != null ? (
                         pct(row.noi.noiMargin)
                       ) : (
-                        <span className="text-fg-3">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </RowCell>
                     <RowCell href={href} numeric cell={fromSm} className={cn(dense, "pr-0 text-fg-2")}>
@@ -279,10 +279,10 @@ export default async function FinancialsOverviewPage({ searchParams }: PageProps
                     <MoneyCents cents={data.unassigned.noiCents} />
                   </Td>
                   {/* No margin or interest of its own: the empty-cell dash, as on the rows above. */}
-                  <Td numeric className={cn("text-fg-3", fromSm)}>
+                  <Td numeric className={cn("text-muted-foreground", fromSm)}>
                     —
                   </Td>
-                  <Td numeric className={cn("text-fg-3", fromSm)}>
+                  <Td numeric className={cn("text-muted-foreground", fromSm)}>
                     —
                   </Td>
                 </tr>
@@ -302,7 +302,7 @@ export default async function FinancialsOverviewPage({ searchParams }: PageProps
                     <MoneyCents cents={p.noiCents} />
                   </Td>
                   <Td numeric className={fromSm}>
-                    {p.noiMargin == null ? <span className="font-normal text-fg-3">—</span> : pct(p.noiMargin)}
+                    {p.noiMargin == null ? <span className="font-normal text-muted-foreground">—</span> : pct(p.noiMargin)}
                   </Td>
                   <Td numeric className={fromSm}>
                     <MoneyCents cents={p.debtInterestCents} />
@@ -311,7 +311,7 @@ export default async function FinancialsOverviewPage({ searchParams }: PageProps
               </tfoot>
             )}
           </Table>
-          {data.hasLines && <p className="mt-3 text-meta text-fg-3">Each row counts only the lines classed to it.</p>}
+          {data.hasLines && <p className="mt-3 text-meta text-muted-foreground">Each row counts only the lines classed to it.</p>}
         </Section>
       )}
     </div>

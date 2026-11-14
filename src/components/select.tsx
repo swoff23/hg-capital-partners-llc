@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  *
  * `value` is an option's `id`, or null for the empty choice. With `name` the
  * pick rides in a hidden field, so a server action reads it from FormData. A
- * value the list doesn't offer (a stored name) shows as its own row in --fg-3,
+ * value the list doesn't offer (a stored name) shows as its own row in --muted-foreground,
  * so opening never changes it silently. Closed, typing a letter jumps to the
  * option that starts with it, as a native select does.
  */
@@ -31,7 +31,7 @@ export type SelectProps = {
   /** Above the field in text-meta 500 --fg-2. Without one, give an `aria-label`. */
   label?: string;
   "aria-label"?: string;
-  /** One line of text-meta --fg-3 under the field (who sees it, what happens). */
+  /** One line of text-meta --muted-foreground under the field (who sees it, what happens). */
   description?: ReactNode;
   items?: OptionItem[];
   sections?: OptionSection[];
@@ -48,7 +48,7 @@ export type SelectProps = {
   size?: FieldSize;
   isRequired?: boolean;
   isInvalid?: boolean;
-  /** The line under an invalid field, in --danger. */
+  /** The line under an invalid field, in --destructive. */
   errorMessage?: string;
   isDisabled?: boolean;
   /** "public" puts the dark public tokens on the list (the public move-in form). */
@@ -103,7 +103,7 @@ export function Select({
 
   const all = flatten(items, sections);
   const found = current !== null ? all.find((o) => o.id === current) : undefined;
-  // A stored value the list doesn't offer stays visible, in --fg-3, so nothing changes silently.
+  // A stored value the list doesn't offer stays visible, in --muted-foreground, so nothing changes silently.
   const strays: OptionItem[] = current !== null && !found ? [{ id: current, label: current, muted: true }] : [];
   const pinned: OptionItem[] = [
     ...(emptyLabel ? [{ id: EMPTY_ID, label: emptyLabel, muted: true }] : []),
@@ -175,16 +175,16 @@ export function Select({
                 fieldClass,
                 fieldSizeClass[size],
                 "flex items-center gap-2 text-left disabled:opacity-50 data-disabled:opacity-50",
-                // Open reads like focus: the --act edge and the inset ring.
-                "data-pressed:border-act data-pressed:ring-1 data-pressed:ring-inset data-pressed:ring-act",
+                // Open reads like focus: the --primary edge and the inset ring.
+                "data-pressed:border-primary data-pressed:ring-1 data-pressed:ring-inset data-pressed:ring-primary",
                 display?.leading && "pl-2",
               )}
             >
               {display?.leading && <span className="flex shrink-0 items-center">{display.leading}</span>}
-              <span id={valueId} className={cn("min-w-0 flex-1 truncate", muted && "text-fg-3")}>
+              <span id={valueId} className={cn("min-w-0 flex-1 truncate", muted && "text-muted-foreground")}>
                 {text}
               </span>
-              <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 text-fg-3" />
+              <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
             </AriaButton>
           }
         >
@@ -225,7 +225,7 @@ export function Select({
         )}
       </div>
       {description && !isInvalid && (
-        <span id={helpId} className="truncate text-meta text-fg-3">
+        <span id={helpId} className="truncate text-meta text-muted-foreground">
           {description}
         </span>
       )}

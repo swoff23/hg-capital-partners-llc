@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
    a label and a value. It moved here from properties/[id]/record-ui.tsx when
    deals, tasks and contractors began using it too (forms 2.8). */
 
-/** The facts rail: label and value rows on --line dividers. */
+/** The facts rail: label and value rows on --border dividers. */
 export function RailList({ children, className }: { children: ReactNode; className?: string }) {
-  return <dl className={cn("divide-y divide-line", className)}>{children}</dl>;
+  return <dl className={cn("divide-y divide-border", className)}>{children}</dl>;
 }
 
 /**
@@ -27,7 +27,7 @@ export const railLineClass = "-ml-[calc(var(--rail-label)+0.75rem)] w-[calc(100%
  * which edits the value in place; the row keeps its height when the field
  * opens, and grows only for one line under it. An empty fact with no field
  * is a verb that opens the section's editor ("Add lender"); a derived one
- * with nothing to add is the dash glyph in --fg-3.
+ * with nothing to add is the dash glyph in --muted-foreground.
  */
 export function RailFact({
   label,
@@ -62,11 +62,11 @@ export function RailFact({
         className,
       )}
     >
-      <dt className="flex min-h-8 items-center text-meta text-fg-3 pointer-coarse:min-h-11">
+      <dt className="flex min-h-8 items-center text-meta text-muted-foreground pointer-coarse:min-h-11">
         {/* One inline box, so a label with a part that drops on a phone ("Insurance (COI)") keeps its space. */}
         <span>{label}</span>
       </dt>
-      <dd className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 text-body text-fg-1 pointer-coarse:min-h-11">
+      <dd className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 text-body text-foreground pointer-coarse:min-h-11">
         {!isEmpty ? (
           children
         ) : empty && onAdd ? (
@@ -74,7 +74,7 @@ export function RailFact({
             {empty}
           </RailVerb>
         ) : (
-          <span className="text-fg-3">—</span>
+          <span className="text-muted-foreground">—</span>
         )}
       </dd>
     </div>
@@ -85,7 +85,7 @@ export function RailFact({
 export const railVerbClass = (tone?: "warn") =>
   cn(
     "relative -my-1 inline-flex items-center gap-1 py-1 text-left font-medium underline-offset-3 transition-colors hover:underline",
-    tone === "warn" ? "text-warn" : "text-fg-2 hover:text-fg-1",
+    tone === "warn" ? "text-warn" : "text-fg-2 hover:text-foreground",
     // A 44px hit area on touch without the row growing.
     "pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-2",
   );
@@ -101,7 +101,7 @@ export function RailVerb({ children, onClick, tone }: { children: ReactNode; onC
 }
 
 /**
- * A section heading's count, in --fg-3 at the body weight. The space before
+ * A section heading's count, in --muted-foreground at the body weight. The space before
  * it keeps the heading's name "Tasks 29", not "Tasks29" (as in the task
  * page's Checklist heading).
  */
@@ -109,7 +109,7 @@ export function Count({ n, className }: { n: number; className?: string }) {
   return (
     <>
       {" "}
-      <span className={cn("num ml-1 font-normal text-fg-3", className)}>{n}</span>
+      <span className={cn("num ml-1 font-normal text-muted-foreground", className)}>{n}</span>
     </>
   );
 }

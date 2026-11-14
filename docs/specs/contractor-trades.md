@@ -122,7 +122,7 @@ All three use one checklist: `OptionList selectionMode="multiple"` inside `Picke
 
 ### 4.4 Contractor list (decision 6)
 
-- From `sm` up, the Trades column shows tags A to Z on one line: as many whole tags as fit, then "+N" in `--fg-3`. A small client piece measures the cell after layout. Until it measures, the cell shows the first tag and "+N", so the first paint never overflows. The cell's accessible name lists every trade.
+- From `sm` up, the Trades column shows tags A to Z on one line: as many whole tags as fit, then "+N" in `--muted-foreground`. A small client piece measures the cell after layout. Until it measures, the cell shows the first tag and "+N", so the first paint never overflows. The cell's accessible name lists every trade.
 - Below `sm` the line under the name stays text: "Company · Demo, Drywall, Framing…", truncated as today.
 - The loading skeleton's Trades column draws tag-shaped blocks instead of word lines.
 

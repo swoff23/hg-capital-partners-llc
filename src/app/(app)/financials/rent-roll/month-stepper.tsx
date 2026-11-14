@@ -51,7 +51,7 @@ export function MonthStepper({
       <Button ref={prev} variant="ghost" icon aria-label="Previous month" disabled={atStart} onClick={() => go(index - 1)} className="size-11">
         <ChevronLeft aria-hidden="true" className={chromeIconClass} />
       </Button>
-      <span aria-live="polite" className="num text-label text-fg-1">
+      <span aria-live="polite" className="num text-label text-foreground">
         {fmtMonthYear(months[index])}
       </span>
       <Button ref={next} variant="ghost" icon aria-label="Next month" disabled={atEnd} onClick={() => go(index + 1)} className="size-11">
@@ -94,19 +94,19 @@ export function RentRollByMonth({
   const [index, setIndex] = useState(startIndex);
   const month = months[index];
   const total = portfolioByMonth[month];
-  const dash = <span className="text-fg-3">—</span>;
+  const dash = <span className="text-muted-foreground">—</span>;
   return (
     <div className="space-y-3">
       <MonthStepper months={months} index={index} onChange={setIndex} />
       {/* Rent billed on accrual, received on cash (integration decision 10). */}
       {total != null ? (
-        <p className="text-figure-m text-fg-1">
-          <Money value={total / 100} /> <span className="text-body text-fg-3">{basis === "CASH" ? "received" : "billed"}</span>
+        <p className="text-figure-m text-foreground">
+          <Money value={total / 100} /> <span className="text-body text-muted-foreground">{basis === "CASH" ? "received" : "billed"}</span>
         </p>
       ) : (
-        <p className="flex h-7 items-center text-body text-fg-3">No rent {basis === "CASH" ? "received" : "billed"}</p>
+        <p className="flex h-7 items-center text-body text-muted-foreground">No rent {basis === "CASH" ? "received" : "billed"}</p>
       )}
-      <ul className="divide-y divide-line">
+      <ul className="divide-y divide-border">
         {rows.map((r) => {
           const cents = r.byMonth[month];
           const notYet = r.purchaseMonth != null && month < r.purchaseMonth;
@@ -119,7 +119,7 @@ export function RentRollByMonth({
                 {cents ? (
                   <Money value={cents / 100} />
                 ) : notYet ? (
-                  <span className="text-meta text-fg-3">Bought {fmtMonthYear(r.purchaseMonth!)}</span>
+                  <span className="text-meta text-muted-foreground">Bought {fmtMonthYear(r.purchaseMonth!)}</span>
                 ) : (
                   dash
                 )}
@@ -138,7 +138,7 @@ export function RentRollByMonth({
       </ul>
       <div className={cn("flex min-h-12 items-center justify-between gap-3", grandTotalRow)}>
         <span>Portfolio</span>
-        <span className="text-right">{total != null ? <Money value={total / 100} /> : <span className="font-normal text-fg-3">—</span>}</span>
+        <span className="text-right">{total != null ? <Money value={total / 100} /> : <span className="font-normal text-muted-foreground">—</span>}</span>
       </div>
     </div>
   );

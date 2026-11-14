@@ -296,7 +296,7 @@ export function useUndoableRemove() {
  *
  * `slots` is the Mark done sheet's proof slots (uploads 2.8): in a grid, the
  * count of finished-work photos the playbook asks for (one on an optional
- * job). Slots not yet holding a photo are empty `--fill-1` squares with a
+ * job). Slots not yet holding a photo are empty `--muted` squares with a
  * Camera (solid, never dashed) after the tiles in flight. `leading` is the
  * caller's recorded files (UploadTile `ready`), drawn first in the same grid,
  * and `filled` is how many there are, so they count. A tap opens `onSlot`, by
@@ -305,8 +305,8 @@ export function useUndoableRemove() {
  * `disabled` turns the slots and the add tile off (a Mark done sending: a
  * photo picked then wouldn't go with it); `label` names the list.
  *
- * `onFill` is for a tray on a `--fill-1` ground (an Internal note): the
- * Remove badge's ring takes that ground instead of `--surface`.
+ * `onFill` is for a tray on a `--muted` ground (an Internal note): the
+ * Remove badge's ring takes that ground instead of `--background`.
  */
 export function MediaUploadTray({
   uploader,
@@ -342,7 +342,7 @@ export function MediaUploadTray({
   const empty = slotted ? Math.max(0, slots - filled - uploads.filter((u) => u.status !== "invalid").length) : 0;
   const open = onSlot ?? (coarse ? uploader.takePhoto : uploader.chooseFiles);
   const slotClass =
-    "relative flex aspect-square w-full items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge transition-colors disabled:opacity-50 not-disabled:hover:text-fg-2";
+    "relative flex aspect-square w-full items-center justify-center rounded-lg bg-muted text-muted-foreground inset-shadow-photo-edge transition-colors disabled:opacity-50 not-disabled:hover:text-fg-2";
   return (
     <div className={cn("space-y-1.5", className)}>
       <ul aria-label={label} className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2" : "flex flex-wrap gap-2"}>
@@ -419,7 +419,7 @@ export function UploadTile({
   upload: MediaUpload;
   grid: boolean;
   ready?: boolean;
-  /** On a `--fill-1` ground: Remove's ring is that ground. */
+  /** On a `--muted` ground: Remove's ring is that ground. */
   onFill?: boolean;
   onRetry?: () => void;
   onRemove?: () => void;
@@ -441,7 +441,7 @@ export function UploadTile({
   return (
     <li
       aria-label={`${u.name}, ${label}`}
-      className={cn("relative rounded-lg bg-fill-1", grid ? "aspect-square w-full" : "h-14 w-14 shrink-0")}
+      className={cn("relative rounded-lg bg-muted", grid ? "aspect-square w-full" : "h-14 w-14 shrink-0")}
     >
       <div className="absolute inset-0 overflow-hidden rounded-lg">
         {photo && (
@@ -453,7 +453,7 @@ export function UploadTile({
           <video src={`${u.previewUrl}#t=0.1`} muted playsInline preload="metadata" onError={() => setBroken(true)} className="h-full w-full object-cover" />
         )}
         {typed && (
-          <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-fg-3">
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-muted-foreground">
             <Glyph className="size-5" strokeWidth={1.5} aria-hidden="true" />
             <span className="text-micro">{typed.label}</span>
           </span>
@@ -481,7 +481,7 @@ export function UploadTile({
         <div
           className={cn(
             "pointer-events-none absolute inset-0 rounded-lg",
-            failed ? "ring-2 ring-inset ring-danger" : "inset-shadow-photo-edge",
+            failed ? "ring-2 ring-inset ring-destructive" : "inset-shadow-photo-edge",
           )}
         />
       </div>
@@ -507,8 +507,8 @@ export function UploadTile({
           className={cn(
             // A square 20px badge: an icon-only button is square, never round. Its 1px ring is the tile's ground, so it
             // doesn't show a pale halo on an Internal note.
-            "absolute flex h-5 w-5 items-center justify-center rounded-sm bg-act text-on-act ring-1",
-            onFill ? "ring-fill-1" : "ring-surface",
+            "absolute flex h-5 w-5 items-center justify-center rounded-sm bg-primary text-primary-foreground ring-1",
+            onFill ? "ring-muted" : "ring-background",
             // On the corner of a 56px tile. A grid tile runs to the tray's edge, so its X sits inside: the 44px
             // touch area then reaches 8px out, short of Send in the gap beside it and of the Retry pill on the
             // tile above (gap 8px; the pill's area stops 2px above its tile's bottom).
@@ -536,7 +536,7 @@ export function UploadTile({
  * photos uploaded" (Done or Canceled) or "Too late to add 2 photos" (still in
  * Review), also with no Retry. Every red tile counts, final ones too, as the
  * queue's toast counts them (media.ts redTilesLine). With nothing failed but files held
- * for a signal it is "No signal · 5 photos waiting" in `--fg-3` ("No signal ·
+ * for a signal it is "No signal · 5 photos waiting" in `--muted-foreground` ("No signal ·
  * 5 waiting" under 360px). Files held for the upload code instead (`paused`)
  * read "Uploads paused · Reload", or "Uploads paused, still trying" where a
  * reload would lose a file. Nothing while all is well.
@@ -548,7 +548,7 @@ export function UploadStatusLine({ uploader, className }: { uploader: MediaUploa
     if (held.some((u) => u.paused)) {
       const reload = uploader.reload;
       return (
-        <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-fg-3", className)}>
+        <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-muted-foreground", className)}>
           <span className="truncate">{reload ? UPLOADS_PAUSED_LINE : UPLOADS_RETRYING_LINE}</span>
           {reload && (
             <>
@@ -566,7 +566,7 @@ export function UploadStatusLine({ uploader, className }: { uploader: MediaUploa
       );
     }
     return (
-      <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-fg-3", className)}>
+      <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-muted-foreground", className)}>
         <span className="truncate max-[359px]:hidden">No signal · {uploadCountPhrase(held.map((u) => u.kind))} waiting</span>
         <span className="truncate min-[360px]:hidden">No signal · {held.length} waiting</span>
       </p>
@@ -576,7 +576,7 @@ export function UploadStatusLine({ uploader, className }: { uploader: MediaUploa
   // The same words and count the queue's toast uses when the page is gone (media.ts redTilesLine).
   const line = redTilesLine(uploader.uploads)?.text || `${uploader.failed} ${uploader.failed === 1 ? "file" : "files"} didn't upload`;
   return (
-    <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-danger", className)}>
+    <p className={cn("flex min-w-0 items-center justify-center gap-1 text-meta text-destructive", className)}>
       <span className="truncate">{line}</span>
       {retryable.length > 0 && (
         <>

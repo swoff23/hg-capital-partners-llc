@@ -163,7 +163,7 @@ export function PortalAccessCard({
             <MenuTrigger>
               <AriaButton
                 aria-label="Portal access actions"
-                className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "-mr-2 text-fg-3 data-pressed:bg-fill-1")}
+                className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "-mr-2 text-muted-foreground data-pressed:bg-muted")}
               >
                 <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="size-4" />
               </AriaButton>
@@ -188,7 +188,7 @@ export function PortalAccessCard({
       <div className="space-y-3">
         {!account && invite && (
           <div className="space-y-2">
-            <p className="text-meta text-fg-3">{invite.line}</p>
+            <p className="text-meta text-muted-foreground">{invite.line}</p>
             {!archived && (
               <Button
                 variant="secondary"
@@ -205,7 +205,7 @@ export function PortalAccessCard({
         )}
         {!account && !invite && (
           <div className="space-y-2">
-            <p className="text-meta text-fg-3">No login yet.</p>
+            <p className="text-meta text-muted-foreground">No login yet.</p>
             {offers.create && (
               <Button
                 onClick={() => {
@@ -222,23 +222,23 @@ export function PortalAccessCard({
         {account && (
           <>
             <dl className={detailRow}>
-              <dt className="text-meta text-fg-3">Email</dt>
+              <dt className="text-meta text-muted-foreground">Email</dt>
               <dd className="min-w-0">
                 {/* The address they sign in with wraps rather than truncating, as the Contact rail's values do. */}
-                <p className="text-body text-fg-1 wrap-anywhere">{account.email}</p>
-                {account.line && <p className="truncate text-meta text-fg-3">{account.line}</p>}
+                <p className="text-body text-foreground wrap-anywhere">{account.email}</p>
+                {account.line && <p className="truncate text-meta text-muted-foreground">{account.line}</p>}
               </dd>
             </dl>
             {setupLine && account.state !== "off" && (
               <dl className={detailRow}>
-                <dt className="text-meta text-fg-3">Setup</dt>
-                <dd className="min-w-0 text-body text-fg-1">{setupLine}</dd>
+                <dt className="text-meta text-muted-foreground">Setup</dt>
+                <dd className="min-w-0 text-body text-foreground">{setupLine}</dd>
               </dl>
             )}
             {account.state !== "off" && (
               <div>
                 <dl className={cn(detailRow, "items-center")}>
-                  <dt className="text-meta text-fg-3">Job emails</dt>
+                  <dt className="text-meta text-muted-foreground">Job emails</dt>
                   <dd className="min-w-0">
                     <InlineSwitch
                       label="Job emails"
@@ -287,7 +287,7 @@ export function PortalAccessCard({
                 </Button>
               )
             ) : (
-              <div className={cn(account.state !== "off" && "border-t border-line pt-3")}>
+              <div className={cn(account.state !== "off" && "border-t border-border pt-3")}>
                 <Button variant="danger" size="sm" disabled={pending} onClick={() => setConfirm("remove")}>
                   Remove access
                 </Button>
@@ -296,7 +296,7 @@ export function PortalAccessCard({
           </>
         )}
 
-        {error && <p className="text-meta text-danger">{error}</p>}
+        {error && <p className="text-meta text-destructive">{error}</p>}
       </div>
 
       {/* Mounted on "no login yet", not on offers.create: a tab loaded before the contractor was archived can have this
@@ -582,9 +582,9 @@ function PayoffSheet({
       }
     >
       <div className="space-y-3 p-4">
-        <p className="text-meta text-fg-3 wrap-anywhere">Starting password for {shown.email}</p>
+        <p className="text-meta text-muted-foreground wrap-anywhere">Starting password for {shown.email}</p>
         <Code value={shown.password} label="Starting password" size="lg" />
-        <p className="text-meta text-fg-3">Shown once. {first} picks their own at first sign-in.</p>
+        <p className="text-meta text-muted-foreground">Shown once. {first} picks their own at first sign-in.</p>
       </div>
     </Sheet>
   );

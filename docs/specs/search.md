@@ -27,9 +27,9 @@ Visual rules come from `docs/brand-guidelines.md` (sections 2, 3, 5, 6, 7 and 9)
 
 **New**, in `src/components/command-palette.tsx`. It replaces the `GlobalSearch` input in `src/components/app-shell.tsx` and keeps its slot (`min-w-0 max-w-md flex-1`, after the lockup).
 
-- A React Aria `Button` drawn with `fieldClass` from `ui.tsx`: `--surface`, 1px `--line-control`, `rounded-md`. 36px with a mouse, 44px on touch.
-- Leading lucide `Search` at `chromeIconClass` in `--fg-3`, with the 32px left padding section 9 allows when a search icon leads.
-- The word "Search" in `text-body` `--fg-3`. That is the whole label (SHELL-037, COPY-035). It is 52px at 16px, so it shows in full at 320.
+- A React Aria `Button` drawn with `fieldClass` from `ui.tsx`: `--background`, 1px `--input`, `rounded-md`. 36px with a mouse, 44px on touch.
+- Leading lucide `Search` at `chromeIconClass` in `--muted-foreground`, with the 32px left padding section 9 allows when a search icon leads.
+- The word "Search" in `text-body` `--muted-foreground`. That is the whole label (SHELL-037, COPY-035). It is 52px at 16px, so it shows in full at 320.
 - Trailing `Kbd` "⌘K" ("Ctrl K" off a Mac), 8px in from the right edge. `Kbd` already hides under `pointer: coarse`. The "/" key works too but isn't printed (FEEL-I05 asked for a "/" keycap; one chip is enough).
 - `aria-label="Search"`, `aria-haspopup="dialog"`, `aria-keyshortcuts="Meta+K Control+K /"`.
 - No hover style, since fields have none in section 9.
@@ -49,9 +49,9 @@ Visual rules come from `docs/brand-guidelines.md` (sections 2, 3, 5, 6, 7 and 9)
 
 | Width and pointer | Container | Position and size | Level |
 |---|---|---|---|
-| Fine pointer, md and up (laptop 1280) | Floating panel | `min(640px, 100vw - 48px)` wide, top at 20vh, centered | Float: `--raised`, 1px `--line-float`, `shadow-float`, `rounded-lg`, no scrim |
+| Fine pointer, md and up (laptop 1280) | Floating panel | `min(640px, 100vw - 48px)` wide, top at 20vh, centered | Float: `--popover`, 1px `--line-float`, `shadow-float`, `rounded-lg`, no scrim |
 | Coarse pointer, md and up (tablet 768, iPad landscape) | Floating panel | Same width, top 16px under the bar (`--app-bar-h`). Height capped by `window.visualViewport`, so the software keyboard never covers the last row | Float, no scrim |
-| Below md (phone 375 and 320) | Full screen | `inset-0`, `100dvh`, top padding `env(safe-area-inset-top)`, no radius | `--raised`, no scrim or shadow, since nothing shows behind it |
+| Below md (phone 375 and 320) | Full screen | `inset-0`, `100dvh`, top padding `env(safe-area-inset-top)`, no radius | `--popover`, no scrim or shadow, since nothing shows behind it |
 
 - Opens and closes at `--dur-0` at every size. Section 7 sets 0ms for the command palette, so the phone gets no sheet slide either.
 - The title "Search" is for screen readers only (`hideTitle`, which `Sheet` already has).
@@ -69,19 +69,19 @@ Visual rules come from `docs/brand-guidelines.md` (sections 2, 3, 5, 6, 7 and 9)
 From top to bottom:
 
 1. **Input row.** 48px with a mouse, 56px on touch (**new** heights).
-   - Leading `Search` icon (16 at 1.5 stroke, 20 at 1.75 on touch, `--fg-3`), centered on the rows' 32px leading-slot column, so the icon, every photo tile and every mark share one vertical line. The typed text starts on the rows' title edge.
-   - Input in `text-body`, placeholder "Search or jump to" in `--fg-3`. Borderless inside the panel, the look AssigneePicker's search row already has. A `--line` rule under the row.
+   - Leading `Search` icon (16 at 1.5 stroke, 20 at 1.75 on touch, `--muted-foreground`), centered on the rows' 32px leading-slot column, so the icon, every photo tile and every mark share one vertical line. The typed text starts on the rows' title edge.
+   - Input in `text-body`, placeholder "Search or jump to" in `--muted-foreground`. Borderless inside the panel, the look AssigneePicker's search row already has. A `--border` rule under the row.
    - A clear button (lucide `X`, 44px hit area on touch, `aria-label="Clear search"`) once there is text. WebKit's own cancel button is hidden, as AssigneePicker already does.
    - It is a React Aria `TextField`, not `SearchField`, so Esc reaches the modal and closes it instead of clearing the text.
    - `type="search"`, `enterKeyHint="search"`, `autoCorrect="off"`, `autoCapitalize="off"`, `spellCheck={false}`, `autoComplete="off"`. 16px text on touch, the iOS zoom guard.
    - **Phone:** the row holds a bordered `SearchInput` (2.9) at 44px, then "Cancel" as a ghost sm button (72px wide on touch), 8px apart, on the 16px gutters. The field is about 208px at 320 and 263px at 375; at 320 that leaves 126px of typing room beside the clear button. The placeholder is "Search", because "Search or jump to" (130px) doesn't fit beside Cancel at 320.
-2. **Scope band**, only after "See all" (Choice 2, recommended B). 36px (44 touch). Lucide `ArrowLeft` and "All results" in `text-meta` 500 `--fg-2`, the `BackLink` look, with the total at the right in `--fg-3`: "40 tasks".
+2. **Scope band**, only after "See all" (Choice 2, recommended B). 36px (44 touch). Lucide `ArrowLeft` and "All results" in `text-meta` 500 `--fg-2`, the `BackLink` look, with the total at the right in `--muted-foreground`: "40 tasks".
 3. **List region.** It scrolls.
    - Max height `min(60vh, 480px)` with a mouse (**new**, the SHELL-011 number). On a tablet the visual viewport bounds it. On a phone it fills the screen under the input row.
-   - Group headers: `text-meta` 500 `--fg-3`, sentence case, 28px, AssigneePicker's `headerClass`. Each sticks to the top of the list on `--raised` and clips at the input row's rule.
-   - Rows (2.4). The highlight is `--fill-2` on `rounded-sm`, the menu and listbox rule inside a raised layer. With a mouse, panel padding 4px plus row padding 8px puts the slot 12px from the panel edge. On the phone, list padding 8px plus row padding 8px puts the slot on the 16px gutter, so the field's search icon and the slot share a center at x 32.
+   - Group headers: `text-meta` 500 `--muted-foreground`, sentence case, 28px, AssigneePicker's `headerClass`. Each sticks to the top of the list on `--popover` and clips at the input row's rule.
+   - Rows (2.4). The highlight is `--accent` on `rounded-sm`, the menu and listbox rule inside a raised layer. With a mouse, panel padding 4px plus row padding 8px puts the slot 12px from the panel edge. On the phone, list padding 8px plus row padding 8px puts the slot on the 16px gutter, so the field's search icon and the slot share a center at x 32.
    - A group with more than 4 matches ends in a "See all 40 tasks" row: 40px (48 touch), `text-body` `--fg-2`, no mark, its text on the title edge.
-4. **Footer.** Fine pointer, md and up only. 36px (**new**), a `--line` rule above, `text-meta` `--fg-3` with `Kbd`: "↑↓ Move", "↵ Open", "⌘↵ New tab", "Esc Close", 16px apart. Mercury, Devin and Magnific print the same four.
+4. **Footer.** Fine pointer, md and up only. 36px (**new**), a `--border` rule above, `text-meta` `--muted-foreground` with `Kbd`: "↑↓ Move", "↵ Open", "⌘↵ New tab", "Esc Close", 16px apart. Mercury, Devin and Magnific print the same four.
 
 A visually hidden `aria-live="polite"` line reads "12 results", "No matches for elmwood" or the error line once each request settles. Today screen readers hear nothing.
 
@@ -93,15 +93,15 @@ A visually hidden `aria-live="polite"` line reads "12 results", "No matches for 
   - **Status column**, 100px (104 touch), left-aligned. Section 9 asks every status to read as glyph plus one word in a fixed column, so the word sits here, not after the title: the task status, the deal stage, or the contractor's Inactive tag. It fits the longest word, "4 - To Schedule" (92px at 13px).
   - **Edge column**, 80px (88 touch), right-aligned and tabular: a task's date or a deal's asking price. A task's assignee avatar sits just before it, as section 5's one-line task rows set.
 - **Two lines below 480px**, 60px, the section 5 phone row. The status word leads the subline in the mark's tone (section 9).
-- Title in `text-body` `--fg-1`. Meta in `text-meta` `--fg-3`.
+- Title in `text-body` `--foreground`. Meta in `text-meta` `--muted-foreground`.
 
 | Type | Leading slot | Title | Meta (one line) | Status column | Edge column | Below 480: line 2 |
 |---|---|---|---|---|---|---|
 | Property | `PhotoThumb` 32, decorative (`alt=""`). The House tile for now: no property photo field exists yet (the uploads spec adds it) | `shortAddress(address) \|\| address`, the Portfolio name (IA-I14) | Unit count (`propertyUnitCount`) and owner: "4 units · HG Buffalo Holding 1 LLC" | Empty | Empty | "4 units". The owner drops |
-| Task | `StatusMark`, 14px (16 touch), centered in the slot | Title. Canceled is struck through in `--fg-3` | The property's or deal's short address | Status word in `STATUS_TONE` | Assignee `Avatar` 20 (an outline square for a contractor), then the date from `dayLabel`, plain text. Overdue (`isOverdue` in `lib/tasks/list.ts`) is the real date in `--danger`. Undated leaves the column empty: the task list's "Due date" chip is a button and can't sit inside a link | Line 1 keeps the date at the right. Line 2 is "Review · 767 Prospect Ave" with the avatar at the right (section 5 task rows) |
+| Task | `StatusMark`, 14px (16 touch), centered in the slot | Title. Canceled is struck through in `--muted-foreground` | The property's or deal's short address | Status word in `STATUS_TONE` | Assignee `Avatar` 20 (an outline square for a contractor), then the date from `dayLabel`, plain text. Overdue (`isOverdue` in `lib/tasks/list.ts`) is the real date in `--destructive`. Undated leaves the column empty: the task list's "Due date" chip is a button and can't sit inside a link | Line 1 keeps the date at the right. Line 2 is "Review · 767 Prospect Ave" with the avatar at the right (section 5 task rows) |
 | Deal | `DealStageMark` | Short address | Empty | Stage name in the `DealStage` tone (`--fg-2`, Closed `--ok`) | Asking price (`theirPrice`) as `Money`, `text-meta` `--fg-2` | Line 1 keeps the price at the right. Line 2 is the stage |
 | Contractor | `Avatar` 24 with `outline` (the contractor square) | Full name | Trade and company: "Plumbing · Ortiz Plumbing" (`cleanTrades`) | An "Inactive" Tag when the contact isn't active | Empty | Trade only; the company drops. The Tag stays at the right |
-| Go to | The page's lucide icon from `nav.tsx` (16, 20 touch, `--fg-3`) | Page name | Parent section when it's a tab: "Financials" | Empty | Empty | The parent section |
+| Go to | The page's lucide icon from `nav.tsx` (16, 20 touch, `--muted-foreground`) | Page name | Parent section when it's a tab: "Financials" | Empty | Empty | The parent section |
 | Create | Lucide `Plus` | "New task", "Apply playbook", "New deal", "New property" | The record it applies to, when there is one: "767 Prospect Ave" | Empty | Its key, once SHELL-052 ships | The record. A one-line 48px row when there is none |
 | Add as a deal | Lucide `Plus` | 'Add "12 Elmwood Ter" as a deal', with the words as typed | Empty | Empty | Empty | One line, 48px (216px at 16px, fits at 320) |
 
@@ -121,8 +121,8 @@ The order is Recent, then Create, then Go to.
 - Kept on the server (RecentView, 2.10), so Connor's laptop and phone share one list.
 - Recent records, not recent searches. MOBILE-008 asked for recent searches, but a record opens in one tap where a past search needs a second. Linear Mobile, Todoist and Notion show recently viewed records.
 - Opening a record puts it on top next time, which closes the loop on what you just did.
-- With no recents, one line in `text-meta` `--fg-3`: "Search by address, name or task." Apple HIG asks the empty field to say what's searchable. At 14px it is 212px wide, so it fits at 320.
-- Fetched when the palette opens, then held in memory for the session and refreshed after each navigation, so a reopen is instant. On the first open only, 5 static `--fill-1` skeleton rows hold its place.
+- With no recents, one line in `text-meta` `--muted-foreground`: "Search by address, name or task." Apple HIG asks the empty field to say what's searchable. At 14px it is 212px wide, so it fits at 320.
+- Fetched when the palette opens, then held in memory for the session and refreshed after each navigation, so a reopen is instant. On the first open only, 5 static `--muted` skeleton rows hold its place.
 
 **Create**
 - New task (`/tasks/new`), New deal (`/deals/new`), New property (`/properties/new`). There is no New contractor route, so SHELL-031's third item waits for the forms spec.
@@ -143,12 +143,12 @@ The order is Recent, then Create, then Go to.
 |---|---|---|
 | Open, empty query | Recent, Create, Go to | Header words only |
 | First open, Recent loading | Create and Go to at once, 5 static skeleton rows for Recent (no shimmer, section 7) | None |
-| One character, nothing local matches | One line in `--fg-3` | "Keep typing to search records." |
+| One character, nothing local matches | One line in `--muted-foreground` | "Keep typing to search records." |
 | Typing, first request, nothing on screen yet | 3 static skeleton rows shaped like the finished row | None |
 | Typing, rows on screen | The rows stay until new ones arrive, with no flash to empty. After 200ms the leading icon becomes a `Spinner` and stays at least 400ms (section 7), so the clear button never moves | None |
 | Results | Groups in a fixed order: Properties, Tasks, Deals, Contractors. 4 rows each, then "See all N" | "See all 40 tasks" |
 | A command's label starts with the query | Up to 3 Go to or Create rows lead the list ("rent" puts Rent roll first) | None |
-| No match | One line in `text-body` `--fg-3` in the list | 'No matches for "elmwood".' |
+| No match | One line in `text-body` `--muted-foreground` in the list | 'No matches for "elmwood".' |
 | No match, address-shaped query (a house number, then a word) and no property or deal matched | The line, then one Create row that opens New deal with the address filled in | 'Add "12 Elmwood Ter" as a deal' |
 | No match in a scope, hits elsewhere | The line, then one row back to what did match | 'No tasks match "elmwood".' then "See 3 deals" |
 | Request failed or offline | The old rows clear. Recent, Create and Go to stay, since they don't need the server | "Search didn't load." with a Retry button (secondary, sm) |
@@ -179,7 +179,7 @@ The order is Recent, then Create, then Go to.
 
 ### 2.8 Touch
 
-- No hover anywhere. A row fills `--fill-2` only while pressed (`data-pressed`). `Kbd` and the footer are hidden.
+- No hover anywhere. A row fills `--accent` only while pressed (`data-pressed`). `Kbd` and the footer are hidden.
 - Nothing is highlighted until an arrow key moves the highlight, so the keyboard's Search key has no row to open: it blurs the input and drops the keyboard, and every row is then in view. On an iPad with a hardware keyboard, the arrows and Enter still work.
 - Targets: rows 48 (one line) or 60 (two lines), "See all" 48, Cancel 44, clear 44.
 - The first drag in the list blurs the input too, as native lists do.
@@ -190,7 +190,7 @@ The order is Recent, then Create, then Go to.
 
 **New** `SearchInput` in `src/components/search-field.tsx`, on React Aria `SearchField`. It replaces three hand-rolled copies: the deals filter field, the tasks filter field and AssigneePicker's search row.
 
-- Leading lucide `Search` (`chromeIconClass`, `--fg-3`) with 32px of left padding (36 on touch, as the deals field has today). A clear button once there is text. The native WebKit cancel button is hidden, as AssigneePicker already does.
+- Leading lucide `Search` (`chromeIconClass`, `--muted-foreground`) with 32px of left padding (36 on touch, as the deals field has today). A clear button once there is text. The native WebKit cancel button is hidden, as AssigneePicker already does.
 - **Esc.** On a page (filter bars) Esc clears the text; a field isn't a layer. Inside a layer (`bare`, AssigneePicker's popover or sheet) Esc closes the layer in one press, as the palette does. Today AssigneePicker's first Esc only clears the text.
 - `variant="field"`: the `fieldClass` look. `size="sm"` is 32px and `"md"` 36px with a mouse; both are at least 44px on touch.
 - `variant="bare"`: borderless, for a row inside a popover (AssigneePicker).
@@ -304,21 +304,21 @@ model RecentView {
 
 | Part | Tokens and classes |
 |---|---|
-| Palette surface | `--raised`, 1px `--line-float` (`--line` light, `--line-strong` dark), `shadow-float`, `rounded-lg` |
-| Phone layer (**new**) | `--raised`, no radius, no scrim, no shadow |
-| Icons | `chromeIconClass`: 16px at 1.5 with a mouse, 20px at 1.75 on touch, `--fg-3` |
-| Input and placeholder | `text-body` `--fg-1`, placeholder `--fg-3`, `--line` rule under the row |
-| Group header | `text-meta` 500 `--fg-3`, sentence case |
-| Row | Title `text-body` `--fg-1`, meta `text-meta` `--fg-3`, highlight `--fill-2` `rounded-sm` |
-| Task status | `StatusMark` and the word in `STATUS_TONE`, in the status column. Canceled title struck through in `--fg-3` |
+| Palette surface | `--popover`, 1px `--line-float` (`--border` light, `--line-strong` dark), `shadow-float`, `rounded-lg` |
+| Phone layer (**new**) | `--popover`, no radius, no scrim, no shadow |
+| Icons | `chromeIconClass`: 16px at 1.5 with a mouse, 20px at 1.75 on touch, `--muted-foreground` |
+| Input and placeholder | `text-body` `--foreground`, placeholder `--muted-foreground`, `--border` rule under the row |
+| Group header | `text-meta` 500 `--muted-foreground`, sentence case |
+| Row | Title `text-body` `--foreground`, meta `text-meta` `--muted-foreground`, highlight `--accent` `rounded-sm` |
+| Task status | `StatusMark` and the word in `STATUS_TONE`, in the status column. Canceled title struck through in `--muted-foreground` |
 | Deal stage | `DealStageMark` tones: `--fg-2`, Closed `--ok`, Pass the slashed ring |
-| Overdue date | `--danger` |
+| Overdue date | `--destructive` |
 | Price | `Money`, tabular, `text-meta` `--fg-2` |
 | Codes (phase 5) | `text-code` `--fg-2` |
 | Inactive | The Tag look: no fill, `--line-strong` edge, `--fg-2`, `text-micro`, 22px. A neutral chip inside a listbox row takes this look (section 9) |
 | Keycaps | `Kbd` |
-| Spinner (**new**) | Lucide `LoaderCircle` at icon size in `--fg-3`, shown after 200ms for at least 400ms (section 7). Under reduced motion it holds still |
-| Skeleton | Static `--fill-1`, no shimmer |
+| Spinner (**new**) | Lucide `LoaderCircle` at icon size in `--muted-foreground`, shown after 200ms for at least 400ms (section 7). Under reduced motion it holds still |
+| Skeleton | Static `--muted`, no shimmer |
 | Motion | `--dur-0` to open and close |
 
 ### 2.14 References
@@ -771,7 +771,7 @@ Today /tasks is 36px with a mouse and 48 on touch, the deals bar 32 and 44 (VISU
 
 | Instance | Becomes | What changes for the user | Kind |
 |---|---|---|---|
-| AssigneePicker's search row on legacy aliases (`text-sm`, `text-muted`, `border-border`, `h-4 w-4`) | `SearchInput` bare, on `text-body`, `text-meta`, `--fg-3`, `--line`, `chromeIconClass` | 16px text on touch as everywhere else; otherwise the same | Fix (applies approved guidelines) |
+| AssigneePicker's search row on legacy aliases (`text-sm`, `text-muted`, `h-4 w-4`) | `SearchInput` bare, on `text-body`, `text-meta`, `--muted-foreground`, `--border`, `chromeIconClass` | 16px text on touch as everywhere else; otherwise the same | Fix (applies approved guidelines) |
 | Esc with text in AssigneePicker clears the text and leaves the popover open | One Esc closes the popover or sheet | One Esc, one layer | Fix |
 
 ### /financials/settings

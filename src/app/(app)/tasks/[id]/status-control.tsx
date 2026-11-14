@@ -148,7 +148,7 @@ export function WaitingReason({ taskId, waitingOn }: { taskId: string; waitingOn
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="max-w-full truncate rounded-sm text-left text-body text-fg-3 transition-colors hover:text-fg-1 pointer-coarse:min-h-11"
+        className="max-w-full truncate rounded-sm text-left text-body text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11"
       >
         Waiting on {waitingOn}
       </button>

@@ -129,7 +129,7 @@ function DealLogBody({
         onSend={({ body, clientId }) => addDealNote(dealId, { body, clientId })}
       />
       {all.length === 0 && inFlight.length === 0 ? (
-        <p className="mt-4 text-body text-fg-3">No activity yet.</p>
+        <p className="mt-4 text-body text-muted-foreground">No activity yet.</p>
       ) : (
         // Focus goes here after a delete, so the keyboard keeps its place in the page.
         <div ref={log} tabIndex={-1} className="mt-4 outline-none">
@@ -170,7 +170,7 @@ function DealLogBody({
                   type="button"
                   aria-expanded={open}
                   onClick={() => setOpened(!open)}
-                  className="rounded-sm text-meta font-medium text-fg-1 underline-offset-3 hover:underline pointer-coarse:min-h-11"
+                  className="rounded-sm text-meta font-medium text-foreground underline-offset-3 hover:underline pointer-coarse:min-h-11"
                 >
                   {open ? "Hide older updates" : `Show ${older} older ${older === 1 ? "update" : "updates"}`}
                 </button>
@@ -343,7 +343,7 @@ function ChangeRow({ change, month }: { change: ChangeEntry; month: boolean }) {
   if (change.fields.length === 1) {
     return (
       <ActivityItem id={`update-${change.id}`} marker="dot">
-        <p className="text-meta text-fg-3">
+        <p className="text-meta text-muted-foreground">
           {change.sentence}
           {time && (
             <>
@@ -375,11 +375,11 @@ function ChangeRow({ change, month }: { change: ChangeEntry; month: boolean }) {
 function FieldLine({ row }: { row: FieldRow }) {
   return (
     <p className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 text-meta sm:grid-cols-[7rem_minmax(0,1fr)]">
-      <span className="min-w-0 truncate text-fg-3">{row.label}</span>
+      <span className="min-w-0 truncate text-muted-foreground">{row.label}</span>
       <span className="flex min-w-0 flex-wrap items-start gap-x-1.5 break-words text-fg-2">
         <Value text={row.from} amount={row.fromAmount} />
         <span className="inline-flex min-w-0 items-start gap-1.5">
-          <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-fg-3" aria-label="to" role="img" />
+          <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-label="to" role="img" />
           <Value text={row.to} amount={row.toAmount} />
         </span>
       </span>
@@ -388,7 +388,7 @@ function FieldLine({ row }: { row: FieldRow }) {
 }
 
 function Value({ text, amount }: { text: string | null; amount: number | null }) {
-  if (text === null) return <span className="text-fg-3">—</span>;
+  if (text === null) return <span className="text-muted-foreground">—</span>;
   return amount !== null ? <Money value={amount} /> : <span className="min-w-0 [overflow-wrap:anywhere]">{text}</span>;
 }
 
@@ -396,7 +396,7 @@ function Value({ text, amount }: { text: string | null; amount: number | null })
 function LineRow({ line, month }: { line: LineEntry; month: boolean }) {
   return (
     <ActivityItem id={`update-${line.id}`} marker="dot">
-      <p className="text-meta text-fg-3 [overflow-wrap:anywhere]">
+      <p className="text-meta text-muted-foreground [overflow-wrap:anywhere]">
         {line.text}
         {line.by && (
           <>

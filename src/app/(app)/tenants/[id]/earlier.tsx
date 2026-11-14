@@ -27,17 +27,17 @@ export function EarlierAtUnit({ leases }: { leases: EarlierLease[] }) {
     <Section title="Earlier at this unit">
       <ul className="-mt-1">
         {leases.map((l) => (
-          <li key={l.id} className="border-b border-line last:border-0">
+          <li key={l.id} className="border-b border-border last:border-0">
             <Link
               href={`/tenants/${l.id}`}
-              className="-mx-2 flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1.5 text-body text-fg-1 transition-colors pointer-fine:hover:bg-fill-1 pointer-coarse:min-h-12"
+              className="-mx-2 flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1.5 text-body text-foreground transition-colors pointer-fine:hover:bg-muted pointer-coarse:min-h-12"
             >
               <span className="min-w-0 truncate">
                 {l.names.join(", ")}
-                <span className="text-fg-3"> · {stay(l)}</span>
+                <span className="text-muted-foreground"> · {stay(l)}</span>
               </span>
               {l.rent !== null && (
-                <span className="shrink-0 text-fg-3 max-sm:hidden">
+                <span className="shrink-0 text-muted-foreground max-sm:hidden">
                   · <Money value={l.rent} />
                 </span>
               )}

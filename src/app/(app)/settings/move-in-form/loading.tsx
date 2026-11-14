@@ -13,12 +13,12 @@ export default function MoveInFormLoading() {
       {[6, 4].map((items, s) => (
         <Section key={s} title={<Block text="text-section" className={rowWidth(s, ["w-20", "w-28"])} />}>
           <div aria-hidden="true" className="space-y-3">
-            <div className="flex items-center gap-6 border-b border-line pb-3">
+            <div className="flex items-center gap-6 border-b border-border pb-3">
               <span className="flex min-h-8 items-center pointer-coarse:min-h-11">
                 <Block text="text-body" className="w-20" />
               </span>
             </div>
-            <div className="divide-y divide-line">
+            <div className="divide-y divide-border">
               {Array.from({ length: items }, (_, i) => (
                 <div key={i} className="py-1.5 pointer-coarse:py-1">
                   <Block className="h-8 w-full rounded-md pointer-coarse:h-11" />

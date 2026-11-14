@@ -554,7 +554,7 @@ export function useDropTarget(
 
 /**
  * The drop state's look, drawn inside a `relative` box that doesn't clip: the
- * field focus look (a 1px `--act` edge and a 1px inset `--act` ring) 8px
+ * field focus look (a 1px `--primary` edge and a 1px inset `--primary` ring) 8px
  * outside the box's content, and, on the target under the pointer, the label
  * at the Float level. Nothing at rest (no dashed box anywhere).
  */
@@ -562,11 +562,11 @@ export function DropLabel({ state, label }: { state: DropTargetState; label: str
   if (!state.active) return null;
   return (
     <>
-      <span aria-hidden="true" className="pointer-events-none absolute -inset-2 z-10 rounded-lg border border-act ring-1 ring-inset ring-act motion-safe:animate-fade-in" />
+      <span aria-hidden="true" className="pointer-events-none absolute -inset-2 z-10 rounded-lg border border-primary ring-1 ring-inset ring-primary motion-safe:animate-fade-in" />
       {state.over && (
         <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <span className="inline-flex items-center gap-2 rounded-lg border border-line-float bg-raised px-3 py-2 text-label text-fg-1 shadow-float animate-pop-in motion-reduce:animate-none">
-            <Upload className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+          <span className="inline-flex items-center gap-2 rounded-lg border border-line-float bg-popover px-3 py-2 text-label text-foreground shadow-float animate-pop-in motion-reduce:animate-none">
+            <Upload className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             {label}
           </span>
         </span>

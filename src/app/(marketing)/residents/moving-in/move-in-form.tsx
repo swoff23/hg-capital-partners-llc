@@ -185,14 +185,14 @@ export function MoveInForm({
   // The payoff: the move-in line art, the resident's own name, who it went to and what happens next.
   if (sent) {
     return (
-      <div role="status" className="flex flex-col items-start gap-5 border-t border-line pt-8">
+      <div role="status" className="flex flex-col items-start gap-5 border-t border-border pt-8">
         <SpotArt name="move-in-sent" />
         <div>
-          <p className={cn(publicType.heading, "text-fg-1")}>Thanks, {sent.name}!</p>
-          <p className={cn(publicType.meta, "mt-2 text-fg-3")}>
+          <p className={cn(publicType.heading, "text-foreground")}>Thanks, {sent.name}!</p>
+          <p className={cn(publicType.meta, "mt-2 text-muted-foreground")}>
             Sent to HG Capital on {sent.day}.{sent.copied ? " We emailed you a copy." : ""}
           </p>
-          <p className={cn(publicType.meta, "mt-1 text-fg-3")}>{AFTER_SEND}</p>
+          <p className={cn(publicType.meta, "mt-1 text-muted-foreground")}>{AFTER_SEND}</p>
         </div>
       </div>
     );
@@ -216,7 +216,7 @@ export function MoveInForm({
       />
 
       <div className="space-y-2">
-        <p className="text-meta text-fg-3">{stepLine(steps, step)}</p>
+        <p className="text-meta text-muted-foreground">{stepLine(steps, step)}</p>
         <Meter value={step + 1} max={steps.length} label="Move-in report progress" valueText={stepLine(steps, step)} spring />
       </div>
 
@@ -276,7 +276,7 @@ export function MoveInForm({
           />
         )}
         {refusal && (
-          <p role="alert" className="text-meta text-danger">
+          <p role="alert" className="text-meta text-destructive">
             {refusal}
           </p>
         )}
@@ -435,7 +435,7 @@ function AboutStep({
             isInvalid={!!problems.date}
             surface="public"
           />
-          {problems.date && <p className="truncate text-meta text-danger">{problems.date}</p>}
+          {problems.date && <p className="truncate text-meta text-destructive">{problems.date}</p>}
         </div>
       </div>
     </Section>
@@ -487,7 +487,7 @@ function RoomStep({
       title={
         <StepTitle headingRef={headingRef}>
           {section.label}
-          {section.minCount === 0 && <span className="ml-2 text-meta font-normal text-fg-3">(optional)</span>}
+          {section.minCount === 0 && <span className="ml-2 text-meta font-normal text-muted-foreground">(optional)</span>}
         </StepTitle>
       }
       actions={
@@ -512,13 +512,13 @@ function RoomStep({
     >
       <div className="space-y-4">
         {instances.map((inst, i) => (
-          <div key={i} className={cn(i > 0 && "border-t border-line pt-4")}>
+          <div key={i} className={cn(i > 0 && "border-t border-border pt-4")}>
             {section.repeatable && (
               <div className="mb-1 flex items-center gap-2">
                 <p
                   ref={i === instances.length - 1 ? added : undefined}
                   tabIndex={-1}
-                  className="shrink-0 text-label text-fg-1 outline-none"
+                  className="shrink-0 text-label text-foreground outline-none"
                 >
                   {section.label} {i + 1}
                 </p>
@@ -540,7 +540,7 @@ function RoomStep({
                 )}
               </div>
             )}
-            <div className="divide-y divide-line">
+            <div className="divide-y divide-border">
               {section.items.map((item) => {
                 const answer = inst.items[item.key] ?? { rating: "", comment: "" };
                 const line = problems[itemKey(section.key, i, item.key)];
@@ -549,7 +549,7 @@ function RoomStep({
                   <div key={item.key} data-invalid={line ? "true" : undefined} className="space-y-2 py-3">
                     {/* Below 640 every item's control sits under its label, from 640 beside it: the width decides, not the label's length. */}
                     <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                      <span className="text-body text-fg-1">{item.label}</span>
+                      <span className="text-body text-foreground">{item.label}</span>
                       <SegmentedControl
                         aria-label={`${item.label} condition`}
                         options={RATING_OPTIONS}
@@ -560,7 +560,7 @@ function RoomStep({
                         onChange={(rating) => onItem(i, item.key, { rating })}
                       />
                     </div>
-                    {line && <p className="truncate text-meta text-danger">{line}</p>}
+                    {line && <p className="truncate text-meta text-destructive">{line}</p>}
                     {/* Said only where there's something to say: after Fair or Poor. */}
                     {flagged && (
                       <FormField label="What's wrong with it?">
@@ -615,14 +615,14 @@ function ReviewStep({
               : `${flagged.length} ${flagged.length === 1 ? "item needs" : "items need"} attention.`}
           </p>
           {flagged.length > 0 && (
-            <ul className="mt-2 divide-y divide-line border-y border-line">
+            <ul className="mt-2 divide-y divide-border border-y border-border">
               {flagged.map((f, i) => (
                 <li key={i} className="flex items-start gap-3 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-body text-fg-1">
-                      {f.item} <span className="text-fg-3">· {f.place}</span>
+                    <p className="text-body text-foreground">
+                      {f.item} <span className="text-muted-foreground">· {f.place}</span>
                     </p>
-                    {f.comment && <p className="mt-0.5 text-meta text-fg-3 [overflow-wrap:anywhere]">{f.comment}</p>}
+                    {f.comment && <p className="mt-0.5 text-meta text-muted-foreground [overflow-wrap:anywhere]">{f.comment}</p>}
                   </div>
                   <span className="shrink-0 text-meta text-fg-2">{f.rating}</span>
                   <button
@@ -650,7 +650,7 @@ function ReviewStep({
             />
           )}
         </FormField>
-        <p className="text-meta text-fg-3">
+        <p className="text-meta text-muted-foreground">
           {property ? `${shortAddress(property.address)}${a.unitLabel ? `, ${a.unitLabel}` : ""}` : "Your report"} goes to HG Capital, and a copy to {a.email.trim() || "you"}.
         </p>
       </div>

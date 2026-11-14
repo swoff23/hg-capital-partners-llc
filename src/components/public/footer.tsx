@@ -2,10 +2,10 @@ import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { publicContainer, publicLinkHover } from "./ui";
 
-/** Bottom of every public page: the legal line and a way to reach us, in --pub-faint over a --line rule. */
+/** Bottom of every public page: the legal line and a way to reach us, in --pub-faint over a --border rule. */
 export function PublicFooter() {
   return (
-    <footer className="border-t border-line">
+    <footer className="border-t border-border">
       <div
         className={cn(
           publicContainer,

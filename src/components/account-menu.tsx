@@ -68,18 +68,18 @@ export function AccountMenu({
       <AriaButton
         aria-label={`Account, ${label}`}
         className={cn(
-          "rounded-md outline-none transition-colors data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-act",
+          "rounded-md outline-none transition-colors data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring",
           sidebar
             ? // 10px in, so the 28px avatar centers on the rail's icons; the words truncate and the collapsed rail clips them.
-              "flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-fill-1 data-pressed:bg-fill-1 pointer-coarse:min-h-11"
-            : "flex size-8 shrink-0 items-center justify-center hover:bg-fill-1 data-pressed:bg-fill-1 pointer-coarse:size-11",
+              "flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted data-pressed:bg-muted pointer-coarse:min-h-11"
+            : "flex size-8 shrink-0 items-center justify-center hover:bg-muted data-pressed:bg-muted pointer-coarse:size-11",
         )}
       >
         <Avatar name={name} email={email} size={28} />
         {sidebar && (
           <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-            <span className="block truncate text-meta font-medium text-fg-1">{label}</span>
-            {name && <span className="block truncate text-meta text-fg-3">{email}</span>}
+            <span className="block truncate text-meta font-medium text-foreground">{label}</span>
+            {name && <span className="block truncate text-meta text-muted-foreground">{email}</span>}
           </span>
         )}
       </AriaButton>

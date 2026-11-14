@@ -12,14 +12,14 @@ const MINUS = "−";
  *   <Money value={p.value} />              // $425,000
  *   <Money value={-1450.5} cents />        // −$1,450.50, the cents raised
  *   <Money value={2300} cents inflow />    // $2,300.00 in --ok, no plus
- *   <Money value={980} failed />           // struck through in --fg-3
+ *   <Money value={980} failed />           // struck through in --muted-foreground
  *
  * `value` is dollars (a number, a numeric string or a Prisma Decimal), as
  * fmtMoney takes it. Cents only on a single transaction line or a bill's key
  * figure; they ride at the cap line in the figure's own color (.cents in
  * globals.css). `inflow` is money in, on transaction lines only. A failed
  * amount sits beside a danger Badge reading "Failed", which the caller
- * places. An empty value is the dash glyph in --fg-3.
+ * places. An empty value is the dash glyph in --muted-foreground.
  */
 export function Money({
   value,
@@ -35,7 +35,7 @@ export function Money({
   className?: string;
 }) {
   const n = toMoneyNumber(value);
-  if (n === null) return <span className={cn("text-fg-3", className)}>—</span>;
+  if (n === null) return <span className={cn("text-muted-foreground", className)}>—</span>;
   const parts = moneyParts(n, cents);
 
   return (
@@ -43,7 +43,7 @@ export function Money({
       className={cn(
         "num whitespace-nowrap",
         inflow && !failed && "text-ok",
-        failed && "text-fg-3 line-through",
+        failed && "text-muted-foreground line-through",
         className,
       )}
     >

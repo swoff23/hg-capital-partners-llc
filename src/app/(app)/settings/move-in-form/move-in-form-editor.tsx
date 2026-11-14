@@ -78,7 +78,7 @@ function SectionEditor({
     <Section title={section.label} className="@container" actions={<AddButton onClick={addItem}>Add item</AddButton>}>
       <div className="space-y-3">
         {/* One row where both fit; on a phone each control takes its own line, so neither row wraps. */}
-        <div className="flex flex-col items-start gap-2 border-b border-line pb-3 @md:flex-row @md:items-center @md:gap-6">
+        <div className="flex flex-col items-start gap-2 border-b border-border pb-3 @md:flex-row @md:items-center @md:gap-6">
           {section.repeatable && (
             <MaxInstances
               value={section.maxCount}
@@ -98,7 +98,7 @@ function SectionEditor({
           />
         </div>
 
-        <div className="divide-y divide-line">
+        <div className="divide-y divide-border">
           {section.items.map((it, ii) => {
             const line = problems[`sections.${index}.items.${ii}.label`];
             return (
@@ -121,7 +121,7 @@ function SectionEditor({
                     aria-label={`Remove ${it.label || "item"}`}
                   />
                 </div>
-                {line && <p className="mt-1 truncate text-meta text-danger">{line}</p>}
+                {line && <p className="mt-1 truncate text-meta text-destructive">{line}</p>}
               </div>
             );
           })}

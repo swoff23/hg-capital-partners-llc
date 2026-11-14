@@ -11,7 +11,7 @@ export type MoneyBarRow = { key: string; label: string; cents: number };
 /**
  * Where money went, ranked (docs/specs/charts.md 2.4): operating expense by
  * category, account or payee. One layout at every size: the label in
- * text-body, its share in --fg-3 and the amount right-aligned on one line,
+ * text-body, its share in --muted-foreground and the amount right-aligned on one line,
  * then a 4px Meter the row's width, scaled to the largest row. A long label
  * truncates before the share. A group whose refunds outran its spend has no
  * meter and no share, just its amount with a true minus; it sorts last, and
@@ -37,7 +37,7 @@ export function MoneyBars({
   const toggle = useRef<HTMLButtonElement>(null);
 
   const shown = rows.filter((r) => r.cents !== 0);
-  if (shown.length === 0) return <p className="text-body text-fg-3">{emptyLabel}</p>;
+  if (shown.length === 0) return <p className="text-body text-muted-foreground">{emptyLabel}</p>;
 
   // Shares are of the groups that spent money, so a refund group nets out of the base.
   const whole = shareBase(shown.map((r) => r.cents));
@@ -77,7 +77,7 @@ export function MoneyBars({
                 type="button"
                 aria-expanded={false}
                 onClick={expand}
-                className="-mx-2 -my-1 block w-[calc(100%+1rem)] rounded-md px-2 py-1 text-left transition-colors hover:bg-fill-1 pointer-coarse:-my-2 pointer-coarse:py-2"
+                className="-mx-2 -my-1 block w-[calc(100%+1rem)] rounded-md px-2 py-1 text-left transition-colors hover:bg-muted pointer-coarse:-my-2 pointer-coarse:py-2"
               >
                 <BarRow
                   label="Everything else"
@@ -121,13 +121,13 @@ function BarRow({
   return (
     <span className="block">
       <span className="flex min-w-0 items-baseline gap-2">
-        <span className="min-w-0 truncate text-body text-fg-1">
+        <span className="min-w-0 truncate text-body text-foreground">
           {label}
           {/* Drops on a narrow list rather than cutting mid-word. */}
-          {more && <span className="text-fg-3 @max-[17rem]:hidden"> {more}</span>}
+          {more && <span className="text-muted-foreground @max-[17rem]:hidden"> {more}</span>}
         </span>
-        {share && <span className="num shrink-0 text-meta text-fg-3">{share}</span>}
-        <span className="ml-auto shrink-0 pl-2 text-body text-fg-1">
+        {share && <span className="num shrink-0 text-meta text-muted-foreground">{share}</span>}
+        <span className="ml-auto shrink-0 pl-2 text-body text-foreground">
           <Money value={cents / 100} />
         </span>
       </span>

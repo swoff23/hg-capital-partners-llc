@@ -589,7 +589,7 @@ export function JobActions({
                 <>
                   <MediaUploadTray uploader={uploader} layout="grid" notice={false} />
                   {ready.length > 0 && (
-                    <p className="mt-1 truncate text-meta text-fg-3">
+                    <p className="mt-1 truncate text-meta text-muted-foreground">
                       {ready.length} upload{ready.length === 1 ? "" : "s"} ready to send
                     </p>
                   )}
@@ -612,7 +612,7 @@ export function JobActions({
         }}
       />
 
-      {/* Sticky bottom bar: the phone chrome, on --canvas over a --line rule. */}
+      {/* Sticky bottom bar: the phone chrome, on --canvas over a --border rule. */}
       {showBar && (
         <ActionBar
           secondary={
@@ -626,7 +626,7 @@ export function JobActions({
           }
           primary={
             step === "review" ? (
-              <Button variant="secondary" disabled className={cn(barButton, "text-fg-3 disabled:opacity-100 max-[360px]:px-2")}>
+              <Button variant="secondary" disabled className={cn(barButton, "text-muted-foreground disabled:opacity-100 max-[360px]:px-2")}>
                 {/* Half the bar on a phone, beside "Add photo/video" for the hour after Mark done: shorter words as the
                     bar narrows, so the label never truncates ("Waiting for review" needs 166px and has no slack
                     until 173px, at 390). Max-[390px] is "below 390", so the first two split there and neither shows
@@ -649,7 +649,7 @@ export function JobActions({
           // The disabled Mark done's one-line reason: uploads still going up, or the red Retry line.
           error={
             finishingLine ? (
-              <p className="text-center text-meta text-fg-3 lg:text-right">{done.line}</p>
+              <p className="text-center text-meta text-muted-foreground lg:text-right">{done.line}</p>
             ) : failed > 0 || waiting > 0 ? (
               <UploadStatusLine uploader={uploader} className="lg:justify-end" />
             ) : null
@@ -688,7 +688,7 @@ export function JobActions({
               {failed > 0 || (waiting > 0 && pending === 0) ? (
                 <UploadStatusLine uploader={uploader} className="md:justify-end" />
               ) : done.line ? (
-                <p className="truncate text-center text-meta text-fg-3 md:text-right">{done.line}</p>
+                <p className="truncate text-center text-meta text-muted-foreground md:text-right">{done.line}</p>
               ) : null}
             </div>
           )
@@ -697,10 +697,10 @@ export function JobActions({
         {sheetState === "ask" ? (
           <div className="space-y-4 p-4">
             <div className="flex items-baseline justify-between gap-3">
-              <p className="min-w-0 text-body font-medium text-fg-1">
+              <p className="min-w-0 text-body font-medium text-foreground">
                 {required > 0 ? "Photos of the finished work" : "Add photos of the finished work?"}
               </p>
-              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">{finishCountLabel(required, sheetReady.length)}</span>}
+              {required > 0 && <span className="shrink-0 text-meta tabular-nums text-muted-foreground">{finishCountLabel(required, sheetReady.length)}</span>}
             </div>
             {/* The photos already up, then the ones going up, then empty slots up to the count asked for (one on an
                 optional job), solid squares, never dashed; once the count is met, one add tile remains. */}
@@ -796,7 +796,7 @@ function Payoff({
       ) : (
         <SpotArt name="job-done" className="motion-safe:animate-pop-in" />
       )}
-      <h2 ref={heading} tabIndex={-1} className="mt-4 text-title text-balance text-fg-1 outline-none">
+      <h2 ref={heading} tabIndex={-1} className="mt-4 text-title text-balance text-foreground outline-none">
         Thanks, {firstName}!
       </h2>
       {received.length > 0 && (
@@ -806,7 +806,7 @@ function Payoff({
               <StripThumb item={r} />
             </li>
           ))}
-          {more > 0 && <li className="text-meta tabular-nums text-fg-3">+{more}</li>}
+          {more > 0 && <li className="text-meta tabular-nums text-muted-foreground">+{more}</li>}
         </ul>
       )}
       <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">{payoffLine(to, getsEmail)}</p>
@@ -832,7 +832,7 @@ function StripThumb({ item }: { item: Recorded }): ReactNode {
   const src = previewOf(item);
   if (!src) {
     return (
-      <span className="flex h-9 w-12 items-center justify-center rounded-lg bg-fill-1 text-fg-3 inset-shadow-photo-edge" aria-hidden="true">
+      <span className="flex h-9 w-12 items-center justify-center rounded-lg bg-muted text-muted-foreground inset-shadow-photo-edge" aria-hidden="true">
         <Play className="size-4" />
       </span>
     );

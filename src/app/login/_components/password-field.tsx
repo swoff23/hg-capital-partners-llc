@@ -35,9 +35,9 @@ export function PasswordField(props: Omit<React.ComponentProps<"input">, "type" 
         onMouseDown={(e) => e.preventDefault()}
         aria-pressed={shown}
         aria-label={shown ? "Hide password" : "Show password"}
-        className="group absolute top-1/2 right-0 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-fg-3 outline-none transition-colors hover:text-fg-1"
+        className="group absolute top-1/2 right-0 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-md group-focus-visible:ring-2 group-focus-visible:ring-act">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md group-focus-visible:ring-2 group-focus-visible:ring-ring">
           {shown ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
         </span>
       </button>

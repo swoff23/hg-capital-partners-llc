@@ -8,7 +8,7 @@ import { trailingMonths } from "@/lib/quickbooks/months";
 /**
  * The Overview while QuickBooks figures load (charts 4; brand section 7,
  * skeletons): the page holds its shape. The control row and source line
- * keep their height, the strip's labels draw at once over --fill-1 figure
+ * keep their height, the strip's labels draw at once over --muted figure
  * blocks, and the month chart and expense card draw their frames. Static,
  * no shimmer. In the Overview's own route group, so the Rent roll and
  * Settings tabs don't borrow its shape. References: Mercury's loading
@@ -34,7 +34,7 @@ export default function FinancialsOverviewLoading() {
         <MonthBarsSkeleton size="overview" months={months} />
         <Card aria-busy="true">
           <CardHeader className="py-2.5">
-            <h2 className="text-section text-fg-1">Operating expense</h2>
+            <h2 className="text-section text-foreground">Operating expense</h2>
             <Block className="mt-1 h-4 w-48" />
           </CardHeader>
           <CardBody>

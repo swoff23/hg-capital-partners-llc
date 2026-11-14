@@ -97,7 +97,7 @@ export function PeriodRow({ period, basis }: { period: PeriodKey; basis: QboBasi
         <span className="truncate">
           {PERIOD_LABEL[period]} · {basis === "CASH" ? "Cash" : "Accrual"}
         </span>
-        <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 text-fg-3" />
+        <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
       </button>
       <div className="shrink-0">
         <RefreshButton />
@@ -105,11 +105,11 @@ export function PeriodRow({ period, basis }: { period: PeriodKey; basis: QboBasi
       <Sheet title="Period and basis" isOpen={open} onOpenChange={setOpen}>
         <div className="space-y-4 p-4 md:w-96">
           <div className="space-y-2">
-            <p className="text-meta text-fg-3">Period</p>
+            <p className="text-meta text-muted-foreground">Period</p>
             <PeriodControl period={period} size="md" fullWidth />
           </div>
           <div className="space-y-2">
-            <p className="text-meta text-fg-3">Basis</p>
+            <p className="text-meta text-muted-foreground">Basis</p>
             <BasisControl basis={basis} size="md" fullWidth />
           </div>
         </div>

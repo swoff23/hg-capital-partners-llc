@@ -47,7 +47,7 @@ export function ErrorScreen({ error, retry }: { error: Error & { digest?: string
 
   return (
     <div className="max-w-prose py-8">
-      <h1 className="text-title text-balance text-fg-1">{cause === "unknown" ? "That page didn't load" : "That didn't save"}</h1>
+      <h1 className="text-title text-balance text-foreground">{cause === "unknown" ? "That page didn't load" : "That didn't save"}</h1>
       <p className="mt-1 text-pretty text-body text-fg-2">
         {cause === "offline"
           ? "No connection, so the last action didn't go through. Your other changes are safe."
@@ -60,7 +60,7 @@ export function ErrorScreen({ error, retry }: { error: Error & { digest?: string
       </Button>
       {/* A code read character by character, so Code: one tap copies it for support. */}
       {error.digest && (
-        <p className="mt-6 text-meta text-fg-3">
+        <p className="mt-6 text-meta text-muted-foreground">
           Ref <Code value={error.digest} label="Error reference" />
         </p>
       )}

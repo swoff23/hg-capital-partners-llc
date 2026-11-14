@@ -47,7 +47,7 @@ export type ActionBarProps = {
   primary?: ReactNode;
   /**
    * One line under the buttons: a disabled primary's reason, a refusal in
-   * `--danger`, or a save conflict. The caller gives it its tone and keeps
+   * `--destructive`, or a save conflict. The caller gives it its tone and keeps
    * it to one line. The toast moves up to clear it.
    */
   error?: ReactNode;
@@ -141,7 +141,7 @@ function useKeyboardUp(enabled: boolean): boolean {
 /**
  * The bar docked to the bottom of the screen that holds a page's next step
  * (forms 2.10): the contractor job page's sticky bar (`job-actions.tsx`),
- * made general. On `--canvas` over a `--line` rule, 12px padding plus the
+ * made general. On `--canvas` over a `--border` rule, 12px padding plus the
  * safe area, the buttons on the page's gutters, and the toast lifted above
  * it (`useToastInset`). Render it only while it has a job: a dirty draft,
  * every step of a stepped form, Apply, a job with a next step.
@@ -233,7 +233,7 @@ export function ActionBar({
       )}
       <div
         className={cn(
-          "fixed bottom-0 z-30 border-t border-line bg-canvas pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]",
+          "fixed bottom-0 z-30 border-t border-border bg-canvas pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]",
           app ? "right-0" : "inset-x-0",
           keyboardUp && "hidden",
           className,
@@ -251,7 +251,7 @@ export function ActionBar({
           )}
         >
           <div className={cn("flex items-center gap-3 lg:justify-end", rowClassName)}>
-            {status && <p className="min-w-0 flex-1 truncate text-body text-fg-1">{status}</p>}
+            {status && <p className="min-w-0 flex-1 truncate text-body text-foreground">{status}</p>}
             {secondary}
             {primary}
           </div>

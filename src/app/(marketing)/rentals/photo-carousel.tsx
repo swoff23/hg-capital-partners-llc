@@ -15,7 +15,7 @@ const Lightbox = dynamic(() => import("@/components/lightbox").then((m) => m.Lig
  * (a scroll-snap strip, so the browser does the gesture); with a mouse,
  * arrows show on hover or keyboard focus. A "1 / 8" counter sits bottom right
  * and `status` ("Leased", "Available Nov 1") is a pill top left, both on the
- * fixed photo tokens. Each photo fades in over the --fill-1 placeholder; no
+ * fixed photo tokens. Each photo fades in over the --muted placeholder; no
  * photos, or one that fails to load, is the House fallback tile.
  *
  * Photos are `next/image` at the column's width (3, 2 and 1 columns), not the
@@ -112,7 +112,7 @@ export function PhotoCarousel({
   }));
 
   return (
-    <div className="group/photo relative aspect-4/3 overflow-hidden rounded-lg bg-fill-1">
+    <div className="group/photo relative aspect-4/3 overflow-hidden rounded-lg bg-muted">
       {count === 0 ? (
         <FallbackTile label={`${label}, no photo yet`} className="absolute inset-0" />
       ) : (
@@ -256,13 +256,13 @@ function StripPhoto({
   );
 }
 
-/** The House tile on --fill-1 (section 6, Fallback): no photos yet, or one that won't load. */
+/** The House tile on --muted (section 6, Fallback): no photos yet, or one that won't load. */
 function FallbackTile({ label, className }: { label: string; className?: string }) {
   return (
     <span
       role="img"
       aria-label={label}
-      className={cn("flex items-center justify-center bg-fill-1 text-fg-3", className)}
+      className={cn("flex items-center justify-center bg-muted text-muted-foreground", className)}
     >
       <House aria-hidden="true" strokeWidth={1.5} className="aspect-square h-2/5 w-auto" />
     </span>

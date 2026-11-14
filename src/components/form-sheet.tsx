@@ -28,7 +28,7 @@ export type FormSheetProps = {
   pending?: boolean;
   /**
    * A refusal that belongs to no field (no signal, a server error, a
-   * conflict's line): one `--danger` line directly above the buttons.
+   * conflict's line): one `--destructive` line directly above the buttons.
    */
   error?: ReactNode;
   /**
@@ -94,7 +94,7 @@ const firstEmptyField =
  *    Esc keycap and the primary with ⌘↵, at the bottom right.
  *  - Below md: one full-width primary above the safe area and the keyboard;
  *    the header's X is the way out, so Cancel and Create more drop.
- *  - A form-level refusal is one `--danger` line above the buttons.
+ *  - A form-level refusal is one `--destructive` line above the buttons.
  *
  * It opens with focus in the first empty field, and ⌘↵ submits from any
  * field. It compares `values` with what it opened with: Cancel, X and Esc
@@ -268,7 +268,7 @@ export function FormSheet({
               </Button>
             </div>
             {primaryDisabled && disabledReason && (
-              <p className="truncate text-meta text-fg-3 md:text-right">{disabledReason}</p>
+              <p className="truncate text-meta text-muted-foreground md:text-right">{disabledReason}</p>
             )}
           </div>
         }

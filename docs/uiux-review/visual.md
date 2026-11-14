@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 59 findings: 0 critical, 10 high, 33 medium, 16 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 HG should read as Linear's structure with Mercury's restraint, signed with HG's own gold and photographs. Four moves.

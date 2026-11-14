@@ -23,14 +23,14 @@ const SIZES = {
 export type PhotoThumbSize = keyof typeof SIZES;
 
 /**
- * A property photo over a --fill-1 placeholder, fading in over 200ms, with
+ * A property photo over a --muted placeholder, fading in over 200ms, with
  * the photo edge on top so a pale facade doesn't bleed into the page. With
  * no photo (or one that fails to load) it's the finished fallback tile: the
- * same size and radius with lucide's House at 40% of the height in --fg-3.
+ * same size and radius with lucide's House at 40% of the height in --muted-foreground.
  *
  * `status` puts a pill in the top-left ("Vacant Nov 1"), only when the state
  * needs attention, and only on the 96 and full sizes, where it fits.
- * `failed` marks an upload that didn't go up: a 2px --danger ring in place
+ * `failed` marks an upload that didn't go up: a 2px --destructive ring in place
  * of the edge, and with `onRetry` a Retry pill near the bottom.
  *
  * `addLabel` is for the staff header of a building with no photo yet
@@ -87,7 +87,7 @@ export function PhotoThumb({
   const labelled = !!addLabel && (size === 96 || size === "full");
 
   return (
-    <span className={cn("relative block shrink-0 overflow-hidden bg-fill-1", box, className)}>
+    <span className={cn("relative block shrink-0 overflow-hidden bg-muted", box, className)}>
       {photo ? (
         <Image
           src={src}
@@ -106,7 +106,7 @@ export function PhotoThumb({
           )}
         />
       ) : (
-        <span role="img" aria-label={alt} className={cn("absolute inset-0 flex items-center justify-center text-fg-3", labelled && "flex-col gap-1")}>
+        <span role="img" aria-label={alt} className={cn("absolute inset-0 flex items-center justify-center text-muted-foreground", labelled && "flex-col gap-1")}>
           {/* absoluteStrokeWidth: a 1.5px line at any tile size, like the rest of the drawn set (a scaled
               stroke would be 5px on the phone's full-width header). */}
           <House aria-hidden="true" strokeWidth={1.5} absoluteStrokeWidth className="aspect-square h-2/5 w-auto" />
@@ -121,7 +121,7 @@ export function PhotoThumb({
         aria-hidden="true"
         className={cn(
           "pointer-events-none absolute inset-0 rounded-[inherit]",
-          failed ? "ring-2 ring-inset ring-danger" : "inset-shadow-photo-edge",
+          failed ? "ring-2 ring-inset ring-destructive" : "inset-shadow-photo-edge",
         )}
       />
       {status && (

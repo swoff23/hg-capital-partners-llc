@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Line art for payoff and empty-queue moments (docs/brand-guidelines.md,
- * section 6): 1.5 strokes in --fg-1 on a 96 grid (72px on phones), exactly
+ * section 6): 1.5 strokes in --foreground on a 96 grid (72px on phones), exactly
  * one --gold fill per drawing, colors from tokens so it follows the theme.
  * Decorative, so aria-hidden; the heading beside it carries the meaning.
  * Never in rows, toasts or dialogs, and a payoff tied to a property shows
@@ -97,7 +97,7 @@ export function SpotArt({ name, className }: { name: SpotArtName; className?: st
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={cn("h-24 w-24 shrink-0 text-fg-1 max-sm:h-18 max-sm:w-18", className)}
+      className={cn("h-24 w-24 shrink-0 text-foreground max-sm:h-18 max-sm:w-18", className)}
     >
       {ART[name]}
     </svg>

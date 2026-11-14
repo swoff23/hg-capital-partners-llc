@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 64 findings: 0 critical, 7 high, 35 medium, 22 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 Financials becomes three quiet tabs: Overview, Statement and Rent. The QuickBooks connection and mapping move into the merged Settings as D10 decided. There they follow Mercury's Books Details layout, with the label and helper on the left and the value and action on the right (https://mobbin.com/screens/5dca96bc-dcc4-4567-afeb-ad744b7e9f8f). One control row sits under the title on every tab. It holds Stripe's period presets, from Month to date to Last 12 months, compared to the previous period (https://mobbin.com/screens/266228e3-d7ac-436a-bb53-c0a89ae421af). Next to them are a Cash | Accrual segmented control and one freshness line. That line says when QuickBooks last updated and which months are closed, the way every Stripe overview card carries its own Updated time (https://mobbin.com/screens/a31f7d76-ade4-4cae-a816-a4c9b33814c3).

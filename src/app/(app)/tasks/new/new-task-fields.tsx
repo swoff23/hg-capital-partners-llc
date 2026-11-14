@@ -238,7 +238,7 @@ export function NewTaskForm({
                     setTagOn(false);
                     set({ propertyId: null, unitLabel: null, dealId: null });
                   }}
-                  className="relative flex size-4.5 shrink-0 items-center justify-center rounded-sm text-fg-3 hover:bg-fill-1 hover:text-fg-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5"
+                  className="relative flex size-4.5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5"
                 >
                   <X aria-hidden="true" className="size-3" />
                 </button>
@@ -307,7 +307,7 @@ export function NewTaskForm({
                 hidden={NOT_NEW.filter((s) => s !== values.taskStatus)}
                 followUp={followUp}
                 onChange={pickStatus}
-                className="shrink-0 border border-line-strong bg-surface px-2 font-medium text-fg-1"
+                className="shrink-0 border border-line-strong bg-background px-2 font-medium text-foreground"
               />
               {showProperty && (
                 <PropertyUnitPicker
@@ -320,7 +320,7 @@ export function NewTaskForm({
                 />
               )}
             </div>
-            {reason && <p className="truncate text-meta text-fg-3">{reason}</p>}
+            {reason && <p className="truncate text-meta text-muted-foreground">{reason}</p>}
           </div>
 
           {/* What the form posts, under the names the server action reads. */}

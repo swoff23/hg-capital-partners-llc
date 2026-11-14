@@ -42,11 +42,11 @@ const STRIP_MAX = 4;
  * "At finish" and "Other photos", and is left off when the job has no Mark
  * done set. `rows={1}` is the Review card's single row (6 from sm, 3 on a
  * phone, no labels); `variant="strip"` is Activity's and the payoff's: 48x36
- * thumbs in one line, as many as fit, then "+2" in `--fg-3`, opening the
+ * thumbs in one line, as many as fit, then "+2" in `--muted-foreground`, opening the
  * viewer at that set.
  *
  * A photo the browser can't draw shows its type (a HEIC tile outside Safari),
- * not a broken glyph. A tile's edge steps up to `--line-control` under a
+ * not a broken glyph. A tile's edge steps up to `--input` under a
  * mouse. `surface`, `menuItems`, `canEdit`, `header` and `onRename` go to the
  * viewer as they are.
  */
@@ -125,7 +125,7 @@ export function MediaGrid({
             </li>
           ))}
           {(more > 0 || narrowMore > 0) && (
-            <li className="text-meta tabular-nums text-fg-3">
+            <li className="text-meta tabular-nums text-muted-foreground">
               {more > 0 && <span className={cn(inCard && "max-[359px]:hidden")}>+{more}</span>}
               {narrowMore > 0 && <span className="min-[360px]:hidden">+{narrowMore}</span>}
             </li>
@@ -215,7 +215,7 @@ function Tile({
     <button
       type="button"
       onClick={onOpen}
-      className={cn("group relative block aspect-square w-full overflow-hidden rounded-lg", video ? "bg-photo-stage" : "bg-fill-1")}
+      className={cn("group relative block aspect-square w-full overflow-hidden rounded-lg", video ? "bg-photo-stage" : "bg-muted")}
     >
       {src && !broken ? (
         // Gated, session-checked route; next/image would cache it publicly.
@@ -265,7 +265,7 @@ function Tile({
       <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg inset-shadow-photo-edge" />
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-lg opacity-0 ring-1 ring-inset ring-line-control transition-opacity duration-fast pointer-fine:group-hover:opacity-100"
+        className="pointer-events-none absolute inset-0 rounded-lg opacity-0 ring-1 ring-inset ring-input transition-opacity duration-fast pointer-fine:group-hover:opacity-100"
       />
     </button>
   );
@@ -276,14 +276,14 @@ function NoPreview({ name }: { name: string }) {
   const look = documentLook(name);
   if (look.glyph === "image" && /^HEIF?$/.test(look.label)) {
     return (
-      <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-fg-3">
+      <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-muted-foreground">
         <FileImage className="size-5" strokeWidth={1.5} aria-hidden="true" />
         <span className="text-micro">HEIC</span>
       </span>
     );
   }
   return (
-    <span className="absolute inset-0 flex items-center justify-center text-fg-3">
+    <span className="absolute inset-0 flex items-center justify-center text-muted-foreground">
       <ImageOff className="size-5" aria-hidden="true" />
     </span>
   );

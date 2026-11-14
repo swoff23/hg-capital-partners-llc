@@ -30,7 +30,7 @@ The spec for HG's selector family. Draft for Connor: nothing is built, and build
 - `BasisToggle` renders `SegmentedControl`. `TopTabs keep={["basis"]}` carries `?basis` across Financials. The basis link on `/financials` is 44px on touch and sits on its own row below `sm`, and `SourceLine` names the period and basis.
 - `SegmentedControl sm` is `text-label`.
 - The property editors' raw selects are 32px (`h-8`), 44 on touch (`selectTouchHeight`).
-- Both CapEx cards use `ForecastYearBars`: `aria-pressed` rows, the pick on a `--line-control` edge at one weight, 44px on touch. The portfolio CapEx card lives on /properties.
+- Both CapEx cards use `ForecastYearBars`: `aria-pressed` rows, the pick on an `--input` edge at one weight, 44px on touch. The portfolio CapEx card lives on /properties.
 - CapEx rule rows show their delete on hover, on focus, or after a first tap on touch, by design.
 - Move-in ratings are `SegmentedControl md` named "{item} condition". Tapping the pick clears it, and below 640 the control sits under the item. Property and Unit there use the `Select` primitive on tokens.
 - `PublicHeader` folds its links into a 44px menu below 600px.
@@ -81,18 +81,18 @@ The spec for HG's selector family. Draft for Connor: nothing is built, and build
 
 ### Marks and copy
 
-- **Pick one:** a lucide `Check` in `--fg-1` at the trailing edge. **Pick many:** a leading checkbox. Never a fill alone (principle 6).
+- **Pick one:** a lucide `Check` in `--foreground` at the trailing edge. **Pick many:** a leading checkbox. Never a fill alone (principle 6).
 - **An empty choice is a named value,** listed first: "Unassigned", "No property", "No unit", "No date", "Doesn't repeat", "No reason", "Not set". Never "None", and never a dash inside a list.
 - **A required pick with no default** reads "Choose a property", "Choose a unit". One verb app-wide.
 - **No "All X" labels.** An idle filter chip says the facet's name. "All assignees", "All properties" and "All statuses" go.
-- **A stored value missing from today's list** stays visible as its own row in `--fg-3`, so nothing changes silently.
+- **A stored value missing from today's list** stays visible as its own row in `--muted-foreground`, so nothing changes silently.
 - **Search fields say "Search" plus the one thing they search,** as both placeholder and accessible name: "Search tasks", "Search deals", "Search contractors", "Search people", "Search properties". Global search, which searches everything, says "Search". "Find a deal" and "Filter by title…" go.
 - **Deals say "Stage" everywhere:** the column header, the deal page's row, `DealStageField`'s accessible name, the chip, the sheet and the sort phrases. "Status" stays the word for tasks and properties.
 
 ### Tokens and motion
 
-- **Panels:** `PopoverSurface` (`--raised`, `rounded-lg`, `shadow-float`, the `--line-float` edge). **Sheets:** the Overlay level, `rounded-xl` top corners.
-- **Highlight:** `--fill-2`, `rounded-sm`; `--danger-tint` on a destructive row. **Section headers:** `text-meta` 500 `--fg-3`. **Sublines and counts:** `text-meta` `--fg-3`, counts tabular.
+- **Panels:** `PopoverSurface` (`--popover`, `rounded-lg`, `shadow-float`, the `--line-float` edge). **Sheets:** the Overlay level, `rounded-xl` top corners.
+- **Highlight:** `--accent`, `rounded-sm`; `--destructive-tint` on a destructive row. **Section headers:** `text-meta` 500 `--muted-foreground`. **Sublines and counts:** `text-meta` `--muted-foreground`, counts tabular.
 - **Neutral chips inside a row** take the Tag look (no fill, a `--line-strong` edge, `--fg-2`, `text-micro`).
 
 **Motion per member** (brand section 7). Lists appear at once; panels holding anything else pop in. Today every `PopoverSurface` pops in, so it gets a `motion` prop (`"none"` or `"pop"`).
@@ -115,22 +115,22 @@ Reduced motion turns each into an opacity change of 120ms or less.
 
 **Job.** The list inside every select, picker, filter panel and repeat menu.
 
-**Builds on.** Extract and extend: `AssigneeList` in `src/components/assignee-picker.tsx` (React Aria `Autocomplete`, `SearchField`, and `ListBox` with sections) moves to `src/components/option-list.tsx`, off the old aliases (`text-muted`, `border-border`, `text-sm`) onto `text-body`, `text-meta`, `--fg-3` and `--line`. Its rows absorb deals' `filterRowClass` (`status-multiselect.tsx:32`), which already has the 32 and 44px rows and the `--fill-2` focus.
+**Builds on.** Extract and extend: `AssigneeList` in `src/components/assignee-picker.tsx` (React Aria `Autocomplete`, `SearchField`, and `ListBox` with sections) moves to `src/components/option-list.tsx`, off the old aliases (`text-muted`, `text-sm`) onto `text-body`, `text-meta`, `--muted-foreground` and `--border`. Its rows absorb deals' `filterRowClass` (`status-multiselect.tsx:32`), which already has the 32 and 44px rows and the `--accent` focus.
 
 **Anatomy**
 
-- An optional search field on top: borderless, a leading `Search` 16 in `--fg-3`, the placeholder per the search rule, over a `--line` rule. It shows at 10 or more options.
+- An optional search field on top: borderless, a leading `Search` 16 in `--muted-foreground`, the placeholder per the search rule, over a `--border` rule. It shows at 10 or more options.
 - Optional pinned rows (the empty choice), then sections with headers.
 - A row, left to right:
   - A checkbox (pick many only).
-  - A visual: `StatusMark` (14, 16 on touch), `Avatar` 24 (round for team, a `rounded-sm` square for contractors), `PhotoThumb` 32, or a lucide icon 16 in `--fg-3`.
-  - A title in `text-body` `--fg-1` over an optional subline in `text-meta` `--fg-3`, each one line and truncated.
+  - A visual: `StatusMark` (14, 16 on touch), `Avatar` 24 (round for team, a `rounded-sm` square for contractors), `PhotoThumb` 32, or a lucide icon 16 in `--muted-foreground`.
+  - A title in `text-body` `--foreground` over an optional subline in `text-meta` `--muted-foreground`, each one line and truncated.
   - An optional Tag.
-  - An optional count in `text-meta` `--fg-3`, tabular (filters).
+  - An optional count in `text-meta` `--muted-foreground`, tabular (filters).
   - A `Check` (pick one only).
-- An empty result is one line in `--fg-3`: "No one matches.", "No property matches."
+- An empty result is one line in `--muted-foreground`: "No one matches.", "No property matches."
 
-**States.** The `--fill-2` highlight follows the mouse and keyboard focus. Picked: the Check or a checked box. Disabled: 50%. A filter row with a zero count stays listed in `--fg-3`, so the list doesn't jump.
+**States.** The `--accent` highlight follows the mouse and keyboard focus. Picked: the Check or a checked box. Disabled: 50%. A filter row with a zero count stays listed in `--muted-foreground`, so the list doesn't jump.
 
 **Keyboard.** Arrows move while the caret stays in the search field. The first match is highlighted as you type, so two letters and Enter pick. Opening scrolls the picked row into view.
 
@@ -148,14 +148,14 @@ Reduced motion turns each into an opacity change of 120ms or less.
 
 **Anatomy**
 
-- Label above in `text-meta` 500 `--fg-2`, 6px over the field. Helper text is one line of `text-meta` `--fg-3`.
-- Trigger: `--surface`, a 1px `--line-control` edge, `rounded-md`, 10px side padding (32 on the left with a leading mark). The value in `text-body` `--fg-1` with its mark, truncated. The placeholder and an empty choice in `--fg-3`. One lucide `ChevronDown` 14 in `--fg-3` at the right, the size `StageSelect` already uses, so Safari's double chevrons go.
+- Label above in `text-meta` 500 `--fg-2`, 6px over the field. Helper text is one line of `text-meta` `--muted-foreground`.
+- Trigger: `--background`, a 1px `--input` edge, `rounded-md`, 10px side padding (32 on the left with a leading mark). The value in `text-body` `--foreground` with its mark, truncated. The placeholder and an empty choice in `--muted-foreground`. One lucide `ChevronDown` 14 in `--muted-foreground` at the right, the size `StageSelect` already uses, so Safari's double chevrons go.
 - Panel: sized per section 2.
 
 **States**
 
-- Focus and open: the edge turns `--act` with a 1px inset `--act` ring.
-- Error: a `--danger` edge, the ring `--danger` on focus, and one `--danger` line of `text-meta` under the field.
+- Focus and open: the edge turns ink with a 1px inset ink ring (`--ring` on focus, `--primary` when open).
+- Error: a `--destructive` edge, the ring `--destructive` on focus, and one `--destructive` line of `text-meta` under the field.
 - Disabled: 50%, no hover. A field that can't apply yet is hidden rather than disabled.
 - Saving in place: dims to 50% and stays focusable, so a keyboard user keeps their place (today's `StageSelect` behavior).
 
@@ -181,12 +181,12 @@ Reduced motion turns each into an opacity change of 120ms or less.
 
 **Two triggers**
 
-- **Chip** (`pickerChip`): list rows, the record rail, create forms. A leading `Avatar` 20, or a lucide `House` 14 for a property, then the name, truncated. Empty: `CircleDashed` and a placeholder in `--fg-3`. Forms use the field's name ("Assignee", "Property"); the rail uses a verb ("Assign", "Add property"), per brand's empty rail fact. No chip carries a chevron.
+- **Chip** (`pickerChip`): list rows, the record rail, create forms. A leading `Avatar` 20, or a lucide `House` 14 for a property, then the name, truncated. Empty: `CircleDashed` and a placeholder in `--muted-foreground`. Forms use the field's name ("Assignee", "Property"); the rail uses a verb ("Assign", "Add property"), per brand's empty rail fact. No chip carries a chevron.
 - **Field** (`fieldClass`, 36 or 44): forms where the pick is the main decision (applying a playbook, the class mapping cell). A leading avatar or photo, the value, and a `ChevronDown`.
 
 **Rows**
 
-- **Assignee.** "Unassigned" pinned first, as today. Then Recent: up to 3, only while the search is empty, from the viewer's own last assignments in task activity, so it follows Connor across devices. Then Team, with you first and "(you)" in `--fg-3` (the tasks filter's "(me)" goes). Then Contractors: square avatars and the trade as the subline. No "Has login" Tag (Connor, Nov 14). Search matches name, trade and email.
+- **Assignee.** "Unassigned" pinned first, as today. Then Recent: up to 3, only while the search is empty, from the viewer's own last assignments in task activity, so it follows Connor across devices. Then Team, with you first and "(you)" in `--muted-foreground` (the tasks filter's "(me)" goes). Then Contractors: square avatars and the trade as the subline. No "Has login" Tag (Connor, Nov 14). Search matches name, trade and email.
 - **Property.** "No property" pinned, left out where a property is required. `PhotoThumb` 32, the short address, and "Buffalo · 3 units" as the subline. Sorted by street, then house number, which fixes "118, 15, 23". Search matches the short and full address, the town and unit labels.
 - **Unit.** Shows when the property has 2 or more units, or a unit is already set (today it shows from one unit). "No unit" pinned.
 - **Property and Unit in one chip** (`PropertyUnitPicker`, New task; Connor, Nov 14). "118 Congress St. · Unit 2", where the chip row has no room for a separate Unit chip. Picking a building with units sets it and steps to its units in the same layer under a back chevron; opened on such a building it starts on the units. The address truncates before the unit does. The task page keeps its separate Property and Unit rows.
@@ -230,20 +230,20 @@ Reduced motion turns each into an opacity change of 120ms or less.
 **Builds on.** `src/components/menu.tsx`, extended in place:
 
 1. **Real selection.** `selectionMode="single"` and `selectedKeys`, so items are `menuitemradio` with `aria-checked`, and the Check comes from `isSelected`. The `checked` prop goes. The task status menu (`status-control.tsx:66`) moves to selection. The public header's menu (`header.tsx:86`) is navigation, so it takes a new `current` prop instead: the item stays a link with `aria-current="page"` and draws the same Check, never a radio.
-2. **Item slots.** `shortcut` (React Aria's `Keyboard` slot rendering `Kbd`, hidden on touch) and `description` (one line of `text-meta` `--fg-3`; the row grows to 44, 56 on touch). The leading slot takes `StatusMark` as well as a lucide icon.
-3. **`MenuSection`** with a header in `text-meta` 500 `--fg-3`.
+2. **Item slots.** `shortcut` (React Aria's `Keyboard` slot rendering `Kbd`, hidden on touch) and `description` (one line of `text-meta` `--muted-foreground`; the row grows to 44, 56 on touch). The leading slot takes `StatusMark` as well as a lucide icon.
+3. **`MenuSection`** with a header in `text-meta` 500 `--muted-foreground`.
 4. **`numberKeys`** for value menus: each item's fixed number, printed at the trailing edge with a mouse (section 2).
 5. **`sheetTitle`** for value menus: on a phone they render in a titled `Sheet` with 44px rows (section 2 says how). ⋯ action menus never take it and stay anchored on every device.
 6. **A follow-up step in the same layer.** When a pick needs one more answer (Waiting needs a reason, Scheduled needs a visit date), the panel swaps to that question. On a phone the sheet swaps its content and shows a back chevron. The status commits only when the question is answered, as `StatusControl` saves status and reason together today. Back returns to the list with nothing changed; Esc closes the whole layer with nothing changed. Never a second stacked sheet.
 
-**Anatomy.** The Float surface, at least 160px, sized to content, 4px padding. Rows are 32px (44 on touch). Destructive items sit last after a `MenuSeparator`, in `--danger` with a `--danger-tint` highlight, and name the object ("Delete task"); they open `ConfirmDialog`. Reversible actions skip the confirm and toast with Undo.
+**Anatomy.** The Float surface, at least 160px, sized to content, 4px padding. Rows are 32px (44 on touch). Destructive items sit last after a `MenuSeparator`, in `--destructive` with a `--destructive-tint` highlight, and name the object ("Delete task"); they open `ConfirmDialog`. Reversible actions skip the confirm and toast with Undo.
 
 **One-item menus.** A row's ⋯ stays a menu even with one item (files, units, listings), so every row keeps one ⋯ in one place (brand's Counted lists). Off rows, a menu with one item becomes a direct button.
 
 **Triggers**
 
-- ⋯: a ghost icon button, 32 (44 on touch), `rounded-md`, `MoreHorizontal` 16 in `--fg-3`.
-- Value (`StatusMenu`): the `StatusMark` and its word in the mark's tone, then `ChevronDown` 14 in `--fg-3`. The ghost `sm` look, 32 (44 on touch).
+- ⋯: a ghost icon button, 32 (44 on touch), `rounded-md`, `MoreHorizontal` 16 in `--muted-foreground`.
+- Value (`StatusMenu`): the `StatusMark` and its word in the mark's tone, then `ChevronDown` 14 in `--muted-foreground`. The ghost `sm` look, 32 (44 on touch).
 - View menu: a secondary `sm` button naming the view, with its count from `sm` up ("Active 13"), and a chevron.
 
 **StatusMenu.** A configured `Menu` for task status and deal stage: rows of `StatusMark` and word with a trailing Check, `numberKeys`, and `sheetTitle` "Status" or "Stage". A change toasts with Undo. Task status hides Review on staff-only tasks (BTASKS-041). Deal stage names drop their spreadsheet prefixes in the UI ("High", not "1 - High"), so typeahead and number keys don't collide; stored values don't change.
@@ -264,7 +264,7 @@ Reduced motion turns each into an opacity change of 120ms or less.
 
 **Headers, wherever a table renders**
 
-- Every sortable header shows `ChevronsUpDown` 14 in `--fg-3` at rest, so sortability needs no hover. The active column turns `--fg-1` with one `ChevronUp` or `ChevronDown`.
+- Every sortable header shows `ChevronsUpDown` 14 in `--muted-foreground` at rest, so sortability needs no hover. The active column turns `--foreground` with one `ChevronUp` or `ChevronDown`.
 - A click flips the direction. Text columns start A to Z; money, counts and dates start highest or newest. The hidden third "clear" click goes: the default order is a column like any other (Stage on deals, Address on properties).
 - The button fills the header cell, at least 32px; on touch its `::after` reaches 44. `aria-sort` stays.
 - `router.replace` in a transition, the table dimmed while it loads.
@@ -284,14 +284,14 @@ This describes Option 1 of section 4.1, the recommendation. The pattern itself i
 - **Wide** (a mouse, and the bar at least as wide as the page's row needs): [search] [views] [facet chips], one row. A container query decides, so it works with the sidebar pinned or not and nothing flashes. Each page sets its width from its longest set state: 56rem (896px) for tasks and contractors, 60rem (960px) for deals. The deals row in its busiest state (search 200, six views with counts about 510, a set Stage chip at most 184, gaps 24) is about 920px, inside the 976px a 1280 screen leaves beside the open sidebar.
 - **Compact** (everywhere else): [search] [views] [Filters button]. Pages with up to 3 views keep the segments; more views become the view menu. Below `sm` the segments move to their own full-width second row.
 
-**Search.** `Input` at a new `sm` size (32, 44 on touch), with a leading `Search` 16 in `--fg-3` and an inline clear button once there's text. 240px in the wide bar, giving way to 200 first; flexible in the compact bar. Debounced 250ms with `replace`, as today. It searches across fields. While a query is typed, the views show match counts, so a hit outside the current view is visible (DEALS-012).
+**Search.** `Input` at a new `sm` size (32, 44 on touch), with a leading `Search` 16 in `--muted-foreground` and an inline clear button once there's text. 240px in the wide bar, giving way to 200 first; flexible in the compact bar. Debounced 250ms with `replace`, as today. It searches across fields. While a query is typed, the views show match counts, so a hit outside the current view is visible (DEALS-012).
 
 **FilterChip (wide layout, so mouse sizes only)**
 
-- Idle: an `sm` chip (32) with the Tag's solid `--line-strong` edge, `Plus` 14 in `--fg-3` and the facet's name in `--fg-2`, `text-label`. Stripe draws idle chips dashed; HG keeps one edge style and lets the Plus say "add".
-- Set: a `--line-control` edge (the 3:1 mark), the facet in `--fg-2` and the value in `--fg-1` at the same 500 weight ("Assignee  Zack"). Two values join ("High, Medium"); three or more read "Zack +2". It truncates at 160px.
-- The remove X is its own button in the same bordered group: 24px, `X` 14 in `--fg-3`, named "Remove Assignee filter".
-- A toggle chip for a yes or no facet ("Has login", "Needs W-9") uses `aria-pressed`. Idle: the `--line-strong` edge in `--fg-2`. Pressed: a `--line-control` edge with a leading Check in `--fg-1`.
+- Idle: an `sm` chip (32) with the Tag's solid `--line-strong` edge, `Plus` 14 in `--muted-foreground` and the facet's name in `--fg-2`, `text-label`. Stripe draws idle chips dashed; HG keeps one edge style and lets the Plus say "add".
+- Set: an `--input` edge (the 3:1 mark), the facet in `--fg-2` and the value in `--foreground` at the same 500 weight ("Assignee  Zack"). Two values join ("High, Medium"); three or more read "Zack +2". It truncates at 160px.
+- The remove X is its own button in the same bordered group: 24px, `X` 14 in `--muted-foreground`, named "Remove Assignee filter".
+- A toggle chip for a yes or no facet ("Has login", "Needs W-9") uses `aria-pressed`. Idle: the `--line-strong` edge in `--fg-2`. Pressed: an `--input` edge with a leading Check in `--foreground`.
 - Panel: a `Popover` at bottom start holding `OptionList`. Pick many uses checkboxes and stays open; pick one uses a Check and closes. Counts trail each row. It applies live, with no Apply and no Clear inside.
 
 **Filters button (compact layout).** A secondary `sm` button: `SlidersHorizontal` 16, "Filters", and a neutral `Badge` counting the facets set plus a non-default sort. Below `sm`, when the row also holds a view menu, it drops to the icon and count, named "Filters, 2 set".
@@ -299,7 +299,7 @@ This describes Option 1 of section 4.1, the recommendation. The pattern itself i
 **FilterSheet**
 
 - The existing `Sheet`, titled "Filters": a bottom sheet on phones, the centered dialog from `md`.
-- One section per facet: a heading in `text-meta` 500 `--fg-2`, the number picked in `--fg-3`, and a ghost "Clear" at the right when set (today's deals sheet already has this).
+- One section per facet: a heading in `text-meta` 500 `--fg-2`, the number picked in `--muted-foreground`, and a ghost "Clear" at the right when set (today's deals sheet already has this).
 - Up to 9 options list inline as `OptionList` rows. At 10 or more: a search field (not focused on open), the picked rows, the first 6 others, and "Show all 32", which expands in place. Mercury iOS shows each facet as a row with its count that opens its own list; listing short facets inline is an adaptation, so a two-facet sheet takes no extra taps.
 - A yes or no facet ("Has login", "Needs W-9", and "Repeats" if open question 10 is a yes) is one `Switch` row, not a section.
 - Sort comes last, on pages that sort.
@@ -348,16 +348,16 @@ This describes Option 1 of section 4.1, the recommendation. The pattern itself i
 **DatePicker.** Builds on `src/components/due-date-picker.tsx` (`DuePanel`, `MonthCalendar`) and `lib/quick-dates.ts`.
 
 - `allowNone`, on by default. Visit date turns it off, so "No date" is never offered and then refused.
-- `variant="field"` for property fact dates and the move-in form. A field trigger with `CalendarDays` 16 in `--fg-3` and the date from `fmtDay`. With a mouse, a React Aria `DateField` takes typing in our field look in every browser. The calendar heading is a button that steps to months, then years, in the same layer, for purchase dates years back. No quick picks.
+- `variant="field"` for property fact dates and the move-in form. A field trigger with `CalendarDays` 16 in `--muted-foreground` and the date from `fmtDay`. With a mouse, a React Aria `DateField` takes typing in our field look in every browser. The calendar heading is a button that steps to months, then years, in the same layer, for purchase dates years back. No quick picks.
 - With a mouse and on a tablet, the quick picks sit under the calendar and over the Repeat row (Connor, Nov 14).
 - Repeat opens below its row in the panel, one line per preset with no "Next:" line (the calendar above shows the date), and the picks fold to one row ("Today, Tomorrow, Monday…") that opens them again (Connor, Nov 14). On a phone Repeat stays a step in the sheet.
 - When the panel fits neither above nor below its chip as it opens (a chip halfway down a 1280x800 laptop), it opens beside the chip, where it has the screen's full height, so nothing scrolls (Connor, Nov 14).
 - Quick picks show a Check on the current value. On a Monday the Monday row hides, since it lands on the same day as Next week. Keys stay with their picks, so the printed keys read 1, 2, 4, 5.
-- A past date opens the calendar on today's month, and the panel's first line names the current value, in `--danger` when overdue ("Due Sep 12").
+- A past date opens the calendar on today's month, and the panel's first line names the current value, in `--destructive` when overdue ("Due Sep 12").
 - Row chips are named with the task: "Due date for Fix the sink: Apr 19" (TASKS-V02). Rows keep their date chip and its "Due date" placeholder, per Connor's Oct 25 task row rule (brand section 5).
 - Calendar cells are 32px squares with a mouse. On touch each cell takes 1/7 of the grid's width at 44px tall: about 42px wide at 320 (a 296px grid) and 50px at 375.
 - Phone sheet: two steps in one layer (open question 5, section 4.4).
-- Tokens: today is a 1px inset `--line-control` ring at the same weight; the picked day is an `--act` fill with `--on-act` text.
+- Tokens: today is a 1px inset `--input` ring at the same weight; the picked day is a `--primary` fill with `--primary-foreground` text.
 
 **RepeatMenu.** Replaces the form inside `src/components/repeat-picker.tsx`. The chip stays unless open question 7 folds Repeat into Due.
 
@@ -376,8 +376,8 @@ This describes Option 1 of section 4.1, the recommendation. The pattern itself i
 
 Both are specified in brand section 9 and don't exist yet.
 
-- **Switch** (new, `src/components/switch.tsx`, React Aria `Switch`). A 32 by 18 track with a 12px knob. Off: `--surface` with a `--line-control` edge and knob. On: an `--act` track with an `--on-act` knob. The label sits on the left in `text-body` and the switch on the right; the whole row is a 44px target on touch. The knob springs at `--dur-check`, since it's a change of state. For yes or no fields: Escrow, a move-in section's Required, and the yes or no facets in the Filters sheet.
-- **Checkbox** (new). `CheckboxMark` in `ui.tsx` for list rows, and `Checkbox` in `src/components/checkbox.tsx` for forms. 16px, `rounded-sm`, `--surface` with a `--line-control` edge; checked is an `--act` fill and edge with an `--on-act` check that fills at `--dur-check`. It replaces the native boxes in the apply flow, the portal job checklist and the deals checklist (which goes with StatusMultiSelect).
+- **Switch** (new, `src/components/switch.tsx`, React Aria `Switch`). A 32 by 18 track with a 12px knob. Off: `--background` with an `--input` edge and knob. On: a `--primary` track with a `--primary-foreground` knob. The label sits on the left in `text-body` and the switch on the right; the whole row is a 44px target on touch. The knob springs at `--dur-check`, since it's a change of state. For yes or no fields: Escrow, a move-in section's Required, and the yes or no facets in the Filters sheet.
+- **Checkbox** (new). `CheckboxMark` in `ui.tsx` for list rows, and `Checkbox` in `src/components/checkbox.tsx` for forms. 16px, `rounded-sm`, `--background` with an `--input` edge; checked is a `--primary` fill and edge with a `--primary-foreground` check that fills at `--dur-check`. It replaces the native boxes in the apply flow, the portal job checklist and the deals checklist (which goes with StatusMultiSelect).
 - **References.** Apple Mail [switches for one-off conditions in a filter sheet](https://mobbin.com/screens/cc77bfc5-49aa-4222-9dc6-9b2009ac7a48), Linear Mobile [a switch in the display sheet](https://mobbin.com/screens/7eb66f59-cb97-4e40-af93-241e4fea1850), Linear [checkbox rows with counts](https://mobbin.com/screens/d1d26f7d-e1e5-490f-ab4f-c96dd12854c1).
 
 ### 3.11 Global search, fixes only
@@ -400,7 +400,7 @@ Builds on `src/components/global-search.tsx`, still a combobox over `/api/search
 Extended in `ui.tsx`:
 
 - Two sizes. `sm` is 32px and 44 on touch, for the rail, create forms and the filter bar. `row` is for list rows: 28px with the `::after` reaching 44 on touch (an exception to brand's 32px `sm` control), or 32px. Amendment 1 asks. At 28, two-line task rows stay 62px; at 32 they grow to 66, since the date chip sets the title's line under the Oct 25 row rule.
-- The placeholder moves to `text-fg-3`, off the old `text-muted` alias. The hover fill shows with a mouse only.
+- The placeholder moves to `text-muted-foreground`, off the old `text-muted` alias. The hover fill shows with a mouse only.
 - Follow-up if 28 stays: the device check measures the 28px box and counts row chips as small targets (a warning). Teach it to read the `::after` hit area.
 
 ## 4. Design choices
@@ -670,7 +670,7 @@ Every instance, grouped by page, at `c2480a1`. "Now" is the code there.
 | Where | Now | Becomes | What changes for the user |
 |---|---|---|---|
 | `components/ui.tsx:274` `Select` | Native select, 36px (44 on touch) | `Select` (3.2); the native one and `selectTouchHeight` are deleted at the end | One look and one menu everywhere, search on long lists, a check on the pick |
-| `components/ui.tsx:247` `pickerChip` | 28px; placeholder on `text-muted` | `row` and `sm` sizes, `--fg-3` placeholder (3.12) | Rail and form chips are real 44px targets on touch |
+| `components/ui.tsx:247` `pickerChip` | 28px; placeholder on `text-muted` | `row` and `sm` sizes, `--muted-foreground` placeholder (3.12) | Rail and form chips are real 44px targets on touch |
 | `components/ui.tsx:265` `Input` | One size, 36px; filter bars hand-size `h-8` | `sm` size with a leading search icon and a clear button | Every filter search looks and clears the same |
 | `components/menu.tsx:33`, `:45` | No sections, shortcuts or selection state; `checked` draws a Check only | Extended (3.5) | Screen readers hear the current value; value menus get numbers and a phone sheet |
 | `components/popover.tsx:41` `PopoverSurface` | Every surface pops in | A `motion` prop; lists open with none | Menus and lists appear at once |
@@ -781,7 +781,7 @@ The server reads comma-joined `owner` and `property` values for the multi-pick.
 | Where | Now | Becomes | What changes for the user |
 |---|---|---|---|
 | `properties/page.tsx:104` to `:117` (gap) | Static headers; string sort by address (`:29`) | `FilterBar` with one Status chip (pick many, counts) and no search for 11 rows. `SortHeader` on Property (by street, then house number), Value and Units. Phone: Filters with Status and Sort | Sort by value or units; 15 comes before 118 |
-| `properties/capex-ui.tsx:70` (`ForecastYearBars`, in `portfolio-capex.tsx:143` and `[id]/capex-outlook.tsx:62`) | The pick on a `--line-control` edge; the other years fade to 40% | The other years stay full strength; the pick keeps its edge (a call in section 8) | The chosen year reads by its edge without hiding the others |
+| `properties/capex-ui.tsx:70` (`ForecastYearBars`, in `portfolio-capex.tsx:143` and `[id]/capex-outlook.tsx:62`) | The pick on an `--input` edge; the other years fade to 40% | The other years stay full strength; the pick keeps its edge (a call in section 8) | The chosen year reads by its edge without hiding the others |
 
 ### Property page `/properties/[id]`
 
@@ -901,7 +901,7 @@ Each slice runs `npm run typecheck`, `npm run lint`, `npm test` and `npm run tes
 | SegmentedControl | `components/segmented-control.tsx` | Roving focus, 44 on touch for `md`, a 2px `::after` per segment, `fullWidth`, Review count |
 | Menu | `components/menu.tsx` | Selection state, `current`, sections, `shortcut`, `description`, `numberKeys`, `sheetTitle`, follow-up step |
 | PopoverSurface | `components/popover.tsx` | A `motion` prop |
-| pickerChip | `components/ui.tsx` | `row` and `sm` sizes; `--fg-3` placeholder |
+| pickerChip | `components/ui.tsx` | `row` and `sm` sizes; `--muted-foreground` placeholder |
 | Input | `components/ui.tsx` | `sm` size, leading search icon, clear button |
 | AssigneePicker | `components/assignee-picker.tsx` | Becomes a wrapper on `EntityPicker`; Recent; you first |
 | DueDatePicker | `components/due-date-picker.tsx` | `allowNone`, `field` variant, named row chips, current-pick check, fixed keys, touch cells, phone steps |

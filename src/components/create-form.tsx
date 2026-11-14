@@ -103,7 +103,7 @@ export type CreateFormProps<V, R> = {
  *  - the save: `useRun` with failures shown in place, never as a toast or
  *    the error page. A zod failure puts its line on the field that caused
  *    it and moves focus there; a refusal that belongs to no field is one
- *    `--danger` line above the primary;
+ *    `--destructive` line above the primary;
  *  - leaving: Cancel, X and Esc close at once when nothing changed and ask
  *    with two buttons when something did; a dirty form holds the LeaveGuard.
  *
@@ -226,7 +226,7 @@ export function CreateForm<V, R>({
   const fieldsBody = (
     <div ref={body} className="space-y-4">
       {restoredAt && (
-        <p className="truncate text-meta text-fg-3">
+        <p className="truncate text-meta text-muted-foreground">
           {draftLabel(restoredAt)}.{" "}
           <button
             type="button"

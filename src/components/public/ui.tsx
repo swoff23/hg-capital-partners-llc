@@ -20,7 +20,7 @@ export { publicType };
 export const publicContainer = "mx-auto w-full max-w-320 px-4 sm:px-8 lg:px-10";
 
 /**
- * The public CTA: limestone (--act) with an ink label, rounded-md, 40px (48 on
+ * The public CTA: limestone (--primary) with an ink label, rounded-md, 40px (48 on
  * touch), and gold on hover. It's the app's primary Button with the public
  * height and hover, so focus and disabled behave the same. One per view.
  */

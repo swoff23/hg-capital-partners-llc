@@ -304,11 +304,11 @@ export function ListingPhotos({
         <span id={labelId} className="text-meta font-medium text-fg-2">
           Photos
         </span>
-        <span className="text-meta tabular-nums text-fg-3">
+        <span className="text-meta tabular-nums text-muted-foreground">
           {count} of {max}
         </span>
       </div>
-      <p className="mt-0.5 truncate text-meta text-fg-3">{helper}</p>
+      <p className="mt-0.5 truncate text-meta text-muted-foreground">{helper}</p>
 
       <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
         <GridList
@@ -332,7 +332,7 @@ export function ListingPhotos({
                     "group/tile relative min-w-0 select-none rounded-lg outline-none [-webkit-touch-callout:none]",
                     i === 0 && coverCell,
                     isDragging && "opacity-40",
-                    isFocusVisible && "outline-2 outline-offset-2 outline-act",
+                    isFocusVisible && "outline-2 outline-offset-2 outline-ring",
                   )
                 }
               >
@@ -346,8 +346,8 @@ export function ListingPhotos({
                       className={cn(i === 0 && "md:h-full")}
                     />
                     {isDropTarget && (
-                      // The landing slot: the tile steps back under a --fill-1 wash and an inset --act edge.
-                      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg bg-fill-1/80 ring-1 ring-inset ring-act" />
+                      // The landing slot: the tile steps back under a --muted wash and an inset --primary edge.
+                      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg bg-muted/80 ring-1 ring-inset ring-primary" />
                     )}
                     {/* The keyboard's way to pick the tile up: shown only while it has focus. */}
                     <AriaButton
@@ -382,11 +382,11 @@ export function ListingPhotos({
             type="button"
             onClick={uploader.chooseFiles}
             className={cn(
-              "flex aspect-4/3 min-w-0 flex-col items-center justify-center gap-1 rounded-lg bg-fill-1 text-label text-fg-2 inset-shadow-photo-edge transition-colors not-disabled:hover:text-fg-1",
+              "flex aspect-4/3 min-w-0 flex-col items-center justify-center gap-1 rounded-lg bg-muted text-label text-fg-2 inset-shadow-photo-edge transition-colors not-disabled:hover:text-foreground",
               count === 0 && pending === 0 && "col-span-2",
             )}
           >
-            <ImagePlus aria-hidden="true" strokeWidth={1.5} className="size-5 text-fg-3" />
+            <ImagePlus aria-hidden="true" strokeWidth={1.5} className="size-5 text-muted-foreground" />
             Add photos
           </button>
         )}
@@ -470,7 +470,7 @@ function TileMenu({
 
 /**
  * A photo still going up, failed or refused (uploads 2.3), at the grid's 4:3:
- * its local preview under the ring, a failed one inside the --danger ring with
+ * its local preview under the ring, a failed one inside the --destructive ring with
  * the Retry pill, and Remove on all of them. The first of an empty set takes
  * the cover's size, so the tile that lands there doesn't jump.
  */
@@ -521,7 +521,7 @@ function PendingTile({ upload: u, onRetry, onRemove, first }: { upload: MediaUpl
         onClick={onRemove}
         aria-label={`Remove ${u.name}`}
         className={cn(
-          "absolute right-2 top-2 flex size-5 items-center justify-center rounded-sm bg-act text-on-act ring-1 ring-raised",
+          "absolute right-2 top-2 flex size-5 items-center justify-center rounded-sm bg-primary text-primary-foreground ring-1 ring-popover",
           "after:absolute after:-inset-1.5 pointer-coarse:after:-inset-3",
         )}
       >

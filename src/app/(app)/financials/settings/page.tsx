@@ -38,7 +38,7 @@ const RUN_WORD: Record<string, string> = {
   FAILED: "Failed",
 };
 
-const dash = <span className="text-fg-3">—</span>;
+const dash = <span className="text-muted-foreground">—</span>;
 
 /* A section a link can land on (the Overview's Review, Map classes): it
    stops clear of the fixed app bar instead of under it. */
@@ -139,7 +139,7 @@ export default async function FinancialsSettingsPage({
               (lastRun.status === "FAILED" ? (
                 <Badge tone="danger">{RUN_WORD.FAILED}</Badge>
               ) : (
-                <span className="text-meta text-fg-3">({RUN_WORD[lastRun.status] ?? lastRun.status})</span>
+                <span className="text-meta text-muted-foreground">({RUN_WORD[lastRun.status] ?? lastRun.status})</span>
               ))}
           </Row>
           <Row label="Reconnect by">
@@ -291,9 +291,9 @@ export default async function FinancialsSettingsPage({
  */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid min-h-10 grid-cols-[6rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-1.5 last:border-b-0 sm:grid-cols-[7rem_minmax(0,1fr)] pointer-coarse:min-h-12">
-      <dt className="text-meta text-fg-3">{label}</dt>
-      <dd className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-body text-fg-1">{children}</dd>
+    <div className="grid min-h-10 grid-cols-[6rem_minmax(0,1fr)] items-center gap-3 border-b border-border py-1.5 last:border-b-0 sm:grid-cols-[7rem_minmax(0,1fr)] pointer-coarse:min-h-12">
+      <dt className="text-meta text-muted-foreground">{label}</dt>
+      <dd className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-body text-foreground">{children}</dd>
     </div>
   );
 }
@@ -311,11 +311,11 @@ function DqRow({
   note?: string;
 }) {
   return (
-    <div className="grid gap-x-3 gap-y-0.5 border-b border-line py-2 last:border-b-0 sm:grid-cols-[16rem_minmax(0,1fr)]">
-      <dt className="text-meta">{bad ? <WarnMark>{label}</WarnMark> : <span className="text-fg-3">{label}</span>}</dt>
+    <div className="grid gap-x-3 gap-y-0.5 border-b border-border py-2 last:border-b-0 sm:grid-cols-[16rem_minmax(0,1fr)]">
+      <dt className="text-meta">{bad ? <WarnMark>{label}</WarnMark> : <span className="text-muted-foreground">{label}</span>}</dt>
       <dd className="min-w-0">
-        <span className="num text-body text-fg-1">{value}</span>
-        {note && <span className="block text-meta text-fg-3">{note}</span>}
+        <span className="num text-body text-foreground">{value}</span>
+        {note && <span className="block text-meta text-muted-foreground">{note}</span>}
       </dd>
     </div>
   );

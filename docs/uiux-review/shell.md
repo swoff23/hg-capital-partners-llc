@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 40 findings: 0 critical, 7 high, 21 medium, 12 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 The shell does two jobs: show each partner what needs them, and reach any record in two keystrokes. Chrome recedes so the work leads.

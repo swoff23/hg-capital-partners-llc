@@ -63,8 +63,8 @@ export interface MonthBarsProps {
 
 /**
  * One series at a time (NOI, Income or Expense) for the 12 months ending
- * with the running month. A picked month shows as a --fill-1 band with a
- * 1px --line-control edge and its label in --fg-1; nothing ever dims. The
+ * with the running month. A picked month shows as a --muted band with a
+ * 1px --input edge and its label in --foreground; nothing ever dims. The
  * running month is a hollow column over "MTD". With a mouse the band and
  * readout follow the pointer and a click picks; on touch a tap picks and a
  * horizontal drag scrubs (vertical swipes still scroll the page). The 12
@@ -169,7 +169,7 @@ export function MonthBars({ months, runningMonth, through, historyStart, purchas
     return (
       <Card data-chart="" className="@container">
         <CardHeader className="flex min-h-13 items-center justify-between gap-3 py-2.5">
-          <h2 className="min-w-0 truncate text-section text-fg-1">By month</h2>
+          <h2 className="min-w-0 truncate text-section text-foreground">By month</h2>
           {control}
         </CardHeader>
         <CardBody>{body}</CardBody>
@@ -220,17 +220,17 @@ function Readout({
   const value = valueOf(month, metric);
   return (
     <div aria-hidden="true" className="mb-3">
-      <p className="truncate text-meta text-fg-3">
+      <p className="truncate text-meta text-muted-foreground">
         {METRIC_NAME[metric]} · {when}
       </p>
       <p className="flex h-7 items-center">
         {noFigure ? (
-          <span className="truncate text-body text-fg-3">{noFigure}</span>
+          <span className="truncate text-body text-muted-foreground">{noFigure}</span>
         ) : (
-          <Money key={`${metric}-${month.periodMonth}-${value}`} value={value / 100} className="animate-fade-in text-figure-m text-fg-1" />
+          <Money key={`${metric}-${month.periodMonth}-${value}`} value={value / 100} className="animate-fade-in text-figure-m text-foreground" />
         )}
       </p>
-      <p className="h-4.5 truncate text-meta text-fg-3 pointer-coarse:h-5">
+      <p className="h-4.5 truncate text-meta text-muted-foreground pointer-coarse:h-5">
         {!noFigure &&
           others.map((k, i) => (
             <span key={k}>
@@ -358,21 +358,21 @@ function Plot({
         {hasLines && (
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex">
             {months.map((m, i) => (
-              <span key={m.periodMonth} className={cn("min-w-0 flex-1", i === shown && "bg-fill-1 ring-1 ring-inset ring-line-control")} />
+              <span key={m.periodMonth} className={cn("min-w-0 flex-1", i === shown && "bg-muted ring-1 ring-inset ring-input")} />
             ))}
           </div>
         )}
         {/* The frame over it: ticks in their own 16px bands, the gridlines, the baseline. */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           {ticks && top > 0 && (
-            <span className="absolute left-0 top-0 text-meta leading-4 text-fg-3">{tickLabel(top)}</span>
+            <span className="absolute left-0 top-0 text-meta leading-4 text-muted-foreground">{tickLabel(top)}</span>
           )}
           {ticks && bottom > 0 && (
-            <span className="absolute bottom-0 left-0 text-meta leading-4 text-fg-3">{tickLabel(-bottom)}</span>
+            <span className="absolute bottom-0 left-0 text-meta leading-4 text-muted-foreground">{tickLabel(-bottom)}</span>
           )}
           <div className={columnArea}>
-            {ticks && top > 0 && <span className="absolute inset-x-0 top-0 h-px bg-line" />}
-            {ticks && bottom > 0 && <span className="absolute inset-x-0 bottom-0 h-px bg-line" />}
+            {ticks && top > 0 && <span className="absolute inset-x-0 top-0 h-px bg-border" />}
+            {ticks && bottom > 0 && <span className="absolute inset-x-0 bottom-0 h-px bg-border" />}
             <span className="absolute inset-x-0 h-px bg-line-strong" style={{ top: `calc(${zero * 100}% - ${zero === 1 ? 1 : 0}px)` }} />
           </div>
         </div>
@@ -395,7 +395,7 @@ function Plot({
                   className={cn(
                     // The plot takes the pointer; a slot only shows the pick and keyboard focus.
                     "pointer-events-none relative min-w-0 flex-1 outline-none",
-                    "data-focus-visible:z-10 data-focus-visible:ring-2 data-focus-visible:ring-inset data-focus-visible:ring-act",
+                    "data-focus-visible:z-10 data-focus-visible:ring-2 data-focus-visible:ring-inset data-focus-visible:ring-ring",
                   )}
                 >
                   <span className="sr-only">{slotName(m, kind, through, purchaseMonth)}</span>
@@ -413,7 +413,7 @@ function Plot({
             })}
           </RadioGroup>
         ) : (
-          <p className="absolute inset-x-0 top-4 bottom-0 flex items-center justify-center px-4 text-center text-body text-balance text-fg-3">
+          <p className="absolute inset-x-0 top-4 bottom-0 flex items-center justify-center px-4 text-center text-body text-balance text-muted-foreground">
             {empty}
           </p>
         )}
@@ -443,7 +443,7 @@ function Column({ value, top, bottom, zero }: { value: number; top: number; bott
 }
 
 /**
- * The running month: a 1px --chart-1 edge on --surface, never dashed (dashes
+ * The running month: a 1px --chart-1 edge on --background, never dashed (dashes
  * mean a reference) and never faded (a fade reads as dimming). Its height
  * changes directly, since scaling would thin its edge.
  */
@@ -453,7 +453,7 @@ function HollowColumn({ value, top, bottom, zero }: { value: number; top: number
   const height = `${share * (up ? zero : 1 - zero) * 100}%`;
   return (
     <span
-      className="absolute inset-x-0 mx-auto block w-3/5 max-w-6 border border-chart-1 bg-surface transition-[height] duration-base ease-spring"
+      className="absolute inset-x-0 mx-auto block w-3/5 max-w-6 border border-chart-1 bg-background transition-[height] duration-base ease-spring"
       style={up ? { bottom: `${(1 - zero) * 100}%`, height } : { top: `${zero * 100}%`, height }}
     />
   );
@@ -468,9 +468,9 @@ function HollowColumn({ value, top, bottom, zero }: { value: number; top: number
 function Axis({ months, shown }: { months: MonthPoint[]; shown: number }) {
   const last = months.length - 1;
   return (
-    <div aria-hidden="true" className="mt-1 grid text-meta text-fg-3" style={{ gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
+    <div aria-hidden="true" className="mt-1 grid text-meta text-muted-foreground" style={{ gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
       {months.map((m, i) => (
-        <span key={m.periodMonth} className={cn("text-center", i === shown && "text-fg-1")}>
+        <span key={m.periodMonth} className={cn("text-center", i === shown && "text-foreground")}>
           <span className="@max-[384px]:hidden">{monthShort(m.periodMonth)}</span>
           <span className="@min-[384px]:hidden">{monthInitial(m.periodMonth)}</span>
         </span>
@@ -506,7 +506,7 @@ function slotName(m: MonthPoint, kind: SlotKind, through: string | null, purchas
 
 /** Every figure on paper; `hidden` on screen, so a screen reader doesn't hear the values twice. */
 function PrintTable({ months, kinds }: { months: MonthPoint[]; kinds: SlotKind[] }) {
-  const cell = "border-b border-line py-1 pr-3 text-right tabular-nums";
+  const cell = "border-b border-border py-1 pr-3 text-right tabular-nums";
   const money = (m: MonthPoint, i: number, cents: number): ReactNode =>
     kinds[i] === "before-history" || kinds[i] === "before-purchase" || m.lineCount === 0 ? "—" : <Money value={cents / 100} />;
   return (
@@ -522,7 +522,7 @@ function PrintTable({ months, kinds }: { months: MonthPoint[]; kinds: SlotKind[]
       <tbody>
         {months.map((m, i) => (
           <tr key={m.periodMonth}>
-            <td className="border-b border-line py-1 pr-3">
+            <td className="border-b border-border py-1 pr-3">
               {fmtMonthYear(m.periodMonth)}
               {kinds[i] === "running" ? " MTD" : ""}
             </td>
@@ -538,20 +538,20 @@ function PrintTable({ months, kinds }: { months: MonthPoint[]; kinds: SlotKind[]
 
 /**
  * The chart's loading frame (brand section 7, skeletons): the title and
- * labels draw at once, 12 equal --fill-1 columns at 40% of the plot (so no
- * fake trend) and a --fill-1 block for the figure. Static, no shimmer.
+ * labels draw at once, 12 equal --muted columns at 40% of the plot (so no
+ * fake trend) and a --muted block for the figure. Static, no shimmer.
  */
 export function MonthBarsSkeleton({ size, months }: { size: "overview" | "record"; months: string[] }) {
   return (
     <Card className="@container" aria-busy="true">
       <CardHeader className="flex min-h-13 items-center justify-between gap-3 py-2.5">
-        <h2 className="text-section text-fg-1">By month</h2>
+        <h2 className="text-section text-foreground">By month</h2>
       </CardHeader>
       <CardBody>
         <div aria-hidden="true" className="mb-3">
-          <p className="text-meta text-fg-3">NOI</p>
+          <p className="text-meta text-muted-foreground">NOI</p>
           <p className="flex h-7 items-center">
-            <span className="block h-5 w-24 bg-fill-1" />
+            <span className="block h-5 w-24 bg-muted" />
           </p>
           <p className="h-4.5 pointer-coarse:h-5" />
         </div>
@@ -559,7 +559,7 @@ export function MonthBarsSkeleton({ size, months }: { size: "overview" | "record
           <div className={cn("relative flex border-b border-line-strong", PLOT_HEIGHT[size])}>
             {months.map((m) => (
               <span key={m} className="relative flex-1">
-                <span className="absolute inset-x-0 bottom-0 mx-auto block h-2/5 w-3/5 max-w-6 bg-fill-1" />
+                <span className="absolute inset-x-0 bottom-0 mx-auto block h-2/5 w-3/5 max-w-6 bg-muted" />
               </span>
             ))}
           </div>

@@ -24,7 +24,7 @@ export const metadata: Metadata = {
  * the first-password page.
  * Code under (portal) never imports staff auth or the properties, deals or
  * QuickBooks modules (src/lib/auth-guard.test.ts). The portal has its own
- * toast region (AppShell holds the app's). The work surface is --surface;
+ * toast region (AppShell holds the app's). The work surface is --background;
  * each page's header is the --canvas chrome, as in the app.
  *
  * One LeaveGuard for every portal page: the job page's photos still going up
@@ -48,7 +48,7 @@ export default async function PortalLayout({ children }: LayoutProps<"/p">) {
   const principal = await requirePortalSession();
   const scope = portalScope(principal.contactId);
   return (
-    <div className="min-h-screen bg-surface text-fg-1">
+    <div className="min-h-screen bg-background text-foreground">
       <ToastProvider>
         <LeaveGuard>
           <PortalUploadQueue key={scope} scope={scope}>

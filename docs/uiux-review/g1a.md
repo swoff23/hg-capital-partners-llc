@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 35 findings: 0 critical, 4 high, 14 medium, 17 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 HG Jobs should feel like a well-run crew app with one purpose: get Zack from a text to the right door, then back to Connor with proof, without a phone call. The door is a single-use invite and one password field on the app's own tokens, as quiet as Linear's sign-in (https://mobbin.com/screens/99fded1c-9799-4744-9f2c-dd5b3232531d). When a link goes out, the screen names the address it went to (https://mobbin.com/screens/6ac75dec-5c85-4c3d-ad9e-717601c1fc9d).

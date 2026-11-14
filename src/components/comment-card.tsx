@@ -43,7 +43,7 @@ export interface CommentCardProps {
   month?: boolean;
   /** When it was last edited; `true` for an imported comment Asana marked edited, with no time. */
   edited?: Date | string | true | null;
-  /** Staff only: the --fill-1 card with Lock and "Internal". */
+  /** Staff only: the --muted card with Lock and "Internal". */
   internal?: boolean;
   /** Imported from an Asana subtask: the checklist item it was on. */
   onItem?: string | null;
@@ -87,7 +87,7 @@ export interface CommentCardProps {
  * avatar sits on the rail (choice 3.1 B), so the header is the first name,
  * the time, "edited" and, for an Internal note, Lock and "Internal" at the
  * trailing edge ("Internal" drops below 480px; the Lock keeps its name).
- * Shared is --surface on a --line edge; Internal is --fill-1 with a
+ * Shared is --background on a --border edge; Internal is --muted with a
  * transparent edge. rounded-md, 12px by 10px padding.
  */
 export function CommentCard({
@@ -131,7 +131,7 @@ export function CommentCard({
     if (focusOnMount) (triggerRef.current ?? cardRef.current)?.focus();
   }, [focusOnMount]);
   const editedDay = editedAt ? fmtDay(todayYmdEastern(new Date(editedAt)), { year: "auto", now: todayYmdEastern(new Date(now)) }) : null;
-  const editedWord = <span className="shrink-0 text-meta text-fg-3">edited</span>;
+  const editedWord = <span className="shrink-0 text-meta text-muted-foreground">edited</span>;
 
   const trigger = menuItems ? (
     <MenuTrigger isOpen={menuOpen} onOpenChange={setMenuOpen}>
@@ -141,7 +141,7 @@ export function CommentCard({
         className={cn(
           buttonClass({ variant: "ghost", size: "sm", icon: true }),
           // 32px without growing the 20px header line; shown on hover or keyboard focus, with a mouse only.
-          "-my-1.5 shrink-0 text-fg-3 data-pressed:bg-fill-1",
+          "-my-1.5 shrink-0 text-muted-foreground data-pressed:bg-muted",
           headerless ? "absolute right-1.5 top-1.5 my-0" : !internal && "ml-auto",
           "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100",
           // On touch it is not drawn, but stays a real button for VoiceOver and Switch Control. It sits at the
@@ -169,19 +169,19 @@ export function CommentCard({
         if (window.getSelection()?.toString()) return;
         setMenuOpen(true);
       }}
-      className={cn("group/card relative rounded-md border px-3 py-2.5 outline-none", internal ? "border-transparent bg-fill-1" : "border-line bg-surface")}
+      className={cn("group/card relative rounded-md border px-3 py-2.5 outline-none", internal ? "border-transparent bg-muted" : "border-border bg-background")}
     >
       {headerless ? (
         trigger
       ) : (
         <div className="relative flex min-w-0 items-center gap-2">
           {shown && (
-            <span className="min-w-0 truncate text-body font-medium text-fg-1">
+            <span className="min-w-0 truncate text-body font-medium text-foreground">
               {shown}
               {author?.contractor && !author.you && <span className="sr-only">, contractor</span>}
             </span>
           )}
-          {sending ? <SendingLabel /> : timed ? <ActivityTime at={at} month={month} className="shrink-0 text-meta text-fg-3" /> : null}
+          {sending ? <SendingLabel /> : timed ? <ActivityTime at={at} month={month} className="shrink-0 text-meta text-muted-foreground" /> : null}
           {edited && (editedAt && !coarse ? <Tooltip label={`Edited ${fullStamp(editedAt, now)}`}>{editedWord}</Tooltip> : editedWord)}
           {internal && (
             <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-meta font-medium text-fg-2">
@@ -192,17 +192,17 @@ export function CommentCard({
           {trigger}
         </div>
       )}
-      {onItem && <p className="mt-1 truncate text-meta text-fg-3">On checklist item: {onItem}</p>}
+      {onItem && <p className="mt-1 truncate text-meta text-muted-foreground">On checklist item: {onItem}</p>}
       {editor ? (
         <div className="mt-1.5">{editor}</div>
       ) : (
         body != null &&
-        body !== "" && <p className={cn("whitespace-pre-wrap break-words text-body text-fg-1", headerless ? "pointer-fine:pr-7" : "mt-1")}>{body}</p>
+        body !== "" && <p className={cn("whitespace-pre-wrap break-words text-body text-foreground", headerless ? "pointer-fine:pr-7" : "mt-1")}>{body}</p>
       )}
       {media && <div className="mt-2">{media}</div>}
       {files && <div className="mt-2">{files}</div>}
       {removedFiles > 0 && (
-        <p className="mt-2 text-meta text-fg-3">{removedFiles === 1 ? "1 file removed" : `${removedFiles} files removed`}</p>
+        <p className="mt-2 text-meta text-muted-foreground">{removedFiles === 1 ? "1 file removed" : `${removedFiles} files removed`}</p>
       )}
     </div>
   );
@@ -230,7 +230,7 @@ function SendingLabel() {
     const t = setTimeout(() => setShow(true), 200);
     return () => clearTimeout(t);
   }, []);
-  return <span className="shrink-0 text-meta text-fg-3">{show ? "Sending…" : ""}</span>;
+  return <span className="shrink-0 text-meta text-muted-foreground">{show ? "Sending…" : ""}</span>;
 }
 
 /**
@@ -347,11 +347,11 @@ export function CommentEditor({
             void save();
           }
         }}
-        className="block max-h-60 min-h-9 w-full resize-none rounded-md border border-line-control bg-surface px-2.5 py-2 text-body text-fg-1 outline-none focus:border-act"
+        className="block max-h-60 min-h-9 w-full resize-none rounded-md border border-input bg-background px-2.5 py-2 text-body text-foreground outline-none focus:border-ring"
       />
-      {note && <p className="truncate text-meta text-fg-3">{note}</p>}
+      {note && <p className="truncate text-meta text-muted-foreground">{note}</p>}
       {error && (
-        <p role="alert" className="text-meta text-danger">
+        <p role="alert" className="text-meta text-destructive">
           {error}
         </p>
       )}
@@ -371,7 +371,7 @@ export function CommentEditor({
 
 /**
  * What happened to an update after it was posted (activity 2.6): one
- * text-meta --fg-3 line, 4px under the card, on the card's left edge. At
+ * text-meta --muted-foreground line, 4px under the card, on the card's left edge. At
  * most two per timeline. The fixed words stay under 35 characters, and a
  * long name truncates before the line could wrap ("Seen by Maximilian… · Tue").
  *
@@ -416,7 +416,7 @@ export function DeliveryLine({
     }
   })();
   return (
-    <p className={cn("flex min-w-0 text-meta text-fg-3", className)}>
+    <p className={cn("flex min-w-0 text-meta text-muted-foreground", className)}>
       {before && <span className="shrink-0 whitespace-pre">{before}</span>}
       <span className="min-w-0 truncate">{who}</span>
       {after && <span className="shrink-0 whitespace-pre">{after}</span>}
@@ -425,7 +425,7 @@ export function DeliveryLine({
 }
 
 /**
- * A message that didn't go (activity 2.7): one `--danger` text-meta line under
+ * A message that didn't go (activity 2.7): one `--destructive` text-meta line under
  * its card, built from what the call said. "Didn't send: no connection ·
  * Retry" offline, "Didn't send · Retry" otherwise; a deal note says "save".
  * Retry sends the same text, visibility, files and `clientId`, so nothing
@@ -450,7 +450,7 @@ export function SendFailedLine({
 }) {
   if (reason) {
     return (
-      <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-danger", className)}>
+      <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-destructive", className)}>
         <span className="shrink-0">{`Didn't ${verb}`}</span>
         <span aria-hidden="true">·</span>
         <span className="truncate" title={reason}>
@@ -460,7 +460,7 @@ export function SendFailedLine({
     );
   }
   return (
-    <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-danger", className)}>
+    <p role="alert" className={cn("flex min-w-0 items-center gap-1 text-meta text-destructive", className)}>
       <span className="truncate">{offline ? `Didn't ${verb}: no connection` : `Didn't ${verb}`}</span>
       <span aria-hidden="true">·</span>
       <button

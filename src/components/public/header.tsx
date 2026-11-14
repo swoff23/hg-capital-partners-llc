@@ -12,7 +12,7 @@ import { publicContainer, publicLinkHover, publicType } from "./ui";
 
 /**
  * Top nav for every public page (PRD §3: "Primary navigation: Rentals |
- * Residents | HG Login"), 64px over a --line rule (docs/brand-guidelines.md,
+ * Residents | HG Login"), 64px over a --border rule (docs/brand-guidelines.md,
  * section 10). Plain text links, not pills or buttons: HG Login stays the
  * quietest link on the page, in --pub-faint; it's a door for two people, not
  * a call to action. Below 600px the links fold into a 44px menu button.
@@ -31,11 +31,11 @@ export function PublicHeader() {
   const pathname = usePathname() ?? "";
 
   return (
-    <header className="border-b border-line">
+    <header className="border-b border-border">
       <div className={cn(publicContainer, "flex h-16 items-center justify-between gap-4")}>
         <Link
           href="/"
-          className={cn(publicType.wordmark, "inline-flex items-center text-fg-1 pointer-coarse:min-h-11", publicLinkHover)}
+          className={cn(publicType.wordmark, "inline-flex items-center text-foreground pointer-coarse:min-h-11", publicLinkHover)}
         >
           {BRAND.company}
         </Link>
@@ -47,8 +47,8 @@ export function PublicHeader() {
               href={l.href}
               aria-current={isCurrent(pathname, l.href) ? "page" : undefined}
               className={cn(
-                "inline-flex items-center whitespace-nowrap pointer-coarse:min-h-11 aria-[current=page]:text-fg-1",
-                l.href === "/login" ? "text-pub-faint" : "text-fg-3",
+                "inline-flex items-center whitespace-nowrap pointer-coarse:min-h-11 aria-[current=page]:text-foreground",
+                l.href === "/login" ? "text-pub-faint" : "text-muted-foreground",
                 publicLinkHover,
               )}
             >
@@ -76,7 +76,7 @@ function PhoneMenu({ pathname }: { pathname: string }) {
       <MenuTrigger>
         <AriaButton
           aria-label="Menu"
-          className={cn(buttonClass({ variant: "ghost", icon: true }), "-mr-3 h-11 w-11 text-fg-1 min-[37.5rem]:hidden")}
+          className={cn(buttonClass({ variant: "ghost", icon: true }), "-mr-3 h-11 w-11 text-foreground min-[37.5rem]:hidden")}
         >
           <MenuIcon aria-hidden="true" className="size-4 shrink-0 stroke-[1.5] pointer-coarse:size-5 pointer-coarse:stroke-[1.75]" />
         </AriaButton>

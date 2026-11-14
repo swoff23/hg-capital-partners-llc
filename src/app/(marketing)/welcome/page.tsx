@@ -24,9 +24,9 @@ export default function WelcomePage() {
         {/* The gold hairline: once on the site, under this eyebrow. */}
         <div aria-hidden="true" className="mt-5 h-px w-14 bg-gold" />
 
-        <h1 className={cn(publicType.display, "mt-7 text-fg-1")}>
+        <h1 className={cn(publicType.display, "mt-7 text-foreground")}>
           Thoughtfully maintained apartments{" "}
-          <span className="text-fg-3">in some of Buffalo&rsquo;s best neighborhoods.</span>
+          <span className="text-muted-foreground">in some of Buffalo&rsquo;s best neighborhoods.</span>
         </h1>
 
         {/* Stacked full width on a phone, side by side from 640. */}

@@ -86,12 +86,12 @@ export function StatusMenu(props: StatusMenuProps) {
       <AriaButton
         isDisabled={isDisabled}
         aria-label={`${noun}: ${wordOf(value)}. Change ${noun.toLowerCase()}`}
-        className={cn(buttonClass({ variant: "ghost", size: "sm" }), "group/status min-w-0 text-meta data-pressed:bg-fill-1", className)}
+        className={cn(buttonClass({ variant: "ghost", size: "sm" }), "group/status min-w-0 text-meta data-pressed:bg-muted", className)}
       >
         {task ? <StatusBadge status={value as TaskStatus} /> : <DealStage stage={value} label={dealStageLabel(value)} className="text-meta" />}
         <ChevronDown
           aria-hidden="true"
-          className={cn("size-3.5 shrink-0 text-fg-3", chevron === "hover" && "opacity-0 group-hover/row:opacity-100 group-hover/status:opacity-100 group-data-pressed/status:opacity-100 pointer-coarse:opacity-100")}
+          className={cn("size-3.5 shrink-0 text-muted-foreground", chevron === "hover" && "opacity-0 group-hover/row:opacity-100 group-hover/status:opacity-100 group-data-pressed/status:opacity-100 pointer-coarse:opacity-100")}
         />
       </AriaButton>
       <Menu

@@ -190,15 +190,15 @@ export function Menu<T extends object>({
     <PopoverSurface placement={placement} motion="none" className="min-w-40">
       {step ? (
         <Dialog aria-label={step.title} className="min-w-64 max-w-80 outline-none">
-          <div className="flex items-center gap-1 border-b border-line py-1 pl-1 pr-3">
+          <div className="flex items-center gap-1 border-b border-border py-1 pl-1 pr-3">
             <AriaButton
               onPress={back}
               aria-label="Back"
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:size-11"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground pointer-coarse:size-11"
             >
               <ChevronLeft className="size-4" aria-hidden="true" />
             </AriaButton>
-            <span className="min-w-0 truncate text-label text-fg-1">{step.title}</span>
+            <span className="min-w-0 truncate text-label text-foreground">{step.title}</span>
           </div>
           {step.content({ back, close, container })}
         </Dialog>
@@ -209,7 +209,7 @@ export function Menu<T extends object>({
   );
 }
 
-const trailingCheck = "h-4 w-4 shrink-0 text-fg-1";
+const trailingCheck = "h-4 w-4 shrink-0 text-foreground";
 
 export function MenuItem({
   variant = "default",
@@ -240,7 +240,7 @@ export function MenuItem({
   current?: boolean;
   /** A printed shortcut ("⌘C"), React Aria's Keyboard slot drawn as a Kbd. Hidden on touch. */
   shortcut?: string;
-  /** One line of text-meta --fg-3 under the label; the row grows to 44 (56 on touch). */
+  /** One line of text-meta --muted-foreground under the label; the row grows to 44 (56 on touch). */
   description?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -267,9 +267,9 @@ export function MenuItem({
         "flex cursor-default select-none items-center gap-2 whitespace-nowrap rounded-sm px-2 text-body outline-none",
         description ? "min-h-11 py-1.5 pointer-coarse:min-h-14" : "h-8 pointer-coarse:h-11",
         variant === "destructive"
-          ? "text-danger data-focused:bg-danger-tint"
+          ? "text-destructive data-focused:bg-destructive-tint"
           // Focus draws the highlight with a mouse and a keyboard; on touch only a visible (keyboard) focus does, so opening a list doesn't paint its first row.
-          : "text-fg-1 data-focused:bg-fill-2 pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-fill-2",
+          : "text-foreground data-focused:bg-accent pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-accent",
         "data-disabled:opacity-50",
         className,
       )}
@@ -283,7 +283,7 @@ export function MenuItem({
               aria-hidden="true"
               className={cn(
                 "flex shrink-0 [&_svg]:h-4 [&_svg]:w-4",
-                variant === "destructive" ? "text-current" : "text-fg-3",
+                variant === "destructive" ? "text-current" : "text-muted-foreground",
               )}
             >
               {icon}
@@ -294,7 +294,7 @@ export function MenuItem({
               <Text slot="label" className="truncate">
                 {children}
               </Text>
-              <Text slot="description" className="truncate text-meta text-fg-3">
+              <Text slot="description" className="truncate text-meta text-muted-foreground">
                 {description}
               </Text>
             </span>
@@ -325,7 +325,7 @@ export function MenuItem({
   );
 }
 
-/** A group of items under a header in text-meta 500 --fg-3 ("Theme"). The header names the group for screen readers. */
+/** A group of items under a header in text-meta 500 --muted-foreground ("Theme"). The header names the group for screen readers. */
 export function MenuSection<T extends object>({
   title,
   children,
@@ -338,7 +338,7 @@ export function MenuSection<T extends object>({
 }) {
   return (
     <AriaMenuSection className={className} {...props}>
-      {title && <Header className="px-2 pb-1 pt-1.5 text-meta font-medium text-fg-3">{title}</Header>}
+      {title && <Header className="px-2 pb-1 pt-1.5 text-meta font-medium text-muted-foreground">{title}</Header>}
       {children}
     </AriaMenuSection>
   );
@@ -346,7 +346,7 @@ export function MenuSection<T extends object>({
 
 /**
  * The menu's non-interactive header: who or what it's about, in two
- * text-meta lines, the label in --fg-1 over a detail in --fg-3 ("Pieter",
+ * text-meta lines, the label in --foreground over a detail in --muted-foreground ("Pieter",
  * then the email; a comment's author, then its stamp). Each line truncates,
  * so the menu never grows past the screen. First in a Menu, or first in a
  * MenuSection, whose group it then names.
@@ -354,12 +354,12 @@ export function MenuSection<T extends object>({
 export function MenuHeader({ title, detail }: { title: ReactNode; detail?: ReactNode }) {
   return (
     <Header role="presentation" className="flex max-w-[calc(100vw_-_2rem)] flex-col px-2 pb-1.5 pt-1 text-meta">
-      <span className="truncate text-fg-1">{title}</span>
-      {detail && <span className="truncate text-fg-3">{detail}</span>}
+      <span className="truncate text-foreground">{title}</span>
+      {detail && <span className="truncate text-muted-foreground">{detail}</span>}
     </Header>
   );
 }
 
 export function MenuSeparator() {
-  return <Separator className="-mx-1 my-1 border-t border-line" />;
+  return <Separator className="-mx-1 my-1 border-t border-border" />;
 }

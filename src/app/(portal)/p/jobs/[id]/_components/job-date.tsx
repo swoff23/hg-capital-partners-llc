@@ -60,7 +60,7 @@ export function JobDate({
 
   if (!editable) {
     return target ? (
-      <span className="truncate text-meta text-fg-3">
+      <span className="truncate text-meta text-muted-foreground">
         <DueDate target={target} isVisit={isVisit} today={today} />
       </span>
     ) : null;
@@ -91,7 +91,7 @@ export function JobDate({
           onFocus={warmDatePanel}
           onPressStart={warmDatePanel}
           className={cn(
-            "min-w-0 truncate rounded-sm text-meta text-fg-3 underline decoration-dotted decoration-1 underline-offset-4 hover:text-fg-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-act focus-visible:outline-solid",
+            "min-w-0 truncate rounded-sm text-meta text-muted-foreground underline decoration-dotted decoration-1 underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid",
             // A 44px target on touch (20px line plus 12px each side) without making the line any taller.
             "pointer-coarse:-my-3 pointer-coarse:py-3",
           )}

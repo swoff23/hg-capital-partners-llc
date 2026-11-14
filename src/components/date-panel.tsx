@@ -62,7 +62,7 @@ export type RepeatBinding = {
  * about 495px, which the picks and the calendar together overflow). A date
  * without quick picks goes straight to the calendar.
  *
- * The panel's first line names a past value ("Due Sep 12", in --danger when
+ * The panel's first line names a past value ("Due Sep 12", in --destructive when
  * overdue), since the calendar opens on today's month. The picks show a Check
  * on the current value. With `repeat`, a Repeat row ends the panel. In the
  * panel it opens the presets below itself, one line each, and folds the picks
@@ -141,12 +141,12 @@ export function DatePanel({
   const start = value && (!past || !withPicks) ? value : today;
   const calendar = <MonthCalendar value={value} start={start} today={today} label={label} onPick={onPick} />;
   const currentLine = past && value && (
-    <p className={cn("px-3 pb-0 pt-2 text-meta", overdue ? "text-danger" : "text-fg-3")}>
+    <p className={cn("px-3 pb-0 pt-2 text-meta", overdue ? "text-destructive" : "text-muted-foreground")}>
       {label.replace(/ date$/i, "")} {fmtDay(value, { year: "auto", now: today })}
     </p>
   );
   const clear = allowNone && !withPicks && value && (
-    <div className="flex justify-end border-t border-line px-3 py-2">
+    <div className="flex justify-end border-t border-border px-3 py-2">
       <Button type="button" variant="ghost" size="sm" onClick={() => onPick(null)}>
         Clear
       </Button>
@@ -161,17 +161,17 @@ export function DatePanel({
       aria-expanded={steps ? undefined : repeatOpen}
       className={cn(
         "flex h-8 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body outline-none transition-colors",
-        "hover:bg-fill-2 focus-visible:bg-fill-2 pointer-coarse:h-11",
+        "hover:bg-accent focus-visible:bg-accent pointer-coarse:h-11",
       )}
     >
-      <Repeat aria-hidden="true" className="size-4 shrink-0 text-fg-3" />
+      <Repeat aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       <span className="flex-1">Repeat</span>
-      <span className="min-w-0 truncate pl-4 text-meta text-fg-3">
+      <span className="min-w-0 truncate pl-4 text-meta text-muted-foreground">
         {repeat.value ? describeRepeat(repeat.value, { short: true, from: value ?? today }) : "Doesn't repeat"}
       </span>
       <ChevronRight
         aria-hidden="true"
-        className={cn("size-4 shrink-0 text-fg-3 transition-transform motion-reduce:transition-none", !steps && repeatOpen && "rotate-90")}
+        className={cn("size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !steps && repeatOpen && "rotate-90")}
       />
     </button>
   );
@@ -200,11 +200,11 @@ export function DatePanel({
               <button
                 type="button"
                 onClick={() => setView("calendar")}
-                className="flex h-11 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body outline-none transition-colors hover:bg-fill-2 focus-visible:bg-fill-2"
+                className="flex h-11 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body outline-none transition-colors hover:bg-accent focus-visible:bg-accent"
               >
-                <CalendarDays aria-hidden="true" className="size-4 shrink-0 text-fg-3" />
+                <CalendarDays aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
                 <span className="flex-1">Pick a date</span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-fg-3" />
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
               </button>
               {repeatRow}
             </div>
@@ -219,7 +219,7 @@ export function DatePanel({
             {currentLine}
             <div className="px-3 pb-3 pt-2">{calendar}</div>
             {clear}
-            {repeatRow && <div className="border-t border-line p-1">{repeatRow}</div>}
+            {repeatRow && <div className="border-t border-border p-1">{repeatRow}</div>}
           </>
         )}
         {view === "repeat" && (
@@ -236,7 +236,7 @@ export function DatePanel({
       {currentLine}
       <div className="px-3 pb-3 pt-2">{calendar}</div>
       {withPicks && (
-        <div className="border-t border-line p-1">
+        <div className="border-t border-border p-1">
           {repeatOpen ? (
             <FoldedPicks picks={picks} onPress={() => setView("date")} />
           ) : (
@@ -246,7 +246,7 @@ export function DatePanel({
       )}
       {clear}
       {repeatRow && (
-        <div ref={repeatSection} className="border-t border-line p-1">
+        <div ref={repeatSection} className="border-t border-border p-1">
           {repeatRow}
           {repeatOpen && repeatMenu}
         </div>
@@ -262,7 +262,7 @@ function FoldedPicks({ picks, onPress }: { picks: QuickPick[]; onPress: () => vo
       type="button"
       onClick={onPress}
       aria-expanded={false}
-      className="flex h-8 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body text-fg-3 outline-none transition-colors hover:bg-fill-2 focus-visible:bg-fill-2 pointer-coarse:h-11"
+      className="flex h-8 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body text-muted-foreground outline-none transition-colors hover:bg-accent focus-visible:bg-accent pointer-coarse:h-11"
     >
       <span className="min-w-0 flex-1 truncate">{`${picks
         .slice(0, 3)
@@ -288,15 +288,15 @@ function QuickPickRows({ picks, value, onPick }: { picks: QuickPick[]; value: Ym
             aria-current={isCurrent || undefined}
             className={cn(
               "flex h-8 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body outline-none transition-colors",
-              "hover:bg-fill-2 data-focus-visible:bg-fill-2 data-pressed:bg-fill-2 pointer-coarse:h-11",
+              "hover:bg-accent data-focus-visible:bg-accent data-pressed:bg-accent pointer-coarse:h-11",
             )}
           >
-            <Icon aria-hidden="true" className="size-4 shrink-0 text-fg-3" />
+            <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
             <span className="flex-1">{p.label}</span>
-            {p.hint && <span className="whitespace-nowrap pl-4 text-meta text-fg-3">{p.hint}</span>}
+            {p.hint && <span className="whitespace-nowrap pl-4 text-meta text-muted-foreground">{p.hint}</span>}
             {/* Its key, printed for a mouse; Kbd hides on touch. */}
             <Kbd aria-hidden="true">{p.number}</Kbd>
-            <Check aria-hidden="true" className={cn("size-4 shrink-0 text-fg-1", !isCurrent && "invisible")} />
+            <Check aria-hidden="true" className={cn("size-4 shrink-0 text-foreground", !isCurrent && "invisible")} />
           </AriaButton>
         );
       })}
@@ -323,17 +323,17 @@ const FULL_MONTHS = [
 ] as const;
 
 const navButton =
-  "flex size-7 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 disabled:opacity-50 pointer-coarse:size-11";
+  "flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 pointer-coarse:size-11";
 const gridButton = cn(
   "flex h-8 items-center justify-center rounded-md text-body tabular-nums outline-none transition-colors pointer-coarse:h-11",
-  "hover:bg-fill-2 data-pressed:bg-fill-2 data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-act",
+  "hover:bg-accent data-pressed:bg-accent data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring",
 );
 
 /**
  * A month of days, with a heading that steps to a month grid and then a
  * 12-year grid in the same layer, for dates years back. Today is a 1px inset
- * `--line-control` ring at the same weight as other days; the picked day is the
- * `--act` fill. Cells are 32px squares with a mouse; on touch each takes 1/7 of
+ * `--input` ring at the same weight as other days; the picked day is the
+ * `--primary` fill. Cells are 32px squares with a mouse; on touch each takes 1/7 of
  * the grid's width at 44px tall.
  */
 function MonthCalendar({
@@ -368,10 +368,10 @@ function MonthCalendar({
           onPress={() => setView(view === "days" ? "months" : "years")}
           isDisabled={view === "years"}
           aria-label={view === "days" ? `${heading}. Choose a month` : view === "months" ? `${heading}. Choose a year` : heading}
-          className="flex h-7 items-center gap-1 rounded-md pl-1 pr-1.5 text-body font-semibold outline-none transition-colors hover:bg-fill-2 disabled:hover:bg-transparent data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-act pointer-coarse:h-11"
+          className="flex h-7 items-center gap-1 rounded-md pl-1 pr-1.5 text-body font-semibold outline-none transition-colors hover:bg-accent disabled:hover:bg-transparent data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-ring pointer-coarse:h-11"
         >
           {heading}
-          {view !== "years" && <ChevronDown aria-hidden="true" className="size-3.5 text-fg-3" />}
+          {view !== "years" && <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />}
         </AriaButton>
         <div className="flex items-center">
           <AriaButton aria-label={view === "days" ? "Previous month" : view === "months" ? "Previous year" : "Previous years"} onPress={() => step(-1)} className={navButton}>
@@ -395,7 +395,7 @@ function MonthCalendar({
           >
             <CalendarGrid weekdayStyle="narrow" className="w-full border-separate border-spacing-0">
               <CalendarGridHeader>
-                {(d) => <CalendarHeaderCell className="pb-1 text-meta font-medium text-fg-3">{d}</CalendarHeaderCell>}
+                {(d) => <CalendarHeaderCell className="pb-1 text-meta font-medium text-muted-foreground">{d}</CalendarHeaderCell>}
               </CalendarGridHeader>
               <CalendarGridBody>
                 {(date) => (
@@ -406,11 +406,11 @@ function MonthCalendar({
                         "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-body tabular-nums outline-none transition-colors",
                         "pointer-coarse:h-11 pointer-coarse:w-full pointer-coarse:rounded-md",
                         isOutsideMonth && "invisible",
-                        // One weight for every day: today is its ring, the pick is the --act fill.
+                        // One weight for every day: today is its ring, the pick is the --primary fill.
                         isSelected
-                          ? "bg-act text-on-act"
-                          : cn("hover:bg-fill-2 data-pressed:bg-fill-2", date.toString() === today && "ring-1 ring-inset ring-line-control"),
-                        isFocusVisible && "outline-solid outline-2 outline-offset-2 outline-act",
+                          ? "bg-primary text-primary-foreground"
+                          : cn("hover:bg-accent data-pressed:bg-accent", date.toString() === today && "ring-1 ring-inset ring-input"),
+                        isFocusVisible && "outline-solid outline-2 outline-offset-2 outline-ring",
                       )
                     }
                   />
@@ -433,7 +433,7 @@ function MonthCalendar({
                     setFocus((f) => f.set({ month: i + 1 }));
                     setView("days");
                   }}
-                  className={cn(gridButton, isPick ? "bg-act text-on-act hover:bg-act-hover" : isNow && "ring-1 ring-inset ring-line-control")}
+                  className={cn(gridButton, isPick ? "bg-primary text-primary-foreground hover:bg-primary-hover" : isNow && "ring-1 ring-inset ring-input")}
                 >
                   {name}
                 </AriaButton>
@@ -454,7 +454,7 @@ function MonthCalendar({
                     setFocus((f) => f.set({ year }));
                     setView("months");
                   }}
-                  className={cn(gridButton, isPick ? "bg-act text-on-act hover:bg-act-hover" : isNow && "ring-1 ring-inset ring-line-control")}
+                  className={cn(gridButton, isPick ? "bg-primary text-primary-foreground hover:bg-primary-hover" : isNow && "ring-1 ring-inset ring-input")}
                 >
                   {year}
                 </AriaButton>

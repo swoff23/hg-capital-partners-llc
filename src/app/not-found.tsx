@@ -13,11 +13,11 @@ import { cn } from "@/lib/utils";
  */
 export default function RootNotFound() {
   return (
-    <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-fg-1">
+    <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-foreground">
       <PublicHeader />
       <main className={cn(publicContainer, "flex flex-1 flex-col items-center justify-center py-16 text-center")}>
-        <h1 className={cn(publicType.heading, "text-fg-1")}>Page not found</h1>
-        <p className={cn(publicType.lead, "mt-3 max-w-sm text-fg-3")}>There&rsquo;s nothing at this address.</p>
+        <h1 className={cn(publicType.heading, "text-foreground")}>Page not found</h1>
+        <p className={cn(publicType.lead, "mt-3 max-w-sm text-muted-foreground")}>There&rsquo;s nothing at this address.</p>
         <Link href="/" className={cn(publicCtaClass, "mt-8")}>
           Back to the front page
         </Link>

@@ -43,21 +43,21 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/templa
       {templates.length === 0 ? (
         <EmptyState>No playbooks yet.</EmptyState>
       ) : (
-        <ul className="divide-y divide-line border-t border-line">
+        <ul className="divide-y divide-border border-t border-border">
           {templates.map((t) => {
             const count = parseTemplateItems(t.items).length;
             return (
               <li key={t.id}>
                 <Link
                   href={`/templates/${t.id}/apply${query}`}
-                  className={cn("-mx-2 flex min-h-10 items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-fill-1 pointer-coarse:min-h-12", pendingRowFill)}
+                  className={cn("-mx-2 flex min-h-10 items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted pointer-coarse:min-h-12", pendingRowFill)}
                 >
                   <LinkPending />
-                  <span className="min-w-0 flex-1 truncate text-body text-fg-1">{t.name}</span>
-                  <span className="shrink-0 text-meta tabular-nums text-fg-3">
+                  <span className="min-w-0 flex-1 truncate text-body text-foreground">{t.name}</span>
+                  <span className="shrink-0 text-meta tabular-nums text-muted-foreground">
                     {count} {count === 1 ? "task" : "tasks"}
                   </span>
-                  <ChevronRight className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 </Link>
               </li>
             );

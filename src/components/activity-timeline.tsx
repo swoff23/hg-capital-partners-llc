@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
  * A record's history as one timeline (docs/specs/activity-comments.md 2.1):
  * the task page, the deal page and the contractor's job page. Each entry is
  * a two-column grid, a 20px marker column, a 12px gap, then the content. One
- * 1px --line hairline runs down the center of the marker column behind the
- * markers, and each marker sits on a --surface knockout so the line never
+ * 1px --border hairline runs down the center of the marker column behind the
+ * markers, and each marker sits on a --background knockout so the line never
  * crosses it. The timeline scrolls with the page; it has no scroll box of
  * its own.
  *
@@ -43,7 +43,7 @@ export function ActivityTimeline({
       className={cn(
         "relative space-y-3",
         // The hairline: a border, so it prints. Centered in the 20px marker column.
-        "before:pointer-events-none before:absolute before:inset-y-0 before:left-[calc(0.625rem-0.5px)] before:border-l before:border-line before:content-['']",
+        "before:pointer-events-none before:absolute before:inset-y-0 before:left-[calc(0.625rem-0.5px)] before:border-l before:border-border before:content-['']",
         // The dots and knockouts are fills, which print only when asked.
         "print:[-webkit-print-color-adjust:exact] print:[print-color-adjust:exact]",
         className,
@@ -59,7 +59,7 @@ export function ActivityTimeline({
  * What sits on the rail for an entry (choice 3.1 B): the author's 20px
  * avatar on a comment (`contractor` draws the square), the StatusMark of the
  * new status on a status change, a 6px --line-strong dot on any other change,
- * the 8px --act unread dot only on the New divider, or nothing.
+ * the 8px --primary unread dot only on the New divider, or nothing.
  */
 export type ActivityMarker =
   | "dot"
@@ -83,7 +83,7 @@ const ANCHOR = "scroll-mt-[calc(var(--app-bar-h)+1rem)]";
 
 function Knockout({ square = false, children }: { square?: boolean; children: ReactNode }) {
   // `relative` so it paints after the rail's positioned ::before and covers the hairline.
-  return <span className={cn("relative flex items-center justify-center bg-surface p-0.5", square ? "rounded-sm" : "rounded-full")}>{children}</span>;
+  return <span className={cn("relative flex items-center justify-center bg-background p-0.5", square ? "rounded-sm" : "rounded-full")}>{children}</span>;
 }
 
 function MarkerGlyph({ marker }: { marker: Exclude<ActivityMarker, "none"> }) {
@@ -96,7 +96,7 @@ function MarkerGlyph({ marker }: { marker: Exclude<ActivityMarker, "none"> }) {
   if (marker === "unread")
     return (
       <Knockout>
-        <span className="size-2 rounded-full bg-act" />
+        <span className="size-2 rounded-full bg-primary" />
       </Knockout>
     );
   if ("status" in marker)
@@ -150,8 +150,8 @@ export function ActivityItem({
 
 /**
  * A day heading, or with `month` a month heading for older history: an h3
- * (the Section heading above is the h2) in text-meta 500 --fg-3, so a screen
- * reader can jump by day, beside the 8px ring (--surface fill, --line-strong
+ * (the Section heading above is the h2) in text-meta 500 --muted-foreground, so a screen
+ * reader can jump by day, beside the 8px ring (--background fill, --line-strong
  * edge). Give `day` and the label is historyDay's ("Today", "Yesterday",
  * "Tue", "Oct 20"; "September", "August 2025"), read against `today` or the
  * timeline's now; or pass the label as children.
@@ -178,10 +178,10 @@ export function ActivityDay({
     <li className={cn(ROW, "pt-2 first:pt-0", className)}>
       <span aria-hidden="true" className="flex h-4.5 items-center justify-center pointer-coarse:h-5">
         <Knockout>
-          <span className="size-2 rounded-full border border-line-strong bg-surface" />
+          <span className="size-2 rounded-full border border-line-strong bg-background" />
         </Knockout>
       </span>
-      <h3 className="min-w-0 text-meta font-medium text-fg-3">{dateTime ? <time dateTime={dateTime}>{label}</time> : label}</h3>
+      <h3 className="min-w-0 text-meta font-medium text-muted-foreground">{dateTime ? <time dateTime={dateTime}>{label}</time> : label}</h3>
     </li>
   );
 }
@@ -194,7 +194,7 @@ export function ActivityDay({
  * ActivityItem with its own marker and time) appear in place under it. At
  * least 32px tall with a mouse (the extra reaches into the gaps, so the line
  * keeps its place) and 44 on touch; it wraps like any sentence, the chevron
- * kept with its last words. Hover --fill-1 with a mouse only.
+ * kept with its last words. Hover --muted with a mouse only.
  */
 export function ActivityRun({
   summary,
@@ -228,7 +228,7 @@ export function ActivityRun({
       aria-expanded={open}
       onClick={() => setOpen((o) => !o)}
       className={cn(
-        "-mx-1.5 block rounded-sm px-1.5 text-left text-meta text-fg-3 transition-colors hover:bg-fill-1",
+        "-mx-1.5 block rounded-sm px-1.5 text-left text-meta text-muted-foreground transition-colors hover:bg-muted",
         after ? "max-w-[calc(100%+0.75rem)]" : "w-[calc(100%+0.75rem)]",
         // 32px with a mouse without moving the line; a real 44px row on touch.
         "-my-1.75 min-h-8 py-1.75 pointer-coarse:my-0 pointer-coarse:min-h-11 pointer-coarse:py-3",
@@ -245,7 +245,7 @@ export function ActivityRun({
         <ChevronRight
           aria-hidden="true"
           className={cn(
-            "ml-1 inline-block size-4 align-[-0.1875rem] text-fg-3 transition-transform duration-fast motion-reduce:transition-none print:hidden",
+            "ml-1 inline-block size-4 align-[-0.1875rem] text-muted-foreground transition-transform duration-fast motion-reduce:transition-none print:hidden",
             open && "rotate-90",
           )}
         />
@@ -271,9 +271,9 @@ export function ActivityRun({
 
 /**
  * A rule across the timeline with its label at the start (activity 2.2 e).
- * `unread` is the New divider: the 8px --act dot on the rail, "New" in
- * text-meta 500 --fg-1, and `id="new"` for the rows that link to it.
- * Without it, no marker and the label in --fg-3: "Moved from Asana · Oct 29".
+ * `unread` is the New divider: the 8px --primary dot on the rail, "New" in
+ * text-meta 500 --foreground, and `id="new"` for the rows that link to it.
+ * Without it, no marker and the label in --muted-foreground: "Moved from Asana · Oct 29".
  */
 export function ActivityDivider({
   unread = false,
@@ -298,8 +298,8 @@ export function ActivityDivider({
     <li id={anchor} className={cn(ROW, anchor && ANCHOR, className)}>
       <MarkerCell marker={unread ? "unread" : "none"} align="line" />
       <div className="flex h-4.5 min-w-0 items-center gap-2 pointer-coarse:h-5">
-        <span className={cn("shrink-0 text-meta", unread ? "font-medium text-fg-1" : "text-fg-3")}>{children}</span>
-        <span aria-hidden="true" className="min-w-0 flex-1 border-t border-line" />
+        <span className={cn("shrink-0 text-meta", unread ? "font-medium text-foreground" : "text-muted-foreground")}>{children}</span>
+        <span aria-hidden="true" className="min-w-0 flex-1 border-t border-border" />
       </div>
     </li>
   );

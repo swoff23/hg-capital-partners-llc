@@ -8,7 +8,7 @@ export type Fact = {
   value: ReactNode;
   /** The record's key figure: text-figure-l beside text-figure-m facts. */
   key?: boolean;
-  /** One text-meta --fg-3 line under the figure, for its comparison ("Up $310") and nothing else. */
+  /** One text-meta --muted-foreground line under the figure, for its comparison ("Up $310") and nothing else. */
   sub?: ReactNode;
   /** A verb in place of the dash for a figure the user can fill ("Add value"), opening the editor where it lives. */
   empty?: { label: string; onClick: () => void };
@@ -28,7 +28,7 @@ const FIGURE_L = "text-figure-l max-sm:@max-[19rem]:text-figure-m sm:@max-[42rem
 /**
  * Every row of headline figures (docs/specs/charts.md 2.2): the Financials
  * KPI strip, the property's Financials figures, the Portfolio strip and the
- * record's fact strip. Facts in one row split by --line rules and 16px in
+ * record's fact strip. Facts in one row split by --border rules and 16px in
  * from each rule; a 2 by 2 grid on phones, so no label wraps (brand
  * section 5, Density). From sm each fact's label, figure and line under it
  * join one grid, so the labels share a row, the subs share a row and the
@@ -54,7 +54,7 @@ export function FactStrip({ facts, size = "m", className }: { facts: Fact[]; siz
     >
       {facts.map((f, i) => {
         // From sm every fact but the first sits right of a rule; on phones only the right-hand column does.
-        const cell = cn("min-w-0 sm:pr-4", i > 0 && "sm:border-l sm:border-line sm:pl-4");
+        const cell = cn("min-w-0 sm:pr-4", i > 0 && "sm:border-l sm:border-border sm:pl-4");
         const large = size === "l" || f.key;
         const empty = f.value == null;
         return (
@@ -62,11 +62,11 @@ export function FactStrip({ facts, size = "m", className }: { facts: Fact[]; siz
             key={typeof f.label === "string" ? f.label : i}
             className={cn(
               "grid min-w-0 content-start gap-0.5 sm:contents",
-              i % 2 === 1 && "max-sm:border-l max-sm:border-line max-sm:pl-4",
+              i % 2 === 1 && "max-sm:border-l max-sm:border-border max-sm:pl-4",
             )}
           >
-            <dt className={cn(cell, "truncate text-meta text-fg-3 sm:pb-0.5")}>{f.label}</dt>
-            <dd className={cn(cell, "flex items-baseline whitespace-nowrap text-fg-1")}>
+            <dt className={cn(cell, "truncate text-meta text-muted-foreground sm:pb-0.5")}>{f.label}</dt>
+            <dd className={cn(cell, "flex items-baseline whitespace-nowrap text-foreground")}>
               {hasKey && (
                 // No overflow clip: a clipped box would lose its baseline. It's invisible, so its glyph never paints.
                 <span aria-hidden="true" className={cn("invisible w-0", FIGURE_L)}>
@@ -86,11 +86,11 @@ export function FactStrip({ facts, size = "m", className }: { facts: Fact[]; siz
                   key={f.fadeKey}
                   className={cn(large ? FIGURE_L : "text-figure-m", f.fadeKey != null && "animate-fade-in")}
                 >
-                  {empty ? <span className="text-fg-3">—</span> : f.value}
+                  {empty ? <span className="text-muted-foreground">—</span> : f.value}
                 </span>
               )}
             </dd>
-            {hasSub && <dd className={cn(cell, "truncate text-meta text-fg-3 sm:pt-0.5")}>{f.sub}</dd>}
+            {hasSub && <dd className={cn(cell, "truncate text-meta text-muted-foreground sm:pt-0.5")}>{f.sub}</dd>}
           </div>
         );
       })}

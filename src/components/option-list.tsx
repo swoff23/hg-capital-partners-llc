@@ -38,19 +38,19 @@ export type OptionItem = {
   label: string;
   /** More words search matches: an email, a trade, the full address. */
   searchText?: string;
-  /** One line of text-meta --fg-3 under the title. */
+  /** One line of text-meta --muted-foreground under the title. */
   description?: ReactNode;
   /** The visual before the title: an Avatar, a StatusMark, a PhotoThumb 32, a lucide icon. */
   leading?: ReactNode;
   /** A neutral Tag after the title ("Has login"). */
   tag?: string;
-  /** A tabular count at the trailing edge (filters). A zero stays listed, in --fg-3. */
+  /** A tabular count at the trailing edge (filters). A zero stays listed, in --muted-foreground. */
   count?: number;
   /** Replaces the trailing Check: a chevron on a row that opens a step ("Custom"). */
   trailing?: ReactNode;
-  /** The title in --fg-3: the empty choice and a stored value the list no longer offers. */
+  /** The title in --muted-foreground: the empty choice and a stored value the list no longer offers. */
   muted?: boolean;
-  /** Words after the title in --fg-3 that stay whole when the title truncates: "(you)". */
+  /** Words after the title in --muted-foreground that stay whole when the title truncates: "(you)". */
   suffix?: string;
   /**
    * A second row for a pick that has another (a Recent row): it shows the
@@ -148,11 +148,11 @@ const rowClass = (twoLines: boolean) =>
   cn(
     "flex cursor-default items-center gap-2.5 rounded-sm px-2 py-1 text-body outline-none",
     twoLines ? "min-h-11 pointer-coarse:min-h-14" : "min-h-8 pointer-coarse:min-h-11",
-    "data-focused:bg-fill-2 data-pressed:bg-fill-2 data-disabled:opacity-50",
+    "data-focused:bg-accent data-pressed:bg-accent data-disabled:opacity-50",
     // On touch only a keyboard focus draws the highlight, so opening a list doesn't paint its first or picked row.
-    "pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-fill-2 pointer-coarse:data-pressed:bg-fill-2",
+    "pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-accent pointer-coarse:data-pressed:bg-accent",
   );
-const headerClass = "px-2 pb-1 pt-2.5 text-meta font-medium text-fg-3";
+const headerClass = "px-2 pb-1 pt-2.5 text-meta font-medium text-muted-foreground";
 
 /**
  * One row of an option list: a ListBoxItem with the checkbox (pick many), the
@@ -173,11 +173,11 @@ export function OptionRow({ option: o, multiple = false }: { option: OptionItem;
           {o.leading && <span className="flex shrink-0 items-center">{o.leading}</span>}
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-baseline gap-1">
-              <span className={cn("truncate", (o.muted || o.count === 0) && "text-fg-3")}>{o.label}</span>
-              {o.suffix && <span className="shrink-0 text-fg-3">{o.suffix}</span>}
+              <span className={cn("truncate", (o.muted || o.count === 0) && "text-muted-foreground")}>{o.label}</span>
+              {o.suffix && <span className="shrink-0 text-muted-foreground">{o.suffix}</span>}
             </span>
             {o.description !== undefined && (
-              <span className="block truncate text-meta text-fg-3">
+              <span className="block truncate text-meta text-muted-foreground">
                 {o.description}
                 {/* At 320 the Tag has no room beside the name: it joins the subline. */}
                 {o.tag && <span className="hidden max-[360px]:inline"> · {o.tag}</span>}
@@ -185,9 +185,9 @@ export function OptionRow({ option: o, multiple = false }: { option: OptionItem;
             )}
           </span>
           {o.tag && <span className={cn(tagClass, o.description !== undefined && "max-[360px]:hidden")}>{o.tag}</span>}
-          {o.count !== undefined && <span className="shrink-0 text-meta tabular-nums text-fg-3">{o.count}</span>}
+          {o.count !== undefined && <span className="shrink-0 text-meta tabular-nums text-muted-foreground">{o.count}</span>}
           {o.trailing ??
-            (!multiple && <Check aria-hidden="true" className={cn("size-4 shrink-0 text-fg-1", !isSelected && "invisible")} />)}
+            (!multiple && <Check aria-hidden="true" className={cn("size-4 shrink-0 text-foreground", !isSelected && "invisible")} />)}
         </>
       )}
     </ListBoxItem>
@@ -281,7 +281,7 @@ export function OptionList(props: OptionListProps) {
       // which in a filter panel would take the filter off (selectors 3.7: Esc never clears a filter).
       escapeKeyBehavior="none"
       autoFocus={searchable ? undefined : focusOnOpen}
-      renderEmptyState={() => <p className="px-2 py-3 text-body text-fg-3">{emptyText}</p>}
+      renderEmptyState={() => <p className="px-2 py-3 text-body text-muted-foreground">{emptyText}</p>}
       className={cn(
         "p-1 outline-none",
         // A popover's list scrolls under a 320px panel (60dvh on touch); a sheet's body scrolls itself.
@@ -299,7 +299,7 @@ export function OptionList(props: OptionListProps) {
       {creating && (
         // Its text is what was typed, so the search never filters it out; it reads the name it adds.
         <ListBoxItem id={CREATE_KEY} textValue={query} className={rowClass(false)}>
-          <Plus aria-hidden="true" strokeWidth={1.75} className="size-4 shrink-0 text-fg-3" />
+          <Plus aria-hidden="true" strokeWidth={1.75} className="size-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate">{addRowLabel(creating)}</span>
         </ListBoxItem>
       )}
@@ -328,9 +328,9 @@ export function OptionList(props: OptionListProps) {
         >
           <div
             className={cn(
-              "shrink-0 border-b border-line p-1",
+              "shrink-0 border-b border-border p-1",
               // Pinned under the sheet's title while the rows scroll.
-              container === "sheet" && "sticky top-0 z-10 bg-raised",
+              container === "sheet" && "sticky top-0 z-10 bg-popover",
             )}
           >
             <SearchInput

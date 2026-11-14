@@ -73,7 +73,7 @@ export function TaskMediaSection({
       title={
         <>
           {title}
-          <span className="ml-1 font-normal tabular-nums text-fg-3">{total}</span>
+          <span className="ml-1 font-normal tabular-nums text-muted-foreground">{total}</span>
         </>
       }
       actions={
@@ -81,7 +81,7 @@ export function TaskMediaSection({
           <MenuTrigger>
             <AriaButton
               aria-label="More for photos and files"
-              className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3 data-pressed:bg-fill-1")}
+              className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-muted-foreground data-pressed:bg-muted")}
             >
               <Ellipsis className="size-4" aria-hidden="true" />
             </AriaButton>

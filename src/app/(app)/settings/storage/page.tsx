@@ -32,10 +32,10 @@ export default async function StorageSettingsPage() {
           {publicFiles === null ? (
             <p className="text-fg-2">Storage isn&apos;t set up on this site yet.</p>
           ) : publicFiles === 0 ? (
-            <p className="text-fg-1">All documents are private.</p>
+            <p className="text-foreground">All documents are private.</p>
           ) : (
             <>
-              <p className="num text-fg-1">{publicFiles === 1 ? "1 document is still public." : `${publicFiles} documents are still public.`}</p>
+              <p className="num text-foreground">{publicFiles === 1 ? "1 document is still public." : `${publicFiles} documents are still public.`}</p>
               <MigrateButton />
             </>
           )}

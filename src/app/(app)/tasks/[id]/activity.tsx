@@ -39,8 +39,8 @@ const SHOWN = 15;
  * under it. A comment you wrote shows at once, "Sending…" in its time slot,
  * and if it can't go it stays with its Retry (PendingSendsProvider).
  *
- * A shared comment is a flat --surface card on a hairline edge; an internal
- * one is a --fill-1 card, and its Lock says so, so it never reads as Review's
+ * A shared comment is a flat --background card on a hairline edge; an internal
+ * one is a --muted card, and its Lock says so, so it never reads as Review's
  * amber (docs/brand-guidelines.md, section 9).
  */
 export function TaskActivity({
@@ -103,7 +103,7 @@ export function TaskActivity({
     for (const s of sends?.sends ?? []) if (known.has(s.clientId) && s.status !== "sending") settle?.(s.clientId);
   });
 
-  if (rows.length === 0 && inFlight.length === 0) return <p className="text-body text-fg-3">No activity yet.</p>;
+  if (rows.length === 0 && inFlight.length === 0) return <p className="text-body text-muted-foreground">No activity yet.</p>;
 
   const groups = groupHeadings(visible, (r) => r.day, today);
   const lastDay = groups.length ? groups[groups.length - 1].day : null;
@@ -118,7 +118,7 @@ export function TaskActivity({
               type="button"
               aria-expanded={open}
               onClick={() => setOpen(!open)}
-              className="rounded-sm text-meta font-medium text-fg-1 underline-offset-3 hover:underline pointer-coarse:min-h-11"
+              className="rounded-sm text-meta font-medium text-foreground underline-offset-3 hover:underline pointer-coarse:min-h-11"
             >
               {open ? "Hide earlier updates" : `Show ${start} earlier ${start === 1 ? "update" : "updates"}`}
             </button>
@@ -126,7 +126,7 @@ export function TaskActivity({
         )}
         {start > 0 && (
           <ActivityItem marker="none" className="hidden print:grid">
-            <p className="text-meta text-fg-3">
+            <p className="text-meta text-muted-foreground">
               {start} earlier {start === 1 ? "update" : "updates"} not shown
             </p>
           </ActivityItem>
@@ -268,7 +268,7 @@ function LineText({
   onViewPrevious: (text: string, by: string) => void;
 }) {
   return (
-    <p className="text-meta text-fg-3">
+    <p className="text-meta text-muted-foreground">
       {line.href ? <TextLink href={line.href}>{line.text}</TextLink> : line.text}
       <span aria-hidden="true">{" · "}</span>
       <ActivityTime at={at} month={month} />
@@ -288,7 +288,7 @@ function ViewPrevious({ onPress }: { onPress: () => void }) {
     <button
       type="button"
       onClick={onPress}
-      className="relative text-meta text-fg-2 underline decoration-1 underline-offset-3 hover:text-fg-1 hover:decoration-2 pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
+      className="relative text-meta text-fg-2 underline decoration-1 underline-offset-3 hover:text-foreground hover:decoration-2 pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
     >
       View previous
     </button>
@@ -310,7 +310,7 @@ function DecisionRowView({ row, month }: { row: Extract<ActivityRow, { type: "de
   const note = row.note;
   return (
     <ActivityItem id={`update-${row.id}`} marker={row.status ? { status: row.status as TaskStatus } : "dot"}>
-      <p className="text-meta text-fg-3">
+      <p className="text-meta text-muted-foreground">
         {row.text}
         <span aria-hidden="true">{" · "}</span>
         <ActivityTime at={row.at} month={month} />
@@ -322,11 +322,11 @@ function DecisionRowView({ row, month }: { row: Extract<ActivityRow, { type: "de
           id={`update-${note.id}`}
           className={cn(
             "mt-1.5 scroll-mt-[calc(var(--app-bar-h)+1rem)] rounded-md border px-3 py-2.5",
-            note.internal ? "border-transparent bg-fill-1" : "border-line bg-surface",
+            note.internal ? "border-transparent bg-muted" : "border-border bg-background",
           )}
         >
           {note.segments && (
-            <p className="whitespace-pre-wrap break-words text-body text-fg-1">
+            <p className="whitespace-pre-wrap break-words text-body text-foreground">
               <CommentBody segments={note.segments} />
             </p>
           )}
@@ -349,7 +349,7 @@ function DeletedLine({ row, month, focus, onFocused }: { row: Extract<ActivityRo
   }, [focus, onFocused]);
   return (
     <ActivityItem id={`update-${row.id}`} marker="dot">
-      <p ref={line} tabIndex={-1} className="text-meta text-fg-3 outline-none">
+      <p ref={line} tabIndex={-1} className="text-meta text-muted-foreground outline-none">
         {row.author} deleted a comment
         <span aria-hidden="true">{" · "}</span>
         <ActivityTime at={row.deletedAt} month={month} />
@@ -424,7 +424,7 @@ function CommentRowView({
   if (gone) {
     return (
       <ActivityItem id={`update-${c.id}`} marker="dot">
-        <p className="text-meta text-fg-3">
+        <p className="text-meta text-muted-foreground">
           {c.author.split(" ")[0]} posted files that were later removed
           <span aria-hidden="true">{" · "}</span>
           <ActivityTime at={at} month={month} />
@@ -502,7 +502,7 @@ function InFlight({ send, author }: { send: PendingSend; author: string }) {
       at={send.at}
       internal={send.visibility === "INTERNAL"}
       body={text || null}
-      files={send.files.length > 0 ? <p className="truncate text-meta text-fg-3">{send.files.map((f) => f.filename).join(", ")}</p> : null}
+      files={send.files.length > 0 ? <p className="truncate text-meta text-muted-foreground">{send.files.map((f) => f.filename).join(", ")}</p> : null}
       sending={send.status === "sending"}
       footer={failed ? <SendFailedLine offline={isOfflineMessage(send.error)} reason={refusal} onRetry={send.retry} /> : undefined}
       menuItems={
@@ -597,9 +597,9 @@ function PreviousNotes({
     >
       <div className="p-4">
         {shown?.text ? (
-          <p className="whitespace-pre-wrap break-words text-body text-fg-1">{shown.text}</p>
+          <p className="whitespace-pre-wrap break-words text-body text-foreground">{shown.text}</p>
         ) : (
-          <p className="text-body text-fg-3">The notes were empty.</p>
+          <p className="text-body text-muted-foreground">The notes were empty.</p>
         )}
       </div>
     </Sheet>

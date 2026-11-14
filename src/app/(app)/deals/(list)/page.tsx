@@ -240,7 +240,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                     />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody className="divide-y divide-border">
                   {deals.map((d) => (
                     <DealListRow
                       key={d.id}
@@ -267,7 +267,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
         </div>
         {truncated && (
           // One line at every width: the phone's words are shorter.
-          <p className="mt-2 truncate text-meta text-fg-3">
+          <p className="mt-2 truncate text-meta text-muted-foreground">
             <span className="sm:hidden">First {CAP} of {shown}. Search for more.</span>
             <span className="max-sm:hidden">Showing first {CAP} of {shown}. Search or filter to see the rest.</span>
           </p>

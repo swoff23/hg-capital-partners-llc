@@ -18,7 +18,7 @@ Connor approved the six specs on Oct 25: "Build it: all six component specs, wit
 ## 0. Rules for every agent
 
 - Work only in your own worktree and branch. Run `npm ci` once in it (its `postinstall` runs `prisma generate` against the base schema); never `npm install <package>`. Edit only the files section 3 gives your package. Everything else is read-only.
-- Token utilities only. The close-out deletes the one-release aliases, so use `text-fg-1`, `text-fg-3`, `bg-fill-1`, `border-line`, `bg-act`, `text-on-act` and the type tokens (`text-body`, `text-meta`, `text-label`), never `text-foreground`, `text-muted`, `bg-background`, `border-border`, `bg-primary`, `text-primary-foreground`, `bg-accent`, `text-sm` or `text-xs`.
+- Token utilities only: `text-foreground`, `text-muted-foreground`, `bg-muted`, `border-border`, `bg-primary`, `text-primary-foreground` and the type tokens (`text-body`, `text-meta`, `text-label`), never `text-muted`, `text-sm` or `text-xs`. The one-release aliases are gone, and since Nov 14 the tokens carry shadcn's names ([design foundation](design-foundation.md), section 3).
 - This is Next 16. Read the guide in `node_modules/next/dist/docs/` before using parallel or intercepting routes, `after()` or `viewport` (AGENTS.md).
 - Services own writes. Env only through `src/lib/env.ts`. Dates through `lib/dates.ts`, money through `lib/money.ts`, addresses through `lib/normalize.ts` (README). No schema change and no new dependency outside phase 0. A need for either goes in the report.
 - Reuse first (CLAUDE.md). Build on phase 0's primitives and contracts. Never fork a copy.
@@ -194,7 +194,7 @@ Small pieces that two or more packages call. Phase 0 builds them for real, so no
 |---|---|---|---|
 | `Input` `size` (sm 32, md 36, 44 on touch), `prefix` and `suffix` slots | `ui.tsx` | Forms 2.1, selectors 3.7 | F1, F2, S2, SR |
 | `Textarea` `autosize` (the `useAutosize` effect out of `inline-address-field.tsx`) | `ui.tsx` | Forms 2.1 | F1, F2, AC |
-| `pickerChip` `row` (28px, 44 hit area on touch) and `sm` (32), `--fg-3` placeholder | `ui.tsx` | Selectors 3.12 | S1, S2, F1, F2, AC |
+| `pickerChip` `row` (28px, 44 hit area on touch) and `sm` (32), `--muted-foreground` placeholder | `ui.tsx` | Selectors 3.12 | S1, S2, F1, F2, AC |
 | `Spinner` (lucide `LoaderCircle`, after 200ms for at least 400ms; under reduced motion it shows without turning) and `Button` `pending` | `ui.tsx` | Forms 2.7, search 2.13 | All |
 | `tagClass` | `ui.tsx` | Search 5, selectors 2 | S1, S2, SR |
 | `CheckboxMark` (the fix pass's `Checkbox` stays for forms) | `ui.tsx` | Selectors 3.10 | S1, S2 |
@@ -208,7 +208,7 @@ Small pieces that two or more packages call. Phase 0 builds them for real, so no
 | `Menu`: `selectionMode` and `selectedKeys` with the Check from `isSelected`, `current`, `MenuSection`, `shortcut`, `description`, a non-interactive header item. Typed with an interim no-op for S1 to finish: `numberKeys`, `sheetTitle`, `followUp` | `menu.tsx` | Selectors 3.5, activity 2.5 | S1, S2, F1, AC, UP1, UP2 |
 | `Sheet`: a view stack with a back button beside the X, `size` md or lg, `fullHeight`, `dirty`, the keyboard inset, and `surface="public"` for its overlay root. Typed with an interim fallback for SR: `layout="palette"` | `sheet.tsx` | Forms 2.9, selectors 3.5, search 2.2, brand section 4 | All |
 | `useKeyboardInset` (sets `--kb-inset` from `visualViewport`) and `viewport.interactiveWidget: "resizes-content"` exported from `(app)/layout.tsx` | `components/use-keyboard-inset.ts` | Forms 2.9, activity 2.7 | F1, F2, AC, UP2 |
-| `Meter` (4px `--fill-1` track, `--chart-1` fill, square ends, progressbar with a label) | `components/meter.tsx` | Charts 2.3 | CH, F1, F2 |
+| `Meter` (4px `--muted` track, `--chart-1` fill, square ends, progressbar with a label) | `components/meter.tsx` | Charts 2.3 | CH, F1, F2 |
 | `DEAL_STAGE_LABEL` ("High", "Medium", "Low", "To schedule", "TBD", "Holding", "Closed", "Pass"; stored values unchanged; extends the fix pass's `dealStatusLabel` if it landed) and `DEAL_FIELD_LABEL` ("Asking price", "Target offer", "Stage" and the rest) | `lib/config.ts` | Selectors 3.5, integration decision 16, Connor's answer | All |
 | `compareStreet` (street, then house number, so 15 comes before 118), with a test | `lib/normalize.ts` (README: addresses go through it) | Selectors 3.3 and 5 | S1, S2 |
 | `parseNoteAuthor(body)`: the three pasted author forms ("(CS)", "  ·  Connor Swofford", "  ·  <label>") split off a note's text, with a test | `lib/deals/note-author.ts` | Activity 2.9, DEALS-044, DATA-I13 | S2 (Latest note), AC (record log, backfill) |
@@ -497,7 +497,7 @@ Before phase 2 merges, a script lists `git diff --name-only build-base-0...build
 18. **Search fields.** One `SearchInput` serves selectors' `Input sm` with an icon and clear button, `OptionList`'s search row and the palette's phone field. Why: two specs named the same control.
 19. **Period control.** Charts' period row ships as FINANCIALS-001: "Last month | Year to date", "Cash | Accrual", the phone chip and its sheet. Selectors' period view menu (This month, Last 12 months, Custom range) isn't built. Why: selectors said its control ships with FINANCIALS-001, and charts designed that work against the data (no 12 months until Jan 2027).
 20. **CapEx year picks.** Charts' rule (the pick filters, nothing dims, the pick keeps its edge) covers selectors' "other years stay full strength". CH builds it.
-21. **Progress bars.** Charts' `Meter` replaces the 2px `--act` bar everywhere, the public move-in step bar included (forms 2.14). The public surface already reads the dark theme's `--chart-1` (`#d7d0c3`), so no token value changes (section 5, item 9).
+21. **Progress bars.** Charts' `Meter` replaces the 2px `--primary` bar everywhere, the public move-in step bar included (forms 2.14). The public surface already reads the dark theme's `--chart-1` (`#d7d0c3`), so no token value changes (section 5, item 9).
 22. **New property's status.** Forms drops Status from the create sheet (PORTFOLIO-044). Selectors' "required, Choose a status" row doesn't apply. Why: forms owns the create field set, and a missing status shows as the rail's verb.
 23. **Equipment and building system types.** A `Select` over the CapEx rule types (selectors), not forms' find-or-add. Why: a type with no rule drops out of the forecast, the failure PROPERTY-022 fixes.
 24. **"(you)", not "(me)".** Your own row reads "(you)" in pickers and filters. Integration decision 7's "First (me)" chip becomes "First (you)". Why: selectors retires "(me)"; one word app-wide.
@@ -522,29 +522,29 @@ For the guidelines owner to write into `docs/brand-guidelines.md` before phase 1
 1. Day headings add "Yesterday" and past weekdays ("Tue"), the past side of the one formatter (activity).
 2. Dates inside history sentences are absolute ("Oct 30"), never Today or Tomorrow (activity).
 3. Codes typed into fields use Geist Mono at `text-body` (forms).
-4. "(optional)" follows a label in `text-meta` 400 `--fg-3`; no asterisks (forms).
+4. "(optional)" follows a label in `text-meta` 400 `--muted-foreground`; no asterisks (forms).
 5. Stored names for camera files: "Photo 2026-10-25 at 2.14 PM", with " 2" for a second in the same minute. The formatter still governs labels on screen (uploads).
 6. In search results only, the typed words in a title are weight 600 as emphasis, never as state (search 4B).
 
 **Section 4, color**
-7. `--chart-1`'s job widens to any measured amount: every `Meter`, checklist progress included, fills `--chart-1` on a `--fill-1` track; `--act` stays with controls (charts 7).
-8. Expense stops borrowing `--chart-ref`, which keeps prior period or budget. Comparisons are words in `--fg-3` ("Up $310") with the basis said once in the source line, no arrows and no green or red. Negatives hang below the baseline in the series color, or show no bar and a true minus; never outlined, never red (charts 8 to 10).
+7. `--chart-1`'s job widens to any measured amount: every `Meter`, checklist progress included, fills `--chart-1` on a `--muted` track; `--primary` stays with controls (charts 7).
+8. Expense stops borrowing `--chart-ref`, which keeps prior period or budget. Comparisons are words in `--muted-foreground` ("Up $310") with the basis said once in the source line, no arrows and no green or red. Negatives hang below the baseline in the series color, or show no bar and a true minus; never outlined, never red (charts 8 to 10).
 9. The public move-in step meter reads the dark `--chart-1` (`#d7d0c3`) that the public surface already has; no new value (conflict 21).
-10. A picked month or year is a `--fill-1` band with a 1px inset `--line-control` edge and its label in `--fg-1`. Nothing dims to show a pick; CapEx picks filter (charts 4).
-11. Photo tiles get a 1px inset `--line-control` edge on hover with a mouse, a new job for that token. Marked invented (uploads 2.5).
+10. A picked month or year is a `--muted` band with a 1px inset `--input` edge and its label in `--foreground`. Nothing dims to show a pick; CapEx picks filter (charts 4).
+11. Photo tiles get a 1px inset `--input` edge on hover with a mouse, a new job for that token. Marked invented (uploads 2.5).
 12. The photo-mark colors appear in two new places: the "+N" overflow tile and the viewer's labeled Download button. The viewer's file card uses a 40px type glyph (uploads).
 
 **Section 5, shape, space and density**
 13. Row chip: `pickerChip` `row` is 28px in list rows with a 44px hit area on touch, an exception to the 32px `sm` control (selectors 1).
 14. Option rows: 32px with a mouse and 44 on touch; with a second line, 44 and 56; the same in a popover and a sheet (selectors 2).
 15. Panels: the larger of the trigger and the widest row, at most 320 wide; at most 320 tall with a mouse and 60dvh in a touch popover (selectors 3). Exception: the command palette is a fixed 640px wide, its top at 20vh, and on a tablet it hangs 16px under the bar (search).
-16. The phone's full-screen layer: `--raised`, no radius, no scrim, no shadow (search).
+16. The phone's full-screen layer: `--popover`, no radius, no scrim, no shadow (search).
 17. Search sizes: input row 48 (56 on touch), footer 36, list at most `min(60vh, 480px)`, a 100px status column and an 80px date or price column (search).
 18. Filter chips truncate at 160px; the remove X is a 24px button shown with a mouse only. Idle chips use the Tag's solid edge with a Plus, never a dashed edge, so dashes stay with chart references (selectors 4 and 10).
 19. `Input` `sm`: 32 with a mouse, 44 on touch, for filter bars (selectors 5).
 20. Segments on touch carry a 2px `::after` above and below, so a 40px segment is a 44px target (selectors 6).
 21. Touch calendar cells are 1/7 of the grid wide and 44px tall (selectors 7).
-22. Charts: monthly flows are columns, one series at a time; comparisons across properties are tables; no stacked bars, donuts or rainbow series; a balance over time is a 2px line. Plots are 160 tall on the Overview (128 below `sm`) and 120 on the property page (96). Columns are 60% of their slot, at most 24px. Meters and ranked bars are 4px. Baseline 1px `--line-strong`, gridlines 1px `--line`, labels `text-meta` `--fg-3`, compact dollars on ticks only. Square ends on every mark. The running month is a hollow column with "MTD", never dashed or faded. Breakdown figures keep the dotted `--line-strong` underline (charts 1 to 6, 12).
+22. Charts: monthly flows are columns, one series at a time; comparisons across properties are tables; no stacked bars, donuts or rainbow series; a balance over time is a 2px line. Plots are 160 tall on the Overview (128 below `sm`) and 120 on the property page (96). Columns are 60% of their slot, at most 24px. Meters and ranked bars are 4px. Baseline 1px `--line-strong`, gridlines 1px `--border`, labels `text-meta` `--muted-foreground`, compact dollars on ticks only. Square ends on every mark. The running month is a hollow column with "MTD", never dashed or faded. Breakdown figures keep the dotted `--line-strong` underline (charts 1 to 6, 12).
 23. The unread dot gets a second position: in a row's leading gutter, centered 8px before the first column. On the timeline rail it marks the New divider (activity).
 24. While a file is dragged, every drop target takes the field focus look 8px outside its content at `rounded-lg`, and the one under the pointer shows a "Drop to add…" label at the Float level (uploads).
 
@@ -559,7 +559,7 @@ For the guidelines owner to write into `docs/brand-guidelines.md` before phase 1
 30. Sheets: the footer and its primary ride above the on-screen keyboard on phones and in the tablet dialog. A picker opened inside a sheet on touch replaces the sheet's body with a back arrow beside the X, never a second sheet (forms 4 and 10, conflict 8).
 31. `ActionBar` on app pages: the job page bar's recipe, shown only while it has a job, hidden while the on-screen keyboard is up (forms 5 and 13).
 32. The calendar heading steps to a month grid, then a 12-year grid (forms 6, conflict 9).
-33. Prefix and suffix text inside a field in `text-body` `--fg-3`. "Saves as $425,000" in the helper line while typing a number (forms 2 and 11).
+33. Prefix and suffix text inside a field in `text-body` `--muted-foreground`. "Saves as $425,000" in the helper line while typing a number (forms 2 and 11).
 34. Form groups use `Section as="h3"` (forms 9).
 35. A save conflict shows on the one open field: a neutral `--fg-2` line with "Keep Pieter's" and "Save mine" (forms 12).
 36. The public move-in report's step line, "Kitchen · 3 of 7", over the progress meter (forms 8).

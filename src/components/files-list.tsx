@@ -56,7 +56,7 @@ export type FileLink = {
  * `byline` and `menu` are on for a record's own list (when it has `onDelete`
  * or `onRename`) and off in Activity rows, where the comment already names
  * who and when; pass either to say otherwise (the portal's list has Open and
- * Download and no handlers). `onFill` hovers in `--fill-2` on a `--fill-1`
+ * Download and no handlers). `onFill` hovers in `--accent` on a `--muted`
  * ground (an internal comment).
  */
 export function FilesList({
@@ -72,7 +72,7 @@ export function FilesList({
 }: {
   files: FileLink[];
   className?: string;
-  /** On a --fill-1 ground (an internal comment), where that hover would vanish: rows hover in --fill-2. */
+  /** On a --muted ground (an internal comment), where that hover would vanish: rows hover in --accent. */
   onFill?: boolean;
   /** Removes a file for good; a server action can be passed as is. */
   onDelete?: (id: string) => Promise<ActionResult<unknown>>;
@@ -129,7 +129,7 @@ export function FilesList({
   // never nests a darker well inside a lighter card in dark.
   return (
     <div className={cn("@container", className)}>
-      <ul className="divide-y divide-line overflow-hidden rounded-md border border-line">
+      <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
         {files.map((f) => {
           const name = names[f.id] ?? f.filename;
           const look = f.kind === "LINK" ? null : documentLook(name);
@@ -148,7 +148,7 @@ export function FilesList({
             <li key={f.id} className="group/file flex items-center">
               {renaming === f.id ? (
                 <div className={cn("flex min-h-10 min-w-0 flex-1 items-center gap-2.5 px-3 pointer-coarse:min-h-12", stacked && "py-1.5")}>
-                  <Icon className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+                  <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <RenameRow
                     name={name}
                     onCancel={() => setRenaming(null)}
@@ -168,31 +168,31 @@ export function FilesList({
                   onClick={open}
                   // The focus outline drawn inside, where the list's rounded clip can't cut it.
                   className={cn(
-                    "flex min-w-0 flex-1 items-center gap-2.5 px-3 text-body text-fg-1 transition-colors focus-visible:-outline-offset-2",
+                    "flex min-w-0 flex-1 items-center gap-2.5 px-3 text-body text-foreground transition-colors focus-visible:-outline-offset-2",
                     stacked ? "min-h-15 py-1.5 @md:min-h-10 @md:py-0 pointer-coarse:@md:min-h-12" : "min-h-10 pointer-coarse:min-h-11",
-                    onFill ? "hover:bg-fill-2" : "hover:bg-fill-1",
+                    onFill ? "hover:bg-accent" : "hover:bg-muted",
                   )}
                 >
-                  <Icon className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+                  <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate">{name}</span>
-                      {f.internal && <Lock className="size-3.5 shrink-0 text-fg-3" aria-label="Internal" />}
+                      {f.internal && <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label="Internal" />}
                     </span>
                     {stacked && (sub || size) && (
-                      <span className="block truncate text-meta text-fg-3 @md:hidden">
+                      <span className="block truncate text-meta text-muted-foreground @md:hidden">
                         {sub}
                         {/* A phone drops the size rather than wrap. */}
                         {size && <span className="max-[479px]:hidden">{sub ? " · " : ""}{size}</span>}
                       </span>
                     )}
                   </span>
-                  {stacked && <span className="hidden w-28 shrink-0 truncate text-meta text-fg-3 @md:block">{who}</span>}
+                  {stacked && <span className="hidden w-28 shrink-0 truncate text-meta text-muted-foreground @md:block">{who}</span>}
                   {/* The size column keeps its width for a link or a file with no size, so every byline starts at the same x. */}
                   {stacked ? (
-                    <span className="hidden w-16 shrink-0 text-right text-meta tabular-nums text-fg-3 @md:block">{size}</span>
+                    <span className="hidden w-16 shrink-0 text-right text-meta tabular-nums text-muted-foreground @md:block">{size}</span>
                   ) : (
-                    size && <span className="shrink-0 text-meta tabular-nums text-fg-3">{size}</span>
+                    size && <span className="shrink-0 text-meta tabular-nums text-muted-foreground">{size}</span>
                   )}
                 </a>
               )}
@@ -202,7 +202,7 @@ export function FilesList({
                     aria-label={`More for ${name}`}
                     className={cn(
                       buttonClass({ variant: "ghost", size: "sm", icon: true }),
-                      "mr-1 text-fg-3 transition-[color,background-color,opacity] data-pressed:bg-fill-1",
+                      "mr-1 text-muted-foreground transition-[color,background-color,opacity] data-pressed:bg-muted",
                       // Shown on hover or focus with a mouse; always there on touch, which has no hover.
                       "aria-expanded:opacity-100 data-focus-visible:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover/file:opacity-100 pointer-fine:group-focus-within/file:opacity-100",
                     )}
@@ -267,7 +267,7 @@ export function FilesList({
           body={
             <>
               <span className="break-all">“{names[target.id] ?? target.filename}”</span> goes for good.
-              {error && <span className="mt-2 block text-danger">{error}</span>}
+              {error && <span className="mt-2 block text-destructive">{error}</span>}
             </>
           }
           onClose={close}
@@ -322,7 +322,7 @@ function RenameRow({ name, onSave, onCancel }: { name: string; onSave: (name: st
         onKeyDown={keys.onKeyDown}
         className="min-w-0 flex-1"
       />
-      {ext && <span className="shrink-0 text-meta text-fg-3">.{ext}</span>}
+      {ext && <span className="shrink-0 text-meta text-muted-foreground">.{ext}</span>}
     </>
   );
 }
@@ -346,16 +346,16 @@ function UploadRow({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onRe
           : `Uploading ${Math.round(u.progress * 100)}%`;
   return (
     <li className="flex min-h-15 items-center @md:min-h-10" aria-label={`${u.name}, ${status}`}>
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3 text-body text-fg-1">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3 text-body text-foreground">
         {failed || refused ? (
-          <Icon className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+          <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         ) : (
           <RowRing value={u.status === "queued" ? 0 : u.progress} />
         )}
         <span className="min-w-0 flex-1">
           <span className="block truncate">{u.name}</span>
           {/* The reason truncates; Retry never does, so a long reason can't push it out of the row. */}
-          <span className={cn("flex min-w-0 items-center gap-1 text-meta @md:hidden", failed || refused ? "text-danger" : "text-fg-3")}>
+          <span className={cn("flex min-w-0 items-center gap-1 text-meta @md:hidden", failed || refused ? "text-destructive" : "text-muted-foreground")}>
             <span className="truncate">{status}</span>
             {failed && (
               <>
@@ -365,7 +365,7 @@ function UploadRow({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onRe
             )}
           </span>
         </span>
-        <span className={cn("hidden max-w-56 min-w-0 truncate text-meta @md:block", failed || refused ? "text-danger" : "text-fg-3")}>{status}</span>
+        <span className={cn("hidden max-w-56 min-w-0 truncate text-meta @md:block", failed || refused ? "text-destructive" : "text-muted-foreground")}>{status}</span>
         {failed && (
           <Button variant="ghost" size="sm" onClick={onRetry} aria-label={`Retry ${u.name}`} className="hidden shrink-0 @md:inline-flex">
             <RotateCcw className="size-4" aria-hidden="true" />
@@ -377,7 +377,7 @@ function UploadRow({ upload: u, onRetry, onRemove }: { upload: MediaUpload; onRe
         type="button"
         onClick={onRemove}
         aria-label={`${failed || refused ? "Remove" : "Cancel upload of"} ${u.name}`}
-        className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "mr-1 text-fg-3")}
+        className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "mr-1 text-muted-foreground")}
       >
         <X className="size-4" aria-hidden="true" />
       </button>
@@ -398,13 +398,13 @@ function RowRetry({ onRetry, name }: { onRetry: () => void; name: string }) {
   );
 }
 
-/** A 16px ring in the icon's place: an `--fg-1` arc over a `--line` track. The row's name carries the percent. */
+/** A 16px ring in the icon's place: a `--foreground` arc over a `--border` track. The row's name carries the percent. */
 function RowRing({ value }: { value: number }) {
   const r = 6.5;
   const c = 2 * Math.PI * r;
   return (
     <svg viewBox="0 0 16 16" className="size-4 shrink-0 -rotate-90" aria-hidden="true">
-      <circle cx="8" cy="8" r={r} fill="none" stroke="currentColor" strokeWidth="2" className="text-line" />
+      <circle cx="8" cy="8" r={r} fill="none" stroke="currentColor" strokeWidth="2" className="text-border" />
       <circle
         cx="8"
         cy="8"
@@ -415,7 +415,7 @@ function RowRing({ value }: { value: number }) {
         strokeLinecap="round"
         strokeDasharray={c}
         strokeDashoffset={c * (1 - value)}
-        className="text-fg-1 transition-[stroke-dashoffset] duration-200 motion-reduce:transition-none"
+        className="text-foreground transition-[stroke-dashoffset] duration-200 motion-reduce:transition-none"
       />
     </svg>
   );

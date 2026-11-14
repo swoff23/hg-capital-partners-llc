@@ -31,7 +31,7 @@ export type DealRow = {
   latestNote: { text: string; day: string | null } | null;
 };
 
-const dash = <span className="text-fg-3">—</span>;
+const dash = <span className="text-muted-foreground">—</span>;
 
 /** A price as the list shows it: the amount, or the words someone typed that aren't one number. */
 function Price({ amount, raw }: { amount: number | null; raw: string | null }) {
@@ -100,7 +100,7 @@ export function DealListRow({ deal }: { deal: DealRow }) {
   const note = deal.latestNote ? (deal.latestNote.day ? `${deal.latestNote.day} · ${deal.latestNote.text}` : deal.latestNote.text) : null;
 
   return (
-    <tr className={cn("group/row transition-colors", flash ? "bg-ok-tint" : cn("hover:bg-fill-1", pendingRowFill))}>
+    <tr className={cn("group/row transition-colors", flash ? "bg-ok-tint" : cn("hover:bg-muted", pendingRowFill))}>
       {/* The first cell starts on the page gutter, under the title (section 5). */}
       <RowCell
         href={href}
@@ -115,16 +115,16 @@ export function DealListRow({ deal }: { deal: DealRow }) {
               rel="noopener noreferrer"
               aria-label="Open the listing"
               title={`Open ${deal.sourceUrl}`}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-fg-3 opacity-0 transition-opacity hover:text-fg-1 focus-visible:opacity-100 group-hover/row:opacity-100 pointer-coarse:hidden @max-[32.5rem]:hidden"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 pointer-coarse:hidden @max-[32.5rem]:hidden"
             >
               <ExternalLink aria-hidden="true" className="size-4 stroke-[1.5]" />
             </a>
           )
         }
       >
-        <span className="block max-w-full truncate font-medium text-fg-1">{deal.address}</span>
+        <span className="block max-w-full truncate font-medium text-foreground">{deal.address}</span>
         {/* The phone row's subline: the stage leads it in its tone (section 9), then the asking price. */}
-        <span className="mt-0.5 hidden max-w-full items-center gap-1.5 text-meta text-fg-3 @max-[32.5rem]:flex">
+        <span className="mt-0.5 hidden max-w-full items-center gap-1.5 text-meta text-muted-foreground @max-[32.5rem]:flex">
           <DealStage stage={stage} label={dealStageLabel(stage)} className="shrink-0" />
           {(deal.theirPrice != null || deal.theirPriceRaw) && (
             <>
@@ -155,7 +155,7 @@ export function DealListRow({ deal }: { deal: DealRow }) {
       </RowCell>
 
       {/* The latest note alone, so the row stays 40px; its tooltip carries the whole of it. */}
-      <RowCell href={href} cell={COLUMN_DROP.latestNote} className={cn(dense, "text-meta text-fg-3")}>
+      <RowCell href={href} cell={COLUMN_DROP.latestNote} className={cn(dense, "text-meta text-muted-foreground")}>
         {note ? (
           <div className="relative z-10 min-w-0">
             <Tooltip label={note} className="block truncate">
@@ -170,11 +170,11 @@ export function DealListRow({ deal }: { deal: DealRow }) {
       </RowCell>
 
       {/* A blank cell when there's no next action: the deal page keeps the verb. */}
-      <RowCell href={href} cell={COLUMN_DROP.nextAction} className={cn(dense, "text-body text-fg-1")}>
+      <RowCell href={href} cell={COLUMN_DROP.nextAction} className={cn(dense, "text-body text-foreground")}>
         <span className="truncate">{deal.nextAction}</span>
       </RowCell>
 
-      <RowCell href={href} cell={COLUMN_DROP.updated} className={cn(dense, "num pr-0 text-meta text-fg-3")}>
+      <RowCell href={href} cell={COLUMN_DROP.updated} className={cn(dense, "num pr-0 text-meta text-muted-foreground")}>
         <span className="truncate">{deal.updated}</span>
       </RowCell>
     </tr>

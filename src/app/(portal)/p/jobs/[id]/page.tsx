@@ -69,7 +69,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
   // posts it, and only Sign out asks.
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas">
+      <header className="sticky top-0 z-20 border-b border-border bg-canvas">
         <div className="mx-auto flex h-14 max-w-300 items-center justify-between gap-3 px-2 sm:px-4 lg:px-6">
           <BackLink fallback="/p" label="My jobs" className="h-11 rounded-md px-2 text-label text-fg-2" />
           <div className="flex items-center gap-1">
@@ -106,9 +106,9 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
                     />
                   )}
                 </div>
-                <h1 className="mt-1 text-title text-balance break-words text-fg-1">{job.title}</h1>
+                <h1 className="mt-1 text-title text-balance break-words text-foreground">{job.title}</h1>
                 {(job.address || job.unitLabel) && (
-                  <p className="mt-1 text-meta text-fg-3">{addressLine(job.address, job.unitLabel)}</p>
+                  <p className="mt-1 text-meta text-muted-foreground">{addressLine(job.address, job.unitLabel)}</p>
                 )}
               </div>
             </div>
@@ -121,7 +121,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
 
           {job.notes && (
             <Section title="Notes">
-              <p className="max-w-prose whitespace-pre-wrap break-words text-pretty text-body text-fg-1">{job.notes}</p>
+              <p className="max-w-prose whitespace-pre-wrap break-words text-pretty text-body text-foreground">{job.notes}</p>
             </Section>
           )}
 

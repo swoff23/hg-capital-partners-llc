@@ -52,7 +52,7 @@ export function JobUpdates({
 }) {
   // The first reading wins for the whole visit.
   const [since] = useState(() => Date.parse(newSince));
-  if (updates.length === 0) return <p className="text-body text-fg-3">No updates yet.</p>;
+  if (updates.length === 0) return <p className="text-body text-muted-foreground">No updates yet.</p>;
 
   const entries = pairDecisions(updates);
   const firstNew = entries.find(({ update: u }) => !u.you && u.kind !== "removed" && u.createdAt.getTime() > since)?.update.id;
@@ -133,7 +133,7 @@ function EntryView({ entry, delivery, viewerName }: { entry: Entry; delivery: Jo
   const delivered = delivery && (delivery.eventId === u.id || delivery.eventId === note?.id);
   return (
     <ActivityItem id={`update-${u.id}`} marker={u.statusTo ? { status: u.statusTo } : "dot"}>
-      <p className="text-meta text-fg-3">
+      <p className="text-meta text-muted-foreground">
         {u.actorLabel} {u.body}
         <span aria-hidden="true">{" · "}</span>
         <ActivityTime at={u.createdAt} />
@@ -142,8 +142,8 @@ function EntryView({ entry, delivery, viewerName }: { entry: Entry; delivery: Jo
       {files && <div className="mt-1.5">{files}</div>}
       {note && (
         // Anchored too, so a job email or the notice's "See the update" that opens at the note finds it.
-        <div id={`update-${note.id}`} className="mt-1.5 scroll-mt-[calc(var(--app-bar-h)+1rem)] rounded-md border border-line bg-surface px-3 py-2.5">
-          {note.parts && <p className="whitespace-pre-wrap break-words text-body text-fg-1">{bodyOf(note.parts)}</p>}
+        <div id={`update-${note.id}`} className="mt-1.5 scroll-mt-[calc(var(--app-bar-h)+1rem)] rounded-md border border-border bg-background px-3 py-2.5">
+          {note.parts && <p className="whitespace-pre-wrap break-words text-body text-foreground">{bodyOf(note.parts)}</p>}
           {note.attachments.media.length > 0 && <div className={cn(note.parts && "mt-2")}>{mediaOf(note, true)}</div>}
           {note.attachments.files.length > 0 && <div className="mt-2">{filesOf(note)}</div>}
         </div>

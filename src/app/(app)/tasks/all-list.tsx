@@ -16,7 +16,7 @@ export function AllList({ scoped = false, cadence = false }: { scoped?: boolean;
   const { tasks } = useTaskList();
   const statusColumn = tasks.some((t) => hasStatusColumn(t));
   return (
-    <ul className="@container divide-y divide-line">
+    <ul className="@container divide-y divide-border">
       {tasks.map((t) => (
         <TaskRow
           key={t.id}

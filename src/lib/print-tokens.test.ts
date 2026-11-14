@@ -29,7 +29,7 @@ test("printing from dark takes the light theme's values", () => {
     assert.equal(hex, lightTokens[name], `${name} in print differs from the light block`);
   }
   // Every color the dark block changes and a page can show is restated, so nothing dark leaks onto paper.
-  for (const name of ["--canvas", "--surface", "--fill-1", "--line", "--line-strong", "--fg-1", "--fg-2", "--fg-3", "--chart-1", "--danger", "--warn", "--ok"]) {
+  for (const name of ["--canvas", "--background", "--muted", "--border", "--line-strong", "--foreground", "--fg-2", "--muted-foreground", "--chart-1", "--destructive", "--warn", "--ok"]) {
     assert.ok(name in printTokens, `${name} is missing from the print block`);
   }
 });

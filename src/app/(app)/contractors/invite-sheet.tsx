@@ -116,7 +116,7 @@ function InviteSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange: 
         )}
       </FormField>
       <OtherHows primary={primary} hasEmail={hasEmail} pending={run.pending} onPick={send} />
-      <Link href="/contractors/new" className="text-meta text-fg-3 underline decoration-1 underline-offset-3 hover:text-fg-1 pointer-coarse:py-3">
+      <Link href="/contractors/new" className="text-meta text-muted-foreground underline decoration-1 underline-offset-3 hover:text-foreground pointer-coarse:py-3">
         Add without inviting
       </Link>
     </FormSheet>
@@ -230,15 +230,15 @@ function SignupLink() {
       >
         {({ container }) => (
           <div className={cn("space-y-3", container === "sheet" ? "p-4" : "p-3")}>
-            {container === "popover" && <p className="text-label text-fg-1">Sign-up link</p>}
+            {container === "popover" && <p className="text-label text-foreground">Sign-up link</p>}
             {problem ? (
-              <p className="text-meta text-danger">{problem}</p>
+              <p className="text-meta text-destructive">{problem}</p>
             ) : link ? (
               <Code value={link} label="Sign-up link" wrap />
             ) : (
-              <p className="text-meta text-fg-3">Getting the link</p>
+              <p className="text-meta text-muted-foreground">Getting the link</p>
             )}
-            <p className="text-meta text-fg-3">New sign-ups wait for a partner to keep them.</p>
+            <p className="text-meta text-muted-foreground">New sign-ups wait for a partner to keep them.</p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Button variant="secondary" size="sm" disabled={!link} onClick={copyMessage}>
                 Copy message

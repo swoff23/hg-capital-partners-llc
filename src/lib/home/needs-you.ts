@@ -29,11 +29,11 @@ export interface NeedsYouItem {
   detail: string;
   /** Dollars set ahead of the detail ("$32,000 across 4 properties"), or null. */
   amount: number | null;
-  /** The part of `amount` that's late, a "$4,000 past due" clause in --danger after it; null when none is. */
+  /** The part of `amount` that's late, a "$4,000 past due" clause in --destructive after it; null when none is. */
   pastDue: number | null;
   /** A key date's label for the date column ("Nov 30", "Tomorrow"), or null. */
   dateLabel: string | null;
-  /** The date has passed, so it reads in --danger. */
+  /** The date has passed, so it reads in --destructive. */
   late: boolean;
   /** For ordering: the key date, or null. */
   date: Ymd | null;

@@ -141,7 +141,7 @@ export function ListingsSection({
           <AddRow onClick={() => openListing(null)} onIntent={listingSheet.warm} disabled={noUnits}>
             Add listing
           </AddRow>
-          {noUnits && <p className="text-meta text-fg-3">Add a unit in Units &amp; access first.</p>}
+          {noUnits && <p className="text-meta text-muted-foreground">Add a unit in Units &amp; access first.</p>}
           {doomed && run.error && <SaveError className="mt-2">{run.error}</SaveError>}
         </Section>
       )}
@@ -186,7 +186,7 @@ function ReadListings({
   onDelete: (index: number) => void;
 }) {
   return (
-    <ul className="divide-y divide-line">
+    <ul className="divide-y divide-border">
       {listings.map((l, i) => {
         const facts = [l.beds && `${l.beds} bd`, l.baths && `${l.baths} ba`, l.sqft && `${l.sqft} sq ft`].filter(Boolean);
         const name = l.unitLabel || "Unlabeled unit";
@@ -200,8 +200,8 @@ function ReadListings({
               aria-label={`Edit the listing for ${name}`}
               className="min-w-0 flex-1 rounded-md text-left pointer-coarse:min-h-11"
             >
-              <p className="truncate text-body text-fg-1">{name}</p>
-              <p className="truncate text-meta text-fg-3">
+              <p className="truncate text-body text-foreground">{name}</p>
+              <p className="truncate text-meta text-muted-foreground">
                 {/* The status column drops below 480, so its word leads the subline. */}
                 <span className="font-medium text-fg-2 min-[480px]:hidden">{STATUS_LABEL[l.status]} · </span>
                 {/* Below 480 the secondary clauses drop rather than wrap (section 5 Density). */}
@@ -227,7 +227,7 @@ function ReadListings({
                 className={cn(textLinkClass, "inline-flex shrink-0 items-center gap-1 text-meta pointer-coarse:min-h-11")}
               >
                 Zillow
-                <ExternalLink aria-hidden="true" strokeWidth={1.5} className="h-3.5 w-3.5 text-fg-3" />
+                <ExternalLink aria-hidden="true" strokeWidth={1.5} className="h-3.5 w-3.5 text-muted-foreground" />
               </a>
             )}
             {/* The status in one fixed column before the menu, whether or not a Zillow link sits before it. */}

@@ -182,7 +182,7 @@ export function ResultLine({
 }) {
   const { clear } = useFilterScope();
   return (
-    <p className="mb-3 mt-3 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-meta text-fg-3">
+    <p className="mb-3 mt-3 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-meta text-muted-foreground">
       <span className="min-w-0 truncate tabular-nums">
         {shown.toLocaleString("en-US")} {shown === 1 ? noun.one : noun.many}
       </span>
@@ -199,7 +199,7 @@ export function ResultLine({
         type="button"
         onClick={clear}
         className={cn(
-          "relative shrink-0 whitespace-nowrap text-fg-1 underline decoration-1 underline-offset-3 hover:decoration-2",
+          "relative shrink-0 whitespace-nowrap text-foreground underline decoration-1 underline-offset-3 hover:decoration-2",
           // A 44px target on touch without making the line taller.
           "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3",
         )}
@@ -498,7 +498,7 @@ function FilterBarFrame({ search, views, facets = [], sort, wide, className }: F
             {views.menu && current && (
               <span className={cn(buttonClass({ variant: "secondary", size: "sm" }), "min-w-0 shrink-0", classes.hide)}>
                 <span className="truncate">{current.label}</span>
-                <ChevronDown aria-hidden="true" className="size-3.5 text-fg-3" />
+                <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
               </span>
             )}
           </>
@@ -509,7 +509,7 @@ function FilterBarFrame({ search, views, facets = [], sort, wide, className }: F
             f.kind === "multi" ? (
               <span key={f.param} className={cn(chipEdge, "min-w-0 shrink border-line-strong")}>
                 <span className="flex h-full min-w-0 items-center gap-1.5 px-2.5">
-                  <Plus aria-hidden="true" className="size-3.5 shrink-0 text-fg-3" />
+                  <Plus aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
                   <span className="shrink-0 text-fg-2">{f.label}</span>
                 </span>
               </span>
@@ -565,8 +565,8 @@ function ViewMenu({
         className={cn(buttonClass({ variant: "secondary", size: "sm" }), "min-w-0 shrink-0", className)}
       >
         <span className="truncate">{current.label}</span>
-        {current.count !== undefined && <span className="tabular-nums text-fg-3 max-sm:hidden">{current.count}</span>}
-        <ChevronDown aria-hidden="true" className="size-3.5 text-fg-3" />
+        {current.count !== undefined && <span className="tabular-nums text-muted-foreground max-sm:hidden">{current.count}</span>}
+        <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
       </AriaButton>
       <Menu
         placement="bottom end"
@@ -581,7 +581,7 @@ function ViewMenu({
             {/* One flex-1 box, so the count rides the right edge beside the Check instead of splitting the room with it. */}
             <span className="flex min-w-0 flex-1 items-center gap-3">
               <span className="truncate">{o.label}</span>
-              {o.count !== undefined && <span className="ml-auto tabular-nums text-fg-3">{o.count}</span>}
+              {o.count !== undefined && <span className="ml-auto tabular-nums text-muted-foreground">{o.count}</span>}
             </span>
           </MenuItem>
         ))}
@@ -592,7 +592,7 @@ function ViewMenu({
 
 /* ---------------- Chips (the wide bar) ---------------- */
 
-const chipEdge = "inline-flex h-8 shrink-0 items-center rounded-md border bg-surface text-label outline-none";
+const chipEdge = "inline-flex h-8 shrink-0 items-center rounded-md border bg-background text-label outline-none";
 
 /** The chip's words for its picks: one, two joined, or the first and how many more. */
 export function chipValue(labels: readonly string[]): string {
@@ -607,8 +607,8 @@ function facetRows(f: Extract<FilterFacet, { kind: "multi" }>): OptionItem[] {
 
 /**
  * A facet with several picks, as a chip. Idle: a solid --line-strong edge, a
- * Plus and the facet's name. Set: a --line-control edge, the name in --fg-2
- * and the picks in --fg-1, and an X of its own to take the filter off. Its
+ * Plus and the facet's name. Set: an --input edge, the name in --fg-2
+ * and the picks in --foreground, and an X of its own to take the filter off. Its
  * panel is the option list with checkboxes and counts, and it applies live:
  * no Apply, no Clear inside.
  */
@@ -638,18 +638,18 @@ function FilterChip({
   }
 
   return (
-    <div className={cn(chipEdge, "min-w-0 shrink", set ? "border-line-control" : "border-line-strong")}>
+    <div className={cn(chipEdge, "min-w-0 shrink", set ? "border-input" : "border-line-strong")}>
       <PopoverTrigger>
         <AriaButton
           ref={main}
           data-chip-button=""
           onKeyDown={onKeyDown}
           aria-label={set ? `${facet.label}: ${labels.join(", ")}` : facet.label}
-          className="flex h-full min-w-0 items-center gap-1.5 rounded-md px-2.5 outline-none transition-colors hover:bg-fill-1 data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:-outline-offset-2 data-focus-visible:outline-act data-pressed:bg-fill-1"
+          className="flex h-full min-w-0 items-center gap-1.5 rounded-md px-2.5 outline-none transition-colors hover:bg-muted data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:-outline-offset-2 data-focus-visible:outline-ring data-pressed:bg-muted"
         >
-          {!set && <Plus aria-hidden="true" className="size-3.5 shrink-0 text-fg-3" />}
+          {!set && <Plus aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />}
           <span className="shrink-0 text-fg-2">{facet.label}</span>
-          {set && <span className="min-w-10 max-w-40 truncate text-fg-1">{chipValue(labels)}</span>}
+          {set && <span className="min-w-10 max-w-40 truncate text-foreground">{chipValue(labels)}</span>}
         </AriaButton>
         {/* The larger of the chip and the widest row, at most 320; a panel with a search field keeps room to type. */}
         <Popover
@@ -675,7 +675,7 @@ function FilterChip({
         <AriaButton
           aria-label={`Remove ${facet.label} filter`}
           onPress={remove}
-          className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-fg-3 outline-none transition-colors hover:bg-fill-2 hover:text-fg-1 data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-act pointer-coarse:hidden"
+          className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-ring pointer-coarse:hidden"
         >
           <X aria-hidden="true" className="size-3.5" />
         </AriaButton>
@@ -686,8 +686,8 @@ function FilterChip({
 
 /**
  * A yes or no facet as a chip ("Has login", "Repeats"): `aria-pressed`.
- * Idle, the solid --line-strong edge in --fg-2; pressed, a --line-control edge
- * with a Check in --fg-1 before the words.
+ * Idle, the solid --line-strong edge in --fg-2; pressed, an --input edge
+ * with a Check in --foreground before the words.
  */
 function ToggleChip({
   facet,
@@ -713,11 +713,11 @@ function ToggleChip({
       }}
       className={cn(
         chipEdge,
-        "gap-1.5 px-2.5 text-fg-2 transition-colors hover:bg-fill-1 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-act",
-        "border-line-strong aria-pressed:border-line-control aria-pressed:text-fg-1",
+        "gap-1.5 px-2.5 text-fg-2 transition-colors hover:bg-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "border-line-strong aria-pressed:border-input aria-pressed:text-foreground",
       )}
     >
-      {on && <Check aria-hidden="true" className="size-3.5 shrink-0 text-fg-1" />}
+      {on && <Check aria-hidden="true" className="size-3.5 shrink-0 text-foreground" />}
       {facet.label}
     </button>
   );
@@ -774,7 +774,7 @@ function FacetSection({
       <div className="flex min-h-6 items-center justify-between gap-3 pl-3 pr-2 pb-1 pointer-coarse:min-h-11">
         <h3 id={headingId} className="flex items-baseline gap-1.5 text-meta font-medium text-fg-2">
           {facet.label}
-          {picked.length > 0 && <span className="font-normal tabular-nums text-fg-3">{picked.length}</span>}
+          {picked.length > 0 && <span className="font-normal tabular-nums text-muted-foreground">{picked.length}</span>}
         </h3>
         {picked.length > 0 && (
           <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])}>
@@ -805,7 +805,7 @@ function FacetSection({
         <button
           type="button"
           onClick={() => setAll(true)}
-          className="mx-1 flex h-8 w-[calc(100%-0.5rem)] items-center rounded-sm px-2 text-body text-fg-2 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:h-11"
+          className="mx-1 flex h-8 w-[calc(100%-0.5rem)] items-center rounded-sm px-2 text-body text-fg-2 transition-colors hover:bg-accent hover:text-foreground pointer-coarse:h-11"
         >
           Show all {rows.length}
         </button>

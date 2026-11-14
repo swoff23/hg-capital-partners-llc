@@ -11,7 +11,7 @@ const SIZES = {
 export type AvatarSize = keyof typeof SIZES;
 
 /**
- * A person's initials (docs/brand-guidelines.md, section 9): --surface
+ * A person's initials (docs/brand-guidelines.md, section 9): --background
  * ground, a 1px --line-strong edge and --fg-2 initials at 12px, so it holds
  * on any fill, a highlighted listbox row included. 20px shows one initial;
  * 24px and up show two, so two people who share a first letter stay apart.
@@ -42,7 +42,7 @@ export function Avatar({
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex shrink-0 select-none items-center justify-center bg-surface text-micro font-semibold leading-none tracking-tight text-fg-2 ring-1 ring-inset ring-line-strong",
+        "inline-flex shrink-0 select-none items-center justify-center bg-background text-micro font-semibold leading-none tracking-tight text-fg-2 ring-1 ring-inset ring-line-strong",
         outline ? "rounded-sm" : "rounded-full",
         box,
         className,

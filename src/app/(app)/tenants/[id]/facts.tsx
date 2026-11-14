@@ -63,14 +63,14 @@ export function LeaseFacts(v: FactValues) {
       <Row label="Property">
         <Link
           href={`/properties/${v.property.id}`}
-          className="block truncate text-body text-fg-1 underline decoration-1 underline-offset-3 hover:decoration-2"
+          className="block truncate text-body text-foreground underline decoration-1 underline-offset-3 hover:decoration-2"
         >
           {v.property.label}
         </Link>
       </Row>
       {v.unitLabel && (
         <Row label="Unit">
-          <span className="block truncate text-body text-fg-1">{v.unitLabel}</span>
+          <span className="block truncate text-body text-foreground">{v.unitLabel}</span>
         </Row>
       )}
       <Row label={v.status === "upcoming" ? "Moves in" : "Moved in"}>
@@ -136,7 +136,7 @@ export function LeaseFacts(v: FactValues) {
             onSave={(next) => saveLeaseTerm(v.leaseId, v.term!.id, { subsidy: next })}
           />
         ) : (
-          <span className="text-fg-3">—</span>
+          <span className="text-muted-foreground">—</span>
         )}
       </Row>
       <Row label="Deposit">
@@ -164,7 +164,7 @@ export function LeaseFacts(v: FactValues) {
             onSave={(next) => saveLeaseTerm(v.leaseId, v.term!.id, { endsOn: next || null })}
           />
         ) : (
-          <span className="text-fg-3">—</span>
+          <span className="text-muted-foreground">—</span>
         )}
       </Row>
     </div>
@@ -172,7 +172,7 @@ export function LeaseFacts(v: FactValues) {
 }
 
 /**
- * One fact: in the rail, a 112px label in --fg-3 and the value over a
+ * One fact: in the rail, a 112px label in --muted-foreground and the value over a
  * hairline, 40px rows (48 on touch); below lg a chip that carries its own
  * label, since the rail's label column is gone.
  */
@@ -180,13 +180,13 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-line lg:last:border-0 lg:pointer-coarse:min-h-12",
-        "max-lg:h-8 max-lg:gap-1.5 max-lg:rounded-md max-lg:border max-lg:border-line max-lg:px-2.5 max-lg:text-meta pointer-coarse:max-lg:h-11",
+        "flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-border lg:last:border-0 lg:pointer-coarse:min-h-12",
+        "max-lg:h-8 max-lg:gap-1.5 max-lg:rounded-md max-lg:border max-lg:border-border max-lg:px-2.5 max-lg:text-meta pointer-coarse:max-lg:h-11",
       )}
     >
-      <span className="shrink-0 text-meta text-fg-3 lg:w-28">{label}</span>
+      <span className="shrink-0 text-meta text-muted-foreground lg:w-28">{label}</span>
       {/* The value's type, as RailFact sets it, so a plain value, a verb and an InlineField read the same size. */}
-      <div className="min-w-0 text-fg-1 lg:flex-1 lg:text-body max-lg:whitespace-nowrap">{children}</div>
+      <div className="min-w-0 text-foreground lg:flex-1 lg:text-body max-lg:whitespace-nowrap">{children}</div>
     </div>
   );
 }

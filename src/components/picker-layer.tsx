@@ -137,15 +137,15 @@ export function PickerLayer({
 /** The header of a step inside a popover: a back chevron and the step's name. */
 export function StepHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
-    <div className="flex items-center gap-1 border-b border-line py-1 pl-1 pr-3">
+    <div className="flex items-center gap-1 border-b border-border py-1 pl-1 pr-3">
       <AriaButton
         onPress={onBack}
         aria-label="Back"
-        className="flex size-8 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:size-11"
+        className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground pointer-coarse:size-11"
       >
         <ChevronLeft aria-hidden="true" className="size-4" />
       </AriaButton>
-      <span className="min-w-0 truncate text-label text-fg-1">{title}</span>
+      <span className="min-w-0 truncate text-label text-foreground">{title}</span>
     </div>
   );
 }

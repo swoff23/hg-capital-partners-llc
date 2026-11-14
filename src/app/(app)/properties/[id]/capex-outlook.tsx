@@ -18,7 +18,7 @@ import { fmtAge, ForecastYearBars } from "../capex-ui";
  * swaps the figure and the total row to its spend, with "All 5 years"
  * beside it to clear the pick; nothing dims (Copilot and Mercury iOS swap
  * the list below a pick). Red means late only: an item past its replacement
- * age before this year reads "Past due" in --danger, and the total names how
+ * age before this year reads "Past due" in --destructive, and the total names how
  * much is; an item due this year reads its year like the rest.
  *
  * The page's one CapEx section (docs/specs/property-page.md 2.3): `children`
@@ -58,7 +58,7 @@ export function CapexForecastCard({
       title="CapEx"
       actions={
         // As tall as an Edit button, so this heading lines up with the rail's beside it.
-        <span className="num flex h-8 items-center text-meta text-fg-3">
+        <span className="num flex h-8 items-center text-meta text-muted-foreground">
           {f.fromYear} to {lastYear}
         </span>
       }
@@ -66,20 +66,20 @@ export function CapexForecastCard({
       <div className="space-y-4">
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <Money key={selectedTotal} value={selectedTotal} className="animate-fade-in text-figure-m text-fg-1" />
+            <Money key={selectedTotal} value={selectedTotal} className="animate-fade-in text-figure-m text-foreground" />
             {selectedYear != null ? (
-              <span className="text-meta text-fg-3">
+              <span className="text-meta text-muted-foreground">
                 <span className="num">{selectedYear}</span> · {allYears}
               </span>
             ) : (
               f.overdueTotal > 0 && (
-                <span className="text-meta text-danger">
+                <span className="text-meta text-destructive">
                   <Money value={f.overdueTotal} /> past due
                 </span>
               )
             )}
           </div>
-          {undatedNote && <p className="mt-1 text-meta text-fg-3">{undatedNote}</p>}
+          {undatedNote && <p className="mt-1 text-meta text-muted-foreground">{undatedNote}</p>}
         </div>
 
         <ForecastYearBars
@@ -105,18 +105,18 @@ export function CapexForecastCard({
                   </Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className="divide-y divide-border">
                 {rows.map((l, idx) => {
-                  const where = l.scope === "building" ? "text-fg-1" : "text-fg-2";
+                  const where = l.scope === "building" ? "text-foreground" : "text-fg-2";
                   return (
                     <tr key={idx}>
                       <Td className={cn("pl-0 max-[480px]:hidden", where)}>{l.unitLabel}</Td>
-                      <Td className="text-fg-1 max-[480px]:pl-0">
+                      <Td className="text-foreground max-[480px]:pl-0">
                         {l.type}
                         <span className={cn("block text-meta min-[480px]:hidden", where)}>{l.unitLabel}</span>
                       </Td>
                       <Td className="num whitespace-nowrap text-fg-2 max-[480px]:hidden">{fmtAge(l.age)}</Td>
-                      <Td className={cn("num whitespace-nowrap", l.pastDue ? "text-danger" : "text-fg-2")}>
+                      <Td className={cn("num whitespace-nowrap", l.pastDue ? "text-destructive" : "text-fg-2")}>
                         {l.pastDue ? "Past due" : l.dueYear}
                       </Td>
                       <Td numeric className="pr-0">

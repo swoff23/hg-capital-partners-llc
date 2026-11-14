@@ -105,13 +105,13 @@ export function BuildingSystems({
       <button type="button" aria-expanded={shown} onClick={() => setShown((v) => !v)} className={cn(addRowClass, "justify-between")}>
         <span className="flex items-center gap-2 whitespace-nowrap">
           {shown ? (
-            <ChevronUp aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+            <ChevronUp aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
           ) : (
-            <ChevronDown aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+            <ChevronDown aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
           Building systems
         </span>
-        <span className="num flex items-center gap-2 whitespace-nowrap text-meta font-normal text-fg-3">
+        <span className="num flex items-center gap-2 whitespace-nowrap text-meta font-normal text-muted-foreground">
           <Meter value={dated} max={total} className="w-16 max-[360px]:hidden" />
           <span>
             {dated} of {total} dated
@@ -134,23 +134,23 @@ export function BuildingSystems({
             </Th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-line">
+        <tbody className="divide-y divide-border">
           {items.map((item) => {
             const stored = initial[item.key];
             const rs = rowFor(item);
             const showCost = rs.status === "Monitor" || rs.status === "Replace";
             return (
-              <tr key={item.key} onClick={() => openSheet(item.key)} className="transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-fill-1">
-                <Td className="pl-0 align-middle text-fg-1 min-[480px]:whitespace-nowrap">
+              <tr key={item.key} onClick={() => openSheet(item.key)} className="transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-muted">
+                <Td className="pl-0 align-middle text-foreground min-[480px]:whitespace-nowrap">
                   {/* The row opens it with a click; this is the keyboard's way in, and names what it opens. */}
                   <button type="button" aria-label={`Edit ${item.label}`} className="text-left">
                     {item.label}
                   </button>
                 </Td>
                 <Td className={cn("align-middle", typeHidden)}>
-                  {stored?.type ? <span className="text-fg-2">{stored.type}</span> : <span className="text-fg-3">—</span>}
+                  {stored?.type ? <span className="text-fg-2">{stored.type}</span> : <span className="text-muted-foreground">—</span>}
                 </Td>
-                <Td className="num align-middle">{stored?.year || <span className="text-fg-3">—</span>}</Td>
+                <Td className="num align-middle">{stored?.year || <span className="text-muted-foreground">—</span>}</Td>
                 <Td className={cn("num whitespace-nowrap align-middle text-fg-2", phoneHidden)}>{fmtAge(rs.age)}</Td>
                 <Td className="whitespace-nowrap align-middle">
                   <EquipmentStatusText status={rs.status} />
@@ -160,14 +160,14 @@ export function BuildingSystems({
                     <>
                       <span className="whitespace-nowrap">
                         <Money value={rs.cost} />
-                        {rs.due && <span className="text-meta text-fg-3 max-[480px]:hidden"> {rs.due}</span>}
+                        {rs.due && <span className="text-meta text-muted-foreground max-[480px]:hidden"> {rs.due}</span>}
                       </span>
                       {/* An overridden cost says what it replaced, where the bare "*" used to. */}
-                      {rs.overridden && <span className="block text-meta text-fg-3">Default {fmtMoney(item.defaultCost)}</span>}
+                      {rs.overridden && <span className="block text-meta text-muted-foreground">Default {fmtMoney(item.defaultCost)}</span>}
                     </>
                   ) : (
                     // Nothing to spend yet (Good or Unknown): the empty-cell dash, so the column never reads unfinished.
-                    <span className="text-fg-3">—</span>
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </Td>
               </tr>

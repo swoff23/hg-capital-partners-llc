@@ -7,12 +7,12 @@
  * public pages' gutters and grids use).
  *
  * Size, line height, weight and tracking only: color comes from the token
- * utilities beside a role (text-fg-1, text-fg-3, text-gold). Unlayered, so a
+ * utilities beside a role (text-foreground, text-muted-foreground, text-gold). Unlayered, so a
  * role wins over a Tailwind text size or weight on the same element; don't
  * pair them.
  */
 
-/* Hero headline; its second clause in --fg-3. 34 / 40, 44 / 48, 56 / 60. */
+/* Hero headline; its second clause in --muted-foreground. 34 / 40, 44 / 48, 56 / 60. */
 .display {
   font-size: 2.125rem;
   line-height: 2.5rem;
@@ -30,7 +30,7 @@
   text-wrap: balance;
 }
 
-/* One paragraph at most, in --fg-3. 16 / 24, then 18 / 28. */
+/* One paragraph at most, in --muted-foreground. 16 / 24, then 18 / 28. */
 .lead {
   font-size: 1rem;
   line-height: 1.5rem;

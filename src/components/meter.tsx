@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * A measured share as a horizontal bar (docs/specs/charts.md 2.3): a 4px
- * --fill-1 track the width of its box with a --chart-1 fill from the left,
+ * --muted track the width of its box with a --chart-1 fill from the left,
  * square ends. Status colors never fill it, so a full checklist stays
  * --chart-1. The same at every size, on touch and with a mouse.
  *
@@ -40,7 +40,7 @@ export function Meter({
       }
     : { "aria-hidden": true as const };
   return (
-    <span data-chart="" className={cn("block h-1 w-full bg-fill-1", className)} {...a11y}>
+    <span data-chart="" className={cn("block h-1 w-full bg-muted", className)} {...a11y}>
       <span
         className={cn("block h-full bg-chart-1", spring && "transition-[width] duration-check ease-spring")}
         style={{ width: `${share * 100}%` }}

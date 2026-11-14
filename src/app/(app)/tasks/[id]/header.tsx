@@ -14,7 +14,7 @@ import { deleteTask, updateTask } from "./actions";
 /**
  * The title on the page title token, edited in place. At rest it's the
  * page's h1; a click or a tap swaps in the field, as on the property page.
- * Long titles wrap. Done and Canceled strike it through in --fg-3, since the
+ * Long titles wrap. Done and Canceled strike it through in --muted-foreground, since the
  * status chip carries no strike (docs/brand-guidelines.md, section 9).
  */
 export function TitleField({ taskId, title, closed }: { taskId: string; title: string; closed: boolean }) {
@@ -27,7 +27,7 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
       // "Enter at least 2 characters." under the open field, in place of a silent revert (BTASKS-013).
       minLength={2}
       message={() => "Task renamed"}
-      className={cn(closed && "text-fg-3 line-through")}
+      className={cn(closed && "text-muted-foreground line-through")}
       onSave={(next) => updateTask(taskId, { title: next })}
     />
   );
@@ -64,7 +64,7 @@ export function MoreMenu({ taskId, title }: { taskId: string; title: string }) {
       <MenuTrigger>
         <AriaButton
           aria-label="More actions"
-          className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3 data-pressed:bg-fill-1")}
+          className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-muted-foreground data-pressed:bg-muted")}
         >
           <Ellipsis className="size-4" aria-hidden="true" />
         </AriaButton>

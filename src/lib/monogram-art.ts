@@ -44,7 +44,7 @@ function round(n: number): number {
 
 /**
  * The monogram as an SVG document. The default is the favicon: the rounded
- * tile, with a 1px --line edge when the browser is dark, so the ink tile
+ * tile, with a 1px --border edge when the browser is dark, so the ink tile
  * never vanishes into a dark tab strip. The edge is a 2px stroke on the
  * tile's outline clipped to the tile, so exactly 1px lands inside on every
  * side, corners included. `bleed` is the full square for apple-icon, which
@@ -62,7 +62,7 @@ export function monogramSvg({
   const rx = bleed ? "" : ` rx="${radius}"`;
   const edge = darkEdge
     ? `<defs><clipPath id="tile"><rect width="100" height="100"${rx}/></clipPath></defs>` +
-      `<style>.edge{stroke:none}@media (prefers-color-scheme:dark){.edge{stroke:${brandTokensDark.line}}}</style>` +
+      `<style>.edge{stroke:none}@media (prefers-color-scheme:dark){.edge{stroke:${brandTokensDark.border}}}</style>` +
       `<rect class="edge" width="100" height="100"${rx} fill="none" stroke-width="2" vector-effect="non-scaling-stroke" clip-path="url(#tile)"/>`
     : "";
   return (

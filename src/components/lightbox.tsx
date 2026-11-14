@@ -63,7 +63,7 @@ export type LightboxMenuItem = {
   id: string;
   label: string;
   icon?: ReactNode;
-  /** Delete and Remove: drawn in --danger, last. */
+  /** Delete and Remove: drawn in --destructive, last. */
   destructive?: boolean;
   onAction: () => void;
 };
@@ -404,7 +404,7 @@ function DeleteQuestion({
       body={
         <>
           <span className="break-all">“{name}”</span> goes for good.
-          {error && <span className="mt-2 block text-meta text-danger">{error}</span>}
+          {error && <span className="mt-2 block text-meta text-destructive">{error}</span>}
         </>
       }
       cancelLabel="Keep it"
@@ -483,7 +483,7 @@ function DocumentStage({ item, url, owner, coarse }: { item: MediaItem; url: str
   const look = documentLook(item.filename);
   const Glyph = look.glyph === "sheet" ? FileSpreadsheet : look.glyph === "image" ? FileImage : FileText;
   if (look.label === "PDF" && !coarse) {
-    return <iframe src={url} title={item.filename} className="h-full w-full max-w-[60rem] rounded-md bg-surface" />;
+    return <iframe src={url} title={item.filename} className="h-full w-full max-w-[60rem] rounded-md bg-background" />;
   }
   const meta = [look.label, item.size ? formatBytes(item.size) : null, owner].filter(Boolean).join(" · ");
   const pdf = look.label === "PDF";

@@ -163,7 +163,7 @@ export function ClassMappingTable({
           <Th>Maps to</Th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-line max-sm:block">
+      <tbody className="divide-y divide-border max-sm:block">
         {classes.map((c) => {
           const key = mapsToKey(targetOf(c));
           const saving = busy.has(c.id);
@@ -171,7 +171,7 @@ export function ClassMappingTable({
             <tr
               key={c.id}
               aria-busy={saving || undefined}
-              className={cn("transition-opacity duration-fast max-sm:block max-sm:py-2", saving ? "opacity-50" : "hover:bg-fill-1")}
+              className={cn("transition-opacity duration-fast max-sm:block max-sm:py-2", saving ? "opacity-50" : "hover:bg-muted")}
             >
               <Td className={cn(cell, "max-sm:block max-sm:pb-0")}>
                 <span className="mr-2 [overflow-wrap:anywhere]">{c.fqn}</span>
@@ -244,25 +244,25 @@ export function AccountCategoryTable({ accounts }: { accounts: AccountRow[] }) {
               <Th>Category</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line max-sm:block">
+          <tbody className="divide-y divide-border max-sm:block">
             {shown.map((a) => {
               const saving = busy.has(a.id);
               return (
                 <tr
                   key={a.id}
                   aria-busy={saving || undefined}
-                  className={cn("transition-opacity duration-fast max-sm:block max-sm:py-2", saving ? "opacity-50" : "hover:bg-fill-1")}
+                  className={cn("transition-opacity duration-fast max-sm:block max-sm:py-2", saving ? "opacity-50" : "hover:bg-muted")}
                 >
                   <Td className={cn(cell, "max-sm:block max-sm:pb-0")}>
                     <span className="inline-flex items-center gap-1.5 [overflow-wrap:anywhere]">
                       {a.fqn}
                       {a.locked && (
                         <Tooltip label="Category set by you">
-                          <Lock role="img" aria-label="Category set by you" className="h-3.5 w-3.5 shrink-0 text-fg-3" />
+                          <Lock role="img" aria-label="Category set by you" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         </Tooltip>
                       )}
                     </span>
-                    <span className="block text-meta text-fg-3 sm:hidden">{a.acctType || a.classification}</span>
+                    <span className="block text-meta text-muted-foreground sm:hidden">{a.acctType || a.classification}</span>
                   </Td>
                   <Td className={cn(cell, "text-fg-2 max-sm:hidden")}>{a.acctType || a.classification}</Td>
                   <Td className={cn(cell, "max-sm:block max-sm:pl-0 max-sm:pt-0 sm:w-72")}>

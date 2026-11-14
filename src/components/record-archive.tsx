@@ -83,7 +83,7 @@ export function RecordMoreMenu({
       <AriaButton
         aria-label="More actions"
         data-record-menu=""
-        className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3 data-pressed:bg-fill-1")}
+        className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-muted-foreground data-pressed:bg-muted")}
       >
         <Ellipsis className="size-4" aria-hidden="true" />
       </AriaButton>
@@ -135,7 +135,7 @@ export function ArchivedNotice({
   return (
     <Notice
       className={className}
-      icon={<Archive aria-hidden="true" strokeWidth={1.75} className="size-4 shrink-0 text-fg-3" />}
+      icon={<Archive aria-hidden="true" strokeWidth={1.75} className="size-4 shrink-0 text-muted-foreground" />}
       action={
         <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => change(false, () => focusRecordMenu())}>
           Restore

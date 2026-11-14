@@ -45,7 +45,7 @@ export function hasStatusColumn(task: ListTask, { status = true, reason = false 
  * The status is its mark and one word in a fixed column at the title's end,
  * from a 480px list up. Below that it leads the second line ("Review · 56
  * Tamarack St"), in its tone (docs/brand-guidelines.md, section 9). Red is
- * the overdue date's alone. A canceled title is struck through in --fg-3,
+ * the overdue date's alone. A canceled title is struck through in --muted-foreground,
  * like a done one.
  *
  * A contractor's job always shows its status and its Target (D7: the visit
@@ -94,7 +94,7 @@ export function TaskRow({
   actions?: ReactNode;
   /**
    * Something new since you last opened it (docs/specs/activity-comments.md
-   * 2.6, choice 3.5 A): the 8px --act unread dot hangs in the leading gutter,
+   * 2.6, choice 3.5 A): the 8px --primary unread dot hangs in the leading gutter,
    * centered 8px before the row's first column on the title's line, and the
    * row opens the task at its New divider.
    */
@@ -110,7 +110,7 @@ export function TaskRow({
   const place = [street && task.place, task.unitLabel].filter(Boolean).join(" · ");
   const oneLine = !actions && !cadence;
   const struck = task.checked || task.status === "CANCELED";
-  // Waiting with a reason: the pause ring and the reason in --fg-3, so amber
+  // Waiting with a reason: the pause ring and the reason in --muted-foreground, so amber
   // stays a partner's decision. Under the Waiting heading the reason alone
   // ("National Fuel"), at every width. Anywhere else the column reads
   // "Waiting on National Fuel"; below 480 the second line has no room for it,
@@ -121,7 +121,7 @@ export function TaskRow({
   const waiting = (text: string, label?: string) => (
     // Under the row's link like the rest of the row, so a click on it opens the task; the link's
     // title carries the full reason on hover. Capped at 160px, so a long one never squeezes out the place.
-    <span className="inline-flex min-w-0 max-w-40 items-center gap-1.5 text-meta text-fg-3">
+    <span className="inline-flex min-w-0 max-w-40 items-center gap-1.5 text-meta text-muted-foreground">
       <StatusMark status="WAITING" />
       <span aria-hidden={label ? true : undefined} className="truncate">
         {text}
@@ -173,7 +173,7 @@ export function TaskRow({
       <Link
         href={unread ? `/tasks/${task.id}#new` : `/tasks/${task.id}`}
         title={waitingOn ? `Waiting on ${waitingOn}` : undefined}
-        className={cn("absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-fill-1", pendingRowFill)}
+        className={cn("absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-muted", pendingRowFill)}
       >
         <span className="sr-only">
           {task.title}
@@ -189,7 +189,7 @@ export function TaskRow({
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute -left-3 top-4 size-2 rounded-full bg-act",
+            "pointer-events-none absolute -left-3 top-4 size-2 rounded-full bg-primary",
             !secondLine && (narrow ? "@min-[30rem]:pointer-coarse:top-5" : "pointer-coarse:top-5"),
           )}
         />
@@ -215,7 +215,7 @@ export function TaskRow({
       >
         {/* The title's line. On a one-line row its pieces join the row, and the date goes last. */}
         <div className={cn("flex min-w-0 items-center gap-3", oneLine && "lg:@min-[50rem]:contents")}>
-          <p className={cn("min-w-0 flex-1 truncate text-body", struck ? "text-fg-3 line-through" : "text-fg-1")}>{task.title}</p>
+          <p className={cn("min-w-0 flex-1 truncate text-body", struck ? "text-muted-foreground line-through" : "text-foreground")}>{task.title}</p>
           {/* The status column: the same width on every row of the list, empty for a staff
               To do. 144px, so "Waiting on" keeps a word of its reason, and 176 on a wide
               one-line list. */}
@@ -230,7 +230,7 @@ export function TaskRow({
             <span className={cn("flex items-center gap-2 @min-[30rem]:hidden", reasonOnly ? "min-w-0 shrink" : "shrink-0")}>
               {narrow}
               {(place || cadence) && (
-                <span aria-hidden="true" className="text-meta text-fg-3">
+                <span aria-hidden="true" className="text-meta text-muted-foreground">
                   ·
                 </span>
               )}
@@ -238,7 +238,7 @@ export function TaskRow({
           )}
           {cadence && (
             // Shrinks, its words truncating, so a long rule never pushes the avatar off a narrow row.
-            <span className="flex min-w-0 shrink items-center gap-2 text-meta text-fg-3">
+            <span className="flex min-w-0 shrink items-center gap-2 text-meta text-muted-foreground">
               <span className="truncate">{cadence}</span>
               {place && <span aria-hidden="true">·</span>}
             </span>
@@ -246,7 +246,7 @@ export function TaskRow({
           <span
             className={cn(
               // Grows so the avatar sits at the right edge; shrinks alongside a Waiting reason.
-              "min-w-0 grow truncate text-meta text-fg-3",
+              "min-w-0 grow truncate text-meta text-muted-foreground",
               oneLine && "lg:@min-[50rem]:block lg:@min-[50rem]:w-36 lg:@min-[50rem]:flex-none",
               !place && "hidden",
             )}
@@ -269,7 +269,7 @@ export function TaskRow({
                   {/* Where the list has room for it; phones keep the avatar alone. Before the avatar,
                       so the avatar keeps the corner. */}
                   {first && (
-                    <span aria-hidden="true" className="hidden truncate text-meta text-fg-3 @min-[28rem]:block">
+                    <span aria-hidden="true" className="hidden truncate text-meta text-muted-foreground @min-[28rem]:block">
                       {first}
                     </span>
                   )}

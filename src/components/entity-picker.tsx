@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
  *
  * Two triggers. A **chip** (the default) for list rows, the record rail and
  * create forms: a leading Avatar 20 or lucide icon, then the name, truncated;
- * empty, a dashed circle and a placeholder in --fg-3 (a verb in the rail:
+ * empty, a dashed circle and a placeholder in --muted-foreground (a verb in the rail:
  * "Assign", "Add property"). No chevron. A **field** (`trigger="field"`) for a
  * form where the pick is the main decision: the same at field height, with a
  * chevron. A pick commits and closes; picking the current value closes without
@@ -42,11 +42,11 @@ export type EntityDisplay = {
   text: string;
   /** Below `sm`, where a narrow column needs it: the short form of the name. */
   shortText?: string;
-  /** After `shortText`, in --fg-3 and never cut: "(you)". A field drops it below 360px, where the name needs the room. */
+  /** After `shortText`, in --muted-foreground and never cut: "(you)". A field drops it below 360px, where the name needs the room. */
   shortSuffix?: string;
   /** After the name and a dot, at every width, never cut: the unit in "118 Congress St. · Unit 2". */
   suffix?: string;
-  /** Nothing is picked: the placeholder, in --fg-3. */
+  /** Nothing is picked: the placeholder, in --muted-foreground. */
   empty: boolean;
 };
 
@@ -146,7 +146,7 @@ function entityTrigger({
       className={cn(
         field ? pickerField : pickerChipClass({ size }),
         field ? !display.empty && "pl-2" : cn("pl-1", display.empty && "pl-2"),
-        display.empty && "text-fg-3",
+        display.empty && "text-muted-foreground",
         className,
       )}
     >
@@ -161,7 +161,7 @@ function entityTrigger({
             {display.shortSuffix && (
               <>
                 {" "}
-                <span className={cn("shrink-0 text-fg-3", field && "max-[360px]:hidden")}>{display.shortSuffix}</span>
+                <span className={cn("shrink-0 text-muted-foreground", field && "max-[360px]:hidden")}>{display.shortSuffix}</span>
               </>
             )}
           </span>
@@ -172,7 +172,7 @@ function entityTrigger({
       )}
       {display.suffix && (
         <>
-          <span aria-hidden="true" className="-mx-0.5 shrink-0 text-fg-3">
+          <span aria-hidden="true" className="-mx-0.5 shrink-0 text-muted-foreground">
             ·
           </span>
           <span className="shrink-0">{display.suffix}</span>
@@ -189,7 +189,7 @@ const emptyMark = <CircleDashed aria-hidden="true" />;
 function EmptyMark({ box }: { box: "size-6" | "size-8" }) {
   return (
     <span aria-hidden="true" className={cn("flex items-center justify-center", box)}>
-      <CircleDashed className="size-5 text-fg-3" />
+      <CircleDashed className="size-5 text-muted-foreground" />
     </span>
   );
 }
@@ -338,7 +338,7 @@ export function AssigneePicker({
         ) : contractor ? (
           <Avatar name={contractor.name} size={20} outline />
         ) : (
-          <CircleDashed aria-hidden="true" className={cn(trigger === "field" && "text-fg-3")} />
+          <CircleDashed aria-hidden="true" className={cn(trigger === "field" && "text-muted-foreground")} />
         ),
         text: name ?? placeholder,
         shortText: name ? short : undefined,
@@ -439,7 +439,7 @@ export function PropertyPicker({
       trigger={trigger}
       size={size}
       display={{
-        leading: current ? <House aria-hidden="true" className={cn(trigger === "field" && "text-fg-3")} /> : emptyMark,
+        leading: current ? <House aria-hidden="true" className={cn(trigger === "field" && "text-muted-foreground")} /> : emptyMark,
         text: current?.label ?? empty,
         empty: !current,
       }}
@@ -525,7 +525,7 @@ export function UnitPicker({
       trigger={trigger}
       size={size}
       display={{
-        leading: value ? <DoorOpen aria-hidden="true" className={cn(trigger === "field" && "text-fg-3")} /> : emptyMark,
+        leading: value ? <DoorOpen aria-hidden="true" className={cn(trigger === "field" && "text-muted-foreground")} /> : emptyMark,
         text: value ? unitDisplay(value) : empty,
         empty: !value,
       }}

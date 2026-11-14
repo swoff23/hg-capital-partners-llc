@@ -98,10 +98,10 @@ function PickField({ label, error, optional = false, children }: { label: string
     <div data-invalid={error ? "true" : undefined} className="flex min-w-0 flex-col gap-1.5">
       <span className="text-meta font-medium text-fg-2">
         {label}
-        {optional && <span className="font-normal text-fg-3"> (optional)</span>}
+        {optional && <span className="font-normal text-muted-foreground"> (optional)</span>}
       </span>
       {children}
-      {error && <p className="truncate text-meta text-danger">{error}</p>}
+      {error && <p className="truncate text-meta text-destructive">{error}</p>}
     </div>
   );
 }
@@ -210,7 +210,7 @@ export function NewLeaseForm({
                   properties={properties}
                   required
                   trigger="field"
-                  className={errors.propertyId ? "border-danger" : undefined}
+                  className={errors.propertyId ? "border-destructive" : undefined}
                   onChange={(id) => {
                     clear("propertyId");
                     clear("unitId");
@@ -225,7 +225,7 @@ export function NewLeaseForm({
                     units={units.map((u) => u.label)}
                     required
                     trigger="field"
-                    className={errors.unitId ? "border-danger" : undefined}
+                    className={errors.unitId ? "border-destructive" : undefined}
                     onChange={(unitLabel) => change({ unitLabel }, "unitId")}
                   />
                 </PickField>
@@ -234,15 +234,15 @@ export function NewLeaseForm({
 
             <Section as="h3" title="Tenants">
               <div className="space-y-4">
-                {errors.tenants && <p className="text-meta text-danger">{errors.tenants}</p>}
+                {errors.tenants && <p className="text-meta text-destructive">{errors.tenants}</p>}
                 {values.tenants.map((t, i) => (
-                  <div key={i} className="space-y-3 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                  <div key={i} className="space-y-3 border-b border-border pb-4 last:border-b-0 last:pb-0">
                     {/* With one person the section's title says it all; the numbered heading comes with a second. */}
                     {values.tenants.length > 1 && (
                       <div className="flex min-h-8 items-center justify-between gap-2 pointer-coarse:min-h-11">
                         <p className="text-label text-fg-2">
                           Tenant {i + 1}
-                          {i === 0 && values.tenants.length > 1 && <span className="text-fg-3"> (primary)</span>}
+                          {i === 0 && values.tenants.length > 1 && <span className="text-muted-foreground"> (primary)</span>}
                         </p>
                         <Button
                           type="button"

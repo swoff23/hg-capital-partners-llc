@@ -9,7 +9,7 @@ Reference check: on Mobbin, c50126f3 (Mercury Insights, Recipient | Category | G
 **What's wrong today.**
 - Financials has no time chart. "Monthly income vs expense" is a list of horizontal rows with no month cap, no MTD and no empty months, and the expense series borrows `--chart-ref`, whose job is prior period or budget.
 - Four bar idioms exist (MoneyBars, IncomeExpenseBars, ForecastYearBars, the checklist bar), with different heights, radii and widths, and two figure strips (Strip plus Kpi, and FactStrip).
-- The CapEx charts dim unpicked years and rows to 30% and 40%, which drops real figures to about 2:1. This year's spend shows in `--danger` though it isn't late.
+- The CapEx charts dim unpicked years and rows to 30% and 40%, which drops real figures to about 2:1. This year's spend shows in `--destructive` though it isn't late.
 - Every bar is a CSS background, so charts vanish on paper, and the dark theme leaks into print.
 - No figure has a period control or a comparison. The Overview totals run from history start with no end.
 
@@ -32,24 +32,24 @@ Every size below uses the app's sizes: laptop 1280 (pointer fine), tablet 768 (t
 **Anatomy, top to bottom.**
 1. **Header.** The title ("By month") on the left. On the right, a `SegmentedControl` sm: "NOI | Income | Expense", NOI pressed by default. When the card is narrower than 340px (a container query, so a pinned sidebar counts), the labels shorten to "NOI | In | Out" and title and control still share one row: about 221px of 256 at 320. The pick is local state; it isn't kept in the URL.
 2. **Readout.** Three fixed lines, so the block never changes height while scrubbing:
-   - Line 1, `text-meta` `--fg-3`: the plotted metric and month, "NOI · Sep 2026".
-   - Line 2, `text-figure-m` `--fg-1`: that month's figure through `Money`, whole dollars, true minus.
-   - Line 3, `text-meta` `--fg-3`: the other two metrics, "Income $12,400 · Expense $8,190" ("In $12,400 · Out $8,190" under 340px).
+   - Line 1, `text-meta` `--muted-foreground`: the plotted metric and month, "NOI · Sep 2026".
+   - Line 2, `text-figure-m` `--foreground`: that month's figure through `Money`, whole dollars, true minus.
+   - Line 3, `text-meta` `--muted-foreground`: the other two metrics, "Income $12,400 · Expense $8,190" ("In $12,400 · Out $8,190" under 340px).
 3. **Plot.**
    - 12 equal slots. One column per slot in `--chart-1`, centered, 60% of the slot wide, capped at 24px, square ends.
-   - The zero baseline is 1px `--line-strong`. One gridline at the top tick is 1px `--line`, plus one at the bottom tick when any month is negative.
-   - The top tick is the smallest of 1, 2, 2.5 or 5 times a power of ten at or above the largest value. Its label ("$5k") sits at the left edge in `text-meta` `--fg-3`, in a 16px band above the gridline that columns never enter. A bottom tick reads "−$5k". Compact dollars appear here only (brand section 3).
+   - The zero baseline is 1px `--line-strong`. One gridline at the top tick is 1px `--border`, plus one at the bottom tick when any month is negative.
+   - The top tick is the smallest of 1, 2, 2.5 or 5 times a power of ten at or above the largest value. Its label ("$5k") sits at the left edge in `text-meta` `--muted-foreground`, in a 16px band above the gridline that columns never enter. A bottom tick reads "−$5k". Compact dollars appear here only (brand section 3).
    - A negative month (NOI below zero, a net refund) hangs below the baseline in the same `--chart-1`. Never red, never outlined.
 4. **Month axis.**
-   - Line one: "Sep" in `text-meta` `--fg-3` when the plot is at least 384px wide, initials (J F M) below that. A container query, so a pinned sidebar counts.
+   - Line one: "Sep" in `text-meta` `--muted-foreground` when the plot is at least 384px wide, initials (J F M) below that. A container query, so a pinned sidebar counts.
    - Line two, only from 384px: the year under the first slot and under each January.
    - "MTD" under the running month at every width, right-aligned to the plot edge when the slot is too narrow.
    - The axis is the chart's period statement (brand section 3). The chart keeps its own 12-month window and doesn't follow the period row; `SourceLine` above carries the source.
 5. **Print table.** Month, Income, Expense, NOI for all 12 months. It's `hidden print:table`, so paper carries every figure and screen readers don't hear the values twice.
 
 **The picked month.**
-- Its slot gets a `--fill-1` band behind the column, full plot height, with a 1px inset `--line-control` edge. That edge is the selected segment's edge and the picked CapEx year's ring today (3.89 / 4.03 against `--surface`, 3.42 / 3.65 against the band), so the pick carries a 3:1 mark without a new one (principle 6). Mercury draws its picked period the same way: a pale band with a 1px edge ([Mercury Books](https://mobbin.com/screens/c6cc0102-adb2-4a1d-830c-ddc7f75fac62), [Mercury Insights](https://mobbin.com/screens/10e9460a-1e44-4361-afe6-e0e9d857e6d9)).
-- Its month label turns `--fg-1`, same weight.
+- Its slot gets a `--muted` band behind the column, full plot height, with a 1px inset `--input` edge. That edge is the selected segment's edge and the picked CapEx year's ring today (3.89 / 4.03 against `--background`, 3.42 / 3.65 against the band), so the pick carries a 3:1 mark without a new one (principle 6). Mercury draws its picked period the same way: a pale band with a 1px edge ([Mercury Books](https://mobbin.com/screens/c6cc0102-adb2-4a1d-830c-ddc7f75fac62), [Mercury Insights](https://mobbin.com/screens/10e9460a-1e44-4361-afe6-e0e9d857e6d9)).
+- Its month label turns `--foreground`, same weight.
 - Other months are never dimmed.
 
 **Default month.** The latest complete month inside history, even when it has no lines, so a gap still shows. When history began this month, it's the running month. Otherwise the running month is never the default (Copilot leaves it out until it's complete).
@@ -59,12 +59,12 @@ Every size below uses the app's sizes: laptop 1280 (pointer fine), tablet 768 (t
 | State | Plot | Readout |
 |---|---|---|
 | Loaded | Columns as above | The picked month |
-| Running month | A hollow column: 1px `--chart-1` edge on `--surface`, and "MTD" on the axis | "NOI · Oct 1 to 25" (through the last sync day, Eastern) |
-| A month in history with no lines | No column | Line 2 reads "No QuickBooks lines for Mar" in `text-body` `--fg-3`, inside the figure line's 28px box; line 3 is blank |
+| Running month | A hollow column: 1px `--chart-1` edge on `--background`, and "MTD" on the axis | "NOI · Oct 1 to 25" (through the last sync day, Eastern) |
+| A month in history with no lines | No column | Line 2 reads "No QuickBooks lines for Mar" in `text-body` `--muted-foreground`, inside the figure line's 28px box; line 3 is blank |
 | A slot before history start | No column; the label stays | "QuickBooks history starts Jan 2026" |
 | A slot before purchase (property page) | No column; the label stays | "Bought Aug 2026" |
-| No lines in the whole window | The frame stays: axis labels and baseline. No ticks | No readout and no tab stop. One `text-body` `--fg-3` sentence centered in the plot: "No QuickBooks lines for Nov 2025 to Oct 2026." Under 384px it balances onto two lines (`text-wrap: balance`). Before the first sync: "Lines show up after the first sync." |
-| Loading | Labels and month initials draw at once. 12 equal `--fill-1` columns at 40% of the plot, so no fake trend. Static, no shimmer, `aria-busy` on the card | Labels drawn; the figure is a `--fill-1` block at figure height |
+| No lines in the whole window | The frame stays: axis labels and baseline. No ticks | No readout and no tab stop. One `text-body` `--muted-foreground` sentence centered in the plot: "No QuickBooks lines for Nov 2025 to Oct 2026." Under 384px it balances onto two lines (`text-wrap: balance`). Before the first sync: "Lines show up after the first sync." |
+| Loading | Labels and month initials draw at once. 12 equal `--muted` columns at 40% of the plot, so no fake trend. Static, no shimmer, `aria-busy` on the card | Labels drawn; the figure is a `--muted` block at figure height |
 | Refresh, or a period or basis switch | The old chart stays until the new data lands. `RefreshButton` keeps its spinner rule (after 200ms, at least 400ms) | Figures fade in over 120ms when the new data lands |
 | Stale sync, Reconciliation off | No change | No change; `SourceLine` carries them |
 
@@ -84,7 +84,7 @@ These rules need every month emitted, empty ones included. `queries.ts` builds t
 **Keyboard.**
 - The 12 slots are a React Aria `RadioGroup` (in `react-aria-components` 1.21.1): one tab stop on the picked slot.
 - Left and Right move the pick (RadioGroup's own arrows). Home and End go to the first and last slot; RadioGroup has no Home or End, so MonthBars adds them.
-- Focus is the 2px `--act` ring around the slot.
+- Focus is the 2px `--ring` ring around the slot.
 - Esc returns to the default month. When the default is already picked, Esc does nothing, so it never eats an outer layer's Esc.
 - The metric control is its own group of `aria-pressed` buttons before the plot.
 
@@ -118,7 +118,7 @@ These rules need every month emitted, empty ones included. `queries.ts` builds t
 
 **Later, not built now.**
 - A prior-year reference, once a year of history exists (from Jan 2027): a 1.5px dashed `--chart-ref` tick across the slot at the same month last year, drawn behind the column. Line 3 of the readout then adds "$3,900 in Sep 2025". This is brand section 4's rule as written.
-- Budget against actual, once rehab budgets exist (PORTFOLIO-I06): actual in `--chart-1`, the budget as the dashed tick, and `--danger` only on the part over, with the words "$1,200 over".
+- Budget against actual, once rehab budgets exist (PORTFOLIO-I06): actual in `--chart-1`, the budget as the dashed tick, and `--destructive` only on the part over, with the words "$1,200 over".
 - Closed-books marks on months (FINANCIALS-I09). They need QuickBooks' close date, which the sync doesn't read today.
 - No event annotations, no value on every column, no second axis (the Causal counter-example).
 
@@ -138,11 +138,11 @@ These rules need every month emitted, empty ones included. `queries.ts` builds t
 
 **Job.** Every row of headline figures: the Financials KPI strip, the property Financials figures, the Portfolio strip and the record fact strip. It replaces `Strip`, `Kpi` and `DqStat` in `financials/_components/ui.tsx` and `financials/page.tsx`.
 
-**Anatomy (kept).** Four facts in one row split by `--line` rules, 16px in from each rule. A 2 by 2 grid on phones. Labels in `text-meta` `--fg-3` over the figure. The key figure shares a baseline with the rest through the invisible strut.
+**Anatomy (kept).** Four facts in one row split by `--border` rules, 16px in from each rule. A 2 by 2 grid on phones. Labels in `text-meta` `--muted-foreground` over the figure. The key figure shares a baseline with the rest through the invisible strut.
 
 **Extensions.**
 - `size="l"` sets every figure to `text-figure-l`, for the KPI strip (brand section 3). The default stays `text-figure-m` with an optional `key` fact.
-- `sub` per fact: one `text-meta` `--fg-3` line under the figure. It holds the comparison (2.6) and nothing else. From sm the strip's grid takes a third row when any fact has one, so the subs share a line.
+- `sub` per fact: one `text-meta` `--muted-foreground` line under the figure. It holds the comparison (2.6) and nothing else. From sm the strip's grid takes a third row when any fact has one, so the subs share a line.
 - **One size step for the whole strip**, so figures in a strip always match. A container query on the strip steps every `text-figure-l` to `text-figure-m` when a cell would be under 136px, the room an eight-character figure ("$398,400", "−$12,400") needs at 28px. It replaces today's viewport rule (`max-[360px]`) and also covers a pinned sidebar. A strip whose longest figure runs past eight characters ($1,240,000) uses `text-figure-m` at every width.
 - `empty` per fact: a verb in place of the dash for a fact the user can fill ("Add value"). It's a `textLinkClass` button at `text-body` that opens the editor where the value lives.
 - A changed figure fades in over 120ms (`animate-fade-in` keyed on the value) after Refresh (brand section 7).
@@ -163,7 +163,7 @@ These rules need every month emitted, empty ones included. `queries.ts` builds t
 
 **Job.** A measured share as a horizontal bar: a ranked amount, a year's spend, checklist progress, data completeness.
 
-**Anatomy.** A 4px `--fill-1` track the width of its box (the "meter track" job brand section 4 already gives `--fill-1`), with a `--chart-1` fill from the left. Square ends. Props: `value`, `max`, optional `label`.
+**Anatomy.** A 4px `--muted` track the width of its box (the "meter track" job brand section 4 already gives `--muted`), with a `--chart-1` fill from the left. Square ends. Props: `value`, `max`, optional `label`.
 
 **Behavior.**
 - With `label`, it's `role="progressbar"` with `aria-valuemin`, `aria-valuemax`, `aria-valuenow` and `aria-valuetext` ("2 of 5 done").
@@ -179,12 +179,12 @@ These rules need every month emitted, empty ones included. `queries.ts` builds t
 **Job.** Where operating expense went in the period, ranked. The property page already imports it from Financials, so it moves first (components.md rule).
 
 **Anatomy.**
-- **Header (Overview card).** "Operating expense" on the left and a `SegmentedControl` sm "Category | Account | Payee" on the right, Category by default. Under the title, one `text-meta` `--fg-3` line gives the period and total: "Jan 1 to Oct 25, 2026 · $61,200". Title and control need about 365px with a mouse and 400px on touch, so when the card is narrower than 400px (a container query) the control sits on its own line under the title. That's 1024 with the sidebar pinned (320px), 375 (311) and 320 (256, where the control alone is about 243). At 1280, 768 and 1024 collapsed they share one row.
+- **Header (Overview card).** "Operating expense" on the left and a `SegmentedControl` sm "Category | Account | Payee" on the right, Category by default. Under the title, one `text-meta` `--muted-foreground` line gives the period and total: "Jan 1 to Oct 25, 2026 · $61,200". Title and control need about 365px with a mouse and 400px on touch, so when the card is narrower than 400px (a container query) the control sits on its own line under the title. That's 1024 with the sidebar pinned (320px), 375 (311) and 320 (256, where the control alone is about 243). At 1280, 768 and 1024 collapsed they share one row.
 - **Row**, the same layout at every size (today's phone layout, used everywhere):
-  - Line 1: the label in `text-body` `--fg-1`, truncating only at the card edge. Then the share in `text-meta` `--fg-3` ("31%", "<1%"). Then the amount, right-aligned, through `Money`.
+  - Line 1: the label in `text-body` `--foreground`, truncating only at the card edge. Then the share in `text-meta` `--muted-foreground` ("31%", "<1%"). Then the amount, right-aligned, through `Money`.
   - Line 2: a `Meter` the full row width, scaled to the largest row.
   - Rows are 8px apart, 12 on touch.
-- **Cap.** The top 7 rows show, then "Everything else", which sums the rest with its share and a meter, and "9 more" in `--fg-3` after its label ([Mercury "Remaining recipients"](https://mobbin.com/screens/c50126f3-c02b-4c44-a643-a26c0db602aa)). It's a button with `aria-expanded`. Opening it replaces the row with the remaining rows in place and moves focus to the first of them; a "Show fewer" `textLinkClass` button ends the list and puts the row back.
+- **Cap.** The top 7 rows show, then "Everything else", which sums the rest with its share and a meter, and "9 more" in `--muted-foreground` after its label ([Mercury "Remaining recipients"](https://mobbin.com/screens/c50126f3-c02b-4c44-a643-a26c0db602aa)). It's a button with `aria-expanded`. Opening it replaces the row with the remaining rows in place and moves focus to the first of them; a "Show fewer" `textLinkClass` button ends the list and puts the row back.
 - **Negative total** (refunds over spend): no meter and no share. The amount has a true minus, and the row sorts last. This replaces the outline-bar rule.
 - **Breakdowns.**
   - Category is today's `CATEGORY_LABELS`.
@@ -203,30 +203,30 @@ These rules need every month emitted, empty ones included. `queries.ts` builds t
 ### 2.5 ForecastYearBars and the CapEx breakdown (extended in place: `src/app/(app)/properties/capex-ui.tsx`, `src/app/(app)/portfolio-capex.tsx`, `src/app/(app)/properties/[id]/capex-outlook.tsx`)
 
 **ForecastYearBars row.** It keeps its parts: the year (`.num`, `w-10`), then a `Meter` where the inline spans are today, then the amount through `Money` in `w-20`, then on the property card "3 items" (drops below 400px, as today). At 320 the meter gets about 140px. Each row prints its amount, so the bars need no axis.
-- **Picked year.** Keeps the 1px inset `--line-control` ring (the same mark as MonthBars' picked month), and its year turns `--fg-1`. The other years stay at full strength (no 40%).
+- **Picked year.** Keeps the 1px inset `--input` ring (the same mark as MonthBars' picked month), and its year turns `--foreground`. The other years stay at full strength (no 40%).
 - **Zero years** become plain text rows with the dash glyph, not disabled buttons. They read in order, and they aren't tab stops because there's nothing to pick.
 - **Names.** Each button's accessible name is a sentence: "2026: $13,000 spend, 3 items".
 - **Esc** clears the pick when focus is in the bars (one layer).
-- **Hover** `--fill-1` only under `@media (hover: hover)`, with 44px rows on touch, as today.
+- **Hover** `--muted` only under `@media (hover: hover)`, with 44px rows on touch, as today.
 
 **What a picked year does (no dimming anywhere).**
 - **Property card.** The item table filters to that year's items. The total row reads "2026 total". The line above the table reads "2026 · All 5 years", where "All 5 years" is a `textLinkClass` button that clears the pick. It replaces the lowercase "clear". This follows Copilot and Mercury iOS: a pick swaps the list below it.
 - **Portfolio card.**
   - The matrix shows only properties with spend that year.
-  - The picked year's column header turns `--fg-1`. The pick's mark is the ring on its year bar just above, so the header takes no mark of its own.
+  - The picked year's column header turns `--foreground`. The pick's mark is the ring on its year bar just above, so the header takes no mark of its own.
   - The big total swaps to "$13,000 · 2026 spend · All 5 years".
   - Below sm the matrix shows two columns: Property, plus one money column for the picked year, or the 5-yr total when nothing is picked. The year bars above are the switch, so the matrix never scrolls sideways on a phone.
 
 **Red means late only (a wrong-state fix, made directly).**
-- `--danger` marks only items whose replacement year is before this year: "Past due" in the Due column, and "$4,000 past due" beside the total.
-- Items due this year read their year in `--fg-2`, and the matrix's first-year cells are `--fg-1` like the rest.
+- `--destructive` marks only items whose replacement year is before this year: "Past due" in the Due column, and "$4,000 past due" beside the total.
+- Items due this year read their year in `--fg-2`, and the matrix's first-year cells are `--foreground` like the rest.
 - The breakdown says "Past due", never "now".
 - In `capexForecast`, an item's `overdue` flag is `projected <= fromYear` today, which is what paints this year's items red. It becomes `projected < fromYear`, and `capexForecast` and `portfolioCapexForecast` add an `overdueTotal` beside `dueNowTotal`.
 
 **Breakdown.**
 - The fixed 336px `role="tooltip"` panel goes.
 - Each nonzero value stays a button with today's dotted `--line-strong` underline (ruling 12). With a mouse it opens a `Popover`; on touch it opens a `Sheet` (`useCoarsePointer`, the picker pattern). That fixes SHELL-025 and VISUAL-051.
-- Content: the title ("118 Congress St · 2026"), then one line per asset: type · unit, with the year when the value spans years, and the cost. Portfolio-level values add the property's short address on a second `text-meta` `--fg-3` line. A Total row follows with the grand-total rule (a breakdown's net, brand section 3).
+- Content: the title ("118 Congress St · 2026"), then one line per asset: type · unit, with the year when the value spans years, and the cost. Portfolio-level values add the property's short address on a second `text-meta` `--muted-foreground` line. A Total row follows with the grand-total rule (a breakdown's net, brand section 3).
 - The surface is sized to content, with a max height of 60vh that scrolls inside.
 - Esc closes it and focus returns to the value.
 - It opens on click, not hover, because it holds a list.
@@ -253,7 +253,7 @@ These rules need every month emitted, empty ones included. `queries.ts` builds t
 - **Stale** and **Reconciliation off** stay as warn marks.
 
 **Comparison line (FactStrip `sub`).**
-- Words in `--fg-3`: "Up $310", "Down $1,200", "No change". No arrows and no green or red, since status colors don't decorate.
+- Words in `--muted-foreground`: "Up $310", "Down $1,200", "No change". No arrows and no green or red, since status colors don't decorate.
 - It shows only when the prior span is fully inside history. In 2026 that's Last month against the month before. Year to date and 12 months get it from Jan 2027 (vs the same months a year earlier). Until then the line is left out, not shown as a dash.
 
 **References.** [Stripe control row above the cards](https://mobbin.com/screens/a31f7d76-ade4-4cae-a816-a4c9b33814c3); [Stripe range pills beside the explicit range](https://mobbin.com/screens/a35ca351-394d-47f0-b96f-5e5cb6356bfb); [Dub period presets](https://mobbin.com/screens/fa13abe1-ef50-478f-a64d-2d124bc407f7); [Xero "up 6,528 vs last period"](https://mobbin.com/screens/5f186488-9c1c-4065-ab67-22e4fe9e6a2e); [Rocket Money in words](https://mobbin.com/screens/b97356ea-e602-4545-bdc9-072d6e36e84a).
@@ -264,7 +264,7 @@ A statement grid, the dense form (Mercury P&L): a table is the right home for co
 
 **From sm (1280 and 768).**
 - **Months.** The 12 months ending with the running month, built with `monthRange`, so empty months keep their column. Headers come from `fmtMonth`, and the running month reads "Oct MTD".
-- **First column.** Pinned (`position: sticky; left: 0` on `--surface`) inside `TableFrame`'s sideways scroll. While it's scrolled, a `--line` rule on its right edge clips the months under it.
+- **First column.** Pinned (`position: sticky; left: 0` on `--background`) inside `TableFrame`'s sideways scroll. While it's scrolled, a `--border` rule on its right edge clips the months under it.
 - **Width.** 12 months, Total and the Property column need about 1,300px, so the grid scrolls sideways at 1280 (976 or 1152 of room) and at 768 (720), with the pinned column holding the addresses. While it scrolls, `Th` doesn't stick to the page (the known gap in `docs/components.md`); at 11 properties the grid is about one screen tall.
 - **Cells.** A month before the property's purchase is blank. A month after purchase with no matched rent is the dash glyph. A property bought inside the window gets "Bought Aug 2026" in its subline, so a blank reads as not owned yet. This replaces "N mo". The Voucher and Owner-funded sublines stay.
 - **Unassigned row.** "Rent not tied to a property", with a Map classes TextLink, sits above the footer. The Portfolio total then matches the Overview's rent.
@@ -288,9 +288,9 @@ A statement grid, the dense form (Mercury P&L): a table is the right home for co
 - MonthBars adds its print table.
 
 **Contrast.** It works through the existing tokens with no new values.
-- `--chart-1` is 8.46 / 12.03 on `--surface` and 7.43 / 10.89 on the `--fill-1` band.
-- `--fg-3` axis text is 5.89 / 6.90 on `--surface`.
-- The picked slot's `--line-control` edge is 3.89 / 4.03 on `--surface` and 3.42 / 3.65 on the band. The band itself is decorative at 1.14 / 1.10.
+- `--chart-1` is 8.46 / 12.03 on `--background` and 7.43 / 10.89 on the `--muted` band.
+- `--muted-foreground` axis text is 5.89 / 6.90 on `--background`.
+- The picked slot's `--input` edge is 3.89 / 4.03 on `--background` and 3.42 / 3.65 on the band. The band itself is decorative at 1.14 / 1.10.
 - No status color or gold appears in any mark.
 
 **Screen readers, one approach for every chart.**
@@ -306,12 +306,12 @@ A statement grid, the dense form (Mercury P&L): a table is the right home for co
    - Plots are 160px tall (128 below sm) on the Overview and 120px (96 below sm) on the property page.
    - Columns are 60% of their slot, capped at 24px.
    - Meters and ranked bars are 4px.
-3. **Axis.** The baseline is 1px `--line-strong`, gridlines are 1px `--line`, and tick and month labels are `text-meta` `--fg-3` with compact dollars on ticks only.
-4. **Picked month or year.** A `--fill-1` band with a 1px inset `--line-control` edge, the label in `--fg-1`. It reuses the selected segment's edge, so it adds no 2px mark (brand section 5 keeps 2px for focus, the tab underline and the nav notch). Nothing is ever dimmed to show a pick; CapEx picks filter instead.
+3. **Axis.** The baseline is 1px `--line-strong`, gridlines are 1px `--border`, and tick and month labels are `text-meta` `--muted-foreground` with compact dollars on ticks only.
+4. **Picked month or year.** A `--muted` band with a 1px inset `--input` edge, the label in `--foreground`. It reuses the selected segment's edge, so it adds no 2px mark (brand section 5 keeps 2px for focus, the tab underline and the nav notch). Nothing is ever dimmed to show a pick; CapEx picks filter instead.
 5. **Running month.** A hollow column (1px `--chart-1` edge) and "MTD". Never dashed, because dashes mean prior period or budget, and never faded, because fades read as dimming.
 6. **Square ends** on every chart mark and meter. The radius table covers components, not marks, and the system is rectilinear. `rounded-xs` and `rounded-sm` on bars go, and so does the checklist's `rounded-full`.
-7. **Meter fill is `--chart-1`** on a `--fill-1` track, including checklist progress, which is `--act` today. This widens `--chart-1`'s job from "current period, actuals" to "a measured amount". `--act` stays with controls.
-8. **Comparisons are words** in `--fg-3`, with the basis stated once in `SourceLine`.
+7. **Meter fill is `--chart-1`** on a `--muted` track, including checklist progress, which is `--primary` today. This widens `--chart-1`'s job from "current period, actuals" to "a measured amount". `--primary` stays with controls.
+8. **Comparisons are words** in `--muted-foreground`, with the basis stated once in `SourceLine`.
 9. **Expense stops using `--chart-ref`.** That token keeps its one job, prior period or budget.
 10. **Negatives** hang below the baseline in the series color (columns), or show no bar with a true-minus amount (ranked bars). Never an outline, never red.
 11. **Marks move, lists swap.** When a chart's metric switches, its columns spring to their new heights over `--dur-base` `--ease-spring`. Lists and tables swap at once (`--dur-0`), like tabs. Brand section 7 names no duration for a chart change.
@@ -328,7 +328,7 @@ Key for the previews:
 | `█` | A column in `--chart-1` |
 | `▒` | A second series (expense in options B and C) |
 | `▯` | The hollow running month |
-| `░` | The picked slot: a `--fill-1` band with a 1px `--line-control` edge |
+| `░` | The picked slot: a `--muted` band with a 1px `--input` edge |
 | `┈` | A gridline |
 | `─` | The baseline |
 | `\|[NOI] Income  Expense\|` | A segmented control with NOI pressed |
@@ -413,7 +413,7 @@ Sep 2026
  N  D  J  F  M  A  M  J  J  A  S  O
 ```
 - **For.** It shows the gap between income and expense across the year at a glance, as the review asked.
-- **Against.** Expense needs a second series, and the dashed `--chart-ref` outline can't survive a 7px bar. It would take a solid `--line-control` fill, a new job for that token, and section 4 would have to allow two series. Bars fall to 7px at 320.
+- **Against.** Expense needs a second series, and the dashed `--chart-ref` outline can't survive a 7px bar. It would take a solid `--input` fill, a new job for that token, and section 4 would have to allow two series. Bars fall to 7px at 320.
 
 **C. Mirrored: income above zero, expense below, NOI as a line (needs a section 4 amendment; [Mercury Insights](https://mobbin.com/screens/67a22ab9-8672-4acb-a980-cfda6b7e810d)).**
 
@@ -437,7 +437,7 @@ $12,400 · Sep 2026
 ‹          Sep 2026          ›
 ```
 - **For.** All three figures in one picture, the closest match to the review.
-- **Against.** Two new color rules (two series in one hue, and an `--fg-1` net marker), a taller plot, and a second design for phones. One lumpy month flattens the others, and a net near zero hides behind the baseline.
+- **Against.** Two new color rules (two series in one hue, and a `--foreground` net marker), a taller plot, and a second design for phones. One lumpy month flattens the others, and a net near zero hides behind the baseline.
 
 ### D2. How a month's figures are read
 
@@ -598,7 +598,7 @@ Property                         Value
 | By property table (L232-345) | Same table, following the period. The whole row opens the property: `RowCell` moves from `properties/page.tsx` into `src/components/ui.tsx` on this second use. "Debt int." becomes "Interest". "N mo" becomes "Bought Aug 2026", only when the purchase falls inside the period. The footnote stays. Phones keep Property and NOI (FINANCIALS-040): the row now opens the property, whose page carries its full P&L | Rows are one big target. The period is stated once in SourceLine. Not in this spec: LLC grouping (FINANCIALS-I07) and DSCR (FINANCIALS-008, from `loanPaymentMonthly`), which are table work for the Statement tab pass, and per-row sparklines (FINANCIALS-042; its verifier advised against a mark per row, and each property page carries its own chart) |
 | `SourceLine` and the basis TextLink (L106-123) | Period row plus SourceLine (2.6) | A period choice, Cash and Accrual as a switch, the running month's last day stated |
 | Period comparisons (absent) | The FactStrip `sub` line (2.6) | Last month compares with the month before, in words. Year to date from Jan 2027 |
-| Loading (none) | `src/app/(app)/financials/loading.tsx` (new): labels drawn, `--fill-1` figure blocks, the MonthBars skeleton, static | The page holds its shape while QuickBooks data loads |
+| Loading (none) | `src/app/(app)/financials/loading.tsx` (new): labels drawn, `--muted` figure blocks, the MonthBars skeleton, static | The page holds its shape while QuickBooks data loads |
 
 ### /financials/rent-roll
 
@@ -619,7 +619,7 @@ Property                         Value
 |---|---|---|
 | `FactStrip` (L92-99) | `FactStrip` from `src/components` with Value, Loan balance, Equity and LTV (choice D4) | Leverage at a glance. Purchase and Open tasks stay in the footer only |
 | Table footer (L166-182) | Kept (D4) | Sold properties leave every total, strip and header subtitle included. That's a data fix, latent today; the count reads "10 owned" once one sells |
-| `PortfolioCapexForecastCard` | 2.5: the year pick filters the matrix rows; the picked year's header turns `--fg-1`. Popover or Sheet breakdowns with property names. Red only for past due. Two columns below sm | Every figure stays readable when a year is picked. Breakdowns can be dismissed, fit the screen and name the property. This year's spend stops reading as late. No sideways scroll on phones. The bars print |
+| `PortfolioCapexForecastCard` | 2.5: the year pick filters the matrix rows; the picked year's header turns `--foreground`. Popover or Sheet breakdowns with property names. Red only for past due. Two columns below sm | Every figure stays readable when a year is picked. Breakdowns can be dismissed, fit the screen and name the property. This year's spend stops reading as late. No sideways scroll on phones. The bars print |
 | `ForecastYearBars` | 2.5: Meter, no dimming, sentence names, zero years as text | Full-strength figures, a screen reader hears "2026: $13,000 spend, 3 items", and it prints |
 
 ### /properties/[id] (record)
@@ -637,7 +637,7 @@ Property                         Value
 | Instance | Becomes | What changes for the user |
 |---|---|---|
 | Summary line (`page.tsx` L33, `summary.ts`) | No change | None |
-| Needs you CapEx row (`needs-you.ts` L103-119) | The amount keeps the lead of the subline, where nothing cuts it. Under a 360px list the "across 4 properties" clause drops instead of truncating (brand section 5: secondary clauses drop rather than wrap). When anything is past due, a "$4,000 past due" clause in `--danger` follows the amount (uses `overdueTotal`). The mark stays `--warn`, since a partner decides the spend | The row's key figure is never cut off at 320. Red shows only for late items |
+| Needs you CapEx row (`needs-you.ts` L103-119) | The amount keeps the lead of the subline, where nothing cuts it. Under a 360px list the "across 4 properties" clause drops instead of truncating (brand section 5: secondary clauses drop rather than wrap). When anything is past due, a "$4,000 past due" clause in `--destructive` follows the amount (uses `overdueTotal`). The mark stays `--warn`, since a partner decides the spend | The row's key figure is never cut off at 320. Red shows only for late items |
 
 ### /tasks/[id] and the HG Jobs portal
 

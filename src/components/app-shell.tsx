@@ -17,9 +17,9 @@ import { SideNav } from "@/components/nav";
 import { chromeIconClass } from "@/components/ui";
 import { ToastProvider } from "@/components/toast";
 
-/** The shell's icon buttons: 32px with a mouse, 44px on touch; idle --fg-3, --fg-1 on hover. */
+/** The shell's icon buttons: 32px with a mouse, 44px on touch; idle --muted-foreground, --foreground on hover. */
 const chromeButtonClass =
-  "flex size-8 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-1 hover:text-fg-1 pointer-coarse:size-11";
+  "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground pointer-coarse:size-11";
 
 export function AppShell({
   children,
@@ -148,7 +148,7 @@ export function AppShell({
   }, []);
 
   // The chrome is --canvas: the sidebar, and below lg the 52px top bar. From
-  // lg the header is the desktop one, 56px on --surface like the work area
+  // lg the header is the desktop one, 56px on --background like the work area
   // (docs/brand-guidelines.md, section 9). --app-bar-h in globals.css holds
   // the bar's height at each size, so everything under it reads one value.
   const shell = (
@@ -163,11 +163,11 @@ export function AppShell({
           mainRef.current?.focus();
         }}
         // Centered on the bar once shown: 52px below lg, 56px from lg, 36px tall (44px on touch).
-        className="fixed -top-14 left-4 z-60 inline-flex h-9 items-center rounded-md border border-line-float bg-raised px-3 text-label text-fg-1 focus:top-2 focus:shadow-float pointer-coarse:h-11 pointer-coarse:focus:top-1 lg:focus:top-2.5 lg:pointer-coarse:focus:top-1.5"
+        className="fixed -top-14 left-4 z-60 inline-flex h-9 items-center rounded-md border border-line-float bg-popover px-3 text-label text-foreground focus:top-2 focus:shadow-float pointer-coarse:h-11 pointer-coarse:focus:top-1 lg:focus:top-2.5 lg:pointer-coarse:focus:top-1.5"
       >
         Skip to content
       </a>
-      <header className="fixed inset-x-0 top-0 z-30 flex h-(--app-bar-h) items-center gap-3 border-b border-line bg-canvas px-4 lg:bg-surface lg:px-5">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-(--app-bar-h) items-center gap-3 border-b border-border bg-canvas px-4 lg:bg-background lg:px-5">
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
@@ -183,7 +183,7 @@ export function AppShell({
             From lg the tile sits centered over the rail's icons. */}
         <LeaveLink
           href="/"
-          className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1 pointer-coarse:min-h-11"
+          className="flex shrink-0 items-center gap-2 text-label font-semibold text-foreground pointer-coarse:min-h-11"
         >
           <Monogram size={24} />
           <span className="max-sm:sr-only">{BRAND.app}</span>
@@ -220,7 +220,7 @@ export function AppShell({
           // Below lg the drawer scrolls, so a phone held sideways still reaches
           // every item and the footer. Across it stays clipped, which is how
           // the collapsed rail hides its labels.
-          "fixed bottom-0 left-0 top-(--app-bar-h) z-40 flex flex-col overflow-hidden border-r border-line bg-canvas p-2 max-lg:overflow-y-auto max-lg:overscroll-contain",
+          "fixed bottom-0 left-0 top-(--app-bar-h) z-40 flex flex-col overflow-hidden border-r border-border bg-canvas p-2 max-lg:overflow-y-auto max-lg:overscroll-contain",
           "w-64 transition-transform duration-sheet ease-spring lg:transition-[width]",
           // The phone drawer is the Overlay level; the rail, opened by hover over the page, floats.
           mobileOpen ? "translate-x-0 shadow-overlay" : "-translate-x-full lg:translate-x-0",
@@ -255,7 +255,7 @@ export function AppShell({
 
         <SideNav collapsed={!expanded && !mobileOpen} onNavigate={() => setMobileOpen(false)} />
 
-        <div className="mt-auto border-t border-line pt-2">
+        <div className="mt-auto border-t border-border pt-2">
           <AppearanceRow className="lg:hidden" />
           <AccountMenu variant="sidebar" name={userName} email={userEmail} signOutAction={signOutAction} />
         </div>

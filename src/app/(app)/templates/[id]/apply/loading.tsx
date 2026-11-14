@@ -5,7 +5,7 @@ import { Section } from "@/components/ui";
 /**
  * Apply a playbook while it loads (docs/specs/performance.md 4.3): Playbooks,
  * the Property label and Tasks draw at once; the playbook's name, the
- * property field and the task rows are --fill-1 blocks on ApplyFlow's own
+ * property field and the task rows are --muted blocks on ApplyFlow's own
  * boxes (./apply-flow.tsx).
  */
 export default function ApplyLoading() {
@@ -35,7 +35,7 @@ export default function ApplyLoading() {
             </span>
           }
         >
-          <ul aria-hidden="true" className="divide-y divide-line">
+          <ul aria-hidden="true" className="divide-y divide-border">
             {Array.from({ length: 6 }, (_, i) => (
               <li
                 key={i}

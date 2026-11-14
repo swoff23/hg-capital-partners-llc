@@ -25,7 +25,7 @@ const ROWS: { name: string[]; company: string[]; trades: string[] }[] = [
  * Contractors while the list loads (docs/specs/performance.md 4.3): the title,
  * Sign-up link and Invite contractor, the filter bar and Name, Company, Trades, Phone and Docs
  * draw at once, with the page's own hiding classes; the count and 8 rows are
- * --fill-1 blocks in the page's cells, the name over its subline below sm.
+ * --muted blocks in the page's cells, the name over its subline below sm.
  */
 export default function ContractorsLoading() {
   return (
@@ -46,7 +46,7 @@ export default function ContractorsLoading() {
             <Th className="hidden pr-0 sm:table-cell">Docs</Th>
           </tr>
         </thead>
-        <tbody aria-hidden="true" className="divide-y divide-line">
+        <tbody aria-hidden="true" className="divide-y divide-border">
           {ROWS.map((r, i) => (
             <tr key={i}>
               <Td className="pl-0 max-sm:w-full max-sm:max-w-0">

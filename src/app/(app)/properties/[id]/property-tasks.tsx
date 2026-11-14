@@ -26,7 +26,7 @@ export type PropertyTask = {
  * The property's open tasks, soonest first. Every row shows its status as
  * the mark and its word in one fixed column, and the whole row opens the
  * task (docs/brand-guidelines.md, section 9). Waiting with a reason reads
- * "Waiting on Zack's quote" there in --fg-3, truncated, as in TaskRow. In a
+ * "Waiting on Zack's quote" there in --muted-foreground, truncated, as in TaskRow. In a
  * list under 30rem (the rail, a phone) a row keeps two lines, with the date
  * top right and the avatar bottom right (docs/brand-guidelines.md, section
  * 5, Task rows): the title and its date, then the status word in its tone
@@ -69,9 +69,9 @@ export function PropertyTasksSection({
       }
     >
       {tasks.length === 0 ? (
-        <p className="text-body text-fg-3">No open tasks.</p>
+        <p className="text-body text-muted-foreground">No open tasks.</p>
       ) : (
-        <ul className="@container divide-y divide-line">
+        <ul className="@container divide-y divide-border">
           {tasks.slice(0, SHOWN).map((t) => {
             const date = t.target ? fmtDay(t.target, { year: "auto", now: today }) : null;
             return (
@@ -81,7 +81,7 @@ export function PropertyTasksSection({
               >
                 <Link
                   href={`/tasks/${t.id}`}
-                  className="absolute inset-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-act"
+                  className="absolute inset-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <span className="sr-only">{t.title}</span>
                 </Link>
@@ -90,7 +90,7 @@ export function PropertyTasksSection({
                 <span className="pointer-events-none flex min-w-0 self-start pt-0.5 @min-[30rem]:self-center @min-[30rem]:pt-0">
                   <StatusMark status={t.status} className="@min-[30rem]:hidden" />
                   {t.waitingOn ? (
-                    <span className="hidden min-w-0 items-center gap-1.5 text-meta text-fg-3 @min-[30rem]:inline-flex">
+                    <span className="hidden min-w-0 items-center gap-1.5 text-meta text-muted-foreground @min-[30rem]:inline-flex">
                       <StatusMark status="WAITING" />
                       <span className="truncate">Waiting on {t.waitingOn}</span>
                     </span>
@@ -101,7 +101,7 @@ export function PropertyTasksSection({
 
                 {/* In a narrow list its two lines are cells of the row's grid, so the date and the avatar share the right edge. */}
                 <div className="pointer-events-none contents min-w-0 @min-[30rem]:block">
-                  <p className="col-start-2 row-start-1 truncate text-body text-fg-1 underline-offset-3 group-hover:underline">{t.title}</p>
+                  <p className="col-start-2 row-start-1 truncate text-body text-foreground underline-offset-3 group-hover:underline">{t.title}</p>
                   <p className={cn("col-start-2 row-start-2 truncate text-meta @min-[30rem]:hidden", STATUS_TONE[t.status])}>
                     {STATUS_LABEL[t.status]}
                   </p>
@@ -120,7 +120,7 @@ export function PropertyTasksSection({
                 <span
                   className={cn(
                     "num pointer-events-none col-start-3 row-start-1 whitespace-nowrap text-right text-meta @min-[30rem]:col-start-auto @min-[30rem]:row-start-auto",
-                    t.late ? "text-danger" : date ? "text-fg-2" : "text-fg-3",
+                    t.late ? "text-destructive" : date ? "text-fg-2" : "text-muted-foreground",
                   )}
                 >
                   {date ?? "—"}
@@ -133,7 +133,7 @@ export function PropertyTasksSection({
             <li>
               <Link
                 href={`/tasks?property=${propertyId}`}
-                className="flex min-h-10 items-center text-label text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:min-h-12"
+                className="flex min-h-10 items-center text-label text-fg-2 transition-colors hover:text-foreground pointer-coarse:min-h-12"
               >
                 See all {tasks.length}
               </Link>

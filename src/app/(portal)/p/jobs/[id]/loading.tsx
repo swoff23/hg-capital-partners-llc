@@ -12,14 +12,14 @@ const action = "h-9 min-w-0 flex-1 rounded-md pointer-coarse:h-11 sm:w-32 sm:fle
  * A job while it loads (docs/specs/performance.md 4.3), on the page's own
  * boxes: My jobs, the Call button and Updates draw at once; the photo, the
  * status, the title, the address, its buttons, the notes and the updates are
- * --fill-1 blocks. Notes show only on a job that has them, so that heading is
+ * --muted blocks. Notes show only on a job that has them, so that heading is
  * a block too. Nothing here reads the session or the job.
  */
 export default function JobLoading() {
   const tel = officeTelHref();
   return (
     <LoadingScreen>
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas">
+      <header className="sticky top-0 z-20 border-b border-border bg-canvas">
         <div className="mx-auto flex h-14 max-w-300 items-center justify-between gap-3 px-2 sm:px-4 lg:px-6">
           <BackLink fallback="/p" label="My jobs" className="h-11 rounded-md px-2 text-label text-fg-2" />
           {tel && (

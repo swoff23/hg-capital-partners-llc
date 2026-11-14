@@ -11,23 +11,23 @@ import { Spinner } from "@/components/spinner";
    a re-brand is a token swap and nothing here names a hex or palette color. */
 
 /* ---------------- Card ----------------
-   Flat: --surface on a --line edge, no shadow. Only for Home and Overview
+   Flat: --background on a --border edge, no shadow. Only for Home and Overview
    modules and public fact tiles; a record's sections use Section. */
 export function Card({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("rounded-lg border border-line bg-surface", className)} {...props} />;
+  return <div className={cn("rounded-lg border border-border bg-background", className)} {...props} />;
 }
 export function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("border-b border-line px-4 py-3", className)} {...props} />;
+  return <div className={cn("border-b border-border px-4 py-3", className)} {...props} />;
 }
 export function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
-  return <h3 className={cn("text-section text-fg-1", className)} {...props} />;
+  return <h3 className={cn("text-section text-foreground", className)} {...props} />;
 }
 export function CardBody({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("p-4", className)} {...props} />;
 }
 
 /* ---------------- Section ----------------
-   A heading and its actions over a --line rule, with the content 12px under
+   A heading and its actions over a --border rule, with the content 12px under
    it. No box and no title bar (Stripe's customer page). The heading names
    the <section>, so it's a region screen readers can jump to. The header
    row is 41px with or without a 32px button in it (the button, the 8px under
@@ -54,8 +54,8 @@ export function Section({
   const headingId = React.useId();
   return (
     <section id={id} aria-labelledby={headingId} className={cn(id && "scroll-mt-[calc(var(--app-bar-h)+1rem)]", className)}>
-      <div className="flex min-h-[2.5625rem] items-center justify-between gap-3 border-b border-line pb-2">
-        <Heading id={headingId} className="min-w-0 text-section text-fg-1">
+      <div className="flex min-h-[2.5625rem] items-center justify-between gap-3 border-b border-border pb-2">
+        <Heading id={headingId} className="min-w-0 text-section text-foreground">
           {title}
         </Heading>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -135,11 +135,11 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "destructive
 type ButtonSize = "sm" | "md";
 
 const btnStyles: Record<ButtonVariant, string> = {
-  primary: "bg-act text-on-act not-disabled:hover:bg-act-hover not-disabled:active:bg-act-hover",
-  secondary: "border border-line-strong bg-surface text-fg-1 not-disabled:hover:bg-fill-1",
-  ghost: "text-fg-2 not-disabled:hover:bg-fill-1 not-disabled:hover:text-fg-1",
-  danger: "border border-line-strong bg-surface text-danger not-disabled:hover:bg-danger-tint",
-  destructive: "bg-danger-fill text-on-danger not-disabled:hover:bg-danger-fill-hover",
+  primary: "bg-primary text-primary-foreground not-disabled:hover:bg-primary-hover not-disabled:active:bg-primary-hover",
+  secondary: "border border-line-strong bg-background text-foreground not-disabled:hover:bg-muted",
+  ghost: "text-fg-2 not-disabled:hover:bg-muted not-disabled:hover:text-foreground",
+  danger: "border border-line-strong bg-background text-destructive not-disabled:hover:bg-destructive-tint",
+  destructive: "bg-destructive-fill text-destructive-foreground not-disabled:hover:bg-destructive-fill-hover",
 };
 const btnSizes: Record<ButtonSize, { text: string; icon: string }> = {
   sm: { text: "h-8 px-2.5", icon: "h-8 w-8" },
@@ -223,12 +223,12 @@ export function LinkButton({
 /* ---------------- TextLink ----------------
    A link its position doesn't mark: inside a sentence, or beside a value or
    label it could pass for (a table cell, a field value, a card header slot).
-   Body ink (--fg-1), whatever the sentence's color, with a 1px underline at a
+   Body ink (--foreground), whatever the sentence's color, with a 1px underline at a
    3px offset, 2px on hover, so it never rests on color alone (WCAG 1.4.1).
    Standalone links known by position or an icon (breadcrumbs, Portfolio with
    its arrow, Add with its plus, Edit) don't use it; they underline on hover.
    textLinkClass is for an <a> or a <button>. */
-export const textLinkClass = "text-fg-1 underline decoration-1 underline-offset-3 hover:decoration-2";
+export const textLinkClass = "text-foreground underline decoration-1 underline-offset-3 hover:decoration-2";
 
 export function TextLink({ className, ...props }: React.ComponentProps<typeof Link>) {
   return <Link className={cn(textLinkClass, className)} {...props} />;
@@ -237,13 +237,13 @@ export function TextLink({ className, ...props }: React.ComponentProps<typeof Li
 /**
  * The last row of a counted list or an editor's table ("Add unit", "Add
  * appliance"): it adds one more row, so the count is always the rows above
- * it (docs/brand-guidelines.md, section 9 Counted lists). A Plus in --fg-3,
- * the label in --fg-2 at text-label, over the list's --line rule; 40px, 48 on
+ * it (docs/brand-guidelines.md, section 9 Counted lists). A Plus in --muted-foreground,
+ * the label in --fg-2 at text-label, over the list's --border rule; 40px, 48 on
  * touch. `className` adjusts it, e.g. an inset to line up with a table's text.
  */
 /** The foot row's look, shared with the rail's "7 more fields" (components/rail-fold.tsx). */
 export const addRowClass =
-  "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12";
+  "flex min-h-10 w-full items-center gap-2 border-t border-border py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-foreground disabled:opacity-50 pointer-coarse:min-h-12";
 
 export function AddRow({
   children,
@@ -269,7 +269,7 @@ export function AddRow({
       disabled={disabled}
       className={cn(addRowClass, className)}
     >
-      <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+      <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
       {children}
     </button>
   );
@@ -281,13 +281,13 @@ export function AddRow({
    button it triggers, at the trailing edge after the label ("Send ⌘↵",
    "Cancel Esc"), and the button carries aria-keyshortcuts while the keys are
    aria-hidden. On a secondary button the keys keep the keycap above. On a
-   primary (--act) button, where a light keycap would glare, pass
-   tone="act": no ground and no edge, just the button's own --on-act at 70%
+   primary (--primary) button, where a light keycap would glare, pass
+   tone="act": no ground and no edge, just the button's own --primary-foreground at 70%
    (8.5:1 on the ink and 6.9:1 on its hover in light; 6.3:1 and 5.6:1 in
    dark), set 2px further from the label. */
 export const kbdClass =
-  "inline-flex h-5 min-w-5 items-center justify-center rounded-sm border border-line-strong bg-fill-1 px-1 font-mono text-micro text-fg-3 pointer-coarse:hidden";
-export const kbdActClass = "ml-0.5 inline-flex h-5 items-center font-mono text-micro text-on-act/70 pointer-coarse:hidden";
+  "inline-flex h-5 min-w-5 items-center justify-center rounded-sm border border-line-strong bg-muted px-1 font-mono text-micro text-muted-foreground pointer-coarse:hidden";
+export const kbdActClass = "ml-0.5 inline-flex h-5 items-center font-mono text-micro text-primary-foreground/70 pointer-coarse:hidden";
 
 export function Kbd({ tone, className, ...props }: React.ComponentProps<"kbd"> & { tone?: "act" }) {
   return <kbd className={cn(tone === "act" ? kbdActClass : kbdClass, className)} {...props} />;
@@ -303,13 +303,13 @@ export const tagClass =
 /* ---------------- Badge ----------------
    One tone map for every badge in the app. Color is state: neutral for a
    label, danger for late or failed, warn for a partner's decision, ok for
-   done or money in. Blue and purple are retired. Neutral sits on --fill-2,
+   done or money in. Blue and purple are retired. Neutral sits on --accent,
    so it still shows inside a raised layer (a menu, a dialog) in dark. */
 export type BadgeTone = "neutral" | "danger" | "warn" | "ok";
 
 const badgeTones: Record<BadgeTone, string> = {
-  neutral: "bg-fill-2 text-fg-2",
-  danger: "bg-danger-tint text-danger",
+  neutral: "bg-accent text-fg-2",
+  danger: "bg-destructive-tint text-destructive",
   warn: "bg-warn-tint text-warn",
   ok: "bg-ok-tint text-ok",
 };
@@ -343,11 +343,11 @@ export const chromeIconClass = "size-4 shrink-0 stroke-[1.5] pointer-coarse:size
 export type PickerChipSize = "row" | "sm";
 
 const pickerChipBase = cn(
-  "relative inline-flex max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line-strong bg-surface px-2 font-medium text-fg-1",
+  "relative inline-flex max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line-strong bg-background px-2 font-medium text-foreground",
   // The hover fill shows with a mouse only (hover: is under @media (hover: hover)).
-  "transition-colors hover:bg-fill-1 data-pressed:bg-fill-1",
-  // An empty chip's placeholder ("Due date", "Assign") reads in --fg-3: set data-placeholder on it.
-  "data-placeholder:text-fg-3",
+  "transition-colors hover:bg-muted data-pressed:bg-muted",
+  // An empty chip's placeholder ("Due date", "Assign") reads in --muted-foreground: set data-placeholder on it.
+  "data-placeholder:text-muted-foreground",
   "disabled:opacity-50 data-disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
 );
 
@@ -363,7 +363,7 @@ const pickerChipSizes: Record<PickerChipSize, string> = {
  * A compact bordered chip that opens a picker (due date, assignee, property),
  * so a row of them reads as one set (docs/specs/selectors.md 3.12). `row`
  * for list rows; `sm` for the rail, create forms and filter bars. Give an
- * empty chip `data-placeholder` and its words turn --fg-3.
+ * empty chip `data-placeholder` and its words turn --muted-foreground.
  */
 export function pickerChipClass({ size = "row" }: { size?: PickerChipSize } = {}) {
   return cn(pickerChipBase, pickerChipSizes[size]);
@@ -374,30 +374,30 @@ export const pickerChip = pickerChipClass();
 
 /**
  * A picker's trigger at field height, for a form where pickers share a grid
- * with inputs and selects (New task): the field look, --surface on a
- * --line-control edge, 36px with a mouse and 44 on touch, so the grid is one
+ * with inputs and selects (New task): the field look, --background on a
+ * --input edge, 36px with a mouse and 44 on touch, so the grid is one
  * control height. Its text is text-body, the value's icon or avatar leads it
- * and a chevron (`pickerFieldChevron`) ends it in --fg-3, dropped below 360px
+ * and a chevron (`pickerFieldChevron`) ends it in --muted-foreground, dropped below 360px
  * so a two-column form keeps the value whole ("Connor (me)" at 320). Keyboard
- * focus draws the field's --act edge and inset ring. `pickerChip` is the same
+ * focus draws the field's --ring edge and inset ring. `pickerChip` is the same
  * trigger in a row of chips.
  */
 export const pickerField = cn(
-  "relative flex h-9 w-full min-w-0 items-center gap-2 whitespace-nowrap rounded-md border border-line-control bg-surface px-2.5 text-left text-body text-fg-1 outline-none",
-  "transition-colors hover:bg-fill-1 data-pressed:bg-fill-1",
-  "data-focus-visible:border-act data-focus-visible:ring-1 data-focus-visible:ring-inset data-focus-visible:ring-act",
+  "relative flex h-9 w-full min-w-0 items-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-2.5 text-left text-body text-foreground outline-none",
+  "transition-colors hover:bg-muted data-pressed:bg-muted",
+  "data-focus-visible:border-ring data-focus-visible:ring-1 data-focus-visible:ring-inset data-focus-visible:ring-ring",
   "pointer-coarse:h-11 disabled:opacity-50 data-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
 );
-export const pickerFieldChevron = "text-fg-3 max-[360px]:hidden";
+export const pickerFieldChevron = "text-muted-foreground max-[360px]:hidden";
 
 /* ---------------- Inputs ----------------
-   --surface on a --line-control edge. Focus turns the edge --act and adds a
-   1px inset --act ring in place of the global outline; aria-invalid turns
-   both --danger. */
+   --background on an --input edge. Focus turns the edge --ring and adds a
+   1px inset --ring ring in place of the global outline; aria-invalid turns
+   both --destructive. */
 export const fieldClass = cn(
-  "w-full rounded-md border border-line-control bg-surface px-2.5 text-body text-fg-1 outline-none placeholder:text-fg-3",
-  "focus:border-act focus:ring-1 focus:ring-inset focus:ring-act",
-  "aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:ring-danger",
+  "w-full rounded-md border border-input bg-background px-2.5 text-body text-foreground outline-none placeholder:text-muted-foreground",
+  "focus:border-ring focus:ring-1 focus:ring-inset focus:ring-ring",
+  "aria-invalid:border-destructive aria-invalid:focus:border-destructive aria-invalid:focus:ring-destructive",
   TOUCH_HEIGHT,
 );
 
@@ -412,15 +412,15 @@ const slotRoom = (text: string) => `calc(0.625rem + ${(text.length * 0.6 + 0.2).
 
 export type InputProps = Omit<React.ComponentProps<"input">, "size" | "prefix"> & {
   size?: FieldSize;
-  /** Short text inside the field's left edge in --fg-3: "$". */
+  /** Short text inside the field's left edge in --muted-foreground: "$". */
   prefix?: string;
-  /** Short text inside the field's right edge in --fg-3: "%", "sq ft", "/mo", "yrs". */
+  /** Short text inside the field's right edge in --muted-foreground: "%", "sq ft", "/mo", "yrs". */
   suffix?: string;
 };
 
 /**
  * A text field. `size` sets its height (`md` 36, `sm` 32; 44 on touch).
- * `prefix` and `suffix` put a unit inside the edge in --fg-3 (forms 2.1); the
+ * `prefix` and `suffix` put a unit inside the edge in --muted-foreground (forms 2.1); the
  * text keeps clear of it, the slot is hidden from screen readers and the unit
  * is read through `aria-describedby` instead. With a slot, `className` goes on
  * the wrapper (set widths there); without one, on the input, as before.
@@ -431,7 +431,7 @@ export function Input({ className, size = "md", prefix, suffix, style, ...props 
     return <input className={cn(fieldClass, fieldSizeClass[size], className)} style={style} {...props} />;
   }
   const describedBy = [props["aria-describedby"], unitId].filter(Boolean).join(" ");
-  const slot = "pointer-events-none absolute top-1/2 -translate-y-1/2 text-body text-fg-3";
+  const slot = "pointer-events-none absolute top-1/2 -translate-y-1/2 text-body text-muted-foreground";
   return (
     <span className={cn("relative block", className)}>
       {prefix && (
@@ -464,8 +464,8 @@ export const selectTouchHeight = "pointer-coarse:h-11";
 
 /**
  * A checkbox drawn from the tokens (docs/brand-guidelines.md, section 9): a
- * 16px `rounded-sm` box, `--surface` on a `--line-control` edge; checked, the
- * `--act` fill and edge with an `--on-act` check. A native input underneath
+ * 16px `rounded-sm` box, `--background` on an `--input` edge; checked, the
+ * `--primary` fill and edge with a `--primary-foreground` check. A native input underneath
  * (appearance none), so labels, forms and keyboard work as usual, and the box
  * looks the same in every engine and theme instead of the browser's own gray.
  * `large` is 20px, for a checklist worked through on a job site. `className`
@@ -482,7 +482,7 @@ export function Checkbox({
       <input
         type="checkbox"
         className={cn(
-          "peer col-start-1 row-start-1 m-0 cursor-pointer appearance-none rounded-sm border border-line-control bg-surface transition-colors checked:border-act checked:bg-act disabled:cursor-default",
+          "peer col-start-1 row-start-1 m-0 cursor-pointer appearance-none rounded-sm border border-input bg-background transition-colors checked:border-primary checked:bg-primary disabled:cursor-default",
           large ? "size-5" : "size-4",
         )}
         {...props}
@@ -496,7 +496,7 @@ export function Checkbox({
         strokeLinecap="round"
         strokeLinejoin="round"
         className={cn(
-          "pointer-events-none col-start-1 row-start-1 text-on-act opacity-0 peer-checked:opacity-100",
+          "pointer-events-none col-start-1 row-start-1 text-primary-foreground opacity-0 peer-checked:opacity-100",
           large ? "size-3.5" : "size-3",
         )}
       >
@@ -510,8 +510,8 @@ export function Checkbox({
  * The checkbox's look with no input, for a row that is itself the control
  * (a pick-many option, a filter row): the row carries the state
  * (`aria-selected`, `aria-checked`) and this draws it. 16px `rounded-sm`,
- * `--surface` on a `--line-control` edge; checked, the `--act` fill and edge
- * with an `--on-act` check that springs in at `--dur-check` (selectors 3.10).
+ * `--background` on an `--input` edge; checked, the `--primary` fill and edge
+ * with a `--primary-foreground` check that springs in at `--dur-check` (selectors 3.10).
  * Hidden from screen readers.
  */
 export function CheckboxMark({ checked, className }: { checked: boolean; className?: string }) {
@@ -520,7 +520,7 @@ export function CheckboxMark({ checked, className }: { checked: boolean; classNa
       aria-hidden="true"
       className={cn(
         "inline-grid size-4 shrink-0 place-items-center rounded-sm border transition-colors duration-check",
-        checked ? "border-act bg-act" : "border-line-control bg-surface",
+        checked ? "border-primary bg-primary" : "border-input bg-background",
         className,
       )}
     >
@@ -532,7 +532,7 @@ export function CheckboxMark({ checked, className }: { checked: boolean; classNa
         strokeLinecap="round"
         strokeLinejoin="round"
         className={cn(
-          "size-3 text-on-act transition-[opacity,scale] duration-check ease-spring",
+          "size-3 text-primary-foreground transition-[opacity,scale] duration-check ease-spring",
           checked ? "scale-100 opacity-100" : "scale-50 opacity-0",
         )}
       >
@@ -547,7 +547,7 @@ export function Select({ className, ...props }: React.ComponentProps<"select">) 
 }
 
 /**
- * An inline save error: one text-meta --danger line under a section's form or
+ * An inline save error: one text-meta --destructive line under a section's form or
  * list, or under the field it belongs to (pass its `id` to the field's
  * `aria-describedby`). `role="alert"`, so it's read out when it appears.
  */
@@ -569,14 +569,14 @@ export function SaveError({
 }) {
   if (action) {
     return (
-      <p id={id} role="alert" className={cn("flex items-baseline gap-1.5 text-meta text-danger", className)}>
+      <p id={id} role="alert" className={cn("flex items-baseline gap-1.5 text-meta text-destructive", className)}>
         <span className="min-w-0 truncate">{children}</span>
         <span className="shrink-0">{action}</span>
       </p>
     );
   }
   return (
-    <p id={id} role="alert" className={cn("text-meta text-danger", className)}>
+    <p id={id} role="alert" className={cn("text-meta text-destructive", className)}>
       {children}
     </p>
   );
@@ -597,8 +597,8 @@ export type FormFieldControlProps = {
 /**
  * A form field: the label above (`text-meta` 500 `--fg-2`, 6px over the
  * control), then the control, then one `text-meta` line: the helper in
- * `--fg-3`, or the error in `--danger` in its place. Optional fields say
- * "(optional)" after the label in `--fg-3`; required ones show nothing and
+ * `--muted-foreground`, or the error in `--destructive` in its place. Optional fields say
+ * "(optional)" after the label in `--muted-foreground`; required ones show nothing and
  * set `aria-required`. No asterisks. The render prop hands the control its
  * `id`, `aria-describedby`, `aria-invalid` and `aria-required`; the label
  * points at the `id`, so clicking it focuses the control.
@@ -652,7 +652,7 @@ export function FormField({
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <label htmlFor={id} className={cn("text-meta font-medium text-fg-2", hideLabel && "sr-only")}>
         {label}
-        {optional && <span className="font-normal text-fg-3"> (optional)</span>}
+        {optional && <span className="font-normal text-muted-foreground"> (optional)</span>}
       </label>
       {children({
         id,
@@ -661,7 +661,7 @@ export function FormField({
         ...(required ? { "aria-required": true as const } : {}),
       })}
       {line && (
-        <p id={lineId} className={cn("truncate text-meta", invalid ? "text-danger" : "text-fg-3")}>
+        <p id={lineId} className={cn("truncate text-meta", invalid ? "text-destructive" : "text-muted-foreground")}>
           {line}
         </p>
       )}
@@ -698,7 +698,7 @@ export function Table({ className, ...props }: React.ComponentProps<"table">) {
  * no `relative`, which would replace the sticky.
  */
 export const thClass =
-  "sticky top-[var(--th-top,0px)] z-10 whitespace-nowrap bg-surface px-3 py-2 text-left text-meta font-medium text-fg-3 inset-shadow-rule";
+  "sticky top-[var(--th-top,0px)] z-10 whitespace-nowrap bg-background px-3 py-2 text-left text-meta font-medium text-muted-foreground inset-shadow-rule";
 
 /** `numeric` right-aligns the cell and sets tabular figures, for money and count columns. */
 export function Th({ className, numeric, ...props }: React.ComponentProps<"th"> & { numeric?: boolean }) {
@@ -722,13 +722,13 @@ export function Td({ className, numeric, ...props }: React.ComponentProps<"td"> 
    A table on a finance screen sits flush with the page gutter: its first and
    last cells drop their outer padding, so the h1, the header and column one
    share an edge (`flushTable`). A grand total (portfolio NOI, the rent roll
-   total, a CapEx forecast's total, a breakdown's net) takes a --fg-1 rule
+   total, a CapEx forecast's total, a breakdown's net) takes a --foreground rule
    above, a 3px double rule below and weight 600 (`grandTotalRow`, on the row
    or on each cell); the 1px top edge of a double border draws as a single
    line. A subtotal row, when one comes, is a --line-strong rule above at
    weight 600. */
 export const flushTable = "[&_tr>*:first-child]:pl-0 [&_tr>*:last-child]:pr-0";
-export const grandTotalRow = "border-t border-b-3 border-double border-fg-1 font-semibold";
+export const grandTotalRow = "border-t border-b-3 border-double border-foreground font-semibold";
 
 /* ---------------- Misc ---------------- */
 export function PageHeader({
@@ -744,8 +744,8 @@ export function PageHeader({
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-title text-balance text-fg-1">{title}</h1>
-        {subtitle && <p className="mt-1 text-body text-fg-3">{subtitle}</p>}
+        <h1 className="text-title text-balance text-foreground">{title}</h1>
+        {subtitle && <p className="mt-1 text-body text-muted-foreground">{subtitle}</p>}
       </div>
       {actions}
     </div>
@@ -757,7 +757,7 @@ export function PageHeader({
  * prefetched (`LinkPending` in the link), on the element that carries the
  * row's hover fill (docs/specs/performance.md 4.6).
  */
-export const pendingRowFill = "has-[[data-link-pending]]:bg-fill-1";
+export const pendingRowFill = "has-[[data-link-pending]]:bg-muted";
 
 /**
  * One cell of a table row that is itself a link to a record, so the whole row
@@ -824,12 +824,12 @@ export function RowCell({
   );
 }
 
-/** A label over its value, in a <dl>. An empty value shows the dash glyph in --fg-3. */
+/** A label over its value, in a <dl>. An empty value shows the dash glyph in --muted-foreground. */
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="py-1.5">
       <dt className="text-meta font-medium text-fg-2">{label}</dt>
-      <dd className="mt-0.5 text-body text-fg-1">{children ?? <span className="text-fg-3">—</span>}</dd>
+      <dd className="mt-0.5 text-body text-foreground">{children ?? <span className="text-muted-foreground">—</span>}</dd>
     </div>
   );
 }
@@ -846,7 +846,7 @@ export function EmptyState({
 }) {
   return (
     <div className={cn("flex flex-col items-center gap-3 px-4 py-8 text-center", className)}>
-      <p className="text-pretty text-body text-fg-3">{children}</p>
+      <p className="text-pretty text-body text-muted-foreground">{children}</p>
       {action}
     </div>
   );

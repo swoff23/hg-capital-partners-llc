@@ -41,7 +41,7 @@ export function MoreMenu({ leaseId }: { leaseId: string }) {
       <MenuTrigger>
         <AriaButton
           aria-label="More actions"
-          className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3 data-pressed:bg-fill-1")}
+          className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-muted-foreground data-pressed:bg-muted")}
         >
           <Ellipsis className="size-4" aria-hidden="true" />
         </AriaButton>

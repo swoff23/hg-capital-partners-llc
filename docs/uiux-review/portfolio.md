@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 34 findings: 0 critical, 2 high, 17 medium, 15 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 Portfolio is the one page that answers two questions: what is the book worth, and which buildings need us. Under D10 each property sits in the sidebar, so this page is an overview, not the way in.

@@ -30,8 +30,8 @@ const SIZES = {
 
 /**
  * Pick one view or filter inside a page (CLAUDE.md, One switch per job).
- * A --fill-1 track with 2px around and between the segments; the selected
- * segment is --surface with a --line-control edge, so the pick never rests
+ * A --muted track with 2px around and between the segments; the selected
+ * segment is --background with an --input edge, so the pick never rests
  * on a pale fill alone (docs/brand-guidelines.md, section 9). Both states
  * keep one weight. Each segment is a pill toggle with `aria-pressed`, styled
  * from that attribute. Separate routes use `TopTabs` instead. `value` may be
@@ -92,7 +92,7 @@ export function SegmentedControl<K extends string>({
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
       className={cn(
-        "items-center gap-0.5 rounded-md bg-fill-1 p-0.5",
+        "items-center gap-0.5 rounded-md bg-muted p-0.5",
         fullWidth === "below-sm" ? "flex w-full sm:inline-flex sm:w-auto sm:shrink-0" : fullWidth ? "flex w-full" : "inline-flex shrink-0",
         className,
       )}
@@ -106,8 +106,8 @@ export function SegmentedControl<K extends string>({
           tabIndex={o.key === stop ? 0 : -1}
           onClick={() => onChange(o.key)}
           className={cn(
-            "inline-flex items-center justify-center whitespace-nowrap rounded-sm text-fg-2 transition-colors hover:text-fg-1",
-            "aria-pressed:bg-surface aria-pressed:text-fg-1 aria-pressed:ring-1 aria-pressed:ring-inset aria-pressed:ring-line-control",
+            "inline-flex items-center justify-center whitespace-nowrap rounded-sm text-fg-2 transition-colors hover:text-foreground",
+            "aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:ring-1 aria-pressed:ring-inset aria-pressed:ring-input",
             // 2px above and below, so a 40px segment is a 44px target on touch.
             "pointer-coarse:relative pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-0.5",
             fullWidth === "below-sm" ? "min-w-0 flex-1 sm:flex-none" : fullWidth && "min-w-0 flex-1",
@@ -116,7 +116,7 @@ export function SegmentedControl<K extends string>({
         >
           {o.label}
           {(o.count !== undefined || o.mark) && (
-            <span className="ml-1 inline-flex items-center gap-1 tabular-nums text-fg-3">
+            <span className="ml-1 inline-flex items-center gap-1 tabular-nums text-muted-foreground">
               {o.mark}
               {o.count}
             </span>

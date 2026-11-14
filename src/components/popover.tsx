@@ -44,12 +44,12 @@ const popoverMotion: Record<PopoverMotion, string> = {
 
 /**
  * The floating surface, shared by Popover and Menu: the Float level
- * (docs/brand-guidelines.md, section 5). --raised on a --line edge with the
+ * (docs/brand-guidelines.md, section 5). --popover on a --border edge with the
  * ink float shadow; in dark the edge is --line-strong (--line-float). This
  * string carries the "pop" motion; PopoverSurface's `motion` picks either.
  */
 const popoverFrame = cn(
-  "overflow-auto rounded-lg border border-line-float bg-raised text-fg-1 shadow-float outline-none",
+  "overflow-auto rounded-lg border border-line-float bg-popover text-foreground shadow-float outline-none",
   "data-[placement=bottom]:origin-top data-[placement=top]:origin-bottom",
 );
 export const popoverSurface = cn(popoverFrame, popoverMotion.pop);

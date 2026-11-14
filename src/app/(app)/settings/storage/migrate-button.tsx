@@ -28,9 +28,9 @@ export function MigrateButton() {
       >
         Move documents to private storage
       </Button>
-      {error && <p className="text-meta text-danger">{error}</p>}
+      {error && <p className="text-meta text-destructive">{error}</p>}
       {report && (
-        <p className="text-meta text-fg-3">
+        <p className="text-meta text-muted-foreground">
           Scanned {report.scanned} · already private {report.alreadyPrivate} · moved {report.moved}
           {report.failed.length > 0 && (
             <>

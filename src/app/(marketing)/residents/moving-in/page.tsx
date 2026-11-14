@@ -104,24 +104,24 @@ export default async function MovingInPage() {
     <ToastProvider>
     <main className={cn(publicContainer, "py-10 sm:py-12")}>
       <div className="max-w-2xl">
-        <h1 className={cn(publicType.heading, "text-fg-1")}>Moving in</h1>
+        <h1 className={cn(publicType.heading, "text-foreground")}>Moving in</h1>
 
-        <ul className="mt-8 border-t border-line">
+        <ul className="mt-8 border-t border-border">
           {CHECKLIST.map((c) => (
-            <li key={c.title} className="border-b border-line py-4">
-              <p className={cn(publicType.meta, "text-fg-3")}>{c.timing}</p>
-              <h2 className={cn(publicType.title, "mt-1 text-fg-1")}>{c.title}</h2>
-              <p className={cn(publicType.meta, "mt-1 text-pretty text-fg-3")}>{c.body}</p>
+            <li key={c.title} className="border-b border-border py-4">
+              <p className={cn(publicType.meta, "text-muted-foreground")}>{c.timing}</p>
+              <h2 className={cn(publicType.title, "mt-1 text-foreground")}>{c.title}</h2>
+              <p className={cn(publicType.meta, "mt-1 text-pretty text-muted-foreground")}>{c.body}</p>
             </li>
           ))}
         </ul>
 
         <section aria-labelledby="move-in-report" className="mt-12">
-          <p className={cn(publicType.meta, "text-fg-3")}>Move-in report</p>
-          <h2 id="move-in-report" className={cn(publicType.heading, "mt-1 text-fg-1")}>
+          <p className={cn(publicType.meta, "text-muted-foreground")}>Move-in report</p>
+          <h2 id="move-in-report" className={cn(publicType.heading, "mt-1 text-foreground")}>
             Tell us how everything looks.
           </h2>
-          <p className={cn(publicType.meta, "mt-2 text-pretty text-fg-3")}>
+          <p className={cn(publicType.meta, "mt-2 text-pretty text-muted-foreground")}>
             Complete this within 2 days of move-in. Not completing it means there are no issues with the home.
           </p>
 
@@ -130,7 +130,7 @@ export default async function MovingInPage() {
           </div>
         </section>
 
-        <p className={cn(publicType.meta, "mt-10 text-fg-3")}>
+        <p className={cn(publicType.meta, "mt-10 text-muted-foreground")}>
           Already a resident with a different question?{" "}
           <LeaveLink href="/residents" className={publicTextLinkClass}>
             Back to Residents

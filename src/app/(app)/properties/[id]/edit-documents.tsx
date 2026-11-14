@@ -57,7 +57,7 @@ export function PropertyDocumentsSection({ propertyId, label, files }: { propert
       <div ref={zone} className="relative">
         {uploader.inputs}
         {empty ? (
-          <p className="text-body text-fg-3">Add a lease, a policy or a loan statement.</p>
+          <p className="text-body text-muted-foreground">Add a lease, a policy or a loan statement.</p>
         ) : (
           <FilesList files={files} uploader={uploader} onDelete={deletePropertyDocument} onRename={renamePropertyDocument} />
         )}

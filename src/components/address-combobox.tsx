@@ -57,7 +57,7 @@ export type AddressComboboxProps = {
   excludeId?: string;
   /**
    * The save was refused (forms 2.6): the field turns invalid, and the
-   * duplicate line, when there is one, turns `--danger`. `errorMessage`
+   * duplicate line, when there is one, turns `--destructive`. `errorMessage`
    * replaces the line with another reason.
    */
   isInvalid?: boolean;
@@ -105,7 +105,7 @@ export type AddressComboboxProps = {
  *
  * When the text is already a record (`sameStreetAddress`), the helper line
  * says so: "767 Prospect Ave is already a property. Open it", neutral while
- * typing, `--danger` once a save was refused (`isInvalid`). For a deal, an
+ * typing, `--destructive` once a save was refused (`isInvalid`). For a deal, an
  * existing deal is checked first, then a property HG owns.
  *
  *   <AddressCombobox kind="deal" label="Address" name="address" value={address} onChange={setAddress} />
@@ -285,7 +285,7 @@ export function AddressCombobox({
                     textValue={value}
                     className={cn(
                       "flex min-h-8 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-body outline-none pointer-coarse:min-h-11",
-                      "data-focused:bg-fill-2 pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-fill-2 pointer-coarse:data-pressed:bg-fill-2",
+                      "data-focused:bg-accent pointer-coarse:data-focused:bg-transparent pointer-coarse:data-focus-visible:bg-accent pointer-coarse:data-pressed:bg-accent",
                     )}
                   >
                     <span className="truncate">Use &ldquo;{typed}&rdquo; as typed</span>

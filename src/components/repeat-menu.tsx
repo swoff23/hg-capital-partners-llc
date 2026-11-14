@@ -96,7 +96,7 @@ export function RepeatMenu({
   if (value && !matched) {
     rows.push({ id: STORED, label: describeRepeat(value, { short: true, from }), description: compact ? undefined : next(value) });
   }
-  rows.push({ id: CUSTOM, label: "Custom", trailing: <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-fg-3" /> });
+  rows.push({ id: CUSTOM, label: "Custom", trailing: <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /> });
 
   const selected = !value ? "none" : (matched?.key ?? STORED);
 
@@ -233,14 +233,14 @@ function RepeatCustom({
         </div>
         <SegmentedControl
           aria-label="Unit"
-          // On --fill-2, since --fill-1 all but disappears on a raised layer in dark.
-          className="bg-fill-2"
+          // On --accent, since --muted all but disappears on a raised layer in dark.
+          className="bg-accent"
           options={CUSTOM_UNITS.map((u) => ({ key: u.mode, label: u.label }))}
           value={unit}
           onChange={setUnit}
         />
       </div>
-      {asked && error ? <SaveError>{error}</SaveError> : <p className="min-h-5 text-meta text-fg-3">{next}</p>}
+      {asked && error ? <SaveError>{error}</SaveError> : <p className="min-h-5 text-meta text-muted-foreground">{next}</p>}
     </form>
   );
 
@@ -256,7 +256,7 @@ function RepeatCustom({
     <div className="w-80 max-w-full">
       <StepHeader title="Custom repeat" onBack={onBack} />
       {body}
-      <div className="border-t border-line p-3">{buttons}</div>
+      <div className="border-t border-border p-3">{buttons}</div>
     </div>
   );
 }

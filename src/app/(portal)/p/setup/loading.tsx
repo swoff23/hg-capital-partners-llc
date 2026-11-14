@@ -4,14 +4,14 @@ import { BRAND } from "@/lib/brand";
 
 /**
  * The setup steps while they load: the bar's monogram and the wordmark draw at once, then the meter, the step's heading
- * and four fields as --fill-1 blocks on the page's own boxes. Nothing here reads the session.
+ * and four fields as --muted blocks on the page's own boxes. Nothing here reads the session.
  */
 export default function SetupLoading() {
   return (
     <LoadingScreen>
-      <header className="border-b border-line bg-canvas">
+      <header className="border-b border-border bg-canvas">
         <div className="mx-auto flex h-14 max-w-400 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1">
+          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-foreground">
             <Monogram size={32} />
             {BRAND.portal}
           </span>

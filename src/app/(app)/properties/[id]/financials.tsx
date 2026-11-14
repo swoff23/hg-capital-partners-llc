@@ -37,7 +37,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
   if (!data.mapped) {
     return (
       <Section title="Financials">
-        <p className="text-body text-fg-3">
+        <p className="text-body text-muted-foreground">
           No QuickBooks class is mapped to this property yet.{" "}
           <TextLink href="/financials/settings#class-mapping">Map it in Financials settings</TextLink>
         </p>
@@ -55,7 +55,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
         // As tall as the rail's Edit button (32px, 44 on touch), so this heading lines up with Details beside it.
         <Link
           href="/financials"
-          className="inline-flex min-h-8 items-center gap-1.5 text-label text-fg-1 hover:underline pointer-coarse:min-h-11"
+          className="inline-flex min-h-8 items-center gap-1.5 text-label text-foreground hover:underline pointer-coarse:min-h-11"
         >
           All financials
           <ArrowRight aria-hidden="true" className={chromeIconClass} />
@@ -77,7 +77,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
               ]}
             />
           ) : (
-            <p className="text-body text-fg-3">
+            <p className="text-body text-muted-foreground">
               {data.hasLines ? `No QuickBooks lines for ${periodText}.` : "No QuickBooks activity for this property yet."}
             </p>
           )}
@@ -115,13 +115,13 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
           <div>
             <h3 className="mb-1 text-meta font-medium text-fg-2">Recent transactions</h3>
             <Table className={flushTable}>
-              <tbody className="divide-y divide-line">
+              <tbody className="divide-y divide-border">
                 {data.recentLines.map((l, i) => {
                   // Signed from the treatment: money in reads in --ok, money out takes the minus.
                   const cents = signedLineCents(l.treatment, l.amountCents, l.category);
                   return (
                     <tr key={i}>
-                      <Td className="num w-px whitespace-nowrap align-middle text-meta text-fg-3">
+                      <Td className="num w-px whitespace-nowrap align-middle text-meta text-muted-foreground">
                         {fmtDay(l.txnDate, { year: "auto" })}
                       </Td>
                       {/* max-w-0 lets the name take what's left and truncate there. Touch has
@@ -143,7 +143,7 @@ export async function PropertyFinancialsCard({ propertyId }: { propertyId: strin
           </div>
         )}
 
-        {data.hasLines && <p className="text-meta text-fg-3">Lines classed to this property only, without entity overhead.</p>}
+        {data.hasLines && <p className="text-meta text-muted-foreground">Lines classed to this property only, without entity overhead.</p>}
       </div>
     </Section>
   );

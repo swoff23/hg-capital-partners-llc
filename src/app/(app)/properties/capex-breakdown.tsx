@@ -21,7 +21,7 @@ export type BreakdownLine = {
  * since it holds a list. The title ("118 Congress St · 2026"), one line per
  * asset (type and unit, the year when the value spans years, the cost; a
  * portfolio-level value adds the property under it, and a late item reads
- * "Past due" in --danger whatever the value spans), then the total under the
+ * "Past due" in --destructive whatever the value spans), then the total under the
  * grand-total rule. Sized to its content, at most 320px wide and its list
  * 320px tall, scrolling inside. Esc closes it and focus goes back to the figure.
  * The figure keeps its dotted --line-strong underline (ruling 12), lighter
@@ -49,7 +49,7 @@ export function BreakdownValue({
       <AriaButton
         className={cn(
           "relative -mx-1 rounded-sm px-1 underline decoration-line-strong decoration-dotted underline-offset-3 outline-none",
-          "data-focus-visible:outline-2 data-focus-visible:outline-act",
+          "data-focus-visible:outline-2 data-focus-visible:outline-ring",
           // A 44px hit area on touch without the row growing.
           "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3",
         )}
@@ -73,7 +73,7 @@ export function BreakdownValue({
 function BreakdownList({ lines, showYear, capped = false }: { lines: BreakdownLine[]; showYear: boolean; capped?: boolean }) {
   const sorted = [...lines].sort((a, b) => a.item.dueYear - b.item.dueYear || b.item.cost - a.item.cost);
   return (
-    <div className="text-meta text-fg-1">
+    <div className="text-meta text-foreground">
       {/* The popover caps its list at the shared 320px and scrolls inside it, the total staying in view;
           the touch sheet scrolls as a whole. A scrolling list takes focus so keys can reach the rest. */}
       <ul tabIndex={capped ? 0 : undefined} className={cn("space-y-1.5", capped && "max-h-80 overflow-y-auto")}>
@@ -83,14 +83,14 @@ function BreakdownList({ lines, showYear, capped = false }: { lines: BreakdownLi
               <span className="block">
                 {/* Late items say so wherever they are listed; the year prefix is for a value spanning years. */}
                 {(item.pastDue || showYear) && (
-                  <span className={cn("num mr-1", item.pastDue ? "text-danger" : "text-fg-3")}>
+                  <span className={cn("num mr-1", item.pastDue ? "text-destructive" : "text-muted-foreground")}>
                     {item.pastDue ? "Past due" : item.dueYear}
                   </span>
                 )}
                 <span className="font-medium">{item.type}</span>
-                <span className="text-fg-3"> · {item.unitLabel}</span>
+                <span className="text-muted-foreground"> · {item.unitLabel}</span>
               </span>
-              {place && <span className="block text-fg-3">{place}</span>}
+              {place && <span className="block text-muted-foreground">{place}</span>}
             </span>
             <Money value={item.cost} className="shrink-0" />
           </li>

@@ -4,10 +4,10 @@ import { cn, fmtDateTime, initials } from "./utils";
 
 test("cn: the type, elevation and motion tokens are sizes and shadows, not colors", () => {
   assert.equal(cn("text-fg-2", "text-body"), "text-fg-2 text-body");
-  assert.equal(cn("text-body text-fg-3", "text-meta"), "text-fg-3 text-meta");
+  assert.equal(cn("text-body text-muted-foreground", "text-meta"), "text-muted-foreground text-meta");
   assert.equal(cn("text-body", "text-micro"), "text-micro");
   assert.equal(cn("shadow-sm", "shadow-float"), "shadow-float");
-  assert.equal(cn("shadow-float", "shadow-line"), "shadow-float shadow-line");
+  assert.equal(cn("shadow-float", "shadow-border"), "shadow-float shadow-border");
   assert.equal(cn("inset-shadow-photo-edge", "inset-shadow-none"), "inset-shadow-none");
   assert.equal(cn("ease-out", "ease-spring"), "ease-spring");
   assert.equal(cn("duration-150", "duration-fast"), "duration-fast");

@@ -54,7 +54,7 @@ export type SearchInputProps = {
 
 /**
  * The search field for filter bars and the search row inside pickers
- * (search 2.9): a leading magnifier in --fg-3, the words, and a clear button
+ * (search 2.9): a leading magnifier in --muted-foreground, the words, and a clear button
  * once there's text. `type="search"` with the Search key on a phone keyboard;
  * the browser's own cancel button is hidden. Built on React Aria, so inside an
  * `Autocomplete` it drives the list under it (arrows move, Enter picks).
@@ -115,7 +115,7 @@ export function SearchInput({
         active={pending}
         className={cn(
           chromeIconClass,
-          "pointer-events-none absolute top-1/2 -translate-y-1/2 text-fg-3",
+          "pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground",
           bare ? "left-3" : "left-2.5",
           iconClassName,
         )}
@@ -124,7 +124,7 @@ export function SearchInput({
           aria-hidden="true"
           className={cn(
             chromeIconClass,
-            "pointer-events-none absolute top-1/2 -translate-y-1/2 text-fg-3",
+            "pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground",
             bare ? "left-3" : "left-2.5",
             iconClassName,
           )}
@@ -139,7 +139,7 @@ export function SearchInput({
           // The browser's own clear button goes; ours sits in the same place on every engine.
           "text-ellipsis [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none",
           bare
-            ? "h-9 w-full rounded-md bg-transparent pl-9 text-body text-fg-1 outline-none placeholder:text-fg-3 pointer-coarse:h-11 pointer-coarse:pl-10"
+            ? "h-9 w-full rounded-md bg-transparent pl-9 text-body text-foreground outline-none placeholder:text-muted-foreground pointer-coarse:h-11 pointer-coarse:pl-10"
             : cn(fieldClass, fieldSizeClass[size], "pl-8 pointer-coarse:pl-9"),
           text ? "pr-8 pointer-coarse:pr-11" : bare ? "pr-3" : undefined,
           inputClassName,
@@ -154,7 +154,7 @@ export function SearchInput({
           preventFocusOnPress
           onPress={clear}
           className={cn(
-            "absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1",
+            "absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
             "pointer-coarse:right-0 pointer-coarse:size-11",
           )}
         >

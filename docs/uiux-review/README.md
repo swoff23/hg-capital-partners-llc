@@ -2,6 +2,8 @@
 
 October 2026. A screen-by-screen teardown of the whole app, benchmarked against researched best-in-class SaaS products and backed by Mobbin references. It's input for planning, not a spec: design changes still need Connor's call, and the settled decisions in [the Asana migration plan](../asana-migration-plan.md) stand unless a finding says it challenges one.
 
+Color names in this review predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 The interactive version, with filters and the evidence screenshots, is `uiux-review/index.html` at the repo root. It is gitignored, like the device report, because the screenshots show real tenant, loan and P&L figures. Here, contractor phone numbers and emails are replaced with [phone] and [email].
 
 `overrides.json` holds the status overrides and notes these docs are rebuilt from, so keep it when they change.

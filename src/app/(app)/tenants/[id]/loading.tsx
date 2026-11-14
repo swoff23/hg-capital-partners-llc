@@ -18,7 +18,7 @@ const FIELDS = [
  * A lease while it loads (docs/specs/performance.md 4.3), on LeasePageView's
  * grid (./view.tsx): Tenants, the status, the Details rail with its labels
  * from lg, and the section headings draw at once; the title, the facts and
- * the rows are --fill-1 blocks.
+ * the rows are --muted blocks.
  */
 export default function LeaseLoading() {
   return (
@@ -31,7 +31,7 @@ export default function LeaseLoading() {
       <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title']">
         <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
           <BackLink fallback="/tenants" label="Tenants" />
-          <span aria-hidden="true" className="text-meta text-fg-3">
+          <span aria-hidden="true" className="text-meta text-muted-foreground">
             /
           </span>
           <Block className="ml-1.5 h-4 w-16 rounded-md" />
@@ -59,7 +59,7 @@ export default function LeaseLoading() {
         <Section title="Tenants">
           <ul aria-hidden="true">
             {[0, 1].map((i) => (
-              <li key={i} className="flex min-h-12 flex-col justify-center border-b border-line py-1.5">
+              <li key={i} className="flex min-h-12 flex-col justify-center border-b border-border py-1.5">
                 <Block text="text-body" className={rowWidth(i, ["w-40", "w-32"])} />
                 <Block text="text-meta" className="w-48" />
               </li>
@@ -70,7 +70,7 @@ export default function LeaseLoading() {
         <Section title="Terms">
           <ul aria-hidden="true">
             {[0, 1].map((i) => (
-              <li key={i} className="flex min-h-12 items-center border-b border-line py-2 last:border-0">
+              <li key={i} className="flex min-h-12 items-center border-b border-border py-2 last:border-0">
                 <Block text="text-body" className={rowWidth(i, ["w-72 max-w-full", "w-64 max-w-full"])} />
               </li>
             ))}
@@ -88,8 +88,8 @@ export default function LeaseLoading() {
 /** A rail row as LeaseFacts lays it (./facts.tsx): a 112px label from lg beside the chip, over a hairline. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-line lg:last:border-0 lg:pointer-coarse:min-h-12">
-      <span className="hidden w-28 shrink-0 text-meta text-fg-3 lg:block">{label}</span>
+    <div className="flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-border lg:last:border-0 lg:pointer-coarse:min-h-12">
+      <span className="hidden w-28 shrink-0 text-meta text-muted-foreground lg:block">{label}</span>
       <div className="min-w-0 lg:flex-1">{children}</div>
     </div>
   );

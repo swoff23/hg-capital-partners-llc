@@ -8,7 +8,7 @@ const MAX = 512;
  * The HG monogram (docs/brand-guidelines.md, section 6): the letters in
  * Geist 600 at -0.04em, --gold on an --ink-tile square with a radius of 22%
  * of the size rounded to whole pixels (5 at 24, 7 at 32). On dark grounds the
- * tile keeps its ink and adds a 1px --line edge (--tile-edge, which matches
+ * tile keeps its ink and adds a 1px --border edge (--tile-edge, which matches
  * the tile in light). It is never redrawn as gold letters alone, and never
  * sits on a photo without its tile.
  *

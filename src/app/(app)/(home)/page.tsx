@@ -45,8 +45,8 @@ export default async function HomePage() {
       {items.length > 0 && <NeedsYou items={items} className="mb-8 pointer-coarse:mb-6" />}
 
       {capped && (
-        <p role="status" className="mb-4 flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-body text-fg-1">
-          <MailWarning className={cn(chromeIconClass, "text-fg-3")} aria-hidden="true" />
+        <p role="status" className="mb-4 flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-body text-foreground">
+          <MailWarning className={cn(chromeIconClass, "text-muted-foreground")} aria-hidden="true" />
           {/* One line at every width: phones get the first sentence only. */}
           <span>
             Email limit reached today.<span className="max-sm:hidden"> Some updates are waiting to send.</span>

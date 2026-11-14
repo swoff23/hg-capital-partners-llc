@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 33 findings: 0 critical, 3 high, 19 medium, 11 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 The portal should feel like a well-briefed foreman's clipboard. One page tells Zack where to be, how to get in and what done looks like, and it confirms that every tap landed. It builds on the approved one-scroll job page, the bottom bar and Open | Done, and makes three things first-class: state, signal and proof.

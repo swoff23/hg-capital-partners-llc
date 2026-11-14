@@ -15,7 +15,7 @@ const FIELDS = [
  * A task while it loads (docs/specs/performance.md 4.3), on TaskPageView's grid
  * (./view.tsx): Tasks, the Details rail with its labels from lg, Checklist and
  * Activity draw at once; the status, the title, the field chips, the notes
- * and the activity rows are --fill-1 blocks, and the composer draws its
+ * and the activity rows are --muted blocks, and the composer draws its
  * frame. Below md the page is the screen's height, so the frame sits on the
  * bottom edge as the real composer does.
  */
@@ -31,7 +31,7 @@ export default function TaskLoading() {
       <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title']">
         <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
           <BackLink fallback="/tasks" label="Tasks" />
-          <span aria-hidden="true" className="text-meta text-fg-3">
+          <span aria-hidden="true" className="text-meta text-muted-foreground">
             /
           </span>
           <Block className="ml-1.5 h-6 w-18 rounded-md" />
@@ -86,7 +86,7 @@ export default function TaskLoading() {
         </Section>
 
         {/* The composer's frame: a box from md, a bar on the bottom edge below it. */}
-        <div className="h-32 rounded-lg border border-line bg-surface max-md:-mx-4 max-md:-mb-4 max-md:mt-auto max-md:h-14 max-md:rounded-none max-md:border-x-0 max-md:border-b-0 pointer-coarse:max-md:h-15" />
+        <div className="h-32 rounded-lg border border-border bg-background max-md:-mx-4 max-md:-mb-4 max-md:mt-auto max-md:h-14 max-md:rounded-none max-md:border-x-0 max-md:border-b-0 pointer-coarse:max-md:h-15" />
       </div>
     </LoadingScreen>
   );
@@ -97,11 +97,11 @@ function Row({ label, children, className }: { label: string; children: ReactNod
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-line lg:last:border-0 lg:pointer-coarse:min-h-12",
+        "flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-border lg:last:border-0 lg:pointer-coarse:min-h-12",
         className,
       )}
     >
-      <span className="hidden w-28 shrink-0 text-meta text-fg-3 lg:block">{label}</span>
+      <span className="hidden w-28 shrink-0 text-meta text-muted-foreground lg:block">{label}</span>
       <div className="min-w-0 lg:flex-1">{children}</div>
     </div>
   );

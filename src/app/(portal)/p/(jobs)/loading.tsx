@@ -6,7 +6,7 @@ import { BRAND } from "@/lib/brand";
 /** A switch's track while it loads, shaped by its words, as SegmentedControl's md size draws it. */
 function SwitchFrame({ labels }: { labels: ReactNode[] }) {
   return (
-    <span aria-hidden="true" className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-fill-1 p-0.5">
+    <span aria-hidden="true" className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-muted p-0.5">
       {labels.map((label, i) => (
         <span key={i} className="invisible inline-flex h-8 items-center px-3 text-label max-[360px]:px-2.5 pointer-coarse:h-10">
           {label}
@@ -32,15 +32,15 @@ const GROUPS = [
  * My jobs while it loads (docs/specs/performance.md 4.3): the bar's monogram
  * and the wordmark draw at once; the account button, the greeting (it carries the
  * contractor's name), the two switches and 4 job rows (photo, title, address
- * and date) are --fill-1 blocks on the page's own boxes. Nothing here reads
+ * and date) are --muted blocks on the page's own boxes. Nothing here reads
  * the session or a job.
  */
 export default function MyJobsLoading() {
   return (
     <LoadingScreen>
-      <header className="border-b border-line bg-canvas">
+      <header className="border-b border-border bg-canvas">
         <div className="mx-auto flex h-14 max-w-400 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1">
+          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-foreground">
             <Monogram size={32} />
             {BRAND.portal}
           </span>
@@ -60,10 +60,10 @@ export default function MyJobsLoading() {
           <SwitchFrame labels={GROUPS} />
         </div>
         <section>
-          <div className="flex min-h-[2.5625rem] items-center border-b border-line pb-2">
+          <div className="flex min-h-[2.5625rem] items-center border-b border-border pb-2">
             <Block text="text-section" className="w-24" />
           </div>
-          <ul aria-hidden="true" className="divide-y divide-line">
+          <ul aria-hidden="true" className="divide-y divide-border">
             {Array.from({ length: 4 }, (_, i) => (
               <li key={i} className="flex min-h-18 items-center gap-3 py-2.5">
                 <Block className="h-9 w-12 shrink-0 rounded-lg" />

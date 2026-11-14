@@ -22,9 +22,9 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
 
   return (
     <>
-      <header className="border-b border-line bg-canvas">
+      <header className="border-b border-border bg-canvas">
         <div className="mx-auto flex h-14 max-w-400 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1">
+          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-foreground">
             <Monogram size={32} />
             {BRAND.portal}
           </span>
@@ -33,7 +33,7 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
       </header>
 
       <main className="mx-auto max-w-400 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        <h1 className="mb-4 text-title text-balance text-fg-1">Hi {firstName(principal.label)}</h1>
+        <h1 className="mb-4 text-title text-balance text-foreground">Hi {firstName(principal.label)}</h1>
         <MyJobs jobs={jobs} tab={tab} initialGroup={group} today={todayYmdEastern()} />
       </main>
     </>

@@ -17,7 +17,7 @@ export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
  */
 export default function MarketingLayout({ children }: LayoutProps<"/">) {
   return (
-    <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-fg-1">
+    <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-foreground">
       <PublicHeader />
       <div className="flex flex-1 flex-col">{children}</div>
       <PublicFooter />

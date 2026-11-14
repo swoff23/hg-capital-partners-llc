@@ -36,12 +36,12 @@ const saveField = (id: string, field: Field) => (next: string, expected: string)
   patchContact(id, { [field]: next }, { [field]: expected });
 
 /** A small link beside a value that does what the value used to do when it was the link: call, text, write, open Maps. */
-const actionLink = cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3");
+const actionLink = cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-muted-foreground");
 
 /**
  * The contractor's company, on the line under their name, edited in place
  * like the name: "Add company" when there's none. It reads as that line
- * always has (text-meta, --fg-3); the page wraps it in -my-1, so the 32px
+ * always has (text-meta, --muted-foreground); the page wraps it in -my-1, so the 32px
  * button at rest and the 32px field open both sit in the line's 24px and
  * nothing under them moves.
  */
@@ -55,7 +55,7 @@ export function ContactCompany({ id, fullName, company }: { id: string; fullName
       value={company ?? ""}
       empty="Add company"
       inRail={false}
-      className="text-meta text-fg-3"
+      className="text-meta text-muted-foreground"
       onSave={saveField(id, "company")}
     />
   );
@@ -143,7 +143,7 @@ export function ContactSection({
             message={() => `${first}'s trades saved`}
             onSave={(next, expected) => saveContactTrades(contact.id, next, expected)}
           />
-          {tradesNote?.trim() && <p className="mt-1 text-meta text-fg-3 wrap-anywhere">Also does: {tradesNote.trim()}</p>}
+          {tradesNote?.trim() && <p className="mt-1 text-meta text-muted-foreground wrap-anywhere">Also does: {tradesNote.trim()}</p>}
         </RailFact>
         <Fact
           contact={contact}

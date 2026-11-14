@@ -21,7 +21,7 @@ const BASELANE_URL: string | null = "https://tenant.baselane.com/login";
 export default function ResidentsPage() {
   return (
     <main className={cn(publicContainer, "py-10 sm:py-12")}>
-      <h1 className={cn(publicType.heading, "max-w-2xl text-fg-1")}>
+      <h1 className={cn(publicType.heading, "max-w-2xl text-foreground")}>
         Everything you need as an HG Capital resident.
       </h1>
 
@@ -44,14 +44,14 @@ function Tile({ title, body, href }: { title: string; body?: string; href?: stri
   const card = (
     <Card className="h-full p-4 transition-colors group-hover:border-line-strong">
       <div className="flex items-start justify-between gap-2">
-        <h2 className={cn(publicType.title, "text-fg-1", href && "transition-colors group-hover:text-gold")}>{title}</h2>
+        <h2 className={cn(publicType.title, "text-foreground", href && "transition-colors group-hover:text-gold")}>{title}</h2>
         {!href ? (
           <Badge className="mt-0.5 shrink-0">Soon</Badge>
         ) : (
-          external && <ArrowUpRight aria-hidden="true" className="mt-1 size-4 shrink-0 stroke-[1.5] text-fg-3" />
+          external && <ArrowUpRight aria-hidden="true" className="mt-1 size-4 shrink-0 stroke-[1.5] text-muted-foreground" />
         )}
       </div>
-      {body && <p className={cn(publicType.meta, "mt-1 text-pretty text-fg-3")}>{body}</p>}
+      {body && <p className={cn(publicType.meta, "mt-1 text-pretty text-muted-foreground")}>{body}</p>}
     </Card>
   );
 

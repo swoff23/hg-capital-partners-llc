@@ -134,7 +134,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
           {groups.map((g) => (
             <Section key={g.key} title={<span className="block truncate">{g.label}</span>}>
               {/* The rows sit on hairlines; the heading's rule is the first one. */}
-              <ul className="-mt-3 divide-y divide-line">
+              <ul className="-mt-3 divide-y divide-border">
                 {g.jobs.map((job) => (
                   <li key={job.id}>
                     <JobRow job={job} today={today} byProperty={group === "property"} />
@@ -177,26 +177,26 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
   return (
     <Link
       href={job.newCount > 0 ? `/p/jobs/${job.id}#new` : `/p/jobs/${job.id}`}
-      className={cn("relative flex min-h-18 items-center gap-3 py-2.5 transition-colors hover:bg-fill-1 focus-visible:-outline-offset-2", pendingRowFill)}
+      className={cn("relative flex min-h-18 items-center gap-3 py-2.5 transition-colors hover:bg-muted focus-visible:-outline-offset-2", pendingRowFill)}
     >
       <LinkPending />
       {job.newCount > 0 && (
-        <span aria-hidden="true" className="absolute -left-2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-act" />
+        <span aria-hidden="true" className="absolute -left-2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
       )}
       {/* The row's text names the place, so the photo is decoration here. */}
       <span aria-hidden="true" className="shrink-0">
         <PhotoThumb size={48} src={job.photoUrl} alt={street ? `Front of ${street}` : "No property"} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-body font-medium text-fg-1">
+        <span className="block truncate text-body font-medium text-foreground">
           {job.newCount > 0 && <span className="sr-only">{job.newCount} new, </span>}
           {job.title}
         </span>
-        <span className="mt-0.5 flex min-w-0 items-center gap-1 text-meta text-fg-3">
+        <span className="mt-0.5 flex min-w-0 items-center gap-1 text-meta text-muted-foreground">
           {uploading && (
             <>
               {/* The urgent state leads and keeps its words; the place and the date are what truncate (uploads 3.1). */}
-              <span className={cn("shrink-0", uploading.tone === "danger" && "text-danger")}>{uploading.text}</span>
+              <span className={cn("shrink-0", uploading.tone === "danger" && "text-destructive")}>{uploading.text}</span>
               {(target || where) && (
                 <span aria-hidden="true" className="shrink-0">
                   ·

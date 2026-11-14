@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 /*
  * Loading screens (docs/specs/performance.md 4.2; brand section 7: "Skeletons
  * match the finished layout, draw labels at once and hold values in static
- * --fill-1. No shimmer."). A page's loading.tsx draws its own containers,
+ * --muted. No shimmer."). A page's loading.tsx draws its own containers,
  * grid and responsive classes, its titles, tabs, back links and column
  * headers, and puts these blocks where the data goes, so nothing moves when
  * the content lands. The screen's root carries aria-busy="true"; every block
@@ -28,7 +28,7 @@ export function LoadingScreen({ className, children }: { className?: string; chi
 }
 
 /**
- * A static --fill-1 block standing in for a value. With `text` (a type token,
+ * A static --muted block standing in for a value. With `text` (a type token,
  * "text-body") it takes one line of that token's height, at a mouse and on
  * touch, and draws the bar at the text's size inside it: a name, a date, a
  * figure. Without it `className` sets the size: a photo, an avatar, a chip's
@@ -41,16 +41,16 @@ export function Block({ text, inline = false, className }: { text?: string; inli
       <span aria-hidden="true" className={cn("flex min-w-0 items-center", text)}>
         {/* A zero-width space holds the token's line height. */}
         {"​"}
-        <span className={cn("block h-[1em] max-w-full bg-fill-1", className)} />
+        <span className={cn("block h-[1em] max-w-full bg-muted", className)} />
       </span>
     );
   }
-  return <span aria-hidden="true" className={cn(inline ? "inline-block align-middle" : "block", "bg-fill-1", className)} />;
+  return <span aria-hidden="true" className={cn(inline ? "inline-block align-middle" : "block", "bg-muted", className)} />;
 }
 
 /**
  * A value that wraps as text does (a name, a company, a list of trades), as
- * its words: inline --fill-1 blocks with spaces between, so a table column
+ * its words: inline --muted blocks with spaces between, so a table column
  * that's too narrow wraps them where it would wrap the words, and sizes
  * itself as it will for the text that lands. One line of `text`'s height each.
  */
@@ -60,7 +60,7 @@ export function Words({ text, widths }: { text: string; widths: readonly string[
       {widths.map((w, i) => (
         <Fragment key={i}>
           {i > 0 && " "}
-          <span className={cn("inline-block h-[1em] bg-fill-1 align-middle", w)} />
+          <span className={cn("inline-block h-[1em] bg-muted align-middle", w)} />
         </Fragment>
       ))}
     </span>
@@ -102,13 +102,13 @@ export function rowWidth(i: number, widths: readonly string[] = TITLE_WIDTHS): s
 export function SkeletonRows({ rows, title }: { rows: number; title?: string }) {
   return (
     <div aria-hidden="true" className="p-1 max-md:p-2">
-      {title && <div className="flex h-7 items-center px-2 text-meta font-medium text-fg-3">{title}</div>}
+      {title && <div className="flex h-7 items-center px-2 text-meta font-medium text-muted-foreground">{title}</div>}
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex h-15 items-center gap-3 px-2 @min-[30rem]:h-10 @min-[30rem]:pointer-coarse:h-12">
-          <span className="size-8 shrink-0 rounded-sm bg-fill-1" />
+          <span className="size-8 shrink-0 rounded-sm bg-muted" />
           <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="h-3 w-2/5 rounded-sm bg-fill-1" />
-            <span className="h-2.5 w-1/4 rounded-sm bg-fill-1 @min-[30rem]:hidden" />
+            <span className="h-3 w-2/5 rounded-sm bg-muted" />
+            <span className="h-2.5 w-1/4 rounded-sm bg-muted @min-[30rem]:hidden" />
           </span>
         </div>
       ))}

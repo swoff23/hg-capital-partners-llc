@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 26 findings: 0 critical, 6 high, 11 medium, 9 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 The phone becomes a chosen subset of HG, not a smaller desktop. Stripe Dashboard and Brex keep a few jobs on the phone and leave the rest to the desk. HG's phone jobs are: see what needs me, work Today, look up a property while standing in it, capture photos and punch-list items, and approve contractor work. Configuration (QuickBooks, CapEx rules, the move-in form) stays readable but is changed on a computer, which Jobber says in one plain line (https://mobbin.com/screens/7f8a7d6c-bfcb-4347-abe3-b0a9b26603d1).

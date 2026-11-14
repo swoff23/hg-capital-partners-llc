@@ -58,7 +58,7 @@ export function BackLink({ fallback, label, className }: { fallback: string; lab
       type="button"
       onClick={() => guard(goBack)}
       className={cn(
-        "inline-flex items-center gap-1 text-meta font-medium text-fg-2 hover:text-fg-1 hover:underline pointer-coarse:min-h-11 print:hidden",
+        "inline-flex items-center gap-1 text-meta font-medium text-fg-2 hover:text-foreground hover:underline pointer-coarse:min-h-11 print:hidden",
         className,
       )}
     >

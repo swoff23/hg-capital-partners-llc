@@ -162,15 +162,15 @@ function DateChip({
           aria-label={`${label}${subject ? ` for ${subject}` : ""}: ${current ? fmtDay(current) : "none"}${repeatWords ? `, repeats ${repeatWords.charAt(0).toLowerCase()}${repeatWords.slice(1)}` : ""}`}
           className={cn(
             field ? pickerField : pickerChipClass({ size: variant === "row" ? "row" : "sm" }),
-            !current && "text-fg-3",
-            current && overdue && "text-danger",
+            !current && "text-muted-foreground",
+            current && overdue && "text-destructive",
             className,
           )}
         >
-          <CalendarDays aria-hidden="true" className={cn(field && "text-fg-3")} />
+          <CalendarDays aria-hidden="true" className={cn(field && "text-muted-foreground")} />
           {prefix}
           {field ? <span className="min-w-0 flex-1 truncate">{text}</span> : text}
-          {repeats && <Repeat2 aria-hidden="true" className="text-fg-3 lg:hidden" />}
+          {repeats && <Repeat2 aria-hidden="true" className="text-muted-foreground lg:hidden" />}
           {field && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
         </AriaButton>
       }

@@ -18,7 +18,7 @@ import { ForecastYearBars } from "./properties/capex-ui";
  * year, and a property by year table that totals like a statement. Picking
  * a year filters the table to the properties with spend that year and swaps
  * the figure to "$13,000 · 2026 spend · All 5 years"; its column header
- * turns --fg-1 and nothing dims. Each figure opens what it's made of (a
+ * turns --foreground and nothing dims. Each figure opens what it's made of (a
  * Popover with a mouse, a Sheet on touch). Red means late only: the total
  * names how much is past its replacement age. Below sm the table keeps two
  * columns, Property and the picked year (or the 5-year total with nothing
@@ -66,7 +66,7 @@ export function PortfolioCapexForecastCard({
       <Section
         title="5-year CapEx forecast"
         actions={
-          <span className="num text-meta text-fg-3">
+          <span className="num text-meta text-muted-foreground">
             {f.fromYear} to {lastYear}
           </span>
         }
@@ -77,21 +77,21 @@ export function PortfolioCapexForecastCard({
               <Money
                 key={selIdx}
                 value={selIdx >= 0 ? f.perYear[selIdx] : f.total}
-                className="animate-fade-in text-figure-m text-fg-1"
+                className="animate-fade-in text-figure-m text-foreground"
               />
               {selIdx >= 0 ? (
-                <span className="text-meta text-fg-3">
+                <span className="text-meta text-muted-foreground">
                   · <span className="num">{selYear}</span> spend · {allYears}
                 </span>
               ) : (
                 f.overdueTotal > 0 && (
-                  <span className="text-meta text-danger">
+                  <span className="text-meta text-destructive">
                     <Money value={f.overdueTotal} /> past due
                   </span>
                 )
               )}
             </div>
-            {undatedNote && <p className="mt-1 text-meta text-fg-3">{undatedNote}</p>}
+            {undatedNote && <p className="mt-1 text-meta text-muted-foreground">{undatedNote}</p>}
           </div>
 
           <ForecastYearBars
@@ -107,7 +107,7 @@ export function PortfolioCapexForecastCard({
                 <tr>
                   <Th className="pl-0">Property</Th>
                   {f.years.map((y, i) => (
-                    <Th key={y} numeric className={cn(yearCol(i), y === selYear && "text-fg-1")}>
+                    <Th key={y} numeric className={cn(yearCol(i), y === selYear && "text-foreground")}>
                       {y}
                     </Th>
                   ))}
@@ -116,7 +116,7 @@ export function PortfolioCapexForecastCard({
                   </Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className="divide-y divide-border">
                 {rows.map((r) => {
                   const name = shortAddress(r.address) || r.address;
                   return (
@@ -128,7 +128,7 @@ export function PortfolioCapexForecastCard({
                         const year = f.years[i];
                         const items = r.items.filter((it) => it.dueYear === year);
                         return (
-                          <Td key={i} numeric className={cn(yearCol(i), v === 0 ? "text-fg-3" : "text-fg-1")}>
+                          <Td key={i} numeric className={cn(yearCol(i), v === 0 ? "text-muted-foreground" : "text-foreground")}>
                             <BreakdownValue title={`${name} · ${year}`} lines={linesOf(items)} showYear={false}>
                               {v ? <Money value={v} /> : "—"}
                             </BreakdownValue>
@@ -158,8 +158,8 @@ export function PortfolioCapexForecastCard({
                     return (
                       <Td key={i} numeric className={yearCol(i)}>
                         <BreakdownValue title={`Portfolio · ${year}`} lines={lines} showYear={false}>
-                          {/* An empty year is the dash in fg-3, not the total row's fg-1 at 600 (section 3). */}
-                          {v ? <Money value={v} /> : <span className="font-normal text-fg-3">—</span>}
+                          {/* An empty year is the dash in muted-foreground, not the total row's foreground at 600 (section 3). */}
+                          {v ? <Money value={v} /> : <span className="font-normal text-muted-foreground">—</span>}
                         </BreakdownValue>
                       </Td>
                     );
@@ -177,7 +177,7 @@ export function PortfolioCapexForecastCard({
               </tfoot>
             </Table>
           ) : (
-            <p className="text-body text-fg-3">
+            <p className="text-body text-muted-foreground">
               No projected CapEx in the next 5 years. Add install years to unit equipment and building systems to
               build the forecast.
             </p>

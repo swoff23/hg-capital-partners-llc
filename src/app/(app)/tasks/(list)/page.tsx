@@ -124,7 +124,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
         )}
         {total > take && (
           <div className="mt-4 flex items-center gap-3">
-            <p className="text-meta tabular-nums text-fg-3">
+            <p className="text-meta tabular-nums text-muted-foreground">
               {take < TASK_PAGE_MAX
                 ? `Showing ${take} of ${total.toLocaleString("en-US")}`
                 : `Showing first ${TASK_PAGE_MAX} of ${total.toLocaleString("en-US")}. Narrow the filters to see the rest.`}

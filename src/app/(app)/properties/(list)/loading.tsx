@@ -19,7 +19,7 @@ const COLUMNS = [
  * Portfolio while it loads (docs/specs/performance.md 4.3): the title, New
  * property, the strip's labels, the filter bar and the column headers draw
  * at once, with the page's own hiding classes; the counts, the figures and 8
- * rows (photo tile, address, figures) are --fill-1 blocks in RowCell's boxes.
+ * rows (photo tile, address, figures) are --muted blocks in RowCell's boxes.
  */
 export default function PortfolioLoading() {
   return (
@@ -52,7 +52,7 @@ export default function PortfolioLoading() {
             ))}
           </tr>
         </thead>
-        <tbody aria-hidden="true" className="divide-y divide-line">
+        <tbody aria-hidden="true" className="divide-y divide-border">
           {Array.from({ length: 8 }, (_, i) => (
             <tr key={i}>
               <Cell className="pl-0" cell="w-full max-w-0">

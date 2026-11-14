@@ -203,7 +203,7 @@ export function TaskFields({
           <DatePicker
             label="Visit date"
             placeholder="Pick a date"
-            prefix={<span className="text-fg-3 lg:hidden">Visit</span>}
+            prefix={<span className="text-muted-foreground lg:hidden">Visit</span>}
             value={v.scheduledFor}
             today={today}
             // A scheduled job needs a visit date: "No date" is never offered.
@@ -252,7 +252,7 @@ export function TaskFields({
       {v.repeatRule && (
         <Row label="Repeats">
           {/* Read-only: set it inside the due date. relative: the chip row below lg scrolls, and nothing may widen the page. */}
-          <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-fg-3 lg:px-0 [&_svg]:size-3.5 [&_svg]:shrink-0">
+          <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-muted-foreground lg:px-0 [&_svg]:size-3.5 [&_svg]:shrink-0">
             <Repeat aria-hidden="true" />
             {describeRepeat(v.repeatRule, { short: true, from })}
           </span>
@@ -279,7 +279,7 @@ export function TaskFields({
             </span>
           ) : (
             // relative: the sr-only text is absolute, and must stay inside the phone chip row's scroller, not widen the page.
-            <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-fg-3 lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-0.5">
+            <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-muted-foreground lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-0.5">
               <KeyRound aria-hidden="true" />
               <span aria-hidden="true">Pick a unit for the code</span>
               <span className="sr-only">Pick a unit so {lockbox.contractor} sees the lockbox code</span>
@@ -288,22 +288,22 @@ export function TaskFields({
         </Row>
       )}
       <Row label="Created" className="hidden lg:flex">
-        <span className="block truncate text-meta text-fg-3">{created}</span>
+        <span className="block truncate text-meta text-muted-foreground">{created}</span>
       </Row>
     </div>
   );
 }
 
-/** One field: in the rail, a 112px label in --fg-3 and the chip, over a hairline; 40px rows, 48 on touch. */
+/** One field: in the rail, a 112px label in --muted-foreground and the chip, over a hairline; 40px rows, 48 on touch. */
 function Row({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-line lg:last:border-0 lg:pointer-coarse:min-h-12",
+        "flex shrink-0 items-center lg:min-h-10 lg:gap-3 lg:border-b lg:border-border lg:last:border-0 lg:pointer-coarse:min-h-12",
         className,
       )}
     >
-      <span className="hidden w-28 shrink-0 text-meta text-fg-3 lg:block">{label}</span>
+      <span className="hidden w-28 shrink-0 text-meta text-muted-foreground lg:block">{label}</span>
       <div className="min-w-0 lg:flex-1">{children}</div>
     </div>
   );

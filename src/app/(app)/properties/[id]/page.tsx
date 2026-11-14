@@ -167,7 +167,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               <PropertyMoreMenu id={property.id} archived={!!property.archivedAt} canAddListing={!property.archivedAt && listings.length === 0 && unitLabels.length > 0} />
             </div>
           </div>
-          {subline && <p className="text-meta text-fg-3">{subline}</p>}
+          {subline && <p className="text-meta text-muted-foreground">{subline}</p>}
         </div>
       </header>
 
@@ -273,7 +273,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
 
           <PropertyNotesSection id={property.id} notes={property.notes} />
           {sourceDeal && (
-            <p className="text-meta text-fg-3">
+            <p className="text-meta text-muted-foreground">
               From deal <TextLink href={`/deals/${sourceDeal.id}`}>{sourceDeal.address}</TextLink>
             </p>
           )}

@@ -117,13 +117,13 @@ export function SearchTrigger({ onOpen }: { onOpen: (opener: HTMLElement) => voi
           fieldClass,
           fieldSizeClass.md,
           // A field has no hover. Its focus ring is for the keyboard: a click returns focus here after the panel closes.
-          "relative flex items-center gap-2 pl-8 pr-2 text-left text-body text-fg-3 pointer-coarse:pl-9",
-          "focus:border-line-control focus:ring-0 focus-visible:border-act focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-act",
+          "relative flex items-center gap-2 pl-8 pr-2 text-left text-body text-muted-foreground pointer-coarse:pl-9",
+          "focus:border-input focus:ring-0 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
         )}
       >
         <Search
           aria-hidden="true"
-          className={cn(chromeIconClass, "pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3")}
+          className={cn(chromeIconClass, "pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground")}
         />
         <span className="min-w-0 flex-1 truncate">Search</span>
         <Kbd aria-hidden="true">{shortcutLabel(mod, "K")}</Kbd>
@@ -405,7 +405,7 @@ export function SearchPanel({ close }: { close: () => void }) {
       <Autocomplete disableAutoFocusFirst={coarse}>
         <div
           className={cn(
-            "flex shrink-0 items-center border-b border-line",
+            "flex shrink-0 items-center border-b border-border",
             phone ? "h-14 gap-2 px-4" : "h-12 pointer-coarse:h-14",
           )}
         >
@@ -489,13 +489,13 @@ function ScopeBand({ type, total, onBack }: { type: SearchType; total: number | 
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-1 text-meta font-medium text-fg-2 hover:text-fg-1 hover:underline pointer-coarse:min-h-11"
+        className="inline-flex items-center gap-1 text-meta font-medium text-fg-2 hover:text-foreground hover:underline pointer-coarse:min-h-11"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5 shrink-0" />
         All results
       </button>
       {/* With none, the notice under the band says so. */}
-      {total !== null && total > 0 && <span className="text-meta tabular-nums text-fg-3">{bandLabel(type, total)}</span>}
+      {total !== null && total > 0 && <span className="text-meta tabular-nums text-muted-foreground">{bandLabel(type, total)}</span>}
     </div>
   );
 }
@@ -509,7 +509,7 @@ function Footer({ mod }: { mod: string }) {
     ["Esc", "Close"],
   ];
   return (
-    <div className="hidden h-9 shrink-0 items-center gap-4 border-t border-line px-3 text-meta text-fg-3 md:flex pointer-coarse:hidden">
+    <div className="hidden h-9 shrink-0 items-center gap-4 border-t border-border px-3 text-meta text-muted-foreground md:flex pointer-coarse:hidden">
       {hints.map(([keys, label]) => (
         <span key={label} className="inline-flex items-center gap-1.5">
           <Kbd>{keys}</Kbd>
@@ -522,7 +522,7 @@ function Footer({ mod }: { mod: string }) {
 
 /* ---------------- The list ---------------- */
 
-const noticeClass = "px-3 py-3 text-body text-fg-3 max-md:px-4";
+const noticeClass = "px-3 py-3 text-body text-muted-foreground max-md:px-4";
 
 function PanelBody({
   view,
@@ -589,7 +589,7 @@ function PanelBody({
   );
 }
 
-const headerClass = "sticky top-0 z-10 flex h-7 items-center bg-raised px-2 text-meta font-medium text-fg-3";
+const headerClass = "sticky top-0 z-10 flex h-7 items-center bg-popover px-2 text-meta font-medium text-muted-foreground";
 
 function PanelSection({
   group,
@@ -674,7 +674,7 @@ function Entry({
         <SearchRow
           id={entry.key}
           href={entry.href}
-          parts={plainParts(addDealLabel(entry.address), { leading: <Plus aria-hidden="true" className={cn(chromeIconClass, "text-fg-3")} /> })}
+          parts={plainParts(addDealLabel(entry.address), { leading: <Plus aria-hidden="true" className={cn(chromeIconClass, "text-muted-foreground")} /> })}
           highlight={highlight}
         />
       );
@@ -689,7 +689,7 @@ type RowParts = {
   /** In the 32px leading slot. */
   leading?: ReactNode;
   title: ReactNode;
-  /** A Canceled task: struck through, in --fg-3. */
+  /** A Canceled task: struck through, in --muted-foreground. */
   struck?: boolean;
   /** One line (480px and wider): after the title. */
   meta?: ReactNode;
@@ -730,7 +730,7 @@ export function SearchRow({
   highlight?: string;
 }) {
   const twoLines = parts.sub !== undefined;
-  const titleClass = cn("truncate text-body", parts.struck ? "text-fg-3 line-through" : "text-fg-1");
+  const titleClass = cn("truncate text-body", parts.struck ? "text-muted-foreground line-through" : "text-foreground");
   return (
     <ListBoxItem
       id={id}
@@ -741,7 +741,7 @@ export function SearchRow({
         "flex cursor-default items-center gap-3 rounded-sm px-2 outline-none",
         twoLines ? "h-15" : "h-12",
         "@min-[30rem]:h-10 @min-[30rem]:pointer-coarse:h-12",
-        "data-focused:bg-fill-2 data-pressed:bg-fill-2",
+        "data-focused:bg-accent data-pressed:bg-accent",
         // On touch only a keyboard highlight (an iPad's arrow keys) or a press draws, so opening the panel doesn't paint a row.
         "pointer-coarse:data-focused:not-data-focus-visible:not-data-pressed:bg-transparent",
       )}
@@ -756,7 +756,7 @@ export function SearchRow({
           {parts.topRight}
         </span>
         {twoLines && (
-          <span className="flex min-w-0 items-center gap-2 text-meta text-fg-3">
+          <span className="flex min-w-0 items-center gap-2 text-meta text-muted-foreground">
             <span className="min-w-0 flex-1 truncate">{parts.sub}</span>
             {parts.bottomRight}
           </span>
@@ -766,7 +766,7 @@ export function SearchRow({
       {/* From 480px: one line, the status and edge columns fixed so they line up row to row. */}
       <span className="hidden min-w-0 flex-1 items-baseline gap-2 @min-[30rem]:flex">
         <span className={cn(titleClass, "min-w-0 shrink-[4]")}>{parts.title}</span>
-        {parts.meta && <span className="min-w-0 truncate text-meta text-fg-3">{parts.meta}</span>}
+        {parts.meta && <span className="min-w-0 truncate text-meta text-muted-foreground">{parts.meta}</span>}
       </span>
       <span className="hidden w-25 shrink-0 truncate text-meta @min-[30rem]:block @min-[30rem]:pointer-coarse:w-26">
         {parts.status}
@@ -839,7 +839,7 @@ function rowParts(row: SearchRowData, q: string, today: Ymd): RowParts {
     }
     case "task": {
       const day = row.due ? dayLabel(row.due, today) : null;
-      const dayTone = row.overdue ? "text-danger" : "text-fg-2";
+      const dayTone = row.overdue ? "text-destructive" : "text-fg-2";
       const when = day ? <span className={cn("shrink-0", dayTone)}>{day}</span> : null;
       const who = row.assignee ? <Avatar name={row.assignee.name} size={20} outline={row.assignee.contractor} /> : null;
       return {
@@ -924,7 +924,7 @@ function commandParts(c: Command): RowParts {
   const Icon = COMMAND_ICON[c.icon];
   const beside = c.parent ?? c.place;
   return {
-    leading: <Icon aria-hidden="true" className={cn(chromeIconClass, "text-fg-3")} />,
+    leading: <Icon aria-hidden="true" className={cn(chromeIconClass, "text-muted-foreground")} />,
     title: c.label,
     meta: beside,
     sub: beside,

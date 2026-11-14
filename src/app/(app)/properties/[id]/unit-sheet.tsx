@@ -169,7 +169,7 @@ export function UnitSheet({
         <div className="grid gap-x-4 gap-y-5 md:grid-cols-3">
           {UTILITY_GROUPS.map((g) => (
             <div key={g.name} className="space-y-4">
-              <p className="text-meta font-medium text-fg-1">{g.name}</p>
+              <p className="text-meta font-medium text-foreground">{g.name}</p>
               {g.fields.map(([k, fieldLabel]) =>
                 UTILITY_STATUS_FIELDS.has(k) ? (
                   <Select
@@ -204,7 +204,7 @@ export function UnitSheet({
         {equipment.length > 0 && (
           <div className="space-y-3 md:space-y-2">
             {/* The table's header, from md; below it each item is its own card with labels. */}
-            <div className={cn(EQUIPMENT_COLS, "max-md:hidden text-meta font-medium text-fg-3")}>
+            <div className={cn(EQUIPMENT_COLS, "max-md:hidden text-meta font-medium text-muted-foreground")}>
               <span>Type</span>
               <span>Model #</span>
               <span>Comments</span>
@@ -273,12 +273,12 @@ function EquipmentRow({
   return (
     <div
       className={cn(
-        "relative space-y-3 rounded-lg border border-line p-3 md:space-y-0 md:rounded-none md:border-0 md:p-0",
+        "relative space-y-3 rounded-lg border border-border p-3 md:space-y-0 md:rounded-none md:border-0 md:p-0",
         EQUIPMENT_COLS,
       )}
     >
       {/* Below md the card names itself, with the X beside it; from md the table's header does. */}
-      <p className="min-h-6 pr-9 text-meta font-medium text-fg-1 md:hidden">{e.type || `Equipment ${j + 1}`}</p>
+      <p className="min-h-6 pr-9 text-meta font-medium text-foreground md:hidden">{e.type || `Equipment ${j + 1}`}</p>
       <Select
         label="Type"
         size="md"

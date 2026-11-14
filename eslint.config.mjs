@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import { findOldNames } from "./scripts/token-renames.mjs";
 
 // No em dashes in copy (docs/copy-rules.md, rule 4). Comments are fine, and so
 // is a lone "—" standing in for an empty value, which is a glyph, not a sentence.
@@ -72,37 +73,50 @@ const SENTRY_PATTERNS = [
 ];
 
 // Brand values come from the tokens in src/app/globals.css, so a re-brand is a
-// token swap (docs/brand-guidelines.md, section 11). A value the tokens can't
+// token swap (docs/brand-guidelines.md, section 4). A value the tokens can't
 // carry (a fixed size the guidelines name) takes an eslint-disable-next-line
 // comment saying why.
+const PALETTES =
+  "amber|blue|cyan|emerald|fuchsia|gray|green|indigo|lime|mauve|mist|neutral|olive|orange|pink|purple|red|rose|sky|slate|stone|taupe|teal|violet|yellow|zinc";
 const DESIGN_VALUE_RULES = [
   {
     pattern: /-\[#/,
-    message: "Hex color in an arbitrary value. Use a color token from globals.css (text-fg-2, bg-canvas, border-line).",
+    message: "Hex color in an arbitrary value. Use a color token from globals.css (text-fg-2, bg-canvas, border-border).",
   },
   {
     pattern: /\btext-\[\d/,
     message: "Arbitrary text size. Use a type token (text-body, text-meta, text-micro) from globals.css.",
   },
   {
-    pattern: /\b(?:zinc|blue|red|amber|green|purple)-\d{2,3}\b/,
+    // Every palette in Tailwind's theme.css, each followed by a step.
+    pattern: new RegExp(`\\b(?:${PALETTES})-\\d{2,3}\\b`),
     message:
-      "Raw palette color. Use a token from globals.css: fg-*, fill-*, line-* for neutrals; danger, warn, ok for status.",
+      "Raw palette color. Use a token from globals.css: foreground, muted-foreground, fg-2, muted, accent, border for neutrals; destructive, warn, ok for status.",
   },
   {
     pattern: /\btext-(?:xs|sm|base|lg|[2-9]?xl)\b/,
     message: "Tailwind text size. Use the type token for the role: text-body, text-label, text-meta or text-micro (section 3).",
   },
   {
-    // The aliases are gone from globals.css, so one of these would draw nothing.
-    pattern:
-      /\b(?:text|bg|border(?:-[trblxyse])?|divide|ring|outline|fill|stroke|decoration)-(?:muted|foreground|background|border|primary(?:-foreground)?|accent)\b/,
-    message:
-      "Retired alias. text-muted is text-fg-3, text-foreground text-fg-1, bg-background bg-fill-1, border-border border-line, bg-accent bg-fill-2, primary the act tokens.",
+    // Since Nov 14 these are ground colors, so as text they nearly disappear. Until
+    // Oct 25 text-muted meant today's text-muted-foreground.
+    pattern: /(?<![\w-])text-(?:muted|accent|background)(?![\w-])/,
+    message: "A ground color used as text. Use text-muted-foreground or text-foreground.",
   },
 ];
 
-/** Reports a string, template string or JSX attribute holding a raw design value. */
+/**
+ * The message for an old color name, naming the new one (docs/specs/design-foundation.md,
+ * section 6.2). `act` split in two, so where it can draw either a fill or a focus
+ * ring the message names both.
+ */
+function oldNameMessage({ match, replacement }) {
+  const prefix = /^(--(?:color-)?|ring-|border(?:-(?:[trblxyse]|bs|be))?-)act$/.exec(match)?.[1];
+  if (prefix) return `"${match}" is the old name. Use "${prefix}primary", or "${prefix}ring" for a focus ring.`;
+  return `"${match}" is the old name. Use "${replacement}".`;
+}
+
+/** Reports a string, template string or JSX attribute holding a raw design value or an old color name. */
 const designTokensRule = {
   meta: {
     type: "suggestion",
@@ -114,6 +128,8 @@ const designTokensRule = {
       for (const { pattern, message } of DESIGN_VALUE_RULES) {
         if (pattern.test(text)) context.report({ node, message });
       }
+      // findOldNames loops with matchAll, so its global patterns keep no state between strings.
+      for (const hit of findOldNames(text)) context.report({ node, message: oldNameMessage(hit) });
     }
     return {
       Literal(node) {

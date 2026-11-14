@@ -50,10 +50,10 @@ export function ConfirmDialog({
       isKeyboardDismissDisabled={busy}
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 data-entering:animate-fade-in motion-reduce:animate-none"
     >
-      <Modal className={`w-full ${several ? "max-w-md" : "max-w-sm"} rounded-xl border border-line-float bg-raised p-5 text-fg-1 shadow-overlay outline-none data-entering:animate-pop-in motion-reduce:animate-none`}>
+      <Modal className={`w-full ${several ? "max-w-md" : "max-w-sm"} rounded-xl border border-line-float bg-popover p-5 text-foreground shadow-overlay outline-none data-entering:animate-pop-in motion-reduce:animate-none`}>
         <Dialog role="alertdialog" className="outline-none">
           {/* A name with no spaces in it (a 100-character unit name) breaks inside the dialog instead of running past its edge. */}
-          <Heading slot="title" className="text-balance text-section text-fg-1 [overflow-wrap:anywhere]">
+          <Heading slot="title" className="text-balance text-section text-foreground [overflow-wrap:anywhere]">
             {title}
           </Heading>
           {body && <div className="mt-1 text-body text-fg-2 [overflow-wrap:anywhere]">{body}</div>}

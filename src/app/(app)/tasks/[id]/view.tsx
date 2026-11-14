@@ -103,7 +103,7 @@ export function TaskPageView(p: TaskPageViewProps) {
         <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title'_'reason_reason']">
           <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
             <BackLink fallback="/tasks" label="Tasks" />
-            <span aria-hidden="true" className="text-meta text-fg-3">
+            <span aria-hidden="true" className="text-meta text-muted-foreground">
               /
             </span>
             <StatusControl
@@ -164,7 +164,7 @@ export function TaskPageView(p: TaskPageViewProps) {
             />
 
             <div>
-              {task.legacyAssignee && <p className="mb-2 text-meta text-fg-3">Assigned in Asana to {task.legacyAssignee}</p>}
+              {task.legacyAssignee && <p className="mb-2 text-meta text-muted-foreground">Assigned in Asana to {task.legacyAssignee}</p>}
               <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} hasLogin={p.contractorHasLogin} />
             </div>
 

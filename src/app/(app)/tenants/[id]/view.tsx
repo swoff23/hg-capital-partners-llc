@@ -53,10 +53,10 @@ export function LeasePageView(p: LeasePageViewProps) {
         <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title']">
           <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
             <BackLink fallback="/tenants" label="Tenants" />
-            <span aria-hidden="true" className="text-meta text-fg-3">
+            <span aria-hidden="true" className="text-meta text-muted-foreground">
               /
             </span>
-            <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap text-meta", p.status === "past" ? "text-fg-3" : "text-fg-2")}>
+            <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap text-meta", p.status === "past" ? "text-muted-foreground" : "text-fg-2")}>
               <StatusMark status={MARK[p.status]} className="text-current" />
               {LEASE_STATUS_LABEL[p.status]}
             </span>
@@ -64,7 +64,7 @@ export function LeasePageView(p: LeasePageViewProps) {
           <div className="[grid-area:more]">
             <MoreMenu leaseId={p.leaseId} />
           </div>
-          <h1 className="min-w-0 py-1 text-title font-semibold text-fg-1 [grid-area:title] [overflow-wrap:anywhere]">
+          <h1 className="min-w-0 py-1 text-title font-semibold text-foreground [grid-area:title] [overflow-wrap:anywhere]">
             <Link href={`/properties/${p.propertyId}`} className="decoration-1 underline-offset-4 hover:underline">
               {p.street}
             </Link>

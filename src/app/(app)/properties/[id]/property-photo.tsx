@@ -284,7 +284,7 @@ function TakenHerePicker({ photos, onPick }: { photos: TakenHerePhoto[]; onPick:
             type="button"
             onClick={() => onPick(p)}
             aria-label={`Use ${p.filename} from ${p.taskTitle}`}
-            className="relative block aspect-square w-full overflow-hidden rounded-lg bg-fill-1"
+            className="relative block aspect-square w-full overflow-hidden rounded-lg bg-muted"
           >
             {/* Gated, session-checked route; next/image would cache it publicly. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}

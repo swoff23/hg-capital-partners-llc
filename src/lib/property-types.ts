@@ -471,7 +471,7 @@ export type CapexForecastItem = {
   /** Years from now until dueYear (0 = due this year, including already-overdue assets). */
   yearsOut: number;
   /**
-   * Past its replacement age before this year: late, so it reads in --danger.
+   * Past its replacement age before this year: late, so it reads in --destructive.
    * An asset reaching that age this year is due now, but not late.
    */
   pastDue: boolean;
@@ -494,7 +494,7 @@ export type CapexForecast = {
   /** Subset due this year (overdue + hitting end of life in the current year). */
   dueNowTotal: number;
   dueNowCount: number;
-  /** Subset past its replacement age before this year (`pastDue`): late, the only spend that reads in --danger. */
+  /** Subset past its replacement age before this year (`pastDue`): late, the only spend that reads in --destructive. */
   overdueTotal: number;
   /** Priced, lifecycle-tracked assets whose install year is unknown (can't be scheduled). */
   unknownCount: number;

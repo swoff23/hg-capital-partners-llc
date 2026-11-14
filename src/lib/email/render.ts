@@ -9,7 +9,7 @@ import { monogramRadius } from "@/lib/monogram-art";
  *
  * Inline styles and a table because that's what Gmail and iOS Mail honor.
  * Email can't read CSS variables, so every color comes from brand-tokens.ts,
- * the hex mirror of the light tokens (docs/brand-guidelines.md, section 11).
+ * the hex mirror of the light tokens (docs/brand-guidelines.md, section 4).
  * The letterhead is the monogram tile and the company name over a 1px
  * --gold-deep rule (section 6). The tile is a table cell, not an image, so it
  * shows with images blocked; the letters fall back to the reader's sans.
@@ -46,7 +46,7 @@ const FONT = "Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,
  */
 const LETTERHEAD = `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
 <td width="32" height="32" align="center" valign="middle" style="width:32px;height:32px;background:${t.inkTile};border-radius:${monogramRadius(32)}px;color:${t.gold};font-size:13px;font-weight:600;letter-spacing:-0.04em;line-height:32px;text-indent:-1px;">${BRAND.mark}</td>
-<td style="padding-left:10px;font-size:15px;line-height:20px;font-weight:600;color:${t.fg1};">${BRAND.company}</td>
+<td style="padding-left:10px;font-size:15px;line-height:20px;font-weight:600;color:${t.foreground};">${BRAND.company}</td>
 </tr></table>`;
 
 export function escapeHtml(s: string): string {
@@ -98,13 +98,13 @@ export function renderPlainEmail(input: PlainEmailInput): RenderedEmail {
 <body style="margin:0;padding:0;background:${t.canvas};">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${t.canvas};padding:32px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${t.surface};border:1px solid ${t.line};border-radius:8px;padding:32px 28px;font-family:${FONT};color:${t.fg1};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${t.background};border:1px solid ${t.border};border-radius:8px;padding:32px 28px;font-family:${FONT};color:${t.foreground};">
 <tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.goldDeep};">${LETTERHEAD}</td></tr>
 <tr><td style="padding:24px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.line)}</td></tr>
 ${items.map((item) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(item)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:16px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
-<a href="${href}" style="display:inline-block;background:${t.act};color:${t.onAct};text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:6px;">${escapeHtml(input.buttonLabel)}</a>
+<a href="${href}" style="display:inline-block;background:${t.primary};color:${t.primaryForeground};text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:6px;">${escapeHtml(input.buttonLabel)}</a>
 </td></tr>
-${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:${t.fg3};">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>
+${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:${t.mutedForeground};">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>
 </td></tr>
 </table>
 </body>
@@ -178,12 +178,12 @@ function previewHtml(preview: string): string {
   return `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(preview)}${"&#847;&zwnj;&nbsp;".repeat(60)}</div>`;
 }
 
-const LABEL = `font-size:13px;line-height:18px;color:${t.fg3};`;
+const LABEL = `font-size:13px;line-height:18px;color:${t.mutedForeground};`;
 
 /** A fact row in the job: its label in a fixed column, the value beside it. */
 function factRow(label: string, valueHtml: string): string {
   // One 22px line box on both sides, so the 13px label sits on the 15px value's first line instead of above it.
-  return `<tr><td valign="top" width="88" style="width:88px;padding:8px 12px 8px 0;border-top:1px solid ${t.line};font-size:13px;line-height:22px;color:${t.fg3};">${escapeHtml(label)}</td><td valign="top" style="padding:8px 0;border-top:1px solid ${t.line};font-size:15px;line-height:22px;color:${t.fg1};">${valueHtml}</td></tr>`;
+  return `<tr><td valign="top" width="88" style="width:88px;padding:8px 12px 8px 0;border-top:1px solid ${t.border};font-size:13px;line-height:22px;color:${t.mutedForeground};">${escapeHtml(label)}</td><td valign="top" style="padding:8px 0;border-top:1px solid ${t.border};font-size:15px;line-height:22px;color:${t.foreground};">${valueHtml}</td></tr>`;
 }
 
 /** A row of thumbnails, each a link, then "+3" when there are more. */
@@ -191,10 +191,10 @@ function photoStripHtml(photos: readonly JobEmailPhoto[], more: number): string 
   const tiles = photos
     .map(
       (ph) =>
-        `<a href="${escapeHtml(safeUrl(ph.href))}" style="display:inline-block;margin:0 6px 6px 0;text-decoration:none;"><img src="${escapeHtml(safeUrl(ph.src))}" alt="Photo" width="72" height="54" style="display:block;width:72px;height:54px;object-fit:cover;border-radius:4px;border:0;background:${t.fill1};"></a>`,
+        `<a href="${escapeHtml(safeUrl(ph.href))}" style="display:inline-block;margin:0 6px 6px 0;text-decoration:none;"><img src="${escapeHtml(safeUrl(ph.src))}" alt="Photo" width="72" height="54" style="display:block;width:72px;height:54px;object-fit:cover;border-radius:4px;border:0;background:${t.muted};"></a>`,
     )
     .join("");
-  const rest = more > 0 ? `<span style="display:inline-block;vertical-align:top;line-height:54px;font-size:14px;color:${t.fg3};">+${more}</span>` : "";
+  const rest = more > 0 ? `<span style="display:inline-block;vertical-align:top;line-height:54px;font-size:14px;color:${t.mutedForeground};">+${more}</span>` : "";
   return `${tiles}${rest}`;
 }
 
@@ -203,9 +203,9 @@ function inlineLink(label: string, url: string): string {
   return `<a href="${escapeHtml(safeUrl(url))}" style="${LINK}">${escapeHtml(label)}</a>`;
 }
 
-const PRIMARY = `display:block;text-align:center;background:${t.act};color:${t.onAct};text-decoration:none;font-size:15px;font-weight:600;padding:13px 22px;border-radius:6px;`;
-const SECONDARY = `display:inline-block;background:${t.surface};color:${t.fg1};text-decoration:none;font-size:15px;font-weight:600;padding:11px 18px;border-radius:6px;border:1px solid ${t.lineStrong};margin:8px 8px 0 0;`;
-const LINK = `color:${t.act};text-decoration:underline;`;
+const PRIMARY = `display:block;text-align:center;background:${t.primary};color:${t.primaryForeground};text-decoration:none;font-size:15px;font-weight:600;padding:13px 22px;border-radius:6px;`;
+const SECONDARY = `display:inline-block;background:${t.background};color:${t.foreground};text-decoration:none;font-size:15px;font-weight:600;padding:11px 18px;border-radius:6px;border:1px solid ${t.lineStrong};margin:8px 8px 0 0;`;
+const LINK = `color:${t.primary};text-decoration:underline;`;
 
 /**
  * The job email: letterhead, What's new, the buttons, then the job (spec 2.2,
@@ -248,7 +248,7 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
       html: job.checklist
         .map(
           (c) =>
-            `<div style="padding:2px 0;${c.done ? `color:${t.fg3};` : ""}"><span style="display:inline-block;width:20px;color:${c.done ? t.ok : t.fg3};">${c.done ? "&#10003;" : "&#9675;"}</span>${escapeHtml(c.title)}</div>`,
+            `<div style="padding:2px 0;${c.done ? `color:${t.mutedForeground};` : ""}"><span style="display:inline-block;width:20px;color:${c.done ? t.ok : t.mutedForeground};">${c.done ? "&#10003;" : "&#9675;"}</span>${escapeHtml(c.title)}</div>`,
         )
         .join(""),
     });
@@ -291,10 +291,10 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
 ${previewHtml(input.preview)}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${t.canvas};padding:32px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${t.surface};border:1px solid ${t.line};border-radius:8px;padding:28px 24px;font-family:${FONT};color:${t.fg1};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${t.background};border:1px solid ${t.border};border-radius:8px;padding:28px 24px;font-family:${FONT};color:${t.foreground};">
 <tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.goldDeep};">${LETTERHEAD}</td></tr>
 <tr><td style="padding:24px 0 0;${LABEL}">What's new</td></tr>
-<tr><td style="padding:4px 0 0;font-size:18px;line-height:1.4;font-weight:600;color:${t.fg1};">${escapeWithBreaks(input.headline)}</td></tr>
+<tr><td style="padding:4px 0 0;font-size:18px;line-height:1.4;font-weight:600;color:${t.foreground};">${escapeWithBreaks(input.headline)}</td></tr>
 ${input.lines.map((l) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(l)}</td></tr>\n`).join("")}${newPhotos.length ? `<tr><td style="padding:10px 0 0;font-size:0;line-height:0;">${photoStripHtml(newPhotos, input.morePhotos ?? 0)}</td></tr>\n` : ""}${input.closing ? `<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}${
     input.primary && primaryUrl
       ? `<tr><td style="padding:24px 0 0;">
@@ -303,14 +303,14 @@ ${secondary.map((b) => `<a href="${escapeHtml(b.url)}" style="${SECONDARY}">${es
 </td></tr>
 `
       : ""
-  }<tr><td style="padding:28px 0 0;"><div style="border-top:1px solid ${t.line};"></div></td></tr>
+  }<tr><td style="padding:28px 0 0;"><div style="border-top:1px solid ${t.border};"></div></td></tr>
 <tr><td style="padding:20px 0 0;${LABEL}">The job</td></tr>
-${photo ? `<tr><td style="padding:8px 0 0;"><img src="${escapeHtml(photo)}" alt="" width="430" style="display:block;width:100%;max-width:430px;height:auto;border-radius:6px;border:0;"></td></tr>\n` : ""}<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.4;font-weight:600;color:${t.fg1};">${escapeHtml(job.title)}</td></tr>
-${whereLine ? `<tr><td style="padding:2px 0 0;font-size:14px;line-height:1.5;color:${t.fg3};">${whereLine}</td></tr>\n` : ""}${
+${photo ? `<tr><td style="padding:8px 0 0;"><img src="${escapeHtml(photo)}" alt="" width="430" style="display:block;width:100%;max-width:430px;height:auto;border-radius:6px;border:0;"></td></tr>\n` : ""}<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.4;font-weight:600;color:${t.foreground};">${escapeHtml(job.title)}</td></tr>
+${whereLine ? `<tr><td style="padding:2px 0 0;font-size:14px;line-height:1.5;color:${t.mutedForeground};">${whereLine}</td></tr>\n` : ""}${
     facts.length
       ? `<tr><td style="padding:12px 0 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${facts.map((f) => factRow(f.label, f.html)).join("")}</table></td></tr>\n`
       : ""
-  }${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:${t.fg3};">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>
+  }${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:${t.mutedForeground};">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>
 </td></tr>
 </table>
 </body>

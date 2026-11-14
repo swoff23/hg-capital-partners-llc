@@ -257,17 +257,17 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
           title={
             <>
               Jobs
-              {jobCount > 0 && <span className="num ml-1.5 font-normal text-fg-3">{jobCount}</span>}
+              {jobCount > 0 && <span className="num ml-1.5 font-normal text-muted-foreground">{jobCount}</span>}
             </>
           }
         >
           {tasks.length === 0 ? (
-            <p className="text-body text-fg-3">No jobs assigned yet.</p>
+            <p className="text-body text-muted-foreground">No jobs assigned yet.</p>
           ) : (
             // Status as a mark and a word in one fixed column, then the job and
             // its place, then the date (section 9). Below 480 the row keeps two
             // lines: the mark leads, and the word and date move into the subline.
-            <ul className="@container divide-y divide-line">
+            <ul className="@container divide-y divide-border">
               {tasks.map((t) => {
                 const closed = !isActiveStatus(t.status);
                 // Their jobs show the Target (D7): the visit date while
@@ -276,12 +276,12 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                 const late = !closed && isTargetLate(dates, today);
                 // completedAt is an instant: the Buffalo day it fell on.
                 const day = closed ? (t.completedAt ? todayYmdEastern(t.completedAt) : null) : targetOf(dates);
-                // Late shows the real date in --danger (section 3).
+                // Late shows the real date in --destructive (section 3).
                 const date = day ? (late ? fmtDay(day, { year: "auto", now: today }) : dayLabel(day, today)) : null;
                 return (
                   <li
                     key={t.id}
-                    className="relative grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 py-2.5 transition-colors hover:bg-fill-1 pointer-coarse:py-3 @min-[30rem]:grid-cols-[7rem_minmax(0,1fr)_6rem] @min-[30rem]:items-center"
+                    className="relative grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 py-2.5 transition-colors hover:bg-muted pointer-coarse:py-3 @min-[30rem]:grid-cols-[7rem_minmax(0,1fr)_6rem] @min-[30rem]:items-center"
                   >
                     {/* The whole row opens the job, as TaskRow does; the place's link sits above it. */}
                     <Link href={`/tasks/${t.id}`} className="absolute inset-0 -outline-offset-2">
@@ -292,11 +292,11 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                       <StatusBadge status={t.status} className="hidden @min-[30rem]:inline-flex" />
                     </span>
                     <div className="min-w-0">
-                      <p aria-hidden="true" className={cn("truncate text-body", closed ? "text-fg-3 line-through" : "text-fg-1")}>
+                      <p aria-hidden="true" className={cn("truncate text-body", closed ? "text-muted-foreground line-through" : "text-foreground")}>
                         {t.title}
                       </p>
                       {/* Always there on a narrow row, where it carries the status word; a wide row shows it only for a place. */}
-                      <p className={cn("truncate text-meta text-fg-3", !t.property && "@min-[30rem]:hidden")}>
+                      <p className={cn("truncate text-meta text-muted-foreground", !t.property && "@min-[30rem]:hidden")}>
                         <span className={cn("@min-[30rem]:hidden", STATUS_TONE[t.status])}>{STATUS_LABEL[t.status]}</span>
                         {t.property && (
                           <>
@@ -304,7 +304,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                             {/* With a mouse the place opens the property; on touch the whole row opens the job. */}
                             <Link
                               href={`/properties/${t.property.id}`}
-                              className="relative hover:text-fg-1 hover:underline pointer-coarse:pointer-events-none"
+                              className="relative hover:text-foreground hover:underline pointer-coarse:pointer-events-none"
                             >
                               {shortAddress(t.property.address)}
                             </Link>
@@ -314,7 +314,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                         {date && (
                           <span className="num @min-[30rem]:hidden">
                             {" · "}
-                            <span className={cn(late && "text-danger")}>{date}</span>
+                            <span className={cn(late && "text-destructive")}>{date}</span>
                           </span>
                         )}
                       </p>
@@ -322,17 +322,17 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                     <span
                       className={cn(
                         "num hidden text-right text-meta @min-[30rem]:block",
-                        late ? "text-danger" : "text-fg-2",
+                        late ? "text-destructive" : "text-fg-2",
                       )}
                     >
-                      {date ?? <span className="text-fg-3">—</span>}
+                      {date ?? <span className="text-muted-foreground">—</span>}
                     </span>
                   </li>
                 );
               })}
             </ul>
           )}
-          {jobCount > tasks.length && <p className="mt-3 text-meta text-fg-3">Showing the latest {JOBS_SHOWN}</p>}
+          {jobCount > tasks.length && <p className="mt-3 text-meta text-muted-foreground">Showing the latest {JOBS_SHOWN}</p>}
         </Section>
       </div>
     </div>

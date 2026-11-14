@@ -33,8 +33,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Contractors" };
 
-/** An empty cell: the lone dash glyph in --fg-3 (docs/brand-guidelines.md, section 3). */
-const EMPTY = <span className="text-fg-3">—</span>;
+/** An empty cell: the lone dash glyph in --muted-foreground (docs/brand-guidelines.md, section 3). */
+const EMPTY = <span className="text-muted-foreground">—</span>;
 
 /** A document link in the Docs column. It sits above the row's link, so a click opens the file. */
 const docLink = cn(textLinkClass, "relative");
@@ -109,7 +109,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                 <Th className="hidden pr-0 sm:table-cell">Docs</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="divide-y divide-border">
               {contacts.map((c) => {
                 const names = tradeNames(c.tradeLinks);
                 const subline = [c.company, tradeLine(c.tradeLinks)].filter(Boolean).join(" · ");
@@ -123,7 +123,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                 );
                 // A doc on file only by filename (the import's notes) still counts,
                 // as it does on the contractor's page; it just has no link, so it
-                // reads in --fg-3 and a link always looks different from plain text.
+                // reads in --muted-foreground and a link always looks different from plain text.
                 // An uploaded file opens first (the files route, private to staff), then an old Drive link.
                 const w9Upload = c.documents.find((d) => d.kind === "W9");
                 const coiUpload = c.documents.find((d) => d.kind === "INSURANCE");
@@ -134,19 +134,19 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                     W-9
                   </a>
                 ) : docOnFile(c.comments, "W-9") ? (
-                  <span className="text-fg-3">W-9</span>
+                  <span className="text-muted-foreground">W-9</span>
                 ) : null;
                 const coi = coiHref ? (
                   <a href={coiHref} target="_blank" rel="noreferrer" className={docLink}>
                     COI
                   </a>
                 ) : docOnFile(c.comments, "Insurance") ? (
-                  <span className="text-fg-3">COI</span>
+                  <span className="text-muted-foreground">COI</span>
                 ) : null;
                 return (
                   // The whole row opens the contractor, as TaskRow does: one link
                   // covers the row, and the phone and document links sit above it.
-                  <tr key={c.id} className={cn("relative transition-colors hover:bg-fill-1", pendingRowFill)}>
+                  <tr key={c.id} className={cn("relative transition-colors hover:bg-muted", pendingRowFill)}>
                     <Td className="pl-0 max-sm:w-full max-sm:max-w-0">
                       <Link href={`/contractors/${c.id}`} className="absolute inset-0 -outline-offset-2">
                         <span className="sr-only">{c.fullName}</span>
@@ -155,14 +155,14 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                       {/* From sm the name keeps its longest word and the badges drop under it when the
                           column is narrow (a tablet), so a badge never sits on the name. */}
                       <div className="flex min-w-0 items-center gap-x-2 gap-y-1 sm:flex-wrap">
-                        <span className="text-fg-1 max-sm:min-w-0 max-sm:truncate">{c.fullName}</span>
+                        <span className="text-foreground max-sm:min-w-0 max-sm:truncate">{c.fullName}</span>
                         {badges && <span className="hidden shrink-0 items-center gap-2 sm:flex">{badges}</span>}
                       </div>
                       {/* On a phone the name keeps the first line; the badges lead the subline. */}
                       {(badges || subline) && (
                         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:hidden">
                           {badges}
-                          {subline && <p className="min-w-0 truncate text-meta text-fg-3">{subline}</p>}
+                          {subline && <p className="min-w-0 truncate text-meta text-muted-foreground">{subline}</p>}
                         </div>
                       )}
                     </Td>

@@ -28,7 +28,7 @@ const RAIL = [
  * today, as the card counts them, and the folded Building systems row) beside
  * the rail's Details, Loan and Insurance with every label drawn at once; the
  * photo, the status, the address, the subline, the figures and the sections'
- * values are --fill-1 blocks. The Financials card shows only once QuickBooks
+ * values are --muted blocks. The Financials card shows only once QuickBooks
  * is connected, and Rental listings only with a listing, so both stay out.
  * Full width at 16:9 on a phone, the photo is 96x72 from sm.
  */
@@ -60,7 +60,7 @@ export default function PropertyLoading() {
         <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
           {/* PropertyTasksSection's rows, on its container query. */}
           <Section title="Tasks">
-            <ul className="@container divide-y divide-line">
+            <ul className="@container divide-y divide-border">
               {Array.from({ length: 4 }, (_, i) => (
                 <TaskRowSkeleton key={i} i={i} />
               ))}
@@ -75,7 +75,7 @@ export default function PropertyLoading() {
           <Section
             title="CapEx"
             actions={
-              <span className="num flex h-8 items-center text-meta text-fg-3">
+              <span className="num flex h-8 items-center text-meta text-muted-foreground">
                 {from} to {from + 4}
               </span>
             }
@@ -85,7 +85,7 @@ export default function PropertyLoading() {
               <div aria-hidden="true" className="-mx-2 space-y-0.5">
                 {years.map((y) => (
                   <div key={y} className="flex w-full items-center gap-3 px-2 py-1 text-meta pointer-coarse:min-h-11">
-                    <span className="num w-10 shrink-0 text-fg-3">{y}</span>
+                    <span className="num w-10 shrink-0 text-muted-foreground">{y}</span>
                     <Block className="h-1 min-w-0 flex-1" />
                     <span className="flex w-20 shrink-0 justify-end">
                       <Block text="text-meta" className="w-14" />
@@ -121,7 +121,7 @@ export default function PropertyLoading() {
 /** A section's contents as lines of blocks, 40px apart as its rows are. */
 function SectionLines({ lines }: { lines: number }) {
   return (
-    <ul aria-hidden="true" className="divide-y divide-line">
+    <ul aria-hidden="true" className="divide-y divide-border">
       {Array.from({ length: lines }, (_, i) => (
         <li key={i} className="flex min-h-10 items-center pointer-coarse:min-h-12">
           <Block text="text-body" className={rowWidth(i)} />
@@ -131,10 +131,10 @@ function SectionLines({ lines }: { lines: number }) {
   );
 }
 
-/** A fold's foot row ("7 more fields", "Building systems"): 40px over a --line rule, 48 on touch. */
+/** A fold's foot row ("7 more fields", "Building systems"): 40px over a --border rule, 48 on touch. */
 function FoldLine() {
   return (
-    <div aria-hidden="true" className="flex min-h-10 items-center border-t border-line pointer-coarse:min-h-12">
+    <div aria-hidden="true" className="flex min-h-10 items-center border-t border-border pointer-coarse:min-h-12">
       <Block text="text-label" className="w-28" />
     </div>
   );

@@ -24,7 +24,7 @@ export function AddButton({ className, children, ...props }: ComponentProps<"but
     <button
       type="button"
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap text-meta font-medium text-fg-1 underline-offset-3 not-disabled:hover:underline disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center gap-1 whitespace-nowrap text-meta font-medium text-foreground underline-offset-3 not-disabled:hover:underline disabled:cursor-not-allowed disabled:opacity-50",
         TOUCH_HEIGHT,
         className,
       )}
@@ -74,13 +74,13 @@ export function RevealRemoveButton({
   );
 }
 
-/** A row's delete: an idle --fg-3 trash that turns --danger under a mouse. 44px square on touch. Give it an aria-label. */
+/** A row's delete: an idle --muted-foreground trash that turns --destructive under a mouse. 44px square on touch. Give it an aria-label. */
 export function RemoveButton({ className, ...props }: ComponentProps<"button">) {
   return (
     <button
       type="button"
       className={cn(
-        "flex size-6 shrink-0 items-center justify-center rounded-sm text-fg-3 transition-colors not-disabled:hover:text-danger disabled:opacity-50 pointer-coarse:size-11",
+        "flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors not-disabled:hover:text-destructive disabled:opacity-50 pointer-coarse:size-11",
         className,
       )}
       {...props}

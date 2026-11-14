@@ -95,7 +95,7 @@ export function PropertyMoveInSwitch({ id, shown }: { id: string; shown: boolean
  * A key date: loan maturity, insurance renewal, tax due, registration expiry.
  * Shown even when it's missing, since its reminder task only exists once the
  * date is set (JOURNEYS-006): an empty one is a --warn verb. A past date reads
- * late in --danger, and the days away ride beside it until the row is too
+ * late in --destructive, and the days away ride beside it until the row is too
  * narrow for them. The helper says what the date does ("Adds a reminder 60
  * days before"), and the toast says it did.
  */
@@ -142,9 +142,9 @@ function KeyDateText({ date }: { date: string }) {
   const late = isPastDay(date);
   return (
     <span className="flex min-w-0 items-baseline gap-x-2">
-      <span className={cn("num shrink-0", late && "text-danger")}>{fmtDay(date)}</span>
+      <span className={cn("num shrink-0", late && "text-destructive")}>{fmtDay(date)}</span>
       {/* Drops when the row is too narrow, rather than wrapping. */}
-      <span className={cn("truncate text-meta max-[26rem]:hidden", late ? "text-danger" : "text-fg-3")}>{relativeDays(date)}</span>
+      <span className={cn("truncate text-meta max-[26rem]:hidden", late ? "text-destructive" : "text-muted-foreground")}>{relativeDays(date)}</span>
     </span>
   );
 }
@@ -159,7 +159,7 @@ export function ChangeCodeMenu({ title, field, change }: { title: string; field:
     <MenuTrigger>
       <AriaButton
         aria-label={`${title} actions`}
-        className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "-mr-2 text-fg-3 data-pressed:bg-fill-1")}
+        className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "-mr-2 text-muted-foreground data-pressed:bg-muted")}
       >
         <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="size-4" />
       </AriaButton>

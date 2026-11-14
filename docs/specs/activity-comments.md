@@ -32,12 +32,12 @@ Every piece below builds on a file that exists. Each says which file it extends,
 **Legend for the ASCII previews**
 
 ```
-o      day or month heading ring: 8px, --surface fill, --line-strong edge
+o      day or month heading ring: 8px, --background fill, --line-strong edge
 *      6px --line-strong dot: a recorded change
 (~)    StatusMark of the new status: 14px, 16 on touch
 (C)    20px Avatar, round: a team member
 [Z]    20px Avatar, rounded-sm square: a contractor
-@      8px --act unread dot
+@      8px --primary unread dot
 >      16px ChevronRight: a folded run
 [lk]   lucide Lock
 [...]  ghost icon button with lucide Ellipsis
@@ -131,10 +131,10 @@ Extends `src/components/activity-timeline.tsx` (`ActivityTimeline`, `ActivityIte
 **Anatomy**
 
 - `ActivityTimeline` stays an `<ol>`. Each `ActivityItem` becomes a two-column grid: a 20px marker column, a 12px gap, then the content.
-- One 1px `--line` hairline runs down the center of the marker column, behind the markers. Each marker sits on a `--surface` knockout so the line never crosses an avatar or a mark.
+- One 1px `--border` hairline runs down the center of the marker column, behind the markers. Each marker sits on a `--background` knockout so the line never crosses an avatar or a mark.
 - The marker centers on the content's first line. For a system line that is the `text-meta` line (18px with a mouse, 20 on touch). For a card it is the card's header line (10px padding, then the `text-body` line). This replaces the `-left-[21px]` and `-left-[22px]` offsets and every caller's `markerClassName` (the task card's `top-4.5`).
-- `marker` prop: `avatar` (20px `Avatar`; `outline` for a contractor), `status` (the `StatusMark` of the new status), `dot` (6px `--line-strong`), `unread` (8px `--act`, only for the New divider) and `none`. Choice 3.1 decides whether `avatar` and `status` ship.
-- `ActivityDay` renders an `<li>` holding an `<h3>` (the Section heading is the h2) in `text-meta` 500 `--fg-3`, with the 8px ring. A `month` variant reads "September", or "August 2025" when it isn't this year.
+- `marker` prop: `avatar` (20px `Avatar`; `outline` for a contractor), `status` (the `StatusMark` of the new status), `dot` (6px `--line-strong`), `unread` (8px `--primary`, only for the New divider) and `none`. Choice 3.1 decides whether `avatar` and `status` ship.
+- `ActivityDay` renders an `<li>` holding an `<h3>` (the Section heading is the h2) in `text-meta` 500 `--muted-foreground`, with the 8px ring. A `month` variant reads "September", or "August 2025" when it isn't this year.
 - Spacing: 12px between entries, 20px above a heading, none above the first.
 - The doc comment drops the `max-h-[520px] overflow-y-auto` example and says the timeline scrolls with the page (VISUAL-043, DEALS-059).
 - Print: fold controls and menus are `print:hidden`. The hairline and markers print.
@@ -150,7 +150,7 @@ Extends `src/components/activity-timeline.tsx` (`ActivityTimeline`, `ActivityIte
 
 **Accessibility.** Day headings let a screen reader jump by day. Markers are `aria-hidden`. A contractor's square avatar gets an sr-only "contractor" after the name, so the shape isn't the only cue (G1C-036).
 
-**Tokens.** `--line` (hairline), `--line-strong` (dot, ring edge), `--surface` (knockout, ring fill), `--act` (unread only), `--fg-3` (headings).
+**Tokens.** `--border` (hairline), `--line-strong` (dot, ring edge), `--background` (knockout, ring fill), `--primary` (unread only), `--muted-foreground` (headings).
 
 **Drops on phone.** Nothing. The rail keeps its 20px column at 320.
 
@@ -162,11 +162,11 @@ Extends `src/components/activity-timeline.tsx` (`ActivityTimeline`, `ActivityIte
 
 Today's card lives inside `src/app/(app)/tasks/[id]/activity.tsx`. It moves to `src/components/` because the portal and the deal page will use it too.
 
-- **Ground.** Shared: `--surface` on a `--line` edge. Internal: `--fill-1` with a transparent edge. `rounded-md`, 12px by 10px padding. All as today.
-- **Header, left to right.** First name in `text-body` 500 `--fg-1` (truncates first). Then the time (`ActivityTime`, 2.4) in `text-meta` `--fg-3`. Then "edited" in `text-meta` `--fg-3` after an edit, whose Tooltip gives the edit time with a mouse. Then, at the trailing edge, Lock plus "Internal" in `text-meta` 500 `--fg-2`. With a mouse, the menu trigger comes last (2.5). On touch nothing in the header is a separate tap target: a tap on the card opens the menu (3.2), whose header line carries the full stamp and the edit time.
+- **Ground.** Shared: `--background` on a `--border` edge. Internal: `--muted` with a transparent edge. `rounded-md`, 12px by 10px padding. All as today.
+- **Header, left to right.** First name in `text-body` 500 `--foreground` (truncates first). Then the time (`ActivityTime`, 2.4) in `text-meta` `--muted-foreground`. Then "edited" in `text-meta` `--muted-foreground` after an edit, whose Tooltip gives the edit time with a mouse. Then, at the trailing edge, Lock plus "Internal" in `text-meta` 500 `--fg-2`. With a mouse, the menu trigger comes last (2.5). On touch nothing in the header is a separate tap target: a tap on the card opens the menu (3.2), whose header line carries the full stamp and the edit time.
 - **Names.** First names everywhere: "Zack", not "Zack (Outlaw Carpentry)". The full label is the menu's header line. In the portal, the contractor's own entries read "You".
-- **Subline.** Imported subtask comments keep "On checklist item: Install doors" in `text-meta` `--fg-3`, truncated.
-- **Body.** `text-body` `--fg-1`, pre-wrap, links as `TextLink`:
+- **Subline.** Imported subtask comments keep "On checklist item: Install doors" in `text-meta` `--muted-foreground`, truncated.
+- **Body.** `text-body` `--foreground`, pre-wrap, links as `TextLink`:
   - `https://` URLs link out in a new tab.
   - `/tasks/<id>` paths link to the task, labelled with its title when the page knows it, or "a task" (G1C-030).
   - Asana task links to tasks that weren't imported read "Asana task (not imported)" as plain text (G1C-031).
@@ -175,7 +175,7 @@ Today's card lives inside `src/app/(app)/tasks/[id]/activity.tsx`. It moves to `
   - In the portal, an imported comment containing one of the property's stored lockbox codes shows it through `Code` with `mask` (G1C-012). Staff see it unmasked through `Code`.
 - **Slots.** Media (`MediaGrid`), files (`FilesList`, or the portal's file links until the uploads and photos spec merges them), and under the card, outside it, one delivery or failure line (2.6, 2.7).
 - **Imported flags.** Imported comments with `data.edited` show "edited" (G1C-044). `data.pinned` stays stored and unread (no pin feature).
-- **Removed files.** A file removed after posting leaves "1 file removed" in `text-meta` `--fg-3` in the files slot. A comment whose only content was files that are now all gone becomes a line: "Connor posted files that were later removed".
+- **Removed files.** A file removed after posting leaves "1 file removed" in `text-meta` `--muted-foreground` in the files slot. A comment whose only content was files that are now all gone becomes a line: "Connor posted files that were later removed".
 
 | | 1280 | 768 | 375 | 320 |
 |---|---|---|---|---|
@@ -185,13 +185,13 @@ Today's card lives inside `src/app/(app)/tasks/[id]/activity.tsx`. It moves to `
 
 **Drops on phone.** The word "Internal" below 480px (the Lock stays, with `aria-label="Internal"`), the trade in the name, and the hover menu.
 
-**Tokens.** `--surface`, `--line`, `--fill-1`, `--fg-1`, `--fg-2`, `--fg-3`. Internal file rows hover `--fill-2` (FilesList `onFill`), as today.
+**Tokens.** `--background`, `--border`, `--muted`, `--foreground`, `--fg-2`, `--muted-foreground`. Internal file rows hover `--accent` (FilesList `onFill`), as today.
 
 **References.** [Linear](https://mobbin.com/screens/2e6c00de-40a7-455d-875f-0d8cb27c8270) (comment as a card with its image inside), [Linear Mobile](https://mobbin.com/screens/21b44a29-c1be-4016-acc5-520fa29659a2) (full-width phone cards), [Linear flow](https://mobbin.com/flows/344eea9e-9f9b-4c94-800a-c6147cb51bee) ("edited" beside the time).
 
 #### b. System line
 
-- One sentence in `text-meta` `--fg-3` with first names, then " · " and `ActivityTime`. It wraps, since it is a sentence and not a label.
+- One sentence in `text-meta` `--muted-foreground` with first names, then " · " and `ActivityTime`. It wraps, since it is a sentence and not a label.
 - Automated writers read by their label: "Property reminder created this task", "Move-in form created this task".
 - "Next repeat created, due Sat, Dec 5" links forward as today. "Created as the next repeat" now links back to the earlier task through `data.repeatOf` (BPLAY-031).
 - Live Asana sync events after the move add " · via Asana" after the time (G2B-I11).
@@ -201,10 +201,10 @@ Today's card lives inside `src/app/(app)/tasks/[id]/activity.tsx`. It moves to `
 
 #### c. Folded run (**new**: `ActivityRun` in `activity-timeline.tsx`)
 
-- One line that stands for several events (rules in 2.3). The whole line is a `button` with `aria-expanded`. A 16px `ChevronRight` in `--fg-3` ends the line and turns 90 degrees when open (`--dur-fast`; no turn under reduced motion).
+- One line that stands for several events (rules in 2.3). The whole line is a `button` with `aria-expanded`. A 16px `ChevronRight` in `--muted-foreground` ends the line and turns 90 degrees when open (`--dur-fast`; no turn under reduced motion).
 - The run's time is plain text, not a Tooltip trigger, so the button holds no other control. Its members carry their own times once open.
 - Open, the member lines appear in place under it, each with its own dot and time.
-- At least 32px tall with a mouse, 44 on touch. A long run wraps like any sentence, with the chevron after its last word ("Pieter changed the price and 2 other fields" takes two lines at 320). Hover `--fill-1`, `rounded-sm`, under `@media (hover: hover)` only.
+- At least 32px tall with a mouse, 44 on touch. A long run wraps like any sentence, with the chevron after its last word ("Pieter changed the price and 2 other fields" takes two lines at 320). Hover `--muted`, `rounded-sm`, under `@media (hover: hover)` only.
 - Imported file runs don't fold. They show one line ("Connor added 6 files") with one row of thumbnails under it (G1D-I03).
 
 #### d. Decision pair
@@ -224,10 +224,10 @@ A status change and the note written with it render as one entry, not a line and
 
 #### e. Dividers (**new**: `ActivityDivider` in `activity-timeline.tsx`)
 
-One row type for two jobs: a marker cell, then a `--line` rule with the label at its start.
+One row type for two jobs: a marker cell, then a `--border` rule with the label at its start.
 
-- **New:** `unread` marker, "New" in `text-meta` 500 `--fg-1`, `id="new"`. Rules in 2.6.
-- **Moved from Asana:** no marker, "Moved from Asana · Oct 29" in `text-meta` `--fg-3`. It sits once, between the last imported entry and the first one written in HG (G1C-029). Deals use "Moved from the deals sheet".
+- **New:** `unread` marker, "New" in `text-meta` 500 `--foreground`, `id="new"`. Rules in 2.6.
+- **Moved from Asana:** no marker, "Moved from Asana · Oct 29" in `text-meta` `--muted-foreground`. It sits once, between the last imported entry and the first one written in HG (G1C-029). Deals use "Moved from the deals sheet".
 
 **References for the divider.** [Front](https://mobbin.com/screens/d63c9ab6-f7ee-40ef-9b4c-ba4966689e57) (a thin "New activity" rule above the first unseen message, checked), [Slack](https://mobbin.com/screens/b2fc60c9-ff15-4441-b1df-45f0d582fdc0) (a thin New rule above the first unseen reply), [Slack](https://mobbin.com/screens/8b7812e7-c71d-4932-9bdb-e498b3974eb0), [Discord](https://mobbin.com/screens/47edf661-a056-4b0e-a9bd-c62d0b524b8b) (a "New messages" rule).
 
@@ -288,7 +288,7 @@ Uses `src/components/menu.tsx` (`Menu`, `MenuItem`, `MenuSeparator`), the shared
 
 **Menu**
 
-- First a header, not interactive, in two `text-meta` lines: the full label in `--fg-1` ("Zack (Outlaw Carpentry)"), then the stamp in `--fg-3` ("Thu, Oct 30 at 2:14 PM", plus " · edited Oct 31" after an edit). On one line it would run about 380px at touch size, wider than a 320 screen. Each line truncates, and the menu never grows past the screen minus 16px gutters; otherwise it sizes to its content.
+- First a header, not interactive, in two `text-meta` lines: the full label in `--foreground` ("Zack (Outlaw Carpentry)"), then the stamp in `--muted-foreground` ("Thu, Oct 30 at 2:14 PM", plus " · edited Oct 31" after an edit). On one line it would run about 380px at touch size, wider than a 320 screen. Each line truncates, and the menu never grows past the screen minus 16px gutters; otherwise it sizes to its content.
 - Copy link, on every comment. It copies `/tasks/<id>#update-<eventId>` and toasts "Link copied".
 - Copy text, on every comment.
 - On your own comments only: Edit, then a separator and Delete (`variant="destructive"`).
@@ -310,7 +310,7 @@ Uses `src/components/menu.tsx` (`Menu`, `MenuItem`, `MenuSeparator`), the shared
 
 - The body swaps for the autogrowing `Textarea`, focused with the caret at the end.
 - One line under the field, only when it matters. Email already sent: "Zack already got the first version". Email still queued: "Zack gets the edited version".
-- Cancel (ghost, sm) with `Kbd` Esc, and Save (secondary, sm) with `Kbd` ⌘↵. With no primary in edit mode, nothing sits disabled without a reason. Saving unchanged text closes the editor. Saving empty text with no files is refused with one `--danger` line: "Add some text, or delete the comment".
+- Cancel (ghost, sm) with `Kbd` Esc, and Save (secondary, sm) with `Kbd` ⌘↵. With no primary in edit mode, nothing sits disabled without a reason. Saving unchanged text closes the editor. Saving empty text with no files is refused with one `--destructive` line: "Add some text, or delete the comment".
 - Esc cancels the edit only. ⌘ or Ctrl+Enter saves.
 - On a phone the pinned composer hides while an edit is open, so there is one field and one keyboard. Cancel and Save are 44px.
 - Saved, the body updates in place and the header gains "edited" (`TaskEvent.editedAt`). No toast: the change in view is the confirmation. The portal shows the new text with "edited".
@@ -335,7 +335,7 @@ Uses `src/components/menu.tsx` (`Menu`, `MenuItem`, `MenuSeparator`), the shared
 
 #### Delivery line (**new**: `DeliveryLine`, a slot under `CommentCard` and the decision pair)
 
-One `text-meta` `--fg-3` line, 4px under the card, aligned with the card's left edge. Two at most per timeline.
+One `text-meta` `--muted-foreground` line, 4px under the card, aligned with the card's left edge. Two at most per timeline.
 
 **Staff side, under the newest staff entry the contractor can see** (a Shared comment, or a status the portal shows):
 
@@ -381,7 +381,7 @@ Placement is choice 3.5. What it means is fixed here:
 
 - **Staff task rows** (Today and All, `src/app/(app)/tasks/task-row.tsx`): since you last opened the task, someone else commented, or a contractor posted photos, started or marked done. Changes by the other partner don't dot.
 - **Portal job rows** (`src/app/(portal)/p/_components/my-jobs.tsx`): today's `newUpdateCounts` rule, Shared updates from HG since the last open, plus a moved date or updated notes if question 2 goes to A.
-- The dot is the brand's unread dot (8px `--act`) with sr-only "New updates". It clears when you open the task.
+- The dot is the brand's unread dot (8px `--primary`) with sr-only "New updates". It clears when you open the task.
 
 ### 2.7 Composer
 
@@ -391,16 +391,16 @@ Moves from `src/app/(app)/tasks/[id]/composer.tsx` to `src/components/composer.t
 
 **Anatomy, 1280 and 768 (inline, never pinned)**
 
-1. Audience line (always shown from `md`). Shared: `text-meta` `--fg-3`. Internal: Lock plus `text-meta` 500 `--fg-2`, today's style and slot.
+1. Audience line (always shown from `md`). Shared: `text-meta` `--muted-foreground`. Internal: Lock plus `text-meta` 500 `--fg-2`, today's style and slot.
 2. Ready tiles and the upload tray, unchanged.
 3. The field.
 4. Tools row: ImagePlus, a spacer, `SegmentedControl` Shared | Internal, `Kbd` ⌘↵ or Ctrl ↵ (hidden on touch), then Send.
 
-Internal turns the box `--fill-1` and the switch track `--fill-2`, as today. Tablet adds the touch-only Camera button left of the field, at 44px. The tools' ghost hover moves under `@media (hover: hover)` (today `IconButton` hovers on touch too).
+Internal turns the box `--muted` and the switch track `--accent`, as today. Tablet adds the touch-only Camera button left of the field, at 44px. The tools' ghost hover moves under `@media (hover: hover)` (today `IconButton` hovers on touch too).
 
 **Anatomy, phone (below 768, pinned)**
 
-- Edge to edge over a top `--line` rule. 16px inner gutters, so Camera and Send line up with the cards above (today 6px, BTASKS-020). Safe-area padding at the bottom.
+- Edge to edge over a top `--border` rule. 16px inner gutters, so Camera and Send line up with the cards above (today 6px, BTASKS-020). Safe-area padding at the bottom.
 - Collapsed: Camera, a one-line field, Send.
 - Active (focus, text, files, or Internal picked): the audience line above the field, the field growing to 5 lines (110px on touch; from `md` the 192px cap stays), and ImagePlus plus Shared | Internal below it. Five lines keep the bar under half of what an iPhone SE shows above its keyboard.
 - It reaches the bottom edge on every task. Below `md` the task page's grid is at least the screen's height under the top bar (`min-h` with `dvh`, less `--app-bar-h`), its main area takes the spare height, and the composer sits at the foot of that area (`mt-auto`). A short task then puts the bar on the bottom edge with nothing to scroll, and a long one keeps today's sticky behavior (BTASKS-020).
@@ -441,7 +441,7 @@ Internal turns the box `--fill-1` and the switch track `--fill-2`, as today. Tab
 - Each send carries a `clientId` made in the browser, stored on the event (`TaskEvent.data.clientId`). The server ignores a second write with the same id, so a Retry after a timeout that did post never posts twice.
 - The outgoing text moves to a pending slot in the same storage entry and clears only on success. After a reload, a pending message whose `clientId` is already in the page's events is dropped; otherwise it comes back in the field. Nothing is lost and nothing doubles.
 - Success swaps in the server's event and its delivery line. No toast: the message in view is the confirmation, and its line says what happens next.
-- Failure keeps the card with one `--danger` `text-meta` line built from `callAction`'s message: "Didn't send: no connection · Retry" offline, "Didn't send · Retry" otherwise. Retry resends the same text, visibility, uploaded file ids and `clientId`, so nothing uploads or posts twice. The failed card's menu offers Retry, Edit (back into the composer) and Discard.
+- Failure keeps the card with one `--destructive` `text-meta` line built from `callAction`'s message: "Didn't send: no connection · Retry" offline, "Didn't send · Retry" otherwise. Retry resends the same text, visibility, uploaded file ids and `clientId`, so nothing uploads or posts twice. The failed card's menu offers Retry, Edit (back into the composer) and Discard.
 - **The portal composer isn't optimistic yet** (it has no `PendingSendsProvider`). The field holds the message while it sends, a failure is a toast with the words kept in the box under the same `clientId`, and the update shows once the page refreshes. Showing it in place at once is a follow-up.
 
 **Print.** `print:hidden` (G1E-010).
@@ -473,14 +473,14 @@ Extends `src/app/(app)/deals/[id]/page.tsx`, `src/lib/deals/service.ts` (`addDea
 
 - **Rows.** Notes are `CommentCard`s with the author on the rail. Change entries are system lines with dots, burst-grouped by 2.3.
 - **Authors.** `DealNote` gains `authorUserId` (question 1). New notes stop appending "(CS)". A one-time backfill maps the three pasted forms ("(CS)", "  ·  Connor Swofford", "  ·  <label>") to the author and strips them (DEALS-044).
-- **Change sentences.** `DealNote` gains a `data` column with the field, the old value and the new one. A burst reads "Connor changed the price and 2 other fields". Opened, each field is a row: label in the 112px rail column (96 on phones), then old value, a 14px `ArrowRight` in `--fg-3`, new value, with `Money` for amounts (Attio, Twenty). At 320 the values get 160px: amounts fit on one line ("$425,000 → $410,000"), and long text values wrap inside their column with the arrow kept beside the new value. A single change reads "Pieter changed the status to 1 - High". A cleared value reads "Connor removed the listing link" (DEALS-042, DEALS-IV06, COPY-031, VISUAL-I10).
+- **Change sentences.** `DealNote` gains a `data` column with the field, the old value and the new one. A burst reads "Connor changed the price and 2 other fields". Opened, each field is a row: label in the 112px rail column (96 on phones), then old value, a 14px `ArrowRight` in `--muted-foreground`, new value, with `Money` for amounts (Attio, Twenty). At 320 the values get 160px: amounts fit on one line ("$425,000 → $410,000"), and long text values wrap inside their column with the arrow kept beside the new value. A single change reads "Pieter changed the status to 1 - High". A cleared value reads "Connor removed the listing link" (DEALS-042, DEALS-IV06, COPY-031, VISUAL-I10).
 - **No-op edits** aren't written. `diffDeal` compares trimmed, normalized values (VISUAL-I10 verification). Existing no-op rows are hidden at read.
 - **Times.** App entries show clock times under day headings (DEALS-V06). Dated imported notes sit under their day with an empty time slot. Undated imported notes sit under an "Undated" heading at the old end and no longer show the import timestamp (DEALS-043).
 - **Heading.** "Activity" with no count. It counted change lines and helped no decision (DEALS-058).
 - **Fold.** The newest 15 rows show (after bursts fold). "Show 40 older updates" at the foot opens the rest and toggles to "Hide older updates", the task page's fold turned upside down for a newest-first log.
 - **Note box.** The shared Composer with no visibility switch and no uploads: placeholder "Add a note", Send labelled "Add note" (secondary, so the stage control keeps the page's one primary), ⌘↵, a saved draft per deal, the new note on screen at once, and "Didn't save · Retry" on failure. The server action returns a result through `callAction`, so `withLog` can't throw the page into the error boundary and lose the note (FEEL-I06, G2D-001, G2B-V01). The box isn't pinned on phones (choice 3.3).
 - **Edit and delete** your own notes, through the same menu (DEALS-V03). `DealNote` gains `editedAt` and `deletedAt`.
-- **Latest note on the Deals list** (`src/app/(app)/deals/deal-row.tsx`): one note, not two stacked, prefixed by its day ("Oct 20 · seeing tomorrow") in `text-meta` `--fg-3`, truncated, with the full text and day in the Tooltip. The author suffix is gone (DATA-I13). The column still drops below about 1124px (`COLUMN_DROP`), so tablet and phone don't see it; this spec doesn't change that.
+- **Latest note on the Deals list** (`src/app/(app)/deals/deal-row.tsx`): one note, not two stacked, prefixed by its day ("Oct 20 · seeing tomorrow") in `text-meta` `--muted-foreground`, truncated, with the full text and day in the Tooltip. The author suffix is gone (DATA-I13). The column still drops below about 1124px (`COLUMN_DROP`), so tablet and phone don't see it; this spec doesn't change that.
 - **Property, later** (PROPERTY-011, G1B-013, D10): the Notes blob becomes an Activity section on the property hub with `PropertyNote` (`docs/property-page-plan.md` section 5) and change entries for details, loan, insurance, units, listings and documents, on the same rows. The existing blob becomes its first note, labelled "Imported note".
 - **Contractor, later** (ADMIN-I01, IA-034): the comments paragraph becomes a "Team notes" section with the Lock line "Only the HG team sees this" and dated notes, plus a rolled-up log of the contractor's updates across jobs, each line linking to its job.
 
@@ -502,7 +502,7 @@ Six choices that change what people see. Each slice in section 4 waits on its pi
 
 ### 3.1 Rail markers
 
-**A. Dots only.** Today's markers on the new grid: an `--act` dot for a comment (avatar inside the card header), a `--line-strong` dot for a change.
+**A. Dots only.** Today's markers on the new grid: a `--primary` dot for a comment (avatar inside the card header), a `--line-strong` dot for a change.
 
 ```
 1280                                              768                                  320
@@ -513,7 +513,7 @@ Six choices that change what people see. Each slice in section 4 waits on its pi
      │ [Z] Zack · 2h                         │          │ [Z] Zack · 2h            │         │ [Z] Zack · 2h [lk]│
      │ Doors are in.                         │          │ Doors are in.            │         │ Doors are in.     │
      └──────────────────────────────────────┘          └──────────────────────────┘         └───────────────────┘
- (# is a 6px --act dot)
+ (# is a 6px --primary dot)
 ```
 
 **B. Identity and status on the rail (recommended).** The author's avatar replaces the comment dot, a status change shows its StatusMark, other changes keep the dot.
@@ -541,7 +541,7 @@ Six choices that change what people see. Each slice in section 4 waits on its pi
         │ [Z] Zack · 2h                     │               │ [Z] Zack · 2h        │          │ [Z] Zack · 2h│
 ```
 
-**Recommendation: B.** Who said it is what you scan for in a conversation with a contractor. Linear puts each person's avatar on the rail and a status icon on status lines, which is B; GitHub puts the author's avatar beside each comment card and a glyph on each event, which is B for comments and C for the rest. Status changes reuse the one drawn set. The `--act` dot then means unread and nothing else, which the brand reserves it for. Moving the avatar out of the header gives the name 28px more at 320, so the Internal tag stops squeezing it. A costs nothing but leaves two `--act` dots meaning two things once the New divider ships. C adds a dozen glyphs for a two-partner team and makes a long imported history busier. Same at every size; nothing drops on phone.
+**Recommendation: B.** Who said it is what you scan for in a conversation with a contractor. Linear puts each person's avatar on the rail and a status icon on status lines, which is B; GitHub puts the author's avatar beside each comment card and a glyph on each event, which is B for comments and C for the rest. Status changes reuse the one drawn set. The `--primary` dot then means unread and nothing else, which the brand reserves it for. Moving the avatar out of the header gives the name 28px more at 320, so the Internal tag stops squeezing it. A costs nothing but leaves two `--primary` dots meaning two things once the New divider ships. C adds a dozen glyphs for a two-partner team and makes a long imported history busier. Same at every size; nothing drops on phone.
 
 References: B: [Linear](https://mobbin.com/screens/beb9d6b3-ec34-46d7-9332-320fcb32a338) (avatars and status icons on the rail, checked), [GitHub](https://mobbin.com/screens/f51b36bd-2708-42e4-bf86-c4ab39b2afae) (avatar beside the comment card, checked). C: [GitHub](https://mobbin.com/screens/f51b36bd-2708-42e4-bf86-c4ab39b2afae) (tag, person and merge glyphs on events, checked), [GitHub phone](https://mobbin.com/screens/0475c4c5-ac5d-4197-b23d-e9d9cb14c21f), [Stripe](https://mobbin.com/screens/ebf7e9fe-326a-4459-ae16-f94aea16f56b) (a glyph per payment event, checked), [Plane](https://mobbin.com/screens/daa3c99b-2a4c-401e-b804-ab045e23ec37).
 
@@ -697,8 +697,8 @@ On my way.                                       On my way.
        (was Thu, Oct 29) by Connor               Oct 30 (was Thu, Oct 29)
 ```
 
-- **Sent back.** The decision pair (2.2 d) without the rail: In progress's StatusMark, "Connor sent this back · 2h" ("HG sent this back" when no partner did), then his note in a `--surface` card on a `--line` edge, three lines, then "See the update" (a `TextLink` to `#update-<eventId>` of the note, or of the status line without one). It stays until Zack marks the job done again. Below 480 the " · 2h" drops before the sentence would wrap.
-- **Date or notes changed since he last looked** (question 2): one line each in `text-body` `--fg-1`, led by a lucide `CalendarClock` or `FileText` in `--fg-3` (16px, 20 on touch). The date line names the Target: "Due date moved to Fri, Oct 30 (was Thu, Oct 29) by Connor", or "Visit moved to …" when the date that moved was the booked visit (the job was Scheduled when it moved, and a later status change doesn't relabel it), and "Due date set to Fri, Oct 30" or "Due date cleared (was Thu, Oct 29)" (`dateChangeText` in `src/lib/portal/job-notice.ts`). Several moves read as one, first day to last, and a date back where it started shows nothing. The notes line reads "Notes updated by Connor". "by Connor" shows only when a partner made the change, and drops below 360. At 375 a date line may take two lines. They clear once he has opened the page after the change.
+- **Sent back.** The decision pair (2.2 d) without the rail: In progress's StatusMark, "Connor sent this back · 2h" ("HG sent this back" when no partner did), then his note in a `--background` card on a `--border` edge, three lines, then "See the update" (a `TextLink` to `#update-<eventId>` of the note, or of the status line without one). It stays until Zack marks the job done again. Below 480 the " · 2h" drops before the sentence would wrap.
+- **Date or notes changed since he last looked** (question 2): one line each in `text-body` `--foreground`, led by a lucide `CalendarClock` or `FileText` in `--muted-foreground` (16px, 20 on touch). The date line names the Target: "Due date moved to Fri, Oct 30 (was Thu, Oct 29) by Connor", or "Visit moved to …" when the date that moved was the booked visit (the job was Scheduled when it moved, and a later status change doesn't relabel it), and "Due date set to Fri, Oct 30" or "Due date cleared (was Thu, Oct 29)" (`dateChangeText` in `src/lib/portal/job-notice.ts`). Several moves read as one, first day to last, and a date back where it started shows nothing. The notes line reads "Notes updated by Connor". "by Connor" shows only when a partner made the change, and drops below 360. At 375 a date line may take two lines. They clear once he has opened the page after the change.
 - Desktop and tablet show the same notice at the record's width; nothing else drops.
 - References: the staff `ReviewBanner` anatomy this mirrors, [Flighty](https://mobbin.com/screens/09e08a95-1063-4e78-baeb-a68dddb6136a) ("Departure changed to 10:15 AM" at the top of the record, from G1A-I09).
 
@@ -761,10 +761,10 @@ Below 480 the "· 4 photos" clause drops rather than wrap (brand section 5, dens
                                                                 └──────────────────────────────┘
 ```
 
-- Flat `Card` as today (`--surface`, `--line`, `rounded-lg`, 16px padding). Brand section 9 keeps `Card` for Home and Overview modules; this banner is today's one other use, and the spec keeps it rather than invent a notice surface. Listed with the brand points below.
+- Flat `Card` as today (`--background`, `--border`, `rounded-lg`, 16px padding). Brand section 9 keeps `Card` for Home and Overview modules; this banner is today's one other use, and the spec keeps it rather than invent a notice surface. Listed with the brand points below.
 - The header is one line at every width: "Zack marked this done · 2h" is about 210px at touch size, inside the 222px it has at 320; a long name truncates first, never the verb.
 - Photos use `MediaGrid` in a new one-row mode (`rows={1}`): 6 tiles from `sm`, 3 on a phone. When more exist, the last tile shows "+1" in `--on-photo` on `--photo-scrim`, the brand's photo counter look, and opens the Lightbox there.
-- "Checklist 12 of 14 done" in `text-meta` `--fg-3`, only when the task has a checklist.
+- "Checklist 12 of 14 done" in `text-meta` `--muted-foreground`, only when the task has a checklist.
 - On a phone the buttons split the width, 44px tall.
 
 **Recommendation: B.** Approving is the moment the loop between partner and contractor closes, and today the evidence sits three sections below (G1A-007). ClassDojo shows the submission, its note and its comment right above Approve, with a line saying who will see it. A fixes the wrong count but still sends you scrolling, and on a phone it loses the photo count to the density rule, which B avoids by showing the photos.
@@ -789,7 +789,7 @@ Every instance from the inventory, grouped by page.
 |---|---|---|
 | TaskActivity and its Row | Renders `CommentCard`, system lines, `ActivityRun`, decision pairs and dividers from the new `buildActivity`. The page selects `TaskEvent.source`, `editedAt` and the read state | 14 ticks become one line. "Show 12 earlier updates" counts what you'll see and folds back. Times stay current and show the full stamp on hover, or in a comment's menu on touch |
 | Comment card | `CommentCard` with links, the menu (3.2), edit and delete, delivery line | Links work. Your own comments can be edited and deleted. You see whether Zack got it and opened it |
-| Internal comment card | Same card on `--fill-1` with Lock; the word drops below 480 | Unchanged look, no name squeeze at 320. "Seen by Pieter" under your own newest note |
+| Internal comment card | Same card on `--muted` with Lock; the word drops below 480 | Unchanged look, no name squeeze at 320. "Seen by Pieter" under your own newest note |
 | System event lines | Sentences from `eventLine` with bursts, reversals, repeat on and off, removed files, conflict sentences, "via Asana", and Notes with View previous | Fewer, clearer lines. Notes overwrites are recoverable. A gone file says it was removed |
 | Attachments in comments | Unchanged inside the card. Removed files leave "1 file removed". Photos section dedupe and held contractor uploads go to the uploads and photos spec | A comment no longer silently loses a photo |
 | Task comment composer | Shared `Composer` with the audience line, visibility in the draft, Esc, "Sending…" in place, "Didn't send · Retry" with a `clientId` so nothing posts twice, pinned to the screen's bottom with 16px gutters and the keyboard inset, comma-joined names, secondary Send, hover only under `(hover: hover)`, print hidden | You know who gets it before you send. An internal draft stays internal. The phone bar sits on the bottom edge and rides the keyboard |

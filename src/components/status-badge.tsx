@@ -11,13 +11,13 @@ import { cn } from "@/lib/utils";
  * avatars never take these tones.
  */
 export const STATUS_TONE: Record<TaskStatus, string> = {
-  OPEN: "text-fg-3",
-  SCHEDULED: "text-fg-3",
+  OPEN: "text-muted-foreground",
+  SCHEDULED: "text-muted-foreground",
   IN_PROGRESS: "text-fg-2",
-  WAITING: "text-fg-3",
+  WAITING: "text-muted-foreground",
   REVIEW: "text-warn",
   DONE: "text-ok",
-  CANCELED: "text-fg-3",
+  CANCELED: "text-muted-foreground",
 };
 
 /* The ring family, drawn on lucide's 24 grid. Each starts from the same
@@ -59,7 +59,7 @@ const GLYPH: Record<TaskStatus, ReactNode> = {
   DONE: (
     <>
       <circle cx="12" cy="12" r="9" fill="currentColor" />
-      <path d="m8.5 12.25 2.5 2.5 4.5-5" className="stroke-surface" />
+      <path d="m8.5 12.25 2.5 2.5 4.5-5" className="stroke-background" />
     </>
   ),
   // Slashed ring

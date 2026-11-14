@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { TenantSheet, type TenantRow } from "./tenant-sheet";
 
 /** A small link beside a person that does what their phone or email used to do as a link. */
-const actionLink = cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3");
+const actionLink = cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-muted-foreground");
 
 /**
  * The Tenants section: one row per person, the primary first, each opening
@@ -36,19 +36,19 @@ export function TenantsSection({ leaseId, tenants }: { leaseId: string; tenants:
           const meta = [t.phone, t.email].filter(Boolean).join(" · ");
           const emergency = [t.emergencyName, t.emergencyPhone].filter(Boolean).join(", ");
           return (
-            <li key={t.id} className="flex items-center gap-1 border-b border-line">
+            <li key={t.id} className="flex items-center gap-1 border-b border-border">
               <button
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => openFor(t)}
-                className="-mx-2 my-0.5 flex min-h-12 min-w-0 flex-1 flex-col items-start justify-center rounded-md px-2 py-1.5 text-left transition-colors pointer-fine:hover:bg-fill-1"
+                className="-mx-2 my-0.5 flex min-h-12 min-w-0 flex-1 flex-col items-start justify-center rounded-md px-2 py-1.5 text-left transition-colors pointer-fine:hover:bg-muted"
               >
                 <span className="flex max-w-full min-w-0 items-center gap-2">
-                  <span className="truncate text-body text-fg-1">{t.fullName}</span>
+                  <span className="truncate text-body text-foreground">{t.fullName}</span>
                   {t.primary && <span className={tagClass}>Primary</span>}
                 </span>
-                {meta && <span className="num max-w-full truncate text-meta text-fg-3">{meta}</span>}
-                {emergency && <span className="max-w-full truncate text-meta text-fg-3">Emergency: {emergency}</span>}
+                {meta && <span className="num max-w-full truncate text-meta text-muted-foreground">{meta}</span>}
+                {emergency && <span className="max-w-full truncate text-meta text-muted-foreground">Emergency: {emergency}</span>}
               </button>
               <div className="flex shrink-0 items-center">
                 {tel && (

@@ -120,7 +120,7 @@ export function DealListingLink({ id, value }: { id: string; value: string | nul
             rel="noopener noreferrer"
             aria-label="Open the listing"
             title={`Open ${value}`}
-            className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-fg-3")}
+            className={cn(buttonClass({ variant: "ghost", size: "sm", icon: true }), "text-muted-foreground")}
           >
             <ExternalLink aria-hidden="true" className={chromeIconClass} />
           </a>

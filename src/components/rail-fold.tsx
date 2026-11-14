@@ -71,9 +71,9 @@ export function RailFold({
       {folded.length > 0 && (
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={addRowClass}>
           {open ? (
-            <ChevronUp aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+            <ChevronUp aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
           ) : (
-            <ChevronDown aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+            <ChevronDown aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
           {open ? "Fewer fields" : moreFieldsLabel(folded.length)}
         </button>

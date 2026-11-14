@@ -126,7 +126,7 @@ export function ResizeHandle({ columnKey }: { columnKey: ColumnKey }) {
       className="group absolute inset-y-0 right-0 z-10 w-2 cursor-col-resize touch-none select-none"
     >
       {/* Translate only this cosmetic line onto the border; translating the hit-box itself gets it shadowed by the next th. */}
-      <span className="mx-auto block h-full w-px translate-x-1/2 bg-transparent group-hover:bg-line-control group-active:bg-act" />
+      <span className="mx-auto block h-full w-px translate-x-1/2 bg-transparent group-hover:bg-input group-active:bg-primary" />
     </span>
   );
 }

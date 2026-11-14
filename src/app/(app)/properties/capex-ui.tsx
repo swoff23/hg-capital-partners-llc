@@ -18,9 +18,9 @@ export const fmtAge = (n: number | null) => (n == null ? "—" : `${n} yr${n ===
  */
 export function EquipmentStatusText({ status }: { status: EquipmentStatus | null }) {
   if (status === "Replace") return <Badge tone="danger">Replace</Badge>;
-  if (!status) return <span className="text-fg-3">—</span>;
+  if (!status) return <span className="text-muted-foreground">—</span>;
   return (
-    <span className={cn(status === "Monitor" ? "text-warn" : status === "Good" ? "text-fg-2" : "text-fg-3")}>
+    <span className={cn(status === "Monitor" ? "text-warn" : status === "Good" ? "text-fg-2" : "text-muted-foreground")}>
       {status}
     </span>
   );
@@ -28,7 +28,7 @@ export function EquipmentStatusText({ status }: { status: EquipmentStatus | null
 
 /** A utility setup status's text color: Done is done (ok), Need to set up is late (danger), Call to confirm a decision (warn). */
 export function utilityToneClass(tone: "green" | "amber" | "red" | "gray"): string {
-  return { green: "text-ok", amber: "text-warn", red: "text-danger", gray: "text-fg-2" }[tone];
+  return { green: "text-ok", amber: "text-warn", red: "text-destructive", gray: "text-fg-2" }[tone];
 }
 
 export type ForecastYear = { year: number; total: number; count?: number };
@@ -39,7 +39,7 @@ export type ForecastYear = { year: number; total: number; count?: number };
  * (dropped below 400px). Each row prints its amount, so the bars need no
  * axis. A year with spend is a toggle (aria-pressed) named as a sentence
  * ("2026: $13,000 spend, 3 items"); picking it filters what's below, and it
- * keeps a 1px inset --line-control edge with its year in --fg-1. Nothing
+ * keeps a 1px inset --input edge with its year in --foreground. Nothing
  * dims: the other years stay at full strength. A year with nothing is plain
  * text with the dash, in order, and not a tab stop. Esc clears the pick
  * while focus is in the bars. The hover fill shows with a mouse only; rows
@@ -80,12 +80,12 @@ export function ForecastYearBars({
         const active = selected === y.year;
         const content = (
           <>
-            <span className={cn("num w-10 shrink-0", active ? "text-fg-1" : "text-fg-3")}>{y.year}</span>
+            <span className={cn("num w-10 shrink-0", active ? "text-foreground" : "text-muted-foreground")}>{y.year}</span>
             <Meter value={y.total} max={max} className="min-w-0 flex-1" />
-            <span className="w-20 shrink-0 text-right text-fg-1">
-              {y.total ? <Money value={y.total} /> : <span className="text-fg-3">—</span>}
+            <span className="w-20 shrink-0 text-right text-foreground">
+              {y.total ? <Money value={y.total} /> : <span className="text-muted-foreground">—</span>}
             </span>
-            {showCount && <span className="num w-14 shrink-0 text-right text-fg-3 max-[400px]:hidden">{items(y.count)}</span>}
+            {showCount && <span className="num w-14 shrink-0 text-right text-muted-foreground max-[400px]:hidden">{items(y.count)}</span>}
           </>
         );
         if (!(y.total > 0 || (y.count ?? 0) > 0)) {
@@ -103,7 +103,7 @@ export function ForecastYearBars({
             onClick={() => onSelect(y.year)}
             aria-pressed={active}
             aria-label={name}
-            className={cn(row, "transition-colors duration-fast hover:bg-fill-1", active && "ring-1 ring-inset ring-line-control")}
+            className={cn(row, "transition-colors duration-fast hover:bg-muted", active && "ring-1 ring-inset ring-input")}
           >
             {content}
           </button>

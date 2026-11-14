@@ -81,7 +81,7 @@ export function ReviewSlot({
   if (review) return <ReviewBanner taskId={taskId} contractor={contractor} hasLogin={hasLogin} now={now} openSendBack={openSendBack} {...review} />;
   if (!heldBanner || !decision) return null;
   return (
-    <p ref={outcome} tabIndex={-1} role="status" className="flex min-w-0 items-center gap-2 text-meta text-fg-3 outline-none">
+    <p ref={outcome} tabIndex={-1} role="status" className="flex min-w-0 items-center gap-2 text-meta text-muted-foreground outline-none">
       <StatusMark status={decision.status} />
       <span className="min-w-0 truncate">
         {decision.name} {decision.status === "DONE" ? "approved this" : "sent this back"}
@@ -147,10 +147,10 @@ function ReviewBanner({
       <div className="flex min-w-0 items-center gap-2.5">
         <Avatar name={fullName} size={24} outline={isContractor} />
         {/* One line at every width: a long name truncates first, never the verb. */}
-        <p className="flex min-w-0 text-body text-fg-1">
+        <p className="flex min-w-0 text-body text-foreground">
           <span className="min-w-0 truncate font-medium">{name}</span>
           <span className="shrink-0 whitespace-pre"> {reviewMoveText(isContractor)}</span>
-          <span className="shrink-0 whitespace-pre text-fg-3">
+          <span className="shrink-0 whitespace-pre text-muted-foreground">
             <span aria-hidden="true">{" · "}</span>
             <ActivityTime at={markedAt} now={now} />
           </span>
@@ -159,7 +159,7 @@ function ReviewBanner({
       {note && <Note text={note} />}
       {photos.length > 0 && <MediaGrid items={photos} rows={1} />}
       {checklist && (
-        <p className="text-meta text-fg-3">
+        <p className="text-meta text-muted-foreground">
           Checklist {checklist.done} of {checklist.total} done
         </p>
       )}
@@ -203,14 +203,14 @@ function Note({ text }: { text: string }) {
   }, [text, more]);
   return (
     <div>
-      <p ref={el} className={`whitespace-pre-wrap break-words text-body text-fg-1 ${more ? "" : "line-clamp-3"}`}>
+      <p ref={el} className={`whitespace-pre-wrap break-words text-body text-foreground ${more ? "" : "line-clamp-3"}`}>
         {text}
       </p>
       {(clipped || more) && (
         <button
           type="button"
           onClick={() => setMore((m) => !m)}
-          className="mt-0.5 text-meta font-medium text-fg-2 underline decoration-1 underline-offset-3 hover:text-fg-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+          className="mt-0.5 text-meta font-medium text-fg-2 underline decoration-1 underline-offset-3 hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         >
           {more ? "Less" : "More"}
         </button>

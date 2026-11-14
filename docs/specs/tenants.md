@@ -170,7 +170,7 @@ A new route, `src/app/(app)/tenants/(list)/page.tsx`, beside Contractors' and bu
 
 - **Sidebar:** "Tenants" with lucide `Users`, right under Portfolio in `src/components/nav.tsx`, with `list: "tenants"` so the link remembers its filters (`src/lib/list-memory.ts`). The phone drawer gets it in the same place. Global search's Go list (`src/lib/commands.ts`) gets "Tenants".
 - **The bar** (`FilterBar` in a `FilterScope list="tenants"`): search (name, phone, email, address, unit), views **Current**, **Past** and **All** (a segmented control, Current by default), and a **Property** facet. Sort: Home (the default, street order then unit), Name, Rent, Lease ends.
-- **Rows: one per tenant**, so everyone in a unit shows. Columns: **Name** (the primary has no badge here; the lease page says it), **Home** ("647 Prospect · Front"), **Rent** (the whole rent, on the primary's row only; the others show "—" in `--fg-3`), **Lease ends** ("Feb 2027", "Monthly", or in Past "Moved out Aug 2026") and **Phone** (`num`, `--fg-2`). A row opens its lease (`TaskRow`-style whole-row link).
+- **Rows: one per tenant**, so everyone in a unit shows. Columns: **Name** (the primary has no badge here; the lease page says it), **Home** ("647 Prospect · Front"), **Rent** (the whole rent, on the primary's row only; the others show "—" in `--muted-foreground`), **Lease ends** ("Feb 2027", "Monthly", or in Past "Moved out Aug 2026") and **Phone** (`num`, `--fg-2`). A row opens its lease (`TaskRow`-style whole-row link).
 - **New lease** is the header's button, as New contractor is on Contractors.
 - **Empty states:** Current with no tenants reads "No current tenants yet." with New lease; a search with nothing reads as Contractors' does.
 - **Sizes.** Laptop 1280: every column. Tablet 768 (touch): Phone drops, rows 48px. Phone 375: each row is the name over the home, with the rent on the right; Lease ends and Phone drop. Phone 320: the same, the home truncates. The bar collapses into its Filters button as Contractors' does.
@@ -182,7 +182,7 @@ A new route, `src/app/(app)/tenants/(list)/page.tsx`, beside Contractors' and bu
 A new `TenantsSection` in `src/app/(app)/properties/[id]/`, right under `UnitsSection` in the main column.
 
 - **One row per rentable unit**, in the units' order (house-meter rows skipped; a property with no units gets one row, "Home"). Columns: **Unit**, **Tenants** (the primary first, everyone else after, comma-joined, truncating), **Rent** and **Lease ends**. A row opens the lease.
-- **A vacant unit** reads "Vacant" in `--fg-3` with an **Add tenants** verb (`RailVerb`-style), which opens New lease with the property and unit picked.
+- **A vacant unit** reads "Vacant" in `--muted-foreground` with an **Add tenants** verb (`RailVerb`-style), which opens New lease with the property and unit picked.
 - **An upcoming lease** shows as a meta line under its unit: "Next: Ana Ruiz from Feb 1". On a vacant unit it takes the row instead: "Ana Ruiz · moves in Feb 1".
 - **Past tenants (6)** is a ghost button under the rows that opens the list in place: one line per past lease, newest first, "Amy Chen, Bo Chen · Front · Mar 2023 to Feb 2025 · $1,750", each opening its lease. It stays open for the visit.
 - The section's own header link "All tenants" opens the Tenants list filtered to this property.

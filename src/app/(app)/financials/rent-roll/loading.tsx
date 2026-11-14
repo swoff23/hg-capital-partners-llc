@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { GridFrame } from "./grid-frame";
 
 /* The pinned property column, as the page pins it. */
-const pinned = "sticky left-0 z-20 bg-surface";
+const pinned = "sticky left-0 z-20 bg-background";
 
 /**
  * The rent roll while it loads (docs/specs/performance.md 4.3), on the
@@ -31,7 +31,7 @@ export default function RentRollLoading() {
           <Block text="text-label" className="w-16" />
         </div>
         <Block text="text-figure-m" className="w-32" />
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-border">
           {Array.from({ length: 8 }, (_, i) => (
             <li key={i} className="flex min-h-12 items-center justify-between gap-3 py-2">
               <Block text="text-body" className={rowWidth(i, ["w-36", "w-28", "w-40"])} />
@@ -57,7 +57,7 @@ export default function RentRollLoading() {
                 </Th>
               </tr>
             </thead>
-            <tbody aria-hidden="true" className="divide-y divide-line">
+            <tbody aria-hidden="true" className="divide-y divide-border">
               {Array.from({ length: 8 }, (_, i) => (
                 <tr key={i}>
                   <Td className={cn(pinned, "min-w-56")}>

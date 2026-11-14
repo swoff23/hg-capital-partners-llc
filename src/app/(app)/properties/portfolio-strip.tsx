@@ -39,7 +39,7 @@ export function PortfolioStrip({ properties }: { properties: StripProperty[] }) 
         ]}
       />
       {line && (
-        <p className="mt-2 truncate text-meta text-fg-3">
+        <p className="mt-2 truncate text-meta text-muted-foreground">
           {/* From sm it names the property; a phone counts it, so a long street can't cut the reason off. */}
           <span className="max-sm:hidden">{words(line.wide)}</span>
           <span className="sm:hidden">{words(line.phone)}</span>

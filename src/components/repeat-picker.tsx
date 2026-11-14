@@ -59,9 +59,9 @@ export function RepeatPicker({
           isDisabled={isDisabled}
           data-placeholder={value ? undefined : true}
           aria-label={`Repeat: ${value ? describeRepeat(value, { from: anchor }) : "doesn't repeat"}`}
-          className={cn(trigger === "field" ? pickerField : pickerChipClass({ size }), !value && "text-fg-3", className)}
+          className={cn(trigger === "field" ? pickerField : pickerChipClass({ size }), !value && "text-muted-foreground", className)}
         >
-          <Repeat aria-hidden="true" className={cn(trigger === "field" && "text-fg-3")} />
+          <Repeat aria-hidden="true" className={cn(trigger === "field" && "text-muted-foreground")} />
           <span className={cn("min-w-0 truncate", trigger === "field" && "flex-1")}>
             {value ? describeRepeat(value, { short: true, from: anchor }) : placeholder}
           </span>

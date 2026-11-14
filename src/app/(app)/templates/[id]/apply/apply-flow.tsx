@@ -222,7 +222,7 @@ export function ApplyFlow({
               properties={properties}
               required
               trigger="field"
-              className={tried && problems.property ? "border-danger" : undefined}
+              className={tried && problems.property ? "border-destructive" : undefined}
               onChange={(id) => {
                 const next = properties.find((p) => p.id === id);
                 patch({
@@ -241,7 +241,7 @@ export function ApplyFlow({
 
         {property && open_ > 0 && (
           // Neutral: nothing is wrong, it may be exactly what's wanted (BPLAY-V01).
-          <p className="truncate text-meta text-fg-3">
+          <p className="truncate text-meta text-muted-foreground">
             {open_} {open_ === 1 ? "task from this playbook is" : "tasks from this playbook are"} still open here.{" "}
             <TextLink href={`/tasks?property=${encodeURIComponent(property.id)}`}>Open {open_ === 1 ? "it" : "them"}</TextLink>
           </p>
@@ -277,7 +277,7 @@ export function ApplyFlow({
         title="Tasks"
         actions={
           <>
-            <span className="text-meta tabular-nums text-fg-3">
+            <span className="text-meta tabular-nums text-muted-foreground">
               {count} of {items.length}
             </span>
             <Button
@@ -291,7 +291,7 @@ export function ApplyFlow({
           </>
         }
       >
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-border">
           {items.map((item, i) => {
             const r = s.rows[i];
             const title = titleOf(i);
@@ -388,7 +388,7 @@ function PickField({ label, error, children }: { label: string; error?: string; 
     <div data-invalid={error ? "true" : undefined} className="flex min-w-0 flex-col gap-1.5">
       <span className="text-meta font-medium text-fg-2">{label}</span>
       {children}
-      {error && <p className="truncate text-meta text-danger">{error}</p>}
+      {error && <p className="truncate text-meta text-destructive">{error}</p>}
     </div>
   );
 }
@@ -445,7 +445,7 @@ function RowTitle({ value, disabled, onRename, note }: { value: string; disabled
           onBlur={keys.onBlur}
           onKeyDown={keys.onKeyDown}
         />
-        {short && <p className="truncate text-meta text-danger">Enter at least 2 characters.</p>}
+        {short && <p className="truncate text-meta text-destructive">Enter at least 2 characters.</p>}
       </div>
     );
   }
@@ -457,10 +457,10 @@ function RowTitle({ value, disabled, onRename, note }: { value: string; disabled
         setDraft(value);
         setEditing(true);
       }}
-      className="-mx-1.5 flex min-h-7 min-w-0 items-center rounded-sm px-1.5 text-left text-body text-fg-1 transition-colors [overflow-wrap:anywhere] not-disabled:hover:bg-fill-1 pointer-coarse:min-h-11"
+      className="-mx-1.5 flex min-h-7 min-w-0 items-center rounded-sm px-1.5 text-left text-body text-foreground transition-colors [overflow-wrap:anywhere] not-disabled:hover:bg-muted pointer-coarse:min-h-11"
     >
       {value}
-      {note && <span className="ml-2 inline-flex items-center gap-1 whitespace-nowrap text-meta text-fg-3 max-md:hidden"><ListChecks aria-hidden="true" className="size-3.5" />{note}</span>}
+      {note && <span className="ml-2 inline-flex items-center gap-1 whitespace-nowrap text-meta text-muted-foreground max-md:hidden"><ListChecks aria-hidden="true" className="size-3.5" />{note}</span>}
     </button>
   );
 }

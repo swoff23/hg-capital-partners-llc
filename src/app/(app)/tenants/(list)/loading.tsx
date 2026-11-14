@@ -18,7 +18,7 @@ const NAMES: string[][] = [
 /**
  * Tenants while the list loads (docs/specs/performance.md 4.3): the title and
  * New lease, the filter bar and the five headers draw at once, with the page's
- * own hiding classes; the count and 8 rows are --fill-1 blocks in the page's
+ * own hiding classes; the count and 8 rows are --muted blocks in the page's
  * cells, the name over the home below sm.
  */
 export default function TenantsLoading() {
@@ -47,7 +47,7 @@ export default function TenantsLoading() {
             <Th className="hidden pr-0 lg:table-cell">Phone</Th>
           </tr>
         </thead>
-        <tbody aria-hidden="true" className="divide-y divide-line">
+        <tbody aria-hidden="true" className="divide-y divide-border">
           {NAMES.map((name, i) => (
             <tr key={i}>
               <Td className="pl-0 max-sm:w-full max-sm:max-w-0">

@@ -38,22 +38,22 @@ export function TermsSection({ leaseId, terms }: { leaseId: string; terms: TermR
       }
     >
       {terms.length === 0 ? (
-        <p className="text-meta text-fg-3">No signed lease yet.</p>
+        <p className="text-meta text-muted-foreground">No signed lease yet.</p>
       ) : (
         <ul className="-mt-1">
           {terms.map((t) => (
             <li
               key={t.id}
-              className="flex min-h-12 flex-col items-start gap-1 border-b border-line py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+              className="flex min-h-12 flex-col items-start gap-1 border-b border-border py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             >
               <div className="min-w-0">
-                <p className="text-body text-fg-1">
+                <p className="text-body text-foreground">
                   <span className="num">{t.endsOn ? `${fmtDay(t.startsOn)} to ${fmtDay(t.endsOn)}` : `${fmtDay(t.startsOn)}, month to month`}</span>
-                  <span className="text-fg-3"> · </span>
+                  <span className="text-muted-foreground"> · </span>
                   <Money value={t.rent} />
                 </p>
                 {t.subsidy ? (
-                  <p className="text-meta text-fg-3 max-sm:truncate">
+                  <p className="text-meta text-muted-foreground max-sm:truncate">
                     Tenant pays <Money value={tenantShare(t.rent, t.subsidy)} /> · Housing authority <Money value={t.subsidy} />
                   </p>
                 ) : null}
@@ -104,7 +104,7 @@ function TermFile({ leaseId, term }: { leaseId: string; term: TermRow }) {
             href={`/api/files/lease/${term.file.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="min-w-0 truncate text-fg-2 underline decoration-1 underline-offset-3 hover:text-fg-1"
+            className="min-w-0 truncate text-fg-2 underline decoration-1 underline-offset-3 hover:text-foreground"
           >
             {term.file.filename}
           </a>

@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * A sortable table header on the Th look (docs/specs/selectors.md 3.6).
- * Every sortable header shows `ChevronsUpDown` in --fg-3 at rest, so
+ * Every sortable header shows `ChevronsUpDown` in --muted-foreground at rest, so
  * sortability needs no hover and works on touch; the active column turns
- * --fg-1 with one `ChevronUp` or `ChevronDown`. A click picks the column or
+ * --foreground with one `ChevronUp` or `ChevronDown`. A click picks the column or
  * flips its direction: a text column starts A to Z (`first="asc"`), money, a
  * count or a date starts with the most or the newest (`first="desc"`). There's
  * no hidden "clear" click: the list's default order is a column like any other
@@ -64,10 +64,10 @@ export function SortHeader({
         type="button"
         onClick={toggle}
         className={cn(
-          "relative -my-2 inline-flex max-w-full items-center gap-1 py-2 transition-colors hover:text-fg-1",
+          "relative -my-2 inline-flex max-w-full items-center gap-1 py-2 transition-colors hover:text-foreground",
           // The button fills the header cell's height (34px) and, on touch, reaches 44 without growing the row.
           "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1.5",
-          active && "text-fg-1",
+          active && "text-foreground",
         )}
       >
         <span className="truncate">{label}</span>
@@ -76,7 +76,7 @@ export function SortHeader({
           className={cn(
             "size-3.5 shrink-0",
             numeric && "absolute right-full top-1/2 mr-1 -translate-y-1/2",
-            active ? "text-fg-1" : "text-fg-3",
+            active ? "text-foreground" : "text-muted-foreground",
           )}
         />
       </button>

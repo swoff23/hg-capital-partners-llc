@@ -121,7 +121,7 @@ export function CrewText({ taskId, openOnLoad = false }: { taskId: string; openO
       >
         <div className="p-4">
           {text ? (
-            <p className="rounded-md border border-line bg-surface p-3 text-body whitespace-pre-wrap text-fg-1 wrap-anywhere">{text}</p>
+            <p className="rounded-md border border-border bg-background p-3 text-body whitespace-pre-wrap text-foreground wrap-anywhere">{text}</p>
           ) : (
             <div className="flex h-24 items-center justify-center">{spinning && <Spinner className="size-5" />}</div>
           )}

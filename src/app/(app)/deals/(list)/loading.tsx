@@ -25,7 +25,7 @@ const dense = "min-h-10 pointer-coarse:min-h-12";
 /**
  * Deals while the list loads (docs/specs/performance.md 4.3): the title, New
  * deal, the filter bar and the column headers draw at once, on the page's own
- * column widths (a dragged width too) and drop points; 10 rows are --fill-1
+ * column widths (a dragged width too) and drop points; 10 rows are --muted
  * blocks in DealListRow's boxes, two lines where the list is under 520px.
  */
 export default function DealsLoading() {
@@ -55,7 +55,7 @@ export default function DealsLoading() {
                 ))}
               </tr>
             </thead>
-            <tbody aria-hidden="true" className="divide-y divide-line">
+            <tbody aria-hidden="true" className="divide-y divide-border">
               {Array.from({ length: 10 }, (_, i) => (
                 <tr key={i}>
                   <Cell className="flex-col items-start justify-center gap-0 pl-0 @max-[32.5rem]:py-2">

@@ -100,8 +100,8 @@ type UploadTarget = {
 **Anatomy**
 
 - **At rest:** nothing. No dashed box anywhere (brand section 9, Empty).
-- **While a file is dragged into the window,** every target on the page takes the drop state: the field focus look from brand section 9 (a 1px `--act` edge plus a 1px inset `--act` ring), `rounded-lg`, drawn 8px outside the target's content so nothing shifts. A Section takes it around its content, under the heading rule. **New:** the field focus look on a section.
-- **The target under the pointer** also shows the drop label at its center, at the Float level: `--raised`, the `--line-float` edge, `shadow-float`, `rounded-lg`, 8px by 12px padding, a 16px lucide `Upload` in `--fg-3` and `text-label` `--fg-1`. **New.**
+- **While a file is dragged into the window,** every target on the page takes the drop state: the field focus look from brand section 9 (a 1px `--primary` edge plus a 1px inset `--primary` ring), `rounded-lg`, drawn 8px outside the target's content so nothing shifts. A Section takes it around its content, under the heading rule. **New:** the field focus look on a section.
+- **The target under the pointer** also shows the drop label at its center, at the Float level: `--popover`, the `--line-float` edge, `shadow-float`, `rounded-lg`, 8px by 12px padding, a 16px lucide `Upload` in `--muted-foreground` and `text-label` `--foreground`. **New.**
 
 ```
 Desktop 1280, property record, a file dragged over the rail
@@ -141,7 +141,7 @@ Desktop 1280, property record, a file dragged over the rail
 - **375 and 320:** no drag and drop. Paste from the iOS edit menu still works in the composer.
 - **Drops on phone:** the drop state and the label.
 - **Motion.** The edge appears at `--dur-fast`; the label pops in at `--dur-base` (scale 0.97 to 1). Reduced motion: a fade.
-- **Tokens.** `--act`, `--raised`, `--line-float`, `shadow-float`, `--fg-1`, `--fg-3`, `text-label`, `rounded-lg`.
+- **Tokens.** `--primary`, `--popover`, `--line-float`, `shadow-float`, `--foreground`, `--muted-foreground`, `text-label`, `rounded-lg`.
 - **References.** Savee turns the window into one target with one line of copy ([screen](https://mobbin.com/screens/8494c1b0-237f-4a3e-b9bc-ba38289b0d3e)); Linear's reply box carries only a paperclip ([screen](https://mobbin.com/screens/2e6c00de-40a7-455d-875f-0d8cb27c8270)); Zillow leads with one button and treats drag as secondary ([screen](https://mobbin.com/screens/3613dc65-9e3a-4c20-b3e7-4dac3c341a8d)); Apple HIG, [highlight valid destinations](https://developer.apple.com/design/human-interface-guidelines/drag-and-drop).
 
 ### 2.3 Upload tiles and the status line
@@ -158,29 +158,29 @@ Desktop 1280, property record, a file dragged over the rail
 | Saving | The ring full | saving |
 | Waiting for signal (phase 3, **new**; the per-tile mark is invented) | The preview under the same 50% `--photo-scrim`, a 20px lucide `WifiOff` in `--on-photo`, no ring | waiting for signal |
 | Paused (**new**; the `Pause` mark is invented, a swap for `WifiOff` in the same slot) | The same scrim and slot as waiting for signal, a 20px lucide `Pause` in `--on-photo`. The upload code didn't load while the app's server answers (`UploadCodeMissingError`), so the file waits without spending tries and goes when the code arrives (the next try fetches it again after a dropped request) or after a reload (a deploy removed it). With the device reading online but the server not answering either (no data), the file shows the waiting for signal tile and the No signal line instead, with no Reload. A file row says "Paused" | paused |
-| Failed | The 2px inset `--danger` ring in place of the photo edge. Grid: the `RetryPill`. Row: the whole tile retries, now with `RotateCcw` to match the pill | couldn't upload: no connection |
+| Failed | The 2px inset `--destructive` ring in place of the photo edge. Grid: the `RetryPill`. Row: the whole tile retries, now with `RotateCcw` to match the pill | couldn't upload: no connection |
 | Refused by the check | `TriangleAlert` on a 60% `--photo-scrim`, as today. Remove only | couldn't upload: over the 25 MB limit |
 | Ready (composer) | The thumbnail (`?v=thumb`), not the original | ready to send |
 
-- **Documents on a tile** show their type: a 20px `FileText` or `FileSpreadsheet` in `--fg-3` over "PDF" in `text-micro` `--fg-3`. Today it's a blank square, and the name is only in the title tooltip touch can't see.
-- **Remove** stays a 20px `--act` badge, now with a 14px `--on-act` X (section 6's size inside a badge; today 12px), and square: `rounded-sm` in place of today's circle, since an icon-only button is square and `rounded-full` never goes on a button (brand sections 5 and 9). Turo puts a square X on each listing photo ([screen](https://mobbin.com/screens/6d630675-f5a5-4c41-83fe-962a8c61174e)). Today's 2px `ring-surface` halo becomes a 1px ring (brand section 5: every border is 1px) in the tile's ground (`--surface` on a Shared reply, `--fill-1` on an Internal note), so it no longer shows a white ring on the Internal ground. The hit area is 44px on touch and 32px with a mouse (today about 28px).
+- **Documents on a tile** show their type: a 20px `FileText` or `FileSpreadsheet` in `--muted-foreground` over "PDF" in `text-micro` `--muted-foreground`. Today it's a blank square, and the name is only in the title tooltip touch can't see.
+- **Remove** stays a 20px `--primary` badge, now with a 14px `--primary-foreground` X (section 6's size inside a badge; today 12px), and square: `rounded-sm` in place of today's circle, since an icon-only button is square and `rounded-full` never goes on a button (brand sections 5 and 9). Turo puts a square X on each listing photo ([screen](https://mobbin.com/screens/6d630675-f5a5-4c41-83fe-962a8c61174e)). Today's 2px `ring-background` halo becomes a 1px ring (brand section 5: every border is 1px) in the tile's ground (`--background` on a Shared reply, `--muted` on an Internal note), so it no longer shows a white ring on the Internal ground. The hit area is 44px on touch and 32px with a mouse (today about 28px).
 - **Removing a ready file** takes the tile out with the toast "Photo removed · Undo". The file is deleted when the toast ends. Today it's deleted at once with no undo (G1D-V01).
 - **The status line** (`UploadStatusLine`): one line of `text-meta` that truncates, under the tray or under the bar's buttons. The composer gets it too (today: a red line with no Retry).
 
 | Situation | Line |
 |---|---|
-| Files can be retried | "2 photos didn't upload · Retry" in `--danger`, Retry underlined, 44px on touch (today's line) |
-| Nothing can be retried | "1 photo didn't upload: over the 25 MB limit" in `--danger` |
-| Every red file is one the job stopped taking before it uploaded | "Job closed before 2 photos uploaded" (Done or Canceled) or "Too late to add 2 photos" (still in Review) in `--danger`, no Retry; each tile keeps its red ring with only Remove |
-| No signal (phase 3) | "No signal · 5 photos waiting" in `--fg-3`; "No signal · 5 waiting" below 360px |
-| Paused (the upload code didn't load) | "Uploads paused · Reload" in `--fg-3`, Reload underlined, 44px on touch; "Uploads paused, still trying" with no Reload where a reload would lose a file (one whose row never reached the outbox) |
+| Files can be retried | "2 photos didn't upload · Retry" in `--destructive`, Retry underlined, 44px on touch (today's line) |
+| Nothing can be retried | "1 photo didn't upload: over the 25 MB limit" in `--destructive` |
+| Every red file is one the job stopped taking before it uploaded | "Job closed before 2 photos uploaded" (Done or Canceled) or "Too late to add 2 photos" (still in Review) in `--destructive`, no Retry; each tile keeps its red ring with only Remove |
+| No signal (phase 3) | "No signal · 5 photos waiting" in `--muted-foreground`; "No signal · 5 waiting" below 360px |
+| Paused (the upload code didn't load) | "Uploads paused · Reload" in `--muted-foreground`, Reload underlined, 44px on touch; "Uploads paused, still trying" with no Reload where a reload would lose a file (one whose row never reached the outbox) |
 
 - **Layouts**, as today: `row` is 56px tiles in a wrapping row (the composer); `grid` is squares at least 88px wide (the job page and the Mark done sheet). The grid's phone gap goes from 6px to 8px, the brand's 4px scale.
 - **Keyboard.** Tab reaches Retry and Remove; both names carry the file's name.
 - **Touch.** Nothing waits on hover: every state shows on the tile.
 - **Sizes.** Row tiles are 56px at every size. Grid at 1280: squares of about 98px in the 448px Mark done sheet (16px padding, four across); at 768 the same sheet, centered; at 375 about 127px in two columns beside Send on the job page (109px in three columns in the sheet); at 320 about 100px (91px in the sheet).
 - **Drops on phone:** nothing. Per-file percent and size are in each tile's name only, as today.
-- **Tokens.** `--photo-scrim`, `--on-photo`, `--danger`, `--pill-bg`, `--pill-fg`, `--act`, `--on-act`, `--fill-1`, `--fg-3`, `text-meta`, `text-micro`, `rounded-lg`, the photo edge.
+- **Tokens.** `--photo-scrim`, `--on-photo`, `--destructive`, `--pill-bg`, `--pill-fg`, `--primary`, `--primary-foreground`, `--muted`, `--muted-foreground`, `text-meta`, `text-micro`, `rounded-lg`, the photo edge.
 - **References.** HBO Max keeps the failed item in place with Retry (brand section 9, [screen](https://mobbin.com/screens/2c6b51a6-80b2-40f0-8513-83e693c55da3)); Quo keeps failed items in the thread ([screen](https://mobbin.com/screens/aa17f20e-29cc-4bc7-90b8-968cc829294c)); Alan puts "tap to retry" under the item ([screen](https://mobbin.com/screens/87f86008-4e1b-4f02-822a-92f5050638d3)); Whop keeps a refused file in the list with its reason ([screen](https://mobbin.com/screens/03fc821c-eec1-4278-bf97-8f8ac202d34c)); Google Photos marks pending tiles in the grid ([screen](https://mobbin.com/screens/76e5e5f4-d870-4c22-a1ad-1cf7c5c341d6)).
 
 ### 2.4 Document rows (FilesList)
@@ -190,13 +190,13 @@ Desktop 1280, property record, a file dragged over the rail
 
 **Anatomy**
 
-- Type icon, 16px, `--fg-3`: `FileText` for PDF, DOCX and TXT; `FileSpreadsheet` for XLSX and CSV; `FileImage` for a photo kept as a document (a photo of an insurance card); `ExternalLink` for a link.
-- Name in `text-body` `--fg-1`, truncating. A 14px `Lock` for Internal, as today.
-- **New:** a byline, "Connor · Oct 3", in `text-meta` `--fg-3`, dated by the brand's one formatter.
+- Type icon, 16px, `--muted-foreground`: `FileText` for PDF, DOCX and TXT; `FileSpreadsheet` for XLSX and CSV; `FileImage` for a photo kept as a document (a photo of an insurance card); `ExternalLink` for a link.
+- Name in `text-body` `--foreground`, truncating. A 14px `Lock` for Internal, as today.
+- **New:** a byline, "Connor · Oct 3", in `text-meta` `--muted-foreground`, dated by the brand's one formatter.
 - Size in `text-meta`, tabular, right-aligned, as today.
 - The ⋯ ghost icon button, shown on hover or focus with a mouse and always on touch, as today. Its Menu: Open, Download, Rename (staff), Delete (staff, destructive). The portal gets Open and Download. On touch the ⋯ stays at rest because the row's own tap already opens the file, so the menu needs its own target; that is the file-list pattern on phones, where Dropbox ([screen](https://mobbin.com/screens/07897a07-e74b-45fb-8591-7dfd0fc08831)) and Google Drive ([screen](https://mobbin.com/screens/a6b02083-1ab2-438c-998b-5a833c4f1a25)) show a ⋯ on every row. It is a menu, not an edit pencil, so CLAUDE.md's touch rule (tap the thing to act on it) still holds for the row.
-- **In flight (new):** the ring in the icon slot (a surface tone: an `--fg-1` arc over a `--line` track), "Uploading 40%" in the byline slot, and a ghost icon X ("Cancel upload of Lease 2026.pdf") in the ⋯ slot.
-- **Failed:** the reason in `--danger` in the byline slot ("No connection"), then a ghost sm "Retry" and the X. Refused: the reason ("Over the 50 MB limit", "This type can't be added") and the X only.
+- **In flight (new):** the ring in the icon slot (a surface tone: a `--foreground` arc over a `--border` track), "Uploading 40%" in the byline slot, and a ghost icon X ("Cancel upload of Lease 2026.pdf") in the ⋯ slot.
+- **Failed:** the reason in `--destructive` in the byline slot ("No connection"), then a ghost sm "Retry" and the X. Refused: the reason ("Over the 50 MB limit", "This type can't be added") and the X only.
 
 ```
 Desktop, one line (task page column)
@@ -231,7 +231,7 @@ Two lines (phones, 375 and 320: the size drops)
 - **375 and 320:** two lines, 60px rows (brand section 5). Below 480px the size drops rather than wrap: "PDF · Connor · Oct 3". A failed row keeps the name and the X on line one and puts "No connection · Retry" on line two, Retry underlined with a 44px area as in the status line, so no button squeezes the name. At 320 the name has about 200px beside the icon and the 44px X.
 - **Drops on phone:** the size.
 - **Keyboard.** Tab to a row, Enter opens it. Tab to ⋯; arrow keys and typeahead in the menu; Esc closes the menu only.
-- **Tokens.** `--fg-1`, `--fg-3`, `--danger`, `--line`, `--fill-1` (hover; `--fill-2` inside an Internal card), `text-body`, `text-meta`, `rounded-md`.
+- **Tokens.** `--foreground`, `--muted-foreground`, `--destructive`, `--border`, `--muted` (hover; `--accent` inside an Internal card), `text-body`, `text-meta`, `rounded-md`.
 - **References.** Xero's files table with size, uploaded and uploaded-by columns and a row ⋯ ([screen](https://mobbin.com/screens/0676d784-6a6c-4fd4-a47e-6527a4eb6ff0)); Remote writes provenance as words ([screen](https://mobbin.com/screens/75bad66f-7b71-45c8-a2f7-bf314a5c06ed)); Mistral AI's two-line rows ([screen](https://mobbin.com/screens/1bb83b09-fca3-44d1-a2d5-27b2c5f0591f)); Dropbox's phone rows with size and time under the name and a ⋯ at rest ([screen](https://mobbin.com/screens/07897a07-e74b-45fb-8591-7dfd0fc08831)); Zoom's in-flight file row with size, percent and cancel ([screen](https://mobbin.com/screens/42268236-8e19-4709-8369-88695d6ab52a)).
 
 ### 2.5 Photo grid (MediaGrid)
@@ -244,13 +244,13 @@ Two lines (phones, 375 and 320: the size drops)
 - **Newest first** (G1D-012).
 - **The finish set leads.** On the task and job pages, the photos sent with the latest Mark done sit first under "At finish", then "Other photos", each label in `text-meta` 500 `--fg-2`. With no Mark done set there are no labels (G1D-034).
 - **Overflow** is choice 2 (recommended: a "+N" tile).
-- **Hover, with a mouse (invented):** the tile's photo edge steps up to a 1px inset `--line-control` at `--dur-fast`. No reference shows a hover on photo tiles, and it gives `--line-control` a job section 4 doesn't list (it identifies controls; a tile that opens the viewer is one). Cut it if you'd rather keep today's pointer-only cue.
+- **Hover, with a mouse (invented):** the tile's photo edge steps up to a 1px inset `--input` at `--dur-fast`. No reference shows a hover on photo tiles, and it gives `--input` a job section 4 doesn't list (it identifies controls; a tile that opens the viewer is one). Cut it if you'd rather keep today's pointer-only cue.
 - **The Internal lock chip** grows from 16px with a 10px icon to 20px, `rounded-sm`, on `--photo-scrim` with a 14px `Lock` in `--on-photo`, 4px in from the top left: section 6 puts icons inside a chip at 14px, and 10px is under that.
 - **Thumbnails** for every new upload (2.1), so tiles stop loading originals.
 - **An early load failure** shows `ImageOff`, not the browser's broken glyph: the tile checks `complete && naturalWidth === 0` after hydration, as `PhotoCarousel` does (G1D-I04).
-- **A photo with no preview** (HEIC outside Safari with no thumbnail) shows a `--fill-1` tile with a 20px `FileImage` over "HEIC" in `text-micro` `--fg-3`, instead of `ImageOff`, which reads as broken. **New.**
+- **A photo with no preview** (HEIC outside Safari with no thumbnail) shows a `--muted` tile with a 20px `FileImage` over "HEIC" in `text-micro` `--muted-foreground`, instead of `ImageOff`, which reads as broken. **New.**
 - **URLs** come from a `urlFor(item, variant)` prop in place of the hard-wired `taskFileUrl`, so property files and public listing photos can use the grid and the viewer (G1D-001).
-- **The strip variant** for Activity and the payoff (choice 3): photos in the 48x36 `PhotoThumb` box, 8px apart, as many as fit, then "+2" in `text-meta` `--fg-3`. Four thumbs and the count measure about 240px, so a strip shows four at 375 and up and three inside a comment card at 320 (the card's content is 232px there: 256px minus its 12px padding). A tap opens the viewer at that set.
+- **The strip variant** for Activity and the payoff (choice 3): photos in the 48x36 `PhotoThumb` box, 8px apart, as many as fit, then "+2" in `text-meta` `--muted-foreground`. Four thumbs and the count measure about 240px, so a strip shows four at 375 and up and three inside a comment card at 320 (the card's content is 232px there: 256px minus its 12px padding). A tap opens the viewer at that set.
 - **The one-row mode** (`rows={1}`) for the Review card: the grid's tiles, one row only (6 from `sm`, 3 on a phone), the last carrying choice 2's "+N". The Activity spec's proof card uses it.
 - **Names** add who: "Open photo by Zack, Oct 25, 2:14 PM" (the label uses the brand's date formatter, not the stored name). The video length chip stays as it is.
 
@@ -262,7 +262,7 @@ Two lines (phones, 375 and 320: the size drops)
 - **375:** 3 fluid columns of about 109px, two rows (6 tiles). **320:** about 91px. The gap goes from today's 6px to 8px, on the brand's 4px scale.
 - **Drops on phone:** 6 tiles before the overflow instead of 12; the hover edge is mouse only.
 - **Keyboard.** Each tile is a button, in newest-first order; Enter opens the viewer at it.
-- **Tokens.** `--fill-1`, `--photo-stage` (video ground, from `globals.css`), `--photo-scrim`, `--on-photo`, `--line-control`, `--fg-2`, `--fg-3`, `text-meta`, `text-micro`, `rounded-lg`, `rounded-sm` (chips), the photo edge.
+- **Tokens.** `--muted`, `--photo-stage` (video ground, from `globals.css`), `--photo-scrim`, `--on-photo`, `--input`, `--fg-2`, `--muted-foreground`, `text-meta`, `text-micro`, `rounded-lg`, `rounded-sm` (chips), the photo edge.
 - **References.** Walmart's photo row whose last tile reads "+113 images" over the photo ([screen](https://mobbin.com/screens/5b2421d5-caad-4863-9579-02e127506528)); GetYourGuide's all-photos grid ([screen](https://mobbin.com/screens/7f7ccd6e-d0f8-4bb0-bf0a-a9ab3405a941)); Check labels evidence photos by what they show (from G1D-034, [screen](https://mobbin.com/screens/713a6f8e-2a44-416f-96ec-4ac14a45beae)).
 
 ### 2.6 Viewer (Lightbox)
@@ -288,7 +288,7 @@ Two lines (phones, 375 and 320: the size drops)
 - **Touch.** Pinch zooms and a double tap toggles, the iOS gestures Apple lists for zooming ([HIG gestures](https://developer.apple.com/design/human-interface-guidelines/gestures)). One finger pans while zoomed: the stage's `touch-pan-y` goes and the viewer handles pointer events itself. At fit, a horizontal swipe steps and the photo follows the finger. A downward swipe at fit closes, as the iOS Photos app does (**new** here: a gesture with no screenshot to cite; Close and Back still close). A swipe that starts on a video doesn't step, as today.
 - **Preload** the next and previous photo, thumbnail first.
 - **Esc,** one layer per press: an open menu or confirm first, then the viewer. Zoom is a view state, not a layer, so Esc never spends a press on it; 0 or a double-click resets zoom.
-- **Delete** asks in `ConfirmDialog` stacked on the viewer, in place of today's Sheet, so delete confirms one way everywhere: "Delete this photo?", "“Photo 2026-10-25 at 2.14 PM” goes for good.", Keep it, Delete photo. A refusal shows in the body in `text-meta` `--danger`.
+- **Delete** asks in `ConfirmDialog` stacked on the viewer, in place of today's Sheet, so delete confirms one way everywhere: "Delete this photo?", "“Photo 2026-10-25 at 2.14 PM” goes for good.", Keep it, Delete photo. A refusal shows in the body in `text-meta` `--destructive`.
 - **Video download** asks the file route for a link that saves as a download, so it no longer opens a tab.
 - **Public:** opened from /rentals, its overlay root carries `data-surface="public"` (brand section 4).
 
@@ -299,7 +299,7 @@ Two lines (phones, 375 and 320: the size drops)
 - **375:** the same; the byline drops the time ("Connor · Oct 3"). The name gets about 195px beside three 44px buttons (Download, ⋯, Close).
 - **320:** the same; the name truncates at about 140px beside the three buttons (about 190px for a contractor, who has no ⋯). The header never wraps; the name and byline truncate.
 - **Drops on phone:** chevrons, the zoom bar, the time in the byline, and Open in new tab (Share takes its place).
-- **Tokens.** `--photo-stage`, `--photo-scrim`, `--on-photo`, `--pill-bg`, `--pill-fg`, `--danger`, `--raised` (menus), `text-body`, `text-meta`, `text-micro`, `rounded-md`, `rounded-full` (the counter only), `--dur-base` for the swipe spring back.
+- **Tokens.** `--photo-stage`, `--photo-scrim`, `--on-photo`, `--pill-bg`, `--pill-fg`, `--destructive`, `--popover` (menus), `text-body`, `text-meta`, `text-micro`, `rounded-md`, `rounded-full` (the counter only), `--dur-base` for the swipe spring back.
 - **References.** Asana's viewer with name and date, zoom, Download and side chevrons ([screen](https://mobbin.com/screens/b27c383f-0712-4c39-bbb7-cb281bd101ce)); Google Drive's header actions and floating zoom bar ([screen](https://mobbin.com/screens/b81fb867-21fc-4969-8a71-cd0cd53c7a53)); Plane's small floating bar ([screen](https://mobbin.com/screens/3102e577-b22c-49f0-a806-1ed8692aa812)); Mercury's in-app receipt with a floating zoom and Download bar ([screen](https://mobbin.com/screens/60364c06-7c88-4ac9-a5e2-cf1041ab4e84)); Meetup's counter, Download and uploader byline ([screen](https://mobbin.com/screens/997acca9-cac3-4bd6-87aa-bd5335638586)); Salesforce ([screen](https://mobbin.com/screens/3e638e9d-7a1b-49ea-aded-b1f2a4e6f434)) and Evernote ([screen](https://mobbin.com/screens/cd400126-4b54-407f-8238-0989944c3cd8)) for the can't-preview card.
 
 ### 2.7 Review photos, the batch line and the payoff
@@ -331,11 +331,11 @@ The Needs review rows on Today (BTASKS-016) can reuse the strip variant; the tas
 
 **Anatomy**
 
-- **Heading line:** "Photos of the finished work" in `text-body` 500 `--fg-1`, with "1 of 2" right-aligned in `text-meta` `--fg-3` when the template asks for photos. A job without a requirement keeps today's question, "Add photos of the finished work?".
-- **Slots:** the grid tray's sizing (auto-fill, at least 88px). Empty slots fill up to the required count (one on an optional job): `--fill-1` squares, `rounded-lg`, the photo edge, a 20px lucide `Camera` in `--fg-3`. Solid, never dashed. Once the count is met, one trailing add tile remains.
+- **Heading line:** "Photos of the finished work" in `text-body` 500 `--foreground`, with "1 of 2" right-aligned in `text-meta` `--muted-foreground` when the template asks for photos. A job without a requirement keeps today's question, "Add photos of the finished work?".
+- **Slots:** the grid tray's sizing (auto-fill, at least 88px). Empty slots fill up to the required count (one on an optional job): `--muted` squares, `rounded-lg`, the photo edge, a 20px lucide `Camera` in `--muted-foreground`. Solid, never dashed. Once the count is met, one trailing add tile remains.
 - **Filled slots** are upload tiles (2.3): progress, ring, Retry.
 - The optional note, then the pinned buttons: secondary "Add photos" (`ImagePlus`, the picker) and primary "Mark done".
-- **Disabled primary** carries one line under it: "Add 1 more photo" in `--fg-3`. "Finishing 2 uploads…" and the failed line keep their places, as `markDoneButton` in `job-view.ts` has them today.
+- **Disabled primary** carries one line under it: "Add 1 more photo" in `--muted-foreground`. "Finishing 2 uploads…" and the failed line keep their places, as `markDoneButton` in `job-view.ts` has them today.
 
 ```
 Phone 375, a template that asks for 2
@@ -360,7 +360,7 @@ Phone 375, a template that asks for 2
 
 - **Sizes.** **1280:** the centered sheet at 28rem; with a mouse a slot opens the file picker, since `capture` means nothing there. **768:** the centered sheet at touch sizes. **375:** three slots of about 109px; both 48px buttons fit side by side. **320:** about 91px slots; each button about 138px, both labels fit.
 - **Drops on phone:** nothing. The count, the slots and the reason line all stay.
-- **Tokens.** `--fill-1`, `--fg-1`, `--fg-3`, `--act`, `--on-act`, `text-body`, `text-meta`, `rounded-lg`, the photo edge, `rounded-xl` sheet corners.
+- **Tokens.** `--muted`, `--foreground`, `--muted-foreground`, `--primary`, `--primary-foreground`, `text-body`, `text-meta`, `rounded-lg`, the photo edge, `rounded-xl` sheet corners.
 - **References.** Airbnb holds Next until the count is met ([screen](https://mobbin.com/screens/fcda60ea-e958-46fc-8db9-09ec2db05879)); Hinge makes the slot the add control ([screen](https://mobbin.com/screens/1071e227-8002-4399-b3f0-c0e8ea0adcfb)); eBay ([screen](https://mobbin.com/screens/49d04cd2-e517-4e26-9ab6-0d9f1c047327)) and alias ([screen](https://mobbin.com/screens/4f52c1f4-b905-4ce5-9648-35da46cebe48)) fill numbered slots one shot at a time; Lime makes the proof photo the finishing step ([screen](https://mobbin.com/screens/9ed22b0d-f65d-48ec-9a28-6bf47a910b1b)); Jobber counts photos as a field ([screen](https://mobbin.com/screens/1b3a7d01-7591-4250-a3dc-2eac5fa91d00)); Turo's soft gate for optional sets ([screen](https://mobbin.com/screens/c2193257-8293-4784-a4e7-f64646f104e6)).
 
 ### 2.9 Listing photo manager
@@ -370,16 +370,16 @@ Phone 375, a template that asks for 2
 
 **Anatomy**
 
-- **Header:** "Photos" in `text-meta` 500 `--fg-2` (a field label, since it sits inside the listing form), with "8 of 20" in `--fg-3`: the server's cap, shown.
-- **Helper,** one line of `text-meta` `--fg-3`: "The first photo is the cover on the site. Drag to reorder." Touch drops the second sentence unless the long-press drag spike below passes. With fewer than five photos (brand section 6, Listing set) it counts instead: "Listings need 5 photos · 2 to go". The gate itself is G2C-I01's.
+- **Header:** "Photos" in `text-meta` 500 `--fg-2` (a field label, since it sits inside the listing form), with "8 of 20" in `--muted-foreground`: the server's cap, shown.
+- **Helper,** one line of `text-meta` `--muted-foreground`: "The first photo is the cover on the site. Drag to reorder." Touch drops the second sentence unless the long-press drag spike below passes. With fewer than five photos (brand section 6, Listing set) it counts instead: "Listings need 5 photos · 2 to go". The gate itself is G2C-I01's.
 - **Grid:** 4 columns, 8px gaps, 4:3 `PhotoThumb` tiles, `rounded-lg`, the photo edge. The cover spans 2 by 2. On a phone the cover runs full width over 2 columns, as Airbnb's phone editor does. How the cover is marked is choice 4.
-- **Add tile,** last: `--fill-1`, the photo edge, a 20px `ImagePlus` over "Add photos" in `text-label` `--fg-2`. It's the only add control here, so the header carries no button. With no photos it takes the cover slot. At 20 photos it goes.
+- **Add tile,** last: `--muted`, the photo edge, a 20px `ImagePlus` over "Add photos" in `text-label` `--fg-2`. It's the only add control here, so the header carries no button. With no photos it takes the cover slot. At 20 photos it goes.
 - **One ⋯ per photo, at rest, at every size:** 32px `rounded-md` on `--pill-bg` with a `--pill-fg` icon (16px with a mouse, 20px on touch), 8px in from the top right, with a 44px hit area on touch: the public carousel arrows' shape and colors, today's precedent for a control on a photo. Its Menu: Make cover, Move earlier, Move later, Open, then Remove (destructive). One button replaces today's three (G2C-V02). It shows at rest rather than on hover because every reference does: Airbnb on the web and on iPhone, and eBay on iPhone, keep a ⋯ on each photo all the time. Since it is never a hover cue, CLAUDE.md's touch rule (don't make a hover cue permanent on touch) doesn't come into it, and a desk and a phone see the same control.
-- **Uploading** tiles are local previews with the ring; **failed** ones keep their picture inside the `--danger` ring with the Retry pill (2.3).
+- **Uploading** tiles are local previews with the ring; **failed** ones keep their picture inside the `--destructive` ring with the Retry pill (2.3).
 
 **Behavior**
 
-- **Drag with a mouse** starts after 4px. The tile lifts with `shadow-float` and follows the pointer; the others reflow on a `--dur-base` spring; the landing slot is a `--fill-1` tile with a 1px inset `--act` edge (no dashed outline). Dropping into the cover slot makes that photo the cover.
+- **Drag with a mouse** starts after 4px. The tile lifts with `shadow-float` and follows the pointer; the others reflow on a `--dur-base` spring; the landing slot is a `--muted` tile with a 1px inset `--primary` edge (no dashed outline). Dropping into the cover slot makes that photo the cover.
 - **Keyboard:** arrow keys move focus; Enter opens the viewer; the drag handle (React Aria's keyboard drag) moves a tile with the arrow keys and Enter drops it, Esc cancels. A live region says "Photo 3 moved to position 1, now the cover".
 - **Touch:** a tap on the photo opens the viewer at it; the ⋯ holds the actions, the same as with a mouse. A long press starts a drag where React Aria supports it (a spike confirms it doesn't fight page scroll in iOS Safari, as Airbnb's phone editor manages). If it fails, Move earlier and Move later in the ⋯ are the path, and Behance's Reorder list is the fallback.
 - **Staged until Save,** as the editor already is. Remove takes the tile out with "Photo removed · Undo". Save applies order, cover and removals together, then confirms "Saved · 8 photos on the site" (or "Saved · Hidden from the site").
@@ -420,7 +420,7 @@ The first photo is the cover on the site.
 ```
 
 - **Drops on phone:** the drag sentence in the helper (unless the spike passes), and two of the four columns. Two columns rather than three keep each ⋯'s 44px area clear of its neighbor's, the overlap today's three buttons have.
-- **Tokens.** `--fill-1`, `--fg-2`, `--fg-3`, `--pill-bg`, `--pill-fg`, `--act`, `--danger`, `shadow-float`, `text-meta`, `text-label`, `rounded-lg`, `rounded-md`, the photo edge, `--dur-base`.
+- **Tokens.** `--muted`, `--fg-2`, `--muted-foreground`, `--pill-bg`, `--pill-fg`, `--primary`, `--destructive`, `shadow-float`, `text-meta`, `text-label`, `rounded-lg`, `rounded-md`, the photo edge, `--dur-base`.
 - **References.** Airbnb: "Drag to reorder", a large cover and a ⋯ per photo ([screen](https://mobbin.com/screens/9201ab20-ceb1-441a-8241-2846d5c67a33)), the menu with Move backward, Move forward and Make cover photo ([screen](https://mobbin.com/screens/0c23f780-db8d-4672-a485-1538c60e55ba)), a drag in progress ([screen](https://mobbin.com/screens/d1508219-51d8-4a2c-9d42-d94ef24e68a8)), the phone layout with a ⋯ on every photo at rest and "Drag to reorder" ([screen](https://mobbin.com/screens/0701edf9-3ec2-4c5a-8b92-50c341d40d98)); Zillow's 4-column 4:3 grid ([screen](https://mobbin.com/screens/d615b7af-3c4c-4327-97a3-d1215eaf4ce6)); eBay puts the cap in the count, "Photos (2/24)", with a ⋯ on each photo ([screen](https://mobbin.com/screens/be147d07-6b03-4126-9a4c-daefb27e7cd5)); Behance's Reorder list as the phone fallback ([screen](https://mobbin.com/screens/4756e1b1-0d0b-48e6-9303-541669b92562)).
 
 ### 2.10 Property photo
@@ -441,7 +441,7 @@ The first photo is the cover on the site.
 
 - **Sizes.** 1280 and 768: the 96x72 tile beside the address. 375 and 320: the full-width 16:9 tile above it. Nothing drops.
 - **Keyboard.** The tile is a button with the name "Add front photo of 56 Tamarack St" (or "Change front photo"); the menu takes arrows and Esc.
-- **Tokens.** `--fill-1`, `--fg-2`, `--fg-3`, `text-label`, `rounded-lg`, the photo edge, the 200ms photo fade.
+- **Tokens.** `--muted`, `--fg-2`, `--muted-foreground`, `text-label`, `rounded-lg`, the photo edge, the 200ms photo fade.
 - **References.** Brand principle 1 and the Zillow header it cites ([screen](https://mobbin.com/screens/cc09445f-c80c-470e-8497-0630e416eafd)); the Zillow no-photo tile ([screen](https://mobbin.com/screens/f6fde171-27a0-44e9-85ff-235a97cec430)).
 
 ### 2.11 Document slots (W-9 and COI)
@@ -452,14 +452,14 @@ The first photo is the cover on the site.
 **Anatomy**
 
 - The Detail row's label, as today ("W-9", "Insurance (COI)"; "(COI)" drops on phones).
-- **Missing:** a secondary sm "Upload" and, beside it, "PDF or photo" in `text-meta` `--fg-3`.
-- **Present:** a chip in the `pickerChip` look (`--surface`, a `--line-strong` edge, `rounded-md`, `text-meta` 500) with the type icon and the name, opening the viewer; its ⋯ holds Replace and Remove. An imported Drive link shows "Drive" with `ExternalLink` and opens in a new tab until it's replaced.
-- **COI expiry:** "Expires Mar 1" in `text-meta` `--fg-3`; once past, "Expired Mar 1" in `--danger` (late, brand section 4). The date is picked with `DueDatePicker`'s calendar, without its quick picks (a new prop).
+- **Missing:** a secondary sm "Upload" and, beside it, "PDF or photo" in `text-meta` `--muted-foreground`.
+- **Present:** a chip in the `pickerChip` look (`--background`, a `--line-strong` edge, `rounded-md`, `text-meta` 500) with the type icon and the name, opening the viewer; its ⋯ holds Replace and Remove. An imported Drive link shows "Drive" with `ExternalLink` and opens in a new tab until it's replaced.
+- **COI expiry:** "Expires Mar 1" in `text-meta` `--muted-foreground`; once past, "Expired Mar 1" in `--destructive` (late, brand section 4). The date is picked with `DueDatePicker`'s calendar, without its quick picks (a new prop).
 - Upload goes through the queue (`contractor-doc` target).
 
 - **Sizes.** 1280 and 768: label column 112px, the chip and expiry on one line. 375 and 320: label column 96px, leaving 192px at 320; the chip takes line one and truncates its name, and "Expires Mar 1" moves to line two under it, so the row reads at 60px and nothing squeezes the name to a few letters. Missing: "Upload" (44px) and "PDF or photo" fit on one line at 320 (about 175px).
 - **Not here:** the table's missing and expired states, the assignee picker's warning (JOURNEYS-I15) and "Needs W-9" (ADMIN-I09) belong to the admin spec and read these fields. Contractors uploading their own in the portal (ADMIN-I10) comes later.
-- **Tokens.** `--surface`, `--line-strong`, `--fg-3`, `--danger`, `text-meta`, `rounded-md`.
+- **Tokens.** `--background`, `--line-strong`, `--muted-foreground`, `--destructive`, `text-meta`, `rounded-md`.
 - **References.** Stripe's required slot with one button and one line, "Upload receipt" beside "Must be a PDF or image" ([screen](https://mobbin.com/screens/520b3bf5-56f5-42f1-8582-dabe93c8621b)) and the same slot filled as a chip ([screen](https://mobbin.com/screens/bd97c102-f0eb-48c3-951f-030e3f7959fd)); Mercury's attachment row with its type (from G1D-I02, [screen](https://mobbin.com/screens/ede3cc07-012f-4e55-a5c7-7cbe8b7f5907)).
 
 ### 2.12 Public listing photos
@@ -543,7 +543,7 @@ Phone 375 (portal, My jobs)
 
 **Option B: An away panel**
 
-A Float panel (`--raised`, `rounded-lg`, `shadow-float`) appears bottom-right once you leave a page with uploads going, and expands upward into a list, as Google Drive's upload panel does ([screen](https://mobbin.com/screens/59045016-c719-4504-aebd-95bf195eaeaa)). On a phone it's a one-line bar in the toast slot that opens a Sheet.
+A Float panel (`--popover`, `rounded-lg`, `shadow-float`) appears bottom-right once you leave a page with uploads going, and expands upward into a list, as Google Drive's upload panel does ([screen](https://mobbin.com/screens/59045016-c719-4504-aebd-95bf195eaeaa)). On a phone it's a one-line bar in the toast slot that opens a Sheet.
 
 ```
 Desktop 1280
@@ -775,7 +775,7 @@ Every inventory instance, grouped by page.
 | `MediaGrid` in the Photos section (`view.tsx:137`) | "Photos and files N", newest first, the At finish set first, choice 2's overflow, the hover edge, thumbnails, a 14px lock in a 20px chip, 8px phone gaps, Download all (2.5) | Finish photos come first, tiles load fast, the heading names what's there |
 | `MediaGrid` in Activity rows (`activity.tsx:91`, `:110`) | Choice 3's strip under one line per batch (2.7) | "Zack added 4 photos" once, and each photo at full size once |
 | `FilesList` for documents (`files-list.tsx:27`, `view.tsx:147`) | The shared `FilesList`: type icons, who and when, Rename, opens in the viewer (2.4) | You see who added a file and when, and PDFs open in place |
-| `FilesList` in Activity rows (`activity.tsx:92`, `:111`) | The same rows with no byline or menu; the `--fill-2` hover inside Internal cards stays | Typed icons; nothing else moves |
+| `FilesList` in Activity rows (`activity.tsx:92`, `:111`) | The same rows with no byline or menu; the `--accent` hover inside Internal cards stays | Typed icons; nothing else moves |
 | `Lightbox` (`lightbox.tsx:39`) | Zoom, pinch, swipe down, documents at a desk, `?file=` links, the counter in the brand corner, Internal in the byline, square stage buttons and chevrons, ConfirmDialog for delete (2.6). The portal's viewer gets the same, with Download only | You can zoom into damage, link a partner to one photo, and read a PDF at your desk without leaving the app |
 | Review banner photo count (`review-banner.tsx:41`, `page.tsx:200`) | The Activity spec's Review card, holding this spec's one-row grid of this visit's photos, Mark done photos first (2.7). Phase 1 fixes today's count to that set, with videos named | The proof sits above Approve |
 | Needs review rows on Today (`tasks/review-actions.tsx`) | The tasks spec places the same strip (BTASKS-016) | Later |
@@ -892,7 +892,7 @@ Every inventory instance, grouped by page.
 | Viewer zoom bar | in `components/lightbox.tsx` | [Asana](https://mobbin.com/screens/b27c383f-0712-4c39-bbb7-cb281bd101ce), [Google Drive](https://mobbin.com/screens/b81fb867-21fc-4969-8a71-cd0cd53c7a53), [Plane](https://mobbin.com/screens/3102e577-b22c-49f0-a806-1ed8692aa812) |
 | Viewer file card and its labeled Download button | in `components/lightbox.tsx` | [Salesforce](https://mobbin.com/screens/3e638e9d-7a1b-49ea-aded-b1f2a4e6f434), [Evernote](https://mobbin.com/screens/cd400126-4b54-407f-8238-0989944c3cd8) |
 | "+N" overflow tile | in `components/media-grid.tsx` | [Walmart](https://mobbin.com/screens/5b2421d5-caad-4863-9579-02e127506528) |
-| Tile hover edge (`--line-control`) | in `components/media-grid.tsx` | **Invented**: no reference shows a hover on photo tiles, and it adds a job to `--line-control`; optional (2.5) |
+| Tile hover edge (`--input`) | in `components/media-grid.tsx` | **Invented**: no reference shows a hover on photo tiles, and it adds a job to `--input`; optional (2.5) |
 | Download all (ZIP route) | `app/api/files/zip/[kind]/[id]/route.ts` | [Google Drive](https://mobbin.com/screens/fcb56b4a-69ad-46f7-8d0e-15d3fd190a94) |
 
 **Deleted:** `components/attachments.tsx`, the `MediaUploader` wrapper and `DefaultTriggers`, `PhotoGallery`, the composer's `ReadyTile`, the portal's hand-rolled file links, and the two hand-drawn icons (VISUAL-032).

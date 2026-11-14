@@ -81,11 +81,11 @@ export default async function RentalsPage() {
   return (
     <main className={cn(publicContainer, "py-10 sm:py-12")}>
       <Eyebrow>{available > 0 ? `Rentals · ${available} available` : "Rentals · None available"}</Eyebrow>
-      <h1 className={cn(publicType.heading, "mt-3 text-fg-1")}>Apartments in Buffalo.</h1>
+      <h1 className={cn(publicType.heading, "mt-3 text-foreground")}>Apartments in Buffalo.</h1>
 
       {available === 0 && (
         // No link until there's a Zillow profile URL (docs/todo-for-connor.md).
-        <p className={cn(publicType.lead, "mt-3 max-w-xl text-fg-3")}>
+        <p className={cn(publicType.lead, "mt-3 max-w-xl text-muted-foreground")}>
           No openings right now. Check back soon. Our homes are also listed on Zillow.
         </p>
       )}
@@ -103,7 +103,7 @@ export default async function RentalsPage() {
 
 /**
  * A borderless 4:3 photo card: the photo, then the street with the rent
- * right-aligned ("/mo" in --fg-3), the unit, and the facts line when there
+ * right-aligned ("/mo" in --muted-foreground), the unit, and the facts line when there
  * are facts (docs/brand-guidelines.md, section 10). The city is the page's
  * heading, so the card leaves it out.
  */
@@ -127,23 +127,23 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
 
       <div className="grid gap-0.5">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className={cn(publicType.title, "min-w-0 text-fg-1")}>{l.street}</h2>
+          <h2 className={cn(publicType.title, "min-w-0 text-foreground")}>{l.street}</h2>
           {!l.leased && (
-            <p className={cn(publicType.title, "shrink-0 text-right text-fg-1")}>
+            <p className={cn(publicType.title, "shrink-0 text-right text-foreground")}>
               {l.rent ? (
                 <>
                   <Money value={l.rent} />
-                  <span className="font-normal text-fg-3">/mo</span>
+                  <span className="font-normal text-muted-foreground">/mo</span>
                 </>
               ) : (
-                <span className="font-normal text-fg-3">Price on request</span>
+                <span className="font-normal text-muted-foreground">Price on request</span>
               )}
             </p>
           )}
         </div>
-        <p className={cn(publicType.meta, "text-fg-3")}>{l.unitLabel}</p>
+        <p className={cn(publicType.meta, "text-muted-foreground")}>{l.unitLabel}</p>
         {/* No facts yet: nothing, since "Price on request" above already says to ask. */}
-        {l.facts && <p className={cn(publicType.meta, "num text-fg-3")}>{l.facts}</p>}
+        {l.facts && <p className={cn(publicType.meta, "num text-muted-foreground")}>{l.facts}</p>}
         {l.zillowUrl && !l.leased && (
           <a
             href={l.zillowUrl}
@@ -151,7 +151,7 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
             rel="noopener noreferrer"
             className={cn(
               publicType.meta,
-              "mt-2 inline-flex w-fit items-center gap-1 text-fg-1 pointer-coarse:min-h-11",
+              "mt-2 inline-flex w-fit items-center gap-1 text-foreground pointer-coarse:min-h-11",
               publicLinkHover,
             )}
           >

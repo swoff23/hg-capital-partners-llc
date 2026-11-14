@@ -54,7 +54,7 @@ export default async function DealPage({ params }: PageProps<"/deals/[id]">) {
           </div>
         </div>
         {deal.convertedProperty && (
-          <p className="mt-1 text-meta text-fg-3">
+          <p className="mt-1 text-meta text-muted-foreground">
             Converted to{" "}
             <TextLink href={`/properties/${deal.convertedProperty.id}`}>{deal.convertedProperty.address}</TextLink>
           </p>

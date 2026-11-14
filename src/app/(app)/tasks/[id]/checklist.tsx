@@ -23,8 +23,8 @@ type Change = { id: string; done: boolean } | { id: string; removed: true };
 
 /**
  * "Checklist 2/5" over a hairline, a 4px meter of how many are ticked,
- * tick-off rows, and "Add item". The boxes are round, on a --line-control
- * edge; ticked, they fill with ink (--act), as every checked control does
+ * tick-off rows, and "Add item". The boxes are round, on an --input
+ * edge; ticked, they fill with ink (--primary), as every checked control does
  * (docs/brand-guidelines.md, section 9). At 5 of 5 the count becomes a check
  * and "All done". An item's words are its own InlineField: a click renames it
  * in place, Enter saves, Esc puts the old words back. Each item's ⋯ menu
@@ -52,7 +52,7 @@ export function Checklist({ taskId, items }: { taskId: string; items: ChecklistR
                 All done
               </span>
             ) : (
-              <span className="ml-1 font-normal tabular-nums text-fg-3">
+              <span className="ml-1 font-normal tabular-nums text-muted-foreground">
                 {done}/{rows.length}
               </span>
             ))}
@@ -125,7 +125,7 @@ function ChecklistItem({ row: r, onTick, onRemoved }: { row: ChecklistRow; onTic
         className={cn(
           "relative flex size-4.5 shrink-0 items-center justify-center rounded-full border transition-colors",
           "after:absolute after:-inset-2.5 pointer-coarse:after:-inset-3.5",
-          r.done ? "border-act bg-act text-on-act" : "border-line-control text-transparent hover:border-fg-1",
+          r.done ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent hover:border-foreground",
         )}
       >
         <Check className="size-3" strokeWidth={3} aria-hidden="true" />
@@ -142,7 +142,7 @@ function ChecklistItem({ row: r, onTick, onRemoved }: { row: ChecklistRow; onTic
           message={() => "Item renamed"}
           // Removing the item replaces this toast, so an Undo for a row that is gone never shows.
           toastKey={toastKeyFor(r.id)}
-          className={cn(r.done && "text-fg-3 line-through")}
+          className={cn(r.done && "text-muted-foreground line-through")}
           onSave={(next) => renameChecklistItem(r.id, next)}
         />
       </div>
@@ -151,7 +151,7 @@ function ChecklistItem({ row: r, onTick, onRemoved }: { row: ChecklistRow; onTic
           aria-label={`${r.title} actions`}
           className={cn(
             buttonClass({ variant: "ghost", size: "sm", icon: true }),
-            "-mr-2 shrink-0 text-fg-3 data-pressed:bg-fill-1",
+            "-mr-2 shrink-0 text-muted-foreground data-pressed:bg-muted",
             // With a mouse the menu shows on the row; touch has no hover, so it stays.
             "pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover/item:opacity-100 pointer-fine:data-pressed:opacity-100",
           )}
@@ -186,7 +186,7 @@ function AddItem({ taskId }: { taskId: string }) {
           cancelled.current = false;
           setOpen(true);
         }}
-        className="-ml-1 mt-0.5 inline-flex h-8 items-center gap-1.5 rounded-md px-1 text-label text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:h-11"
+        className="-ml-1 mt-0.5 inline-flex h-8 items-center gap-1.5 rounded-md px-1 text-label text-fg-2 transition-colors hover:text-foreground pointer-coarse:h-11"
       >
         <Plus className="size-4" aria-hidden="true" />
         Add item
@@ -205,7 +205,7 @@ function AddItem({ taskId }: { taskId: string }) {
 
   return (
     <div className="mt-0.5 flex min-h-9 items-center gap-2.5 pointer-coarse:min-h-11">
-      <span className="size-4.5 shrink-0 rounded-full border border-dashed border-line-control" aria-hidden="true" />
+      <span className="size-4.5 shrink-0 rounded-full border border-dashed border-input" aria-hidden="true" />
       <input
         ref={input}
         autoFocus
@@ -229,7 +229,7 @@ function AddItem({ taskId }: { taskId: string }) {
           cancelled.current = false;
           setOpen(false);
         }}
-        className="min-w-0 flex-1 bg-transparent text-body text-fg-1 outline-none placeholder:text-fg-3"
+        className="min-w-0 flex-1 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground"
       />
     </div>
   );

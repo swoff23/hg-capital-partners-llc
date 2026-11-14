@@ -80,7 +80,7 @@ export function DateField({
           fieldClass,
           fieldSizeClass[size],
           "relative flex items-center pr-9 pointer-coarse:hidden",
-          "focus-within:border-act focus-within:ring-1 focus-within:ring-inset focus-within:ring-act",
+          "focus-within:border-ring focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring",
           isDisabled && "opacity-50",
         )}
         aria-invalid={isInvalid || undefined}
@@ -106,7 +106,7 @@ export function DateField({
               {(segment) => (
                 <DateSegment
                   segment={segment}
-                  className="rounded-sm px-0.5 tabular-nums caret-transparent outline-none data-focused:bg-fill-2 data-placeholder:text-fg-3 data-[type=literal]:px-0 data-[type=literal]:text-fg-3"
+                  className="rounded-sm px-0.5 tabular-nums caret-transparent outline-none data-focused:bg-accent data-placeholder:text-muted-foreground data-[type=literal]:px-0 data-[type=literal]:text-muted-foreground"
                 />
               )}
             </DateInput>
@@ -122,7 +122,7 @@ export function DateField({
           onPressStart={warmDatePanel}
           onPress={() => setOpen(true)}
           onKeyDown={openOnArrow(() => setOpen(true))}
-          className="absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-sm text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1"
+          className="absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <CalendarDays aria-hidden="true" className="size-4" />
         </AriaButton>
@@ -139,9 +139,9 @@ export function DateField({
         onPressStart={warmDatePanel}
         onPress={() => setOpen(true)}
         onKeyDown={openOnArrow(() => setOpen(true))}
-        className={cn(pickerField, "hidden pointer-coarse:flex", !current && "text-fg-3")}
+        className={cn(pickerField, "hidden pointer-coarse:flex", !current && "text-muted-foreground")}
       >
-        <CalendarDays aria-hidden="true" className="text-fg-3" />
+        <CalendarDays aria-hidden="true" className="text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate">{current ? fmtDay(current) : placeholder}</span>
       </AriaButton>
       <PickerLayer

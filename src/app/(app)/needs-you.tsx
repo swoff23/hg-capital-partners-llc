@@ -51,7 +51,7 @@ export function NeedsYou({ items, className }: { items: NeedsYouItem[]; classNam
 
   return (
     <Section title="Needs you" className={className}>
-      <ul ref={list} className="@container divide-y divide-line">
+      <ul ref={list} className="@container divide-y divide-border">
         {items.map((item, i) => (
           <li key={item.key} className={cn(!all && i >= PHONE_ROWS && "max-sm:hidden")}>
             <Row item={item} />
@@ -63,7 +63,7 @@ export function NeedsYou({ items, className }: { items: NeedsYouItem[]; classNam
         <button
           type="button"
           onClick={showAll}
-          className="flex min-h-10 w-full items-center text-left text-label text-fg-2 transition-colors hover:text-fg-1 pointer-coarse:min-h-12 sm:hidden"
+          className="flex min-h-10 w-full items-center text-left text-label text-fg-2 transition-colors hover:text-foreground pointer-coarse:min-h-12 sm:hidden"
         >
           {more} more
         </button>
@@ -74,7 +74,7 @@ export function NeedsYou({ items, className }: { items: NeedsYouItem[]; classNam
 
 function Row({ item }: { item: NeedsYouItem }) {
   const Icon = ICON[item.kind];
-  const date = item.dateLabel && <span className={item.late ? "text-danger" : undefined}>{item.dateLabel}</span>;
+  const date = item.dateLabel && <span className={item.late ? "text-destructive" : undefined}>{item.dateLabel}</span>;
   const acts = item.actions;
 
   const link = (
@@ -82,7 +82,7 @@ function Row({ item }: { item: NeedsYouItem }) {
       href={item.href}
       className={cn(
         // The hover fill reaches 8px past each side, rounded, as on the task rows beside it.
-        "-mx-2 grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 rounded-md px-2 py-2 transition-colors hover:bg-fill-1 pointer-coarse:min-h-12",
+        "-mx-2 grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 rounded-md px-2 py-2 transition-colors hover:bg-muted pointer-coarse:min-h-12",
         acts
           ? "@min-[30rem]:grid-cols-[7rem_minmax(0,1fr)] @min-[30rem]:items-center"
           : "@min-[30rem]:grid-cols-[7rem_minmax(0,1fr)_auto_auto] @min-[30rem]:items-center",
@@ -97,11 +97,11 @@ function Row({ item }: { item: NeedsYouItem }) {
       </span>
 
       <span className="min-w-0">
-        <span className={cn("block text-body text-fg-1", acts && "truncate")}>{item.title}</span>
-        <span className="flex min-w-0 text-meta text-fg-3">
+        <span className={cn("block text-body text-foreground", acts && "truncate")}>{item.title}</span>
+        <span className="flex min-w-0 text-meta text-muted-foreground">
           {/* A row with buttons keeps its second line for the detail alone; the icon already marks it. */}
           <span className={cn("shrink-0 whitespace-pre text-warn @min-[30rem]:hidden", acts && "hidden")}>{`${item.state} · `}</span>
-          {/* An amount leads the subline, where nothing cuts it; a late part follows in --danger. Under a
+          {/* An amount leads the subline, where nothing cuts it; a late part follows in --destructive. Under a
               360px list the detail ("across 4 properties") drops instead of truncating, and only a very
               long amount line is cut, after the amount, before the chevron. */}
           {item.amount != null && (
@@ -110,7 +110,7 @@ function Row({ item }: { item: NeedsYouItem }) {
               {item.pastDue != null && (
                 <>
                   {" · "}
-                  <span className="text-danger">
+                  <span className="text-destructive">
                     <Money value={item.pastDue} /> past due
                   </span>
                 </>
@@ -129,7 +129,7 @@ function Row({ item }: { item: NeedsYouItem }) {
         <>
           {/* From 480px the date sits in its own column, right-aligned so the rows line up. */}
           <span className="num hidden whitespace-nowrap text-right text-meta text-fg-2 @min-[30rem]:block">{date}</span>
-          <ChevronRight aria-hidden="true" className={cn(chromeIconClass, "self-center text-fg-3")} />
+          <ChevronRight aria-hidden="true" className={cn(chromeIconClass, "self-center text-muted-foreground")} />
         </>
       )}
     </Link>

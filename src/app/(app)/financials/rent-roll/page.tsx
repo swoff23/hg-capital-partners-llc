@@ -17,11 +17,11 @@ export const metadata: Metadata = { title: "Rent roll" };
 
 export const dynamic = "force-dynamic";
 
-const dash = <span className="text-fg-3">—</span>;
+const dash = <span className="text-muted-foreground">—</span>;
 
-/* The pinned property column: sticky on --surface, with a --line rule on its right edge while the grid is scrolled. */
+/* The pinned property column: sticky on --background, with a --border rule on its right edge while the grid is scrolled. */
 const pinned =
-  "sticky left-0 z-20 bg-surface group-data-scrolled/grid:shadow-[inset_-1px_0_0_var(--line)]";
+  "sticky left-0 z-20 bg-background group-data-scrolled/grid:shadow-[inset_-1px_0_0_var(--border)]";
 
 /**
  * The rent roll (docs/specs/charts.md 2.7): rent by property for the 12
@@ -125,16 +125,16 @@ export default async function RentRollPage({ searchParams }: PageProps<"/financi
                     <Th numeric>{totalLabel}</Th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody className="divide-y divide-border">
                   {roll.rows.map((r) => {
                     // "Bought Aug 2026" when the purchase falls in the window, so its blank months read as not owned yet.
                     const bought = r.purchaseMonth && r.purchaseMonth > roll.months[0] ? r.purchaseMonth : null;
                     return (
-                      <tr key={r.propertyId} className="group/row hover:bg-fill-1">
-                        <Td className={cn(pinned, "min-w-56 group-hover/row:bg-fill-1")}>
+                      <tr key={r.propertyId} className="group/row hover:bg-muted">
+                        <Td className={cn(pinned, "min-w-56 group-hover/row:bg-muted")}>
                           <TextLink href={`/properties/${r.propertyId}`}>{r.address}</TextLink>
                           {(bought || r.subsidyCents > 0 || r.ownerFundedCents > 0) && (
-                            <div className="text-meta text-fg-3">
+                            <div className="text-meta text-muted-foreground">
                               {[
                                 bought && <span key="bought">Bought {fmtMonthYear(bought)}</span>,
                                 r.subsidyCents > 0 && (

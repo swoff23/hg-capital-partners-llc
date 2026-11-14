@@ -73,13 +73,13 @@ One token per role. Desktop is `pointer: fine`; touch is `pointer: coarse` (phon
 - **Right-aligned** money and count columns, with headers aligned to match ([Mercury Books](https://mobbin.com/screens/91ad4bbc-ef0f-4edf-a79f-fc6b9cb4ab7c)).
 - **Whole dollars** in totals, KPIs, lists, rent and prices: `$425,000`, `$1,450/mo`. `$425k` only on chart axes.
 - **Cents** only on a single transaction line and a bill's key figure: `.cents { font-size: 0.62em; vertical-align: 0.27em; }`, which lifts them to the cap line, in the figure's own color ([Mercury iOS](https://mobbin.com/screens/82e8f14d-9bf6-4956-bb4d-8d9306d167d3)).
-- **Signs.** Money out takes a true minus (U+2212) in `--fg-1`. Money in is `--ok` with no plus, on transaction lines only.
-- **Failed amount.** Struck through in `--fg-3`, beside a danger-tint "Failed" badge ([Mercury](https://mobbin.com/screens/3e5ccd40-7dbf-4fb4-a26d-915180a2cd64)).
-- **Statement rules.** A subtotal row takes a 1px `--line-strong` rule above and weight 600. A grand total (NOI, the rent roll total, a breakdown's net) takes a 1px `--fg-1` rule above and a double rule below (`border-bottom: 3px double var(--fg-1)`), as QuickBooks and Mercury rule their P&L ([QuickBooks](https://mobbin.com/screens/9717816c-36a8-4661-b49f-e4f6ebe98a14), [Mercury](https://mobbin.com/screens/39aedac6-b7a2-494f-ad2c-b3c6739e80f4)).
-- **Period and source.** Every figure block states both in `text-meta` `--fg-3`: "Jan to Sep 2026 · QuickBooks, synced 6h ago".
-- **Empty values.** An empty cell is the lone dash glyph (U+2014) in `--fg-3`. An empty rail fact is a verb ("Add lender"). A missing feed is a sentence ("No QuickBooks lines for Sep yet"), never `$0`.
+- **Signs.** Money out takes a true minus (U+2212) in `--foreground`. Money in is `--ok` with no plus, on transaction lines only.
+- **Failed amount.** Struck through in `--muted-foreground`, beside a `--destructive-tint` "Failed" badge ([Mercury](https://mobbin.com/screens/3e5ccd40-7dbf-4fb4-a26d-915180a2cd64)).
+- **Statement rules.** A subtotal row takes a 1px `--line-strong` rule above and weight 600. A grand total (NOI, the rent roll total, a breakdown's net) takes a 1px `--foreground` rule above and a double rule below (`border-bottom: 3px double var(--foreground)`), as QuickBooks and Mercury rule their P&L ([QuickBooks](https://mobbin.com/screens/9717816c-36a8-4661-b49f-e4f6ebe98a14), [Mercury](https://mobbin.com/screens/39aedac6-b7a2-494f-ad2c-b3c6739e80f4)).
+- **Period and source.** Every figure block states both in `text-meta` `--muted-foreground`: "Jan to Sep 2026 · QuickBooks, synced 6h ago".
+- **Empty values.** An empty cell is the lone dash glyph (U+2014) in `--muted-foreground`. An empty rail fact is a verb ("Add lender"). A missing feed is a sentence ("No QuickBooks lines for Sep yet"), never `$0`.
 - **Codes** are `text-code` in `--fg-2`, never colored, never wrapped mid-token, copied with one tap. Account numbers mask as `•• 2502` with reveal ([Mercury](https://mobbin.com/screens/63939c2c-1c29-423a-b038-13d57cccb930)).
-- **Dates** come from one Eastern-time formatter: Today, Tomorrow, a weekday within six days, then "Oct 30", with the year only when it isn't this year. Overdue shows the real date in `--danger`.
+- **Dates** come from one Eastern-time formatter: Today, Tomorrow, a weekday within six days, then "Oct 30", with the year only when it isn't this year. Overdue shows the real date in `--destructive`.
 
 ## 4. Color
 
@@ -89,57 +89,60 @@ Two OKLCH ramps, so light and dark come from the same steps ([Linear UI redesign
 - **Ink:** hue 256 to 266. Grounds (dark canvas through `--line-strong`) stay at chroma 0.026 or less; type and the action reach 0.045. Two tints go past the ground limit on purpose: dark `--select` (0.037) and light `--chart-1` (0.060). A brighter navy ground is a regression toward generic dark fintech ([Copilot](https://mobbin.com/screens/1bfa784d-99eb-4850-88e2-4064d4d06452)).
 - **Lines belong to the ground, type belongs to the ink.** Light lines are warm, light text is cool; dark lines are cool, dark text is warm.
 
-Tokens live on `:root` (light) and `:root[data-theme="dark"]`, mapped in `@theme inline` as `--color-*`. Text tokens are `fg-*`, so utilities read `text-fg-2`.
+Every brand value lives in a token in `globals.css`, so a re-brand is a token swap. Tokens use shadcn/ui's names where shadcn has the role (`--background`, `--foreground`, `--muted-foreground`, `--primary`, `--border` and the rest) and HG names where it doesn't (`--fg-2`, `--line-strong`, `--canvas`, `--warn`, `--ok`, brand, toast and photo). They live on `:root` (light) and `:root[data-theme="dark"], [data-surface="public"]`, mapped in `@theme inline` as `--color-*`, so utilities read `text-muted-foreground` and `text-fg-2`. shadcn's other names (`--card`, `--secondary`, `--ring` and the sidebar set) point at these tokens.
+
+Email can't read CSS variables, so it reads the hex mirror in `src/lib/brand-tokens.ts`, which a test keeps equal to `globals.css`.
 
 ### Neutrals
 
 | Token | Light | Dark | One job | Contrast L / D |
 |---|---|---|---|---|
-| `--canvas` | `#f8f7f3` | `#0a0e17` | Chrome: sidebar, phone bars, public page ground | `--fg-1` 15.10 / 15.94 |
-| `--surface` | `#ffffff` | `#0f141e` | Work surface and `body` | `--fg-1` 16.19 / 15.22 |
-| `--raised` | `#ffffff` | `#161d28` | Menus, popovers, dialogs, sheets | `--fg-1` 16.19 / 13.98 |
-| `--fill-1` | `#f2f0ec` | `#181e2a` | Row hover, segmented track, meter track, keycap, photo placeholder | `--fg-1` 14.22 / 13.79; `--fg-3` 5.17 / 6.25; 1.14 / 1.10 vs surface |
-| `--fill-2` | `#e7e5e0` | `#212835` | Current nav item, menu highlight, neutral badge ground | `--fg-1` 12.86 / 12.22; `--fg-3` 4.68 / 5.54 |
-| `--select` | `#e4e9f0` | `#2a3548` | `::selection`, bulk-selected rows | `--fg-1` 13.27 / 10.19; `--fg-3` 4.82 / 4.62 |
-| `--line` | `#e7e5e0` | `#212835` | Hairlines, row dividers, card edges (decorative) | 1.26 / 1.25 vs surface |
-| `--line-strong` | `#d5d1ca` | `#323947` | Secondary button edge, header and subtotal rules, keycap edges, and floating-layer edges in dark (decorative) | 1.52 / 1.59 vs surface |
-| `--line-control` | `#84817a` | `#6e7684` | Edge of fields, checkboxes, radios, switch-off track; selected segment edge; chart reference line | 3.89 / 4.03 surface; 3.63 / 4.22 canvas; 3.42 / 3.65 fill-1; 3.09 / 3.23 fill-2; 3.70 dark raised |
-| `--fg-3` | `#5b6576` | `#a19e98` | Meta, placeholders, idle icons, the empty dash | 5.89 / 6.90 surface; floor 4.68 on light fill-2, 4.62 on dark select |
-| `--fg-2` | `#424e61` | `#c0bdb7` | Labels, secondary values, idle nav, codes | 8.42 / 9.84 surface; floor 6.69 on light fill-2, 6.59 on dark select |
-| `--fg-1` | `#152133` | `#ece9e4` | Primary text, headings, figures, links | 16.19 / 15.22 surface; floor 12.86 / 10.19 |
+| `--canvas` | `#f8f7f3` | `#0a0e17` | Chrome: sidebar, phone bars, public page ground | `--foreground` 15.10 / 15.94 |
+| `--background` | `#ffffff` | `#0f141e` | Work surface and `body` | `--foreground` 16.19 / 15.22 |
+| `--popover` | `#ffffff` | `#161d28` | Menus, popovers, dialogs, sheets | `--foreground` 16.19 / 13.98 |
+| `--muted` | `#f2f0ec` | `#181e2a` | Row hover, segmented track, meter track, keycap, photo placeholder | `--foreground` 14.22 / 13.79; `--muted-foreground` 5.17 / 6.25; 1.14 / 1.10 vs background |
+| `--accent` | `#e7e5e0` | `#212835` | Current nav item, menu highlight, neutral badge ground | `--foreground` 12.86 / 12.22; `--muted-foreground` 4.68 / 5.54 |
+| `--select` | `#e4e9f0` | `#2a3548` | `::selection`, bulk-selected rows | `--foreground` 13.27 / 10.19; `--muted-foreground` 4.82 / 4.62 |
+| `--border` | `#e7e5e0` | `#212835` | Hairlines, row dividers, card edges (decorative) | 1.26 / 1.25 vs background |
+| `--line-strong` | `#d5d1ca` | `#323947` | Secondary button edge, header and subtotal rules, keycap edges, and floating-layer edges in dark (decorative) | 1.52 / 1.59 vs background |
+| `--input` | `#84817a` | `#6e7684` | Edge of fields, checkboxes, radios, switch-off track; selected segment edge; chart reference line | 3.89 / 4.03 background; 3.63 / 4.22 canvas; 3.42 / 3.65 muted; 3.09 / 3.23 accent; 3.70 dark popover |
+| `--muted-foreground` | `#5b6576` | `#a19e98` | Meta, placeholders, idle icons, the empty dash | 5.89 / 6.90 background; floor 4.68 on light accent, 4.62 on dark select |
+| `--fg-2` | `#424e61` | `#c0bdb7` | Labels, secondary values, idle nav, codes | 8.42 / 9.84 background; floor 6.69 on light accent, 6.59 on dark select |
+| `--foreground` | `#152133` | `#ece9e4` | Primary text, headings, figures, links | 16.19 / 15.22 background; floor 12.86 / 10.19 |
 
-- A "floor" is the lowest ratio across every ground in this table (canvas, surface, raised, fill-1, fill-2, select). Light floors sit on `--fill-2`; dark floors sit on `--select`.
-- `--line-control` passes 3:1 on every ground but one: dark `--select` (2.70; light is 3.19). The only control on a selected row is its checked box, which reads by its `--act` fill (10.19).
-- Hover inside a raised layer (menu, listbox) uses `--fill-2` (1.14 vs dark raised); `--fill-1` there is invisible in dark (1.01).
+- A "floor" is the lowest ratio across every ground in this table (canvas, background, popover, muted, accent, select). Light floors sit on `--accent`; dark floors sit on `--select`.
+- `--input` passes 3:1 on every ground but one: dark `--select` (2.70; light is 3.19). The only control on a selected row is its checked box, which reads by its `--primary` fill (10.19).
+- Hover inside a raised layer (menu, listbox) uses `--accent` (1.14 vs dark popover); `--muted` there is invisible in dark (1.01).
 - Dark surfaces brighten as they rise. Nothing nests a darker well inside a lighter card (review VISUAL-023).
 
-### Act (ink)
+### Primary (ink)
 
 | Token | Light | Dark | One job | Contrast L / D |
 |---|---|---|---|---|
-| `--act` | `#152133` | `#ece9e4` | Primary fill, checked control, tab underline, nav notch, unread dot, focus ring | 16.19 / 15.22 vs surface; 12.86 / 12.22 vs fill-2 |
-| `--on-act` | `#ffffff` | `#0f141e` | Label and icon on `--act` | 16.19 / 15.22 |
-| `--act-hover` | `#28364d` | `#d3d1cb` | Primary hover and pressed | `--on-act` 12.17 / 12.07 |
+| `--primary` | `#152133` | `#ece9e4` | Primary fill, checked control, tab underline, nav notch, unread dot | 16.19 / 15.22 vs background; 12.86 / 12.22 vs accent |
+| `--primary-foreground` | `#ffffff` | `#0f141e` | Label and icon on `--primary` | 16.19 / 15.22 |
+| `--primary-hover` | `#28364d` | `#d3d1cb` | Primary hover and pressed | `--primary-foreground` 12.17 / 12.07 |
+| `--ring` | `--primary` | same | Focus ring | 16.19 / 15.22 vs background |
 
 - No blue anywhere. The primary is ink in light and limestone in dark, the inversion Vercel's dark dashboard uses ([Vercel dark](https://mobbin.com/screens/e9576405-bcef-419a-922a-8fb84b044a54)). It fixes today's dark primary (white on blue-500, 3.68:1).
-- A link is the same ink as body text (1.00 against `--fg-1`, 1.92 / 1.55 against `--fg-2`), so a link in a sentence always carries an underline (WCAG 1.4.1). See TextLink.
-- Focus: 2px `--act` outline, 2px offset in `--surface`, so it stays visible around an ink button. Inside the toast the outline is `--toast-fg`, since ink on the ink toast would vanish.
+- A link is the same ink as body text (1.00 against `--foreground`, 1.92 / 1.55 against `--fg-2`), so a link in a sentence always carries an underline (WCAG 1.4.1). See TextLink.
+- Focus: 2px `--ring` outline, 2px offset in `--background`, so it stays visible around an ink button. Inside the toast the outline is `--toast-fg`, since ink on the ink toast would vanish.
 
 ### Status
 
 | Token | Light | Dark | One job | Contrast L / D |
 |---|---|---|---|---|
-| `--danger` | `#b91c1c` | `#f47b76` | Overdue date, failed upload or sync, destructive text | 6.47 / 6.97 surface; floor 5.14 light fill-2, 4.67 dark select |
-| `--danger-tint` | `#fff2f1` | `#341817` | Failed badge ground | `--danger` on it 5.92 / 6.16 |
-| `--danger-fill` | `#b91c1c` | `#c92f33` | Confirmed destructive button | `--on-danger` on it 6.47 / 5.33 |
-| `--danger-fill-hover` | `#a31818` | `#b3292d` | Its hover | `--on-danger` on it 7.77 / 6.42 |
-| `--on-danger` | `#ffffff` | `#ffffff` | Label and icon on `--danger-fill` | as above |
-| `--warn` | `#a54e09` | `#f7a059` | A partner must decide: Review, stale sync, missing key fact | 5.69 / 8.89 surface; floor 4.52 light fill-2, 5.95 dark select |
+| `--destructive` | `#b91c1c` | `#f47b76` | Overdue date, failed upload or sync, destructive text | 6.47 / 6.97 background; floor 5.14 light accent, 4.67 dark select |
+| `--destructive-tint` | `#fff2f1` | `#341817` | Failed badge ground | `--destructive` on it 5.92 / 6.16 |
+| `--destructive-fill` | `#b91c1c` | `#c92f33` | Confirmed destructive button | `--destructive-foreground` on it 6.47 / 5.33 |
+| `--destructive-fill-hover` | `#a31818` | `#b3292d` | Its hover | `--destructive-foreground` on it 7.77 / 6.42 |
+| `--destructive-foreground` | `#ffffff` | `#ffffff` | Label and icon on `--destructive-fill` | as above |
+| `--warn` | `#a54e09` | `#f7a059` | A partner must decide: Review, stale sync, missing key fact | 5.69 / 8.89 background; floor 4.52 light accent, 5.95 dark select |
 | `--warn-tint` | `#fff5ec` | `#321f0f` | Decision badge ground | `--warn` on it 5.29 / 7.57 |
-| `--ok` | `#1d7038` | `#6ad18a` | Done, paid, money in | 6.13 / 9.74 surface; floor 4.87 light fill-2, 6.52 dark select |
+| `--ok` | `#1d7038` | `#6ad18a` | Done, paid, money in | 6.13 / 9.74 background; floor 4.87 light accent, 6.52 dark select |
 | `--ok-tint` | `#eff9f1` | `#142619` | Done badge ground | `--ok` on it 5.69 / 8.40 |
 
-- `--warn` and `--danger` are only 1.14 / 1.28 apart, so a status is always a glyph plus a word. Color is never the only signal.
+- `--warn` and `--destructive` are only 1.14 / 1.28 apart, so a status is always a glyph plus a word. Color is never the only signal.
 - Warn sits at hue 50 (light) and 58 (dark) at chroma 0.134, burnt orange. Gold sits at hue 84 at chroma 0.093. Tailwind amber-400 is ruled out because its hue (84.4) is gold's.
 - Status colors never decorate: no chart fills, avatar grounds or icon tints outside a status mark.
 
@@ -147,9 +150,9 @@ Tokens live on `:root` (light) and `:root[data-theme="dark"]`, mapped in `@theme
 
 | Token | Value | One job | Contrast |
 |---|---|---|---|
-| `--gold` | `#c8a765` (both) | Monogram letters, the one fill in payoff art, public eyebrow and hover | 7.07 on ink tile; 8.05 dark surface; 8.43 dark canvas; 2.29 on white, so never on a light ground |
+| `--gold` | `#c8a765` (both) | Monogram letters, the one fill in payoff art, public eyebrow and hover | 7.07 on ink tile; 8.05 dark background; 8.43 dark canvas; 2.29 on white, so never on a light ground |
 | `--gold-deep` | `#86662c` | Gold on a light page: the rule on printed reports, PDFs and email letterhead | 5.32 white; 4.96 canvas |
-| `--ink-tile` | `#152133` | Monogram ground everywhere | 1.19 vs dark canvas, so it takes a 1px `--line` edge on dark |
+| `--ink-tile` | `#152133` | Monogram ground everywhere | 1.19 vs dark canvas, so it takes a 1px `--border` edge on dark |
 
 - In the app, gold appears three ways only: the monogram, the payoff art fill and the rule on outgoing documents. Never in rows, badges, pills, dots, charts or buttons, and never interactive.
 
@@ -161,9 +164,9 @@ Tokens live on `:root` (light) and `:root[data-theme="dark"]`, mapped in `@theme
 | `--toast-fg` | `#ffffff` | `#ece9e4` | Toast message and Undo | 16.19 / 12.22 |
 | `--toast-fg-2` | `#c0bdb7` | `#c0bdb7` | Toast's ripple clause | 8.64 / 7.89 |
 | `--toast-hover` | `rgb(255 255 255 / 0.1)` | same | Undo hover fill (desktop only) | decorative |
-| `--chart-1` | `#384e6e` | `#d7d0c3` | Current period, actuals | 8.46 / 12.03 surface |
-| `--chart-ref` | `--line-control`, dashed 1.5px | same | Prior period or budget | 3.89 / 4.03 |
-| over budget | `--danger` | `--danger` | Only the part that is over | 6.47 / 6.97 |
+| `--chart-1` | `#384e6e` | `#d7d0c3` | Current period, actuals | 8.46 / 12.03 background |
+| `--chart-ref` | `--input`, dashed 1.5px | same | Prior period or budget | 3.89 / 4.03 |
+| over budget | `--destructive` | `--destructive` | Only the part that is over | 6.47 / 6.97 |
 
 Photo marks sit on pixels nobody controls, so their tokens are fixed and do not change with the theme.
 
@@ -174,7 +177,7 @@ Photo marks sit on pixels nobody controls, so their tokens are fixed and do not 
 | `--photo-scrim` | `rgb(10 14 23 / 0.72)` | Photo counter ground; the hero's bottom scrim at its darkest | base |
 | `--on-photo` | `#ece9e4` | Counter text, hero headline over the scrim | 6.54 even over a white pixel |
 
-- Never `--fg-1` on a photo pill: in dark it is limestone, and limestone on the white pill drops to 1.06 to 1.21.
+- Never `--foreground` on a photo pill: in dark it is limestone, and limestone on the white pill drops to 1.06 to 1.21.
 
 - Charts carry one series in color plus a dashed reference, labeled directly. No gold, no rainbow series; multi-property comparisons are tables ([Vercel analytics](https://mobbin.com/screens/900542f7-c157-4445-8f88-d79dca719c7a)).
 - Set `color-scheme: light` and `color-scheme: dark` per theme so native menus and pickers follow (VISUAL-024), and `::selection` to `--select`.
@@ -191,18 +194,18 @@ Two tokens are public-only.
 | Role | Token | Hex | Contrast |
 |---|---|---|---|
 | Page ground | `--canvas` | `#0a0e17` | base |
-| Fact tiles, fields, notices | `--surface` | `#0f141e` | base |
-| Headlines, body, wordmark | `--fg-1` | `#ece9e4` | 15.94 canvas / 15.22 surface |
-| Lead, nav, card meta, second clause | `--fg-3` | `#a19e98` | 7.22 / 6.90 |
-| Field outlines | `--line-control` | `#6e7684` | 4.22 / 4.03 |
-| Hairlines (decorative) | `--line` | `#212835` | 1.30 / 1.25 |
+| Fact tiles, fields, notices | `--background` | `#0f141e` | base |
+| Headlines, body, wordmark | `--foreground` | `#ece9e4` | 15.94 canvas / 15.22 background |
+| Lead, nav, card meta, second clause | `--muted-foreground` | `#a19e98` | 7.22 / 6.90 |
+| Field outlines | `--input` | `#6e7684` | 4.22 / 4.03 |
+| Hairlines (decorative) | `--border` | `#212835` | 1.30 / 1.25 |
 | HG Login, legal lines, placeholders | `--pub-faint` | `#858991` | 5.50 / 5.25 |
 | Eyebrow, link hover, CTA hover fill | `--gold` | `#c8a765` | 8.43 / 8.05 |
 | Pressed gold link | `--pub-gold-hi` | `#d8ba7e` | 10.33 / 9.87 |
-| Form errors | `--danger` | `#f47b76` | 7.30 / 6.97 |
-| CTA | `--act` fill, `--on-act` label | `#ece9e4` / `#0f141e` | 15.22; on gold hover 8.05 |
+| Form errors | `--destructive` | `#f47b76` | 7.30 / 6.97 |
+| CTA | `--primary` fill, `--primary-foreground` label | `#ece9e4` / `#0f141e` | 15.22; on gold hover 8.05 |
 
-- Text over a photo is `--on-photo` at 18px or larger over a bottom scrim that runs from `--photo-scrim` at the bottom edge to transparent at 62% of the height: 6.54 even over a white pixel. Gold and `--fg-3` never sit on a photo.
+- Text over a photo is `--on-photo` at 18px or larger over a bottom scrim that runs from `--photo-scrim` at the bottom edge to transparent at 62% of the height: 6.54 even over a white pixel. Gold and `--muted-foreground` never sit on a photo.
 - Today's `#4c525c` (HG Login, placeholders, 2.50) and `#454b55` (footer, 2.24) fail on today's `#080b12`; `--pub-faint` replaces both.
 
 ## 5. Shape, space and elevation
@@ -227,18 +230,18 @@ Two tokens are public-only.
 - Below 480px a row keeps two lines: its trailing button drops (the whole row opens the item), and the subline keeps status, place and date. Secondary clauses ("Luis marked it done · 4 photos", "2 bd · 1 ba", "/mo" on unit rows) drop rather than wrap.
 - **Task rows** (Connor, Oct 25): the date always sits at the right edge. On a two-line row the date chip is top right on the title's line and the assignee avatar bottom right on the place line; the title truncates before the date and the place before the avatar. On a one-line row (wide All list) the avatar sits just before the date at the right edge. An undated row's "Due date" chip takes the same slot, so every row's date lines up.
 - Photo rows: Portfolio 56px (48x36 photo); contractor job cards 72px.
-- Record fact strip: four facts in one row split by `--line` rules, 16px in from each rule; a 2 by 2 grid on phones so no label wraps.
+- Record fact strip: four facts in one row split by `--border` rules, 16px in from each rule; a 2 by 2 grid on phones so no label wraps.
 - Detail rails: a 112px label column, 96px on phones.
 - Controls 32px (sm) and 36px (md) with a mouse; 44px minimum on touch (`TOUCH_HEIGHT`).
 
-**Borders.** All 1px. `--line` separates, `--line-strong` rules, `--line-control` identifies a control. The only 2px marks are focus, the tab underline and the nav notch. No colored rails on cards.
+**Borders.** All 1px. `--border` separates, `--line-strong` rules, `--input` identifies a control. The only 2px marks are focus, the tab underline and the nav notch. No colored rails on cards.
 
 **Elevation.** Flat in the page flow. Shadow color is ink, not black.
 
 | Level | Light | Dark | Used for |
 |---|---|---|---|
-| Flat | `--line` edge, no shadow | same | Sections, cards, tables, inputs, bars |
-| Float | `--raised`, `--line` edge, `0 8px 24px -4px rgb(21 33 51 / 0.14)` | `--raised`, `--line-strong` edge, `0 8px 24px -6px rgb(0 0 0 / 0.5)` | Menus, popovers, toasts, command palette |
+| Flat | `--border` edge, no shadow | same | Sections, cards, tables, inputs, bars |
+| Float | `--popover`, `--border` edge, `0 8px 24px -4px rgb(21 33 51 / 0.14)` | `--popover`, `--line-strong` edge, `0 8px 24px -6px rgb(0 0 0 / 0.5)` | Menus, popovers, toasts, command palette |
 | Overlay | `0 24px 64px -12px rgb(21 33 51 / 0.28)` over scrim `rgb(10 14 23 / 0.45)` | `0 24px 64px -12px rgb(0 0 0 / 0.7)` over `rgb(0 0 0 / 0.6)` | Dialogs, sheets, drawers |
 | Photo edge | `inset 0 0 0 1px rgb(21 33 51 / 0.08)` | `inset 0 0 0 1px rgb(236 233 228 / 0.08)` | Every photo, so a pale facade doesn't bleed |
 
@@ -247,7 +250,7 @@ Two tokens are public-only.
 ### Icons
 
 - lucide-react (installed): 16px at 1.5 stroke with a mouse, 20px at 1.75 on touch, 14px inside badges.
-- Idle `--fg-3`, hover and current `--fg-1`, inside a primary button `--on-act`. Only a status icon takes a status color.
+- Idle `--muted-foreground`, hover and current `--foreground`, inside a primary button `--primary-foreground`. Only a status icon takes a status color.
 - The status ring family is the one drawn set, on lucide's grid and stroke.
 - No emoji, no icon tiles, no typed glyphs standing in for icons (`+`, `↗`, `✕`). Linear removed its colored icon tiles for the same reason ([Linear refresh](https://linear.app/now/behind-the-latest-design-refresh)).
 
@@ -255,8 +258,8 @@ Two tokens are public-only.
 
 - **Monogram.** "HG" in Geist 600 at -0.04em, `--gold` on an `--ink-tile` square. Radius 22% of the size, rounded to whole pixels (5px at 24, 7px at 32), with the letters centered on cap height, not the line box; full bleed at 180 for `apple-icon`, where iOS masks it.
 - **Sizes.** 16 favicon (the minimum), 24 sidebar and phone top bar, 32 portal header and emails, 180 `apple-icon`, 512 home-screen icon. Clear space is 25% of the tile on every side.
-- **On dark grounds** the tile keeps its ink and adds a 1px `--line` edge. It is never redrawn as gold letters alone ([Mercury tile](https://mobbin.com/screens/d575358b-679b-4d52-aa98-5026970291b3)).
-- **Wordmarks.** App: tile plus "HG Capital" in `text-label` 600 `--fg-1`; on phones the words drop. Portal: "HG Capital Partners" (`BRAND.portal`). Public: "HG CAPITAL PARTNERS" in Geist 500, 13px caps at 0.28em. Emails and PDFs: tile plus "HG Capital Partners" over a 1px `--gold-deep` rule. Never "HG Capital OS".
+- **On dark grounds** the tile keeps its ink and adds a 1px `--border` edge. It is never redrawn as gold letters alone ([Mercury tile](https://mobbin.com/screens/d575358b-679b-4d52-aa98-5026970291b3)).
+- **Wordmarks.** App: tile plus "HG Capital" in `text-label` 600 `--foreground`; on phones the words drop. Portal: "HG Capital Partners" (`BRAND.portal`). Public: "HG CAPITAL PARTNERS" in Geist 500, 13px caps at 0.28em. Emails and PDFs: tile plus "HG Capital Partners" over a 1px `--gold-deep` rule. Never "HG Capital OS".
 - **Never** gold text on a light ground, gold gradients or foil, a blue or white tile, the letters on a photo without their tile, or the monogram as a bullet.
 
 ### Photography
@@ -267,8 +270,8 @@ HG's own buildings only. No stock, no AI imagery, no virtual staging.
 - **Listing set** (five minimum before a listing goes public): exterior three-quarter, entry, then each unit's main room, kitchen and bath.
 - **Crops.** 4:3 for thumbnails and cards; 16:9 for the phone record and the job page. The public hero is 21:9 at 1280, 16:9 at 768 and 4:3 at 375.
 - **Sizes.** None in the sidebar. 32px in search and Home rows. 48x36 in Portfolio rows. 96x72 in the record header. Full-width 16:9 on the phone property page and the job page, because the person holding the phone is often standing at the building ([Zillow header](https://mobbin.com/screens/cc09445f-c80c-470e-8497-0630e416eafd)).
-- **Loading.** `next/image` over a `--fill-1` placeholder, 200ms fade.
-- **Fallback.** A `--fill-1` tile at the same size and radius, with the photo edge and lucide `House` at 1.5 stroke in `--fg-3` at 40% of the tile height ([Zillow](https://mobbin.com/screens/f6fde171-27a0-44e9-85ff-235a97cec430)). Until the photos exist this tile carries every row, so it must look finished.
+- **Loading.** `next/image` over a `--muted` placeholder, 200ms fade.
+- **Fallback.** A `--muted` tile at the same size and radius, with the photo edge and lucide `House` at 1.5 stroke in `--muted-foreground` at 40% of the tile height ([Zillow](https://mobbin.com/screens/f6fde171-27a0-44e9-85ff-235a97cec430)). Until the photos exist this tile carries every row, so it must look finished.
 - **Status on a photo.** A `--pill-bg` pill with a `--pill-fg` label (14.21 even over black), `rounded-full`, 24px tall, 8px side padding, `text-micro`, 12px in from the top-left, only when the state needs attention ("Vacant Nov 1", "Leased" on the public site) ([Airbnb](https://mobbin.com/screens/d8494673-d50a-497f-b350-c4646a14db7c)).
 - **Photo counter.** "1 / 8" in `--on-photo` on `--photo-scrim`, same pill shape, 12px in from the bottom-right, tabular.
 - **Alt text** names the place: "Front of 767 Prospect Ave".
@@ -276,7 +279,7 @@ HG's own buildings only. No stock, no AI imagery, no virtual staging.
 ### Payoff line art
 
 - Five drawings, shipped one at a time: a Buffalo double with a porch (all clear), a clipboard with a check (job done), a key on a ring (move-in report sent), an envelope with a roofline (request sent), an open ledger (month closed).
-- 1.5px `--fg-1` strokes on a 96px grid (72 on phone) with exactly one `--gold` fill per drawing: a door, a porch light, a key bow ([Gusto](https://mobbin.com/screens/f74caf21-298d-44dc-af95-bd86acc044db)).
+- 1.5px `--foreground` strokes on a 96px grid (72 on phone) with exactly one `--gold` fill per drawing: a door, a porch light, a key bow ([Gusto](https://mobbin.com/screens/f74caf21-298d-44dc-af95-bd86acc044db)).
 - Inline SVG, `aria-hidden`, colors from tokens so it follows the theme.
 - Only on payoff and empty-queue moments. Never in rows, toasts or dialogs; a finished task gets the check spring instead ([Airbnb Today](https://mobbin.com/screens/3a9a1f0c-c768-45b8-b3e0-f4d0d02698ad)).
 - A payoff tied to a property shows that property's photo instead of art.
@@ -295,7 +298,7 @@ HG's own buildings only. No stock, no AI imagery, no virtual staging.
 | `--ease-spring` | `cubic-bezier(0.32, 0.72, 0, 1)` | Today's overlay curve, kept |
 
 - Spinners show after 200ms and stay at least 400ms; buttons keep their label while loading ([Vercel guidelines](https://vercel.com/design/guidelines)).
-- Skeletons match the finished layout, draw labels at once and hold values in static `--fill-1`. No shimmer.
+- Skeletons match the finished layout, draw labels at once and hold values in static `--muted`. No shimmer.
 - Figures never count up or roll. A changed figure crossfades in 120ms.
 - Line art may draw its strokes once (600ms) on first view. That is the only loop-like motion.
 - `prefers-reduced-motion: reduce` turns everything into an opacity change of 120ms or less and skips the draw-in. One global block in `globals.css` (VISUAL-056).
@@ -321,32 +324,32 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 | Variant | Fill | Label | Edge | Hover | Use |
 |---|---|---|---|---|---|
-| `primary` | `--act` | `--on-act` | none | `--act-hover` | One per view: the next step |
-| `secondary` | `--surface` | `--fg-1` | `--line-strong` | `--fill-1` | Everything else |
-| `ghost` | none | `--fg-2` | none | `--fill-1`, label `--fg-1` | Toolbars, row actions |
-| `danger` | `--surface` | `--danger` | `--line-strong` | `--danger-tint` | First step of a destructive action, row menus |
-| `destructive` | `--danger-fill` | `--on-danger` | none | `--danger-fill-hover` | The confirm button only, naming what goes ([Lindy](https://mobbin.com/screens/541ad8e0-1d7d-441b-bbf7-daf3e59e76d3)) |
+| `primary` | `--primary` | `--primary-foreground` | none | `--primary-hover` | One per view: the next step |
+| `secondary` | `--background` | `--foreground` | `--line-strong` | `--muted` | Everything else |
+| `ghost` | none | `--fg-2` | none | `--muted`, label `--foreground` | Toolbars, row actions |
+| `danger` | `--background` | `--destructive` | `--line-strong` | `--destructive-tint` | First step of a destructive action, row menus |
+| `destructive` | `--destructive-fill` | `--destructive-foreground` | none | `--destructive-fill-hover` | The confirm button only, naming what goes ([Lindy](https://mobbin.com/screens/541ad8e0-1d7d-441b-bbf7-daf3e59e76d3)) |
 
 - `rounded-md`, `text-label`, 16px icons with a 6px gap, `sm` 32px with 10px side padding and `md` 36px with 14px, 44px on touch. Icon-only buttons are square. No pill buttons; `hover:opacity-90` goes. Hover fills sit under `@media (hover: hover)`.
 - Disabled: 50% opacity, no hover, and a disabled primary always has a one-line reason under it.
 
 ### Inputs and controls
 
-- **Fields** (Input, Textarea, Select): `--surface`, 1px `--line-control`, `rounded-md`, 36px (44 touch), 10px side padding (32px on the left when a search icon leads), `text-body`, placeholder `--fg-3`.
-- **Focus:** the edge turns `--act` plus a 1px inset `--act` ring, in place of the global outline. **Error:** `--danger` edge, the inset ring turns `--danger` on focus, and one `--danger` line under the field.
-- **Labels** sit above in `text-meta` 500 `--fg-2`, sentence case, 6px above the field. Helper text is one line of `text-meta` `--fg-3`.
-- **Checkbox and radio:** 16px, `--surface` with a `--line-control` edge; checked is `--act` fill and edge with an `--on-act` mark. **Switch:** a 32 by 18 track with a 12px knob. Off is `--surface` with a `--line-control` edge and knob; on is an `--act` track with an `--on-act` knob.
-- **Segmented control:** `--fill-1` track, `rounded-md`, 2px padding and 2px between segments; segments are `rounded-sm` and 4px shorter than the control. The selected segment is `--surface` with a `--line-control` edge (3.42 / 3.65 vs the track), same weight, `aria-pressed`.
-- **Menus and listboxes:** hover and keyboard focus use `--fill-2`; the chosen option carries a lucide `Check` in `--fg-1` at its trailing edge, so the pick never rests on a fill.
-- **Calendar:** today carries a 1px inset `--line-control` ring at the same weight as other days; the picked day is the `--act` fill ([Material date picker](https://m3.material.io/components/date-pickers/guidelines)).
-- **Avatar:** `--surface` ground with a 1px `--line-strong` edge and `--fg-2` initials at 12px, so it holds on any fill, including a highlighted listbox row. 20px avatars show one initial; 24px and up show two, so two people who share a first letter stay apart. Team members are round; contractors are `rounded-sm` squares, so who's in-house reads without color (GitHub draws people round and organizations square).
-- **Tabs** (`TopTabs`): a fixed 14 / 20 at every size (`text-label` would grow to 16 on touch and push three tabs past 320), idle `--fg-2`, selected `--fg-1` with a 2px `--act` underline, both 500, counts in `--fg-3`; links in a labeled `<nav>`, the current page marked with `aria-current="page"`, which the styles read. The row clips at a `--line` divider.
-- **Sidebar:** `--canvas`. Items 32px, `rounded-md`. Idle label `--fg-2`, icon `--fg-3`, hover `--fill-1`. Current item: `--fill-2`, label and icon `--fg-1`, and a 2px by 16px `--act` notch at the left edge (12.86 / 12.22). The notch is invented: references select with a fill alone at about 1.2:1.
-- **Desktop header** (from `lg`): `--surface` with a `--line` rule, running full width above the `--canvas` sidebar with the monogram centered over the rail's icons, so it reads as part of the work area, as Mercury's does.
-- **Phone navigation:** the drawer from the 52px top bar, on `--canvas`, with the sidebar's item styles at 44px. It scrolls when the screen is short (a phone held sideways), and every control in it, Sign out and Appearance included, is 44px on touch. A bottom tab bar is not part of this rollout; if one comes later it is `--canvas` with a `--line` rule above, 20px `--fg-3` icons over 12 / 16 500 `--fg-2` labels, and the current tab `--fg-1` with a 16 by 2px `--act` notch on its top edge.
-- **TextLink** (**new**, `ui.tsx`): inherits `--fg-1`, solid 1px underline at a 3px offset, 2px on hover. Required for every link in a sentence. Standalone links (breadcrumbs, "See all") are known by position and underline on hover.
-- **Kbd** (**new**, `ui.tsx`): Geist Mono 12px, 20px tall, 20px minimum width, `rounded-sm`, `--fill-1` with a `--line-strong` edge, `--fg-3` glyph (5.17 / 6.25). Printed in menus, the command palette, Find (⌘K) and dialog footers ("Cancel Esc", "Create task ⌘↵") ([Linear menu](https://mobbin.com/screens/83e65fd8-259c-4568-8fa6-5a2269ed4123), [Vercel switcher](https://mobbin.com/screens/63496168-dbae-470d-9039-6883d8d1e479)). Hidden under `pointer: coarse`; touch gets the same actions as visible buttons.
-- **A shortcut prints inside the button it triggers** (Connor, Oct 26), at the trailing edge after the label: "Send ⌘↵", "Create task ⌘↵", "Cancel Esc". It is never a separate keycap beside the button, as in Linear's "Comment ⌘↵" and Stripe's "Add note ⌘↵". Inside a primary (`--act`) button the keys drop the keycap ground and take `--on-act` at reduced opacity; inside a secondary button they keep the Kbd look. The button carries `aria-keyshortcuts` and the printed keys are `aria-hidden`.
+- **Fields** (Input, Textarea, Select): `--background`, 1px `--input`, `rounded-md`, 36px (44 touch), 10px side padding (32px on the left when a search icon leads), `text-body`, placeholder `--muted-foreground`.
+- **Focus:** the edge turns `--ring` plus a 1px inset `--ring` ring, in place of the global outline. **Error:** `--destructive` edge, the inset ring turns `--destructive` on focus, and one `--destructive` line under the field.
+- **Labels** sit above in `text-meta` 500 `--fg-2`, sentence case, 6px above the field. Helper text is one line of `text-meta` `--muted-foreground`.
+- **Checkbox and radio:** 16px, `--background` with an `--input` edge; checked is `--primary` fill and edge with a `--primary-foreground` mark. **Switch:** a 32 by 18 track with a 12px knob. Off is `--background` with an `--input` edge and knob; on is a `--primary` track with a `--primary-foreground` knob.
+- **Segmented control:** `--muted` track, `rounded-md`, 2px padding and 2px between segments; segments are `rounded-sm` and 4px shorter than the control. The selected segment is `--background` with an `--input` edge (3.42 / 3.65 vs the track), same weight, `aria-pressed`.
+- **Menus and listboxes:** hover and keyboard focus use `--accent`; the chosen option carries a lucide `Check` in `--foreground` at its trailing edge, so the pick never rests on a fill.
+- **Calendar:** today carries a 1px inset `--input` ring at the same weight as other days; the picked day is the `--primary` fill ([Material date picker](https://m3.material.io/components/date-pickers/guidelines)).
+- **Avatar:** `--background` ground with a 1px `--line-strong` edge and `--fg-2` initials at 12px, so it holds on any fill, including a highlighted listbox row. 20px avatars show one initial; 24px and up show two, so two people who share a first letter stay apart. Team members are round; contractors are `rounded-sm` squares, so who's in-house reads without color (GitHub draws people round and organizations square).
+- **Tabs** (`TopTabs`): a fixed 14 / 20 at every size (`text-label` would grow to 16 on touch and push three tabs past 320), idle `--fg-2`, selected `--foreground` with a 2px `--primary` underline, both 500, counts in `--muted-foreground`; links in a labeled `<nav>`, the current page marked with `aria-current="page"`, which the styles read. The row clips at a `--border` divider.
+- **Sidebar:** `--canvas`. Items 32px, `rounded-md`. Idle label `--fg-2`, icon `--muted-foreground`, hover `--muted`. Current item: `--accent`, label and icon `--foreground`, and a 2px by 16px `--primary` notch at the left edge (12.86 / 12.22). The notch is invented: references select with a fill alone at about 1.2:1.
+- **Desktop header** (from `lg`): `--background` with a `--border` rule, running full width above the `--canvas` sidebar with the monogram centered over the rail's icons, so it reads as part of the work area, as Mercury's does.
+- **Phone navigation:** the drawer from the 52px top bar, on `--canvas`, with the sidebar's item styles at 44px. It scrolls when the screen is short (a phone held sideways), and every control in it, Sign out and Appearance included, is 44px on touch. A bottom tab bar is not part of this rollout; if one comes later it is `--canvas` with a `--border` rule above, 20px `--muted-foreground` icons over 12 / 16 500 `--fg-2` labels, and the current tab `--foreground` with a 16 by 2px `--primary` notch on its top edge.
+- **TextLink** (**new**, `ui.tsx`): inherits `--foreground`, solid 1px underline at a 3px offset, 2px on hover. Required for every link in a sentence. Standalone links (breadcrumbs, "See all") are known by position and underline on hover.
+- **Kbd** (**new**, `ui.tsx`): Geist Mono 12px, 20px tall, 20px minimum width, `rounded-sm`, `--muted` with a `--line-strong` edge, `--muted-foreground` glyph (5.17 / 6.25). Printed in menus, the command palette, Find (⌘K) and dialog footers ("Cancel Esc", "Create task ⌘↵") ([Linear menu](https://mobbin.com/screens/83e65fd8-259c-4568-8fa6-5a2269ed4123), [Vercel switcher](https://mobbin.com/screens/63496168-dbae-470d-9039-6883d8d1e479)). Hidden under `pointer: coarse`; touch gets the same actions as visible buttons.
+- **A shortcut prints inside the button it triggers** (Connor, Oct 26), at the trailing edge after the label: "Send ⌘↵", "Create task ⌘↵", "Cancel Esc". It is never a separate keycap beside the button, as in Linear's "Comment ⌘↵" and Stripe's "Add note ⌘↵". Inside a primary (`--primary`) button the keys drop the keycap ground and take `--primary-foreground` at reduced opacity; inside a secondary button they keep the Kbd look. The button carries `aria-keyshortcuts` and the printed keys are `aria-hidden`.
 
 ### Badges and status marks
 
@@ -354,29 +357,29 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 | Status | Glyph | Tone |
 |---|---|---|
-| To do | Empty ring | `--fg-3` |
-| Scheduled | Ring with clock hands | `--fg-3` |
+| To do | Empty ring | `--muted-foreground` |
+| Scheduled | Ring with clock hands | `--muted-foreground` |
 | In progress | Half ring | `--fg-2` |
-| Waiting | Ring with pause bars | `--fg-3` |
+| Waiting | Ring with pause bars | `--muted-foreground` |
 | Review | Three-quarter ring | `--warn` |
 | Done | Filled ring with check | `--ok` |
-| Canceled | Slashed ring, title struck in `--fg-3` | `--fg-3` |
+| Canceled | Slashed ring, title struck in `--muted-foreground` | `--muted-foreground` |
 
 - Every status reads as glyph plus one word in a fixed column on every row ([Vercel](https://mobbin.com/screens/b95a75d7-02f8-4b45-9147-b8251441ca75)). Red belongs to the overdue date alone. Below 480px the word drops from the column and leads the row's subline instead ("Review · 56 Tamarack St"), in the mark's tone.
-- **Waiting with a reason** shows the pause ring and the reason ("Waiting on Zack's quote") in the same column, in `--fg-3`, truncated. Today's amber reason badge in `task-row.tsx` goes, so amber stays a partner's decision.
-- **Internal comments** on the task page move from amber to a `--fill-1` card with the lucide `Lock` carrying the meaning (`activity.tsx`), so they never read as Review.
+- **Waiting with a reason** shows the pause ring and the reason ("Waiting on Zack's quote") in the same column, in `--muted-foreground`, truncated. Today's amber reason badge in `task-row.tsx` goes, so amber stays a partner's decision.
+- **Internal comments** on the task page move from amber to a `--muted` card with the lucide `Lock` carrying the meaning (`activity.tsx`), so they never read as Review.
 - Every task status renders through `StatusBadge` and its one tone map in `status-badge.tsx`; no other file picks a status color.
 - A system item in Needs you (a stale sync, a missing key fact) takes the lucide icon of the thing at the mark's size, 2 stroke, in `--warn`: `RefreshCw` plus "Stale" for a sync.
 - Deal stages and the property lifecycle reuse the ring, filling by stage in `--fg-2`; Closed is `--ok`, Passed is the slashed ring.
-- **Badge:** `rounded-sm`, `text-micro`, 20px tall, no ring. Tones: `neutral` (`--fg-2` on `--fill-2`, 6.69 / 7.89, so it still shows inside a raised layer in dark), `danger`, `warn`, `ok` (tint grounds). Blue and purple are retired.
-- **Tags:** no fill, a `--line-strong` edge, `--fg-2` text, `rounded-sm`, `text-micro`, 22px tall with 8px side padding. A neutral chip inside a menu or listbox row takes the Tag look, since the row's `--fill-2` hover would swallow a filled badge.
-- **Unread dot:** 8px `--act`, 12px in from a card's top and right edges. It means new and nothing else.
+- **Badge:** `rounded-sm`, `text-micro`, 20px tall, no ring. Tones: `neutral` (`--fg-2` on `--accent`, 6.69 / 7.89, so it still shows inside a raised layer in dark), `danger`, `warn`, `ok` (tint grounds). Blue and purple are retired.
+- **Tags:** no fill, a `--line-strong` edge, `--fg-2` text, `rounded-sm`, `text-micro`, 22px tall with 8px side padding. A neutral chip inside a menu or listbox row takes the Tag look, since the row's `--accent` hover would swallow a filled badge.
+- **Unread dot:** 8px `--primary`, 12px in from a card's top and right edges. It means new and nothing else.
 
 ### Tables and money
 
 - `Table` drops its 70vh box; the page scrolls (VISUAL-V02).
-- `Th`: sticky on `--surface` under a `--line-strong` rule, `text-meta` 500 `--fg-3`, sentence case, no gray band.
-- `Th` and `Td` take a `numeric` prop: right-aligned, tabular. Rows are 40 / 48px on `--line` dividers, hover `--fill-1`, and the whole row is the link.
+- `Th`: sticky on `--background` under a `--line-strong` rule, `text-meta` 500 `--muted-foreground`, sentence case, no gray band.
+- `Th` and `Td` take a `numeric` prop: right-aligned, tabular. Rows are 40 / 48px on `--border` dividers, hover `--muted`, and the whole row is the link.
 - A footer row counts and sums ([Attio](https://mobbin.com/screens/fdc76916-ff87-4e2a-8256-80939ffa935c)), with statement rules on finance screens.
 - **Money** (**new**, `src/components/money.tsx`): whole dollars by default, a `cents` prop for transaction lines, true minus, inflow `--ok`, a `failed` state.
 - **Code** (**new**, `src/components/code.tsx`): `text-code` `--fg-2`, one-tap copy, a toast naming what was copied ("Lockbox code copied"), optional mask.
@@ -388,18 +391,18 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 ### Cards and sections
 
-- **Section** (replaces `SectionCard`): a `text-section` heading and its actions over a `--line` rule. No box, no title bar.
-- **Card:** `--surface`, 1px `--line`, `rounded-lg`, no shadow, 16px padding. Only for Home and Overview modules and public fact tiles ([Mercury home](https://mobbin.com/screens/a0539f69-cca9-4645-8f3d-aa59048efdd1)).
+- **Section** (replaces `SectionCard`): a `text-section` heading and its actions over a `--border` rule. No box, no title bar.
+- **Card:** `--background`, 1px `--border`, `rounded-lg`, no shadow, 16px padding. Only for Home and Overview modules and public fact tiles ([Mercury home](https://mobbin.com/screens/a0539f69-cca9-4645-8f3d-aa59048efdd1)).
 
 ### Photos
 
 - **PhotoThumb** (**new**, `src/components/photo-thumb.tsx`): the sizes, fallback tile, photo edge and fade above.
-- **Failed upload:** the thumbnail stays in the grid with a 2px inset `--danger` ring (it replaces the photo edge) and an inline Retry pill (`--pill-bg`, `--pill-fg`, 32px tall, 14px label, 14px `RotateCcw`, 44px hit area) 8px above its bottom center ([HBO Max](https://mobbin.com/screens/2c6b51a6-80b2-40f0-8513-83e693c55da3)).
-- While any photo has failed, Mark done stays disabled above one `--danger` line: "2 photos didn't upload · Retry".
+- **Failed upload:** the thumbnail stays in the grid with a 2px inset `--destructive` ring (it replaces the photo edge) and an inline Retry pill (`--pill-bg`, `--pill-fg`, 32px tall, 14px label, 14px `RotateCcw`, 44px hit area) 8px above its bottom center ([HBO Max](https://mobbin.com/screens/2c6b51a6-80b2-40f0-8513-83e693c55da3)).
+- While any photo has failed, Mark done stays disabled above one `--destructive` line: "2 photos didn't upload · Retry".
 
 ### Dialogs and sheets
 
-- **Dialog:** `--raised`, `rounded-xl`, overlay shadow and scrim. The title names the object; the body is one sentence of consequence.
+- **Dialog:** `--popover`, `rounded-xl`, overlay shadow and scrim. The title names the object; the body is one sentence of consequence.
 - Cancel and the primary sit bottom right with their keys. A destructive confirm uses `destructive` and names what goes ([Relume](https://mobbin.com/screens/4bc93d85-683e-4461-8e1a-fd1b519f240d)).
 - Esc closes the dialog, focus stays inside it while open and returns to the trigger after, and it portals to `<body>`. Below `sm` a dialog's actions stack full width with the primary on top, as Apple's alerts do when labels don't fit side by side ([HIG alerts](https://developer.apple.com/design/human-interface-guidelines/alerts)), so no label wraps at 320.
 - **Sheet (phone):** `rounded-xl` top corners, title, content, and the primary pinned above the safe area. Esc closes one layer.
@@ -421,65 +424,29 @@ The dark front door stays and becomes the app's own dark material. Same Geist, s
 
 | Role | 1280 | 768 | 375 | Weight | Tracking | Notes |
 |---|---|---|---|---|---|---|
-| Display | 56 / 60 | 44 / 48 | 34 / 40 | 400 | -0.03em | Hero headline; second clause in `--fg-3` |
+| Display | 56 / 60 | 44 / 48 | 34 / 40 | 400 | -0.03em | Hero headline; second clause in `--muted-foreground` |
 | Heading | 28 / 34 | 28 / 34 | 24 / 30 | 400 | -0.02em | Page h1 on Rentals and Residents |
 | Eyebrow | 12 / 16 | 12 / 16 | 12 / 16 | 500 | 0.28em caps | `--gold`, one per page, carrying a real fact: "Rentals · 2 available" |
-| Lead | 18 / 28 | 18 / 28 | 16 / 24 | 400 | 0 | `--fg-3`, one paragraph at most |
+| Lead | 18 / 28 | 18 / 28 | 16 / 24 | 400 | 0 | `--muted-foreground`, one paragraph at most |
 | Card title | 16 / 24 | 16 / 24 | 16 / 24 | 500 | 0 | Listing street |
-| Card meta | 14 / 20 | 14 / 20 | 14 / 20 | 400 | 0 | "2 bd · 1 ba · 950 sq ft", tabular `--fg-3` |
+| Card meta | 14 / 20 | 14 / 20 | 14 / 20 | 400 | 0 | "2 bd · 1 ba · 950 sq ft", tabular `--muted-foreground` |
 | Wordmark | 13 / 16 | 13 / 16 | 13 / 16 | 500 | 0.28em caps | "HG CAPITAL PARTNERS" |
 
 - **Gutters** 40 / 32 / 16 at 1280 / 768 / 375, for the header, hero type, listings and footer alike.
-- **Header.** 64px over a `--line` rule. Wordmark in `--fg-1` left; Rentals and Residents in `--fg-3` at 14 / 20, 28px apart, the current page in `--fg-1`; HG Login last in `--pub-faint`. Below 600 the links fold into a 44px menu button.
+- **Header.** 64px over a `--border` rule. Wordmark in `--foreground` left; Rentals and Residents in `--muted-foreground` at 14 / 20, 28px apart, the current page in `--foreground`; HG Login last in `--pub-faint`. Below 600 the links fold into a 44px menu button.
 - **Uppercase** lives only here, in the eyebrow and wordmark. The gold hairline (56px) appears once, under the welcome eyebrow.
 - **Listings** are borderless 4:3 photo cards, `rounded-lg`, with a "1 / 8" counter and swipe on touch ([KOBU](https://mobbin.com/sites/sections/4226456d-e845-483a-ad1b-305a93fe7d36), [Airbnb](https://mobbin.com/screens/8a6b4476-52d7-4c85-965b-2a870b388eb3)).
-- **Caption.** Street with rent right-aligned (tabular, "/mo" in `--fg-3`), then neighborhood and unit, then the facts line ([Realtor.com](https://mobbin.com/screens/b0a7e96c-8e57-41b8-9029-a9521f0fa412)). Desktop hover turns the street gold.
+- **Caption.** Street with rent right-aligned (tabular, "/mo" in `--muted-foreground`), then neighborhood and unit, then the facts line ([Realtor.com](https://mobbin.com/screens/b0a7e96c-8e57-41b8-9029-a9521f0fa412)). Desktop hover turns the street gold.
 - **Grid** 3 / 2 / 1 columns at 1280 / 768 / 375, 16px gutters on phone.
 - **CTA.** Limestone fill, `rounded-md`, 40px (48 touch), hover gold. The listing page pins rent and "Text us about this home" in a phone bottom bar ([Redfin](https://mobbin.com/screens/8783369a-0d07-4dc7-9de5-590c8fb954a6)).
 - **Hero.** A full-bleed HG exterior (21:9, then 16:9 at 768) under the bottom scrim replaces the radial glow, with the headline set on the photo's lower left ([Okta](https://mobbin.com/sites/sections/5e71206c-b8c4-4e6d-a122-a8bb332a11fd)). At 375 the photo is 4:3 with no scrim and the headline moves below it onto solid `--canvas`. Until the photo exists, the hero is flat `--canvas` with type, never stock or a gradient.
-- **Notices** (the sign-in notice that is gold-tinted today) become `--surface` with a `--line` edge and `--fg-1` text. Gold never marks state.
+- **Notices** (the sign-in notice that is gold-tinted today) become `--background` with a `--border` edge and `--foreground` text. Gold never marks state.
 - **Guardrail.** Navy plus gold leans toward the private-bank template. Holding the ground chroma at 0.026, keeping gold to one eyebrow per page and using no serif keep it HG.
 
-## 11. What changes from today
+## 11. History
 
-| File | Today | Change |
-|---|---|---|
-| `src/app/globals.css` | 8 zinc and blue tokens | All tokens above, light and dark; `@theme inline` color map; type tokens in `@theme` plus one `pointer: coarse` block; shadow and motion tokens; `color-scheme`; `::selection`; global `:focus-visible`; tabular on numeric cells, `.num` and the figure tokens; `.cents`; reduced-motion block; `[data-surface="public"]` scope and the widened `dark` custom variant |
-| `src/app/globals.css` aliases | | One release: `--background` to `--fill-1`, `--foreground` to `--fg-1`, `--muted` to `--fg-3`, `--border` to `--line`, `--primary` to `--act`, `--primary-foreground` to `--on-act`, `--accent` to `--fill-2`. `body` moves to `--surface` explicitly |
-| `src/components/ui.tsx` | Blue primary with opacity hover; `rounded-lg` controls; zinc and purple badges; uppercase `Th` and `Field`; `shadow-sm` cards; 70vh tables; dashed `EmptyState` | Buttons, fields, badges, tables, `Card`, `Section`, `PageHeader` (`text-title`), `Field`, `EmptyState` as in section 9; new `TextLink` and `Kbd` |
-| `src/components/status-badge.tsx` | Seven tones (blue, purple, amber, red) | `StatusMark` ring family; tones neutral, `warn` (Review), `ok` (Done) |
-| `src/lib/config.ts` | A second `TONE_CLASSES` map | Deleted; deal badges use the one tone map in `ui.tsx` (VISUAL-011) |
-| `src/components/money.tsx`, `code.tsx`, `photo-thumb.tsx`, `monogram.tsx`, `spot-art.tsx` | | New, each with a row in `docs/components.md` |
-| `src/components/segmented-control.tsx`, `toast.tsx`, `menu.tsx`, `popover.tsx`, `sheet.tsx`, `confirm-dialog.tsx` | Mixed fills and radii | Tokens, radii and states from section 9 |
-| `src/components/app-shell.tsx`, `nav.tsx` | Blue current item, full-color icons | `--canvas` chrome, `--fill-2` plus ink notch, `--fg-3` icons, monogram lockup |
-| `src/app/(portal)/p/layout.tsx` | `bg-background` page | `bg-surface` page, `--canvas` header, "HG Jobs" lockup |
-| `src/app/(app)/financials/_components/ui.tsx`, `financials/page.tsx`, `rent-roll/page.tsx` | `bg-background` KPI tiles and tracks | Figure tokens at 500, statement rules, `Money` |
-| `src/app/(app)/properties/[id]/edit-units.tsx` | Unit count as an editable field | Units list with Add unit and row Delete; count derived |
-| `src/app/layout.tsx` | Title "HG Capital OS"; default favicon | Keep `Geist` and `Geist_Mono`; title template "%s · HG"; `viewport.themeColor` `#f8f7f3` light, `#0a0e17` dark |
-| `src/app/favicon.ico` | create-next-app triangle | Deleted; add `src/app/icon.svg` and `src/app/apple-icon.png` (monogram) |
-| `src/app/(marketing)/layout.tsx` | `bg-[#080b12] text-[#f2f4f7]` | `data-surface="public"`, `bg-canvas text-fg-1`, `themeColor` `#0a0e17` |
-| `src/components/public/header.tsx`, `footer.tsx`, `(marketing)/welcome`, `rentals/page.tsx`, `rentals/photo-carousel.tsx`, `residents/*`, `(marketing)/error.tsx`, `src/app/not-found.tsx`, `src/app/login/_components/auth-frame.tsx`, `password-field.tsx` | 140 hex literals in 14 files (48 of them gold); pill CTAs; radial glow | Tokens only; photo hero; borderless listing cards; `rounded-md` CTAs; fact eyebrow |
-| `src/lib/email/render.ts` | Hand-picked hex | Reads `src/lib/brand-tokens.ts` (**new**), a hex mirror of the light tokens plus `--gold-deep` and `--ink-tile`, since email can't use CSS variables. A unit test fails when the mirror and `globals.css` disagree |
-| `eslint.config.mjs` | Em dash rule | Adds: reject `-[#` hex arbitrary values, `text-[N` arbitrary sizes and raw palette utilities (`zinc-`, `blue-`, `red-`, `amber-`, `green-`, `purple-`) in strings under `src/` |
-| `CLAUDE.md` | Personality and Typography describe Geist Mono figures, zinc plus blue, two palettes, card shadows | Visual bullets replaced by one line: "Visual rules live in docs/brand-guidelines.md." Non-visual rules stay |
-| `docs/components.md` | | Rows for TextLink, Kbd, StatusMark, Money, Code, PhotoThumb, Monogram, SpotArt, Section |
-
-Settled decisions this replaces, to name at sign-off: the task tone map in `docs/asana-migration-plan.md` §7 (Review drops red, Scheduled drops blue, In progress drops purple), Geist Mono for figures, the two-palette rule, and `shadow-sm` on cards.
-
-Migration size today: 272 `text-muted`, 248 `text-xs`, 114 `dark:`, 99 `border-border`, 73 `bg-background` (37 hover fills), 60 `rounded-lg`, 55 `text-primary`, 43 arbitrary `text-[N]` sizes, 35 `ring-primary`, 19 `bg-primary`.
-
-## 12. Rollout order
-
-Each slice runs `npm run typecheck`, `npm run lint`, `npm test` and `npm run test:devices`, and opens touched dialogs and menus at 375 and 320 by hand. The sweep can't judge color.
-
-1. **Tokens and aliases.** `globals.css` in full, with `TextLink` and the sweep of the 55 `text-primary` sites in the same slice, so no link or active tab renders as plain text when `--primary` turns ink. The lint rule lands as a warning.
-2. **Primitives.** `ui.tsx`, `status-badge.tsx`, the radius step-down, the new primitives and their `docs/components.md` rows, and the `config.ts` tone map removal.
-3. **The shell.** Sidebar, phone bars, portal layout, monogram, favicon and icons, metadata and `themeColor`.
-4. **Pages.** Home, Properties (list, record, Units tab), Tasks, Deals, Financials (statement rules), Contractors, then the HG Jobs job page (failed photos).
-5. **Public site.** Tokens, header and footer, rentals cards, then the welcome hero once a real exterior exists.
-6. **Close out.** Codemod the old names to the new utilities (`text-muted` to `text-fg-3`, `text-xs` to `text-meta` or `text-micro`), drop the `dark:` overrides the tokens now cover, delete the aliases, flip the lint rule to error, and rewrite CLAUDE.md.
-
-The 11 identity photos are shot in parallel and are required before step 5's hero and before calling step 4 done.
+- **Oct 25, 2026.** Ink and Limestone landed in `4f45a1b`. The change list and rollout order it followed are in that commit's copy of this file.
+- **Nov 14, 2026.** The color tokens took shadcn/ui's names ([design foundation](specs/design-foundation.md), section 3). Values didn't change.
 
 ## References
 

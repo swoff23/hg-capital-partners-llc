@@ -49,7 +49,7 @@ const rowGrid = cn(
 /** The figures: in thirds on their own line below sm, three grid cells of the row from sm. */
 const figuresCell = "max-sm:col-span-full max-sm:grid max-sm:grid-cols-3 max-sm:gap-2 sm:contents";
 /** The row's one error line, under all of it. */
-const rowLine = "col-span-full truncate text-meta text-danger";
+const rowLine = "col-span-full truncate text-meta text-destructive";
 
 /** A group's label inside Building systems. */
 const subhead = "pb-1 pt-3 text-meta font-medium text-fg-2";
@@ -67,7 +67,7 @@ function InfoTip({ label, name, className }: { label: string; name: string; clas
       <button
         type="button"
         aria-label={`What ${name} means`}
-        className="relative inline-flex size-4 items-center justify-center rounded-sm text-fg-3 transition-colors hover:text-fg-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5"
+        className="relative inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5"
       >
         <Info aria-hidden="true" className="size-4" strokeWidth={1.5} />
       </button>
@@ -77,11 +77,11 @@ function InfoTip({ label, name, className }: { label: string; name: string; clas
 
 /** The table's header: the first column's name and the three figures (with their ⓘ), from sm; the three figures alone, once, on a phone. */
 function RuleHeader({ first }: { first: string }) {
-  const th = "whitespace-nowrap px-2.5 text-right text-meta font-medium text-fg-3";
+  const th = "whitespace-nowrap px-2.5 text-right text-meta font-medium text-muted-foreground";
   return (
     <>
       <div className={cn(rowGrid, "mb-1 hidden border-b border-line-strong pb-2 sm:grid")}>
-        <span className="text-meta font-medium text-fg-3">{first}</span>
+        <span className="text-meta font-medium text-muted-foreground">{first}</span>
         <span className={cn(th, "flex items-center justify-end gap-1")}>
           Monitor at <InfoTip label={MONITOR_TIP} name="Monitor at" />
         </span>
@@ -164,7 +164,7 @@ function Figures({
   );
 }
 
-/** One row on a --line divider: its name, its figures, its delete (tap to reveal on touch, as the move-in form's items do) and its one error line. */
+/** One row on a --border divider: its name, its figures, its delete (tap to reveal on touch, as the move-in form's items do) and its one error line. */
 function RuleRow({
   uid,
   label,
@@ -434,9 +434,9 @@ export function CapexRulesEditor({
         }
       >
         <RuleHeader first="Appliance" />
-        <div className="divide-y divide-line">
+        <div className="divide-y divide-border">
           {appliances.map((r) => equipmentRow(r, "appliance"))}
-          {appliances.length === 0 && <p className="py-2.5 text-body text-fg-3">No appliance rules.</p>}
+          {appliances.length === 0 && <p className="py-2.5 text-body text-muted-foreground">No appliance rules.</p>}
         </div>
         {/* The list's last row adds one more, as Add unit ends the Units list; it's off once every type has a rule. */}
         <AddRow onClick={() => addEquipment(freeAppliances[0])} disabled={freeAppliances.length === 0}>
@@ -446,7 +446,7 @@ export function CapexRulesEditor({
 
       <Section title="Building systems">
         <RuleHeader first="System" />
-        <div className="divide-y divide-line">
+        <div className="divide-y divide-border">
           {/* Roof, furnace and the rest are kept per unit, and a building can carry its own roof
               too: the subheads say which a figure is, so two Roof rows never read as one rule. */}
           {coreSystems.length > 0 && <p className={subhead}>Per unit</p>}

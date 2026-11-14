@@ -2,6 +2,8 @@
 
 Part of the [UI/UX review](README.md). 30 findings: 0 critical, 4 high, 15 medium, 11 low.
 
+Color names here predate the Nov 14 rename to shadcn's names ([design foundation](../specs/design-foundation.md), section 3).
+
 ## How it should work
 
 Tasks becomes the quiet queue HG runs on after Asana: one row, one composer and one record page, each borrowed from the product that does it best.

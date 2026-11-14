@@ -74,7 +74,7 @@ export function SendBackSheet({
         onSend(note);
       }}
     >
-      {taskTitle && <p className="truncate text-body text-fg-3">{taskTitle}</p>}
+      {taskTitle && <p className="truncate text-body text-muted-foreground">{taskTitle}</p>}
       <FormField
         label="What still needs doing?"
         error={tried && !note ? "Add a short note for the contractor." : undefined}

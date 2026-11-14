@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * The round Done checkbox on task rows: the status ring family at 18px
  * inside a 44px hit area (negative margins keep the row compact). To do's
- * empty ring in --fg-3, --fg-1 on hover with a mouse; ticked, Done's filled
+ * empty ring in --muted-foreground, --foreground on hover with a mouse; ticked, Done's filled
  * ring in --ok, with the check spring (docs/brand-guidelines.md, sections 6
  * and 7). The caller owns the state, so a tap shows at once while the save
  * runs.
@@ -39,13 +39,13 @@ export function TaskCheckbox({
     >
       <span
         aria-hidden="true"
-        className="grid size-4.5 place-items-center rounded-full group-focus-visible/check:outline-solid group-focus-visible/check:outline-2 group-focus-visible/check:outline-offset-2 group-focus-visible/check:outline-act"
+        className="grid size-4.5 place-items-center rounded-full group-focus-visible/check:outline-solid group-focus-visible/check:outline-2 group-focus-visible/check:outline-offset-2 group-focus-visible/check:outline-ring"
       >
         <StatusMark
           status="OPEN"
           className={cn(
             "col-start-1 row-start-1 size-4.5 transition-colors pointer-coarse:size-4.5",
-            checked ? "opacity-0" : "group-hover/check:text-fg-1",
+            checked ? "opacity-0" : "group-hover/check:text-foreground",
           )}
         />
         {/* Scale 0.9 to 1 on the spring; reduced motion makes it an instant change. */}

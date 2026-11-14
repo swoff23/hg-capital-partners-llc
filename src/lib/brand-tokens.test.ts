@@ -14,7 +14,7 @@ function repoRoot(): string {
   }
 }
 
-/** Every hex token in globals.css's first, light :root block, as { "--fill-1": "#f2f0ec" }. */
+/** Every hex token in globals.css's first, light :root block, as { "--muted": "#f2f0ec" }. */
 function lightHexTokens(): Record<string, string> {
   const css = fs.readFileSync(path.join(repoRoot(), "src", "app", "globals.css"), "utf8");
   const block = css.match(/^:root \{([\s\S]*?)^\}/m);
@@ -28,10 +28,10 @@ function lightHexTokens(): Record<string, string> {
 }
 
 test("cssVarName: camelCase to the CSS custom property", () => {
-  assert.equal(cssVarName("fill1"), "--fill-1");
+  assert.equal(cssVarName("mutedForeground"), "--muted-foreground");
   assert.equal(cssVarName("lineStrong"), "--line-strong");
   assert.equal(cssVarName("toastFg2"), "--toast-fg-2");
-  assert.equal(cssVarName("dangerFillHover"), "--danger-fill-hover");
+  assert.equal(cssVarName("destructiveFillHover"), "--destructive-fill-hover");
 });
 
 test("brandTokens mirrors every hex token on :root in globals.css, value for value", () => {

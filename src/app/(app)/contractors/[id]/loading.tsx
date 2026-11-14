@@ -28,7 +28,7 @@ const FACTS = [
  * A contractor while they load (docs/specs/performance.md 4.3), on the page's
  * grid: Contractors, the Contact rows' labels, Notes, Portal access and Jobs
  * draw at once; the name, the company line, the values and the job rows are
- * --fill-1 blocks in the page's own boxes.
+ * --muted blocks in the page's own boxes.
  */
 export default function ContractorLoading() {
   return (
@@ -65,7 +65,7 @@ export default function ContractorLoading() {
         </aside>
 
         <Section className="min-w-0 @4xl:col-start-1 @4xl:row-start-1" title="Jobs">
-          <ul aria-hidden="true" className="@container divide-y divide-line">
+          <ul aria-hidden="true" className="@container divide-y divide-border">
             {Array.from({ length: 6 }, (_, i) => (
               <li
                 key={i}

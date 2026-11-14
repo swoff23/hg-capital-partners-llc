@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Tailwind scans every file git doesn't ignore and builds a rule for each
+   class name it finds. The color rename's fixtures and scripts spell out
+   class names no page uses, so they stay out of the scan
+   (docs/specs/design-foundation.md, section 7.2). */
+@source not "../lib/token-renames.test.ts";
+@source not "../../scripts";
+
 /* Ink and Limestone (docs/brand-guidelines.md). Every brand value lives in a
    token here, so a re-brand is a token swap. Light is :root; dark is
    [data-theme="dark"] on <html> (set before paint by THEME_SCRIPT in
@@ -16,29 +23,29 @@
 
   /* Neutrals (limestone grounds, ink type) */
   --canvas: #f8f7f3;
-  --surface: #ffffff;
-  --raised: #ffffff;
-  --fill-1: #f2f0ec;
-  --fill-2: #e7e5e0;
+  --background: #ffffff;
+  --popover: #ffffff;
+  --muted: #f2f0ec;
+  --accent: #e7e5e0;
   --select: #e4e9f0;
-  --line: #e7e5e0;
+  --border: #e7e5e0;
   --line-strong: #d5d1ca;
-  --line-control: #84817a;
-  --fg-3: #5b6576;
+  --input: #84817a;
+  --muted-foreground: #5b6576;
   --fg-2: #424e61;
-  --fg-1: #152133;
+  --foreground: #152133;
 
-  /* Act (ink) */
-  --act: #152133;
-  --on-act: #ffffff;
-  --act-hover: #28364d;
+  /* Primary (ink) */
+  --primary: #152133;
+  --primary-foreground: #ffffff;
+  --primary-hover: #28364d;
 
   /* Status */
-  --danger: #b91c1c;
-  --danger-tint: #fff2f1;
-  --danger-fill: #b91c1c;
-  --danger-fill-hover: #a31818;
-  --on-danger: #ffffff;
+  --destructive: #b91c1c;
+  --destructive-tint: #fff2f1;
+  --destructive-fill: #b91c1c;
+  --destructive-fill-hover: #a31818;
+  --destructive-foreground: #ffffff;
   --warn: #a54e09;
   --warn-tint: #fff5ec;
   --ok: #1d7038;
@@ -73,7 +80,7 @@
   /* Edges that only show on dark grounds (section 5). Each is built from
      another token and redefined in the dark block below, so no component
      needs a dark: override. In light they match what they sit on. */
-  --line-float: var(--line);
+  --line-float: var(--border);
   --toast-edge: var(--toast-bg);
   --tile-edge: var(--ink-tile);
 
@@ -104,27 +111,27 @@
   color-scheme: dark;
 
   --canvas: #0a0e17;
-  --surface: #0f141e;
-  --raised: #161d28;
-  --fill-1: #181e2a;
-  --fill-2: #212835;
+  --background: #0f141e;
+  --popover: #161d28;
+  --muted: #181e2a;
+  --accent: #212835;
   --select: #2a3548;
-  --line: #212835;
+  --border: #212835;
   --line-strong: #323947;
-  --line-control: #6e7684;
-  --fg-3: #a19e98;
+  --input: #6e7684;
+  --muted-foreground: #a19e98;
   --fg-2: #c0bdb7;
-  --fg-1: #ece9e4;
+  --foreground: #ece9e4;
 
-  --act: #ece9e4;
-  --on-act: #0f141e;
-  --act-hover: #d3d1cb;
+  --primary: #ece9e4;
+  --primary-foreground: #0f141e;
+  --primary-hover: #d3d1cb;
 
-  --danger: #f47b76;
-  --danger-tint: #341817;
-  --danger-fill: #c92f33;
-  --danger-fill-hover: #b3292d;
-  --on-danger: #ffffff;
+  --destructive: #f47b76;
+  --destructive-tint: #341817;
+  --destructive-fill: #c92f33;
+  --destructive-fill-hover: #b3292d;
+  --destructive-foreground: #ffffff;
   --warn: #f7a059;
   --warn-tint: #321f0f;
   --ok: #6ad18a;
@@ -144,43 +151,75 @@
   /* Floating layers, the toast and the monogram tile take an edge here. */
   --line-float: var(--line-strong);
   --toast-edge: var(--line-strong);
-  --tile-edge: var(--line);
+  --tile-edge: var(--border);
 }
 
 /* Tokens built from other tokens. A var() resolves where it's declared, so
    these sit on every element that redefines the base tokens; declared on
-   :root alone, the public wrapper would inherit the light values. */
+   :root alone, the public wrapper would inherit the light values. Most are
+   shadcn/ui's names, each pointing at the HG token that has its role. */
 :root,
 [data-surface="public"] {
-  --chart-ref: var(--line-control);
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+  --accent-foreground: var(--foreground);
+  --secondary: var(--accent);
+  --secondary-foreground: var(--fg-2);
+  --ring: var(--primary);
+  --sidebar: var(--canvas);
+  --sidebar-foreground: var(--fg-2);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --chart-ref: var(--input);
 }
 
-/* Utilities read the variables, so text-fg-2, bg-canvas, border-line-control,
-   bg-danger-tint and friends follow the theme. */
+/* Utilities read the variables, so text-fg-2, bg-canvas, border-input,
+   bg-destructive-tint and friends follow the theme. */
 @theme inline {
   --color-canvas: var(--canvas);
-  --color-surface: var(--surface);
-  --color-raised: var(--raised);
-  --color-fill-1: var(--fill-1);
-  --color-fill-2: var(--fill-2);
+  --color-background: var(--background);
+  --color-popover: var(--popover);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
   --color-select: var(--select);
-  --color-line: var(--line);
+  --color-border: var(--border);
   --color-line-strong: var(--line-strong);
-  --color-line-control: var(--line-control);
+  --color-input: var(--input);
   --color-line-float: var(--line-float);
-  --color-fg-1: var(--fg-1);
+  --color-foreground: var(--foreground);
   --color-fg-2: var(--fg-2);
-  --color-fg-3: var(--fg-3);
+  --color-muted-foreground: var(--muted-foreground);
 
-  --color-act: var(--act);
-  --color-on-act: var(--on-act);
-  --color-act-hover: var(--act-hover);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-ring: var(--ring);
 
-  --color-danger: var(--danger);
-  --color-danger-tint: var(--danger-tint);
-  --color-danger-fill: var(--danger-fill);
-  --color-danger-fill-hover: var(--danger-fill-hover);
-  --color-on-danger: var(--on-danger);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-tint: var(--destructive-tint);
+  --color-destructive-fill: var(--destructive-fill);
+  --color-destructive-fill-hover: var(--destructive-fill-hover);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-warn: var(--warn);
   --color-warn-tint: var(--warn-tint);
   --color-ok: var(--ok);
@@ -367,12 +406,12 @@
 
 /* ---------------- Globals ---------------- */
 body {
-  background: var(--surface);
-  color: var(--fg-1);
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
 }
 
-/* The public site under iOS overscroll: body is --surface on :root, so in the
+/* The public site under iOS overscroll: body is --background on :root, so in the
    light theme it would flash white above and below the dark public pages.
    #0a0e17 is the dark --canvas, the public ground; body can't read it, since
    the public tokens sit on the wrapper inside it. A rule of its own, so a
@@ -391,7 +430,7 @@ body:has([data-surface="public"]) {
 
 ::selection {
   background-color: var(--select);
-  color: var(--fg-1);
+  color: var(--foreground);
 }
 
 * {
@@ -403,7 +442,7 @@ body:has([data-surface="public"]) {
    --toast-fg, set by the toast itself. */
 @layer base {
   :focus-visible {
-    outline: 2px solid var(--act);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
@@ -420,7 +459,7 @@ body:has([data-surface="public"]) {
      control (section 9). */
   input[type="checkbox"],
   input[type="radio"] {
-    accent-color: var(--act);
+    accent-color: var(--primary);
   }
 
   /* Cents on a single transaction line or a bill's key figure, lifted to the
@@ -492,26 +531,26 @@ body:has([data-surface="public"]) {
     color-scheme: light;
 
     --canvas: #f8f7f3;
-    --surface: #ffffff;
-    --raised: #ffffff;
-    --fill-1: #f2f0ec;
-    --fill-2: #e7e5e0;
+    --background: #ffffff;
+    --popover: #ffffff;
+    --muted: #f2f0ec;
+    --accent: #e7e5e0;
     --select: #e4e9f0;
-    --line: #e7e5e0;
+    --border: #e7e5e0;
     --line-strong: #d5d1ca;
-    --line-control: #84817a;
-    --fg-3: #5b6576;
+    --input: #84817a;
+    --muted-foreground: #5b6576;
     --fg-2: #424e61;
-    --fg-1: #152133;
+    --foreground: #152133;
 
-    --act: #152133;
-    --on-act: #ffffff;
-    --act-hover: #28364d;
+    --primary: #152133;
+    --primary-foreground: #ffffff;
+    --primary-hover: #28364d;
 
-    --danger: #b91c1c;
-    --danger-tint: #fff2f1;
-    --danger-fill: #b91c1c;
-    --danger-fill-hover: #a31818;
+    --destructive: #b91c1c;
+    --destructive-tint: #fff2f1;
+    --destructive-fill: #b91c1c;
+    --destructive-fill-hover: #a31818;
     --warn: #a54e09;
     --warn-tint: #fff5ec;
     --ok: #1d7038;
@@ -522,7 +561,7 @@ body:has([data-surface="public"]) {
     --toast-fg-2: #c0bdb7;
     --chart-1: #384e6e;
 
-    --line-float: var(--line);
+    --line-float: var(--border);
     --toast-edge: var(--toast-bg);
     --tile-edge: var(--ink-tile);
   }

@@ -22,7 +22,7 @@ export default function HomeLoading() {
       </div>
 
       {/* The Mine | Contractors switch below lg: its track, shaped by its words. */}
-      <span aria-hidden="true" className="mb-4 inline-flex shrink-0 items-center gap-0.5 rounded-md bg-fill-1 p-0.5 lg:hidden">
+      <span aria-hidden="true" className="mb-4 inline-flex shrink-0 items-center gap-0.5 rounded-md bg-muted p-0.5 lg:hidden">
         {["Mine", "Contractors"].map((label) => (
           <span key={label} className="invisible inline-flex h-8 items-center px-3 text-label pointer-coarse:h-10">
             {label}
@@ -52,7 +52,7 @@ function Column({ title, className, children }: { title: string; className?: str
     <section aria-label={title} className={className ? `min-w-0 ${className}` : "min-w-0"}>
       <h2 className="mb-2 hidden text-meta font-medium text-fg-2 lg:block">{title}</h2>
       <Section as="h3" title={<Block text="text-section" className="w-28" />}>
-        <ul className="@container divide-y divide-line">{children}</ul>
+        <ul className="@container divide-y divide-border">{children}</ul>
       </Section>
     </section>
   );

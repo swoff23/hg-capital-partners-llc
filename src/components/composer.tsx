@@ -332,7 +332,7 @@ const NO_IDS: readonly string[] = [];
  * and go out with the message; Send waits for them. Cmd or Ctrl+Enter
  * sends, printed inside Send at its trailing edge for a mouse ("Send ⌘↵").
  * A line over the field says who will see it, and with the switch, Internal
- * turns the box --fill-1 under a Lock line (docs/brand-guidelines.md, section
+ * turns the box --muted under a Lock line (docs/brand-guidelines.md, section
  * 9); the text and the choice are kept together, and Send reads "Add note".
  * Esc leaves the field and keeps the draft. Pinned on a phone, it sits on the
  * bottom edge with its contents on the 16px page gutter, rides above the
@@ -744,9 +744,9 @@ function ComposerBody({
             )
           : "rounded-lg",
         // Both grounds are opaque: on a phone it sits over the page.
-        internal ? "border-line bg-fill-1" : "border-line bg-surface",
+        internal ? "border-border bg-muted" : "border-border bg-background",
         // Same drop cue as the Attachments box.
-        dropState.over && "border-act",
+        dropState.over && "border-primary",
       )}
     >
       {api?.inputs}
@@ -759,7 +759,7 @@ function ComposerBody({
             <span className="flex min-w-0 flex-1">{audienceLine}</span>
           </p>
         ) : (
-          <p className={cn("min-w-0 px-4 pt-2 text-meta text-fg-3 md:px-3", open ? "flex" : "hidden md:flex")}>{audienceLine}</p>
+          <p className={cn("min-w-0 px-4 pt-2 text-meta text-muted-foreground md:px-3", open ? "flex" : "hidden md:flex")}>{audienceLine}</p>
         ))}
       {uploader && ready.length > 0 && (
         <ul className="flex flex-wrap gap-2 px-4 pt-2.5 md:px-3">
@@ -810,7 +810,7 @@ function ComposerBody({
             }
           }}
           // Five lines on a phone, so the bar stays under half of what an iPhone SE shows above its keyboard; the old cap from md.
-          className="max-h-[6.875rem] min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-body text-fg-1 outline-none placeholder:text-fg-3 md:max-h-48 md:min-h-12 md:px-1"
+          className="max-h-[6.875rem] min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-body text-foreground outline-none placeholder:text-muted-foreground md:max-h-48 md:min-h-12 md:px-1"
         />
         {sendButton(cn("mb-0.5", tools && "md:hidden"))}
       </div>
@@ -830,8 +830,8 @@ function ComposerBody({
           {mode === "switch" && (
             <SegmentedControl
               aria-label="Who sees this"
-              // On the internal note's --fill-1 ground the track steps up to --fill-2, or it vanishes.
-              className={cn("ml-auto", internal && "bg-fill-2")}
+              // On the internal note's --muted ground the track steps up to --accent, or it vanishes.
+              className={cn("ml-auto", internal && "bg-accent")}
               value={visibility}
               onChange={setVisibility}
               options={[
@@ -876,7 +876,7 @@ function IconButton({
 }: {
   label: string;
   onPress: () => void;
-  /** On the internal note's --fill-1 ground, where the ghost hover would vanish: it steps up to --fill-2. */
+  /** On the internal note's --muted ground, where the ghost hover would vanish: it steps up to --accent. */
   onFill?: boolean;
   className?: string;
   children: React.ReactNode;
@@ -887,11 +887,11 @@ function IconButton({
       aria-label={label}
       title={label}
       onClick={onPress}
-      // A ghost icon button with its icon idle in --fg-3, --fg-1 on hover.
+      // A ghost icon button with its icon idle in --muted-foreground, --foreground on hover.
       className={cn(
         buttonClass({ variant: "ghost", icon: true }),
-        "shrink-0 text-fg-3 [&_svg]:size-4.5",
-        onFill && "not-disabled:hover:bg-fill-2",
+        "shrink-0 text-muted-foreground [&_svg]:size-4.5",
+        onFill && "not-disabled:hover:bg-accent",
         className,
       )}
     >

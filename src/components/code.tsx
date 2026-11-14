@@ -60,7 +60,7 @@ export function Code({
         // Names the code itself, not only the action: "Lockbox code 4521, copy".
         aria-label={`${label} ${shown ? value : `ending ${value.slice(-4)}`}, copy`}
         className={cn(
-          "group relative inline-flex items-center gap-1.5 rounded-sm font-mono text-fg-2 transition-colors hover:text-fg-1",
+          "group relative inline-flex items-center gap-1.5 rounded-sm font-mono text-fg-2 transition-colors hover:text-foreground",
           wrap ? "min-w-0 whitespace-normal text-left" : "shrink-0 whitespace-nowrap",
           size === "lg" ? "text-code-l" : "text-code",
           // A 44px hit area on touch without the code growing.
@@ -73,7 +73,7 @@ export function Code({
         {copyIcon && (
           <Copy
             aria-hidden="true"
-            className="h-3.5 w-3.5 shrink-0 text-fg-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:hidden"
+            className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:hidden"
           />
         )}
       </button>
@@ -83,7 +83,7 @@ export function Code({
           onClick={() => setShown((s) => !s)}
           aria-label={shown ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
           aria-pressed={shown}
-          className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-fg-3 transition-colors hover:bg-fill-1 hover:text-fg-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5"
+          className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5"
         >
           {shown ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
         </button>

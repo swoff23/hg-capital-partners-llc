@@ -38,7 +38,7 @@ type Place = SetupStep | "done";
 const ORDER: readonly Place[] = [...SETUP_STEPS, "done"];
 
 const BLANK_W9 = "https://www.irs.gov/pub/irs-pdf/fw9.pdf";
-const quietLink = "inline-flex min-h-11 items-center rounded-sm text-label text-fg-2 outline-none hover:text-fg-1 focus-visible:ring-2 focus-visible:ring-act";
+const quietLink = "inline-flex min-h-11 items-center rounded-sm text-label text-fg-2 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
 
 const headings: Record<SetupStep, string> = {
   details: "Check your details",
@@ -171,9 +171,9 @@ export function SetupSteps({
 
   return (
     <>
-      <header className="border-b border-line bg-canvas">
+      <header className="border-b border-border bg-canvas">
         <div className="mx-auto flex h-14 max-w-400 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-fg-1">
+          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-foreground">
             <Monogram size={32} />
             {BRAND.portal}
           </span>
@@ -195,7 +195,7 @@ export function SetupSteps({
 
       <main ref={region} className="mx-auto max-w-2xl px-4 py-6 pb-28 sm:px-6 sm:py-8 lg:px-8">
         <Meter value={number} max={SETUP_TOTAL} label="Setup progress" valueText={stepLine} spring />
-        <p className="mt-2 text-meta text-fg-3">{stepLine}</p>
+        <p className="mt-2 text-meta text-muted-foreground">{stepLine}</p>
 
         <form
           noValidate
@@ -206,7 +206,7 @@ export function SetupSteps({
           className="mt-6 space-y-6 text-left"
         >
           {place !== "done" && (
-            <h1 ref={heading} tabIndex={-1} className="text-title text-balance text-fg-1 outline-none">
+            <h1 ref={heading} tabIndex={-1} className="text-title text-balance text-foreground outline-none">
               {headings[place]}
             </h1>
           )}
@@ -281,7 +281,7 @@ export function SetupSteps({
               Next <SubmitKeycap />
             </Button>
           }
-          error={refusal ? <p role="alert" className="truncate text-center text-meta text-danger lg:text-right">{refusal}</p> : undefined}
+          error={refusal ? <p role="alert" className="truncate text-center text-meta text-destructive lg:text-right">{refusal}</p> : undefined}
         />
       )}
     </>
@@ -326,7 +326,7 @@ function TradesStep({
       <div data-invalid={errors.tenantFixes ? "true" : undefined} className="space-y-2">
         {/* Below 640 the control sits under the question, from 640 beside it, as the move-in report's ratings. */}
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <span id="tenant-fixes" className="text-body text-fg-1">
+          <span id="tenant-fixes" className="text-body text-foreground">
             Are you OK with fixing maintenance issues our tenants have?
           </span>
           <SegmentedControl
@@ -338,7 +338,7 @@ function TradesStep({
             onChange={(key) => setWork((w) => ({ ...w, tenantFixes: key === "yes" }))}
           />
         </div>
-        {errors.tenantFixes && <p className="truncate text-meta text-danger">{errors.tenantFixes}</p>}
+        {errors.tenantFixes && <p className="truncate text-meta text-destructive">{errors.tenantFixes}</p>}
       </div>
     </div>
   );
@@ -415,13 +415,13 @@ function DocumentsStep({
           </TextLink>
         )}
       </div>
-      {kind === "w9" && <p className="text-meta text-fg-3">Only HG Capital staff can see it.</p>}
+      {kind === "w9" && <p className="text-meta text-muted-foreground">Only HG Capital staff can see it.</p>}
       {kind === "w9" && signOutHint && files.length === 0 && (
-        <p className="text-meta text-fg-3">No W-9 handy? Sign out and come back. Your answers are saved.</p>
+        <p className="text-meta text-muted-foreground">No W-9 handy? Sign out and come back. Your answers are saved.</p>
       )}
       {noPolicy &&
         (noPolicy.chosen ? (
-          <p className="text-meta text-fg-3">You said you don&apos;t carry business insurance.</p>
+          <p className="text-meta text-muted-foreground">You said you don&apos;t carry business insurance.</p>
         ) : (
           <div>
             <Button type="button" variant="ghost" disabled={noPolicy.busy || uploader.uploads.length > 0} onClick={noPolicy.choose}>
@@ -439,17 +439,17 @@ function AllSet({ heading, firstName }: { heading: React.RefObject<HTMLHeadingEl
   return (
     <div role="status" className="flex flex-col items-start gap-5">
       <SpotArt name="job-done" />
-      <h1 ref={heading} tabIndex={-1} className="text-title text-balance text-fg-1 outline-none">
+      <h1 ref={heading} tabIndex={-1} className="text-title text-balance text-foreground outline-none">
         {firstName ? `Thanks, ${firstName}!` : "Thanks!"}
       </h1>
-      <ul className="w-full divide-y divide-line border-y border-line">
+      <ul className="w-full divide-y divide-border border-y border-border">
         <li className="flex items-start gap-3 py-3">
           <Landmark className="mt-0.5 size-5 shrink-0 stroke-[1.5] text-fg-2" aria-hidden="true" />
-          <span className="text-body text-fg-1">If we don&apos;t have your bank details yet, Baselane will email you a link to add them.</span>
+          <span className="text-body text-foreground">If we don&apos;t have your bank details yet, Baselane will email you a link to add them.</span>
         </li>
         <li className="flex items-start gap-3 py-3">
           <ClipboardList className="mt-0.5 size-5 shrink-0 stroke-[1.5] text-fg-2" aria-hidden="true" />
-          <span className="text-body text-fg-1">Your jobs from HG Capital show up here.</span>
+          <span className="text-body text-foreground">Your jobs from HG Capital show up here.</span>
         </li>
       </ul>
       <LinkButton href="/p" variant="primary" className="h-12 w-full pointer-fine:h-9 sm:w-60">

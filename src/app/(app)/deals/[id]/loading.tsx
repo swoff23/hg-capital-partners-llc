@@ -17,7 +17,7 @@ const FACTS = [
 /**
  * A deal while it loads (docs/specs/performance.md 4.3), on the page's grid:
  * Deals, Details with its labels and Activity draw at once; the address, the
- * facts' values and the notes are --fill-1 blocks, and the note field draws
+ * facts' values and the notes are --muted blocks, and the note field draws
  * its frame.
  */
 export default function DealLoading() {
@@ -46,12 +46,12 @@ export default function DealLoading() {
         <div className="min-w-0 lg:col-start-1 lg:row-start-1">
           <Section title="Activity">
             {/* The note field's frame, then two notes. */}
-            <div className="h-15.5 rounded-lg border border-line bg-surface" />
+            <div className="h-15.5 rounded-lg border border-border bg-background" />
             <ul aria-hidden="true" className="mt-6 space-y-6">
               {["w-3/4", "w-1/2"].map((w) => (
                 <li key={w} className="space-y-2 pl-8">
                   <Block text="text-meta" className="w-12" />
-                  <div className="flex h-10 items-center rounded-lg border border-line px-3">
+                  <div className="flex h-10 items-center rounded-lg border border-border px-3">
                     <Block text="text-body" className={w} />
                   </div>
                 </li>

@@ -74,7 +74,7 @@ export function OAuthReturnNotice({
           <TriangleAlert
             aria-hidden="true"
             strokeWidth={2}
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger pointer-coarse:h-4 pointer-coarse:w-4"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive pointer-coarse:h-4 pointer-coarse:w-4"
           />
         }
       >
@@ -84,7 +84,7 @@ export function OAuthReturnNotice({
     );
   }
   return (
-    <p className="text-meta text-fg-3">
+    <p className="text-meta text-muted-foreground">
       {text}
       {retry}
     </p>

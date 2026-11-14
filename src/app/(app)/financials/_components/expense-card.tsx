@@ -36,8 +36,8 @@ export function ExpenseCard({
     <Card className="@container">
       <CardHeader className="grid gap-x-3 gap-y-2 py-2.5 @min-[400px]:grid-cols-[minmax(0,1fr)_auto] @min-[400px]:items-center">
         <div className="min-w-0">
-          <h2 className="truncate text-section text-fg-1">Operating expense</h2>
-          <p className="truncate text-meta text-fg-3">
+          <h2 className="truncate text-section text-foreground">Operating expense</h2>
+          <p className="truncate text-meta text-muted-foreground">
             {period}
             {totalCents != null && (
               <>

@@ -161,11 +161,11 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                     <Th className="pr-0 max-sm:hidden">Status</Th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody className="divide-y divide-border">
                   {rows.map((r) => {
                     const href = `/properties/${r.id}`;
                     return (
-                      <tr key={r.id} className={cn("transition-colors duration-fast hover:bg-fill-1", pendingRowFill)}>
+                      <tr key={r.id} className={cn("transition-colors duration-fast hover:bg-muted", pendingRowFill)}>
                         {/* The address column takes the room the others leave, so a long address truncates instead of widening the table. */}
                         <RowCell href={href} first cell="w-full max-w-0" className="pl-0">
                           {/* Decorative inside the link, which the address already names. */}
@@ -173,9 +173,9 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                             <PhotoThumb size={48} alt="" />
                           </span>
                           <span className="min-w-0">
-                            <span className="block truncate text-body text-fg-1">{r.name}</span>
+                            <span className="block truncate text-body text-foreground">{r.name}</span>
                             {(r.entity || r.status || r.archived) && (
-                              <span className={cn("block truncate text-meta text-fg-3", !r.entity && "sm:hidden")}>
+                              <span className={cn("block truncate text-meta text-muted-foreground", !r.entity && "sm:hidden")}>
                                 {/* The status column drops below sm, so its word leads the subline. */}
                                 {r.archived ? (
                                   <span className="sm:hidden">
@@ -196,9 +196,9 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                           </span>
                         </RowCell>
                         <RowCell href={href} numeric cell="max-[480px]:hidden">
-                          {r.units ?? <span className="text-fg-3">—</span>}
+                          {r.units ?? <span className="text-muted-foreground">—</span>}
                         </RowCell>
-                        <RowCell href={href} numeric cell="max-sm:hidden" className={r.openTasks ? undefined : "text-fg-3"}>
+                        <RowCell href={href} numeric cell="max-sm:hidden" className={r.openTasks ? undefined : "text-muted-foreground"}>
                           {r.openTasks}
                         </RowCell>
                         <RowCell href={href} numeric cell="max-md:hidden">
@@ -209,11 +209,11 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                         </RowCell>
                         <RowCell href={href} cell="max-sm:hidden" className="whitespace-nowrap pr-0 text-meta">
                           {r.archived ? (
-                            <span className="text-fg-3">Archived</span>
+                            <span className="text-muted-foreground">Archived</span>
                           ) : r.status ? (
                             <PropertyStatus status={r.status} />
                           ) : (
-                            <span className="text-fg-3">—</span>
+                            <span className="text-muted-foreground">—</span>
                           )}
                         </RowCell>
                       </tr>

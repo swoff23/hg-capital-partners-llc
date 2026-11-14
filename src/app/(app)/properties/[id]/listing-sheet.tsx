@@ -146,7 +146,7 @@ export function ListingSheet({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-1.5">
           <span className="text-meta font-medium text-fg-2">
-            Available from<span className="font-normal text-fg-3"> (optional)</span>
+            Available from<span className="font-normal text-muted-foreground"> (optional)</span>
           </span>
           <DateField label="Available from" value={draft.availableDate || null} onChange={(v) => change({ availableDate: v ?? "" })} />
         </div>

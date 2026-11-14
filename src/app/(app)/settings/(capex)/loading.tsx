@@ -13,7 +13,7 @@ const rowGrid = cn(
 const field = "h-8 rounded-md pointer-coarse:h-11";
 
 /** A figure's column header. */
-const th = "whitespace-nowrap px-2.5 text-right text-meta font-medium text-fg-3";
+const th = "whitespace-nowrap px-2.5 text-right text-meta font-medium text-muted-foreground";
 
 /**
  * CapEx rules while they load (docs/specs/performance.md 4.3): the action
@@ -42,11 +42,11 @@ export default function CapexRulesLoading() {
 
 /** RuleHeader's two forms: the name and the three figures from sm, the figures alone below it. Its ⓘ as an icon. */
 function Header({ first }: { first: string }) {
-  const tip = <Info aria-hidden="true" className="size-4 text-fg-3" strokeWidth={1.5} />;
+  const tip = <Info aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={1.5} />;
   return (
     <>
       <div className={cn(rowGrid, "mb-1 hidden border-b border-line-strong pb-2 sm:grid")}>
-        <span className="text-meta font-medium text-fg-3">{first}</span>
+        <span className="text-meta font-medium text-muted-foreground">{first}</span>
         <span className={cn(th, "flex items-center justify-end gap-1")}>Monitor at {tip}</span>
         <span className={cn(th, "flex items-center justify-end gap-1")}>Replace at {tip}</span>
         <span className={th}>Cost</span>
@@ -63,7 +63,7 @@ function Header({ first }: { first: string }) {
 
 function Rules({ count }: { count: number }) {
   return (
-    <div aria-hidden="true" className="divide-y divide-line">
+    <div aria-hidden="true" className="divide-y divide-border">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className={cn(rowGrid, "py-1.5 pointer-coarse:py-1")}>
           <Block className={field} />
@@ -81,8 +81,8 @@ function Rules({ count }: { count: number }) {
 /** AddRow's box and words, inert. */
 function AddFrame({ children }: { children: string }) {
   return (
-    <div className="flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-label text-fg-2 pointer-coarse:min-h-12">
-      <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+    <div className="flex min-h-10 w-full items-center gap-2 border-t border-border py-2 text-label text-fg-2 pointer-coarse:min-h-12">
+      <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
       {children}
     </div>
   );

@@ -3,13 +3,13 @@ import { PlaybooksHeaderFrame } from "./header-frame";
 
 /**
  * Playbooks while they load (docs/specs/performance.md 4.3): the title draws
- * at once and 10 rows are --fill-1 blocks on the page's own rows.
+ * at once and 10 rows are --muted blocks on the page's own rows.
  */
 export default function PlaybooksLoading() {
   return (
     <LoadingScreen>
       <PlaybooksHeaderFrame />
-      <ul aria-hidden="true" className="divide-y divide-line border-t border-line">
+      <ul aria-hidden="true" className="divide-y divide-border border-t border-border">
         {Array.from({ length: 10 }, (_, i) => (
           <li key={i} className="flex min-h-10 items-center gap-3 py-2 pointer-coarse:min-h-12">
             <span className="min-w-0 flex-1">

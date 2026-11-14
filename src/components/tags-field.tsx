@@ -109,7 +109,7 @@ export function TagOverflow({ tags, className }: { tags: readonly string[]; clas
             <span className="truncate">{t}</span>
           </span>
         ))}
-        {hidden > 0 && <span className="shrink-0 text-meta tabular-nums text-fg-3">+{hidden}</span>}
+        {hidden > 0 && <span className="shrink-0 text-meta tabular-nums text-muted-foreground">+{hidden}</span>}
       </span>
       {/* Every tag and the widest "+N", laid out off-screen to be measured. */}
       <span ref={meter} aria-hidden="true" className="pointer-events-none invisible absolute left-0 top-0 flex gap-1">
@@ -251,13 +251,13 @@ export function TagsField({
             className={cn(
               fieldClass,
               "flex min-h-9 items-center gap-2 py-1 text-left",
-              "data-pressed:border-act data-pressed:ring-1 data-pressed:ring-inset data-pressed:ring-act",
+              "data-pressed:border-primary data-pressed:ring-1 data-pressed:ring-inset data-pressed:ring-primary",
             )}
           >
             <span id={valueId} className="flex min-w-0 flex-1">
-              {shown.length > 0 ? <TagList tags={shown} /> : <span className="truncate text-fg-3">{placeholder}</span>}
+              {shown.length > 0 ? <TagList tags={shown} /> : <span className="truncate text-muted-foreground">{placeholder}</span>}
             </span>
-            <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 text-fg-3" />
+            <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
           </AriaButton>
         }
       >

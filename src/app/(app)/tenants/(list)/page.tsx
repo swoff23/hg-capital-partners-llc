@@ -24,8 +24,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Tenants" };
 
-/** An empty cell: the lone dash glyph in --fg-3 (docs/brand-guidelines.md, section 3). */
-const EMPTY = <span className="text-fg-3">—</span>;
+/** An empty cell: the lone dash glyph in --muted-foreground (docs/brand-guidelines.md, section 3). */
+const EMPTY = <span className="text-muted-foreground">—</span>;
 
 export default async function TenantsPage({ searchParams }: PageProps<"/tenants">) {
   await requireUser();
@@ -89,10 +89,10 @@ export default async function TenantsPage({ searchParams }: PageProps<"/tenants"
                 <Th className="hidden pr-0 lg:table-cell">Phone</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="divide-y divide-border">
               {rows.map((r) => (
                 // The whole row opens the lease, as the Contractors rows open theirs: one link covers it.
-                <tr key={`${r.leaseId}:${r.tenantId}`} className={cn("relative transition-colors hover:bg-fill-1", pendingRowFill)}>
+                <tr key={`${r.leaseId}:${r.tenantId}`} className={cn("relative transition-colors hover:bg-muted", pendingRowFill)}>
                   <Td className="pl-0 max-sm:w-full max-sm:max-w-0">
                     <Link href={`/tenants/${r.leaseId}`} className="absolute inset-0 -outline-offset-2">
                       <span className="sr-only">
@@ -100,8 +100,8 @@ export default async function TenantsPage({ searchParams }: PageProps<"/tenants"
                       </span>
                       <LinkPending />
                     </Link>
-                    <span className="block truncate text-fg-1">{r.fullName}</span>
-                    <p className="mt-0.5 truncate text-meta text-fg-3 sm:hidden">{r.home}</p>
+                    <span className="block truncate text-foreground">{r.fullName}</span>
+                    <p className="mt-0.5 truncate text-meta text-muted-foreground sm:hidden">{r.home}</p>
                   </Td>
                   <Td className="hidden text-fg-2 sm:table-cell">{r.home}</Td>
                   <Td numeric className="pr-0 sm:pr-3">

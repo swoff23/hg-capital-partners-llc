@@ -132,11 +132,11 @@ Fix 1 alone doesn't move these numbers; it changes when the person sees somethin
 
 ### 4.2 The pattern
 
-Copy `financials/(overview)/loading.tsx` (brand section 7: "Skeletons match the finished layout, draw labels at once and hold values in static `--fill-1`. No shimmer.").
+Copy `financials/(overview)/loading.tsx` (brand section 7: "Skeletons match the finished layout, draw labels at once and hold values in static `--muted`. No shimmer.").
 
 - **Same shape.** The skeleton uses the page's own containers, grid, gaps and responsive classes, so nothing moves when the content lands, and whatever the page hides at a width, the skeleton hides too. Desktop, tablet and phone follow from the page.
 - **Draws at once, in its real style:** page titles, the New button (a live link), back links (live), the tabs (already in the section layouts), section headings every record has, field labels, column headers and fact labels.
-- **Static `--fill-1` blocks:** anything from data. Names, addresses, figures, dates, counts, status marks, avatars, photos and row contents, each at the height of the text it stands in for and a plausible width. Square corners on text blocks; photo and avatar blocks keep their own radius.
+- **Static `--muted` blocks:** anything from data. Names, addresses, figures, dates, counts, status marks, avatars, photos and row contents, each at the height of the text it stands in for and a plausible width. Square corners on text blocks; photo and avatar blocks keep their own radius.
 - **The filter row** draws its real frame: the search field with its placeholder, the view control with its labels and the view from the URL, and the facet buttons with their names, inert and with no counts (Question 1). `FilterBar`'s own container query decides one row or the Filters button, so it matches at every width.
 - **No motion.** The skeleton appears in the click's frame (`--dur-0`) and the content replaces it without a fade. Nothing loops, so reduced motion needs nothing extra.
 - **Accessibility.** The skeleton's root has `aria-busy="true"` and every block is `aria-hidden`, as on the Overview today.
@@ -151,7 +151,7 @@ Copy `financials/(overview)/loading.tsx` (brand section 7: "Skeletons match the 
 
 "Moves" means the page file moves into the group named; its imports of files beside it go up one level, and those files stay where they are.
 
-| Route | File | Draws at once | `--fill-1` blocks |
+| Route | File | Draws at once | `--muted` blocks |
 |---|---|---|---|
 | Home `/` | `(app)/(home)/loading.tsx`; `page.tsx` moves | Nothing: the greeting carries the person's name | Greeting at title height, the summary line, 6 task rows |
 | `/tasks` | `(app)/tasks/(list)/loading.tsx`; `page.tsx` moves | "Tasks", New task, the filter row | 12 task rows: check circle, title, place, avatar, date chip |
@@ -182,7 +182,7 @@ Each heading in the "Draws at once" column renders on every record today. The bu
 
 ### 4.4 Previews
 
-`####` is a static `--fill-1` block, `( )` is a check circle, `(#)` is an avatar block, `[ ]` is a control's frame. Words are drawn at once.
+`####` is a static `--muted` block, `( )` is a check circle, `(#)` is an avatar block, `[ ]` is a control's frame. Words are drawn at once.
 
 **Task list at 1280 (desktop)**
 
@@ -278,7 +278,7 @@ The SaaS names Connor's north star points at:
 
 ### 4.6 Taps before the prefetch lands
 
-On a phone that has just opened the app, a row's prefetch may not be back when it's tapped. Next's `useLinkStatus` reports that one link as pending, and stays quiet for prefetched links (`03-api-reference/04-functions/use-link-status.md`). Proposed (Question 2): a pending sidebar item or tab takes its current look at once (the `--act` notch, `--fill-2`), and a pending row takes its `--fill-1` hover fill. No spinner. This is **new**: nothing uses `useLinkStatus` today. The pattern is the one the Next docs give for slow networks.
+On a phone that has just opened the app, a row's prefetch may not be back when it's tapped. Next's `useLinkStatus` reports that one link as pending, and stays quiet for prefetched links (`03-api-reference/04-functions/use-link-status.md`). Proposed (Question 2): a pending sidebar item or tab takes its current look at once (the `--primary` notch, `--accent`), and a pending row takes its `--muted` hover fill. No spinner. This is **new**: nothing uses `useLinkStatus` today. The pattern is the one the Next docs give for slow networks.
 
 ## 5. The fixes, ranked
 
@@ -317,7 +317,7 @@ Suggested order: 1 with 2 (the felt change plus the cheapest weight cut), then 3
 **Connor's calls**
 
 1. **The filter row in a skeleton.** A: draw the real bar inert, with its labels and the view from the URL, no counts. B: keep its height empty, as the Overview's control row does today. Recommended: **A**. Every list reference above draws its toolbar, and the page looks finished sooner.
-2. **A tap before the prefetch lands (4.6).** A: the tapped sidebar item or tab takes its current look and a tapped row its hover fill, with no spinner. B: a 2px `--act` line under the top bar after 200 ms. C: nothing. Recommended: **A**. It answers the tap where the finger is, and it never shows for prefetched links.
+2. **A tap before the prefetch lands (4.6).** A: the tapped sidebar item or tab takes its current look and a tapped row its hover fill, with no spinner. B: a 2px `--primary` line under the top bar after 200 ms. C: nothing. Recommended: **A**. It answers the tap where the finger is, and it never shows for prefetched links.
 3. **Task list length.** A: 100 rows and a Show more button that adds 100 at a time. B: keep 400 and render only the rows on screen (virtualized). C: keep 400 as today. Recommended: **A**. It's the smallest change that brings `/tasks` under budget, and the filters already narrow the list. Mobbin turned up no strong Show more example in a first search ([Klaviyo's Prev and Next](https://mobbin.com/screens/211575d4-7ff1-4971-b12d-4e69315a8a5f) is the nearest), so the control gets its own research and options once picked.
 4. **Keep a visited page for 30 seconds (fix 10).** Recommended: **yes**. Revisiting is the most common click after Back, and your own edits still show at once.
 5. **Edits.** Ticks and status changes already show at once. Recommended: keep that, make the server's half lighter (fix 8), and leave comments as they are (they already show while sending).

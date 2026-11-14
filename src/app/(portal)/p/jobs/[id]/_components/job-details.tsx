@@ -106,7 +106,7 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
               All done
             </span>
           ) : (
-            <span className="ml-1 font-normal tabular-nums text-fg-3">{`${doneCount}/${shown.length}`}</span>
+            <span className="ml-1 font-normal tabular-nums text-muted-foreground">{`${doneCount}/${shown.length}`}</span>
           )}
         </>
       }
@@ -127,7 +127,7 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
             <label className={cn("flex min-h-11 items-center gap-3 py-1", editable ? "cursor-pointer" : "cursor-default")}>
               {/* Drawn from the tokens, so the box is the same in every engine and in dark. */}
               <Checkbox large checked={item.done} disabled={!editable} onChange={(e) => toggle(item.id, e.target.checked)} />
-              <span className={cn("text-body", item.done ? "text-fg-3 line-through" : "text-fg-1")}>{item.title}</span>
+              <span className={cn("text-body", item.done ? "text-muted-foreground line-through" : "text-foreground")}>{item.title}</span>
             </label>
           </li>
         ))}

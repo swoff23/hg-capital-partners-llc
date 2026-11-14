@@ -21,7 +21,7 @@ const CLEANUP = [false, true, true, false, false, true, true, true, false];
  * Financials Settings while it loads (docs/specs/performance.md 4.3), as a
  * connected company shows it: the section headings and the Connection rows'
  * labels draw at once, on the page's own row boxes; Refresh, the values, the
- * Basis switch and Disconnect are --fill-1 frames, and the cleanup list and
+ * Basis switch and Disconnect are --muted frames, and the cleanup list and
  * the mapping rows are blocks.
  */
 export default function FinancialsSettingsLoading() {
@@ -47,7 +47,7 @@ export default function FinancialsSettingsLoading() {
           </div>
           {CLEANUP.map((note, i) => (
             // DqRow's box: the label, then the value and its note.
-            <div key={i} className="grid gap-x-3 gap-y-0.5 border-b border-line py-2 last:border-b-0 sm:grid-cols-[16rem_minmax(0,1fr)]">
+            <div key={i} className="grid gap-x-3 gap-y-0.5 border-b border-border py-2 last:border-b-0 sm:grid-cols-[16rem_minmax(0,1fr)]">
               <Block text="text-meta" className={rowWidth(i, ["w-32", "w-40", "w-28", "w-44"])} />
               <div className="min-w-0">
                 <Block text="text-body" className="w-20" />
@@ -70,8 +70,8 @@ export default function FinancialsSettingsLoading() {
 /** The page's label and value row: 40px with a mouse, 48 on touch, over a hairline. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid min-h-10 grid-cols-[6rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-1.5 last:border-b-0 sm:grid-cols-[7rem_minmax(0,1fr)] pointer-coarse:min-h-12">
-      <dt className="text-meta text-fg-3">{label}</dt>
+    <div className="grid min-h-10 grid-cols-[6rem_minmax(0,1fr)] items-center gap-3 border-b border-border py-1.5 last:border-b-0 sm:grid-cols-[7rem_minmax(0,1fr)] pointer-coarse:min-h-12">
+      <dt className="text-meta text-muted-foreground">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>
   );
@@ -80,7 +80,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /** A mapping table's rows as blocks: a name and its pick. */
 function Lines({ count }: { count: number }) {
   return (
-    <ul aria-hidden="true" className="divide-y divide-line">
+    <ul aria-hidden="true" className="divide-y divide-border">
       {Array.from({ length: count }, (_, i) => (
         <li key={i} className="flex min-h-12 items-center justify-between gap-3 pointer-coarse:min-h-14">
           <Block text="text-body" className={rowWidth(i, ["w-40", "w-32", "w-48", "w-28"])} />

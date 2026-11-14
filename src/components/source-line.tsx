@@ -10,14 +10,14 @@ import { cn } from "@/lib/utils";
    record's Financials section. */
 
 /**
- * A notice above the figures: --surface on a --line edge. A glyph carries any
+ * A notice above the figures: --background on a --border edge. A glyph carries any
  * state. `action` puts one control at the row's end, centered on the line
  * (an archived record's Restore); the words truncate before it moves.
  */
 export function Notice({ icon, action, className, children }: { icon?: ReactNode; action?: ReactNode; className?: string; children: ReactNode }) {
   if (action) {
     return (
-      <div className={cn("flex items-center gap-2 rounded-md border border-line bg-surface py-1.5 pl-3 pr-1.5 text-meta text-fg-1", className)}>
+      <div className={cn("flex items-center gap-2 rounded-md border border-border bg-background py-1.5 pl-3 pr-1.5 text-meta text-foreground", className)}>
         {icon}
         <p className="min-w-0 flex-1 truncate">{children}</p>
         <div className="shrink-0">{action}</div>
@@ -25,7 +25,7 @@ export function Notice({ icon, action, className, children }: { icon?: ReactNode
     );
   }
   return (
-    <p className={cn("flex items-start gap-2 rounded-md border border-line bg-surface px-3 py-2 text-meta text-fg-1", className)}>
+    <p className={cn("flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2 text-meta text-foreground", className)}>
       {icon}
       <span className="min-w-0">{children}</span>
     </p>
@@ -75,7 +75,7 @@ function ago(h: number): string {
 
 /**
  * Period and source for a figure block (section 3): "Jan 1 to Oct 25, 2026 ·
- * QuickBooks, cash basis, synced 6h ago", in text-meta --fg-3.
+ * QuickBooks, cash basis, synced 6h ago", in text-meta --muted-foreground.
  *
  * The period is `period` as given, or `span` read through periodLabel: with
  * `through`, a span ending in the running month runs to the last synced day.
@@ -116,7 +116,7 @@ export function SourceLine({
   const stale = h != null && h > 36;
   const when = comparison || (span ? periodLabel(span.from, span.to, { through }) : period);
   return (
-    <p className={cn("text-meta text-fg-3", className)}>
+    <p className={cn("text-meta text-muted-foreground", className)}>
       {when && <>{when} · </>}
       <span className="max-[480px]:hidden">
         QuickBooks

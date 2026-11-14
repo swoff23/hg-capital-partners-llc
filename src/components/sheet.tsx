@@ -40,7 +40,7 @@ import {
  * md) and a centered dialog from md up. Esc closes this one layer, focus is
  * trapped inside and returns to the trigger, and the page behind doesn't
  * scroll. Tapping the dimmed backdrop closes it unless `isDismissable` is off.
- * The Overlay level (docs/brand-guidelines.md, section 5): --raised, the
+ * The Overlay level (docs/brand-guidelines.md, section 5): --popover, the
  * overlay shadow over the scrim, rounded-xl (the top corners on a phone).
  *
  *   <SheetTrigger>
@@ -50,7 +50,7 @@ import {
  *
  * Or controlled, with no trigger: <Sheet isOpen={open} onOpenChange={setOpen} title="…">.
  * `footer` pins the primary (and its one-line reason) under the scrolling
- * content, over a --line rule and above the safe area, so a long sheet on a
+ * content, over a --border rule and above the safe area, so a long sheet on a
  * short phone never hides its next step (docs/brand-guidelines.md, section 9).
  *
  * The on-screen keyboard (forms 2.9): while a sheet is open, useKeyboardInset
@@ -147,7 +147,7 @@ export function Sheet({
           palette
             ? cn(
                 // The container the rows' one-line and two-line layouts are measured on (search 2.4).
-                "@container flex w-full min-w-0 flex-col overflow-hidden bg-raised text-fg-1 outline-none",
+                "@container flex w-full min-w-0 flex-col overflow-hidden bg-popover text-foreground outline-none",
                 // The phone: the whole screen under the status bar, ending above the keyboard.
                 "max-md:h-[calc(100dvh_-_var(--kb-inset,0px))] max-md:pt-[env(safe-area-inset-top)]",
                 "max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)_-_var(--kb-inset,0px)))]",
@@ -158,7 +158,7 @@ export function Sheet({
                 "md:pointer-coarse:max-h-[calc(100dvh_-_var(--app-bar-h)_-_2rem_-_var(--kb-inset,0px))]",
               )
             : cn(
-                "flex max-h-[calc(90dvh_-_var(--kb-inset,0px))] w-full flex-col overflow-hidden bg-raised text-fg-1 shadow-overlay outline-none",
+                "flex max-h-[calc(90dvh_-_var(--kb-inset,0px))] w-full flex-col overflow-hidden bg-popover text-foreground shadow-overlay outline-none",
                 // The safe area, until the keyboard covers it.
                 "rounded-t-xl pb-[max(0px,calc(env(safe-area-inset-bottom)_-_var(--kb-inset,0px)))]",
                 fullHeight && "max-md:h-[calc(90dvh_-_var(--kb-inset,0px))]",
@@ -209,7 +209,7 @@ export function useSheet(): Pick<SheetActions, "close"> | null {
   return useContext(SheetContext);
 }
 
-const footerClass = "shrink-0 border-t border-line p-4";
+const footerClass = "shrink-0 border-t border-border p-4";
 const scrollClass = "min-h-0 flex-1 overflow-y-auto overscroll-contain";
 /** The palette's body: a column whose list scrolls itself under the input row. */
 const paletteBodyClass = "flex min-h-0 flex-1 flex-col";
@@ -378,10 +378,10 @@ function SheetHeader({
     );
   }
   const iconButton =
-    "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:h-11 pointer-coarse:w-11";
+    "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground pointer-coarse:h-11 pointer-coarse:w-11";
   return (
     <div
-      className={cn("flex shrink-0 items-center gap-1 border-b border-line py-1.5 pr-1.5", onBack ? "pl-1.5" : "pl-4")}
+      className={cn("flex shrink-0 items-center gap-1 border-b border-border py-1.5 pr-1.5", onBack ? "pl-1.5" : "pl-4")}
     >
       {onBack && (
         <AriaButton onPress={onBack} aria-label="Back" className={iconButton}>

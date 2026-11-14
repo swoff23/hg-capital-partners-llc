@@ -64,7 +64,7 @@ export function JobMediaSection({
     <Section
       title={
         <>
-          {noun} <span className="ml-1 font-normal tabular-nums text-fg-3">{total}</span>
+          {noun} <span className="ml-1 font-normal tabular-nums text-muted-foreground">{total}</span>
         </>
       }
     >
