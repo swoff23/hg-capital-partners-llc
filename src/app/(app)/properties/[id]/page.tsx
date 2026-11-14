@@ -4,7 +4,7 @@ import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { preload } from "@/lib/preload";
-import { getPropertyById } from "@/lib/properties/read";
+import { getEntityChoices, getPropertyById } from "@/lib/properties/read";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
@@ -13,7 +13,7 @@ import { toYmd, todayYmdEastern } from "@/lib/dates";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
 import { targetDate } from "@/lib/tasks/rules";
-import { loanPosition } from "@/lib/properties/figures";
+import { buildingLine, loanPosition } from "@/lib/properties/figures";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { countUnitRefs } from "@/lib/properties/unit-refs";
@@ -21,7 +21,6 @@ import { BackLink } from "@/components/back-link";
 import { ArchivedNotice } from "@/components/record-archive";
 import { archivedLine } from "@/lib/archive";
 import { setPropertyArchived } from "../actions";
-import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { DocumentsSection, propertyDocuments } from "./documents-section";
 import { PropertyLoanSection } from "./edit-loan";
@@ -65,8 +64,9 @@ function taskAssignee(t: {
 
 /**
  * A property's record (docs/brand-guidelines.md, sections 5 and 9): capped at
- * 1200 with a 320 rail from lg. The identity header (photo, status, the
- * address as the h1, entity and units), the four-fact strip, then the work
+ * 1200 with a 320 rail from lg. The identity header (the address as the h1,
+ * then beds, baths, square feet and units; the photo once one is set), the
+ * four-fact strip, then the work
  * first (docs/specs/property-page.md): tasks, units and access, financials,
  * CapEx and rental listings, beside the facts rail (details, loan, insurance)
  * and the property's documents and notes. Below lg it's one column in that
@@ -78,7 +78,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   preload(getPropertyFinancials(id));
   preload(propertyDocuments(id));
   // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
-  const [user, property, openTasks, sourceDeal, propertyListings, capexRules] = await Promise.all([
+  const [user, property, openTasks, sourceDeal, propertyListings, capexRules, entities] = await Promise.all([
     requireUser(),
     getPropertyById(id),
     prisma.task.findMany({
@@ -93,6 +93,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       include: { photos: { orderBy: { sortOrder: "asc" } } },
     }),
     getCapexRules(),
+    getEntityChoices(),
   ]);
   if (!property) notFound();
   // Who archived it, for the notice: read only for an archived property, so a live one costs no extra query.
@@ -139,32 +140,31 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   const value = d(property.value);
   const balance = d(property.currentLoan);
   const position = loanPosition(value, balance);
-  const subline = [property.llcOwner?.trim(), unitCount > 0 && `${unitCount} ${unitCount === 1 ? "unit" : "units"}`]
-    .filter(Boolean)
-    .join(" · ");
+  const subline = buildingLine({ beds: property.beds, baths: d(property.baths), sqft: property.sqft, units: unitCount });
   const version = property.updatedAt.toISOString();
 
   return (
     <div className="max-w-300">
       <BackLink fallback="/properties" label="Portfolio" />
 
-      {/* Identity: the building's photo (the fallback tile until it's taken), status, address, entity and units. */}
-      <header className="mt-3 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
-        {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. */}
+      {/* Identity: the address, then what the building is (Connor, Nov 14). Status lives in Details; the photo shows
+          once one is set, and the ⋯ menu's "Add photo" sets the first. */}
+      <header className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
+        {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. Nothing until set. */}
         <PropertyPhoto property={{ id: property.id, address: property.address, photoUrl: property.photoUrl }} canEdit />
-        <div className="min-w-0">
-          {property.status && (
-            <p className="text-meta">
-              <PropertyStatus status={property.status} />
-            </p>
-          )}
+        <div className="min-w-0 flex-1">
           {/* The ⋯ menu is centered on the address's first line, as on a task's page: the heading's 4px padding and half its line, less half the 32px button (44 on touch). */}
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
               <PropertyAddressField id={property.id} value={property.address} />
             </div>
             <div className="shrink-0 pt-1 pointer-coarse:-mt-px pointer-coarse:pt-0">
-              <PropertyMoreMenu id={property.id} archived={!!property.archivedAt} canAddListing={!property.archivedAt && listings.length === 0 && unitLabels.length > 0} />
+              <PropertyMoreMenu
+                id={property.id}
+                archived={!!property.archivedAt}
+                canAddListing={!property.archivedAt && listings.length === 0 && unitLabels.length > 0}
+                canAddPhoto={!property.archivedAt && !property.photoUrl}
+              />
             </div>
           </div>
           {subline && <p className="text-meta text-fg-3">{subline}</p>}
@@ -224,15 +224,17 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               attorney: property.attorney,
               status: property.status,
               showOnMoveInForm: property.showOnMoveInForm,
-              strategy: property.strategy,
               purchaseDate: ymd(property.purchaseDate),
               purchasePrice: d(property.purchasePrice),
               value,
               refinanceDate: ymd(property.refinanceDate),
               sqft: property.sqft,
+              beds: property.beds,
+              baths: d(property.baths),
               rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
               propertyTaxDueDate: ymd(property.propertyTaxDueDate),
             }}
+            entities={entities}
           />
 
           <PropertyLoanSection

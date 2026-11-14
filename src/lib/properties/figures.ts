@@ -103,3 +103,26 @@ export function leftOutLine(names: readonly string[]): { wide: LeftOutWords; pho
   const counted = { before: `Leaves out ${names.length} properties with no value.`, link: null, after: "" };
   return { wide: counted, phone: counted };
 }
+
+/**
+ * The line under a property's address (Connor, Nov 14): what the building is,
+ * "3 beds · 1.5 baths · 2,880 sq ft · 2 units". A part with nothing set drops
+ * out; null when none is. Baths keep a half and lose trailing zeros ("1.50"
+ * reads "1.5"). The units count comes from the Units list (propertyUnitCount).
+ */
+export function buildingLine(b: {
+  beds: number | null;
+  baths: string | number | null;
+  sqft: number | null;
+  units: number;
+}): string | null {
+  const count = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+  const baths = b.baths == null || String(b.baths).trim() === "" ? null : Number(b.baths);
+  const parts = [
+    b.beds != null && count(b.beds, "bed", "beds"),
+    baths != null && Number.isFinite(baths) && count(baths, "bath", "baths"),
+    b.sqft != null && `${b.sqft.toLocaleString("en-US")} sq ft`,
+    b.units > 0 && count(b.units, "unit", "units"),
+  ].filter((p): p is string => !!p);
+  return parts.length ? parts.join(" · ") : null;
+}

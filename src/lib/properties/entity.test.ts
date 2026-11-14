@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ENTITY_NAMES } from "../quickbooks/entities";
-import { ENTITY_MESSAGE, entityProblem } from "./entity";
+import { OFFERED_ENTITIES, entityChoices, entityName } from "./entity";
 
 test("ENTITY_NAMES: the five companies in their QuickBooks order", () => {
   assert.deepEqual(ENTITY_NAMES, [
@@ -13,22 +13,42 @@ test("ENTITY_NAMES: the five companies in their QuickBooks order", () => {
   ]);
 });
 
-test("entityProblem: takes any of the companies", () => {
-  for (const name of ENTITY_NAMES) assert.equal(entityProblem(name, null), null);
+test("OFFERED_ENTITIES: the holding companies, without the management company or BMK", () => {
+  assert.deepEqual(OFFERED_ENTITIES, ["HG Capital Partners LLC", "HG Buffalo Holding 1 LLC", "HG Buffalo Holding 2 LLC"]);
 });
 
-test("entityProblem: takes empty, which clears the entity", () => {
-  assert.equal(entityProblem(null, "HG Capital Partners LLC"), null);
-  assert.equal(entityProblem("  ", "HG Capital Partners LLC"), null);
+test("entityName: blank clears the entity", () => {
+  assert.equal(entityName(null), null);
+  assert.equal(entityName("   "), null);
 });
 
-test("entityProblem: refuses a name that isn't on the list", () => {
-  assert.equal(entityProblem("HG Buffalo Holding 3 LLC", "HG Capital Partners LLC"), ENTITY_MESSAGE);
-  assert.equal(entityProblem("hg capital partners llc", null), ENTITY_MESSAGE);
+test("entityName: a QuickBooks company saves in its own spelling", () => {
+  assert.equal(entityName("hg capital partners llc"), "HG Capital Partners LLC");
+  assert.equal(entityName("  HG Buffalo   Holding 1 LLC "), "HG Buffalo Holding 1 LLC");
+  assert.equal(entityName("bmk property group llc"), "BMK Property Group LLC");
 });
 
-test("entityProblem: keeps a value stored before the list, unchanged", () => {
-  const old = "1) 50% BK \n2) 50% HG Buffalo Holding 1 LLC";
-  assert.equal(entityProblem(old, old), null);
-  assert.equal(entityProblem("Something new", old), ENTITY_MESSAGE);
+test("entityName: a new name is kept as typed, spacing tidied", () => {
+  assert.equal(entityName("  Linwood  Partners LLC "), "Linwood Partners LLC");
+});
+
+test("entityChoices: the offered companies, then added names A to Z, once each", () => {
+  assert.deepEqual(
+    entityChoices([
+      "HG Capital Partners LLC",
+      "Zeta Holdings LLC",
+      null,
+      "Alder LLC",
+      "alder llc",
+      "HG Buffalo Holding 2 LLC",
+    ]),
+    [...OFFERED_ENTITIES, "Alder LLC", "Zeta Holdings LLC"],
+  );
+});
+
+test("entityChoices: names QuickBooks knows and pasted notes aren't added names", () => {
+  assert.deepEqual(
+    entityChoices(["BMK Property Group LLC", "HG Buffalo Property Management LLC", "1) 50% BK \n2) 50% HG Buffalo Holding 1 LLC", "  "]),
+    [...OFFERED_ENTITIES],
+  );
 });

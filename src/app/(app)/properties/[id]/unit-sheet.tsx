@@ -315,3 +315,124 @@ function EquipmentRow({
   );
 }
 
+
+/**
+ * One piece of a unit's equipment in a small sheet, opened from its row in
+ * Units & access the way a building system opens from its row (Connor, Nov
+ * 14): Type, Model #, Comments and Year. Save writes the unit with this one
+ * item changed, pinned to the version the sheet opened at, so a change anyone
+ * made meanwhile refuses it and "Load the latest" starts the sheet over on
+ * it. Adding and removing equipment stay in the unit's own sheet.
+ */
+export function EquipmentSheet({
+  propertyId,
+  version,
+  latest,
+  unit,
+  unitName,
+  index,
+  gone,
+  rules,
+  isOpen,
+  onOpenChange,
+}: {
+  propertyId: string;
+  version: string;
+  latest: string;
+  /** The unit as the page shows it now. */
+  unit: PropertyUnit;
+  unitName: string;
+  /** The item's place in the unit's equipment. */
+  index: number;
+  /** The unit or the item was deleted elsewhere: the latest has nothing to load. */
+  gone: boolean;
+  rules: CapexRules;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const blank: UnitEquipment = { type: "", model: "", installYear: "", comment: "" };
+  const current = unit.equipment?.[index] ?? blank;
+  const [base, setBase] = useState<UnitEquipment>(current);
+  const [pinned, setPinned] = useState(version);
+  const [draft, setDraft] = useState<UnitEquipment>(() => structuredClone(current));
+  const [tried, setTried] = useState(false);
+  // The name as the sheet opened, so the title doesn't change while a new type is picked.
+  const [title] = useState(current.type.trim() || "Equipment");
+  const run = useRun();
+  const router = useRouter();
+  const types = rules.equipment.map((r) => ({ id: r.type, label: r.type }));
+  // A year already stored is left as it is ("~2004"); only one typed over has to read.
+  const problems = equipmentProblems([draft], new Map([[0, base.installYear ?? ""]]))[0];
+  const typeProblem = draft.type.trim() ? undefined : "Choose a type.";
+
+  function change(patch: Partial<UnitEquipment>) {
+    if (run.error) run.reset();
+    setDraft((d) => ({ ...d, ...patch }));
+  }
+
+  function submit() {
+    setTried(true);
+    if (typeProblem || problems) return;
+    const next = structuredClone(unit);
+    next.equipment = [...(next.equipment ?? [])];
+    next.equipment[index] = draft;
+    run.run(() => savePropertyUnit(propertyId, next, pinned), {
+      failure: "inline",
+      succeeded: () => onOpenChange(false),
+      done: `${draft.type.trim() || title} saved`,
+      key: `equipment:${propertyId}:${unit.id ?? unitName}:${index}`,
+    });
+  }
+
+  function loadLatest() {
+    run.reset();
+    setTried(false);
+    if (gone) {
+      onOpenChange(false);
+      return;
+    }
+    setBase(current);
+    setDraft(structuredClone(current));
+    setPinned(latest);
+    router.refresh();
+  }
+
+  return (
+    <FormSheet
+      title={`${title} · ${unitName}`}
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      onSubmit={submit}
+      primary="Save"
+      pending={run.pending}
+      values={draft}
+      dirty={stableJson(draft) !== stableJson(base)}
+      discardTitle={`Discard changes to ${title}?`}
+      leaveTitle={`Leave ${title}?`}
+      error={run.error ?? undefined}
+      errorAction={run.conflict && <LoadLatest onClick={loadLatest} />}
+      fieldErrors={run.fieldErrors}
+    >
+      <Select
+        label="Type"
+        size="md"
+        items={types}
+        value={draft.type.trim() || null}
+        placeholder="Choose a type"
+        onChange={(v) => change({ type: v ?? "" })}
+        isInvalid={tried && !!typeProblem}
+        errorMessage={typeProblem}
+        searchLabel="Search types"
+      />
+      <FormField label="Model #" optional>
+        {(p) => <Input {...p} autoComplete="off" value={draft.model ?? ""} onChange={(ev) => change({ model: ev.target.value })} />}
+      </FormField>
+      <FormField label="Comments" optional>
+        {(p) => <Input {...p} autoComplete="off" value={draft.comment ?? ""} onChange={(ev) => change({ comment: ev.target.value })} />}
+      </FormField>
+      <FormField label="Year installed" optional helper="Adds it to the forecast" error={(tried && problems?.year) || undefined}>
+        {(p) => <NumberInput kind="year" {...p} value={draft.installYear ?? ""} onChange={(next) => change({ installYear: next })} />}
+      </FormField>
+    </FormSheet>
+  );
+}

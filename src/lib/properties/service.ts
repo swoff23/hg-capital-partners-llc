@@ -7,8 +7,8 @@ import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
 import { splitAddress } from "@/lib/address-suggestions";
 import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
-import { amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
-import { entityProblem } from "@/lib/properties/entity";
+import { ROOMS_LIMIT, SQFT_LIMIT, amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
+import { entityName } from "@/lib/properties/entity";
 import { cleanListing, type ListingInput } from "@/lib/properties/listing-clean";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
@@ -128,12 +128,10 @@ export async function createProperty(
   input: NewProperty,
   by: Editor,
 ): Promise<{ property: Property; duplicateOf?: undefined } | { property?: undefined; duplicateOf: Property }> {
-  const entity = entityProblem(input.llcOwner, null);
-  if (entity) throw new FieldError({ llcOwner: entity });
   const duplicateOf = await findDuplicateProperty(input.address);
   if (duplicateOf) return { duplicateOf };
   const property = await prisma.property.create({
-    data: { address: input.address.trim(), llcOwner: input.llcOwner || null, status: input.status || null, ...stamp(by) },
+    data: { address: input.address.trim(), llcOwner: entityName(input.llcOwner), status: input.status || null, ...stamp(by) },
   });
   revalidatePath("/properties");
   return { property };
@@ -141,16 +139,16 @@ export async function createProperty(
 
 /* ---------------- Scalar details ---------------- */
 
-// Refi target, closing costs and rehab amount left the page (docs/specs/property-page.md):
+// Refi target, closing costs, rehab amount and strategy left the page (docs/specs/property-page.md):
 // their columns keep what they hold, and nothing writes them any more.
 
 const TEXT_FIELDS = [
-  "llcOwner", "attorney", "status", "strategy", "notes",
+  "llcOwner", "attorney", "status", "notes",
   "lender", "loanServicer", "loanNumber", "loanType",
   "insuranceCarrier", "insurancePolicyNo", "insuranceLiability",
 ] as const;
 const MONEY_FIELDS = [
-  "value", "replacementCost", "purchasePrice", "rehabMonths",
+  "value", "replacementCost", "purchasePrice", "rehabMonths", "baths",
   "loanOriginalAmount", "currentLoan", "loanRate", "loanPaymentMonthly",
   "insuranceCoverage", "insuranceDeductible", "insurancePremium",
 ] as const;
@@ -205,23 +203,20 @@ export async function patchProperty(
   for (const k of DATE_FIELDS) if (has(k)) data[k] = ymdToDate(s(k));
   if (has("loanEscrow")) data.loanEscrow = s("loanEscrow") === "yes";
   if (has("showOnMoveInForm")) data.showOnMoveInForm = s("showOnMoveInForm") === "yes";
-  if (has("sqft")) {
-    const r = readWholeNumber(patch.sqft);
-    if (r.ok) data.sqft = r.value;
+  for (const [k, limit] of [["sqft", SQFT_LIMIT], ["beds", ROOMS_LIMIT]] as const) {
+    if (!has(k)) continue;
+    const r = readWholeNumber(patch[k], limit);
+    if (r.ok) data[k] = r.value;
     else {
-      bad.push("sqft");
-      if (r.tooLarge) tooLarge.push("sqft");
+      bad.push(k);
+      if (r.tooLarge) tooLarge.push(k);
     }
   }
   // Nothing is written when a number didn't read: storing null would erase what's there.
   if (bad.length) throw new Error(badNumbersMessage(bad, tooLarge));
 
-  // Entity is one of the companies, or the value already stored (lib/properties/entity.ts).
-  if ("llcOwner" in data && data.llcOwner != null) {
-    const stored = await prisma.property.findUnique({ where: { id }, select: { llcOwner: true } });
-    const problem = entityProblem(data.llcOwner as string, stored?.llcOwner);
-    if (problem) throw new FieldError({ llcOwner: problem });
-  }
+  // Entity: a QuickBooks company in its own spelling, or a new name as typed (lib/properties/entity.ts).
+  if (has("llcOwner")) data.llcOwner = entityName(patch.llcOwner);
 
   // A rename onto an address another property has is refused on the address field, like New property's.
   if (typeof data.address === "string") {

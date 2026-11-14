@@ -31,6 +31,16 @@ test("foldedKeys: a row seen filled on this visit stays out after it's cleared",
   assert.deepEqual(foldedKeys(rows, new Set(["lender"])), ["loanRate"]);
 });
 
+test("foldedKeys: a fold row always folds, filled, seen filled or empty", () => {
+  const rows = [
+    { key: "value", empty: false, keep: true },
+    { key: "attorney", empty: false, fold: true },
+    { key: "status", empty: true, fold: true },
+    { key: "loanServicer", empty: false, fold: true },
+  ];
+  assert.deepEqual(foldedKeys(rows, new Set(["attorney", "loanServicer"])), ["attorney", "status", "loanServicer"]);
+});
+
 test("foldedKeys: nothing folds when every row has a value", () => {
   assert.deepEqual(foldedKeys([{ key: "value", empty: false }], none), []);
 });

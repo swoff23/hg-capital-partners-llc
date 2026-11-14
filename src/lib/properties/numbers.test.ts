@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { RENT_LIMIT, amountProblem, badNumbersMessage, readAmount, readRate, readWholeNumber } from "./numbers";
+import { RENT_LIMIT, amountLimit, amountProblem, badNumbersMessage, readAmount, readRate, readWholeNumber } from "./numbers";
 
 test("readAmount: blank clears, clean numbers store, typos are refused", () => {
   assert.deepEqual(readAmount(""), { ok: true, value: null });
@@ -35,9 +35,9 @@ test("readWholeNumber: square feet", () => {
 test("badNumbersMessage: names the fields in one short line", () => {
   assert.equal(badNumbersMessage(["value"]), "Value isn't a number.");
   assert.equal(badNumbersMessage(["replacementCost"]), "Replacement cost isn't a number.");
-  assert.equal(badNumbersMessage(["sqft"]), "Sq ft isn't a whole number.");
+  assert.equal(badNumbersMessage(["sqft"]), "Square feet isn't a whole number.");
   assert.equal(badNumbersMessage(["loanRate"]), "Rate needs a percentage, like 6.875.");
-  assert.equal(badNumbersMessage(["value", "sqft"]), "Check Value and Sq ft.");
+  assert.equal(badNumbersMessage(["value", "sqft"]), "Check Value and Square feet.");
   assert.equal(badNumbersMessage(["value", "loanRate", "insurancePremium"]), "Check Value, Rate and Premium.");
   for (const m of [badNumbersMessage(["replacementCost"]), badNumbersMessage(["loanOriginalAmount", "loanPaymentMonthly"])]) {
     assert.ok(m.length <= 43, `${m} (${m.length}) fits a section card on one line`);
@@ -68,7 +68,7 @@ test("badNumbersMessage: a number too large says the limit in one line", () => {
   assert.equal(badNumbersMessage(["sqft"], ["sqft"]), "Keep it under 10,000,000.");
   assert.equal(badNumbersMessage(["rehabMonths"], ["rehabMonths"]), "Keep it under 1,000,000.");
   // Two fields still name both.
-  assert.equal(badNumbersMessage(["value", "sqft"], ["value"]), "Check Value and Sq ft.");
+  assert.equal(badNumbersMessage(["value", "sqft"], ["value"]), "Check Value and Square feet.");
 });
 
 test("amountProblem: the rail's check before it sends, for money and square feet only", () => {
@@ -82,4 +82,13 @@ test("amountProblem: the rail's check before it sends, for money and square feet
   // Not a number field: nothing to say.
   assert.equal(amountProblem("lender", "99999999999999999999"), null);
   assert.equal(amountProblem("loanRate", "99999999999999999999"), null);
+});
+
+test("beds and baths: beds a whole number, baths a half, both under 10,000", () => {
+  assert.equal(badNumbersMessage(["beds"]), "Beds isn't a whole number.");
+  assert.equal(badNumbersMessage(["baths"]), "Baths isn't a number.");
+  assert.equal(amountProblem("beds", "12000"), "Keep it under 10,000.");
+  assert.equal(amountProblem("baths", "10000"), "Keep it under 10,000.");
+  assert.equal(amountProblem("baths", "2.5"), null);
+  assert.deepEqual(readAmount("2.5", amountLimit("baths")), { ok: true, value: "2.50" });
 });
