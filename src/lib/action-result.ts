@@ -193,7 +193,7 @@ export class FieldError extends Error {
   }
 }
 
-export const GENERIC_ERROR = "Something went wrong saving that. Try again; if it keeps happening, reload the page.";
+export const GENERIC_ERROR = "We couldn't save that. Try again, or reload the page.";
 
 /** A server action call that never reached the server, or whose answer never came back. One line at 320. */
 export const OFFLINE_ERROR = "No connection. Try again.";

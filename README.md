@@ -7,7 +7,7 @@ lives in the same app.
 
 ## Before you build
 
-The working rules (planning, reuse, design references, copy, device check, landing) live in [CLAUDE.md](CLAUDE.md). Claude Code loads that file automatically, and it applies to people just the same.
+The working rules (planning, reuse, design references, copy, device check, landing) live in [CLAUDE.md](CLAUDE.md). Claude Code loads that file automatically, and it applies to people just the same. The full copy standard is [docs/copy-rules.md](docs/copy-rules.md).
 
 1. **Plan first.** Feature-sized work gets its questions answered and a spec saved in `docs/` before any code.
 2. **Check what we have.** Look up the job in [docs/components.md](docs/components.md) and search `src/components/`. Use what fits, or extend it with a prop instead of copying it.
