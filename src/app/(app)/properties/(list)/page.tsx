@@ -5,7 +5,6 @@ import { ScopeButton } from "@/components/filter-bar";
 import { SortHeader } from "@/components/sort-header";
 import { EmptyState, LinkButton, PageHeader, RowCell, Table, Td, Th, pendingRowFill } from "@/components/ui";
 import { Money } from "@/components/money";
-import { PhotoThumb } from "@/components/photo-thumb";
 import { shortAddress } from "@/lib/normalize";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { parseBuildingCapex, parseUnits, propertyUnitCount } from "@/lib/property-types";
@@ -34,8 +33,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 /**
  * Portfolio (docs/brand-guidelines.md, sections 5 and 9): the summary strip
  * (value, loan balance, equity and LTV; charts D4 A), then one
- * 56px row per property with its photo (the fallback tile until
- * it's taken), money right-aligned and tabular, and a footer row that counts
+ * 56px row per property (no photo tile: Connor, Nov 14), money
+ * right-aligned and tabular, and a footer row that counts
  * and sums. The whole row opens the property. Below sm the status leads the
  * row's subline and the secondary columns drop. The 5-year CapEx forecast
  * sits under the table at #capex. A Status chip filters (several picks) and
@@ -168,10 +167,6 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
                       <tr key={r.id} className={cn("transition-colors duration-fast hover:bg-fill-1", pendingRowFill)}>
                         {/* The address column takes the room the others leave, so a long address truncates instead of widening the table. */}
                         <RowCell href={href} first cell="w-full max-w-0" className="pl-0">
-                          {/* Decorative inside the link, which the address already names. */}
-                          <span aria-hidden="true" className="shrink-0">
-                            <PhotoThumb size={48} alt="" />
-                          </span>
                           <span className="min-w-0">
                             <span className="block truncate text-body text-fg-1">{r.name}</span>
                             {(r.entity || r.status || r.archived) && (

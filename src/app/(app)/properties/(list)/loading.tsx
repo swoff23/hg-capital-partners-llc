@@ -19,7 +19,7 @@ const COLUMNS = [
  * Portfolio while it loads (docs/specs/performance.md 4.3): the title, New
  * property, the strip's labels, the filter bar and the column headers draw
  * at once, with the page's own hiding classes; the counts, the figures and 8
- * rows (photo tile, address, figures) are --fill-1 blocks in RowCell's boxes.
+ * rows (address, figures) are --fill-1 blocks in RowCell's boxes.
  */
 export default function PortfolioLoading() {
   return (
@@ -56,7 +56,6 @@ export default function PortfolioLoading() {
           {Array.from({ length: 8 }, (_, i) => (
             <tr key={i}>
               <Cell className="pl-0" cell="w-full max-w-0">
-                <Block className="h-9 w-12 shrink-0 rounded-lg" />
                 <span className="min-w-0 flex-1">
                   <Block text="text-body" className={rowWidth(i, ["w-40", "w-32", "w-44", "w-36"])} />
                   {/* The owning entity under the address. */}
