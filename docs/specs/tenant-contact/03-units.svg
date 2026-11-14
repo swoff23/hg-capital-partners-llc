@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="590" viewBox="0 0 880 590" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The property's Units editor: the unit sheet and the units list</title>
+<rect width="880" height="590" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Units and access: the unit sheet and the list</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768, the 672px dialog</text>
+<rect x="0" y="22" width="500" height="450" rx="14" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="24" y="56" font-size="14" font-weight="600" fill="#152133">Unit 2</text>
+<g font-size="11" fill="#424e61">
+<text x="24" y="84">Name</text><text x="258" y="84">Lockbox</text>
+<text x="24" y="140">Tenant</text><text x="258" y="140">Tenant phone</text>
+<text x="24" y="196">Moves in (optional)</text><text x="258" y="196">Moves out (optional)</text>
+</g>
+<g fill="#ffffff" stroke="#84817a">
+<rect x="24" y="90" width="218" height="30" rx="7"/><rect x="258" y="90" width="218" height="30" rx="7"/>
+<rect x="24" y="146" width="218" height="30" rx="7"/><rect x="258" y="146" width="218" height="30" rx="7"/>
+<rect x="24" y="202" width="218" height="30" rx="7"/><rect x="258" y="202" width="218" height="30" rx="7"/>
+</g>
+<g font-size="12" fill="#152133">
+<text x="34" y="110">Unit 2</text><text x="268" y="110">At the side door, 4521</text>
+<text x="34" y="166">Tenant name</text><text x="268" y="166">716-555-0142</text>
+<text x="34" y="222">Mar 1, 2024</text><text x="268" y="222">Jan 31</text>
+</g>
+<text x="258" y="248" font-size="11" fill="#5b6576">Leave blank until they give notice</text>
+<text x="24" y="276" font-size="12" fill="#424e61">Remove tenant</text>
+<line x1="24" y1="294" x2="476" y2="294" stroke="#e7e5e0"/>
+<text x="24" y="318" font-size="12" font-weight="500" fill="#152133">Next tenant</text>
+<g font-size="11" fill="#424e61"><text x="24" y="340">Tenant</text><text x="258" y="340">Tenant phone</text></g>
+<g fill="#ffffff" stroke="#84817a"><rect x="24" y="346" width="218" height="30" rx="7"/><rect x="258" y="346" width="218" height="30" rx="7"/></g>
+<g font-size="12" fill="#152133"><text x="34" y="366">Next tenant</text><text x="268" y="366">716-555-0199</text></g>
+<text x="24" y="396" font-size="11" fill="#424e61">Moves in</text>
+<rect x="24" y="402" width="218" height="30" rx="7" fill="#ffffff" stroke="#84817a"/>
+<text x="34" y="422" font-size="12" fill="#152133">Feb 1</text>
+<text x="258" y="396" font-size="12" fill="#424e61">Remove next tenant</text>
+<rect x="290" y="428" width="88" height="28" rx="7" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="334" y="446" font-size="12" fill="#152133" text-anchor="middle">Cancel</text>
+<rect x="388" y="428" width="88" height="28" rx="7" fill="#152133"/>
+<text x="432" y="446" font-size="12" fill="#ffffff" text-anchor="middle">Save</text>
+<text x="0" y="496" font-size="11" fill="#5b6576">Next tenant shows only when there is one, or after "Add next tenant" under a current tenant.</text>
+<text x="0" y="511" font-size="11" fill="#5b6576">House-meter rows get no tenant fields.</text>
+</g>
+
+<g transform="translate(568 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375 and 320, full height, stacked</text>
+<rect x="0" y="22" width="200" height="250" rx="16" fill="#ffffff" stroke="#d5d1ca"/>
+<g font-size="11" fill="#424e61"><text x="14" y="52">Tenant</text><text x="14" y="100">Tenant phone</text><text x="14" y="148">Moves in (optional)</text><text x="14" y="196">Moves out (optional)</text></g>
+<g fill="#ffffff" stroke="#84817a"><rect x="14" y="58" width="172" height="28" rx="7"/><rect x="14" y="106" width="172" height="28" rx="7"/><rect x="14" y="154" width="172" height="28" rx="7"/><rect x="14" y="202" width="172" height="28" rx="7"/></g>
+<g font-size="12" fill="#152133"><text x="24" y="77">Tenant name</text><text x="24" y="125">716-555-0142</text><text x="24" y="173">Mar 1, 2024</text></g>
+<text x="14" y="252" font-size="11" fill="#5b6576">Leave blank until they give notice</text>
+
+<text x="0" y="306" font-size="11" font-weight="500" fill="#424e61">The units list, any size</text>
+<rect x="0" y="316" width="280" height="150" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="16" y="340" font-size="12" fill="#152133">Unit 2</text>
+<text x="16" y="357" font-size="11" fill="#5b6576">Tenant Tenant name · moves out Jan 31</text>
+<text x="16" y="372" font-size="11" fill="#5b6576">Next Next tenant · from Feb 1</text>
+<text x="16" y="387" font-size="11" fill="#5b6576">Lockbox at the side door</text>
+<line x1="16" y1="400" x2="264" y2="400" stroke="#f2f0ec"/>
+<text x="16" y="422" font-size="12" fill="#152133">Unit 3</text>
+<text x="16" y="442" font-size="12" fill="#424e61">Add tenant</text>
+<text x="0" y="488" font-size="11" fill="#5b6576">Below 480 the words Tenant and Next drop, as Lockbox does.</text>
+</g>
+</svg>
