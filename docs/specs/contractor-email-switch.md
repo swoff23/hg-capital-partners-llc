@@ -69,19 +69,17 @@ Job emails                       [ ON ]
 [Remove access]
 ```
 
-Before the first sign-in, one line under the switch says why nothing is going yet:
+Before the first sign-in the row is the same. The Email fact's "Not signed in yet" already says why nothing is going, so the switch adds no line of its own (Connor, Nov 14, after seeing it built).
 
 ```
 Portal access              Invited  ···
 Email       zack@example.com
             Not signed in yet
 Job emails                       [ ON ]
-Start at Zack's first sign-in
 ```
 
 - **Laptop 1280 and tablet 768.** The card is the narrow rail beside Jobs. The row is the label on the left and the switch on the right, 32px tall with a mouse and 44px on touch.
 - **Mobile 375 and 320.** The card is full width and the row is the same. Nothing drops.
-- **The line under the switch** is `text-meta` in `--fg-3`, one line, and truncates before it wraps on a long name. It shows only while the contractor has never signed in, whether the switch is on or off.
 - **Saving.** The switch flips at once and a toast with Undo confirms it, as "Show on move-in form" does on a property. No confirm dialog, since it is undone with one tap.
 - **Access off.** The row is hidden.
 
@@ -90,7 +88,6 @@ Start at Zack's first sign-in
 | Where | Text |
 |---|---|
 | Switch label | Job emails |
-| Under the switch, before the first sign-in | Start at Zack's first sign-in |
 | Toast, turned off | Zack's job emails are off |
 | Toast, turned on | Zack's job emails are on |
 | Under a staff update, never signed in | Zack hasn't signed in yet |
@@ -147,7 +144,7 @@ The line under a staff update picks the first that applies:
 
 Two lines elsewhere promised an email that this change can now withhold, so the build corrected them. Neither was in the plan above, and both are Connor's to reword.
 
-- **The comment box on a task.** Its audience line read "Zack sees this and gets an email". For a contractor who is quiet or switched off it now reads "Zack sees this". The line under the sent comment says why.
+- **The comment box on a task.** Its audience line reads "Zack sees this and gets an email" when one goes. For a contractor who is quiet or switched off it reads "Zack won't get an email" (Connor, Nov 14: say the rarer case, when no email will go). The line under the sent comment says why.
 - **The contractor's Mark done screen.** It read "Sent to Connor and Pieter. You'll get an email if anything else is needed." For a contractor whose switch is off it now reads "Sent to Connor and Pieter. Check back here if anything else is needed."
 
 The rule lives in one place, `src/lib/portal/job-emails.ts`, and every reader calls it: the queue, the send run, the task page and the portal's job page.

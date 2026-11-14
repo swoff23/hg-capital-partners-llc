@@ -41,8 +41,6 @@ export type PortalAccountView = {
   contactActive: boolean;
   /** The "Job emails" switch: HG's changes to their jobs email them (docs/specs/contractor-email-switch.md). */
   jobEmails: boolean;
-  /** They have signed in at least once. Until then no job email goes, whatever the switch says. */
-  signedIn: boolean;
 };
 
 /**
@@ -82,9 +80,10 @@ type Shown = { email: string; password: string; phone: boolean };
  * "Job emails" (docs/specs/contractor-email-switch.md, layout A) is a switch
  * under the Email fact, on the same label column: off stops every task email
  * to them. It saves on the tap with a toast and Undo, like any yes or no fact
- * (InlineSwitch). Until their first sign-in one line under it says emails
- * start then, whichever way the switch is set. Access off hides it, as it
- * hides Reset password: nothing reaches a login that can't sign in.
+ * (InlineSwitch). No job email goes before their first sign-in either; the
+ * Email fact's "Not signed in yet" already says they haven't, so the switch
+ * adds no line of its own (Connor, Nov 14). Access off hides it, as it hides
+ * Reset password: nothing reaches a login that can't sign in.
  */
 export function PortalAccessCard({
   contactId,
@@ -207,7 +206,6 @@ export function PortalAccessCard({
                     />
                   </dd>
                 </dl>
-                {!account.signedIn && <p className="truncate text-meta text-fg-3">Start at {first}&apos;s first sign-in</p>}
               </div>
             )}
             {account.state !== "off" && (

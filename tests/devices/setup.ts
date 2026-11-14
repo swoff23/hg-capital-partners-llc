@@ -83,8 +83,8 @@ async function seedPortalFixture(db: PrismaClient, fixture: PortalFixture): Prom
     db.contact.update({ where: { id: account.contactId }, data: { active: true } }),
     db.portalAccount.update({
       where: { id: account.id },
-      // One who has chosen a password has signed in, so their card shows the plain Job emails switch; the newcomer
-      // never has, and theirs keeps the "Start at … first sign-in" line (docs/specs/contractor-email-switch.md).
+      // One who has chosen a password has signed in, so HG's changes would email them; the newcomer never has, so
+      // theirs wouldn't (docs/specs/contractor-email-switch.md).
       data: { status: "ACTIVE", mustChangePassword: fixture.mustChangePassword, ...(fixture.mustChangePassword ? { lastSignInAt: null } : { lastSignInAt: new Date() }) },
     }),
     // One live session per run; earlier runs' rows are cleared.

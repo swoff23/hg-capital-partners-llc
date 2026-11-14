@@ -213,8 +213,6 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                     restorable: c.portalAccount.status !== "ACTIVE",
                     contactActive: c.active,
                     jobEmails: c.portalAccount.jobEmails,
-                    // The first sign-in job emails wait for (src/lib/portal/job-emails.ts reads the same column).
-                    signedIn: c.portalAccount.lastSignInAt !== null,
                   }
                 : null
             }

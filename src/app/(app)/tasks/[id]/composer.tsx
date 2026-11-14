@@ -81,8 +81,9 @@ export function Composer({
       pin="phone"
       audience={{
         shared: reachable ? (
-          // The email is promised only when one goes; the line under the sent comment says why when it doesn't.
-          <AudienceText name={reachable.first} words={reachable.getsEmail ? "sees this and gets an email" : "sees this"} />
+          // Says when no email will go, the rarer case (Connor, Nov 14). The line under the sent comment says why:
+          // "Zack hasn't signed in yet" or "Zack's emails are off".
+          <AudienceText name={reachable.first} words={reachable.getsEmail ? "sees this and gets an email" : "won't get an email"} />
         ) : contractor ? (
           <span className="flex min-w-0 items-baseline gap-2">
             <AudienceText name={contractor.first} words="needs a login to see this" />
