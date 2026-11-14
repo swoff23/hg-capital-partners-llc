@@ -112,3 +112,152 @@ ${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1
 
   return { text, html };
 }
+
+// ---------------------------------------------------------------------------
+// The job email (docs/specs/contractor-job-emails.md, section 2)
+// ---------------------------------------------------------------------------
+
+export interface JobEmailButton {
+  label: string;
+  url: string;
+}
+
+export interface JobEmailInput {
+  /** The hidden inbox preview line. */
+  preview: string;
+  /** What's new: the headline, then the other lines. */
+  headline: string;
+  lines: string[];
+  closing?: string;
+  primary: JobEmailButton;
+  secondary: JobEmailButton[];
+  job: {
+    title: string;
+    where: string;
+    directionsUrl: string | null;
+    photoUrl: string | null;
+    due: string | null;
+    notes: string | null;
+    checklist: { title: string; done: boolean }[];
+    contractor: string | null;
+    checklistLine: string | null;
+  };
+  footnote?: string;
+}
+
+/** An http(s) URL, or a throw: every link in an email is checked before it's written. */
+function safeUrl(raw: string): string {
+  const url = new URL(raw);
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Email links must be http(s)");
+  return url.toString();
+}
+
+/**
+ * Gmail and iOS Mail show the start of the body beside the subject. This puts
+ * the preview line there, hidden in the email itself, then enough blank space
+ * that the letterhead's words don't follow it into the preview.
+ */
+function previewHtml(preview: string): string {
+  return `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(preview)}${"&#847;&zwnj;&nbsp;".repeat(60)}</div>`;
+}
+
+const LABEL = `font-size:13px;line-height:18px;color:${t.fg3};`;
+
+/** A fact row in the job: its label in a fixed column, the value beside it. */
+function factRow(label: string, valueHtml: string): string {
+  // One 22px line box on both sides, so the 13px label sits on the 15px value's first line instead of above it.
+  return `<tr><td valign="top" width="88" style="width:88px;padding:8px 12px 8px 0;border-top:1px solid ${t.line};font-size:13px;line-height:22px;color:${t.fg3};">${escapeHtml(label)}</td><td valign="top" style="padding:8px 0;border-top:1px solid ${t.line};font-size:15px;line-height:22px;color:${t.fg1};">${valueHtml}</td></tr>`;
+}
+
+const PRIMARY = `display:block;text-align:center;background:${t.act};color:${t.onAct};text-decoration:none;font-size:15px;font-weight:600;padding:13px 22px;border-radius:6px;`;
+const SECONDARY = `display:inline-block;background:${t.surface};color:${t.fg1};text-decoration:none;font-size:15px;font-weight:600;padding:11px 18px;border-radius:6px;border:1px solid ${t.lineStrong};margin:8px 8px 0 0;`;
+const LINK = `color:${t.act};text-decoration:underline;`;
+
+/**
+ * The job email: letterhead, What's new, the buttons, then the job (spec 2.2,
+ * Connor's order A). One 480px column like the plain email, full width on a
+ * phone. The primary button is full width; the secondary ones sit in a row
+ * and wrap under each other on a narrow phone. A plain-text part carries the
+ * same sections in the same order, each button as a labeled link.
+ */
+export function renderJobEmail(input: JobEmailInput): RenderedEmail {
+  const primaryUrl = safeUrl(input.primary.url);
+  const secondary = input.secondary.map((b) => ({ label: b.label, url: safeUrl(b.url) }));
+  const directions = input.job.directionsUrl ? safeUrl(input.job.directionsUrl) : null;
+  const photo = input.job.photoUrl ? safeUrl(input.job.photoUrl) : null;
+  const { job } = input;
+
+  const facts: { label: string; text: string; html: string }[] = [];
+  if (job.contractor) facts.push({ label: "Contractor", text: job.contractor, html: escapeHtml(job.contractor) });
+  if (job.due) facts.push({ label: "Due", text: job.due, html: escapeHtml(job.due) });
+  if (job.checklistLine) facts.push({ label: "Checklist", text: job.checklistLine, html: escapeHtml(job.checklistLine) });
+  if (job.notes) facts.push({ label: "Notes", text: job.notes, html: escapeWithBreaks(job.notes) });
+  if (job.checklist.length) {
+    facts.push({
+      label: "Checklist",
+      text: job.checklist.map((c) => `${c.done ? "[x]" : "[ ]"} ${c.title}`).join("\n"),
+      html: job.checklist
+        .map(
+          (c) =>
+            `<div style="padding:2px 0;${c.done ? `color:${t.fg3};` : ""}"><span style="display:inline-block;width:20px;color:${c.done ? t.ok : t.fg3};">${c.done ? "&#10003;" : "&#9675;"}</span>${escapeHtml(c.title)}</div>`,
+        )
+        .join(""),
+    });
+  }
+
+  const text = [
+    BRAND.company,
+    "",
+    "What's new",
+    input.headline,
+    ...input.lines,
+    ...(input.closing ? ["", input.closing] : []),
+    "",
+    `${input.primary.label}: ${primaryUrl}`,
+    ...secondary.map((b) => `${b.label}: ${b.url}`),
+    "",
+    "The job",
+    job.title,
+    ...(job.where ? [job.where] : []),
+    ...(directions ? [`Directions: ${directions}`] : []),
+    ...facts.flatMap((f) => ["", `${f.label}:`, f.text]),
+    ...(input.footnote ? ["", input.footnote] : []),
+  ].join("\n");
+
+  const whereLine = [job.where ? escapeHtml(job.where) : "", directions ? `<a href="${escapeHtml(directions)}" style="${LINK}">Directions</a>` : ""]
+    .filter(Boolean)
+    .join(" &middot; ");
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0;padding:0;background:${t.canvas};">
+${previewHtml(input.preview)}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${t.canvas};padding:32px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${t.surface};border:1px solid ${t.line};border-radius:8px;padding:28px 24px;font-family:${FONT};color:${t.fg1};">
+<tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.goldDeep};">${LETTERHEAD}</td></tr>
+<tr><td style="padding:24px 0 0;${LABEL}">What's new</td></tr>
+<tr><td style="padding:4px 0 0;font-size:18px;line-height:1.4;font-weight:600;color:${t.fg1};">${escapeWithBreaks(input.headline)}</td></tr>
+${input.lines.map((l) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(l)}</td></tr>\n`).join("")}${input.closing ? `<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}<tr><td style="padding:24px 0 0;">
+<a href="${escapeHtml(primaryUrl)}" style="${PRIMARY}">${escapeHtml(input.primary.label)}</a>
+${secondary.map((b) => `<a href="${escapeHtml(b.url)}" style="${SECONDARY}">${escapeHtml(b.label)}</a>`).join("\n")}
+</td></tr>
+<tr><td style="padding:28px 0 0;"><div style="border-top:1px solid ${t.line};"></div></td></tr>
+<tr><td style="padding:20px 0 0;${LABEL}">The job</td></tr>
+${photo ? `<tr><td style="padding:8px 0 0;"><img src="${escapeHtml(photo)}" alt="" width="430" style="display:block;width:100%;max-width:430px;height:auto;border-radius:6px;border:0;"></td></tr>\n` : ""}<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.4;font-weight:600;color:${t.fg1};">${escapeHtml(job.title)}</td></tr>
+${whereLine ? `<tr><td style="padding:2px 0 0;font-size:14px;line-height:1.5;color:${t.fg3};">${whereLine}</td></tr>\n` : ""}${
+    facts.length
+      ? `<tr><td style="padding:12px 0 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${facts.map((f) => factRow(f.label, f.html)).join("")}</table></td></tr>\n`
+      : ""
+  }${input.footnote ? `<tr><td style="padding:24px 0 0;font-size:13px;line-height:1.5;color:${t.fg3};">${escapeHtml(input.footnote)}</td></tr>\n` : ""}</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+  return { text, html };
+}

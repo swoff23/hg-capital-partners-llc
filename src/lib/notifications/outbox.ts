@@ -1,11 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { renderPlainEmail } from "@/lib/email/render";
+import { renderJobEmail } from "@/lib/email/render";
+import { todayYmdEastern, toYmd } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
+import { CODE_MASK, lockboxMasker } from "@/lib/portal/access-code";
 import { staffFirstNames } from "@/lib/portal/queries";
-import { isActiveStatus } from "@/lib/task-scope";
+import { targetDate } from "@/lib/tasks/rules";
 import {
   DAILY_EMAIL_CAP,
   deliveryFor,
@@ -175,9 +177,16 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         select: {
           title: true,
           unitLabel: true,
-          // Read at send time: the reply line goes only on a job still open.
+          // Read at send time: the buttons follow the job's next step, and the reply line goes only on a job still open.
           status: true,
-          property: { select: { address: true } },
+          // The job as it stands when the email goes (docs/specs/contractor-job-emails.md 2.2).
+          dueDate: true,
+          scheduledFor: true,
+          description: true,
+          propertyId: true,
+          checklist: { select: { title: true, done: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
+          assigneeContact: { select: { fullName: true } },
+          property: { select: { address: true, photoUrl: true } },
           // Who can open the job right now (D12), checked again at send time.
           access: { where: { revokedAt: null }, select: { contactId: true } },
         },
@@ -222,30 +231,36 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     }
 
     if (delivery.audience === "contractor") staffNames ??= await staffFirstNames();
+    const task = row.task;
+    // The notes go to the contractor with this property's lockbox codes masked: the code itself stays behind the job's
+    // own Lockbox section, where each view is logged (D21), not in an inbox.
+    const notes =
+      delivery.audience === "contractor" && task.description?.trim()
+        ? (await lockboxMasker(prisma, task.propertyId))(task.description).map((part) => ("text" in part ? part.text : CODE_MASK)).join("")
+        : null;
     const email = taskEmail({
       items,
-      title: row.task.title,
-      address: row.task.property?.address ?? null,
-      unitLabel: row.task.unitLabel,
+      title: task.title,
+      address: task.property?.address ?? null,
+      unitLabel: task.unitLabel,
       audience: delivery.audience,
       appUrl,
       taskId: row.taskId,
+      status: task.status,
+      due: toYmd(targetDate(task)),
+      today: todayYmdEastern(now),
+      notes,
+      checklist: task.checklist,
+      photoUrl: task.property?.photoUrl ?? null,
+      contractorName: task.assigneeContact?.fullName ?? null,
       recipientName: row.recipientContact?.fullName,
       staffNames: staffNames ?? [],
-      jobOpen: isActiveStatus(row.task.status),
     });
-    const rendered = renderPlainEmail({
-      line: email.line,
-      items: email.items,
-      closing: email.closing,
-      buttonLabel: email.buttonLabel,
-      buttonUrl: email.buttonUrl,
-      footnote: email.footnote,
-    });
+    const rendered = renderJobEmail(email);
     const wait = lastSendAt + SEND_GAP_MS - Date.now();
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     lastSendAt = Date.now();
-    const res = await sendEmail({ to: delivery.to, subject: email.subject, text: rendered.text, html: rendered.html });
+    const res = await sendEmail({ to: delivery.to, subject: email.subject, text: rendered.text, html: rendered.html, threadKey: email.threadKey });
 
     if (res.ok) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });

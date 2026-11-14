@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { brandTokens } from "@/lib/brand-tokens";
-import { escapeHtml, escapeWithBreaks, renderPlainEmail } from "./render";
+import { escapeHtml, escapeWithBreaks, renderJobEmail, renderPlainEmail } from "./render";
 
 const input = {
   line: "Choose a new password for your HG jobs login.",
@@ -104,4 +104,75 @@ test("the letterhead is the HG tile and the company name over a gold-deep rule",
   assert.ok(html.includes(">HG Capital Partners</td>"));
   assert.ok(html.includes(`border-bottom:1px solid ${brandTokens.goldDeep}`));
   assert.ok(html.indexOf("HG Capital Partners") < html.indexOf(input.line));
+});
+
+const job = {
+  preview: 'Connor moved the due date to Mon, Nov 23. Connor: "Faucet\'s in the garage."',
+  headline: "Connor moved the due date to Mon, Nov 23.",
+  lines: ['Connor: "Faucet\'s in the garage."'],
+  primary: { label: "Start job", url: "https://hg.example.com/p/jobs/t1" },
+  secondary: [{ label: "Add photos", url: "https://hg.example.com/p/jobs/t1" }],
+  job: {
+    title: "Replace kitchen faucet",
+    where: "118 Congress St · Rear",
+    directionsUrl: "https://maps.apple.com/?daddr=118%20Congress%20St",
+    photoUrl: "https://blob.example.com/front.jpg",
+    due: "Mon, Nov 23",
+    notes: "New faucet is in the garage.\nShut-off sticks.",
+    checklist: [
+      { title: "Swap faucet", done: false },
+      { title: "Check for leaks", done: true },
+    ],
+    contractor: null,
+    checklistLine: null,
+  },
+  footnote: "Reply in the job so Connor and Pieter both see it.",
+};
+
+test("job email: What's new, then the buttons, then the job, in that order", () => {
+  const rendered = renderJobEmail(job);
+  const { text } = rendered;
+  // After the hidden preview line, which repeats What's new.
+  const html = rendered.html.slice(rendered.html.indexOf("<table"));
+  const order = ["What's new", job.headline, "Faucet&#39;s in the garage", ">Start job</a>", ">Add photos</a>", "The job", 'src="https://blob.example.com/front.jpg"', "Replace kitchen faucet", ">Directions</a>", "Mon, Nov 23</td>", "Shut-off sticks", "Check for leaks", job.footnote];
+  const at = order.map((s) => html.indexOf(s));
+  assert.ok(at.every((i) => i >= 0), `missing: ${order.filter((_, i) => at[i] < 0).join(", ")}`);
+  assert.deepEqual([...at].sort((a, b) => a - b), at);
+  assert.ok(text.indexOf("What's new") < text.indexOf("Start job: https://hg.example.com/p/jobs/t1"));
+  assert.ok(text.indexOf("Add photos: https://hg.example.com/p/jobs/t1") < text.indexOf("The job"));
+  assert.ok(text.includes("Notes:\nNew faucet is in the garage.\nShut-off sticks."));
+  assert.ok(text.includes("[ ] Swap faucet\n[x] Check for leaks"));
+});
+
+test("job email: the preview line is hidden at the very top of the body", () => {
+  const { html } = renderJobEmail(job);
+  const body = html.slice(html.indexOf("<body"));
+  const hidden = body.indexOf('<div style="display:none;');
+  assert.ok(hidden > 0 && hidden < body.indexOf("<table"));
+  assert.ok(body.includes("Connor moved the due date to Mon, Nov 23. Connor: &quot;Faucet&#39;s in the garage.&quot;"));
+});
+
+test("job email: what isn't there isn't drawn, and every link is http(s)", () => {
+  const bare = renderJobEmail({ ...job, secondary: [], footnote: undefined, job: { ...job.job, photoUrl: null, directionsUrl: null, due: null, notes: null, checklist: [] } });
+  assert.ok(!bare.html.includes("<img"));
+  assert.ok(!bare.html.includes("Directions"));
+  assert.ok(!bare.html.includes(">Due<"));
+  assert.equal([...bare.html.matchAll(/<a href="/g)].length, 1);
+  assert.throws(() => renderJobEmail({ ...job, primary: { label: "x", url: "javascript:alert(1)" } }));
+  assert.throws(() => renderJobEmail({ ...job, job: { ...job.job, photoUrl: "data:image/png;base64,AAAA" } }));
+});
+
+test("job email: a partner's copy names the contractor and the checklist's progress", () => {
+  const { html } = renderJobEmail({ ...job, job: { ...job.job, notes: null, checklist: [], contractor: "Zack Smith", checklistLine: "1 of 2 done" } });
+  assert.ok(html.indexOf(">Contractor<") < html.indexOf("Zack Smith"));
+  assert.ok(html.includes("1 of 2 done"));
+});
+
+test("job email: user text is escaped, comments keep their breaks, and colors are brand tokens", () => {
+  const { html } = renderJobEmail({ ...job, headline: 'Zack: "<b>Done</b>\nall set"', job: { ...job.job, title: "Fix <script>" } });
+  assert.ok(!html.includes("<script>") && !html.includes("<b>Done"));
+  assert.ok(html.includes("Zack: &quot;&lt;b&gt;Done&lt;/b&gt;<br>all set&quot;"));
+  const hexes = new Set([...html.matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0].toLowerCase()));
+  const tokens = new Set(Object.values(brandTokens).map((v) => String(v).toLowerCase()));
+  for (const hex of hexes) assert.ok(tokens.has(hex), `${hex} is not a brand token`);
 });

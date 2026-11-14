@@ -5,7 +5,9 @@ import {
   MAX_ATTEMPTS,
   deliveryFor,
   easternDayStart,
-  emailSubject,
+  jobSubject,
+  previewText,
+  whatsNew,
   filePhrase,
   firstUpdateId,
   itemLine,
@@ -31,35 +33,35 @@ const item = (kind: string, summary: string, actorLabel = "Connor Swofford"): Ou
 // The summaries below are the exact shapes src/lib/tasks/core.ts writes.
 const TITLE = "Cabinet install";
 
-test("subject: one person's changes read as an update", () => {
-  assert.equal(
-    emailSubject([item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), item("COMMENT", '"Doors arrive Thu"')], TITLE),
-    "Connor updated Cabinet install",
-  );
+const STATUS_OPEN = { status: "OPEN" as const, today: "2026-10-22" };
+
+test("subject: the date first, always Due, then the job, street and unit; no date, just the job", () => {
+  assert.equal(jobSubject({ title: "Replace kitchen faucet", where: "118 Congress St · Rear", due: "Mon, Nov 23" }), "Due Mon, Nov 23: Replace kitchen faucet, 118 Congress St · Rear");
+  assert.equal(jobSubject({ title: "Replace kitchen faucet", where: "", due: null }), "Replace kitchen faucet");
+  // A title with line breaks can't break the subject.
+  assert.equal(jobSubject({ title: "Fix\nsteps", where: "23 Sherwood St", due: null }), "Fix steps, 23 Sherwood St");
 });
 
-test("subject: a contractor's Mark done says so", () => {
-  const zack = "Zack (Outlaw Carpentry)";
-  assert.equal(
-    emailSubject([item("COMMENT", '"All done"', zack), item("STATUS", 'marked "Fix front steps" done', zack)], "Fix front steps"),
-    "Zack marked Fix front steps done",
-  );
-});
-
-test("subject: an assignment alone says assigned; two partners are both named", () => {
-  assert.equal(emailSubject([item("ASSIGNED", `assigned you "${TITLE}"`)], TITLE), "Connor assigned you Cabinet install");
-  assert.equal(
-    emailSubject([item("NOTES", `updated the notes on "${TITLE}"`), item("COMMENT", '"Use the side door"', "Pieter Hoff")], TITLE),
-    "Connor and Pieter updated Cabinet install",
-  );
+test("subject: the same whatever changed, so the job keeps one thread per date", () => {
+  const base = { title: TITLE, address: "23 Sherwood St, Buffalo, NY 14213", unitLabel: "Upper", audience: "contractor" as const, appUrl: "https://hg.example.com", taskId: "t1", ...STATUS_OPEN, due: "2026-10-30" };
+  const subjects = [
+    [item("COMMENT", '"Doors arrive Thu"')],
+    [item("STATUS", `sent "${TITLE}" back: Level it`)],
+    [item("ASSIGNED", `assigned you "${TITLE}"`)],
+  ].map((items) => taskEmail({ ...base, items }).subject);
+  assert.deepEqual(new Set(subjects), new Set(["Due Fri, Oct 30: Cabinet install, 23 Sherwood St · Upper"]));
+  assert.equal(taskEmail({ ...base, items: [item("NOTES", "updated the notes")] }).threadKey, "job-t1-2026-10-30");
+  assert.equal(taskEmail({ ...base, due: null, items: [item("NOTES", "updated the notes")] }).threadKey, "job-t1-none");
+  // Next year's date says the year.
+  assert.equal(taskEmail({ ...base, due: "2027-01-05", items: [item("NOTES", "updated the notes")] }).subject, "Due Tue, Jan 5, 2027: Cabinet install, 23 Sherwood St · Upper");
 });
 
 test("each change reads as one line without the title", () => {
-  // A contractor reads a due date or a visit, never "target" (the job page's words). Core records which at enqueue.
+  // Every job has one date and emails call it the due date, a scheduled job's included: never "visit" or "target".
   assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: false }), "moved the due date to Fri, Oct 30");
-  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: true }), "moved the visit to Fri, Oct 30");
+  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: true }), "moved the due date to Fri, Oct 30");
   assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to no date`), visit: false }), "cleared the due date");
-  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to no date`), visit: true }), "cleared the visit date");
+  assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to no date`), visit: true }), "cleared the due date");
   // Rows queued before the flag read neutrally, and still parse.
   assert.equal(itemText(item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)), "moved the date to Fri, Oct 30");
   assert.equal(itemText(item("TARGET", `moved "${TITLE}" to no date`)), "cleared the date");
@@ -69,7 +71,7 @@ test("each change reads as one line without the title", () => {
   assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}" for Tue, Jan 5, 2027`)), "assigned you this job for Tue, Jan 5, 2027");
   assert.equal(itemText(item("ASSIGNED", `assigned you "Quote \"A\" for B"`)), "assigned you this job");
   assert.equal(itemText(item("STATUS", `started "${TITLE}"`, "Zack Smith")), "started the job");
-  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
+  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)), "set the due date to Thu, Oct 29");
   assert.equal(itemText(item("STATUS", `set "${TITLE}" to open`)), "moved it to To do");
   assert.equal(itemText(item("STATUS", `sent "${TITLE}" back: Level the uppers`)), "sent it back: Level the uppers");
   assert.equal(itemText(item("STATUS", `marked "${TITLE}" done`)), "marked it done");
@@ -87,41 +89,45 @@ test("Approve says approved, and only the contractor's own Start says started (B
   assert.equal(itemText(item("STATUS", `approved "Hang 36" mirror"`)), "approved it");
 });
 
-test("subject: sent back, scheduled and approved say so (BCONTRACT-007)", () => {
-  assert.equal(emailSubject([item("STATUS", `sent "${TITLE}" back: Level the uppers`)], TITLE), "Connor sent back Cabinet install");
-  // The visit date moved again within the same email: the subject gives the new date, or none if it was cleared.
-  const scheduled = item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`);
-  assert.equal(emailSubject([scheduled, item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)], TITLE), "Connor scheduled Cabinet install for Fri, Oct 30");
-  assert.equal(emailSubject([scheduled, item("TARGET", `moved "${TITLE}" to no date`)], TITLE), "Connor updated Cabinet install");
-  assert.equal(emailSubject([item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), scheduled], TITLE), "Connor scheduled Cabinet install for Thu, Oct 29");
-  assert.equal(
-    emailSubject([item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`), item("COMMENT", '"Side door"', "Pieter Hoff")], TITLE),
-    "Connor scheduled Cabinet install for Thu, Oct 29",
+test("What's new leads with the latest status change, else the assignment, else the date, else the first line (BCONTRACT-007)", () => {
+  assert.deepEqual(whatsNew([item("COMMENT", '"Side door"'), item("STATUS", `sent "${TITLE}" back: Level the uppers`)], TITLE), {
+    headline: "Connor sent it back: Level the uppers.",
+    lines: ['Connor: "Side door"'],
+  });
+  // The latest status change decides: sent back, then approved, leads with approved.
+  assert.equal(whatsNew([item("STATUS", `sent "${TITLE}" back`), item("STATUS", `approved "${TITLE}"`)], TITLE).headline, "Connor approved it.");
+  assert.equal(whatsNew([item("COMMENT", '"Use the side door"'), item("ASSIGNED", `assigned you "${TITLE}"`)], TITLE).headline, "Connor assigned you this job.");
+  // Only the latest date is said, and it leads over a comment.
+  assert.deepEqual(
+    whatsNew([item("TARGET", `moved "${TITLE}" to Thu, Oct 29`), item("COMMENT", '"Doors"'), item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)], TITLE),
+    { headline: "Connor moved the date to Fri, Oct 30.", lines: ['Connor: "Doors"'] },
   );
-  assert.equal(emailSubject([item("COMMENT", '"Looks great"'), item("STATUS", `approved "${TITLE}"`, "Pieter Hoff")], TITLE), "Pieter approved Cabinet install");
-  // The latest status change decides: sent back, then approved, reads approved.
-  assert.equal(
-    emailSubject([item("STATUS", `sent "${TITLE}" back`), item("STATUS", `approved "${TITLE}"`)], TITLE),
-    "Connor approved Cabinet install",
-  );
-  // Approved, then reopened: the job isn't approved any more.
-  assert.equal(
-    emailSubject([item("STATUS", `approved "${TITLE}"`), item("STATUS", `set "${TITLE}" to in progress`)], TITLE),
-    "Connor updated Cabinet install",
-  );
-  // Assigned with a visit date: the assignment line already has the date.
-  assert.equal(emailSubject([item("ASSIGNED", `assigned you "${TITLE}" for Thu, Oct 29`)], TITLE), "Connor assigned you Cabinet install");
+  assert.deepEqual(whatsNew([item("COMMENT", '"Doors"'), item("NOTES", "updated the notes")], TITLE), {
+    headline: 'Connor: "Doors"',
+    lines: ["Connor updated the notes."],
+  });
+});
+
+test("the preview line is What's new on one line, cut on a word", () => {
+  assert.equal(previewText("Connor moved the due date to Mon, Nov 23.", ['Connor: "Faucet\'s in the garage."']), 'Connor moved the due date to Mon, Nov 23. Connor: "Faucet\'s in the garage."');
+  const long = previewText("Connor assigned you this job.", ["word ".repeat(60)]);
+  assert.ok(long.length <= 140 && long.endsWith("…") && !long.endsWith(" …"));
 });
 
 test("the job line names the unit as My jobs does (BCONTRACT-V03)", () => {
-  const base = { items: [item("NOTES", "updated the notes")], title: "Bathroom tile", audience: "contractor" as const, appUrl: "https://hg.example.com", taskId: "t1" };
-  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: "Upper" }).line, "Bathroom tile, 415 Crescent Ave · Upper");
-  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: " 2 " }).line, "Bathroom tile, 415 Crescent Ave · 2");
-  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: null }).line, "Bathroom tile, 415 Crescent Ave");
-  assert.equal(taskEmail({ ...base, address: null, unitLabel: null }).line, "Bathroom tile");
+  const base = { items: [item("NOTES", "updated the notes")], title: "Bathroom tile", audience: "contractor" as const, appUrl: "https://hg.example.com", taskId: "t1", ...STATUS_OPEN };
+  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: "Upper" }).job.where, "415 Crescent Ave · Upper");
+  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: " 2 " }).job.where, "415 Crescent Ave · 2");
+  assert.equal(taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: null }).subject, "Bathroom tile, 415 Crescent Ave");
+  assert.equal(taskEmail({ ...base, address: null, unitLabel: null }).subject, "Bathroom tile");
+  assert.equal(taskEmail({ ...base, address: null, unitLabel: null }).job.directionsUrl, null);
+  assert.equal(
+    taskEmail({ ...base, address: "415 Crescent Ave, Buffalo, NY 14214", unitLabel: null }).job.directionsUrl,
+    "https://maps.apple.com/?daddr=415%20Crescent%20Ave%2C%20Buffalo%2C%20NY%2014214",
+  );
 });
 
-test("a scheduled job's email gives the visit date", () => {
+test("a scheduled job's email gives its date as the due date", () => {
   const email = taskEmail({
     items: [item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)],
     title: TITLE,
@@ -129,15 +135,21 @@ test("a scheduled job's email gives the visit date", () => {
     audience: "contractor",
     appUrl: "https://hg.example.com",
     taskId: "t1",
+    status: "SCHEDULED",
+    due: "2026-10-29",
+    today: "2026-10-22",
   });
-  assert.deepEqual(email.items, ["Connor scheduled it for Thu, Oct 29"]);
+  assert.equal(email.headline, "Connor set the due date to Thu, Oct 29.");
+  assert.equal(email.subject, "Due Thu, Oct 29: Cabinet install, 23 Sherwood St");
+  assert.equal(email.job.due, "Thu, Oct 29");
+  assert.equal(email.primary.label, "Start job");
   // Next year's date says the year.
-  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Tue, Jan 5, 2027`)), "scheduled it for Tue, Jan 5, 2027");
+  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Tue, Jan 5, 2027`)), "set the due date to Tue, Jan 5, 2027");
 });
 
 test("a title with a quote in it comes out whole", () => {
   const t = 'Hang 36" mirror';
-  assert.equal(itemText(item("STATUS", `scheduled "${t}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
+  assert.equal(itemText(item("STATUS", `scheduled "${t}" for Thu, Oct 29`)), "set the due date to Thu, Oct 29");
   assert.equal(itemText({ ...item("TARGET", `moved "${t}" to Fri, Oct 30`), visit: false }), "moved the due date to Fri, Oct 30");
   assert.equal(itemText(item("STATUS", `marked "${t}" done`)), "marked it done");
   assert.equal(itemText(item("STATUS", `sent "${t}" back: Level it`)), "sent it back: Level it");
@@ -166,8 +178,8 @@ test("a send-back on a title that says `\" back: ` itself comes out whole when t
   // The note after an exact title may say `" back: ` too.
   assert.equal(itemText(item("STATUS", `sent "${t}" back: Put it "back: here"`), t), 'sent it back: Put it "back: here"');
   // taskEmail hands its title down.
-  const email = taskEmail({ items: [noNote], title: t, address: null, audience: "contractor", appUrl: "https://hg.example.com", taskId: "t1" });
-  assert.deepEqual(email.items, ["Connor sent it back"]);
+  const email = taskEmail({ items: [noNote], title: t, address: null, audience: "contractor", appUrl: "https://hg.example.com", taskId: "t1", ...STATUS_OPEN });
+  assert.equal(email.headline, "Connor sent it back.");
 });
 
 test("lines: comments quote, oldest first, only the latest target and notes", () => {
@@ -179,24 +191,78 @@ test("lines: comments quote, oldest first, only the latest target and notes", ()
   assert.deepEqual(lines, ['Connor: "Doors arrive Thu" (+1 file)', "Connor moved the date to Fri, Oct 30"]);
 });
 
-test("the whole email: job and street, the lines, one button to the right place", () => {
-  const email = taskEmail({
+test("the whole email: subject, preview, What's new, the next step's buttons and the job", () => {
+  const staff = taskEmail({
     items: [item("COMMENT", '"Uppers in"', "Zack Smith")],
     title: TITLE,
     address: "23 Sherwood St, Buffalo, NY 14213",
     audience: "staff",
     appUrl: "https://hg.example.com/",
     taskId: "t1",
+    status: "IN_PROGRESS",
+    due: "2026-10-30",
+    today: "2026-10-22",
+    notes: "Side door code is on the lockbox.",
+    checklist: [
+      { title: "Hang uppers", done: true },
+      { title: "Hang lowers", done: false },
+    ],
+    contractorName: "Zack Smith",
   });
-  assert.deepEqual(email, {
-    subject: "Zack updated Cabinet install",
-    line: "Cabinet install, 23 Sherwood St",
-    items: ['Zack: "Uppers in"'],
-    buttonLabel: "Open task",
-    buttonUrl: "https://hg.example.com/tasks/t1",
+  assert.deepEqual(staff, {
+    subject: "Due Fri, Oct 30: Cabinet install, 23 Sherwood St",
+    preview: 'Zack: "Uppers in"',
+    headline: 'Zack: "Uppers in"',
+    lines: [],
+    primary: { label: "Open task", url: "https://hg.example.com/tasks/t1" },
+    secondary: [],
+    job: {
+      title: TITLE,
+      where: "23 Sherwood St",
+      directionsUrl: "https://maps.apple.com/?daddr=23%20Sherwood%20St%2C%20Buffalo%2C%20NY%2014213",
+      photoUrl: null,
+      due: "Fri, Oct 30",
+      // A partner's copy names the contractor and the checklist's progress, not the notes or items.
+      notes: null,
+      checklist: [],
+      contractor: "Zack Smith",
+      checklistLine: "1 of 2 done",
+    },
+    threadKey: "job-t1-2026-10-30",
   });
+  // The contractor's copy carries the notes and checklist, with Start job or Mark done and Add photos.
+  const zack = taskEmail({ ...staffInput(), audience: "contractor", status: "IN_PROGRESS", photoUrl: "https://blob.example.com/front.jpg" });
+  assert.equal(zack.job.notes, "Side door\nin back.");
+  assert.deepEqual(zack.job.checklist, [{ title: "Hang uppers", done: true }]);
+  assert.equal(zack.job.contractor, null);
+  assert.equal(zack.job.photoUrl, "https://blob.example.com/front.jpg");
+  assert.deepEqual([zack.primary.label, ...zack.secondary.map((b) => b.label)], ["Mark done", "Add photos"]);
+  assert.equal(taskEmail({ ...staffInput(), audience: "contractor", status: "OPEN" }).primary.label, "Start job");
+  assert.equal(taskEmail({ ...staffInput(), audience: "contractor", status: "WAITING" }).primary.label, "Start job");
+  assert.deepEqual(taskEmail({ ...staffInput(), audience: "contractor", status: "REVIEW" }).secondary, []);
+  assert.equal(taskEmail({ ...staffInput(), audience: "contractor", status: "REVIEW" }).primary.label, "See job");
+  // A partner's copy of a job waiting in Review asks for the decision.
+  const review = taskEmail({ ...staffInput(), status: "REVIEW" });
+  assert.deepEqual([review.primary.label, ...review.secondary.map((b) => b.label)], ["Approve", "Send back"]);
   assert.equal(openUrl("https://hg.example.com", "contractor", "t1"), "https://hg.example.com/p/jobs/t1");
 });
+
+function staffInput() {
+  return {
+    items: [item("COMMENT", '"Uppers in"', "Zack Smith")],
+    title: TITLE,
+    address: "23 Sherwood St, Buffalo, NY 14213",
+    audience: "staff" as const,
+    appUrl: "https://hg.example.com",
+    taskId: "t1",
+    status: "IN_PROGRESS" as const,
+    due: "2026-10-30",
+    today: "2026-10-22",
+    notes: "  Side door  \r\n in back.  ",
+    checklist: [{ title: "Hang uppers", done: true }],
+    contractorName: "Zack Smith",
+  };
+}
 
 test("an approval thanks the contractor by first name, and the button reads See job (BCONTRACT-008)", () => {
   const base = {
@@ -206,39 +272,41 @@ test("an approval thanks the contractor by first name, and the button reads See 
     appUrl: "https://hg.example.com",
     taskId: "t1",
     staffNames: ["Connor", "Pieter"],
+    status: "DONE" as const,
+    today: "2026-10-22",
   };
   const approved = [item("COMMENT", '"Looks great"', "Pieter Hoff"), item("STATUS", `approved "${TITLE}"`, "Pieter Hoff")];
+  const email = taskEmail({ ...base, items: approved, recipientName: "Zack (Outlaw Carpentry)" });
+  assert.equal(email.headline, "Pieter approved it.");
+  assert.deepEqual(email.lines, ['Pieter: "Looks great"']);
+  assert.equal(email.closing, "Thanks, Zack.");
+  assert.deepEqual(email.primary, { label: "See job", url: "https://hg.example.com/p/jobs/t1" });
+  assert.deepEqual(email.secondary, []);
   // Approved means Done: the job is closed by send time, so there's nowhere to reply.
-  assert.deepEqual(taskEmail({ ...base, items: approved, recipientName: "Zack (Outlaw Carpentry)", jobOpen: false }), {
-    subject: "Pieter approved Cabinet install",
-    line: "Cabinet install, 23 Sherwood St",
-    items: ['Pieter: "Looks great"', "Pieter approved it"],
-    closing: "Thanks, Zack.",
-    buttonLabel: "See job",
-    buttonUrl: "https://hg.example.com/p/jobs/t1",
-  });
+  assert.ok(!("footnote" in email));
   // The name he goes by; no name on the contact still thanks.
   assert.equal(taskEmail({ ...base, items: approved, recipientName: "Jacob (Jake) Hoak" }).closing, "Thanks, Jake.");
   assert.equal(taskEmail({ ...base, items: approved, recipientName: null }).closing, "Thanks.");
   // A comment after the approval doesn't take it back.
   const thenComment = [...approved, item("COMMENT", '"Invoice by Friday"')];
-  assert.equal(taskEmail({ ...base, items: thenComment, recipientName: "Zack Smith" }).buttonLabel, "See job");
-  // Approved, then reopened: the latest status change isn't an approval.
+  assert.equal(taskEmail({ ...base, items: thenComment, recipientName: "Zack Smith" }).primary.label, "See job");
+  // Approved, then reopened: the latest status change isn't an approval, and the job's next step leads.
   const reopened = taskEmail({
     ...base,
+    status: "IN_PROGRESS",
     items: [item("STATUS", `approved "${TITLE}"`), item("STATUS", `set "${TITLE}" to in progress`)],
     recipientName: "Zack Smith",
   });
   assert.equal(reopened.closing, undefined);
-  assert.equal(reopened.buttonLabel, "Open job");
-  // Every other contractor email keeps Open job, with no thanks.
-  const sentBack = taskEmail({ ...base, items: [item("STATUS", `sent "${TITLE}" back: Level the uppers`)], recipientName: "Zack Smith" });
+  assert.equal(reopened.primary.label, "Mark done");
+  // A send-back carries no thanks.
+  const sentBack = taskEmail({ ...base, status: "IN_PROGRESS", items: [item("STATUS", `sent "${TITLE}" back: Level the uppers`)], recipientName: "Zack Smith" });
   assert.equal(sentBack.closing, undefined);
-  assert.equal(sentBack.buttonLabel, "Open job");
+  assert.equal(sentBack.primary.label, "Mark done");
   // Staff never get the thanks or See job.
   const staff = taskEmail({ ...base, audience: "staff", items: approved, recipientName: "Zack Smith" });
   assert.equal(staff.closing, undefined);
-  assert.equal(staff.buttonLabel, "Open task");
+  assert.equal(staff.primary.label, "Open task");
 });
 
 test("contractor emails say where to reply, naming the partners; staff emails don't", () => {
@@ -246,22 +314,15 @@ test("contractor emails say where to reply, naming the partners; staff emails do
   assert.equal(replyLine(["Connor"]), "Reply in the job so Connor sees it.");
   assert.equal(replyLine(["Connor", "Pieter", "Dana"]), "Reply in the job so Connor, Pieter and Dana all see it.");
   assert.equal(replyLine([]), "Reply in the job so HG sees it.");
-  const base = { items: [item("NOTES", "updated the notes")], title: TITLE, address: null, appUrl: "https://hg.example.com", taskId: "t1" };
+  const base = { items: [item("NOTES", "updated the notes")], title: TITLE, address: null, appUrl: "https://hg.example.com", taskId: "t1", ...STATUS_OPEN };
   assert.equal(
     taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"] }).footnote,
     "Reply in the job so Connor and Pieter both see it.",
   );
   // Only while the job is still open when the email goes out.
-  assert.equal(
-    taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"], jobOpen: true }).footnote,
-    "Reply in the job so Connor and Pieter both see it.",
-  );
-  assert.ok(!("footnote" in taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"], jobOpen: false })));
+  assert.ok(!("footnote" in taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"], status: "DONE" })));
+  assert.ok(!("footnote" in taskEmail({ ...base, audience: "contractor", staffNames: ["Connor", "Pieter"], status: "CANCELED" })));
   assert.ok(!("footnote" in taskEmail({ ...base, audience: "staff", staffNames: ["Connor", "Pieter"] })));
-});
-
-test("a title with line breaks can't break the subject", () => {
-  assert.equal(emailSubject([item("NOTES", "updated the notes")], "Fix\nsteps"), "Connor updated Fix steps");
 });
 
 test("parseItems keeps only well-formed items", () => {
@@ -277,7 +338,7 @@ test("an item's eventId changes no word of the email, only where its button open
   const stored = [old, tagged, item("STATUS", `marked "${TITLE}" done`, zack)];
   const parsed = parseItems(JSON.parse(JSON.stringify(stored)));
   assert.deepEqual(parsed, stored, "kept as stored, eventId and all");
-  const withIds = taskEmail({ items: parsed, title: TITLE, address: null, audience: "staff", appUrl: "https://hg.example.com", taskId: "t1" });
+  const withIds = taskEmail({ items: parsed, title: TITLE, address: null, audience: "staff", appUrl: "https://hg.example.com", taskId: "t1", ...STATUS_OPEN });
   const without = taskEmail({
     items: parsed.map((i) => ({ kind: i.kind, actorLabel: i.actorLabel, summary: i.summary, at: i.at })),
     title: TITLE,
@@ -285,15 +346,16 @@ test("an item's eventId changes no word of the email, only where its button open
     audience: "staff",
     appUrl: "https://hg.example.com",
     taskId: "t1",
+    ...STATUS_OPEN,
   });
   // Every line, the subject and the rest read the same; the button opens at the first update an item names
   // (activity 2.6), and a row of old items opens the job as it always did.
-  const { buttonUrl: anchored, ...said } = withIds;
-  const { buttonUrl: plain, ...saidWithout } = without;
+  const { primary: anchored, ...said } = withIds;
+  const { primary: plain, ...saidWithout } = without;
   assert.deepEqual(said, saidWithout);
-  assert.equal(anchored, "https://hg.example.com/tasks/t1#update-e-2");
-  assert.equal(plain, "https://hg.example.com/tasks/t1");
-  assert.equal(withIds.items.length, 3);
+  assert.equal(anchored.url, "https://hg.example.com/tasks/t1#update-e-2");
+  assert.equal(plain.url, "https://hg.example.com/tasks/t1");
+  assert.equal(withIds.lines.length + 1, 3);
 });
 
 test("recipients: staff, a contractor with an active login and access, or skipped", () => {
@@ -520,13 +582,15 @@ test("a send-back's note lives inside its status line: edited, the email follows
 });
 
 test("the button opens at the first update in the bundle; nothing to open at means the job", () => {
-  const base = { title: TITLE, address: null, audience: "contractor" as const, appUrl: "https://hg.example.com", taskId: "t1" };
+  const base = { title: TITLE, address: null, audience: "contractor" as const, appUrl: "https://hg.example.com", taskId: "t1", status: "DONE" as const, today: "2026-10-22" };
   const items = [item("ASSIGNED", `assigned you "${TITLE}"`), withEvent(item("COMMENT", '"Doors"'), "e7"), withEvent(item("STATUS", `approved "${TITLE}"`), "e8")];
-  assert.equal(taskEmail({ ...base, items }).buttonUrl, "https://hg.example.com/p/jobs/t1#update-e7");
-  assert.equal(taskEmail({ ...base, audience: "staff", items }).buttonUrl, "https://hg.example.com/tasks/t1#update-e7");
+  assert.equal(taskEmail({ ...base, items }).primary.url, "https://hg.example.com/p/jobs/t1#update-e7");
+  assert.equal(taskEmail({ ...base, audience: "staff", items }).primary.url, "https://hg.example.com/tasks/t1#update-e7");
   // Old rows, and kinds that have no row in the timeline, open the page.
-  assert.equal(taskEmail({ ...base, items: [item("COMMENT", '"Doors"')] }).buttonUrl, "https://hg.example.com/p/jobs/t1");
-  assert.equal(taskEmail({ ...base, items: [withEvent(item("NOTES", "updated the notes"), "e9")] }).buttonUrl, "https://hg.example.com/p/jobs/t1");
+  assert.equal(taskEmail({ ...base, items: [item("COMMENT", '"Doors"')] }).primary.url, "https://hg.example.com/p/jobs/t1");
+  assert.equal(taskEmail({ ...base, items: [withEvent(item("NOTES", "updated the notes"), "e9")] }).primary.url, "https://hg.example.com/p/jobs/t1");
+  // The next step's buttons open the job itself.
+  assert.equal(taskEmail({ ...base, status: "OPEN", items: [withEvent(item("COMMENT", '"Doors"'), "e7")] }).primary.url, "https://hg.example.com/p/jobs/t1");
   assert.equal(firstUpdateId(items), "e7");
   assert.equal(firstUpdateId([]), null);
   assert.equal(openUrl("https://hg.example.com/", "staff", "t1", "e7"), "https://hg.example.com/tasks/t1#update-e7");
@@ -534,8 +598,10 @@ test("the button opens at the first update in the bundle; nothing to open at mea
 
 test("a bundle with a comment and Mark done reads as before: the note, then marked it done", () => {
   const items = [withEvent(item("COMMENT", '"All done"', "Zack Smith"), "n1"), withEvent(item("STATUS", `marked "${TITLE}" done`, "Zack Smith"), "s1")];
-  const email = taskEmail({ items, title: TITLE, address: null, audience: "staff", appUrl: "https://hg.example.com", taskId: "t1" });
-  assert.equal(email.subject, "Zack marked Cabinet install done");
-  assert.deepEqual(email.items, ['Zack: "All done"', "Zack marked it done"]);
-  assert.equal(email.buttonUrl, "https://hg.example.com/tasks/t1#update-n1");
+  const email = taskEmail({ items, title: TITLE, address: null, audience: "staff", appUrl: "https://hg.example.com", taskId: "t1", status: "REVIEW", today: "2026-10-22" });
+  assert.equal(email.subject, "Cabinet install");
+  assert.equal(email.headline, "Zack marked it done.");
+  assert.deepEqual(email.lines, ['Zack: "All done"']);
+  assert.equal(email.preview, 'Zack marked it done. Zack: "All done"');
+  assert.deepEqual([email.primary.label, ...email.secondary.map((b) => b.label)], ["Approve", "Send back"]);
 });

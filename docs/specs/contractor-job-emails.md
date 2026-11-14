@@ -59,9 +59,9 @@ Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi 
 ### 2.1 Inbox row
 
 - **From:** HG Capital Partners.
-- **Subject:** `Due Mon, Nov 23: Replace kitchen faucet, 118 Congress Rear`. The street is `shortAddress`, the unit is `unitLabel`, as My jobs shows them (`job-view.ts` `addressLine`). No date: `Replace kitchen faucet, 118 Congress Rear`. Taken off or canceled: `Off this job: Replace kitchen faucet, 118 Congress Rear`.
+- **Subject:** `Due Mon, Nov 23: Replace kitchen faucet, 118 Congress St · Rear`. The street is `shortAddress`, the unit is `unitLabel`, as My jobs shows them (`job-view.ts` `addressLine`). No date: `Replace kitchen faucet, 118 Congress St · Rear`. Taken off or canceled: `Off this job: Replace kitchen faucet, 118 Congress St · Rear`.
 - **Preview line:** the What's new headline, then one useful fact. "Connor moved the due date. 2 photos from Connor." Hidden text at the top of the body, padded so Gmail doesn't pull the letterhead in after it.
-- **Threading:** each email sets `Message-ID` and points `References` at the job's first email under the same subject, so mail apps keep one thread per job per date. Gmail splits when the subject changes, which is the date moving (Q10).
+- **Threading:** each email points `In-Reply-To` and `References` at one id per job and date (`content.ts` `threadKey`, written by `resend.ts`), so mail apps keep one thread per job per date. Gmail splits when the subject changes, which is the date moving (Q10).
 
 ### 2.2 Body, top to bottom (Q8 A)
 
