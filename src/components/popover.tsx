@@ -1,8 +1,12 @@
 "use client";
+import { useContext, useLayoutEffect, useRef, useState, type Ref } from "react";
 import {
   Dialog,
   DialogTrigger,
+  OverlayTriggerStateContext,
   Popover as AriaPopover,
+  PopoverContext,
+  useSlottedContext,
   type DialogProps,
   type PopoverProps as AriaPopoverProps,
 } from "react-aria-components";
@@ -60,7 +64,107 @@ type SurfaceProps = Omit<AriaPopoverProps, "className"> & {
    * public wrapper, so it carries the surface itself.
    */
   surface?: "app" | "public";
+  /** A panel that fits neither above nor below its trigger opens beside it (the due date panel). */
+  besideWhenShort?: boolean;
 };
+
+/**
+ * Where a popover sits while it stays open (`usePlacement`).
+ *
+ * It prefers the side it's on. React Aria places it again whenever its
+ * content changes size, from the placement it was given, so a panel that
+ * opened above its trigger and then swaps in a shorter step (a building's
+ * units) would drop below. Preferring the side it's on keeps it there; it
+ * still moves when the new content no longer fits on that side (Status
+ * opening the visit date panel).
+ *
+ * With `besideWhenShort`, a panel that fits neither above nor below its
+ * trigger as it opens goes beside it instead, where it has the screen's full
+ * height: the due date panel under a chip halfway down a laptop screen
+ * (Connor, Nov 14). That's decided once, as it opens, so it never jumps
+ * sides mid-use.
+ */
+const VIEWPORT_PAD = 12; // React Aria's containerPadding.
+
+function usePlacement({
+  placement,
+  offset,
+  isOpen,
+  triggerRef,
+  besideWhenShort,
+}: {
+  placement: NonNullable<AriaPopoverProps["placement"]>;
+  offset: number;
+  isOpen: boolean | undefined;
+  triggerRef: AriaPopoverProps["triggerRef"] | undefined;
+  besideWhenShort: boolean;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const state = useContext(OverlayTriggerStateContext);
+  const fromTrigger = useSlottedContext(PopoverContext);
+  const trigger = triggerRef ?? fromTrigger?.triggerRef;
+  const open = isOpen ?? state?.isOpen ?? false;
+  const [side, setSide] = useState<"top" | "bottom" | null>(null);
+  const [beside, setBeside] = useState(false);
+  if (!open && (side || beside)) {
+    setSide(null);
+    setBeside(false);
+  }
+  const [axis, align] = placement.split(" ");
+  const vertical = axis === "top" || axis === "bottom";
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!open || !vertical || !el) return;
+    const read = () => {
+      const p = el.getAttribute("data-placement");
+      if (p === "top" || p === "bottom") setSide(p);
+    };
+    read();
+    const watch = new MutationObserver(read);
+    watch.observe(el, { attributes: true, attributeFilter: ["data-placement"] });
+    return () => watch.disconnect();
+  }, [open, vertical]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const anchor = trigger?.current;
+    if (!besideWhenShort || !open || beside || !vertical || !el || !anchor) return;
+    const check = () => {
+      // The panel's own height, uncapped (the popover scrolls; its scrollHeight is the whole panel), plus its border.
+      const need = el.scrollHeight + (el.offsetHeight - el.clientHeight);
+      const t = anchor.getBoundingClientRect();
+      const room = Math.max(t.top, window.innerHeight - t.bottom) - offset - VIEWPORT_PAD;
+      if (need > room) setBeside(true);
+    };
+    // Decided as it opens (and a frame later, once a lazy panel has drawn), never mid-use: a panel that
+    // grows after opening (Repeat) stays on its side and scrolls instead of jumping beside.
+    check();
+    const frame = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(frame);
+  }, [besideWhenShort, open, beside, vertical, trigger, offset]);
+
+  // Beside, React Aria caps the height from where the panel first sat, and it
+  // only places it again when the popover itself changes size. Content that
+  // outgrows the cap (Repeat opening) lifts it, so the popover grows, React
+  // Aria measures the whole panel and centers it on the trigger again.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!open || !beside || !el) return;
+    const watch = new ResizeObserver(() => {
+      if (el.scrollHeight > el.clientHeight + 1) el.style.maxHeight = "";
+    });
+    for (const child of el.children) watch.observe(child);
+    return () => watch.disconnect();
+  }, [open, beside]);
+
+  const held: AriaPopoverProps["placement"] = beside
+    ? "end"
+    : side
+      ? ((align ? `${side} ${align}` : side) as AriaPopoverProps["placement"])
+      : placement;
+  return [ref, held] as const;
+}
 
 /** A styled React Aria Popover with nothing inside it. For menus and list boxes, which bring their own role. */
 export function PopoverSurface({
@@ -69,11 +173,14 @@ export function PopoverSurface({
   offset = 6,
   motion = "pop",
   surface = "app",
+  besideWhenShort = false,
   ...props
 }: SurfaceProps) {
+  const [sideRef, heldPlacement] = usePlacement({ placement, offset, isOpen: props.isOpen, triggerRef: props.triggerRef, besideWhenShort });
   return (
     <AriaPopover
-      placement={placement}
+      ref={sideRef as Ref<HTMLDivElement>}
+      placement={heldPlacement}
       offset={offset}
       className={cn(popoverFrame, popoverMotion[motion], className)}
       data-surface={surface === "public" ? "public" : undefined}

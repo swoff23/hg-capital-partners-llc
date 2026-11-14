@@ -41,10 +41,17 @@ const fieldCode = lazyModule(() => import("@/components/date-field"));
  * What a chip opens: date-panel.tsx's `DatePanel`, fetched on first use. A
  * spacer holds the layer open to about its size until it arrives, which a
  * chip's hover, focus or press (`warmDatePanel`) has usually done already.
+ * The popover picks its side from the spacer, so the spacer matches the
+ * panel: the calendar with the picks under it (and Repeat) is about 480px.
  */
 export function DatePanel(props: ComponentProps<typeof DatePanelCode>) {
   const code = useLazyModule(panelCode);
-  return code ? <code.DatePanel {...props} /> : <div aria-hidden="true" className="h-72 w-80 max-w-full" />;
+  const tall = props.layout !== "steps" && props.picks !== false;
+  return code ? (
+    <code.DatePanel {...props} />
+  ) : (
+    <div aria-hidden="true" className={cn("w-80 max-w-full", tall ? (props.repeat ? "h-120" : "h-112") : "h-72")} />
+  );
 }
 
 /** Starts fetching the panel, so the open that follows finds it ready. Safe to call often. */
@@ -143,6 +150,8 @@ function DateChip({
       title={label}
       surface={surface}
       motion="pop"
+      // Halfway down a laptop screen the panel fits neither above nor below its chip.
+      besideWhenShort
       trigger={
         <AriaButton
           isDisabled={isDisabled}

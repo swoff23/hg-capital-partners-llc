@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button as AriaButton } from "react-aria-components";
+import { ChevronRight } from "lucide-react";
 import { OptionList, type OptionItem } from "@/components/option-list";
 import { SegmentedControl } from "@/components/segmented-control";
+import { StepHeader } from "@/components/picker-layer";
 import { SheetView } from "@/components/sheet";
 import { NumberInput } from "@/components/number-input";
 import { Button, SaveError } from "@/components/ui";
@@ -68,6 +68,7 @@ export function RepeatMenu({
   onPick,
   layer,
   onBack,
+  compact = false,
 }: {
   value: RepeatRule | null;
   /** The date the presets read their weekday and day from: the due date, or today with none. */
@@ -80,6 +81,8 @@ export function RepeatMenu({
   layer: "popover" | "sheet";
   /** In a popover: the chevron at the head of the menu, back to whatever opened it. Without one the menu has no header. */
   onBack?: () => void;
+  /** One-line rows with no "Next:" line: open under the date panel's calendar, which already shows the date. */
+  compact?: boolean;
 }) {
   const [custom, setCustom] = useState(false);
   const presets = repeatPresets(from, today);
@@ -88,10 +91,10 @@ export function RepeatMenu({
 
   const rows: OptionItem[] = presets
     .filter((p) => p.rule)
-    .map((p) => ({ id: p.key, label: p.label, description: next(p.rule!) }));
+    .map((p) => ({ id: p.key, label: p.label, description: compact ? undefined : next(p.rule!) }));
   // The stored rule, when it's none of the presets.
   if (value && !matched) {
-    rows.push({ id: STORED, label: describeRepeat(value, { short: true, from }), description: next(value) });
+    rows.push({ id: STORED, label: describeRepeat(value, { short: true, from }), description: compact ? undefined : next(value) });
   }
   rows.push({ id: CUSTOM, label: "Custom", trailing: <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-fg-3" /> });
 
@@ -139,22 +142,6 @@ export function RepeatMenu({
     </div>
   ) : (
     list
-  );
-}
-
-/** The header of a step inside a popover: a back chevron and the step's name. */
-export function StepHeader({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <div className="flex items-center gap-1 border-b border-line py-1 pl-1 pr-3">
-      <AriaButton
-        onPress={onBack}
-        aria-label="Back"
-        className="flex size-8 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:size-11"
-      >
-        <ChevronLeft aria-hidden="true" className="size-4" />
-      </AriaButton>
-      <span className="min-w-0 truncate text-label text-fg-1">{title}</span>
-    </div>
   );
 }
 
@@ -265,7 +252,8 @@ function RepeatCustom({
     );
   }
   return (
-    <div className="w-80">
+    // Never wider than what holds it: the date panel's Repeat section is a little narrower than a popover.
+    <div className="w-80 max-w-full">
       <StepHeader title="Custom repeat" onBack={onBack} />
       {body}
       <div className="border-t border-line p-3">{buttons}</div>

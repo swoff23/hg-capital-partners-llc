@@ -186,9 +186,10 @@ Reduced motion turns each into an opacity change of 120ms or less.
 
 **Rows**
 
-- **Assignee.** "Unassigned" pinned first, as today. Then Recent: up to 3, only while the search is empty, from the viewer's own last assignments in task activity, so it follows Connor across devices. Then Team, with you first and "(you)" in `--fg-3` (the tasks filter's "(me)" goes). Then Contractors: square avatars, the trade as the subline and a "Has login" Tag. Search matches name, trade and email.
+- **Assignee.** "Unassigned" pinned first, as today. Then Recent: up to 3, only while the search is empty, from the viewer's own last assignments in task activity, so it follows Connor across devices. Then Team, with you first and "(you)" in `--fg-3` (the tasks filter's "(me)" goes). Then Contractors: square avatars and the trade as the subline. No "Has login" Tag (Connor, Nov 14). Search matches name, trade and email.
 - **Property.** "No property" pinned, left out where a property is required. `PhotoThumb` 32, the short address, and "Buffalo · 3 units" as the subline. Sorted by street, then house number, which fixes "118, 15, 23". Search matches the short and full address, the town and unit labels.
 - **Unit.** Shows when the property has 2 or more units, or a unit is already set (today it shows from one unit). "No unit" pinned.
+- **Property and Unit in one chip** (`PropertyUnitPicker`, New task; Connor, Nov 14). "118 Congress St. · Unit 2", where the chip row has no room for a separate Unit chip. Picking a building with units sets it and steps to its units in the same layer under a back chevron; opened on such a building it starts on the units. The address truncates before the unit does. The task page keeps its separate Property and Unit rows.
 
 **Behavior**
 
@@ -200,7 +201,7 @@ Reduced motion turns each into an opacity change of 120ms or less.
 
 - 1280: popover, 32px rows (44 with a subline), search focused on open.
 - 768: 44px rows (56 with a subline); container per open question 3.
-- 375 and 320: sheet, 44 and 56px rows, the picked row scrolled into view. At 320 the Tag moves into the subline ("Plumbing · Has login") so the name keeps its width.
+- 375 and 320: sheet, 44 and 56px rows, the picked row scrolled into view.
 
 **Accessible names.** "Assignee: Zack". In list rows the name includes the task.
 
@@ -348,6 +349,9 @@ This describes Option 1 of section 4.1, the recommendation. The pattern itself i
 
 - `allowNone`, on by default. Visit date turns it off, so "No date" is never offered and then refused.
 - `variant="field"` for property fact dates and the move-in form. A field trigger with `CalendarDays` 16 in `--fg-3` and the date from `fmtDay`. With a mouse, a React Aria `DateField` takes typing in our field look in every browser. The calendar heading is a button that steps to months, then years, in the same layer, for purchase dates years back. No quick picks.
+- With a mouse and on a tablet, the quick picks sit under the calendar and over the Repeat row (Connor, Nov 14).
+- Repeat opens below its row in the panel, one line per preset with no "Next:" line (the calendar above shows the date), and the picks fold to one row ("Today, Tomorrow, Monday…") that opens them again (Connor, Nov 14). On a phone Repeat stays a step in the sheet.
+- When the panel fits neither above nor below its chip as it opens (a chip halfway down a 1280x800 laptop), it opens beside the chip, where it has the screen's full height, so nothing scrolls (Connor, Nov 14).
 - Quick picks show a Check on the current value. On a Monday the Monday row hides, since it lands on the same day as Next week. Keys stay with their picks, so the printed keys read 1, 2, 4, 5.
 - A past date opens the calendar on today's month, and the panel's first line names the current value, in `--danger` when overdue ("Due Sep 12").
 - Row chips are named with the task: "Due date for Fix the sink: Apr 19" (TASKS-V02). Rows keep their date chip and its "Due date" placeholder, per Connor's Oct 25 task row rule (brand section 5).
