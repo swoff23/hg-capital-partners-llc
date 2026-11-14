@@ -26,3 +26,5 @@ Each chunk ships its own small migration.
 [contractor-email-switch.md](contractor-email-switch.md) keeps a contractor's job emails quiet until their first sign-in and adds a "Job emails" switch to each contractor's Portal access card. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
 [error-alerts.md](error-alerts.md) sends Connor an alert when the app breaks: server and browser errors through Sentry, and site-down and stopped-job checks through Better Stack. It was planned with Connor on Nov 3, 2026, and waits for his "build it".
+
+[contractor-trades.md](contractor-trades.md) turns contractor trades into one list in the database and folds the 31 old spellings into 17 trades. It also gives the contractor page, the New contractor form and the list one tags-and-checklist picker. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
