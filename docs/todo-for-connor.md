@@ -12,6 +12,14 @@ Email went on Nov 14: the Vercel variables are in, the sending domain is set up 
 
 A contractor gets no job emails until they have signed in once, and each contractor's Portal access card has a "Job emails" switch ([contractor-email-switch.md](specs/contractor-email-switch.md)). Creating a login sends nothing.
 
+## Retire the contractor Google Form
+
+Contractor onboarding is live (Nov 14, [contractor-onboarding.md](specs/contractor-onboarding.md)): Invite contractor and the Sign-up link on the Contractors page, and new people set up their own account, trades, W-9 and insurance in the portal. Bank details go through Baselane's own link.
+
+- [ ] Try it once: send yourself an invite, sign up on your phone, and upload a W-9. Uploads couldn't be tried before launch, so this is the first real one.
+- [ ] Turn off responses on the Google Form ("HG Capital – Contractor Onboarding Form").
+- [ ] Delete the five bank columns (H to L of "Contractor Info": bank name, account type, name on account, routing and account number) from its responses sheet, or lock the sheet to you only. It's the most exposed copy of contractors' bank numbers you hold.
+
 ## Asana import
 
 Asana access ends around **Nov 1**, so these need doing by about **Thu Oct 29**.
