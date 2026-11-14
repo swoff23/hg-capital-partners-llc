@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1490.5 1186" width="1490.5" height="1186" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The photo viewer open in a view</title>
+<rect width="1490.5" height="1186" fill="#ffffff"/>
+<text x="32" y="38" font-size="15" font-weight="600" fill="#152133">The photo viewer open in a view</text>
+<text x="32" y="72" font-size="13" font-weight="500" fill="#152133">Desktop 1280</text>
+<text x="32" y="95" font-size="11" font-weight="500" fill="#424e61">Leave it</text>
+<rect x="83.33" y="82.15" width="46" height="18" rx="3" fill="#f2f0ec"/>
+<text x="106.33" y="95" font-size="11" font-weight="500" fill="#424e61" text-anchor="middle">Picked</text>
+<text x="672" y="95" font-size="11" font-weight="400" fill="#5b6576" text-anchor="end">Closing the photo brings the bar back.</text>
+<text x="704" y="95" font-size="11" font-weight="500" fill="#424e61">Add a label<tspan dx="10" font-weight="400" fill="#5b6576">Not picked</tspan></text>
+<g transform="translate(32 106)">
+<clipPath id="frame1"><rect x="0" y="0" width="640" height="400" rx="6"/></clipPath>
+<g clip-path="url(#frame1)">
+<rect x="0" y="0" width="640" height="400" fill="#0a0e17"/>
+<g transform="translate(604 9.5) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></g>
+<g transform="translate(624 9.5) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<rect x="8" y="7" width="46.2" height="4" rx="2" fill="#707173"/>
+<rect x="8" y="16.88" width="78.65" height="3.25" rx="1.62" fill="#42454a"/>
+<clipPath id="photo2"><rect x="76.67" y="27" width="486.67" height="365"/></clipPath>
+<rect x="76.67" y="27" width="486.67" height="365" fill="#e7e5e0"/>
+<line x1="76.67" y1="27" x2="563.33" y2="392" stroke="#d5d1ca" stroke-width="1" clip-path="url(#photo2)"/>
+<rect x="8" y="204.5" width="18" height="18" rx="3" fill="#0a0e17" fill-opacity="0.72"/>
+<g transform="translate(12 208.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></g>
+<rect x="614" y="204.5" width="18" height="18" rx="3" fill="#0a0e17" fill-opacity="0.72"/>
+<g transform="translate(618 208.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></g>
+<rect x="290" y="368" width="60" height="18" rx="3" fill="#0a0e17" fill-opacity="0.72"/>
+<g opacity="0.5">
+<g transform="translate(295 373) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></g>
+</g>
+<rect x="311" y="375.5" width="18" height="3" rx="1.5" fill="#707173"/>
+<g transform="translate(337 373) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<rect x="613" y="382" width="21" height="12" rx="6" fill="#0a0e17" fill-opacity="0.72"/>
+<rect x="613" y="382" width="21" height="12" rx="6" fill="none" stroke="#323947" stroke-width="0.75"/>
+<rect x="617.62" y="386.5" width="11.76" height="3" rx="1.5" fill="#707173"/>
+</g>
+<rect x="0.5" y="0.5" width="639" height="399" rx="6" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+</g>
+<g transform="translate(704 106)">
+<clipPath id="frame3"><rect x="0" y="0" width="640" height="400" rx="6"/></clipPath>
+<g clip-path="url(#frame3)">
+<rect x="0" y="0" width="640" height="400" fill="#0a0e17"/>
+<g transform="translate(604 9.5) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></g>
+<g transform="translate(624 9.5) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<text x="8" y="15.95" font-size="7" font-weight="400" fill="#ece9e4" fill-opacity="0.7" textLength="84">Viewing as Zack Reading</text>
+<line x1="98" y1="9" x2="98" y2="18" stroke="#323947" stroke-width="1"/>
+<rect x="104" y="7" width="46.2" height="4" rx="2" fill="#707173"/>
+<rect x="104" y="16.88" width="78.65" height="3.25" rx="1.62" fill="#42454a"/>
+<clipPath id="photo4"><rect x="76.67" y="27" width="486.67" height="365"/></clipPath>
+<rect x="76.67" y="27" width="486.67" height="365" fill="#e7e5e0"/>
+<line x1="76.67" y1="27" x2="563.33" y2="392" stroke="#d5d1ca" stroke-width="1" clip-path="url(#photo4)"/>
+<rect x="8" y="204.5" width="18" height="18" rx="3" fill="#0a0e17" fill-opacity="0.72"/>
+<g transform="translate(12 208.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></g>
+<rect x="614" y="204.5" width="18" height="18" rx="3" fill="#0a0e17" fill-opacity="0.72"/>
+<g transform="translate(618 208.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></g>
+<rect x="290" y="368" width="60" height="18" rx="3" fill="#0a0e17" fill-opacity="0.72"/>
+<g opacity="0.5">
+<g transform="translate(295 373) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></g>
+</g>
+<rect x="311" y="375.5" width="18" height="3" rx="1.5" fill="#707173"/>
+<g transform="translate(337 373) scale(0.33)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<rect x="613" y="382" width="21" height="12" rx="6" fill="#0a0e17" fill-opacity="0.72"/>
+<rect x="613" y="382" width="21" height="12" rx="6" fill="none" stroke="#323947" stroke-width="0.75"/>
+<rect x="617.62" y="386.5" width="11.76" height="3" rx="1.5" fill="#707173"/>
+</g>
+<rect x="0.5" y="0.5" width="639" height="399" rx="6" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+</g>
+<text x="32" y="550" font-size="13" font-weight="500" fill="#152133">Tablet 768</text>
+<text x="872" y="550" font-size="13" font-weight="500" fill="#152133">Phone 375</text>
+<text x="32" y="573" font-size="11" font-weight="500" fill="#424e61">Leave it</text>
+<rect x="83.33" y="560.15" width="46" height="18" rx="3" fill="#f2f0ec"/>
+<text x="106.33" y="573" font-size="11" font-weight="500" fill="#424e61" text-anchor="middle">Picked</text>
+<text x="440" y="573" font-size="11" font-weight="500" fill="#424e61">Add a label<tspan dx="10" font-weight="400" fill="#5b6576">Not picked</tspan></text>
+<text x="872" y="573" font-size="11" font-weight="500" fill="#424e61">Leave it</text>
+<rect x="923.33" y="560.15" width="46" height="18" rx="3" fill="#f2f0ec"/>
+<text x="946.33" y="573" font-size="11" font-weight="500" fill="#424e61" text-anchor="middle">Picked</text>
+<text x="1177.25" y="573" font-size="11" font-weight="500" fill="#424e61">Add a label<tspan dx="10" font-weight="400" fill="#5b6576">Not picked</tspan></text>
+<g transform="translate(32 584)">
+<clipPath id="frame5"><rect x="0" y="0" width="384" height="512" rx="6"/></clipPath>
+<g clip-path="url(#frame5)">
+<rect x="0" y="0" width="384" height="512" fill="#0a0e17"/>
+<g transform="translate(341 9.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></g>
+<rect x="335.38" y="3.88" width="21.25" height="21.25" rx="3" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<g transform="translate(365 9.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<rect x="359.38" y="3.88" width="21.25" height="21.25" rx="3" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<rect x="8" y="7.3" width="52.8" height="4.4" rx="2.2" fill="#707173"/>
+<rect x="8" y="18.38" width="84.7" height="3.25" rx="1.62" fill="#42454a"/>
+<clipPath id="photo6"><rect x="32" y="146.5" width="320" height="240"/></clipPath>
+<rect x="32" y="146.5" width="320" height="240" fill="#e7e5e0"/>
+<line x1="32" y1="146.5" x2="352" y2="386.5" stroke="#d5d1ca" stroke-width="1" clip-path="url(#photo6)"/>
+<rect x="357" y="494" width="21" height="12" rx="6" fill="#0a0e17" fill-opacity="0.72"/>
+<rect x="357" y="494" width="21" height="12" rx="6" fill="none" stroke="#323947" stroke-width="0.75"/>
+<rect x="361.62" y="498.5" width="11.76" height="3" rx="1.5" fill="#707173"/>
+</g>
+<rect x="0.5" y="0.5" width="383" height="511" rx="6" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+</g>
+<g transform="translate(440 584)">
+<clipPath id="frame7"><rect x="0" y="0" width="384" height="512" rx="6"/></clipPath>
+<g clip-path="url(#frame7)">
+<rect x="0" y="0" width="384" height="512" fill="#0a0e17"/>
+<g transform="translate(341 9.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></g>
+<rect x="335.38" y="3.88" width="21.25" height="21.25" rx="3" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<g transform="translate(365 9.5) scale(0.42)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<rect x="359.38" y="3.88" width="21.25" height="21.25" rx="3" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<text x="8" y="16.95" font-size="7" font-weight="400" fill="#ece9e4" fill-opacity="0.7" textLength="84">Viewing as Zack Reading</text>
+<line x1="98" y1="10" x2="98" y2="19" stroke="#323947" stroke-width="1"/>
+<rect x="104" y="7.3" width="52.8" height="4.4" rx="2.2" fill="#707173"/>
+<rect x="104" y="18.38" width="84.7" height="3.25" rx="1.62" fill="#42454a"/>
+<clipPath id="photo8"><rect x="32" y="146.5" width="320" height="240"/></clipPath>
+<rect x="32" y="146.5" width="320" height="240" fill="#e7e5e0"/>
+<line x1="32" y1="146.5" x2="352" y2="386.5" stroke="#d5d1ca" stroke-width="1" clip-path="url(#photo8)"/>
+<rect x="357" y="494" width="21" height="12" rx="6" fill="#0a0e17" fill-opacity="0.72"/>
+<rect x="357" y="494" width="21" height="12" rx="6" fill="none" stroke="#323947" stroke-width="0.75"/>
+<rect x="361.62" y="498.5" width="11.76" height="3" rx="1.5" fill="#707173"/>
+</g>
+<rect x="0.5" y="0.5" width="383" height="511" rx="6" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+</g>
+<g transform="translate(872 584)">
+<clipPath id="frame9"><rect x="0" y="0" width="281.25" height="500.25" rx="6"/></clipPath>
+<g clip-path="url(#frame9)">
+<rect x="0" y="0" width="281.25" height="500.25" fill="#0a0e17"/>
+<g transform="translate(216.75 14.25) scale(0.62)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></g>
+<rect x="208.12" y="5.62" width="32.25" height="32.25" rx="4.5" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<g transform="translate(252.75 14.25) scale(0.62)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<rect x="244.12" y="5.62" width="32.25" height="32.25" rx="4.5" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<rect x="12" y="10.95" width="79.2" height="6.6" rx="3.3" fill="#707173"/>
+<rect x="12" y="27.64" width="75.08" height="4.73" rx="2.36" fill="#42454a"/>
+<clipPath id="photo10"><rect x="6" y="164.91" width="269.25" height="201.94"/></clipPath>
+<rect x="6" y="164.91" width="269.25" height="201.94" fill="#e7e5e0"/>
+<line x1="6" y1="164.91" x2="275.25" y2="366.84" stroke="#d5d1ca" stroke-width="1" clip-path="url(#photo10)"/>
+<rect x="240.75" y="473.25" width="31.5" height="18" rx="9" fill="#0a0e17" fill-opacity="0.72"/>
+<rect x="240.75" y="473.25" width="31.5" height="18" rx="9" fill="none" stroke="#323947" stroke-width="0.75"/>
+<rect x="247.68" y="480" width="17.64" height="4.5" rx="2.25" fill="#707173"/>
+<rect x="97.2" y="384.84" width="86.85" height="16" rx="8" fill="#ffffff" stroke="#5b6576" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<g transform="translate(103.2 387.34) scale(0.46)" fill="none" stroke="#5b6576" stroke-opacity="1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/></g>
+<text x="118.2" y="395.99" font-size="9" font-weight="400" fill="#5b6576" textLength="58">swipe for next</text>
+</g>
+<rect x="0.5" y="0.5" width="280.25" height="499.25" rx="6" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+</g>
+<g transform="translate(1177.25 584)">
+<clipPath id="frame11"><rect x="0" y="0" width="281.25" height="500.25" rx="6"/></clipPath>
+<g clip-path="url(#frame11)">
+<rect x="0" y="0" width="281.25" height="500.25" fill="#0a0e17"/>
+<g transform="translate(216.75 14.25) scale(0.62)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></g>
+<rect x="208.12" y="5.62" width="32.25" height="32.25" rx="4.5" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<g transform="translate(252.75 14.25) scale(0.62)" fill="none" stroke="#ece9e4" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<rect x="244.12" y="5.62" width="32.25" height="32.25" rx="4.5" fill="none" stroke="#c0bdb7" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<text x="12" y="25.43" font-size="10.5" font-weight="400" fill="#ece9e4" fill-opacity="0.7" textLength="78">Viewing as Zack</text>
+<line x1="99" y1="15" x2="99" y2="28.5" stroke="#323947" stroke-width="1"/>
+<rect x="108" y="10.95" width="79.2" height="6.6" rx="3.3" fill="#707173"/>
+<rect x="108" y="27.64" width="75.08" height="4.73" rx="2.36" fill="#42454a"/>
+<clipPath id="photo12"><rect x="6" y="164.91" width="269.25" height="201.94"/></clipPath>
+<rect x="6" y="164.91" width="269.25" height="201.94" fill="#e7e5e0"/>
+<line x1="6" y1="164.91" x2="275.25" y2="366.84" stroke="#d5d1ca" stroke-width="1" clip-path="url(#photo12)"/>
+<rect x="240.75" y="473.25" width="31.5" height="18" rx="9" fill="#0a0e17" fill-opacity="0.72"/>
+<rect x="240.75" y="473.25" width="31.5" height="18" rx="9" fill="none" stroke="#323947" stroke-width="0.75"/>
+<rect x="247.68" y="480" width="17.64" height="4.5" rx="2.25" fill="#707173"/>
+<rect x="97.2" y="384.84" width="86.85" height="16" rx="8" fill="#ffffff" stroke="#5b6576" stroke-width="0.75" stroke-dasharray="2 1.5"/>
+<g transform="translate(103.2 387.34) scale(0.46)" fill="none" stroke="#5b6576" stroke-opacity="1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/></g>
+<text x="118.2" y="395.99" font-size="9" font-weight="400" fill="#5b6576" textLength="58">swipe for next</text>
+</g>
+<rect x="0.5" y="0.5" width="280.25" height="499.25" rx="6" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+</g>
+<text x="32" y="1126" font-size="11" font-weight="400" fill="#424e61">The viewer is a full-screen layer over the whole page, ink bar included. Grey bars are the photo's name over who added it and when, the zoom level and the 3 / 8 count.</text>
+<text x="32" y="1144" font-size="11" font-weight="400" fill="#424e61">Dashed outlines are notes: the 44px tap targets on touch, and the swipe on a phone. The greyed minus is Zoom out at fit; touch has no arrows or zoom bar.</text>
+<text x="32" y="1162" font-size="11" font-weight="400" fill="#5b6576">Frames at a fixed scale: 1280 and 768 at 0.5, 375 at 0.75.</text>
+</svg>

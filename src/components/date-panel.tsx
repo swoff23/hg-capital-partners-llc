@@ -56,7 +56,7 @@ export type RepeatBinding = {
 
 /**
  * What a date picker opens. With a mouse, and on a touch tablet, the quick
- * picks (task dates only) sit over the month calendar in one panel. On a touch
+ * picks (task dates only) sit under the month calendar in one panel. On a touch
  * phone the sheet is two steps in one layer: the picks, then "Pick a date"
  * swaps in the calendar under a back arrow (a Sheet on an iPhone SE shows
  * about 495px, which the picks and the calendar together overflow). A date
@@ -64,8 +64,10 @@ export type RepeatBinding = {
  *
  * The panel's first line names a past value ("Due Sep 12", in --danger when
  * overdue), since the calendar opens on today's month. The picks show a Check
- * on the current value. With `repeat`, a Repeat row ends the panel and opens
- * the repeat menu in the same layer.
+ * on the current value. With `repeat`, a Repeat row ends the panel. In the
+ * panel it opens the presets below itself, one line each, and folds the picks
+ * to one row so the panel keeps close to its height and the calendar stays in
+ * view (Connor, Nov 14); on a phone it's a step in the sheet.
  */
 export function DatePanel({
   value,
@@ -90,7 +92,7 @@ export function DatePanel({
   repeat?: RepeatBinding;
   /** Commits a repeat rule and closes the layer. */
   onRepeat?: (rule: RepeatRule | null) => void;
-  /** "steps" is the phone sheet's two steps; "together" puts the picks over the calendar. */
+  /** "steps" is the phone sheet's two steps; "together" puts the picks under the calendar. */
   layout?: "together" | "steps";
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -100,6 +102,16 @@ export function DatePanel({
   );
   const steps = layout === "steps";
   const [view, setView] = useState<"date" | "calendar" | "repeat">("date");
+  // The Repeat section, scrolled into view when it opens: on a short screen the panel scrolls inside its popover.
+  const repeatSection = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (steps || view !== "repeat") return;
+    // After the popover has measured its taller content and capped its height.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => repeatSection.current?.scrollIntoView({ block: "nearest" }));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [steps, view]);
   const past = value !== null && isPastDay(value, today);
 
   // A number chooses its quick pick: Today 1 through No date 5, whichever picks show.
@@ -140,10 +152,13 @@ export function DatePanel({
       </Button>
     </div>
   );
+  // In the panel Repeat opens below its row and the picks fold away; in the phone sheet it's a step.
+  const repeatOpen = view === "repeat";
   const repeatRow = repeat && (
     <button
       type="button"
-      onClick={() => setView("repeat")}
+      onClick={() => setView(steps || !repeatOpen ? "repeat" : "date")}
+      aria-expanded={steps ? undefined : repeatOpen}
       className={cn(
         "flex h-8 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body outline-none transition-colors",
         "hover:bg-fill-2 focus-visible:bg-fill-2 pointer-coarse:h-11",
@@ -154,7 +169,10 @@ export function DatePanel({
       <span className="min-w-0 truncate pl-4 text-meta text-fg-3">
         {repeat.value ? describeRepeat(repeat.value, { short: true, from: value ?? today }) : "Doesn't repeat"}
       </span>
-      <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-fg-3" />
+      <ChevronRight
+        aria-hidden="true"
+        className={cn("size-4 shrink-0 text-fg-3 transition-transform motion-reduce:transition-none", !steps && repeatOpen && "rotate-90")}
+      />
     </button>
   );
   const repeatMenu = repeat && (
@@ -165,7 +183,8 @@ export function DatePanel({
       slot={repeat.slot}
       layer={steps ? "sheet" : "popover"}
       onPick={(rule) => onRepeat?.(rule)}
-      onBack={() => setView("date")}
+      onBack={steps ? () => setView("date") : undefined}
+      compact={!steps}
     />
   );
 
@@ -212,20 +231,45 @@ export function DatePanel({
     );
   }
 
-  if (view === "repeat") return <div ref={ref}>{repeatMenu}</div>;
-
   return (
     <div ref={ref} className="w-80">
       {currentLine}
+      <div className="px-3 pb-3 pt-2">{calendar}</div>
       {withPicks && (
-        <div className="p-1">
-          <QuickPickRows picks={picks} value={value} onPick={onPick} />
+        <div className="border-t border-line p-1">
+          {repeatOpen ? (
+            <FoldedPicks picks={picks} onPress={() => setView("date")} />
+          ) : (
+            <QuickPickRows picks={picks} value={value} onPick={onPick} />
+          )}
         </div>
       )}
-      <div className={cn("px-3 pb-3 pt-2", withPicks && "border-t border-line")}>{calendar}</div>
       {clear}
-      {repeatRow && <div className="border-t border-line p-1">{repeatRow}</div>}
+      {repeatRow && (
+        <div ref={repeatSection} className="border-t border-line p-1">
+          {repeatRow}
+          {repeatOpen && repeatMenu}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** The quick picks folded to one row while Repeat is open below; it opens them again and folds Repeat. */
+function FoldedPicks({ picks, onPress }: { picks: QuickPick[]; onPress: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      aria-expanded={false}
+      className="flex h-8 w-full items-center gap-2.5 rounded-sm px-2 text-left text-body text-fg-3 outline-none transition-colors hover:bg-fill-2 focus-visible:bg-fill-2 pointer-coarse:h-11"
+    >
+      <span className="min-w-0 flex-1 truncate">{`${picks
+        .slice(0, 3)
+        .map((p) => p.label)
+        .join(", ")}…`}</span>
+      <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+    </button>
   );
 }
 

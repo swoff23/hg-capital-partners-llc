@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="860" height="520" viewBox="0 0 860 520" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The staff task page: the Tenants row and the Access row</title>
+<defs>
+<g id="call"><circle r="12" fill="#ffffff" stroke="#d5d1ca"/><path d="M-5 -5 q0 10 10 10 l2-3-3-2-2 1 q-3-1-4-4 l1-2-2-3z" fill="none" stroke="#424e61" stroke-width="1.2" stroke-linejoin="round"/></g>
+</defs>
+<rect width="860" height="520" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">The task page: Tenants and Access rows</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280, the Details rail, two tenants, menu open</text>
+<rect x="0" y="22" width="380" height="400" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="54" font-size="12" fill="#5b6576">Tenants</text>
+<text x="100" y="54" font-size="12" fill="#152133">Tenant one</text>
+<text x="100" y="70" font-size="11" fill="#5b6576">716-555-0142</text>
+<use xlink:href="#call" x="352" y="58"/>
+<text x="100" y="94" font-size="12" fill="#152133">Tenant two</text>
+<text x="100" y="110" font-size="11" fill="#5b6576">716-555-0199</text>
+<use xlink:href="#call" x="352" y="98"/>
+<text x="100" y="132" font-size="11" fill="#5b6576">Moves out Jan 31</text>
+<line x1="20" y1="148" x2="360" y2="148" stroke="#f2f0ec"/>
+<text x="20" y="172" font-size="12" fill="#5b6576">Access</text>
+<rect x="100" y="158" width="110" height="24" rx="12" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="112" y="174" font-size="12" fill="#152133">Tenant only</text>
+<path d="M194 168 l4 4 4-4" fill="none" stroke="#424e61" stroke-width="1.3"/>
+<text x="100" y="200" font-size="11" fill="#5b6576">Tenants shown to Zack</text>
+<rect x="100" y="212" width="250" height="108" rx="10" fill="#ffffff" stroke="#d5d1ca"/>
+<path d="M114 236 l4 4 8-9" fill="none" stroke="#152133" stroke-width="1.5"/>
+<text x="136" y="236" font-size="12" fill="#152133">Tenant only</text>
+<text x="136" y="252" font-size="11" fill="#5b6576">They set a time with the tenants</text>
+<line x1="100" y1="264" x2="350" y2="264" stroke="#e7e5e0"/>
+<text x="136" y="286" font-size="12" fill="#152133">Permission to enter</text>
+<text x="136" y="302" font-size="11" fill="#5b6576">Adds the lockbox code</text>
+<text x="20" y="352" font-size="11" fill="#5b6576">No code on file: Permission to enter is disabled,</text>
+<text x="20" y="367" font-size="11" fill="#5b6576">with "No lockbox code". Picked: "Tenants and lockbox</text>
+<text x="20" y="382" font-size="11" fill="#5b6576">shown to Zack". No login: "once Zack signs in".</text>
+<text x="20" y="404" font-size="11" fill="#5b6576">Text icons show on touch only.</text>
+</g>
+
+<g transform="translate(448 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Tablet 768 and phone 375, the chip row (touch)</text>
+<rect x="0" y="22" width="380" height="64" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="14" y="42" width="130" height="26" rx="13" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="28" y="59" font-size="12" fill="#152133">Tenant one +1</text>
+<rect x="152" y="42" width="168" height="26" rx="13" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="166" y="59" font-size="12" fill="#152133">Permission to enter</text>
+<path d="M302 52 l4 4 4-4" fill="none" stroke="#424e61" stroke-width="1.3"/>
+<rect x="328" y="42" width="44" height="26" rx="13" fill="#f2f0ec"/>
+<text x="0" y="106" font-size="11" fill="#5b6576">The tenants chip opens, for each person, their name</text>
+<text x="0" y="121" font-size="11" fill="#5b6576">over their number, Call and Text; then Edit on the property.</text>
+<text x="0" y="136" font-size="11" fill="#5b6576">The Access status line heads its own menu. 320: the row scrolls.</text>
+
+<text x="0" y="172" font-size="11" font-weight="500" fill="#424e61">Vacant unit, any size</text>
+<rect x="0" y="182" width="380" height="48" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="211" font-size="12" fill="#5b6576">Access</text>
+<text x="100" y="211" font-size="12" fill="#152133">Lockbox shown to Zack</text>
+<text x="0" y="248" font-size="11" fill="#5b6576">No chip and no menu: a vacant unit has nothing to choose.</text>
+
+<text x="0" y="282" font-size="11" font-weight="500" fill="#424e61">Nothing on file</text>
+<rect x="0" y="292" width="380" height="48" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="321" font-size="12" fill="#5b6576">Access</text>
+<text x="100" y="321" font-size="12" fill="#152133" text-decoration="underline">Add a tenant or code</text>
+<text x="242" y="321" font-size="11" fill="#5b6576">Nothing shown to Zack</text>
+<text x="0" y="358" font-size="11" fill="#5b6576">Links to the property's Units and access with that unit open.</text>
+</g>
+</svg>

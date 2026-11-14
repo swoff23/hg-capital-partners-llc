@@ -10,7 +10,8 @@ The look follows docs/brand-guidelines.md once that's approved; this plan is the
 2. **Needs you.** A short list, only when something is in it, of the things that aren't tasks but need a partner. Each is one row that opens the record:
    - a loan maturing within 90 days, and an insurance renewal or rental registration within 60 (the property's key dates);
    - CapEx due this year, as one row ("CapEx due in 2026: $32,000 across 4 properties") that opens the forecast on Properties;
-   - a QuickBooks sync older than 3 days, or a lost connection.
+   - a QuickBooks sync older than 3 days, or a lost connection;
+   - a contractor who signed up with the sign-up link, with Keep and Archive, and one who finished setup, with Sent for Baselane's bank link (docs/specs/contractor-onboarding.md, 4.5). These two rows carry buttons beside the text; a tap anywhere else still opens the contractor.
    The contractor jobs waiting for review stay where they are, at the top of the Contractors column.
 3. **Today**, exactly as approved and built: the Mine | Contractors columns (TodayView), with Overdue and "Move all to today", Today, Waiting and No date in Mine, and Needs review and each contractor's jobs in Contractors.
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { Code } from "@/components/code";
 import { isOfflineError } from "@/lib/action-result";
+import { reportClientError } from "@/lib/client-errors";
 import { watchServerActions, writeFailedRecently } from "@/lib/failed-writes";
 import { RELOAD_LABEL, isChunkLoadError, reloadPage } from "@/lib/lazy-module";
 
@@ -24,8 +25,9 @@ function causeOf(error: Error): "offline" | "save" | "unknown" {
  * A plain sentence and one action, flat on the page (docs/brand-guidelines.md,
  * section 9, Empty and payoff states). The title says what's known: "That
  * didn't save" when a save failed in the last few seconds (lib/failed-writes)
- * or the device is offline; the generic title otherwise, including a page
- * that failed to render after a save that worked. The action is Try again,
+ * or the device is offline; "That page didn't load" otherwise, as on the
+ * public site and the sign-in screens, including a page that failed to
+ * render after a save that worked. The action is Try again,
  * which re-renders the segment (`retry`), except for a chunk of the page's
  * code that didn't load (`isChunkLoadError`): after a deploy moved the chunk,
  * Try again re-renders with the same URLs and would only fail again, so the
@@ -35,6 +37,8 @@ function causeOf(error: Error): "offline" | "save" | "unknown" {
 export function ErrorScreen({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    // A browser error goes to Sentry; one with a digest came from the server, which reported it (lib/client-errors.ts).
+    reportClientError(error, "boundary");
   }, [error]);
 
   // Read once, when the boundary opens, so the words don't change under the reader.
@@ -43,7 +47,7 @@ export function ErrorScreen({ error, retry }: { error: Error & { digest?: string
 
   return (
     <div className="max-w-prose py-8">
-      <h1 className="text-title text-balance text-fg-1">{cause === "unknown" ? "Something went wrong" : "That didn't save"}</h1>
+      <h1 className="text-title text-balance text-fg-1">{cause === "unknown" ? "That page didn't load" : "That didn't save"}</h1>
       <p className="mt-1 text-pretty text-body text-fg-2">
         {cause === "offline"
           ? "No connection, so the last action didn't go through. Your other changes are safe."

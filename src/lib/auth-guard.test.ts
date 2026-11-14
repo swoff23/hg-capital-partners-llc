@@ -10,7 +10,8 @@
  *     auth or sessions, the staff task read helpers, staff pages, or the
  *     properties, deals or QuickBooks modules.
  *  3. Lockbox codes live in Property.units, which portal code reads in one
- *     place only: src/lib/portal/access-code.ts.
+ *     place only: src/lib/portal/access-code.ts. Tenants and leases are read
+ *     there too, and nowhere else in portal code (docs/specs/tenants.md 11).
  *
  * Static only: it parses the source with the TypeScript compiler, no Next,
  * no database.
@@ -48,10 +49,15 @@ const ALLOWLIST = new Set([
   "src/app/login/actions.ts#signOut", // only clears the caller's own cookie
   "src/app/login/actions.ts#requestPasswordReset", // same answer for every email; DB rate limit
   "src/app/(marketing)/residents/moving-in/actions.ts#submitMoveInInspection", // public form; IP and global caps
+  "src/app/join/[token]/actions.ts#createAccount", // a contractor's invite or the sign-up link; the single-use or resettable 32-byte token is the check, per-IP limit
+  "src/app/join/[token]/actions.ts#openInvite", // only stamps a first-open time on a live invite; the token is the check, returns nothing
   "/login/reset/submit", // the reset link's form; does nothing without a live single-use token
   "/api/health", // detail behind HEALTH_TOKEN
+  "/api/version", // only the live commit, which /api/health already shows anyone; no database (update-notice.tsx asks it)
   "/api/quickbooks/sync", // CRON_SECRET
   "/api/cron/notifications", // CRON_SECRET, the same check as /api/quickbooks/sync
+  "/j/[token]/calendar", // a job email's link token (job-links.ts resolveJobLink): only while it still opens the job
+  "/api/email/inbound", // Resend's webhook signature (RESEND_WEBHOOK_SECRET), checked before anything is read
 ]);
 
 /**
@@ -329,6 +335,11 @@ const STAFF_ONLY = [
   "@/lib/properties",
   "@/lib/deals",
   "@/lib/quickbooks",
+  // Tenants and leases (docs/specs/tenants.md 11): the writes and the staff reads. The pure rules
+  // (status.ts, fields.ts) stay importable, for access-code.ts's one job's tenants.
+  "@/lib/tenants/service",
+  "@/lib/tenants/queries",
+  "@/lib/tenants/core",
   "@/app/(app)",
 ];
 
@@ -438,6 +449,17 @@ test("only access-code.ts in portal code mentions units", () => {
   const allowed = new Set(["src/lib/portal/access-code.ts", "src/lib/portal/access-code.test.ts"]);
   const bad = portalFiles.filter((f) => !allowed.has(rel(f)) && fs.readFileSync(f, "utf8").includes("units")).map(rel);
   assert.deepEqual(bad, [], "Property.units holds lockbox codes; read it only through src/lib/portal/access-code.ts");
+});
+
+// Rent, deposits, emails, notes and lease files never reach a contractor: portal code reads the
+// tenant and lease tables in access-code.ts alone, and only a job's living tenants' names and numbers there.
+const TENANT_TABLE = /\.(lease|leaseTenant|leaseTerm|leaseFile|tenant)\s*\./;
+
+test("only access-code.ts in portal code reads the tenant and lease tables", () => {
+  const allowed = new Set(["src/lib/portal/access-code.ts", "src/lib/portal/access-code.test.ts"]);
+  const bad = portalFiles.filter((f) => !allowed.has(rel(f)) && TENANT_TABLE.test(fs.readFileSync(f, "utf8"))).map(rel);
+  assert.deepEqual(bad, [], "Tenants and leases are staff records; portal code reads them only through src/lib/portal/access-code.ts");
+  assert.ok(TENANT_TABLE.test("await db.leaseTenant.findMany({})") && TENANT_TABLE.test("tx.tenant.findUnique") && !TENANT_TABLE.test("Please call the tenant."));
 });
 
 test("the boundary checks catch what they should", () => {

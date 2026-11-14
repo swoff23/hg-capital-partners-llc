@@ -5,7 +5,8 @@ import { FormSheet } from "@/components/form-sheet";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
 import { NumberInput, numberHelper, numberProblem } from "@/components/number-input";
-import { FormField, Input, Section, Table, Td, Th } from "@/components/ui";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { FormField, Input, Table, Td, Th, addRowClass } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import { stableJson } from "@/lib/drafts";
 import { cn, fmtMoney } from "@/lib/utils";
@@ -44,8 +45,13 @@ const toDraft = (data: BuildingCapexData, key: string): Draft => ({
  * 64px meter, says how complete the dates are (charts 4.2), and a Monitor or
  * Replace cost says the year it falls due ("$8,000 in 2032"), so a cost past
  * the forecast reads as later, not missing.
+ *
+ * It sits folded at the foot of the CapEx section (docs/specs/property-page.md
+ * 2.3): one "Building systems" row with the count and the meter, which opens
+ * the table in place. It starts closed on every visit; an open sheet keeps it
+ * open, so a save never folds the row it came from.
  */
-export function BuildingCapexSection({
+export function BuildingSystems({
   propertyId,
   version,
   initial,
@@ -63,6 +69,7 @@ export function BuildingCapexSection({
   // gives the sheet fresh fields; it stays mounted while it closes, so it slides out.
   const [sheet, setSheet] = useState<{ key: string; version: string; id: number } | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [shown, setShown] = useState(false);
   const { dated, total } = systemsDated(initial, rules);
   const current = items.find((i) => i.key === sheet?.key) ?? null;
 
@@ -96,16 +103,29 @@ export function BuildingCapexSection({
   };
 
   return (
-    <Section title="Building CapEx">
-      <p className="num flex items-center gap-2 text-meta text-fg-3">
-        <span>
-          {dated} of {total} systems dated
+    <div>
+      {/* The foot row's look (AddRow), with the count and its meter at the right; the meter is a picture of the words,
+          so it drops under 360 to keep the row on one line. */}
+      <button type="button" aria-expanded={shown} onClick={() => setShown((v) => !v)} className={cn(addRowClass, "justify-between")}>
+        <span className="flex items-center gap-2 whitespace-nowrap">
+          {shown ? (
+            <ChevronUp aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+          ) : (
+            <ChevronDown aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-fg-3" />
+          )}
+          Building systems
         </span>
-        <Meter value={dated} max={total} label="Systems with an install year" valueText={`${dated} of ${total} dated`} className="w-16" />
-      </p>
+        <span className="num flex items-center gap-2 whitespace-nowrap text-meta font-normal text-fg-3">
+          <Meter value={dated} max={total} className="w-16 max-[360px]:hidden" />
+          <span>
+            {dated} of {total} dated
+          </span>
+        </span>
+      </button>
 
-      {/* Reading on a phone, the type and age drop so the cost stays on screen, and below 360 the status moves under the name. */}
-      <Table className="mt-2">
+      {shown && (
+      /* Reading on a phone, the type and age drop so the cost stays on screen, and below 360 the status moves under the name. */
+      <Table>
         <thead>
           <tr>
             <Th className="pl-0">Component</Th>
@@ -165,6 +185,7 @@ export function BuildingCapexSection({
           })}
         </tbody>
       </Table>
+      )}
 
       {sheet && current && (
         <SystemSheet
@@ -178,7 +199,7 @@ export function BuildingCapexSection({
           onOpenChange={setIsOpen}
         />
       )}
-    </Section>
+    </div>
   );
 }
 

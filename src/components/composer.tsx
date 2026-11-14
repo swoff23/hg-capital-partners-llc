@@ -26,9 +26,8 @@ import {
 import { SegmentedControl } from "@/components/segmented-control";
 import { useToast, useToastInset } from "@/components/toast";
 import { DropLabel, useDropTarget, type DropTargetState, type UploadTarget } from "@/components/upload-queue";
-import { Button, Kbd, buttonClass } from "@/components/ui";
+import { Button, buttonClass } from "@/components/ui";
 import { useKeyboardInset } from "@/components/use-keyboard-inset";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { callAction, OFFLINE_ERROR, type ActionResult } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
 import { EMPTY_DRAFT, adoptSharedDraft, clientIdToReuse, parseDraft, resolvePending, serializeDraft, type Draft } from "@/lib/composer-draft";
@@ -109,7 +108,7 @@ export interface ComposerProps {
    */
   clearance?: string;
   /**
-   * Placeholder per side: "Reply to Zack" or "Add a comment"; "Add an internal
+   * Placeholder per side: "Add comment…"; "Add an internal
    * note", which shortens to `internalShort` ("Internal note") below 480px.
    */
   placeholders: { shared: string; internal?: string; internalShort?: string };
@@ -398,7 +397,6 @@ function ComposerBody({
   );
   const text = draft.text;
   const visibility = mode === "switch" ? draft.visibility : "SHARED";
-  const mod = useModKey();
   const sends = usePendingSends();
   const zone = useContext(ZoneContext);
   const undoable = useUndoableRemove();
@@ -681,9 +679,7 @@ function ComposerBody({
   // The tools row holds the switch and the file button; without either it has nothing to show.
   const tools = mode === "switch" || !!api;
 
-  // The keys that send from the text box sit inside the button, at its trailing edge, for a mouse: Kbd
-  // hides on touch, and here below md and in a narrow column, so Send is just its word there. The button
-  // carries the shortcut for assistive tech; the printed keys stay out of its name.
+  // ⌘↵ sends from the text box; the button carries the shortcut for assistive tech.
   const sendButton = (className: string) => (
     <Button
       type="button"
@@ -698,9 +694,6 @@ function ComposerBody({
       className={className}
     >
       {label}
-      <Kbd aria-hidden="true" className="max-md:hidden @max-md/composer:hidden">
-        {shortcutLabel(mod, "↵")}
-      </Kbd>
     </Button>
   );
 

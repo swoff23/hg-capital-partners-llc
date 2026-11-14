@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   // Neither refusal says why to the caller (cronRefusal); the unset secret goes to the logs.
   const refused = cronRefusal(auth);
   if (refused) {
-    if (auth === "unconfigured") console.warn("[cron:quickbooks-sync] not run: CRON_SECRET is unset");
+    if (auth === "unconfigured") console.warn("[cron:quickbooks-sync] not run: CRON_SECRET is unset or blank");
     return new NextResponse(refused.body, { status: refused.status });
   }
 

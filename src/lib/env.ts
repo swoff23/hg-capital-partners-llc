@@ -67,8 +67,15 @@ const schema = z.object({
   EMAIL_FROM: z.string().optional(), // "HG Capital <jobs@mail.example.com>"
   // Where replies go, e.g. "office@hgcapitalpartners.com". Unset: replies go to EMAIL_FROM.
   EMAIL_REPLY_TO: z.email("must be an email address").optional(),
+  // Resend's receiving webhook secret ("whsec_…"): set, job emails take replies by email (src/app/api/email/inbound).
+  RESEND_WEBHOOK_SECRET: z.string().optional(),
   // Origin for links in emails, e.g. "https://hgcapitalpartners.com".
   APP_URL: z.string().url().optional(),
+  // Sentry (docs/specs/error-alerts.md). Set by Sentry's Vercel integration; public by design.
+  // The server reads it here and reports only in production (src/lib/report-server.ts). The
+  // browser gets its own copy from next.config.ts, filled in only for production builds.
+  // A plain string on purpose: a malformed DSN must not stop the app from parsing its environment.
+  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
 });
 
 type Raw = z.infer<typeof schema>;
@@ -88,6 +95,11 @@ export interface EmailEnv {
   from: string;
   /** EMAIL_REPLY_TO, or null to send no Reply-To. */
   replyTo: string | null;
+  /**
+   * RESEND_WEBHOOK_SECRET, or null. Set, job emails carry their own reply address and replies post to the job
+   * (docs/specs/contractor-job-emails.md, section 5).
+   */
+  webhookSecret: string | null;
 }
 
 export interface Env extends Raw {
@@ -161,7 +173,7 @@ function build(source: EnvSource): Env {
     },
     get email(): EmailEnv | null {
       if (!raw.RESEND_API_KEY || !raw.EMAIL_FROM) return null;
-      return { apiKey: raw.RESEND_API_KEY, from: raw.EMAIL_FROM, replyTo: raw.EMAIL_REPLY_TO ?? null };
+      return { apiKey: raw.RESEND_API_KEY, from: raw.EMAIL_FROM, replyTo: raw.EMAIL_REPLY_TO ?? null, webhookSecret: raw.RESEND_WEBHOOK_SECRET?.trim() || null };
     },
     get appUrl(): string {
       if (raw.APP_URL) return raw.APP_URL.replace(/\/+$/, "");

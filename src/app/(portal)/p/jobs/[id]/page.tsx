@@ -4,15 +4,18 @@ import { PhotoThumb } from "@/components/photo-thumb";
 import { StatusBadge } from "@/components/status-badge";
 import { Section } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
+import { contractorMaySetDate, jobLinkStep } from "@/lib/portal/job-link-paths";
 import { addressLine, firstName, nextStep } from "@/lib/portal/job-view";
 import { noteJobViewed } from "@/lib/portal/jobs";
 import { getJob } from "@/lib/portal/queries";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { isActiveStatus } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
+import { CrewText } from "./_components/crew-text";
+import { HashScroll } from "./_components/hash-scroll";
 import { JobActions } from "./_components/job-actions";
 import { JobHeader } from "./_components/job-header";
-import { DueDate } from "../../_components/due-date";
+import { JobDate } from "./_components/job-date";
 import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
 import { JobNotice } from "./_components/job-notice";
@@ -20,6 +23,8 @@ import { JobUpdates } from "./_components/job-updates";
 import { LateUploads } from "./_components/late-uploads";
 
 export const metadata: Metadata = { title: "Job" };
+
+const firstValue = (v: string | string[] | undefined): string | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
 /**
  * A contractor's job (docs/asana-migration-plan.md §6, D31: one scroll with a
@@ -38,9 +43,11 @@ export const metadata: Metadata = { title: "Job" };
  * where the contractor last looked before this visit is recorded, so it shows
  * once and clears on the next open.
  */
-export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
+export default async function JobPage({ params, searchParams }: PageProps<"/p/jobs/[id]">) {
   const principal = await requirePortalPrincipal();
   const { id } = await params;
+  // What an email's button asked the page to have ready (job-link-paths.ts).
+  const ask = jobLinkStep(firstValue((await searchParams).do));
   const job = await getJob(principal, id);
   if (!job) notFound();
 
@@ -59,9 +66,11 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
   // posts it, and only Sign out asks.
   return (
     <>
-      <JobHeader />
+      {/* Text to my crew, while the job is open (docs/specs/contractor-job-emails.md, section 4). */}
+      <JobHeader actions={active && <CrewText taskId={job.id} openOnLoad={ask === "share"} />} />
 
       <main className={cn("mx-auto max-w-300", hasBar ? "pb-[calc(6.5rem+env(safe-area-inset-bottom))]" : "pb-12")}>
+        <HashScroll />
         {photoAlt && <PhotoThumb size="full" src={job.photoUrl} alt={photoAlt} className="rounded-none sm:hidden" />}
 
         <div className="space-y-8 px-4 pt-4 sm:px-6 sm:pt-8 lg:px-8 pointer-coarse:space-y-6">
@@ -71,10 +80,15 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <StatusBadge status={job.status} className="shrink-0" />
-                  {job.target && active && (
-                    <span className="truncate text-meta text-fg-3">
-                      <DueDate target={job.target} isVisit={job.targetIsVisit} today={today} />
-                    </span>
+                  {active && (
+                    <JobDate
+                      taskId={job.id}
+                      target={job.target}
+                      isVisit={job.targetIsVisit}
+                      today={today}
+                      editable={contractorMaySetDate(job.status)}
+                      openOnLoad={ask === "date"}
+                    />
                   )}
                 </div>
                 <h1 className="mt-1 text-title text-balance break-words text-fg-1">{job.title}</h1>
@@ -100,7 +114,7 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
 
           <JobMediaSection media={job.media} atFinish={job.atFinish} />
 
-          <Section title="Updates">
+          <Section id="updates" title="Updates">
             <JobUpdates
               updates={job.updates}
               now={now.toISOString()}
@@ -115,10 +129,12 @@ export default async function JobPage({ params }: PageProps<"/p/jobs/[id]">) {
                 status={job.status}
                 firstName={firstName(principal.label)}
                 staffNames={job.staffNames}
+                getsEmail={job.getsEmail}
                 finishPhotosRequired={job.finishPhotosRequired}
                 markedDoneAt={job.markedDoneAt}
                 property={place}
                 sentClientIds={job.updates.flatMap((u) => (u.clientId ? [u.clientId] : []))}
+                openMarkDoneOnLoad={ask === "done"}
               />
             ) : (
               // An approved or canceled job has no composer, but photos queued before then can still be waiting to record.

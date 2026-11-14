@@ -24,7 +24,7 @@ function warnOffTxPooler(env: ClientEnv): void {
   const warning = productionPoolerWarning(env);
   if (!warning) return;
   pooler.__hgPoolerWarned = true;
-  logError("db:pooler", new Error(warning.message), { dbVia: warning.dbVia, dbPool: warning.dbPool });
+  logError("db:pooler", new Error(warning.message), { dbVia: warning.dbVia, dbPool: warning.dbPool }, { level: "warning" });
 }
 
 /**

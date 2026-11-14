@@ -1,21 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { capitalizedName, cleanTrades, docOnFile, joinDocLines, mailtoHref, mapsHref, planContactFixes, splitDocLines, telHref, textHref } from "./contacts";
+import { capitalizedName, docOnFile, joinDocLines, mailtoHref, mapsHref, planContactFixes, splitDocLines, telHref, textHref } from "./contacts";
 import { readNewContact } from "./contractors/contact-fields";
-
-test("a new contractor's trades go through cleanTrades, as the directory shows them", () => {
-  // What the sheet's Trades picker posts: the picks joined with " / ", repeats and all.
-  const read = (trades: string) => {
-    const r = readNewContact({ fullName: "Zack Reading", trades });
-    return r.ok ? r.data.trades : undefined;
-  };
-  assert.equal(read("Plumbing / HVAC"), "Plumbing / HVAC");
-  assert.equal(read("HVAC / hvac / Plumbing"), "HVAC / Plumbing");
-  assert.equal(read("  Framing  "), "Framing");
-  // No trade picked is no trades, not an empty string.
-  assert.equal(read(""), undefined);
-  assert.equal(cleanTrades("HVAC / HVAC"), "HVAC");
-});
 
 test("a new contractor keeps the notes and leaves the import's document lines to the importer", () => {
   const r = readNewContact({ fullName: "Zack Reading", comments: "Prefers texts.\nGate code with Pieter" });
@@ -57,17 +43,6 @@ test("a W-9 the import noted as on file is found in the notes (ADMIN-022)", () =
   assert.equal(docOnFile("Asked for the W-9 on file: none yet", "W-9"), null);
 });
 
-test("trades lose the repeats the import's merge left in (ADMIN-023)", () => {
-  assert.equal(cleanTrades("HVAC / HVAC"), "HVAC");
-  assert.equal(cleanTrades("Electric / electric"), "Electric");
-  assert.equal(cleanTrades("Demo/Framing/Trim / Framing/General/Tile/Drywall/Trim"), "Demo / Framing / Trim / General / Tile / Drywall");
-  // No repeats: exactly as stored.
-  assert.equal(cleanTrades("Plumber/minor HVAC / Plumbing"), "Plumber/minor HVAC / Plumbing");
-  assert.equal(cleanTrades("Rats/Pests"), "Rats/Pests");
-  assert.equal(cleanTrades("  "), null);
-  assert.equal(cleanTrades(null), null);
-});
-
 test("lowercase names get capitals; names that have them are left alone (ADMIN-023)", () => {
   assert.equal(capitalizedName("John detzler"), "John Detzler");
   assert.equal(capitalizedName("Jacob (Jake) hoak"), "Jacob (Jake) Hoak");
@@ -81,71 +56,42 @@ test("lowercase names get capitals; names that have them are left alone (ADMIN-0
 
 test("the cleanup lists only contacts that change, and only what changes", () => {
   const plan = planContactFixes([
-    { id: "a", fullName: "Steve Fuller", trades: "HVAC / HVAC" },
-    { id: "b", fullName: "John detzler", trades: "Paint / Misc." },
-    { id: "c", fullName: "Jose Alvarez", trades: "Floor Install only / Flooring" },
-    { id: "d", fullName: "jacob hoak", trades: "Electric / Electric" },
-    { id: "e", fullName: "Kim Lockett", trades: null },
+    { id: "a", fullName: "Steve Fuller", trades: ["HVAC"] },
+    { id: "b", fullName: "John detzler", trades: ["Handyman", "Painting"] },
+    { id: "d", fullName: "jacob hoak", trades: ["Electric"] },
+    { id: "e", fullName: "Kim Lockett", trades: [] },
   ]);
   assert.deepEqual(plan, [
-    { id: "a", fullName: "Steve Fuller", trades: { from: "HVAC / HVAC", to: "HVAC" } },
     { id: "b", fullName: "John detzler", name: "John Detzler" },
-    { id: "d", fullName: "jacob hoak", name: "Jacob Hoak", trades: { from: "Electric / Electric", to: "Electric" } },
+    { id: "d", fullName: "jacob hoak", name: "Jacob Hoak" },
   ]);
   // Run again on the fixed values: nothing left to do.
-  assert.deepEqual(
-    planContactFixes([
-      { id: "a", fullName: "Steve Fuller", trades: "HVAC" },
-      { id: "b", fullName: "John Detzler", trades: "Paint / Misc." },
-    ]),
-    [],
-  );
+  assert.deepEqual(planContactFixes([{ id: "b", fullName: "John Detzler", trades: ["Painting"] }]), []);
 });
 
 test("Connor's three hand fixes: trades out of Company, the company out of a name, matched exactly (decision 31)", () => {
   const before = [
-    { id: "jer", fullName: "Jeremiah Anderson", company: "Electric", trades: "Electric / Electric" },
-    { id: "kim", fullName: "Kim Lockett", company: "House Cleaner", trades: "House Cleaner / Property Cleaning" },
-    { id: "mike", fullName: "Mike Morris (Freedom Electric)", company: "Freedom Electric", trades: "Electric / Electric" },
+    { id: "jer", fullName: "Jeremiah Anderson", company: "Electric", trades: [] },
+    { id: "kim", fullName: "Kim Lockett", company: "House Cleaner", trades: ["Cleaning"] },
+    { id: "mike", fullName: "Mike Morris (Freedom Electric)", company: "Freedom Electric", trades: ["Electric"] },
     // Same names with other values, and the same company on someone else: never touched.
-    { id: "jer2", fullName: "Jeremiah Anderson", company: "Anderson Electric LLC", trades: "Electric" },
-    { id: "kim2", fullName: "Kim lockett", company: "House Cleaner", trades: "Cleaning" },
-    { id: "other", fullName: "Sam Sparks", company: "Electric", trades: null },
-    { id: "mike2", fullName: "Mike Morris (Freedom Electric)", company: "Morris Co", trades: null },
+    { id: "jer2", fullName: "Jeremiah Anderson", company: "Anderson Electric LLC", trades: ["Electric"] },
+    { id: "kim2", fullName: "Kim lockett", company: "House Cleaner", trades: ["Cleaning"] },
+    { id: "other", fullName: "Sam Sparks", company: "Electric", trades: [] },
+    { id: "mike2", fullName: "Mike Morris (Freedom Electric)", company: "Morris Co", trades: [] },
   ];
   assert.deepEqual(planContactFixes(before), [
-    { id: "jer", fullName: "Jeremiah Anderson", trades: { from: "Electric / Electric", to: "Electric" }, company: { from: "Electric", to: null } },
-    // House Cleaner is already a trade: only Company changes.
+    { id: "jer", fullName: "Jeremiah Anderson", addTrade: "Electric", company: { from: "Electric", to: null } },
+    // "House Cleaner" maps to Cleaning, which Kim already has: only Company changes.
     { id: "kim", fullName: "Kim Lockett", company: { from: "House Cleaner", to: null } },
-    { id: "mike", fullName: "Mike Morris (Freedom Electric)", name: "Mike Morris", trades: { from: "Electric / Electric", to: "Electric" } },
+    { id: "mike", fullName: "Mike Morris (Freedom Electric)", name: "Mike Morris" },
     { id: "kim2", fullName: "Kim lockett", name: "Kim Lockett" },
   ]);
-
-  // A trade that wasn't listed yet is added; a blank company is filled.
-  assert.deepEqual(planContactFixes([{ id: "jer", fullName: "Jeremiah Anderson", company: "Electric", trades: null }]), [
-    { id: "jer", fullName: "Jeremiah Anderson", trades: { from: null, to: "Electric" }, company: { from: "Electric", to: null } },
-  ]);
-  assert.deepEqual(planContactFixes([{ id: "kim", fullName: "Kim Lockett", company: "House Cleaner", trades: "Property Cleaning" }])[0].trades, {
-    from: "Property Cleaning",
-    to: "Property Cleaning / House Cleaner",
-  });
-  assert.deepEqual(planContactFixes([{ id: "mike", fullName: "Mike Morris (Freedom Electric)", company: null, trades: "Electric" }]), [
+  assert.deepEqual(planContactFixes([{ id: "kim", fullName: "Kim Lockett", company: "House Cleaner", trades: [] }])[0].addTrade, "Cleaning");
+  assert.deepEqual(planContactFixes([{ id: "mike", fullName: "Mike Morris (Freedom Electric)", company: null, trades: ["Electric"] }]), [
     { id: "mike", fullName: "Mike Morris (Freedom Electric)", name: "Mike Morris", company: { from: null, to: "Freedom Electric" } },
   ]);
-
-  // Applied: a second run finds nothing.
-  assert.deepEqual(
-    planContactFixes([
-      { id: "jer", fullName: "Jeremiah Anderson", company: null, trades: "Electric" },
-      { id: "kim", fullName: "Kim Lockett", company: null, trades: "House Cleaner / Property Cleaning" },
-      { id: "mike", fullName: "Mike Morris", company: "Freedom Electric", trades: "Electric" },
-    ]),
-    [],
-  );
-  // A caller that didn't read Company changes no company.
-  assert.deepEqual(planContactFixes([{ id: "kim", fullName: "Kim Lockett", trades: null }]), []);
 });
-
 test("splitDocLines keeps the import's document lines apart from the notes", () => {
   const stored = "Prefers texts\nW-9 on file: w9-2024.pdf\n\nInsurance on file: coi.pdf\nGate code with Pieter";
   const { notes, docLines } = splitDocLines(stored);

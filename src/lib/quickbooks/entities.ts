@@ -58,3 +58,13 @@ export const QBO_ENTITY_SEED: readonly QboEntitySeed[] = [
 export const ENTITY_CODES: readonly string[] = [...QBO_ENTITY_SEED]
   .map((e) => e.code)
   .sort((a, b) => b.length - a.length);
+
+/**
+ * The five companies' names in their QuickBooks order. The Entity picker
+ * offers the holding companies among them, then any name added on a
+ * property (lib/properties/entity.ts). A new LLC is added to
+ * `QBO_ENTITY_SEED` once.
+ */
+export const ENTITY_NAMES: readonly string[] = [...QBO_ENTITY_SEED]
+  .sort((a, b) => a.sortOrder - b.sortOrder)
+  .map((e) => e.name);

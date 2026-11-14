@@ -342,6 +342,8 @@ One `text-meta` `--fg-3` line, 4px under the card, aligned with the card's left 
 | State | Line |
 |---|---|
 | The contractor has no login | Zack has no login yet |
+| A login that has never signed in ([contractor-email-switch.md](contractor-email-switch.md)) | Zack hasn't signed in yet |
+| Signed in, with the Job emails switch off, and no email went for it | Zack's emails are off |
 | Email queued (the bundle hasn't sent, 2.8) | Zack gets an email |
 | Email sent, job not opened since | Emailed to Zack |
 | Zack opened the job after it | Seen by Zack · 2:14 PM |
@@ -411,6 +413,7 @@ Internal turns the box `--fill-1` and the switch track `--fill-2`, as today. Tab
 | Situation | Shared | Internal |
 |---|---|---|
 | Contractor assigned, has a login | Zack sees this and gets an email | Lock, Only Connor and Pieter see this |
+| Contractor assigned, never signed in or Job emails off ([contractor-email-switch.md](contractor-email-switch.md)) | Zack won't get an email | Lock, Only Connor and Pieter see this |
 | Contractor assigned, no login | Zack needs a login to see this. Desktop adds a "Set up login" TextLink to his contractor record | same |
 | No contractor (a partner or nobody) | Any contractor you assign sees this | same |
 | Three or more staff | | Lock, Only the HG team sees this |

@@ -24,7 +24,7 @@ test("the drain re-reads each item's event after it claims the row, not before",
 test("it reads in one query per row, scoped to the row's task, only for items that name events", () => {
   assert.equal((code.match(/taskEvent\.findMany/g) ?? []).length, 1);
   assert.match(code, /where: \{ id: \{ in: ids \}, taskId \}/);
-  assert.match(code, /if \(ids\.length === 0\) return stored;/, "a row of old items sends as stored, with no read");
+  assert.match(code, /if \(ids\.length === 0\) return \{ items: stored, photosByEvent: new Map\(\) \};/, "a row of old items sends as stored, with no read");
   // A file taken off a comment is not counted.
   assert.match(code, /attachments: \{ where: \{ deletedAt: null \}/);
 });
@@ -56,11 +56,18 @@ test("every write to a claimed row is an updateMany by id, so a row deleteTask's
   assert.doesNotMatch(code, /notificationOutbox\.update\(/, "no update that needs the row to be there");
   const drain = code.slice(code.indexOf("export async function drainDue"));
   const writes = drain.match(/notificationOutbox\.updateMany\(\{\s*where: \{ [^}]*\}/g) ?? [];
-  // nothing to send, sent, refused for Resend's limits, failed: each by the row's id alone.
-  assert.equal(writes.length, 4);
+  // the task gone at the claim, nothing to send, sent, refused for Resend's limits, failed: each by the row's id alone.
+  assert.equal(writes.length, 5);
   for (const w of writes) assert.match(w, /where: \{ id: row\.id \}$/);
   // A count of 0 is not an error: nothing reads it, and the loop goes on to the next row.
   assert.doesNotMatch(drain, /const \{ count \} = await prisma\.notificationOutbox\.updateMany/);
   // The sent count is the email that went out, whether or not its row is still there.
   assert.match(drain, /if \(res\.ok\) \{\s*await prisma\.notificationOutbox\.updateMany\(\{ where: \{ id: row\.id \}, data: \{ sentAt: new Date\(\), lastError: null \} \}\);\s*result\.sent\+\+;/);
+});
+
+// docs/specs/contractor-email-switch.md: a line still waiting when Job emails goes off is dropped by the run.
+test("the drain reads the contractor's Job emails switch with the row and closes a refused row unsent, with the reason", () => {
+  assert.match(code, /portalAccount: \{ select: \{ email: true, status: true, jobEmails: true \} \}/);
+  // deliveryFor's refusal (content.test.ts: "emails off") is the row's lastError, so nothing reads it as emailed.
+  assert.match(code, /await closeUnsent\(row\.id, now, !row\.task \? "no task" : delivery\.ok \? "no recipient" : delivery\.reason\)/);
 });

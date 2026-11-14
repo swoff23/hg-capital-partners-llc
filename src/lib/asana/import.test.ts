@@ -166,7 +166,7 @@ test("the importer's principal is one rules.ts never emails for, whatever change
   const kinds: NotifyChange["kind"][] = ["COMMENT", "ATTACHMENT", "STATUS", "ASSIGNED", "TARGET", "NOTES", "DUE", "CHECKLIST", "CONFLICT", "CREATED", "REPEAT"];
   for (const kind of kinds) {
     for (const visibility of ["SHARED", "INTERNAL"] as const) {
-      assert.equal(notifyAudience("asana", { kind, visibility }, { contractorHasLogin: true }), null, `${kind} ${visibility}`);
+      assert.equal(notifyAudience("asana", { kind, visibility }, { contractorGetsEmail: true }), null, `${kind} ${visibility}`);
     }
   }
 });

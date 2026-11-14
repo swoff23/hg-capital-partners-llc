@@ -31,14 +31,15 @@ test("a sheet whose code can't be fetched closes with a toast instead of replaci
   // Before, useLazyModule threw to the page boundary: the property page became 'Something went wrong'.
   const hook = read("./use-lazy-module.ts");
   assert.match(hook, /failed: \(error\) => \(answer\.current \? answer\.current\(error\) : setFailure\(\{ error \}\)\),/);
-  for (const [file, sheet] of [
-    ["../app/(app)/properties/[id]/edit-units.tsx", "unitSheet"],
-    ["../app/(app)/properties/[id]/edit-listings.tsx", "listingSheet"],
+  // Units also has the one-item equipment sheet from the same module, and closes it too.
+  for (const [file, sheet, opens, alsoCloses] of [
+    ["../app/(app)/properties/[id]/edit-units.tsx", "unitSheet", "sheet !== null \\|\\| item !== null", "\\s*setItem\\(null\\);\\s*setItemOpen\\(false\\);"],
+    ["../app/(app)/properties/[id]/edit-listings.tsx", "listingSheet", "sheet !== null", ""],
   ] as const) {
     const src = read(file);
     assert.match(
       src,
-      new RegExp(`useLazyModule\\(${sheet}, sheet !== null, \\(\\) => \\{\\s*setSheet\\(null\\);\\s*setIsOpen\\(false\\);\\s*run\\.toast\\(openFailedToast\\(\\)\\);\\s*\\}\\);`),
+      new RegExp(`useLazyModule\\(${sheet}, ${opens}, \\(\\) => \\{\\s*setSheet\\(null\\);\\s*setIsOpen\\(false\\);${alsoCloses}\\s*run\\.toast\\(openFailedToast\\(\\)\\);\\s*\\}\\);`),
       `${file} closes the sheet and toasts`,
     );
     // And the code is fetched ahead of the tap: when the page is idle, and at hover, focus and press.
@@ -47,4 +48,16 @@ test("a sheet whose code can't be fetched closes with a toast instead of replaci
     assert.match(src, new RegExp(`\\{\\.\\.\\.warmOnIntent\\(${sheet}\\)\\}`), `${file} warms at the row that opens it`);
     assert.match(src, new RegExp(`onPressStart=\\{${sheet}\\.warm\\}`), `${file} warms at the row's menu`);
   }
+});
+
+test("the staff app and the portal both tell a tab left open about a new version; the public site doesn't", () => {
+  // docs/specs/update-notice.md, decision 4.
+  for (const file of ["../app/(app)/layout.tsx", "../app/(portal)/p/layout.tsx"]) {
+    assert.match(read(file), /<UpdateNotice version=\{getEnv\(\)\.VERCEL_GIT_COMMIT_SHA \?\? null\} \/>/, file);
+  }
+  assert.doesNotMatch(read("../app/(marketing)/layout.tsx"), /UpdateNotice/);
+  // Reload asks through the guard with its own way out, and the toast stays until it's used.
+  const notice = read("./update-notice.tsx");
+  assert.match(notice, /useLeaveGuard\(\{ leaveLabel: RELOAD_ANYWAY \}\)/);
+  assert.match(notice, /sticky: true,/);
 });

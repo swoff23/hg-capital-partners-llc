@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addToast, type QueuedToast } from "@/components/toast-queue";
 import { toastMs } from "@/lib/toast-time";
@@ -26,16 +26,38 @@ import { toastMs } from "@/lib/toast-time";
  * Congress St."), so a phone cuts the place and not the news. `key` names what the toast is about: a toast
  * with the key of one still showing replaces it instead of stacking, so ten
  * quick edits on one record show one toast for the latest (forms 2.13).
+ *
+ * `sticky` is for a toast that waits for the person (the update notice,
+ * components/update-notice.tsx): no timer, newer toasts never push it out,
+ * and its × is drawn on touch too, since it never closes by itself. With an
+ * action, the icon, message and action are one button, so a press anywhere
+ * on the pill acts.
  */
 
 export type ToastInput = {
   /** One line. */
   message: string;
+  /**
+   * The line under 375px, when `message` won't fit there. TOAST_PHONE_CHARS counts on no icon and no drawn ×;
+   * a sticky toast with an icon has both, which leaves about 124px at 320 ("Update ready", not "A new version is
+   * ready"). Shorten the words, not the font (docs/copy-rules.md).
+   */
+  phoneMessage?: string;
   /** The ripple clause, after " · " in --toast-fg-2: "Forecasts updated", or the place an away upload toast is about. */
   detail?: string;
   /** What it's about ("task:abc:due"): a new toast with a live toast's key replaces it. */
   key?: string;
-  action?: { label: string; onAction: () => void };
+  /**
+   * The toast's one next step. A plain toast closes once it runs. A sticky one stays (the step may ask first, as
+   * Reload does under unsaved work), and `onAction` returns true when the page is going away, which spins the icon.
+   */
+  action?: { label: string; onAction: () => boolean | void | Promise<void> };
+  /** A lucide icon before the message, in --toast-fg-2: 16px at 1.5 with a mouse, 20px at 1.75 on touch. */
+  icon?: LucideIcon;
+  /** Waits for the person: no timer, never pushed out by newer toasts, × drawn on touch, the whole pill its action. */
+  sticky?: boolean;
+  /** Runs when the person closes it with × or Esc. Not when its action runs or its time runs out. */
+  onDismiss?: () => void;
 };
 
 type ToastItem = QueuedToast<ToastInput>;
@@ -92,17 +114,57 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => void }) {
   const [held, setHeld] = useState(false);
-  const { id, version } = item;
+  // A sticky toast's action is leaving the page (a reload): the icon spins until it goes.
+  const [leaving, setLeaving] = useState(false);
+  const { id, version, sticky, action } = item;
   // A button needs the tap, and a finger can't hold the toast open: 8 seconds with one, 5 without.
   const stays = toastMs(item.action !== undefined);
 
-  // A replacement (a new version under the same key) starts the time over.
+  // A replacement (a new version under the same key) starts the time over. A sticky toast has no timer.
   useEffect(() => {
-    if (held) return;
+    if (held || sticky) return;
     const timer = setTimeout(() => dismiss(id), stays);
     return () => clearTimeout(timer);
-  }, [held, dismiss, id, version, stays]);
-  const onDismiss = () => dismiss(id);
+  }, [held, sticky, dismiss, id, version, stays]);
+  // The person closing it, with × or Esc.
+  const onClose = () => {
+    dismiss(id);
+    item.onDismiss?.();
+  };
+  const act = () => {
+    if (!action) return;
+    const goingAway = action.onAction();
+    if (sticky) setLeaving(goingAway === true);
+    else dismiss(id);
+  };
+
+  const Icon = item.icon;
+  const icon = Icon && (
+    <Icon
+      aria-hidden="true"
+      strokeWidth={1.5}
+      className={cn(
+        "size-4 shrink-0 text-toast-fg-2 pointer-coarse:size-5 pointer-coarse:stroke-[1.75]",
+        leaving && "animate-spin motion-reduce:animate-none",
+      )}
+    />
+  );
+  const message = (
+    <span className="min-w-0 flex-1 truncate">
+      {item.phoneMessage ? (
+        <>
+          <span className="max-[374px]:hidden">{item.message}</span>
+          <span className="hidden max-[374px]:inline">{item.phoneMessage}</span>
+        </>
+      ) : (
+        item.message
+      )}
+      {item.detail && <span className="text-toast-fg-2"> · {item.detail}</span>}
+    </span>
+  );
+  const actionLabelClass = "shrink-0 font-medium text-toast-fg underline decoration-1 underline-offset-3";
+  // The whole pill is the action: icon, message and label in one button, the × beside it.
+  const wholePill = sticky && action;
 
   return (
     <div
@@ -117,40 +179,55 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
         if (e.key !== "Escape" || e.nativeEvent.isComposing) return;
         e.preventDefault();
         e.stopPropagation();
-        onDismiss();
+        onClose();
       }}
       className={cn(
         // The ink pill on the toast tokens, at the Float level. Its edge only shows in dark (--toast-edge).
         // relative: a hidden Dismiss is absolute and stays inside the pill.
-        "pointer-events-auto relative flex min-h-10 items-center gap-2 rounded-lg border border-toast-edge bg-toast-bg py-1 pl-3.5 pr-1 text-body text-toast-fg shadow-float",
+        "pointer-events-auto relative flex min-h-10 items-center gap-2 rounded-lg border border-toast-edge bg-toast-bg py-1 pr-1 text-body text-toast-fg shadow-float",
+        // A whole-pill button carries the left padding itself, so a press on the pill's edge still acts.
+        wholePill ? "pl-1 gap-1" : "pl-3.5",
         "animate-toast-in motion-reduce:animate-none",
       )}
     >
-      <span className="min-w-0 flex-1 truncate">
-        {item.message}
-        {item.detail && <span className="text-toast-fg-2"> · {item.detail}</span>}
-      </span>
-      {item.action && (
+      {wholePill ? (
         <button
           type="button"
-          onClick={() => {
-            item.action!.onAction();
-            onDismiss();
-          }}
-          className="shrink-0 rounded-md px-2 py-1.5 font-medium text-toast-fg underline decoration-1 underline-offset-3 transition-colors hover:bg-toast-hover focus-visible:outline-toast-fg pointer-coarse:min-h-11"
+          onClick={act}
+          className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 pl-2.5 pr-2 text-left transition-colors hover:bg-toast-hover focus-visible:outline-toast-fg pointer-coarse:min-h-11"
         >
-          {item.action.label}
+          {icon}
+          {message}
+          <span className={actionLabelClass}>{action.label}</span>
         </button>
+      ) : (
+        <>
+          {icon}
+          {message}
+          {action && (
+            <button
+              type="button"
+              onClick={act}
+              className={cn(
+                actionLabelClass,
+                "rounded-md px-2 py-1.5 transition-colors hover:bg-toast-hover focus-visible:outline-toast-fg pointer-coarse:min-h-11",
+              )}
+            >
+              {action.label}
+            </button>
+          )}
+        </>
       )}
       <button
         type="button"
         aria-label="Dismiss"
-        onClick={onDismiss}
+        onClick={onClose}
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-toast-fg-2 transition-colors hover:bg-toast-hover hover:text-toast-fg focus-visible:outline-toast-fg pointer-coarse:h-11 pointer-coarse:w-11",
           // On touch (tablets too) a toast with an action closes itself, so its × gives the message the room.
           // It stays a real button for VoiceOver and Switch Control, and is drawn again while it has keyboard focus.
-          item.action && "pointer-coarse:not-focus-visible:sr-only",
+          // A sticky toast never closes itself, so its × stays drawn.
+          action && !sticky && "pointer-coarse:not-focus-visible:sr-only",
         )}
       >
         <X className="h-4 w-4" aria-hidden="true" />

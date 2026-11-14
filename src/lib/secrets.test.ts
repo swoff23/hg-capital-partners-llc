@@ -44,6 +44,19 @@ test("cronAuthorized: bearer must match exactly", () => {
   assert.equal(cronAuthorized("cron-1", ""), "denied");
 });
 
+test("cronAuthorized: a secret saved with a stray space or newline still matches Vercel's header", () => {
+  // The header arrives with its edges trimmed, so the untrimmed secret used to refuse every run, logging nothing.
+  assert.equal(cronAuthorized("cron-1 ", "Bearer cron-1"), "ok");
+  assert.equal(cronAuthorized(" cron-1", "Bearer cron-1"), "ok");
+  assert.equal(cronAuthorized("cron-1\n", "Bearer cron-1"), "ok");
+  assert.equal(cronAuthorized("cron-1 ", "Bearer cron-2"), "denied");
+  // Only the edges: a space inside the secret is part of it.
+  assert.equal(cronAuthorized("cron 1", "Bearer cron1"), "denied");
+  // Whitespace alone is no secret: it fails closed, as unset.
+  assert.equal(cronAuthorized(" ", "Bearer x"), "unconfigured");
+  assert.equal(cronAuthorized("\n\t", null), "unconfigured");
+});
+
 test("cronRefusal: the status says which side to fix, the body never says why", () => {
   assert.deepEqual(cronRefusal("unconfigured"), { status: 503, body: "Service Unavailable" });
   assert.deepEqual(cronRefusal("denied"), { status: 401, body: "Unauthorized" });

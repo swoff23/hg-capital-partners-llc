@@ -21,6 +21,7 @@ import {
   Settings2,
   SquareCheckBig,
   TrendingUp,
+  Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -878,6 +879,18 @@ function rowParts(row: SearchRowData, q: string, today: Ymd): RowParts {
         text: [row.title, stage].join(", "),
       };
     }
+    case "tenant": {
+      const past = row.past ? <span className={tagClass}>Past</span> : null;
+      return {
+        leading: <Avatar name={row.title} size={24} />,
+        title: <Marked text={row.title} q={q} />,
+        meta: row.home ?? undefined,
+        status: past,
+        sub: row.home ?? "Tenant",
+        topRight: past ?? undefined,
+        text: [row.title, row.home, row.past ? "Past" : ""].filter(Boolean).join(", "),
+      };
+    }
     case "contractor": {
       const meta = [row.trade, row.company].filter(Boolean).join(" · ");
       const inactive = !row.active ? <span className={tagClass}>Inactive</span> : null;
@@ -900,6 +913,7 @@ const COMMAND_ICON: Record<CommandIcon, LucideIcon> = {
   portfolio: Building2,
   financials: ChartColumn,
   tasks: SquareCheckBig,
+  tenants: Users,
   contractors: Wrench,
   playbooks: ClipboardList,
   settings: Settings2,

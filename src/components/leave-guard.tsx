@@ -56,8 +56,11 @@ export type LeaveHold = LeaveWords & {
 
 type Guard = {
   hold: (id: string, hold: (LeaveWords & { scope: LeaveScope }) | null) => void;
-  ask: (leave: () => void, signOut: boolean) => void;
+  ask: (leave: () => void, signOut: boolean, leaveLabel: string) => void;
 };
+
+/** The sheet's way out, unless the exit names its own ("Reload anyway" for the update notice's Reload). */
+const LEAVE_ANYWAY = "Leave anyway";
 
 const LeaveGuardContext = createContext<Guard | null>(null);
 
@@ -77,6 +80,8 @@ export function LeaveGuard({
   const [asking, setAsking] = useState<{ signOut: boolean } | null>(null);
   // The latest words, kept after the question closes so a closing sheet doesn't go blank.
   const [words, setWords] = useState<LeaveWords | null>(null);
+  // The asking exit's way out, kept after the question closes for the same reason.
+  const [leaveLabel, setLeaveLabel] = useState(LEAVE_ANYWAY);
   const leaveTo = useRef<(() => void) | null>(null);
   const holdsRef = useRef(holds);
   useLayoutEffect(() => {
@@ -91,9 +96,10 @@ export function LeaveGuard({
   }
 
   const hold = useCallback<Guard["hold"]>((id, h) => setHolds((hs) => setHold(hs, id, h)), []);
-  const ask = useCallback<Guard["ask"]>((leave, signOut) => {
+  const ask = useCallback<Guard["ask"]>((leave, signOut, label) => {
     if (!holdFor(holdsRef.current, signOut)) return leave();
     leaveTo.current = leave;
+    setLeaveLabel(label);
     setAsking({ signOut });
   }, []);
   const guard = useMemo(() => ({ hold, ask }), [hold, ask]);
@@ -121,7 +127,7 @@ export function LeaveGuard({
           {/* Same row as the Mark done sheet: the way out on the left, the main button on the right. */}
           <div className="flex items-center gap-3">
             <Button variant="secondary" className="h-12 min-w-0 flex-1 whitespace-nowrap max-[360px]:px-2" onClick={leaveAnyway}>
-              Leave anyway
+              {leaveLabel}
             </Button>
             <Button className="h-12 min-w-0 flex-1 whitespace-nowrap max-[360px]:px-2" onClick={() => setAsking(null)}>
               <span className="truncate">{words?.stay}</span>
@@ -169,10 +175,12 @@ const leaveNow = (leave: () => void) => leave();
  * or asks first while a hold covers it. A Sign out button passes
  * `{ signOut: true }`: signing out is the one exit an upload in flight must
  * stop, so it also asks for "sign-out" holds, which every other exit lets
- * pass.
+ * pass. `leaveLabel` names the sheet's way out when the exit isn't a leave:
+ * the update notice's Reload passes "Reload anyway".
  */
-export function useLeaveGuard(options: { signOut?: boolean } = {}): (leave: () => void) => void {
+export function useLeaveGuard(options: { signOut?: boolean; leaveLabel?: string } = {}): (leave: () => void) => void {
   const ask = useContext(LeaveGuardContext)?.ask;
   const signOut = options.signOut === true;
-  return useMemo(() => (ask ? (leave: () => void) => ask(leave, signOut) : leaveNow), [ask, signOut]);
+  const label = options.leaveLabel ?? LEAVE_ANYWAY;
+  return useMemo(() => (ask ? (leave: () => void) => ask(leave, signOut, label) : leaveNow), [ask, signOut, label]);
 }

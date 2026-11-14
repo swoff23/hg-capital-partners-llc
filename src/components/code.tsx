@@ -1,6 +1,5 @@
 "use client";
-import { useState } from "react";
-import { Copy, Eye, EyeOff } from "lucide-react";
+import { Copy } from "lucide-react";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
 
@@ -8,9 +7,9 @@ import { cn } from "@/lib/utils";
  * A code read character by character: a lockbox, unit, SBL, loan, policy or
  * account number (docs/brand-guidelines.md, section 3). Geist Mono in --fg-2,
  * never colored, never wrapped mid-token. One tap copies it, and a toast
- * names what was copied ("Lockbox code copied"). `mask` shows only the last
- * four ("•• 2502") with a button to reveal the rest; a copy is always the
- * whole code. `size="lg"` is the lockbox code on the job page and in Access.
+ * names what was copied ("Lockbox code copied"). Always shown in full: a
+ * utility account number once hid behind a reveal button, and Connor wants
+ * them in sight (Nov 14). `size="lg"` is the lockbox code on the job page and in Access.
  * `copyIcon={false}` drops the hover copy icon where copying isn't the job
  * (the job page's lockbox, typed into the box by hand).
  * `wrap` lets a long code break onto more lines inside its column instead
@@ -22,7 +21,6 @@ import { cn } from "@/lib/utils";
 export function Code({
   value,
   label,
-  mask = false,
   size = "md",
   copyIcon = true,
   wrap = false,
@@ -31,7 +29,6 @@ export function Code({
   value: string;
   /** What the code is, for the copy button and the toast: "Lockbox code". */
   label: string;
-  mask?: boolean;
   size?: "md" | "lg";
   /** The copy icon that shows on hover; off where copying isn't the job (the job page's lockbox). */
   copyIcon?: boolean;
@@ -40,8 +37,6 @@ export function Code({
   className?: string;
 }) {
   const { toast } = useToast();
-  const [shown, setShown] = useState(!mask);
-  const text = shown ? value : `•• ${value.slice(-4)}`;
 
   async function copy() {
     try {
@@ -58,7 +53,7 @@ export function Code({
         type="button"
         onClick={copy}
         // Names the code itself, not only the action: "Lockbox code 4521, copy".
-        aria-label={`${label} ${shown ? value : `ending ${value.slice(-4)}`}, copy`}
+        aria-label={`${label} ${value}, copy`}
         className={cn(
           "group relative inline-flex items-center gap-1.5 rounded-sm font-mono text-fg-2 transition-colors hover:text-fg-1",
           wrap ? "min-w-0 whitespace-normal text-left" : "shrink-0 whitespace-nowrap",
@@ -69,7 +64,7 @@ export function Code({
       >
         {/* Never truncated: a code is read character by character, so the cell gives it room. A wrapping
             code breaks at its spaces, and inside a token only when that token alone is wider than the column. */}
-        <span className={cn(wrap && "min-w-0 [overflow-wrap:anywhere]")}>{text}</span>
+        <span className={cn(wrap && "min-w-0 [overflow-wrap:anywhere]")}>{value}</span>
         {copyIcon && (
           <Copy
             aria-hidden="true"
@@ -77,17 +72,6 @@ export function Code({
           />
         )}
       </button>
-      {mask && (
-        <button
-          type="button"
-          onClick={() => setShown((s) => !s)}
-          aria-label={shown ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
-          aria-pressed={shown}
-          className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-fg-3 transition-colors hover:bg-fill-1 hover:text-fg-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5"
-        >
-          {shown ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
-        </button>
-      )}
     </span>
   );
 }

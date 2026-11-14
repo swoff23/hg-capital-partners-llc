@@ -14,7 +14,11 @@ const SESSION_COOKIE = "hgos_session";
 // The run's server is plain http on localhost, so the portal cookie goes by
 // its non-__Host- name, PORTAL_COOKIE_HTTP. setup.ts seeds both fixtures'
 // sessions.
-const PORTAL_TOKEN_ENV = { portal: "DEVICE_PORTAL_TOKEN", "portal-welcome": "DEVICE_PORTAL_WELCOME_TOKEN" } as const;
+const PORTAL_TOKEN_ENV = {
+  portal: "DEVICE_PORTAL_TOKEN",
+  "portal-welcome": "DEVICE_PORTAL_WELCOME_TOKEN",
+  "portal-setup": "DEVICE_PORTAL_SETUP_TOKEN",
+} as const;
 
 // Every width from the responsiveness rule, including both sides of each
 // breakpoint edge (639/640, 767/768, 1023/1024, 1279/1280).
@@ -67,7 +71,7 @@ for (const route of listRoutes()) {
 
     if (route.session === "staff") {
       await page.context().addCookies([{ name: SESSION_COOKIE, value: process.env.DEVICE_SESSION_TOKEN!, url: origin }]);
-    } else if (route.session === "portal" || route.session === "portal-welcome") {
+    } else if (route.session === "portal" || route.session === "portal-welcome" || route.session === "portal-setup") {
       const value = process.env[PORTAL_TOKEN_ENV[route.session]]!;
       await page.context().addCookies([{ name: PORTAL_COOKIE_HTTP, value, url: origin }]);
     }

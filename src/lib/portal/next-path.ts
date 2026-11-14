@@ -22,6 +22,16 @@ export const PORTAL_HOME = "/p";
 /** Where a contractor still holding a starting password is sent. */
 export const WELCOME_PASSWORD_PATH = "/p/welcome/password";
 
+/** Contractor onboarding's steps (docs/specs/contractor-onboarding.md): the only page someone mid-setup may open. */
+export const SETUP_PATH = "/p/setup";
+
+/** Whether a /p path (with or without its query) is the setup steps. */
+export function isSetupPath(path: string | null): boolean {
+  if (!path) return false;
+  const pathname = path.split(/[?#]/)[0];
+  return pathname === SETUP_PATH;
+}
+
 /**
  * Request header src/proxy.ts sets on every /p request: the path and query the
  * browser asked for. A client can send its own on other routes, so whatever

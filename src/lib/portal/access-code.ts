@@ -18,9 +18,9 @@ import type { PrismaClient } from "@prisma/client";
  * The same property's codes can also turn up in the text of an imported
  * comment ("gate code 2925"). `lockboxMasker` hides them there, on the
  * server: the browser gets segments with the code already replaced, never the
- * code or the list of codes. (Code's own `mask` keeps the last four
- * characters and ships the whole value, which would show a four-digit code in
- * full.) The assigned contractor reads the real one in the job's Lockbox
+ * code or the list of codes. (A browser-side mask that keeps the last four
+ * characters would ship the whole value and show a four-digit code in full.)
+ * The assigned contractor reads the real one in the job's Lockbox
  * section.
  */
 

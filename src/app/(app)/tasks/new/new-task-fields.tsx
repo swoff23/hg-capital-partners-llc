@@ -6,14 +6,14 @@ import type { TaskStatus } from "@prisma/client";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { CreateForm } from "@/components/create-form";
 import { DatePanel, DatePicker } from "@/components/due-date-picker";
-import { AssigneePicker, PropertyPicker, UnitPicker } from "@/components/entity-picker";
+import { AssigneePicker, PropertyUnitPicker } from "@/components/entity-picker";
 import type { MenuFollowUp } from "@/components/menu";
 import { StatusMenu } from "@/components/status-menu";
 import { useToast } from "@/components/toast";
 import { Button, FormField, Input, Textarea, tagClass } from "@/components/ui";
 import type { FieldErrors } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
-import { offersUnits, type PropertyOption } from "@/lib/picker-options-shape";
+import type { PropertyOption } from "@/lib/picker-options-shape";
 import { firstOccurrence, type RepeatRule } from "@/lib/tasks/repeat";
 import { followDueDay } from "@/lib/tasks/repeat-choice";
 import { fmtShortDay } from "@/lib/tasks/activity";
@@ -67,8 +67,8 @@ function blank(context: NewTaskContext | null, meId: string): Values {
  * Tag (a deal's task is about the deal, so there's no Property chip beside
  * it); Title, Notes, then the task page's own chips in one row that scrolls
  * sideways and never wraps: Assignee, Due with Repeat inside it, Status with
- * Waiting and Scheduled asking their answer in the same layer, Property and
- * Unit. With a mouse each chip opens a popover over the dialog; on touch it
+ * Waiting and Scheduled asking their answer in the same layer, and Property
+ * with its Unit in one chip. With a mouse each chip opens a popover over the dialog; on touch it
  * opens as a view inside the sheet.
  *
  * "Create task" with Create more; a task made from the sheet leaves you where
@@ -113,7 +113,6 @@ export function NewTaskForm({
   }, []);
   const set = (patch: Partial<Values>) => setValues((v) => ({ ...v, ...patch }));
 
-  const property = properties.find((p) => p.id === values.propertyId);
   const showProperty = !(tagOn && context);
 
   function changeDue(next: Ymd | null) {
@@ -130,11 +129,6 @@ export function NewTaskForm({
       set({ repeat: rule, due: first });
       setLastDue(first);
     } else set({ repeat: rule });
-  }
-
-  function changeProperty(propertyId: string | null) {
-    const next = properties.find((p) => p.id === propertyId);
-    set({ propertyId, unitLabel: values.unitLabel && next?.units.includes(values.unitLabel) ? values.unitLabel : null });
   }
 
   function followUp(to: TaskStatus): MenuFollowUp | null {
@@ -185,6 +179,9 @@ export function NewTaskForm({
   return (
     <CreateForm<Values, CreatedTask>
       variant={variant}
+      // A steady 672px from md (the lg width at full), so the chip row fits with a unit picked and the sheet doesn't grow as you pick (Connor, Nov 14).
+      size="lg"
+      sheetClassName="md:w-2xl"
       title="New task"
       primary="Create task"
       discardTitle="Discard the new task?"
@@ -293,6 +290,8 @@ export function NewTaskForm({
                 meId={meId}
                 recent={recent}
                 size="sm"
+                // From md, Assignee and Property give up width first, cutting their names; a phone swipes the row instead.
+                className="md:min-w-24 md:shrink"
                 onChange={(assignee) => set({ assignee })}
               />
               <DatePicker
@@ -311,14 +310,13 @@ export function NewTaskForm({
                 className="shrink-0 border border-line-strong bg-surface px-2 font-medium text-fg-1"
               />
               {showProperty && (
-                <PropertyPicker value={values.propertyId} properties={properties} size="sm" onChange={changeProperty} />
-              )}
-              {property && offersUnits(property.units, values.unitLabel) && (
-                <UnitPicker
-                  value={values.unitLabel}
-                  units={property.units}
+                <PropertyUnitPicker
+                  propertyId={values.propertyId}
+                  unitLabel={values.unitLabel}
+                  properties={properties}
                   size="sm"
-                  onChange={(unitLabel) => set({ unitLabel })}
+                  className="md:min-w-32 md:shrink"
+                  onChange={set}
                 />
               )}
             </div>

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { dbConnectionSummary } from "@/lib/db-url";
 import { getEnv } from "@/lib/env";
+import { currentJobReasons } from "@/lib/jobs-check-in";
 import { healthDetailAllowed } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,10 @@ export const dynamic = "force-dynamic";
  * nobody gets the detail (see src/lib/secrets.ts). The detail also says how
  * the database is reached (dbDriver, dbVia, dbPool), how long a SELECT 1
  * took (dbMs), and the session's time zone (dbTimeZone), which must stay UTC
- * for the driver to read a timestamptz right (src/lib/db.ts).
+ * for the driver to read a timestamptz right (src/lib/db.ts). It also lists
+ * why the background jobs' check-in says "error" (`jobs`, src/lib/jobs-health.ts),
+ * which is what docs/alerts.md says to send Claude. Sentry's uptime check reads
+ * only the public answer: a 503 when the database is down.
  *
  *   curl -s "$PROD/api/health?token=$HEALTH_TOKEN" | jq
  */
@@ -74,6 +78,14 @@ export async function GET(request: NextRequest) {
     body.dbTimeZone = dbTimeZone;
     body.migrations = migrations;
     body.latestMigration = migrations.find((m) => m.appliedAt && !m.rolledBackAt)?.name ?? null;
+    if (db === "up") {
+      try {
+        body.jobs = await currentJobReasons();
+      } catch (err) {
+        body.jobs = null;
+        body.jobsError = err instanceof Error ? err.message : String(err);
+      }
+    }
   }
 
   return NextResponse.json(body, { status: db === "up" ? 200 : 503 });

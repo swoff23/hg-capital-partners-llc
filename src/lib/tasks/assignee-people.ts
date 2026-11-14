@@ -15,7 +15,7 @@ import type { Prisma } from "@prisma/client";
  */
 export const listedContactsWhere = {
   active: true,
-  OR: [{ trades: { not: null } }, { assignedTasks: { some: {} } }],
+  OR: [{ tradeLinks: { some: {} } }, { assignedTasks: { some: {} } }],
 } satisfies Prisma.ContactWhereInput;
 
 /** The picker's key for a stored assignee: `{ userId }` is "u:…", `{ contactId }` is "c:…". */

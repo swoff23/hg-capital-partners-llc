@@ -58,6 +58,12 @@ export type SelectProps = {
   /** "Search reasons": the search field's name when the list is long. */
   searchLabel?: string;
   emptyText?: string;
+  /**
+   * Find-or-add: the search always shows, and text that names no option adds
+   * it ('Add "Linwood Partners LLC"'). Called with the text; put it in `items`
+   * so it reads as a row and not as a stray.
+   */
+  onCreate?: (text: string) => void;
   id?: string;
   /** On the wrapper: widths and margins. */
   className?: string;
@@ -88,6 +94,7 @@ export function Select({
   title,
   searchLabel,
   emptyText,
+  onCreate,
   id,
   className,
 }: SelectProps) {
@@ -203,6 +210,15 @@ export function Select({
               onTab={close}
               searchLabel={searchLabel ?? (label ? `Search ${label.toLowerCase()}` : "Search")}
               emptyText={emptyText}
+              onCreate={
+                onCreate
+                  ? (text) => {
+                      close();
+                      onCreate(text);
+                      pick(text);
+                    }
+                  : undefined
+              }
             />
           )}
         </PickerLayer>

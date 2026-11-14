@@ -4,7 +4,7 @@ import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { preload } from "@/lib/preload";
-import { getEntityNames, getPropertyById } from "@/lib/properties/read";
+import { getEntityChoices, getPropertyById } from "@/lib/properties/read";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
@@ -13,26 +13,26 @@ import { toYmd, todayYmdEastern } from "@/lib/dates";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
 import { targetDate } from "@/lib/tasks/rules";
-import { loanPosition } from "@/lib/properties/figures";
+import { buildingLine, loanPosition } from "@/lib/properties/figures";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
-import { ArchivedNotice, RecordMoreMenu } from "@/components/record-archive";
+import { ArchivedNotice } from "@/components/record-archive";
 import { archivedLine } from "@/lib/archive";
 import { shortAddress } from "@/lib/normalize";
 import { setPropertyArchived } from "../actions";
-import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { DocumentsSection, propertyDocuments } from "./documents-section";
 import { PropertyLoanSection } from "./edit-loan";
 import { PropertyInsuranceSection } from "./edit-insurance";
 import { UnitsSection } from "./edit-units";
 import { ListingsSection, type EditableListing } from "./edit-listings";
-import { BuildingCapexSection } from "./building-capex";
+import { BuildingSystems } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
 import { PropertyFinancialsCard } from "./financials";
 import { PropertyFactStrip } from "./record-strip";
+import { PropertyMoreMenu } from "./property-more-menu";
 import { PropertyPhoto } from "./property-photo";
 import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
 import type { Metadata } from "next";
@@ -65,10 +65,13 @@ function taskAssignee(t: {
 
 /**
  * A property's record (docs/brand-guidelines.md, sections 5 and 9): capped at
- * 1200 with a 320 rail from lg. The identity header (photo, status, the
- * address as the h1, entity and units), the four-fact strip, then the work
- * (financials, CapEx, units, rentals) beside the facts rail (details, loan,
- * insurance) and the property's tasks, documents and notes.
+ * 1200 with a 320 rail from lg. The identity header (the address as the h1,
+ * then beds, baths, square feet and units; the photo once one is set), the
+ * four-fact strip, then the work
+ * first (docs/specs/property-page.md): tasks, units and access, financials,
+ * CapEx and rental listings, beside the facts rail (details, loan, insurance)
+ * and the property's documents and notes. Below lg it's one column in that
+ * order, so on a phone the tasks and lockbox codes sit under the figures.
  */
 export default async function PropertyPage({ params }: PageProps<"/properties/[id]">) {
   const { id } = await params;
@@ -91,7 +94,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       include: { photos: { orderBy: { sortOrder: "asc" } } },
     }),
     getCapexRules(),
-    getEntityNames(),
+    getEntityChoices(),
   ]);
   if (!property) notFound();
   // Who archived it, for the notice: read only for an archived property, so a live one costs no extra query.
@@ -138,37 +141,30 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   const value = d(property.value);
   const balance = d(property.currentLoan);
   const position = loanPosition(value, balance);
-  const subline = [property.llcOwner?.trim(), unitCount > 0 && `${unitCount} ${unitCount === 1 ? "unit" : "units"}`]
-    .filter(Boolean)
-    .join(" · ");
+  const subline = buildingLine({ beds: property.beds, baths: d(property.baths), sqft: property.sqft, units: unitCount });
   const version = property.updatedAt.toISOString();
 
   return (
     <div className="max-w-300">
       <BackLink fallback="/properties" label="Portfolio" />
 
-      {/* Identity: the building's photo (the fallback tile until it's taken), status, address, entity and units. */}
-      <header className="mt-3 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
-        {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. */}
+      {/* Identity: the address, then what the building is (Connor, Nov 14). Status lives in Details; the photo shows
+          once one is set, and the ⋯ menu's "Add photo" sets the first. */}
+      <header className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
+        {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. Nothing until set. */}
         <PropertyPhoto property={{ id: property.id, address: property.address, photoUrl: property.photoUrl }} canEdit />
-        <div className="min-w-0">
-          {property.status && (
-            <p className="text-meta">
-              <PropertyStatus status={property.status} />
-            </p>
-          )}
+        <div className="min-w-0 flex-1">
           {/* The ⋯ menu is centered on the address's first line, as on a task's page: the heading's 4px padding and half its line, less half the 32px button (44 on touch). */}
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
               <PropertyAddressField id={property.id} value={property.address} />
             </div>
             <div className="shrink-0 pt-1 pointer-coarse:-mt-px pointer-coarse:pt-0">
-              <RecordMoreMenu
-                kind="property"
+              <PropertyMoreMenu
                 id={property.id}
-                href={`/properties/${property.id}`}
                 archived={!!property.archivedAt}
-                action={setPropertyArchived}
+                canAddListing={!property.archivedAt && listings.length === 0 && unitLabels.length > 0}
+                canAddPhoto={!property.archivedAt && !property.photoUrl}
               />
             </div>
           </div>
@@ -194,12 +190,9 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10 pointer-coarse:mt-6">
+        {/* The work: what's open here, how to get in, then the money and the plan. */}
         <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
-          <PropertyFinancialsCard propertyId={property.id} />
-
-          <CapexForecastCard units={units} building={buildingCapex} rules={capexRules} />
-
-          <BuildingCapexSection propertyId={property.id} version={version} initial={buildingCapex} rules={capexRules} />
+          <PropertyTasksSection propertyId={property.id} tasks={tasks} today={today} />
 
           <UnitsSection
             propertyId={property.id}
@@ -212,13 +205,19 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             unitRefs={countUnitRefs(openTasks, propertyListings)}
           />
 
+          <PropertyFinancialsCard propertyId={property.id} />
+
+          <CapexForecastCard units={units} building={buildingCapex} rules={capexRules}>
+            <BuildingSystems propertyId={property.id} version={version} initial={buildingCapex} rules={capexRules} />
+          </CapexForecastCard>
+
+          {/* Nothing until the first listing; the header's ⋯ "Add listing" opens its sheet. */}
           <ListingsSection propertyId={property.id} version={version} initial={listings} unitLabels={unitLabels} />
         </div>
 
-        {/* The facts rail, then the property's tasks, documents and notes. Sections sit 32px apart, 24 on touch. */}
+        {/* The facts rail, then the property's documents and notes. Sections sit 32px apart, 24 on touch. */}
         <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
           <PropertyDetailsSection
-            entities={entities}
             property={{
               id: property.id,
               address: property.address,
@@ -226,18 +225,17 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               attorney: property.attorney,
               status: property.status,
               showOnMoveInForm: property.showOnMoveInForm,
-              strategy: property.strategy,
-              refiTarget: property.refiTarget,
               purchaseDate: ymd(property.purchaseDate),
               purchasePrice: d(property.purchasePrice),
-              closingCosts: d(property.closingCosts),
-              rehabAmount: d(property.rehabAmount),
               value,
               refinanceDate: ymd(property.refinanceDate),
               sqft: property.sqft,
+              beds: property.beds,
+              baths: d(property.baths),
               rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
               propertyTaxDueDate: ymd(property.propertyTaxDueDate),
             }}
+            entities={entities}
           />
 
           <PropertyLoanSection
@@ -273,8 +271,6 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               replacementCost: d(property.replacementCost),
             }}
           />
-
-          <PropertyTasksSection propertyId={property.id} tasks={tasks} today={today} />
 
           <DocumentsSection propertyId={property.id} />
 

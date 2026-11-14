@@ -4,6 +4,7 @@ import {
   MIN_PASSWORD_LENGTH,
   PASSWORD_MESSAGES,
   checkNewPassword,
+  checkPasswordChange,
   isPasswordProblem,
   isStartingPasswordTry,
   looksLikeEmail,
@@ -41,6 +42,39 @@ test("the account's email, or its name part, is refused", () => {
 test("the password being replaced is refused", () => {
   assert.equal(checkNewPassword("k7mq-4vxp-2hzt", { current: "k7mq-4vxp-2hzt" }), "same");
   assert.equal(checkNewPassword("my own words 9", { current: "k7mq-4vxp-2hzt" }), null);
+});
+
+/** A stand-in for verifyPassword that records each call. */
+function currentCheck(right: boolean) {
+  const calls: number[] = [];
+  return { calls, check: async () => (calls.push(1), right) };
+}
+
+const email = "zack@outlawcarpentry.com";
+const starting = "k7mq-4vxp-2hzt";
+
+test("the new password typed into both boxes is a wrong starting password, not the same one", async () => {
+  // Read as new and confirm: the starting password was never typed.
+  const v = currentCheck(false);
+  assert.equal(await checkPasswordChange({ current: "framing-crew-77", next: "framing-crew-77", email }, v.check), "wrong-current");
+  assert.equal(v.calls.length, 1);
+});
+
+test("reusing the starting password is refused once the starting password is known to be right", async () => {
+  assert.equal(await checkPasswordChange({ current: starting, next: starting, email }, currentCheck(true).check), "same");
+});
+
+test("a weak new password is answered without checking the current one, so it spends no strike", async () => {
+  const v = currentCheck(false);
+  assert.equal(await checkPasswordChange({ current: starting, next: "short", email }, v.check), "short");
+  assert.equal(await checkPasswordChange({ current: starting, next: email, email }, v.check), "email");
+  assert.equal(v.calls.length, 0);
+});
+
+test("a right starting password and a different new one go through", async () => {
+  const v = currentCheck(true);
+  assert.equal(await checkPasswordChange({ current: starting, next: "framing-crew-77", email }, v.check), null);
+  assert.equal(v.calls.length, 1);
 });
 
 test("confirmation must match", () => {

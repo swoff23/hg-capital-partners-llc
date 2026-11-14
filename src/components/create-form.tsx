@@ -5,9 +5,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormSheet } from "@/components/form-sheet";
 import { useHoldLeave } from "@/components/leave-guard";
 import { useDraft } from "@/components/use-draft";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { useRun } from "@/components/use-run";
-import { Button, Kbd, PageHeader, SaveError, textLinkClass } from "@/components/ui";
+import { Button, PageHeader, SaveError, textLinkClass } from "@/components/ui";
 import type { ActionResult, FieldErrors } from "@/lib/action-result";
 import { draftLabel, stableJson } from "@/lib/drafts";
 import { cn } from "@/lib/utils";
@@ -85,6 +84,8 @@ export type CreateFormProps<V, R> = {
   /** Offer "Create more" in the sheet's footer. */
   createMore?: boolean;
   size?: "md" | "lg";
+  /** Classes for the sheet itself, such as a fixed width so it doesn't resize as its chips change. */
+  sheetClassName?: string;
   fullHeight?: boolean;
   children: (ctx: CreateFormContext) => ReactNode;
 };
@@ -129,6 +130,7 @@ export function CreateForm<V, R>({
   onCreated,
   createMore = false,
   size,
+  sheetClassName,
   fullHeight,
   children,
 }: CreateFormProps<V, R>) {
@@ -262,6 +264,7 @@ export function CreateForm<V, R>({
         leaveTitle={leaveTitle}
         size={size}
         fullHeight={fullHeight}
+        className={sheetClassName}
       >
         {fieldsBody}
       </FormSheet>
@@ -312,7 +315,6 @@ function PageBody({
   onLeave: () => void;
   children: ReactNode;
 }) {
-  const mod = useModKey();
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!pending) onSubmit(new FormData(e.currentTarget));
@@ -334,9 +336,6 @@ function PageBody({
           <div className="flex items-center gap-2">
             <Button type="submit" pending={pending} aria-keyshortcuts="Meta+Enter Control+Enter">
               {primary}
-              <Kbd tone="act" aria-hidden="true">
-                {shortcutLabel(mod, "↵")}
-              </Kbd>
             </Button>
             <Button type="button" variant="secondary" onClick={() => (dirty ? setAsking(true) : onLeave())}>
               Cancel

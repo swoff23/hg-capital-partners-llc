@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 440" width="1010" height="440" font-family="Geist, -apple-system, system-ui, sans-serif">
+  <title>The view-as bar in dark theme over My jobs, at 1280 and 375</title>
+  <defs>
+    <clipPath id="clip-desktop"><rect x="0" y="0" width="640" height="240"/></clipPath>
+    <clipPath id="clip-phone"><rect x="0" y="0" width="281.25" height="360"/></clipPath>
+  </defs>
+
+  <!-- Sheet -->
+  <rect x="0" y="0" width="1010" height="440" fill="#ffffff"/>
+
+  <!-- Captions -->
+  <text x="24" y="22" font-size="11" font-weight="500" fill="#5b6576">Desktop 1280</text>
+  <text x="704" y="22" font-size="11" font-weight="500" fill="#5b6576">Phone 375</text>
+
+  <!-- ============ Desktop 1280, 0.5 scale ============ -->
+  <g transform="translate(24 32)">
+    <g clip-path="url(#clip-desktop)">
+      <!-- Page surface -->
+      <rect x="0" y="0" width="640" height="240" fill="#0f141e"/>
+
+      <!-- Ink bar: 40px, words on the 32px gutters (Exit's underlined word ends on the gutter), 1px edge along its bottom -->
+      <rect x="0" y="0" width="640" height="20" fill="#212835"/>
+      <rect x="0" y="19" width="640" height="1" fill="#323947"/>
+      <text x="16" y="12.28" font-size="6.5" font-weight="500" fill="#ece9e4">Viewing as Zack Reading<tspan font-weight="400" fill="#c0bdb7"> · No login yet</tspan></text>
+      <text x="603.42" y="12.28" font-size="6.5" font-weight="400" fill="#c0bdb7" text-anchor="end">View only</text>
+      <text x="624" y="12.28" font-size="6.5" font-weight="500" fill="#ece9e4" text-anchor="end" text-decoration="underline">Exit</text>
+
+      <!-- Portal header: 56px canvas chrome with its hairline -->
+      <rect x="0" y="20" width="640" height="28" fill="#0a0e17"/>
+      <rect x="0" y="47" width="640" height="1" fill="#212835"/>
+      <rect x="16.25" y="26.25" width="15.5" height="15.5" rx="3.5" fill="#152133" stroke="#212835" stroke-width="0.5"/>
+      <text x="24" y="36.6" font-size="7.5" font-weight="600" fill="#c8a765" text-anchor="middle" letter-spacing="-0.3">HG</text>
+      <text x="36" y="36.5" font-size="7" font-weight="500" fill="#ece9e4">HG Jobs</text>
+      <rect x="608.25" y="26.25" width="15.5" height="15.5" rx="2" fill="#0f141e" stroke="#323947" stroke-width="0.5"/>
+      <text x="616" y="36.4" font-size="7" font-weight="500" fill="#c0bdb7" text-anchor="middle">ZR</text>
+
+      <!-- Greeting -->
+      <text x="16" y="76.3" font-size="12" font-weight="600" fill="#ece9e4" letter-spacing="-0.18">Hi Zack</text>
+
+      <!-- Open | Done -->
+      <rect x="16" y="88" width="58" height="18" rx="4" fill="#181e2a"/>
+      <rect x="17.25" y="89.25" width="27" height="15.5" rx="3" fill="#0f141e" stroke="#6e7684" stroke-width="0.5"/>
+      <rect x="23" y="95.25" width="15.5" height="3.5" rx="1.75" fill="#5b6576"/>
+      <rect x="51.25" y="95.25" width="16" height="3.5" rx="1.75" fill="#323947"/>
+
+      <!-- By date | By property -->
+      <rect x="527.5" y="88" width="96.5" height="18" rx="4" fill="#181e2a"/>
+      <rect x="528.75" y="89.25" width="38.5" height="15.5" rx="3" fill="#0f141e" stroke="#6e7684" stroke-width="0.5"/>
+      <rect x="534.5" y="95.25" width="27" height="3.5" rx="1.75" fill="#5b6576"/>
+      <rect x="574.5" y="95.25" width="42.5" height="3.5" rx="1.75" fill="#323947"/>
+
+      <!-- Section heading and its rule -->
+      <rect x="16" y="121.75" width="30" height="4.5" rx="2.25" fill="#5b6576"/>
+      <rect x="16" y="136" width="608" height="1" fill="#212835"/>
+
+      <!-- Job row 1: To do -->
+      <rect x="16" y="145.5" width="24" height="18" rx="4" fill="#212835"/>
+      <line x1="16.5" y1="163" x2="39.5" y2="146" stroke="#323947" stroke-width="0.5"/>
+      <rect x="46" y="147.25" width="118" height="4.5" rx="2.25" fill="#5b6576"/>
+      <rect x="46" y="158.25" width="150" height="3.5" rx="1.75" fill="#323947"/>
+      <circle cx="571.5" cy="154.5" r="2.6" fill="none" stroke="#a19e98" stroke-width="0.75"/>
+      <rect x="578" y="152.75" width="17" height="3.5" rx="1.75" fill="#323947"/>
+      <rect x="16" y="172.5" width="608" height="1" fill="#212835"/>
+
+      <!-- Job row 2: In progress -->
+      <rect x="16" y="182" width="24" height="18" rx="4" fill="#212835"/>
+      <line x1="16.5" y1="199.5" x2="39.5" y2="182.5" stroke="#323947" stroke-width="0.5"/>
+      <rect x="46" y="183.75" width="96" height="4.5" rx="2.25" fill="#5b6576"/>
+      <rect x="46" y="194.75" width="128" height="3.5" rx="1.75" fill="#323947"/>
+      <circle cx="571.5" cy="191" r="2.6" fill="none" stroke="#c0bdb7" stroke-width="0.75"/>
+      <path d="M571.5 189.54 a1.46 1.46 0 0 1 0 2.92 z" fill="#c0bdb7"/>
+      <rect x="578" y="189.25" width="40" height="3.5" rx="1.75" fill="#323947"/>
+    </g>
+    <rect x="-0.5" y="-0.5" width="641" height="241" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+  </g>
+
+  <!-- ============ Phone 375, 0.75 scale ============ -->
+  <g transform="translate(704 32)">
+    <g clip-path="url(#clip-phone)">
+      <!-- Page surface -->
+      <rect x="0" y="0" width="281.25" height="360" fill="#0f141e"/>
+
+      <!-- Ink bar: 44px on touch, 16px gutters (Exit's underlined word ends on the gutter), 1px edge along its bottom -->
+      <rect x="0" y="0" width="281.25" height="33" fill="#212835"/>
+      <rect x="0" y="32" width="281.25" height="1" fill="#323947"/>
+      <text x="12" y="20.7" font-size="12" font-weight="500" fill="#ece9e4">Viewing as Zack</text>
+      <text x="269.25" y="20.7" font-size="12" font-weight="500" fill="#ece9e4" text-anchor="end" text-decoration="underline">Exit</text>
+
+      <!-- Portal header -->
+      <rect x="0" y="33" width="281.25" height="42" fill="#0a0e17"/>
+      <rect x="0" y="74" width="281.25" height="1" fill="#212835"/>
+      <rect x="12.375" y="42.375" width="23.25" height="23.25" rx="5.25" fill="#152133" stroke="#212835" stroke-width="0.75"/>
+      <text x="24" y="57.9" font-size="11" font-weight="600" fill="#c8a765" text-anchor="middle" letter-spacing="-0.44">HG</text>
+      <text x="42" y="58.3" font-size="12" font-weight="500" fill="#ece9e4">HG Jobs</text>
+      <rect x="245.625" y="42.375" width="23.25" height="23.25" rx="3" fill="#0f141e" stroke="#323947" stroke-width="0.75"/>
+      <text x="257.25" y="57.3" font-size="9" font-weight="500" fill="#c0bdb7" text-anchor="middle">ZR</text>
+
+      <!-- Greeting -->
+      <text x="12" y="113" font-size="21" font-weight="600" fill="#ece9e4" letter-spacing="-0.3">Hi Zack</text>
+
+      <!-- Open | Done -->
+      <rect x="12" y="130.5" width="88.5" height="33" rx="6" fill="#181e2a"/>
+      <rect x="13.875" y="132.375" width="41.25" height="29.25" rx="5" fill="#0f141e" stroke="#6e7684" stroke-width="0.75"/>
+      <rect x="22.5" y="144.25" width="24" height="5.5" rx="2.75" fill="#5b6576"/>
+      <rect x="66" y="144.25" width="24" height="5.5" rx="2.75" fill="#323947"/>
+
+      <!-- By date | By property -->
+      <rect x="120.75" y="130.5" width="148.5" height="33" rx="6" fill="#181e2a"/>
+      <rect x="122.625" y="132.375" width="59.25" height="29.25" rx="5" fill="#0f141e" stroke="#6e7684" stroke-width="0.75"/>
+      <rect x="131.25" y="144.25" width="42" height="5.5" rx="2.75" fill="#5b6576"/>
+      <rect x="192.75" y="144.25" width="66" height="5.5" rx="2.75" fill="#323947"/>
+
+      <!-- Section heading and its rule -->
+      <rect x="12" y="187.5" width="42" height="6" rx="3" fill="#5b6576"/>
+      <rect x="12" y="208.5" width="257.25" height="1" fill="#212835"/>
+
+      <!-- Job row 1: To do, the status leads the subline below 480 -->
+      <rect x="12" y="222.75" width="36" height="27" rx="6" fill="#212835"/>
+      <line x1="12.75" y1="249" x2="47.25" y2="223.5" stroke="#323947" stroke-width="0.75"/>
+      <rect x="57" y="225" width="150" height="6" rx="3" fill="#5b6576"/>
+      <circle cx="63" cy="245.25" r="4.5" fill="none" stroke="#a19e98" stroke-width="1.125"/>
+      <rect x="73.5" y="243" width="28" height="4.5" rx="2.25" fill="#323947"/>
+      <circle cx="106.1" cy="245.25" r="0.9" fill="#a19e98"/>
+      <rect x="110.25" y="243" width="112" height="4.5" rx="2.25" fill="#323947"/>
+      <rect x="12" y="263.25" width="257.25" height="1" fill="#212835"/>
+
+      <!-- Job row 2: In progress -->
+      <rect x="12" y="277.5" width="36" height="27" rx="6" fill="#212835"/>
+      <line x1="12.75" y1="303.75" x2="47.25" y2="278.25" stroke="#323947" stroke-width="0.75"/>
+      <rect x="57" y="279.75" width="120" height="6" rx="3" fill="#5b6576"/>
+      <circle cx="63" cy="300" r="4.5" fill="none" stroke="#c0bdb7" stroke-width="1.125"/>
+      <path d="M63 297.5 a2.5 2.5 0 0 1 0 5 z" fill="#c0bdb7"/>
+      <rect x="73.5" y="297.75" width="63.5" height="4.5" rx="2.25" fill="#323947"/>
+      <circle cx="141.6" cy="300" r="0.9" fill="#a19e98"/>
+      <rect x="145.75" y="297.75" width="90" height="4.5" rx="2.25" fill="#323947"/>
+    </g>
+    <rect x="-0.5" y="-0.5" width="282.25" height="361" fill="none" stroke="#d5d1ca" stroke-width="1"/>
+  </g>
+
+  <!-- Footer -->
+  <text x="24" y="420" font-size="11" fill="#5b6576">1280 frame at 0.5 scale, 375 frame at 0.75 scale. Both cropped to 480px tall. Hairlines drawn 1px at both scales.</text>
+</svg>

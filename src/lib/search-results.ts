@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient, RecentKind, TaskStatus } from "@prisma/client";
 import { SIGNED_OUT, type Answer, type Viewer } from "@/lib/api-answer";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
-import { cleanTrades } from "@/lib/contacts";
+import { TRADE_LINKS, hasTradeNamed, tradeLine } from "@/lib/contractors/trades";
 import { toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { propertyUnitCount } from "@/lib/property-types";
@@ -23,7 +23,9 @@ import {
   type SearchRow,
   type SearchType,
   type TaskSearchRow,
+  type TenantSearchRow,
 } from "@/lib/search-types";
+import { homeLabel, leaseStatus, type LeaseStatus } from "@/lib/tenants/status";
 import { activeTask, closedTask, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { isOverdue } from "@/lib/tasks/list";
 import { paletteTaskWhere } from "@/lib/tasks/list-query";
@@ -45,7 +47,7 @@ import { paletteTaskWhere } from "@/lib/tasks/list-query";
 export * from "@/lib/search-types";
 
 /** The database calls a search makes. */
-export type SearchDb = Pick<PrismaClient, "property" | "task" | "deal" | "contact">;
+export type SearchDb = Pick<PrismaClient, "property" | "task" | "deal" | "contact" | "tenant">;
 
 /* ---------------- Rows ---------------- */
 
@@ -85,15 +87,29 @@ const CONTACT_SELECT = {
   id: true,
   fullName: true,
   company: true,
-  trades: true,
+  tradeLinks: TRADE_LINKS,
   active: true,
   updatedAt: true,
 } satisfies Prisma.ContactSelect;
+
+const TENANT_SELECT = {
+  id: true,
+  fullName: true,
+  updatedAt: true,
+  leases: {
+    select: {
+      lease: {
+        select: { id: true, unitLabel: true, movesIn: true, movesOut: true, property: { select: { address: true } } },
+      },
+    },
+  },
+} satisfies Prisma.TenantSelect;
 
 type PropertyRecord = Prisma.PropertyGetPayload<{ select: typeof PROPERTY_SELECT }>;
 type TaskRecord = Prisma.TaskGetPayload<{ select: typeof TASK_SELECT }>;
 type DealRecord = Prisma.DealGetPayload<{ select: typeof DEAL_SELECT }>;
 type ContactRecord = Prisma.ContactGetPayload<{ select: typeof CONTACT_SELECT }>;
+type TenantRecord = Prisma.TenantGetPayload<{ select: typeof TENANT_SELECT }>;
 
 export function propertyRow(p: PropertyRecord): PropertySearchRow {
   return {
@@ -141,9 +157,50 @@ export function contractorRow(c: ContactRecord): ContractorSearchRow {
     id: c.id,
     href: `/contractors/${c.id}`,
     title: c.fullName,
-    trade: cleanTrades(c.trades),
+    trade: tradeLine(c.tradeLinks),
     company: c.company?.trim() || null,
     active: c.active,
+  };
+}
+
+const LATEST = "9999-12-31";
+const EARLIEST = "0000-01-01";
+
+/** A sortable string that reverses the order of a day. */
+const invert = (ymd: string): string => [...ymd].map((c) => (/\d/.test(c) ? String(9 - Number(c)) : c)).join("");
+
+/**
+ * The lease a tenant is found by: the one they live in now, else the next one
+ * waiting, else the latest past one. Null when they're on no lease.
+ */
+export function relevantLease(leases: TenantRecord["leases"], today: Ymd): { lease: TenantRecord["leases"][number]["lease"]; status: LeaseStatus } | null {
+  const rank: Record<LeaseStatus, number> = { current: 0, upcoming: 1, past: 2 };
+  // Within a status: the latest move-in among current ones, the soonest among upcoming ones, the latest move-out among past ones.
+  const key = (l: TenantRecord["leases"][number]["lease"], status: LeaseStatus): string => {
+    if (status === "past") return toYmd(l.movesOut) ?? EARLIEST;
+    if (status === "upcoming") return invert(toYmd(l.movesIn) ?? LATEST);
+    return toYmd(l.movesIn) ?? EARLIEST;
+  };
+  let best: { lease: TenantRecord["leases"][number]["lease"]; status: LeaseStatus; key: string } | null = null;
+  for (const { lease } of leases) {
+    const status = leaseStatus(lease, today);
+    const k = key(lease, status);
+    if (!best || rank[status] < rank[best.status] || (status === best.status && k > best.key)) best = { lease, status, key: k };
+  }
+  return best && { lease: best.lease, status: best.status };
+}
+
+/** A tenant row opens the lease it shows; a tenant on no lease has no page to open, so they aren't a row. */
+export function tenantRow(t: TenantRecord, today: Ymd): TenantSearchRow | null {
+  const found = relevantLease(t.leases, today);
+  if (!found) return null;
+  return {
+    type: "tenant",
+    id: t.id,
+    href: `/tenants/${found.lease.id}`,
+    title: t.fullName,
+    home: homeLabel(found.lease.property.address, found.lease.unitLabel),
+    past: found.status === "past",
   };
 }
 
@@ -234,7 +291,7 @@ async function findDeals(db: SearchDb, q: string, terms: string[][], limit: numb
 }
 
 async function findContractors(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
-  const where = live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }]));
+  const where = live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)]));
   const [pool, total] = await Promise.all([
     db.contact.findMany({ where, orderBy: newest, take: POOL, select: CONTACT_SELECT }),
     db.contact.count({ where }),
@@ -248,6 +305,35 @@ async function findContractors(db: SearchDb, q: string, terms: string[][], limit
   return { rows, total };
 }
 
+/** A tenant is found by name, phone, email, or the address or unit of a lease they're on. */
+const tenantWhere = (terms: string[][]): Prisma.TenantWhereInput => ({
+  // A tenant on no lease has no page to open.
+  AND: [
+    { leases: { some: {} } },
+    everyTermMatches<Prisma.TenantWhereInput>(terms, (t) => [
+      { fullName: t },
+      { email: t },
+      { phone: t },
+      { phoneE164: t },
+      { leases: { some: { lease: { OR: [{ property: { address: t } }, { unitLabel: t }] } } } },
+    ]),
+  ],
+});
+
+async function findTenants(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
+  const where = tenantWhere(terms);
+  const [pool, total] = await Promise.all([
+    db.tenant.findMany({ where, orderBy: newest, take: POOL, select: TENANT_SELECT }),
+    db.tenant.count({ where }),
+  ]);
+  const today = todayYmdEastern();
+  const candidates = pool.flatMap((t) => {
+    const row = tenantRow(t, today);
+    return row ? [{ row, title: t.fullName, live: row.past ? 1 : 0, updatedAt: t.updatedAt }] : [];
+  });
+  return { rows: ranked(candidates, q, limit), total };
+}
+
 /** How many of each type match, with no rows: for "See 3 deals" when the type asked for has none. */
 async function countsOf(db: SearchDb, q: string, terms: string[][], types: readonly SearchType[]): Promise<Map<SearchType, number>> {
   const counts = await Promise.all(
@@ -255,6 +341,8 @@ async function countsOf(db: SearchDb, q: string, terms: string[][], types: reado
       switch (type) {
         case "property":
           return [type, await db.property.count({ where: live(everyTermMatches<Prisma.PropertyWhereInput>(terms, (t) => [{ address: t }])) })];
+        case "tenant":
+          return [type, await db.tenant.count({ where: tenantWhere(terms) })];
         case "task":
           return [type, await db.task.count({ where: paletteTaskWhere(q) })];
         case "deal":
@@ -263,7 +351,7 @@ async function countsOf(db: SearchDb, q: string, terms: string[][], types: reado
           return [
             type,
             await db.contact.count({
-              where: live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, { trades: t }])),
+              where: live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)])),
             }),
           ];
       }
@@ -275,8 +363,8 @@ async function countsOf(db: SearchDb, q: string, terms: string[][], types: reado
 export type SearchParams = { q: string; type?: SearchType; limit?: number };
 
 /**
- * The groups for a typed query, in the fixed order Properties, Tasks, Deals,
- * Contractors. Searching everything, a group with no match is left out. Narrowed
+ * The groups for a typed query, in the fixed order Properties, Tenants, Tasks,
+ * Deals, Contractors. Searching everything, a group with no match is left out. Narrowed
  * to one type, that group comes with up to `limit` rows; and if it has none,
  * the other types that do match follow with their totals and no rows, so the
  * panel can point to them.
@@ -293,7 +381,8 @@ export async function runSearch(db: SearchDb, params: SearchParams): Promise<Sea
   // Properties first, since the Deals group folds into the ones it shows.
   const property = wants("property") ? await findProperties(db, q, terms, limit) : null;
   const foldInto = new Set(only === undefined ? (property?.rows.map((r) => r.id) ?? []) : []);
-  const [task, deal, contractor] = await Promise.all([
+  const [tenant, task, deal, contractor] = await Promise.all([
+    wants("tenant") ? findTenants(db, q, terms, limit) : null,
     wants("task") ? findTasks(db, q, limit) : null,
     wants("deal") ? findDeals(db, q, terms, limit, foldInto) : null,
     wants("contractor") ? findContractors(db, q, terms, limit) : null,
@@ -301,6 +390,7 @@ export async function runSearch(db: SearchDb, params: SearchParams): Promise<Sea
 
   const found: [SearchType, Found | null][] = [
     ["property", property],
+    ["tenant", tenant],
     ["task", task],
     ["deal", deal],
     ["contractor", contractor],

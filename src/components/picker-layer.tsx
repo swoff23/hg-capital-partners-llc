@@ -1,6 +1,7 @@
 "use client";
 import { cloneElement, isValidElement, useState, type KeyboardEvent, type ReactElement, type ReactNode, type RefObject } from "react";
-import { DialogTrigger } from "react-aria-components";
+import { ChevronLeft } from "lucide-react";
+import { Button as AriaButton, DialogTrigger } from "react-aria-components";
 import { Popover, type PopoverMotion } from "@/components/popover";
 import { Sheet, SheetView, useSheet } from "@/components/sheet";
 import { pickContainer, type PickContainer } from "@/components/use-coarse-pointer";
@@ -38,6 +39,8 @@ export function PickerLayer({
   placement = "bottom start",
   motion = "none",
   popoverClassName,
+  besideWhenShort,
+  sheetFooter,
   children,
 }: {
   isOpen: boolean;
@@ -58,6 +61,13 @@ export function PickerLayer({
   /** Lists appear at once ("none", the default); a panel holding more than a list pops in ("pop"). */
   motion?: PopoverMotion;
   popoverClassName?: string;
+  /** A panel that fits neither above nor below the trigger opens beside it (the due date panel). */
+  besideWhenShort?: boolean;
+  /**
+   * On a phone, pinned under the list: a pick-many list's Done, which closes
+   * it (the popover closes on a click away and needs none).
+   */
+  sheetFooter?: (close: () => void) => ReactNode;
   children: (layer: { container: PickContainer; close: () => void }) => ReactNode;
 }) {
   const sheet = useSheet();
@@ -73,12 +83,18 @@ export function PickerLayer({
   if (container === "sheet") {
     layer = sheet ? (
       isOpen ? (
-        <SheetView title={title} onBack={close}>
+        <SheetView title={title} onBack={close} footer={sheetFooter?.(close)}>
           {children({ container, close })}
         </SheetView>
       ) : null
     ) : (
-      <Sheet title={title} surface={surface} isOpen={trigger ? undefined : isOpen} onOpenChange={trigger ? undefined : onOpenChange}>
+      <Sheet
+        title={title}
+        surface={surface}
+        isOpen={trigger ? undefined : isOpen}
+        onOpenChange={trigger ? undefined : onOpenChange}
+        footer={sheetFooter?.(close)}
+      >
         {children({ container, close })}
       </Sheet>
     );
@@ -89,6 +105,7 @@ export function PickerLayer({
         placement={placement}
         motion={motion}
         surface={surface}
+        besideWhenShort={besideWhenShort}
         className={popoverClassName}
         {...(trigger ? {} : { triggerRef: anchorRef, isOpen, onOpenChange })}
       >
@@ -114,5 +131,21 @@ export function PickerLayer({
       {armed}
       {layer}
     </DialogTrigger>
+  );
+}
+
+/** The header of a step inside a popover: a back chevron and the step's name. */
+export function StepHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="flex items-center gap-1 border-b border-line py-1 pl-1 pr-3">
+      <AriaButton
+        onPress={onBack}
+        aria-label="Back"
+        className="flex size-8 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-fill-2 hover:text-fg-1 pointer-coarse:size-11"
+      >
+        <ChevronLeft aria-hidden="true" className="size-4" />
+      </AriaButton>
+      <span className="min-w-0 truncate text-label text-fg-1">{title}</span>
+    </div>
   );
 }

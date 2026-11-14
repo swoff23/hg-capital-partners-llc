@@ -2,15 +2,34 @@
 
 Everything that's waiting on you, in one list. None of it blocks using the app day to day. Tick items off here (or tell Claude) as you go.
 
-## Turn on email
+## Check email works
 
-- [ ] In Vercel, add these environment variables, then redeploy:
-  - `APP_URL`: https://hgcapitalpartners.com
-  - `CRON_SECRET`: any long random string
-  - `RESEND_API_KEY` and `EMAIL_FROM`: from Resend
-  - `EMAIL_REPLY_TO` (optional): an inbox you and Pieter both read
+Email went on Nov 14: the Vercel variables are in, the sending domain is set up in Resend, and the email job runs every minute. Nothing was waiting to send, so nothing went to Pieter. No real email has gone out yet.
 
-Until then, no emails go out. The email job knocks every minute and is turned away, which is harmless. `APP_URL` also makes "Forgot password" work on the contractor portal; until it's set, that page errors. Before email goes on, Claude clears anything your test contractor queued, so Pieter doesn't get test emails.
+- [ ] Create your test login (the first item under "Before inviting contractors"), then on /login/forgot enter the test contractor's email. The reset email should arrive within a minute. Check spam for the first one.
+- [ ] Comment on one of the "Test:" jobs. Once the test contractor has signed in, the email arrives about 3 minutes later and the line under your comment changes to "Emailed to ...".
+- [ ] Tell Pieter before you post anything as the test contractor. A contractor's update emails both of you.
+
+A contractor gets no job emails until they have signed in once, and each contractor's Portal access card has a "Job emails" switch ([contractor-email-switch.md](specs/contractor-email-switch.md)). Creating a login sends nothing.
+
+## Turn on error alerts
+
+Sentry is connected and reporting (Nov 14), on the free plan with no card. The background-jobs monitor checks in green every minute. What each alert means is in [alerts.md](alerts.md).
+
+- [x] In Vercel, add Sentry and connect it to the hg-capital-partners-llc-wy7r project on the free Developer plan. Done Nov 14: the keys are in, no log drain was added, and the redeploy uploaded source maps and turned reporting on.
+- [x] In Sentry, under Settings, then Security & Privacy, turn on "Prevent storing of IP addresses".
+- [x] Add one uptime monitor for `https://www.hgcapitalpartners.com/api/health` (with www: the bare domain redirects), every minute, and confirm the "new issue" email alert is on. The exact clicks are in [alerts.md](alerts.md), under "Setting up".
+- [ ] Make Sentry's alert emails notify on your phone (a Gmail filter that marks them important, if Gmail notifies only for those).
+- [ ] In Resend, confirm the team email it notifies about a failing webhook is yours.
+- [ ] In Supabase (project ywdjaygwkqyrmbdnvaai), open Database, then Backups, and confirm daily backups are listed.
+
+## Retire the contractor Google Form
+
+Contractor onboarding is live (Nov 14, [contractor-onboarding.md](specs/contractor-onboarding.md)): Invite contractor and the Sign-up link on the Contractors page, and new people set up their own account, trades, W-9 and insurance in the portal. Bank details go through Baselane's own link.
+
+- [ ] Try it once: send yourself an invite, sign up on your phone, and upload a W-9. Uploads couldn't be tried before launch, so this is the first real one.
+- [ ] Turn off responses on the Google Form ("HG Capital – Contractor Onboarding Form").
+- [ ] Delete the five bank columns (H to L of "Contractor Info": bank name, account type, name on account, routing and account number) from its responses sheet, or lock the sheet to you only. It's the most exposed copy of contractors' bank numbers you hold.
 
 ## Asana import
 
@@ -47,7 +66,6 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - [ ] Database certificate check (date to be set). Its own change: prove Supabase's certificate from a laptop with a read-only connection, then ship it behind one environment variable. A wrong setting fails every query, so the way back is a redeploy or a rollback. See fix 3 in [docs/specs/performance.md](specs/performance.md).
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
 - [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
-- [ ] In Vercel, turn on Skew Protection (Project Settings, Advanced). Now that you're on Pro, it keeps a page that was open during a deploy talking to the version it loaded, instead of failing its next save.
 
 ## Small calls (no rush)
 
@@ -60,6 +78,10 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - **Build the Financials card's loading frame before you press Connect, and check it against the local database (already connected).** It switches itself on with the four QuickBooks keys, so nothing ships on the day. From the click every property page shifts by the card's height until the frame exists, and the loading screen leaves the card out today (`src/app/(app)/properties/[id]/loading.tsx`). Check a property with no QuickBooks class mapped too: it shows a one-line section.
 
 ## Done
+
+- Nov 14: email turned on. `CRON_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` and `EMAIL_REPLY_TO` are in Vercel, and `mail.hgcapitalpartners.com` is set up in Resend.
+- Nov 14: Skew Protection is on in Vercel with a 12-hour max age. It starts with the next deploy.
+- Nov 14: `CONNOR_PASSWORD` and `PIETER_PASSWORD` deleted from Vercel. Both passwords were already saved in the database, so sign-in is unchanged.
 
 - Oct 25: the Ink and Limestone brand and Home as Today, built and landed. The guidelines are in [brand-guidelines.md](brand-guidelines.md).
 - Oct 25: approved the six component specs with every recommendation. "Our price" on deals means the target offer. They build in seven chunks.

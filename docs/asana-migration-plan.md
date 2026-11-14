@@ -294,7 +294,7 @@ It stores head()'s values. Uploads still finishing after a contractor taps Mark 
 
 **Delivery.**
 - Resend from a verified subdomain on the zone that actually serves hgcapitalpartners.com (check `dig +short NS`).
-- Writes enqueue rows in `NotificationOutbox` inside the same transaction. `after()` sends immediately. A once-a-minute cron (Pro, guarded by `CRON_SECRET`) sends retries and bundled date changes.
+- Writes enqueue rows in `NotificationOutbox` inside the same transaction. A once-a-minute cron (Pro, guarded by `CRON_SECRET`) is the only thing that sends them, 3 minutes after the latest change to a job and never more than 10 after the first, with retries. As built, nothing sends at write time.
 - The importer never enqueues.
 
 **The rule: email only crosses the staff/contractor line.**

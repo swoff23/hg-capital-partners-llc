@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/db";
-import { uniqueEntities } from "@/lib/properties/entities";
+import { entityChoices } from "@/lib/properties/entity";
 
 /**
  * One property's own row, without its relations. `cache()` de-dupes within a
@@ -11,15 +11,10 @@ import { uniqueEntities } from "@/lib/properties/entities";
 export const getPropertyById = cache((id: string) => prisma.property.findUnique({ where: { id } }));
 
 /**
- * The entities already on properties, for the Entity field's suggestions (New
- * property and a property's Details). `cache()` de-dupes within a request.
+ * The Entity picker's rows (lib/properties/entity.ts entityChoices): the
+ * offered companies, then every name added on a property, archived ones too.
  */
-export const getEntityNames = cache(async (): Promise<string[]> => {
-  const rows = await prisma.property.findMany({
-    where: { llcOwner: { not: null } },
-    select: { llcOwner: true },
-    distinct: ["llcOwner"],
-    orderBy: { llcOwner: "asc" },
-  });
-  return uniqueEntities(rows.map((r) => r.llcOwner));
+export const getEntityChoices = cache(async () => {
+  const rows = await prisma.property.findMany({ where: { llcOwner: { not: null } }, distinct: ["llcOwner"], select: { llcOwner: true } });
+  return entityChoices(rows.map((r) => r.llcOwner));
 });

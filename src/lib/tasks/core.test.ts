@@ -553,7 +553,7 @@ test("addComment: a second send with the same clientId returns the first and wri
 test("addComment: a first send stores its clientId, takes the lock before the lookup, and queues the email with the event's id", async () => {
   const { tx, calls } = fakeTx({ assigneeContactId: "c-zack" }, (model, op, args) => {
     if (model === "taskEvent" && op === "findFirst") return null;
-    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE" };
+    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE", lastSignInAt: new Date("2026-10-01T12:00:00Z"), jobEmails: true };
     if (model === "taskEvent" && op === "create") return { id: "ev9", ...args.data };
     return undefined;
   });
@@ -569,6 +569,29 @@ test("addComment: a first send stores its clientId, takes the lock before the lo
   assert.equal(item.kind, "COMMENT");
   assert.equal(item.eventId, "ev9");
 });
+
+// docs/specs/contractor-email-switch.md: a task email is queued only for a contractor who has signed in once and whose
+// Job emails switch is on. The comment itself is written either way; the portal shows it when they sign in.
+for (const [why, login] of [
+  ["has never signed in", { status: "ACTIVE", lastSignInAt: null, jobEmails: true }],
+  ["has Job emails off", { status: "ACTIVE", lastSignInAt: new Date("2026-10-01T12:00:00Z"), jobEmails: false }],
+  ["has had access removed", { status: "DISABLED", lastSignInAt: new Date("2026-10-01T12:00:00Z"), jobEmails: true }],
+] as const) {
+  test(`addComment: a contractor who ${why} is queued no email, and the comment still posts`, async () => {
+    const { tx, calls } = fakeTx({ assigneeContactId: "c-zack" }, (model, op, args) => {
+      if (model === "taskEvent" && op === "findFirst") return null;
+      if (model === "portalAccount" && op === "findUnique") return login;
+      if (model === "taskEvent" && op === "create") return { id: "ev9", ...args.data };
+      return undefined;
+    });
+    await addComment(tx, "t1", { body: "Doors are in", visibility: "SHARED", clientId: "send-1" }, PIETER);
+    assert.equal(created(calls, "taskEvent").length, 1, "the comment is written");
+    assert.deepEqual(queued(calls), [], "and nothing is queued for them");
+    // The rule's three facts are what is read about the login, by the contractor assigned now.
+    const read = calls.find((c) => c.model === "portalAccount" && c.op === "findUnique")!;
+    assert.deepEqual(read.args, { where: { contactId: "c-zack" }, select: { status: true, lastSignInAt: true, jobEmails: true } });
+  });
+}
 
 test("addComment: a Retry of photos alone that did post (no unposted files left to name) returns the first send", async () => {
   const first = { id: "ev1", kind: "COMMENT", taskId: "t1", body: null };
@@ -838,7 +861,7 @@ test("restoreComment: the comment and the files that went with it come back, and
 
 test("setStatus: Send back writes the status, then the note tied to it, and the email names the note inside the status line", async () => {
   const { tx, calls } = fakeTx({ status: "REVIEW", assigneeContactId: "c-zack", title: "Cabinet install" }, (model, op, args) => {
-    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE" };
+    if (model === "portalAccount" && op === "findUnique") return { status: "ACTIVE", lastSignInAt: new Date("2026-10-01T12:00:00Z"), jobEmails: true };
     if (model === "taskEvent" && op === "create") return { id: (args.data as { kind: string }).kind === "STATUS" ? "s1" : "n1", ...args.data };
     return undefined;
   });
@@ -1114,6 +1137,8 @@ test("undoApproval takes the next repeat copy back through the same rule as a re
   // The copy's email rows in id order too, as every outbox lock takes them.
   const copyEmails = calls.find((c) => c.model === "$queryRaw" && c.op.includes('FROM "NotificationOutbox"') && !c.op.includes("@>"))!;
   assert.match(copyEmails.op, /WHERE "taskId" = \? ORDER BY "id" FOR UPDATE$/);
+  // With each row's error, so one closed unsent (repeat.ts isUntouchedCopy, delivery.ts emailStateOf) never counts as sent.
+  assert.match(copyEmails.op, /^\s*SELECT "sentAt", "lastError", "attempts" FROM "NotificationOutbox"/);
 });
 
 test("undoApproval: a touched copy stays, and the job still goes back to Review", async () => {
@@ -1210,7 +1235,7 @@ test("REPEAT is written only from patchTask, never as a task is made or its next
 });
 
 test("patchTask: the email for a moved date says whether it is the visit or the due date", async () => {
-  const hasLogin: Answer = (model, op) => (model === "portalAccount" && op === "findUnique" ? { status: "ACTIVE" } : undefined);
+  const hasLogin: Answer = (model, op) => (model === "portalAccount" && op === "findUnique" ? { status: "ACTIVE", lastSignInAt: new Date("2026-10-01T12:00:00Z"), jobEmails: true } : undefined);
   // Scheduled: the date the contractor sees is the booked visit.
   const visit = fakeTx({ status: "SCHEDULED", assigneeContactId: "c-zack", scheduledFor: day("2026-10-29"), dueDate: day("2026-11-10") }, hasLogin);
   await patchTask(visit.tx, "t1", { scheduledFor: "2026-10-30" }, PIETER, new Date("2026-10-23T15:00:00Z"));

@@ -4,7 +4,9 @@ import { KeyRound, Repeat } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { DatePicker } from "@/components/due-date-picker";
+import { Code } from "@/components/code";
 import { AssigneePicker, PropertyPicker, UnitPicker } from "@/components/entity-picker";
+import { tagClass } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import type { Ymd } from "@/lib/dates";
 import { offersUnits, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
@@ -14,6 +16,11 @@ import { cn } from "@/lib/utils";
 import { updateTask } from "./actions";
 
 export type { PropertyOption };
+
+/** The Lockbox row: the code the contractor's job shows, or a nudge to pick a unit when the property has several. */
+export type TaskLockbox =
+  | { state: "shown"; code: string; contractor: string; hasLogin: boolean }
+  | { state: "pick-unit"; contractor: string; hasLogin: boolean };
 
 export interface TaskFieldValues {
   assignee: AssigneeValue;
@@ -67,8 +74,8 @@ export function TaskFields({
   recent: AssigneeValue[];
   /** The date the series gave this task when it is a repeat copy, null for a series' first task: the repeat menu's "Next:" steps from it. */
   repeatSlot: Ymd | null;
-  /** Set when a contractor is assigned and the property has lockbox codes (D21). */
-  lockbox: { state: "shown" | "pick-unit"; contractor: string; hasLogin: boolean } | null;
+  /** Set when a contractor is assigned and the property has lockbox codes (D21); `code` is the one their job shows. */
+  lockbox: TaskLockbox | null;
   created: string;
   className?: string;
 }) {
@@ -253,26 +260,31 @@ export function TaskFields({
       )}
       {lockbox && (
         <Row label="Lockbox">
-          {/* relative: the sr-only text is absolute, and must stay inside the phone chip row's scroller, not widen the page. */}
-          <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-fg-3 lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-0.5">
-            <KeyRound aria-hidden="true" />
-            {/* Short so each stays one line in the rail; the full sentence is what's read out. */}
-            {lockbox.state === "shown" ? (
-              lockbox.hasLogin ? (
-                `Shown to ${lockbox.contractor}`
-              ) : (
-                <>
-                  <span aria-hidden="true">Once {lockbox.contractor} signs in</span>
-                  <span className="sr-only">{lockbox.contractor} sees the lockbox code after signing in</span>
-                </>
-              )
-            ) : (
-              <>
-                <span aria-hidden="true">Pick a unit for the code</span>
-                <span className="sr-only">Pick a unit so {lockbox.contractor} sees the lockbox code</span>
-              </>
-            )}
-          </span>
+          {lockbox.state === "shown" ? (
+            // The code copies on a tap; the Tag says the contractor sees it too. In the rail a long imported code
+            // ("4857 (back door)") wraps and the Tag drops under it; below lg the chip row scrolls instead.
+            <span className="relative inline-flex min-h-7 items-center gap-2 whitespace-nowrap px-2 lg:flex-wrap lg:gap-y-1 lg:whitespace-normal lg:px-0 lg:py-1.5">
+              <Code value={lockbox.code} label="Lockbox code" wrap className="min-w-0" />
+              <span className={tagClass}>
+                {/* Short so the Tag stays one line; the full sentence is what's read out. */}
+                {lockbox.hasLogin ? (
+                  `Shown to ${lockbox.contractor}`
+                ) : (
+                  <>
+                    <span aria-hidden="true">Once {lockbox.contractor} signs in</span>
+                    <span className="sr-only">{lockbox.contractor} sees the lockbox code after signing in</span>
+                  </>
+                )}
+              </span>
+            </span>
+          ) : (
+            // relative: the sr-only text is absolute, and must stay inside the phone chip row's scroller, not widen the page.
+            <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 text-meta text-fg-3 lg:items-start lg:whitespace-normal lg:px-0 lg:py-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0 lg:[&_svg]:mt-0.5">
+              <KeyRound aria-hidden="true" />
+              <span aria-hidden="true">Pick a unit for the code</span>
+              <span className="sr-only">Pick a unit so {lockbox.contractor} sees the lockbox code</span>
+            </span>
+          )}
         </Row>
       )}
       <Row label="Created" className="hidden lg:flex">

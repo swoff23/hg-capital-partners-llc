@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { Check } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Check, Plus } from "lucide-react";
 import {
   Autocomplete,
   Header,
@@ -91,6 +91,15 @@ type Common = {
   revealPicked?: boolean;
   /** Tab leaves the list: the layer closes and focus goes back to its trigger. */
   onTab?: () => void;
+  /**
+   * Typed text that names no row adds one: the last row reads 'Add "Roofing"'
+   * and picking it calls this with the text (trimmed), then clears the
+   * search. A row whose label is the text, ignoring case and spacing, stops
+   * it, so "plumbing" finds Plumbing instead. The search always shows.
+   */
+  onCreate?: (text: string) => void;
+  /** How the add row names what it adds ("roofing" is added as "Roofing"), so the row reads exactly that; null hides the row. */
+  createName?: (text: string) => string | null;
   className?: string;
 };
 
@@ -109,6 +118,15 @@ export function countOptions({ pinned, items, sections }: Pick<Common, "pinned" 
 
 /** What the Autocomplete filter sees for a row that shows only while the search is empty: a prefix no typed word contains. */
 const EMPTY_ONLY = "\u0000";
+
+/** The add row's key: no option's id starts with it. */
+const CREATE_KEY = "\u0001create";
+
+/** The add row's words, here and in the Combobox: 'Add "Roofing"'. */
+export const addRowLabel = (text: string) => `Add “${text}”`;
+
+/** Labels compared the way the add row compares them: ignoring case and spacing. */
+const sameLabel = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toLowerCase() === b.trim().replace(/\s+/g, " ").toLowerCase();
 
 /** Whether a row matches typed words: every word must appear somewhere in it, in any order ("tamarack 56" finds "56 Tamarack St"). */
 export function matchesAllWords(text: string, input: string, contains: (text: string, part: string) => boolean): boolean {
@@ -188,15 +206,22 @@ export function OptionList(props: OptionListProps) {
     autoFocus,
     revealPicked = true,
     onTab,
+    onCreate,
+    createName,
     className,
   } = props;
   const multiple = props.selectionMode === "multiple";
   const { contains } = useFilter({ sensitivity: "base" });
-  const searchable = search === true || (search === "auto" && countOptions(props) >= SEARCH_FROM);
+  const searchable = !!onCreate || search === true || (search === "auto" && countOptions(props) >= SEARCH_FROM);
+  // The search's text, held here only for the add row; without one the Autocomplete keeps its own.
+  const [query, setQuery] = useState("");
   // A mouse starts typing at once; touch leaves the keyboard down until asked.
   const focusOnOpen = autoFocus ?? !isCoarseNow();
 
   const rows = [...(pinned ?? []), ...(items ?? []), ...(sections ?? []).flatMap((x) => x.items)];
+  const typed = query.trim().replace(/\s+/g, " ");
+  const named = typed && onCreate ? (createName ? createName(typed) : typed) : null;
+  const creating = named && !rows.some((o) => sameLabel(o.label, typed) || sameLabel(o.label, named)) ? named : null;
   const aliasOf = new Map(rows.filter((o) => o.alias).map((o) => [o.id, o.alias!]));
   const picked = multiple ? props.selectedKeys : props.selectedKey === null ? [] : [props.selectedKey];
   // A Recent row is picked when the pick it stands for is.
@@ -233,6 +258,11 @@ export function OptionList(props: OptionListProps) {
 
   function onSelectionChange(keys: Selection) {
     if (keys === "all") return;
+    if (creating && [...keys].includes(CREATE_KEY)) {
+      onCreate!(creating);
+      setQuery("");
+      return;
+    }
     const ids = [...keys].map((k) => aliasOf.get(String(k)) ?? String(k));
     if (props.selectionMode === "multiple") return props.onSelectionChange([...new Set(ids)]);
     // Tapping the current pick toggles it off in React Aria: treat that as picking it again.
@@ -266,6 +296,13 @@ export function OptionList(props: OptionListProps) {
           {s.items.map((o) => <OptionRow key={o.id} option={o} multiple={multiple} />)}
         </ListBoxSection>
       ))}
+      {creating && (
+        // Its text is what was typed, so the search never filters it out; it reads the name it adds.
+        <ListBoxItem id={CREATE_KEY} textValue={query} className={rowClass(false)}>
+          <Plus aria-hidden="true" strokeWidth={1.75} className="size-4 shrink-0 text-fg-3" />
+          <span className="min-w-0 flex-1 truncate">{addRowLabel(creating)}</span>
+        </ListBoxItem>
+      )}
     </ListBox>
   );
 
@@ -285,7 +322,10 @@ export function OptionList(props: OptionListProps) {
       )}
     >
       {searchable ? (
-        <Autocomplete filter={(text, input) => matchesAllWords(text, input, contains)}>
+        <Autocomplete
+          filter={(text, input) => matchesAllWords(text, input, contains)}
+          {...(onCreate ? { inputValue: query, onInputChange: setQuery } : {})}
+        >
           <div
             className={cn(
               "shrink-0 border-b border-line p-1",
@@ -293,7 +333,14 @@ export function OptionList(props: OptionListProps) {
               container === "sheet" && "sticky top-0 z-10 bg-raised",
             )}
           >
-            <SearchInput variant="bare" placeholder={searchLabel} aria-label={searchLabel} autoFocus={focusOnOpen} />
+            <SearchInput
+              variant="bare"
+              placeholder={searchLabel}
+              aria-label={searchLabel}
+              autoFocus={focusOnOpen}
+              // The field keeps its own text otherwise, which would outlast the add row clearing the search.
+              {...(onCreate ? { value: query, onChange: setQuery } : {})}
+            />
           </div>
           {list}
         </Autocomplete>

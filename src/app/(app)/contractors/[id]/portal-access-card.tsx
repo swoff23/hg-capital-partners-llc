@@ -5,6 +5,7 @@ import { Button as AriaButton } from "react-aria-components";
 import { Code } from "@/components/code";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormSheet } from "@/components/form-sheet";
+import { InlineSwitch } from "@/components/inline-field";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Sheet } from "@/components/sheet";
 import { useToast } from "@/components/toast";
@@ -23,8 +24,10 @@ import {
   removePortalAccess,
   resetPortalPassword,
   restorePortalAccess,
+  setPortalJobEmails,
   signOutPortalEverywhere,
 } from "../actions";
+import { ResendInviteSheet } from "../invite-sheet";
 
 export type PortalAccountView = {
   id: string;
@@ -37,6 +40,8 @@ export type PortalAccountView = {
   restorable: boolean;
   /** The contact is active. Restoring an inactive contact's login doesn't let them sign in yet. */
   contactActive: boolean;
+  /** The "Job emails" switch: HG's changes to their jobs email them (docs/specs/contractor-email-switch.md). */
+  jobEmails: boolean;
 };
 
 /**
@@ -49,6 +54,15 @@ const BADGE: Record<PortalAccessState, string> = {
   invited: "Invited",
   active: "Active",
   off: "Access off",
+};
+
+/** Someone who came in by an invite and hasn't made their account: where the invite stands (docs/specs/contractor-onboarding.md, 4.4). */
+export type InviteView = {
+  state: "invited" | "opened";
+  /** "Sent Nov 14 · not opened" or "Opened Nov 15 · no account yet". */
+  line: string;
+  /** They have an email on file, so Email invite works from Resend. */
+  hasEmail: boolean;
 };
 
 /** A fact beside its label, on the same 112px label column (96 on phones) as the Contact rail above. */
@@ -72,26 +86,38 @@ type Shown = { email: string; password: string; phone: boolean };
  * Access off and drops Reset password and Sign out everywhere (decision 22).
  * An archived contractor's card offers neither Create login nor Restore
  * access (loginOffers): both wait for Restore on the page's Archived line.
+ *
+ * "Job emails" (docs/specs/contractor-email-switch.md, layout A) is a switch
+ * under the Email fact, on the same label column: off stops every task email
+ * to them. It saves on the tap with a toast and Undo, like any yes or no fact
+ * (InlineSwitch). No job email goes before their first sign-in either; the
+ * Email fact's "Not signed in yet" already says they haven't, so the switch
+ * adds no line of its own (Connor, Nov 14). Access off hides it, as it hides
+ * Reset password: nothing reaches a login that can't sign in.
  */
 export function PortalAccessCard({
   contactId,
   contactName,
   defaultEmail,
   phone,
-  staffName,
   appUrl,
   account,
   archived,
+  invite = null,
+  setupLine = null,
 }: {
   contactId: string;
   contactName: string;
   defaultEmail: string | null;
   phone: string | null;
-  staffName: string;
   appUrl: string;
   account: PortalAccountView | null;
   /** The contractor is archived: no new login and no restored access until they are restored. */
   archived: boolean;
+  /** An invited contractor with no login yet: replaces "No login yet" with where the invite stands, and Resend. */
+  invite?: InviteView | null;
+  /** A contractor who signed up and hasn't finished setup: "W-9 · 4 of 6". Their login works as any other. */
+  setupLine?: string | null;
 }) {
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -103,6 +129,8 @@ export function PortalAccessCard({
   const [createKey, setCreateKey] = useState(0);
   const [changing, setChanging] = useState(false);
   const [changeKey, setChangeKey] = useState(0);
+  const [resending, setResending] = useState(false);
+  const [resendKey, setResendKey] = useState(0);
   const [confirm, setConfirm] = useState<"reset" | "remove" | null>(null);
   const first = firstName(contactName) || contactName;
   const offers = loginOffers(account, archived);
@@ -126,9 +154,12 @@ export function PortalAccessCard({
     <Section
       title="Portal access"
       actions={
-        account && (
+        !account && invite ? (
+          <Badge>{invite.state === "opened" ? "Opened" : "Invited"}</Badge>
+        ) : (
+          account && (
           <>
-            <Badge>{BADGE[account.state]}</Badge>
+            <Badge>{setupLine && account.state !== "off" ? "Onboarding" : BADGE[account.state]}</Badge>
             <MenuTrigger>
               <AriaButton
                 aria-label="Portal access actions"
@@ -149,12 +180,30 @@ export function PortalAccessCard({
               </Menu>
             </MenuTrigger>
           </>
+          )
         )
       }
       className="@container"
     >
       <div className="space-y-3">
-        {!account && (
+        {!account && invite && (
+          <div className="space-y-2">
+            <p className="text-meta text-fg-3">{invite.line}</p>
+            {!archived && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setResendKey((k) => k + 1);
+                  setResending(true);
+                }}
+              >
+                Resend
+              </Button>
+            )}
+          </div>
+        )}
+        {!account && !invite && (
           <div className="space-y-2">
             <p className="text-meta text-fg-3">No login yet.</p>
             {offers.create && (
@@ -180,6 +229,28 @@ export function PortalAccessCard({
                 {account.line && <p className="truncate text-meta text-fg-3">{account.line}</p>}
               </dd>
             </dl>
+            {setupLine && account.state !== "off" && (
+              <dl className={detailRow}>
+                <dt className="text-meta text-fg-3">Setup</dt>
+                <dd className="min-w-0 text-body text-fg-1">{setupLine}</dd>
+              </dl>
+            )}
+            {account.state !== "off" && (
+              <div>
+                <dl className={cn(detailRow, "items-center")}>
+                  <dt className="text-meta text-fg-3">Job emails</dt>
+                  <dd className="min-w-0">
+                    <InlineSwitch
+                      label="Job emails"
+                      field="jobEmails"
+                      value={account.jobEmails ? "yes" : "no"}
+                      message={(next) => `${first}'s job emails are ${next === "yes" ? "on" : "off"}`}
+                      onSave={(next) => setPortalJobEmails(account.id, next)}
+                    />
+                  </dd>
+                </dl>
+              </div>
+            )}
             {account.state !== "off" && (
               // Side by side where they fit, stacked full width where they don't,
               // so neither label wraps. At touch sizes the pair needs 326px, so
@@ -231,6 +302,9 @@ export function PortalAccessCard({
       {/* Mounted on "no login yet", not on offers.create: a tab loaded before the contractor was archived can have this
           open when the server refuses, and the refresh that follows must not take the sheet (and its inline "Restore
           this contractor first.") away. On an archived page nothing opens it, since the button is gone. */}
+      {!account && invite && (
+        <ResendInviteSheet key={resendKey} contactId={contactId} first={first} hasEmail={invite.hasEmail} isOpen={resending} onOpenChange={setResending} />
+      )}
       {!account && (
         <CreateLoginSheet
           key={createKey}
@@ -252,8 +326,6 @@ export function PortalAccessCard({
           shown={shown}
           first={first}
           phone={phone}
-          contactName={contactName}
-          staffName={staffName}
           appUrl={appUrl}
         />
       )}
@@ -470,8 +542,6 @@ function PayoffSheet({
   shown,
   first,
   phone,
-  contactName,
-  staffName,
   appUrl,
 }: {
   isOpen: boolean;
@@ -479,12 +549,10 @@ function PayoffSheet({
   shown: Shown;
   first: string;
   phone: string | null;
-  contactName: string;
-  staffName: string;
   appUrl: string;
 }) {
   const { toast } = useToast();
-  const body = loginTextBody({ contactName, staffName, appUrl, email: shown.email, password: shown.password });
+  const body = loginTextBody({ appUrl, email: shown.email, password: shown.password });
 
   async function copyMessage() {
     try {

@@ -55,5 +55,6 @@ export const config = {
     "/settings/:path*",
     "/tasks/:path*",
     "/templates/:path*",
+    "/tenants/:path*",
   ],
 };

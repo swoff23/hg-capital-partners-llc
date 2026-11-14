@@ -47,6 +47,7 @@ import {
   unconfirmedIds,
   updateTimeLabel,
   type JobCard,
+  payoffLine,
 } from "./job-view";
 
 const TODAY = "2026-10-22"; // a Thursday
@@ -516,4 +517,11 @@ test("the leave sheet names what's still uploading (decision 24)", () => {
   assert.equal(stillUploading(["video", "video", "video"]), "3 videos are still uploading");
   assert.equal(stillUploading(["image", "video"]), "2 files are still uploading");
   assert.equal(stillUploading(["file"]), "1 file is still uploading");
+});
+
+// docs/specs/contractor-email-switch.md: the payoff promises an email only to a contractor who gets them.
+test("the Mark done payoff says what happens next: an email, or a look back here when their job emails are off", () => {
+  assert.equal(payoffLine("Connor and Pieter", true), "Sent to Connor and Pieter. You'll get an email if anything else is needed.");
+  assert.equal(payoffLine("Connor and Pieter", false), "Sent to Connor and Pieter. Check back here if anything else is needed.");
+  assert.equal(payoffLine("HG", false), "Sent to HG. Check back here if anything else is needed.");
 });

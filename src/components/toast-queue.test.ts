@@ -52,3 +52,29 @@ test("addToast: a checklist item's removal takes its rename's Undo off the scree
     ],
   );
 });
+
+test("addToast: a sticky toast stays when three newer ones arrive; the oldest plain one goes instead", () => {
+  type S = T & { sticky?: boolean };
+  let list: QueuedToast<S>[] = [];
+  list = addToast<S>(list, { message: "A new version is ready", key: "update", sticky: true }, 1, 3).list;
+  for (let i = 2; i <= 4; i++) list = addToast<S>(list, { message: `m${i}` }, i, 3).list;
+  assert.deepEqual(
+    list.map((t) => [t.id, t.message]),
+    [
+      [1, "A new version is ready"],
+      [3, "m3"],
+      [4, "m4"],
+    ],
+  );
+});
+
+test("addToast: with only sticky toasts to drop, the newest still shows and the list runs over", () => {
+  type S = T & { sticky?: boolean };
+  let list: QueuedToast<S>[] = [];
+  for (let i = 1; i <= 3; i++) list = addToast<S>(list, { message: `s${i}`, sticky: true }, i, 3).list;
+  list = addToast<S>(list, { message: "m4" }, 4, 3).list;
+  assert.deepEqual(
+    list.map((t) => t.message),
+    ["s1", "s2", "s3", "m4"],
+  );
+});

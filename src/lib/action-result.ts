@@ -34,6 +34,7 @@
 import { unstable_rethrow } from "next/navigation";
 import { HG_TIME_ZONE, fmtDay, todayYmdEastern } from "./dates";
 import { firstName } from "./names";
+import { isOfflineError } from "./offline-error";
 import { TOAST_PHONE_CHARS } from "./toast-line";
 
 /** One plain message per field name, for the field's own error line (forms 2.12). */
@@ -232,16 +233,8 @@ export const GENERIC_ERROR = "Couldn't save. Try again or reload the page.";
 /** A server action call that never reached the server, or whose answer never came back. One line at 320. */
 export const OFFLINE_ERROR = "No connection. Try again.";
 
-// What fetch rejects with when the network is down or drops mid-request:
-// Chrome, Firefox, Safari (old and new), and Node's undici.
-const NETWORK_FAILURE =
-  /^(Failed to fetch|Load failed|NetworkError when attempting to fetch resource\.?|The Internet connection appears to be offline\.?|The network connection was lost\.?|The request timed out\.?|Network request failed|network error|fetch failed)$/i;
-
-/** Whether a thrown call failed for want of a connection, as opposed to a bug or a refusal. */
-export function isOfflineError(err: unknown): boolean {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
-  return err instanceof TypeError && NETWORK_FAILURE.test(err.message);
-}
+// The check lives in its own file so the browser's error catcher can use it alone (offline-error.ts).
+export { isOfflineError };
 
 /**
  * Calls a server action from the browser and always settles to a result.

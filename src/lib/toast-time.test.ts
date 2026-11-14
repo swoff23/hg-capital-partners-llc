@@ -21,8 +21,9 @@ test("the toast reads its time from here, by whether it has a button, and keeps 
   const toast = src("components", "toast.tsx");
   assert.match(toast, /const stays = toastMs\(item\.action !== undefined\);/);
   assert.match(toast, /setTimeout\(\(\) => dismiss\(id\), stays\)/);
-  // The timer restarts when the time changes, as it does for a replacement under the same key.
-  assert.match(toast, /\}, \[held, dismiss, id, version, stays\]\);/);
+  // The timer restarts when the time changes, as it does for a replacement under the same key. A sticky toast has none.
+  assert.match(toast, /if \(held \|\| sticky\) return;/);
+  assert.match(toast, /\}, \[held, sticky, dismiss, id, version, stays\]\);/);
   assert.doesNotMatch(toast, /\b5_?000\b|\b8_?000\b|DURATION_MS/);
 });
 

@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { todayYmdEastern } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
-import { generateStartingPassword, hashToken, newToken } from "../../src/lib/portal/tokens";
+import { generateStartingPassword, hashToken, newToken, signupLinkToken } from "../../src/lib/portal/tokens";
 import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
 import * as core from "../../src/lib/tasks/core";
@@ -22,6 +22,8 @@ import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes
  *
  *  - "portal": a contractor who has chosen a password, for every /p page,
  *    with a job of its own so My jobs and the job page render with data.
+ *  - "portal-setup": one who came in by an invite and is partway through
+ *    setup, for /p/setup.
  *  - "portal-welcome": one still on a starting password, for
  *    /p/welcome/password, which sends anyone else on to /p.
  */
@@ -44,6 +46,12 @@ const PORTAL_WELCOME_FIXTURE: PortalFixture = {
   email: "device-check-welcome@hg.localhost",
   name: "Device Check Newcomer",
   mustChangePassword: true,
+};
+/** Someone who came in by an invite and is partway through setup, for /p/setup and the card above My jobs. */
+const PORTAL_SETUP_FIXTURE: PortalFixture = {
+  email: "device-check-setup@hg.localhost",
+  name: "Device Check Signup",
+  mustChangePassword: false,
 };
 
 function assertLocalDb(): void {
@@ -83,7 +91,9 @@ async function seedPortalFixture(db: PrismaClient, fixture: PortalFixture): Prom
     db.contact.update({ where: { id: account.contactId }, data: { active: true } }),
     db.portalAccount.update({
       where: { id: account.id },
-      data: { status: "ACTIVE", mustChangePassword: fixture.mustChangePassword },
+      // One who has chosen a password has signed in, so HG's changes would email them; the newcomer never has, so
+      // theirs wouldn't (docs/specs/contractor-email-switch.md).
+      data: { status: "ACTIVE", mustChangePassword: fixture.mustChangePassword, ...(fixture.mustChangePassword ? { lastSignInAt: null } : { lastSignInAt: new Date() }) },
     }),
     // One live session per run; earlier runs' rows are cleared.
     db.portalSession.deleteMany({ where: { accountId: account.id } }),
@@ -97,6 +107,16 @@ async function seedPortalFixture(db: PrismaClient, fixture: PortalFixture): Prom
     }),
   ]);
   return { token, contactId: account.contactId };
+}
+
+/** A live shared sign-up link, so /join/[token] has a token to open (routes.ts rebuilds it from the row). */
+async function seedSignupLink(db: PrismaClient): Promise<void> {
+  assertLocalDb();
+  const live = await db.portalInvite.findFirst({ where: { shared: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, select: { id: true } });
+  if (live) return;
+  const id = crypto.randomUUID().replace(/-/g, "");
+  const token = signupLinkToken(id, process.env.DEVICE_SESSION_SECRET!);
+  await db.portalInvite.create({ data: { id, shared: true, tokenHash: hashToken(token) } });
 }
 
 /** The fixture job's actor: a system writer, so seeding it never queues an email. */
@@ -186,6 +206,14 @@ export default async function setup() {
     await seedPortalJob(db, portal.contactId);
     process.env.DEVICE_PORTAL_TOKEN = portal.token;
     process.env.DEVICE_PORTAL_WELCOME_TOKEN = (await seedPortalFixture(db, PORTAL_WELCOME_FIXTURE)).token;
+    const setup = await seedPortalFixture(db, PORTAL_SETUP_FIXTURE);
+    // Back to the start of setup every run: came in by an invite, details checked, nothing after.
+    await db.contact.update({
+      where: { id: setup.contactId },
+      data: { signupSource: "INVITE", needsReview: false, setupStep: "details", setupDoneAt: null, mailingAddress: "100 Main St, Buffalo, NY 14202", phone: "716-555-0100" },
+    });
+    process.env.DEVICE_PORTAL_SETUP_TOKEN = setup.token;
+    await seedSignupLink(db);
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

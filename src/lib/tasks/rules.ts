@@ -91,19 +91,25 @@ export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null
  *   - a contractor changes their job → both partners hear about it.
  *   - staff changing staff tasks, the system and the importer email nobody.
  * `TARGET` stands for "the date the contractor sees moved"; core decides that.
+ *
+ * `contractorGetsEmail` is the whole rule for a contractor's task emails
+ * (src/lib/portal/job-emails.ts): an active login, signed in at least once,
+ * and their "Job emails" switch on. Without it a staff change queues nothing,
+ * and nothing is sent later to catch them up.
  */
 export type NotifyChange = { kind: TaskEventKind | "TARGET"; visibility: Visibility };
 
 const STAFF_TO_CONTRACTOR: ReadonlySet<NotifyChange["kind"]> = new Set(["ASSIGNED", "TARGET", "NOTES"]);
-const CONTRACTOR_TO_STAFF: ReadonlySet<NotifyChange["kind"]> = new Set(["COMMENT", "ATTACHMENT", "STATUS"]);
+// TARGET: the day a contractor agreed with the tenant (core.ts setDateByContractor).
+const CONTRACTOR_TO_STAFF: ReadonlySet<NotifyChange["kind"]> = new Set(["COMMENT", "ATTACHMENT", "STATUS", "TARGET"]);
 
 export function notifyAudience(
   actor: PrincipalKind,
   change: NotifyChange,
-  opts: { contractorHasLogin: boolean },
+  opts: { contractorGetsEmail: boolean },
 ): "contractor" | "staff" | null {
   if (actor === "staff") {
-    if (!opts.contractorHasLogin) return null;
+    if (!opts.contractorGetsEmail) return null;
     if (change.visibility === "SHARED" && (change.kind === "COMMENT" || change.kind === "ATTACHMENT" || change.kind === "STATUS")) {
       return "contractor";
     }

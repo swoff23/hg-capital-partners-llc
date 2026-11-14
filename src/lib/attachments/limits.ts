@@ -97,6 +97,56 @@ export function storedPropertyDocumentPath(pathname: string, propertyId: string)
   return pathname.startsWith(prefix) && /^[A-Za-z0-9._-]{1,160}$/.test(pathname.slice(prefix.length)) && /[A-Za-z0-9]/.test(pathname.slice(prefix.length));
 }
 
+/**
+ * A contractor's W-9 or insurance (docs/specs/contractor-onboarding.md): contacts/<contactId>/<w9|insurance>/<name>,
+ * a photo or a document, each to its own cap, as a property document.
+ */
+export function contactUploadLimits(contactId: string, docKind: unknown, pathname: string, fileKind?: unknown): TokenLimits | string {
+  if (!PROPERTY_ID.test(contactId) || (docKind !== "w9" && docKind !== "insurance")) return "That upload path isn't allowed.";
+  const name = pathname.slice(pathname.lastIndexOf("/") + 1);
+  if (pathname !== `contacts/${contactId}/${docKind}/${name}` || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) return "That upload path isn't allowed.";
+  if (fileKind !== "file" && fileKind !== "image") return "fileKind must be image or file.";
+  const rule = UPLOAD_RULES[fileKind];
+  if (nameExtension(name) !== null) {
+    const type = contentTypeForName(name);
+    if (!type || !rule.contentTypes.includes(type)) return "That file name doesn't match its type.";
+  }
+  return { maximumSizeInBytes: rule.maxBytes, allowedContentTypes: [...rule.contentTypes] };
+}
+
+/** Whether a stored contact-document blob sits where `contactUploadLimits` put it (Blob adds a random suffix). */
+export function storedContactDocumentPath(pathname: string, contactId: string, docKind: "w9" | "insurance"): boolean {
+  if (!PROPERTY_ID.test(contactId)) return false;
+  const prefix = `contacts/${contactId}/${docKind}/`;
+  const rest = pathname.slice(prefix.length);
+  return pathname.startsWith(prefix) && /^[A-Za-z0-9._-]{1,160}$/.test(rest) && /[A-Za-z0-9]/.test(rest);
+}
+
+/**
+ * A signed lease's token (docs/specs/tenants.md): its own lease's folder, leases/<leaseId>/<safe name>, a photo or
+ * a PDF, held to that file kind's type list and cap, as a contractor's W-9 is.
+ */
+export function leaseUploadLimits(leaseId: string, pathname: string, fileKind?: unknown): TokenLimits | string {
+  if (!PROPERTY_ID.test(leaseId)) return "That upload path isn't allowed.";
+  const name = pathname.slice(pathname.lastIndexOf("/") + 1);
+  if (pathname !== `leases/${leaseId}/${name}` || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) return "That upload path isn't allowed.";
+  if (fileKind !== "file" && fileKind !== "image") return "fileKind must be image or file.";
+  const rule = UPLOAD_RULES[fileKind];
+  if (nameExtension(name) !== null) {
+    const type = contentTypeForName(name);
+    if (!type || !rule.contentTypes.includes(type)) return "That file name doesn't match its type.";
+  }
+  return { maximumSizeInBytes: rule.maxBytes, allowedContentTypes: [...rule.contentTypes] };
+}
+
+/** Whether a stored lease blob sits where `leaseUploadLimits` put it (Blob adds a random suffix). */
+export function storedLeaseDocumentPath(pathname: string, leaseId: string): boolean {
+  if (!PROPERTY_ID.test(leaseId)) return false;
+  const prefix = `leases/${leaseId}/`;
+  const rest = pathname.slice(prefix.length);
+  return pathname.startsWith(prefix) && /^[A-Za-z0-9._-]{1,160}$/.test(rest) && /[A-Za-z0-9]/.test(rest);
+}
+
 /** The record step's refusal of a blob that arrived with no bytes: the upload broke, so it goes again. */
 export const EMPTY_UPLOAD = "That file arrived empty. Try again.";
 

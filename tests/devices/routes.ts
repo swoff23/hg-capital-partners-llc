@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { PrismaClient } from "@prisma/client";
+import { signupLinkToken } from "../../src/lib/portal/tokens";
 
 const APP_DIR = path.join(__dirname, "../../src/app");
 
@@ -17,6 +18,13 @@ export const PORTAL_FIXTURE_EMAIL = "device-check@hg.localhost";
 export const SAMPLE_PARAMS: Record<string, FindRow> = {
   "contractors/[id]": (db) => db.contact.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   "deals/[id]": (db) => db.deal.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // A lease page (docs/specs/tenants.md 6): the one with the most tenants on it, so a household of several and a
+  // long name or two are checked on a phone. Each machine's own import, or a lease made with New lease.
+  "tenants/[id]": async (db) => {
+    const leases = await db.lease.findMany({ select: { id: true, _count: { select: { tenants: true } } }, orderBy: { createdAt: "asc" } });
+    const pick = leases.reduce<(typeof leases)[number] | null>((best, l) => (!best || l._count.tenants > best._count.tenants ? l : best), null);
+    return pick ? { id: pick.id } : null;
+  },
   // The contractor portal's job page: the job setup.ts gives the fixture contractor.
   "jobs/[id]": (db) =>
     db.task.findFirst({
@@ -35,6 +43,17 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     const pick = all.reduce<(typeof all)[number] | null>((best, p) => (!best || longest(p.units) > longest(best.units) ? p : best), null);
     return pick ? { id: pick.id } : null;
   },
+  // The shared sign-up link (docs/specs/contractor-onboarding.md): setup.ts makes sure one exists, and its token is
+  // rebuilt from the row the way the app does, under the device check's own SESSION_SECRET.
+  "join/[token]": async (db) => {
+    const row = await db.portalInvite.findFirst({
+      where: { shared: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    const secret = process.env.DEVICE_SESSION_SECRET;
+    return row && secret ? { id: signupLinkToken(row.id, secret) } : null;
+  },
   "tasks/[id]": (db) =>
     db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
   // Playbooks come from the Asana load (scripts/asana/20-load.ts).
@@ -48,7 +67,7 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
  * /login load signed out. "portal-welcome" is the second fixture, still on
  * its starting password, for the one page only it can see.
  */
-export type RouteSession = "none" | "staff" | "portal" | "portal-welcome";
+export type RouteSession = "none" | "staff" | "portal" | "portal-welcome" | "portal-setup";
 
 export interface Route {
   /** The URL pattern, e.g. /deals/[id] */
@@ -67,6 +86,8 @@ const SESSION_BY_GROUP: Record<string, RouteSession> = { "(app)": "staff", "(por
  */
 export const ROUTE_SESSION_OVERRIDE: Record<string, RouteSession> = {
   "/p/welcome/password": "portal-welcome",
+  // Setup is for people who came in by an invite or the sign-up link; the fixture staff added would only bounce to /p.
+  "/p/setup": "portal-setup",
 };
 
 /**

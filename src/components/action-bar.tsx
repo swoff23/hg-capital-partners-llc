@@ -2,8 +2,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useToastInset } from "@/components/toast";
 import { useKeyboardInset } from "@/components/use-keyboard-inset";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
-import { Kbd } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /** Height of the bar above the safe area: 48px buttons plus 12px padding each side. */
@@ -18,22 +16,6 @@ const LINE_PX = 32;
  * the `secondary` and `primary` Buttons.
  */
 export const actionBarButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 lg:w-60 lg:flex-none";
-
-/**
- * The printed ⌘↵ (Ctrl ↵ off a Mac) at the end of the primary's label, inside
- * the button, toned for the ink fill (no keycap ground); hidden on touch,
- * where there is no keyboard shortcut. Give the button
- * `aria-keyshortcuts="Meta+Enter Control+Enter"`. For a secondary action bar
- * button, print a plain `Kbd` instead.
- */
-export function SubmitKeycap() {
-  const mod = useModKey();
-  return (
-    <Kbd tone="act" aria-hidden="true">
-      {shortcutLabel(mod, "↵")}
-    </Kbd>
-  );
-}
 
 export type ActionBarProps = {
   /**
@@ -59,7 +41,7 @@ export type ActionBarProps = {
    * the last row and a focused field never hide under it (forms 2.10).
    */
   placement?: "page" | "app";
-  /** ⌘↵ (Ctrl ↵) runs this, the primary's action. Ignored while a dialog or sheet has the key. Print the keycap with `<SubmitKeycap />` in the primary. */
+  /** ⌘↵ (Ctrl ↵) runs this, the primary's action. Ignored while a dialog or sheet has the key. Give the primary `aria-keyshortcuts="Meta+Enter Control+Enter"`. */
   onPrimary?: () => void;
   /**
    * Hide the bar while the on-screen keyboard is up, so it never covers the
@@ -151,7 +133,7 @@ function useKeyboardUp(enabled: boolean): boolean {
  *     status="3 unsaved changes"
  *     onPrimary={save}
  *     secondary={<Button variant="secondary" className={actionBarButton} onClick={discard}>Discard</Button>}
- *     primary={<Button className={actionBarButton} onClick={save}>Save <SubmitKeycap /></Button>}
+ *     primary={<Button className={actionBarButton} onClick={save}>Save</Button>}
  *   />
  *
  * ⌘↵ runs `onPrimary` and the bar sits after the page's content in the Tab

@@ -14,8 +14,9 @@ import { activityRecordIds, easternDay } from "@/lib/tasks/activity";
 import { activityRecordNames } from "@/lib/tasks/activity-names";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { asanaProfileGids, asanaTaskGids, taskIdsIn } from "@/lib/tasks/body-links";
+import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { emailStatesIn } from "@/lib/tasks/delivery";
-import { lockboxState } from "@/lib/tasks/lockbox";
+import { lockboxState, resolveLockboxCode } from "@/lib/tasks/lockbox";
 import { lastSeen, markTaskSeen, otherPartnersSeen, seenBaseline } from "@/lib/tasks/read-state";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
 import { copySlot } from "@/lib/tasks/repeat-slot";
@@ -23,6 +24,7 @@ import { isDraftUpload, markDoneComment, mediaItem, reviewPhotos, taskMedia, tas
 import { OVERDUE_ELIGIBLE, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { shapeActivity } from "./activity-rows";
 import type { ReviewDecision, ReviewProof } from "./review-banner";
+import type { TaskLockbox } from "./fields";
 import { TaskPageView } from "./view";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
@@ -34,11 +36,14 @@ export async function generateMetadata({ params }: PageProps<"/tasks/[id]">): Pr
 
 /**
  * The staff task page: loads the task and shapes it for TaskPageView
- * (./view.tsx), which lays it out. Lockbox codes and password hashes never
- * reach the client; only unit labels and a lockbox state do.
+ * (./view.tsx), which lays it out. Password hashes never reach the client,
+ * and of the property's lockbox codes only the one this job shows does.
  */
-export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
+export default async function TaskPage({ params, searchParams }: PageProps<"/tasks/[id]">) {
   const { id } = await params;
+  // A partner's email asked for Send back (docs/specs/contractor-job-emails.md, section 8). Approve opens the page as
+  // is: it acts on one tap, so a link never presses it.
+  const openSendBack = (await searchParams).do === "send-back";
 
   // The first wave: the task, each of its lists, and what needs only its id and the viewer, all at once.
   // The session check runs beside them and is awaited with them, so nothing is shown without it.
@@ -62,7 +67,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       assigneeContactId: true,
       assigneeName: true,
       createdBy: { select: { name: true, email: true } },
-      assigneeContact: { select: { id: true, fullName: true, active: true } },
+      assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: JOB_EMAIL_SELECT } } },
     },
   });
   const [user, row, access, checklist, attachments, events, staff, properties, previouslySeen, partnersSeen] = await Promise.all([
@@ -120,7 +125,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   // the page was up and showed with the refresh doesn't come back as unread. The previous open is read first (above):
   // it is the divider's baseline, which the page keeps from its first render (activity.tsx), so the divider stays put.
   if (!(await isActionRender())) after(() => recordView(user.id, "TASK", task.id));
-  after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id })));
+  after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id }, { level: "warning" })));
 
   const live = task.events.filter((e) => !e.deletedAt);
   const commentBodies = live.filter((e) => e.kind === "COMMENT" && e.body).map((e) => e.body!);
@@ -174,12 +179,19 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   // contact is active, since sign-in refuses an inactive one (the card's Access
   // off). Nothing else about the account is read.
   const contractorHasLogin = !!contractor?.active && contractors.some((c) => c.id === contractor.id && c.hasLogin);
+  // Whether a change here emails them, or why not: no login, never signed in, or their Job emails switch is off
+  // (docs/specs/contractor-email-switch.md). The same rule core.ts queues by.
+  const contractorEmails = contractor ? jobEmailState(contractor.portalAccount, contractor.active) : "no-login";
   const property = propertyRow;
 
-  const lockbox = (() => {
+  const lockbox = ((): TaskLockbox | null => {
     if (!contractorFirst || !property || !active) return null;
-    const state = lockboxState(parseUnits(property.units), task.unitLabel);
-    return state === "none" ? null : { state, contractor: contractorFirst, hasLogin: contractorHasLogin };
+    const units = parseUnits(property.units);
+    const who = { contractor: contractorFirst, hasLogin: contractorHasLogin };
+    // The code the contractor's job shows; with none, a property with codes asks for a unit.
+    const code = resolveLockboxCode(units, task.unitLabel);
+    if (code) return { state: "shown", code, ...who };
+    return lockboxState(units, task.unitLabel) === "pick-unit" ? { state: "pick-unit", ...who } : null;
   })();
 
   const userName = (u: { name: string | null; email: string }) => u.name || u.email;
@@ -219,7 +231,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
         ? {
             id: contractor.id,
             first: contractorFirst ?? contractor.fullName,
-            hasLogin: contractorHasLogin,
+            emails: contractorEmails,
             accessActive: task.access.some((a) => a.contactId === contactId),
             seenAt: contractorSeen?.lastSeenAt ?? null,
           }
@@ -268,6 +280,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
 
   return (
     <TaskPageView
+      openSendBack={openSendBack}
       task={{
         id: task.id,
         title: task.title,
@@ -302,7 +315,9 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       created={created}
       contractorFirst={contractorFirst}
       contractorHasLogin={contractorHasLogin}
-      contractor={contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin } : null}
+      contractor={
+        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin, emails: contractorEmails } : null
+      }
       staffFirstNames={staffFirstNames}
       review={review}
       decision={decision}

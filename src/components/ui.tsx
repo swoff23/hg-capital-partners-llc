@@ -39,6 +39,7 @@ export function Section({
   children,
   as: Heading = "h2",
   className,
+  id,
 }: {
   title: React.ReactNode;
   /** Buttons or links at the heading's right end. */
@@ -47,10 +48,12 @@ export function Section({
   /** The heading level; h2 under the page's h1. */
   as?: "h2" | "h3";
   className?: string;
+  /** An anchor a link can open at (`#lockbox`); the section then stops clear of the sticky app bar. */
+  id?: string;
 }) {
   const headingId = React.useId();
   return (
-    <section aria-labelledby={headingId} className={className}>
+    <section id={id} aria-labelledby={headingId} className={cn(id && "scroll-mt-[calc(var(--app-bar-h)+1rem)]", className)}>
       <div className="flex min-h-[2.5625rem] items-center justify-between gap-3 border-b border-line pb-2">
         <Heading id={headingId} className="min-w-0 text-section text-fg-1">
           {title}
@@ -238,6 +241,10 @@ export function TextLink({ className, ...props }: React.ComponentProps<typeof Li
  * the label in --fg-2 at text-label, over the list's --line rule; 40px, 48 on
  * touch. `className` adjusts it, e.g. an inset to line up with a table's text.
  */
+/** The foot row's look, shared with the rail's "7 more fields" (components/rail-fold.tsx). */
+export const addRowClass =
+  "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12";
+
 export function AddRow({
   children,
   onClick,
@@ -265,7 +272,7 @@ export function AddRow({
       onPointerDown={onIntent}
       disabled={disabled}
       className={cn(
-        "flex min-h-10 w-full items-center gap-2 border-t border-line py-2 text-left text-label text-fg-2 transition-colors not-disabled:hover:text-fg-1 disabled:opacity-50 pointer-coarse:min-h-12",
+        addRowClass,
         // The fill reaches 8px past the text, as a list row's does, and the divider above it steps aside while it shows.
         waiting && cn(sheetWaitingFill, "-mx-2 rounded-md border-transparent px-2"),
         className,
@@ -278,12 +285,10 @@ export function AddRow({
 }
 
 /* ---------------- Kbd ----------------
-   A printed shortcut: "Esc", "⌘K". Touch screens get the same actions as
-   visible buttons, so the keycap hides there. A shortcut prints inside the
-   button it triggers, at the trailing edge after the label ("Send ⌘↵",
-   "Cancel Esc"), and the button carries aria-keyshortcuts while the keys are
-   aria-hidden. On a secondary button the keys keep the keycap above. On a
-   primary (--act) button, where a light keycap would glare, pass
+   A printed shortcut: "⌘K", a menu item's key. Touch screens get the same
+   actions as visible buttons, so the keycap hides there. Buttons don't print
+   their Esc or ⌘↵ keys; they only carry aria-keyshortcuts. For a keycap
+   inside a primary (--act) button, where a light keycap would glare, pass
    tone="act": no ground and no edge, just the button's own --on-act at 70%
    (8.5:1 on the ink and 6.9:1 on its hover in light; 6.3:1 and 5.6:1 in
    dark), set 2px further from the label. */

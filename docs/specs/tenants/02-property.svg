@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="430" viewBox="0 0 860 430" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The property page's Tenants section at laptop 1280 and phone 375</title>
+<rect width="860" height="430" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">The property's Tenants section, under Units and access</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768, past tenants open</text>
+<rect x="0" y="22" width="540" height="340" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="52" font-size="12" fill="#8a919c">Units and access ...</text>
+<text x="20" y="84" font-size="14" font-weight="600" fill="#152133">Tenants</text>
+<text x="520" y="84" font-size="11" text-anchor="end" fill="#424e61" text-decoration="underline">All tenants</text>
+<line x1="20" y1="94" x2="520" y2="94" stroke="#e7e5e0"/>
+<g font-size="11" fill="#5b6576"><text x="20" y="114">Unit</text><text x="96" y="114">Tenants</text><text x="360" y="114">Rent</text><text x="430" y="114">Lease ends</text></g>
+<g font-size="12">
+<text x="20" y="140" fill="#152133">Front</text>
+<text x="96" y="140" fill="#152133">Tenant one, Tenant two</text>
+<text x="360" y="140" fill="#152133">$1,900</text><text x="430" y="140" fill="#424e61">Feb 2027</text>
+<text x="96" y="156" font-size="11" fill="#5b6576">Next: Tenant five from Mar 1</text>
+<line x1="20" y1="168" x2="520" y2="168" stroke="#f2f0ec"/>
+<text x="20" y="190" fill="#152133">Rear</text>
+<text x="96" y="190" fill="#152133">Tenant three</text>
+<text x="360" y="190" fill="#152133">$1,450</text><text x="430" y="190" fill="#424e61">Monthly</text>
+<line x1="20" y1="202" x2="520" y2="202" stroke="#f2f0ec"/>
+<text x="20" y="224" fill="#152133">Upper</text>
+<text x="96" y="224" fill="#8a919c">Vacant</text>
+<text x="146" y="224" font-size="12" fill="#152133" text-decoration="underline">Add tenants</text>
+<line x1="20" y1="236" x2="520" y2="236" stroke="#f2f0ec"/>
+</g>
+<text x="20" y="262" font-size="12" fill="#424e61">Past tenants (6)</text>
+<path d="M120 256 l4 4 4-4" fill="none" stroke="#424e61" stroke-width="1.3"/>
+<g font-size="11" fill="#424e61">
+<text x="20" y="286">Tenant six, Tenant seven · Front · Mar 2023 to Feb 2025 · $1,750</text>
+<text x="20" y="306">Tenant eight · Upper · Jun 2022 to May 2026 · $1,600</text>
+<text x="20" y="326" fill="#8a919c">4 more, newest first</text>
+</g>
+</g>
+
+<g transform="translate(604 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375 and 320</text>
+<rect x="0" y="22" width="224" height="340" rx="18" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="16" y="56" font-size="14" font-weight="600" fill="#152133">Tenants</text>
+<line x1="16" y1="66" x2="208" y2="66" stroke="#e7e5e0"/>
+<g font-size="12">
+<text x="16" y="90" fill="#152133">Front</text><text x="208" y="90" text-anchor="end" fill="#152133">$1,900</text>
+<text x="16" y="106" font-size="11" fill="#424e61">Tenant one, Tenant two</text>
+<text x="16" y="122" font-size="11" fill="#5b6576">Next: Tenant five from Mar 1</text>
+<line x1="16" y1="134" x2="208" y2="134" stroke="#f2f0ec"/>
+<text x="16" y="156" fill="#152133">Rear</text><text x="208" y="156" text-anchor="end" fill="#152133">$1,450</text>
+<text x="16" y="172" font-size="11" fill="#424e61">Tenant three</text>
+<line x1="16" y1="184" x2="208" y2="184" stroke="#f2f0ec"/>
+<text x="16" y="206" fill="#152133">Upper</text>
+<text x="16" y="222" font-size="11" fill="#8a919c">Vacant</text>
+<text x="208" y="206" text-anchor="end" font-size="12" fill="#152133" text-decoration="underline">Add tenants</text>
+<line x1="16" y1="234" x2="208" y2="234" stroke="#f2f0ec"/>
+</g>
+<text x="16" y="258" font-size="12" fill="#424e61">Past tenants (6)</text>
+<text x="16" y="292" font-size="10" fill="#5b6576">The unit and rent on one line, the</text>
+<text x="16" y="306" font-size="10" fill="#5b6576">names under it. Lease ends moves to</text>
+<text x="16" y="320" font-size="10" fill="#5b6576">the lease page. Names truncate at 320.</text>
+</g>
+</svg>

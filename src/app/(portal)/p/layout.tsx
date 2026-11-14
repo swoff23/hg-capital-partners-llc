@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { LeaveGuard } from "@/components/leave-guard";
 import { ToastProvider } from "@/components/toast";
+import { UpdateNotice } from "@/components/update-notice";
+import { getEnv } from "@/lib/env";
 import { portalScope } from "@/lib/attachments/queue-owner";
 import { BRAND } from "@/lib/brand";
 import { requirePortalSession } from "@/lib/portal/session";
@@ -50,6 +52,8 @@ export default async function PortalLayout({ children }: LayoutProps<"/p">) {
       <ToastProvider>
         <LeaveGuard>
           <PortalUploadQueue key={scope} scope={scope}>
+            {/* A job page left open hears about a new version (docs/specs/update-notice.md). */}
+            <UpdateNotice version={getEnv().VERCEL_GIT_COMMIT_SHA ?? null} />
             {children}
           </PortalUploadQueue>
         </LeaveGuard>

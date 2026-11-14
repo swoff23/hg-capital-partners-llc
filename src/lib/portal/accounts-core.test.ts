@@ -9,6 +9,7 @@ import {
   changePortalEmailIn,
   createPortalAccountIn,
   enablePortalAccountIn,
+  setJobEmailsIn,
 } from "./accounts-core";
 
 const STAFF = { id: "u-connor" };
@@ -251,4 +252,59 @@ test("createPortalAccountIn and enablePortalAccountIn lock the contractor's row 
     "the contact, found through the login, before the login is read",
   );
   assert.deepEqual(back.order.slice(1), ["read login"]);
+});
+
+// ---------------------------------------------------------------------------
+// The "Job emails" switch (docs/specs/contractor-email-switch.md)
+// ---------------------------------------------------------------------------
+
+/** One login with its switch, in memory, with the audit rows written. */
+function fakeSwitch(jobEmails: boolean) {
+  const account = { id: "a1", contactId: "c-zack", jobEmails };
+  const events: { kind: string; userId: string | null; contactId: string | null; data: unknown }[] = [];
+  const tx = {
+    portalAccount: {
+      findUnique: async ({ where }: { where: { id: string } }) => (where.id === account.id ? { id: account.id, contactId: account.contactId } : null),
+      // Compare-and-set, as the service writes it: only a row still at the other value changes.
+      updateMany: async ({ where, data }: { where: { id: string; jobEmails: boolean }; data: { jobEmails: boolean } }) => {
+        if (where.id !== account.id || account.jobEmails !== where.jobEmails) return { count: 0 };
+        account.jobEmails = data.jobEmails;
+        return { count: 1 };
+      },
+    },
+    securityEvent: {
+      create: async ({ data }: { data: (typeof events)[number] }) => {
+        events.push(data);
+      },
+    },
+  } as unknown as Prisma.TransactionClient;
+  return { tx, account, events };
+}
+
+test("setJobEmailsIn: off is saved and logged with who did it", async () => {
+  const { tx, account, events } = fakeSwitch(true);
+  assert.equal(await setJobEmailsIn(tx, "a1", false, STAFF), true);
+  assert.equal(account.jobEmails, false);
+  assert.deepEqual(events, [{ kind: "ACCOUNT_DISABLED", userId: "u-connor", contactId: "c-zack", taskId: null, ipHash: null, data: { action: "job-emails-off" } }]);
+});
+
+test("setJobEmailsIn: back on is saved and logged the same way", async () => {
+  const { tx, account, events } = fakeSwitch(false);
+  assert.equal(await setJobEmailsIn(tx, "a1", true, STAFF), true);
+  assert.equal(account.jobEmails, true);
+  assert.deepEqual(events.map((e) => e.data), [{ action: "job-emails-on" }]);
+});
+
+test("setJobEmailsIn: a switch already there changes nothing and logs nothing, so two partners' taps leave one row", async () => {
+  const { tx, account, events } = fakeSwitch(true);
+  assert.equal(await setJobEmailsIn(tx, "a1", false, STAFF), true);
+  assert.equal(await setJobEmailsIn(tx, "a1", false, { id: "u-pieter" }), false);
+  assert.equal(account.jobEmails, false);
+  assert.equal(events.length, 1);
+});
+
+test("setJobEmailsIn: a login that is gone is refused in words staff can read", async () => {
+  const { tx, events } = fakeSwitch(true);
+  await assert.rejects(() => setJobEmailsIn(tx, "nope", false, STAFF), (err: unknown) => err instanceof PortalAccountError && err.message === "That login no longer exists.");
+  assert.equal(events.length, 0);
 });

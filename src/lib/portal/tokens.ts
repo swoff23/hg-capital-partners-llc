@@ -27,6 +27,16 @@ export function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token, "utf8").digest("hex");
 }
 
+/**
+ * The shared sign-up link's token, made again from its row whenever a partner copies it
+ * (docs/specs/contractor-onboarding.md, section 6). The database keeps only its hash, like every other token here;
+ * the secret and the row id rebuild it, so nobody can read it out of a copy of the table. 32 bytes, base64url, so
+ * it passes isWellFormedToken.
+ */
+export function signupLinkToken(rowId: string, secret: string): string {
+  return crypto.createHmac("sha256", secret).update(`hg-portal:signup:${rowId}`, "utf8").digest("base64url");
+}
+
 /** HMAC of a value under a purpose label, so one secret yields unrelated hashes per use. */
 export function keyedHash(purpose: "ip" | "email", value: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(`hg-portal:${purpose}:${value}`, "utf8").digest("hex");

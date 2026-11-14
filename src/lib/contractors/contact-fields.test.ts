@@ -15,6 +15,7 @@ test("readNewContact: every field reads as an edit would, phone with its dialabl
   const r = readNewContact({
     fullName: "Zack Reading",
     company: "Outlaw Carpentry",
+    // Trades aren't a text field any more (setContactTrades), so this one is ignored.
     trades: "Carpentry / Framing / carpentry",
     phone: "(716) 555-1234",
     email: "Zack@Example.com",
@@ -28,8 +29,6 @@ test("readNewContact: every field reads as an edit would, phone with its dialabl
     data: {
       fullName: "Zack Reading",
       company: "Outlaw Carpentry",
-      // The same trade twice is kept once.
-      trades: "Carpentry / Framing",
       phone: "716-555-1234",
       phoneE164: "+17165551234",
       email: "zack@example.com",
@@ -55,7 +54,6 @@ test("readContactPatch: every empty optional field saves as null", () => {
     ok: true,
     data: {
       company: null,
-      trades: null,
       phone: null,
       phoneE164: null,
       email: null,
@@ -138,9 +136,8 @@ test("readPhone: blank is no phone; anything that can't be dialed is refused", (
   }
 });
 
-test("readContactPatch: trades drop a trade typed twice, as the directory shows them", () => {
-  assert.deepEqual(readContactPatch({ trades: "HVAC / hvac / Plumbing" }), { ok: true, data: { trades: "HVAC / Plumbing" } });
-  assert.deepEqual(readContactPatch({ trades: " Plumbing / HVAC " }), { ok: true, data: { trades: "Plumbing / HVAC" } });
+test("readContactPatch: trades are not a text field, so a patch can't write the old column", () => {
+  assert.deepEqual(readContactPatch({ trades: "HVAC / Plumbing" }), { ok: true, data: {} });
 });
 
 test("readContactPatch: multi-line fields keep their lines, with the ends trimmed", () => {

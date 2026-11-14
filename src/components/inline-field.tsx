@@ -7,17 +7,16 @@ import {
   useRef,
   useState,
   type ComponentProps,
-  type FocusEvent,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type Ref,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { AddressCombobox } from "@/components/address-combobox";
 import { Code } from "@/components/code";
-import { Combobox } from "@/components/combobox";
 import { DatePanel, warmDatePanel } from "@/components/due-date-picker";
 import { FormSheet } from "@/components/form-sheet";
 import { listOnScreen } from "@/components/list-on-screen";
@@ -28,10 +27,10 @@ import { OptionList, type OptionItem } from "@/components/option-list";
 import { PickerLayer } from "@/components/picker-layer";
 import { railLineClass, railVerbClass } from "@/components/rail";
 import { Switch } from "@/components/switch";
-import { Button, FormField, Input, Kbd, fieldClass } from "@/components/ui";
+import { DoneFooter, TagList, TagsChecklist, tagsLine, tagsOf } from "@/components/tags-field";
+import { Button, FormField, Input, fieldClass } from "@/components/ui";
 import { isCoarseNow } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { useRun } from "@/components/use-run";
 import type { AddressKind } from "@/lib/address-suggestions";
 import { conflictKeepLabel, type ActionResult } from "@/lib/action-result";
@@ -110,10 +109,10 @@ export type InlineFieldProps = {
   options?: OptionItem[];
   /** `choice`: the named empty value ("No reason"), listed first. */
   emptyLabel?: string;
-  /** `text`: values already in use, listed under the field; a new one can still be typed (an entity). In place and in the touch sheet. */
-  suggestions?: readonly string[];
   /** `choice`: the line when a search of the options finds none ("No reason matches."). */
   emptyText?: string;
+  /** `choice`: the search always shows, and text that names no option adds it ('Add "Linwood Partners LLC"'), saved like a pick. */
+  allowAdd?: boolean;
   /** The least length for text and headings; 0, the default, lets a fact be emptied. */
   minLength?: number;
   /** The line for a blank heading: "Enter the address." */
@@ -365,11 +364,9 @@ type Mode = "rest" | "inline" | "sheet";
 
 /** Text, a note, a number, an email, a phone or a link. */
 function TextFact(props: InlineFieldProps) {
-  const { kind, label, value, field, context, empty, tone, helper, display, unit, minLength, tooShort, allowText, check, code, trailing, onRequest, wrap, suggestions, className } = props;
+  const { kind, label, value, field, context, empty, tone, helper, display, unit, minLength, tooShort, allowText, check, code, trailing, onRequest, wrap, className } = props;
   const multiline = kind === "multiline";
   const nk = numberKindOf(kind);
-  // A text fact with a list of what's in use (an entity) is a Combobox that takes a new value too.
-  const suggest = kind === "text" ? suggestions : undefined;
   const inRail = props.inRail ?? !multiline;
   const save = useFactSave(props);
   const router = useRouter();
@@ -384,7 +381,6 @@ function TextFact(props: InlineFieldProps) {
   const closing = useRef(false);
   const refocus = useRef(false);
   const lineId = useId();
-  const mod = useModKey();
   const shown = save.shown;
 
   function open() {
@@ -404,7 +400,7 @@ function TextFact(props: InlineFieldProps) {
   // Opened in place: focus it, numbers selected so typing replaces them, text with the caret at the end.
   useLayoutEffect(() => {
     if (mode !== "inline") return;
-    const el = control.current ?? root.current?.querySelector("input");
+    const el = control.current;
     if (!el) return;
     el.focus();
     if (nk) el.select();
@@ -438,9 +434,8 @@ function TextFact(props: InlineFieldProps) {
   }
 
   /** Leaves the field, saving a real edit. Returns whether it left (a draft that can't be read stays open). */
-  function commit(force?: { expected: string }, opts: { toNext?: boolean; text?: string } = {}): boolean {
-    // `text` is what a suggestions field was left with: it keeps its own draft, so the one kept here may be behind.
-    const d: InlineDecision = decideInlineEdit(kind, opts.text ?? draft, value, { minLength, tooShort, allowText });
+  function commit(force?: { expected: string }, opts: { toNext?: boolean } = {}): boolean {
+    const d: InlineDecision = decideInlineEdit(kind, draft, value, { minLength, tooShort, allowText });
     if (d.kind === "problem") {
       setProblem(d.message);
       return false;
@@ -517,49 +512,6 @@ function TextFact(props: InlineFieldProps) {
     commit();
   }
 
-  /** What a suggestions field was left with: its own input's text (the field keeps a draft of its own). */
-  const typedIn = (from: HTMLElement | null) => from?.querySelector("input")?.value;
-  const saveWith = (text: string | undefined, opts: { toNext?: boolean } = {}) =>
-    commit(save.conflict ? { expected: theirsText() } : undefined, { ...opts, text });
-
-  // A suggestions field saves on a pick, Enter or leaving, as every one-line fact does. The field itself says when
-  // the text differs from the saved one; these only close it when nothing changed, and own Esc and Tab.
-  function onSuggestKeyDown(e: KeyboardEvent<HTMLElement>) {
-    if (e.nativeEvent.isComposing) return;
-    const input = e.target as HTMLElement;
-    const picking = !!input.getAttribute("aria-activedescendant");
-    if (e.key === "Escape") {
-      // The list is a layer of its own: one Esc closes it, the next closes the field.
-      if (listOnScreen(input)) return;
-      e.preventDefault();
-      cancel();
-    } else if (e.key === "Enter" && !picking) {
-      // A changed text was already saved by the field's own Enter, which closed this one.
-      if (!closing.current) saveWith(typedIn(root.current));
-    } else if (e.key === "Tab" && !e.shiftKey && !picking) {
-      const next = nextValue(root.current);
-      const left = saveWith(typedIn(root.current), { toNext: true });
-      if (!left) e.preventDefault();
-      else if (next) {
-        e.preventDefault();
-        requestAnimationFrame(() => next.focus());
-      }
-    }
-  }
-  function onSuggestBlur(e: FocusEvent<HTMLElement>) {
-    // Between the input and its own buttons is still inside the field.
-    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-    settleOnLeave(e.currentTarget);
-  }
-  function settleOnLeave(from: HTMLElement) {
-    if (closing.current) {
-      closing.current = false;
-      return;
-    }
-    if (save.conflict) return;
-    saveWith(typedIn(from));
-  }
-
   function changed(next: string) {
     setDraft(next);
     // Once a line shows, the field re-checks as you type and clears it the moment it reads.
@@ -587,20 +539,7 @@ function TextFact(props: InlineFieldProps) {
   } as const;
 
   let controlNode: ReactNode;
-  if (suggest) {
-    // Opens on what was typed when a refused save put the field back; leaving, a pick or Enter saves (onSuggest...).
-    controlNode = (
-      <Combobox
-        aria-label={label}
-        size="sm"
-        items={suggest}
-        allowCustom
-        value={value}
-        initialText={draft}
-        onChange={(next) => saveWith(next)}
-      />
-    );
-  } else if (multiline) {
+  if (multiline) {
     controlNode = (
       <AutosizeTextarea
         ref={control as Ref<HTMLTextAreaElement>}
@@ -647,8 +586,6 @@ function TextFact(props: InlineFieldProps) {
   // The sheet's field is at 44px on touch from Input itself, and the sheet's title stands in for the label.
   const sheetControl = (p: { id: string; "aria-describedby"?: string; "aria-invalid"?: true }) => {
     const common = { id: p.id, "aria-describedby": p["aria-describedby"], "aria-invalid": p["aria-invalid"], value: draft, autoComplete: "off" } as const;
-    // The list is the field's own, so in the sheet its pick or Enter sets the draft and Save sends it.
-    if (suggest) return <Combobox aria-label={label} items={suggest} allowCustom value={draft} onChange={changed} />;
     if (multiline) return <AutosizeTextarea {...common} rows={5} onChange={(e) => changed(e.target.value)} className="min-h-32 text-body" />;
     if (nk) return <NumberInput kind={nk} suffix={unit} allowText={allowText} {...common} enterKeyHint="done" onChange={changed} />;
     return (
@@ -668,7 +605,7 @@ function TextFact(props: InlineFieldProps) {
       onOpenChange={(o) => {
         if (!o) cancel();
       }}
-      onSubmit={(_data, form) => commit(save.conflict ? { expected: theirsText() } : undefined, suggest ? { text: typedIn(form) } : {})}
+      onSubmit={() => commit(save.conflict ? { expected: theirsText() } : undefined)}
       primary={save.conflict ? "Save mine" : "Save"}
       pending={save.pending}
       values={draft}
@@ -738,24 +675,15 @@ function TextFact(props: InlineFieldProps) {
 
   // Open in place with a mouse.
   return (
-    <div
-      ref={root}
-      className={cn("min-w-0 flex-1", multiline && "w-full")}
-      onKeyDown={suggest ? onSuggestKeyDown : undefined}
-      onBlur={suggest ? onSuggestBlur : undefined}
-    >
+    <div ref={root} className={cn("min-w-0 flex-1", multiline && "w-full")}>
       {controlNode}
       {multiline && (
         <div className="mt-2 flex justify-end gap-2">
           <Button size="sm" variant="secondary" onClick={cancel} aria-keyshortcuts="Escape">
             Cancel
-            <Kbd aria-hidden="true">Esc</Kbd>
           </Button>
           <Button size="sm" onClick={() => commit(save.conflict ? { expected: theirsText() } : undefined)} aria-keyshortcuts="Meta+Enter Control+Enter">
             Save
-            <Kbd tone="act" aria-hidden="true">
-              {shortcutLabel(mod, "↵")}
-            </Kbd>
           </Button>
         </div>
       )}
@@ -767,13 +695,30 @@ function TextFact(props: InlineFieldProps) {
 /* ---------------- The heading ---------------- */
 
 // The page's h1 on the title token, editable or not. font-semibold repeats the token's weight so a caller's size override (the task title) keeps it.
-const headingText = "rounded-md px-2 py-1 pr-6 text-title font-semibold text-fg-1";
+// The 1px edge is there at rest too (transparent), so the field that replaces the title on a click has the same box and nothing moves.
+const headingText = "rounded-md border border-transparent px-2 py-1 text-title font-semibold text-fg-1 [overflow-wrap:anywhere]";
+
+/** Where in the heading's text a click landed, so the field opens with the cursor there; undefined from the keyboard. */
+function caretFromClick(e: ReactMouseEvent<HTMLElement>): number | undefined {
+  if (e.detail === 0) return undefined;
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+  };
+  const pos = doc.caretPositionFromPoint?.(e.clientX, e.clientY);
+  const range = pos ? null : document.caretRangeFromPoint?.(e.clientX, e.clientY);
+  const node = pos?.offsetNode ?? range?.startContainer;
+  const offset = pos?.offset ?? range?.startOffset;
+  if (!node || offset === undefined || node.nodeType !== Node.TEXT_NODE || !e.currentTarget.contains(node)) return undefined;
+  return offset;
+}
 
 /**
  * The page's h1: the address of a property or a deal, a task's title, a
- * contractor's name. A click opens the field in place (a bordered address
- * field with suggestions for an address), on touch the one-field sheet. Enter
- * or leaving commits, Esc puts the saved name back. A name too short says so
+ * contractor's name. With a mouse it reads as the rail's facts do: a fill and
+ * a text cursor on hover, no pencil. A click opens the field in the title's
+ * own box, with the cursor where the click landed (a bordered address field
+ * with suggestions for an address); on touch the one-field sheet. Enter or
+ * leaving commits, Esc puts the saved name back. A name too short says so
  * under the field instead of snapping back, and a refused rename never stays
  * on screen: the field reopens with what was typed and the reason.
  */
@@ -790,28 +735,32 @@ function HeadingFact(props: InlineFieldProps) {
   const area = useRef<HTMLTextAreaElement>(null);
   const closing = useRef(false);
   const refocus = useRef(false);
+  // Where the cursor goes when the field opens: the click's spot, or the end.
+  const caret = useRef<number | undefined>(undefined);
   const lineId = useId();
   const shown = save.shown;
 
-  function open() {
+  function open(at?: number) {
     if (save.pending) return;
     save.reset();
     setProblem(null);
     setDraft(value);
+    caret.current = at === undefined ? undefined : Math.min(at, value.length);
     closing.current = false;
     if (isCoarseNow()) {
       setSheetUsed(true);
       setMode("sheet");
     } else setMode("inline");
   }
-  useEffect(() => onRequest?.(open));
+  useEffect(() => onRequest?.(() => open()));
 
   useLayoutEffect(() => {
     if (mode !== "inline") return;
     const el = area.current ?? root.current?.querySelector<HTMLInputElement>("input");
     if (!el) return;
     el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    const at = caret.current ?? el.value.length;
+    el.setSelectionRange(at, at);
   }, [mode]);
 
   useEffect(() => {
@@ -952,29 +901,24 @@ function HeadingFact(props: InlineFieldProps) {
   );
 
   if (mode !== "inline") {
-    // A desktop hover cue only; touch has no hover, and a tap opens the field.
+    // The hover fill and text cursor are for a mouse only; touch has no hover, and a tap opens the sheet.
     return (
       <>
-        <h1 className="group/addr relative -mx-2 min-w-0">
+        <h1 className="-mx-2 min-w-0">
           <button
             ref={valueRef}
             type="button"
             data-inline-value=""
-            onClick={open}
+            onClick={(e) => open(caretFromClick(e))}
             aria-busy={save.pending || undefined}
             className={cn(
               headingText,
-              "text-balance text-left transition-colors [overflow-wrap:anywhere] pointer-fine:hover:bg-fill-1",
+              "block w-fit max-w-full text-left transition-colors pointer-fine:cursor-text pointer-fine:hover:bg-fill-1 aria-busy:cursor-progress",
               className,
             )}
           >
             {shown}
           </button>
-          <Pencil
-            aria-hidden="true"
-            strokeWidth={1.5}
-            className="pointer-events-none absolute right-2 top-3 h-4 w-4 text-fg-3 opacity-0 transition-opacity pointer-fine:group-hover/addr:opacity-100"
-          />
         </h1>
         {/* A refusal that landed after the field closed, under the heading and not inside it. */}
         {(save.error || save.conflict) && (
@@ -989,7 +933,7 @@ function HeadingFact(props: InlineFieldProps) {
   }
 
   return (
-    <div ref={root} className="-mx-2 w-full min-w-0" onKeyDown={address ? onKeyDown : undefined} onBlur={address ? (e) => !e.currentTarget.contains(e.relatedTarget) && onBlur() : undefined}>
+    <div ref={root} className="-mx-2 min-w-0" onKeyDown={address ? onKeyDown : undefined} onBlur={address ? (e) => !e.currentTarget.contains(e.relatedTarget) && onBlur() : undefined}>
       {address ? (
         <AddressCombobox
           kind={address.kind}
@@ -1003,19 +947,32 @@ function HeadingFact(props: InlineFieldProps) {
           className="px-2"
         />
       ) : (
-        <AutosizeTextarea
-          ref={area}
-          aria-label={label}
-          aria-invalid={problem ? true : undefined}
-          aria-describedby={problem || save.error || save.conflict ? lineId : undefined}
-          rows={1}
-          value={draft}
-          onChange={(e) => changed(e.target.value)}
-          onKeyDown={onKeyDown}
-          onBlur={onBlur}
-          // Editing reads as a field: --surface with the focus edge, at the heading's size.
-          className={cn("w-full border-line-control px-2 py-1 text-title font-semibold", className)}
-        />
+        // The field takes the title's own box: an invisible copy of the text sizes it (wider as you type, up to the
+        // column, then onto more lines) and the textarea lies over it, with the same type, padding and edge, so the
+        // words stay put. Editing reads as a field: --surface with the focus edge.
+        <div className="relative w-fit max-w-full">
+          <span aria-hidden="true" className={cn(headingText, "invisible block whitespace-pre-wrap", className)}>
+            {draft}
+            {"\u200b"}
+          </span>
+          <textarea
+            ref={area}
+            aria-label={label}
+            aria-invalid={problem ? true : undefined}
+            aria-describedby={problem || save.error || save.conflict ? lineId : undefined}
+            rows={1}
+            value={draft}
+            onChange={(e) => changed(e.target.value)}
+            onKeyDown={onKeyDown}
+            onBlur={onBlur}
+            className={cn(
+              headingText,
+              "absolute inset-0 size-full resize-none overflow-hidden whitespace-pre-wrap border-line-control bg-surface outline-none",
+              "focus:border-act focus:ring-1 focus:ring-inset focus:ring-act aria-invalid:border-danger aria-invalid:focus:ring-danger",
+              className,
+            )}
+          />
+        </div>
       )}
       <div className="px-2">
         {!refusal && <FactLine id={lineId} problem={address ? null : problem} save={save} p={{ kind: "heading", field }} inRail={false} />}
@@ -1029,7 +986,7 @@ function HeadingFact(props: InlineFieldProps) {
 
 /** A date or a choice. The value opens its panel (a popover, a sheet on a phone) and a pick saves. */
 function PickedFact(props: InlineFieldProps) {
-  const { kind, label, value, field, empty, tone, helper, display, unit, options = [], emptyLabel, emptyText, allowNone = true, trailing, onRequest, className } = props;
+  const { kind, label, value, field, empty, tone, helper, display, unit, options = [], emptyLabel, emptyText, allowAdd, allowNone = true, trailing, onRequest, className } = props;
   const inRail = props.inRail ?? true;
   const save = useFactSave(props);
   const router = useRouter();
@@ -1111,6 +1068,14 @@ function PickedFact(props: InlineFieldProps) {
                 onTab={close}
                 searchLabel={`Search ${label.toLowerCase()}`}
                 emptyText={emptyText}
+                onCreate={
+                  allowAdd
+                    ? (text) => {
+                        close();
+                        pick(text);
+                      }
+                    : undefined
+                }
               />
             )
           }
@@ -1186,6 +1151,117 @@ export function InlineSwitch(props: {
       {(save.error || save.conflict) && (
         <>
           <FactLine id={lineId} problem={null} save={save} p={{ kind: "choice", field }} inRail />
+          <ConflictButtons
+            save={save}
+            inRail
+            onKeep={() => {
+              save.reset();
+              setTurnedDown(null);
+              router.refresh();
+            }}
+            onSaveMine={() => {
+              const theirs = (save.conflict && field ? save.conflict.theirs?.[field] : undefined) ?? "";
+              if (turnedDown !== null) save.start(turnedDown, theirs, { failed: () => setTurnedDown(turnedDown) });
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Pick many: saved once, on close ---------------- */
+
+/**
+ * A record's pick-many value (a contractor's trades; docs/specs/
+ * contractor-trades.md 4.2): tags at rest, A to Z, and a click or tap
+ * anywhere on them opens the checklist under them, a sheet with Done on a
+ * phone. Ticks wait while it's open. Closing it (a click away, Esc, Tab or
+ * Done) saves once when the set changed, with one toast whose Undo puts back
+ * the set it opened with. `value` and `onSave`'s strings are the values on
+ * one line, "HVAC, Plumbing" (`tagsLine`), so the conflict line and Undo work
+ * as for any text fact.
+ */
+export function InlineTags(props: {
+  label: string;
+  /** The values on one line, as `tagsLine` writes them; "" for none. */
+  value: string;
+  /** Every value the checklist offers. */
+  options: readonly string[];
+  onSave: (next: string, expected: string) => Promise<ActionResult<unknown>>;
+  /** The verb for none: "Add trades". */
+  empty: string;
+  /** The server's name for the field, to read the other person's values from a conflict. */
+  field?: string;
+  /** Lets typed text add a value ('Add "Roofing"'), named by this; null refuses it. */
+  normalize?: (text: string) => string | null;
+  /** The toast after a save: "Zack's trades saved". */
+  message: (next: string) => string;
+  emptyText?: string;
+}) {
+  const { label, value, field, empty } = props;
+  const save = useFactSave({ kind: "text", label, value, onSave: props.onSave, message: props.message });
+  const router = useRouter();
+  const lineId = useId();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
+  // The set a conflict turned down, to send again on "Save mine".
+  const [turnedDown, setTurnedDown] = useState<string | null>(null);
+  const tags = tagsOf(save.shown);
+
+  function openChange(next: boolean) {
+    if (next) {
+      setDraft(tags);
+      setOpen(true);
+      return;
+    }
+    setOpen(false);
+    const line = tagsLine(draft);
+    if (line.toLowerCase() === tagsLine(tags).toLowerCase()) return;
+    setTurnedDown(null);
+    // Expected is what's shown, so a second change made while the first saves queues behind it.
+    save.start(line, save.shown, { failed: () => setTurnedDown(line) });
+  }
+
+  const shown = tagsLine(tags);
+  const trigger =
+    tags.length === 0 ? (
+      <AriaButton aria-busy={save.pending || undefined} className={railVerbClass()}>
+        <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0" />
+        {empty}
+      </AriaButton>
+    ) : (
+      <AriaButton aria-busy={save.pending || undefined} aria-label={`${label}, ${shown}, edit`} className={cn(valueButtonClass, "py-1.5")}>
+        <TagList tags={tags} />
+      </AriaButton>
+    );
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <PickerLayer
+        isOpen={open}
+        onOpenChange={openChange}
+        title={label}
+        popoverClassName="max-w-80"
+        sheetFooter={(close) => <DoneFooter close={close} />}
+        trigger={trigger}
+      >
+        {({ container, close }) => (
+          <TagsChecklist
+            label={label}
+            options={props.options}
+            value={draft}
+            onChange={setDraft}
+            normalize={props.normalize}
+            emptyText={props.emptyText}
+            container={container}
+            onTab={close}
+          />
+        )}
+      </PickerLayer>
+      {(save.error || save.conflict) && (
+        <>
+          <FactLine id={lineId} problem={null} save={save} p={{ kind: "text", field }} inRail />
           <ConflictButtons
             save={save}
             inRail

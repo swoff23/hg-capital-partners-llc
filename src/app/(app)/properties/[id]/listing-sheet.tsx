@@ -207,7 +207,7 @@ export function ListingSheet({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <FormField label="Sq ft" optional error={shows("sqft") ?? serverError("sqft")}>
+        <FormField label="Square feet" optional error={shows("sqft") ?? serverError("sqft")}>
           {(p) => <NumberInput kind="integer" {...p} value={draft.sqft} onBlur={() => leave("sqft")} onChange={(v) => change({ sqft: v })} />}
         </FormField>
         <FormField label="Beds" optional error={shows("beds")}>

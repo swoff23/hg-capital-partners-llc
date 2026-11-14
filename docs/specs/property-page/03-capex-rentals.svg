@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="560" viewBox="0 0 920 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>One CapEx section with building systems folded at its foot, and Rental listings only once a listing exists, with Add listing in the header menu</title>
+<rect width="920" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">CapEx in one section, Rental listings only with a listing</text>
+
+<g transform="translate(32 56)" font-size="11">
+<text x="0" y="12" font-weight="500" fill="#424e61">CapEx, building systems folded</text>
+<text x="0" y="40" font-size="13" font-weight="600" fill="#152133">CapEx</text><text x="300" y="40" text-anchor="end" fill="#5b6576">2026 to 2030</text>
+<line x1="0" y1="50" x2="300" y2="50" stroke="#e7e5e0"/>
+<text x="0" y="76" font-size="16" font-weight="600" fill="#152133">$7,900</text><text x="62" y="76" fill="#b91c1c">$5,500 past due</text>
+<text x="0" y="94" fill="#5b6576">Excludes 8 items with no install year</text>
+<g fill="#5b6576"><text x="0" y="116">2026</text><text x="0" y="132">2027</text><text x="0" y="148">2028</text><text x="0" y="164">2029</text><text x="0" y="180">2030</text></g>
+<g fill="#152133"><rect x="36" y="110" width="200" height="5" rx="2.5"/><rect x="36" y="142" width="30" height="5" rx="2.5"/><rect x="36" y="158" width="58" height="5" rx="2.5"/></g>
+<g fill="#ece9e4"><rect x="36" y="126" width="200" height="5" rx="2.5"/><rect x="36" y="174" width="200" height="5" rx="2.5"/></g>
+<g fill="#424e61"><text x="300" y="116" text-anchor="end">$5,500</text><text x="300" y="148" text-anchor="end">$800</text><text x="300" y="164" text-anchor="end">$1,600</text></g>
+<g fill="#152133"><text x="0" y="210">Rear · Water Heater</text><text x="0" y="234">2nd Floor · Water Heater</text><text x="0" y="258">Front · Water Heater</text><text x="0" y="282">2nd Floor · Refrigerator</text></g>
+<g fill="#b91c1c"><text x="230" y="210" text-anchor="end">Past due</text><text x="230" y="234" text-anchor="end">Past due</text><text x="230" y="258" text-anchor="end">Past due</text><text x="230" y="282" text-anchor="end">Past due</text></g>
+<g fill="#152133"><text x="300" y="210" text-anchor="end">$1,500</text><text x="300" y="234" text-anchor="end">$1,500</text><text x="300" y="258" text-anchor="end">$1,500</text><text x="300" y="282" text-anchor="end">$1,000</text></g>
+<text x="0" y="306" fill="#5b6576">… 3 more items, then the 5-year total</text>
+<g stroke="#e7e5e0"><line x1="0" y1="196" x2="300" y2="196"/><line x1="0" y1="220" x2="300" y2="220"/><line x1="0" y1="244" x2="300" y2="244"/><line x1="0" y1="268" x2="300" y2="268"/><line x1="0" y1="292" x2="300" y2="292"/><line x1="0" y1="318" x2="300" y2="318"/></g>
+<text x="0" y="342" fill="#152133">⌄  Building systems</text><text x="300" y="342" text-anchor="end" fill="#5b6576">3 of 10 dated</text>
+<rect x="140" y="335" width="40" height="3" rx="1.5" fill="#ece9e4"/><rect x="140" y="335" width="12" height="3" rx="1.5" fill="#152133"/>
+<line x1="0" y1="354" x2="300" y2="354" stroke="#e7e5e0"/>
+<text x="0" y="380" fill="#5b6576">The separate Building CapEx section is gone.</text>
+</g>
+
+<g transform="translate(372 56)" font-size="11">
+<text x="0" y="12" font-weight="500" fill="#424e61">Building systems, opened</text>
+<text x="0" y="40" fill="#152133">⌃  Building systems</text><text x="240" y="40" text-anchor="end" fill="#5b6576">3 of 10 dated</text>
+<line x1="0" y1="52" x2="240" y2="52" stroke="#e7e5e0"/>
+<g fill="#5b6576" font-size="10"><text x="0" y="70">System</text><text x="150" y="70">Year</text><text x="240" y="70" text-anchor="end">Status</text></g>
+<g fill="#152133"><text x="0" y="94">Roof · Shingle</text><text x="150" y="94">2022</text><text x="240" y="94" text-anchor="end">Good</text>
+<text x="0" y="118">Windows</text><text x="150" y="118">—</text><text x="240" y="118" text-anchor="end" fill="#5b6576">Unknown</text>
+<text x="0" y="142">Electrical · Circuit</text><text x="150" y="142">2021</text><text x="240" y="142" text-anchor="end">Good</text>
+<text x="0" y="166">Plumbing · Copper/PEX</text><text x="150" y="166">2024</text><text x="240" y="166" text-anchor="end">Good</text></g>
+<text x="0" y="190" fill="#5b6576">… 6 more systems</text>
+<g stroke="#e7e5e0"><line x1="0" y1="80" x2="240" y2="80"/><line x1="0" y1="104" x2="240" y2="104"/><line x1="0" y1="128" x2="240" y2="128"/><line x1="0" y1="152" x2="240" y2="152"/><line x1="0" y1="176" x2="240" y2="176"/><line x1="0" y1="200" x2="240" y2="200"/></g>
+<text x="0" y="226" fill="#5b6576">A row still opens its own sheet to edit.</text>
+<text x="0" y="244" fill="#5b6576">Phone: Type and Age drop, as today.</text>
+</g>
+
+<g transform="translate(652 56)" font-size="11">
+<text x="0" y="12" font-weight="500" fill="#424e61">No listings: section hidden</text>
+<text x="0" y="40" font-size="13" font-weight="600" fill="#152133">118 Congress St.</text><text x="236" y="40" text-anchor="end" fill="#424e61">···</text>
+<rect x="76" y="50" width="164" height="100" rx="8" fill="#ffffff" stroke="#c0bdb7"/>
+<g fill="#152133"><text x="90" y="72">+ Add listing</text><text x="90" y="96">Copy link</text></g>
+<line x1="76" y1="108" x2="240" y2="108" stroke="#e7e5e0"/>
+<text x="90" y="130" fill="#152133">Archive</text>
+<text x="0" y="176" fill="#5b6576">Shown only when the property has units.</text>
+
+<text x="0" y="226" font-weight="500" fill="#424e61">After adding one</text>
+<text x="0" y="254" font-size="13" font-weight="600" fill="#152133">Rental listings</text>
+<line x1="0" y1="264" x2="240" y2="264" stroke="#e7e5e0"/>
+<text x="0" y="286" fill="#152133">Rear</text><text x="240" y="286" text-anchor="end" fill="#424e61">$1,450/mo · Listed</text>
+<line x1="0" y1="298" x2="240" y2="298" stroke="#e7e5e0"/>
+<text x="0" y="320" fill="#424e61">+ Add listing</text>
+<line x1="0" y1="332" x2="240" y2="332" stroke="#e7e5e0"/>
+<text x="0" y="358" fill="#5b6576">Below CapEx, as today.</text>
+</g>
+</svg>

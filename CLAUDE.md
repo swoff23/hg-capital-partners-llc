@@ -13,7 +13,7 @@ These apply to everyone working in this repo, people and agents alike. Claude Co
 ## Ask before visual changes
 
 - **Fix data, logic, money and wrong-copy bugs directly.** Ask before changing layout, visual style or where a component sits, even when a reference or mock disagrees with the build. Connor approves design changes.
-- **Offer 2 or 3 concrete options with a recommendation.** ASCII previews work. Say how each behaves at desktop, tablet and mobile, then build only the one that's picked. Unpicked options stay in chat, not in the code.
+- **Offer 2 or 3 concrete options with a recommendation.** Draw them as low-fi visual mockups, never ASCII or text sketches. Say how each behaves at desktop, tablet and mobile, then build only the one that's picked. Unpicked options stay in chat, not in the code.
 
 ## Reuse first
 
@@ -60,18 +60,21 @@ HG should feel like a well-run property company, not a generic AI template. Calm
 
 ## Copy
 
+The full standard, with a review checklist to run before a string ships, is [docs/copy-rules.md](docs/copy-rules.md). The short version:
+
 - **Everything on screen gives the user value.** If a line, label, chip or tooltip doesn't help them decide or act, cut it. Don't restate what the layout already shows (tab names, column headers, counts shown elsewhere).
 - **Use the lightest form that works.** Nothing, then a count or chip, then a tooltip, then one short line. Never a paragraph.
 - **One line.** Notices, helper text and sublabels don't wrap at the component's normal width. Shorten the words, not the font.
 - **No em dashes.** They read as AI-written. Don't fix one by swapping in a period, comma or colon: a dash usually means the sentence is doing two jobs, so rewrite it. If you can't tell what it should say, ask Connor. A lone "—" standing in for an empty value is fine.
-- **No filler.** No "simply", "easily", "Note that", "This lets you". Don't repeat the heading in the body.
+- **No filler.** No "simply", "easily", "Note that", "This lets you", and no hype ("seamless", "unlock", "supercharge"). Don't repeat the heading in the body.
 - **No emojis in product copy.**
 - **Warm words, no theater.** Personal and plain ("Hi Dana, here's what's due this week."). No hype, no SaaS filler, no promises we can't back up. Exclamation points only on a sent screen's thank-you heading.
+- **Messages say what happened and what to do next.** Toasts, errors, validation and empty states, in plain words a 6th grader reads. Toasts stay under about 90 characters. Never "Something went wrong" or "An error occurred", and never blame the user.
 - **Internal caveats stay out of the UI.** They go in code comments or docs.
 
 ## Enforce it in code
 
-- **Rules that can be lint rules should be.** `eslint.config.mjs` rejects em dashes in string literals, template strings and JSX text under `src/`, and (`hg/design-tokens`) any styling outside the brand tokens. Comments, tests and a lone "—" for an empty value stay allowed.
+- **Rules that can be lint rules should be.** `eslint.config.mjs` rejects em dashes and vague error copy (`hg/vague-copy`) in string literals, template strings and JSX text under `src/`, and (`hg/design-tokens`) any styling outside the brand tokens. Filler words are a warning (`hg/filler-copy`) to read case by case. Comments, tests and a lone "—" for an empty value stay allowed.
 - **Lint runs in CI, not in the build.** Next 16's `next build` doesn't lint, so a violation fails CI on the push to main but still deploys. Run `npm run lint` before you push. CSS isn't linted, so check it by hand.
 
 ## Device check (definition of done for UI)

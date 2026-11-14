@@ -80,7 +80,7 @@ async function discardUnrecorded(taskId: string, paths: (string | null | undefin
     const loose = mine.filter((p) => !used.has(p));
     if (loose.length) await del(loose, { token: auth.token });
   } catch (err) {
-    logError("tasks:attachments:discard", err, { taskId, paths: mine });
+    logError("tasks:attachments:discard", err, { taskId, paths: mine }, { level: "warning" });
   }
 }
 
@@ -114,7 +114,7 @@ async function verifyBlob(taskId: string, pathname: string, role: UploadRole, au
     // Uploaded with access "public": delete that exact blob by its URL, since
     // a pathname alone may name the private one.
     if (blob.pathname === pathname) {
-      await del(blob.url, { token: auth.token }).catch((err) => logError("tasks:attachments:discard", err, { pathname }));
+      await del(blob.url, { token: auth.token }).catch((err) => logError("tasks:attachments:discard", err, { pathname }, { level: "warning" }));
     }
     throw new core.TaskRuleError("That file isn't in our private storage.");
   }
@@ -227,13 +227,13 @@ export async function recordTaskAttachment(
  */
 export async function contractorUploadRefusal(
   taskId: string,
-  contactId: string,
+  who: core.ContractorWho,
   opts: { atMint?: boolean; queuedAt?: string | null } = {},
   db: core.Tx = prisma,
   now = new Date(),
 ): Promise<string | null> {
   try {
-    await core.assertContractorAccess(db, taskId, contactId);
+    await core.assertContractorAccess(db, taskId, who);
   } catch (err) {
     if (err instanceof core.TaskRuleError) return err.message;
     throw err;
@@ -261,7 +261,7 @@ export async function contractorUploadRefusal(
         )?.createdAt ?? null)
       : null;
   // Done and Canceled say the job closed; a job still in Review says it's too late, since it isn't closed.
-  return acceptsContractorUpload(task, lastReview, contactId, now, opts.queuedAt, startedAt) ? null : lateRefusal(task.status);
+  return acceptsContractorUpload(task, lastReview, who.contactId, now, opts.queuedAt, startedAt) ? null : lateRefusal(task.status);
 }
 
 /**
@@ -285,13 +285,13 @@ export async function recordPortalAttachment(
   const att = await discardingOnRefusal(taskId, input, auth, async () => {
     // Access first, as every portal step checks it: a contractor taken off the job learns nothing of it, not even
     // whether an upload of theirs is still on it.
-    await core.assertContractorAccess(prisma, taskId, portal.contactId);
+    await core.assertContractorAccess(prisma, taskId, portal);
     // A Retry of a record that committed, whose answer never reached the phone, gets its row back even once the job
     // stopped taking files: the file is on the job already, so the tile finishes instead of going up again as a
     // second copy. The batch step that posts it checks access again (portal/job-batch.ts).
     const mine = await core.findOwnUpload(prisma, taskId, input.pathname, p);
     if (mine) return mine;
-    const early = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt });
+    const early = await contractorUploadRefusal(taskId, portal, { queuedAt });
     if (early) throw new core.TaskRuleError(early);
     // A Retry of a record that committed gets the same row back, so the tile finishes and no second copy is made.
     return recordOnce(taskId, input, p, async () => {
@@ -300,7 +300,7 @@ export async function recordPortalAttachment(
         // The job's lock first, then its status and window are read: a staff Approve or Cancel that lands after the
         // early check above is waited for and then seen, so no file records on a job that has just closed.
         await core.lockTask(tx, taskId);
-        const refusal = await contractorUploadRefusal(taskId, portal.contactId, { queuedAt }, tx);
+        const refusal = await contractorUploadRefusal(taskId, portal, { queuedAt }, tx);
         if (refusal) throw new core.TaskRuleError(refusal);
         return core.recordAttachment(tx, taskId, meta, p, { visibility: "SHARED", standalone: opts.standalone });
       });
@@ -334,7 +334,7 @@ export async function deleteTaskAttachment(attachmentId: string, p?: core.Princi
   const blobs = [att.url, att.thumbPathname, att.posterPathname].filter((x): x is string => !!x);
   const token = getEnv().BLOB_READ_WRITE_TOKEN;
   if (blobs.length && token) {
-    await del(blobs, { token }).catch((err) => logError("tasks:attachments:delete", err, { attachmentId }));
+    await del(blobs, { token }).catch((err) => logError("tasks:attachments:delete", err, { attachmentId }, { level: "warning" }));
   }
   revalidatePath(`/tasks/${att.taskId}`);
 }

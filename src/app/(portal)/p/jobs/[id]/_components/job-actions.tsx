@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Camera, ImagePlus, Play } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
@@ -39,6 +39,7 @@ import {
   markDoneButton,
   MAX_FILES_PER_POST,
   nextStep,
+  payoffLine,
   postRoom,
   backOnTray,
   lostAfter,
@@ -143,10 +144,12 @@ export function JobActions({
   status,
   firstName,
   staffNames,
+  getsEmail,
   finishPhotosRequired,
   markedDoneAt,
   property,
   sentClientIds,
+  openMarkDoneOnLoad = false,
 }: {
   taskId: string;
   /** The signed-in contractor, whose draft the composer keeps. */
@@ -154,6 +157,8 @@ export function JobActions({
   status: TaskStatus;
   firstName: string;
   staffNames: string[];
+  /** HG's changes email this contractor, so the payoff promises one (docs/specs/contractor-email-switch.md). */
+  getsEmail: boolean;
   /** Photos Mark done asks for, from the job's playbook (TaskTemplate.finishPhotosRequired). Null or 0: optional, as every job starts. */
   finishPhotosRequired?: number | null;
   /** When this contractor marked the job done (ISO), while it's in Review: "Add photo/video" hides an hour later. Without it, it stays. */
@@ -162,6 +167,11 @@ export function JobActions({
   property?: { label: string; photoUrl: string | null } | null;
   /** The contractor's own updates already on the page, by the id each was sent with: a reload mid-send drops one that did post. */
   sentClientIds?: readonly string[];
+  /**
+   * An email's Mark done button (`?do=done`, docs/specs/contractor-job-emails.md 3): the sheet opens once as the page
+   * loads, while Mark done is the job's next step. It only asks; nothing is sent until they tap Mark done in it.
+   */
+  openMarkDoneOnLoad?: boolean;
 }) {
   const { toast } = useToast();
   const owner = useUploadScope();
@@ -186,7 +196,11 @@ export function JobActions({
   const [, startSending] = useTransition();
   const [starting, startStarting] = useTransition();
 
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // Open from the start when an email's Mark done opened the page and Mark done is the job's next step.
+  // Only while the address still asks, read from the router (current during a client-side move, unlike
+  // window.location): Back to a page whose ?do= was taken off doesn't reopen it.
+  const asked = useSearchParams().get("do") === "done";
+  const [sheetOpen, setSheetOpen] = useState(() => openMarkDoneOnLoad && step === "done" && asked);
   const [sheetState, setSheetState] = useState<"ask" | "sent">("ask");
   const [note, setNote] = useState("");
   // What HG received, for the payoff's strip.
@@ -496,6 +510,15 @@ export function JobActions({
     setSheetOpen(true);
   }
 
+  // An email's Mark done opened the page with the sheet up (sheetOpen's first value). The ?do= comes off the address,
+  // so a reload or Back doesn't open it again.
+  useEffect(() => {
+    if (!openMarkDoneOnLoad) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("do");
+    window.history.replaceState(null, "", url);
+  }, [openMarkDoneOnLoad]);
+
   // What the Mark done sheet shows, counts and sends: the tray, less the photos a written update may have posted
   // (they wait on the tray for its Send again; the server wouldn't count them).
   const sheetReady = finishable(ready, unconfirmed);
@@ -611,7 +634,7 @@ export function JobActions({
                     twice. */}
                 <span className="truncate min-[390px]:hidden">In review</span>
                 <span className="truncate max-[390px]:hidden sm:hidden">Waiting for review</span>
-                <span className="truncate max-sm:hidden">Waiting for HG to review</span>
+                <span className="truncate max-sm:hidden">Waiting for HG Capital to review</span>
               </Button>
             ) : step === "start" ? (
               <Button className={barButton} disabled={starting} onClick={start}>
@@ -710,7 +733,7 @@ export function JobActions({
             </div>
           </div>
         ) : (
-          <Payoff firstName={firstName} staffNames={staffNames} received={received} property={property ?? null} />
+          <Payoff firstName={firstName} staffNames={staffNames} getsEmail={getsEmail} received={received} property={property ?? null} />
         )}
       </Sheet>
     </>
@@ -719,12 +742,12 @@ export function JobActions({
 
 /**
  * Who reads an update (activity 2.7): the partners its email goes to,
- * "Connor and Pieter get this by email", or "The HG team" from three on.
+ * "Connor and Pieter get this by email", or "The HG Capital team" from three on.
  */
 function audienceWords(staff: readonly string[]): string {
   if (staff.length === 1) return `${staff[0]} gets this by email`;
   if (staff.length === 2) return `${joinNames([...staff])} get this by email`;
-  return "The HG team gets this by email";
+  return "The HG Capital team gets this by email";
 }
 
 /** Where a recorded photo or video's picture is: its thumbnail, or the poster of a video, from the task file route. */
@@ -748,15 +771,17 @@ function readyUpload(item: Recorded): MediaUpload {
 function Payoff({
   firstName,
   staffNames,
+  getsEmail,
   received,
   property,
 }: {
   firstName: string;
   staffNames: string[];
+  getsEmail: boolean;
   received: Recorded[];
   property: { label: string; photoUrl: string | null } | null;
 }) {
-  const to = joinNames(staffNames) || "HG";
+  const to = joinNames(staffNames) || "HG Capital";
   // The button that opened this view is gone: move focus here, so it's read
   // out and Esc still closes the sheet.
   const heading = useRef<HTMLHeadingElement>(null);
@@ -785,9 +810,7 @@ function Payoff({
           {more > 0 && <li className="text-meta tabular-nums text-fg-3">+{more}</li>}
         </ul>
       )}
-      <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">
-        Sent to {to}. You&apos;ll get an email if anything else is needed.
-      </p>
+      <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">{payoffLine(to, getsEmail)}</p>
       <LinkButton
         href="/p"
         variant="primary"

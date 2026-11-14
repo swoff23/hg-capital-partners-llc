@@ -31,7 +31,7 @@ export interface FirstPasswordState {
 /**
  * First sign-in: swap the starting password for one the contractor chose,
  * then go on to the page they signed in for (the form's hidden `next`, see
- * src/lib/portal/next-path.ts), or My jobs with its "Password saved" line.
+ * src/lib/portal/next-path.ts), or My jobs.
  *
  * A refusal comes back as state (forms 4.9), not a redirect, so both fields
  * stay as typed and the reason shows on the field it's about. There is one
@@ -50,5 +50,5 @@ export async function chooseOwnPassword(_prev: FirstPasswordState, formData: For
 
   const result = await changeOwnPassword(principal, current, password);
   if (!result.ok) return { error: result.error };
-  redirect(back ?? "/p?saved=1");
+  redirect(back ?? "/p");
 }
