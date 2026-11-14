@@ -11,16 +11,33 @@ import { tidyAddress } from "./address-suggestions";
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const combobox = read("../components/address-combobox.tsx");
 
-test("call 10: only the heading's in-place field takes the heading variant, at the heading's size", () => {
-  assert.match(combobox, /variant === "heading" \? "h-10 px-\[7px\] text-title font-semibold" : fieldSizeClass\[size\]/);
+test("call 10: only the heading's in-place field takes the heading variant, in the heading's own box", () => {
+  // The box the heading has at rest (inline-field.tsx headingText): its 1px edge, 8px in, 4px above and below the
+  // title's line, from 8px left of the column. So the text and the box stay put when the field opens.
+  assert.match(
+    combobox,
+    /variant === "heading" \? "h-\[calc\(var\(--text-title--line-height\)_\+_0\.625rem\)\] px-2 py-1 text-title font-semibold" : fieldSizeClass\[size\]/,
+  );
   assert.match(combobox, /variant === "heading" && "-mx-2"/);
   const inline = read("../components/inline-field.tsx");
+  assert.match(inline, /const headingText = "rounded-md border border-transparent px-2 py-1 text-title font-semibold/);
   assert.equal(inline.match(/variant="heading"/g)?.length, 1);
   // The one-field sheet on touch keeps the standard field.
   const sheet = inline.slice(inline.indexOf("const sheet = sheetUsed"), inline.indexOf("if (mode !== \"inline\")"));
   assert.doesNotMatch(sheet, /variant="heading"/);
   // The heading size sits on the input alone: no suggestion row or helper line carries it.
-  assert.equal(combobox.match(/text-title/g)?.length, 1);
+  assert.equal(combobox.match(/ text-title /g)?.length, 1);
+});
+
+test("call 10: opening a heading moves nothing, so its own match line waits until the typing changes", () => {
+  assert.match(combobox, /const quiet = openedWith !== undefined && value === openedWith;/);
+  assert.match(combobox, /const match: AddressMatch \| null = !quiet && active && answer\?\.q === typed \? answer\.data\.match : null;/);
+  // The heading passes what it opened with, in place and in the touch sheet; no other field holds its line.
+  const inline = read("../components/inline-field.tsx");
+  assert.equal(inline.match(/openedWith=\{value\}/g)?.length, 2);
+  for (const form of ["../app/(app)/deals/new/new-deal-form.tsx", "../app/(app)/properties/new/new-property-form.tsx"]) {
+    assert.doesNotMatch(read(form), /openedWith/, form);
+  }
 });
 
 test("call 13: New property, New deal and the two prices keep their line's space", () => {

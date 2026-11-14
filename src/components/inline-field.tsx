@@ -886,6 +886,7 @@ function HeadingFact(props: InlineFieldProps) {
           onChange={changed}
           isInvalid={!!problem || !!refusal}
           errorMessage={problem ?? refusal ?? undefined}
+          openedWith={value}
           // The list stays under the field, inside the sheet.
           flip={false}
           // Leaving the field inside the sheet says how it will save; in place, leaving saves.
@@ -944,6 +945,8 @@ function HeadingFact(props: InlineFieldProps) {
           isInvalid={!!problem || !!refusal}
           errorMessage={problem ?? refusal ?? undefined}
           variant="heading"
+          // Opening it says nothing new: the "is already a property" line waits for the typing to change.
+          openedWith={value}
           className="px-2"
         />
       ) : (

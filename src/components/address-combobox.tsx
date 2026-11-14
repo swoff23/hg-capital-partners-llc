@@ -73,12 +73,20 @@ export type AddressComboboxProps = {
   size?: FieldSize;
   /**
    * `heading`: the field for a record's address heading, with a mouse. It
-   * takes the heading's own size (24px semibold in a 40px box, the way a
-   * task's title is edited) and reaches 8px past the column like the heading's
-   * hover fill, so opening it moves nothing. Only the field itself changes: the
-   * suggestion rows and the helper line keep their normal sizes.
+   * takes the heading's own box (24px semibold with the heading's padding and
+   * 1px edge, 42px tall, from 8px left of the column), the way a task's title
+   * is edited, so the text and the box stay where they were and opening it
+   * moves nothing. Only the field itself changes: the suggestion rows and the
+   * helper line keep their normal sizes.
    */
   variant?: "field" | "heading";
+  /**
+   * The text the field opened with (a heading being renamed). The "is already
+   * a property" line waits until the typing differs from it: a deal at an
+   * address HG owns says nothing new when its heading opens, and the line
+   * would push the page down.
+   */
+  openedWith?: string;
   /**
    * Keep one line's space under the field when it has no line, so the form
    * doesn't grow between pressing and releasing Create when "Saves as" shows
@@ -156,6 +164,7 @@ export function AddressCombobox({
   autoFocus,
   size = "md",
   variant = "field",
+  openedWith,
   reserveLine = false,
   surface = "app",
   flip = true,
@@ -199,7 +208,9 @@ export function AddressCombobox({
   }, [active, typed, kind, excludeId]);
 
   const suggestions = active ? (answer?.data.suggestions ?? []) : [];
-  const match: AddressMatch | null = active && answer?.q === typed ? answer.data.match : null;
+  // Still what the field opened with: the record's own address, so its match is no news yet.
+  const quiet = openedWith !== undefined && value === openedWith;
+  const match: AddressMatch | null = !quiet && active && answer?.q === typed ? answer.data.match : null;
 
   const matchLine = match && (
     <span className="flex min-w-0 items-baseline gap-1">
@@ -286,8 +297,8 @@ export function AddressCombobox({
                 setMoved(true);
                 onLink(pasted.trim());
               }}
-              // The heading's 8px inset less the field's 1px edge, so the text sits where the heading's does.
-              className={cn(fieldClass, variant === "heading" ? "h-10 px-[7px] text-title font-semibold" : fieldSizeClass[size])}
+              // The heading's own box: its 1px edge, 8px inset and 4px above and below the title's line.
+              className={cn(fieldClass, variant === "heading" ? "h-[calc(var(--text-title--line-height)_+_0.625rem)] px-2 py-1 text-title font-semibold" : fieldSizeClass[size])}
             />
             <PopoverSurface surface={surface} motion="none" shouldFlip={flip} className={cn("w-(--trigger-width)", !active && "hidden")}>
               <ListBox

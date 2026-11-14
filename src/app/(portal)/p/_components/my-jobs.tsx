@@ -221,8 +221,9 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
           )}
           {/* The place fills what's left from a zero basis, so the date only shrinks once the
               place is gone. A shrink-999 place still left the date a fraction of a pixel short
-              of its text, and that was enough to fire its ellipsis ("Due Toda…"). */}
-          {where && <span className={cn("min-w-0 flex-1 truncate", uploading && "max-[360px]:hidden")}>{where}</span>}
+              of its text, and that was enough to fire its ellipsis ("Due Toda…"). Under 360 it
+              gives way to a date beside the upload line; with no date it is all that follows. */}
+          {where && <span className={cn("min-w-0 flex-1 truncate", uploading && target && "max-[360px]:hidden")}>{where}</span>}
         </span>
       </span>
       <StatusBadge status={job.status} className="w-28 shrink-0 max-[479px]:hidden" />

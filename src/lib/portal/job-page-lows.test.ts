@@ -107,5 +107,8 @@ test("the My jobs row hands the queue's whole count to rowUploadLine, which is h
 test("at 320 the My jobs row's upload line leaves the date whole: the separator and the place go under 360", () => {
   const row = readFileSync(join(__dirname, "..", "..", "app", "(portal)", "p", "_components", "my-jobs.tsx"), "utf8");
   assert.match(row, /className=\{cn\(uploading && "max-\[360px\]:hidden"\)\}/);
-  assert.match(row, /className=\{cn\("min-w-0 flex-1 truncate", uploading && "max-\[360px\]:hidden"\)\}/);
+  // Only beside a date: with no date (none set, or a finished job still taking photos) the place is all that follows.
+  assert.match(row, /className=\{cn\("min-w-0 flex-1 truncate", uploading && target && "max-\[360px\]:hidden"\)\}/);
+  // The separator before the place sits inside the date's span, so it goes with the date.
+  assert.match(row, /\{target && \(\s*<span className="min-w-0 truncate">[\s\S]*?\{where && \(\s*<span aria-hidden="true" className=\{cn\(uploading && "max-\[360px\]:hidden"\)\}>/);
 });

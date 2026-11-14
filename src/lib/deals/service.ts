@@ -53,7 +53,8 @@ function revalidateDeal(id: string): void {
 /**
  * The existing deal this address would duplicate, or null: the same house
  * number and street however it was typed, with no street type, ZIP or town
- * that disagrees (see sameStreetAddress), newest first. The house number
+ * that disagrees (see sameStreetAddress), a live deal before an archived
+ * one, newest first within each. The house number
  * narrows the rows; the street match is done here. `excludeId` leaves out
  * the deal being renamed, so it isn't its own duplicate.
  */

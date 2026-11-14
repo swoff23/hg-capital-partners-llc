@@ -110,6 +110,8 @@ const HOUSE_NUMBER = /^\d+[a-z]?(?:[/-]\d+[a-z]?)?$/i;
  * A street-type word right after the house number is the name, never the
  * end: the "St" of a Saint street ("34 St James Pl", which used to split as
  * "34 St" and save as "34 St, James Pl"), the "Court" of "12 Court St".
+ * After a direction, St is the street's type, never a Saint ("45 N St"), so
+ * "45 N St Clair St" still ends at "45 N St".
  * Spacing and stray commas are tidied; the words are kept as stored.
  */
 export function splitAddress(raw: string): { street: string; place: string } {
