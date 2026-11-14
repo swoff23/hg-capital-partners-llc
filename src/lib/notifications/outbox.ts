@@ -365,9 +365,13 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
   }
 
   if (reachedCapNow(sentBefore, result.sent)) {
-    logError("notifications:daily-cap", new Error(`Daily email cap of ${DAILY_EMAIL_CAP} reached; the rest go out tomorrow`), {
-      sentToday: sentBefore + result.sent,
-    });
+    // A warning: the background jobs' check-in says "email_capped" and alerts (src/lib/jobs-health.ts).
+    logError(
+      "notifications:daily-cap",
+      new Error(`Daily email cap of ${DAILY_EMAIL_CAP} reached; the rest go out tomorrow`),
+      { sentToday: sentBefore + result.sent },
+      { level: "warning" },
+    );
   }
   return result;
 }

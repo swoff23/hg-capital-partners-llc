@@ -107,7 +107,7 @@ Free Developer plan: 1 user, 5,000 errors a month, 30 days of history, 1 uptime 
 
 | Check | What | Alerts after |
 |---|---|---|
-| New error | Issue alert "a new issue is created", production only, level error or above (so Q13's warnings never email), email to Connor | The first time each kind happens |
+| New error | Issue alert "a new issue is created" or "a resolved issue comes back", production only, level error or above (so Q13's warnings never email), email to Connor | The first time each kind happens, and again if it returns after being resolved |
 | Site | Uptime monitor: `GET https://hgcapitalpartners.com/api/health` every minute, expects 200 | 3 misses in a row (about 3 minutes) |
 | Background jobs | Cron monitor: schedule every minute, 1 minute of margin, `failureIssueThreshold` 5, `recoveryThreshold` 1 | 5 missed or "error" check-ins in a row (about 5 minutes) |
 
@@ -186,3 +186,26 @@ Checked line by line against main at 200093a, Vercel's production settings and t
 - **Q19.** A wrong webhook secret answers 401 to every reply. Resend retries each one for about a day before it turns the endpoint off and emails the team, so replies could be missing for a day with no sign.
 - **Q20.** There's no official way to defer Sentry's Next.js client package. Loading it up front adds about 56 KB compressed to pages already over budget. `@sentry/browser` does the job for errors at about half that. The build's source map step should still cover its chunk, and the branch confirms that a browser error shows a readable file and line.
 - **Q21.** Better Stack's two edges were phone push and room for more checks. The free plan doesn't confirm push, and this needs one site check and one job check-in, which Sentry's free plan now includes. One account means one inbox, nothing to paste, and a job monitor created from code. The home page check adds little: if `/api/health` answers, the domain and Vercel are up, and a broken page render is a server error Sentry already reports.
+
+## 9. Build notes (Nov 14)
+
+Built on branch claude/error-monitoring-docs-abc5aa after Connor's "build it". What the build settled, and where it differs from the sections above:
+
+- **Packages.** `@sentry/nextjs` and `@sentry/browser`, both pinned at 11.10.0 (released Oct 28), not the newest 11.12.0 from Nov 10. In this version `withSentryConfig` comes from `@sentry/nextjs/config`.
+- **What the SDK collects.** Sentry 11 replaced `sendDefaultPii` with `dataCollection`, and its defaults collect cookies, headers, bodies, query values, database query data and local variables. `DATA_COLLECTION` in `src/lib/error-report.ts` turns every one off on both sides, and the scrubber still runs on what's left.
+- **Source maps.** Under Turbopack, Sentry's wrapper turns on public browser source maps and deletes them after uploading. `next.config.ts` makes them only for a production build with `SENTRY_AUTH_TOKEN` set, so until the integration is connected, production serves no source maps.
+- **The browser's DSN.** `next.config.ts` passes it as `HG_BROWSER_SENTRY_DSN`, empty outside a production build, with the commit as `HG_BROWSER_RELEASE`.
+- **Where the code is.** `src/lib/report-server.ts` is the only file that imports `@sentry/nextjs`, and `src/lib/sentry-browser.ts` the only one that imports `@sentry/browser`. The lint rule and `src/lib/client-weight.test.ts` both hold that. `src/lib/client-errors.ts` is the catcher. `src/lib/jobs-health.ts` holds the rules and `src/lib/jobs-check-in.ts` the check-in. `isOfflineError` moved to `src/lib/offline-error.ts` so the catcher doesn't pull all of `action-result.ts` into every page, and `action-result.ts` re-exports it.
+- **Not reported from the browser:** a missing chunk after a deploy, besides offline errors and errors with a digest. The error screen already offers Reload, and it isn't a bug.
+- **Warnings, not errors:** removing old files from storage, recent views, "seen" marks, the database pooler notice and the daily cap line. The daily cap already alerts as `email_capped`. Security logs (a failed sign-in, a lockbox view) stay errors.
+- **Q4's user ID isn't sent yet.** Every event carries the area and staff or contractor, except on `/`: neither the address nor the route Next 16.3 names (it leaves out the route group) tells the public page from Home, so only the public site's error screen tags it. The ID would need a lookup on each error: the staff session cookie holds an email, which must never leave, and attaching it to Sentry's request scope can't be proven to stay per request on Vercel. Events carry no ID until that's worked out.
+- **The runbook** is [docs/alerts.md](../alerts.md). Connor's setup steps are in [docs/todo-for-connor.md](../todo-for-connor.md), under "Turn on error alerts".
+
+- **Checked end to end before landing**, with a local production build pointed at a stand-in Sentry on 127.0.0.1:
+  - A crashing page (database unreachable) arrived through `onRequestError` with its area, its digest and the request's user agent, and nothing else from the request.
+  - A failed webhook signature arrived once as `email:inbound-signature`; a post without Resend's headers stayed quiet.
+  - The job check-in arrived as "error" with the monitor's settings attached, because the local QuickBooks sandbox hadn't synced in 26 hours (`qbo_stale`, also shown in `/api/health`'s detail).
+  - Browser errors arrived tagged by area, with the query string dropped and the job link token replaced. A dropped connection didn't report.
+  - No test token appeared anywhere in what was sent.
+  - Sentry's browser chunk is 25 KB compressed and loaded after the page did; the catcher that ships with every page is 3 KB. The build served no source maps.
+  - An error thrown before any of the page's scripts have run isn't caught. No script on the page can catch it.

@@ -25,7 +25,7 @@ export async function recordView(userId: string, kind: RecentKind, recordId: str
   try {
     await recordViewIn(prisma, userId, kind, recordId);
   } catch (err) {
-    logError("recent-views.record", err, { kind, recordId });
+    logError("recent-views.record", err, { kind, recordId }, { level: "warning" });
   }
 }
 

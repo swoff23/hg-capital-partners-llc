@@ -80,7 +80,7 @@ async function discardUnrecorded(taskId: string, paths: (string | null | undefin
     const loose = mine.filter((p) => !used.has(p));
     if (loose.length) await del(loose, { token: auth.token });
   } catch (err) {
-    logError("tasks:attachments:discard", err, { taskId, paths: mine });
+    logError("tasks:attachments:discard", err, { taskId, paths: mine }, { level: "warning" });
   }
 }
 
@@ -114,7 +114,7 @@ async function verifyBlob(taskId: string, pathname: string, role: UploadRole, au
     // Uploaded with access "public": delete that exact blob by its URL, since
     // a pathname alone may name the private one.
     if (blob.pathname === pathname) {
-      await del(blob.url, { token: auth.token }).catch((err) => logError("tasks:attachments:discard", err, { pathname }));
+      await del(blob.url, { token: auth.token }).catch((err) => logError("tasks:attachments:discard", err, { pathname }, { level: "warning" }));
     }
     throw new core.TaskRuleError("That file isn't in our private storage.");
   }
@@ -334,7 +334,7 @@ export async function deleteTaskAttachment(attachmentId: string, p?: core.Princi
   const blobs = [att.url, att.thumbPathname, att.posterPathname].filter((x): x is string => !!x);
   const token = getEnv().BLOB_READ_WRITE_TOKEN;
   if (blobs.length && token) {
-    await del(blobs, { token }).catch((err) => logError("tasks:attachments:delete", err, { attachmentId }));
+    await del(blobs, { token }).catch((err) => logError("tasks:attachments:delete", err, { attachmentId }, { level: "warning" }));
   }
   revalidatePath(`/tasks/${att.taskId}`);
 }

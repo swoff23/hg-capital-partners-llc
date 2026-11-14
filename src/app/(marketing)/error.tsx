@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { publicContainer, publicCtaClass, publicType } from "@/components/public/ui";
+import { reportClientError } from "@/lib/client-errors";
 import { cn } from "@/lib/utils";
 
 /** Error boundary for the public pages, in the same dark material as the rest of the front door. */
@@ -13,6 +14,8 @@ export default function MarketingError({
 }) {
   useEffect(() => {
     console.error(error);
+    // Named "public" here: the address alone can't tell the public `/` from Home (lib/error-report.ts areaOfPath).
+    reportClientError(error, "boundary", "public");
   }, [error]);
 
   return (
