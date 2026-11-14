@@ -67,3 +67,7 @@ Invites are on hold until you say go. The portal is on, but only your test contr
   - the Messages tab has nothing to keep;
   - Brandon gets added and Kenneth confirmed;
   - your recommendations are accepted and built, and the Active badge is gray.
+
+## When QuickBooks is connected
+
+- **Build and check the Financials card's loading frame the same day you press Connect.** Every property page shifts by the card's height from that moment, and the loading screen leaves the card out today (`src/app/(app)/properties/[id]/loading.tsx`). The frame can switch itself on with the four QuickBooks keys. A property with no QuickBooks class mapped shows a one-line section, so check one of those too.

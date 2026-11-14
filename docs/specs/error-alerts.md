@@ -2,7 +2,9 @@
 
 Planned with Connor on Nov 3, 2026, in two rounds of questions (Q1 to Q12 below). He took every recommendation. Nothing here gets built until Connor says "build it" in chat.
 
-It builds on its own branch after the Nov 3 landing (land-nov3) is live, and before contractors are invited (Q12).
+**Nov 14, 2026:** email went on in production (about 13:34 UTC), so the order condition below is met. Section 2 (the reuse check) was corrected against the code at that date in seven places; decisions Q1 to Q12 did not change.
+
+It builds on its own branch after the Nov 3 landing (land-nov3) is live, and before contractors are invited (Q12). Email goes first, then this build, then invites. The two Better Stack site checks need nothing built and can be set up any day. Until this ships, Claude reads the cron and `email:send` log lines on go-live day and the morning after.
 
 ## 1. Summary
 
@@ -39,28 +41,33 @@ It builds on its own branch after the Nov 3 landing (land-nov3) is live, and bef
 **Reused as is.**
 
 - `src/lib/log.ts` `logError`: the one structured error line. It stays as the Vercel log. Sentry is added next to it, not in its place.
-- `src/lib/server-action.ts` `withResult` and `withLog`: every server action already passes through one of these.
+- `src/lib/server-action.ts` `withResult` and `withLog`: every server action passes through one of these except five files: `src/app/login/actions.ts`, `src/app/(portal)/p/actions.ts` and the three `filter-actions.ts`. That's harmless, because what those throw reaches `onRequestError`.
 - `src/lib/action-result.ts` `userMessage`: it already decides what's expected (ConflictError, FieldError, zod, a plain sentence) and what isn't (it returns `GENERIC_ERROR`). Q7's rule reuses that decision instead of inventing a second one.
 - `src/app/api/health/route.ts` and `src/lib/secrets.ts` `healthDetailAllowed`: the site-down check reads the public `{ ok, db }` answer, so it needs no token.
 - `NotificationOutbox` (`sendAfter`, `sentAt`, `attempts`, `lastError`) and `QboSyncRun` (`status`, `finishedAt`): the stuck-email and missed-sync checks read these. No schema change.
-- `src/lib/env.ts`: the one place `process.env` is read. The new keys go there.
+- `src/lib/env.ts`: the one place `process.env` is read. The server keys go there. The browser key can't (see Extended), which makes it the second stated exception to README.md "Rules of the road"; `next.config.ts` (lines 21 to 24) is the first.
+- `src/lib/lazy-module.ts` `lazyModule` and `warmWhenIdle` (docs/components.md row 22, landed in 13c8435): they already load a module once the page is idle. Sentry's browser package loads through them.
 
 **Extended.**
 
 - **`withResult`.** It reports to Sentry only when `toFailure` would show `GENERIC_ERROR` (Q7). `withLog` reports nothing itself: it rethrows, and Next's `onRequestError` reports the error once.
-- **The four `error.tsx` screens.** Each passes the error to the catcher. Their look and copy don't change.
+- **The five `error.tsx` screens.** There are five, not four: `src/app/(portal)/p/error.tsx` landed after this spec was written (5a07d48, Nov 3). They draw through three pieces, and each piece already runs one effect that logs the error: `ErrorScreen` (`src/components/error-screen.tsx`, lines 36 to 38), `AuthCrash` (`src/app/login/_components/auth-crash.tsx`, lines 16 to 18) and `src/app/(marketing)/error.tsx` (lines 14 to 16). The catcher goes in those three. Their look and copy don't change.
+  - The catcher skips what those screens already tell apart as not a bug: a device with no connection (`isOfflineError`, `action-result.ts`) and a chunk that didn't load after a deploy (`isChunkLoadError`, `error-screen.tsx`).
+  - It also skips an error that carries a `digest`. That error came from the server, where `onRequestError` reports it, so sending it again would double every server error. The digest goes on the server report as a tag, so the Ref shown on the screen (`error-screen.tsx`, lines 58 to 62) finds the event.
 - **`/api/cron/notifications`.** After a run, it pings Better Stack's email check-in, using `after()` so the response isn't held.
 - **`env.ts`.** New keys:
-  - `NEXT_PUBLIC_SENTRY_DSN` and `SENTRY_DSN` (set by the integration);
+  - `SENTRY_DSN` (set by the integration);
   - `SENTRY_AUTH_TOKEN` (build only, set by the integration; it uploads source maps so error locations are readable);
   - `BETTERSTACK_EMAIL_HEARTBEAT_URL`.
 
   All are optional: with any one unset, that part does nothing, as Resend works today.
+- **`NEXT_PUBLIC_SENTRY_DSN` stays out of `env.ts`.** `env.ts` imports zod (line 1), and `src/lib/client-weight.test.ts` (lines 27 to 28) keeps zod out of the browser, so `instrumentation-client.ts` reads this one key from `process.env` directly, with a comment saying why.
+- **`src/lib/auth-guard.test.ts`.** `/api/health/jobs` goes in its `ALLOWLIST` (lines 46 to 55), or that test fails. `@sentry` goes in the browser-weight test's `FORBIDDEN` list at the same time.
 
 **New.**
 
 - **`src/instrumentation.ts`.** It starts Sentry on the server and exports `onRequestError` (Next 16, `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/instrumentation.md`). Only when `VERCEL_ENV` is production.
-- **`src/instrumentation-client.ts`.** The tiny catcher (`window` error and `unhandledrejection`, plus the error screens) buffers errors. It loads Sentry's browser package with a dynamic import once the page is idle, then hands the buffer over (Q6).
+- **`src/instrumentation-client.ts`.** The tiny catcher (`window` error and `unhandledrejection`, plus the error screens) buffers errors. It loads Sentry's browser package through the existing `lazyModule` and `warmWhenIdle` once the page is idle, then hands the buffer over (Q6).
 - **`src/lib/error-report.ts`.** The scrubber (Sentry's `beforeSend`, on both sides) carries the Q4 rules:
   - drop request bodies, cookies, headers other than the user agent, query strings that carry tokens, and IP addresses;
   - keep only the user's ID and kind;
@@ -70,7 +77,10 @@ It builds on its own branch after the Nov 3 landing (land-nov3) is live, and bef
 - **`/api/health/jobs`.** It's token-gated with the existing `HEALTH_TOKEN` (`healthDetailAllowed`). It answers 200, or 503 with short reason codes:
   - `email_stuck`;
   - `email_failing`;
+  - `email_capped`;
   - `qbo_stale`.
+
+  `email_stuck` measures lateness from `firstAt`, not `sendAfter`: the drain moves `sendAfter` (a claim pushes it out by a lease, a failed try by the backoff, and a Resend quota refusal by an hour for every due row, `src/lib/notifications/outbox.ts`), so rows held by Resend's quota would never read as stuck. A healthy row is first due within 10 minutes of `firstAt` (`src/lib/tasks/rules.ts`, line 122). Rows held by the daily cap keep their old `sendAfter`, so they would page on every cap day; they get their own code, `email_capped`, from `sentTodayCount` (`outbox.ts`, lines 66 to 75).
 
   Each code applies only while that feature is on: email counts as on when `getEnv().email` and `CRON_SECRET` are both set, and QuickBooks counts as on while a connection exists. Better Stack checks it every 3 minutes with the token in a header.
 - **`next.config.ts`.** It's wrapped with Sentry's config for source maps. This is checked on the branch first, because Turbopack is Next 16's default and third-party guides report rough edges (risk 1).
