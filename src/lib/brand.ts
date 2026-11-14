@@ -9,8 +9,8 @@ export const BRAND = {
   mark: "HG",
   /** The app's wordmark beside the tile. */
   app: "HG Capital",
-  /** The contractor portal's wordmark. */
-  portal: "HG Jobs",
+  /** The contractor portal's wordmark (Connor, Nov 14: the company's name, not "HG Jobs"). */
+  portal: "HG Capital Partners",
   /** The company: public site, emails and PDFs. */
   company: "HG Capital Partners",
 } as const;

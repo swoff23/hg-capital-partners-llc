@@ -34,7 +34,8 @@ The spec for replacing the Google Form "HG Capital – Contractor Onboarding For
 | 11 | Home | **Needs you rows for shared-link sign-ups** (Keep or Archive) and **for sending the Baselane link** once someone finishes (Sent). Nothing for invited people finishing |
 | 12 | Logins | **Create login and Reset password stay as they are** for anyone already in Contractors: a staff-set starting password and Copy message. Invites are only for new people |
 | 13 | Contractors list | **A badge beside the name** while it applies (New, Invited, Opened, Onboarding), plus a Status filter. Active rows show nothing extra |
-| 14 | Naming | Copy says **"HG Capital"**, never bare "HG". The five portal strings that say "HG" today change in this build (section 7) |
+| 14 | Naming | Copy says **"HG Capital"**, never bare "HG". The five portal strings that said "HG" changed in this build (section 7). The portal's wordmark is **"HG Capital Partners"** (was "HG Jobs"), and the "HG Login" eyebrow is gone from every sign-in page with its own title (Connor, during the build) |
+| 15 | Finishing setup | **Required** (Connor, during the build). Until details, trades and a W-9 are in, the steps are the only page a new contractor can open. **Sign out** replaces Finish later; the next sign-in opens the step they stopped on. No card above My jobs |
 
 Dropped on the way: an insurance expiry date, and with it the expiry reminders and the assignee-picker warning that were on the "W-9 and COI tracking" list.
 
@@ -47,13 +48,13 @@ Dropped on the way: an insurance expiry date, and with it the expiry reminders a
 | **Personal invite** (`/join/<token>`) | "Hi Mike. Set up your HG Capital contractor account." Email prefilled when the invite had one, then a password. Their name comes from the invite |
 | **Shared sign-up link** (`/join/<token>`, the shared token) | "Set up your HG Capital contractor account." Name, mobile, email and a password |
 
-Contractors already in the app never see the steps, the card in 3.3 or the setup entry in the account menu.
+Contractors already in the app never see the steps or the setup entry in the account menu.
 
 Both links use the sign-in page's frame (`AuthFrame`), the dark public material, so they read as HG Capital's own sign-in.
 
 ### 3.2 The steps
 
-One step at a time, like the move-in report: a `Meter` with "W-9 · 4 of 6", the step's heading, and the docked bar with **Finish later** (Back from step 3 on) and **Next**. Each Next saves that step to the server, so staff see progress and a contractor can switch phones halfway.
+One step at a time, like the move-in report: a `Meter` with "W-9 · 4 of 6", the step's heading, and the docked bar with **Back** (from the second step shown) and **Next**. **Sign out** sits at the top right until setup is done ("My jobs" after). Each Next saves that step to the server, so staff see progress and a contractor can switch phones halfway.
 
 | # | Step | What it asks | Required to finish |
 |---|---|---|---|
@@ -66,11 +67,11 @@ One step at a time, like the move-in report: a `Meter` with "W-9 · 4 of 6", the
 
 A later upload (from the account menu) adds to the record; the newest one is what staff see first.
 
-**Finish later** goes to My jobs. The steps open by themselves right after the account is created. After Finish later, the card in 3.3 is the way back.
+**Setup is required** (decision 15). Every /p page sends someone mid-setup to the steps (`requirePortalPrincipal` and the layout's `requirePortalSession`), as a starting password is sent to the first-password page; a job email's link sends them to sign in and finish first. The W-9 step says "No W-9 handy? Sign out and come back. Your answers are saved." Someone who finished and opens the steps from the account menu starts at their details, to update them.
 
-### 3.3 The card above My jobs
+### 3.3 After setup
 
-Until the contractor is done, My jobs opens with one card: "Finish your setup", "2 of 4" on the right, and a row for each step still open (Trades, W-9, Insurance) that opens that step. It leaves once details, trades and the W-9 are in. Insurance left open after that is fine: the step stays reachable from the account menu ("Your details and files"), where a contractor can also update anything later.
+There's no card above My jobs: nobody reaches My jobs before setup is done (decision 15). The account menu's "Your details and files" opens the steps again for anyone who came in by an invite or the sign-up link, to update details or add a newer file. Files they already sent stay; only staff can remove them then.
 
 ### 3.4 All set
 
@@ -95,10 +96,10 @@ The payoff screen (CLAUDE.md, Make payoff moments count):
 
 - **Header:** **Invite contractor** (primary) and **Sign-up link** (secondary). New contractor goes away as a header button; its form stays (4.2).
 - **Badges** beside the name, in the badge spot Inactive and Tenant fixes use today, and leading the second line on a phone. Only one status badge per row:
-  - **New**: signed up with the shared link and not kept yet (accent).
+  - **New**: signed up with the shared link and not kept yet (the warn tone: a partner's decision, brand guidelines section 4).
   - **Invited**: invite sent, link not opened (neutral).
   - **Opened**: link opened, no account yet (neutral).
-  - **Onboarding**: account made, not done (the waiting tone).
+  - **Onboarding**: account made, not done (neutral).
   - Active shows nothing.
 - **Status filter** in Filters: New, Invited, Opened, Onboarding. "Needs W-9" keeps working and also counts uploaded W-9s.
 
@@ -110,7 +111,7 @@ The text: "Hi Mike, it's Connor at HG Capital. Set up your contractor account he
 
 ### 4.3 Sign-up link
 
-A popover from the header button: the link in a `Code` that copies on a tap, **Copy link**, and **Reset link** behind a confirm ("Anyone with the old link won't be able to sign up."). The text Copy message gives: "Set up your HG Capital contractor account here: <link>".
+A popover from the header button (a sheet on a phone): the link in a `Code` that copies on a tap, **Copy message** (the link with one line around it, ready to paste into a text), and **Reset link** behind a confirm ("Anyone with the old link won't be able to sign up."). Toast: "Sign-up link reset. The old one no longer works." On a phone the header's Sign-up link is an icon button, so the row never wraps.
 
 ### 4.4 The contractor's page
 
@@ -122,7 +123,7 @@ A popover from the header button: the link in a `Code` that copies on a tap, **C
 - **Trades:** the contractor's "didn't list" line shows under the tags as "Also does: Gutters, roof patches". Opening the trades checklist starts with that text in its search, so 'Add "Gutters"' is one tap.
 - **W-9 and Insurance** facts open the newest uploaded file in the viewer. An old Drive link still shows when nothing has been uploaded. "No insurance" when the contractor said so.
 - **Bank:** "Baselane link sent Nov 14", or nothing.
-- **Activity:** "Signed up with the sign-up link", "Finished setup", "Added a W-9", in the contractor's existing record history.
+- **Activity:** not built in this pass. The record's Onboarding badge, the progress line and the files cover it for now.
 
 ### 4.5 Home, Needs you
 
@@ -195,7 +196,7 @@ model ContactDocument {
 - **The shared link is rate limited** per IP (`RateLimiter`, as the move-in form) and per email. Every sign-up starts as New with no jobs, so a stranger sees only their own setup.
 - **No auto-matching.** A sign-up whose phone or email matches an existing contractor makes a separate New record and says so on the Needs you row. Attaching it to the existing record would let anyone who knows Zack's phone number see Zack's jobs.
 - **An email that already has a login** gets "That email already has an account. Sign in or reset your password." This tells a stranger that the email has an account, which is acceptable for this portal; the sign-in throttle still applies.
-- **Files** go to private Blob through new upload kinds (`portal-contact-upload` for the contractor, `contact-upload` for staff) and are served through the files route: staff, or the contractor who owns them. W-9s carry tax IDs, so they never get a public URL.
+- **Files** go to private Blob through a new upload kind (`portal-contact-upload`, the contractor's own; a staff upload from the contractor's page isn't built yet, and old Drive links still show) and are served through the files route: staff, or the contractor who owns them. W-9s carry tax IDs, so they never get a public URL.
 - **Portal code boundaries** stay as they are (`src/lib/auth-guard.test.ts`). `/join` joins the guard test's allowlist of unauthenticated routes, beside login, password reset and the move-in form. While `PORTAL_ENABLED` is off it returns 404 like the rest of the portal.
 
 ## 7. Copy
@@ -219,7 +220,7 @@ All strings follow docs/copy-rules.md. The ones that set the tone:
 | | Laptop 1280 | Tablet 768 | Phone 375 |
 |---|---|---|---|
 | Steps | Centered column, bar docked under it | Same | Full screen, bar docked with the safe area |
-| Card above My jobs | Full width of the list | Same | Same; rows stack |
+| Setup gate | Any /p page goes to the steps | Same | Same |
 | Invite contractor | Dialog | Dialog | Bottom sheet, Text invite first |
 | Contractors list | Badge after the name | Badge drops under the name when the column is narrow | Badge leads the second line |
 | Needs you rows | One line, buttons right | Two lines, buttons right | Two lines; three rows then "N more" |
@@ -236,7 +237,7 @@ Nothing drops on a phone. The device check sweep covers the new routes at every 
 - The trades checklist from today's trades work (`TagsChecklist`, `TagsField`, `InlineTags`; docs/specs/contractor-trades.md).
 - The upload queue and uploader (`useMediaUploader`, private Blob, `lib/attachments/`) and the `Lightbox` viewer.
 - Tokens and hashing (`lib/portal/tokens.ts`), `RateLimiter`, the mailer (`lib/email/send.ts`, `lib/email/render.ts`), `smsHref` from `lib/portal/login-text.ts`.
-- `AddressCombobox` for the mailing address on step 2.
+- The mailing address is a plain field (`autoComplete="street-address"`): `AddressCombobox` reads the staff-only `/api/addresses` and suggests HG Capital's own properties.
 - `FormSheet`, `Code`, `ConfirmDialog`, `Badge`, `SpotArt`, the toast with Undo.
 
 **Extended**
@@ -245,7 +246,7 @@ Nothing drops on a phone. The device check sweep covers the new routes at every 
 - `NeedsYou`: rows can carry buttons (Keep, Archive, Sent) beside opening the record.
 - Contractors list: header actions, a status badge and a Status filter; "Needs W-9" reads uploads.
 - Archive: one path that removes a New sign-up's login and archives it.
-- The portal gate (`requirePortalPrincipal`): sends a new account to the steps right after it's made, as it sends a starting password to the password page.
+- The portal gate (`requirePortalPrincipal`, `requirePortalSession`, `portalHomePath`): sends anyone mid-setup to the steps from every /p page, as it sends a starting password to the password page.
 - Upload kinds: two new kinds for contractor documents.
 
 **New**
@@ -270,7 +271,7 @@ Five chunks, each usable on its own, most of a day in all:
 
 1. **Data and status:** the migration (both tables, the Contact fields, RLS), `onboarding.ts` with tests, upload kinds and the files route.
 2. **Invites:** `/join/[token]`, step 1, the invite and sign-up-link services, `PortalAccessCard`, Invite contractor, Sign-up link.
-3. **The steps:** `/p/setup`, steps 2 to 6, the card above My jobs, the account menu entry, the gate sending a new account there.
+3. **The steps:** `/p/setup`, steps 2 to 6, the account menu entry, the setup gate.
 4. **Staff views:** list badges and Status filter, the contractor page facts, Needs you rows and their actions, the archive path.
 5. **Copy:** the bare "HG" strings, then a pass over every new string with docs/copy-rules.md.
 

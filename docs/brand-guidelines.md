@@ -1,6 +1,6 @@
 # HG brand guidelines: Ink and Limestone
 
-The visual rulebook for HG Capital OS, the HG Jobs contractor portal and the public rentals site. It replaces the visual rules in CLAUDE.md's Personality and Typography sections. The copy, touch, reduced-motion and "every color has a job" rules there still stand.
+The visual rulebook for HG Capital OS, the contractor portal and the public rentals site. It replaces the visual rules in CLAUDE.md's Personality and Typography sections. The copy, touch, reduced-motion and "every color has a job" rules there still stand.
 
 Every ratio here is WCAG 2.x contrast, computed against the exact hex shown. "L / D" means light theme / dark theme.
 
@@ -256,7 +256,7 @@ Two tokens are public-only.
 - **Monogram.** "HG" in Geist 600 at -0.04em, `--gold` on an `--ink-tile` square. Radius 22% of the size, rounded to whole pixels (5px at 24, 7px at 32), with the letters centered on cap height, not the line box; full bleed at 180 for `apple-icon`, where iOS masks it.
 - **Sizes.** 16 favicon (the minimum), 24 sidebar and phone top bar, 32 portal header and emails, 180 `apple-icon`, 512 home-screen icon. Clear space is 25% of the tile on every side.
 - **On dark grounds** the tile keeps its ink and adds a 1px `--line` edge. It is never redrawn as gold letters alone ([Mercury tile](https://mobbin.com/screens/d575358b-679b-4d52-aa98-5026970291b3)).
-- **Wordmarks.** App: tile plus "HG Capital" in `text-label` 600 `--fg-1`; on phones the words drop. Portal: "HG Jobs". Public: "HG CAPITAL PARTNERS" in Geist 500, 13px caps at 0.28em. Emails and PDFs: tile plus "HG Capital Partners" over a 1px `--gold-deep` rule. Never "HG Capital OS".
+- **Wordmarks.** App: tile plus "HG Capital" in `text-label` 600 `--fg-1`; on phones the words drop. Portal: "HG Capital Partners" (`BRAND.portal`). Public: "HG CAPITAL PARTNERS" in Geist 500, 13px caps at 0.28em. Emails and PDFs: tile plus "HG Capital Partners" over a 1px `--gold-deep` rule. Never "HG Capital OS".
 - **Never** gold text on a light ground, gold gradients or foil, a blue or white tile, the letters on a photo without their tile, or the monogram as a bullet.
 
 ### Photography

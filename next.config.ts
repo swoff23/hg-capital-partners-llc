@@ -70,6 +70,14 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "no-store" },
         ],
       },
+      {
+        // Invite and sign-up links carry their token in the URL too (docs/specs/contractor-onboarding.md, section 6).
+        source: "/join/:token",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
     ];
   },
 };

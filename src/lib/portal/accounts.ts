@@ -135,20 +135,26 @@ export async function resetPortalPassword(accountId: string, byUser: Staff): Pro
 
 /** Remove access: the login stays (and its history), but nothing gets in. */
 export async function disablePortalAccount(accountId: string, byUser: Staff): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    const account = await accountOrThrow(tx, accountId);
-    const now = new Date();
-    await tx.portalAccount.update({ where: { id: accountId }, data: { status: "DISABLED" } });
-    const revoked = await revokePortalSessions(tx, accountId, { at: now });
-    await expireResetTokens(tx, accountId, now);
-    // The links in their job emails stop too, and stay stopped if access comes back (docs/specs/contractor-job-emails.md, 3).
-    const links = await revokeJobLinksFor(tx, account.contactId, now);
-    await logSecurityEvent(tx, {
-      kind: "ACCOUNT_DISABLED",
-      userId: byUser.id,
-      contactId: account.contactId,
-      data: { action: "disabled", sessionsRevoked: revoked, jobLinksRevoked: links },
-    });
+  await prisma.$transaction((tx) => disablePortalAccountIn(tx, accountId, byUser));
+}
+
+/**
+ * Remove access inside the caller's transaction: also Archive on a new sign-up from Home
+ * (src/lib/archive-signup.ts), which turns the login off and archives in one go.
+ */
+export async function disablePortalAccountIn(tx: Prisma.TransactionClient, accountId: string, byUser: Staff): Promise<void> {
+  const account = await accountOrThrow(tx, accountId);
+  const now = new Date();
+  await tx.portalAccount.update({ where: { id: accountId }, data: { status: "DISABLED" } });
+  const revoked = await revokePortalSessions(tx, accountId, { at: now });
+  await expireResetTokens(tx, accountId, now);
+  // The links in their job emails stop too, and stay stopped if access comes back (docs/specs/contractor-job-emails.md, 3).
+  const links = await revokeJobLinksFor(tx, account.contactId, now);
+  await logSecurityEvent(tx, {
+    kind: "ACCOUNT_DISABLED",
+    userId: byUser.id,
+    contactId: account.contactId,
+    data: { action: "disabled", sessionsRevoked: revoked, jobLinksRevoked: links },
   });
 }
 

@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   PHONE_ROWS,
+  baselaneItems,
+  duplicateLine,
+  signupItems,
   STALE_SYNC_MS,
   capexItem,
   keyDateItems,
@@ -171,4 +174,68 @@ test("phones: three rows, then the rest behind N more", () => {
   assert.equal(moreCount(2), 0);
   assert.equal(moreCount(3), 0);
   assert.equal(moreCount(5), 2);
+});
+
+// Contractor onboarding rows (docs/specs/contractor-onboarding.md, 4.5)
+
+const signup = (over: Partial<Parameters<typeof signupItems>[0][number]> = {}) => ({
+  id: "c1",
+  fullName: "Tony Bell",
+  phoneE164: "+17165550101",
+  email: "tony@example.com",
+  trades: "Electric, Handyman",
+  createdAt: new Date("2026-11-13T15:00:00Z"),
+  ...over,
+});
+
+test("a sign-up reads 'Tony Bell signed up' over its trades and the link", () => {
+  const [row] = signupItems([signup()], []);
+  assert.equal(row.title, "Tony Bell signed up");
+  assert.equal(row.detail, "Electric, Handyman · with your sign-up link");
+  assert.equal(row.href, "/contractors/c1");
+  assert.equal(row.actions, "signup");
+  assert.equal(row.contactId, "c1");
+});
+
+test("a sign-up with no trades says only where it came from", () => {
+  assert.equal(signupItems([signup({ trades: null })], [])[0].detail, "with your sign-up link");
+});
+
+test("a sign-up sharing a mobile or an email says who, phone first, ignoring case and itself", () => {
+  const zack = { id: "z", fullName: "Zack Reading", phoneE164: "+17165550101", email: null };
+  const amy = { id: "a", fullName: "Amy Lee", phoneE164: null, email: "TONY@example.com" };
+  assert.equal(duplicateLine(signup(), [amy, zack]), "Same phone as Zack Reading");
+  assert.equal(duplicateLine(signup(), [amy]), "Same email as Amy Lee");
+  assert.equal(duplicateLine(signup(), [{ id: "c1", fullName: "Tony Bell", phoneE164: "+17165550101", email: null }]), null);
+  assert.equal(duplicateLine(signup({ phoneE164: null, email: null }), [{ ...zack, phoneE164: null }]), null);
+  assert.equal(signupItems([signup()], [zack])[0].detail, "Same phone as Zack Reading");
+});
+
+test("sign-ups go oldest first", () => {
+  const rows = signupItems([signup({ id: "b", createdAt: new Date("2026-11-14T10:00:00Z") }), signup({ id: "a" })], []);
+  assert.deepEqual(rows.map((r) => r.key), ["signup:a", "signup:b"]);
+});
+
+test("a Baselane row names the person and the day they finished setup", () => {
+  const rows = baselaneItems(
+    [
+      { id: "d", fullName: "Dana Fox", setupDoneAt: new Date("2026-11-14T15:00:00Z") },
+      { id: "e", fullName: "Eli Park", setupDoneAt: new Date("2026-11-10T15:00:00Z") },
+    ],
+    "2026-11-14",
+  );
+  assert.deepEqual(rows.map((r) => [r.title, r.detail]), [
+    ["Send Eli Park the Baselane link", "Finished setup Nov 10"],
+    ["Send Dana Fox the Baselane link", "Finished setup today"],
+  ]);
+  assert.equal(rows[0].actions, "baselane");
+});
+
+test("the list puts sign-ups and Baselane rows after key dates and before CapEx", () => {
+  const signups = signupItems([signup()], []);
+  const baselane = baselaneItems([{ id: "d", fullName: "Dana Fox", setupDoneAt: new Date("2026-11-14T15:00:00Z") }], "2026-11-14");
+  const capex = capexItem({ fromYear: 2026, perYear: [1000], rows: [{ perYear: [1000] }] });
+  const keyDates = keyDateItems([property({ loanMaturityDate: utc("2026-11-30") })], "2026-11-14");
+  const list = needsYouList({ keyDates, signups, baselane, capex, quickbooks: null });
+  assert.deepEqual(list.map((i) => i.kind), ["loan", "signup", "baselane", "capex"]);
 });

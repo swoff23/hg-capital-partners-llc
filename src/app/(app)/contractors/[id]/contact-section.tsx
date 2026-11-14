@@ -110,6 +110,7 @@ export function ContactSection({
   contact,
   portalEmail,
   tradeOptions,
+  tradesNote,
   children,
 }: {
   contact: EditableContact;
@@ -117,6 +118,8 @@ export function ContactSection({
   portalEmail: string | null;
   /** Every trade, for the Trades checklist. */
   tradeOptions: readonly string[];
+  /** What a contractor who signed up wrote for "Anything we didn't list?"; shown under the tags. */
+  tradesNote?: string | null;
   children?: ReactNode;
 }) {
   const phone = contact.phone?.trim() || null;
@@ -140,6 +143,7 @@ export function ContactSection({
             message={() => `${first}'s trades saved`}
             onSave={(next, expected) => saveContactTrades(contact.id, next, expected)}
           />
+          {tradesNote?.trim() && <p className="mt-1 text-meta text-fg-3 wrap-anywhere">Also does: {tradesNote.trim()}</p>}
         </RailFact>
         <Fact
           contact={contact}

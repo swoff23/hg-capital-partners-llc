@@ -8,7 +8,7 @@ import { getEnv } from "@/lib/env";
 import type { Principal } from "@/lib/tasks/core";
 import { sessionExpiresAt, sessionIsLive, shouldTouchSession } from "./limits";
 import { linkSessionMayOpen } from "./job-link-paths";
-import { PORTAL_HOME, WELCOME_PASSWORD_PATH, afterPortalSignIn, withNext } from "./next-path";
+import { PORTAL_HOME, SETUP_PATH, WELCOME_PASSWORD_PATH, afterPortalSignIn, isSetupPath, withNext } from "./next-path";
 import { portalCookieForRequest, requestUserAgent, requestedPortalPath } from "./request";
 import { hashToken, isWellFormedToken, newToken } from "./tokens";
 
@@ -40,6 +40,11 @@ export type PortalPrincipal = {
 interface PortalSessionState {
   principal: PortalPrincipal;
   mustChangePassword: boolean;
+  /**
+   * Came in by an invite or the sign-up link and hasn't finished setup (docs/specs/contractor-onboarding.md): every
+   * /p page but the setup steps sends them there. Never true for a contractor staff added.
+   */
+  inSetup: boolean;
 }
 
 /**
@@ -73,7 +78,7 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
           email: true,
           status: true,
           mustChangePassword: true,
-          contact: { select: { id: true, fullName: true, active: true } },
+          contact: { select: { id: true, fullName: true, active: true, signupSource: true, setupDoneAt: true } },
         },
       },
     },
@@ -101,6 +106,7 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
     // A link session never meets the first-password page: the link, not a password, is how it got in, and it opens one
     // job only. Signing in in full still asks for a new password while the starting one is in use.
     mustChangePassword: row.account.mustChangePassword && !row.onlyTaskId,
+    inSetup: row.account.contact.signupSource !== "STAFF" && !row.account.contact.setupDoneAt,
   };
 });
 
@@ -143,7 +149,9 @@ export async function requirePortalPrincipal(opts: { passwordPage?: boolean } = 
   if (!state) redirect(withNext("/login", await requestedPortalPath()));
   if (state.principal.onlyTaskId) {
     // A link session stays on its job (job-link-paths.ts linkSessionMayOpen); anywhere else, they sign in in full.
+    // Someone still in setup signs in and finishes it first, job or no job.
     const path = await requestedPortalPath();
+    if (state.inSetup) redirect(withNext("/login", SETUP_PATH));
     if (opts.passwordPage || !linkSessionMayOpen(path, state.principal.onlyTaskId)) redirect(withNext("/login", path));
     return state.principal;
   }
@@ -151,6 +159,9 @@ export async function requirePortalPrincipal(opts: { passwordPage?: boolean } = 
     if (!state.mustChangePassword) redirect((await requestedPortalPath()) ?? PORTAL_HOME);
   } else if (state.mustChangePassword) {
     redirect(withNext(WELCOME_PASSWORD_PATH, await requestedPortalPath()));
+  } else if (state.inSetup && !isSetupPath(await requestedPortalPath())) {
+    // Setup is required (Connor, Nov 14): until details, trades and a W-9 are in, the steps are the only page.
+    redirect(SETUP_PATH);
   }
   return state.principal;
 }
@@ -171,8 +182,13 @@ export async function requirePortalSession(): Promise<PortalPrincipal> {
   // A link session off its job goes to sign in here too, as a real redirect rather than one streamed after a 200.
   if (state.principal.onlyTaskId) {
     const path = await requestedPortalPath();
+    if (state.inSetup) redirect(withNext("/login", SETUP_PATH));
     if (!linkSessionMayOpen(path, state.principal.onlyTaskId)) redirect(withNext("/login", path));
   }
+  // Mid-setup, anything but the steps goes to them here too, as a real redirect. A starting password still comes first:
+  // the steps' own requirePortalPrincipal sends it on to the first-password page with ?next=/p/setup, which this
+  // reads as the steps (portalReturnPath), so it isn't sent back.
+  if (state.inSetup && !isSetupPath(await requestedPortalPath())) redirect(SETUP_PATH);
   return state.principal;
 }
 
@@ -185,6 +201,7 @@ export async function portalHomePath(next: string | null = null): Promise<string
   const state = await readSession();
   // A link session isn't signed in to My jobs: /login shows the form, and signing in replaces it with a full session.
   if (!state || state.principal.onlyTaskId) return null;
+  if (state.inSetup && !state.mustChangePassword) return SETUP_PATH;
   return afterPortalSignIn(state.mustChangePassword, next);
 }
 

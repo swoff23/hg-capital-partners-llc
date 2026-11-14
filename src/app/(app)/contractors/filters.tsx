@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, type ReactNode } from "react";
 import { FilterBar, FilterResults, FilterScope, ResultLine, type FilterFacet } from "@/components/filter-bar";
+import { ONBOARDING_LABEL, ONBOARDING_STATUSES } from "@/lib/contractors/onboarding";
 import { countContractorsAction } from "./filter-actions";
 
 export type ContractorFilterData = {
@@ -17,7 +18,7 @@ const noun = { one: "contractor", many: "contractors" };
 
 /**
  * The Contractors page's bar (selectors 5): a search over the name, the
- * company and the trades, a Trade filter with several picks, and three yes
+ * company and the trades, a Trade filter and a Status filter with several picks, and three yes
  * or no chips, "Has login", "Needs W-9" (no W-9 on file) and "Archived" (the
  * archived contractors instead of the rest). With a mouse on a wide page they
  * are chips; elsewhere the search keeps the row beside one Filters button. `children` is the table, which dims while a change loads.
@@ -32,6 +33,14 @@ export function ContractorFilters({ data, children }: { data: ContractorFilterDa
         searchLabel: "Search trades",
         emptyText: "No trade matches.",
         items: data.trades.map((t) => ({ id: t.key, label: t.label, count: t.count })),
+      },
+      {
+        kind: "multi",
+        param: "status",
+        label: "Status",
+        searchLabel: "Search statuses",
+        emptyText: "No status matches.",
+        items: ONBOARDING_STATUSES.map((s) => ({ id: s, label: ONBOARDING_LABEL[s] })),
       },
       { kind: "toggle", param: "login", label: "Has login" },
       { kind: "toggle", param: "w9", label: "Needs W-9" },
@@ -66,6 +75,7 @@ export function ContractorFiltersPlaceholder() {
       search={{ placeholder: "Search contractors" }}
       facets={[
         { kind: "multi", param: "trade", label: "Trade" },
+        { kind: "multi", param: "status", label: "Status" },
         { kind: "toggle", param: "login", label: "Has login" },
         { kind: "toggle", param: "w9", label: "Needs W-9" },
         { kind: "toggle", param: "archived", label: "Archived" },

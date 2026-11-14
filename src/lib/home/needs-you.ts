@@ -11,7 +11,10 @@ import { shortAddress } from "@/lib/normalize";
  * covers it.
  */
 
-export type NeedsYouKind = "loan" | "insurance" | "registration" | "capex" | "sync-stale" | "sync-lost";
+export type NeedsYouKind = "loan" | "insurance" | "registration" | "capex" | "sync-stale" | "sync-lost" | "signup" | "baselane";
+
+/** The rows that carry buttons beside them (contractor onboarding, docs/specs/contractor-onboarding.md 4.5). */
+export type NeedsYouActions = "signup" | "baselane";
 
 /** One row, serializable from the server page to the client list. */
 export interface NeedsYouItem {
@@ -34,6 +37,9 @@ export interface NeedsYouItem {
   late: boolean;
   /** For ordering: the key date, or null. */
   date: Ymd | null;
+  /** The buttons beside the row, and the contractor they act on. Absent on a row that only opens its record. */
+  actions?: NeedsYouActions;
+  contactId?: string;
 }
 
 /** On a phone the list shows this many rows, then "N more". */
@@ -164,11 +170,100 @@ export function quickbooksItem(conn: QuickbooksState | null, now: Date): NeedsYo
   return { ...base, kind: "sync-stale", title: "QuickBooks sync", state: "Stale", detail };
 }
 
-/** The list in order: key dates (late first, then soonest), this year's CapEx, then QuickBooks. */
+// ---------------------------------------------------------------------------
+// Contractor onboarding
+// ---------------------------------------------------------------------------
+
+export interface SignupContact {
+  id: string;
+  fullName: string;
+  phoneE164: string | null;
+  email: string | null;
+  /** Their trades on one line ("Electric, Handyman"), or null with none. */
+  trades: string | null;
+  createdAt: Date;
+}
+
+/** Someone already in Contractors, for the same-phone and same-email check. */
+export interface KnownContact {
+  id: string;
+  fullName: string;
+  phoneE164: string | null;
+  email: string | null;
+}
+
+const sameEmail = (a: string | null, b: string | null) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** "Same phone as Zack Reading" when another contractor has this mobile, else "Same email as ...", else null. A phone wins over an email. */
+export function duplicateLine(person: Pick<SignupContact, "id" | "phoneE164" | "email">, others: KnownContact[]): string | null {
+  const rest = others.filter((o) => o.id !== person.id);
+  const byPhone = person.phoneE164 ? rest.find((o) => o.phoneE164 === person.phoneE164) : undefined;
+  if (byPhone) return `Same phone as ${byPhone.fullName}`;
+  const byEmail = rest.find((o) => sameEmail(o.email, person.email));
+  return byEmail ? `Same email as ${byEmail.fullName}` : null;
+}
+
+/** "Tony Bell signed up" rows, oldest first. `others` are the non-archived contractors the sign-ups are checked against. */
+export function signupItems(people: SignupContact[], others: KnownContact[]): NeedsYouItem[] {
+  return [...people]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
+    .map((p) => ({
+      key: `signup:${p.id}`,
+      kind: "signup",
+      href: `/contractors/${p.id}`,
+      title: `${p.fullName.trim()} signed up`,
+      state: "New",
+      detail: duplicateLine(p, others) ?? [p.trades, "with your sign-up link"].filter(Boolean).join(" · "),
+      amount: null,
+      pastDue: null,
+      dateLabel: null,
+      late: false,
+      date: null,
+      actions: "signup",
+      contactId: p.id,
+    }));
+}
+
+export interface BaselaneContact {
+  id: string;
+  fullName: string;
+  setupDoneAt: Date;
+}
+
+/** "Send Dana Fox the Baselane link" rows, whoever finished setup first on top. */
+export function baselaneItems(people: BaselaneContact[], today: Ymd): NeedsYouItem[] {
+  return [...people]
+    .sort((a, b) => a.setupDoneAt.getTime() - b.setupDoneAt.getTime() || a.id.localeCompare(b.id))
+    .map((p) => {
+      const day = todayYmdEastern(p.setupDoneAt);
+      return {
+        key: `baselane:${p.id}`,
+        kind: "baselane",
+        href: `/contractors/${p.id}`,
+        title: `Send ${p.fullName.trim()} the Baselane link`,
+        state: "Send",
+        detail: day === today ? "Finished setup today" : `Finished setup ${fmtDay(day, { year: "auto", now: today })}`,
+        amount: null,
+        pastDue: null,
+        dateLabel: null,
+        late: false,
+        date: null,
+        actions: "baselane",
+        contactId: p.id,
+      };
+    });
+}
+
+/**
+ * The list in order: key dates (late first, then soonest), new sign-ups, Baselane links to send, this year's
+ * CapEx, then QuickBooks.
+ */
 export function needsYouList(parts: {
   keyDates: NeedsYouItem[];
+  signups?: NeedsYouItem[];
+  baselane?: NeedsYouItem[];
   capex: NeedsYouItem | null;
   quickbooks: NeedsYouItem | null;
 }): NeedsYouItem[] {
-  return [...parts.keyDates, ...(parts.capex ? [parts.capex] : []), ...(parts.quickbooks ? [parts.quickbooks] : [])];
+  return [...parts.keyDates, ...(parts.signups ?? []), ...(parts.baselane ?? []), ...(parts.capex ? [parts.capex] : []), ...(parts.quickbooks ? [parts.quickbooks] : [])];
 }

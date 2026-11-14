@@ -5,6 +5,7 @@ import { todayYmdEastern } from "@/lib/dates";
 import { JOBS_GROUP_COOKIE, firstName, parseJobsGroup, parseJobsTab } from "@/lib/portal/job-view";
 import { listMyJobs } from "@/lib/portal/queries";
 import { requirePortalPrincipal } from "@/lib/portal/session";
+import { readSetupCard } from "@/lib/portal/setup";
 import { AccountMenu } from "../_components/account-menu";
 import { MyJobs } from "../_components/my-jobs";
 
@@ -15,7 +16,9 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
   const { view } = (await searchParams) as { view?: string };
   const tab = parseJobsTab(view);
   const group = parseJobsGroup((await cookies()).get(JOBS_GROUP_COOKIE)?.value);
-  const jobs = await listMyJobs(principal, tab);
+  // Someone mid-setup never gets here (session.ts sends them to the steps); `setup` is only for the account menu's
+  // "Your details and files", for people who came in by an invite or the sign-up link.
+  const [jobs, setup] = await Promise.all([listMyJobs(principal, tab), readSetupCard(principal.contactId)]);
 
   return (
     <>
@@ -25,7 +28,7 @@ export default async function MyJobsPage({ searchParams }: PageProps<"/p">) {
             <Monogram size={32} />
             {BRAND.portal}
           </span>
-          <AccountMenu name={principal.label} email={principal.email} />
+          <AccountMenu name={principal.label} email={principal.email} setupLink={setup !== null} />
         </div>
       </header>
 
