@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="600" viewBox="0 0 920 600" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The facts rail: Details trimmed with the Entity list open, Loan folded and opened, Insurance folded</title>
+<rect width="920" height="600" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">The facts rail after cleanup</text>
+
+<g transform="translate(32 56)" font-size="11">
+<text x="0" y="12" font-weight="500" fill="#424e61">Details, 12 rows, Entity list open</text>
+<text x="0" y="40" font-size="13" font-weight="600" fill="#152133">Details</text>
+<line x1="0" y1="50" x2="260" y2="50" stroke="#e7e5e0"/>
+<g fill="#5b6576">
+<text x="0" y="70">Value</text><text x="0" y="98">Purchase date</text><text x="0" y="126">Purchase price</text><text x="0" y="154">Refinance date</text>
+<text x="0" y="182">Strategy</text><text x="0" y="210">Sq ft</text><text x="0" y="238">Entity</text>
+<text x="0" y="406">Attorney</text><text x="0" y="434">Status</text><text x="0" y="462">Move-in form</text><text x="0" y="490">Registration</text><text x="0" y="518">Tax due</text>
+</g>
+<g fill="#152133">
+<text x="104" y="70">$430,000</text><text x="104" y="98">Oct 30, 2024</text><text x="104" y="126">$295,000</text><text x="104" y="154">Mar 27, 2025</text>
+<text x="104" y="182">Hold</text><text x="104" y="210">3,382</text><text x="104" y="238">HG Capital Partners LLC</text>
+<text x="104" y="406">Nick</text><text x="104" y="434">◉ Refinanced</text><text x="104" y="462">Yes</text>
+</g>
+<rect x="236" y="452" width="24" height="13" rx="6.5" fill="#152133"/><circle cx="253" cy="458.5" r="4.5" fill="#ffffff"/>
+<g fill="#a54e09"><text x="104" y="490">+ Add expiry</text><text x="104" y="518">+ Add due date</text></g>
+<g stroke="#e7e5e0"><line x1="0" y1="80" x2="260" y2="80"/><line x1="0" y1="108" x2="260" y2="108"/><line x1="0" y1="136" x2="260" y2="136"/><line x1="0" y1="164" x2="260" y2="164"/><line x1="0" y1="192" x2="260" y2="192"/><line x1="0" y1="220" x2="260" y2="220"/><line x1="0" y1="248" x2="260" y2="248"/><line x1="0" y1="416" x2="260" y2="416"/><line x1="0" y1="444" x2="260" y2="444"/><line x1="0" y1="472" x2="260" y2="472"/><line x1="0" y1="500" x2="260" y2="500"/><line x1="0" y1="528" x2="260" y2="528"/></g>
+<rect x="96" y="254" width="228" height="134" rx="8" fill="#ffffff" stroke="#c0bdb7"/>
+<g fill="#152133"><text x="108" y="276">HG Capital Partners LLC</text><text x="310" y="276" text-anchor="end">✓</text>
+<text x="108" y="298">HG Buffalo Holding 1 LLC</text><text x="108" y="320">HG Buffalo Holding 2 LLC</text><text x="108" y="342">HG Buffalo Property Management LLC</text><text x="108" y="364">BMK Property Group LLC</text></g>
+<text x="108" y="382" fill="#5b6576">Not set</text>
+<text x="0" y="556" fill="#5b6576">Gone from the page: Closing costs, Rehab amount, Refi target.</text>
+<text x="0" y="574" fill="#5b6576">Another property's empty Attorney or Sq ft folds like Loan.</text>
+</g>
+
+<g transform="translate(370 56)" font-size="11">
+<text x="0" y="12" font-weight="500" fill="#424e61">Loan, folded</text>
+<text x="0" y="40" font-size="13" font-weight="600" fill="#152133">Loan</text>
+<line x1="0" y1="50" x2="240" y2="50" stroke="#e7e5e0"/>
+<g fill="#5b6576"><text x="0" y="70">Maturity</text><text x="0" y="98">Balance</text><text x="0" y="126">Servicer</text><text x="0" y="154">Escrow</text></g>
+<text x="96" y="70" fill="#a54e09">+ Add maturity date</text>
+<g fill="#152133"><text x="96" y="98">$321,603</text><text x="96" y="126">Fay Servicing</text><text x="96" y="154">No</text></g>
+<rect x="216" y="144" width="24" height="13" rx="6.5" fill="#d5d1ca"/><circle cx="223" cy="150.5" r="4.5" fill="#ffffff"/>
+<g stroke="#e7e5e0"><line x1="0" y1="80" x2="240" y2="80"/><line x1="0" y1="108" x2="240" y2="108"/><line x1="0" y1="136" x2="240" y2="136"/><line x1="0" y1="164" x2="240" y2="164"/></g>
+<text x="0" y="186" fill="#424e61">⌄  7 more fields</text>
+<line x1="0" y1="198" x2="240" y2="198" stroke="#e7e5e0"/>
+
+<text x="0" y="240" font-weight="500" fill="#424e61">Insurance, folded</text>
+<text x="0" y="268" font-size="13" font-weight="600" fill="#152133">Insurance</text>
+<line x1="0" y1="278" x2="240" y2="278" stroke="#e7e5e0"/>
+<g fill="#5b6576"><text x="0" y="298">Renewal</text><text x="0" y="326">Replacement</text></g>
+<text x="96" y="298" fill="#a54e09">+ Add renewal date</text><text x="96" y="326" fill="#152133">$700,000</text>
+<g stroke="#e7e5e0"><line x1="0" y1="308" x2="240" y2="308"/><line x1="0" y1="336" x2="240" y2="336"/></g>
+<text x="0" y="358" fill="#424e61">⌄  7 more fields</text>
+<line x1="0" y1="370" x2="240" y2="370" stroke="#e7e5e0"/>
+<text x="0" y="404" fill="#5b6576">Reminder dates (orange) never fold.</text>
+<text x="0" y="422" fill="#5b6576">Folded rows keep their order when shown.</text>
+</g>
+
+<g transform="translate(650 56)" font-size="11">
+<text x="0" y="12" font-weight="500" fill="#424e61">Loan, opened</text>
+<text x="0" y="40" font-size="13" font-weight="600" fill="#152133">Loan</text>
+<line x1="0" y1="50" x2="240" y2="50" stroke="#e7e5e0"/>
+<g fill="#5b6576"><text x="0" y="70">Maturity</text><text x="0" y="98">Balance</text><text x="0" y="126">Lender</text><text x="0" y="154">Servicer</text><text x="0" y="182">Loan #</text><text x="0" y="210">Loan type</text><text x="0" y="238">Original loan</text><text x="0" y="266">Rate</text><text x="0" y="294">Payment / mo</text><text x="0" y="322">Escrow</text><text x="0" y="350">Originated</text></g>
+<text x="96" y="70" fill="#a54e09">+ Add maturity date</text>
+<g fill="#152133"><text x="96" y="98">$321,603</text><text x="96" y="154">Fay Servicing</text><text x="96" y="322">No</text></g>
+<g fill="#424e61"><text x="96" y="126">+ Add lender</text><text x="96" y="182">+ Add loan number</text><text x="96" y="210">+ Add loan type</text><text x="96" y="238">+ Add original amount</text><text x="96" y="266">+ Add rate</text><text x="96" y="294">+ Add payment</text><text x="96" y="350">+ Add origination date</text></g>
+<rect x="216" y="312" width="24" height="13" rx="6.5" fill="#d5d1ca"/><circle cx="223" cy="318.5" r="4.5" fill="#ffffff"/>
+<g stroke="#e7e5e0"><line x1="0" y1="80" x2="240" y2="80"/><line x1="0" y1="108" x2="240" y2="108"/><line x1="0" y1="136" x2="240" y2="136"/><line x1="0" y1="164" x2="240" y2="164"/><line x1="0" y1="192" x2="240" y2="192"/><line x1="0" y1="220" x2="240" y2="220"/><line x1="0" y1="248" x2="240" y2="248"/><line x1="0" y1="276" x2="240" y2="276"/><line x1="0" y1="304" x2="240" y2="304"/><line x1="0" y1="332" x2="240" y2="332"/><line x1="0" y1="360" x2="240" y2="360"/></g>
+<text x="0" y="382" fill="#424e61">⌃  Fewer fields</text>
+<line x1="0" y1="394" x2="240" y2="394" stroke="#e7e5e0"/>
+<text x="0" y="428" fill="#5b6576">Rows are 40px with a mouse, 48 on touch.</text>
+<text x="0" y="446" fill="#5b6576">Same at every width; nothing on hover.</text>
+</g>
+</svg>
