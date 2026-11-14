@@ -56,8 +56,8 @@ test("every write to a claimed row is an updateMany by id, so a row deleteTask's
   assert.doesNotMatch(code, /notificationOutbox\.update\(/, "no update that needs the row to be there");
   const drain = code.slice(code.indexOf("export async function drainDue"));
   const writes = drain.match(/notificationOutbox\.updateMany\(\{\s*where: \{ [^}]*\}/g) ?? [];
-  // nothing to send, sent, refused for Resend's limits, failed: each by the row's id alone.
-  assert.equal(writes.length, 4);
+  // the task gone at the claim, nothing to send, sent, refused for Resend's limits, failed: each by the row's id alone.
+  assert.equal(writes.length, 5);
   for (const w of writes) assert.match(w, /where: \{ id: row\.id \}$/);
   // A count of 0 is not an error: nothing reads it, and the loop goes on to the next row.
   assert.doesNotMatch(drain, /const \{ count \} = await prisma\.notificationOutbox\.updateMany/);

@@ -4,6 +4,7 @@ import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { contractorMaySetDate, jobLinkUrl, type JobLinkStep } from "@/lib/portal/job-link-paths";
+import { reminderFor } from "./reminder-rules";
 import { addressLine, firstName, joinNames, nextStep } from "@/lib/portal/job-view";
 
 /**
@@ -218,8 +219,22 @@ function withSendBackNote(item: OutboxItem, note: EventSnapshot | undefined): Ou
  * dropped, and "canceled" goes only while the job is still canceled.
  */
 export function offItems(items: readonly OutboxItem[], now: { hasAccess: boolean; canceled: boolean }): OutboxItem[] {
+  // Handed the job and taken off it (or it canceled) inside this one bundle, before any email told them they had it
+  // (a picker's Undo, a quick re-pick): there's nothing to tell them.
+  const firstOff = items.findIndex((i) => i.kind === "OFF");
+  if (firstOff >= 0 && (!now.hasAccess || now.canceled) && items.slice(0, firstOff).some((i) => i.kind === "ASSIGNED")) return [];
   if (!now.hasAccess) return items.filter((i) => i.kind === "OFF");
   return items.filter((i) => i.kind !== "OFF" || (now.canceled && /^canceled /.test(oneLine(i.summary))));
+}
+
+/**
+ * The 8 am lines (reminders.ts) at send time: a "Due today" or "Due yesterday" goes only while it is still true. The
+ * job still waits on the contractor (not In review, Done or Canceled) and its date is still the one the line was for,
+ * on the day it says. A line the job has moved past is dropped; a bundle left empty closes as "nothing to send".
+ */
+export function liveReminders(items: readonly OutboxItem[], now: { status: TaskStatus; due: Ymd | null; today: Ymd }): OutboxItem[] {
+  const want = contractorMaySetDate(now.status) ? reminderFor(now.due, now.today) : null;
+  return items.filter((i) => !UNSIGNED_KINDS.has(i.kind) || (i.kind === want && i.due === now.due));
 }
 
 /** The update an email's button opens at: the first comment, status or file post the recipient can see. */
@@ -336,18 +351,21 @@ export function itemLine(item: OutboxItem, title?: string): string {
   return text.startsWith(":") ? `${name}${text}` : `${name} ${text}`;
 }
 
-/** Target and notes changes say only their latest; everything else is kept, oldest first. */
+/** Lines that say only their latest: a date, the notes, and an assignment (a picker's Undo and re-pick hands it over twice). */
+const LATEST_ONLY = new Set(["TARGET", "NOTES", "ASSIGNED"]);
+
+/** Target, notes and assignment changes say only their latest; everything else is kept, oldest first. */
 function latestOnly(items: OutboxItem[]): OutboxItem[] {
   const lastOf = new Map<string, number>();
   items.forEach((it, i) => {
-    if (it.kind === "TARGET" || it.kind === "NOTES") lastOf.set(it.kind, i);
+    if (LATEST_ONLY.has(it.kind)) lastOf.set(it.kind, i);
   });
-  return items.filter((it, i) => (it.kind === "TARGET" || it.kind === "NOTES" ? lastOf.get(it.kind) === i : true));
+  return items.filter((it, i) => (LATEST_ONLY.has(it.kind) ? lastOf.get(it.kind) === i : true));
 }
 
 /**
- * The lines of one email, oldest first. Target and notes changes say only
- * their latest; everything else is listed.
+ * The lines of one email, oldest first. Target, notes and assignment changes
+ * say only their latest; everything else is listed.
  */
 export function itemLines(items: OutboxItem[], title?: string): string[] {
   return latestOnly(items).map((it) => itemLine(it, title));
@@ -531,8 +549,10 @@ function buttons(input: {
   return { primary: { label: "See job", url: to(null, updateId) }, secondary: [] };
 }
 
-/** The most thumbnails a strip shows before "+3". */
+/** The most thumbnails What's new shows before "+3". */
 export const EMAIL_PHOTO_MAX = 4;
+/** The most of HG's photos the job section shows before "+N" (spec 2.2). */
+export const JOB_PHOTO_MAX = 6;
 
 /**
  * A photo's thumbnail in an email, through the private file route with the
@@ -543,10 +563,16 @@ export function emailPhotoUrl(appUrl: string, attachmentId: string, linkToken: s
   return `${appUrl.replace(/\/+$/, "")}/api/files/task/${encodeURIComponent(attachmentId)}?v=thumb&l=${linkToken}`;
 }
 
-/** Up to EMAIL_PHOTO_MAX thumbnails, each opening `href`, and how many more there are. */
-function photoStrip(ids: readonly string[], appUrl: string, linkToken: string | null, href: string): { photos: EmailPhoto[]; morePhotos: number } {
+/** Up to `max` thumbnails, each opening `href`, and how many more there are. */
+function photoStrip(
+  ids: readonly string[],
+  appUrl: string,
+  linkToken: string | null,
+  href: string,
+  max: number = EMAIL_PHOTO_MAX,
+): { photos: EmailPhoto[]; morePhotos: number } {
   if (!linkToken || ids.length === 0) return { photos: [], morePhotos: 0 };
-  const shown = ids.slice(0, EMAIL_PHOTO_MAX);
+  const shown = ids.slice(0, max);
   return { photos: shown.map((id) => ({ src: emailPhotoUrl(appUrl, id, linkToken), href })), morePhotos: ids.length - shown.length };
 }
 
@@ -678,8 +704,11 @@ export function taskEmail(input: {
   const btns = buttons({ audience: input.audience, status: input.status, approved, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
   // Tapping a photo opens the job: the contractor's through their link, a partner's on the task page.
   const photoHref = contractor ? (token ? jobLinkUrl(input.appUrl, token, null, firstUpdateId(input.items)) : openUrl(input.appUrl, "contractor", input.taskId)) : openUrl(input.appUrl, "staff", input.taskId, firstUpdateId(input.items));
-  const fresh = photoStrip(input.newPhotoIds ?? [], input.appUrl, token, photoHref);
-  const older = contractor ? photoStrip(input.jobPhotoIds ?? [], input.appUrl, token, photoHref) : { photos: [], morePhotos: 0 };
+  // A contractor's link stops opening a closed job, thumbnails included, so a closed job's email shows none.
+  const showPhotos = !contractor || isActiveStatus(input.status);
+  const none = { photos: [], morePhotos: 0 };
+  const fresh = showPhotos ? photoStrip(input.newPhotoIds ?? [], input.appUrl, token, photoHref) : none;
+  const older = contractor && showPhotos ? photoStrip(input.jobPhotoIds ?? [], input.appUrl, token, photoHref, JOB_PHOTO_MAX) : none;
   return {
     subject: jobSubject({ title: input.title, where, due }),
     preview: previewText(headline, lines),

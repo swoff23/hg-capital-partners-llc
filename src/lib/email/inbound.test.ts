@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { REPLY_MAX, htmlToText, isAutoReply, replyAddress, replyBody, replyToken, threadTaskId, verifyWebhook } from "./inbound";
+import { REPLY_MAX, fromAddress, htmlToText, isAutoReply, replyAddress, replyBody, replyToken, singleAddress, threadTaskId, verifyWebhook } from "./inbound";
 
 const secretBytes = crypto.randomBytes(24);
 const secret = `whsec_${secretBytes.toString("base64")}`;
@@ -65,4 +65,26 @@ test("out-of-office notices, lists and delivery reports never post", () => {
   assert.equal(isAutoReply({}, "Out of Office: Zack Reading"), true);
   assert.equal(isAutoReply({}, "Automatic reply: Due Mon, Nov 23"), true);
   assert.equal(isAutoReply({}, "Re: Due Mon, Nov 23: Replace kitchen faucet"), false);
+});
+
+test("the sender is the address at the end of the From line, never one a display name holds", () => {
+  assert.equal(fromAddress("Zack Reading <Zack@OutlawCarpentry.com>"), "zack@outlawcarpentry.com");
+  assert.equal(fromAddress("zack@outlawcarpentry.com"), "zack@outlawcarpentry.com");
+  assert.equal(fromAddress('"<pieter@hg.com>" <attacker@evil.example>'), "attacker@evil.example");
+  assert.equal(singleAddress("Zack <zack@x.com>"), true);
+  assert.equal(singleAddress('"pieter@hg.com" <attacker@evil.example>'), false);
+  assert.equal(singleAddress(null), false);
+});
+
+test("From lines with a comment or the same address twice still read as that one sender", () => {
+  assert.equal(fromAddress("zack@x.com (Zack Reading)"), "zack@x.com");
+  assert.equal(singleAddress("zack@x.com (Zack Reading)"), true);
+  assert.equal(singleAddress('"zack@x.com" <zack@x.com>'), true);
+  assert.equal(singleAddress("<a@x.com>, <b@x.com>"), false);
+});
+
+test("an @ the address pattern can't place makes the line more than one address", () => {
+  assert.equal(singleAddress('"a b"@evil.com, <pieter@hg.com>'), false);
+  assert.equal(singleAddress("attacker(c)@evil.com, <pieter@hg.com>"), false);
+  assert.equal(singleAddress("attacker @evil.com, <pieter@hg.com>"), false);
 });

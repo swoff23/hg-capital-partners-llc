@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Copy, MessageSquareText, Share } from "lucide-react";
 import { Sheet } from "@/components/sheet";
 import { Spinner, useSpinnerVisible } from "@/components/spinner";
@@ -48,14 +48,18 @@ export function CrewText({ taskId, openOnLoad = false }: { taskId: string; openO
     });
   }
 
-  const askedOnLoad = useRef(false);
   useEffect(() => {
-    if (!openOnLoad || askedOnLoad.current) return;
-    askedOnLoad.current = true;
-    const url = new URL(window.location.href);
-    url.searchParams.delete("do");
-    window.history.replaceState(null, "", url);
-    show();
+    // Only while the address still asks: Back to a page whose ?do= was taken off doesn't reopen it.
+    if (!openOnLoad || new URLSearchParams(window.location.search).get("do") !== "share") return;
+    // The next frame, after the page has drawn. The ?do= comes off there too, so an effect run twice in development
+    // still opens it once.
+    const frame = requestAnimationFrame(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("do");
+      window.history.replaceState(null, "", url);
+      show();
+    });
+    return () => cancelAnimationFrame(frame);
     // Once per page load; show reads the latest state when it runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openOnLoad]);

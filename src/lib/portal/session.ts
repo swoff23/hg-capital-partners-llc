@@ -5,6 +5,9 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
+import type { JobLinkKind, TaskStatus } from "@prisma/client";
+import { LATE_UPLOAD_WINDOW_MS } from "@/lib/attachments/access";
+import { isActiveStatus } from "@/lib/task-scope";
 import type { Principal } from "@/lib/tasks/core";
 import { sessionExpiresAt, sessionIsLive, shouldTouchSession } from "./limits";
 import { linkSessionMayOpen } from "./job-link-paths";
@@ -72,6 +75,9 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
       revokedAt: true,
       lastUsedAt: true,
       onlyTaskId: true,
+      onlyTask: { select: { status: true, completedAt: true } },
+      jobLinkId: true,
+      jobLink: { select: { kind: true } },
       account: {
         select: {
           id: true,
@@ -84,6 +90,7 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
     },
   });
   if (!row || !sessionIsLive(row, now)) return null;
+  if (row.onlyTaskId && !linkSessionStillOpens(row.onlyTask, row.jobLinkId ? (row.jobLink?.kind ?? null) : "EMAIL", now)) return null;
   if (row.account.status !== "ACTIVE" || !row.account.contact.active) return null;
 
   if (shouldTouchSession(row.lastUsedAt, now)) {
@@ -109,6 +116,24 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
     inSetup: row.account.contact.signupSource !== "STAFF" && !row.account.contact.setupDoneAt,
   };
 });
+
+/**
+ * Whether a link session still opens its job (spec section 3). It ends with the job: gone or Canceled at once, Done
+ * once the hour after the approval is up, since a Done job still takes the contractor's files for an hour after their
+ * Mark done (attachments/access.ts LATE_UPLOAD_WINDOW_MS) and the uploads in flight need the session. Only a session a
+ * button link started counts: one a REPLY or STAFF link started (a reply address opened the job while that was
+ * possible, before Nov 14's fix) never does.
+ */
+function linkSessionStillOpens(
+  task: { status: TaskStatus; completedAt: Date | null } | null,
+  linkKind: JobLinkKind | null,
+  now: Date,
+): boolean {
+  if (linkKind !== "EMAIL" && linkKind !== "CREW") return false;
+  if (!task || task.status === "CANCELED") return false;
+  if (isActiveStatus(task.status)) return true;
+  return task.status === "DONE" && !!task.completedAt && now.getTime() - task.completedAt.getTime() <= LATE_UPLOAD_WINDOW_MS;
+}
 
 /**
  * The signed-in contractor, or null (no cookie, revoked or expired session,

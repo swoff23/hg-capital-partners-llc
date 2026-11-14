@@ -42,14 +42,21 @@ export function JobDate({
   const [saving, startSaving] = useTransition();
 
   useEffect(() => {
-    if (!openOnLoad || !editable) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete("do");
-    window.history.replaceState(null, "", url);
-    // After the page has drawn, so the layer measures the screen it opens on.
-    const frame = requestAnimationFrame(() => setOpen(true));
+    // Only while the address still asks: Back to a page whose ?do= was taken off doesn't reopen it.
+    if (!openOnLoad || new URLSearchParams(window.location.search).get("do") !== "date") return;
+    // The next frame, after the page has drawn, so the layer measures the screen it opens on. The ?do= comes off there
+    // whether or not the job takes a date now, so a later change can't open it unasked; an effect run twice in
+    // development still opens it once.
+    const frame = requestAnimationFrame(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("do");
+      window.history.replaceState(null, "", url);
+      if (editable) setOpen(true);
+    });
     return () => cancelAnimationFrame(frame);
-  }, [openOnLoad, editable]);
+    // Once per page load, with the job as it was then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openOnLoad]);
 
   if (!editable) {
     return target ? (
@@ -60,10 +67,12 @@ export function JobDate({
   }
 
   function pick(next: Ymd | null) {
+    // While a pick saves the trigger is pending (React Aria keeps it focused and won't open it), so there's no second pick.
     if (!next || next === target) return;
+    const day = fmtDay(next, { weekday: true, year: "auto", now: today });
     startSaving(async () => {
       const res = await callAction(() => setJobDateAction(taskId, next));
-      toast({ message: res.ok ? `Due date moved to ${fmtDay(next, { weekday: true, year: "auto", now: today })}` : res.error });
+      toast({ message: res.ok ? (target ? `Due date moved to ${day}` : `Due date set for ${day}`) : res.error });
     });
   }
 
@@ -73,21 +82,29 @@ export function JobDate({
       onOpenChange={setOpen}
       title="Due date"
       motion="pop"
+      // As the task page's date chips: beside the date on a short laptop screen where it fits neither above nor below.
+      besideWhenShort
       trigger={
         <AriaButton
-          isDisabled={saving}
+          isPending={saving}
           onHoverStart={warmDatePanel}
           onFocus={warmDatePanel}
           onPressStart={warmDatePanel}
-          aria-label={target ? `Change the due date: ${fmtDay(target)}` : "Set a due date"}
           className={cn(
             "min-w-0 truncate rounded-sm text-meta text-fg-3 underline decoration-dotted decoration-1 underline-offset-4 hover:text-fg-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-act focus-visible:outline-solid",
-            // A 44px target on touch without making the line any taller.
-            "pointer-coarse:-my-2.5 pointer-coarse:py-2.5",
+            // A 44px target on touch (20px line plus 12px each side) without making the line any taller.
+            "pointer-coarse:-my-3 pointer-coarse:py-3",
           )}
         >
-          {/* The same words as before; the date's own label still says Due or Visit until the page drops "visit". */}
-          {target ? <DueDate target={target} isVisit={isVisit} today={today} /> : "Set a date"}
+          {/* The visible words are its name; the date's own label still says Due or Visit until the page drops "visit". */}
+          {target ? (
+            <>
+              <DueDate target={target} isVisit={isVisit} today={today} />
+              <span className="sr-only">, change</span>
+            </>
+          ) : (
+            "Set a date"
+          )}
         </AriaButton>
       }
     >
