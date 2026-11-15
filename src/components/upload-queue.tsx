@@ -8,6 +8,7 @@ import { useLeaveWarning } from "@/components/use-leave-warning";
 import { NO_COUNTS, UploadEngine, type EngineDeps, type EngineNotice } from "@/lib/attachments/engine";
 import { idbOutbox } from "@/lib/attachments/outbox";
 import { lazyTransfer } from "@/lib/attachments/lazy-transfer";
+import { reportClientError } from "@/lib/client-errors";
 import { reloadPage, warmWhenIdle } from "@/lib/lazy-module";
 import type { FileKind } from "@/lib/attachments/content-types";
 import type { UploadKind } from "@/lib/attachments/upload-kinds";
@@ -303,6 +304,7 @@ export function browserDeps(parts: {
     notify: parts.notify,
     navigate: parts.navigate,
     reload: reloadPage,
+    report: (error) => reportClientError(error, "upload"),
     online: () => typeof navigator === "undefined" || navigator.onLine !== false,
     now: () => new Date(),
     setTimer: (fn, ms) => setTimeout(fn, ms),

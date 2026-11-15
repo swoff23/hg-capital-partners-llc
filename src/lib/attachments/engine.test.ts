@@ -5,7 +5,7 @@ import { GENERIC_ERROR } from "@/lib/action-result";
 import { UploadEngine, capReason, type EngineDeps, type EngineNotice } from "./engine";
 import { JOB_CLOSED, TOO_LATE } from "./access";
 import { EMPTY_UPLOAD } from "./limits";
-import { closedJobLine, redTilesLine } from "./media";
+import { STORAGE_REFUSED, closedJobLine, redTilesLine } from "./media";
 import { FinalRefusalError, MAX_ONLINE_TRIES, OUTBOX_MAX_AGE_MS, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
 import { NOT_A_VIDEO, PrepareError, UNREADABLE_PHOTO } from "./prepare";
 import { WRONG_SIGN_IN } from "./queue-owner";
@@ -240,6 +240,27 @@ test("a refusal is red at once, with the server's reason; a refused file can't b
   h.engine.retry(b.key);
   await h.flush();
   assert.equal(h.engine.uploadsFor(t.key)[1].status, "invalid");
+});
+
+test("Blob refusing the bytes: the tile says refused by storage, Retry stays, and the report gets Blob's own words", async () => {
+  // Nov 15: a listing photo sent as public to a private store. Blob's own words never reach the server's logs.
+  const h = setup({ script: [new Error("Vercel Blob: Cannot use public access on a private store."), new TypeError("Failed to fetch")] });
+  const reported: Error[] = [];
+  h.deps.report = (e) => reported.push(e);
+  const t = target({ key: "listing:p1", uploadKind: "listing-photo-upload", parentId: "p1", access: "public" });
+  h.engine.add(t, [file("yard.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(tile.status, "failed", "red at once, with a Retry");
+  assert.equal(tile.error, STORAGE_REFUSED);
+  assert.equal(h.sent.length, 1, "no second try on its own");
+  assert.equal(reported.length, 1);
+  assert.match(reported[0].message, /listing-photo-upload, public\): Vercel Blob: Cannot use public access on a private store\./);
+  // A dropped connection on the Retry is the road: it waits, and nothing is reported.
+  h.engine.retry(tile.key);
+  await h.flush();
+  assert.equal(h.engine.uploadsFor(t.key)[0].status, "waiting");
+  assert.equal(reported.length, 1);
 });
 
 test("a stalled upload is cut off after 30 seconds and counted as a timeout", async () => {

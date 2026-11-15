@@ -113,16 +113,51 @@ export function shownReason(reason: string): string {
  */
 export const BROWSER_STOPPED = "the browser couldn't send it";
 
+/** Every @vercel/blob error's message starts with this. */
+const BLOB_ERROR = /^Vercel Blob: /;
+
+/**
+ * Blob itself said no to the bytes: a store that won't take this kind of file
+ * (a private store asked for a public photo, Nov 15), a suspended or missing
+ * store, a token it won't honor. Its own words ("Vercel Blob: Access denied,
+ * please provide a valid token for this resource.") mean nothing on a tile, and
+ * nothing the person does changes them, so the tile says this and the engine
+ * reports the original to Sentry (isStorageRefusal).
+ */
+export const STORAGE_REFUSED = "refused by storage";
+
+/**
+ * Whether a send failed because Blob refused it, as opposed to the road (no
+ * connection, the service down, rate limited), the clock (an expired token) or
+ * our own token route ("Failed to retrieve the client token", which shownReason
+ * words).
+ */
+export function isStorageRefusal(e: unknown): boolean {
+  if (!(e instanceof Error) || !BLOB_ERROR.test(e.message)) return false;
+  const m = e.message;
+  return !TOKEN_REFUSED.test(m) && !TOKEN_EXPIRED.test(m) && !BLOB_SERVICE_DOWN.test(m) && !/too many requests/i.test(m);
+}
+
 /**
  * Why an upload to Blob failed, for the tile and the red line: "no connection"
  * for a dropped connection however it surfaced, BROWSER_STOPPED for the
- * browser's own errors, else the error's own message.
+ * browser's own errors, STORAGE_REFUSED when Blob said no, else the error's
+ * own message.
  */
 export function uploadFailureReason(e: unknown): string {
   if (isOfflineError(e) || (e instanceof Error && BLOB_SERVICE_DOWN.test(e.message))) return "no connection";
   if (e instanceof TypeError) return BROWSER_STOPPED;
+  if (isStorageRefusal(e)) return STORAGE_REFUSED;
   return e instanceof Error ? e.message : "";
 }
+
+/**
+ * The reasons short and plain enough to sit on a line beside its Retry, for any
+ * count ("5 photos didn't upload: refused by storage · Retry"). The rest
+ * (the server's own sentences, "Reload and try again", which would argue with
+ * the Retry) stay on each tile's label.
+ */
+const LINE_REASONS: readonly string[] = ["no connection", STORAGE_REFUSED];
 
 /**
  * One line for however many files failed, count first so the reason fits on
@@ -186,7 +221,9 @@ export function closedJobLine(uploads: readonly ShownTile[], where = ""): string
  * (UploadStatusLine) and the toast its queue shows once the page is gone
  * (engine.ts) both say, so the two always count alike: every red tile,
  * final ones included, in uploadNotice's nouns. While any can go again it is
- * "2 photos didn't upload" with a Retry for those; when every red tile is
+ * "2 photos didn't upload" with a Retry for those, and on the tray's own line
+ * the reason after it when every red tile shares one of LINE_REASONS ("5
+ * photos didn't upload: refused by storage"); when every red tile is
  * final, closedJobLine; otherwise uploadNotice's line with its reason when
  * they share one ("1 photo didn't upload: over the 25 MB photo limit"). Null
  * when nothing is red. The toast passes `where`, the target's label, since it
@@ -205,7 +242,12 @@ export function redTilesLine(
   const place = where.trim();
   // The toast's news leads and the place trails in its lighter tone (`detail`), so the place is what a phone cuts.
   const placed = <T extends { text: string; retry: boolean }>(line: T): T & { detail?: string } => (place ? { ...line, detail: place } : line);
-  if (red.some((u) => u.status === "failed")) return placed({ text: uploadNotice(failures, { reason: false }), retry: true });
+  if (red.some((u) => u.status === "failed")) {
+    // The tray's line gives the reason too, when every red tile shares one that reads well beside Retry: without it the
+    // line said only the count. The away toast keeps the count alone, so its place still fits a phone (TOAST_PHONE_CHARS).
+    const shared = !place && failures.every((f) => f.reason === failures[0].reason) && LINE_REASONS.includes(failures[0].reason);
+    return placed({ text: uploadNotice(failures, { reason: shared }), retry: true });
+  }
   // Every red tile final: the toast says "not added" (the tray under the tiles keeps the reason: closed, or too late).
   if (place && closedJobLine(red)) return placed({ text: `${failedCount(red)} not added`, retry: false });
   return placed({ text: closedJobLine(red) || uploadNotice(failures), retry: false });

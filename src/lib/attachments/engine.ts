@@ -3,7 +3,7 @@ import type { MediaUpload, RecordMediaInput, RecordMediaResult } from "@/compone
 import type { UploadCounts, UploadTarget } from "@/components/upload-queue";
 import { usesMultipart, type FileKind } from "./content-types";
 import { EMPTY_UPLOAD } from "./limits";
-import { checkMediaFile, redTilesLine, storedNames, uploadFailureReason, withExtension } from "./media";
+import { checkMediaFile, isStorageRefusal, redTilesLine, storedNames, uploadFailureReason, withExtension } from "./media";
 import {
   STALL_MS,
   FinalRefusalError,
@@ -156,6 +156,11 @@ export type EngineDeps = {
    * removed it, so no retry fetches it. Without it that notice isn't shown.
    */
   reload?: () => void;
+  /**
+   * Hands an upload Blob itself refused (media.ts isStorageRefusal) to the error reports. The tile says only
+   * "refused by storage", and the refusal never reaches the server's logs, so this is where its own words go.
+   */
+  report?: (error: Error) => void;
 };
 
 /** The tiles of a target with none: one shared array, so a server snapshot and an idle client one are the same. */
@@ -801,6 +806,10 @@ export class UploadEngine {
             : "offline"
           : classifyFailure(err, online);
     const reason = ownWords ? err.message : failure === "refused" ? uploadFailureReason(err) : "no connection";
+    if (!ownWords && failure === "refused" && isStorageRefusal(err)) {
+      // Blob's own words, and where the file was going, for whoever reads the report: the tile can't say more.
+      this.deps.report?.(new Error(`Upload refused by Blob (${job.spec.uploadKind}, ${job.spec.access}): ${(err as Error).message}`, { cause: err }));
+    }
     const next = afterFailure({ tries: job.tries, waits: job.waits }, failure);
     const codeMissing = err instanceof UploadCodeMissingError;
     if (codeMissing) this.noticeCodeMissing();

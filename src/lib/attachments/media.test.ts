@@ -1,11 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BlobServiceNotAvailable } from "@vercel/blob";
+import {
+  BlobAccessError,
+  BlobClientTokenExpiredError,
+  BlobError,
+  BlobServiceNotAvailable,
+  BlobServiceRateLimited,
+  BlobStoreNotFoundError,
+  BlobStoreSuspendedError,
+  BlobUnknownError,
+} from "@vercel/blob";
 import { JOB_CLOSED, TOO_LATE } from "./access";
 import { MAX_FILENAME, contentTypeForName, fileKindForType, fitFilename } from "./content-types";
 import {
   BROWSER_STOPPED,
   MEDIA_ACCEPT,
+  STORAGE_REFUSED,
   byline,
   bylineName,
   bylineStamp,
@@ -16,6 +26,7 @@ import {
   downloadUrl,
   fmtDuration,
   isGenericCameraName,
+  isStorageRefusal,
   pickerAccept,
   propertyFileUrl,
   redTilesLine,
@@ -226,7 +237,8 @@ test("redTilesLine: the tray's line and the away toast count every red tile alik
   assert.equal(redTilesLine([tile("a.jpg", "uploading"), tile("b.jpg", "waiting")]), null);
   // Any that can go again: the count of every red tile, and a Retry.
   assert.deepEqual(redTilesLine([flaky, closed]), { text: "2 photos didn't upload", retry: true });
-  assert.deepEqual(redTilesLine([flaky]), { text: "1 photo didn't upload", retry: true });
+  // One shared reason that reads well beside Retry goes on the line too.
+  assert.deepEqual(redTilesLine([flaky]), { text: "1 photo didn't upload: no connection", retry: true });
   // Only final ones: the job's own line, no Retry.
   assert.deepEqual(redTilesLine([closed, { ...closed, name: "b.jpg" }]), { text: "Job closed before 2 photos uploaded", retry: false });
   assert.deepEqual(redTilesLine([tooLate]), { text: "Too late to add 1 photo", retry: false });
@@ -235,9 +247,54 @@ test("redTilesLine: the tray's line and the away toast count every red tile alik
   // Only the check's refusals keep their reason, as before.
   assert.deepEqual(redTilesLine([big]), { text: "1 photo didn't upload: over the 25 MB photo limit", retry: false });
   // A mix of kinds is files, as uploadNotice words it.
-  assert.deepEqual(redTilesLine([flaky, tile("v.mov", "failed", { error: "no connection", kind: "video" })]), { text: "2 files didn't upload", retry: true });
+  assert.deepEqual(redTilesLine([flaky, tile("v.mov", "failed", { error: "no connection", kind: "video" })]), {
+    text: "2 files didn't upload: no connection",
+    retry: true,
+  });
   // A red tile with no words still counts.
   assert.deepEqual(redTilesLine([tile("a.jpg", "failed")]), { text: "1 photo didn't upload", retry: true });
+});
+
+test("redTilesLine: storage's refusal shows beside Retry; other reasons stay on the tiles", () => {
+  const failed = (name: string, error: string) => ({ name, kind: "image" as const, status: "failed", error });
+  const five = ["a", "b", "c", "d", "e"].map((n) => failed(`${n}.jpg`, STORAGE_REFUSED));
+  // What the listing dialog said on Nov 15, with its reason now.
+  assert.deepEqual(redTilesLine(five), { text: "5 photos didn't upload: refused by storage", retry: true });
+  // "Reload and try again" would argue with the Retry beside it, and a server's own sentence doesn't fit a line.
+  assert.deepEqual(redTilesLine([failed("a.jpg", "Failed to retrieve the client token")]), { text: "1 photo didn't upload", retry: true });
+  assert.deepEqual(redTilesLine([failed("a.jpg", "That upload didn't finish. Try again.")]), { text: "1 photo didn't upload", retry: true });
+  // Different reasons can't share the line.
+  assert.deepEqual(redTilesLine([failed("a.jpg", STORAGE_REFUSED), failed("b.jpg", "no connection")]), { text: "2 photos didn't upload", retry: true });
+  // Short enough to sit beside Retry on a phone, two-digit counts included.
+  const many = Array.from({ length: 20 }, (_, i) => failed(`${i}.jpg`, STORAGE_REFUSED));
+  assert.ok(redTilesLine(many)!.text.length <= 43, redTilesLine(many)!.text);
+  // The away toast keeps the count alone, so the place after it still fits a phone.
+  assert.deepEqual(redTilesLine(five, "647 Prospect Ave"), { text: "5 photos didn't upload", retry: true, detail: "647 Prospect Ave" });
+});
+
+test("uploadFailureReason: Blob's own refusals read refused by storage, and nothing else does", () => {
+  for (const e of [
+    new BlobAccessError(),
+    new BlobStoreSuspendedError(),
+    new BlobStoreNotFoundError(),
+    new BlobUnknownError(),
+    new BlobError("Cannot use public access on a private store."),
+  ]) {
+    assert.equal(uploadFailureReason(e), STORAGE_REFUSED, e.message);
+    assert.equal(isStorageRefusal(e), true, e.message);
+  }
+  // The road, the clock and our own token route keep their own words.
+  for (const e of [
+    new BlobServiceNotAvailable(),
+    new BlobClientTokenExpiredError(),
+    new BlobServiceRateLimited(5),
+    new Error("Vercel Blob: Failed to retrieve the client token"),
+    new TypeError("Failed to fetch"),
+    new Error("That upload didn't finish. Try again."),
+  ]) {
+    assert.equal(isStorageRefusal(e), false, e.message);
+    assert.notEqual(uploadFailureReason(e), STORAGE_REFUSED, e.message);
+  }
 });
 
 test("uploadFailureReason: a dropped connection reads no connection, single PUT or multipart", () => {
