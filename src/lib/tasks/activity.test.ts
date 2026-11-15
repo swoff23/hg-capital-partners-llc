@@ -54,7 +54,7 @@ test("system events read as one sentence, people by first name", () => {
   assert.equal(line(ev("STATUS", { from: "OPEN", to: "IN_PROGRESS" })), "Connor set status to In progress");
   assert.equal(line(ev("STATUS", { from: "OPEN", to: "WAITING", waitingOn: "city inspection" })), "Connor set status to Waiting on city inspection");
   assert.equal(line(ev("STATUS", { from: "OPEN", to: "SCHEDULED", scheduledFor: "2026-10-30" })), "Connor set status to Scheduled for Fri, Oct 30");
-  assert.equal(line(ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, ZACK)), "Zack marked this done");
+  assert.equal(line(ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, ZACK)), "Zack sent this for review");
   assert.equal(line(ev("STATUS", { from: "REVIEW", to: "DONE" })), "Connor approved this");
   assert.equal(line(ev("STATUS", { from: "REVIEW", to: "IN_PROGRESS" })), "Connor sent this back");
   assert.equal(line(ev("ASSIGNED", { to: { userId: null, contactId: "c-zack" } })), "Connor assigned Zack Reading");
@@ -383,7 +383,7 @@ test("a Done whose next repeat was made isn't hidden when it is reopened inside 
 test("an approval that was undone is gone from the timeline (its Done line is soft-deleted)", () => {
   const review = ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, { ...ZACK, visibility: "SHARED", createdAt: at(1) });
   const approved = ev("STATUS", { from: "REVIEW", to: "DONE" }, { visibility: "SHARED", createdAt: at(5), deletedAt: at(6) });
-  assert.deepEqual(texts(build([review, approved])), ["Zack marked this done"]);
+  assert.deepEqual(texts(build([review, approved])), ["Zack sent this for review"]);
 });
 
 /* ---------------- Decisions, batches and deleted comments ---------------- */
@@ -607,10 +607,10 @@ test("entryIsFresh looks inside decisions, batches and runs", () => {
 test("a partner moving a job to Review set a status; only the contractor marks it done", () => {
   const line = (e: ActivityEvent) => eventLine(e, names, TODAY).text;
   assert.equal(line(ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" })), "Connor set status to Review");
-  assert.equal(line(ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, ZACK)), "Zack marked this done");
+  assert.equal(line(ev("STATUS", { from: "IN_PROGRESS", to: "REVIEW" }, ZACK)), "Zack sent this for review");
   // The Review banner says the same words after the name.
   assert.equal(reviewMoveText(false), "set status to Review");
-  assert.equal(reviewMoveText(true), "marked this done");
+  assert.equal(reviewMoveText(true), "sent this for review");
 });
 
 test("linkedUpdateId: the update a link points at, and none for a hash that isn't percent-encoding", () => {

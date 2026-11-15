@@ -556,8 +556,9 @@ export function JobActions({
 
   // Bar buttons share the width on phones and tablets; on a wide screen they size to a column at the end.
   const barButton = actionBarButton;
-  // The Mark done sheet's pair: half each on a phone, sized to their labels at the dialog's end from md.
-  const sheetButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 md:flex-none";
+  // The Mark done sheet's pair: half each on a phone, sized to their labels at the dialog's end from md. Below 360px
+  // the padding tightens as the bar's does, so "Send for review" (117px) fits its half at 320 without truncating.
+  const sheetButton = "h-12 min-w-0 flex-1 whitespace-nowrap pointer-fine:h-9 max-[360px]:px-2 md:flex-none";
 
   // The camera, for an empty slot on touch: the rear camera straight away, photos only (uploads 2.8).
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -643,7 +644,7 @@ export function JobActions({
             ) : (
               // Off while anything is still going up or failed; the line under the bar says which.
               <Button className={cn(barButton, "max-[360px]:px-2")} disabled={pending > 0 || waiting > 0 || failed > 0} onClick={openMarkDone}>
-                Mark done
+                <span className="truncate">Send for review</span>
               </Button>
             )
           }
@@ -666,7 +667,7 @@ export function JobActions({
           setSheetOpen(open);
         }}
         isDismissable={!finishing}
-        title={sheetState === "sent" ? "Sent for review" : "Mark done"}
+        title={sheetState === "sent" ? "Sent for review" : "Send for review"}
         hideTitle={sheetState === "sent"}
         className="md:w-[28rem]"
         // Pinned under the photos and the note, so on a short phone the primary and why it's off stay in view.

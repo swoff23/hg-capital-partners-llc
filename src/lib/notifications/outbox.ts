@@ -222,7 +222,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         },
       },
       recipientUser: { select: { email: true } },
-      recipientContact: { select: { active: true, fullName: true, portalAccount: { select: { email: true, status: true, jobEmails: true } } } },
+      recipientContact: { select: { active: true, portalAccount: { select: { email: true, status: true, jobEmails: true } } } },
     },
   });
   if (rows.length === 0) return result;
@@ -335,7 +335,6 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       checklist: task.checklist,
       photoUrl: task.property?.photoUrl ?? null,
       contractorName: task.assigneeContact?.fullName ?? null,
-      recipientName: row.recipientContact?.fullName,
       staffNames: staffNames ?? [],
       replyByEmail: !!replyToken,
     });
