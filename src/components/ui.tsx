@@ -628,6 +628,7 @@ export function FormField({
   id: idProp,
   hideLabel = false,
   reserveLine = false,
+  fitLine = false,
   className,
   children,
 }: {
@@ -654,6 +655,13 @@ export function FormField({
    * field) never moves what sits below it between a press and its release.
    */
   reserveLine?: boolean;
+  /**
+   * The line takes the field's width and adds nothing to a sheet that sizes to
+   * its content, for a line that appears between a press and its release (the
+   * address field's Saves as and archived lines), so it can't widen the sheet
+   * and move Create. Other lines still widen a content-sized sheet to show whole.
+   */
+  fitLine?: boolean;
   className?: string;
   children: (control: FormFieldControlProps) => React.ReactNode;
 }) {
@@ -675,8 +683,7 @@ export function FormField({
         ...(required ? { "aria-required": true as const } : {}),
       })}
       {line && (
-        // w-0 min-w-full: the line takes the field's width and adds nothing to a sheet that sizes to its content, so a long Saves as line can't widen the sheet and move Create.
-        <p id={lineId} className={cn("w-0 min-w-full truncate text-meta", invalid ? "text-danger" : "text-fg-3")}>
+        <p id={lineId} className={cn(fitLine && "w-0 min-w-full", "truncate text-meta", invalid ? "text-danger" : "text-fg-3")}>
           {line}
         </p>
       )}

@@ -171,6 +171,8 @@ export function UnitsSection({
   // Tapped and its code is still on the way: that row (or Add unit) takes the fill a tapped list row takes. Read from
   // the shared store, not the hook, which only notices code that came in while idle one render after the tap.
   const waitingFor = sheet !== null && !editor && unitSheet.loaded() === null ? sheet : null;
+  // The same for an equipment row, whose sheet comes in the same chunk.
+  const waitingItem = item !== null && !editor && unitSheet.loaded() === null ? item : null;
   const itemAt = item ? sheetUnitAt(initial, { unitId: item.unitId, at: item.at, label: item.label }) : -1;
   const itemUnit = itemAt >= 0 ? initial[itemAt] : undefined;
 
@@ -187,6 +189,7 @@ export function UnitsSection({
               name={unitName(u, i)}
               rules={rules}
               waiting={waitingFor !== null && waitingFor.at === i}
+              waitingItem={waitingItem !== null && waitingItem.at === i ? waitingItem.index : null}
               onEdit={() => openUnit(i)}
               onEditEquipment={(j) => openEquipment(i, j)}
               onDelete={() => askDelete(i)}
@@ -209,6 +212,7 @@ export function UnitsSection({
                 name={unitName(u, i)}
                 rules={rules}
                 waiting={waitingFor !== null && waitingFor.at === i}
+                waitingItem={waitingItem !== null && waitingItem.at === i ? waitingItem.index : null}
                 onEdit={() => openUnit(i)}
                 onEditEquipment={(j) => openEquipment(i, j)}
                 onDelete={() => askDelete(i)}
@@ -316,6 +320,7 @@ function ReadUnit({
   name,
   rules,
   waiting,
+  waitingItem,
   onEdit,
   onEditEquipment,
   onDelete,
@@ -325,6 +330,8 @@ function ReadUnit({
   rules: CapexRules;
   /** Its sheet was tapped and the code is still arriving: the name takes `sheetWaitingFill`. */
   waiting: boolean;
+  /** The equipment row whose sheet was tapped while the code is still arriving, by its place; it takes `sheetWaitingFill`. */
+  waitingItem: number | null;
   onEdit: () => void;
   /** Opens one equipment item, by its place in the unit's list. */
   onEditEquipment: (index: number) => void;
@@ -431,7 +438,8 @@ function ReadUnit({
                     key={j}
                     onClick={() => onEditEquipment(j)}
                     onPointerEnter={unitSheet.warm}
-                    className="transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-fill-1"
+                    aria-busy={j === waitingItem || undefined}
+                    className={cn("transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-fill-1", j === waitingItem && sheetWaitingFill)}
                   >
                     <Td className="pl-0 text-fg-2">
                       <button type="button" aria-label={`Edit ${e.type || `equipment ${j + 1}`}`} onFocus={unitSheet.warm} className="text-left">

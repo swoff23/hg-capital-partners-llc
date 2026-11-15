@@ -254,6 +254,7 @@ export function AddressCombobox({
       helper={matchLine || linkLine || (tidy ? `Saves as ${tidy}` : null) || helper}
       error={error}
       reserveLine={reserveLine}
+      fitLine
       className={className}
     >
       {(control) => (

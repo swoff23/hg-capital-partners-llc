@@ -56,6 +56,16 @@ test("a tapped unit or listing row takes the fill while its sheet's code downloa
   assert.doesNotMatch(read("../../components/lightbox-lazy.tsx"), /sheetWaitingFill/);
 });
 
+test("a tapped unit equipment row takes the fill too while the unit sheet's code downloads", () => {
+  const src = read(`${PAGE}edit-units.tsx`);
+  // Its sheet comes in the same chunk as the unit's, so it reads the same store.
+  assert.match(src, /const waitingItem = item !== null && !editor && unitSheet\.loaded\(\) === null \? item : null;/);
+  // Both lists hand each unit the waiting item's place when it is theirs.
+  assert.equal(src.match(/waitingItem=\{waitingItem !== null && waitingItem\.at === i \? waitingItem\.index : null\}/g)?.length, 2);
+  // The tapped row, not the unit's name, says it's working.
+  assert.match(src, /<tr\s+key=\{j\}\s+onClick=\{\(\) => onEditEquipment\(j\)\}\s+onPointerEnter=\{unitSheet\.warm\}\s+aria-busy=\{j === waitingItem \|\| undefined\}\s+className=\{cn\("transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-fill-1", j === waitingItem && sheetWaitingFill\)\}/);
+});
+
 test("the move-in switch reads Shown and Hidden and keeps its label; Escrow keeps Yes and No", () => {
   const fact = read(`${PAGE}property-fact.tsx`);
   assert.match(fact, /<RailFact label="Move-in form">/);
