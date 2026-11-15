@@ -22,7 +22,7 @@ function monthIdx(token: string): number | null {
 }
 
 /** Parse a "Latest Updates" blob (assumed newest-first) into dated notes. */
-function parseTimeline(blob: string): { notes: { date: Date | null; body: string }[]; dated: number } {
+export function parseTimeline(blob: string): { notes: { date: Date | null; body: string }[]; dated: number } {
   const rawLines = blob.split(/\n+/).map((l) => l.trim()).filter(Boolean);
   const notes: { date: Date | null; body: string }[] = [];
   let year = new Date().getFullYear();
@@ -67,7 +67,7 @@ function parseTimeline(blob: string): { notes: { date: Date | null; body: string
 // The app's list (src/lib/config.ts) is the only list; anything else -> the default.
 const KNOWN_STATUSES = new Set<string>(DEAL_STATUSES);
 
-function toStatus(statusCol: string | null, priorityCol: string | null): string {
+export function toStatus(statusCol: string | null, priorityCol: string | null): string {
   // An explicit "Pass" in the Status column is definitive.
   if ((statusCol ?? "").trim().toLowerCase() === "pass") return "Pass";
   const p = (priorityCol ?? "").trim();
