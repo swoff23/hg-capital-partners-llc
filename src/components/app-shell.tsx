@@ -8,7 +8,7 @@ import { LOADING_SCREEN_SELECTOR } from "@/lib/loading-screen";
 import { focusHeadingAfter, isSheetPath } from "@/lib/sheet-routes";
 import { SIDEBAR_COOKIE, railState } from "@/lib/sidebar";
 import type { ListHrefs } from "@/lib/list-memory";
-import { AccountMenu, AppearanceRow } from "@/components/account-menu";
+import { AccountMenu } from "@/components/account-menu";
 import { CommandPalette } from "@/components/command-palette";
 import { LeaveLink } from "@/components/leave-link";
 import { ListMemoryProvider } from "@/components/list-memory";
@@ -191,10 +191,6 @@ export function AppShell({
         <div className="min-w-0 max-w-md flex-1">
           <CommandPalette suspended={mobileOpen} onBeforeOpen={closeDrawer} />
         </div>
-        {/* The account menu: from lg, where it carries the Theme; below, the drawer has Appearance and the account row. */}
-        <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
-          <AccountMenu name={userName} email={userEmail} signOutAction={signOutAction} />
-        </div>
       </header>
 
       {mobileOpen && (
@@ -255,9 +251,9 @@ export function AppShell({
 
         <SideNav collapsed={!expanded && !mobileOpen} onNavigate={() => setMobileOpen(false)} />
 
+        {/* The account menu, with the Theme and Sign out, at every size. */}
         <div className="mt-auto border-t border-border pt-2">
-          <AppearanceRow className="lg:hidden" />
-          <AccountMenu variant="sidebar" name={userName} email={userEmail} signOutAction={signOutAction} />
+          <AccountMenu name={userName} email={userEmail} signOutAction={signOutAction} />
         </div>
       </aside>
 
