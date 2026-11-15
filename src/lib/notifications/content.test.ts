@@ -8,6 +8,7 @@ import {
   jobSubject,
   jobWhere,
   liveReminders,
+  notesFingerprint,
   offItems,
   previewText,
   whatsNew,
@@ -26,6 +27,7 @@ import {
   sendBudget,
   sendFailureKind,
   taskEmail,
+  undoneDropped,
   type EventSnapshot,
   type OutboxItem,
 } from "./content";
@@ -801,4 +803,49 @@ test("photos: none on a closed job's contractor email, and up to six of HG's in 
 test("an assignment handed over twice in one bundle reads once", () => {
   const assigned = item("ASSIGNED", `assigned you "${TITLE}"`);
   assert.deepEqual(itemLines([assigned, item("COMMENT", '"Doors"'), assigned], TITLE), ['Connor: "Doors"', "Connor assigned you this job"]);
+});
+
+test("a change put back before the email goes says nothing (Connor, Nov 15)", () => {
+  const now = { due: "2026-10-30", notes: "Paint is in the basement.", status: "IN_PROGRESS" as const };
+  const moved = (to: string, from: string): OutboxItem => ({ ...item("TARGET", `moved "${TITLE}" to ${to}`), visit: false, from });
+  const comment = item("COMMENT", '"Doors"');
+  // Moved and moved back: the date lines go, anything else in the bundle stays.
+  assert.deepEqual(undoneDropped([moved("Mon, Nov 2", "2026-10-30"), comment, moved("Fri, Oct 30", "2026-11-02")], now), [comment]);
+  // Moved twice to somewhere new: kept (the email says only the latest).
+  const twice = [moved("Mon, Nov 2", "2026-10-30"), moved("Tue, Nov 3", "2026-11-02")];
+  assert.deepEqual(undoneDropped(twice, { ...now, due: "2026-11-03" }), twice);
+  // A date set on a job that had none, then cleared again.
+  assert.deepEqual(undoneDropped([moved("Mon, Nov 2", ""), moved("no date", "2026-11-02")], { ...now, due: null }), []);
+
+  // Notes edited and put back (trimmed, as they're stored), or edited to something new.
+  const notes = (was: string): OutboxItem => ({ ...item("NOTES", `updated the notes on "${TITLE}"`), from: notesFingerprint(was) });
+  assert.deepEqual(undoneDropped([notes("Paint is in the basement."), notes("Paint is in the garage.")], now), []);
+  assert.deepEqual(undoneDropped([notes("Paint is in the basement.")], { ...now, notes: "  Paint is in the basement.\n" }), []);
+  assert.deepEqual(undoneDropped([notes("Paint is in the basement.")], { ...now, notes: "Paint is in the garage." }), [notes("Paint is in the basement.")]);
+
+  // A status changed and changed back: both lines go.
+  const waiting: OutboxItem = { ...item("STATUS", `set "${TITLE}" to waiting`), eventId: "s1", from: "IN_PROGRESS" };
+  const back: OutboxItem = { ...item("STATUS", `set "${TITLE}" to in progress`), eventId: "s2", from: "WAITING" };
+  assert.deepEqual(undoneDropped([waiting, comment, back], now), [comment]);
+  // Sent back, then moved to Review again: the send-back and its note go.
+  const sentBack: OutboxItem = { ...item("STATUS", `sent "${TITLE}" back: Drip under the sink`), eventId: "s4", noteEventId: "n4", from: "REVIEW" };
+  const toReview: OutboxItem = { ...item("STATUS", `set "${TITLE}" to review`), eventId: "s5", from: "IN_PROGRESS" };
+  assert.deepEqual(undoneDropped([sentBack, toReview], { ...now, status: "REVIEW" }), []);
+  // Changed, changed back, then on to somewhere new: every line stays, as before.
+  const done: OutboxItem = { ...item("STATUS", `set "${TITLE}" to done`), eventId: "s3", from: "IN_PROGRESS" };
+  assert.deepEqual(undoneDropped([waiting, back, done], { ...now, status: "DONE" }), [waiting, back, done]);
+
+  // Each kind on its own: a date put back doesn't take a real status change with it.
+  assert.deepEqual(undoneDropped([moved("Mon, Nov 2", "2026-10-30"), waiting, moved("Fri, Oct 30", "2026-11-02")], { ...now, status: "WAITING" }), [waiting]);
+  // Lines queued before Nov 15 carry no `from` and send as before.
+  const old = item("TARGET", `moved "${TITLE}" to Fri, Oct 30`);
+  assert.deepEqual(undoneDropped([old], now), [old]);
+});
+
+test("notes fingerprint: the same notes print the same, trimmed as stored, and none prints empty", () => {
+  assert.equal(notesFingerprint("Paint is in the basement."), notesFingerprint("  Paint is in the basement. "));
+  assert.notEqual(notesFingerprint("Paint is in the basement."), notesFingerprint("Paint is in the basement!"));
+  assert.match(notesFingerprint("Lockbox 4321"), /^[0-9a-z]{1,11}$/);
+  assert.equal(notesFingerprint(null), "");
+  assert.equal(notesFingerprint("   "), "");
 });
