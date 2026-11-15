@@ -253,7 +253,8 @@ test("the link runs when a deal moves to Closed and when a property is added, an
 });
 
 test("both pages print the short address, so each line holds one line on a phone", () => {
-  const dealPage = read("../../app/(app)/deals/[id]/page.tsx");
+  // The deal has no page: its sheet prints the line (deal-record.tsx).
+  const dealPage = read("../../app/(app)/deals/[id]/deal-record.tsx");
   assert.match(dealPage, /Converted to\{" "\}\s*<TextLink href=\{`\/properties\/\$\{deal\.convertedProperty\.id\}`\}>\{shortAddress\(deal\.convertedProperty\.address\) \|\| deal\.convertedProperty\.address\}<\/TextLink>/);
   const propertyPage = read("../../app/(app)/properties/[id]/page.tsx");
   assert.match(propertyPage, /From deal <TextLink href=\{`\/deals\/\$\{sourceDeal\.id\}`\}>\{shortAddress\(sourceDeal\.address\) \|\| sourceDeal\.address\}<\/TextLink>/);

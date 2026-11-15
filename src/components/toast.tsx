@@ -98,9 +98,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext value={{ toast, dismiss, setInset }}>
       {children}
+      {/* A top layer to React Aria: a press on a toast's Undo isn't a press outside an open sheet (which would close
+          it first), focus can move to it from inside one, and the sheet's aria-hiding leaves it readable. */}
       <div
         role="status"
         aria-live="polite"
+        data-react-aria-top-layer="true"
         className="pointer-events-none fixed inset-x-4 z-[70] flex flex-col items-stretch gap-2 sm:right-auto sm:w-max sm:max-w-sm"
         style={{ bottom: `calc(1rem + env(safe-area-inset-bottom) + ${inset}px)` }}
       >

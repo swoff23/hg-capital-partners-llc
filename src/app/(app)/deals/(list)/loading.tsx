@@ -31,6 +31,15 @@ const dense = "min-h-10 pointer-coarse:min-h-12";
 export default function DealsLoading() {
   return (
     <LoadingScreen>
+      <DealsListSkeleton />
+    </LoadingScreen>
+  );
+}
+
+/** The list's skeleton inside the loading screen; a deal's own URL loads the list too (deals/[id]/loading.tsx). */
+export function DealsListSkeleton() {
+  return (
+    <>
       <PageHeader
         title="Deals"
         actions={
@@ -76,7 +85,7 @@ export default function DealsLoading() {
           </Table>
         </ColumnWidthsProvider>
       </div>
-    </LoadingScreen>
+    </>
   );
 }
 

@@ -97,7 +97,9 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
         });
         if (more) return;
         if (variant === "sheet") router.back();
-        else router.replace(`/deals/${deal.id}`);
+        // A full load: a client navigation from here would open the deal's sheet over this spent form, and its
+        // close (Back) would leave the app, since /deals/new was a pasted link or a reload.
+        else window.location.replace(`/deals/${deal.id}`);
       }}
     >
       {({ errors, clear }) => (
