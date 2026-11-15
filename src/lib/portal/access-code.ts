@@ -4,7 +4,8 @@ import type { PrismaClient } from "@prisma/client";
  * The lockbox code a contractor sees on their job (docs/asana-migration-plan.md
  * D21). Codes live in Property.units, beside utility accounts and equipment,
  * so this is the one portal file that reads that column
- * (src/lib/auth-guard.test.ts), and it hands back one string, never the list.
+ * (src/lib/auth-guard.test.ts), and it hands back one unit's lockbox (its
+ * code, location and photo, docs/specs/lockbox-location.md), never the list.
  *
  * Which code:
  *  - the job names a unit: that unit's code, or none when the unit has none;
@@ -26,25 +27,67 @@ import type { PrismaClient } from "@prisma/client";
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
-/** The code for this job from the property's units JSON, or null. */
-export function pickLockboxCode(units: unknown, unitLabel: string | null | undefined): string | null {
-  const list = Array.isArray(units) ? units.filter((u): u is Record<string, unknown> => !!u && typeof u === "object") : [];
+/** A lockbox photo's two files, as the files route serves them; never handed to the browser. */
+export type LockboxPhotoFiles = { pathname: string; thumbPathname: string | null };
+
+/**
+ * Everything the job's Lockbox section shows (docs/specs/lockbox-location.md):
+ * the code, where the box is, and its photo. The location and photo ride with
+ * the code: with no code there is nothing, whatever else is on file.
+ */
+export type LockboxAccess = { code: string; location: string | null; photo: LockboxPhotoFiles | null };
+
+const unitList = (units: unknown) =>
+  Array.isArray(units) ? units.filter((u): u is Record<string, unknown> => !!u && typeof u === "object") : [];
+
+function photoOf(u: Record<string, unknown> | undefined): LockboxPhotoFiles | null {
+  const p = u?.lockboxPhoto;
+  if (!p || typeof p !== "object") return null;
+  const { pathname, thumbPathname } = p as Record<string, unknown>;
+  return typeof pathname === "string" && pathname ? { pathname, thumbPathname: typeof thumbPathname === "string" && thumbPathname ? thumbPathname : null } : null;
+}
+
+/**
+ * The lockbox for this job from the property's units JSON, or null. One
+ * unit's, never the list. With no unit and one code across the property, the
+ * location and photo come from the units carrying it ("Same lockbox for all
+ * units" keeps them in agreement); otherwise the first unit, in list order,
+ * that has one.
+ */
+export function pickLockboxAccess(units: unknown, unitLabel: string | null | undefined): LockboxAccess | null {
+  const list = unitList(units);
   const wanted = clean(unitLabel).toLowerCase();
   if (wanted) {
     const unit = list.find((u) => clean(u.label).toLowerCase() === wanted);
-    return clean(unit?.lockboxCode) || null;
+    const code = clean(unit?.lockboxCode);
+    return code ? { code, location: clean(unit?.lockboxLocation) || null, photo: photoOf(unit) } : null;
   }
   const codes = new Set(list.map((u) => clean(u.lockboxCode)).filter(Boolean));
-  return codes.size === 1 ? [...codes][0] : null;
+  if (codes.size !== 1) return null;
+  const [code] = [...codes];
+  const carrying = list.filter((u) => clean(u.lockboxCode) === code);
+  const location = carrying.map((u) => clean(u.lockboxLocation)).find(Boolean) || null;
+  const photo = carrying.map(photoOf).find((p) => p !== null) ?? null;
+  return { code, location, photo };
+}
+
+/** The code for this job from the property's units JSON, or null. */
+export function pickLockboxCode(units: unknown, unitLabel: string | null | undefined): string | null {
+  return pickLockboxAccess(units, unitLabel)?.code ?? null;
 }
 
 type PropertyReader = Pick<PrismaClient, "property">;
 
-/** Reads the property's units and returns the one code for this job, or null. */
-export async function readLockboxCode(db: PropertyReader, propertyId: string | null, unitLabel: string | null): Promise<string | null> {
+/** Reads the property's units and returns this job's lockbox, or null. */
+export async function readLockboxAccess(db: PropertyReader, propertyId: string | null, unitLabel: string | null): Promise<LockboxAccess | null> {
   if (!propertyId) return null;
   const row = await db.property.findUnique({ where: { id: propertyId }, select: { units: true } });
-  return row ? pickLockboxCode(row.units, unitLabel) : null;
+  return row ? pickLockboxAccess(row.units, unitLabel) : null;
+}
+
+/** Reads the property's units and returns the one code for this job, or null. */
+export async function readLockboxCode(db: PropertyReader, propertyId: string | null, unitLabel: string | null): Promise<string | null> {
+  return (await readLockboxAccess(db, propertyId, unitLabel))?.code ?? null;
 }
 
 // ---------------------------------------------------------------------------

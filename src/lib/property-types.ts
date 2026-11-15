@@ -18,6 +18,19 @@ export type UnitEquipment = {
   comment?: string | null;
 };
 
+/**
+ * A unit's lockbox photo (docs/specs/lockbox-location.md): private Blob under
+ * properties/<id>/lockbox/, a 2560px JPEG with no metadata, and the ~1024px
+ * thumbnail made beside it. Served only through /api/files, which checks who
+ * asks (property-lockbox for staff, lockbox for the job's contractor).
+ */
+export type LockboxPhoto = {
+  pathname: string;
+  thumbPathname?: string | null;
+  width?: number | null;
+  height?: number | null;
+};
+
 export type PropertyUnit = {
   /**
    * Stable for the unit's life (G2C-001): written once by the units save
@@ -27,9 +40,21 @@ export type PropertyUnit = {
   id?: string | null;
   label?: string | null;
   lockboxCode?: string | null;
+  /** Where the box is, as typed: "Back entrance", "On the gate". One line, LOCKBOX_LOCATION_MAX at most. */
+  lockboxLocation?: string | null;
+  lockboxPhoto?: LockboxPhoto | null;
+  /**
+   * "Same lockbox for all units" is on: every rentable unit of the property
+   * carries it, with the same code, location and photo (applySharedLockbox).
+   * Absent when off. House-meter rows never carry it.
+   */
+  lockboxShared?: boolean;
   utilities?: UnitUtilities;
   equipment?: UnitEquipment[];
 };
+
+/** The longest a lockbox location runs: one line in the sheet, the Units list and the job page. */
+export const LOCKBOX_LOCATION_MAX = 80;
 
 /** A clean year value ("2016", "~2004") stays in the Year field; anything else is a comment. */
 const YEAR_ONLY = /^~?\s*(19|20)\d{2}\s*$/;
@@ -85,6 +110,73 @@ export function rentableUnitLabels(units: unknown): string[] {
     .map((u) => u.label?.trim() ?? "")
     .filter(Boolean);
   return [...new Set(labels)];
+}
+
+/* ---------------- Lockbox (docs/specs/lockbox-location.md) ---------------- */
+
+/**
+ * A lockbox value typed before the location had its own field, split into
+ * the code and where the box is: "4857 (back left corner of the house)" is
+ * the code 4857 at "Back left corner of the house". A value with no
+ * trailing parentheses is all code. The migration and the property import
+ * share it, so a re-import can't put the parentheses back.
+ */
+export function splitLockboxValue(value: string | null | undefined): { code: string | null; location: string | null } {
+  const v = (value ?? "").trim();
+  const m = /^(.*?)\s*\((.+)\)\s*$/.exec(v);
+  if (!m || !m[1].trim()) return { code: v || null, location: null };
+  const words = m[2].trim();
+  return { code: m[1].trim(), location: words ? words[0].toUpperCase() + words.slice(1) : null };
+}
+
+/** "Same lockbox for all units" is on for this property: a rentable unit carries it. */
+export function lockboxIsShared(units: readonly PropertyUnit[]): boolean {
+  return units.some((u) => u.lockboxShared === true && !isHouseMeterRow(u));
+}
+
+/**
+ * The units list once the unit at `at` is saved, by its "Same lockbox for
+ * all units" (decision 4b). On: every other rentable unit takes its code,
+ * location and photo, and all of them carry the flag. Newly off: the flag
+ * leaves every unit and each keeps its own values. House-meter rows are
+ * never shared. Pure; see property-types.test.ts.
+ */
+/** The unit without "Same lockbox for all units". */
+function unshared(u: PropertyUnit): PropertyUnit {
+  const rest = { ...u };
+  delete rest.lockboxShared;
+  return rest;
+}
+
+export function applySharedLockbox(units: readonly PropertyUnit[], at: number): PropertyUnit[] {
+  const saved = units[at];
+  if (!saved) return [...units];
+  const on = saved.lockboxShared === true && !isHouseMeterRow(saved);
+  if (on) {
+    return units.map((u, i) => {
+      if (isHouseMeterRow(u)) return unshared(u);
+      if (i === at) return u;
+      return {
+        ...u,
+        lockboxCode: saved.lockboxCode ?? null,
+        lockboxLocation: saved.lockboxLocation ?? null,
+        lockboxPhoto: saved.lockboxPhoto ?? null,
+        lockboxShared: true,
+      };
+    });
+  }
+  if (!units.some((u) => u.lockboxShared)) return [...units];
+  return units.map((u) => ("lockboxShared" in u ? unshared(u) : u));
+}
+
+/** Every blob a units list's lockbox photos point at, originals and thumbnails, each once. */
+export function lockboxPhotoPaths(units: readonly PropertyUnit[]): Set<string> {
+  const paths = new Set<string>();
+  for (const u of units) {
+    if (u.lockboxPhoto?.pathname) paths.add(u.lockboxPhoto.pathname);
+    if (u.lockboxPhoto?.thumbPathname) paths.add(u.lockboxPhoto.thumbPathname);
+  }
+  return paths;
 }
 
 /* ---------------- Unit ids and renames (G2C-001) ---------------- */

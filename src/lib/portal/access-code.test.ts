@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CODE_MASK, lockboxMasker, maskCodes, pickLockboxCode, readLockboxCode } from "./access-code";
+import { CODE_MASK, lockboxMasker, maskCodes, pickLockboxCode, readLockboxCode, pickLockboxAccess } from "./access-code";
 
 const duplex = [
   { label: "Lower", lockboxCode: "1924 (back entrance)" },
@@ -120,4 +120,38 @@ test("lockboxMasker reads one column of one property, once", async () => {
   mask("a");
   mask("b");
   assert.deepEqual(calls, [{ where: { id: "p1" }, select: { units: true } }]);
+});
+
+/* ---------------- Location and photo (docs/specs/lockbox-location.md) ---------------- */
+
+const gate = { pathname: "properties/p1/lockbox/gate.jpg", thumbPathname: "properties/p1/lockbox/thumb/gate.jpg" };
+
+test("pickLockboxAccess: the job's unit brings its location and photo with its code", () => {
+  const units = [
+    { label: "Lower", lockboxCode: "1924", lockboxLocation: "Back entrance", lockboxPhoto: { ...gate, width: 10, height: 10 } },
+    { label: "Attic", lockboxCode: "4857", lockboxLocation: "Back left corner of the house" },
+  ];
+  assert.deepEqual(pickLockboxAccess(units, "lower"), { code: "1924", location: "Back entrance", photo: gate });
+  assert.deepEqual(pickLockboxAccess(units, "Attic"), { code: "4857", location: "Back left corner of the house", photo: null });
+});
+
+test("pickLockboxAccess: no code, no lockbox, whatever else is on file", () => {
+  const units = [{ label: "Unit 2", lockboxCode: "", lockboxLocation: "Side door", lockboxPhoto: gate }];
+  assert.equal(pickLockboxAccess(units, "Unit 2"), null);
+  assert.equal(pickLockboxAccess(units, null), null);
+});
+
+test("pickLockboxAccess: no unit and one shared code takes the first location and photo on file", () => {
+  const units = [
+    { label: "Lower", lockboxCode: "6385" },
+    { label: "Upper", lockboxCode: "6385", lockboxLocation: "On the gate", lockboxPhoto: gate },
+    { label: "HSE (house)" },
+  ];
+  assert.deepEqual(pickLockboxAccess(units, null), { code: "6385", location: "On the gate", photo: gate });
+  assert.equal(pickLockboxAccess([...units, { label: "Attic", lockboxCode: "4857" }], null), null);
+});
+
+test("pickLockboxAccess: a photo without a usable pathname is none", () => {
+  const units = [{ label: "Lower", lockboxCode: "1924", lockboxPhoto: { pathname: "" } }];
+  assert.deepEqual(pickLockboxAccess(units, "Lower"), { code: "1924", location: null, photo: null });
 });

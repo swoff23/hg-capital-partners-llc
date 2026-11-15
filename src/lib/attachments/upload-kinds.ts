@@ -14,6 +14,7 @@ import type { FileKind } from "./content-types";
  *   property-upload        staff, a property's documents    { propertyId, fileKind }
  *   listing-photo-upload   staff, a listing's public photos { propertyId }
  *   property-photo-upload  staff, the building's photo      { propertyId }
+ *   lockbox-photo-upload   staff, a unit's lockbox photo    { propertyId }
  *   portal-contact-upload  a contractor, their W-9 or insurance { contactId, docKind, fileKind }
  *   contact-upload         staff, a contractor's W-9 or insurance { contactId, docKind, fileKind }
  *   lease-upload           staff, a lease's signed term     { leaseId, termId, fileKind }
@@ -28,6 +29,7 @@ export const UPLOAD_KINDS = [
   "property-upload",
   "listing-photo-upload",
   "property-photo-upload",
+  "lockbox-photo-upload",
   "portal-contact-upload",
   "contact-upload",
   "lease-upload",
@@ -42,18 +44,20 @@ export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "c
   "property-upload": "propertyId",
   "listing-photo-upload": "propertyId",
   "property-photo-upload": "propertyId",
+  "lockbox-photo-upload": "propertyId",
   "portal-contact-upload": "contactId",
   "contact-upload": "contactId",
   "lease-upload": "leaseId",
 };
 
-/** Listing and property photos are public Blob (the public site and PhotoThumb read them); everything else is private. */
+/** Listing and property photos are public Blob (the public site and PhotoThumb read them); everything else is private, the lockbox photo included. */
 export const UPLOAD_KIND_ACCESS: Record<UploadKind, "private" | "public"> = {
   "task-upload": "private",
   "portal-task-upload": "private",
   "property-upload": "private",
   "listing-photo-upload": "public",
   "property-photo-upload": "public",
+  "lockbox-photo-upload": "private",
   "portal-contact-upload": "private",
   "contact-upload": "private",
   "lease-upload": "private",
@@ -73,6 +77,7 @@ export const UPLOAD_KIND_ALLOWED: Record<UploadKind, readonly FileKind[]> = {
   "property-upload": ["image", "file"],
   "listing-photo-upload": ["image"],
   "property-photo-upload": ["image"],
+  "lockbox-photo-upload": ["image"],
   // A W-9 or a policy: a phone photo or a PDF.
   "portal-contact-upload": ["image", "file"],
   // One that came by email: a phone photo or a PDF, as the contractor's own.
@@ -88,6 +93,8 @@ export const UPLOAD_KIND_PREVIEWS: Record<UploadKind, boolean> = {
   "property-upload": false,
   "listing-photo-upload": false,
   "property-photo-upload": false,
+  // A thumbnail for the sheet's tile, the Units list and the job page, so a phone at the door loads ~1024px, not 2560.
+  "lockbox-photo-upload": true,
   "portal-contact-upload": false,
   "contact-upload": false,
   "lease-upload": false,
@@ -110,6 +117,7 @@ export function uploadTargetKey(kind: UploadKind, parentId: string): string {
     "property-upload": "property-doc",
     "listing-photo-upload": "listing",
     "property-photo-upload": "property-photo",
+    "lockbox-photo-upload": "lockbox-photo",
     "portal-contact-upload": "portal-contact",
     "contact-upload": "contact-doc",
     "lease-upload": "lease-doc",
@@ -149,7 +157,9 @@ export interface UploadRequest {
  * token route checks (a thumbnail or poster is role "thumb" or "poster" and
  * always an image); property documents to properties/<propertyId>/<safe name>
  * with their fileKind, so the token holds each to its own cap; listing photos
- * to their bare slug; the property photo under properties/<propertyId>/photo/.
+ * to their bare slug; the property photo under properties/<propertyId>/photo/;
+ * a unit's lockbox photo under properties/<propertyId>/lockbox/, its
+ * thumbnail in that folder's thumb/.
  * `queuedAt` rides in a contractor's payload so the token route can apply the
  * late-upload rule when it mints a resumed upload a fresh token. `owner` is
  * the queue's scope (queue-owner.ts), in every kind's payload, so the route
@@ -177,6 +187,11 @@ export function uploadRequest(
       return { pathname: slug, clientPayload: owned({ propertyId: parentId }) };
     case "property-photo-upload":
       return { pathname: `properties/${parentId}/photo/${slug}`, clientPayload: owned({ propertyId: parentId }) };
+    case "lockbox-photo-upload":
+      return {
+        pathname: `properties/${parentId}/lockbox/${role === "thumb" ? "thumb/" : ""}${slug}`,
+        clientPayload: owned({ propertyId: parentId }),
+      };
     case "portal-contact-upload":
     case "contact-upload": {
       const parent = readContactDocParent(parentId);

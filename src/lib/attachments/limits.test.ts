@@ -134,6 +134,16 @@ test("propertyUploadLimits: public photos are photos only, 25 MB, with no HEIC f
   assert.ok(typeof propertyUploadLimits("property-photo-upload", P, `properties/${P}/front.jpg`) === "string", "that is a document's folder");
 });
 
+test("propertyUploadLimits: a lockbox photo is a photo, in that property's lockbox folder or its thumb/ only", () => {
+  const l = propertyUploadLimits("lockbox-photo-upload", P, `properties/${P}/lockbox/gate.jpg`);
+  assert.deepEqual(l, { maximumSizeInBytes: 25 * 1024 * 1024, allowedContentTypes: [...PUBLIC_PHOTO_RULE.contentTypes] });
+  assert.equal(typeof propertyUploadLimits("lockbox-photo-upload", P, `properties/${P}/lockbox/thumb/gate.jpg`), "object");
+  assert.ok(typeof propertyUploadLimits("lockbox-photo-upload", P, `properties/${P}/photo/gate.jpg`) === "string", "the front photo's folder");
+  assert.ok(typeof propertyUploadLimits("lockbox-photo-upload", P, `properties/other/lockbox/gate.jpg`) === "string", "another property");
+  assert.ok(typeof propertyUploadLimits("lockbox-photo-upload", P, `properties/${P}/lockbox/a/gate.jpg`) === "string", "a deeper folder");
+  assert.ok(typeof propertyUploadLimits("lockbox-photo-upload", P, `properties/${P}/lockbox/..`) === "string");
+});
+
 test("storedPropertyDocumentPath: where Blob puts a property document, never the photo folder", () => {
   assert.equal(storedPropertyDocumentPath(`properties/${P}/Lease-2026-AbC123.pdf`, P), true);
   assert.equal(storedPropertyDocumentPath(`properties/${P}/photo/front-xyz.jpg`, P), false);

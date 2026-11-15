@@ -5,8 +5,10 @@ import { MAX_FILENAME } from "@/lib/attachments/content-types";
 import { requireUser } from "@/lib/auth";
 import {
   discardListingUploads,
+  discardLockboxUploads,
   discardPropertyPhoto,
   recordListingPhoto,
+  recordLockboxPhoto,
   removePropertyPhoto,
   restorePropertyPhoto,
   setPropertyPhoto,
@@ -14,6 +16,7 @@ import {
   type PhotoRef,
   type TakenHerePhoto,
 } from "@/lib/properties/photo";
+import type { LockboxPhoto } from "@/lib/property-types";
 import { withResult } from "@/lib/server-action";
 
 /**
@@ -106,5 +109,25 @@ export async function takenHerePhotosAction(propertyId: string): Promise<ActionR
   return withResult("takenHerePhotos", async () => {
     await requireUser();
     return takenHerePhotos(id.parse(propertyId));
+  });
+}
+
+/**
+ * A unit's lockbox photo the sheet just uploaded (docs/specs/lockbox-location.md): checked against Blob and handed back
+ * as the unit stores it. Saved with the unit, at Save; the poster a photo never needs goes.
+ */
+export async function recordLockboxPhotoAction(propertyId: string, file: z.input<typeof uploadedSchema>): Promise<ActionResult<LockboxPhoto>> {
+  return withResult("recordLockboxPhoto", async () => {
+    await requireUser();
+    const f = uploadedSchema.parse(file);
+    return recordLockboxPhoto(id.parse(propertyId), f, [f.posterPathname].filter((p): p is string => !!p));
+  });
+}
+
+/** Lockbox photos the unit sheet uploaded and then dropped. Any file a unit still uses is kept. */
+export async function discardLockboxUploadsAction(propertyId: string, pathnames: string[]): Promise<ActionResult<{ deleted: number }>> {
+  return withResult("discardLockboxUploads", async () => {
+    await requireUser();
+    return discardLockboxUploads(id.parse(propertyId), z.array(pathname).max(20).parse(pathnames));
   });
 }
