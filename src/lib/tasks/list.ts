@@ -123,10 +123,15 @@ export const isContractorJob = (t: ListTask) => t.assignee?.kind === "contact" |
  * one it gave you with yours, instead of under Unassigned. A name that is
  * nobody stays as it was.
  */
-export function withLegacyPeople(tasks: ListTask[], people: readonly PersonRef[]): ListTask[] {
+export function withLegacyPeople(
+  tasks: ListTask[],
+  people: readonly PersonRef[],
+  /** Each imported name to its person's key, when the caller already has it (the Tasks page's `legacy.merged`), so its rows and its sort agree. */
+  known?: ReadonlyMap<string, string>,
+): ListTask[] {
   const names = [...new Set(tasks.flatMap((t) => (t.assignee?.kind === "name" ? [t.assignee.name] : [])))];
   if (names.length === 0) return tasks;
-  const { merged } = mergeLegacyNames(names, people);
+  const merged = known ?? mergeLegacyNames(names, people).merged;
   if (merged.size === 0) return tasks;
   const nameOf = new Map(people.map((p) => [p.key, p.name]));
   return tasks.map((t) => {

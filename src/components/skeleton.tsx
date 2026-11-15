@@ -137,33 +137,50 @@ export function TaskRowSkeleton({
 }) {
   const wide = (cls: string) => (oneLine ? cls : undefined);
   return (
-    <li aria-hidden="true" className={cn("relative flex items-start gap-3 py-1.5 pointer-coarse:min-h-12", wide("lg:@min-[50rem]:items-center"))}>
+    <li aria-hidden="true" className={cn("relative flex items-start gap-3 py-1.5 pointer-coarse:min-h-12", wide("lg:@min-[60rem]:items-center"))}>
       {checkbox && (
         // TaskCheckbox's 44px box and its offsets, the To do ring in it.
-        <span className={cn("-m-3 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center", wide("lg:@min-[50rem]:-mt-3"))}>
+        <span className={cn("-m-3 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center", wide("lg:@min-[60rem]:-mt-3"))}>
           <StatusMark status="OPEN" className="size-4.5 pointer-coarse:size-4.5" />
         </span>
       )}
-      <span className={cn("relative block min-w-0 flex-1", wide("lg:@min-[50rem]:flex lg:@min-[50rem]:items-center lg:@min-[50rem]:gap-3"))}>
-        <span className={cn("flex min-w-0 items-center gap-3", wide("lg:@min-[50rem]:contents"))}>
+      <span className={cn("relative block min-w-0 flex-1", wide("lg:@min-[60rem]:flex lg:@min-[60rem]:items-center lg:@min-[60rem]:gap-3"))}>
+        <span className={cn("flex min-w-0 items-center gap-3", wide("lg:@min-[60rem]:contents"))}>
           <span className="min-w-0 flex-1">
             <Block text="text-body" className={rowWidth(i)} />
           </span>
           {/* The date chip's 28px frame, last on a one-line row. */}
-          <span className={cn("flex shrink-0", wide("lg:@min-[50rem]:order-last lg:@min-[50rem]:w-30 lg:@min-[50rem]:justify-end"))}>
+          <span className={cn("flex shrink-0", wide("lg:@min-[60rem]:order-last lg:@min-[60rem]:w-30 lg:@min-[60rem]:justify-end"))}>
             <Block className="h-7 w-20 rounded-md" />
           </span>
         </span>
-        <span className={cn("mt-0.5 flex min-h-5 min-w-0 items-center gap-2", wide("lg:@min-[50rem]:contents"))}>
-          <span className={cn("min-w-0 grow", wide("lg:@min-[50rem]:block lg:@min-[50rem]:w-36 lg:@min-[50rem]:flex-none"))}>
+        {/* The place line: the place, then the person's first name and 24px avatar bottom right. */}
+        <span className={cn("mt-0.5 flex min-h-5 min-w-0 items-center gap-2", wide("lg:@min-[60rem]:hidden"))}>
+          <span className="min-w-0 grow">
             <Block text="text-meta" className={rowWidth(i, PLACE_WIDTHS)} />
           </span>
           {avatar && (
-            <span className="ml-auto flex w-5 shrink-0 items-center">
-              <Block className="size-5 rounded-full" />
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              <Block text="text-meta" className="w-10" />
+              <Block className="-my-0.5 size-6 rounded-full" />
             </span>
           )}
         </span>
+        {/* A one-line row's Property, Unit and Assignee columns (TaskRow's widths). */}
+        {oneLine && (
+          <span className="hidden lg:@min-[60rem]:contents">
+            <span className="w-36 flex-none">
+              <Block text="text-meta" className={rowWidth(i, PLACE_WIDTHS)} />
+            </span>
+            <span className="w-24 flex-none" />
+            {avatar && (
+              <span className="flex w-28 flex-none items-center gap-1.5">
+                <Block className="size-6 rounded-full" />
+                <Block text="text-meta" className="w-10" />
+              </span>
+            )}
+          </span>
+        )}
       </span>
     </li>
   );

@@ -2,18 +2,21 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
-import { easternDayStart, type Ymd } from "@/lib/dates";
+import { easternDayStart, toYmd, type Ymd } from "@/lib/dates";
+import { shortAddress } from "@/lib/normalize";
 import { DAILY_EMAIL_CAP } from "@/lib/notifications/content";
 import { sentSince } from "@/lib/notifications/sent-count";
 import { mergeLegacyNames, type PersonRef } from "./assignee-people";
 import { assigneeOptions } from "./assignee-options";
-import { toListTask, withLegacyPeople, type ListTask } from "./list";
+import { toListTask, withLegacyPeople, type ListAssignee, type ListTask } from "./list";
+import { groupCounts, personKey, personName, placeKey, sortRows, type SortRow, type TaskSort } from "./list-sort";
 import { unreadTaskIds } from "./read-state";
 import {
   NONE,
   allTasksOrderBy,
   allTasksWhere,
   ownerCounts,
+  personOfLegacyName,
   personRefs,
   propertyCounts,
   viewScopeWhere,
@@ -76,29 +79,89 @@ export async function todayTasks(userId: string): Promise<ListTask[]> {
   return withUnread(userId, withLegacyPeople(rows.map(toListTask), personRefs(users, contractors, archived)));
 }
 
+/** What the Property and Assignee sorts read from every matching row (list-sort.ts SortRow). */
+const SORT_SELECT = {
+  id: true,
+  dueDate: true,
+  completedAt: true,
+  createdAt: true,
+  propertyId: true,
+  property: { select: { address: true } },
+  deal: { select: { address: true } },
+  assignee: { select: { id: true, name: true, email: true } },
+  assigneeContact: { select: { id: true, fullName: true } },
+  assigneeName: true,
+} satisfies Prisma.TaskSelect;
+
+type SortRecord = Prisma.TaskGetPayload<{ select: typeof SORT_SELECT }>;
+
+/** A row's sort keys: its building and its person as the list shows them, an imported name merged into its person. */
+function sortRowOf(r: SortRecord, known: ReadonlyMap<string, string>, nameOf: ReadonlyMap<string, string>): SortRow {
+  const place = shortAddress(r.property?.address ?? r.deal?.address) || null;
+  const legacyKey = !r.assignee && !r.assigneeContact && r.assigneeName ? known.get(r.assigneeName) : undefined;
+  const assignee: ListAssignee | null = r.assignee
+    ? { kind: "user", id: r.assignee.id, name: r.assignee.name, email: r.assignee.email }
+    : r.assigneeContact
+      ? { kind: "contact", id: r.assigneeContact.id, name: r.assigneeContact.fullName }
+      : r.assigneeName
+        ? { kind: "name", name: r.assigneeName, person: legacyKey ? { key: legacyKey, name: nameOf.get(legacyKey) ?? r.assigneeName } : undefined }
+        : null;
+  return {
+    id: r.id,
+    due: toYmd(r.dueDate),
+    finished: r.completedAt?.toISOString() ?? null,
+    created: r.createdAt.toISOString(),
+    place,
+    placeKey: placeKey({ propertyId: r.propertyId, place }),
+    person: personName(assignee),
+    personKey: personKey(assignee),
+  };
+}
+
 /**
- * The Tasks page: the rows the view, picks and search leave, in their order
- * (list-query.ts), at most `take` of them, plus the full count. With
+ * The Tasks page: the rows the view, picks and search leave, in the list's
+ * sort (list-sort.ts), at most `take` of them, plus the full count and, for
+ * the Property and Assignee sorts, how many rows each heading holds. The Due
+ * sort is a database order; the other two read every matching row's keys,
+ * sort them here (street order and names from three places can't be done in
+ * SQL) and load the page's rows by id. Imported names are merged into the
+ * person they stand for, as the filter counts them (`legacy`). With
  * `viewerId`, the rows new to that partner are marked `unread`.
  */
 export async function allTasks(
   f: AllFilters,
   take: number,
   legacy: LegacyNames,
-  viewerId?: string,
-): Promise<{ tasks: ListTask[]; total: number }> {
+  { sort, people, viewerId }: { sort: TaskSort; people: readonly PersonRef[]; viewerId?: string },
+): Promise<{ tasks: ListTask[]; total: number; groups: Record<string, number> }> {
   const where = allTasksWhere(f, legacy);
-  // The unread check starts as soon as the rows are in, beside the count.
-  const [tasks, total] = await Promise.all([
-    prisma.task
-      .findMany({ where, orderBy: allTasksOrderBy(f.status), take, select: LIST_SELECT })
-      .then((rows) => {
-        const list = rows.map(toListTask);
-        return viewerId ? withUnread(viewerId, list) : list;
-      }),
-    prisma.task.count({ where }),
-  ]);
-  return { tasks, total };
+  const known = personOfLegacyName(legacy);
+  const finish = (rows: Prisma.TaskGetPayload<{ select: typeof LIST_SELECT }>[]) => {
+    const list = withLegacyPeople(rows.map(toListTask), people, known);
+    return viewerId ? withUnread(viewerId, list) : list;
+  };
+
+  if (sort.field === "due") {
+    // The unread check starts as soon as the rows are in, beside the count.
+    const [tasks, total] = await Promise.all([
+      prisma.task.findMany({ where, orderBy: allTasksOrderBy(f.status, sort), take, select: LIST_SELECT }).then(finish),
+      prisma.task.count({ where }),
+    ]);
+    return { tasks, total, groups: {} };
+  }
+
+  const nameOf = new Map(people.map((p) => [p.key, p.name]));
+  const keys = await prisma.task.findMany({ where, select: SORT_SELECT });
+  const sorted = sortRows(
+    keys.map((r) => sortRowOf(r, known, nameOf)),
+    sort,
+    f.status,
+  );
+  const ids = sorted.slice(0, take).map((r) => r.id);
+  const at = new Map(ids.map((id, i) => [id, i]));
+  const rows = await prisma.task.findMany({ where: { id: { in: ids } }, select: LIST_SELECT });
+  rows.sort((a, b) => (at.get(a.id) ?? 0) - (at.get(b.id) ?? 0));
+  return { tasks: await finish(rows), total: keys.length, groups: groupCounts(sorted, sort.field) };
 }
 
 /** How many tasks the filters leave: the number on the Filters sheet's "Show 13 tasks". */

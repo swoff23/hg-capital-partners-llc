@@ -127,7 +127,7 @@ export function TodayView({ userId }: { userId: string }) {
           {crew.review.length > 0 && (
             <TaskSection title="Needs review" count={crew.review.length}>
               {crew.review.map((t) => (
-                <TaskRow key={t.id} task={t} checkbox={false} avatar name status={false} actions={<ReviewActions task={t} />} />
+                <TaskRow key={t.id} task={t} checkbox={false} avatar status={false} actions={<ReviewActions task={t} />} />
               ))}
             </TaskSection>
           )}
