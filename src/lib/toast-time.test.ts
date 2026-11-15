@@ -5,14 +5,14 @@ import { join } from "node:path";
 import { POST_UNDO_GRACE_MS, POST_UNDO_MS, undoWindowOpen } from "@/lib/portal/job-view";
 import { TOAST_ACTION_MS, TOAST_MS, toastMs } from "./toast-time";
 
-// Design call 7 (Nov 14): a toast with a button stays 8 seconds, one without stays 5, and the three timers that
+// Design call 7 (Nov 14), then Connor's answer the same day: a toast stays 5 seconds with a button or without, and the three timers that
 // used to copy the old 5 seconds read the same number, so Undo never shows after the thing it undoes is gone.
 
 const src = (...path: string[]) => readFileSync(join(__dirname, "..", ...path), "utf8");
 
-test("a toast with a button stays 8 seconds, one without stays 5", () => {
+test("a toast stays 5 seconds, with a button or without", () => {
   assert.equal(TOAST_MS, 5_000);
-  assert.equal(TOAST_ACTION_MS, 8_000);
+  assert.equal(TOAST_ACTION_MS, 5_000);
   assert.equal(toastMs(true), TOAST_ACTION_MS);
   assert.equal(toastMs(false), TOAST_MS);
 });
@@ -47,7 +47,7 @@ test("the server takes a contractor's photos-posted Undo for as long as the toas
   assert.match(src("lib", "portal", "job-view.ts"), /export const POST_UNDO_MS = TOAST_ACTION_MS;/);
   const posted = new Date("2026-11-14T15:00:00.000Z");
   const after = (ms: number) => new Date(posted.getTime() + ms);
-  // The last moment the toast is up: 5 seconds was the old window, and 8 is inside the new one without the grace.
+  // The last moment the toast is up is inside the window even without the grace.
   assert.equal(undoWindowOpen(posted, after(TOAST_ACTION_MS)), true);
   assert.equal(undoWindowOpen(posted, after(TOAST_ACTION_MS + POST_UNDO_GRACE_MS)), true);
   assert.equal(undoWindowOpen(posted, after(TOAST_ACTION_MS + POST_UNDO_GRACE_MS + 1)), false);

@@ -1,8 +1,8 @@
 /**
  * How long a toast stays (components/toast.tsx), and the one place every timer that has to agree with it reads
- * the number. A toast with a button (Undo, Retry, Reload, View, Open, Discard) stays TOAST_ACTION_MS: a pointer
- * or keyboard focus holds a toast open, a finger can't, so on a phone this is all the time there is to reach
- * the button. One with nothing to tap stays TOAST_MS.
+ * the number. A toast with a button (Undo, Retry, Reload, View, Open, Discard) stays TOAST_ACTION_MS and one with
+ * nothing to tap stays TOAST_MS. Both are 5 seconds (Connor, Nov 14). They stay two names because a timer that
+ * has to outlast an Undo reads TOAST_ACTION_MS, so changing the button's time moves those timers with it.
  *
  * Three timers run beside the toast, because a toast can't tell its caller when it closes. Each is built from
  * TOAST_ACTION_MS, so Undo never shows after the thing it undoes is gone (toast-time.test.ts holds them to it):
@@ -17,9 +17,9 @@
 export const TOAST_MS = 5_000;
 
 /** A toast with a button. */
-export const TOAST_ACTION_MS = 8_000;
+export const TOAST_ACTION_MS = 5_000;
 
-/** How long a toast stays: longer when it carries a button. */
+/** How long a toast stays, by whether it carries a button. */
 export function toastMs(hasAction: boolean): number {
   return hasAction ? TOAST_ACTION_MS : TOAST_MS;
 }

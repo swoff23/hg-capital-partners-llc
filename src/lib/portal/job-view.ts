@@ -460,7 +460,7 @@ export const POST_UNDO_MS = TOAST_ACTION_MS;
 /**
  * The server accepts an Undo a little after the toast has gone: the tap spends
  * part of the window in flight on a weak signal, and a toast held under the
- * pointer or focus (toast.tsx) lasts longer than its eight seconds.
+ * pointer or focus (toast.tsx) lasts longer than its five seconds.
  */
 export const POST_UNDO_GRACE_MS = 10_000;
 

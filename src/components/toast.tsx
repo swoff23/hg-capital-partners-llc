@@ -14,7 +14,7 @@ import { toastMs } from "@/lib/toast-time";
  * One region per surface: AppShell mounts a ToastProvider, and the portal
  * layout mounts its own. Bottom-left on a computer; full width on a phone,
  * lifted above a sticky bottom bar by useToastInset(). A toast with a button
- * goes after 8 seconds and one without after 5 (lib/toast-time.ts), held
+ * goes after 5 seconds, as does one without (lib/toast-time.ts), held
  * while the pointer or focus is on it; Esc closes the one that has focus. On
  * a coarse pointer a toast with an action draws no ×
  * (it closes itself, and the message gets the room), but keeps the Dismiss
@@ -117,7 +117,7 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
   // A sticky toast's action is leaving the page (a reload): the icon spins until it goes.
   const [leaving, setLeaving] = useState(false);
   const { id, version, sticky, action } = item;
-  // A button needs the tap, and a finger can't hold the toast open: 8 seconds with one, 5 without.
+  // With a button or without, 5 seconds (lib/toast-time.ts); the two times are kept apart in case they part again.
   const stays = toastMs(item.action !== undefined);
 
   // A replacement (a new version under the same key) starts the time over. A sticky toast has no timer.

@@ -407,7 +407,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 ### Toasts
 
 - The toast pill (`--toast-*`, `rounded-lg`, float shadow): bottom-left on desktop, full width above the bottom bar on phone.
-- One line names the change and its ripple. A toast with a button (Undo, Retry, Reload, View) stays 8 seconds and one without stays 5 (`src/lib/toast-time.ts`); either pauses on hover or focus ([Superhuman](https://mobbin.com/screens/b0cecd33-9403-4c15-af1c-033d84826cf5)).
+- One line names the change and its ripple. A toast stays 5 seconds, with a button (Undo, Retry, Reload, View) or without (`src/lib/toast-time.ts`); either pauses on hover or focus ([Superhuman](https://mobbin.com/screens/b0cecd33-9403-4c15-af1c-033d84826cf5)).
 
 ### Empty and payoff states
 

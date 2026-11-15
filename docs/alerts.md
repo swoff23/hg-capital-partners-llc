@@ -17,7 +17,7 @@ Once, in Sentry, after the integration is connected. Menu names follow Sentry's 
 
 **The email:** "New issue" with an error name, the file and line, and a tag for the area: `staff`, `portal`, `public`, `sign-in` or `api`.
 
-**What it means:** something broke that people see as "That page didn't load", "That didn't save" or "We couldn't save that". It can also be a background job's error that people never see, such as a reply by email that didn't post or a QuickBooks sync that failed. Its `scope` tag says which (`email:inbound`, `qbo:sync`, `notifications:reminders`).
+**What it means:** something broke that people see as "That page didn't load", "That didn't save" or "Couldn't save". It can also be a background job's error that people never see, such as a reply by email that didn't post or a QuickBooks sync that failed. Its `scope` tag says which (`email:inbound`, `qbo:sync`, `notifications:reminders`).
 
 You get one email the first time each kind happens. Repeats are grouped under the same issue and don't email again. If you mark it resolved in Sentry and it comes back, you get one more email.
 

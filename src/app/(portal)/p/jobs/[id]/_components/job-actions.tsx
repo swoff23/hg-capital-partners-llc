@@ -288,7 +288,7 @@ export function JobActions({
    */
   const sendKept = () => postKept(taskId, toast, owner);
 
-  /** Posts a batch as updates of up to MAX_FILES_PER_POST files: "3 photos posted", and eight seconds to take it back. Answers the files that didn't post. */
+  /** Posts a batch as updates of up to MAX_FILES_PER_POST files: "3 photos posted", and five seconds to take it back. Answers the files that didn't post. */
   const sendBatch = (items: Recorded[]) => postRecordedBatch(taskId, items, toast, owner);
 
   /**

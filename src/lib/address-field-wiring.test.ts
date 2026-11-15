@@ -95,5 +95,5 @@ const asTyped = (typed: string) => tidyAddress(typed) || typed;
 test("calls 13 and 21: a helper line under a field takes the field's width, so a long one can't widen a sheet and move Create", () => {
   const ui = read("../components/ui.tsx");
   assert.match(ui, /<p id=\{lineId\} className=\{cn\(fitLine && "w-0 min-w-full", "truncate text-meta"/);
-  assert.match(read("../components/address-combobox.tsx"), /reserveLine=\{reserveLine\}\s*fitLine\s/);
+  assert.match(read("../components/address-combobox.tsx"), /reserveLine=\{reserveLine\}\s*fitLine=\{reserveLine\}/);
 });
