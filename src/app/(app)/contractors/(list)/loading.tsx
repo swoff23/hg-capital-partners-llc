@@ -8,7 +8,7 @@ import { ContractorHeaderActions } from "../invite-sheet";
  * Eight rows' words, at the lengths names and companies run to, so the
  * columns size as they will for the real ones: a name is two words and a
  * company is often a dash. Trades are tags, one to three of them, in a
- * column that takes a third of the width whatever they hold.
+ * column that takes a third of the width (a quarter from md to lg) whatever they hold.
  */
 const ROWS: { name: string[]; company: string[]; trades: string[] }[] = [
   { name: ["w-12", "w-16"], company: ["w-3"], trades: ["w-12", "w-16"] },
@@ -23,7 +23,7 @@ const ROWS: { name: string[]; company: string[]; trades: string[] }[] = [
 
 /**
  * Contractors while the list loads (docs/specs/performance.md 4.3): the title,
- * Sign-up link and Invite contractor, the filter bar and Name, Company, Trades, Phone and Docs
+ * Sign-up link and Invite contractor, the filter bar and Name, Company, Trades, Phone, Docs and Status
  * draw at once, with the page's own hiding classes; the count and 8 rows are
  * --muted blocks in the page's cells, the name over its subline below sm.
  */
@@ -41,9 +41,10 @@ export default function ContractorsLoading() {
           <tr>
             <Th className="pl-0">Name</Th>
             <Th className="hidden sm:table-cell">Company</Th>
-            <Th className="hidden w-1/3 sm:table-cell">Trades</Th>
+            <Th className="hidden w-1/3 sm:table-cell md:w-1/4 lg:w-1/3">Trades</Th>
             <Th className="pr-0 sm:pr-3">Phone</Th>
-            <Th className="hidden pr-0 sm:table-cell">Docs</Th>
+            <Th className="hidden pr-0 sm:table-cell md:pr-3">Docs</Th>
+            <Th className="hidden pr-0 md:table-cell">Status</Th>
           </tr>
         </thead>
         <tbody aria-hidden="true" className="divide-y divide-border">
@@ -69,8 +70,12 @@ export default function ContractorsLoading() {
               <Td className="pr-0 sm:pr-3">
                 <Block text="text-body" className="w-20 pointer-coarse:w-27" />
               </Td>
-              <Td className="hidden pr-0 sm:table-cell">
+              <Td className="hidden pr-0 sm:table-cell md:pr-3">
                 <Block text="text-body" className={rowWidth(i, ["w-8", "w-12 pointer-coarse:w-17", "w-8"])} />
+              </Td>
+              <Td className="hidden pr-0 md:table-cell">
+                {/* Most rows are Active, the empty dash. */}
+                <Block text="text-body" className="w-3" />
               </Td>
             </tr>
           ))}

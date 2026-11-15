@@ -33,7 +33,7 @@ The spec for replacing the Google Form "HG Capital – Contractor Onboarding For
 | 10 | Done | **Details, trades and a W-9.** Then the contractor shows as Active |
 | 11 | Home | **Needs you rows for shared-link sign-ups** (Keep or Archive) and **for sending the Baselane link** once someone finishes (Sent). Nothing for invited people finishing |
 | 12 | Logins | **Create login and Reset password stay as they are** for anyone already in Contractors: a staff-set starting password and Copy message. Invites are only for new people |
-| 13 | Contractors list | **A badge beside the name** while it applies (New, Invited, Opened, Onboarding), plus a Status filter. Active rows show nothing extra |
+| 13 | Contractors list | **A Status column** while it applies (New, Invited, Opened, Onboarding), plus a Status filter. Active rows show the empty dash. (Was a badge beside the name until Nov 15) |
 | 14 | Naming | Copy says **"HG Capital"**, never bare "HG". The five portal strings that said "HG" changed in this build (section 7). The portal's wordmark is **"HG Capital Partners"** (was "HG Jobs"), and the "HG Login" eyebrow is gone from every sign-in page with its own title (Connor, during the build) |
 | 15 | Finishing setup | **Required** (Connor, during the build). Until details, trades and a W-9 are in, the steps are the only page a new contractor can open. **Sign out** replaces Finish later; the next sign-in opens the step they stopped on. No card above My jobs |
 
@@ -95,12 +95,12 @@ The payoff screen (CLAUDE.md, Make payoff moments count):
 ### 4.1 Contractors list
 
 - **Header:** **Invite contractor** (primary) and **Sign-up link** (secondary). New contractor goes away as a header button; its form stays (4.2).
-- **Badges** beside the name, in the badge spot Inactive and Tenant fixes use today, and leading the second line on a phone. Only one status badge per row:
+- **Status column** at the end of the row from tablet width up, as on Properties (Nov 15: moved out of the name's badge spot, which keeps Inactive and Tenant fixes). Narrower than a tablet the badge stays by the name, leading the second line on a phone. Only one status badge per row:
   - **New**: signed up with the shared link and not kept yet (the warn tone: a partner's decision, brand guidelines section 4).
   - **Invited**: invite sent, link not opened (neutral).
   - **Opened**: link opened, no account yet (neutral).
   - **Onboarding**: account made, not done (neutral).
-  - Active shows nothing.
+  - Active shows the empty dash.
 - **Status filter** in Filters: New, Invited, Opened, Onboarding. "Needs W-9" keeps working and also counts uploaded W-9s.
 
 ### 4.2 Invite contractor
@@ -222,7 +222,7 @@ All strings follow docs/copy-rules.md. The ones that set the tone:
 | Steps | Centered column, bar docked under it | Same | Full screen, bar docked with the safe area |
 | Setup gate | Any /p page goes to the steps | Same | Same |
 | Invite contractor | Dialog | Dialog | Bottom sheet, Text invite first |
-| Contractors list | Badge after the name | Badge drops under the name when the column is narrow | Badge leads the second line |
+| Contractors list | Status column, last | Status column, last | Badge leads the second line |
 | Needs you rows | One line, buttons right | Two lines, buttons right | Two lines; three rows then "N more" |
 
 Nothing drops on a phone. The device check sweep covers the new routes at every width (section 9).
