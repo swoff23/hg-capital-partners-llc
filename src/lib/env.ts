@@ -41,6 +41,8 @@ const schema = z.object({
   HEALTH_TOKEN: z.string().optional(),
   CRON_SECRET: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  // The public store's token, for listing and building photos (src/lib/attachments/blob-stores.ts).
+  PUBLIC_BLOB_READ_WRITE_TOKEN: z.string().optional(),
 
   QBO_CLIENT_ID: z.string().optional(),
   QBO_CLIENT_SECRET: z.string().optional(),

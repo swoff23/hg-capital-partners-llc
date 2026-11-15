@@ -4,10 +4,10 @@ import { isFinalRefusal } from "@/lib/attachments/access";
 import { contactUploadLimits, leaseUploadLimits, propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
 import { appScope, ownerRefusal, portalScope } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
-import { UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
+import { blobToken, noStoreMessage } from "@/lib/attachments/blob-stores";
+import { UPLOAD_KIND_ACCESS, UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { getPortalPrincipal } from "@/lib/portal/session";
 import { contractorUploadRefusal } from "@/lib/tasks/service";
@@ -197,9 +197,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
   if (!Object.hasOwn(KINDS, kind)) return NextResponse.json({ error: "Unknown upload kind" }, { status: 404 });
   const cfg = KINDS[kind];
 
-  const token = getEnv().BLOB_READ_WRITE_TOKEN;
+  // Listing and building photos go to the public store, everything else to the private one (blob-stores.ts).
+  const access = UPLOAD_KIND_ACCESS[kind as UploadKindKey];
+  const token = blobToken(access);
   if (!token) {
-    return NextResponse.json({ error: "File uploads need a Blob store, and none is connected yet." }, { status: 503 });
+    return NextResponse.json({ error: noStoreMessage(access) }, { status: 503 });
   }
 
   let body: HandleUploadBody;

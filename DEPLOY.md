@@ -14,7 +14,8 @@ production builds only).
 | `SESSION_SECRET` | yes | 32+ random chars. Signs the login cookie and the QuickBooks OAuth state. Rotating it signs everyone out. |
 | `HEALTH_TOKEN` | recommended | Unlocks the detailed `/api/health` payload. Without it the probe still answers, but only `{ ok, db, env, commit, at }`. |
 | `CRON_SECRET` | for email and QuickBooks | Vercel sends it as `Authorization: Bearer …` on both crons: the once-a-minute email job (`/api/cron/notifications`, the only thing that sends task emails) and the nightly QuickBooks sync (`/api/quickbooks/sync`). Until it is set, both answer 503 and never run. |
-| `BLOB_READ_WRITE_TOKEN` | yes | Added automatically when the Blob store is connected under Storage. |
+| `BLOB_READ_WRITE_TOKEN` | yes | Added automatically when the Blob store is connected under Storage. A private store: documents, task and job files. |
+| `PUBLIC_BLOB_READ_WRITE_TOKEN` | for listing photos | The public store (`hg-capital-public-photos`) for listing photos and the building photo, connected under Storage with the env prefix `PUBLIC_BLOB`. A store is public or private as a whole, so these can't share the private one. Without it, those uploads wait with "Listing photos need a public Blob store". |
 | `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `QBO_REDIRECT_URI`, `QBO_TOKEN_SECRET` | for Financials | Intuit production keys; redirect URI is `https://www.hgcapitalpartners.com/api/quickbooks/callback`; token secret is 32 random bytes base64. All four or nothing — the Connect button appears only when all are present. |
 | `QBO_ENVIRONMENT` | for Financials | `production` (defaults to `sandbox`). |
 | `QBO_HISTORY_START` | optional | First month to pull, `YYYY-MM`. Defaults to `2026-01`. |

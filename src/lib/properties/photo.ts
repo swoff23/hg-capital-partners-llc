@@ -2,9 +2,9 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { BlobNotFoundError, del, head, type HeadBlobResult } from "@vercel/blob";
 import { prisma } from "@/lib/db";
+import { blobToken, noStoreMessage, type BlobAccess } from "@/lib/attachments/blob-stores";
 import { isPrivateStoreUrl, storeIdFromToken } from "@/lib/attachments/paths";
 import { lockboxPhotoPaths, parseUnits, type LockboxPhoto } from "@/lib/property-types";
-import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 
 /**
@@ -69,10 +69,14 @@ export type PhotoRef = { url: string; pathname: string };
 
 type BlobAuth = { token: string; storeId: string };
 
-function blobAuth(): BlobAuth {
-  const token = getEnv().BLOB_READ_WRITE_TOKEN;
+/**
+ * A store's token and id (blob-stores.ts): the listing and front photos are in the public store, a lockbox photo in
+ * the private one. Neither looks in the other.
+ */
+function blobAuth(access: BlobAccess): BlobAuth {
+  const token = blobToken(access);
   const storeId = storeIdFromToken(token);
-  if (!token || !storeId) throw new Error("File uploads need a Blob store, and none is connected yet.");
+  if (!token || !storeId) throw new Error(noStoreMessage(access));
   return { token, storeId };
 }
 
@@ -98,7 +102,7 @@ async function headOf(pathname: string, auth: BlobAuth): Promise<HeadBlobResult 
 
 /** Best effort: a file already gone, or no token, isn't an error. */
 async function deleteBlobs(targets: readonly string[], auth?: BlobAuth): Promise<void> {
-  const token = auth?.token ?? getEnv().BLOB_READ_WRITE_TOKEN;
+  const token = auth?.token ?? blobToken("public");
   if (!token || targets.length === 0) return;
   try {
     await del([...targets], { token });
@@ -156,7 +160,7 @@ export async function setPropertyPhoto(
   spare: readonly string[] = [],
 ): Promise<{ previous: PhotoRef | null; current: PhotoRef }> {
   if (!isPropertyPhotoPath(propertyId, pathname)) throw new Error("That photo isn't in this property's folder.");
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   const previous = await currentPhoto(propertyId);
   // The front photo keeps no thumbnail: whatever the browser made beside it goes.
   if (spare.length > 0) await discardListingUploads(propertyId, spare);
@@ -181,7 +185,7 @@ export async function removePropertyPhoto(propertyId: string): Promise<{ previou
  */
 export async function restorePropertyPhoto(propertyId: string, pathname: string): Promise<{ displaced: PhotoRef | null; current: PhotoRef }> {
   if (!isPropertyPhotoPath(propertyId, pathname)) throw new Error("That photo isn't in this property's folder.");
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   const blob = await headOf(pathname, auth);
   if (!blob || !isPublicStoreUrl(blob.url, auth.storeId)) throw new Error("That photo is gone, so it can't be put back.");
   const displaced = await currentPhoto(propertyId);
@@ -211,7 +215,7 @@ export async function discardPropertyPhoto(propertyId: string, pathname: string)
 export async function recordListingPhoto(propertyId: string, pathname: string, spare: readonly string[] = []): Promise<PhotoRef> {
   const exists = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } });
   if (!exists) throw new Error("This property is gone.");
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   // A listing keeps neither a thumbnail nor a poster: whatever the browser made beside it goes.
   if (spare.length > 0) await discardListingUploads(propertyId, spare);
   return verifiedPhoto(pathname, auth);
@@ -228,7 +232,7 @@ export async function discardListingUploads(propertyId: string, pathnames: reado
   if (unique.length === 0) return { deleted: 0 };
   const owner = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } });
   if (!owner) return { deleted: 0 };
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   const [listed, shown] = await Promise.all([
     prisma.listingPhoto.findMany({ where: { pathname: { in: unique } }, select: { pathname: true } }),
     prisma.property.findMany({ where: { photoPathname: { in: unique } }, select: { photoPathname: true } }),
@@ -267,7 +271,7 @@ export async function recordLockboxPhoto(
   const exists = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } });
   if (!exists) throw new Error("This property is gone.");
   if (!isLockboxPhotoPath(propertyId, file.pathname)) throw new Error("That photo isn't in this property's lockbox folder.");
-  const auth = blobAuth();
+  const auth = blobAuth("private");
   // A photo keeps no poster: whatever the browser made beside it goes.
   if (spare.length > 0) await discardLockboxUploads(propertyId, spare);
   const checked = async (pathname: string): Promise<string | null> => {
@@ -304,7 +308,7 @@ export async function discardLockboxUploads(propertyId: string, pathnames: reado
   const row = await prisma.property.findUnique({ where: { id: propertyId }, select: { units: true } });
   if (!row) return { deleted: 0 };
   const used = lockboxPhotoPaths(parseUnits(row.units));
-  const token = getEnv().BLOB_READ_WRITE_TOKEN;
+  const token = blobToken("private");
   const storeId = storeIdFromToken(token);
   if (!token || !storeId) return { deleted: 0 };
   const auth = { token, storeId };
