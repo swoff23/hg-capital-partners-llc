@@ -28,7 +28,13 @@ import { parseNoteAuthor } from "./note-author";
  * value, and a field that ended where it started shows nothing (activity
  * 2.3). Rows saved before a change carried data are read from their text; an
  * old line that recorded nothing ("Next action: — → —") is left out.
+ *
+ * Next action left the deal on Nov 15, 2026 (Connor), and its history went
+ * with it: its edits are left out, without ending the burst around them.
  */
+
+/** Fields a deal no longer has, whose old edits the log leaves out. */
+const GONE_FIELDS: ReadonlySet<DealChangeField> = new Set(["nextAction"]);
 
 /** A burst ends 30 minutes after its first edit (activity 2.3). */
 export const BURST_MS = 30 * 60_000;
@@ -224,6 +230,8 @@ export function buildDealLog(rows: readonly LogSourceRow[]): LogEntry[] {
     }
 
     const edit = readEdit(r);
+    // A field the deal no longer has: skipped as if it weren't there, so the edits around it still fold.
+    if (edit && GONE_FIELDS.has(edit.change.field)) continue;
     // Archive and Restore read as a sentence with the person first: "Connor archived this deal".
     const archive = edit ? null : readArchiveEvent(r.data);
     if (archive) {
