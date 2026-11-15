@@ -378,7 +378,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 ### Tables and money
 
 - `Table` drops its 70vh box; the page scrolls (VISUAL-V02).
-- `Th`: sticky on `--background` under a `--line-strong` rule, `text-meta` 500 `--muted-foreground`, sentence case, no gray band.
+- `Th`: sticky on `--background` under a `--line-strong` rule, `text-meta` 500 `--muted-foreground`, sentence case, no gray band. It's the only thing that sticks: a list's title, search, filters and New button scroll with the page, since the page scrolls rather than the table, and pinning them would cost a phone a fifth of its screen.
 - `Th` and `Td` take a `numeric` prop: right-aligned, tabular. Rows are 40 / 48px on `--border` dividers, hover `--muted`, and the whole row is the link.
 - A footer row counts and sums ([Attio](https://mobbin.com/screens/fdc76916-ff87-4e2a-8256-80939ffa935c)), with statement rules on finance screens.
 - **Money** (**new**, `src/components/money.tsx`): whole dollars by default, a `cents` prop for transaction lines, true minus, inflow `--ok`, a `failed` state.
