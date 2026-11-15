@@ -352,9 +352,12 @@ export function itemText(item: OutboxItem, title?: string): string {
       if (/^started ".*"$/.test(s)) return "started the job";
       const set = /^set ".*" to (.+)$/.exec(s);
       if (set) return `moved it to ${STATUS_BY_WORDS.get(set[1]) ?? set[1]}`;
-      if (/^marked ".*" done$/.test(s)) return "marked it done";
+      // A contractor's Send for review, as rows queued before Nov 15 word it.
+      if (/^marked ".*" done$/.test(s)) return "sent it for review";
+      // A send-back first: its note may end in "for review" itself.
       const tail = sendBackTail(s, title);
       if (tail !== null) return `sent it back${tail}`;
+      if (/^sent ".*" for review$/.test(s)) return "sent it for review";
       return s.replace(/"[^"]*"/, "it");
     }
     case "DUE_TODAY":
@@ -477,13 +480,16 @@ export function jobSubject(input: { word: string; title: string; where: string }
 /**
  * The subject's word (Connor, Nov 15: "Due" on every email read wrong once a
  * job was done). The first that applies: Done while the job is Done when it
- * goes, New for an email that hands them the job, with its due date written
- * the brand's way ("New, due Friday", dates.ts dueLabel), Due today or Due
- * yesterday for the 8 am lines, then Update. Removed is offEmail's, and Error
- * is the reply path's (replies.ts).
+ * goes; Review on a partner's email while it still waits on their review
+ * (docs/specs/send-for-review.md, section 4), the email that carries Approve
+ * and Send back; New for an email that hands the contractor the job, with its
+ * due date written the brand's way ("New, due Friday", dates.ts dueLabel); Due
+ * today or Due yesterday for the 8 am lines; then Update. Removed is
+ * offEmail's, and Error is the reply path's (replies.ts).
  */
-export function subjectWord(input: { items: readonly OutboxItem[]; status: TaskStatus; due: Ymd | null; today: Ymd }): string {
+export function subjectWord(input: { items: readonly OutboxItem[]; status: TaskStatus; due: Ymd | null; today: Ymd; audience: Audience }): string {
   if (input.status === "DONE") return "Done";
+  if (input.audience === "staff" && input.status === "REVIEW") return "Review";
   if (input.items.some((i) => i.kind === "ASSIGNED")) return input.due ? `New, due ${dueLabel(input.due, input.today)}` : "New";
   if (input.items.some((i) => i.kind === "DUE_TODAY")) return "Due today";
   if (input.items.some((i) => i.kind === "OVERDUE")) return "Due yesterday";
@@ -553,8 +559,6 @@ export interface TaskEmail {
   /** What's new's photos: the bundle's own, up to four, then "+N". */
   photos: EmailPhoto[];
   morePhotos: number;
-  /** A contractor's approval thanks them: "Thanks, Zack." */
-  closing?: string;
   /** The next step; null on an email with nothing left to do (taken off the job). */
   primary: EmailButton | null;
   secondary: EmailButton[];
@@ -563,12 +567,6 @@ export interface TaskEmail {
   footnote?: string;
   /** Threads the job's emails (threadKey). */
   threadKey: string;
-}
-
-/** True when the email's latest status change is an approval. */
-function endsApproved(items: OutboxItem[]): boolean {
-  const last = items.findLast((i) => i.kind === "STATUS");
-  return !!last && /^approved ".*"$/.test(oneLine(last.summary));
 }
 
 /**
@@ -599,7 +597,6 @@ export function replyLine(staffNames: readonly string[]): string {
 function buttons(input: {
   audience: Audience;
   status: TaskStatus;
-  approved: boolean;
   appUrl: string;
   taskId: string;
   items: OutboxItem[];
@@ -622,9 +619,9 @@ function buttons(input: {
     overdue && token && contractorMaySetDate(input.status)
       ? [{ label: "Change date", url: to("date") }]
       : [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Text to my crew", url: to("share") }] : [])];
-  const step = input.approved ? null : nextStep(input.status);
+  const step = nextStep(input.status);
   if (step === "start") return { primary: { label: "Start job", url: to(null) }, secondary: extras };
-  if (step === "done") return { primary: { label: "Mark done", url: to("done") }, secondary: extras };
+  if (step === "done") return { primary: { label: "Send for review", url: to("done") }, secondary: extras };
   return { primary: { label: "See job", url: to(null, updateId) }, secondary: [] };
 }
 
@@ -730,9 +727,8 @@ export function offEmail(title: string, where: string, taskId: string): TaskEmai
  *
  * A contractor's email ends on the reply line while the job is still open: a
  * closed job's page is read-only and core.ts addComment refuses a
- * contractor's comment on it. When its latest status change is an approval,
- * it also thanks them by first name and the button reads See job
- * (BCONTRACT-008): nothing is left to do, only the record to see.
+ * contractor's comment on it. An approval emails them nothing
+ * (docs/specs/send-for-review.md); a closed job's email reads See job.
  */
 export function taskEmail(input: {
   items: OutboxItem[];
@@ -753,8 +749,6 @@ export function taskEmail(input: {
   photoUrl?: string | null;
   /** Staff: the contractor on the job. */
   contractorName?: string | null;
-  /** The contractor's name on their contact, for the thanks. */
-  recipientName?: string | null;
   /** First names of the partners, for a contractor's reply line. */
   staffNames?: readonly string[];
   /** The email's own link (job-links.ts): a contractor's EMAIL link, a partner's STAFF link. Null sends plain links. */
@@ -770,15 +764,13 @@ export function taskEmail(input: {
 }): TaskEmail {
   const where = jobWhere(input.address, input.unitLabel);
   const contractor = input.audience === "contractor";
-  const approved = contractor && endsApproved(input.items);
-  const thanksTo = greetingName(input.recipientName);
   const due = input.due ? fmtDay(input.due, { weekday: true, year: "auto", now: input.today }) : null;
   const { headline, lines } = whatsNew(input.items, input.title);
   const checklist = input.checklist ?? [];
   const notes = input.notes?.trim() ? keepBreaks(input.notes) : null;
   if (contractor && input.items.some((i) => i.kind === "OFF")) return offEmail(input.title, where, input.taskId);
   const token = input.linkToken ?? null;
-  const btns = buttons({ audience: input.audience, status: input.status, approved, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
+  const btns = buttons({ audience: input.audience, status: input.status, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
   // Tapping a photo opens the job: the contractor's through their link, a partner's on the task page.
   const photoHref = contractor ? (token ? jobLinkUrl(input.appUrl, token, null, firstUpdateId(input.items)) : openUrl(input.appUrl, "contractor", input.taskId)) : openUrl(input.appUrl, "staff", input.taskId, firstUpdateId(input.items));
   // A contractor's link stops opening a closed job, thumbnails included, so a closed job's email shows none.
@@ -787,13 +779,12 @@ export function taskEmail(input: {
   const fresh = showPhotos ? photoStrip(input.newPhotoIds ?? [], input.appUrl, token, photoHref) : none;
   const older = contractor && showPhotos ? photoStrip(input.jobPhotoIds ?? [], input.appUrl, token, photoHref, JOB_PHOTO_MAX) : none;
   return {
-    subject: jobSubject({ word: subjectWord({ items: input.items, status: input.status, due: input.due ?? null, today: input.today }), title: input.title, where }),
+    subject: jobSubject({ word: subjectWord({ items: input.items, status: input.status, due: input.due ?? null, today: input.today, audience: input.audience }), title: input.title, where }),
     preview: previewText(headline, lines),
     headline,
     lines,
     photos: fresh.photos,
     morePhotos: fresh.morePhotos,
-    ...(approved ? { closing: thanksTo ? `Thanks, ${thanksTo}.` : "Thanks." } : {}),
     ...btns,
     job: {
       title: oneLine(input.title),

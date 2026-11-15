@@ -118,7 +118,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
 
       {jobs.length === 0 ? (
         // What happens next, in one line (docs/brand-guidelines.md, section 9, Empty).
-        <EmptyState>{tab === "open" ? "New jobs from HG Capital show up here." : "Jobs you mark done show up here."}</EmptyState>
+        <EmptyState>{tab === "open" ? "New jobs from HG Capital show up here." : "Approved jobs show up here."}</EmptyState>
       ) : shown.length === 0 ? (
         <EmptyState
           action={

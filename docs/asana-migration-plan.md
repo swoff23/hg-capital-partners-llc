@@ -64,7 +64,7 @@ Sources: the Asana CSV export, the live Asana API (read-only), a code audit, abo
 | D5 | Pieter properties and JMPL | Archive only. Not imported; the backup keeps them |
 | D6 | Statuses | Seven: To do, Scheduled, In progress, Waiting (with a reason), Review, Done, Canceled |
 | D6b | Contractor Mark done | Goes to Review. Both partners get an email. Approve makes it Done; Send back (with a note) returns it to In progress. Staff completing their own tasks go straight to Done |
-| D6c | State flow | Scheduled carries its own visit date. Contractors can tap Start job (In progress) and Mark done (Review). Staff can set any state. Only staff can cancel |
+| D6c | State flow | Scheduled carries its own visit date. Contractors can tap Start job (In progress) and Send for review (Review; the button read Mark done until Nov 15, docs/specs/send-for-review.md). Staff can set any state. Only staff can cancel |
 | D7 | Dates | One Due date. Today shows Overdue with "Move all to today", and every date chip has quick picks. Contractors see a neutral "Target": the visit date if Scheduled, otherwise Due |
 | D8 | Follow-up | No owner field. Contractor jobs sit on one shared list; every contractor update emails both partners |
 | D9 | Pop-up parts | React Aria Components for behavior, styled with our tokens |

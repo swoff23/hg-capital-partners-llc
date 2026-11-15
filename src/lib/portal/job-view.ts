@@ -180,7 +180,7 @@ export function statusUpdateText(from: string | null, to: string | null, by: { c
     case "IN_PROGRESS":
       return from === "REVIEW" ? "sent it back" : by.contractor ? "started the job" : "moved it to In progress";
     case "REVIEW":
-      return by.contractor ? "marked it done" : "moved it to Review";
+      return by.contractor ? "sent it for review" : "moved it to Review";
     case "DONE":
       return from === "REVIEW" ? "approved it" : "closed the job";
     default:
@@ -310,7 +310,7 @@ export function addMorePhotosLine(missing: number): string {
 
 export type MarkDoneState = {
   /** The label never changes (forms 2.7): it waits, and a line says why. */
-  label: "Mark done";
+  label: "Send for review";
   enabled: boolean;
   /** The action is running: the button keeps its label and shows its Spinner. */
   busy: boolean;
@@ -340,7 +340,7 @@ export function markDoneButton(s: {
   uploaded: number;
   required: number;
 }): MarkDoneState {
-  const label = "Mark done" as const;
+  const label = "Send for review" as const;
   if (s.pending > 0) return { label, enabled: false, busy: false, reason: "uploading", line: finishingLabel(s.pending) };
   if (s.sending) return { label, enabled: false, busy: true, reason: null, line: null };
   if (s.failed > 0) return { label, enabled: false, busy: false, reason: "failed", line: null };

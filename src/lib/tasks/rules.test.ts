@@ -119,6 +119,17 @@ test("email only crosses the staff/contractor line", () => {
   assert.equal(notifyAudience("asana", { kind: "COMMENT", visibility: "SHARED" }, login), null);
 });
 
+// docs/specs/send-for-review.md, section 2: a contractor hears back about finished work only when it's sent back.
+test("a staff move to Done emails the contractor nothing; every other shared status change still does", () => {
+  const login = { contractorGetsEmail: true };
+  assert.equal(notifyAudience("staff", { kind: "STATUS", visibility: "SHARED", to: "DONE" }, login), null);
+  for (const to of ["IN_PROGRESS", "SCHEDULED", "REVIEW", "OPEN"] as const) {
+    assert.equal(notifyAudience("staff", { kind: "STATUS", visibility: "SHARED", to }, login), "contractor", to);
+  }
+  // The contractor's own Send for review still reaches the partners.
+  assert.equal(notifyAudience("contractor", { kind: "STATUS", visibility: "SHARED", to: "REVIEW" }, login), "staff");
+});
+
 test("bundleSendAfter: 3 minutes after the latest change, at most 10 after the first", () => {
   const first = new Date("2026-10-29T15:00:00Z");
   assert.equal(bundleSendAfter(first, first).getTime(), first.getTime() + BUNDLE_QUIET_MS);

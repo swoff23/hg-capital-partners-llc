@@ -168,7 +168,7 @@ test("the portal's status updates are exactly the ones core shares with a contra
 test("status updates read as a short phrase", () => {
   assert.equal(statusUpdateText("OPEN", "IN_PROGRESS"), "started the job");
   assert.equal(statusUpdateText("REVIEW", "IN_PROGRESS"), "sent it back");
-  assert.equal(statusUpdateText("IN_PROGRESS", "REVIEW"), "marked it done");
+  assert.equal(statusUpdateText("IN_PROGRESS", "REVIEW"), "sent it for review");
   assert.equal(statusUpdateText("REVIEW", "DONE"), "approved it");
   assert.equal(statusUpdateText("OPEN", "DONE"), "closed the job");
   assert.equal(statusUpdateText("OPEN", "SCHEDULED"), "scheduled the job");
@@ -179,7 +179,7 @@ test("status updates read as a short phrase", () => {
   assert.equal(statusUpdateText("REVIEW", "IN_PROGRESS", { contractor: false }), "sent it back");
   // Only the contractor marks it done; a partner moving it to Review changed its status, as the email says.
   assert.equal(statusUpdateText("IN_PROGRESS", "REVIEW", { contractor: false }), "moved it to Review");
-  assert.equal(statusUpdateText("IN_PROGRESS", "REVIEW", { contractor: true }), "marked it done");
+  assert.equal(statusUpdateText("IN_PROGRESS", "REVIEW", { contractor: true }), "sent it for review");
 });
 
 test("file posts say what was added", () => {
@@ -331,8 +331,8 @@ test("a failed send's files go back in front of the ones that landed since, so a
 
 test("Mark done has no Skip: an optional job reads Mark done and is on, with or without photos", () => {
   const idle = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
-  assert.deepEqual(markDoneButton(idle), { label: "Mark done", enabled: true, busy: false, reason: null, line: null });
-  assert.equal(markDoneButton({ ...idle, uploaded: 3 }).label, "Mark done");
+  assert.deepEqual(markDoneButton(idle), { label: "Send for review", enabled: true, busy: false, reason: null, line: null });
+  assert.equal(markDoneButton({ ...idle, uploaded: 3 }).label, "Send for review");
   assert.equal(markDoneButton({ ...idle, uploaded: 3 }).enabled, true);
 });
 
@@ -340,19 +340,19 @@ test("Mark done waits for uploads and stays off while a photo failed (decision 1
   const idle = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
   // It keeps its label (forms 2.7) and a line says why it waits.
   assert.deepEqual(markDoneButton({ ...idle, pending: 2 }), {
-    label: "Mark done",
+    label: "Send for review",
     enabled: false,
     busy: false,
     reason: "uploading",
     line: "Finishing 2 uploads…",
   });
   // Sending is the button's own pending state, not another label.
-  assert.deepEqual(markDoneButton({ ...idle, sending: true }), { label: "Mark done", enabled: false, busy: true, reason: null, line: null });
+  assert.deepEqual(markDoneButton({ ...idle, sending: true }), { label: "Send for review", enabled: false, busy: true, reason: null, line: null });
   // A failed photo waits for a Retry or a Remove; the red line with Retry is the uploader's.
-  assert.deepEqual(markDoneButton({ ...idle, failed: 2 }), { label: "Mark done", enabled: false, busy: false, reason: "failed", line: null });
+  assert.deepEqual(markDoneButton({ ...idle, failed: 2 }), { label: "Send for review", enabled: false, busy: false, reason: "failed", line: null });
   // A retry puts the tile back in flight: the button counts it again.
   assert.deepEqual(markDoneButton({ ...idle, failed: 1, pending: 1 }), {
-    label: "Mark done",
+    label: "Send for review",
     enabled: false,
     busy: false,
     reason: "uploading",
@@ -363,7 +363,7 @@ test("Mark done waits for uploads and stays off while a photo failed (decision 1
 test("Mark done stays off while a photo waits for a signal, and its line is the uploader's", () => {
   const idle = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 0 };
   // A photo held for a signal isn't on the job yet: marking done now would leave it out of the finish set.
-  assert.deepEqual(markDoneButton({ ...idle, waiting: 2 }), { label: "Mark done", enabled: false, busy: false, reason: "waiting", line: null });
+  assert.deepEqual(markDoneButton({ ...idle, waiting: 2 }), { label: "Send for review", enabled: false, busy: false, reason: "waiting", line: null });
   // Going up leads, then failed, then waiting, then the count.
   assert.equal(markDoneButton({ ...idle, waiting: 1, pending: 1 }).reason, "uploading");
   assert.equal(markDoneButton({ ...idle, waiting: 1, failed: 1 }).reason, "failed");
@@ -374,9 +374,9 @@ test("Mark done stays off while a photo waits for a signal, and its line is the 
 
 test("Mark done with a required count waits for that many uploaded photos, and says how many more", () => {
   const ask2 = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0, required: 2 };
-  assert.deepEqual(markDoneButton(ask2), { label: "Mark done", enabled: false, busy: false, reason: "short", line: "Add 2 more photos" });
+  assert.deepEqual(markDoneButton(ask2), { label: "Send for review", enabled: false, busy: false, reason: "short", line: "Add 2 more photos" });
   assert.equal(markDoneButton({ ...ask2, uploaded: 1 }).line, "Add 1 more photo");
-  assert.deepEqual(markDoneButton({ ...ask2, uploaded: 2 }), { label: "Mark done", enabled: true, busy: false, reason: null, line: null });
+  assert.deepEqual(markDoneButton({ ...ask2, uploaded: 2 }), { label: "Send for review", enabled: true, busy: false, reason: null, line: null });
   assert.equal(markDoneButton({ ...ask2, uploaded: 5 }).enabled, true, "more than asked is fine");
   // Only uploaded photos count: one still going up, or one that failed, keeps it off for its own reason.
   assert.equal(markDoneButton({ ...ask2, uploaded: 1, pending: 1 }).reason, "uploading");

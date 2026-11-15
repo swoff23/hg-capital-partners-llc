@@ -514,7 +514,7 @@ test("status email lines: Approve and the contractor's Start have their own word
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "contractor" }, now), 'started "Cabinet install"');
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "staff" }, now), 'set "Cabinet install" to in progress');
   assert.equal(statusSummary({ ...base, from: "REVIEW", to: "IN_PROGRESS", actor: "staff", note: "Level it" }, now), 'sent "Cabinet install" back: Level it');
-  assert.equal(statusSummary({ ...base, from: "IN_PROGRESS", to: "REVIEW", actor: "contractor" }, now), 'marked "Cabinet install" done');
+  assert.equal(statusSummary({ ...base, from: "IN_PROGRESS", to: "REVIEW", actor: "contractor" }, now), 'sent "Cabinet install" for review');
   assert.equal(
     statusSummary({ ...base, from: "OPEN", to: "SCHEDULED", actor: "staff", scheduledFor: new Date("2026-10-29T00:00:00Z") }, now),
     'scheduled "Cabinet install" for Thu, Oct 29',
@@ -914,7 +914,7 @@ test("setStatus: a contractor's Mark done posts the note and photos as a comment
   const items = queued(calls);
   assert.deepEqual(items.slice(0, 2).map((i) => [i.kind, i.summary, i.eventId]), [
     ["COMMENT", "added files (+2 files)", "n1"],
-    ["STATUS", 'marked "Fix steps" done', "s1"],
+    ["STATUS", 'sent "Fix steps" for review', "s1"],
   ]);
 });
 
