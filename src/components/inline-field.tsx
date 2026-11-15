@@ -29,6 +29,7 @@ import { railLineClass, railVerbClass } from "@/components/rail";
 import { Switch } from "@/components/switch";
 import { DoneFooter, TagList, TagsChecklist, tagsLine, tagsOf } from "@/components/tags-field";
 import { Button, FormField, Input, fieldClass } from "@/components/ui";
+import { useSheet } from "@/components/sheet";
 import { isCoarseNow } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { useRun } from "@/components/use-run";
@@ -348,6 +349,16 @@ function nextValue(from: Element | null): HTMLElement | null {
 
 /* ---------------- The component ---------------- */
 
+/**
+ * Whether opening a field puts it in its own one-field sheet: on touch,
+ * except inside a sheet already (a record shown in one, like the deal sheet),
+ * where it edits in place, since a sheet never opens on a sheet.
+ */
+function useOpensSheet(): () => boolean {
+  const inSheet = useSheet() !== null;
+  return () => !inSheet && isCoarseNow();
+}
+
 export function InlineField(props: InlineFieldProps) {
   switch (props.kind) {
     case "heading":
@@ -370,6 +381,7 @@ function TextFact(props: InlineFieldProps) {
   const inRail = props.inRail ?? !multiline;
   const save = useFactSave(props);
   const router = useRouter();
+  const opensSheet = useOpensSheet();
   const [mode, setMode] = useState<Mode>("rest");
   const [sheetUsed, setSheetUsed] = useState(false);
   const [draft, setDraft] = useState("");
@@ -389,7 +401,7 @@ function TextFact(props: InlineFieldProps) {
     setProblem(null);
     setDraft(value);
     closing.current = false;
-    if (isCoarseNow()) {
+    if (opensSheet()) {
       setSheetUsed(true);
       setMode("sheet");
     } else setMode("inline");
@@ -459,8 +471,9 @@ function TextFact(props: InlineFieldProps) {
       failed: () => {
         setDraft(d.value);
         closing.current = false;
-        setMode(isCoarseNow() ? "sheet" : "inline");
-        if (isCoarseNow()) setSheetUsed(true);
+        const coarse = opensSheet();
+        setMode(coarse ? "sheet" : "inline");
+        if (coarse) setSheetUsed(true);
       },
       succeeded: () => {
         if (sheet) {
@@ -486,7 +499,9 @@ function TextFact(props: InlineFieldProps) {
   function onKeyDown(e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Escape") {
+      // The open field is a layer of its own: this Esc closes it, not a sheet it sits in (one Esc, one layer).
       e.preventDefault();
+      e.stopPropagation();
       cancel();
     } else if (e.key === "Enter" && (!multiline || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -726,6 +741,7 @@ function HeadingFact(props: InlineFieldProps) {
   const { label, value, field, context, minLength = 1, blank, tooShort, address, onRequest, className } = props;
   const save = useFactSave(props);
   const router = useRouter();
+  const opensSheet = useOpensSheet();
   const [mode, setMode] = useState<Mode>("rest");
   const [sheetUsed, setSheetUsed] = useState(false);
   const [draft, setDraft] = useState("");
@@ -747,7 +763,7 @@ function HeadingFact(props: InlineFieldProps) {
     setDraft(value);
     caret.current = at === undefined ? undefined : Math.min(at, value.length);
     closing.current = false;
-    if (isCoarseNow()) {
+    if (opensSheet()) {
       setSheetUsed(true);
       setMode("sheet");
     } else setMode("inline");
@@ -801,7 +817,7 @@ function HeadingFact(props: InlineFieldProps) {
       failed: () => {
         setDraft(d.value);
         closing.current = false;
-        const coarse = isCoarseNow();
+        const coarse = opensSheet();
         if (coarse) setSheetUsed(true);
         setMode(coarse ? "sheet" : "inline");
       },
@@ -842,7 +858,9 @@ function HeadingFact(props: InlineFieldProps) {
     const listOpen = listOnScreen(e.target as HTMLElement);
     if (e.key === "Escape") {
       if (listOpen) return;
+      // As a fact's field: this Esc closes the heading's field, not a sheet it sits in.
       e.preventDefault();
+      e.stopPropagation();
       cancel();
     } else if (e.key === "Enter" && !e.shiftKey) {
       if (listOpen && (e.target as HTMLElement).getAttribute("aria-activedescendant")) return;

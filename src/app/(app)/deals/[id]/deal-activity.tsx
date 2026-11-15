@@ -9,7 +9,7 @@ import { DealLog } from "./deal-log";
 /**
  * A deal's Activity: its notes and recorded changes, newest first, with the
  * note box on top (docs/specs/activity-comments.md 2.9, choice 3.3 A). A
- * server component that loads its own notes, so the deal page only mounts
+ * server component that loads its own notes, so the deal's sheet only mounts
  * it. The rows are shaped into the record log (lib/deals/record-log.ts:
  * authors, field changes folded by person, no-op lines left out) and drawn
  * by deal-log.tsx. A deleted note isn't loaded. The heading has no count: it
@@ -46,7 +46,7 @@ export async function DealActivity({ dealId }: { dealId: string }) {
   );
 }
 
-/** The deal's notes that aren't deleted. Once per request (React cache), so the deal page can start it beside its own read. */
+/** The deal's notes that aren't deleted. Once per request (React cache), so the deal's sheet can start it beside its own read. */
 export const dealNotes = cache((dealId: string) =>
   prisma.dealNote.findMany({
     where: { dealId, deletedAt: null },
