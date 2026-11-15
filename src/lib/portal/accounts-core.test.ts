@@ -308,3 +308,14 @@ test("setJobEmailsIn: a login that is gone is refused in words staff can read", 
   await assert.rejects(() => setJobEmailsIn(tx, "nope", false, STAFF), (err: unknown) => err instanceof PortalAccountError && err.message === "That login no longer exists.");
   assert.equal(events.length, 0);
 });
+
+test("a sign-up that races past the reads still gets the email line: rethrowUnique maps the account step's FieldError", async () => {
+  // invites.ts is server-only, so its source is read. Call 5 made the account step refuse an address as a FieldError.
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./invites.ts", import.meta.url), "utf8");
+  assert.match(src, /import \{ FieldError \} from "@\/lib\/action-result";/);
+  assert.match(
+    src,
+    /function rethrowUnique[\s\S]*?if \(err instanceof FieldError && err\.fieldErrors\.email\) throw new InviteError\(EMAIL_TAKEN, "email"\);[\s\S]*?throw err;/,
+  );
+});

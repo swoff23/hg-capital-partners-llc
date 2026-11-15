@@ -26,7 +26,7 @@ test("call 10: only the heading's in-place field takes the heading variant, in t
   const sheet = inline.slice(inline.indexOf("const sheet = sheetUsed"), inline.indexOf("if (mode !== \"inline\")"));
   assert.doesNotMatch(sheet, /variant="heading"/);
   // The heading size sits on the input alone: no suggestion row or helper line carries it.
-  assert.equal(combobox.match(/ text-title /g)?.length, 1);
+  assert.equal(combobox.match(/(?<![\w-])text-title(?![\w-])/g)?.length, 1);
 });
 
 test("call 10: opening a heading moves nothing, so its own match line waits until the typing changes", () => {
@@ -91,3 +91,8 @@ test("call 21: the line and every refusal use the one archived sentence", () => 
 
 // The row's text, as the field computes it.
 const asTyped = (typed: string) => tidyAddress(typed) || typed;
+
+test("calls 13 and 21: a helper line under a field takes the field's width, so a long one can't widen a sheet and move Create", () => {
+  const ui = read("../components/ui.tsx");
+  assert.match(ui, /<p id=\{lineId\} className=\{cn\("w-0 min-w-full truncate text-meta"/);
+});

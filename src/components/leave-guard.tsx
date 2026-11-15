@@ -13,6 +13,7 @@ import {
 } from "react";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
+import { leaveConfirmed } from "@/components/use-leave-warning";
 import { hasUnsavedWork, holdFor, setHold, type HoldEntry, type LeaveScope, type LeaveWords } from "@/components/leave-holds";
 
 /**
@@ -105,6 +106,7 @@ export function LeaveGuard({
   const guard = useMemo(() => ({ hold, ask }), [hold, ask]);
 
   function leaveAnyway() {
+    leaveConfirmed();
     setAsking(null);
     leaveTo.current?.();
   }

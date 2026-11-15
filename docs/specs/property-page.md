@@ -70,7 +70,7 @@ The fact strip doesn't change. The header changed on Nov 14 (see Header under th
 ![One CapEx section with building systems folded, and Rental listings only with a listing](property-page/03-capex-rentals.svg)
 
 - **CapEx** is one section titled "CapEx", with the forecast's year range on the right. The forecast is unchanged: total, past due, the year bars and the items table with its 5-year total.
-- Under it, "Building systems" is one row with the "3 of 10 dated" count and its meter. A tap opens the systems table in place. Every system row still opens its own sheet to edit. On a phone the table drops Type and Age, as today.
+- Under it, "Building systems" is one row with the "3 of 10 dated" count and its meter. A tap opens the systems table in place. Every system row still opens its own sheet to edit. On a phone the table drops Type and Age, as today; below 360 the Status column drops too and each row's status sits under its name (design call 17).
 - The separate "Building CapEx" section and its heading are gone.
 - The **Rental listings** section renders only when the property has at least one listing. Without one, the header's ⋯ menu gets "Add listing" above Copy link, which opens the same listing sheet as today. The item only appears when the property has units, matching today's disabled "Add listing".
 - Once a listing exists, the section is back below CapEx with its own "+ Add listing" row, as today.

@@ -418,7 +418,7 @@ function TextFact(props: InlineFieldProps) {
   useHoldLeave(dirty ? { title: `Leave without saving ${label.toLowerCase()}?`, stay: "Keep editing" } : null);
   // The same test holds a reload or a closed tab: a note saves only on Save, so a paragraph can sit unsaved.
   // One-line facts save when focus leaves them and never ask. Laptops only: iOS Safari never shows the question.
-  useLeaveWarning(dirty);
+  useLeaveWarning(dirty, { guarded: true });
 
   function leave(returnFocus: boolean) {
     closing.current = true;

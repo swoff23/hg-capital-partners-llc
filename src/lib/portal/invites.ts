@@ -1,5 +1,6 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
+import { FieldError } from "@/lib/action-result";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { hashPassword } from "@/lib/password";
@@ -253,6 +254,8 @@ function limit(ipHash: string): void {
 /** A unique index the reads missed (two tabs at once): the same answer the reads give. */
 function rethrowUnique(err: unknown): never {
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new InviteError(EMAIL_TAKEN, "email");
+  // Call 5: the account step refuses an address as a FieldError; a sign-up that raced past the reads gets the same line.
+  if (err instanceof FieldError && err.fieldErrors.email) throw new InviteError(EMAIL_TAKEN, "email");
   if (err instanceof PortalAccountError) throw new InviteError(err.message, "email");
   throw err;
 }

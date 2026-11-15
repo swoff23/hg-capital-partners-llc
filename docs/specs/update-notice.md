@@ -51,9 +51,9 @@ The spec for telling a tab that's been left open that a new version of the app i
 
 - **Content:** `RefreshCw` in `--toast-fg-2`, then "A new version is ready", then "Reload" underlined in `--toast-fg`, then the ×.
 - **One button.** The icon, the message and Reload are a single button, so pressing anywhere on the pill reloads, as Connor asked. The × is its own button beside it.
-- **Sticky.** No 5-second timer, and other toasts never push it out of the three shown. It stacks with them in the usual order.
+- **Sticky.** No timer, and other toasts never push it out of the three shown. It stacks with them in the usual order.
 - **The × and Esc** hide it until the next deploy: the live version is remembered in `localStorage` (`hg:update-dismissed`, every read and write in try/catch). The next-link rule (3.4) keeps working after a dismiss.
-- **On touch the × is drawn,** at 44px. Toasts with an action normally hide it on touch because they close themselves after 5 seconds. This one doesn't, so it needs a visible way to close.
+- **On touch the × is drawn,** at 44px. Toasts with an action normally hide it on touch because they close themselves after 8 seconds. This one doesn't, so it needs a visible way to close.
 - **Motion:** the usual `animate-toast-in`. Once Reload is really reloading (nothing held, or "Reload anyway"), the arrows spin until the page goes. A press that opens the leave sheet doesn't spin them. Neither moves under reduced motion.
 - **Screen readers:** the toast region is already a polite live region, so "A new version is ready" is announced once. The button's name is its text, "A new version is ready Reload".
 

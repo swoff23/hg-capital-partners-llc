@@ -675,7 +675,8 @@ export function FormField({
         ...(required ? { "aria-required": true as const } : {}),
       })}
       {line && (
-        <p id={lineId} className={cn("truncate text-meta", invalid ? "text-danger" : "text-fg-3")}>
+        // w-0 min-w-full: the line takes the field's width and adds nothing to a sheet that sizes to its content, so a long Saves as line can't widen the sheet and move Create.
+        <p id={lineId} className={cn("w-0 min-w-full truncate text-meta", invalid ? "text-danger" : "text-fg-3")}>
           {line}
         </p>
       )}

@@ -18,7 +18,7 @@ test("the reload question is on for exactly what holds the in-app links: a chang
   // One test, two guards: the LeaveGuard's hold and the browser's own question read the same `dirty`.
   assert.match(
     field,
-    /const dirty = mode === "inline" && multiline && decideInlineEdit\(kind, draft, value, \{\}\)\.kind !== "same";\s*useHoldLeave\(dirty \? \{[^\n]*\} : null\);\s*(\/\/[^\n]*\s*)*useLeaveWarning\(dirty\);/,
+    /const dirty = mode === "inline" && multiline && decideInlineEdit\(kind, draft, value, \{\}\)\.kind !== "same";\s*useHoldLeave\(dirty \? \{[^\n]*\} : null\);\s*(\/\/[^\n]*\s*)*useLeaveWarning\(dirty, \{ guarded: true \}\);/,
   );
   // Nothing else in the field asks: a one-line fact, a heading and a switch save on blur or on the tap.
   assert.equal(field.match(/useLeaveWarning\(/g)?.length, 1);
@@ -38,4 +38,16 @@ test("the hook asks through beforeunload only while it is on, and takes the list
   assert.match(hook, /if \(!active\) return;/);
   assert.match(hook, /e\.preventDefault\(\);\s*e\.returnValue = "";/);
   assert.match(hook, /window\.addEventListener\("beforeunload", warn\);\s*return \(\) => window\.removeEventListener\("beforeunload", warn\);/);
+});
+
+test("a leave the LeaveGuard confirmed isn't asked about again by the browser, for guarded callers only", () => {
+  const comp = (f: string) => readFileSync(join(__dirname, "..", "components", f), "utf8");
+  const hook = comp("use-leave-warning.ts");
+  const guard = comp("leave-guard.tsx");
+  // The update notice's Reload anyway runs through the guard, then location.reload(): one ask, not two.
+  assert.match(hook, /export function leaveConfirmed\(\) \{\s*confirmedAt = Date\.now\(\);/);
+  assert.match(hook, /if \(guarded && Date\.now\(\) - confirmedAt < CONFIRMED_MS\) return;/);
+  assert.match(guard, /function leaveAnyway\(\) \{\s*leaveConfirmed\(\);/);
+  // The upload queue isn't guarded: files the outbox can't keep still get the browser's one question.
+  assert.doesNotMatch(comp("media-uploader.tsx"), /guarded/);
 });
