@@ -23,7 +23,6 @@ export type DealRow = {
   theirPriceRaw: string | null;
   ourPrice: number | null;
   ourPriceRaw: string | null;
-  nextAction: string | null;
   sourceUrl: string | null;
   /** The day it last changed, worked out on the server ("Oct 20"). */
   updated: string;
@@ -169,11 +168,6 @@ export function DealListRow({ deal }: { deal: DealRow }) {
         ) : (
           <span aria-label="No notes">—</span>
         )}
-      </RowCell>
-
-      {/* A blank cell when there's no next action: the deal's sheet keeps the verb. */}
-      <RowCell href={href} cell={COLUMN_DROP.nextAction} className={cn(dense, "text-body text-foreground")}>
-        <span className="truncate">{deal.nextAction}</span>
       </RowCell>
 
       <RowCell href={href} cell={COLUMN_DROP.updated} className={cn(dense, "num pr-0 text-meta text-muted-foreground")}>

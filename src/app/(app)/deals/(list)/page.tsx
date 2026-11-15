@@ -30,7 +30,6 @@ const SORT_COLUMNS: Record<
   units: (desc) => ({ units: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   theirPrice: (desc) => ({ theirPrice: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   ourPrice: (desc) => ({ ourPrice: { sort: desc ? "desc" : "asc", nulls: "last" } }),
-  nextAction: (desc) => ({ nextAction: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   updated: (desc) => ({ updatedAt: desc ? "desc" : "asc" }),
 };
 
@@ -51,7 +50,6 @@ const LIST_COLUMNS = {
   theirPriceRaw: true,
   ourPrice: true,
   ourPriceRaw: true,
-  nextAction: true,
   sourceUrl: true,
   updatedAt: true,
 } satisfies Prisma.DealSelect;
@@ -227,13 +225,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                       <ResizeHandle columnKey="latestNote" />
                     </Th>
                     <SortHeader
-                      label={DEAL_FIELD_LABEL.nextAction}
-                      field="nextAction"
-                      defaultSort={DEFAULT_DEAL_SORT}
-                      className={COLUMN_DROP.nextAction}
-                      trailing={<ResizeHandle columnKey="nextAction" />}
-                    />
-                    <SortHeader
                       label={DEAL_FIELD_LABEL.updatedAt}
                       field="updated"
                       defaultSort={DEFAULT_DEAL_SORT}
@@ -256,7 +247,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                         theirPriceRaw: d.theirPriceRaw,
                         ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
                         ourPriceRaw: d.ourPriceRaw,
-                        nextAction: d.nextAction,
                         sourceUrl: d.sourceUrl,
                         updated: easternDay(d.updatedAt, today),
                         latestNote: latestNote(notes.get(d.id), today),

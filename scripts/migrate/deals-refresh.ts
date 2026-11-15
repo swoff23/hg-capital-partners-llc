@@ -59,7 +59,8 @@ type SheetDeal = {
   latest: string | null;
 };
 
-const FIELDS = ["status", "theirPriceRaw", "ourPriceRaw", "units", "nextAction"] as const;
+// Next action isn't shown anywhere since Nov 15, 2026, so the refresh leaves it alone (a new deal still takes the sheet's).
+const FIELDS = ["status", "theirPriceRaw", "ourPriceRaw", "units"] as const;
 type Field = (typeof FIELDS)[number];
 
 /** The change-entry field each one is logged under. */
@@ -68,7 +69,6 @@ const LOGGED: Record<Field, DealChangeField> = {
   theirPriceRaw: "theirPrice",
   ourPriceRaw: "ourPrice",
   units: "units",
-  nextAction: "nextAction",
 };
 
 async function readDeals(file: string): Promise<{ row: Row; deal: SheetDeal }[]> {
@@ -154,7 +154,8 @@ async function main() {
         nextAction: true,
         archivedAt: true,
         convertedPropertyId: true,
-        notes: { where: { deletedAt: null }, select: { source: true, body: true, data: true } },
+        // Deleted notes too: a sheet line someone deleted in the app stays deleted on the next run.
+        notes: { select: { source: true, body: true, data: true } },
       },
     }),
   ]);

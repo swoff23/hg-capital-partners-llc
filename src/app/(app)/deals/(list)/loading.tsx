@@ -15,7 +15,6 @@ const COLUMNS: { key: Exclude<ColumnKey, "address">; label: string; numeric?: bo
   { key: "theirPrice", label: DEAL_FIELD_LABEL.theirPrice, numeric: true, block: "w-16" },
   { key: "ourPrice", label: DEAL_FIELD_LABEL.ourPrice, numeric: true, block: "w-16" },
   { key: "latestNote", label: DEAL_FIELD_LABEL.latestNote, block: "w-24", text: "text-meta" },
-  { key: "nextAction", label: DEAL_FIELD_LABEL.nextAction, block: "w-28" },
   { key: "updated", label: DEAL_FIELD_LABEL.updatedAt, block: "w-12", text: "text-meta" },
 ];
 

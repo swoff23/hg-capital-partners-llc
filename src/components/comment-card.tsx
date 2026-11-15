@@ -151,7 +151,8 @@ export function CommentCard({
         <Ellipsis className="size-4" aria-hidden="true" />
       </AriaButton>
       <Menu>
-        <MenuHeader title={author ? author.name : `Imported ${noun}`} detail={`${timed ? fullStamp(at, now) : ""}${editedDay ? `${timed ? " · " : ""}edited ${editedDay}` : ""}`} />
+        {/* Who wrote it and when; an imported line names nobody, so its menu starts with its actions. */}
+        {author && <MenuHeader title={author.name} detail={`${timed ? fullStamp(at, now) : ""}${editedDay ? `${timed ? " · " : ""}edited ${editedDay}` : ""}`} />}
         {menuItems}
       </Menu>
     </MenuTrigger>

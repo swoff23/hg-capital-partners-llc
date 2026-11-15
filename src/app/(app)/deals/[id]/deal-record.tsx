@@ -13,7 +13,7 @@ import { preload } from "@/lib/preload";
 import { recordView } from "@/lib/recent-views";
 import { setDealArchived } from "../actions";
 import { DealActivity, dealNotes } from "./deal-activity";
-import { DealFact, DealListingLink, DealPassReason, DealPrice, DealStageRow, DealUnits } from "./deal-detail";
+import { DealListingLink, DealPassReason, DealPrice, DealStageRow, DealUnits } from "./deal-detail";
 import { DealSheet } from "./deal-sheet";
 
 /**
@@ -33,7 +33,7 @@ export const loadDeal = cache((id: string) =>
 
 type LoadedDeal = NonNullable<Awaited<ReturnType<typeof loadDeal>>>;
 
-/** The facts, each changed where it stands: the stage, the two prices, the units, what's next and the listing, with the pass reason at Pass. */
+/** The facts, each changed where it stands: the stage, the two prices, the units and the listing, with the pass reason at Pass. (No next action since Nov 15, 2026: the notes beside them say what's next.) */
 function DealFacts({ deal }: { deal: LoadedDeal }) {
   return (
     <RailList>
@@ -41,7 +41,6 @@ function DealFacts({ deal }: { deal: LoadedDeal }) {
       <DealPrice id={deal.id} which="their" raw={deal.theirPriceRaw} />
       <DealPrice id={deal.id} which="our" raw={deal.ourPriceRaw} />
       <DealUnits id={deal.id} value={deal.units} />
-      <DealFact id={deal.id} field="nextAction" label="Next action" kind="text" value={deal.nextAction} empty="Add next action" />
       <DealListingLink id={deal.id} value={deal.sourceUrl} />
       {deal.status === "Pass" && <DealPassReason id={deal.id} value={deal.passReason} />}
     </RailList>
