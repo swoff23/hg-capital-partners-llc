@@ -131,7 +131,7 @@ test("missing upload code reads as paused on the tiles and in the counts, not as
     ],
     "waiting, but for the code",
   );
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 2, paused: 2, failed: 0, awaitingPage: 0, pendingKinds: ["image", "image"] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 2, paused: 2, failed: 0, refused: 0, awaitingPage: 0, pendingKinds: ["image", "image"] });
 
   // The code arrives and both go up: nothing is left to read paused.
   h.code.missing = false;

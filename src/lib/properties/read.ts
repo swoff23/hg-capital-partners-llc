@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/db";
+import { entityChoices } from "@/lib/properties/entity";
 
 /**
  * One property's own row, without its relations. `cache()` de-dupes within a
@@ -8,3 +9,12 @@ import { prisma } from "@/lib/db";
  * its Financials card each ask for it, and they share one query.
  */
 export const getPropertyById = cache((id: string) => prisma.property.findUnique({ where: { id } }));
+
+/**
+ * The Entity picker's rows (lib/properties/entity.ts entityChoices): the
+ * offered companies, then every name added on a property, archived ones too.
+ */
+export const getEntityChoices = cache(async () => {
+  const rows = await prisma.property.findMany({ where: { llcOwner: { not: null } }, distinct: ["llcOwner"], select: { llcOwner: true } });
+  return entityChoices(rows.map((r) => r.llcOwner));
+});

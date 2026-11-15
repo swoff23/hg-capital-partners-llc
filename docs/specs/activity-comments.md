@@ -870,7 +870,7 @@ Each slice is its own approval. Each runs `npm run typecheck`, `npm run lint`, `
 5. **Review.** The banner (3.6) and its one-line outcome, one Send back sheet, button order, Undo on Approve, decision pairs (including Mark done's note through `setStatus`).
 6. **Portal.** Updates on the timeline (3.4), the shared composer, the job-page notice (send back now; dates and notes per question 2), the leading dot on My jobs, masked codes, email content and anchors.
 7. **Deals.** Schema batch (question 1), backfill, record log (3.3), note box, Latest note.
-8. **Property and contractor logs,** with the property hub (D10).
+8. **Property and contractor logs,** with the property hub (D10). Archive and restore are the first two lines of each log, worded as the deal's are: "Connor archived this property" and "Connor restored this property", and "Connor archived this contractor" and "Connor restored this contractor". Until then an archive or restore leaves no trace.
 
 ## 5. Reuse check
 

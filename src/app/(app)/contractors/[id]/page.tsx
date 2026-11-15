@@ -332,7 +332,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               })}
             </ul>
           )}
-          {jobCount > tasks.length && <p className="mt-3 text-meta text-muted-foreground">Showing the latest {JOBS_SHOWN}</p>}
+          {jobCount > tasks.length && <Link href={`/tasks?status=all&owner=c:${id}`} className="flex min-h-10 items-center border-t border-border text-label text-fg-2 transition-colors hover:text-foreground pointer-coarse:min-h-12">See all jobs</Link>}
         </Section>
       </div>
     </div>

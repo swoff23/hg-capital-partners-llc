@@ -26,7 +26,7 @@ Nothing here gets built until Connor says "build it" in chat. It also builds onl
 |---|---|
 | T1 | Tenants are records with their own list, not a field on the unit. Past tenants are kept. Supersedes Q1 and Q23's "lease terms stay in Baselane" |
 | T2 | Everyone who lives in a unit is on its lease, and one tenant is the primary. Matches Q25 |
-| T3 | Option B, the useful extras. Each tenant: name, phone, email, emergency contact. Each lease: everyone on it, rent with the Section 8 split, deposit, each signed term, move-in and move-out, the signed PDF, notes. No date of birth, ID numbers, income or employer |
+| T3 | Option B, the useful extras. Each tenant: name, phone, email (Connor dropped the emergency contact later on Nov 14). Each lease: everyone on it, rent with the Section 8 split, deposit, each signed term, move-in and move-out, the signed PDF, notes. No date of birth, ID numbers, income or employer |
 | T4 | The import reads Connor's Baselane export and the signed leases. Connor checks the list before anything is saved |
 | T5 | Option A on the property page: a Tenants section under Units & access, one row per unit, past tenants below |
 | T6 | Tenants gets its own sidebar item under Portfolio, and the property page shows each property's tenants too. The list can be filtered by property |
@@ -56,8 +56,6 @@ model Tenant {
   phone          String?  // as shown: "716-555-1234 ext 2"
   phoneE164      String?  // what Call and Text dial, from readPhone
   email          String?
-  emergencyName  String?
-  emergencyPhone String?
   notes          String?  @db.Text
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -195,7 +193,7 @@ A new `TenantsSection` in `src/app/(app)/properties/[id]/`, right under `UnitsSe
 `src/app/(app)/tenants/[id]/page.tsx`, where the id is the lease's. A record page on the task page's grid: main column and a 320px Details rail from lg, a chip row below that.
 
 - **Header:** the back link "Tenants", a status mark (Current, Upcoming or Past, from `leaseStatus`, using `StatusMark`'s ring family: Upcoming the clock, Current the half ring, Past the slashed ring) and the title "647 Prospect · Front", whose address links to the property. The ⋯ menu: Copy link, and Delete lease (confirm: "Delete this lease? Its tenants stay in the app, but this stay, its terms and its files go for good.").
-- **Tenants** section: one row per person, the primary first with a "Primary" tag (`tagClass`). Each row: the name over the phone and email as meta, and the emergency contact as a second meta line when set. Call, Text (touch only, Q13) and Email icon links on the right, as on a contractor's record. A click on the row opens the person's sheet (`FormSheet`): name, phone, email, emergency contact, notes, "Make primary", "Remove from lease". **Add tenant** under the rows opens the same sheet empty, or lets staff pick someone already in the app.
+- **Tenants** section: one row per person, the primary first with a "Primary" tag (`tagClass`). Each row: the name over the phone and email as meta. Call, Text (touch only, Q13) and Email icon links on the right, as on a contractor's record. A click on the row opens the person's sheet (`FormSheet`): name, phone, email, notes, "Make primary", "Remove from lease". **Add tenant** under the rows opens the same sheet empty, or lets staff pick someone already in the app.
 - **Terms** section: one row per term, newest first: "Mar 1, 2026 to Feb 28, 2027 · $1,900", with "Tenant pays $400 · Housing authority $1,500" under it when there's a subsidy, and the signed PDF as a file link on the right (the files list's row). **Renew** adds a term starting the day after the last one ends, prefilled with its rent.
 - **Notes**: `InlineField` multiline, as on the task page.
 - **Earlier at this unit**: the unit's other leases, one line each as on the property page.
@@ -297,3 +295,7 @@ Part one (section 14's steps 1 and 2, and search) is built. What it decided insi
 - **Search** shows a tenant with the initials avatar contractors use, a "Past" tag on a past tenant, and their most relevant lease as the second line. Tenants aren't in Recent yet: `RecentKind` is a Postgres enum, so that waits for a migration.
 - **New lease** doesn't yet offer someone already in the app as you type a name (the service takes `{ tenantId }`, so it's a UI add). The lease page's Add tenant is new people only, for the same reason.
 - **The lease page's tab** reads the home ("647 Prospect Ave. · Front"), through a new `lease` record kind.
+- **No emergency contact** (Connor, Nov 14, after the build): migration `20261115170000_drop_tenant_emergency_contact` drops the two columns; the sheet, the lease page and the import no longer have them.
+- **The term forms ask for the two parts** (Connor, Nov 14): New lease and Renew ask **Tenant pays** and **Housing authority pays**; the term keeps the whole rent, their sum (`rentFromParts` in `src/lib/tenants/fields.ts`). Renew prefills both from the last term, so renewing on the same terms keeps the same rent. No "Saves as" line under the amounts.
+- **The housing authority's contact** (Connor, Nov 14): each term keeps the caseworker's name and email (`subsidyContact`, `subsidyEmail`, migration `20261115170100_lease_term_subsidy_email`), kept only with a share, like who pays. New lease and Renew ask for them under Who pays; Renew prefills them from the last term. The lease page's rail shows Who pays, Contact and Contact email under Housing authority, each saving inline, with a mail link beside the email. The import reads optional `subsidy_contact` and `subsidy_email` columns; leases already imported skip, so their contacts go in from the rail.
+- **The import ran on Nov 14**: 31 leases, 60 people and 38 terms into production from Connor's checked file (Cowork's export, with his corrections), without PDFs. The import now merges rows with the same name on one lease into one person, checks every term and stay overlap in the dry run, reads a file by any name (`--file`), runs without PDFs (`--skip-files`) and prints the database it's about to use.

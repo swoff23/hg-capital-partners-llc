@@ -5,10 +5,10 @@ import { del } from "@vercel/blob";
 import type { Prisma, Property } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
-import { splitAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, liveFirst, splitAddress } from "@/lib/address-suggestions";
 import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
-import { amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
-import { entityProblem } from "@/lib/properties/entity";
+import { ROOMS_LIMIT, SQFT_LIMIT, amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
+import { entityName } from "@/lib/properties/entity";
 import { cleanListing, type ListingInput } from "@/lib/properties/listing-clean";
 import { fmtDay, ymdToDate } from "@/lib/dates";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
@@ -25,6 +25,8 @@ import {
 } from "@/lib/property-types";
 import { rowConflict, isAtVersion, onConflict, staleFields } from "@/lib/properties/edits";
 import { setPropertyArchived } from "@/lib/archive";
+import { linkProperty } from "@/lib/deals/property-link";
+import { logError } from "@/lib/log";
 import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
 /**
@@ -42,10 +44,13 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  *   - whole-blob saves (units, building CapEx, listings) are guarded by the
  *     Property.updatedAt the editor pinned when Edit opened
  *   - every write records who made it (`updatedByUserId`), so a refusal can
- *     say "Pieter changed this at 2:14 PM" (forms 2.12)
+ *     say "Pieter changed this at 2:14 PM" (forms 2.12), or "You changed
+ *     this at 2:14 PM." when the newer save was the caller's own
  *   - archive and restore (lib/archive.ts) record who did it; an archived
  *     property leaves Portfolio, its totals, Home, search, the pickers and
  *     the move-in form, and its tasks keep working
+ *   - a new property links to its Closed deal when exactly one matches
+ *     (lib/deals/property-link.ts), with a line in that deal's log
  */
 
 /**
@@ -67,11 +72,13 @@ function revalidateProperty(id: string): void {
 /**
  * The refusal for a save that lost to a newer one: reads the row as it is
  * now, so the line can say who saved and when (and, for a field save, what
- * the fields hold now).
+ * the fields hold now). `by` is who is saving: when the newer save was their
+ * own, the line says "You changed this" (edits.ts `rowConflict`).
  */
 async function conflictOf(
   id: string,
   fields: string[],
+  by: Editor,
   opts: { values?: boolean; db?: Pick<typeof prisma, "property"> } = {},
 ): Promise<Error> {
   // Inside a transaction the read goes through it: a second connection would wait on the one the transaction holds.
@@ -80,7 +87,7 @@ async function conflictOf(
     include: { updatedByUser: { select: { name: true, email: true } } },
   });
   if (!row) return new Error("This property is gone.");
-  return rowConflict(row, fields, opts);
+  return rowConflict(row, fields, { values: opts.values, actorId: by?.id });
 }
 
 function versionDate(expectedVersion: string): Date | null {
@@ -97,7 +104,7 @@ async function updateAtVersion(
 ): Promise<void> {
   const version = versionDate(expectedVersion);
   const r = version ? await prisma.property.updateMany({ where: { id, updatedAt: version }, data: { ...data, ...stamp(by) } }) : { count: 0 };
-  if (r.count === 0) throw await conflictOf(id, [field]);
+  if (r.count === 0) throw await conflictOf(id, [field], by);
 }
 
 /* ---------------- Create ---------------- */
@@ -115,7 +122,7 @@ export async function findDuplicateProperty(address: string, opts: { excludeId?:
     where: { address: containsText(lead), ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
     orderBy: { updatedAt: "desc" },
   });
-  return candidates.find((p) => sameStreetAddress(p.address, address)) ?? null;
+  return liveFirst(candidates.filter((p) => sameStreetAddress(p.address, address)));
 }
 
 export interface NewProperty {
@@ -128,29 +135,47 @@ export async function createProperty(
   input: NewProperty,
   by: Editor,
 ): Promise<{ property: Property; duplicateOf?: undefined } | { property?: undefined; duplicateOf: Property }> {
-  const entity = entityProblem(input.llcOwner, null);
-  if (entity) throw new FieldError({ llcOwner: entity });
   const duplicateOf = await findDuplicateProperty(input.address);
   if (duplicateOf) return { duplicateOf };
   const property = await prisma.property.create({
-    data: { address: input.address.trim(), llcOwner: input.llcOwner || null, status: input.status || null, ...stamp(by) },
+    data: { address: input.address.trim(), llcOwner: entityName(input.llcOwner), status: input.status || null, ...stamp(by) },
   });
+  await linkToDeal(property.id, by);
   revalidatePath("/properties");
   return { property };
 }
 
+/**
+ * Links a property just added to its Closed deal, when exactly one matches
+ * (lib/deals/property-link.ts), and writes "Linked to 118 Congress St." in
+ * that deal's log. The property is saved by now, so a failure here is logged
+ * and never fails that save; the two stay unlinked, as before this existed.
+ */
+async function linkToDeal(id: string, by: Editor): Promise<void> {
+  try {
+    const linked = await prisma.$transaction((tx) => linkProperty(tx, id, by));
+    // The deal's page gains its "Converted to" line and its log the new line.
+    if (linked) {
+      revalidatePath(`/deals/${linked.dealId}`);
+      revalidatePath("/deals");
+    }
+  } catch (err) {
+    logError("properties:link-deal", err, { propertyId: id });
+  }
+}
+
 /* ---------------- Scalar details ---------------- */
 
-// Refi target, closing costs and rehab amount left the page (docs/specs/property-page.md):
+// Refi target, closing costs, rehab amount and strategy left the page (docs/specs/property-page.md):
 // their columns keep what they hold, and nothing writes them any more.
 
 const TEXT_FIELDS = [
-  "llcOwner", "attorney", "status", "strategy", "notes",
+  "llcOwner", "attorney", "status", "notes",
   "lender", "loanServicer", "loanNumber", "loanType",
   "insuranceCarrier", "insurancePolicyNo", "insuranceLiability",
 ] as const;
 const MONEY_FIELDS = [
-  "value", "replacementCost", "purchasePrice", "rehabMonths",
+  "value", "replacementCost", "purchasePrice", "rehabMonths", "baths",
   "loanOriginalAmount", "currentLoan", "loanRate", "loanPaymentMonthly",
   "insuranceCoverage", "insuranceDeductible", "insurancePremium",
 ] as const;
@@ -205,30 +230,27 @@ export async function patchProperty(
   for (const k of DATE_FIELDS) if (has(k)) data[k] = ymdToDate(s(k));
   if (has("loanEscrow")) data.loanEscrow = s("loanEscrow") === "yes";
   if (has("showOnMoveInForm")) data.showOnMoveInForm = s("showOnMoveInForm") === "yes";
-  if (has("sqft")) {
-    const r = readWholeNumber(patch.sqft);
-    if (r.ok) data.sqft = r.value;
+  for (const [k, limit] of [["sqft", SQFT_LIMIT], ["beds", ROOMS_LIMIT]] as const) {
+    if (!has(k)) continue;
+    const r = readWholeNumber(patch[k], limit);
+    if (r.ok) data[k] = r.value;
     else {
-      bad.push("sqft");
-      if (r.tooLarge) tooLarge.push("sqft");
+      bad.push(k);
+      if (r.tooLarge) tooLarge.push(k);
     }
   }
   // Nothing is written when a number didn't read: storing null would erase what's there.
   if (bad.length) throw new Error(badNumbersMessage(bad, tooLarge));
 
-  // Entity is one of the companies, or the value already stored (lib/properties/entity.ts).
-  if ("llcOwner" in data && data.llcOwner != null) {
-    const stored = await prisma.property.findUnique({ where: { id }, select: { llcOwner: true } });
-    const problem = entityProblem(data.llcOwner as string, stored?.llcOwner);
-    if (problem) throw new FieldError({ llcOwner: problem });
-  }
+  // Entity: a QuickBooks company in its own spelling, or a new name as typed (lib/properties/entity.ts).
+  if (has("llcOwner")) data.llcOwner = entityName(patch.llcOwner);
 
   // A rename onto an address another property has is refused on the address field, like New property's.
   if (typeof data.address === "string") {
     const stored = await prisma.property.findUnique({ where: { id }, select: { address: true } });
     if (stored && stored.address !== data.address) {
       const duplicateOf = await findDuplicateProperty(data.address, { excludeId: id });
-      if (duplicateOf) throw new FieldError({ address: `${splitAddress(duplicateOf.address).street} is already a property.` });
+      if (duplicateOf) throw new FieldError({ address: duplicateSentence("property", splitAddress(duplicateOf.address).street, duplicateOf.archivedAt !== null) });
     }
   }
 
@@ -241,10 +263,10 @@ export async function patchProperty(
       expected: Object.fromEntries(guarded.map((k) => [k, expected[k]])),
     };
     const stale = staleFields(current, edits);
-    if (stale.length > 0) throw rowConflict(current, stale, { values: true });
+    if (stale.length > 0) throw rowConflict(current, stale, { values: true, actorId: by?.id });
     // At the version just read, so a save that lands in between is refused too.
     const r = await prisma.property.updateMany({ where: { id, updatedAt: current.updatedAt }, data: { ...data, ...stamp(by) } });
-    if (r.count === 0) throw await conflictOf(id, guarded, { values: true });
+    if (r.count === 0) throw await conflictOf(id, guarded, by, { values: true });
   } else if (Object.keys(data).length > 0) {
     await prisma.property.update({ where: { id }, data: { ...data, ...stamp(by) } });
   }
@@ -370,10 +392,10 @@ async function writeUnitsAt(
   const renamed = await prisma.$transaction(async (tx) => {
     const current = await tx.property.findUnique({
       where: { id },
-      select: { units: true, unitCount: true, updatedAt: true, updatedByUser: { select: { name: true, email: true } } },
+      select: { units: true, unitCount: true, updatedAt: true, updatedByUserId: true, updatedByUser: { select: { name: true, email: true } } },
     });
     if (!current) throw new Error("This property is gone.");
-    if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["units"]);
+    if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["units"], { actorId: by?.id });
     const before = parseUnits(current.units);
     // With ids, placeholders included, as the page showed them to the editor.
     const clean: PropertyUnit[] = next(withUnitIds(before)).map((u) => ({
@@ -397,7 +419,7 @@ async function writeUnitsAt(
       where: { id, updatedAt: current.updatedAt },
       data: { units: stored as unknown as object, unitCount, ...stamp(by) },
     });
-    if (r.count === 0) throw await conflictOf(id, ["units"], { db: tx });
+    if (r.count === 0) throw await conflictOf(id, ["units"], by, { db: tx });
     const countChanged = unitCount !== current.unitCount;
     if (renames.length === 0) return { listings: 0, tasks: [], countChanged };
     // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
@@ -434,10 +456,10 @@ export async function mergeBuildingCapex(id: string, patch: BuildingCapexPatch, 
 async function writeBuildingCapex(id: string, patch: BuildingCapexPatch, expectedVersion: string, by: Editor): Promise<void> {
   const current = await prisma.property.findUnique({
     where: { id },
-    select: { buildingCapex: true, updatedAt: true, updatedByUser: { select: { name: true, email: true } } },
+    select: { buildingCapex: true, updatedAt: true, updatedByUserId: true, updatedByUser: { select: { name: true, email: true } } },
   });
   if (!current) throw new Error("This property is gone.");
-  if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["buildingCapex"]);
+  if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["buildingCapex"], { actorId: by?.id });
 
   const clean: Record<string, BuildingCapexEntry> = { ...(parseBuildingCapex(current.buildingCapex) as Record<string, BuildingCapexEntry>) };
   for (const [key, v] of Object.entries(patch)) {
@@ -556,7 +578,7 @@ async function touchAtVersion(tx: Prisma.TransactionClient, propertyId: string, 
   if (touched.count === 0) {
     // The refused sheet's page comes back on the latest with the refusal.
     revalidatePath(`/properties/${propertyId}`);
-    throw await conflictOf(propertyId, ["listings"], { db: tx });
+    throw await conflictOf(propertyId, ["listings"], by, { db: tx });
   }
 }
 

@@ -82,11 +82,13 @@ export async function tenantRows(opts: { view: TenantView; propertyIds?: readonl
       });
     }
   }
+  // Within a unit: who lives there now, then who's moving in, then who's gone.
+  const statusRank: Record<LeaseStatus, number> = { current: 0, upcoming: 1, past: 2 };
   return rows.sort(
     (a, b) =>
       compareStreet(a.address, b.address) ||
       a.unitOrder - b.unitOrder ||
-      (a.status === b.status ? 0 : a.status === "past" ? 1 : -1) ||
+      statusRank[a.status] - statusRank[b.status] ||
       Number(b.primary) - Number(a.primary) ||
       a.fullName.localeCompare(b.fullName),
   );

@@ -7,6 +7,7 @@ import { dayAfter } from "@/lib/tenants/status";
 import { LeasePageView } from "./view";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
+import { tenantShare } from "@/lib/tenants/fields";
 
 /** The tab names the household's home (record-title.ts), so tabs and history can be told apart. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -52,8 +53,6 @@ export default async function LeasePage({ params }: { params: Promise<{ id: stri
         phone: t.tenant.phone,
         phoneE164: t.tenant.phoneE164,
         email: t.tenant.email,
-        emergencyName: t.tenant.emergencyName,
-        emergencyPhone: t.tenant.emergencyPhone,
         notes: t.tenant.notes,
         primary: t.primary,
       }))}
@@ -61,8 +60,13 @@ export default async function LeasePage({ params }: { params: Promise<{ id: stri
       termDefaults={{
         // The day after the last term ends; a month-to-month last term leaves the day for staff to enter.
         startsOn: last ? (lastEnd ? dayAfter(lastEnd) : "") : (toYmd(lease.movesIn) ?? today),
-        rent: last ? String(Number(last.rent)) : "",
+        // The same split as the last term: what the tenant paid and the housing authority's share.
+        tenantPays: last ? String(tenantShare(last.rent.toString(), last.subsidy?.toString() ?? null)) : "",
+        subsidy: last?.subsidy ? String(Number(last.subsidy)) : "",
         subsidyFrom: last?.subsidyFrom ?? "",
+        // The caseworker usually stays the same across renewals.
+        subsidyContact: last?.subsidyContact ?? "",
+        subsidyEmail: last?.subsidyEmail ?? "",
         first: lease.terms.length === 0,
       }}
       facts={{
@@ -80,6 +84,9 @@ export default async function LeasePage({ params }: { params: Promise<{ id: stri
               id: now.term.id,
               rent: String(Number(now.term.rent)),
               subsidy: now.term.subsidy ? String(Number(now.term.subsidy)) : "",
+              subsidyFrom: now.term.subsidyFrom ?? "",
+              subsidyContact: now.term.subsidyContact ?? "",
+              subsidyEmail: now.term.subsidyEmail ?? "",
               endsOn: toYmd(now.term.endsOn),
             }
           : null,

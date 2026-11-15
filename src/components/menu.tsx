@@ -44,6 +44,12 @@ import { pickContainer, type PickContainer } from "@/components/use-coarse-point
  * so screen readers hear the current value. `selectionMode="multiple"` puts a
  * checkbox at each item's leading edge instead. A navigation menu marks its
  * page with `current` on the item, never with selection.
+ *
+ * An anchored menu is as wide as its longest item and never wider than the
+ * screen less the 16px gutters. Only when that cap bites (a narrow phone, a
+ * zoomed page, a long word to come) do an item's label and description wrap,
+ * since touch has no hover to read a cut-off line with. Copy still keeps to
+ * one line; the wrap is the guard, not the plan.
  */
 
 /** Opens its Menu from the first pressable child. Re-export of React Aria's MenuTrigger. */
@@ -187,7 +193,13 @@ export function Menu<T extends object>({
   }
 
   return (
-    <PopoverSurface placement={placement} motion="none" className="min-w-40">
+    <PopoverSurface
+      placement={placement}
+      motion="none"
+      // The list takes its content's width first (w-max), so its items wrap only at the cap, never early
+      // because of where the panel happens to be anchored. A follow-up question keeps its own widths.
+      className={cn("min-w-40 max-w-[calc(100vw_-_2rem)]", !step && "w-max")}
+    >
       {step ? (
         <Dialog aria-label={step.title} className="min-w-64 max-w-80 outline-none">
           <div className="flex items-center gap-1 border-b border-border py-1 pl-1 pr-3">
@@ -240,7 +252,7 @@ export function MenuItem({
   current?: boolean;
   /** A printed shortcut ("⌘C"), React Aria's Keyboard slot drawn as a Kbd. Hidden on touch. */
   shortcut?: string;
-  /** One line of text-meta --muted-foreground under the label; the row grows to 44 (56 on touch). */
+  /** A line of text-meta --muted-foreground under the label; the row grows to 44 (56 on touch). Write it to fit one line: it wraps only when the menu is capped at the screen's width. */
   description?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -264,8 +276,10 @@ export function MenuItem({
               )
       }
       className={cn(
-        "flex cursor-default select-none items-center gap-2 whitespace-nowrap rounded-sm px-2 text-body outline-none",
-        description ? "min-h-11 py-1.5 pointer-coarse:min-h-14" : "h-8 pointer-coarse:h-11",
+        // No nowrap: in a menu capped at the screen's width the label wraps (and a long word breaks) instead of
+        // scrolling the panel sideways. The row is at least its old height and grows only for a second line.
+        "flex cursor-default select-none items-center gap-2 rounded-sm px-2 text-body outline-none [overflow-wrap:anywhere]",
+        description ? "min-h-11 py-1.5 pointer-coarse:min-h-14" : "min-h-8 py-1 pointer-coarse:min-h-11",
         variant === "destructive"
           ? "text-destructive data-focused:bg-destructive-tint"
           // Focus draws the highlight with a mouse and a keyboard; on touch only a visible (keyboard) focus does, so opening a list doesn't paint its first row.
@@ -291,10 +305,8 @@ export function MenuItem({
           )}
           {description ? (
             <span className="flex min-w-0 flex-1 flex-col">
-              <Text slot="label" className="truncate">
-                {children}
-              </Text>
-              <Text slot="description" className="truncate text-meta text-muted-foreground">
+              <Text slot="label">{children}</Text>
+              <Text slot="description" className="text-meta text-muted-foreground">
                 {description}
               </Text>
             </span>
@@ -303,7 +315,7 @@ export function MenuItem({
           )}
           {/* A number key is printed for a mouse and kept out of the item's name ("To do", not "To do 1"), as the date picks do. */}
           {printed && (
-            <Keyboard aria-hidden={shortcut === undefined ? true : undefined} className={cn(kbdClass, "ml-auto")}>
+            <Keyboard aria-hidden={shortcut === undefined ? true : undefined} className={cn(kbdClass, "ml-auto shrink-0 whitespace-nowrap")}>
               {printed}
             </Keyboard>
           )}

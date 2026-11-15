@@ -1,6 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { Prisma } from "@prisma/client";
+import { FieldError } from "@/lib/action-result";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { loginThrottle } from "@/lib/login-throttle";
@@ -67,7 +68,7 @@ export async function createPortalAccount(
   createdByUser: Staff,
 ): Promise<{ account: CreatedPortalAccount; password: string }> {
   const email = normalizeEmail(rawEmail);
-  if (!looksLikeEmail(email)) throw new PortalAccountError("Enter a valid email.");
+  if (!looksLikeEmail(email)) throw new FieldError({ email: "Enter a valid email." });
 
   const password = generateStartingPassword();
   const passwordHash = await hashPassword(password);
@@ -98,12 +99,12 @@ export async function createPortalAccount(
  */
 export async function changePortalEmail(accountId: string, rawEmail: string, byUser: Staff): Promise<{ email: string }> {
   const email = normalizeEmail(rawEmail);
-  if (!looksLikeEmail(email)) throw new PortalAccountError("Enter a full email, like name@example.com.");
+  if (!looksLikeEmail(email)) throw new FieldError({ email: "Enter a full email, like name@example.com." });
   try {
     await prisma.$transaction((tx) => changePortalEmailIn(tx, accountId, email, byUser));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new PortalAccountError("Another contractor already uses that email.");
+      throw new FieldError({ email: "Another contractor already uses that email." });
     }
     throw err;
   }

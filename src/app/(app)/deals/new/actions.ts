@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
-import { splitAddress, tidyAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, splitAddress, tidyAddress } from "@/lib/address-suggestions";
 import { withResult } from "@/lib/server-action";
 import { newDealSchema } from "@/lib/deals/fields";
 import { addDealNote } from "@/lib/deals/notes";
@@ -35,7 +35,8 @@ export async function createDeal(formData: FormData): Promise<ActionResult<Creat
     if (r.duplicateOf) {
       // The address field's refusal, with the street as the record has it.
       const street = splitAddress(r.duplicateOf.address).street;
-      throw new z.ZodError([{ code: "custom", path: ["address"], message: `${street} is already a deal.`, input: p.address }]);
+      const message = duplicateSentence("deal", street, r.duplicateOf.archivedAt !== null);
+      throw new z.ZodError([{ code: "custom", path: ["address"], message, input: p.address }]);
     }
     if (note) await addDealNote(r.deal.id, note, user);
     return { id: r.deal.id, address: r.deal.address, status: r.deal.status };

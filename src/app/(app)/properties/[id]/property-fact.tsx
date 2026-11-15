@@ -84,6 +84,7 @@ export function PropertyMoveInSwitch({ id, shown }: { id: string; shown: boolean
         label="Show on move-in form"
         field="showOnMoveInForm"
         value={shown ? "yes" : "no"}
+        words={{ on: "Shown", off: "Hidden" }}
         message={(next) => (next === "yes" ? "Shown on the move-in form" : "Off the move-in form")}
         onSave={(next, expected) => patchProperty(id, { showOnMoveInForm: next }, { showOnMoveInForm: expected })}
       />

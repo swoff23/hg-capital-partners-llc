@@ -1,9 +1,6 @@
-import { Phone } from "lucide-react";
-import { BackLink } from "@/components/back-link";
 import { Block, LoadingScreen, rowWidth } from "@/components/skeleton";
-import { Section, buttonClass } from "@/components/ui";
-import { officeTelHref } from "@/lib/portal/office";
-import { cn } from "@/lib/utils";
+import { Section } from "@/components/ui";
+import { JobHeader } from "./_components/job-header";
 
 /** An address button's frame: Directions and Copy address, side by side. */
 const action = "h-9 min-w-0 flex-1 rounded-md pointer-coarse:h-11 sm:w-32 sm:flex-none";
@@ -16,19 +13,9 @@ const action = "h-9 min-w-0 flex-1 rounded-md pointer-coarse:h-11 sm:w-32 sm:fle
  * a block too. Nothing here reads the session or the job.
  */
 export default function JobLoading() {
-  const tel = officeTelHref();
   return (
     <LoadingScreen>
-      <header className="sticky top-0 z-20 border-b border-border bg-canvas">
-        <div className="mx-auto flex h-14 max-w-300 items-center justify-between gap-3 px-2 sm:px-4 lg:px-6">
-          <BackLink fallback="/p" label="My jobs" className="h-11 rounded-md px-2 text-label text-fg-2" />
-          {tel && (
-            <a href={tel} aria-label="Call HG" className={cn(buttonClass({ variant: "ghost", icon: true }), "h-11 w-11")}>
-              <Phone className="h-5 w-5" aria-hidden="true" />
-            </a>
-          )}
-        </div>
-      </header>
+      <JobHeader />
 
       <main className="mx-auto max-w-300 pb-12">
         <Block className="aspect-video w-full sm:hidden" />

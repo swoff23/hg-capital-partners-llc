@@ -7,7 +7,9 @@ import { Section } from "@/components/ui";
  * the person's name and the summary line their counts, so both are blocks at
  * their own line heights; Today's Mine and Contractors columns draw their
  * names from lg, with a section of task rows each, on TaskRow's own boxes.
- * Below lg the column switch holds its place. In Home's own route group, so
+ * Below lg the column switch holds its place. Needs you is conditional, so its
+ * heading is a block, with one two-line row (the CapEx row is there all year) and
+ * the page's own gap under it. In Home's own route group, so
  * no other page borrows its shape.
  */
 export default function HomeLoading() {
@@ -20,6 +22,16 @@ export default function HomeLoading() {
           <Block text="text-body" className="w-40" />
         </div>
       </div>
+
+      {/* Needs you: a heading block and one row (title over place), at NeedsYou's own boxes and gap. */}
+      <Section title={<Block text="text-section" className="w-24" />} className="mb-8 pointer-coarse:mb-6">
+        <ul className="@container">
+          <li className="-mx-2 flex min-h-10 flex-col justify-center px-2 py-2 pointer-coarse:min-h-12">
+            <Block text="text-body" className="w-48" />
+            <Block text="text-meta" className="w-32" />
+          </li>
+        </ul>
+      </Section>
 
       {/* The Mine | Contractors switch below lg: its track, shaped by its words. */}
       <span aria-hidden="true" className="mb-4 inline-flex shrink-0 items-center gap-0.5 rounded-md bg-muted p-0.5 lg:hidden">

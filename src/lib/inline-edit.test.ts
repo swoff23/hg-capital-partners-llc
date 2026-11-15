@@ -93,6 +93,9 @@ test("inlineConflictLine: a value says what it is now; a note says who changed i
   assert.match(inlineConflictLine("money", { by: "Pieter Louw", at }, "$410,000", now), /^Pieter set this to \$410,000 at 2:14\sPM$/);
   assert.match(inlineConflictLine("multiline", { by: "Pieter Louw", at }, notes, now), /^Pieter changed this at 2:14\sPM$/);
   assert.match(inlineConflictLine("multiline", { at }, notes, now), /^This changed at 2:14\sPM$/);
+  // Your own newer change (design call 19): the field line and the note's line both say You.
+  assert.match(inlineConflictLine("money", { at, mine: true }, "$410,000", now), /^You set this to \$410,000 at 2:14\sPM$/);
+  assert.match(inlineConflictLine("multiline", { at, mine: true }, notes, now), /^You changed this at 2:14\sPM$/);
   assert.equal(inlineConflictLine("multiline", { by: "Pieter Louw", at: "2026-10-24T18:14:00Z" }, notes, now), "Pieter changed this on Oct 24");
   // Cleared notes fit as they are.
   assert.match(inlineConflictLine("multiline", { by: "Pieter Louw", at }, "", now), /^Pieter cleared this at 2:14\sPM$/);

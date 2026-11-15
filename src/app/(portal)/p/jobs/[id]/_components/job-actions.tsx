@@ -46,7 +46,8 @@ import {
   sendOutcome,
   settleLost,
   stripCounts,
-  TOO_MANY_FILES,
+  RETRY_PAST_CAP,
+  RETRY_PAST_CAP_IN_SHEET,
   unconfirmedIds,
   type LostSend,
 } from "@/lib/portal/job-view";
@@ -399,7 +400,7 @@ export function JobActions({
     // refuses 5 with the reason. A Retry past it keeps its failed tile and Retry, and toasts the way on (engine.ts retry).
     maxFiles: postRoom(ready.length + posting),
     maxFilesReason: MAX_FILES_REASON,
-    maxFilesNotice: TOO_MANY_FILES,
+    maxFilesNotice: sheetOpen ? RETRY_PAST_CAP_IN_SHEET : RETRY_PAST_CAP,
     // Photos go up upright, as a 2560px JPEG without GPS and without the original (question 3).
     prepare: "display",
     record,

@@ -12,12 +12,16 @@ export type RailFoldRow = FoldRow & { node: ReactNode };
  * A facts rail whose empty rows fold behind one "7 more fields" row
  * (docs/specs/property-page.md 2.2; Attio's "Show all values", Lightfield's
  * "See more"). Folded, the list shows the filled rows and the kept ones
- * (`keep`: a reminder date, a switch); the foot row opens the rest in place,
- * in their usual order, and turns into "Fewer fields". It has the look of
- * the list's `AddRow`: 40px, 48 on touch, the same at every width, nothing
- * on hover alone. It starts closed on every visit.
+ * (`keep`: a reminder date, a switch), never a `fold` row (a detail most
+ * visits don't need, filled or not); the foot row opens the rest under them,
+ * in their usual order, so the rows already shown never move, and turns into
+ * "Fewer fields". It has the look of the list's `AddRow`: 40px, 48 on touch,
+ * the same at every width, nothing on hover alone. It starts closed on every
+ * visit.
  *
- * A row filled on this visit stays out of the fold after it's cleared, so a
+ * While it's open the lower rows are the ones it opened with, so a field
+ * filled there doesn't jump up under the finger; closing sorts them again. A
+ * row filled on this visit stays out of the fold after it's cleared, so a
  * cleared field doesn't vanish under the finger. A verb elsewhere that asks
  * for a folded row (the fact strip's "Add value") opens the fold through
  * `listen`, and `reopen` asks again once the row is in, so its field opens.
@@ -33,7 +37,9 @@ export function RailFold({
   /** Asks for `key` again once the fold has opened, so the row's own field takes the request. */
   reopen?: (key: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  // The rows the fold opened with, held while it's open; null when it's closed.
+  const [opened, setOpened] = useState<readonly string[] | null>(null);
+  const open = opened !== null;
   // The row a verb elsewhere asked for while it was folded, asked for again once the fold is open.
   const asked = useRef<string | null>(null);
   // The rows seen filled on this visit; a filled row joins as it renders (state adjusted during render, as React allows).
@@ -42,14 +48,14 @@ export function RailFold({
   if (newlyFilled.length > 0) setSeen(new Set([...seen, ...newlyFilled.map((r) => r.key)]));
 
   const folded = foldedKeys(rows, seen);
-  const hidden = open ? [] : folded;
-  const hiddenKey = hidden.join(",");
+  const lower = opened ?? folded;
+  const hiddenKey = open ? "" : folded.join(",");
 
   useEffect(() => {
     if (!listen || !hiddenKey) return;
     return listen(hiddenKey.split(","), (key) => {
       asked.current = key;
-      setOpen(true);
+      setOpened(hiddenKey.split(","));
     });
   }, [listen, hiddenKey]);
 
@@ -64,12 +70,13 @@ export function RailFold({
   return (
     <>
       <RailList>
-        {rows.filter((r) => !hidden.includes(r.key)).map((r) => (
+        {/* The shown rows, then (open) the folded ones under them, each group in its usual order. */}
+        {[...rows.filter((r) => !lower.includes(r.key)), ...(open ? rows.filter((r) => lower.includes(r.key)) : [])].map((r) => (
           <Fragment key={r.key}>{r.node}</Fragment>
         ))}
       </RailList>
-      {folded.length > 0 && (
-        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={addRowClass}>
+      {lower.length > 0 && (
+        <button type="button" aria-expanded={open} onClick={() => setOpened(open ? null : folded)} className={addRowClass}>
           {open ? (
             <ChevronUp aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
           ) : (

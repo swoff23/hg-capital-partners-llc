@@ -451,7 +451,7 @@ test("only access-code.ts in portal code mentions units", () => {
   assert.deepEqual(bad, [], "Property.units holds lockbox codes; read it only through src/lib/portal/access-code.ts");
 });
 
-// Rent, deposits, emails, emergency contacts and lease files never reach a contractor: portal code reads the
+// Rent, deposits, emails, notes and lease files never reach a contractor: portal code reads the
 // tenant and lease tables in access-code.ts alone, and only a job's living tenants' names and numbers there.
 const TENANT_TABLE = /\.(lease|leaseTenant|leaseTerm|leaseFile|tenant)\s*\./;
 

@@ -70,15 +70,18 @@ test("dealConflict: names the person and carries what the field holds now; witho
   assert.match(without.message, /^This changed /);
 });
 
-test("dealConflict: your own save from another tab names no one, so it doesn't read as someone else's", () => {
+test("dealConflict: your own save from another tab says You, so it doesn't read as someone else's", () => {
   const at = new Date("2026-10-27T12:31:00.000Z");
   const row = { ...stored, theirPriceRaw: "111", updatedAt: at, updatedByUserId: "u_connor", updatedByUser: { name: "Connor Swofford", email: "connor@example.com" } };
   const now = new Date("2026-10-27T13:00:00.000Z");
   // It said "Connor set this to $111 at 8:31 AM" with "Keep Connor's", to Connor.
   const yours = dealConflict(row, ["theirPriceRaw"], "u_connor");
-  assert.equal(yours.conflict.by, undefined);
+  assert.equal(yours.conflict.by, undefined, "the name is left out, so it can never show");
+  assert.equal(yours.conflict.mine, true);
   assert.deepEqual(yours.conflict.theirs, { theirPriceRaw: "111" });
-  assert.equal(conflictValueLine(yours.conflict, "$111", now), "This changed to $111 at 8:31 AM");
+  // Design call 19 (Nov 14): "You", where it read "This changed to $111 at 8:31 AM" from Nov 3.
+  assert.equal(conflictValueLine(yours.conflict, "$111", now), "You set this to $111 at 8:31 AM");
+  assert.match(yours.message, /^You changed this (at|on) /);
   assert.equal(conflictKeepLabel(yours.conflict), "Keep current");
   // Someone else's still says who.
   const theirs = dealConflict(row, ["theirPriceRaw"], "u_pieter");

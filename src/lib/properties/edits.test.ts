@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ConflictError } from "@/lib/action-result";
+import { ConflictError, conflictKeepLabel } from "@/lib/action-result";
 import { switchSave } from "@/lib/inline-edit";
 import { changedFields, editorName, fieldText, isAtVersion, onConflict, rowConflict, sameText, staleFields } from "./edits";
 
@@ -24,6 +24,40 @@ test("rowConflict: a row that doesn't record who says so without a name", () => 
   assert.equal(editorName({ name: null, email: "pieter@example.com" }), "pieter@example.com");
   assert.equal(byEmail.conflict.by, "pieter@example.com");
   assert.match(byEmail.message, /^Pieter changed this /);
+});
+
+test("rowConflict: your own newer save says You and names no one (design call 19)", () => {
+  const at = new Date("2026-10-23T18:14:00.000Z");
+  const row = { updatedAt: at, updatedByUserId: "u_connor", updatedByUser: { name: "Connor Swofford", email: "connor@example.com" }, value: "410000" };
+  // It read "Connor changed this at 2:14 PM." and "Keep Connor's", to Connor.
+  const yours = rowConflict(row, ["value"], { values: true, actorId: "u_connor" });
+  assert.deepEqual(yours.conflict, { fields: ["value"], at: at.toISOString(), mine: true, theirs: { value: "410000" } });
+  assert.match(yours.message, /^You changed this /);
+  assert.equal(conflictKeepLabel(yours.conflict), "Keep current");
+  // A whole-blob editor (units, building CapEx, listings) the same way.
+  assert.match(rowConflict(row, ["units"], { actorId: "u_connor" }).message, /^You changed this /);
+  // Someone else's save, an unknown caller, and a row with no last editor are as they were.
+  assert.equal(rowConflict(row, ["value"], { actorId: "u_pieter" }).conflict.by, "Connor Swofford");
+  assert.equal(rowConflict(row, ["value"], {}).conflict.by, "Connor Swofford");
+  assert.equal(rowConflict({ updatedAt: at, updatedByUserId: null, updatedByUser: null }, ["value"], { actorId: "u_connor" }).conflict.mine, undefined);
+});
+
+test("every property save hands its conflict the person saving, and reads the row's last editor id to compare (design call 19)", async () => {
+  // service.ts talks to the database, so its source is read.
+  const { readFileSync } = await import("node:fs");
+  const service = readFileSync(new URL("./service.ts", import.meta.url), "utf8");
+  // No conflict is built without the actor: each rowConflict passes actorId, each conflictOf passes `by`.
+  const built = service.match(/throw rowConflict\([^\n]*\);/g) ?? [];
+  assert.equal(built.length, 3);
+  for (const call of built) assert.match(call, /actorId: by\?\.id \}\);$/, call);
+  const read = service.match(/throw await conflictOf\([^\n]*\);/g) ?? [];
+  assert.equal(read.length, 4);
+  for (const call of read) assert.match(call, /^throw await conflictOf\([a-zA-Z]+, \[[^\]]*\]|^throw await conflictOf\([a-zA-Z]+, guarded/, call);
+  for (const call of read) assert.match(call, /, by(, \{[^}]*\})?\);$/, call);
+  assert.match(service, /return rowConflict\(row, fields, \{ values: opts\.values, actorId: by\?\.id \}\);/);
+  // The two saves that select columns by name read the last editor's id too, or the comparison would never match.
+  assert.match(service, /select: \{ units: true, unitCount: true, updatedAt: true, updatedByUserId: true,/);
+  assert.match(service, /select: \{ buildingCapex: true, updatedAt: true, updatedByUserId: true,/);
 });
 
 test("rowConflict: a whole-blob editor names the blob and carries no values", () => {

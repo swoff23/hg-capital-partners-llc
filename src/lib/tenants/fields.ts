@@ -26,7 +26,7 @@ export type Read<T> = { ok: true; data: T } | { ok: false; problems: Problems };
 
 type Input = Partial<Record<string, string | null | undefined>>;
 
-const TENANT_MAX = { fullName: 120, phone: 40, email: 254, emergencyName: 120, emergencyPhone: 40, notes: 10_000 } as const;
+const TENANT_MAX = { fullName: 120, phone: 40, email: 254, notes: 10_000 } as const;
 export type TenantField = keyof typeof TENANT_MAX;
 export const TENANT_FIELDS = Object.keys(TENANT_MAX) as TenantField[];
 
@@ -35,8 +35,6 @@ export type TenantData = {
   phone?: string | null;
   phoneE164?: string | null;
   email?: string | null;
-  emergencyName?: string | null;
-  emergencyPhone?: string | null;
   notes?: string | null;
 };
 
@@ -72,12 +70,6 @@ export function readTenant(input: Input, mode: "new" | "patch"): Read<TenantData
         const read = readPhone(text);
         if (!read) problems.phone = PHONE_INVALID;
         else Object.assign(data, read);
-        break;
-      }
-      case "emergencyPhone": {
-        // Kept as shown: nothing dials it from the app.
-        if (text && !readPhone(text)) problems.emergencyPhone = PHONE_INVALID;
-        else data.emergencyPhone = text ? readPhone(text)!.phone : null;
         break;
       }
       case "email": {
@@ -130,6 +122,9 @@ export type TermData = {
   rent: string; // a Decimal string, "1900.00"
   subsidy: string | null;
   subsidyFrom: string | null;
+  /** The housing authority's contact for this term (the Section 8 caseworker): kept only with a share. */
+  subsidyContact: string | null;
+  subsidyEmail: string | null;
 };
 
 /** One signed term: when it runs, the whole rent and the housing authority's share of it. */
@@ -151,6 +146,10 @@ export function readTerm(input: Input): Read<TermData> {
 
   const from = oneLine(input.subsidyFrom ?? "");
   if (from.length > 200) problems.subsidyFrom = tooLong(200);
+  const contact = oneLine(input.subsidyContact ?? "");
+  if (contact.length > 120) problems.subsidyContact = tooLong(120);
+  const email = normalizeEmail(input.subsidyEmail ?? "");
+  if (email && !looksLikeEmail(email)) problems.subsidyEmail = EMAIL_INVALID;
 
   if (Object.keys(problems).length) return { ok: false, problems };
   const share = subsidy.ok && subsidy.value ? toDecimalString(subsidy.value) : null;
@@ -161,8 +160,10 @@ export function readTerm(input: Input): Read<TermData> {
       endsOn: endsOn ?? null,
       rent: toDecimalString((rent as { value: number }).value)!,
       subsidy: share,
-      // Who pays only means something with a share.
+      // Who pays, and their contact, only mean something with a share.
       subsidyFrom: share ? from || null : null,
+      subsidyContact: share ? contact || null : null,
+      subsidyEmail: share ? email || null : null,
     },
   };
 }
@@ -179,4 +180,24 @@ export function tenantShare(rent: string | number, subsidy: string | number | nu
   const r = Number(rent);
   const s = subsidy == null ? 0 : Number(subsidy);
   return Math.max(0, Math.round((r - s) * 100) / 100);
+}
+
+export const TENANT_PAYS_REQUIRED = "Enter what the tenant pays each month.";
+
+/**
+ * The whole monthly rent from the two parts the forms ask for (Connor, Nov 14):
+ * what the tenant pays and the housing authority's share. Blank Tenant pays is
+ * $0 when the housing authority covers it all; with no share either, it's
+ * required. The rent saves as their sum, so the share stays at most the rent.
+ */
+export function rentFromParts(tenantPays: string, subsidy: string): Read<{ rent: string }> {
+  const tenant = readNumber("money", tenantPays ?? "");
+  const share = readNumber("money", subsidy ?? "");
+  const problems: Problems = {};
+  if (!tenant.ok) problems.tenantPays = tenant.message;
+  if (!share.ok) problems.subsidy = share.message;
+  if (Object.keys(problems).length) return { ok: false, problems };
+  const total = ((tenant as { value: number | null }).value ?? 0) + ((share as { value: number | null }).value ?? 0);
+  if (total <= 0) return { ok: false, problems: { tenantPays: TENANT_PAYS_REQUIRED } };
+  return { ok: true, data: { rent: toDecimalString(total)! } };
 }

@@ -8,7 +8,7 @@ It builds on its own branch. land-nov3 is live and job emails landed on Nov 14, 
 
 **Why.** Nothing tells anyone when the app breaks.
 
-- **Error screens.** Five error boundaries show a crash only to the person who hit it. `src/app/(app)/error.tsx` and `src/app/(portal)/p/error.tsx` render `src/components/error-screen.tsx`. `src/app/login/error.tsx` and `src/app/(portal)/p/welcome/error.tsx` render `src/app/login/_components/auth-crash.tsx`. `src/app/(marketing)/error.tsx` has its own. They say "That page didn't load" or "That didn't save".
+- **Error screens.** Six error boundaries show a crash only to the person who hit it. `src/app/(app)/error.tsx`, `src/app/(portal)/p/error.tsx` and a job's own `src/app/(portal)/p/jobs/[id]/error.tsx` (under the job page's header, design call 3) render `src/components/error-screen.tsx`. `src/app/login/error.tsx` and `src/app/(portal)/p/welcome/error.tsx` render `src/app/login/_components/auth-crash.tsx`. `src/app/(marketing)/error.tsx` has its own. They say "That page didn't load" or "That didn't save".
 - **Server errors.** Each is one JSON line from `src/lib/log.ts`, seen in Vercel's Logs tab and nowhere else. Besides the server action wrappers, 34 places catch an error, log it and carry on, among them a reply by email that didn't post, the 8 am emails, a failed QuickBooks sync and a password reset email that didn't send.
 - **Health.** `/api/health` reports the database, but nothing checks it.
 - **Email is live.** Since Nov 14 production sends job emails every minute and takes replies by email. With Asana gone and contractors on the portal, a broken page or a stuck email queue could go unnoticed for days.
@@ -32,7 +32,7 @@ It builds on its own branch. land-nov3 is live and job emails landed on Nov 14, 
 | Q4 | What's sent: the error message, the code location, the page address, the area, and staff or contractor by ID. What never leaves the app: form contents, notes, comments, lockbox codes, tenant names or phones, emails, names, cookies and IP addresses. Session replay stays off |
 | Q5 | Connor confirms Supabase's daily backups (7 days on Pro) are on. Point-in-time restore is skipped for now |
 | Q6 | Sentry's browser package loads after the page is ready, and a tiny catcher holds earlier errors until then. Errors in the first second lose only their click trail |
-| Q7 | Only unexpected errors alert: anything that ends on an error screen or on the generic "We couldn't save that" line (`GENERIC_ERROR`). Conflicts, field messages and plain refusals ("This job is closed.") never do. Production only. Each error is tagged with its area (staff app, contractor portal, public site) and with staff or contractor |
+| Q7 | Only unexpected errors alert: anything that ends on an error screen or on the generic "Couldn't save" line (`GENERIC_ERROR`). Conflicts, field messages and plain refusals ("This job is closed.") never do. Production only. Each error is tagged with its area (staff app, contractor portal, public site) and with staff or contractor |
 | Q8 | Better Stack checks `/api/health` (it tests the database) and the public home page every 3 minutes. It alerts after 2 misses in a row (about 6 minutes) and sends a recovery notice. *Changed by Q21: Sentry runs the health check, and the home page check is dropped* |
 | Q9 | Stopped means: the email job misses its check-in for 10 minutes; an email is more than 15 minutes past its send time or has failed 3 times; QuickBooks has had no successful sync in 26 hours. Each check is quiet while email or QuickBooks is off. *Q15 sharpens the email rules. Under Q21 a missed check-in alerts after about 5 minutes, not 10, because Sentry counts misses in a row rather than waiting out a long grace period* |
 | Q10 | `docs/alerts.md` covers each alert, what it means and what to send Claude. Every check's description links to it |
@@ -57,7 +57,7 @@ It builds on its own branch. land-nov3 is live and job emails landed on Nov 14, 
 
 **Reused as is.**
 
-- `src/lib/server-action.ts` `withResult` and `withLog`: every server action already passes through one of these.
+- `src/lib/server-action.ts` `withResult` and `withLog`: every server action passes through one of these except seven files: `src/app/login/actions.ts`, `src/app/(portal)/p/actions.ts`, `src/app/join/[token]/actions.ts` and the four `filter-actions.ts`. That's harmless, because what those throw reaches `onRequestError`.
 - `src/lib/action-result.ts` `userMessage` and `toFailure`: they already decide what's expected (ConflictError, FieldError, zod, Prisma's number overflow, a plain sentence) and what isn't (`GENERIC_ERROR`). Q7's rule reuses that decision instead of inventing a second one.
 - `src/lib/action-result.ts` `isOfflineError`: the error screens already use it, and the catcher skips what it matches (Q18).
 - `src/app/api/health/route.ts`: its public `{ ok, db }` answer is a 503 when the database is down, so the uptime check needs no token. `src/lib/secrets.ts` `healthDetailAllowed` already gates the detail that gains the jobs' reasons (Q14).
@@ -70,7 +70,7 @@ It builds on its own branch. land-nov3 is live and job emails landed on Nov 14, 
 
 - **`src/lib/log.ts` `logError`.** It keeps writing the one JSON line, and also hands the error to a reporter that `src/instrumentation.ts` sets at start-up (Q13). `log.ts` imports nothing from Sentry, so the scripts under `scripts/` that use it are unchanged. A caller can pass `report: false` or `level: "warning"`. Each scope and message reports at most once a minute per server instance.
 - **`withResult`.** It reports only when `toFailure` would show `GENERIC_ERROR` (Q7). `withLog` logs without reporting: it rethrows, and Next's `onRequestError` reports the error once.
-- **The three error screen components** (`ErrorScreen`, `AuthCrash`, and the public site's `error.tsx`), which cover all five boundaries. Each passes the error to the catcher, which skips errors with a digest and offline errors (Q18). Their look and copy don't change.
+- **The three error screen components** (`ErrorScreen`, `AuthCrash`, and the public site's `error.tsx`), which cover all six boundaries. Each passes the error to the catcher, which skips errors with a digest and offline errors (Q18). Their look and copy don't change.
 - **`/api/cron/notifications`.** After a run it checks in with Sentry, "ok" or "error" from `jobsHealth()` (Q14). The check-in and `Sentry.flush()` run in `after()`, so the response isn't held.
 - **`/api/health`.** The token-gated detail gains `jobs`, the reason codes from `jobsHealth()`. The public answer doesn't change.
 - **`/api/email/inbound`.** A signature failure with Svix headers present reports once (Q19).
@@ -111,7 +111,7 @@ Free Developer plan: 1 user, 5,000 errors a month, 30 days of history, 1 uptime 
 | Site | Uptime monitor: `GET https://www.hgcapitalpartners.com/api/health` every minute (with www: the bare domain answers with a redirect), expects 200 | 3 misses in a row (about 3 minutes) |
 | Background jobs | Cron monitor: schedule every minute, 1 minute of margin, `failureIssueThreshold` 5, `recoveryThreshold` 1 | 5 missed or "error" check-ins in a row (about 5 minutes) |
 
-The cron monitor's settings travel with each check-in (`monitorConfig`), which should create the monitor on the first one. Sentry's JavaScript docs show the config but don't spell out that it creates the monitor, so the branch confirms it, and if it doesn't, Connor adds the monitor by hand with the same settings. Sentry asks for a margin no longer than the schedule, which is why "stopped" is counted in check-ins in a row.
+The cron monitor's settings travel with each check-in (`monitorConfig`), and the first check-in created the monitor: confirmed in production on Nov 14, green every minute. Sentry's JavaScript docs don't spell that out, so if the monitor is ever deleted, the next check-in should bring it back; if not, add it by hand with the same settings. Sentry asks for a margin no longer than the schedule, which is why "stopped" is counted in check-ins in a row.
 
 All three alert by email from Sentry; each monitor's own alert setting points at Connor. His phone shows them through Gmail's notifications (section 4).
 
@@ -200,6 +200,7 @@ Built on branch claude/error-monitoring-docs-abc5aa after Connor's "build it". W
 - **Not reported from the browser:** a missing chunk after a deploy, besides offline errors and errors with a digest. The error screen already offers Reload, and it isn't a bug.
 - **Warnings, not errors:** removing old files from storage, recent views, "seen" marks, the database pooler notice and the daily cap line. The daily cap already alerts as `email_capped`. Security logs (a failed sign-in, a lockbox view) stay errors.
 - **Q4's user ID isn't sent yet.** Every event carries the area and staff or contractor, except on `/`: neither the address nor the route Next 16.3 names (it leaves out the route group) tells the public page from Home, so only the public site's error screen tags it. The ID would need a lookup on each error: the staff session cookie holds an email, which must never leave, and attaching it to Sentry's request scope can't be proven to stay per request on Vercel. Events carry no ID until that's worked out.
+- **`email_stuck` reads `sendAfter`** (`src/lib/jobs-health.ts`), which the drain moves: a claim pushes it out by a lease, a failed try by its backoff, and a Resend quota refusal by an hour (`src/lib/notifications/outbox.ts`). So a row Resend keeps refusing never reads as stuck. `firstAt` doesn't move. Noted on Nov 14 by the design-calls merge; not changed there.
 - **The runbook** is [docs/alerts.md](../alerts.md). Connor's setup steps are in [docs/todo-for-connor.md](../todo-for-connor.md), under "Turn on error alerts".
 
 - **Checked end to end before landing**, with a local production build pointed at a stand-in Sentry on 127.0.0.1:

@@ -44,7 +44,7 @@ const vagueCopyRule = copyRule(
   "Error copy says what happened and what to do next.",
   VAGUE_COPY,
   (hit) =>
-    `"${hit}" says nothing. Say what happened and what to do next, like "We couldn't save that. Try again." See docs/copy-rules.md, rule 7.`,
+    `"${hit}" says nothing. Say what happened and what to do next, like "Couldn't save. Try again." See docs/copy-rules.md, rule 7.`,
 );
 
 const fillerCopyRule = copyRule(

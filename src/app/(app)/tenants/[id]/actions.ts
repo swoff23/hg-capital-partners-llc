@@ -28,8 +28,6 @@ const tenantPatch = z
     fullName: text,
     phone: text,
     email: text,
-    emergencyName: text,
-    emergencyPhone: text,
     notes: text,
   })
   .partial()
@@ -41,6 +39,8 @@ const termFields = z
     rent: text,
     subsidy: text,
     subsidyFrom: text,
+    subsidyContact: text,
+    subsidyEmail: text,
   })
   .partial()
   .strict();

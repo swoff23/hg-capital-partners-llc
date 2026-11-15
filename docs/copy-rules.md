@@ -53,7 +53,7 @@ Quoted speech and scripts can keep their natural phrasing, but still without the
 This covers toasts, errors, validation, confirmations and empty states.
 
 - Write in plain English for a 6th to 8th grade reader.
-- Say what happened and what to do next: "We couldn't save that. Try again, or reload the page."
+- Say what happened and what to do next: "Couldn't save. Try again or reload the page."
 - Keep toasts under about 90 characters.
 - Never use "Something went wrong", "An error occurred", "Request failed" or "Oh no".
 - Don't blame the user. Say what's needed: "Enter a full email, like name@example.com."

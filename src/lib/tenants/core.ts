@@ -3,7 +3,7 @@ import type { LeaseSource, Prisma, PrismaClient } from "@prisma/client";
 import { FieldError } from "@/lib/action-result";
 import { toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { isHouseMeterRow, isPlaceholderUnitId, parseUnits, type PropertyUnit } from "@/lib/property-types";
-import { MAX_TENANTS, readDeposit, readStay, readTenant, readTerm, type TenantData } from "./fields";
+import { MAX_TENANTS, readDeposit, readStay, readTenant, readTerm, type TenantData, type TermData } from "./fields";
 import { leaseStatus, overlappingTerms, staysOverlap } from "./status";
 
 /**
@@ -168,8 +168,16 @@ export async function createLease(db: Db, input: NewLease, by: By): Promise<{ id
   });
 }
 
-function termColumns(t: { startsOn: Ymd; endsOn: Ymd | null; rent: string; subsidy: string | null; subsidyFrom: string | null }) {
-  return { startsOn: ymdToDate(t.startsOn)!, endsOn: ymdToDate(t.endsOn), rent: t.rent, subsidy: t.subsidy, subsidyFrom: t.subsidyFrom };
+function termColumns(t: TermData) {
+  return {
+    startsOn: ymdToDate(t.startsOn)!,
+    endsOn: ymdToDate(t.endsOn),
+    rent: t.rent,
+    subsidy: t.subsidy,
+    subsidyFrom: t.subsidyFrom,
+    subsidyContact: t.subsidyContact,
+    subsidyEmail: t.subsidyEmail,
+  };
 }
 
 export type LeasePatch = Partial<Record<"movesIn" | "movesOut" | "deposit" | "notes", string | null>>;
@@ -272,6 +280,8 @@ export async function patchTerm(db: Db, termId: string, patch: Partial<Record<st
       rent: term.rent.toString(),
       subsidy: term.subsidy?.toString() ?? "",
       subsidyFrom: term.subsidyFrom ?? "",
+      subsidyContact: term.subsidyContact ?? "",
+      subsidyEmail: term.subsidyEmail ?? "",
       ...patch,
     };
     const r = readTerm(merged);

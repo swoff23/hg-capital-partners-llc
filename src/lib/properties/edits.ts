@@ -102,16 +102,22 @@ export function editorName(by: LastEditor): string | undefined {
  * field save what each field holds now, as text, so the editor can say "Pieter
  * set this to $410,000 at 2:14 PM" and offer "Keep Pieter's" and "Save
  * mine". A whole-blob editor (units, building CapEx, listings) names the
- * blob and has no values. Pure; see edits.test.ts.
+ * blob and has no values. `actorId` is who is saving: when the row's last
+ * save was theirs (`updatedByUserId`; another tab, their phone) the refusal is
+ * marked `mine` and reads "You changed this at 2:14 PM." with "Keep current",
+ * where it read "Connor changed this" and "Keep Connor's" to Connor. Properties
+ * and deals both come through here. Pure; see edits.test.ts.
  */
 export function rowConflict(
   row: Record<string, unknown> & { updatedAt: Date; updatedByUser?: LastEditor },
   fields: string[],
-  opts: { values?: boolean } = {},
+  opts: { values?: boolean; actorId?: string } = {},
 ): ConflictError {
+  const mine = opts.actorId !== undefined && row.updatedByUserId === opts.actorId;
   return new ConflictError({
     fields,
-    by: editorName(row.updatedByUser) ?? null,
+    by: mine ? null : (editorName(row.updatedByUser) ?? null),
+    mine,
     at: row.updatedAt,
     ...(opts.values ? { theirs: Object.fromEntries(fields.map((k) => [k, fieldText(row[k])])) } : {}),
   });

@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addToast, type QueuedToast } from "@/components/toast-queue";
+import { toastMs } from "@/lib/toast-time";
 
 /**
  * Short confirmations with an optional action, usually Undo:
@@ -12,15 +13,17 @@ import { addToast, type QueuedToast } from "@/components/toast-queue";
  *
  * One region per surface: AppShell mounts a ToastProvider, and the portal
  * layout mounts its own. Bottom-left on a computer; full width on a phone,
- * lifted above a sticky bottom bar by useToastInset(). Each toast goes after
- * about 5 seconds, held while the pointer or focus is on it; Esc closes the
- * one that has focus. On a coarse pointer a toast with an action draws no ×
+ * lifted above a sticky bottom bar by useToastInset(). A toast with a button
+ * goes after 5 seconds, as does one without (lib/toast-time.ts), held
+ * while the pointer or focus is on it; Esc closes the one that has focus. On
+ * a coarse pointer a toast with an action draws no ×
  * (it closes itself, and the message gets the room), but keeps the Dismiss
  * button for assistive tech. The region is a polite live region
  * (role="status"), so screen readers hear each message.
  *
  * `detail` is the ripple clause after " · " in --toast-fg-2 ("CapEx rules
- * saved · Forecasts updated"). `key` names what the toast is about: a toast
+ * saved · Forecasts updated"), or where the news is about when the page is gone ("2 photos not added · 118
+ * Congress St."), so a phone cuts the place and not the news. `key` names what the toast is about: a toast
  * with the key of one still showing replaces it instead of stacking, so ten
  * quick edits on one record show one toast for the latest (forms 2.13).
  *
@@ -40,7 +43,7 @@ export type ToastInput = {
    * ready"). Shorten the words, not the font (docs/copy-rules.md).
    */
   phoneMessage?: string;
-  /** The ripple clause, after " · " in --toast-fg-2: "Forecasts updated". */
+  /** The ripple clause, after " · " in --toast-fg-2: "Forecasts updated", or the place an away upload toast is about. */
   detail?: string;
   /** What it's about ("task:abc:due"): a new toast with a live toast's key replaces it. */
   key?: string;
@@ -67,7 +70,6 @@ type ToastApi = {
 
 const ToastContext = createContext<(ToastApi & { setInset: (px: number) => void }) | null>(null);
 
-const DURATION_MS = 5000;
 const MAX_SHOWN = 3;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -115,13 +117,15 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
   // A sticky toast's action is leaving the page (a reload): the icon spins until it goes.
   const [leaving, setLeaving] = useState(false);
   const { id, version, sticky, action } = item;
+  // With a button or without, 5 seconds (lib/toast-time.ts); the two times are kept apart in case they part again.
+  const stays = toastMs(item.action !== undefined);
 
-  // A replacement (a new version under the same key) starts the 5 seconds over. A sticky toast has no timer.
+  // A replacement (a new version under the same key) starts the time over. A sticky toast has no timer.
   useEffect(() => {
     if (held || sticky) return;
-    const timer = setTimeout(() => dismiss(id), DURATION_MS);
+    const timer = setTimeout(() => dismiss(id), stays);
     return () => clearTimeout(timer);
-  }, [held, sticky, dismiss, id, version]);
+  }, [held, sticky, dismiss, id, version, stays]);
   // The person closing it, with × or Esc.
   const onClose = () => {
     dismiss(id);

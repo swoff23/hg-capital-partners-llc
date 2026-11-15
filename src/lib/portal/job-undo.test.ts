@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { TOAST_ACTION_MS } from "@/lib/toast-time";
 import { POST_UNDO_GRACE_MS, POST_UNDO_MS, undoWindowOpen } from "./job-view";
 
 // The contractor's "3 photos posted · Undo" (uploads 2.7, question 5): the
@@ -11,7 +12,8 @@ import { POST_UNDO_GRACE_MS, POST_UNDO_MS, undoWindowOpen } from "./job-view";
 const POSTED = new Date("2026-10-26T15:00:00.000Z");
 const after = (ms: number) => new Date(POSTED.getTime() + ms);
 
-test("the toast's window is five seconds, as every Undo in the app", () => {
+test("the toast's window is five seconds, read from the toast's own number, as every Undo in the app", () => {
+  assert.equal(POST_UNDO_MS, TOAST_ACTION_MS);
   assert.equal(POST_UNDO_MS, 5_000);
 });
 

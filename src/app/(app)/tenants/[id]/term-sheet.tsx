@@ -2,20 +2,28 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { DatePicker } from "@/components/due-date-picker";
 import { FormSheet } from "@/components/form-sheet";
-import { NumberInput, numberHelper, numberProblem } from "@/components/number-input";
+import { NumberInput, numberProblem } from "@/components/number-input";
 import { Switch } from "@/components/switch";
 import { FieldRow, FormField, Input } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import { fmtDay, type Ymd } from "@/lib/dates";
-import { readTerm } from "@/lib/tenants/fields";
+import { readTerm, rentFromParts } from "@/lib/tenants/fields";
 import { addLeaseTerm } from "./actions";
 
 /**
- * What the new term starts from: the day after the last one ends, with its
- * rent and who pays the housing authority's share. Blank when there's no
- * term yet.
+ * What the new term starts from: the day after the last one ends, with what
+ * the tenant paid, the housing authority's share, who paid it and their contact, so a
+ * renewal on the same terms keeps the same rent. Blank when there's no term yet.
  */
-export type TermDefaults = { startsOn: Ymd | ""; rent: string; subsidyFrom: string; first: boolean };
+export type TermDefaults = {
+  startsOn: Ymd | "";
+  tenantPays: string;
+  subsidy: string;
+  subsidyFrom: string;
+  subsidyContact: string;
+  subsidyEmail: string;
+  first: boolean;
+};
 
 const TermSheetContext = createContext<{ open: () => void } | null>(null);
 
@@ -56,7 +64,16 @@ export function TermSheetProvider({
   );
 }
 
-type Form = { startsOn: string; endsOn: string; monthly: boolean; rent: string; subsidy: string; subsidyFrom: string };
+type Form = {
+  startsOn: string;
+  endsOn: string;
+  monthly: boolean;
+  tenantPays: string;
+  subsidy: string;
+  subsidyFrom: string;
+  subsidyContact: string;
+  subsidyEmail: string;
+};
 
 function TermSheet({
   leaseId,
@@ -75,9 +92,11 @@ function TermSheet({
     startsOn: defaults.startsOn,
     endsOn: "",
     monthly: false,
-    rent: defaults.rent,
-    subsidy: "",
+    tenantPays: defaults.tenantPays,
+    subsidy: defaults.subsidy,
     subsidyFrom: defaults.subsidyFrom,
+    subsidyContact: defaults.subsidyContact,
+    subsidyEmail: defaults.subsidyEmail,
   });
   const [problems, setProblems] = useState<Record<string, string>>({});
   const run = useRun();
@@ -94,15 +113,20 @@ function TermSheet({
   const hasShare = form.subsidy.trim() !== "";
 
   function submit() {
+    // The form asks for the two parts; the term keeps the whole rent, their sum (Connor, Nov 14).
+    const parts = rentFromParts(form.tenantPays, form.subsidy);
     const input = {
       startsOn: form.startsOn,
       endsOn: form.monthly ? "" : form.endsOn,
-      rent: form.rent,
+      rent: parts.ok ? parts.data.rent : "",
       subsidy: form.subsidy,
       subsidyFrom: form.subsidyFrom,
+      subsidyContact: form.subsidyContact,
+      subsidyEmail: form.subsidyEmail,
     };
     const read = readTerm(input);
-    const found: Record<string, string> = read.ok ? {} : { ...read.problems };
+    const { rent: rentLine, ...termLines } = read.ok ? {} : read.problems;
+    const found: Record<string, string> = { ...termLines, ...(parts.ok ? (rentLine ? { tenantPays: rentLine } : {}) : parts.problems) };
     if (!form.monthly && !form.endsOn && !found.endsOn) found.endsOn = "Enter when the lease ends, or choose Month to month.";
     if (Object.keys(found).length) {
       setProblems(found);
@@ -145,29 +169,59 @@ function TermSheet({
         )}
       </FieldRow>
       <Switch label="Month to month" isSelected={form.monthly} onChange={(monthly) => set({ monthly })} />
-      <FormField label="Rent" helper={numberHelper("money", form.rent, { fallback: "The whole monthly rent" })} error={errors.rent}>
-        {(p) => <NumberInput kind="money" {...p} value={form.rent} onChange={(rent) => set({ rent })} />}
+      {/* No "Saves as" line under the amounts (Connor, Nov 14). */}
+      <FormField label="Tenant pays" error={errors.tenantPays ?? errors.rent}>
+        {(p) => <NumberInput kind="money" {...p} value={form.tenantPays} onChange={(tenantPays) => set({ tenantPays })} />}
       </FormField>
       <FormField
         label="Housing authority pays"
         optional
-        helper={numberHelper("money", form.subsidy)}
         error={errors.subsidy ?? (form.subsidy ? numberProblem("money", form.subsidy) ?? undefined : undefined)}
       >
         {(p) => <NumberInput kind="money" {...p} value={form.subsidy} onChange={(subsidy) => set({ subsidy })} />}
       </FormField>
       {hasShare && (
-        <FormField label="Who pays" optional error={errors.subsidyFrom}>
-          {(p) => (
-            <Input
-              {...p}
-              name="subsidyFrom"
-              autoComplete="off"
-              value={form.subsidyFrom}
-              onChange={(e) => set({ subsidyFrom: e.target.value })}
-            />
-          )}
-        </FormField>
+        <>
+          <FormField label="Who pays" optional error={errors.subsidyFrom}>
+            {(p) => (
+              <Input
+                {...p}
+                name="subsidyFrom"
+                autoComplete="off"
+                value={form.subsidyFrom}
+                onChange={(e) => set({ subsidyFrom: e.target.value })}
+              />
+            )}
+          </FormField>
+          {/* The housing authority's contact, the Section 8 caseworker (Connor, Nov 14). */}
+          <FieldRow>
+            <FormField label="Contact name" optional error={errors.subsidyContact}>
+              {(p) => (
+                <Input
+                  {...p}
+                  name="subsidyContact"
+                  autoComplete="off"
+                  value={form.subsidyContact}
+                  onChange={(e) => set({ subsidyContact: e.target.value })}
+                />
+              )}
+            </FormField>
+            <FormField label="Contact email" optional error={errors.subsidyEmail}>
+              {(p) => (
+                <Input
+                  {...p}
+                  type="email"
+                  name="subsidyEmail"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={form.subsidyEmail}
+                  onChange={(e) => set({ subsidyEmail: e.target.value })}
+                />
+              )}
+            </FormField>
+          </FieldRow>
+        </>
       )}
     </FormSheet>
   );

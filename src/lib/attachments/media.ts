@@ -129,9 +129,9 @@ export function uploadFailureReason(e: unknown): string {
  * a phone: "2 photos didn't upload: no connection". Nouns as addedText words
  * them (a mix is "files"); the names are on each tile. Empty when none did.
  * `reason: false` is the count alone, "2 photos didn't upload", for a line
- * that carries its own Retry (the contractor's Mark done). `where` names the
- * target, for a line shown on another page: "1 photo didn't upload to 56
- * Tamarack St".
+ * that carries its own Retry (the contractor's Mark done). `where` appends
+ * " to <place>"; the away toast no longer uses it, since the place trails as
+ * the toast's own detail (`redTilesLine`).
  */
 export function uploadNotice(
   failures: UploadFailure[],
@@ -171,8 +171,7 @@ const isRed = (u: ShownTile) => u.status === "failed" || u.status === "invalid";
  * (a job still in Review past its window, TOO_LATE), which is true either
  * way. No Retry goes with it. Empty when nothing is red, or any red tile is
  * something else (a Retry, or a file the check refused), which keeps today's
- * line. `where` names the target as uploadNotice does ("Too late to add 2
- * photos to 56 Tamarack St").
+ * line. `where` is the optional " to <place>" tail, as uploadNotice's.
  */
 export function closedJobLine(uploads: readonly ShownTile[], where = ""): string {
   const red = uploads.filter(isRed);
@@ -191,15 +190,25 @@ export function closedJobLine(uploads: readonly ShownTile[], where = ""): string
  * final, closedJobLine; otherwise uploadNotice's line with its reason when
  * they share one ("1 photo didn't upload: over the 25 MB photo limit"). Null
  * when nothing is red. The toast passes `where`, the target's label, since it
- * shows on whatever page is open ("2 photos didn't upload to 56 Tamarack
- * St"); the tray's own line needs none.
+ * shows on whatever page is open: the news leads and the place comes back as
+ * `detail`, after " · " in the toast's second tone ("2 photos didn't upload ·
+ * 56 Tamarack St", "2 photos not added · 56 Tamarack St" when every red tile
+ * is final); the tray's own line needs none.
  */
-export function redTilesLine(uploads: readonly ShownTile[], where = ""): { text: string; retry: boolean } | null {
+export function redTilesLine(
+  uploads: readonly ShownTile[],
+  where = "",
+): { text: string; retry: boolean; detail?: string } | null {
   const red = uploads.filter(isRed);
   if (red.length === 0) return null;
   const failures = red.map((u) => ({ name: u.name, kind: u.kind, reason: u.error ?? "" }));
-  if (red.some((u) => u.status === "failed")) return { text: uploadNotice(failures, { reason: false, where }), retry: true };
-  return { text: closedJobLine(red, where) || uploadNotice(failures, { where }), retry: false };
+  const place = where.trim();
+  // The toast's news leads and the place trails in its lighter tone (`detail`), so the place is what a phone cuts.
+  const placed = <T extends { text: string; retry: boolean }>(line: T): T & { detail?: string } => (place ? { ...line, detail: place } : line);
+  if (red.some((u) => u.status === "failed")) return placed({ text: uploadNotice(failures, { reason: false }), retry: true });
+  // Every red tile final: the toast says "not added" (the tray under the tiles keeps the reason: closed, or too late).
+  if (place && closedJobLine(red)) return placed({ text: `${failedCount(red)} not added`, retry: false });
+  return placed({ text: closedJobLine(red) || uploadNotice(failures), retry: false });
 }
 
 /** "0:07", "4:32", "1:02:03". Empty for a missing or nonsense length. */

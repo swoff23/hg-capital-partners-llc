@@ -123,8 +123,6 @@ export const PROPERTY_STATUSES = [
   "Sold",
 ] as const;
 
-export const PROPERTY_STRATEGIES = ["Hold", "Flip", "BRRRR", "Sell", "TBD"] as const;
-
 export const EQUIPMENT_TYPES = [
   "Roof",
   "Refrigerator",
