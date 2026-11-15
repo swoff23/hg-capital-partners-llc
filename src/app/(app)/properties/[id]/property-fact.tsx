@@ -11,6 +11,7 @@ import { fmtDay, isPastDay, relativeDays } from "@/lib/dates";
 import { amountProblem } from "@/lib/properties/numbers";
 import { patchProperty } from "../actions";
 import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { useMissingField } from "./missing-context";
 
 /**
  * One fact in a property's rail, edited in place (forms 4.2, 3.1 A): the
@@ -42,10 +43,13 @@ type FactProps = Omit<InlineFieldProps, "label" | "value" | "onSave" | "kind" | 
 export const isBlank = (v: string | number | null | undefined) => v == null || String(v).trim() === "";
 
 export function PropertyFact({ id, field, label, name, anchor, value, ...rest }: FactProps) {
+  // A required blank (Missing info, docs/specs/missing-info.md D2) reads its verb in --warn, as a missing key date does.
+  const missing = useMissingField(field);
   return (
     <RailFact label={label} id={anchor}>
       <InlineField
         {...rest}
+        tone={rest.tone ?? (missing ? "warn" : undefined)}
         label={name ?? label}
         field={field}
         value={value ?? ""}

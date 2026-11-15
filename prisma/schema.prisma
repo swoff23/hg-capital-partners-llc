@@ -62,6 +62,8 @@ model User {
   // Contractor onboarding (docs/specs/contractor-onboarding.md): invites a partner sent, and a contractor's Keep or Baselane note.
   sentPortalInvites           PortalInvite[]       @relation("PortalInviteCreatedBy")
   uploadedContactDocuments    ContactDocument[]    @relation("ContactDocumentUploadedByUser")
+  // Missing info (docs/specs/missing-info.md, D3): the checks a partner said don't apply.
+  missingInfoSkips            MissingInfoSkip[]    @relation("MissingInfoSkipBy")
 
   qboConnections QuickbooksConnection[]
 }
@@ -636,10 +638,14 @@ model TaskChecklistItem {
   dueDate         DateTime? // from an imported Asana subtask; display only
   position        Int       @default(0)
   asanaGid        String?   @unique
+  // Make task (docs/specs/missing-info.md, D9): the missing-info row this item stands for,
+  // "<check>|<subject>". The item ticks itself once that row is filled in or skipped.
+  checkKey        String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   @@index([taskId, position])
+  @@index([checkKey])
 }
 
 // When each person last opened a task, for "2 new" badges. One row per
@@ -1377,4 +1383,24 @@ model LeaseFile {
   term             LeaseTerm?
 
   @@index([leaseId])
+}
+
+// ---------------------------------------------------------------------------
+// Missing info (docs/specs/missing-info.md). The gaps themselves are never
+// stored: src/lib/missing/checks.ts computes them from the records on each
+// read. This keeps only a partner's "Doesn't apply" (D3), one row per check
+// on one record. Every write goes through src/lib/missing/service.ts.
+// ---------------------------------------------------------------------------
+model MissingInfoSkip {
+  id              String   @id @default(cuid())
+  // The check: "insurance.carrier", "utility.fuelLofl", "lease.pdf", ...
+  check           String
+  // The record: "property:<id>", "unit:<propertyId>:<unitId>", "lease:<id>", "contact:<id>".
+  subject         String
+  createdBy       User?    @relation("MissingInfoSkipBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@unique([check, subject])
+  @@index([subject])
 }

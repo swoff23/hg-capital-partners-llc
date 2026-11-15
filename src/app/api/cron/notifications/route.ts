@@ -1,6 +1,8 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { getEnv } from "@/lib/env";
 import { checkInBackgroundJobs } from "@/lib/jobs-check-in";
+import { logError } from "@/lib/log";
+import { settleMissingInfo } from "@/lib/missing/service";
 import { drainDue } from "@/lib/notifications/outbox";
 import { queueDueReminders } from "@/lib/notifications/reminders";
 import { cronAuthorized, cronRefusal } from "@/lib/secrets";
@@ -15,6 +17,11 @@ export const maxDuration = 60;
  * `Authorization: Bearer $CRON_SECRET`. Like /api/quickbooks/sync, it answers
  * 503 and sends nothing while CRON_SECRET is unset, and 401 to anyone else.
  * Neither body says why (cronRefusal); the unset secret goes to the logs.
+ *
+ * It also ticks Make task's checklist items whose Missing info rows were filled
+ * in anywhere in the app, and finishes a task when its last one ticks
+ * (docs/specs/missing-info.md, D9). A failure there is logged and never stops
+ * the emails.
  *
  * After a run it checks in with Sentry's "background-jobs" monitor, which is
  * how a stopped job, a stuck queue or a stale QuickBooks sync reaches Connor
@@ -35,6 +42,10 @@ export async function GET(request: NextRequest) {
   // The 8 am emails join the outbox first (they send a bundle's quiet minutes later), then the run sends what's due.
   const reminders = await queueDueReminders(now);
   const result = await drainDue(now);
+  const settled = await settleMissingInfo().catch((err: unknown) => {
+    logError("cron:missing-info", err);
+    return 0;
+  });
   after(() => checkInBackgroundJobs(new Date()));
-  return NextResponse.json({ ...result, reminders: reminders.queued });
+  return NextResponse.json({ ...result, reminders: reminders.queued, settled });
 }

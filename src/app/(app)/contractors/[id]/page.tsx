@@ -30,6 +30,9 @@ import { statusOf } from "../query";
 import { setContractorArchived } from "../actions";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
+import { ofPriority } from "@/lib/missing/checks";
+import { loadMissingInfo } from "@/lib/missing/queries";
+import { MissingSummary } from "../../missing/missing-summary";
 
 /** The tab names the record (record-title.ts), so tabs and history can be told apart. */
 export async function generateMetadata({ params }: PageProps<"/contractors/[id]">): Promise<Metadata> {
@@ -126,6 +129,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   const tasks = rows.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   // Buffalo's calendar day, not the server's (UTC on Vercel rolls over at 8pm).
   const today = todayYmdEastern();
+  // Missing info (docs/specs/missing-info.md, D7): a W-9 required of anyone who worked a job this year.
+  const missing = c.archivedAt ? [] : ofPriority((await loadMissingInfo(today, { contactId: c.id })).gaps, "required");
 
   return (
     // A record: capped at 1200, with a 320 rail beside the jobs once the page
@@ -160,6 +165,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
           {status && <ContractorStatusBadge status={status} className="shrink-0" />}
           {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
         </div>
+        <MissingSummary className="mt-4" gaps={missing} />
         {c.archivedAt && (
           <ArchivedNotice
             className="mt-4"

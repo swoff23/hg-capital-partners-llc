@@ -7,6 +7,7 @@ import type { OptionItem } from "@/components/option-list";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressHeading, PropertyNotes } from "./property-heading";
 import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { MissingTitle, useMissingFields } from "./missing-context";
 import { PropertyFact, PropertyKeyDate, PropertyMoveInSwitch, isBlank as blank } from "./property-fact";
 
 export type EditableProperty = {
@@ -57,11 +58,13 @@ export function PropertyAddressField({ id, value }: { id: string; value: string 
  * typing a new one adds it; a stored name off the list stays as its own row.
  */
 export function PropertyDetailsSection({ property: p, entities }: { property: EditableProperty; entities: readonly string[] }) {
+  const missing = useMissingFields();
   const context = `Details · ${shortAddress(p.address) || p.address}`;
   const common = { id: p.id, context };
   return (
-    <Section title="Details">
+    <Section title={<MissingTitle section="details">Details</MissingTitle>}>
       <RailFold
+        missing={missing}
         listen={onPropertyFieldRequest}
         reopen={openPropertyField}
         rows={[

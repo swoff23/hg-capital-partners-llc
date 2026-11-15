@@ -13,14 +13,31 @@ import { cn } from "@/lib/utils";
  * A notice above the figures: --background on a --border edge. A glyph carries any
  * state. `action` puts one control at the row's end, centered on the line
  * (an archived record's Restore); the words truncate before it moves.
+ * `below` opens under the line inside the same edge, over a --border rule:
+ * what the line counts, shown by its action (a property's Missing info rows).
  */
-export function Notice({ icon, action, className, children }: { icon?: ReactNode; action?: ReactNode; className?: string; children: ReactNode }) {
+export function Notice({
+  icon,
+  action,
+  below,
+  className,
+  children,
+}: {
+  icon?: ReactNode;
+  action?: ReactNode;
+  below?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
   if (action) {
     return (
-      <div className={cn("flex items-center gap-2 rounded-md border border-border bg-background py-1.5 pl-3 pr-1.5 text-meta text-foreground", className)}>
-        {icon}
-        <p className="min-w-0 flex-1 truncate">{children}</p>
-        <div className="shrink-0">{action}</div>
+      <div className={cn("rounded-md border border-border bg-background text-meta text-foreground", className)}>
+        <div className="flex items-center gap-2 py-1.5 pl-3 pr-1.5">
+          {icon}
+          <p className="min-w-0 flex-1 truncate">{children}</p>
+          <div className="shrink-0">{action}</div>
+        </div>
+        {below && <div className="border-t border-border px-3 pb-1">{below}</div>}
       </div>
     );
   }

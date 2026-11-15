@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronRight, FileBadge, Hammer, Landmark, RefreshCw, ShieldCheck, Send, Unplug, UserPlus, type LucideIcon } from "lucide-react";
+import { ChevronRight, FileBadge, FileClock, Hammer, Landmark, ListChecks, RefreshCw, ShieldCheck, Send, Unplug, UserPlus, type LucideIcon } from "lucide-react";
 import { Money } from "@/components/money";
 import { useToast } from "@/components/toast";
 import { Button, Section, chromeIconClass } from "@/components/ui";
@@ -22,6 +22,8 @@ const ICON: Record<NeedsYouKind, LucideIcon> = {
   loan: Landmark,
   insurance: ShieldCheck,
   registration: FileBadge,
+  lease: FileClock,
+  missing: ListChecks,
   capex: Hammer,
   "sync-stale": RefreshCw,
   "sync-lost": Unplug,

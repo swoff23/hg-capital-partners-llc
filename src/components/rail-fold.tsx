@@ -27,16 +27,20 @@ export type RailFoldRow = FoldRow & { node: ReactNode };
  * `listen`, and `reopen` asks again once the row is in, so its field opens.
  */
 export function RailFold({
-  rows,
+  rows: given,
   listen,
   reopen,
+  missing,
 }: {
   rows: RailFoldRow[];
   /** Subscribes to requests for any of `keys` from elsewhere on the page; returns the unsubscribe. */
   listen?: (keys: readonly string[], open: (key: string) => void) => () => void;
   /** Asks for `key` again once the fold has opened, so the row's own field takes the request. */
   reopen?: (key: string) => void;
+  /** Rows that are a required blank (Missing info, docs/specs/missing-info.md D2): they stay out of the fold until filled. */
+  missing?: ReadonlySet<string>;
 }) {
+  const rows = missing && missing.size > 0 ? given.map((r) => (missing.has(r.key) ? { ...r, missing: true } : r)) : given;
   // The rows the fold opened with, held while it's open; null when it's closed.
   const [opened, setOpened] = useState<readonly string[] | null>(null);
   const open = opened !== null;

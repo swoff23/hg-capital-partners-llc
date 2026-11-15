@@ -3,6 +3,7 @@ import { RailFold } from "@/components/rail-fold";
 import { Section } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
 import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { MissingTitle, useMissingFields } from "./missing-context";
 import { ChangeCodeMenu, PropertyEscrow, PropertyFact, PropertyKeyDate, isBlank } from "./property-fact";
 
 export type EditableLoan = {
@@ -35,12 +36,14 @@ export type EditableLoan = {
  * section's ⋯ holds "Change loan number".
  */
 export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
+  const missing = useMissingFields();
   const context = `Loan · ${shortAddress(p.address) || p.address}`;
   const common = { id: p.id, context };
   const loanNumber = p.loanNumber?.trim();
   return (
-    <Section title="Loan" actions={loanNumber ? <ChangeCodeMenu title="Loan" field="loanNumber" change="Change loan number" /> : undefined}>
+    <Section title={<MissingTitle section="loan">Loan</MissingTitle>} actions={loanNumber ? <ChangeCodeMenu title="Loan" field="loanNumber" change="Change loan number" /> : undefined}>
       <RailFold
+        missing={missing}
         listen={onPropertyFieldRequest}
         reopen={openPropertyField}
         rows={[

@@ -29,6 +29,12 @@ export type PropertyUnit = {
   lockboxCode?: string | null;
   utilities?: UnitUtilities;
   equipment?: UnitEquipment[];
+  /**
+   * Missing info's Mark vacant (docs/specs/missing-info.md, D6): the Buffalo day
+   * a partner said nobody lives here, so the unit stops asking for a lease. The
+   * tenants service clears it when a lease for the unit is created.
+   */
+  vacantSince?: string | null;
 };
 
 /** A clean year value ("2016", "~2004") stays in the Year field; anything else is a comment. */

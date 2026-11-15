@@ -6,15 +6,18 @@ import { parseBuildingCapex, parseUnits, portfolioCapexForecast } from "@/lib/pr
 import { isSold } from "@/lib/properties/figures";
 import { liveRecord } from "@/lib/record-scope";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
-import { baselaneItems, capexItem, keyDateItems, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
+import { leaseEndRows, loadMissingInfo } from "@/lib/missing/queries";
+import { ofPriority, placesLine } from "@/lib/missing/checks";
+import { baselaneItems, capexItem, keyDateItems, missingItem, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
 
 /**
  * Everything Home's Needs you list reads, in one place: each property's key
- * dates and CapEx inputs, the CapEx rules, and the QuickBooks connection.
+ * dates and CapEx inputs, the CapEx rules, the QuickBooks connection, lease
+ * ends and the Missing info count (docs/specs/missing-info.md).
  * The rules for what shows are in ./needs-you.
  */
 export async function needsYou(today: Ymd, now: Date = new Date()): Promise<NeedsYouItem[]> {
-  const [properties, rules, conn, signups, setups] = await Promise.all([
+  const [properties, rules, conn, signups, setups, leaseEnds, missing] = await Promise.all([
     // An archived property leaves Home (lib/archive.ts); its reminder tasks stay on Today.
     prisma.property.findMany({
       where: liveRecord,
@@ -45,7 +48,10 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
       where: { setupDoneAt: { not: null }, baselaneSentAt: null, signupSource: { not: "STAFF" }, ...liveRecord },
       select: { id: true, fullName: true, setupDoneAt: true },
     }),
+    leaseEndRows(today),
+    loadMissingInfo(today),
   ]);
+  const required = ofPriority(missing.gaps, "required");
 
   // Other contractors sharing a new sign-up's mobile or email, so the row can say so.
   const phones = signups.flatMap((s) => (s.phoneE164 ? [s.phoneE164] : []));
@@ -82,6 +88,8 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
 
   return needsYouList({
     keyDates: keyDateItems(properties, today),
+    leaseEnds,
+    missing: missingItem(required.length, placesLine(required)),
     signups: signupItems(
       signups.map((s) => ({ id: s.id, fullName: s.fullName, phoneE164: s.phoneE164, email: s.email, trades: tradeLine(s.tradeLinks), createdAt: s.createdAt })),
       known,

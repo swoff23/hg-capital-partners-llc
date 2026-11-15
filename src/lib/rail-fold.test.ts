@@ -49,3 +49,12 @@ test("moreFieldsLabel: one line, singular for one", () => {
   assert.equal(moreFieldsLabel(7), "7 more fields");
   assert.equal(moreFieldsLabel(1), "1 more field");
 });
+
+test("foldedKeys: a missing required row never folds, even one that always would", () => {
+  const rows = [
+    { key: "insuranceCarrier", empty: true, fold: true, missing: true },
+    { key: "insurancePolicyNo", empty: false, fold: true },
+    { key: "insuranceCoverage", empty: true, missing: false },
+  ];
+  assert.deepEqual(foldedKeys(rows, none), ["insurancePolicyNo", "insuranceCoverage"]);
+});

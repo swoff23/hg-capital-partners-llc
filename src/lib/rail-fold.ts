@@ -7,10 +7,15 @@
  * visit and then cleared stays out, so it doesn't vanish under the finger
  * that cleared it.
  */
-export type FoldRow = { key: string; empty: boolean; keep?: boolean; fold?: boolean };
+export type FoldRow = { key: string; empty: boolean; keep?: boolean; fold?: boolean; missing?: boolean };
 
+/**
+ * A `missing` row (Missing info's required blank, docs/specs/missing-info.md
+ * D2) never folds, `fold` or not: it shows until it's filled in, then folds
+ * again as its kind does.
+ */
 export function foldedKeys(rows: readonly FoldRow[], seenFilled: ReadonlySet<string>): string[] {
-  return rows.filter((r) => r.fold || (r.empty && !r.keep && !seenFilled.has(r.key))).map((r) => r.key);
+  return rows.filter((r) => !r.missing && (r.fold || (r.empty && !r.keep && !seenFilled.has(r.key)))).map((r) => r.key);
 }
 
 /** The fold's row: "7 more fields", "1 more field". */

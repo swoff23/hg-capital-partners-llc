@@ -3,6 +3,7 @@ import { RailFold } from "@/components/rail-fold";
 import { Section } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
 import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { MissingTitle, useMissingFields } from "./missing-context";
 import { ChangeCodeMenu, PropertyFact, PropertyKeyDate, isBlank } from "./property-fact";
 
 export type EditableInsurance = {
@@ -28,12 +29,14 @@ export type EditableInsurance = {
  * copies it, and the section's ⋯ holds "Change policy number".
  */
 export function PropertyInsuranceSection({ insurance: p }: { insurance: EditableInsurance }) {
+  const missing = useMissingFields();
   const context = `Insurance · ${shortAddress(p.address) || p.address}`;
   const common = { id: p.id, context };
   const policy = p.insurancePolicyNo?.trim();
   return (
-    <Section title="Insurance" actions={policy ? <ChangeCodeMenu title="Insurance" field="insurancePolicyNo" change="Change policy number" /> : undefined}>
+    <Section title={<MissingTitle section="insurance">Insurance</MissingTitle>} actions={policy ? <ChangeCodeMenu title="Insurance" field="insurancePolicyNo" change="Change policy number" /> : undefined}>
       <RailFold
+        missing={missing}
         listen={onPropertyFieldRequest}
         reopen={openPropertyField}
         rows={[

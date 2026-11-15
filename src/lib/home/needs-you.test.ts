@@ -8,6 +8,7 @@ import {
   STALE_SYNC_MS,
   capexItem,
   keyDateItems,
+  missingItem,
   moreCount,
   needsYouList,
   quickbooksItem,
@@ -238,4 +239,30 @@ test("the list puts sign-ups and Baselane rows after key dates and before CapEx"
   const keyDates = keyDateItems([property({ loanMaturityDate: utc("2026-11-30") })], "2026-11-14");
   const list = needsYouList({ keyDates, signups, baselane, capex, quickbooks: null });
   assert.deepEqual(list.map((i) => i.kind), ["loan", "signup", "baselane", "capex"]);
+});
+
+test("Missing info: one row with the required count and where, opening the worklist; none at zero", () => {
+  assert.equal(missingItem(0, ""), null);
+  const row = missingItem(1177, "11 properties, 8 contractors")!;
+  assert.equal(row.kind, "missing");
+  assert.equal(row.href, "/missing");
+  assert.equal(row.title, "Missing info");
+  assert.equal(row.state, "Missing");
+  assert.equal(row.detail, "1,177 to fill in · 11 properties, 8 contractors");
+  assert.equal(missingItem(3, "")!.detail, "3 to fill in");
+});
+
+test("the list: key dates and lease ends by date, then sign-ups, Baselane, Missing info, CapEx, QuickBooks", () => {
+  const dated = (key: string, date: string) => ({ ...missingItem(1, "")!, key, kind: "loan" as const, title: key, detail: key, date });
+  const list = needsYouList({
+    keyDates: [dated("loan", "2026-12-01")],
+    leaseEnds: [{ ...dated("lease", "2026-11-20"), kind: "lease" as const }],
+    missing: missingItem(5, "2 properties"),
+    capex: null,
+    quickbooks: null,
+  });
+  assert.deepEqual(
+    list.map((i) => i.key),
+    ["lease", "loan", "missing"],
+  );
 });

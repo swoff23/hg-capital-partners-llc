@@ -540,6 +540,12 @@ export interface NewTaskInput {
   taskTemplateId?: string | null;
   autoKey?: string | null;
   priority?: string | null;
+  /**
+   * Checklist items to start with, in order. Missing info's Make task gives each
+   * the row it stands for (`checkKey`, docs/specs/missing-info.md D9), so the
+   * item ticks itself once that row is filled in.
+   */
+  checklist?: { title: string; checkKey?: string | null }[];
 }
 
 export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now = new Date()): Promise<Task> {
@@ -593,6 +599,9 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
     await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
   }
   await logDeal(tx, task.dealId, p, `Task added: ${task.title}`, now);
+  for (const item of input.checklist ?? []) {
+    if (item.title.trim()) await addChecklistItem(tx, task.id, item.title, p, now, item.checkKey ?? null);
+  }
   return task;
 }
 
@@ -2007,7 +2016,7 @@ export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p:
   return updated;
 }
 
-export async function addChecklistItem(tx: Tx, taskId: string, title: string, p: Principal, now = new Date()) {
+export async function addChecklistItem(tx: Tx, taskId: string, title: string, p: Principal, now = new Date(), checkKey: string | null = null) {
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't add checklist items yet.");
   const t = title.trim();
   if (!t) throw new TaskRuleError("The item needs a name.");
@@ -2016,7 +2025,7 @@ export async function addChecklistItem(tx: Tx, taskId: string, title: string, p:
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   if (!(await tx.task.findUnique({ where: { id: taskId }, select: { id: true } }))) throw new TaskRuleError("That task no longer exists.");
   const last = await tx.taskChecklistItem.findFirst({ where: { taskId }, orderBy: { position: "desc" }, select: { position: true } });
-  const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1 } });
+  const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1, checkKey } });
   // Stamped like every other edit, so a repeat copy someone added to counts
   // as touched and isn't taken back when the finished task reopens.
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });

@@ -1,6 +1,6 @@
 # Missing info
 
-Planned with Connor on Nov 15, 2026, one question at a time (D1 to D10 below). Nothing here gets built until Connor says "build it" in chat.
+Planned with Connor on Nov 15, 2026, one question at a time (D1 to D10 below). He said "build it" the same day. Section 11 lists where the build differs from this plan.
 
 ## 1. Summary
 
@@ -237,3 +237,18 @@ Run [copy-rules.md](../copy-rules.md) before it ships. Starting words:
 - Earlier review findings this answers: PORTFOLIO-I01 and PORTFOLIO-007 in `docs/uiux-review/portfolio.md`, JOURNEYS-006 and JOURNEYS-007 in `docs/uiux-review/journeys.md`.
 - New York Real Property Law § 226-c, the notice before not renewing or raising rent 5% or more. Confirm the days with HG Capital's attorney.
 - The 1099-NEC threshold for payments made in 2026 is $2,000 under the 2025 tax law (it was $600). Confirm with the CPA.
+
+## 11. What the build changed
+
+Built Nov 15, 2026. Where the code differs from the sections above:
+
+1. **Select, not hover boxes.** Picking rows for Make task starts with a Select button beside the Required | Suggested switch, as Mail's Select does. At rest a row has no box, so nothing on the list reads as "tick when done", and rows line up with their group's heading. While selecting, a tap anywhere on a row picks it, and the bar at the foot holds Cancel and Make task (Select all with nothing picked). Select is hidden below 640px; a phone hands off one row from its ⋯.
+2. **The in-place mark is the field's own verb in --warn** ("Add carrier"), the look key dates already had (JOURNEYS-006), not the word "Missing". It still opens the field. Section titles carry "· 3 missing" in --warn, and a unit row with gaps shows a --warn mark and "2 missing" in its status spot.
+3. **Vacant since is never cleared by a write.** The checks treat it as stale once a lease for the unit moves in on or after it, so the tenants service needed no change.
+4. **No unit id backfill script.** `ensureUnitIds` gives a property's units their ids the first time a skip or Make task names one under a placeholder (23 Sherwood's two units in production).
+5. **Lease and contractor pages get a one-line summary** ("2 missing: Signed lease PDF, primary tenant's phone") without Show, since their sections sit right under it. The lease page also shows its lease end once the notice window opens: "Lease ends Mar 31 · Notice by Jan 30".
+6. **The unit sheet isn't marked.** Its status selects already color "Need to set up" and "Call to confirm"; blank account fields aren't flagged inside the sheet yet.
+7. **A lease-end row has no Doesn't apply button yet.** Its real answers (a renewal term, a move-out date, a month-to-month term) are on the lease page. The data takes a skip on `term:<id>`.
+8. **The worklist is 800px wide** (`max-w-200`), a reading width for one column of rows.
+9. **A tenant's email row names them:** "Dana Fox's email". A tenant on two live leases has one row.
+10. `/missing` is a staff section (`STAFF_SECTIONS`, the proxy matcher) with its own Not found.

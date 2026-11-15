@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import type { TaskStatus } from "@prisma/client";
 import { BackLink } from "@/components/back-link";
@@ -20,6 +21,8 @@ const MARK: Record<LeaseStatus, TaskStatus> = { upcoming: "SCHEDULED", current: 
 
 export type LeasePageViewProps = {
   leaseId: string;
+  /** Missing info's lines for this lease (docs/specs/missing-info.md): its required blanks and its notice deadline. */
+  notices?: ReactNode;
   status: LeaseStatus;
   /** The street, linked to the property, and the unit after it ("Front"), when there is one. */
   street: string;
@@ -79,6 +82,7 @@ export function LeasePageView(p: LeasePageViewProps) {
         </aside>
 
         <div className="min-w-0 space-y-8 pt-2 [grid-area:main] pointer-coarse:space-y-6 lg:pt-4">
+          {p.notices && <div className="space-y-2">{p.notices}</div>}
           <TenantsSection leaseId={p.leaseId} tenants={p.tenants} />
           <TermsSection leaseId={p.leaseId} terms={p.terms} />
           <Section title="Notes">

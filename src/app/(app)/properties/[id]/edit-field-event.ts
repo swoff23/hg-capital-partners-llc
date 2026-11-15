@@ -19,3 +19,17 @@ export function onPropertyFieldRequest(fields: readonly string[], open: (field: 
   window.addEventListener(EVENT, listener);
   return () => window.removeEventListener(EVENT, listener);
 }
+
+const UNIT_EVENT = "property:edit-unit";
+
+/** Opens one unit's sheet from outside the Units section: Missing info's rows on the property page (docs/specs/missing-info.md). */
+export function openPropertyUnit(unitId: string) {
+  window.dispatchEvent(new CustomEvent<string>(UNIT_EVENT, { detail: unitId }));
+}
+
+/** Subscribes `open` to requests for a unit's sheet; returns the unsubscribe. */
+export function onPropertyUnitRequest(open: (unitId: string) => void): () => void {
+  const listener = (e: Event) => open((e as CustomEvent<string>).detail);
+  window.addEventListener(UNIT_EVENT, listener);
+  return () => window.removeEventListener(UNIT_EVENT, listener);
+}

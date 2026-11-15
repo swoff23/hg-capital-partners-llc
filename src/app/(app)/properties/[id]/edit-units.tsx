@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, CircleAlert, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Code } from "@/components/code";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
@@ -30,6 +30,8 @@ import { shortAddress } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import { deletePropertyUnit } from "../actions";
 import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
+import { onPropertyUnitRequest } from "./edit-field-event";
+import { MissingTitle, useUnitMissing } from "./missing-context";
 
 // The editor loads after the page has settled or at the first hover, focus or press, not with the page (lib/lazy-module.ts).
 const unitSheet = lazyModule(() => import("./unit-sheet"));
@@ -125,6 +127,24 @@ export function UnitsSection({
     setIsOpen(true);
   }
 
+  // Missing info opens a unit's sheet: a row on this page asks by event, one on the worklist links here with ?unit=.
+  useEffect(() => {
+    const openById = (unitId: string) => {
+      const i = initial.findIndex((u) => u.id === unitId);
+      if (i >= 0) openUnit(i);
+    };
+    const url = new URL(window.location.href);
+    const asked = url.searchParams.get("unit");
+    if (asked) {
+      url.searchParams.delete("unit");
+      window.history.replaceState(window.history.state, "", url);
+      openById(asked);
+    }
+    return onPropertyUnitRequest(openById);
+    // The listener reads the list it was set up with; a newer render sets it up again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
+
   function openEquipment(i: number, index: number) {
     const unit = initial[i];
     setItem({ unitId: unit?.id ?? null, at: i, label: unit?.label, index, version, id: (item?.id ?? 0) + 1 });
@@ -177,7 +197,7 @@ export function UnitsSection({
   const itemUnit = itemAt >= 0 ? initial[itemAt] : undefined;
 
   return (
-    <Section title="Units & access">
+    <Section title={<MissingTitle section="units">Units &amp; access</MissingTitle>}>
       {rentable.length === 0 ? (
         <p className="pb-2 text-body text-muted-foreground">Add each unit to keep its lockbox code, utilities and equipment here.</p>
       ) : (
@@ -341,6 +361,8 @@ function ReadUnit({
   const equipment = u.equipment ?? [];
   const lockbox = u.lockboxCode?.trim() ? splitLockbox(u.lockboxCode) : null;
   const datedCount = equipment.filter((e) => parseInstallYear(e.installYear) != null).length;
+  // Its required blanks (Missing info, docs/specs/missing-info.md D2), in the row's one status spot.
+  const missing = useUnitMissing(u.id);
   return (
     <li className="py-1.5">
       <div className="flex min-h-8 items-center gap-3">
@@ -358,6 +380,14 @@ function ReadUnit({
         >
           {name}
         </button>
+        {missing > 0 && (
+          <span className="flex shrink-0 items-center gap-1 text-meta text-warn" aria-label={`${missing} missing`}>
+            <CircleAlert aria-hidden="true" strokeWidth={2} className="size-3.5 pointer-coarse:size-4" />
+            <span aria-hidden="true" className="max-[480px]:hidden">
+              {missing} missing
+            </span>
+          </span>
+        )}
         {lockbox && (
           <span className="flex shrink-0 items-center gap-1.5">
             <span className="text-meta text-muted-foreground max-[480px]:hidden">Lockbox</span>

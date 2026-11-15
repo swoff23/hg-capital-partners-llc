@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { toYmd, todayYmdEastern } from "@/lib/dates";
+import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { leasePage } from "@/lib/tenants/queries";
 import { dayAfter } from "@/lib/tenants/status";
@@ -8,6 +8,12 @@ import { LeasePageView } from "./view";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
 import { tenantShare } from "@/lib/tenants/fields";
+import { prisma } from "@/lib/db";
+import { liveRecord } from "@/lib/record-scope";
+import { ofPriority } from "@/lib/missing/checks";
+import { leaseEnd, noticeLine } from "@/lib/missing/lease-notice";
+import { leaseMissingInfo } from "@/lib/missing/queries";
+import { LeaseEndNotice, MissingSummary } from "../../missing/missing-summary";
 
 /** The tab names the household's home (record-title.ts), so tabs and history can be told apart. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -25,6 +31,16 @@ export default async function LeasePage({ params }: { params: Promise<{ id: stri
   const data = await leasePage(id, today);
   if (!data) notFound();
   const { lease, status, home, now, others } = data;
+  // Missing info (docs/specs/missing-info.md): this lease's required blanks, and its end once the notice window opens.
+  const [missing, propertyLive] = await Promise.all([
+    leaseMissingInfo(lease.id, lease.propertyId, today),
+    prisma.property.findFirst({ where: { id: lease.propertyId, ...liveRecord }, select: { address: true } }),
+  ]);
+  const required = ofPriority(missing.gaps, "required");
+  const end = propertyLive
+    ? leaseEnd({ id: lease.id, address: propertyLive.address, unitLabel: lease.unitLabel, movesIn: lease.movesIn, movesOut: lease.movesOut, terms: lease.terms }, today)
+    : null;
+  const endShown = end && today >= end.showFrom ? end : null;
 
   const terms = lease.terms.map((t) => ({
     id: t.id,
@@ -41,6 +57,20 @@ export default async function LeasePage({ params }: { params: Promise<{ id: stri
   return (
     <LeasePageView
       leaseId={lease.id}
+      notices={
+        required.length > 0 || endShown ? (
+          <>
+            <MissingSummary gaps={required} />
+            {endShown && (
+              <LeaseEndNotice
+                ends={`${endShown.endsOn < today ? "Lease ended" : "Lease ends"} ${fmtDay(endShown.endsOn, { year: "auto", now: today })}`}
+                notice={noticeLine(endShown, today)}
+                late={endShown.late}
+              />
+            )}
+          </>
+        ) : undefined
+      }
       status={status}
       street={shortAddress(lease.property.address)}
       unitLabel={lease.unitLabel}

@@ -397,11 +397,14 @@ async function writeUnitsAt(
     if (!current) throw new Error("This property is gone.");
     if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["units"], { actorId: by?.id });
     const before = parseUnits(current.units);
+    // A unit's Vacant since (Missing info, D6) isn't on the unit sheet, so an edit that doesn't send it keeps what's stored.
+    const vacant = new Map(withUnitIds(before).map((u) => [u.id, u.vacantSince ?? null]));
     // With ids, placeholders included, as the page showed them to the editor.
     const clean: PropertyUnit[] = next(withUnitIds(before)).map((u) => ({
       id: u.id?.trim() || null,
       label: u.label?.trim() || null,
       lockboxCode: u.lockboxCode?.trim() || null,
+      ...vacantField(u.vacantSince === undefined ? vacant.get(u.id) : u.vacantSince),
       utilities: Object.fromEntries(Object.entries(u.utilities ?? {}).map(([k, v]) => [k, v?.trim() || null])),
       equipment: (u.equipment ?? [])
         .filter((e) => e.type && (e.model || e.installYear || e.comment))
@@ -437,6 +440,44 @@ async function writeUnitsAt(
   if (renamed.countChanged) revalidatePath("/properties");
   if (renamed.listings) revalidatePath("/rentals");
   revalidateTasks(renamed.tasks);
+}
+
+/** A unit's Vacant since, stored only while it's set, so a unit with none keeps the shape it always had. */
+const vacantField = (v: string | null | undefined) => (v?.trim() ? { vacantSince: v.trim() } : {});
+
+/**
+ * Change one unit from Missing info (docs/specs/missing-info.md): a utility
+ * status answered in place (D4), or Mark vacant (D6). The worklist has no
+ * version to pin, so this writes at the row's latest; a save that lands in
+ * between still refuses it, as any stale write is refused. `unitId` may be a
+ * placeholder ("unit-at-2"), which names the same unit as the page showed it.
+ */
+export async function changeUnit(
+  id: string,
+  unitId: string,
+  change: (u: PropertyUnit) => PropertyUnit,
+  p: TaskPrincipal,
+  by: Editor,
+): Promise<void> {
+  const row = await prisma.property.findUnique({ where: { id }, select: { updatedAt: true, units: true } });
+  if (!row) throw new Error("This property is gone.");
+  if (!withUnitIds(parseUnits(row.units)).some((u) => u.id === unitId)) throw new Error("That unit is gone. Reload to see the latest.");
+  await writeUnits(id, row.updatedAt.toISOString(), p, by, (stored) => stored.map((u) => (u.id === unitId ? change(u) : u)));
+}
+
+/**
+ * Give every unit of the property a lasting id, for a check that has to name
+ * one (a skip, Mark vacant). Returns the units as stored after, in the same
+ * order, so a placeholder ("unit-at-2") still finds its unit by its place.
+ */
+export async function ensureUnitIds(id: string, p: TaskPrincipal, by: Editor): Promise<PropertyUnit[]> {
+  const row = await prisma.property.findUnique({ where: { id }, select: { updatedAt: true, units: true } });
+  if (!row) throw new Error("This property is gone.");
+  const units = parseUnits(row.units);
+  if (units.every((u) => u.id)) return units;
+  await writeUnits(id, row.updatedAt.toISOString(), p, by, (stored) => stored);
+  const after = await prisma.property.findUnique({ where: { id }, select: { units: true } });
+  return parseUnits(after?.units);
 }
 
 /* ---------------- Building CapEx (JSON, merge by key) ---------------- */
