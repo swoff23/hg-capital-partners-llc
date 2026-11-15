@@ -35,6 +35,13 @@ export interface OutboxItem {
   visit?: boolean;
   /** DUE_TODAY and OVERDUE (reminders.ts): the date the reminder is for. */
   due?: string;
+  /**
+   * TARGET, NOTES and STATUS: what the job had before this change, so a change
+   * put back before the email goes is dropped (undoneDropped). TARGET: the
+   * date the contractor saw, "" for none. NOTES: notesFingerprint of the
+   * notes. STATUS: the status. Absent on rows queued before Nov 15.
+   */
+  from?: string;
 }
 
 /** Lines that are the job's own news, with nobody's name in front: the 8 am emails. */
@@ -235,6 +242,51 @@ export function offItems(items: readonly OutboxItem[], now: { hasAccess: boolean
 export function liveReminders(items: readonly OutboxItem[], now: { status: TaskStatus; due: Ymd | null; today: Ymd }): OutboxItem[] {
   const want = contractorMaySetDate(now.status) ? reminderFor(now.due, now.today) : null;
   return items.filter((i) => !UNSIGNED_KINDS.has(i.kind) || (i.kind === want && i.due === now.due));
+}
+
+/**
+ * A short fingerprint of a job's notes (cyrb53, trimmed first as core.ts
+ * stores them), so an outbox line can tell notes put back as they were
+ * without keeping a copy: notes can hold lockbox codes, which stay out of the
+ * outbox. "" for no notes.
+ */
+export function notesFingerprint(notes: string | null | undefined): string {
+  const s = notes?.trim() ?? "";
+  if (!s) return "";
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/** The kinds a later change can put back as they were, and what each is compared on. */
+const UNDOABLE_KINDS = ["TARGET", "NOTES", "STATUS"] as const;
+
+/**
+ * Changes put back before the email goes (Connor, Nov 15): a date moved and
+ * moved back, notes edited back to what they said, a status changed and
+ * changed back. For each of those kinds, when its first line's `from` is
+ * what the job has now, every line of that kind goes: the email would only
+ * report a change that isn't there. A kind that ends somewhere new keeps all
+ * its lines, as before. Lines without `from` (queued before Nov 15) stay.
+ *
+ * A status put back takes a send-back's note with it (it lives inside the
+ * STATUS line); the note comment itself stays on the job. Approve's Undo
+ * deletes its line, which reconcileItems already drops.
+ */
+export function undoneDropped(items: readonly OutboxItem[], now: { due: Ymd | null; notes: string | null; status: TaskStatus }): OutboxItem[] {
+  const current: Record<(typeof UNDOABLE_KINDS)[number], string> = { TARGET: now.due ?? "", NOTES: notesFingerprint(now.notes), STATUS: now.status };
+  const undone = new Set<string>(UNDOABLE_KINDS.filter((kind) => {
+    const first = items.find((i) => i.kind === kind);
+    return first?.from !== undefined && first.from === current[kind];
+  }));
+  return items.filter((i) => !undone.has(i.kind));
 }
 
 /** The update an email's button opens at: the first comment, status or file post the recipient can see. */

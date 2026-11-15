@@ -178,6 +178,8 @@ Comparable products: PM Toolbelt lets a vendor complete a work order from an ema
 
 **The gate is unchanged** (docs/specs/contractor-email-switch.md): a contractor gets job emails only once their login is active, they have signed in at least once, and their Job emails switch is on. Bundling is unchanged: 3 minutes quiet, at most 10 (`rules.ts` `BUNDLE_QUIET_MS`, `BUNDLE_MAX_MS`).
 
+**A change put back before the email goes says nothing (Connor, Nov 15).** A date moved and moved back, notes edited back to what they said, or a status changed and changed back: when the job is back where the bundle's first change of that kind found it, every line of that kind is dropped (`content.ts` `undoneDropped`). Each line records what the job had before it (`from`; the notes as a fingerprint, so lockbox codes stay out of the outbox), and the send run compares that with the job as it stands. A kind that ends somewhere new keeps all its lines. A bundle left empty sends nothing. A status put back takes a send-back's note with it; the note comment stays on the job. Already handled before this: a deleted or edited comment, removed files, Approve's Undo, an assignment undone or re-picked, taken off and put back, canceled and reopened.
+
 | Trigger | Contractor | Connor and Pieter | Today |
 |---|---|---|---|
 | Assigned | yes | no | same |
