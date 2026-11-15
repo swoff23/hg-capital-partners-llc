@@ -25,6 +25,7 @@ import {
   sendBudget,
   sendFailureKind,
   taskEmail,
+  undoneDropped,
   type EventSnapshot,
   type OutboxItem,
 } from "./content";
@@ -262,7 +263,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     // The job's state and the recipient's access, read again now the row is claimed: the batch read before the claim can
     // be a write behind (taken off and put back, canceled, a date moved), and these decide what goes.
     const [fresh, accessRow] = await Promise.all([
-      prisma.task.findUnique({ where: { id: row.taskId }, select: { status: true, dueDate: true, scheduledFor: true } }),
+      prisma.task.findUnique({ where: { id: row.taskId }, select: { status: true, dueDate: true, scheduledFor: true, description: true } }),
       delivery.audience === "contractor" && row.recipientContactId
         ? prisma.taskAccess.findFirst({ where: { taskId: row.taskId, contactId: row.recipientContactId, revokedAt: null }, select: { id: true } })
         : null,
@@ -272,15 +273,18 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       result.skipped++;
       continue;
     }
-    const task = { ...row.task, status: fresh.status, dueDate: fresh.dueDate, scheduledFor: fresh.scheduledFor };
-    const items =
+    const task = { ...row.task, status: fresh.status, dueDate: fresh.dueDate, scheduledFor: fresh.scheduledFor, description: fresh.description };
+    const due = toYmd(targetDate(task));
+    const kept =
       delivery.audience === "contractor"
         ? liveReminders(offItems(live.items, { hasAccess: !!accessRow, canceled: task.status === "CANCELED" }), {
             status: task.status,
-            due: toYmd(targetDate(task)),
+            due,
             today: todayYmdEastern(now),
           })
         : live.items;
+    // A date, the notes or a status put back as they were before the bundle's first change says nothing (undoneDropped).
+    const items = undoneDropped(kept, { due, notes: task.description, status: task.status });
     const off = items.some((i) => i.kind === "OFF");
     if (items.length === 0) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });

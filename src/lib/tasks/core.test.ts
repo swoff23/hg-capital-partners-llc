@@ -878,7 +878,7 @@ test("setStatus: Send back writes the status, then the note tied to it, and the 
   // One email line: the status, with the note's id so an edit or a delete reaches it. No second comment line.
   const items = queued(calls);
   assert.equal(items.length, 1);
-  assert.deepEqual(items[0], { kind: "STATUS", actorLabel: "Pieter Louw", summary: 'sent "Cabinet install" back: Level the uppers', at: items[0].at, eventId: "s1", noteEventId: "n1" });
+  assert.deepEqual(items[0], { kind: "STATUS", actorLabel: "Pieter Louw", summary: 'sent "Cabinet install" back: Level the uppers', at: items[0].at, eventId: "s1", noteEventId: "n1", from: "REVIEW" });
 });
 
 test("setStatus: a move with no note writes no comment and no note id", async () => {

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
+import { notesFingerprint } from "@/lib/notifications/content";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
@@ -345,10 +346,16 @@ export interface OutboxItem {
   visit?: boolean;
   /** DUE_TODAY and OVERDUE (notifications/reminders.ts): the date the reminder is for, which keeps it to once per date. */
   due?: string;
+  /**
+   * TARGET, NOTES and STATUS: what the job had before this change, so the drain drops a change put back before the
+   * email goes (notifications/content.ts undoneDropped). TARGET the date ("" for none), NOTES notesFingerprint, STATUS
+   * the status.
+   */
+  from?: string;
 }
 
 /** What a line carries beside its summary (OutboxItem's optional fields). */
-type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit">;
+type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit" | "from">;
 
 type NotifyTask = Pick<Task, "id" | "assigneeContactId">;
 
@@ -776,6 +783,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   }
   const audience = await notify(tx, task, p, { kind: "STATUS", visibility }, summary, now, {
     eventId: statusEvent.id,
+    from: before.status,
     ...(noteEvent && p.kind !== "contractor" && note ? { noteEventId: noteEvent.event.id } : {}),
   });
   // A canceled open job tells its contractor there's no need to go (the Canceled line itself stays Internal).
@@ -1261,10 +1269,10 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
       // Whether the date that moved is the booked visit, so the email says "visit" or "due date" the way the job
       // page labels it (a cleared date is the one the job had).
       const visit = targetIsVisit(targetAfter ? after : before);
-      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { visit });
+      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { visit, from: targetBefore ?? "" });
     }
     if (events.some((e) => e.kind === "NOTES")) {
-      await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now);
+      await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now, { from: notesFingerprint(before.description) });
     }
   }
   return after;
@@ -1299,7 +1307,7 @@ export async function setDateByContractor(tx: Tx, taskId: string, date: Ymd, p: 
   const after = await tx.task.update({ where: { id: taskId }, data: { ...data, ...editStamp(p, now) } });
   for (const e of events) await addEvent(tx, taskId, p, e);
   const was = from ? ` (was ${emailDay(from, now)})` : "";
-  await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { visit: false });
+  await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { visit: false, from: from ?? "" });
   return after;
 }
 
