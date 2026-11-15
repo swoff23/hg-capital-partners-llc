@@ -19,9 +19,6 @@ export function Card({ className, ...props }: React.ComponentProps<"div">) {
 export function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("border-b border-border px-4 py-3", className)} {...props} />;
 }
-export function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
-  return <h3 className={cn("text-section text-foreground", className)} {...props} />;
-}
 export function CardBody({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("p-4", className)} {...props} />;
 }
@@ -62,59 +59,6 @@ export function Section({
       </div>
       <div className="pt-3">{children}</div>
     </section>
-  );
-}
-
-/**
- * A Section with view and edit modes. In view mode an Edit button (when
- * `onEdit` is set), revealed on hover with a mouse and always shown on touch
- * screens; in edit mode the `actions` slot (Cancel / Save).
- * Used by the property edit sections, a contractor's Contact and the
- * /settings editors. The Edit carries `data-section-edit`, where
- * useSectionSave returns focus when the form closes.
- */
-export function SectionCard({
-  title,
-  children,
-  onEdit,
-  editing,
-  actions,
-  as = "h2",
-}: {
-  title: string;
-  children: React.ReactNode;
-  onEdit?: () => void;
-  editing?: boolean;
-  actions?: React.ReactNode;
-  /** The heading level; h2 for a record's sections under its h1. */
-  as?: "h2" | "h3";
-}) {
-  return (
-    <Section
-      as={as}
-      title={title}
-      className="group"
-      actions={
-        editing
-          ? actions
-          : onEdit && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onEdit}
-                // useSectionSave puts focus back here when the form closes.
-                data-section-edit=""
-                // Pulled out by its padding, so the word ends on the section's edge like every other action.
-                className="-mr-2.5 opacity-0 transition-[opacity,background-color,color] focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
-              >
-                Edit
-              </Button>
-            )
-      }
-    >
-      {children}
-    </Section>
   );
 }
 
@@ -203,12 +147,6 @@ export function Button({
     </button>
   );
 }
-
-/* ---------------- Spinner ----------------
-   The one loading glyph (lucide LoaderCircle), after 200ms for at least 400ms.
-   A client component in its own module; re-exported so primitives come from
-   one place. */
-export { Spinner };
 
 export function LinkButton({
   className,
@@ -314,11 +252,6 @@ const badgeTones: Record<BadgeTone, string> = {
   ok: "bg-ok-tint text-ok",
 };
 
-/** A badge tone's ground and text, for an element that can't be a Badge (a status <select>). */
-export function badgeToneClass(tone: BadgeTone): string {
-  return badgeTones[tone];
-}
-
 export function Badge({
   tone = "neutral",
   className,
@@ -369,9 +302,6 @@ export function pickerChipClass({ size = "row" }: { size?: PickerChipSize } = {}
   return cn(pickerChipBase, pickerChipSizes[size]);
 }
 
-/** `pickerChipClass()` at the `row` size, the chip every picker drew before the sizes. */
-export const pickerChip = pickerChipClass();
-
 /**
  * A picker's trigger at field height, for a form where pickers share a grid
  * with inputs and selects (New task): the field look, --background on a
@@ -379,8 +309,8 @@ export const pickerChip = pickerChipClass();
  * control height. Its text is text-body, the value's icon or avatar leads it
  * and a chevron (`pickerFieldChevron`) ends it in --muted-foreground, dropped below 360px
  * so a two-column form keeps the value whole ("Connor (me)" at 320). Keyboard
- * focus draws the field's --ring edge and inset ring. `pickerChip` is the same
- * trigger in a row of chips.
+ * focus draws the field's --ring edge and inset ring. `pickerChipClass` is
+ * the same trigger in a row of chips.
  */
 export const pickerField = cn(
   "relative flex h-9 w-full min-w-0 items-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-2.5 text-left text-body text-foreground outline-none",
@@ -459,8 +389,6 @@ export function Input({ className, size = "md", prefix, suffix, style, ...props 
 export function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return <textarea className={cn(fieldClass, "py-2", className)} {...props} />;
 }
-/** WebKit ignores min-height on a native select, so the select sets its 44px touch height outright. */
-export const selectTouchHeight = "pointer-coarse:h-11";
 
 /**
  * A checkbox drawn from the tokens (docs/brand-guidelines.md, section 9): a
@@ -540,10 +468,6 @@ export function CheckboxMark({ checked, className }: { checked: boolean; classNa
       </svg>
     </span>
   );
-}
-
-export function Select({ className, ...props }: React.ComponentProps<"select">) {
-  return <select className={cn(fieldClass, "h-9", selectTouchHeight, className)} {...props} />;
 }
 
 /**
@@ -821,16 +745,6 @@ export function RowCell({
         </>
       )}
     </Td>
-  );
-}
-
-/** A label over its value, in a <dl>. An empty value shows the dash glyph in --muted-foreground. */
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="py-1.5">
-      <dt className="text-meta font-medium text-fg-2">{label}</dt>
-      <dd className="mt-0.5 text-body text-foreground">{children ?? <span className="text-muted-foreground">—</span>}</dd>
-    </div>
   );
 }
 

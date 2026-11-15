@@ -64,10 +64,11 @@ export function PublicHeader() {
 }
 
 /**
- * The links below 600px. React Aria portals the menu to <body>, outside the
- * page's public wrapper, so its own root carries data-surface="public" to
- * stay in the dark material. The RouterProvider makes its items client-side
- * links, like the header's.
+ * The links below 600px. Inside the marketing layout's PublicSurface, React
+ * Aria portals the menu into the public ground, so it keeps the dark
+ * material. Its root still carries data-surface="public" until the menu
+ * family goes stock (docs/specs/design-foundation.md, section 5.5). The
+ * RouterProvider makes its items client-side links, like the header's.
  */
 function PhoneMenu({ pathname }: { pathname: string }) {
   const router = useRouter();

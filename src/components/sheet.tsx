@@ -15,7 +15,6 @@ import { ChevronLeft, X } from "lucide-react";
 import {
   Button as AriaButton,
   Dialog,
-  DialogTrigger,
   Heading,
   Modal,
   ModalOverlay,
@@ -43,10 +42,10 @@ import {
  * The Overlay level (docs/brand-guidelines.md, section 5): --popover, the
  * overlay shadow over the scrim, rounded-xl (the top corners on a phone).
  *
- *   <SheetTrigger>
+ *   <DialogTrigger>
  *     <AriaButton>Due</AriaButton>
  *     <Sheet title="Due date">{({ close }) => …}</Sheet>
- *   </SheetTrigger>
+ *   </DialogTrigger>
  *
  * Or controlled, with no trigger: <Sheet isOpen={open} onOpenChange={setOpen} title="…">.
  * `footer` pins the primary (and its one-line reason) under the scrolling
@@ -64,9 +63,6 @@ import {
  * sheet's own body stays mounted underneath and comes back at the same
  * scroll, with focus on whatever opened the view.
  */
-
-/** Opens its Sheet from the first pressable child. Re-export of React Aria's DialogTrigger. */
-export const SheetTrigger = DialogTrigger;
 
 export type SheetProps = {
   /** The heading, and the dialog's accessible name. */

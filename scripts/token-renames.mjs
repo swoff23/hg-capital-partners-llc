@@ -16,8 +16,8 @@ export const RENAMED = {
 
 // Longest first, so `line-control` wins over `line` and `danger-fill-hover` over `danger-fill`.
 const KEYS = Object.keys(RENAMED).sort((a, b) => b.length - a.length).join("|");
-// Every Tailwind utility that takes a color.
-const UTIL = "text|bg|border(?:-(?:[trblxyse]|bs|be))?|divide|ring(?:-offset)?|inset-ring|outline|fill|stroke|decoration|caret|accent|placeholder|shadow|inset-shadow|drop-shadow|text-shadow|from|via|to";
+// Every Tailwind utility that takes a color. Exported for eslint.config.mjs's white and black ban.
+export const UTIL = "text|bg|border(?:-(?:[trblxyse]|bs|be))?|divide|ring(?:-offset)?|inset-ring|outline|fill|stroke|decoration|caret|accent|placeholder|shadow|inset-shadow|drop-shadow|text-shadow|from|via|to";
 
 /**
  * A color utility on an old name: group 1 is the utility, group 2 the token.

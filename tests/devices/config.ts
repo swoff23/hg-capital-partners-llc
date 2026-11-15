@@ -3,7 +3,20 @@ import path from "node:path";
 import { devices, type PlaywrightTestConfig } from "@playwright/test";
 import type { FindingKind } from "./checks";
 
-export const REPORT_DIR = path.join(__dirname, "../../device-report");
+/**
+ * Light by default. `npm run test:devices:dark` (DEVICES_SCHEME=dark) runs the
+ * same check with every browser in dark mode, so the app takes its dark theme
+ * (THEME_SCRIPT follows the system when nothing is saved), and writes its own
+ * report to device-report-dark/. scripts/device-check-gate.mjs reads the light
+ * run only (docs/specs/design-foundation.md, sections 7.1 and 7.4).
+ */
+export const COLOR_SCHEME: "light" | "dark" = (() => {
+  const scheme = process.env.DEVICES_SCHEME ?? "light";
+  if (scheme !== "light" && scheme !== "dark") throw new Error(`DEVICES_SCHEME is "light" or "dark", not "${scheme}".`);
+  return scheme;
+})();
+
+export const REPORT_DIR = path.join(__dirname, COLOR_SCHEME === "dark" ? "../../device-report-dark" : "../../device-report");
 
 // Problems that were already there, by page and device, so a run only fails
 // on new ones. Fixing a page and rerunning with

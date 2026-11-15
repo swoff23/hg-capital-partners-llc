@@ -1,11 +1,15 @@
-import { clsx, type ClassValue } from "clsx";
-import { extendTailwindMerge } from "tailwind-merge";
+import type { ClassValue } from "cn";
+import { createCn } from "cn/config";
 import { HG_TIME_ZONE } from "./dates";
 
-/* tailwind-merge reads any unknown text-*, shadow-* or ease-* as a color, so
-   cn("text-fg-2", "text-body") would drop the color. It learns the token names
-   from app/globals.css here: the type scale, elevation and motion. */
-const twMerge = extendTailwindMerge({
+/* HG's cn is the cn package's merge (shadcn/ui's), taught HG's token names
+   from app/globals.css: the type scale, elevation and motion. Left to its
+   defaults it reads an unknown text-*, shadow-* or ease-* as a color, so
+   cn("text-fg-2", "text-body") would drop the color. Stock files in
+   components/ui/ import the package's own cn, which doesn't know these names,
+   so none of them goes into a stock part (docs/specs/design-foundation.md,
+   section 5.4). App code imports cn from here; lint bans "cn" elsewhere. */
+const merge = createCn({
   extend: {
     theme: {
       text: ["title", "section", "body", "label", "meta", "micro", "figure-l", "figure-m", "code", "code-l"],
@@ -20,7 +24,7 @@ const twMerge = extendTailwindMerge({
 });
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return merge(...inputs);
 }
 
 /** The number in a money value (a number, a numeric string or a Prisma Decimal), or null when it's empty or unreadable. */

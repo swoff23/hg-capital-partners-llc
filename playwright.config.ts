@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { defineConfig } from "@playwright/test";
-import { DEVICES } from "./tests/devices/config";
+import { COLOR_SCHEME, DEVICES } from "./tests/devices/config";
 
 // DEVICES_PORT lets two checkouts run the device check side by side.
 const PORT = Number(process.env.DEVICES_PORT) || 3100;
@@ -18,7 +18,9 @@ export default defineConfig({
   retries: 0,
   timeout: 120_000,
   reporter: [["line"], ["./tests/devices/gallery-reporter.ts"]],
-  use: { baseURL: `http://localhost:${PORT}` },
+  // DEVICES_SCHEME=dark (`npm run test:devices:dark`) puts every browser in dark
+  // mode; without it the run stays light (tests/devices/config.ts).
+  use: { baseURL: `http://localhost:${PORT}`, colorScheme: COLOR_SCHEME },
   projects: DEVICES,
   webServer: {
     // A production build in its own folder, so it never touches `npm run dev`

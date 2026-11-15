@@ -13,33 +13,35 @@ These apply to everyone working in this repo, people and agents alike. Claude Co
 ## Ask before visual changes
 
 - **Fix data, logic, money and wrong-copy bugs directly.** Ask before changing layout, visual style or where a component sits, even when a reference or mock disagrees with the build. Connor approves design changes.
+- **Stock looks are approved.** A stock component as `npx shadcn add` writes it needs no design ask of its own, since its landing's review covers it. Changing its classes does.
 - **Offer 2 or 3 concrete options with a recommendation.** Draw them as low-fi visual mockups, never ASCII or text sketches. Say how each behaves at desktop, tablet and mobile, then build only the one that's picked. Unpicked options stay in chat, not in the code.
 
 ## Reuse first
 
-1. **Check what we have.** Look up the job (dialog, menu, tooltip, field, toggle, empty state, sent screen) in [docs/components.md](docs/components.md), then search `src/components/` and the feature's folder under `src/app/`. If something does the job, use it. If it almost does, extend it with a prop or variant instead of forking a copy.
-2. **Research only what's missing.** See Design references.
-3. **Leave it findable.** New general-purpose components go in `src/components/` (primitives in `src/components/ui.tsx`) and get a row in docs/components.md in the same commit. Feature-only compositions stay beside their page and don't need a row.
-4. **Don't add another copy.** Where the inventory lists duplicates, use the recommended one, and consolidate toward it when you're already in that code.
+1. **Check what we have.** Look up the job (dialog, menu, tooltip, field, toggle, empty state, sent screen) in [docs/components.md](docs/components.md), then search `src/components/` and the feature's folder under `src/app/`. If something does the job, use it. If an HG piece almost does, extend it with a prop or variant instead of forking a copy.
+2. **Pull what's missing.** Add it from shadcn's aria registry with `npx shadcn@4.23.0 add`, the way docs/components.md says under "Adding a component". Never run `shadcn init`.
+3. **Compose, don't restyle.** Build feature pieces from stock parts with layout classes. Don't edit a stock file's classes to make it fit; take the misfit to Connor.
+4. **Leave it findable.** Stock files live in `src/components/ui/` as the CLI wrote them. New general-purpose compositions go in `src/components/` and get a row in docs/components.md in the same commit. Feature-only compositions stay beside their page and don't need a row.
+5. **Don't add another copy.** Where the inventory lists duplicates, use the recommended one, and consolidate toward it when you're already in that code.
 
 ## Design references
 
-- **Never make UI up from scratch.** Every layout, control and interaction traces back to an existing component here, or failing that a proven pattern: Mobbin, Apple HIG or Material, or the shadcn/ui component that does the job. shadcn/ui is a reference for anatomy and props only; we build in our own Tailwind primitives and don't add it as a dependency. Invent only when nothing fits, and say so when you do.
-- **Check Mobbin before designing anything new.** Screens, redesigns, flows, dialogs, empty states. Cover both the mobile and desktop versions of the pattern, and look at comparable products alongside it.
+- **Components are stock.** Controls are shadcn/ui's aria-vega items on React Aria, kept as `npx shadcn add` writes them: sizes, spacing, radius, shadows, focus ring and motion. docs/brand-guidelines.md sets the theme (colors, gold, the status colors, Geist). A stock file changes only through the global rules in `globals.css`. Until a family's landing ([design foundation](docs/specs/design-foundation.md), section 7.3), its HG component stays the one to use.
+- **Never make UI up from scratch.** Every layout, control and interaction traces back to an existing component here, a registry item, or failing that a proven pattern: Mobbin, Apple HIG or Material. A control the registry lacks is composed from React Aria and stock parts; Intent UI is an anatomy reference only. Invent only when nothing fits, and say so when you do.
+- **Check Mobbin before designing anything new.** Screens, redesigns, flows, page layouts, empty states and payoff moments start there; controls come from the registry. Cover both the mobile and desktop versions of the pattern, and look at comparable products alongside it.
 - **Design for every size from the start.** Laptop 1280x800, tablet 768x1024 (gets the touch layout), mobile 375x667. Every mock says how it behaves at all three and what drops on mobile. Mobile can hide secondary info or use shorter copy instead of cramming it in.
-- **Cite what you used.** Link the references in the commit message or handoff notes, next to the components reused.
-- **Adapt, don't copy.** References decide the pattern; the build uses our primitives and tokens.
+- **Cite what you used.** Link the references in the commit message or handoff notes, and name each registry item you pulled.
 - **Research can win.** When a reference contradicts an earlier request, flag the conflict and recommend the research-backed option.
 
 ## Personality
 
 HG should feel like a well-run property company, not a generic AI template. Calm and premium in visuals, plain and credible in words.
 
-- **Visual rules live in [docs/brand-guidelines.md](docs/brand-guidelines.md)** ("Ink and Limestone"): type, color tokens, shape, elevation, icons, photography, motion, components and the public site. Use its tokens and utilities only; the `hg/design-tokens` lint rule rejects raw palette classes, hex values, raw and arbitrary text sizes, and the old HG color names under `src/`, naming the new one. No stock gradient blobs, glass on every surface, emoji decoration, or sparkles on things that aren't AI.
+- **Visual rules live in [docs/brand-guidelines.md](docs/brand-guidelines.md)** ("Ink and Limestone"): type, color tokens, shape, elevation, icons, photography, motion, components and the public site. Use its tokens and utilities only; lint rejects raw palette classes, hex values and the old HG color names under `src/`, naming the new one, and in HG's own code also raw and arbitrary text sizes, white and black, Tailwind's shadows and backdrop blur. No stock gradient blobs, glass on every surface, emoji decoration, or sparkles on things that aren't AI.
 - **Every color has a job.** Color marks identity or state. Statuses keep fixed colors (the `StatusMark` tones) that no other mark in the same view reuses. All-gray-on-white reads unfinished; color without a job reads as slop.
 - **Make payoff moments count.** When someone sends, saves or finishes something (a move-in report, a maintenance request, a closed task), show what happened and what's next: the property photo or `SpotArt`, a warm heading and the concrete next step. Don't end on a generic check icon.
 - **Close the loop.** Show people their input mattered: what happens to it next, its status once it's in the system, and a record of what was done.
-- **Motion is feedback.** A short spring when something changes (guidelines section 7). Loops belong only inside illustrations. Always respect reduced motion.
+- **Respect reduced motion.** Stock components animate, and one block in `globals.css` cuts their motion to a fade when someone asks for less.
 - **Real data in visuals.** Anyone shown in an illustration or sample comes from the signed-in user or the record (first name, initials), never a hard-coded name.
 
 ## Craft the edges
@@ -74,12 +76,13 @@ The full standard, with a review checklist to run before a string ships, is [doc
 
 ## Enforce it in code
 
-- **Rules that can be lint rules should be.** `eslint.config.mjs` rejects em dashes and vague error copy (`hg/vague-copy`) in string literals, template strings and JSX text under `src/`, and (`hg/design-tokens`) any styling outside the brand tokens. Filler words are a warning (`hg/filler-copy`) to read case by case. Comments, tests and a lone "—" for an empty value stay allowed.
+- **Rules that can be lint rules should be.** `eslint.config.mjs` rejects em dashes and vague error copy (`hg/vague-copy`) in string literals, template strings and JSX text under `src/`; hex values, raw palette colors and old color names everywhere there (`hg/design-tokens`); and, outside the stock files in `src/components/ui/`, Tailwind and arbitrary text sizes (`hg/raw-type`) and white, black, Tailwind's shadows and backdrop blur (`hg/raw-effects`). App code imports `cn` from `@/lib/utils`, never the `cn` package. Filler words are a warning (`hg/filler-copy`) to read case by case. Comments, tests and a lone "—" for an empty value stay allowed.
 - **Lint runs in CI, not in the build.** Next 16's `next build` doesn't lint, so a violation fails CI on the push to main but still deploys. Run `npm run lint` before you push. CSS isn't linted. `src/lib/token-names.test.ts` catches old color names in CSS, tests and the docs; check the rest of CSS by hand.
 
 ## Device check (definition of done for UI)
 
 - **Run `npm run test:devices` before handing off any UI work.** It makes a production build in `.next-devices` (a running `npm run dev` is untouched), signs in as the first local user with a password, loads every route in WebKit (Safari, and every iPhone browser) and Chromium (Chrome, Android) on iPhone SE, iPhone 17, Galaxy S24, iPad Mini and desktop, sweeps widths 320 to 1920 on desktop, and writes a screenshot grid to `device-report/index.html`. It needs the local Postgres with the import loaded (README, Local development). In a fresh checkout run `npx playwright install chromium webkit` first.
+- **Run it in light and dark.** `npm run test:devices:dark` is the same check with every browser in dark mode, so the app takes its dark theme; it writes `device-report-dark/`. The commit gate reads the light run.
 - **Errors fail.** Crashes, console errors, failed requests, sideways scroll, inputs under 16px on iOS. Warnings report only: tap targets under 44px, wrapped rows of controls.
 - **Only new errors fail.** Errors that predate the check live in `tests/devices/known-issues.json`. Drop entries as they're fixed (`npm run test:devices:known` rewrites the file from a full run); never add a new one without Connor's OK.
 - **The sweep only sees each page's default state.** Open every dialog, menu and state you touched at 375 and 320 yourself, and eyeball the report for what it can't judge: awkward in-between layouts, spacing, clipped popovers.
@@ -91,4 +94,4 @@ The full standard, with a review checklist to run before a string ships, is [doc
 
 - **One branch to main at a time.** Before pushing, check for other sessions working this repo and say which files you're about to land. If one is mid-landing, let it go first.
 - **Commit on the branch, then merge `origin/main` into it.** Before merging, check main's new commits for overlap with your files, keep both sides' unrelated pieces, and say what overlapped.
-- **Check the merged code, then push.** `npm run typecheck`, `npm run lint`, `npm test`, and the full device check for UI changes, then `git push origin HEAD:main`. Every push to main deploys to production in about two minutes.
+- **Check the merged code, then push.** `npm run typecheck`, `npm run lint`, `npm test`, and the full device check in light and dark for UI changes, then `git push origin HEAD:main`. Every push to main deploys to production in about two minutes.

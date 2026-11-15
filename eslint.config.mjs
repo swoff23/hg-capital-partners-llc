@@ -1,7 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
-import { findOldNames } from "./scripts/token-renames.mjs";
+import { UTIL, findOldNames } from "./scripts/token-renames.mjs";
 
 // No em dashes in copy (docs/copy-rules.md, rule 4). Comments are fine, and so
 // is a lone "—" standing in for an empty value, which is a glyph, not a sentence.
@@ -72,10 +72,33 @@ const SENTRY_PATTERNS = [
   { group: ["@sentry/nextjs/*", "@sentry/node", "@sentry/node/*", "@sentry/react", "@sentry/react/*", "@sentry/core", "@sentry/core/*"], message: SENTRY_SERVER_MESSAGE, allowTypeImports: true },
 ];
 
+// The cn package is installed for the stock files in src/components/ui/, so an
+// app import of it builds and runs while quietly skipping HG's merge config
+// (docs/specs/design-foundation.md, section 5.4). Only lint can catch that.
+const CN_MESSAGE =
+  'Import cn from "@/lib/utils", which knows HG\'s type, shadow and motion names. The cn package is for the stock files in src/components/ui/.';
+const CN_PATHS = [{ name: "cn", message: CN_MESSAGE }];
+const CN_PATTERNS = [{ group: ["cn/*"], message: CN_MESSAGE }];
+// no-restricted-imports doesn't see import(), so a dynamic import of the package is a syntax ban.
+// esquery ends a regex at its first slash, so \u002F stands for the one in "cn/config".
+const CN_DYNAMIC_IMPORT = { selector: "ImportExpression[source.value=/^cn(\\u002F.*)?$/]", message: CN_MESSAGE };
+
+// The em dash bans, restated wherever a later block sets no-restricted-syntax.
+const EM_DASH_SYNTAX = [
+  { selector: "JSXText[value=/—/]:not([value=/^\\s*—\\s*$/])", message: EM_DASH_MESSAGE },
+  { selector: "Literal[value=/—/]:not([value='—'])", message: EM_DASH_MESSAGE },
+  { selector: "TemplateElement[value.raw=/—/]", message: EM_DASH_MESSAGE },
+];
+
 // Brand values come from the tokens in src/app/globals.css, so a re-brand is a
 // token swap (docs/brand-guidelines.md, section 4). A value the tokens can't
 // carry (a fixed size the guidelines name) takes an eslint-disable-next-line
-// comment saying why.
+// comment saying why. Three rules, so the stock files in src/components/ui/
+// can turn off the two that stock code breaks by design
+// (docs/specs/design-foundation.md, section 5.4):
+//   hg/design-tokens  hex, raw palettes and old color names. On everywhere.
+//   hg/raw-type       Tailwind and arbitrary text sizes, a ground color as text. App code only.
+//   hg/raw-effects    white and black, Tailwind's shadow scale, backdrop blur. App code only.
 const PALETTES =
   "amber|blue|cyan|emerald|fuchsia|gray|green|indigo|lime|mauve|mist|neutral|olive|orange|pink|purple|red|rose|sky|slate|stone|taupe|teal|violet|yellow|zinc";
 const DESIGN_VALUE_RULES = [
@@ -84,14 +107,16 @@ const DESIGN_VALUE_RULES = [
     message: "Hex color in an arbitrary value. Use a color token from globals.css (text-fg-2, bg-canvas, border-border).",
   },
   {
-    pattern: /\btext-\[\d/,
-    message: "Arbitrary text size. Use a type token (text-body, text-meta, text-micro) from globals.css.",
-  },
-  {
     // Every palette in Tailwind's theme.css, each followed by a step.
     pattern: new RegExp(`\\b(?:${PALETTES})-\\d{2,3}\\b`),
     message:
       "Raw palette color. Use a token from globals.css: foreground, muted-foreground, fg-2, muted, accent, border for neutrals; destructive, warn, ok for status.",
+  },
+];
+const RAW_TYPE_RULES = [
+  {
+    pattern: /\btext-\[\d/,
+    message: "Arbitrary text size. Use a type token (text-body, text-meta, text-micro) from globals.css.",
   },
   {
     pattern: /\btext-(?:xs|sm|base|lg|[2-9]?xl)\b/,
@@ -102,6 +127,37 @@ const DESIGN_VALUE_RULES = [
     // Oct 25 text-muted meant today's text-muted-foreground.
     pattern: /(?<![\w-])text-(?:muted|accent|background)(?![\w-])/,
     message: "A ground color used as text. Use text-muted-foreground or text-foreground.",
+  },
+];
+const WHITE_BLACK_MESSAGE =
+  "White or black as a color. Use a token from globals.css: background or foreground, or on-photo and photo-scrim over a photo.";
+const TAILWIND_SHADOW_MESSAGE =
+  "Tailwind shadow. HG's own pieces use the elevation tokens (shadow-float, shadow-overlay); stock parts in src/components/ui/ bring their own.";
+const RAW_EFFECT_RULES = [
+  {
+    // After a color utility only, with or without an opacity, so a bare "white" (a canvas fillStyle) stays allowed.
+    pattern: new RegExp(`(?<![\\w-])(?:${UTIL})-(?:white|black)(?![\\w-])`),
+    message: WHITE_BLACK_MESSAGE,
+  },
+  {
+    // The same as an arbitrary value: text-[white], bg-[black]/50.
+    pattern: new RegExp(`(?<![\\w-])(?:${UTIL})-\\[(?:white|black)\\]`),
+    message: WHITE_BLACK_MESSAGE,
+  },
+  {
+    // Bare `shadow` and the box-shadow scale. HG's own names (shadow-float, shadow-overlay) aren't in it.
+    pattern: /(?<![\w-])shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl|inner))?(?![\w-])/,
+    message: TAILWIND_SHADOW_MESSAGE,
+  },
+  {
+    // The drop and inset scales; inset-shadow-photo-edge and inset-shadow-rule stay HG's. A bare
+    // drop-shadow is left out: the video glyph over a photo uses it (components/media-grid.tsx).
+    pattern: /(?<![\w-])(?:drop|inset)-shadow-(?:2xs|xs|sm|md|lg|xl|2xl)(?![\w-])/,
+    message: TAILWIND_SHADOW_MESSAGE,
+  },
+  {
+    pattern: /(?<![\w-])backdrop-blur\b/,
+    message: "Backdrop blur. Only stock overlays in src/components/ui/ blur what's behind them; HG's own pieces sit on bg-scrim.",
   },
 ];
 
@@ -116,30 +172,45 @@ function oldNameMessage({ match, replacement }) {
   return `"${match}" is the old name. Use "${replacement}".`;
 }
 
-/** Reports a string, template string or JSX attribute holding a raw design value or an old color name. */
-const designTokensRule = {
-  meta: {
-    type: "suggestion",
-    docs: { description: "Use the design tokens in globals.css instead of raw colors and sizes." },
-    schema: [],
-  },
-  create(context) {
-    function check(node, text) {
-      for (const { pattern, message } of DESIGN_VALUE_RULES) {
-        if (pattern.test(text)) context.report({ node, message });
+/**
+ * A rule that reports a string or template string matching any of `patterns`,
+ * plus whatever `extra(text)` finds ({ message } per hit).
+ */
+function classRule(description, patterns, extra = () => []) {
+  return {
+    meta: { type: "suggestion", docs: { description }, schema: [] },
+    create(context) {
+      function check(node, text) {
+        for (const { pattern, message } of patterns) {
+          if (pattern.test(text)) context.report({ node, message });
+        }
+        for (const { message } of extra(text)) context.report({ node, message });
       }
-      // findOldNames loops with matchAll, so its global patterns keep no state between strings.
-      for (const hit of findOldNames(text)) context.report({ node, message: oldNameMessage(hit) });
-    }
-    return {
-      Literal(node) {
-        if (typeof node.value === "string") check(node, node.value);
-      },
-      TemplateElement(node) {
-        check(node, node.value.raw);
-      },
-    };
-  },
+      return {
+        Literal(node) {
+          if (typeof node.value === "string") check(node, node.value);
+        },
+        TemplateElement(node) {
+          check(node, node.value.raw);
+        },
+      };
+    },
+  };
+}
+
+/** Raw colors and old color names. findOldNames loops with matchAll, so its global patterns keep no state between strings. */
+const designTokensRule = classRule("Use the color tokens in globals.css instead of raw colors.", DESIGN_VALUE_RULES, (text) =>
+  findOldNames(text).map((hit) => ({ message: oldNameMessage(hit) })),
+);
+const rawTypeRule = classRule("Use the type tokens in globals.css instead of raw text sizes.", RAW_TYPE_RULES);
+const rawEffectsRule = classRule("Use the tokens in globals.css instead of raw white, black, shadows and blur.", RAW_EFFECT_RULES);
+
+const HG_RULES = {
+  "design-tokens": designTokensRule,
+  "raw-type": rawTypeRule,
+  "raw-effects": rawEffectsRule,
+  "vague-copy": vagueCopyRule,
+  "filler-copy": fillerCopyRule,
 };
 
 const eslintConfig = defineConfig([
@@ -148,17 +219,12 @@ const eslintConfig = defineConfig([
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/**/*.test.ts"],
-    plugins: {
-      hg: { rules: { "design-tokens": designTokensRule, "vague-copy": vagueCopyRule, "filler-copy": fillerCopyRule } },
-    },
+    plugins: { hg: { rules: HG_RULES } },
     rules: {
-      "no-restricted-syntax": [
-        "error",
-        { selector: "JSXText[value=/—/]:not([value=/^\\s*—\\s*$/])", message: EM_DASH_MESSAGE },
-        { selector: "Literal[value=/—/]:not([value='—'])", message: EM_DASH_MESSAGE },
-        { selector: "TemplateElement[value.raw=/—/]", message: EM_DASH_MESSAGE },
-      ],
+      "no-restricted-syntax": ["error", ...EM_DASH_SYNTAX, CN_DYNAMIC_IMPORT],
       "hg/design-tokens": "error",
+      "hg/raw-type": "error",
+      "hg/raw-effects": "error",
       "hg/vague-copy": "error",
       "hg/filler-copy": "warn",
       // The HEIC decoder (libheif, LGPL-3.0, about 3 MB) ships as its own lazy
@@ -168,8 +234,8 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-restricted-imports": [
         "error",
         {
-          paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS, ...SENTRY_SERVER_PATHS],
-          patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS],
+          paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS, ...SENTRY_SERVER_PATHS, ...CN_PATHS],
+          patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS, ...CN_PATTERNS],
         },
       ],
     },
@@ -181,7 +247,10 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
-        { paths: [...HEIC_PATHS, ...SENTRY_SERVER_PATHS], patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS.slice(1)] },
+        {
+          paths: [...HEIC_PATHS, ...SENTRY_SERVER_PATHS, ...CN_PATHS],
+          patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS.slice(1), ...CN_PATTERNS],
+        },
       ],
     },
   },
@@ -190,7 +259,45 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
-        { paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS], patterns: [...HEIC_PATTERNS, SENTRY_PATTERNS[0]] },
+        {
+          paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS, ...CN_PATHS],
+          patterns: [...HEIC_PATTERNS, SENTRY_PATTERNS[0], ...CN_PATTERNS],
+        },
+      ],
+    },
+  },
+  // HG's cn is built on cn/config, so utils.ts may import the package. Every other ban stays.
+  {
+    files: ["src/lib/utils.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...EM_DASH_SYNTAX],
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS, ...SENTRY_SERVER_PATHS],
+          patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS],
+        },
+      ],
+    },
+  },
+  // Stock shadcn/ui files, exactly as `npx shadcn add` writes them (docs/specs/design-foundation.md,
+  // sections 5.4 and 5.6). They size text with Tailwind's steps, cast Tailwind's shadows, import the
+  // cn package and, in use-mobile, set state in an effect, so those rules are off here. The color,
+  // old-name and copy rules stay on: stock code passes them.
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.ts"],
+    rules: {
+      "hg/raw-type": "off",
+      "hg/raw-effects": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "no-restricted-syntax": ["error", ...EM_DASH_SYNTAX],
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [...HEIC_PATHS, ...SENTRY_BROWSER_PATHS, ...SENTRY_SERVER_PATHS],
+          patterns: [...HEIC_PATTERNS, ...SENTRY_PATTERNS],
+        },
       ],
     },
   },
@@ -204,6 +311,7 @@ const eslintConfig = defineConfig([
     // Device check (npm run test:devices)
     ".next-devices/**",
     "device-report/**",
+    "device-report-dark/**",
     "playwright-report/**",
     "test-results/**",
   ]),
