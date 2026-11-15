@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  accountStatus,
   furthestStep,
   inSetup,
   inviteState,
@@ -34,6 +35,16 @@ test("a sign-up from the shared link is New until kept, even mid-setup", () => {
   const link = { ...base, signupSource: "LINK" as const, hasLogin: true, needsReview: true };
   assert.equal(onboardingStatus(link), "new");
   assert.equal(onboardingStatus({ ...link, needsReview: false }), "onboarding");
+});
+
+test("the list's status: New, then Access off, then the setup step, then the login's state", () => {
+  assert.equal(accountStatus("new", "off"), "new");
+  assert.equal(accountStatus("onboarding", "off"), "off");
+  assert.equal(accountStatus("onboarding", "active"), "onboarding");
+  assert.equal(accountStatus("invited", null), "invited");
+  assert.equal(accountStatus(null, "active"), "active");
+  assert.equal(accountStatus(null, "invited"), "invited");
+  assert.equal(accountStatus(null, null), null);
 });
 
 test("steps run details, trades, W-9, insurance; Back never moves progress back", () => {

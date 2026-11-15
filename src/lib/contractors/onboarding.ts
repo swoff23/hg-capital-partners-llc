@@ -7,6 +7,8 @@
  * and every contact from before onboarding, is STAFF: no badge, no steps, no card (decision 5).
  */
 
+import type { PortalAccessState } from "@/lib/portal/access-state";
+
 export type SignupSourceValue = "STAFF" | "INVITE" | "LINK";
 
 /** New (a sign-up from the shared link, not kept yet), Invited, Opened, Onboarding. Null is Active, or never in setup. */
@@ -83,6 +85,29 @@ export function onboardingStatus(c: OnboardingFacts): OnboardingStatus | null {
   if (!c.hasLogin) return c.inviteOpened ? "opened" : "invited";
   if (!c.setupDoneAt) return "onboarding";
   return null;
+}
+
+/**
+ * The Contractors list's Status column and filter: the onboarding status while it applies, otherwise what sign-in
+ * does with their login (lib/portal/access-state.ts): Active, Invited (made, not used yet) or Access off. Null is no
+ * login and never in setup, the empty dash. New wins over all of it (a partner's decision), and Access off wins over
+ * Onboarding (they can't sign in to finish). The login's Invited shares the invite's word: asked in, not in yet.
+ */
+export type AccountStatus = OnboardingStatus | "active" | "off";
+
+export const ACCOUNT_STATUSES: readonly AccountStatus[] = [...ONBOARDING_STATUSES, "active", "off"];
+
+export const ACCOUNT_STATUS_LABEL: Record<AccountStatus, string> = { ...ONBOARDING_LABEL, active: "Active", off: "Access off" };
+
+export function isAccountStatus(v: unknown): v is AccountStatus {
+  return typeof v === "string" && (ACCOUNT_STATUSES as readonly string[]).includes(v);
+}
+
+/** One status from the onboarding status and the login's state (`portalAccess(...).state`, or null with no login). */
+export function accountStatus(onboarding: OnboardingStatus | null, login: PortalAccessState | null): AccountStatus | null {
+  if (onboarding === "new") return "new";
+  if (login === "off") return "off";
+  return onboarding ?? login;
 }
 
 /** Whether this contractor sees the setup steps and the card above My jobs. */

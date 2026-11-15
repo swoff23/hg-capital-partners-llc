@@ -25,7 +25,7 @@ import { setupProgressLine } from "@/lib/contractors/onboarding";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import { ContactCompany, ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
-import { OnboardingBadge } from "../status-badge";
+import { ContractorStatusBadge } from "../status-badge";
 import { statusOf } from "../query";
 import { setContractorArchived } from "../actions";
 import type { Metadata } from "next";
@@ -157,7 +157,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
           <div className="-my-1 flex min-w-0 has-[input]:flex-1">
             <ContactCompany id={c.id} fullName={c.fullName} company={c.company} />
           </div>
-          {status && <OnboardingBadge status={status} className="shrink-0" />}
+          {status && <ContractorStatusBadge status={status} className="shrink-0" />}
           {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
         </div>
         {c.archivedAt && (

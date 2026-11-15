@@ -33,7 +33,7 @@ The spec for replacing the Google Form "HG Capital – Contractor Onboarding For
 | 10 | Done | **Details, trades and a W-9.** Then the contractor shows as Active |
 | 11 | Home | **Needs you rows for shared-link sign-ups** (Keep or Archive) and **for sending the Baselane link** once someone finishes (Sent). Nothing for invited people finishing |
 | 12 | Logins | **Create login and Reset password stay as they are** for anyone already in Contractors: a staff-set starting password and Copy message. Invites are only for new people |
-| 13 | Contractors list | **A Status column** while it applies (New, Invited, Opened, Onboarding), plus a Status filter. Active rows show the empty dash. (Was a badge beside the name until Nov 15) |
+| 13 | Contractors list | **A Status column** (New, Invited, Opened, Onboarding, then the login's Active, Invited or Access off), plus a Status filter. No login and never in setup is the empty dash. (Was a badge beside the name, onboarding only, until Nov 15) |
 | 14 | Naming | Copy says **"HG Capital"**, never bare "HG". The five portal strings that said "HG" changed in this build (section 7). The portal's wordmark is **"HG Capital Partners"** (was "HG Jobs"), and the "HG Login" eyebrow is gone from every sign-in page with its own title (Connor, during the build) |
 | 15 | Finishing setup | **Required** (Connor, during the build). Until details, trades and a W-9 are in, the steps are the only page a new contractor can open. **Sign out** replaces Finish later; the next sign-in opens the step they stopped on. No card above My jobs |
 
@@ -100,8 +100,10 @@ The payoff screen (CLAUDE.md, Make payoff moments count):
   - **Invited**: invite sent, link not opened (neutral).
   - **Opened**: link opened, no account yet (neutral).
   - **Onboarding**: account made, not done (neutral).
-  - Active shows the empty dash.
-- **Status filter** in Filters: New, Invited, Opened, Onboarding. "Needs W-9" keeps working and also counts uploaded W-9s.
+  - Otherwise the login's state, the words the Portal access card uses (Nov 15, Connor): **Active** (signed in on their own password), **Invited** (a login staff made, not used yet) or **Access off** (removed, or the contact is inactive). Access off outranks Onboarding; New outranks everything.
+  - No login and never in setup (or archived) shows the empty dash.
+  - One rule decides it: `lib/contractors/onboarding.ts` `accountStatus`, read by `accountStatusOf` in the list's query.
+- **Status filter** in Filters: New, Invited, Opened, Onboarding, Active, Access off, reading the same status as the column. "Needs W-9" keeps working and also counts uploaded W-9s.
 
 ### 4.2 Invite contractor
 
