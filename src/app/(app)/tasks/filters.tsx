@@ -6,6 +6,7 @@ import { FilterBar, FilterResults, FilterScope, ResultLine, type FilterFacet } f
 import type { OptionItem } from "@/components/option-list";
 import type { PropertyOption } from "@/lib/picker-options-shape";
 import type { TaskView } from "@/lib/tasks/list-query";
+import { DEFAULT_TASK_SORT, TASK_SORT_CHOICES, taskSortPhrase } from "@/lib/tasks/list-sort";
 import { countTasksAction } from "./filter-actions";
 
 const VIEWS: { key: TaskView; label: string }[] = [
@@ -45,7 +46,10 @@ const count = (map: ReadonlyMap<string, number>) => (row: OptionItem): OptionIte
  * The Tasks page's bar (selectors 3.7, 4.1 option 1): a search over the title,
  * the property and the assignee, Open | Done | All, and the Assignee and
  * Property filters with the Repeats toggle, as chips with a mouse on a wide
- * page and behind a Filters button elsewhere. State lives in the URL;
+ * page and behind a Filters button elsewhere. The sort is the wide list's
+ * column headers (all-list.tsx), and the Filters sheet's last section
+ * elsewhere; 60rem is where both switch, so there's always a way to sort
+ * (docs/specs/task-list-sort.md 3.2). State lives in the URL;
  * `children` is the list the server renders, which dims while a change loads.
  * Assignees list the team (you first), then contractors, then "Others" for
  * imported names that match nobody; each row counts the tasks picking it would
@@ -98,7 +102,8 @@ export function TaskFilters({ data, children }: { data: TaskFilterData; children
           options: VIEWS.map((v) => ({ ...v, count: viewCounts?.[v.key] })),
         }}
         facets={facets}
-        wide="56rem"
+        sort={{ param: "sort", default: DEFAULT_TASK_SORT, choices: TASK_SORT_CHOICES, phrase: taskSortPhrase }}
+        wide="60rem"
         shown={data.shown}
         count={countTasksAction}
       />
@@ -123,7 +128,8 @@ export function TaskFiltersPlaceholder() {
         { kind: "multi", param: "property", label: "Property" },
         { kind: "toggle", param: "repeats", label: "Repeats" },
       ]}
-      wide="56rem"
+      sort={{ param: "sort", default: DEFAULT_TASK_SORT }}
+      wide="60rem"
     />
   );
 }

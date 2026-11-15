@@ -40,3 +40,5 @@ Each chunk ships its own small migration.
 [design-foundation.md](design-foundation.md) moves the app and the public site onto stock shadcn/ui components (React Aria base, aria-vega style), with Ink and Limestone's colors, gold and Geist as the theme. A zero-pixel color rename lands first, then landings A to M swap one component family at a time, each reviewed by Connor before it ships. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
 [property-page.md](property-page.md) reorders the property page to lead with Tasks and Units and access, folds empty fields behind "N more fields", merges the two CapEx sections, turns Entity into a list of the five QuickBooks companies, and shows Rental listings only once a listing exists. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
+
+[task-list-sort.md](task-list-sort.md) gives the Tasks list a Unit column, the assignee as two initials plus a first name, sortable Property, Assignee and Due headers (Property by default, a heading per building), and drops "To do" from rows. It was planned with Connor on Nov 14, 2026, and waits for his "build it".

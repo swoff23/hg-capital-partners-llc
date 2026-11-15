@@ -28,6 +28,12 @@ import { cn } from "@/lib/utils";
  * the label sets the button's baseline, level with the other headers. The label
  * sits 12px in from the cell's edge, as a plain cell's text does. `trailing`
  * sits after the button inside the cell: the deals table's column resize handle.
+ *
+ * `cell="div"` heads a list that isn't a table (the Tasks list,
+ * docs/specs/task-list-sort.md): the same label, caret and click on a plain
+ * div with `listHeadClass`, no padding of its own and no rule (the header row
+ * draws one under every column), and the sort said in words for a screen
+ * reader, since a div can't carry `aria-sort`.
  */
 export function SortHeader({
   label,
@@ -37,6 +43,7 @@ export function SortHeader({
   numeric = false,
   className,
   trailing,
+  cell = "th",
 }: {
   label: string;
   field: string;
@@ -46,6 +53,8 @@ export function SortHeader({
   numeric?: boolean;
   className?: string;
   trailing?: ReactNode;
+  /** "div" over a list that isn't a table. */
+  cell?: "th" | "div";
 }) {
   const { query, update } = useFilterScope();
   const raw = query.get("sort") || defaultSort;
@@ -58,8 +67,12 @@ export function SortHeader({
   }
 
   const Caret = !active ? ChevronsUpDown : desc ? ChevronDown : ChevronUp;
+  const Cell = cell;
   return (
-    <th aria-sort={active ? (desc ? "descending" : "ascending") : "none"} className={cn(thClass, numeric && "text-right", className)}>
+    <Cell
+      aria-sort={cell === "th" ? (active ? (desc ? "descending" : "ascending") : "none") : undefined}
+      className={cn(cell === "th" ? thClass : listHeadClass, numeric && "text-right", className)}
+    >
       <button
         type="button"
         onClick={toggle}
@@ -71,6 +84,7 @@ export function SortHeader({
         )}
       >
         <span className="truncate">{label}</span>
+        {cell === "div" && active && <span className="sr-only">{desc ? ", sorted descending" : ", sorted ascending"}</span>}
         <Caret
           aria-hidden="true"
           className={cn(
@@ -81,6 +95,9 @@ export function SortHeader({
         />
       </button>
       {trailing}
-    </th>
+    </Cell>
   );
 }
+
+/** A list's column label (`cell="div"`, and the plain labels beside it): the header look without a table cell's padding, stickiness or rule. */
+export const listHeadClass = "whitespace-nowrap text-left text-meta font-medium text-muted-foreground";

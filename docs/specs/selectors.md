@@ -248,7 +248,7 @@ Reduced motion turns each into an opacity change of 120ms or less.
 
 **StatusMenu.** A configured `Menu` for task status and deal stage: rows of `StatusMark` and word with a trailing Check, `numberKeys`, and `sheetTitle` "Status" or "Stage". A change toasts with Undo. Task status hides Review on staff-only tasks (BTASKS-041). Deal stage names drop their spreadsheet prefixes in the UI ("High", not "1 - High"), so typeahead and number keys don't collide; stored values don't change.
 
-**Account menu.** The avatar opens a `Menu`: a header section with the name and email, a Theme section (System, Light, Dark, with a Check), a rule, and Sign out. No Settings item, since the sidebar's Settings already opens company settings. System follows the OS. It replaces the header's light and dark button (`app-shell.tsx:102`) and the sidebar's raw Sign out (`:168`). In the phone drawer, the Appearance row (`:161`) becomes a `SegmentedControl` (System | Light | Dark). The portal account menu gets the same header above Sign out.
+**Account menu.** The account row at the foot of the sidebar (the avatar, the name and the email) opens a `Menu` upward: a header section with the name and email, a Theme section (System, Light, Dark, with a Check), a rule, and Sign out. No Settings item, since the sidebar's Settings already opens company settings. System follows the OS. It replaces the header's light and dark button and the sidebar's raw Sign out. It is the only account menu at every size, in the rail and in the phone drawer, so the app bar has no avatar and the drawer has no separate Appearance row (Connor, Nov 14, amending the first build's avatar at the right of the app bar). The portal account menu gets the same header above Sign out.
 
 **Sizes**
 
@@ -977,3 +977,4 @@ Each is a size or rule sections 5, 7 and 9 don't have yet. None adds a color or 
 - Contractors' login and W-9 filters are both toggle chips ("Has login", "Needs W-9").
 - The account menu has no Settings item; Settings stays in the sidebar.
 - The light and dark button moves into the account menu with System. It ships with the shell slice and can be dropped without touching the rest.
+- The account menu lives in the sidebar footer only, with the Theme in it at every size (Connor, Nov 14). The app bar's avatar and the drawer's Appearance row go.

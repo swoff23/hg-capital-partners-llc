@@ -9,6 +9,7 @@ import { propertyOptions } from "@/lib/picker-options";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { NONE, TASK_PAGE_MAX, parseAllFilters, personRefs, taskLimit, withKnownFilters, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
 import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
+import { parseTaskSort } from "@/lib/tasks/list-sort";
 import { AllList } from "../all-list";
 import { TaskFilters } from "../filters";
 import { TaskListProvider } from "../task-list-context";
@@ -40,7 +41,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   // The people on offer, the imported names and the buildings start beside the session check; all of it is
   // awaited together, so nothing is shown without it.
   const options = assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
-  const [user, { users, contractors }, legacy, properties] = await Promise.all([
+  const [user, { users, contractors, archived }, legacy, properties] = await Promise.all([
     requireUser(),
     options,
     // Imported names that are a person on offer count for that person; the rest list once as "Others".
@@ -63,8 +64,10 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   if (known !== null) redirect(known ? `/tasks?${known}` : "/tasks");
 
   const searching = filters.q !== "";
-  const [{ tasks, total }, counts, viewCounts] = await Promise.all([
-    allTasks(filters, take, legacy.merged, user.id),
+  // Property by default, a heading per building; Due flat; Assignee a heading per person (docs/specs/task-list-sort.md).
+  const sort = parseTaskSort(typeof sp.sort === "string" ? sp.sort : null);
+  const [{ tasks, total, groups }, counts, viewCounts] = await Promise.all([
+    allTasks(filters, take, legacy.merged, { sort, people: personRefs(users, contractors, archived), viewerId: user.id }),
     taskFilterCounts(filters, legacy.merged),
     // While a query is typed, each view counts its hits, so one outside the current view shows.
     searching ? taskViewCounts(filters, legacy.merged) : Promise.resolve(null),
@@ -115,10 +118,10 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
                 <Section
                   title={<TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>}
                 >
-                  <AllList scoped cadence={filters.repeats} />
+                  <AllList scoped sort={sort} groups={groups} cadence={filters.repeats} />
                 </Section>
               ) : (
-                <AllList cadence={filters.repeats} />
+                <AllList sort={sort} groups={groups} cadence={filters.repeats} />
               )}
             </TaskListProvider>
           </div>
