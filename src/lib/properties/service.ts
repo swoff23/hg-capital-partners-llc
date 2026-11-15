@@ -14,15 +14,21 @@ import { fmtDay, ymdToDate } from "@/lib/dates";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { containsText } from "@/lib/search";
 import {
+  LOCKBOX_LOCATION_MAX,
+  applySharedLockbox,
   countUnitRecords,
+  isHouseMeterRow,
+  lockboxPhotoPaths,
   parseBuildingCapex,
   parseUnits,
   reconcileUnits,
   renamedLabel,
   withUnitIds,
   type BuildingCapexEntry,
+  type LockboxPhoto,
   type PropertyUnit,
 } from "@/lib/property-types";
+import { discardLockboxUploads, isLockboxPhotoPath } from "@/lib/properties/photo";
 import { rowConflict, isAtVersion, onConflict, staleFields } from "@/lib/properties/edits";
 import { setPropertyArchived } from "@/lib/archive";
 import { linkProperty } from "@/lib/deals/property-link";
@@ -357,9 +363,13 @@ export async function replaceUnits(
  * refuses it, and a rename reaches the tasks and listings that name the unit.
  */
 export async function saveUnit(id: string, unit: PropertyUnit, expectedVersion: string, p: TaskPrincipal, by: Editor): Promise<void> {
-  await writeUnits(id, expectedVersion, p, by, (stored) =>
-    unit.id && stored.some((u) => u.id === unit.id) ? stored.map((u) => (u.id === unit.id ? unit : u)) : [...stored, unit],
-  );
+  await writeUnits(id, expectedVersion, p, by, (stored) => {
+    const at = unit.id ? stored.findIndex((u) => u.id === unit.id) : -1;
+    const next = at >= 0 ? stored.map((u, i) => (i === at ? unit : u)) : [...stored, unit];
+    // "Same lockbox for all units" (docs/specs/lockbox-location.md, decision 4b): on, the others take this unit's
+    // lockbox; newly off, each keeps its own.
+    return applySharedLockbox(next, at >= 0 ? at : next.length - 1);
+  });
 }
 
 /** Delete one unit by its id, from its row's menu after the confirm (forms 4.2). A unit already gone is not an error. */
@@ -405,6 +415,9 @@ async function writeUnitsAt(
       label: u.label?.trim() || null,
       lockboxCode: u.lockboxCode?.trim() || null,
       ...vacantField(u.vacantSince === undefined ? vacant.get(u.id) : u.vacantSince),
+      lockboxLocation: u.lockboxLocation?.trim().slice(0, LOCKBOX_LOCATION_MAX) || null,
+      lockboxPhoto: cleanLockboxPhoto(id, u.lockboxPhoto),
+      ...(u.lockboxShared === true && !isHouseMeterRow(u) ? { lockboxShared: true } : {}),
       utilities: Object.fromEntries(Object.entries(u.utilities ?? {}).map(([k, v]) => [k, v?.trim() || null])),
       equipment: (u.equipment ?? [])
         .filter((e) => e.type && (e.model || e.installYear || e.comment))
@@ -424,7 +437,10 @@ async function writeUnitsAt(
     });
     if (r.count === 0) throw await conflictOf(id, ["units"], by, { db: tx });
     const countChanged = unitCount !== current.unitCount;
-    if (renames.length === 0) return { listings: 0, tasks: [], countChanged };
+    // Lockbox photos this save stopped using: deleted once it has landed.
+    const kept = lockboxPhotoPaths(stored);
+    const dropped = [...lockboxPhotoPaths(before)].filter((path) => !kept.has(path));
+    if (renames.length === 0) return { listings: 0, tasks: [], countChanged, dropped };
     // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
     const listings = await tx.listing.findMany({ where: { propertyId: id }, select: { id: true, unitLabel: true } });
     let listingCount = 0;
@@ -434,8 +450,12 @@ async function writeUnitsAt(
       await tx.listing.update({ where: { id: l.id }, data: { unitLabel: to } });
       listingCount++;
     }
-    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p), countChanged };
+    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p), countChanged, dropped };
   }, TX_LIMITS);
+  // Best effort, after the save landed: a file that fails to delete is only clutter in Blob, which no unit points at.
+  if (renamed.dropped.length > 0) {
+    await discardLockboxUploads(id, renamed.dropped).catch((err: unknown) => logError("properties:lockbox-photo:discard", err, { propertyId: id }, { level: "warning" }));
+  }
   revalidatePath(`/properties/${id}`);
   if (renamed.countChanged) revalidatePath("/properties");
   if (renamed.listings) revalidatePath("/rentals");
@@ -478,6 +498,19 @@ export async function ensureUnitIds(id: string, p: TaskPrincipal, by: Editor): P
   await writeUnits(id, row.updatedAt.toISOString(), p, by, (stored) => stored);
   const after = await prisma.property.findUnique({ where: { id }, select: { units: true } });
   return parseUnits(after?.units);
+}
+
+/**
+ * A unit's lockbox photo as the save keeps it: only files inside this
+ * property's lockbox folder (photo.ts isLockboxPhotoPath), so a stale or
+ * forged pathname can never point a unit at someone else's file. A bad
+ * thumbnail is dropped and the photo kept.
+ */
+function cleanLockboxPhoto(propertyId: string, photo: LockboxPhoto | null | undefined): LockboxPhoto | null {
+  if (!photo?.pathname || !isLockboxPhotoPath(propertyId, photo.pathname)) return null;
+  const thumb = photo.thumbPathname && isLockboxPhotoPath(propertyId, photo.thumbPathname) ? photo.thumbPathname : null;
+  const size = (n: number | null | undefined) => (typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.round(n) : null);
+  return { pathname: photo.pathname, thumbPathname: thumb, width: size(photo.width), height: size(photo.height) };
 }
 
 /* ---------------- Building CapEx (JSON, merge by key) ---------------- */

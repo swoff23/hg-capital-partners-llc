@@ -102,7 +102,7 @@ Resolves the open item in docs/specs/contractor-job-emails.md ("Partners' subjec
 
 ## 8. Not in this change
 
-- **Reopening a Done job with a reason.** If HG Capital finds a problem after approving, the status menu moves it back to In progress and the contractor gets "Connor moved it to In progress" with no reason. Recommendation for later: offer Send back (with its note) on a Done job too, so every "there's an issue" email says what the issue is.
+- **A problem found after approving.** Connor's call (Nov 15): make a new task for it, assigned to the contractor, rather than reopening the approved one. No Send back on a Done job.
 - **A reminder to Connor and Pieter** when a job sits in Review for days. Today's "to review" count on Today covers it for now.
 - **A contractor's reply "done" by email** posts a comment, not Send for review, so the job stays In progress and keeps its 8 am emails. The email's Send for review button is the way.
 

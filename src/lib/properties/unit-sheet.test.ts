@@ -8,8 +8,7 @@ import {
   firstEquipmentProblem,
   sheetUnitAt,
   stillFailing,
-  unitSheetWords,
-} from "./unit-sheet";
+  unitSheetWords, sharedLockboxLine } from "./unit-sheet";
 
 test("unitSheetWords: the leave question never changes while the name is typed", () => {
   // Built from the typed name, the hold it names was re-set on every keystroke (React error #185 on a long name).
@@ -76,4 +75,41 @@ test("the lines: the year fits the table's Year column, and the footer points up
   assert.equal(EQUIPMENT_FOOTER, "Check the equipment above.");
   assert.equal(firstEquipmentProblem({ 2: { type: "Choose a type." } }), "Choose a type.");
   assert.equal(firstEquipmentProblem(null), undefined);
+});
+
+/* ---------------- Same lockbox for all units (docs/specs/lockbox-location.md) ---------------- */
+
+test("sharedLockboxLine: off, or nobody else to share with, says nothing", () => {
+  assert.equal(sharedLockboxLine({ on: false, wasOn: true, code: "6385", others: [{ name: "Lower", code: "6385" }] }), null);
+  assert.equal(sharedLockboxLine({ on: true, wasOn: false, code: "6385", others: [] }), null);
+});
+
+test("sharedLockboxLine: on, and the others already match, says who shares it", () => {
+  assert.deepEqual(sharedLockboxLine({ on: true, wasOn: true, code: "6385", others: [{ name: "Lower", code: "6385" }] }), {
+    text: "Lower uses it too",
+    warning: false,
+  });
+  const three = [
+    { name: "1st Front", code: "7676" },
+    { name: "1st Rear", code: "7676" },
+  ];
+  assert.deepEqual(sharedLockboxLine({ on: true, wasOn: false, code: "7676", others: three }), { text: "The other 2 units use it too", warning: false });
+  // A unit with no code takes the shared one: nothing of theirs is replaced.
+  assert.deepEqual(sharedLockboxLine({ on: true, wasOn: false, code: "4154", others: [{ name: "Unit 1", code: "" }] }), {
+    text: "Unit 1 uses it too",
+    warning: false,
+  });
+});
+
+test("sharedLockboxLine: being turned on over different codes warns, naming them while they fit", () => {
+  const oxford = [
+    { name: "Lower", code: "1924" },
+    { name: "Upper", code: "2925" },
+  ];
+  assert.deepEqual(sharedLockboxLine({ on: true, wasOn: false, code: "4857", others: oxford }), { text: "Replaces the codes on Lower and Upper", warning: true });
+  assert.deepEqual(sharedLockboxLine({ on: true, wasOn: false, code: "1924", others: oxford }), { text: "Replaces the code on Upper", warning: true });
+  const four = [...oxford, { name: "Attic", code: "4857" }, { name: "Basement", code: "1" }];
+  assert.deepEqual(sharedLockboxLine({ on: true, wasOn: false, code: "9", others: four }), { text: "Replaces the codes on 4 other units", warning: true });
+  // Already shared: a new code goes to everyone, which the line already says.
+  assert.deepEqual(sharedLockboxLine({ on: true, wasOn: true, code: "9", others: oxford }), { text: "The other 2 units use it too", warning: false });
 });

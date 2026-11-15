@@ -14,7 +14,7 @@ import { DealAddress } from "./deal-detail";
  * with it open (deals/[id]/page.tsx). The header is the deal's own: its
  * address, edited in place, and the ⋯ menu with Copy link and Archive. The
  * facts sit in a 256px column that stays put while Activity scrolls beside
- * it, so the notes and the next action are always in view; on a phone the
+ * it, so the notes are always in view; on a phone the
  * facts come first and Activity follows. Everything saves as it changes,
  * so there's no Save.
  *

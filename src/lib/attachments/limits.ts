@@ -49,7 +49,7 @@ export const PUBLIC_PHOTO_RULE: UploadRule = {
 };
 
 /** The property kinds' token routes. */
-export type PropertyUploadKind = "property-upload" | "listing-photo-upload" | "property-photo-upload";
+export type PropertyUploadKind = "property-upload" | "listing-photo-upload" | "property-photo-upload" | "lockbox-photo-upload";
 
 const PROPERTY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** A stored-name slug: the upload path's last part (uploads 2.1). */
@@ -83,6 +83,12 @@ export function propertyUploadLimits(kind: PropertyUploadKind, propertyId: strin
   if (kind === "listing-photo-upload") {
     // The listing photos go through the upload queue, which names each blob by its stored name's slug (upload-kinds.ts uploadRequest).
     if (pathname !== name || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) return "That upload path isn't allowed.";
+  } else if (kind === "lockbox-photo-upload") {
+    // A unit's lockbox photo, private, and the thumbnail made beside it (docs/specs/lockbox-location.md).
+    const folder = `properties/${propertyId}/lockbox/`;
+    if ((pathname !== `${folder}${name}` && pathname !== `${folder}thumb/${name}`) || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) {
+      return "That upload path isn't allowed.";
+    }
   } else if (pathname !== `properties/${propertyId}/photo/${name}` || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) {
     return "That upload path isn't allowed.";
   }

@@ -21,10 +21,20 @@ import { propertyUploadLimits, uploadLimits } from "./limits";
 const T = "cm1abc2def3ghi";
 const P = "cm9prop8erty7";
 
-test("UPLOAD_KINDS: the five token routes the uploads spec names, the contractor's documents and signed leases, each with a parent and an access", () => {
+test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox photo, the contractor's documents and signed leases, each with a parent and an access", () => {
   assert.deepEqual(
     [...UPLOAD_KINDS],
-    ["task-upload", "portal-task-upload", "property-upload", "listing-photo-upload", "property-photo-upload", "portal-contact-upload", "contact-upload", "lease-upload"],
+    [
+      "task-upload",
+      "portal-task-upload",
+      "property-upload",
+      "listing-photo-upload",
+      "property-photo-upload",
+      "lockbox-photo-upload",
+      "portal-contact-upload",
+      "contact-upload",
+      "lease-upload",
+    ],
   );
   for (const k of UPLOAD_KINDS) {
     assert.ok(UPLOAD_KIND_PARENT[k], k);
@@ -60,9 +70,11 @@ test("UPLOAD_KIND_ALLOWED: what each target takes, and previews only where the r
   assert.deepEqual(UPLOAD_KIND_ALLOWED["property-upload"], ["image", "file"]);
   assert.deepEqual(UPLOAD_KIND_ALLOWED["listing-photo-upload"], ["image"]);
   assert.deepEqual(UPLOAD_KIND_ALLOWED["property-photo-upload"], ["image"]);
+  assert.deepEqual(UPLOAD_KIND_ALLOWED["lockbox-photo-upload"], ["image"]);
+  // The lockbox photo keeps its thumbnail (properties/photo.ts recordLockboxPhoto) for the tile and the job page.
   assert.deepEqual(
     UPLOAD_KINDS.filter((k) => UPLOAD_KIND_PREVIEWS[k]),
-    ["task-upload", "portal-task-upload"],
+    ["task-upload", "portal-task-upload", "lockbox-photo-upload"],
   );
 });
 
@@ -109,6 +121,16 @@ test("uploadRequest: property kinds name the property; a document's payload carr
   assert.equal(photo.pathname, `properties/${P}/photo/Front-2.jpg`);
   assert.deepEqual(JSON.parse(photo.clientPayload), { propertyId: P });
   assert.equal(typeof propertyUploadLimits("property-photo-upload", P, photo.pathname), "object");
+
+  // A unit's lockbox photo, private, with its thumbnail in the folder's thumb/ (docs/specs/lockbox-location.md).
+  const lockbox = uploadRequest("lockbox-photo-upload", P, { name: "Gate.JPG", contentType: "image/jpeg", fileKind: "image" });
+  assert.equal(lockbox.pathname, `properties/${P}/lockbox/Gate.jpg`);
+  assert.deepEqual(JSON.parse(lockbox.clientPayload), { propertyId: P });
+  assert.equal(typeof propertyUploadLimits("lockbox-photo-upload", P, lockbox.pathname), "object");
+  const thumb = uploadRequest("lockbox-photo-upload", P, { name: "Gate.jpg", contentType: "image/jpeg", fileKind: "image" }, { role: "thumb" });
+  assert.equal(thumb.pathname, `properties/${P}/lockbox/thumb/Gate.jpg`);
+  assert.equal(typeof propertyUploadLimits("lockbox-photo-upload", P, thumb.pathname), "object");
+  assert.equal(UPLOAD_KIND_ACCESS["lockbox-photo-upload"], "private");
 });
 
 test("uploadRequest: the queue's owner rides in every kind's payload when it is given, and in none when it isn't", () => {

@@ -1,16 +1,16 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { ChevronRight, CircleAlert, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, CircleAlert, MapPin, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Code } from "@/components/code";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
-import { AddRow, Button, Section, Table, Td, Th, buttonClass, sheetWaitingFill } from "@/components/ui";
+import { AddRow, Button, Section, Table, Td, Th, buttonClass, sheetWaitingFill, textLinkClass } from "@/components/ui";
 import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
-import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
+import { lockboxIsShared, type CapexRules, type PropertyUnit, type UnitUtilities } from "@/lib/property-types";
 import {
   UTILITY_GROUPS,
   UTILITY_STATUS_FIELDS,
@@ -29,6 +29,7 @@ import { dueIn } from "@/lib/properties/capex";
 import { shortAddress } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import { deletePropertyUnit } from "../actions";
+import { LockboxPhotoViewer } from "./lockbox-photo-viewer";
 import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
 import { onPropertyUnitRequest } from "./edit-field-event";
 import { MissingTitle, useUnitMissing } from "./missing-context";
@@ -41,17 +42,6 @@ export const isAccountField = (k: keyof UnitUtilities) => k.endsWith("Acct");
 
 /** What a unit goes by in a row or a dialog: its label, or its place in the list. */
 const unitName = (u: PropertyUnit, i: number) => u.label?.trim() || `Unit ${i + 1}`;
-
-/**
- * A stored lockbox value split into the code and its note: "4857 (back left
- * corner of the house)" is the code 4857 and where the box is. The code is
- * read and copied character by character, so the note never shares its token.
- */
-function splitLockbox(value: string): { code: string; note: string | null } {
-  const m = /^(.*?)\s*\((.+)\)\s*$/.exec(value.trim());
-  if (!m || !m[1]) return { code: value.trim(), note: null };
-  return { code: m[1], note: m[2].trim() || null };
-}
 
 const THIS_YEAR = new Date().getFullYear();
 
@@ -205,6 +195,7 @@ export function UnitsSection({
           {rentable.map(({ u, i }) => (
             <ReadUnit
               key={u.id ?? i}
+              propertyId={propertyId}
               unit={u}
               name={unitName(u, i)}
               rules={rules}
@@ -228,6 +219,7 @@ export function UnitsSection({
             {meters.map(({ u, i }) => (
               <ReadUnit
                 key={u.id ?? i}
+                propertyId={propertyId}
                 unit={u}
                 name={unitName(u, i)}
                 rules={rules}
@@ -248,7 +240,10 @@ export function UnitsSection({
           propertyId={propertyId}
           version={sheet.version}
           latest={version}
-          unit={editing ?? sheet.opened ?? blankUnit()}
+          unit={editing ?? sheet.opened ?? blankUnit(initial)}
+          others={rentable
+            .filter(({ i }) => i !== editingAt)
+            .map(({ u, i }) => ({ name: unitName(u, i), code: u.lockboxCode?.trim() ?? "" }))}
           isNew={sheet.opened === null}
           gone={sheet.opened !== null && !editing}
           title={editing ? unitName(editing, editingAt) : sheet.opened?.label?.trim() || "New unit"}
@@ -336,6 +331,7 @@ function Disclosure({ title, children }: { title: string; children: ReactNode })
 }
 
 function ReadUnit({
+  propertyId,
   unit: u,
   name,
   rules,
@@ -345,6 +341,7 @@ function ReadUnit({
   onEditEquipment,
   onDelete,
 }: {
+  propertyId: string;
   unit: PropertyUnit;
   name: string;
   rules: CapexRules;
@@ -359,7 +356,10 @@ function ReadUnit({
 }) {
   const hasUtilities = UTILITY_GROUPS.some((g) => g.fields.some(([k]) => u.utilities?.[k]));
   const equipment = u.equipment ?? [];
-  const lockbox = u.lockboxCode?.trim() ? splitLockbox(u.lockboxCode) : null;
+  const code = u.lockboxCode?.trim() || null;
+  const location = u.lockboxLocation?.trim() || null;
+  const photo = u.lockboxPhoto?.pathname ? u.lockboxPhoto : null;
+  const [viewing, setViewing] = useState(false);
   const datedCount = equipment.filter((e) => parseInstallYear(e.installYear) != null).length;
   // Its required blanks (Missing info, docs/specs/missing-info.md D2), in the row's one status spot.
   const missing = useUnitMissing(u.id);
@@ -388,20 +388,43 @@ function ReadUnit({
             </span>
           </span>
         )}
-        {lockbox && (
+        {code && (
           <span className="flex shrink-0 items-center gap-1.5">
             <span className="text-meta text-muted-foreground max-[480px]:hidden">Lockbox</span>
-            <Code value={lockbox.code} label="Lockbox code" />
+            <Code value={code} label="Lockbox code" />
           </span>
         )}
         <UnitMenu name={name} onEdit={onEdit} onDelete={onDelete} />
       </div>
-      {/* Where the box is: its own line, so a long note never pushes the code or the menu off screen. */}
-      {lockbox?.note && (
-        <p title={lockbox.note} className="-mt-1 truncate pb-1 text-meta text-muted-foreground">
-          Lockbox at {lockbox.note}
+      {/* Where the box is, then its photo (docs/specs/lockbox-location.md, decision 3): its own line, so a long
+          location never pushes the code or the menu off screen. The location truncates; Photo never does. */}
+      {(location || photo) && (
+        <p className="-mt-1 flex min-w-0 items-center gap-1 pb-1 text-meta text-muted-foreground">
+          {location && (
+            <>
+              <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+              <span title={location} className="min-w-0 truncate">
+                {location}
+              </span>
+            </>
+          )}
+          {photo && (
+            <>
+              {location && <span aria-hidden="true">·</span>}
+              <button
+                type="button"
+                onClick={() => setViewing(true)}
+                aria-label={`Open lockbox photo for ${name}`}
+                // TextLink's look: a link in a line of muted text carries its underline. A 44px hit area on touch.
+                className={cn(textLinkClass, "relative shrink-0 whitespace-nowrap pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-3")}
+              >
+                {location ? "Photo" : "Lockbox photo"}
+              </button>
+            </>
+          )}
         </p>
       )}
+      {photo && <LockboxPhotoViewer propertyId={propertyId} photo={photo} location={location} isOpen={viewing} onOpenChange={setViewing} />}
       {hasUtilities && (
         <Disclosure title="Utilities">
           <div className="@container">
@@ -503,6 +526,17 @@ function ReadUnit({
 }
 
 
-function blankUnit(): PropertyUnit {
-  return { label: "", lockboxCode: "", utilities: {}, equipment: [] };
+/** A new unit's sheet. With "Same lockbox for all units" on, it opens with the shared lockbox and the box ticked. */
+function blankUnit(units: readonly PropertyUnit[] = []): PropertyUnit {
+  const shared = lockboxIsShared(units) ? units.find((u) => u.lockboxShared) : undefined;
+  if (!shared) return { label: "", lockboxCode: "", utilities: {}, equipment: [] };
+  return {
+    label: "",
+    lockboxCode: shared.lockboxCode ?? "",
+    lockboxLocation: shared.lockboxLocation ?? null,
+    lockboxPhoto: shared.lockboxPhoto ?? null,
+    lockboxShared: true,
+    utilities: {},
+    equipment: [],
+  };
 }

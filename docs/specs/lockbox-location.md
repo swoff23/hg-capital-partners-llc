@@ -1,6 +1,6 @@
 # Lockbox location and photo
 
-This spec gives each unit a **Lockbox location** ("Back entrance") beside its Lockbox code, and a **lockbox photo** the contractor taps to see where the box is. It closes UI/UX review item G2C-037 and is the location and photo part of G1A-I05's "Getting in" block. It was planned with Connor on Nov 15, 2026, against `d4941ac`, and waits for his "build it".
+This spec gives each unit a **Lockbox location** ("Back entrance") beside its Lockbox code, and a **lockbox photo** the contractor taps to see where the box is. It closes UI/UX review item G2C-037 and is the location and photo part of G1A-I05's "Getting in" block. It was planned with Connor on Nov 15, 2026, against `d4941ac`. He said "build it" the same day, and it was built to this spec; the one-off in section 3.7 still waits for his yes on production.
 
 ## 1. Summary
 
@@ -98,7 +98,8 @@ Decided (A), in `job-details.tsx` `LockboxSection`:
 - The code, large, as today (`Code size="lg"`, no copy icon).
 - Beside it on the right, the **photo thumbnail**, 96x72 on a phone, 4:3, `rounded-md`, a button named "Open lockbox photo". A tap opens the `Lightbox` full screen, titled "Lockbox photo" over the location, with pinch and double-tap zoom as every photo has. A swipe down or Close goes back to the job.
 - Under the code, the **location** after a map pin, in `text-body` `--foreground`, wrapping if it must.
-- No photo: the code and location only. No location: the code and photo only.
+- No photo: the code and location only. No location: the code and photo only, with no location line (Connor, Nov 15: "if we didnt include a location, then there shouldnt be a location field").
+- A photo on file whose image won't load (the file is gone from storage) shows no tile either, never an empty box (Connor, Nov 15: "if a photo is missing/not uploaded then there shouldn't be a photo on the contractor view"). A photo that didn't finish uploading is never saved to the unit, so it can't reach the job page. Staff still see the empty tile in the unit sheet, so they know to replace it.
 - Same block at 1280, 768 and 375. At 320 the code and thumbnail still share the row (a 4-digit code at `text-code-l` is about 70px).
 
 ### 3.5 What doesn't change
@@ -114,8 +115,8 @@ Decided (A), in `job-details.tsx` `LockboxSection`:
 - New upload kind `lockbox-photo-upload` (`src/lib/attachments/upload-kinds.ts`): staff only, **private** Blob, photos only, prepared as `display` (upright, a 2560px JPEG, **no metadata**, so a phone photo's GPS never goes up) plus a thumbnail.
 - The gated files route (`src/app/api/files/[kind]/[id]/route.ts`) gains two kinds:
   - `lockbox`, id = the task: staff, and the contractor the job resolves for, under the same checks the code gets in `queries.ts` (assigned, job open) and the job-link token (`?l=`, that job only). The route asks `access-code.ts` which unit's photo the job shows, so a contractor never gets another unit's photo.
-  - `unit-lockbox`, id = the property, `?unit=<unitId>`: staff only, for the Units list and the sheet.
-- `access-code.ts` stays the one portal file that reads `Property.units` (`auth-guard.test.ts`). `pickLockboxCode` becomes `pickLockboxAccess`, returning `{ code, location, hasPhoto }` for one unit, never the list. `readLockboxCode` callers that only need the code keep a thin wrapper.
+  - `property-lockbox`, id = the property, `?p=<pathname>`: staff only, for the Units list and the sheet. It serves any file inside that property's lockbox folder (`isLockboxPhotoPath`), so the sheet can show a photo uploaded before Save.
+- `access-code.ts` stays the one portal file that reads `Property.units` (`auth-guard.test.ts`). `pickLockboxCode` becomes `pickLockboxAccess`, returning `{ code, location, hasPhoto }` for one unit, never the list. `pickLockboxCode` and `readLockboxCode` stay as thin wrappers for the callers that only need the code (job emails, crew texts).
 - With no unit on the job and one shared code (D21), the location and photo come from the units carrying that code, which the checkbox keeps in agreement when it's on. With it off and two units on the same code with different locations or photos, the first unit in list order that has one wins.
 - A replaced or removed photo's files are deleted after the save, unless another unit still points at them (a shared lockbox puts one photo on every unit).
 
@@ -160,17 +161,18 @@ A one-off script, `scripts/migrate/lockbox-locations.ts`, dry run by default:
 **Extended**
 
 - `PropertyUnit` with `lockboxLocation`, `lockboxPhoto` and `lockboxShared`; `writeUnitsAt`'s whitelist; the units action schema; `saveUnit` applies the shared lockbox.
-- `access-code.ts` `pickLockboxCode` into `pickLockboxAccess`; `src/lib/tasks/lockbox.ts` `resolveLockboxCode` to match for the staff page.
+- `access-code.ts`: `pickLockboxAccess` and `readLockboxAccess` beside the code-only wrappers. `src/lib/tasks/lockbox.ts` is unchanged, since the staff task rail still shows the code alone.
 - `LockboxSection` (`job-details.tsx`) with the thumbnail and the location line.
 - `UnitRow` (`edit-units.tsx`): its second line reads the location field and gains the Photo button.
-- `upload-kinds.ts` with `lockbox-photo-upload`; the files route with `lockbox` and `unit-lockbox`.
-- `photo.ts` with `isLockboxPhotoPath` and the delete-after-save helper.
+- `upload-kinds.ts`, `limits.ts` and the Blob token route with `lockbox-photo-upload`; the files route with `lockbox` and `property-lockbox`.
+- `photo.ts` with `isLockboxPhotoPath`, `recordLockboxPhoto` and `discardLockboxUploads`; `photo-actions.ts` with their two actions.
 
 **New**
 
 - `applySharedLockbox` (pure, decision 4b) and the `lockboxShared` key.
 - `scripts/migrate/lockbox-locations.ts`.
-- No new component. The photo tile in the sheet follows `property-photo.tsx`'s tile; if it is built as a shared piece it gets a row in `docs/components.md` in the same commit.
+- `lockbox-photo.tsx` (the sheet's tile, `LockboxPhotoField`) and `lockbox-photo-viewer.tsx` (`LockboxPhotoViewer`, `lockboxPhotoUrl`) beside the property page. Feature-only compositions of `useMediaUploader`, `Menu` and `LazyLightbox`, after `property-photo.tsx`'s tile and the listing sheet's upload-before-Save, so they get no row in `docs/components.md`.
+- `sharedLockboxLine` in `src/lib/properties/unit-sheet.ts`, the checkbox's one line.
 
 ## 5. References
 
@@ -185,5 +187,5 @@ A one-off script, `scripts/migrate/lockbox-locations.ts`, dry run by default:
 
 - Unit tests: `writeUnitsAt`'s whitelist keeps the new keys and drops a photo outside the property's folder; `applySharedLockbox` (turning on copies to every rentable unit and skips house-meter rows, turning off keeps the values, a new unit joins); `pickLockboxAccess` for a unit, no unit with one shared code, and two codes; the migration's split, the typo and the hand-set "On the gate".
 - `auth-guard.test.ts` still finds `Property.units` read only in `access-code.ts` among portal files.
-- Files route: a contractor gets the photo for their own open job only; a closed job, another contractor, another unit and `unit-lockbox` are refused.
+- Files route: a contractor gets the photo for their own open job only; a closed job, another contractor, another unit and `property-lockbox` are refused, and a path outside the property's lockbox folder is refused to staff too.
 - `npm run test:devices`, then the sheet, the Units list and the job page by hand at 375 and 320, with and without a photo and a location, and the Lightbox opened from each.

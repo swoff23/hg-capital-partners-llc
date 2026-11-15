@@ -1,11 +1,14 @@
 "use client";
-import { useOptimistic, useTransition } from "react";
-import { Check, Copy, Navigation } from "lucide-react";
+import { useOptimistic, useState, useTransition } from "react";
+import { Check, Copy, MapPin, Navigation } from "lucide-react";
 import { Code } from "@/components/code";
+import type { MediaItem } from "@/components/lightbox";
+import { LazyLightbox } from "@/components/lightbox-lazy";
 import { Meter } from "@/components/meter";
 import { useToast } from "@/components/toast";
 import { Button, Checkbox, LinkButton, Section } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
+import type { JobLockbox } from "@/lib/portal/queries";
 import { cn } from "@/lib/utils";
 import { setChecklistItemAction } from "../actions";
 
@@ -61,11 +64,65 @@ export function AddressActions({ address }: { address: string }) {
  * a tap on the code still copies it, as every Code does. Code's button names
  * the code for screen readers. A long code wraps inside its column, so every
  * character shows.
+ *
+ * Where the box is sits under the code, and its photo beside it, 96x72; a tap
+ * opens the photo full screen in the viewer, zoom included
+ * (docs/specs/lockbox-location.md, decision 1). The same block at every
+ * width. The photo comes from /api/files/lockbox/<job>, which shows it under
+ * the code's own rule. No photo, or one whose file won't load, shows no tile
+ * at all (Connor, Nov 15): the contractor never meets an empty box.
  */
-export function LockboxSection({ code }: { code: string }) {
+export function LockboxSection({ taskId, lockbox }: { taskId: string; lockbox: JobLockbox }) {
+  const [viewing, setViewing] = useState(false);
+  const [broken, setBroken] = useState(false);
+  const url = `/api/files/lockbox/${encodeURIComponent(taskId)}`;
+  const photo = broken ? null : lockbox.photo;
+  const item: MediaItem = { id: "lockbox", kind: "IMAGE", filename: "Lockbox photo.jpg", hasThumb: !!photo?.hasThumb, createdAt: "" };
   return (
     <Section id="lockbox" title="Lockbox">
-      <Code value={code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <Code value={lockbox.code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
+          {lockbox.location && (
+            <p className="mt-2 flex items-start gap-1.5 text-body text-foreground">
+              <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0 break-words">{lockbox.location}</span>
+            </p>
+          )}
+        </div>
+        {photo && (
+          <button
+            type="button"
+            onClick={() => setViewing(true)}
+            aria-label="Open lockbox photo"
+            className="relative block aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md bg-muted"
+          >
+            {/* Gated, session-checked route; next/image would cache it publicly. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo.hasThumb ? `${url}?v=thumb` : url}
+              alt=""
+              decoding="async"
+              draggable={false}
+              onError={() => setBroken(true)}
+              className="h-full w-full object-cover"
+            />
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-md inset-shadow-photo-edge" />
+          </button>
+        )}
+      </div>
+      {photo && (
+        <LazyLightbox
+          items={[item]}
+          index={0}
+          onIndexChange={() => {}}
+          isOpen={viewing}
+          onOpenChange={setViewing}
+          urlFor={(_item, variant) => (variant === "thumb" && photo.hasThumb ? `${url}?v=thumb` : url)}
+          surface="portal"
+          header={{ title: "Lockbox photo", byline: lockbox.location ?? undefined }}
+        />
+      )}
     </Section>
   );
 }

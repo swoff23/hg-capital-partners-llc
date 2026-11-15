@@ -25,6 +25,7 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/property-upload        { propertyId, fileKind }           staff, documents and photos
  *   /api/blob/listing-photo-upload   { propertyId }                     staff, public photos
  *   /api/blob/property-photo-upload  { propertyId }                     staff, the building's public photo
+ *   /api/blob/lockbox-photo-upload   { propertyId }                     staff, a unit's private lockbox photo
  *   /api/blob/portal-contact-upload  { contactId, docKind, fileKind }   contractor, their own W-9 or insurance
  *   /api/blob/contact-upload         { contactId, docKind, fileKind }   staff, a contractor's W-9 or insurance
  *   /api/blob/lease-upload           { leaseId, termId, fileKind }      staff, a lease's signed term
@@ -87,7 +88,7 @@ function taskLimits(kind: "task-upload" | "portal-task-upload", taskId: string, 
 
 /** The path must be this property's for its kind, and the type and size fit what the file says it is. */
 async function propertyLimits(
-  kind: "property-upload" | "listing-photo-upload" | "property-photo-upload",
+  kind: "property-upload" | "listing-photo-upload" | "property-photo-upload" | "lockbox-photo-upload",
   propertyId: string,
   pathname: string,
   payload: Record<string, unknown>,
@@ -136,6 +137,12 @@ const KINDS: Record<string, UploadKind> = {
     principal: "staff",
     idKey: "propertyId",
     authorize: (id, pathname, payload) => propertyLimits("property-photo-upload", id, pathname, payload),
+  },
+  "lockbox-photo-upload": {
+    principal: "staff",
+    idKey: "propertyId",
+    // A unit's lockbox photo and its thumbnail, to the private store (docs/specs/lockbox-location.md).
+    authorize: (id, pathname, payload) => propertyLimits("lockbox-photo-upload", id, pathname, payload),
   },
   "portal-contact-upload": {
     principal: "contractor",

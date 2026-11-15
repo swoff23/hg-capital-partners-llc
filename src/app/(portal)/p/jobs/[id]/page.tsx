@@ -102,7 +102,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
 
           <JobNotice notice={job.notice} now={now.toISOString()} />
 
-          {job.lockbox && <LockboxSection code={job.lockbox} />}
+          {job.lockbox && <LockboxSection taskId={job.id} lockbox={job.lockbox} />}
 
           {job.notes && (
             <Section title="Notes">

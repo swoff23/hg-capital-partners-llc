@@ -65,7 +65,7 @@ test("one person's edits within 30 minutes fold into one sentence with a row per
   const log = buildDealLog([
     edit("2026-10-20T15:00:00Z", "theirPrice", "$425,000", "$410,000"),
     edit("2026-10-20T15:05:00Z", "status", "2 - Medium", "1 - High"),
-    edit("2026-10-20T15:10:00Z", "nextAction", null, "Call Friday"),
+    edit("2026-10-20T15:10:00Z", "passReason", null, "Call Friday"),
   ]);
   assert.equal(log.length, 1);
   const [entry] = log;
@@ -77,7 +77,7 @@ test("one person's edits within 30 minutes fold into one sentence with a row per
     [
       ["Asking price", "$425,000", "$410,000"],
       ["Stage", "Medium", "High"],
-      ["Next action", null, "Call Friday"],
+      ["Pass reason", null, "Call Friday"],
     ],
   );
   assert.deepEqual([entry.fields[0].fromAmount, entry.fields[0].toAmount], [425000, 410000], "a price carries its amounts for Money");
@@ -119,17 +119,17 @@ test("a field that ended where it started shows nothing, and a burst of only tho
 test("a burst ends after 30 minutes, at another person, and at a note", () => {
   const t0 = Date.parse("2026-10-20T15:00:00Z");
   const iso = (ms: number) => new Date(ms).toISOString();
-  assert.equal(buildDealLog([edit(iso(t0), "units", "4", "5"), edit(iso(t0 + BURST_MS + 60_000), "nextAction", null, "x")]).length, 2, "31 minutes apart");
-  assert.equal(buildDealLog([edit(iso(t0), "units", "4", "5"), edit(iso(t0 + BURST_MS - 60_000), "nextAction", null, "x")]).length, 1, "29 minutes apart");
+  assert.equal(buildDealLog([edit(iso(t0), "units", "4", "5"), edit(iso(t0 + BURST_MS + 60_000), "passReason", null, "x")]).length, 2, "31 minutes apart");
+  assert.equal(buildDealLog([edit(iso(t0), "units", "4", "5"), edit(iso(t0 + BURST_MS - 60_000), "passReason", null, "x")]).length, 1, "29 minutes apart");
   assert.equal(
-    buildDealLog([edit(iso(t0), "units", "4", "5"), edit(iso(t0 + 60_000), "nextAction", null, "x", { authorUserId: "u2", authorName: "Pieter Louw" })]).length,
+    buildDealLog([edit(iso(t0), "units", "4", "5"), edit(iso(t0 + 60_000), "passReason", null, "x", { authorUserId: "u2", authorName: "Pieter Louw" })]).length,
     2,
     "someone else ends it",
   );
   const withNote = buildDealLog([
     edit(iso(t0), "units", "4", "5"),
     row({ source: "manual", body: "hi", at: iso(t0 + 60_000) }),
-    edit(iso(t0 + 120_000), "nextAction", null, "x"),
+    edit(iso(t0 + 120_000), "passReason", null, "x"),
   ]);
   assert.equal(withNote.length, 3, "a note ends it");
 });
@@ -139,10 +139,27 @@ test("the 30 minutes run from the burst's first edit, not its latest", () => {
   const iso = (ms: number) => new Date(ms).toISOString();
   const log = buildDealLog([
     edit(iso(t0), "units", "4", "5"),
-    edit(iso(t0 + 20 * 60_000), "nextAction", null, "x"),
+    edit(iso(t0 + 20 * 60_000), "passReason", null, "x"),
     edit(iso(t0 + 40 * 60_000), "priority", null, "A"),
   ]);
   assert.equal(log.length, 2, "the third is 40 minutes after the first");
+});
+
+test("next action edits are left out (it left the deal Nov 15, 2026), without ending the burst around them", () => {
+  assert.equal(buildDealLog([edit("2026-10-20T15:00:00Z", "nextAction", null, "Call Friday")]).length, 0);
+  const log = buildDealLog([
+    edit("2026-10-20T15:00:00Z", "units", "4", "5"),
+    edit("2026-10-20T15:05:00Z", "nextAction", null, "Call Friday"),
+    edit("2026-10-20T15:10:00Z", "status", "2 - Medium", "1 - High"),
+  ]);
+  assert.equal(log.length, 1);
+  const [entry] = log;
+  assert.ok(entry.type === "change");
+  if (entry.type === "change") assert.deepEqual(entry.fields.map((f) => f.field), ["units", "status"]);
+  const old = row({ at: "2026-10-20T15:00:00Z", body: "Next action: — → Call Friday  ·  Connor Swofford", authorUserId: null, authorName: null });
+  assert.equal(buildDealLog([old]).length, 0, "an old line read from its text too");
+  const sheet = row({ at: "2026-10-20T15:00:00Z", body: "Next action: run numbers → —  ·  Spreadsheet", data: { field: "nextAction", from: "run numbers", to: null }, authorUserId: null, authorName: null });
+  assert.equal(buildDealLog([sheet]).length, 0, "and one the spreadsheet refresh signed");
 });
 
 test("old change lines are read from their text, folded with the rest, and a no-op is left out", () => {

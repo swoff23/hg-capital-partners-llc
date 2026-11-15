@@ -44,7 +44,7 @@ export function DealAddress({ id, value }: { id: string; value: string }) {
 type FactProps = Omit<InlineFieldProps, "label" | "onSave" | "field" | "value"> & {
   id: string;
   /** The deal column the patch carries: "theirPriceRaw". */
-  field: "theirPriceRaw" | "ourPriceRaw" | "nextAction" | "sourceUrl" | "passReason";
+  field: "theirPriceRaw" | "ourPriceRaw" | "sourceUrl" | "passReason";
   label: string;
   value: string | null;
 };

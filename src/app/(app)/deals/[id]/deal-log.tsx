@@ -37,9 +37,11 @@ function subscribeToHash(onChange: () => void) {
  * Retry's place ("Didn't save · Shorten it to 5,000 characters.",
  * `sendRefusal`), and the card's Edit is the way on. It posts
  * through addDealNote, which answers with a result instead of throwing. Your
- * own notes have Edit and Delete in their menu; Delete shows a toast with
- * Undo. A line from the deals sheet names no one (no avatar, no name), and a
- * rule marks where the sheet's lines end and this app's begin.
+ * own notes, and the lines from the deals sheet, have Edit and Delete in
+ * their menu and nothing else (no Copy link or Copy text, Connor Nov 15);
+ * Delete shows a toast with Undo. A line from the deals sheet names no one
+ * (no avatar, no name, no header in its menu), and a rule marks where the
+ * sheet's lines end and this app's begin.
  */
 export function DealLog(props: {
   dealId: string;
@@ -147,7 +149,8 @@ function DealLogBody({
                       entry={e}
                       month={g.kind === "month"}
                       dealId={dealId}
-                      mine={e.type === "note" && e.authorUserId === viewerId}
+                      // Your own notes, and the lines imported from the sheet, which are nobody's.
+                      mine={e.type === "note" && (e.authorUserId === viewerId || e.imported)}
                       editing={editing === e.id}
                       onEdit={(id) => setEditing(id)}
                       onHide={(id, hide) =>
@@ -244,7 +247,7 @@ function EntryRow({
   return <LineRow line={entry} month={month} />;
 }
 
-/** A note as a comment card, with Copy link and Copy text for everyone and Edit and Delete for its author. */
+/** A note as a comment card, with Edit and Delete in its menu for its author (and for anyone on an imported line); others' notes have no menu. */
 function NoteRow({
   note,
   dealId,
@@ -263,15 +266,6 @@ function NoteRow({
   onDeleted: () => void;
 }) {
   const { toast } = useToast();
-
-  async function copy(text: string, done: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast({ message: done });
-    } catch {
-      toast({ message: "Couldn't copy. Select the text to copy it instead." });
-    }
-  }
 
   async function remove() {
     onHide(note.id, true);
@@ -315,25 +309,15 @@ function NoteRow({
         ) : undefined
       }
       menuItems={
-        editing ? undefined : (
+        editing || !mine ? undefined : (
           <>
-            <MenuItem id="link" onAction={() => copy(`${window.location.origin}/deals/${dealId}#update-${note.id}`, "Link copied")}>
-              Copy link
+            <MenuItem id="edit" onAction={() => onEdit(note.id)}>
+              Edit
             </MenuItem>
-            <MenuItem id="text" onAction={() => copy(note.text, "Text copied")}>
-              Copy text
+            <MenuSeparator />
+            <MenuItem id="delete" variant="destructive" onAction={remove}>
+              Delete
             </MenuItem>
-            {mine && (
-              <>
-                <MenuItem id="edit" onAction={() => onEdit(note.id)}>
-                  Edit
-                </MenuItem>
-                <MenuSeparator />
-                <MenuItem id="delete" variant="destructive" onAction={remove}>
-                  Delete
-                </MenuItem>
-              </>
-            )}
           </>
         )
       }
