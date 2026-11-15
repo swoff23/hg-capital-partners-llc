@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="470" viewBox="0 0 840 470" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The unit sheet: a Lockbox section with the photo tile on the left, running from the top of Code's label to the bottom of the Location field, and the Same lockbox for all units checkbox under it</title>
+<rect width="840" height="470" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Decisions 2, 2b and 4b: the unit sheet's Lockbox section</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768 (the lg sheet), 23 Sherwood Upper</text>
+<rect x="0" y="22" width="480" height="346" rx="10" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="20" y="52" font-size="14" font-weight="600" fill="#152133">Upper</text>
+<text x="20" y="80" font-size="11" fill="#424e61">Name</text>
+<rect x="20" y="86" width="210" height="32" rx="6" fill="#ffffff" stroke="#c0bdb7"/>
+<text x="30" y="106" font-size="12" fill="#152133">Upper</text>
+<text x="20" y="146" font-size="12" font-weight="600" fill="#152133">Lockbox</text>
+<line x1="20" y1="154" x2="460" y2="154" stroke="#e7e5e0"/>
+<rect x="20" y="164" width="96" height="124" rx="6" fill="#f2f0ec" stroke="#d5d1ca"/>
+<path d="M30 276 l26 -30 18 18 14 -10 22 22z" fill="#c0bdb7"/>
+<text x="128" y="176" font-size="11" fill="#424e61">Code <tspan fill="#84817a">optional</tspan></text>
+<rect x="128" y="182" width="332" height="32" rx="6" fill="#ffffff" stroke="#c0bdb7"/>
+<text x="138" y="202" font-size="12" font-family="Geist Mono, ui-monospace, monospace" fill="#152133">6385</text>
+<text x="128" y="236" font-size="11" fill="#424e61">Location <tspan fill="#84817a">optional</tspan></text>
+<rect x="128" y="242" width="332" height="46" rx="6" fill="#ffffff" stroke="#c0bdb7"/>
+<text x="138" y="269" font-size="12" fill="#152133">On the gate</text>
+<line x1="10" y1="164" x2="20" y2="164" stroke="#a54e09"/>
+<line x1="10" y1="288" x2="20" y2="288" stroke="#a54e09"/>
+<line x1="116" y1="164" x2="128" y2="164" stroke="#a54e09" stroke-dasharray="2 2"/>
+<line x1="116" y1="288" x2="128" y2="288" stroke="#a54e09" stroke-dasharray="2 2"/>
+<rect x="20" y="304" width="14" height="14" rx="3" fill="#152133"/>
+<path d="M23.5 311 l2.5 2.5 4.5 -5" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+<text x="42" y="315" font-size="12" fill="#152133">Same lockbox for all units</text>
+<text x="42" y="332" font-size="10" fill="#5b6576">Lower uses it too</text>
+<text x="20" y="358" font-size="12" font-weight="600" fill="#152133">Utilities (optional)</text>
+</g>
+
+<g transform="translate(552 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375 (and 320), 15 Oxford Attic</text>
+<rect x="0" y="22" width="240" height="346" rx="18" fill="#ffffff" stroke="#d5d1ca"/>
+<text x="16" y="56" font-size="13" font-weight="600" fill="#152133">Attic</text>
+<text x="16" y="80" font-size="10" fill="#424e61">Name</text>
+<rect x="16" y="86" width="208" height="30" rx="6" fill="#ffffff" stroke="#c0bdb7"/>
+<text x="16" y="142" font-size="11" font-weight="600" fill="#152133">Lockbox</text>
+<line x1="16" y1="150" x2="224" y2="150" stroke="#e7e5e0"/>
+<rect x="16" y="160" width="72" height="116" rx="6" fill="#ffffff" stroke="#84817a" stroke-dasharray="4 3"/>
+<rect x="44" y="204" width="16" height="12" rx="2" fill="none" stroke="#5b6576" stroke-width="1.2"/>
+<circle cx="52" cy="210" r="3" fill="none" stroke="#5b6576" stroke-width="1.1"/>
+<text x="52" y="232" font-size="9" fill="#5b6576" text-anchor="middle">Add photo</text>
+<text x="98" y="172" font-size="10" fill="#424e61">Code</text>
+<rect x="98" y="178" width="126" height="30" rx="6" fill="#ffffff" stroke="#c0bdb7"/>
+<text x="106" y="197" font-size="11" font-family="Geist Mono, ui-monospace, monospace" fill="#152133">4857</text>
+<text x="98" y="228" font-size="10" fill="#424e61">Location</text>
+<rect x="98" y="234" width="126" height="42" rx="6" fill="#ffffff" stroke="#c0bdb7"/>
+<text x="106" y="259" font-size="11" fill="#152133">Back left corner…</text>
+<rect x="16" y="290" width="14" height="14" rx="3" fill="#152133"/>
+<path d="M19.5 297 l2.5 2.5 4.5 -5" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+<text x="38" y="301" font-size="11" fill="#152133">Same lockbox for all units</text>
+<text x="38" y="317" font-size="9" fill="#a54e09">Replaces the codes on Lower and Upper</text>
+<text x="16" y="346" font-size="9" fill="#5b6576">Nothing changes until Save unit.</text>
+</g>
+</svg>

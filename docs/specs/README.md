@@ -42,3 +42,5 @@ Each chunk ships its own small migration.
 [property-page.md](property-page.md) reorders the property page to lead with Tasks and Units and access, folds empty fields behind "N more fields", merges the two CapEx sections, turns Entity into a list of the five QuickBooks companies, and shows Rental listings only once a listing exists. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
 [task-list-sort.md](task-list-sort.md) gives the Tasks list a Unit column, the assignee as two initials plus a first name, sortable Property, Assignee and Due headers (Property by default, a heading per building), and drops "To do" from rows. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
+
+[lockbox-location.md](lockbox-location.md) gives each unit a Lockbox location beside its code and a lockbox photo, shown to the contractor on the job page, where a tap opens the photo full screen. A "Same lockbox for all units" checkbox in the unit sheet shares one code, location and photo across a building. It splits today's five "code (location)" values. It was planned with Connor on Nov 15, 2026, and waits for his "build it".
