@@ -87,7 +87,10 @@ export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null
  * Email only crosses the staff/contractor line (D19, D20):
  *   - staff change a contractor's job → the contractor hears about it
  *     (assignment, a shared comment or file, a shared status, target date or
- *     notes changes). Internal notes never email a contractor.
+ *     notes changes). Internal notes never email a contractor, and neither
+ *     does a move to Done: Approve, or a partner closing the job, is only
+ *     shown on the job (docs/specs/send-for-review.md, section 2). The
+ *     contractor hears back about finished work only when it's sent back.
  *   - a contractor changes their job → both partners hear about it.
  *   - staff changing staff tasks, the system and the importer email nobody.
  * `TARGET` stands for "the date the contractor sees moved"; core decides that.
@@ -97,7 +100,12 @@ export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null
  * and their "Job emails" switch on. Without it a staff change queues nothing,
  * and nothing is sent later to catch them up.
  */
-export type NotifyChange = { kind: TaskEventKind | "TARGET"; visibility: Visibility };
+export type NotifyChange = {
+  kind: TaskEventKind | "TARGET";
+  visibility: Visibility;
+  /** A STATUS change's new status: a staff move to Done emails nobody. */
+  to?: TaskStatus;
+};
 
 const STAFF_TO_CONTRACTOR: ReadonlySet<NotifyChange["kind"]> = new Set(["ASSIGNED", "TARGET", "NOTES"]);
 // TARGET: the day a contractor agreed with the tenant (core.ts setDateByContractor).
@@ -110,6 +118,7 @@ export function notifyAudience(
 ): "contractor" | "staff" | null {
   if (actor === "staff") {
     if (!opts.contractorGetsEmail) return null;
+    if (change.kind === "STATUS" && change.to === "DONE") return null;
     if (change.visibility === "SHARED" && (change.kind === "COMMENT" || change.kind === "ATTACHMENT" || change.kind === "STATUS")) {
       return "contractor";
     }
@@ -128,9 +137,9 @@ export const BUNDLE_QUIET_MS = 3 * 60_000;
 export const BUNDLE_MAX_MS = 10 * 60_000;
 
 /**
- * How long Approve's Undo lasts (core.ts undoApproval): under the 3 minutes
- * an approval email waits. A bundle near its 10-minute cap can be due sooner,
- * so Undo is also refused once the approval's email row is claimed or sent.
+ * How long Approve's Undo lasts (core.ts undoApproval). An approval emails
+ * nobody (notifyAudience), so nothing else limits it; the refusal for an
+ * approval email claimed or sent only covers rows queued before that rule.
  */
 export const APPROVAL_UNDO_MS = 2 * 60_000;
 

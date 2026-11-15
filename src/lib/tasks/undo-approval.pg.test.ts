@@ -20,6 +20,11 @@ import * as core from "./core";
  * database (its name must contain "scratch"); it writes rows there and
  * leaves them.
  *
+ * Since Nov 15 an approval emails nobody (rules.ts notifyAudience,
+ * docs/specs/send-for-review.md). The Undo's refusal for an approval email
+ * claimed or sent stays for rows queued before then; `legacyApprovalRow`
+ * writes one as enqueue did.
+ *
  *   createdb -h localhost hg_undo_scratch
  *   DATABASE_URL=postgresql://<you>@localhost:5432/hg_undo_scratch npx prisma migrate deploy
  *   HG_SCRATCH_DATABASE_URL=postgresql://<you>@localhost:5432/hg_undo_scratch npx tsx --test src/lib/tasks/undo-approval.pg.test.ts
@@ -64,7 +69,7 @@ before(async () => {
   staff = { kind: "staff", userId: connor.id, label: "Connor" };
   pieter = { kind: "staff", userId: pieterUser.id, label: "Pieter" };
   const contact = await prisma.contact.create({ data: { fullName: "Zack Outlaw" } });
-  // A login, so the approval and the next copy's "assigned you" are each an email row for Zack.
+  // A login, so the next copy's "assigned you" is an email row for Zack (the approval itself emails nobody).
   await prisma.portalAccount.create({
     // Signed in once, so HG's changes email him (src/lib/portal/job-emails.ts).
     data: { contactId: contact.id, email: `zack-${run}@example.test`, passwordHash: "scrypt$x", mustChangePassword: false, status: "ACTIVE", lastSignInAt: new Date() },
@@ -89,6 +94,19 @@ async function approvedJob(): Promise<{ taskId: string; approvedEventId: string;
   return { taskId: task.id, approvedEventId: approved.statusEventId, copyId: approved.nextTaskId };
 }
 
+/**
+ * An approval email to Zack as one was queued before Nov 15 (core.ts enqueue): the line the Undo still checks, so a
+ * claimed or sent one from then refuses it. It joins Zack's open row on the job (his "assigned you") as enqueue did.
+ */
+async function legacyApprovalRow(taskId: string, approvedEventId: string): Promise<void> {
+  const item = { kind: "STATUS", actorLabel: staff.label, summary: 'approved "Change the furnace filter"', at: new Date().toISOString(), eventId: approvedEventId, from: "REVIEW" };
+  await prisma.$executeRaw`
+    INSERT INTO "NotificationOutbox" ("id", "openKey", "recipientContactId", "taskId", "items", "firstAt", "sendAfter", "createdAt")
+    VALUES (${randomUUID()}, ${`c:${zack.contactId}:${taskId}`}, ${zack.contactId}, ${taskId}, jsonb_build_array(${JSON.stringify(item)}::jsonb),
+      (now() AT TIME ZONE 'UTC'), (now() AT TIME ZONE 'UTC') + interval '3 minutes', (now() AT TIME ZONE 'UTC'))
+    ON CONFLICT ("openKey") DO UPDATE SET "items" = "NotificationOutbox"."items" || EXCLUDED."items"`;
+}
+
 /** Zack's email rows on this task that name the approval, read as the Undo reads them. */
 async function approvalRows(taskId: string, approvedEventId: string) {
   return prisma.$queryRaw<{ id: string; sentAt: Date | null; openKey: string | null; attempts: number }[]>`
@@ -101,8 +119,7 @@ const undo = (taskId: string, approvedEventId: string) => prisma.$transaction((t
 
 test("Approve then Undo: back in Review, the Done line hidden, the next copy and its email taken back", { skip, timeout }, async () => {
   const { taskId, approvedEventId, copyId } = await approvedJob();
-  const rows = await approvalRows(taskId, approvedEventId);
-  assert.equal(rows.length, 1, "the approval's email to Zack, found by its event");
+  assert.deepEqual(await approvalRows(taskId, approvedEventId), [], "the approval emails Zack nothing");
   assert.ok(await prisma.notificationOutbox.count({ where: { taskId: copyId } }), "the copy's 'assigned you' row");
 
   const { task } = await undo(taskId, approvedEventId);
@@ -114,11 +131,6 @@ test("Approve then Undo: back in Review, the Done line hidden, the next copy and
   assert.equal(await prisma.notificationOutbox.count({ where: { taskId: copyId } }), 0, "with its unsent email");
   assert.equal(await prisma.taskEvent.count({ where: { taskId, kind: "REPEAT_CREATED" } }), 0, "and its REPEAT_CREATED line");
   assert.equal(await prisma.taskEvent.count({ where: { taskId, kind: "STATUS", deletedAt: null, data: { path: ["to"], equals: "DONE" } } }), 0);
-  assert.deepEqual(
-    (await approvalRows(taskId, approvedEventId)).map((r) => r.sentAt),
-    [null],
-    "the row stays for the drain, which reads the line back and leaves it out",
-  );
 
   // A retry of an Undo that went through is a quiet success, and changes nothing.
   const again = await undo(taskId, approvedEventId);
@@ -162,9 +174,14 @@ test("the Undo's 2-minute limit holds on the times the adapter reads back, whate
   assert.equal((await undo(taskId, approvedEventId)).task.status, "REVIEW");
 });
 
-test("Undo is refused once the approval's email is claimed or sent, read through the adapter; nothing changes", { skip, timeout }, async () => {
+test("Undo is refused once an approval email from before Nov 15 is claimed or sent, read through the adapter; nothing changes", { skip, timeout }, async () => {
   const { taskId, approvedEventId, copyId } = await approvedJob();
+  await legacyApprovalRow(taskId, approvedEventId);
   const [row] = await approvalRows(taskId, approvedEventId);
+  // Waiting and unclaimed, it doesn't stop the Undo; checked on a second approval so this one stays Done.
+  const other = await approvedJob();
+  await legacyApprovalRow(other.taskId, other.approvedEventId);
+  assert.equal((await undo(other.taskId, other.approvedEventId)).task.status, "REVIEW");
   // A send run's claim (outbox.ts claim): the open key goes and a try is spent.
   await prisma.notificationOutbox.update({ where: { id: row.id }, data: { openKey: null, attempts: 1 } });
   await assert.rejects(undo(taskId, approvedEventId), (e) => e instanceof core.TaskRuleError && e.message === "The email is on its way. Change the status.");
@@ -175,8 +192,9 @@ test("Undo is refused once the approval's email is claimed or sent, read through
   assert.equal((await prisma.taskEvent.findUniqueOrThrow({ where: { id: approvedEventId } })).deletedAt, null);
 });
 
-test("Undo holds the approval's email row: a send run's claim waits for it, then finds the line gone", { skip, timeout }, async () => {
+test("Undo holds an approval email row from before Nov 15: a send run's claim waits for it, then finds the line gone", { skip, timeout }, async () => {
   const { taskId, approvedEventId } = await approvedJob();
+  await legacyApprovalRow(taskId, approvedEventId);
   const [row] = await approvalRows(taskId, approvedEventId);
 
   // Stop the Undo just after it locks the approval's email rows (the jsonb containment query), with its backend's pid.

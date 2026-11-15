@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { ACCOUNT_STATUSES } from "@/lib/contractors/onboarding";
+import type { PortalAccessFacts } from "@/lib/portal/access-state";
 import {
+  accountStatusOf,
   contractorQuery,
   contractorsWhere,
   contractorsCount,
@@ -13,6 +16,7 @@ import {
   resolveTradePicks,
   statusOf,
   tradeOptions,
+  type AccountRow,
   type ContractorFilters,
 } from "./query";
 
@@ -115,29 +119,56 @@ test("Needs W-9 reads the notes the way the Docs column does", () => {
   assert.equal(matchesNeedsW9({ w9Url: null, comments: null, documents: [{ kind: "INSURANCE" }] }, needs), true);
 });
 
-const statusRow = (over: Partial<Parameters<typeof statusOf>[0]> = {}): Parameters<typeof statusOf>[0] => ({
+/** A login sign-in lets in: their own password, signed in. */
+const login = (over: Partial<PortalAccessFacts> = {}): AccountRow["portalAccount"] => ({
+  id: "a",
+  status: "ACTIVE",
+  mustChangePassword: false,
+  lastSignInAt: new Date(),
+  lastSeenAt: null,
+  ...over,
+});
+
+const accountRow = (over: Partial<AccountRow> = {}): AccountRow => ({
   signupSource: "INVITE",
   needsReview: false,
   setupDoneAt: null,
+  active: true,
   portalAccount: null,
   portalInvites: [{ openedAt: null }],
   ...over,
 });
 
-test("the Status filter reads the same badge the rows show", () => {
-  const invited = statusRow();
-  const opened = statusRow({ portalInvites: [{ openedAt: new Date() }] });
-  const onboarding = statusRow({ portalAccount: { id: "a" } });
-  const isNew = statusRow({ signupSource: "LINK", needsReview: true, portalInvites: [], portalAccount: { id: "b" } });
-  const active = statusRow({ portalAccount: { id: "c" }, setupDoneAt: new Date() });
-  const staff = statusRow({ signupSource: "STAFF", portalInvites: [] });
-  assert.deepEqual([invited, opened, onboarding, isNew, active, staff].map(statusOf), ["invited", "opened", "onboarding", "new", null, null]);
+test("the Status filter reads the same status the rows show", () => {
+  const invited = accountRow();
+  const opened = accountRow({ portalInvites: [{ openedAt: new Date() }] });
+  const onboarding = accountRow({ portalAccount: login() });
+  const isNew = accountRow({ signupSource: "LINK", needsReview: true, portalInvites: [], portalAccount: login() });
+  const active = accountRow({ portalAccount: login(), setupDoneAt: new Date() });
+  const staff = accountRow({ signupSource: "STAFF", portalInvites: [] });
+  const rows = [invited, opened, onboarding, isNew, active, staff];
+  assert.deepEqual(rows.map(statusOf), ["invited", "opened", "onboarding", "new", null, null], "the onboarding badge alone");
+  assert.deepEqual(rows.map(accountStatusOf), ["invited", "opened", "onboarding", "new", "active", null]);
   assert.equal(matchesStatus(invited, []), true, "no picks keeps everyone");
   assert.equal(matchesStatus(staff, []), true);
   assert.equal(matchesStatus(invited, ["invited", "opened"]), true);
   assert.equal(matchesStatus(opened, ["invited"]), false);
-  assert.equal(matchesStatus(active, ["onboarding"]), false, "Active has no badge to match");
-  assert.equal(matchesStatus(staff, ["new", "invited", "opened", "onboarding"]), false);
+  assert.equal(matchesStatus(active, ["onboarding"]), false);
+  assert.equal(matchesStatus(active, ["active"]), true, "done with setup reads Active");
+  assert.equal(matchesStatus(staff, ACCOUNT_STATUSES), false, "no login and never in setup matches no pick");
+});
+
+test("someone staff added shows their login's state, and Access off outranks Onboarding", () => {
+  const staff = (over: Partial<AccountRow>) => accountRow({ signupSource: "STAFF", portalInvites: [], ...over });
+  assert.equal(accountStatusOf(staff({ portalAccount: login() })), "active");
+  assert.equal(accountStatusOf(staff({ portalAccount: login({ mustChangePassword: true, lastSignInAt: null }) })), "invited", "made, never used");
+  assert.equal(accountStatusOf(staff({ portalAccount: login({ status: "DISABLED" }) })), "off", "access removed");
+  assert.equal(accountStatusOf(staff({ active: false, portalAccount: login() })), "off", "an inactive contact can't sign in");
+  assert.equal(accountStatusOf(staff({ portalAccount: login(), archivedAt: new Date() })), null, "archived is the dash");
+  assert.equal(accountStatusOf(accountRow({ portalAccount: login({ status: "DISABLED" }) })), "off", "mid-setup with access off");
+  const newOff = accountRow({ signupSource: "LINK", needsReview: true, portalAccount: login({ status: "DISABLED" }) });
+  assert.equal(accountStatusOf(newOff), "new", "a partner's decision still comes first");
+  assert.equal(matchesStatus(staff({ portalAccount: login({ mustChangePassword: true }) }), ["invited"]), true);
 });
 
 test("the Status filter in the URL: known statuses only, and it counts as narrowing", () => {

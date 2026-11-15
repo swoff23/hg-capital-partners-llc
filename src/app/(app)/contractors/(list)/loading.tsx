@@ -74,8 +74,8 @@ export default function ContractorsLoading() {
                 <Block text="text-body" className={rowWidth(i, ["w-8", "w-12 pointer-coarse:w-17", "w-8"])} />
               </Td>
               <Td className="hidden pr-0 md:table-cell">
-                {/* Most rows are Active, the empty dash. */}
-                <Block text="text-body" className="w-3" />
+                {/* A badge where there's a login or a setup step (a badge's 20px), the dash where there's neither. */}
+                {i % 3 === 1 ? <Block className="h-5 w-12 rounded-sm" /> : <Block text="text-body" className="w-3" />}
               </Td>
             </tr>
           ))}

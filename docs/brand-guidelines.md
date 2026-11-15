@@ -398,7 +398,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 - **PhotoThumb** (**new**, `src/components/photo-thumb.tsx`): the sizes, fallback tile, photo edge and fade above.
 - **Failed upload:** the thumbnail stays in the grid with a 2px inset `--destructive` ring (it replaces the photo edge) and an inline Retry pill (`--pill-bg`, `--pill-fg`, 32px tall, 14px label, 14px `RotateCcw`, 44px hit area) 8px above its bottom center ([HBO Max](https://mobbin.com/screens/2c6b51a6-80b2-40f0-8513-83e693c55da3)).
-- While any photo has failed, Mark done stays disabled above one `--destructive` line: "2 photos didn't upload · Retry".
+- While any photo has failed, Send for review stays disabled above one `--destructive` line: "2 photos didn't upload · Retry".
 
 ### Dialogs and sheets
 

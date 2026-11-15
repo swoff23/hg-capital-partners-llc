@@ -12,8 +12,9 @@ import { cn } from "@/lib/utils";
 import { ContactLink } from "../contact-link";
 import { ContractorFilters } from "../filters";
 import { ContractorHeaderActions } from "../invite-sheet";
-import { OnboardingBadge } from "../status-badge";
+import { ContractorStatusBadge } from "../status-badge";
 import {
+  accountStatusOf,
   contractorsCount,
   contractorScope,
   contractorsWhere,
@@ -23,7 +24,6 @@ import {
   matchesStatus,
   matchesTrades,
   STATUS_INCLUDE,
-  statusOf,
   parseContractorFilters,
   contractorQuery,
   resolveTradePicks,
@@ -61,7 +61,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
   const picks = resolveTradePicks(f.trades, allTrades);
   if (picks.join(",") !== f.trades.join(",")) redirect(`/contractors?${contractorQuery({ ...f, trades: picks })}`);
   // A W-9 can be named in the notes, so "Needs W-9" reads on the rows, and so does the Trade filter, whose counts come from the rest (query.ts).
-  // The onboarding Status filter reads the same badge the rows show (statusOf), so it's on the rows too.
+  // The Status filter reads the same status the rows show (accountStatusOf), so it's on the rows too.
   const found = searched.filter((c) => matchesNeedsW9(c, f) && matchesStatus(c, f.status));
   const contacts = found.filter((c) => matchesTrades(c, f.trades));
   // Every trade stays listed, counting the contractors the search and the other filters leave.
@@ -118,8 +118,9 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
               {contacts.map((c) => {
                 const names = tradeNames(c.tradeLinks);
                 const subline = [c.company, tradeLine(c.tradeLinks)].filter(Boolean).join(" · ");
-                const status = statusOf(c);
-                const statusBadge = status && <OnboardingBadge status={status} className="shrink-0" />;
+                // The onboarding status while it applies, else the login's: Active, Invited or Access off.
+                const status = accountStatusOf(c);
+                const statusBadge = status && <ContractorStatusBadge status={status} className="shrink-0" />;
                 // Traits stay beside the name; the onboarding status has its own column from md.
                 const traits = (c.tenantFixes || !c.active) && (
                   <>
@@ -165,7 +166,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                         <span className="text-foreground max-sm:min-w-0 max-sm:truncate">{c.fullName}</span>
                         {(status || traits) && (
                           <span className={cn("hidden shrink-0 items-center gap-2 sm:flex", !traits && "md:hidden")}>
-                            {status && <OnboardingBadge status={status} className="shrink-0 md:hidden" />}
+                            {status && <ContractorStatusBadge status={status} className="shrink-0 md:hidden" />}
                             {traits}
                           </span>
                         )}
@@ -196,7 +197,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                       {coi}
                       {!w9 && !coi && EMPTY}
                     </Td>
-                    {/* Active, or never in setup, is the empty dash. */}
+                    {/* No login and never in setup is the empty dash. */}
                     <Td className="hidden whitespace-nowrap pr-0 md:table-cell">{statusBadge || EMPTY}</Td>
                   </tr>
                 );

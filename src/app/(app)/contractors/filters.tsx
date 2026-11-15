@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, type ReactNode } from "react";
 import { FilterBar, FilterResults, FilterScope, ResultLine, type FilterFacet } from "@/components/filter-bar";
-import { ONBOARDING_LABEL, ONBOARDING_STATUSES } from "@/lib/contractors/onboarding";
+import { ACCOUNT_STATUS_LABEL, ACCOUNT_STATUSES } from "@/lib/contractors/onboarding";
 import { countContractorsAction } from "./filter-actions";
 
 export type ContractorFilterData = {
@@ -40,7 +40,7 @@ export function ContractorFilters({ data, children }: { data: ContractorFilterDa
         label: "Status",
         searchLabel: "Search statuses",
         emptyText: "No status matches.",
-        items: ONBOARDING_STATUSES.map((s) => ({ id: s, label: ONBOARDING_LABEL[s] })),
+        items: ACCOUNT_STATUSES.map((s) => ({ id: s, label: ACCOUNT_STATUS_LABEL[s] })),
       },
       { kind: "toggle", param: "login", label: "Has login" },
       { kind: "toggle", param: "w9", label: "Needs W-9" },

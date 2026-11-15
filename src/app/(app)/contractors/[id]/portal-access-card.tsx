@@ -15,6 +15,7 @@ import { useRun } from "@/components/use-run";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { inlineProblem } from "@/lib/inline-edit";
 import { firstName } from "@/lib/names";
+import { ACCOUNT_STATUS_LABEL } from "@/lib/contractors/onboarding";
 import { loginOffers, type PortalAccessState } from "@/lib/portal/access-state";
 import { loginTextBody, smsHref } from "@/lib/portal/login-text";
 import { cn } from "@/lib/utils";
@@ -50,11 +51,7 @@ export type PortalAccountView = {
  * money in, and none of the three login states is one of those. The line
  * under Email ("Last seen 2d ago") carries Active (decision 22).
  */
-const BADGE: Record<PortalAccessState, string> = {
-  invited: "Invited",
-  active: "Active",
-  off: "Access off",
-};
+const BADGE: Record<PortalAccessState, string> = ACCOUNT_STATUS_LABEL;
 
 /** Someone who came in by an invite and hasn't made their account: where the invite stands (docs/specs/contractor-onboarding.md, 4.4). */
 export type InviteView = {

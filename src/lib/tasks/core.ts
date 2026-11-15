@@ -611,7 +611,7 @@ export function statusSummary(
   now: Date,
 ): string {
   const t = `"${c.title}"`;
-  if (c.to === "REVIEW" && c.actor === "contractor") return `marked ${t} done`;
+  if (c.to === "REVIEW" && c.actor === "contractor") return `sent ${t} for review`;
   if (c.from === "REVIEW" && c.to === "IN_PROGRESS") return `sent ${t} back${c.note ? `: ${c.note}` : ""}`;
   if (c.from === "REVIEW" && c.to === "DONE") return `approved ${t}`;
   if (c.to === "IN_PROGRESS" && c.actor === "contractor") return `started ${t}`;
@@ -781,7 +781,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   if (noteEvent && p.kind === "contractor") {
     await notify(tx, task, p, { kind: "COMMENT", visibility: "SHARED" }, commentSummary(note ?? "", noteEvent.linked), now, { eventId: noteEvent.event.id });
   }
-  const audience = await notify(tx, task, p, { kind: "STATUS", visibility }, summary, now, {
+  const audience = await notify(tx, task, p, { kind: "STATUS", visibility, to }, summary, now, {
     eventId: statusEvent.id,
     from: before.status,
     ...(noteEvent && p.kind !== "contractor" && note ? { noteEventId: noteEvent.event.id } : {}),
@@ -805,7 +805,8 @@ type ApprovalEmail = { sentAt: Date | null; lastError: string | null; openKey: s
 
 /**
  * What an approval's email rows say about its Undo, as one toast line, or
- * null when nothing stops it. Sent (`sentAt` with no `lastError`): Zack has
+ * null when nothing stops it. Since Nov 15 an approval emails nobody
+ * (rules.ts notifyAudience), so only an approval queued before then has rows. Sent (`sentAt` with no `lastError`): Zack has
  * it. On its way (`sentAt` null, claimed, a try spent): a send run has it,
  * or it failed and waits to try again, and either way it may reach him. A
  * row closed without sending (`sentAt` with a `lastError`: nothing left in
@@ -821,8 +822,8 @@ export function approvalEmailRefusal(rows: readonly ApprovalEmail[]): string | n
  * Approve's Undo (activity 2.8): the job goes back to Review as if it had not
  * been approved. A plain `setStatus(REVIEW)` would not do: it writes a Shared
  * status line, so Zack is emailed "moved it to Review" and the portal shows
- * "Connor marked it done", and it becomes the latest move to Review, so the
- * contractor loses the late-upload hour after his own Mark done. This writes
+ * "Connor moved it to Review", and it becomes the latest move to Review, so
+ * the contractor loses the late-upload hour after his own Send for review. This writes
  * no status line of its own. It soft-deletes the Done line (the events stay
  * in the database; the timeline hides what was undone at once, and the drain
  * drops the approval from an email still waiting, since its item names that
@@ -833,9 +834,10 @@ export function approvalEmailRefusal(rows: readonly ApprovalEmail[]): string | n
  * Staff only, and only the partner who approved, within APPROVAL_UNDO_MS:
  * the toast stays up while hovered or focused, so the server keeps the
  * limit. Refused, with who moved it, when the task is no longer Done or the
- * approval is not the latest status line, and once the approval's email is
- * sent or on its way (approvalEmailRefusal): by then Zack has been told, or
- * may be, and the status menu is the honest way back. A row the drain closed
+ * approval is not the latest status line, and, for an approval from before
+ * approvals stopped emailing, once its email is sent or on its way
+ * (approvalEmailRefusal): by then Zack has been told, or may be, and the
+ * status menu is the honest way back. A row the drain closed
  * without sending doesn't stop it. A retry of an Undo that already went
  * through is a quiet success. Lock order: this task, then its contractor's
  * Contact (FOR SHARE: one archived since the approval doesn't get the job
