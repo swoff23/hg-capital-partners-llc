@@ -90,10 +90,12 @@ export function replyAddress(token: string, from: string): string {
 /**
  * The job a reply's thread names, when it came to the plain address instead
  * (a mail app that ignored Reply-To): our emails carry `References:
- * <job-<taskId>-<date>@…>` (content.ts threadKey), which a reply keeps.
+ * <job-<taskId>@…>` (content.ts threadKey), which a reply keeps. Emails sent
+ * before Nov 15 carried `<job-<taskId>-<date>@…>`, so a reply to one of
+ * those still finds its job. The off email's `-off` id never matches.
  */
 export function threadTaskId(references: string | null | undefined): string | null {
-  const m = /<job-([A-Za-z0-9]{1,64})-(?:\d{4}-\d{2}-\d{2}|none)@/.exec(references ?? "");
+  const m = /<job-([A-Za-z0-9]{1,64})(?:-(?:\d{4}-\d{2}-\d{2}|none))?@/.exec(references ?? "");
   return m ? m[1] : null;
 }
 

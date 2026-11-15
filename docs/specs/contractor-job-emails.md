@@ -21,7 +21,7 @@ Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi 
 | # | Decision |
 |---|---|
 | 1 | Sender name "HG Capital Partners" |
-| 2 | Subject: "Due" and the date first, then the job, street and unit. Always "Due", never "Visit" (Connor's call) |
+| 2 | Subject: a word for what the email is (New, Update, Done, Due today, Due yesterday, Removed, Error), then the job, street and unit. Only New carries the due date. Never "Visit" (Connor's call, Nov 15, replacing "Due" and the date on every email, which read wrong on a finished job) |
 | 3 | A hidden preview line says the change |
 | 4 | What changed leads, in its own "What's new" section (Connor's call) |
 | 5 | The whole job is in the email |
@@ -29,7 +29,7 @@ Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi 
 | 7 | Access sits behind "Show access" (superseded in part by Q3 B: no password) |
 | 8 | Buttons for the next step |
 | 9 | Buttons open the job with no sign-in |
-| 10 | The date stays in the subject, so a date change starts a new thread (Connor's call, over the recommended one thread per job) |
+| 10 | The date leaves the subject (New aside), so a date move no longer starts a new thread (Connor's call, Nov 15, reversing his Nov 14 call to keep it there) |
 | 11 | Reply by email |
 | Q1 | Contractors get both: one-tap buttons and reply by email |
 | Q3 | B: a button opens that one job with access (lockbox and tenant), no password, until the job closes or they lose access. Contractors forward to their crews a lot (Connor's call, over A) |
@@ -45,8 +45,8 @@ Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi 
 
 **Small defaults chosen while writing this, not asked.** Say so if any is wrong.
 
-- A job with no due date: the subject is just the job, street and unit, and no 8 am emails go.
-- "Taken off a job" and "canceled" emails start their subject with "Off this job:", not "Due". A "Due" date on a job they're no longer doing would send them there.
+- A job with no due date: a New email's subject is `New:` and the job, and no 8 am emails go.
+- "Taken off a job" and "canceled" emails start their subject with "Removed:" (Nov 15; it was "Off this job:"), never a date, which would send them there.
 - Emails never say "visit". The job page still labels a Scheduled job's date "Visit date"; renaming that is a follow-up (section 11).
 - 8 am emails go only for jobs still open (not In review, Done or Canceled). "Once" is once per due date: if the date moves and the new one passes, one more nudge goes.
 - The overdue nudge offers Mark done and Change date, not "reply with a new date", since contractors can now set it.
@@ -59,9 +59,21 @@ Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi 
 ### 2.1 Inbox row
 
 - **From:** HG Capital Partners.
-- **Subject:** `Due Mon, Nov 23: Replace kitchen faucet, 118 Congress St · Rear`. The street is `shortAddress`, the unit is `unitLabel`, as My jobs shows them (`job-view.ts` `addressLine`). No date: `Replace kitchen faucet, 118 Congress St · Rear`. Taken off or canceled: `Off this job: Replace kitchen faucet, 118 Congress St · Rear`.
+- **Subject (revised Nov 15, Connor's call):** a word for what the email is, then the job, street and unit. The street is `shortAddress`, the unit is `unitLabel`, as My jobs shows them (`job-view.ts` `addressLine`).
+
+  | Email | Subject |
+  |---|---|
+  | Assigned, or a repeat's next copy | `New, due Friday: Replace kitchen faucet, 118 Congress St · Rear`. The date is written the brand's way (brand guidelines section 3, `dates.ts` `dueLabel`, from Buffalo's today when it's sent): `today`, `tomorrow`, the weekday within six days, then `Nov 23`, with the year only when it isn't this one, and a past date as the real date. No date: `New: Replace kitchen faucet, 118 Congress St · Rear` |
+  | Comment or files, notes, date moved or cleared, scheduled, sent back, any other status change | `Update: Replace kitchen faucet, 118 Congress St · Rear` |
+  | The job is Done when it goes (approved, or a partner closed it) | `Done: Replace kitchen faucet, 118 Congress St · Rear` |
+  | 8 am on the date | `Due today: Replace kitchen faucet, 118 Congress St · Rear` |
+  | 8 am the morning after | `Due yesterday: Replace kitchen faucet, 118 Congress St · Rear` |
+  | Taken off, or canceled | `Removed: Replace kitchen faucet, 118 Congress St · Rear` |
+  | Photos or a video from an email reply didn't post (section 5) | `Error: Replace kitchen faucet, 118 Congress St · Rear` |
+
+  An email carrying several changes takes the first word that applies: Removed, Done, New, Due today or Due yesterday, then Update. Done leads New so a job handed over and closed inside one bundle never reads as new work. Only New carries the date: a date move shows in the preview line and the job's Due row. A job reopened after Done goes back to Update.
 - **Preview line:** the What's new headline, then one useful fact. "Connor moved the due date. 2 photos from Connor." Hidden text at the top of the body, padded so Gmail doesn't pull the letterhead in after it.
-- **Threading:** each email points `In-Reply-To` and `References` at one id per job and date (`content.ts` `threadKey`, written by `resend.ts`), so mail apps keep one thread per job per date. Gmail splits when the subject changes, which is the date moving (Q10).
+- **Threading (revised Nov 15):** each email points `In-Reply-To` and `References` at one id per job (`content.ts` `threadKey`, written by `resend.ts`), so Apple Mail and Outlook keep all of a job's emails in one thread. Gmail also needs the subject to match, so it groups them by word: a job's Updates stay together, even across a date move, and New, Done and Removed each start their own. The id used to carry the date (`job-<id>-<date>`); the reply match (`inbound.ts` `threadTaskId`) takes both forms, so a reply to an older email still finds its job.
 
 ### 2.2 Body, top to bottom (Q8 A)
 
@@ -152,7 +164,7 @@ The taken-off email carries only the job's title and address: no access, notes, 
 | Says "done" | A comment only. A reply never changes status |
 | Clutter | Quoted email, "Sent from my iPhone" and signatures are cut. Out-of-office and empty replies are ignored |
 
-**How it's built.** Each job email carries a REPLY link (`JobLink` kind `REPLY`) as its reply address; it lets a reply post to that job as the person the email went to and never opens the job. The webhook (`src/app/api/email/inbound/route.ts`) checks Resend's Svix signature with `RESEND_WEBHOOK_SECRET`, then `src/lib/email/replies.ts` fetches the email and its files from Resend and posts them (`core.addComment`, once per email by its id). Rule 2's sender shows as a last line, "From mike@gmail.com", which everyone on the job sees. Files that post: the portal's photos and videos, and the staff side's documents too (PDFs, an invoice), within each kind's size cap; a signature's small inline logo is left out. Files sent by email have no thumbnail (the server can't make one), so the app shows the full picture. A reply to plain `jobs@` is matched by its thread only when the sender's domain passes DMARC, since a From line and a References header can be forged. Gmail and Outlook publish no enforcing DMARC policy, so their users' replies match only through the r+ address (which their apps use); one that ignores Reply-To is dropped. More than 50 files in one reply: the first 50 post and the contractor gets a note to add the rest on the job.
+**How it's built.** Each job email carries a REPLY link (`JobLink` kind `REPLY`) as its reply address; it lets a reply post to that job as the person the email went to and never opens the job. The webhook (`src/app/api/email/inbound/route.ts`) checks Resend's Svix signature with `RESEND_WEBHOOK_SECRET`, then `src/lib/email/replies.ts` fetches the email and its files from Resend and posts them (`core.addComment`, once per email by its id). Rule 2's sender shows as a last line, "From mike@gmail.com", which everyone on the job sees. Files that post: the portal's photos and videos, and the staff side's documents too (PDFs, an invoice), within each kind's size cap; a signature's small inline logo is left out. Files sent by email have no thumbnail (the server can't make one), so the app shows the full picture. A reply to plain `jobs@` is matched by its thread only when the sender's domain passes DMARC, since a From line and a References header can be forged. Gmail and Outlook publish no enforcing DMARC policy, so their users' replies match only through the r+ address (which their apps use); one that ignores Reply-To is dropped. More than 50 files in one reply: the first 50 post and the contractor gets a note to add the rest on the job. That note, and the one for a video too big to post, has the subject `Error:` and the job, street and unit (2.1), so a contractor with several jobs knows which one.
 
 **Staff replies (Q9).** A reply to Connor or Pieter's copy posts as their Shared comment, addressed to the contractor, who gets it by email as any staff comment today. Their copy's footer says so: "Reply to answer Zack."
 
@@ -188,12 +200,12 @@ The 8 am emails run from a cron. Vercel's schedules are UTC, so it runs at 12:00
 - **The notice:** the job page's "what changed since you last looked" notice leaves out the contractor's own changes, so their new date isn't news to them.
 - **What it writes:** the job's due date. On a job that is Scheduled, the scheduled day too, so the two can't disagree. Earlier or later than before, no approval.
 - **Staff email:** "Zack moved the due date to Mon, Nov 23 (was Thu, Nov 19)."
-- **Effect:** the contractor's next subject, 8 am email and nudge follow the new date.
+- **Effect:** the job's Due row, the 8 am email and the nudge follow the new date.
 - **Asana sync:** until cutover, the daily sync holds back a task edited in the app, so a contractor's date isn't overwritten. The build checks that a contractor's edit counts.
 
 ## 8. Connor and Pieter's copy (Q9 A)
 
-Same shell, subject and threading as section 2, sent to both partners as today.
+Same shell, subject and threading as section 2, sent to both partners as today. Partners only get the contractor's changes, so their subjects read `Update:` (Nov 15).
 
 - **What's new:** the contractor's lines, with their photos as larger thumbnails (up to four, then "+N").
 - **Buttons:** In review: Approve (primary) and Send back. Otherwise: Open task. Send back opens the task page with its sheet up (`?do=send-back`). Approve opens the task page as it is, with the Review banner's Approve at the top: Approve acts on one tap, so a link never presses it. Staff links use the staff sign-in, not job links.
@@ -237,6 +249,7 @@ Sections 2 to 4 and 6 to 8 need none of this. Reply by email waits on 2 and 3.
 - Once the tenant spec ships (docs/specs/tenant-contact.md), Show access shows the tenant too.
 - A weekly "your jobs this week" email.
 - A "Send invoice" button on approved jobs, once contractor invoices exist (docs/contractor-invoices-plan.md).
+- Partners' subjects: a job waiting on their review reads `Update:` like any other, so it doesn't stand out in the inbox. A word of its own for that, or keep.
 
 ## 12. Build order
 
