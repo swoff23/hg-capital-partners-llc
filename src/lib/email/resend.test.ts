@@ -34,8 +34,8 @@ test("a bare EMAIL_FROM gets the company's name; one that names itself is kept",
 });
 
 test("a thread key points every email for a job at one parent on the sending domain", () => {
-  const body = resendBody({ from: "HG <jobs@mail.hg.com>", replyTo: null }, { to: "x@y.z", subject: "s", text: "t", threadKey: "job-t1-2026-10-30" });
-  assert.deepEqual(body.headers, { "In-Reply-To": "<job-t1-2026-10-30@mail.hg.com>", References: "<job-t1-2026-10-30@mail.hg.com>" });
+  const body = resendBody({ from: "HG <jobs@mail.hg.com>", replyTo: null }, { to: "x@y.z", subject: "s", text: "t", threadKey: "job-t1" });
+  assert.deepEqual(body.headers, { "In-Reply-To": "<job-t1@mail.hg.com>", References: "<job-t1@mail.hg.com>" });
   assert.equal("headers" in resendBody({ from: "jobs@mail.hg.com", replyTo: null }, { to: "x@y.z", subject: "s", text: "t" }), false);
 });
 

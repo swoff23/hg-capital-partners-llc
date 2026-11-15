@@ -9,6 +9,7 @@ import { getEnv, type EmailEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { jobLinkUrl } from "@/lib/portal/job-link-paths";
 import { mintJobLink, resolveJobLink } from "@/lib/portal/job-links";
+import { jobSubject, jobWhere } from "@/lib/notifications/content";
 import { isActiveStatus } from "@/lib/task-scope";
 import * as core from "@/lib/tasks/core";
 import { renderPlainEmail } from "./render";
@@ -167,7 +168,7 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
   // Rule 6: nothing written and nothing attached (a "From x" line alone is not a reply).
   if (!written && files.length === 0) return { outcome: "ignored", reason: "empty" };
 
-  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { title: true, status: true } });
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { title: true, status: true, unitLabel: true, property: { select: { address: true } } } });
   if (!task) return { outcome: "ignored", reason: "no job" };
   if (p.kind === "contractor") {
     try {
@@ -217,6 +218,8 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
       taskId,
       contactId: p.contactId,
       to: who.loginEmail,
+      // Names the job, so a contractor with several knows which one (docs/specs/contractor-job-emails.md 2.1).
+      subject: jobSubject({ word: "Error", title: task.title, where: jobWhere(task.property?.address ?? null, task.unitLabel) }),
       line: tooMany
         ? `Only ${MAX_FILES_PER_POST} photos fit in one reply. Add the rest on the job.`
         : "Your video was too big for email. Add it on the job.",
@@ -263,7 +266,7 @@ async function forwardToPartners(
 }
 
 /** A file that didn't come through (too big, sent as a link, or past the 50 a post takes), with Add photos through a fresh job link. */
-async function tellTooBig(appUrl: string, input: { emailId: string; taskId: string; contactId: string; to: string; line: string }): Promise<void> {
+async function tellTooBig(appUrl: string, input: { emailId: string; taskId: string; contactId: string; to: string; subject: string; line: string }): Promise<void> {
   const token = await mintJobLink(prisma, { taskId: input.taskId, kind: "EMAIL", contactId: input.contactId });
   const rendered = renderPlainEmail({
     line: input.line,
@@ -272,7 +275,7 @@ async function tellTooBig(appUrl: string, input: { emailId: string; taskId: stri
   });
   const res = await sendEmail({
     to: input.to,
-    subject: input.line.startsWith("Only") ? "Some of your photos didn't come through" : "Your video didn't come through",
+    subject: input.subject,
     text: rendered.text,
     html: rendered.html,
     idempotencyKey: `reply-too-big/${input.emailId}`,

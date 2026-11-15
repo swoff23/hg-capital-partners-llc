@@ -1,5 +1,5 @@
 import type { TaskStatus } from "@prisma/client";
-import { HG_TIME_ZONE, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { HG_TIME_ZONE, dueLabel, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
@@ -404,19 +404,46 @@ export function previewText(headline: string, lines: readonly string[]): string 
 }
 
 /**
- * The subject every email about a job carries (Connor, Nov 14: the date
- * first, always "Due"): "Due Mon, Nov 23: Replace kitchen faucet, 118
- * Congress St · Rear". No date, just the job. It doesn't change with the kind
- * of change, so each job keeps one thread per date (threadKey).
+ * A job's street and unit as My jobs shows them (job-view.ts addressLine), so an email names the same unit whose
+ * lockbox code the job page shows (D21): "118 Congress St · Rear".
  */
-export function jobSubject(input: { title: string; where: string; due: string | null }): string {
-  const what = [oneLine(input.title) || "A job", input.where].filter(Boolean).join(", ");
-  return input.due ? `Due ${input.due}: ${what}` : what;
+export function jobWhere(address: string | null, unitLabel?: string | null): string {
+  const street = address ? shortAddress(address) || oneLine(address) : "";
+  return addressLine(street || null, unitLabel ? oneLine(unitLabel) : null);
 }
 
-/** What threads one job's emails under one subject: the job and the date in it (resend.ts makes it a header). */
-export function threadKey(taskId: string, dueYmd: string | null): string {
-  return `job-${taskId}-${dueYmd ?? "none"}`;
+/**
+ * A job email's subject: a word for what the email is, then the job, street
+ * and unit (docs/specs/contractor-job-emails.md 2.1): "Update: Replace
+ * kitchen faucet, 118 Congress St · Rear".
+ */
+export function jobSubject(input: { word: string; title: string; where: string }): string {
+  const what = [oneLine(input.title) || "A job", input.where].filter(Boolean).join(", ");
+  return `${input.word}: ${what}`;
+}
+
+/**
+ * The subject's word (Connor, Nov 15: "Due" on every email read wrong once a
+ * job was done). The first that applies: Done while the job is Done when it
+ * goes, New for an email that hands them the job, with its due date written
+ * the brand's way ("New, due Friday", dates.ts dueLabel), Due today or Due
+ * yesterday for the 8 am lines, then Update. Removed is offEmail's, and Error
+ * is the reply path's (replies.ts).
+ */
+export function subjectWord(input: { items: readonly OutboxItem[]; status: TaskStatus; due: Ymd | null; today: Ymd }): string {
+  if (input.status === "DONE") return "Done";
+  if (input.items.some((i) => i.kind === "ASSIGNED")) return input.due ? `New, due ${dueLabel(input.due, input.today)}` : "New";
+  if (input.items.some((i) => i.kind === "DUE_TODAY")) return "Due today";
+  if (input.items.some((i) => i.kind === "OVERDUE")) return "Due yesterday";
+  return "Update";
+}
+
+/**
+ * What threads one job's emails (resend.ts makes it a header): one id per job, so a date move no longer splits the
+ * thread. Emails sent before Nov 15 carry `job-<id>-<date>`; inbound.ts threadTaskId reads both.
+ */
+export function threadKey(taskId: string): string {
+  return `job-${taskId}`;
 }
 
 /** Directions to the building, the job page's target (job-details.tsx AddressActions). */
@@ -610,10 +637,9 @@ function footnoteFor(input: {
  * there), no access, notes, photos or buttons: the job isn't theirs now.
  */
 export function offEmail(title: string, where: string, taskId: string): TaskEmail {
-  const what = [oneLine(title) || "A job", where].filter(Boolean).join(", ");
   const headline = "You're off this job. No need to go.";
   return {
-    subject: `Off this job: ${what}`,
+    subject: jobSubject({ word: "Removed", title, where }),
     preview: headline,
     headline,
     lines: [],
@@ -642,13 +668,13 @@ export function offEmail(title: string, where: string, taskId: string): TaskEmai
 }
 
 /**
- * One email about a job (docs/specs/contractor-job-emails.md): the Due
- * subject, the preview line, What's new, the next step's buttons and the job.
+ * One email about a job (docs/specs/contractor-job-emails.md): the subject
+ * (subjectWord), the preview line, What's new, the next step's buttons and
+ * the job.
  *
- * The job names its street and unit as My jobs does (job-view.ts
- * addressLine), so the email names the same unit whose lockbox code the job
- * page shows (D21). A contractor's email carries the notes and checklist; a
- * partner's names the contractor and the checklist's progress.
+ * The job names its street and unit as My jobs does (jobWhere). A
+ * contractor's email carries the notes and checklist; a partner's names the
+ * contractor and the checklist's progress.
  *
  * A contractor's email ends on the reply line while the job is still open: a
  * closed job's page is read-only and core.ts addComment refuses a
@@ -690,8 +716,7 @@ export function taskEmail(input: {
   /** The email has its own reply address (replies post to the job, section 5): the footer says what a reply does. */
   replyByEmail?: boolean;
 }): TaskEmail {
-  const street = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
-  const where = addressLine(street || null, input.unitLabel ? oneLine(input.unitLabel) : null);
+  const where = jobWhere(input.address, input.unitLabel);
   const contractor = input.audience === "contractor";
   const approved = contractor && endsApproved(input.items);
   const thanksTo = greetingName(input.recipientName);
@@ -710,7 +735,7 @@ export function taskEmail(input: {
   const fresh = showPhotos ? photoStrip(input.newPhotoIds ?? [], input.appUrl, token, photoHref) : none;
   const older = contractor && showPhotos ? photoStrip(input.jobPhotoIds ?? [], input.appUrl, token, photoHref, JOB_PHOTO_MAX) : none;
   return {
-    subject: jobSubject({ title: input.title, where, due }),
+    subject: jobSubject({ word: subjectWord({ items: input.items, status: input.status, due: input.due ?? null, today: input.today }), title: input.title, where }),
     preview: previewText(headline, lines),
     headline,
     lines,
@@ -735,7 +760,7 @@ export function taskEmail(input: {
       morePhotos: older.morePhotos,
     },
     ...footnoteFor(input),
-    threadKey: threadKey(input.taskId, input.due ?? null),
+    threadKey: threadKey(input.taskId),
   };
 }
 
