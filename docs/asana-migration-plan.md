@@ -94,7 +94,7 @@ Sources: the Asana CSV export, the live Asana API (read-only), a code audit, abo
 ### Defaults I filled in (confirm or correct)
 
 1. **Unassigned tasks** (e.g. move-in form submissions) show in an "Unassigned" section at the top of both partners' Mine column.
-2. **Forgot password** applies to contractor accounts only. Staff logins stay managed by hand, as today.
+2. **Forgot password** applies to contractor accounts only. Staff logins stay managed by hand, as today. *Changed Nov 16, 2026: staff logins use Forgot password too ([specs/staff-password-reset.md](specs/staff-password-reset.md)).*
 3. Either partner can Approve or Send back any contractor job.
 4. Contractors see Shared files, and new contractor uploads are Shared. Staff uploads follow the comment default (Shared on a contractor's job).
 5. If the free email cap is hit, the app logs it and shows staff a banner on that day's Today.

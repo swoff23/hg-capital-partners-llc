@@ -1,6 +1,6 @@
 # Staff password reset
 
-Planned with Connor on Nov 16, 2026. He asked for Forgot password to work for staff logins too and took the defaults below. It waits for his "build it".
+Planned with Connor on Nov 16, 2026. He asked for Forgot password to work for staff logins too and took the defaults below. He said "build it" the same day, and it's built.
 
 ## 1. Summary
 

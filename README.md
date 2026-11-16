@@ -99,11 +99,14 @@ npm run dev                   # http://localhost:3000
 run `npm run migrate users`, set that person's `*_PASSWORD` env var in Vercel,
 redeploy once (the build hashes it into the DB, then the var can be removed).
 
-**Change a password** — passwords live in the DB. Set a new value in the
-matching `*_PASSWORD` var, clear the user's `passwordHash` (Supabase SQL editor
-or Prisma Studio), redeploy. Locally, just change the var in `.env` and run
-`npm run db:dev-passwords` — it overwrites the local hash and refuses to run
-against a non-localhost `DATABASE_URL`.
+**Change a password** — use "Forgot password" on the sign-in page. It emails
+a link that works once, for 30 minutes, and saving the new password signs that
+person out on every device (docs/specs/staff-password-reset.md). It needs the
+user to have a password already: clearing `passwordHash` turns a staff login
+off, and Forgot password won't set a first one. Locally, either follow the link
+the dev server prints (no Resend key, so the email goes to its console), or
+change the var in `.env` and run `npm run db:dev-passwords`. That overwrites
+the local hash and refuses to run against a non-localhost `DATABASE_URL`.
 
 **Re-run the spreadsheet import** — safe anytime; idempotent on address. It no
 longer touches tasks: those come from the Asana import in `scripts/asana/`

@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
  * action origin check rejects. Nothing here needs that check: the request
  * does nothing without a live, single-use token, and anyone holding one
  * could use it directly. The signed-in contractor, if any, is read only to
- * keep their current session when the link is for their own account.
+ * keep their current session when the link is for their own account. A
+ * partner's reset keeps no session: it signs them out everywhere.
  */
 export async function POST(request: Request): Promise<Response> {
   if (!getEnv().portalEnabled) return new Response("Not found", { status: 404 });

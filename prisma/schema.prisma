@@ -18,15 +18,18 @@ datasource db {
 // Users — 2 trusted internal users (Connor, Pieter). No roles in v1.
 // ---------------------------------------------------------------------------
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
   // scrypt hash, "<saltHex>.<hashHex>" — see src/lib/password.ts. Null means
   // this user can't sign in yet (no roles/self-signup in v1: rows without a
   // hash are provisioned by hand, then backfilled — see
   // scripts/backfill-password-hashes.ts).
-  passwordHash String?
-  createdAt    DateTime @default(now())
+  passwordHash      String?
+  // Set by a "Forgot password" reset. A session cookie issued before it no
+  // longer signs in (src/lib/auth.ts), so a reset signs the user out everywhere.
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
 
   asanaGid String? @unique // Asana user gid, matched once by the import
 
@@ -65,7 +68,9 @@ model User {
   // Missing info (docs/specs/missing-info.md, D3): the checks a partner said don't apply.
   missingInfoSkips            MissingInfoSkip[]    @relation("MissingInfoSkipBy")
 
-  qboConnections QuickbooksConnection[]
+  qboConnections      QuickbooksConnection[]
+  // "Forgot password" links for this partner (docs/specs/staff-password-reset.md).
+  passwordResetTokens PasswordResetToken[]
 }
 
 // ---------------------------------------------------------------------------
@@ -799,16 +804,22 @@ enum JobLinkKind {
   REPLY // a job email's reply address: lets a reply post to the job, never opens it
 }
 
+// A "Forgot password" link, for a contractor login or a staff User
+// (docs/specs/staff-password-reset.md). Exactly one of accountId and userId
+// is set: a CHECK in the migration, since Prisma can't say it.
 model PasswordResetToken {
-  id        String        @id @default(cuid())
-  account   PortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  accountId String
-  tokenHash String        @unique
+  id        String         @id @default(cuid())
+  account   PortalAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String?
+  user      User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?
+  tokenHash String         @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime      @default(now())
+  createdAt DateTime       @default(now())
 
   @@index([accountId])
+  @@index([userId])
 }
 
 enum SecurityEventKind {

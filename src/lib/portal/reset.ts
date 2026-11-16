@@ -11,14 +11,25 @@ import { expireResetTokens, logSecurityEvent, revokePortalSessions } from "./acc
 import { checkNewPassword, looksLikeEmail, normalizeEmail, type PasswordProblem } from "./credentials";
 import { resetRequestAllowed, resetTokenExpiresAt, resetWindowStart } from "./limits";
 import { emailHash } from "./request";
-import { deliverResetEmail, type ResetRequestData } from "./reset-core";
+import {
+  RESET_TOKEN_SELECT,
+  ResetTokenTaken,
+  deliverResetEmail,
+  findResetOwner,
+  resetTokenOwner,
+  saveStaffReset,
+  usableReset,
+  type ResetOwner,
+  type ResetRequestData,
+} from "./reset-core";
 import type { PortalPrincipal } from "./session";
 import { hashToken, isWellFormedToken, newToken } from "./tokens";
 
 /**
  * "Forgot password" for contractor logins (docs/asana-migration-plan.md
- * §5.1). Staff passwords stay managed by hand, so a staff email gets the same
- * answer as an unknown one and nothing is sent.
+ * §5.1) and, since Nov 16, staff logins (docs/specs/staff-password-reset.md).
+ * A staff User with no password gets the same answer as an unknown email and
+ * nothing is sent: clearing a staff password is how that login is turned off.
  *
  * The request looks identical from outside whether or not the email has a
  * login: same redirect, and the email goes out after the response. Limits
@@ -62,36 +73,42 @@ export async function startPasswordReset(rawEmail: string, ipHash: string): Prom
     const byIp = await tx.securityEvent.count({ where: { kind: "PASSWORD_RESET_REQUESTED", createdAt: { gte: since }, ipHash } });
     if (!resetRequestAllowed({ email: byEmail, ip: byIp })) return null;
 
-    const account = await tx.portalAccount.findUnique({
-      where: { email },
-      select: { id: true, contactId: true, status: true, contact: { select: { active: true } } },
-    });
-    const usable = !!account && account.status === "ACTIVE" && account.contact.active;
-    const token = usable ? newToken() : null;
+    const { owner, contactId, userId } = await findResetOwner(tx, email);
+    const token = owner ? newToken() : null;
 
-    if (account && token) {
+    if (owner && token) {
       await tx.passwordResetToken.create({
-        data: { accountId: account.id, tokenHash: hashToken(token), expiresAt: resetTokenExpiresAt(now) },
+        data: { ...resetTokenOwner(owner), tokenHash: hashToken(token), expiresAt: resetTokenExpiresAt(now) },
       });
     }
     // Not sent yet, for every address: the send after the response marks it once the email went (reset-core.ts).
     const data: ResetRequestData = { emailHash: keyed, sent: false };
     const event = await logSecurityEvent(tx, {
       kind: "PASSWORD_RESET_REQUESTED",
-      contactId: account?.contactId ?? null,
+      contactId,
+      userId,
       ipHash,
       data,
     });
-    return token ? { token, eventId: event.id, data } : null;
+    return owner && token ? { token, eventId: event.id, data, kind: owner.kind } : null;
   });
 
   if (request) after(() => sendResetEmail(email, request));
 }
 
-async function sendResetEmail(to: string, request: { token: string; eventId: string; data: ResetRequestData }): Promise<void> {
+/** The email's first line: a contractor's login is for their jobs, a partner's for the whole app. */
+const RESET_LINE: Record<ResetOwner["kind"], string> = {
+  contractor: "Here's your link to choose a new password for HG Capital jobs.",
+  staff: "Here's your link to choose a new password for HG Capital.",
+};
+
+async function sendResetEmail(
+  to: string,
+  request: { token: string; eventId: string; data: ResetRequestData; kind: ResetOwner["kind"] },
+): Promise<void> {
   try {
     const { text, html } = renderPlainEmail({
-      line: "Here's your link to choose a new password for HG Capital jobs.",
+      line: RESET_LINE[request.kind],
       buttonLabel: "Choose a new password",
       buttonUrl: `${getEnv().appUrl}${RESET_PATH}?token=${request.token}`,
       footnote: "The link works for 30 minutes. If you didn't ask for it, you can ignore this email.",
@@ -109,18 +126,8 @@ async function sendResetEmail(to: string, request: { token: string; eventId: str
 
 async function findUsableToken(token: string, now: Date) {
   if (!isWellFormedToken(token)) return null;
-  const row = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash: hashToken(token) },
-    select: {
-      id: true,
-      usedAt: true,
-      expiresAt: true,
-      account: { select: { id: true, email: true, contactId: true, status: true, contact: { select: { active: true } } } },
-    },
-  });
-  if (!row || row.usedAt || row.expiresAt <= now) return null;
-  if (row.account.status !== "ACTIVE" || !row.account.contact.active) return null;
-  return row;
+  const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(token) }, select: RESET_TOKEN_SELECT });
+  return usableReset(row, now);
 }
 
 /** For the reset page's first render: does this link still work? Read-only. */
@@ -130,13 +137,14 @@ export async function resetTokenIsUsable(token: string): Promise<boolean> {
 
 export type ResetProblem = PasswordProblem | "expired";
 
-class TokenAlreadyUsed extends Error {}
-
 /**
  * Set a new password from a reset link. The link is checked before the
  * password so a typo doesn't burn it, then consumed atomically: only one of
- * two racing submissions gets count 1. All sessions are revoked, except the
- * one making the request when it belongs to the same account.
+ * two racing submissions gets count 1.
+ *
+ * A contractor's sessions are all revoked, except the one making the request
+ * when it belongs to the same account. A partner's reset signs them out
+ * everywhere, the browser they reset from included (saveStaffReset).
  */
 export async function finishPasswordReset(
   token: string,
@@ -145,36 +153,40 @@ export async function finishPasswordReset(
   current: PortalPrincipal | null,
 ): Promise<{ ok: true } | { ok: false; error: ResetProblem }> {
   const now = new Date();
-  const row = await findUsableToken(token, now);
-  if (!row) return { ok: false, error: "expired" };
-  const problem = checkNewPassword(next, { confirm, email: row.account.email });
+  const reset = await findUsableToken(token, now);
+  if (!reset) return { ok: false, error: "expired" };
+  const problem = checkNewPassword(next, { confirm, email: reset.email });
   if (problem) return { ok: false, error: problem };
 
   const passwordHash = await hashPassword(next);
-  const keep = current?.accountId === row.account.id ? current.sessionId : undefined;
   try {
-    await prisma.$transaction(async (tx) => {
-      const consumed = await tx.passwordResetToken.updateMany({
-        where: { id: row.id, usedAt: null, expiresAt: { gt: now } },
-        data: { usedAt: now },
+    if (reset.kind === "staff") {
+      await prisma.$transaction((tx) => saveStaffReset(tx, { tokenId: reset.tokenId, userId: reset.userId, passwordHash, now }));
+    } else {
+      const keep = current?.accountId === reset.accountId ? current.sessionId : undefined;
+      await prisma.$transaction(async (tx) => {
+        const consumed = await tx.passwordResetToken.updateMany({
+          where: { id: reset.tokenId, usedAt: null, expiresAt: { gt: now } },
+          data: { usedAt: now },
+        });
+        if (consumed.count !== 1) throw new ResetTokenTaken();
+        await tx.portalAccount.update({
+          where: { id: reset.accountId },
+          data: { passwordHash, mustChangePassword: false, passwordChangedAt: now },
+        });
+        await expireResetTokens(tx, reset.accountId, now);
+        const revoked = await revokePortalSessions(tx, reset.accountId, { except: keep, at: now });
+        await logSecurityEvent(tx, {
+          kind: "PASSWORD_RESET",
+          contactId: reset.contactId,
+          data: { by: "email-link", sessionsRevoked: revoked },
+        });
       });
-      if (consumed.count !== 1) throw new TokenAlreadyUsed();
-      await tx.portalAccount.update({
-        where: { id: row.account.id },
-        data: { passwordHash, mustChangePassword: false, passwordChangedAt: now },
-      });
-      await expireResetTokens(tx, row.account.id, now);
-      const revoked = await revokePortalSessions(tx, row.account.id, { except: keep, at: now });
-      await logSecurityEvent(tx, {
-        kind: "PASSWORD_RESET",
-        contactId: row.account.contactId,
-        data: { by: "email-link", sessionsRevoked: revoked },
-      });
-    });
+    }
   } catch (err) {
-    if (err instanceof TokenAlreadyUsed) return { ok: false, error: "expired" };
+    if (err instanceof ResetTokenTaken) return { ok: false, error: "expired" };
     throw err;
   }
-  loginThrottle.reset(row.account.email);
+  loginThrottle.reset(reset.email);
   return { ok: true };
 }
