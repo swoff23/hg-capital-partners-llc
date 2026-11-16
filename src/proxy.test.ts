@@ -35,6 +35,15 @@ test("/ is unchanged: the public page when signed out, the dashboard with a cook
   assert.equal(passedOn(signedIn, STAFF_PATH_HEADER), "/");
 });
 
+test("a Server Action call to / without a cookie reaches the dashboard, not /welcome", () => {
+  const res = proxy(new NextRequest(`${ORIGIN}/`, { method: "POST", headers: { "next-action": "abc123", [STAFF_PATH_HEADER]: "/deals/spoof" } }));
+  assert.equal(res.headers.get("x-middleware-rewrite"), null);
+  assert.equal(passedOn(res, STAFF_PATH_HEADER), "/");
+  // A plain POST without the header is still the public page.
+  const plain = proxy(new NextRequest(`${ORIGIN}/`, { method: "POST" }));
+  assert.equal(plain.headers.get("x-middleware-rewrite"), `${ORIGIN}/welcome`);
+});
+
 test("the matcher covers every staff section, and nothing else but / and the portal", () => {
   const sections = STAFF_SECTIONS.map((s) => `/${s}/:path*`);
   assert.deepEqual([...config.matcher].sort(), ["/", "/p", "/p/:path*", ...sections].sort());
