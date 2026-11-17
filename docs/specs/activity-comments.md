@@ -412,8 +412,8 @@ Internal turns the box `--muted` and the switch track `--accent`, as today. Tabl
 
 | Situation | Shared | Internal |
 |---|---|---|
-| Contractor assigned, has a login | Zack sees this and gets an email | Lock, Only Connor and Pieter see this |
-| Contractor assigned, never signed in or Job emails off ([contractor-email-switch.md](contractor-email-switch.md)) | Zack won't get an email | Lock, Only Connor and Pieter see this |
+| Contractor assigned, has a login, Job emails on or never signed in | none (Connor, Nov 16: seeing it is the default) | Lock, Only Connor and Pieter see this |
+| Contractor assigned, Job emails off ([contractor-email-switch.md](contractor-email-switch.md)) | Zack won't get an email | Lock, Only Connor and Pieter see this |
 | Contractor assigned, no login | Zack needs a login to see this. Desktop adds a "Set up login" TextLink to his contractor record | same |
 | No contractor (a partner or nobody) | Any contractor you assign sees this | same |
 | Three or more staff | | Lock, Only the HG team sees this |
