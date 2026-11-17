@@ -31,8 +31,16 @@ export function proxy(request: NextRequest) {
   if (pathname !== "/") return withPathHeader(request, STAFF_PATH_HEADER, pathname + search);
 
   // The dashboard: set the header to "/" so one the client sent never reaches requireUser().
-  if (request.cookies.has(SESSION_COOKIE)) return withPathHeader(request, STAFF_PATH_HEADER, "/");
+  // A Server Action call from the dashboard goes there too, cookie or not: /welcome has no
+  // actions, so rewriting it would fail with "Failed to find Server Action". Without a session
+  // the action's own requireUser() sends the caller to /login.
+  if (request.cookies.has(SESSION_COOKIE) || isServerAction(request)) return withPathHeader(request, STAFF_PATH_HEADER, "/");
   return NextResponse.rewrite(new URL("/welcome", request.url));
+}
+
+/** A Server Action call: a POST carrying the Next-Action header with the action's id. */
+function isServerAction(request: NextRequest): boolean {
+  return request.method === "POST" && request.headers.has("next-action");
 }
 
 function withPathHeader(request: NextRequest, name: string, value: string): NextResponse {
