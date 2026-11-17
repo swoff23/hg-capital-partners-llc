@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="660" viewBox="0 0 900 660" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>A property page's new key-date line, its Missing info rows, and the Snooze line on the roll-up pages, at laptop and phone</title>
+<rect width="900" height="660" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Key dates get a line on the property page; roll-up pages get Snooze only</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Property page, laptop 1280 and tablet 768</text>
+<rect x="0" y="22" width="520" height="330" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="54" font-size="18" font-weight="600" fill="#152133">118 Congress St</text>
+
+<rect x="20" y="68" width="480" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<circle cx="35" cy="83" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<text x="48" y="87" font-size="12" fill="#152133">14 missing</text>
+<text x="488" y="87" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Show</text>
+
+<rect x="20" y="104" width="480" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="30" y="113" width="11" height="11" rx="2" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<text x="48" y="123" font-size="12" fill="#152133">Insurance renews Dec 12</text>
+<text x="432" y="123" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Snooze</text>
+<text x="488" y="123" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Dismiss</text>
+
+<rect x="260" y="138" width="200" height="118" rx="8" fill="#ffffff" stroke="#c9c6bf"/>
+<g font-size="12" fill="#152133">
+<text x="274" y="160">Tomorrow</text><text x="448" y="160" text-anchor="end" fill="#8a909b">Nov 17</text>
+<text x="274" y="186">Next week</text><text x="448" y="186" text-anchor="end" fill="#8a909b">Nov 23</text>
+<text x="274" y="212">A week before</text><text x="448" y="212" text-anchor="end" fill="#8a909b">Dec 5</text>
+<line x1="268" y1="223" x2="452" y2="223" stroke="#e7e5e0"/>
+<text x="274" y="244">Pick a date</text>
+</g>
+<text x="20" y="160" font-size="11" fill="#5b6576">A date still ahead caps the snooze</text>
+<text x="20" y="175" font-size="11" fill="#5b6576">a week before it. Next month would</text>
+<text x="20" y="190" font-size="11" fill="#5b6576">pass Dec 12, so it reads "A week</text>
+<text x="20" y="205" font-size="11" fill="#5b6576">before". The calendar stops at Dec 5.</text>
+<text x="20" y="226" font-size="11" fill="#5b6576">Two dates due: "2 dates due:</text>
+<text x="20" y="241" font-size="11" fill="#5b6576">Insurance Dec 12, registration Jan 5".</text>
+
+<text x="20" y="284" font-size="11" font-weight="500" fill="#424e61">A Missing info row's ⋯, under Show and on the Missing info page</text>
+<rect x="20" y="292" width="200" height="50" rx="8" fill="#ffffff" stroke="#c9c6bf"/>
+<g font-size="12" fill="#152133"><text x="34" y="312">Snooze</text><text x="208" y="312" text-anchor="end" fill="#8a909b">›</text><text x="34" y="334">Dismiss</text></g>
+<text x="236" y="312" font-size="11" fill="#5b6576">Doesn't apply becomes Dismiss. Make task</text>
+<text x="236" y="327" font-size="11" fill="#5b6576">and the row's real answer stay as they are.</text>
+</g>
+
+<g transform="translate(32 420)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Roll-up pages, laptop: a line at the top while the Home row shows</text>
+<g font-size="12" fill="#152133">
+<text x="0" y="42" font-size="13" font-weight="600">Portfolio · CapEx</text>
+<rect x="0" y="50" width="520" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="14" y="69">On your Home as $21,000 past due</text>
+<text x="508" y="69" font-size="11" text-anchor="end" text-decoration="underline">Snooze</text>
+<text x="0" y="106" font-size="13" font-weight="600">Missing info</text>
+<rect x="0" y="114" width="520" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="14" y="133">On your Home as 177 to fill in</text>
+<text x="508" y="133" font-size="11" text-anchor="end" text-decoration="underline">Snooze</text>
+<text x="0" y="170" font-size="13" font-weight="600">Financials settings · QuickBooks</text>
+<rect x="0" y="178" width="520" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="14" y="197">On your Home as a stale sync</text>
+<text x="508" y="197" font-size="11" text-anchor="end" text-decoration="underline">Snooze</text>
+</g>
+</g>
+
+<g transform="translate(624 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375</text>
+<rect x="0" y="22" width="244" height="540" rx="20" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="14" y="54" font-size="15" font-weight="600" fill="#152133">118 Congress St</text>
+<rect x="12" y="68" width="220" height="34" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<circle cx="26" cy="85" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<text x="38" y="89" font-size="12" fill="#152133">14 missing</text>
+<text x="224" y="89" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Show</text>
+<rect x="12" y="110" width="220" height="34" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="21" y="121" width="11" height="11" rx="2" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<text x="38" y="131" font-size="11" fill="#152133">Insurance Dec 12</text>
+<text x="170" y="131" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Snooze</text>
+<text x="224" y="131" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Dismiss</text>
+<text x="14" y="170" font-size="11" fill="#5b6576">The date line shortens to the</text>
+<text x="14" y="185" font-size="11" fill="#5b6576">kind and the date.</text>
+
+<text x="14" y="226" font-size="13" font-weight="600" fill="#152133">CapEx</text>
+<rect x="12" y="236" width="220" height="34" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="24" y="257" font-size="12" fill="#152133">On your Home</text>
+<text x="224" y="257" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Snooze</text>
+<text x="14" y="296" font-size="11" fill="#5b6576">Roll-up lines drop the figure</text>
+<text x="14" y="311" font-size="11" fill="#5b6576">on a phone; the Home row</text>
+<text x="14" y="326" font-size="11" fill="#5b6576">already shows it.</text>
+</g>
+</svg>

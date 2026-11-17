@@ -380,6 +380,23 @@ export function pickerChipClass({ size = "row" }: { size?: PickerChipSize } = {}
 export const pickerChip = pickerChipClass();
 
 /**
+ * A picker trigger that reads as the plain value until a mouse is on it: a
+ * cell in a dense list (the Tasks list's Assignee), where a chip on every row
+ * would be noise. With a mouse it takes the chip's --line-strong edge and
+ * --background fill, and holds them while its layer is open; on touch it
+ * stays plain and a tap opens it. Its 1px edge is transparent at rest, so the
+ * caller sizes it and pulls it out by that edge and padding, keeping the
+ * value where the plain text sat.
+ */
+export const pickerGhost = cn(
+  "relative inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap rounded-md border border-transparent text-meta text-muted-foreground",
+  // The hover look shows with a mouse only (hover: is under @media (hover: hover)).
+  "transition-colors hover:border-line-strong hover:bg-background hover:text-foreground",
+  "aria-expanded:border-line-strong aria-expanded:bg-background aria-expanded:text-foreground",
+  "disabled:opacity-50 data-disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
+);
+
+/**
  * A picker's trigger at field height, for a form where pickers share a grid
  * with inputs and selects (New task): the field look, --background on a
  * --input edge, 36px with a mouse and 44 on touch, so the grid is one

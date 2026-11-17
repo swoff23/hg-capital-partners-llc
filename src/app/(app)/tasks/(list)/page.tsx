@@ -39,10 +39,12 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   // A page of rows at a time: the first page, and the footer's Show more asks for another (?show=200).
   const take = taskLimit(sp);
   // The people on offer, the imported names and the buildings start beside the session check; all of it is
-  // awaited together, so nothing is shown without it.
-  const options = assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
-  const [user, { users, contractors, archived }, legacy, properties] = await Promise.all([
-    requireUser(),
+  // awaited together, so nothing is shown without it. The people wait on the session for the viewer's
+  // Recent picks, which the rows' Assignee pickers list first.
+  const session = requireUser();
+  const options = session.then((u) => assigneeOptions(filters.owner.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)), u.id));
+  const [user, { users, contractors, archived, recent }, legacy, properties] = await Promise.all([
+    session,
     options,
     // Imported names that are a person on offer count for that person; the rest list once as "Others".
     legacyAssignees(options.then((o) => personRefs(o.users, o.contractors, o.archived))),
@@ -113,7 +115,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
           </div>
         ) : (
           <div className="mt-4">
-            <TaskListProvider tasks={tasks} today={todayYmdEastern()}>
+            {/* With the people, each row's Assignee cell reassigns it in place (assignee-cell.tsx). */}
+            <TaskListProvider tasks={tasks} today={todayYmdEastern()} people={{ users, contractors, meId: user.id, recent }}>
               {scopedProperty ? (
                 <Section
                   title={<TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>}

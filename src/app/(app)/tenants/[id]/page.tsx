@@ -48,6 +48,9 @@ export default async function LeasePage({ params }: { params: Promise<{ id: stri
     endsOn: toYmd(t.endsOn),
     rent: Number(t.rent),
     subsidy: t.subsidy ? Number(t.subsidy) : null,
+    subsidyFrom: t.subsidyFrom,
+    subsidyContact: t.subsidyContact,
+    subsidyEmail: t.subsidyEmail,
     file: t.file ? { id: t.file.id, filename: t.file.filename } : null,
   }));
   const last = lease.terms[0];
