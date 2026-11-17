@@ -538,7 +538,7 @@ export interface JobFacts {
   contractor: string | null;
   /** Staff only: "2 of 3 done". */
   checklistLine: string | null;
-  /** Contractor only, with a job link: "Show access", which opens the job at its Lockbox. Null when it has no code. */
+  /** Contractor only, with a job link: "Show access", which opens the job at its Tenants or Lockbox. Null when it shows neither. */
   accessUrl: string | null;
   /** Contractor only, with a job link and a date: the .ics for Add to calendar. */
   calendarUrl: string | null;
@@ -753,7 +753,7 @@ export function taskEmail(input: {
   staffNames?: readonly string[];
   /** The email's own link (job-links.ts): a contractor's EMAIL link, a partner's STAFF link. Null sends plain links. */
   linkToken?: string | null;
-  /** Contractor: the job has a lockbox code to show (never the code itself). */
+  /** Contractor: the job page shows the tenants or a lockbox code (never either one itself). */
   hasAccess?: boolean;
   /** The photos the bundle's updates carry, oldest first, as attachment ids the recipient may see. */
   newPhotoIds?: readonly string[];

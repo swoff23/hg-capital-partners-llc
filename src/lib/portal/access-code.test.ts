@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CODE_MASK, lockboxMasker, maskCodes, pickLockboxCode, readLockboxCode, pickLockboxAccess } from "./access-code";
+import { CODE_MASK, lockboxMasker, maskCodes, pickLockboxCode, readJobAccess, readLockboxCode, pickLockboxAccess } from "./access-code";
 
 const duplex = [
   { label: "Lower", lockboxCode: "1924 (back entrance)" },
@@ -154,4 +154,65 @@ test("pickLockboxAccess: no unit and one shared code takes the first location an
 test("pickLockboxAccess: a photo without a usable pathname is none", () => {
   const units = [{ label: "Lower", lockboxCode: "1924", lockboxPhoto: { pathname: "" } }];
   assert.deepEqual(pickLockboxAccess(units, "Lower"), { code: "1924", location: null, photo: null });
+});
+
+// ---------------------------------------------------------------------------
+// readJobAccess (docs/specs/tenant-contact.md section 7, tenants.md section 8)
+// ---------------------------------------------------------------------------
+
+const homes = [
+  { id: "f", label: "Front", lockboxCode: "2374", lockboxLocation: "By the side door" },
+  { id: "r", label: "Rear", lockboxCode: "4857" },
+];
+const person = (fullName: string, phone: string | null = null) => ({ tenant: { fullName, phone, phoneE164: phone ? `+1${phone.replace(/\D/g, "")}` : null } });
+const leaseRows = [
+  { unitId: "f", movesIn: new Date("2025-06-01"), movesOut: null, tenants: [person("Dana Lee", "716-555-0142"), person("Sam Ortiz")] },
+  { unitId: "f", movesIn: new Date("2024-01-01"), movesOut: new Date("2025-05-31"), tenants: [person("Past Person", "716-555-0000")] },
+  { unitId: "f", movesIn: new Date("2027-02-01"), movesOut: null, tenants: [person("Next Person", "716-555-0001")] },
+];
+
+function fakeDb(seen: unknown[] = []) {
+  return {
+    property: { findUnique: async () => ({ units: homes }) },
+    lease: {
+      findMany: async (args: { where: { unitId: string | null } }) => {
+        seen.push(args.where);
+        return leaseRows.filter((l) => l.unitId === args.where.unitId);
+      },
+    },
+  } as unknown as Parameters<typeof readJobAccess>[0];
+}
+
+const NOW = new Date("2026-11-17T17:00:00Z");
+
+test("readJobAccess: an occupied home shows the household living there today, and no lockbox without permission", async () => {
+  const seen: unknown[] = [];
+  const got = await readJobAccess(fakeDb(seen), { propertyId: "p1", unitLabel: "front", entryPermittedAt: null }, NOW);
+  assert.deepEqual(got.tenants, [
+    { name: "Dana Lee", phone: "716-555-0142", dial: "+17165550142" },
+    { name: "Sam Ortiz", phone: null, dial: null },
+  ]);
+  assert.equal(got.permitted, false);
+  assert.equal(got.lockbox, null);
+  assert.deepEqual(seen, [{ propertyId: "p1", unitId: "f" }], "one unit's leases, by its id");
+});
+
+test("readJobAccess: permission adds the lockbox, with its location", async () => {
+  const got = await readJobAccess(fakeDb(), { propertyId: "p1", unitLabel: "Front", entryPermittedAt: NOW }, NOW);
+  assert.equal(got.permitted, true);
+  assert.deepEqual(got.lockbox, { code: "2374", location: "By the side door", photo: null });
+});
+
+test("readJobAccess: a vacant unit shows the lockbox and no tenants", async () => {
+  const got = await readJobAccess(fakeDb(), { propertyId: "p1", unitLabel: "Rear", entryPermittedAt: null }, NOW);
+  assert.deepEqual(got.tenants, []);
+  assert.equal(got.lockbox?.code, "4857");
+});
+
+test("readJobAccess: no unit on a building names no household, and no property shows nothing", async () => {
+  const seen: unknown[] = [];
+  const got = await readJobAccess(fakeDb(seen), { propertyId: "p1", unitLabel: null, entryPermittedAt: null }, NOW);
+  assert.deepEqual(got.tenants, []);
+  assert.deepEqual(seen, [], "no lease read at all");
+  assert.deepEqual(await readJobAccess(fakeDb(), { propertyId: null, unitLabel: "Front", entryPermittedAt: NOW }, NOW), { tenants: [], permitted: false, lockbox: null });
 });

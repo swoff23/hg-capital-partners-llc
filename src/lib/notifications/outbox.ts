@@ -7,7 +7,7 @@ import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { SEEABLE_FILE, contractorMaySee } from "@/lib/attachments/access";
-import { CODE_MASK, lockboxMasker, readLockboxCode } from "@/lib/portal/access-code";
+import { CODE_MASK, lockboxMasker, readJobAccess } from "@/lib/portal/access-code";
 import { mintJobLink } from "@/lib/portal/job-links";
 import { staffFirstNames } from "@/lib/portal/queries";
 import { targetDate } from "@/lib/tasks/rules";
@@ -214,6 +214,8 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
           scheduledFor: true,
           description: true,
           propertyId: true,
+          // Permission to enter decides whether the lockbox shows at an occupied home (tenants.md section 8).
+          entryPermittedAt: true,
           checklist: { select: { title: true, done: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
           assigneeContact: { select: { fullName: true } },
           property: { select: { address: true, photoUrl: true } },
@@ -311,7 +313,9 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       : row.recipientUserId && newPhotoIds.length
         ? await mintJobLink(prisma, { taskId: row.taskId, kind: "STAFF", userId: row.recipientUserId })
         : null;
-    const hasAccess = !!contractorId && !!(await readLockboxCode(prisma, task.propertyId, task.unitLabel));
+    // "Show access" when the job page would show the tenants or the lockbox (docs/specs/tenant-contact.md section 3).
+    const access = contractorId ? await readJobAccess(prisma, task) : null;
+    const hasAccess = !!access && (!!access.lockbox || access.tenants.length > 0);
     // Its own reply address, while replies by email are on (section 5): a reply posts to this job as this recipient.
     const replyConfig = getEnv().email;
     const replyWho = row.recipientContactId ? { contactId: row.recipientContactId } : row.recipientUserId ? { userId: row.recipientUserId } : null;

@@ -17,7 +17,8 @@ export function jobLinkStep(value: string | null | undefined): JobLinkStep | nul
  *  - done, share and date: `?do=` asks the page to open the Mark done sheet,
  *    the crew text or the date (it opens nothing the job can't take, and asks
  *    before acting);
- *  - access: `#lockbox`, the Lockbox section;
+ *  - access: `#access`, which the page takes to Tenants, or to Lockbox when
+ *    nobody lives there (hash-scroll.tsx);
  *  - photos: `#updates`, the Updates section with the composer;
  *  - no step: `#update-<id>` for the update the email opens at.
  * Ids are checked so nothing from the link's query reaches the path unescaped.
@@ -26,7 +27,7 @@ export function jobLinkDestination(taskId: string, step: string | null, updateId
   const s = jobLinkStep(step);
   const page = `/p/jobs/${encodeURIComponent(taskId)}`;
   if (s === "done" || s === "share" || s === "date") return `${page}?do=${s}`;
-  if (s === "access") return `${page}#lockbox`;
+  if (s === "access") return `${page}#access`;
   if (s === "photos") return `${page}#updates`;
   return updateId && /^[A-Za-z0-9_-]{1,64}$/.test(updateId) ? `${page}#update-${updateId}` : page;
 }

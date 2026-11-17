@@ -1,14 +1,16 @@
 "use client";
 import { useOptimistic, useState, useTransition } from "react";
-import { Check, Copy, MapPin, Navigation } from "lucide-react";
+import { Check, Copy, MapPin, MessageSquareText, Navigation, Phone } from "lucide-react";
 import { Code } from "@/components/code";
 import type { MediaItem } from "@/components/lightbox";
 import { LazyLightbox } from "@/components/lightbox-lazy";
 import { Meter } from "@/components/meter";
 import { useToast } from "@/components/toast";
-import { Button, Checkbox, LinkButton, Section } from "@/components/ui";
+import { Button, Checkbox, LinkButton, Section, buttonClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
-import type { JobLockbox } from "@/lib/portal/queries";
+import { telHref, textHref } from "@/lib/contacts";
+import type { JobLockbox, JobTenants } from "@/lib/portal/queries";
+import { firstName } from "@/lib/portal/job-view";
 import { cn } from "@/lib/utils";
 import { setChecklistItemAction } from "../actions";
 
@@ -72,7 +74,47 @@ export function AddressActions({ address }: { address: string }) {
  * the code's own rule. No photo, or one whose file won't load, shows no tile
  * at all (Connor, Nov 15): the contractor never meets an empty box.
  */
-export function LockboxSection({ taskId, lockbox }: { taskId: string; lockbox: JobLockbox }) {
+/**
+ * Who lives there (docs/specs/tenant-contact.md section 3, Q26): one row per
+ * person, the name over the number, with Call and Text on the right. Text is
+ * touch only, where a tap opens Messages (Q13); with a mouse the number reads
+ * in full beside Call. A tenant with no number on file shows by name alone
+ * (tenants.md call 2). Above Lockbox; `#access` from an email lands here.
+ */
+export function TenantsSection({ tenants }: { tenants: JobTenants }) {
+  const iconLink = buttonClass({ variant: "secondary", icon: true });
+  return (
+    <Section id="tenants" title={tenants.people.length === 1 ? "Tenant" : "Tenants"}>
+      <ul className="divide-y divide-border">
+        {tenants.people.map((t, i) => {
+          const first = firstName(t.name) || t.name;
+          const tel = telHref(t.dial);
+          const sms = textHref(t.dial);
+          return (
+            <li key={i} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-body text-foreground">{t.name}</p>
+                {t.phone && <p className="num whitespace-nowrap text-meta text-fg-2">{t.phone}</p>}
+              </div>
+              {tel && (
+                <a href={tel} aria-label={`Call ${first}`} className={iconLink}>
+                  <Phone aria-hidden="true" className="size-4" />
+                </a>
+              )}
+              {sms && (
+                <a href={sms} aria-label={`Text ${first}`} className={cn(iconLink, "pointer-fine:hidden")}>
+                  <MessageSquareText aria-hidden="true" className="size-4" />
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Section>
+  );
+}
+
+export function LockboxSection({ taskId, lockbox, permittedBy = 0 }: { taskId: string; lockbox: JobLockbox; permittedBy?: number }) {
   const [viewing, setViewing] = useState(false);
   const [broken, setBroken] = useState(false);
   const url = `/api/files/lockbox/${encodeURIComponent(taskId)}`;
@@ -83,6 +125,10 @@ export function LockboxSection({ taskId, lockbox }: { taskId: string; lockbox: J
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Code value={lockbox.code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
+          {/* At an occupied home the code shows only with their Permission to enter, and this says so (Connor, Nov 17). */}
+          {permittedBy > 0 && (
+            <p className="mt-2 text-body text-ok">{permittedBy === 1 ? "The tenant said you can let yourself in" : "The tenants said you can let yourself in"}</p>
+          )}
           {lockbox.location && (
             <p className="mt-2 flex items-start gap-1.5 text-body text-foreground">
               <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

@@ -1,4 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
+import { todayYmdEastern } from "@/lib/dates";
+import { accessState, tenantUnit } from "@/lib/tasks/lockbox";
+import { livingLease } from "@/lib/tenants/status";
 
 /**
  * The lockbox code a contractor sees on their job (docs/asana-migration-plan.md
@@ -89,6 +92,59 @@ export async function readLockboxAccess(db: PropertyReader, propertyId: string |
 export async function readLockboxCode(db: PropertyReader, propertyId: string | null, unitLabel: string | null): Promise<string | null> {
   return (await readLockboxAccess(db, propertyId, unitLabel))?.code ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Who lives there, and whether the lockbox shows
+// ---------------------------------------------------------------------------
+
+/** One tenant as a contractor sees them: the name, the number as typed, and the clean one Call and Text dial. */
+export type JobTenant = { name: string; phone: string | null; dial: string | null };
+
+/**
+ * A job's Tenants and Lockbox sections (docs/specs/tenant-contact.md sections
+ * 3 and 7, tenants.md section 8): the household living in its unit today,
+ * whether they gave Permission to enter, and the lockbox when it shows (a
+ * vacant home, or permission). Names and numbers only: never rent, emails,
+ * notes, another household or the units list.
+ */
+export type JobAccess = { tenants: JobTenant[]; permitted: boolean; lockbox: LockboxAccess | null };
+
+export const NO_ACCESS: JobAccess = { tenants: [], permitted: false, lockbox: null };
+
+type JobAccessReader = Pick<PrismaClient, "property" | "lease">;
+
+/** The job's access as lockbox.ts accessState decides it. Whether to show any of it (assigned contractor, open job) is the caller's call. */
+export async function readJobAccess(
+  db: JobAccessReader,
+  job: { propertyId: string | null; unitLabel: string | null; entryPermittedAt: Date | null },
+  now: Date = new Date(),
+): Promise<JobAccess> {
+  if (!job.propertyId) return NO_ACCESS;
+  const row = await db.property.findUnique({ where: { id: job.propertyId }, select: { units: true } });
+  if (!row) return NO_ACCESS;
+  const list = unitList(row.units).map((u) => ({ id: str(u.id), label: str(u.label), lockboxCode: str(u.lockboxCode) }));
+  const home = tenantUnit(list, job.unitLabel);
+  const leases = home
+    ? await db.lease.findMany({
+        where: { propertyId: job.propertyId, unitId: home.unitId },
+        select: {
+          unitId: true,
+          movesIn: true,
+          movesOut: true,
+          tenants: { select: { tenant: { select: { fullName: true, phone: true, phoneE164: true } } }, orderBy: [{ primary: "desc" }, { position: "asc" }] },
+        },
+      })
+    : [];
+  const living = home ? livingLease(leases, home.unitId, todayYmdEastern(now)) : null;
+  const state = accessState(list, job.unitLabel, living, job.entryPermittedAt);
+  return {
+    tenants: (living?.tenants ?? []).map(({ tenant: t }) => ({ name: t.fullName, phone: t.phone, dial: t.phoneE164 ?? t.phone })),
+    permitted: state.permitted,
+    lockbox: state.showsLockbox ? pickLockboxAccess(row.units, job.unitLabel) : null,
+  };
+}
+
+const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 
 // ---------------------------------------------------------------------------
 // Codes inside comment text

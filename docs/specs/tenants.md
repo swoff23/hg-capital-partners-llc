@@ -57,7 +57,7 @@ Nothing here gets built until Connor says "build it" in chat. It also builds onl
 
 7. The switch works with or without a lockbox code on file. With none, turning it on records the permission and the contractor still sees no code. (Was: disabled with "No lockbox code".) Permission now matters to staff too (T10), so it shouldn't depend on a code.
 8. The task page drops `tenant-contact.md` section 4's status lines ("Tenants and lockbox shown to Zack"). The Lockbox row stays as built and keeps showing the code to staff; its "Shown to Zack" tag shows only while the contractor sees the code (a vacant unit, or permission on).
-9. The job page drops "The tenants said you can let yourself in" under the code (T13). The code only ever shows at an occupied home with permission, so the line explains rather than prevents a mistake.
+9. ~~The job page drops "The tenants said you can let yourself in" under the code.~~ Connor kept it (Nov 17, with "build it"): it stays under the code at an occupied home with permission, "The tenant said" with one person.
 10. Toasts read "Permission to enter on" and "Permission to enter off", with Undo. The activity lines read "Connor turned on permission to enter", "Connor turned off permission to enter" and "Permission to enter was cleared when the unit changed".
 
 ## 3. Data
@@ -238,7 +238,7 @@ A new `TenantsSection` in `src/app/(app)/properties/[id]/`, right under `UnitsSe
 - **Any assignee** (T10). The task page's Tenants row and the Permission to enter switch show on every active task at an occupied unit, whoever it's assigned to. The job page's rules don't change: only the assigned contractor sees the tenants or the code, and only while the job is open.
 - **A switch, not a menu** (T12, T13). In Details, the Access row's chip and menu become a stock `Switch` labeled "Permission to enter", with nothing under it, between Tenant and Lockbox. At lg it's a rail row, the label on the left and the switch on the right, saving on toggle through `InlineSwitch` and `patchTask({ entryPermitted })`. Below lg it's a line under the chip row, as on New task. A vacant unit has no switch. Drawn in [tenants/04-permission-to-enter.svg](tenants/04-permission-to-enter.svg).
 - **The Lockbox row** stays as built ("2374 · Shown to Brandon", Nov 14) and keeps showing the code to staff. Its tag shows only while the contractor sees the code (call 8). The status lines are dropped.
-- **The job page** drops the line under the code (call 9).
+- **The job page** keeps the line under the code (call 9, as Connor kept it).
 
 The write, the ACCESS events (with the lines in call 10) and the `#access` anchor in job emails are otherwise unchanged. The five calls in T8 hold.
 
@@ -332,3 +332,17 @@ Part one (section 14's steps 1 and 2, and search) is built. What it decided insi
 - **The housing authority's contact** (Connor, Nov 14): each term keeps the caseworker's name and email (`subsidyContact`, `subsidyEmail`, migration `20261115170100_lease_term_subsidy_email`), kept only with a share, like who pays. New lease and Renew ask for them under Who pays; Renew prefills them from the last term. The lease page's rail shows Who pays, Contact and Contact email under Housing authority, each saving inline, with a mail link beside the email. The import reads optional `subsidy_contact` and `subsidy_email` columns; leases already imported skip, so their contacts go in from the rail.
 - **Any term edits, and a term deletes** (Connor, Nov 16, [lease-term-edits.md](lease-term-edits.md)): a term row opens that term in the Renew sheet's fields, titled with its dates, and Delete term removes it with Undo. Its signed lease stays on the lease, unlinked. A lease's only term can go.
 - **The import ran on Nov 14**: 31 leases, 60 people and 38 terms into production from Connor's checked file (Cowork's export, with his corrections), without PDFs. The import now merges rows with the same name on one lease into one person, checks every term and stay overlap in the dry run, reads a file by any name (`--file`), runs without PDFs (`--skip-files`) and prints the database it's about to use.
+
+## 16. Build notes (Nov 17)
+
+Section 14's step 3, with section 8's Nov 17 changes, is built. Connor said "build it" on Nov 17 and kept "The tenants said you can let yourself in" (call 9). Calls 7, 8 and 10 shipped as written. Playbooks (step 4) aren't built yet. What the build decided inside the spec:
+
+- **One rule, two readers.** `src/lib/tasks/lockbox.ts` gains `tenantUnit` (whose home a job is in: its unit by label, or a property's one rentable unit) and `accessState` (occupied, permitted, and whether the lockbox shows). The portal reads through `access-code.ts` `readJobAccess`; staff read through a new `src/lib/tenants/living.ts` `readTaskHome`, which the auth guard keeps out of portal code. Both decide through `accessState`.
+- **The lockbox photo** (`/api/files/lockbox/<job>`) follows the code: a contractor gets it only while their job shows the code.
+- **Show access** in a job email shows when the job page would show the tenants or the lockbox, and opens at `#access`, which lands on Tenants, or on Lockbox with nobody living there. Emails already sent with `#lockbox` still land on Lockbox.
+- **Text to my crew** says "Lockbox, photos, updates" only when the contractor's job shows the code.
+- **The task page's Tenants row** links each name to the lease (T7) rather than adding an Open lease line in the rail; the chip's menu below lg ends in Open lease. It shows on any task whose home has a household on file, open or closed.
+- **The Lockbox row** still shows only with a contractor assigned, as built Nov 14. Staff see the code there whether or not the contractor does.
+- **The switch** writes through `patchTask({ entryPermitted })`, which compares with whether permission holds for the household there now. So after a new household moves in it reads off, and turning it on stamps the day again. A unit or property change clears it; the line names the change only when the permission still held.
+- **New task** asks a staff action (`homeHasTenants`) for a yes or no when a home is picked, and `createTask` checks again before it saves.
+

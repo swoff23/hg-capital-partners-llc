@@ -622,3 +622,20 @@ test("linkedUpdateId: the update a link points at, and none for a hash that isn'
   assert.equal(linkedUpdateId("#new"), null);
   assert.equal(linkedUpdateId(""), null);
 });
+
+/* ---------------- Permission to enter ---------------- */
+
+test("ACCESS lines say who turned Permission to enter on or off, and when a unit change cleared it", () => {
+  const e = [
+    ev("ACCESS", { entry: { from: false, to: true } }),
+    ev("ACCESS", { entry: { from: true, to: false } }),
+    ev("ACCESS", { entry: { from: true, to: false }, cleared: "unit" }),
+    ev("ACCESS"),
+  ];
+  assert.deepEqual(texts(build(e)), [
+    "Connor turned on permission to enter",
+    "Connor turned off permission to enter",
+    "Permission to enter was cleared when the unit changed",
+    "Connor changed who can see this",
+  ]);
+});

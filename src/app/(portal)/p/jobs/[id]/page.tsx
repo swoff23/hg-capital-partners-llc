@@ -16,7 +16,7 @@ import { HashScroll } from "./_components/hash-scroll";
 import { JobActions } from "./_components/job-actions";
 import { JobHeader } from "./_components/job-header";
 import { JobDate } from "./_components/job-date";
-import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
+import { AddressActions, JobChecklist, LockboxSection, TenantsSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
 import { JobNotice } from "./_components/job-notice";
 import { JobUpdates } from "./_components/job-updates";
@@ -29,7 +29,8 @@ const firstValue = (v: string | string[] | undefined): string | null => (Array.i
 /**
  * A contractor's job (docs/asana-migration-plan.md §6, D31: one scroll with a
  * bottom bar): the property's photo, status and title, address, what changed
- * since they last looked, lockbox (D21), notes (D16), checklist, photos and
+ * since they last looked, tenants and lockbox (D21, docs/specs/tenants.md
+ * section 8), notes (D16), checklist, photos and
  * videos, updates and the composer. Done and canceled jobs are read-only
  * (D18). Opening it marks everything seen.
  *
@@ -51,8 +52,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
   const job = await getJob(principal, id);
   if (!job) notFound();
 
-  // Read state and the lockbox log, written after the page is sent.
-  await noteJobViewed(job.id, { lockboxShown: !!job.lockbox });
+  // Read state and the lockbox and tenants log, written after the page is sent.
+  await noteJobViewed(job.id, { lockboxShown: !!job.lockbox, tenantShown: job.tenants.people.length > 0 });
 
   const now = new Date();
   const today = todayYmdEastern(now);
@@ -102,7 +103,11 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
 
           <JobNotice notice={job.notice} now={now.toISOString()} />
 
-          {job.lockbox && <LockboxSection taskId={job.id} lockbox={job.lockbox} />}
+          {job.tenants.people.length > 0 && <TenantsSection tenants={job.tenants} />}
+
+          {job.lockbox && (
+            <LockboxSection taskId={job.id} lockbox={job.lockbox} permittedBy={job.tenants.permitted ? job.tenants.people.length : 0} />
+          )}
 
           {job.notes && (
             <Section title="Notes">

@@ -16,7 +16,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
-import { readLockboxAccess } from "@/lib/portal/access-code";
+import { readJobAccess, readLockboxAccess } from "@/lib/portal/access-code";
 import { resolveJobLink } from "@/lib/portal/job-links";
 import { isLockboxPhotoPath } from "@/lib/properties/photo";
 import { getPortalPrincipal } from "@/lib/portal/session";
@@ -196,12 +196,16 @@ const LOCKBOX_PHOTO_NAME = "Lockbox photo.jpg";
 
 /**
  * The lockbox photo of job `taskId`, or its thumbnail. A contractor gets it
- * only while the job is open and theirs, as the code (portal/queries.ts), and
- * only from a job they can open; a job link's session only for that job.
+ * only while the job is open and theirs, and only while the job shows its
+ * code (portal/queries.ts: at an occupied home, only with Permission to
+ * enter), from a job they can open; a job link's session only for that job.
  */
 async function lockboxPhoto(taskId: string, variant: Variant | null, viewer: Viewer): Promise<Served | null> {
   if (viewer.onlyTaskId && viewer.onlyTaskId !== taskId) return null;
-  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { status: true, propertyId: true, unitLabel: true, assigneeContactId: true } });
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { status: true, propertyId: true, unitLabel: true, assigneeContactId: true, entryPermittedAt: true },
+  });
   if (!task?.propertyId) return null;
   if (viewer.kind === "contractor") {
     if (!isActiveStatus(task.status) || task.assigneeContactId !== viewer.contactId) return null;
@@ -211,7 +215,7 @@ async function lockboxPhoto(taskId: string, variant: Variant | null, viewer: Vie
       return null;
     }
   }
-  const photo = (await readLockboxAccess(prisma, task.propertyId, task.unitLabel))?.photo;
+  const photo = (viewer.kind === "contractor" ? (await readJobAccess(prisma, task)).lockbox : await readLockboxAccess(prisma, task.propertyId, task.unitLabel))?.photo;
   const pathname = variant === "thumb" ? photo?.thumbPathname : photo?.pathname;
   if (!pathname || !isLockboxPhotoPath(task.propertyId, pathname)) return null;
   return { source: pathname, privatePathname: pathname, filename: LOCKBOX_PHOTO_NAME, contentType: null, publicFallback: false };
