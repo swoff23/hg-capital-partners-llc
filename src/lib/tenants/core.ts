@@ -292,6 +292,64 @@ export async function patchTerm(db: Db, termId: string, patch: Partial<Record<st
   });
 }
 
+/**
+ * A deleted term as Undo puts it back (docs/specs/lease-term-edits.md): the
+ * values a new term is read from, as text, and the signed lease it had.
+ */
+export type TermSnapshot = {
+  startsOn: Ymd;
+  endsOn: Ymd | "";
+  rent: string;
+  subsidy: string;
+  subsidyFrom: string;
+  subsidyContact: string;
+  subsidyEmail: string;
+  fileId: string | null;
+};
+
+/**
+ * Deletes one term. Its signed lease stays on the lease, unlinked, as a
+ * replaced file does, so Undo can link it back; it goes with the lease.
+ * A lease's only term can go too. Returns what restoreTerm needs.
+ */
+export async function deleteTerm(db: Db, leaseId: string, termId: string): Promise<TermSnapshot> {
+  return db.$transaction(async (tx) => {
+    const term = await tx.leaseTerm.findUnique({ where: { id: termId } });
+    if (!term || term.leaseId !== leaseId) throw new Error("This term is already gone. Reload the page.");
+    await tx.leaseTerm.delete({ where: { id: termId } });
+    return {
+      startsOn: toYmd(term.startsOn)!,
+      endsOn: toYmd(term.endsOn) ?? "",
+      rent: term.rent.toString(),
+      subsidy: term.subsidy?.toString() ?? "",
+      subsidyFrom: term.subsidyFrom ?? "",
+      subsidyContact: term.subsidyContact ?? "",
+      subsidyEmail: term.subsidyEmail ?? "",
+      fileId: term.fileId,
+    };
+  });
+}
+
+/**
+ * Undo for deleteTerm: the term again, read and checked like a new one, so
+ * it's refused when a term added since overlaps it. Its signed lease comes
+ * back only while that file is still this lease's and no other term has it.
+ */
+export async function restoreTerm(db: Db, leaseId: string, snapshot: TermSnapshot): Promise<{ id: string }> {
+  const { fileId, ...input } = snapshot;
+  const r = readTerm(input);
+  if (!r.ok) fail(r.problems);
+  return db.$transaction(async (tx) => {
+    if (!(await tx.lease.findUnique({ where: { id: leaseId }, select: { id: true } }))) throw new Error("This lease is gone.");
+    const terms = await tx.leaseTerm.findMany({ where: { leaseId }, select: { startsOn: true, endsOn: true } });
+    if (overlappingTerms([...terms, { startsOn: r.data.startsOn, endsOn: r.data.endsOn }])) fail({ startsOn: TERMS_OVERLAP });
+    const file = fileId
+      ? await tx.leaseFile.findFirst({ where: { id: fileId, leaseId, term: null }, select: { id: true } })
+      : null;
+    return tx.leaseTerm.create({ data: { leaseId, ...termColumns(r.data), fileId: file?.id ?? null }, select: { id: true } });
+  });
+}
+
 /** Deletes the stay, its terms and its files. Its tenants stay in the app. Returns the Blob paths to remove. */
 export async function deleteLease(db: Db, id: string): Promise<{ propertyId: string; pathnames: string[] } | null> {
   return db.$transaction(async (tx) => {

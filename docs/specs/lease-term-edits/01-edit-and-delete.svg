@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="550" viewBox="0 0 860 550" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Editing and deleting a lease term: tap a term row to open its sheet at laptop 1280 and phone 375, and the Undo toast after Delete term</title>
+<rect width="860" height="550" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Tap a term row to edit it; Delete term sits under the fields</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768: the sheet opens as a dialog</text>
+<rect x="0" y="22" width="540" height="430" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="56" font-size="14" font-weight="600" fill="#152133">Terms</text>
+<line x1="20" y1="68" x2="520" y2="68" stroke="#e7e5e0"/>
+<text x="20" y="88" font-size="12" fill="#152133">Dec 11, 2025 to Dec 31, 2026 · $1,530</text>
+<text x="20" y="104" font-size="10.5" fill="#5b6576">Tenant pays $0 · Housing authority $1,530</text>
+<line x1="20" y1="114" x2="520" y2="114" stroke="#e7e5e0"/>
+<rect x="14" y="118" width="280" height="30" rx="6" fill="#f4f3ef"/>
+<text x="20" y="137" font-size="12" fill="#152133">Oct 1, 2025 to Dec 10, 2025 · $1,800</text>
+<line x1="20" y1="152" x2="520" y2="152" stroke="#e7e5e0"/>
+<text x="20" y="176" font-size="10.5" fill="#5b6576">The tapped row; hover tint on a mouse only</text>
+
+<rect x="0" y="22" width="540" height="430" rx="12" fill="#152133" opacity="0.16"/>
+<g transform="translate(-150 40)">
+<rect x="300" y="22" width="240" height="330" rx="12" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="316" y="52" font-size="13" font-weight="600" fill="#152133">Oct 1, 2025 to Dec 10, 2025</text>
+<text x="524" y="52" font-size="13" text-anchor="end" fill="#5b6576">×</text>
+<line x1="300" y1="64" x2="540" y2="64" stroke="#e7e5e0"/>
+
+<text x="316" y="86" font-size="10" fill="#5b6576">Starts</text>
+<rect x="316" y="92" width="104" height="26" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="324" y="109" font-size="11" fill="#152133">Oct 1, 2025</text>
+<text x="428" y="86" font-size="10" fill="#5b6576">Ends</text>
+<rect x="428" y="92" width="96" height="26" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="436" y="109" font-size="11" fill="#152133">Dec 10, 2025</text>
+
+<rect x="316" y="130" width="24" height="14" rx="7" fill="#ffffff" stroke="#d6d3cc"/>
+<circle cx="323" cy="137" r="5" fill="#d6d3cc"/>
+<text x="348" y="141" font-size="11" fill="#152133">Month to month</text>
+
+<text x="316" y="166" font-size="10" fill="#5b6576">Tenant pays</text>
+<rect x="316" y="172" width="208" height="26" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="324" y="189" font-size="11" fill="#152133">$1,800</text>
+
+<text x="316" y="216" font-size="10" fill="#5b6576">Housing authority pays  ·  Optional</text>
+<rect x="316" y="222" width="208" height="26" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+
+<rect x="316" y="262" width="84" height="26" rx="6" fill="#ffffff" stroke="#b3261e"/>
+<text x="358" y="279" font-size="11" text-anchor="middle" fill="#b3261e">Delete term</text>
+
+<line x1="300" y1="304" x2="540" y2="304" stroke="#e7e5e0"/>
+<rect x="388" y="316" width="60" height="24" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="418" y="332" font-size="11" text-anchor="middle" fill="#152133">Cancel</text>
+<rect x="456" y="316" width="68" height="24" rx="6" fill="#152133"/>
+<text x="490" y="332" font-size="11" text-anchor="middle" fill="#ffffff">Save term</text>
+</g>
+</g>
+
+<g transform="translate(612 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375: a bottom sheet</text>
+<rect x="0" y="22" width="200" height="380" rx="20" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="14" y="52" font-size="11.5" font-weight="600" fill="#152133">Oct 1, 2025 to Dec 10, 2025</text>
+<line x1="0" y1="62" x2="200" y2="62" stroke="#e7e5e0"/>
+<text x="14" y="78" font-size="9.5" fill="#5b6576">Starts</text>
+<rect x="14" y="82" width="172" height="24" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="14" y="120" font-size="9.5" fill="#5b6576">Ends</text>
+<rect x="14" y="124" width="172" height="24" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<rect x="14" y="158" width="22" height="13" rx="6.5" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="42" y="168" font-size="10" fill="#152133">Month to month</text>
+<text x="14" y="190" font-size="9.5" fill="#5b6576">Tenant pays</text>
+<rect x="14" y="194" width="172" height="24" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<text x="14" y="232" font-size="9.5" fill="#5b6576">Housing authority pays</text>
+<rect x="14" y="236" width="172" height="24" rx="6" fill="#ffffff" stroke="#d6d3cc"/>
+<rect x="14" y="274" width="78" height="24" rx="6" fill="#ffffff" stroke="#b3261e"/>
+<text x="53" y="290" font-size="10" text-anchor="middle" fill="#b3261e">Delete term</text>
+<line x1="0" y1="352" x2="200" y2="352" stroke="#e7e5e0"/>
+<rect x="110" y="362" width="76" height="28" rx="6" fill="#152133"/>
+<text x="148" y="380" font-size="10.5" text-anchor="middle" fill="#ffffff">Save term</text>
+
+<text x="0" y="424" font-size="11" font-weight="500" fill="#424e61">After Delete term, every size</text>
+<rect x="0" y="432" width="200" height="36" rx="8" fill="#152133"/>
+<text x="10" y="454" font-size="10" fill="#ffffff">Oct 1 to Dec 10, 2025 term deleted</text>
+<text x="190" y="454" font-size="10" font-weight="600" text-anchor="end" fill="#ffffff" text-decoration="underline">Undo</text>
+</g>
+
+<text x="32" y="534" font-size="10.5" fill="#5b6576">The file link or "Add the signed lease" at a row's right stays its own tap target. The Details rail still edits today's term inline.</text>
+</svg>
