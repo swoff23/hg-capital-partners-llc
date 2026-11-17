@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="640" viewBox="0 0 1440 640">
+<title>Permission to enter: the toggle on New task and in the task page's Details</title>
+<style>
+text{font-family:Geist,-apple-system,"Segoe UI",system-ui,sans-serif}
+.h{font-size:17px;font-weight:600;fill:#152133}
+.b{font-size:14px;fill:#152133}
+.b16{font-size:16px;fill:#152133}
+.l{font-size:12px;font-weight:500;fill:#424e61}
+.c{font-size:12px;font-weight:500;fill:#152133}
+.c13{font-size:13px;font-weight:500;fill:#152133}
+.m{font-size:12px;fill:#5b6576}
+.m13{font-size:13px;fill:#5b6576}
+.cap{font-size:15px;font-weight:600;fill:#152133}
+.sub{font-size:12px;fill:#5b6576}
+.chip{fill:#ffffff;stroke:#d5d1ca}
+.box{fill:#ffffff;stroke:#d5d1ca}
+.btn{fill:#152133}
+.btnt{font-size:14px;font-weight:500;fill:#ffffff;text-anchor:middle}
+.code{font-family:"Geist Mono",ui-monospace,monospace;font-size:14px;font-weight:500;fill:#152133}
+.tag{font-size:11px;fill:#424e61}
+</style>
+<defs>
+  <clipPath id="row375"><rect x="0" y="300" width="375" height="60"/></clipPath>
+  <linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+</defs>
+<rect width="1440" height="640" fill="#f8f7f3"/>
+
+<!-- New task, laptop and tablet -->
+<text x="24" y="36" class="cap">New task · laptop 1280 and tablet 768</text>
+<text x="24" y="56" class="sub">Under the options, only once the picked unit has tenants living there. Off by default.</text>
+<rect x="24" y="72" width="672" height="384" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="48" y="108" class="h">New task</text>
+<path d="M664 96 l12 12 M676 96 l-12 12" stroke="#424e61" stroke-width="1.5"/>
+<text x="48" y="140" class="l">Title</text>
+<rect x="48" y="148" width="624" height="36" rx="6" class="box"/>
+<text x="60" y="171" class="b">Fix the kitchen faucet</text>
+<text x="48" y="206" class="l">Notes</text><text x="88" y="206" class="m">Optional</text>
+<rect x="48" y="214" width="624" height="60" rx="6" class="box"/>
+<text x="60" y="237" class="b">Drips under the sink.</text>
+<rect x="48" y="290" width="84" height="32" rx="6" class="chip"/>
+<rect x="56" y="297" width="18" height="18" rx="4" fill="#e7e5e0"/><text x="61" y="310" font-size="10" font-weight="600" fill="#424e61">Z</text>
+<text x="82" y="310" class="c">Zack</text>
+<rect x="140" y="290" width="62" height="32" rx="6" class="chip"/>
+<rect x="150" y="300" width="11" height="11" rx="2" fill="none" stroke="#424e61" stroke-width="1.2"/><path d="M150 304 h11" stroke="#424e61" stroke-width="1.2"/>
+<text x="168" y="310" class="c">Fri</text>
+<rect x="210" y="290" width="70" height="32" rx="6" class="chip"/>
+<circle cx="223" cy="306" r="4.5" fill="none" stroke="#5b6576" stroke-width="1.3"/>
+<text x="233" y="310" class="c">To do</text>
+<rect x="288" y="290" width="204" height="32" rx="6" class="chip"/>
+<rect x="295" y="297" width="18" height="18" rx="3" fill="#e7e5e0"/>
+<text x="320" y="310" class="c">118 Congress St. · Unit 2</text>
+<!-- the toggle -->
+<text x="48" y="355" class="b">Permission to enter</text>
+<rect x="640" y="342" width="32" height="18" rx="9" fill="#ffffff" stroke="#d5d1ca"/>
+<circle cx="649" cy="351" r="6" fill="#d5d1ca"/>
+<path d="M24 384 H696" stroke="#e7e5e0"/>
+<rect x="48" y="410" width="32" height="18" rx="9" fill="#ffffff" stroke="#d5d1ca"/><circle cx="57" cy="419" r="6" fill="#d5d1ca"/>
+<text x="90" y="424" class="m13">Create more</text>
+<rect x="560" y="402" width="112" height="36" rx="6" class="btn"/>
+<text x="616" y="425" class="btnt">Create task</text>
+
+<!-- New task, phone -->
+<text x="736" y="36" class="cap">New task · phone 375</text>
+<text x="736" y="56" class="sub">The same line, 44px tall. Shown on.</text>
+<g transform="translate(736,72) scale(0.84)">
+  <rect x="0" y="0" width="375" height="667" rx="32" fill="#f2f0ec" stroke="#d5d1ca"/>
+  <text x="28" y="32" font-size="14" font-weight="600" fill="#152133">9:41</text>
+  <rect x="0" y="52" width="375" height="615" rx="16" fill="#ffffff"/>
+  <path d="M24 84 l12 12 M36 84 l-12 12" stroke="#424e61" stroke-width="1.6"/>
+  <text x="187.5" y="96" class="h" text-anchor="middle">New task</text>
+  <text x="16" y="136" class="l">Title</text>
+  <rect x="16" y="144" width="343" height="44" rx="6" class="box"/>
+  <text x="28" y="172" class="b16">Fix the kitchen faucet</text>
+  <text x="16" y="212" class="l">Notes</text><text x="56" y="212" class="m">Optional</text>
+  <rect x="16" y="220" width="343" height="72" rx="6" class="box"/>
+  <text x="28" y="248" class="b16">Drips under the sink.</text>
+  <g clip-path="url(#row375)">
+    <rect x="16" y="308" width="92" height="44" rx="6" class="chip"/>
+    <rect x="26" y="321" width="18" height="18" rx="4" fill="#e7e5e0"/><text x="31" y="334" font-size="10" font-weight="600" fill="#424e61">Z</text>
+    <text x="52" y="335" class="c13">Zack</text>
+    <rect x="116" y="308" width="66" height="44" rx="6" class="chip"/>
+    <rect x="128" y="324" width="11" height="11" rx="2" fill="none" stroke="#424e61" stroke-width="1.2"/><path d="M128 328 h11" stroke="#424e61" stroke-width="1.2"/>
+    <text x="147" y="335" class="c13">Fri</text>
+    <rect x="190" y="308" width="82" height="44" rx="6" class="chip"/>
+    <circle cx="205" cy="330" r="5" fill="none" stroke="#5b6576" stroke-width="1.3"/>
+    <text x="218" y="335" class="c13">To do</text>
+    <rect x="280" y="308" width="214" height="44" rx="6" class="chip"/>
+    <rect x="290" y="321" width="18" height="18" rx="3" fill="#e7e5e0"/>
+    <text x="316" y="335" class="c13">118 Congress St. · Unit 2</text>
+    <rect x="335" y="300" width="40" height="60" fill="url(#fade)"/>
+  </g>
+  <text x="16" y="393" class="b16">Permission to enter</text>
+  <rect x="327" y="379" width="32" height="18" rx="9" fill="#152133"/>
+  <circle cx="350" cy="388" r="6" fill="#ffffff"/>
+  <path d="M0 592 H375" stroke="#e7e5e0"/>
+  <rect x="16" y="623" width="32" height="18" rx="9" fill="#ffffff" stroke="#d5d1ca"/><circle cx="25" cy="632" r="6" fill="#d5d1ca"/>
+  <text x="58" y="637" class="m13">Create more</text>
+  <rect x="219" y="610" width="140" height="44" rx="6" class="btn"/>
+  <text x="289" y="637" class="btnt">Create task</text>
+</g>
+
+<!-- Task page Details, laptop -->
+<text x="1092" y="36" class="cap">Task page Details · laptop</text>
+<text x="1092" y="56" class="sub">Same toggle, between Tenant and Lockbox.</text>
+<rect x="1092" y="72" width="324" height="348" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<g>
+  <text x="1108" y="98" class="m">Status</text>
+  <circle cx="1238" cy="94" r="4.5" fill="none" stroke="#5b6576" stroke-width="1.3"/><text x="1248" y="98" class="b">To do</text>
+  <path d="M1108 112 H1400" stroke="#e7e5e0"/>
+  <text x="1108" y="138" class="m">Assignee</text><text x="1232" y="138" class="b">Zack</text>
+  <path d="M1108 152 H1400" stroke="#e7e5e0"/>
+  <text x="1108" y="178" class="m">Due</text><text x="1232" y="178" class="b">Fri</text>
+  <path d="M1108 192 H1400" stroke="#e7e5e0"/>
+  <text x="1108" y="218" class="m">Property</text><text x="1232" y="218" class="b">118 Congress St.</text>
+  <path d="M1108 232 H1400" stroke="#e7e5e0"/>
+  <text x="1108" y="258" class="m">Unit</text><text x="1232" y="258" class="b">Unit 2</text>
+  <path d="M1108 272 H1400" stroke="#e7e5e0"/>
+  <text x="1108" y="296" class="m">Tenant</text>
+  <text x="1232" y="294" class="b">Dana Lee</text>
+  <text x="1232" y="311" class="m">716-555-0142</text>
+  <circle cx="1388" cy="298" r="12" fill="#ffffff" stroke="#d5d1ca"/>
+  <path d="M1383 293 q0 10 10 10 l2-3-3-2-2 1 q-3-1-4-4 l1-2-2-3z" fill="none" stroke="#424e61" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M1108 324 H1400" stroke="#e7e5e0"/>
+  <text x="1108" y="350" class="b">Permission to enter</text>
+  <rect x="1368" y="337" width="32" height="18" rx="9" fill="#152133"/>
+  <circle cx="1391" cy="346" r="6" fill="#ffffff"/>
+  <path d="M1108 364 H1400" stroke="#e7e5e0"/>
+  <text x="1108" y="392" class="m">Lockbox</text>
+  <text x="1232" y="392" class="code">2374</text>
+  <rect x="1278" y="377" width="94" height="22" rx="4" fill="none" stroke="#d5d1ca"/>
+  <text x="1325" y="392" class="tag" text-anchor="middle">Shown to Zack</text>
+</g>
+<text x="1092" y="446" class="sub">Below lg (tablet and phone), the toggle is a line</text>
+<text x="1092" y="464" class="sub">under the chip row, as on New task.</text>
+</svg>

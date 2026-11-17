@@ -4,6 +4,8 @@
 
 Planned with Connor on Oct 26, 2026 (Q1 to Q20), and reopened on Nov 14, 2026 when he asked for every decision to be argued again. The Nov 14 round changed six things (Q21 to Q26): a unit counts as occupied by move dates, an occupied unit shares the lockbox only with the tenants' permission to enter, the auto-switch of Q18 and Q20 is gone, applying the New Tenant and Move Out playbooks saves to the unit, and every tenant who lives in the unit shows, one row each.
 
+**Nov 17, 2026:** [tenants.md](tenants.md) section 8 (T10 to T13) changes section 4 here. Permission to enter shows on every task at an occupied unit, whoever it's assigned to; it's a switch in Details and on New task instead of a menu; and the status lines and the job page's line under the code are dropped.
+
 Connor said "build it after" on Nov 14: it builds once branch `design-calls-nov14` is on main. That branch and the Nov 14 job emails both change files cited here (the portal job page and its queries, `properties/service.ts`), so the build starts by re-reading every cited file and correcting the cites.
 
 ## 1. Summary
