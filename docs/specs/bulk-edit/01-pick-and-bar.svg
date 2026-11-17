@@ -1,0 +1,189 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="920" viewBox="0 0 900 920" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Picking task rows and the bulk edit bar at laptop 1280, tablet 768, phone 375 and phone 320</title>
+<rect width="900" height="920" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Picking rows, and the bar that edits them</text>
+
+<!-- Laptop 1280 -->
+<text x="32" y="64" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 (mouse)</text>
+<rect x="32" y="74" width="836" height="410" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="72" y="110" font-size="18" font-weight="600" fill="#152133">Tasks</text>
+<rect x="752" y="90" width="96" height="28" rx="6" fill="#152133"/>
+<text x="800" y="108" font-size="12" text-anchor="middle" fill="#ffffff">+ New task</text>
+<rect x="72" y="130" width="180" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="86" y="148" font-size="11" fill="#8a919c">Search tasks</text>
+<rect x="262" y="130" width="120" height="28" rx="6" fill="#f2f0ec"/>
+<rect x="265" y="133" width="40" height="22" rx="5" fill="#ffffff" stroke="#84817a"/>
+<text x="285" y="148" font-size="11" text-anchor="middle" fill="#152133">Open</text>
+<text x="326" y="148" font-size="11" text-anchor="middle" fill="#424e61">Done</text>
+<text x="362" y="148" font-size="11" text-anchor="middle" fill="#424e61">All</text>
+<rect x="392" y="130" width="84" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="434" y="148" font-size="11" text-anchor="middle" fill="#424e61">+ Assignee</text>
+<rect x="484" y="130" width="84" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="526" y="148" font-size="11" text-anchor="middle" fill="#424e61">+ Property</text>
+<rect x="576" y="130" width="64" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="608" y="148" font-size="11" text-anchor="middle" fill="#424e61">Repeats</text>
+
+<!-- column heads with the header box -->
+<rect x="48" y="172" width="12" height="12" rx="3" fill="#152133"/>
+<line x1="51" y1="178" x2="57" y2="178" stroke="#ffffff" stroke-width="1.5"/>
+<text x="520" y="182" font-size="11" fill="#5b6576">Property</text>
+<text x="650" y="182" font-size="11" fill="#5b6576">Unit</text>
+<text x="718" y="182" font-size="11" fill="#5b6576">Assignee</text>
+<text x="848" y="182" font-size="11" text-anchor="end" fill="#5b6576">Due</text>
+<line x1="72" y1="192" x2="848" y2="192" stroke="#e7e5e0"/>
+
+<!-- group 1, all picked -->
+<rect x="48" y="206" width="12" height="12" rx="3" fill="#152133"/>
+<path d="M50.5 212.2 53 214.6 57.5 209.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="72" y="216" font-size="13" font-weight="600" fill="#152133">767 Prospect Avenue</text>
+<text x="210" y="216" font-size="13" fill="#5b6576">3</text>
+<line x1="72" y1="226" x2="848" y2="226" stroke="#e7e5e0"/>
+
+<g font-size="12">
+<rect x="64" y="228" width="792" height="32" rx="6" fill="#f2f0ec"/>
+<rect x="48" y="238" width="12" height="12" rx="3" fill="#152133"/><path d="M50.5 244.2 53 246.6 57.5 241.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="80" cy="244" r="7" fill="none" stroke="#84817a" stroke-width="1.5"/>
+<text x="96" y="248" fill="#152133">Mud Drywall</text>
+<text x="520" y="248" font-size="11" fill="#5b6576">767 Prospect Avenue</text>
+<circle cx="726" cy="244" r="9" fill="#ffffff" stroke="#e7e5e0"/><text x="726" y="247" font-size="7" text-anchor="middle" fill="#424e61">JA</text><text x="740" y="248" font-size="11" fill="#5b6576">Jose</text>
+<rect x="794" y="233" width="54" height="22" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="821" y="248" font-size="11" text-anchor="middle" fill="#b91c1c">Aug 28</text>
+<line x1="72" y1="260" x2="848" y2="260" stroke="#e7e5e0"/>
+
+<rect x="64" y="262" width="792" height="32" rx="6" fill="#f2f0ec"/>
+<rect x="48" y="272" width="12" height="12" rx="3" fill="#152133"/><path d="M50.5 278.2 53 280.6 57.5 275.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="80" cy="278" r="7" fill="none" stroke="#84817a" stroke-width="1.5"/>
+<text x="96" y="282" fill="#152133">finish electric</text>
+<text x="520" y="282" font-size="11" fill="#5b6576">767 Prospect Avenue</text>
+<circle cx="726" cy="278" r="9" fill="#ffffff" stroke="#e7e5e0"/><text x="726" y="281" font-size="7" text-anchor="middle" fill="#424e61">JH</text><text x="740" y="282" font-size="11" fill="#5b6576">Jake</text>
+<rect x="794" y="267" width="54" height="22" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="821" y="282" font-size="11" text-anchor="middle" fill="#b91c1c">Nov 6</text>
+<line x1="72" y1="294" x2="848" y2="294" stroke="#e7e5e0"/>
+
+<rect x="64" y="296" width="792" height="32" rx="6" fill="#f2f0ec"/>
+<rect x="48" y="306" width="12" height="12" rx="3" fill="#152133"/><path d="M50.5 312.2 53 314.6 57.5 309.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="80" cy="312" r="7" fill="none" stroke="#84817a" stroke-width="1.5"/>
+<text x="96" y="316" fill="#152133">Move water box lower to avoid freezing</text>
+<text x="520" y="316" font-size="11" fill="#5b6576">767 Prospect Avenue</text>
+<circle cx="726" cy="312" r="9" fill="#ffffff" stroke="#e7e5e0"/><text x="726" y="315" font-size="7" text-anchor="middle" fill="#424e61">IF</text><text x="740" y="316" font-size="11" fill="#5b6576">Idrius</text>
+<rect x="794" y="301" width="54" height="22" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="821" y="316" font-size="11" text-anchor="middle" fill="#b91c1c">Nov 6</text>
+</g>
+
+<!-- group 2, nothing picked: boxes still show while picking -->
+<rect x="48.75" y="346.75" width="10.5" height="10.5" rx="2.5" fill="#ffffff" stroke="#84817a" stroke-width="1.5"/>
+<text x="72" y="356" font-size="13" font-weight="600" fill="#152133">118 Congress St.</text>
+<text x="186" y="356" font-size="13" fill="#5b6576">3</text>
+<line x1="72" y1="366" x2="848" y2="366" stroke="#e7e5e0"/>
+<g font-size="12">
+<rect x="48.75" y="378.75" width="10.5" height="10.5" rx="2.5" fill="#ffffff" stroke="#84817a" stroke-width="1.5"/>
+<circle cx="80" cy="384" r="7" fill="none" stroke="#84817a" stroke-width="1.5"/>
+<text x="96" y="388" fill="#152133">SCHEDULE Steve's HVAC work for rear unit</text>
+<text x="520" y="388" font-size="11" fill="#5b6576">118 Congress St.</text>
+<text x="650" y="388" font-size="11" fill="#5b6576">Rear</text>
+<circle cx="726" cy="384" r="9" fill="#ffffff" stroke="#e7e5e0"/><text x="726" y="387" font-size="7" text-anchor="middle" fill="#424e61">PL</text><text x="740" y="388" font-size="11" fill="#5b6576">Pieter</text>
+<rect x="794" y="373" width="54" height="22" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="821" y="388" font-size="11" text-anchor="middle" fill="#b91c1c">Nov 6</text>
+</g>
+
+<!-- the bar, docked to the content column -->
+<path d="M33 426 H867 V472 a12 12 0 0 1 -12 12 H45 a12 12 0 0 1 -12 -12 Z" fill="#f8f7f3"/>
+<line x1="33" y1="426" x2="867" y2="426" stroke="#e7e5e0"/>
+<text x="72" y="459" font-size="12" font-weight="500" fill="#152133">3 selected</text>
+<g font-size="12" fill="#152133">
+<rect x="150" y="440" width="78" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<circle cx="166" cy="455" r="5.5" fill="none" stroke="#424e61" stroke-width="1.3" stroke-dasharray="2.2 1.8"/><text x="178" y="459">Status</text>
+<rect x="236" y="440" width="94" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<circle cx="252" cy="452" r="2.6" fill="none" stroke="#424e61" stroke-width="1.3"/><path d="M247 460 a5 4 0 0 1 10 0" fill="none" stroke="#424e61" stroke-width="1.3"/><text x="264" y="459">Assignee</text>
+<rect x="338" y="440" width="94" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="348" y="449" width="11" height="11" rx="2" fill="none" stroke="#424e61" stroke-width="1.3"/><line x1="348" y1="453" x2="359" y2="453" stroke="#424e61" stroke-width="1.3"/><text x="366" y="459">Due date</text>
+<rect x="440" y="440" width="94" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="451" y="448" width="9" height="13" rx="1" fill="none" stroke="#424e61" stroke-width="1.3"/><line x1="454" y1="452" x2="457" y2="452" stroke="#424e61"/><line x1="454" y1="456" x2="457" y2="456" stroke="#424e61"/><text x="468" y="459">Property</text>
+<rect x="542" y="440" width="82" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<path d="M553 450 h10 M555.5 450 v-1.5 h5 v1.5 M554.5 450 l1 10 h5 l1 -10" fill="none" stroke="#b91c1c" stroke-width="1.3"/><text x="570" y="459" fill="#b91c1c">Delete</text>
+<rect x="772" y="440" width="76" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<path d="M784 451 l7 7 M791 451 l-7 7" stroke="#424e61" stroke-width="1.3"/><text x="798" y="459">Clear</text>
+</g>
+
+<g font-size="11" fill="#5b6576">
+<text x="32" y="506">Hover a row and its box shows in the left margin, in the unread dot's place. Once one is picked, every row and heading shows its box.</text>
+<text x="32" y="522">The header box picks every row on screen, a heading's box picks that building, Shift-click picks a range. A click elsewhere on a row still opens it.</text>
+</g>
+
+<!-- Tablet 768, touch -->
+<text x="32" y="562" font-size="11" font-weight="500" fill="#424e61">Tablet 768 (touch)</text>
+<rect x="32" y="572" width="404" height="300" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="52" y="602" font-size="16" font-weight="600" fill="#152133">Tasks</text>
+<rect x="48" y="616" width="12" height="12" rx="3" fill="#152133"/><line x1="51" y1="622" x2="57" y2="622" stroke="#ffffff" stroke-width="1.5"/>
+<text x="70" y="626" font-size="12" fill="#152133" text-decoration="underline">Select all 42</text>
+<line x1="48" y1="638" x2="420" y2="638" stroke="#e7e5e0"/>
+<rect x="48" y="650" width="12" height="12" rx="3" fill="#152133"/><path d="M50.5 656.2 53 658.6 57.5 653.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="70" y="660" font-size="13" font-weight="600" fill="#152133">767 Prospect Avenue</text><text x="212" y="660" font-size="13" fill="#5b6576">3</text>
+<g font-size="12">
+<rect x="40" y="670" width="388" height="46" rx="6" fill="#f2f0ec"/>
+<rect x="48" y="678" width="12" height="12" rx="3" fill="#152133"/><path d="M50.5 684.2 53 686.6 57.5 681.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="70" y="688" fill="#152133">Mud Drywall</text><text x="420" y="688" font-size="11" text-anchor="end" fill="#b91c1c">Aug 28</text>
+<text x="70" y="706" font-size="11" fill="#5b6576">767 Prospect Avenue</text><text x="420" y="706" font-size="11" text-anchor="end" fill="#5b6576">Jose</text>
+<rect x="40" y="718" width="388" height="46" rx="6" fill="#f2f0ec"/>
+<rect x="48" y="726" width="12" height="12" rx="3" fill="#152133"/><path d="M50.5 732.2 53 734.6 57.5 729.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="70" y="736" fill="#152133">finish electric</text><text x="420" y="736" font-size="11" text-anchor="end" fill="#b91c1c">Nov 6</text>
+<text x="70" y="754" font-size="11" fill="#5b6576">767 Prospect Avenue</text><text x="420" y="754" font-size="11" text-anchor="end" fill="#5b6576">Jake</text>
+</g>
+<path d="M33 812 H435 V860 a12 12 0 0 1 -12 12 H45 a12 12 0 0 1 -12 -12 Z" fill="#f8f7f3"/>
+<line x1="33" y1="812" x2="435" y2="812" stroke="#e7e5e0"/>
+<g font-size="11" fill="#152133">
+<text x="48" y="846" font-weight="500">3 selected</text>
+<rect x="114" y="824" width="56" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="142" y="846" text-anchor="middle">Status</text>
+<rect x="174" y="824" width="62" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="205" y="846" text-anchor="middle">Assignee</text>
+<rect x="240" y="824" width="62" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="271" y="846" text-anchor="middle">Due date</text>
+<rect x="306" y="824" width="62" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="337" y="846" text-anchor="middle">Property</text>
+<rect x="372" y="824" width="52" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="398" y="846" text-anchor="middle" fill="#b91c1c">Delete</text>
+</g>
+<text x="32" y="890" font-size="11" fill="#5b6576">Long-press starts. While picking, the box takes the circle's place</text>
+<text x="32" y="906" font-size="11" fill="#5b6576">and a tap anywhere on a row picks it.</text>
+
+<!-- Phone 375 -->
+<text x="460" y="562" font-size="11" font-weight="500" fill="#424e61">Phone 375</text>
+<rect x="460" y="572" width="200" height="300" rx="20" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="476" y="600" font-size="15" font-weight="600" fill="#152133">Tasks</text>
+<rect x="476" y="612" width="12" height="12" rx="3" fill="#152133"/><line x1="479" y1="618" x2="485" y2="618" stroke="#ffffff" stroke-width="1.5"/>
+<text x="496" y="622" font-size="11" fill="#152133" text-decoration="underline">Select all 42</text>
+<line x1="476" y1="632" x2="644" y2="632" stroke="#e7e5e0"/>
+<rect x="476" y="642" width="12" height="12" rx="3" fill="#152133"/><line x1="479" y1="648" x2="485" y2="648" stroke="#ffffff" stroke-width="1.5"/>
+<text x="496" y="652" font-size="12" font-weight="600" fill="#152133">767 Prospect Ave</text>
+<g font-size="11">
+<rect x="468" y="662" width="184" height="42" rx="6" fill="#f2f0ec"/>
+<rect x="476" y="669" width="12" height="12" rx="3" fill="#152133"/><path d="M478.5 675.2 481 677.6 485.5 672.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="496" y="679" fill="#152133">Mud Drywall</text><text x="644" y="679" font-size="10" text-anchor="end" fill="#b91c1c">Aug 28</text>
+<text x="496" y="695" font-size="10" fill="#5b6576">767 Prospect Ave</text><text x="644" y="695" font-size="10" text-anchor="end" fill="#5b6576">Jose</text>
+<rect x="468" y="706" width="184" height="42" rx="6" fill="#f2f0ec"/>
+<rect x="476" y="713" width="12" height="12" rx="3" fill="#152133"/><path d="M478.5 719.2 481 721.6 485.5 716.6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="496" y="723" fill="#152133">finish electric</text><text x="644" y="723" font-size="10" text-anchor="end" fill="#b91c1c">Nov 6</text>
+<text x="496" y="739" font-size="10" fill="#5b6576">767 Prospect Ave</text><text x="644" y="739" font-size="10" text-anchor="end" fill="#5b6576">Jake</text>
+<rect x="476.75" y="757.75" width="10.5" height="10.5" rx="2.5" fill="#ffffff" stroke="#84817a" stroke-width="1.5"/>
+<text x="496" y="767" fill="#152133">Move water box lo…</text><text x="644" y="767" font-size="10" text-anchor="end" fill="#b91c1c">Nov 6</text>
+<text x="496" y="783" font-size="10" fill="#5b6576">767 Prospect Ave</text><text x="644" y="783" font-size="10" text-anchor="end" fill="#5b6576">Idrius</text>
+</g>
+<path d="M461 820 H659 V852 a20 20 0 0 1 -20 20 H481 a20 20 0 0 1 -20 -20 Z" fill="#f8f7f3"/>
+<line x1="461" y1="820" x2="659" y2="820" stroke="#e7e5e0"/>
+<g>
+<rect x="468" y="828" width="36" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><path d="M474 838 l6 6 M480 838 l-6 6" stroke="#424e61" stroke-width="1.3"/><text x="490" y="846" font-size="11" font-weight="500" fill="#152133">2</text>
+<rect x="510" y="828" width="26" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><circle cx="523" cy="842" r="5.5" fill="none" stroke="#424e61" stroke-width="1.3" stroke-dasharray="2.2 1.8"/>
+<rect x="539" y="828" width="26" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><circle cx="552" cy="839" r="2.6" fill="none" stroke="#424e61" stroke-width="1.3"/><path d="M547 847 a5 4 0 0 1 10 0" fill="none" stroke="#424e61" stroke-width="1.3"/>
+<rect x="568" y="828" width="26" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><rect x="575.5" y="836.5" width="11" height="11" rx="2" fill="none" stroke="#424e61" stroke-width="1.3"/><line x1="575.5" y1="840.5" x2="586.5" y2="840.5" stroke="#424e61" stroke-width="1.3"/>
+<rect x="597" y="828" width="26" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><rect x="605.5" y="835.5" width="9" height="13" rx="1" fill="none" stroke="#424e61" stroke-width="1.3"/>
+<rect x="626" y="828" width="26" height="28" rx="6" fill="#ffffff" stroke="#e7e5e0"/><path d="M634 837 h10 M636.5 837 v-1.5 h5 v1.5 M635.5 837 l1 10 h5 l1 -10" fill="none" stroke="#b91c1c" stroke-width="1.3"/>
+</g>
+<text x="460" y="890" font-size="11" fill="#5b6576">Icons only. Each opens a titled sheet.</text>
+
+<!-- Phone 320, the bar's fit -->
+<text x="684" y="562" font-size="11" font-weight="500" fill="#424e61">Phone 320, the bar</text>
+<rect x="684" y="572" width="184" height="64" rx="8" fill="#f8f7f3" stroke="#e7e5e0"/>
+<g>
+<rect x="690" y="586" width="34" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/><path d="M695 599 l6 6 M701 599 l-6 6" stroke="#424e61" stroke-width="1.3"/><text x="710" y="608" font-size="11" font-weight="500" fill="#152133">2</text>
+<rect x="727" y="586" width="24" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="755" y="586" width="24" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="783" y="586" width="24" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="811" y="586" width="24" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="839" y="586" width="24" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0"/>
+</g>
+<g font-size="11" fill="#5b6576">
+<text x="684" y="656">The × with the count is Clear.</text>
+<text x="684" y="672">Then five 44px buttons:</text>
+<text x="684" y="688">about 285 of the 288px</text>
+<text x="684" y="704">between the 16px gutters.</text>
+</g>
+</svg>

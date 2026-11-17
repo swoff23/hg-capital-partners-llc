@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="840" viewBox="0 0 900 840" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>What each bulk edit opens (status menu, calendar, people sheet, delete dialog) and the toasts after</title>
+<rect width="900" height="840" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">What each button opens, and what you see after</text>
+
+<!-- Status, laptop -->
+<text x="32" y="64" font-size="11" font-weight="500" fill="#424e61">Status: the task page's menu</text>
+<rect x="32" y="76" width="176" height="236" rx="8" fill="#ffffff" stroke="#e7e5e0"/>
+<g font-size="12" fill="#152133">
+<circle cx="50" cy="98" r="5.5" fill="none" stroke="#84817a" stroke-width="1.5"/><text x="64" y="102">To do</text><text x="196" y="102" font-size="10" text-anchor="end" fill="#8a919c">1</text>
+<circle cx="50" cy="126" r="5.5" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="2.2 1.8"/><text x="64" y="130">Scheduled</text><text x="196" y="130" font-size="10" text-anchor="end" fill="#8a919c">2</text>
+<circle cx="50" cy="154" r="5.5" fill="none" stroke="#2563eb" stroke-width="1.5"/><path d="M50 148.5 a5.5 5.5 0 0 1 0 11 Z" fill="#2563eb"/><text x="64" y="158">In progress</text><text x="196" y="158" font-size="10" text-anchor="end" fill="#8a919c">3</text>
+<rect x="32" y="168" width="176" height="28" fill="#e7e5e0"/>
+<circle cx="50" cy="182" r="5.5" fill="none" stroke="#5b6576" stroke-width="1.5"/><line x1="48.3" y1="179.5" x2="48.3" y2="184.5" stroke="#5b6576" stroke-width="1.3"/><line x1="51.7" y1="179.5" x2="51.7" y2="184.5" stroke="#5b6576" stroke-width="1.3"/><text x="64" y="186">Waiting</text><text x="196" y="186" font-size="10" text-anchor="end" fill="#8a919c">4</text>
+<circle cx="50" cy="210" r="5.5" fill="none" stroke="#9a6700" stroke-width="1.5"/><text x="64" y="214">Review</text><text x="196" y="214" font-size="10" text-anchor="end" fill="#8a919c">5</text>
+<circle cx="50" cy="238" r="6" fill="#15803d"/><path d="M47.3 238.2 49.3 240.2 52.8 236.2" fill="none" stroke="#ffffff" stroke-width="1.3"/><text x="64" y="242">Done</text><text x="196" y="242" font-size="10" text-anchor="end" fill="#8a919c">6</text>
+<circle cx="50" cy="266" r="5.5" fill="none" stroke="#84817a" stroke-width="1.5"/><line x1="46.5" y1="269.5" x2="53.5" y2="262.5" stroke="#84817a" stroke-width="1.3"/><text x="64" y="270">Canceled</text><text x="196" y="270" font-size="10" text-anchor="end" fill="#8a919c">7</text>
+</g>
+<rect x="32" y="320" width="72" height="28" rx="6" fill="#ffffff" stroke="#152133"/>
+<text x="68" y="338" font-size="12" text-anchor="middle" fill="#152133">Status</text>
+<text x="32" y="368" font-size="11" fill="#5b6576">No check while the picks are mixed.</text>
+<text x="32" y="384" font-size="11" fill="#5b6576">Review shows when every pick</text>
+<text x="32" y="400" font-size="11" fill="#5b6576">has a contractor.</text>
+
+<!-- Waiting follow-up -->
+<text x="236" y="64" font-size="11" font-weight="500" fill="#424e61">Waiting asks once, for all of them</text>
+<rect x="236" y="76" width="212" height="128" rx="8" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="250" y="102" font-size="12" fill="#5b6576">‹</text><text x="264" y="102" font-size="12" font-weight="500" fill="#152133">What's it waiting on?</text>
+<rect x="250" y="116" width="184" height="30" rx="6" fill="#ffffff" stroke="#84817a"/>
+<text x="260" y="135" font-size="12" fill="#152133">National Fuel</text>
+<rect x="306" y="158" width="128" height="30" rx="6" fill="#152133"/>
+<text x="370" y="177" font-size="12" text-anchor="middle" fill="#ffffff">Set 3 to Waiting</text>
+<text x="236" y="224" font-size="11" fill="#5b6576">Scheduled asks for the visit date</text>
+<text x="236" y="240" font-size="11" fill="#5b6576">the same way. Back or Esc changes</text>
+<text x="236" y="256" font-size="11" fill="#5b6576">nothing.</text>
+
+<!-- Due date, laptop -->
+<text x="476" y="64" font-size="11" font-weight="500" fill="#424e61">Due date: the task page's calendar</text>
+<rect x="476" y="76" width="212" height="236" rx="8" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="490" y="100" font-size="12" font-weight="500" fill="#152133">November 2026</text>
+<text x="660" y="100" font-size="12" fill="#5b6576">‹  ›</text>
+<g font-size="10" fill="#5b6576" text-anchor="middle">
+<text x="498" y="124">Su</text><text x="526" y="124">Mo</text><text x="554" y="124">Tu</text><text x="582" y="124">We</text><text x="610" y="124">Th</text><text x="638" y="124">Fr</text><text x="666" y="124">Sa</text>
+</g>
+<g font-size="11" fill="#152133" text-anchor="middle">
+<text x="498" y="146">1</text><text x="526" y="146">2</text><text x="554" y="146">3</text><text x="582" y="146">4</text><text x="610" y="146">5</text><text x="638" y="146">6</text><text x="666" y="146">7</text>
+<text x="498" y="170">8</text><text x="526" y="170">9</text><text x="554" y="170">10</text><text x="582" y="170">11</text><text x="610" y="170">12</text><text x="638" y="170">13</text><text x="666" y="170">14</text>
+<text x="498" y="194">15</text><rect x="514" y="180" width="24" height="20" rx="5" fill="none" stroke="#84817a"/><text x="526" y="194">16</text><text x="554" y="194">17</text><text x="582" y="194">18</text><text x="610" y="194">19</text><rect x="626" y="180" width="24" height="20" rx="5" fill="#152133"/><text x="638" y="194" fill="#ffffff">20</text><text x="666" y="194">21</text>
+<text x="498" y="218">22</text><text x="526" y="218">23</text><text x="554" y="218">24</text><text x="582" y="218">25</text><text x="610" y="218">26</text><text x="638" y="218">27</text><text x="666" y="218">28</text>
+<text x="498" y="242">29</text><text x="526" y="242">30</text>
+</g>
+<line x1="476" y1="256" x2="688" y2="256" stroke="#e7e5e0"/>
+<text x="490" y="280" font-size="12" fill="#152133">Today</text><text x="540" y="280" font-size="12" fill="#152133">Tomorrow</text><text x="674" y="280" font-size="12" text-anchor="end" fill="#5b6576">Clear date</text>
+<text x="476" y="340" font-size="11" fill="#5b6576">A contractor's Scheduled job moves its visit</text>
+<text x="476" y="356" font-size="11" fill="#5b6576">date, as its row's date chip does today.</text>
+
+<!-- Property -->
+<text x="716" y="64" font-size="11" font-weight="500" fill="#424e61">Property</text>
+<rect x="716" y="76" width="152" height="160" rx="8" fill="#ffffff" stroke="#e7e5e0"/>
+<rect x="726" y="86" width="132" height="26" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="736" y="103" font-size="11" fill="#8a919c">Search properties</text>
+<g font-size="12" fill="#152133"><text x="728" y="134" fill="#5b6576">No property</text><text x="728" y="160">118 Congress St.</text><text x="728" y="186">23 Sherwood St</text><text x="728" y="212">415 Crescent Ave.</text></g>
+<text x="716" y="256" font-size="11" fill="#5b6576">A task keeps its unit when</text>
+<text x="716" y="272" font-size="11" fill="#5b6576">the new building has one</text>
+<text x="716" y="288" font-size="11" fill="#5b6576">by that name, else it clears.</text>
+
+<!-- Assignee, phone -->
+<text x="32" y="440" font-size="11" font-weight="500" fill="#424e61">Assignee, phone 375: a titled sheet</text>
+<rect x="32" y="452" width="200" height="300" rx="20" fill="#f2f0ec" stroke="#e7e5e0"/>
+<path d="M33 520 H231 V732 a20 20 0 0 1 -20 20 H53 a20 20 0 0 1 -20 -20 Z" fill="#ffffff"/>
+<line x1="33" y1="520" x2="231" y2="520" stroke="#e7e5e0"/>
+<text x="48" y="544" font-size="13" font-weight="600" fill="#152133">Assignee · 3 tasks</text><text x="216" y="544" font-size="13" text-anchor="end" fill="#5b6576">×</text>
+<rect x="48" y="556" width="168" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="58" y="575" font-size="11" fill="#8a919c">Search people</text>
+<g font-size="12" fill="#152133">
+<text x="48" y="610" fill="#5b6576">Unassigned</text>
+<text x="48" y="634" font-size="10" font-weight="500" fill="#5b6576">Team</text>
+<circle cx="58" cy="652" r="9" fill="#ffffff" stroke="#e7e5e0"/><text x="58" y="655" font-size="7" text-anchor="middle" fill="#424e61">CS</text><text x="74" y="656">Connor (you)</text>
+<circle cx="58" cy="678" r="9" fill="#ffffff" stroke="#e7e5e0"/><text x="58" y="681" font-size="7" text-anchor="middle" fill="#424e61">PL</text><text x="74" y="682">Pieter</text>
+<text x="48" y="704" font-size="10" font-weight="500" fill="#5b6576">Contractors</text>
+<circle cx="58" cy="722" r="9" fill="#ffffff" stroke="#84817a" stroke-dasharray="2 1.5"/><text x="58" y="725" font-size="7" text-anchor="middle" fill="#424e61">ZR</text><text x="74" y="726">Zack</text>
+</g>
+
+<!-- Delete dialog -->
+<text x="260" y="440" font-size="11" font-weight="500" fill="#424e61">Delete asks first, at every size</text>
+<rect x="260" y="452" width="300" height="140" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="280" y="482" font-size="14" font-weight="600" fill="#152133">Delete 3 tasks?</text>
+<text x="280" y="506" font-size="12" fill="#424e61">Their notes, checklists and files go too.</text>
+<text x="280" y="524" font-size="12" fill="#424e61">This can't be undone.</text>
+<rect x="352" y="544" width="68" height="30" rx="6" fill="#ffffff" stroke="#e7e5e0"/><text x="386" y="563" font-size="12" text-anchor="middle" fill="#152133">Cancel</text>
+<rect x="428" y="544" width="116" height="30" rx="6" fill="#b91c1c"/><text x="486" y="563" font-size="12" text-anchor="middle" fill="#ffffff">Delete 3 tasks</text>
+<text x="260" y="612" font-size="11" fill="#5b6576">Below 640 the buttons stack full width, Delete on top.</text>
+
+<!-- Toasts -->
+<text x="588" y="440" font-size="11" font-weight="500" fill="#424e61">Toasts, bottom left (5 seconds)</text>
+<g font-size="11">
+<rect x="588" y="452" width="280" height="30" rx="8" fill="#152133"/><text x="600" y="471" fill="#ffffff">Moved 3 tasks to Fri Nov 20</text><text x="856" y="471" text-anchor="end" font-weight="500" fill="#ffffff">Undo</text>
+<rect x="588" y="490" width="280" height="30" rx="8" fill="#152133"/><text x="600" y="509" fill="#ffffff">Gave 3 tasks to Zack <tspan fill="#a8b0bd">· Zack gets 3 emails</tspan></text><text x="856" y="509" text-anchor="end" font-weight="500" fill="#ffffff">Undo</text>
+<rect x="588" y="528" width="280" height="30" rx="8" fill="#152133"/><text x="600" y="547" fill="#ffffff">2 tasks set to Done. 1 changed since.</text><text x="856" y="547" text-anchor="end" font-weight="500" fill="#ffffff">Undo</text>
+<rect x="588" y="566" width="280" height="30" rx="8" fill="#152133"/><text x="600" y="585" fill="#ffffff">Put back 2 tasks. 1 changed since.</text>
+<rect x="588" y="604" width="280" height="30" rx="8" fill="#152133"/><text x="600" y="623" fill="#ffffff">Deleted 3 tasks</text>
+</g>
+<text x="588" y="654" font-size="11" fill="#5b6576">The ticks stay, so a second edit reaches</text>
+<text x="588" y="670" font-size="11" fill="#5b6576">the same tasks. Undo puts each task back</text>
+<text x="588" y="686" font-size="11" fill="#5b6576">to its own old value.</text>
+</svg>
