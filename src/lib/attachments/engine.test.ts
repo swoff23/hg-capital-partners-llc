@@ -5,11 +5,11 @@ import { GENERIC_ERROR } from "@/lib/action-result";
 import { UploadEngine, capReason, type EngineDeps, type EngineNotice } from "./engine";
 import { JOB_CLOSED, TOO_LATE } from "./access";
 import { EMPTY_UPLOAD } from "./limits";
-import { closedJobLine, redTilesLine } from "./media";
+import { STORAGE_REFUSED, closedJobLine, redTilesLine } from "./media";
 import { FinalRefusalError, MAX_ONLINE_TRIES, OUTBOX_MAX_AGE_MS, STALL_MS, memoryOutbox, type OutboxStore } from "./outbox";
 import { NOT_A_VIDEO, PrepareError, UNREADABLE_PHOTO } from "./prepare";
 import { WRONG_SIGN_IN } from "./queue-owner";
-import { MAX_FILES_REASON, TOO_MANY_FILES } from "@/lib/portal/job-view";
+import { MAX_FILES_REASON, RETRY_PAST_CAP } from "@/lib/portal/job-view";
 import { TOAST_PHONE_CHARS } from "@/lib/toast-line";
 import type { SendInput } from "./transfer";
 
@@ -125,7 +125,7 @@ test("a batch: camera names are dated, a refused file gets its reason, the rest 
   );
   assert.equal(tiles[2].error, "only photos, videos and documents can be added here");
   assert.equal(new Set(tiles.map((u) => u.batchId)).size, 1, "one batch");
-  assert.deepEqual(h.engine.counts(t.key), { pending: 3, waiting: 0, paused: 0, failed: 1, awaitingPage: 0, pendingKinds: ["image", "image", "file"] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 3, waiting: 0, paused: 0, failed: 1, refused: 0, awaitingPage: 0, pendingKinds: ["image", "image", "file"] });
 
   await h.flush();
   assert.deepEqual(t.recorded.sort(), ["Lease 2026.pdf", "Photo 2026-10-25 at 2.14 PM 2.jpg", "Photo 2026-10-25 at 2.14 PM.jpg"].sort());
@@ -133,7 +133,7 @@ test("a batch: camera names are dated, a refused file gets its reason, the rest 
   assert.deepEqual(h.engine.uploadsFor(t.key).map((u) => u.status), ["invalid"]);
   assert.equal(landed.length, 1);
   assert.equal(landed[0].length, 3);
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, paused: 0, failed: 1, awaitingPage: 0, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, paused: 0, failed: 1, refused: 0, awaitingPage: 0, pendingKinds: [] });
 });
 
 test("the record step gets the pathname, the stored name and no queuedAt unless the target asks", async () => {
@@ -175,7 +175,7 @@ test("no signal: the file waits, then goes the moment the signal is back", async
   h.engine.add(t, [file("a.jpg")]);
   await h.flush();
   assert.equal(h.engine.uploadsFor(t.key)[0].status, "waiting");
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 1, paused: 0, failed: 0, awaitingPage: 0, pendingKinds: ["image"] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 1, paused: 0, failed: 0, refused: 0, awaitingPage: 0, pendingKinds: ["image"] });
   assert.equal(h.sent.length, 1);
 
   h.state.online = true;
@@ -240,6 +240,27 @@ test("a refusal is red at once, with the server's reason; a refused file can't b
   h.engine.retry(b.key);
   await h.flush();
   assert.equal(h.engine.uploadsFor(t.key)[1].status, "invalid");
+});
+
+test("Blob refusing the bytes: the tile says refused by storage, Retry stays, and the report gets Blob's own words", async () => {
+  // Nov 15: a listing photo sent as public to a private store. Blob's own words never reach the server's logs.
+  const h = setup({ script: [new Error("Vercel Blob: Cannot use public access on a private store."), new TypeError("Failed to fetch")] });
+  const reported: Error[] = [];
+  h.deps.report = (e) => reported.push(e);
+  const t = target({ key: "listing:p1", uploadKind: "listing-photo-upload", parentId: "p1", access: "public" });
+  h.engine.add(t, [file("yard.jpg")]);
+  await h.flush();
+  const [tile] = h.engine.uploadsFor(t.key);
+  assert.equal(tile.status, "failed", "red at once, with a Retry");
+  assert.equal(tile.error, STORAGE_REFUSED);
+  assert.equal(h.sent.length, 1, "no second try on its own");
+  assert.equal(reported.length, 1);
+  assert.match(reported[0].message, /listing-photo-upload, public\): Vercel Blob: Cannot use public access on a private store\./);
+  // A dropped connection on the Retry is the road: it waits, and nothing is reported.
+  h.engine.retry(tile.key);
+  await h.flush();
+  assert.equal(h.engine.uploadsFor(t.key)[0].status, "waiting");
+  assert.equal(reported.length, 1);
 });
 
 test("a stalled upload is cut off after 30 seconds and counted as a timeout", async () => {
@@ -838,7 +859,7 @@ test("a final refusal is Remove only: the refused state, its reason, and no Retr
       ["invalid", "This job is closed.", true],
     ],
   );
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, paused: 0, failed: 2, awaitingPage: 0, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, paused: 0, failed: 2, refused: 2, awaitingPage: 0, pendingKinds: [] });
   assert.equal(calls, 2);
   // Neither Retry nor Retry all sends or records anything again.
   h.engine.retry(tiles[0].key);
@@ -893,7 +914,7 @@ test("away from the page, a final refusal says the job closed, with no Retry in 
   h.engine.add(t, [file("a.jpg"), file("b.jpg")]);
   gone();
   await h.flush();
-  assert.deepEqual(h.notices.at(-1), { message: "Job closed before 2 photos uploaded to 56 Tamarack St", key: "upload-failed:portal-task:t9" });
+  assert.deepEqual(h.notices.at(-1), { message: "2 photos not added", detail: "56 Tamarack St", key: "upload-failed:portal-task:t9" });
   assert.ok(!h.notices.some((n) => n.action?.label === "Retry"));
 });
 
@@ -913,7 +934,8 @@ test("away from the page, a mix counts every red tile as the tray does, and its 
   await h.flush();
   const last = h.notices.at(-1)!;
   // The tray's own line for the same two tiles (media.ts redTilesLine), final one included.
-  assert.equal(last.message, "2 photos didn't upload to 56 Tamarack St");
+  assert.equal(last.message, "2 photos didn't upload");
+  assert.equal(last.detail, "56 Tamarack St");
   assert.equal(last.message, redTilesLine(h.engine.uploadsFor(t.key), "56 Tamarack St")!.text);
   assert.equal(last.action?.label, "Retry");
   last.action!.run();
@@ -939,7 +961,7 @@ test("a final refusal from the token route is the same Remove-only tile, with no
       ["invalid", "This job is closed.", true],
     ],
   );
-  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, paused: 0, failed: 2, awaitingPage: 0, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(t.key), { pending: 0, waiting: 0, paused: 0, failed: 2, refused: 2, awaitingPage: 0, pendingKinds: [] });
   assert.equal(calls, 0, "nothing to record: the bytes never went up");
   // Neither Retry nor Retry all asks for another token, and no timer does.
   h.engine.retry(tiles[0].key);
@@ -963,6 +985,9 @@ test("a final token refusal and a final record refusal share one tray: both Remo
   const tiles = h.engine.uploadsFor(t.key);
   assert.deepEqual(tiles.map((u) => [u.status, u.final]), [["invalid", true], ["invalid", true]]);
   assert.equal(closedJobLine(tiles), "Job closed before 2 photos uploaded");
+  // The My jobs row counts them apart from a Retry's: every red one final reads "2 photos not added".
+  assert.equal(h.engine.counts(t.key).failed, 2);
+  assert.equal(h.engine.counts(t.key).refused, 2);
 });
 
 test("a token refusal that is not final keeps Retry, and Retry asks again", async () => {
@@ -986,7 +1011,7 @@ test("away from the page, a token-final file says the job closed too, with no Re
   h.engine.add(t, [file("a.jpg"), file("b.jpg")]);
   gone();
   await h.flush();
-  assert.deepEqual(h.notices.at(-1), { message: "Job closed before 2 photos uploaded to 56 Tamarack St", key: "upload-failed:portal-task:t9" });
+  assert.deepEqual(h.notices.at(-1), { message: "2 photos not added", detail: "56 Tamarack St", key: "upload-failed:portal-task:t9" });
   assert.ok(!h.notices.some((n) => n.action?.label === "Retry"));
 });
 
@@ -1010,7 +1035,7 @@ test("a job in Review that stopped taking files is Remove only and says too late
     ],
   );
   assert.equal(closedJobLine(tiles), "Too late to add 2 photos");
-  assert.deepEqual(h.notices.at(-1), { message: "Too late to add 2 photos to 56 Tamarack St", key: "upload-failed:portal-task:t9" });
+  assert.deepEqual(h.notices.at(-1), { message: "2 photos not added", detail: "56 Tamarack St", key: "upload-failed:portal-task:t9" });
   assert.ok(!h.notices.some((n) => /closed/i.test(n.message)), "a job in Review isn't closed");
   assert.ok(!h.notices.some((n) => n.action), "no Retry, and no other action");
 });
@@ -1028,7 +1053,7 @@ test("away from the page, a final tile beside one the check refused still says t
     ["big.jpg", "invalid", false],
   ]);
   // It used to say nothing here: no tile to retry, and not every red tile final.
-  assert.deepEqual(h.notices.at(-1), { message: "2 photos didn't upload to 56 Tamarack St", key: "upload-failed:portal-task:t9" });
+  assert.deepEqual(h.notices.at(-1), { message: "2 photos didn't upload", detail: "56 Tamarack St", key: "upload-failed:portal-task:t9" });
   assert.equal(h.notices.at(-1)!.message, redTilesLine(tiles, "56 Tamarack St")!.text, "the tray's own words and count");
   assert.equal(redTilesLine(tiles)!.text, "2 photos didn't upload", "the tray's line under the tiles needs no address");
 });
@@ -1346,7 +1371,7 @@ test("dispose: an upload in flight is aborted, its claim let go and its outbox r
   assert.equal(h.timers.size, 0, "no stall or retry timer left");
   assert.deepEqual(recorded, [], "nothing recorded");
   assert.equal((await outbox.all()).length, 1, "the row stays");
-  assert.deepEqual(h.engine.counts(), { pending: 0, waiting: 0, paused: 0, failed: 0, awaitingPage: 0, pendingKinds: [] });
+  assert.deepEqual(h.engine.counts(), { pending: 0, waiting: 0, paused: 0, failed: 0, refused: 0, awaitingPage: 0, pendingKinds: [] });
 
   // The same person's next queue picks it up.
   const next = setup({ outbox, claim: shared.claim, scope: "portal:c-zack" });
@@ -1472,7 +1497,8 @@ test("a failure after its page was left names where the file was going", async (
   gone();
   await h.flush();
   assert.equal(h.notices.length, 1);
-  assert.equal(h.notices[0].message, "1 photo didn't upload to 56 Tamarack St");
+  assert.equal(h.notices[0].message, "1 photo didn't upload");
+  assert.equal(h.notices[0].detail, "56 Tamarack St");
   assert.equal(h.notices[0].action?.label, "Retry");
   const two = [
     { name: "a.jpg", kind: "image" as const, status: "failed" },
@@ -1495,7 +1521,8 @@ test("a file an earlier visit left in the outbox that fails says so, naming wher
   assert.equal(home.engine.uploadsFor("property-photo:p1")[0]?.status, "failed", "its red tile waits on its own page");
   // Named, so it never reads as Home's upload, and with Retry, so nobody waits on a photo they don't know failed.
   assert.equal(home.notices.length, 1);
-  assert.equal(home.notices[0].message, "1 photo didn't upload to 56 Tamarack St");
+  assert.equal(home.notices[0].message, "1 photo didn't upload");
+  assert.equal(home.notices[0].detail, "56 Tamarack St");
   assert.equal(home.notices[0].action?.label, "Retry");
 
   // Retried from the toast and refused again: it says so again, under the same key.
@@ -1527,7 +1554,8 @@ test("a file the server refuses for good, put back by every reload, toasts once 
     assert.equal(load.engine.uploadsFor(key)[0]?.status, "failed", `visit ${visit}: its red tile is still there to Remove`);
     toasts.push(load.notices.length);
     if (visit === 1) {
-      assert.equal(load.notices[0].message, "1 photo didn't upload to 56 Tamarack St");
+      assert.equal(load.notices[0].message, "1 photo didn't upload");
+      assert.equal(load.notices[0].detail, "56 Tamarack St");
       assert.equal(load.notices[0].action?.label, "Retry");
     }
     const [row] = await outbox.all();
@@ -1562,7 +1590,8 @@ test("a file the outbox put back that the job refuses for good says so once, nam
   const [tile] = myJobs.engine.uploadsFor("portal-task:t9");
   assert.deepEqual([tile?.status, tile?.final], ["invalid", true], "its Remove-only tile waits on its own page");
   assert.equal(myJobs.notices.length, 1);
-  assert.equal(myJobs.notices[0].message, "Job closed before 1 photo uploaded to 56 Tamarack St", "named, so it never reads as My jobs' upload");
+  assert.equal(myJobs.notices[0].message, "1 photo not added");
+  assert.equal(myJobs.notices[0].detail, "56 Tamarack St", "named, so it never reads as My jobs' upload");
   assert.equal(myJobs.notices[0].action, undefined, "no Retry: no try can change it");
   myJobs.engine.dispose();
 
@@ -1652,7 +1681,7 @@ test("a Retry of several with no room: each keeps its Retry and its outbox row, 
     key: "portal-task:t7",
     maxFiles: 50,
     maxFilesReason: MAX_FILES_REASON,
-    maxFilesNotice: TOO_MANY_FILES,
+    maxFilesNotice: RETRY_PAST_CAP,
     allowed: ["image"],
     whenAway: "post",
   });
@@ -1671,7 +1700,7 @@ test("a Retry of several with no room: each keeps its Retry and its outbox row, 
   ]);
   // The same words under the tray's one key, so the second toast replaces the first: one shows.
   const said = h.notices.filter((n) => n.key === `upload-cap:${t.key}`);
-  assert.deepEqual([...new Set(said.map((n) => n.message))], ["Send up to 50 at a time."]);
+  assert.deepEqual([...new Set(said.map((n) => n.message))], ["Send these 50, then Retry."]);
   assert.equal(new Set(said.map((n) => n.key)).size, 1);
   // Whole on a phone: a toast is one cut-off line, so a longer one would lose the reason.
   for (const n of said) assert.ok(n.message.length <= TOAST_PHONE_CHARS, n.message);

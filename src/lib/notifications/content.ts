@@ -1,5 +1,5 @@
 import type { TaskStatus } from "@prisma/client";
-import { HG_TIME_ZONE, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { HG_TIME_ZONE, dueLabel, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
@@ -35,6 +35,13 @@ export interface OutboxItem {
   visit?: boolean;
   /** DUE_TODAY and OVERDUE (reminders.ts): the date the reminder is for. */
   due?: string;
+  /**
+   * TARGET, NOTES and STATUS: what the job had before this change, so a change
+   * put back before the email goes is dropped (undoneDropped). TARGET: the
+   * date the contractor saw, "" for none. NOTES: notesFingerprint of the
+   * notes. STATUS: the status. Absent on rows queued before Nov 15.
+   */
+  from?: string;
 }
 
 /** Lines that are the job's own news, with nobody's name in front: the 8 am emails. */
@@ -237,6 +244,51 @@ export function liveReminders(items: readonly OutboxItem[], now: { status: TaskS
   return items.filter((i) => !UNSIGNED_KINDS.has(i.kind) || (i.kind === want && i.due === now.due));
 }
 
+/**
+ * A short fingerprint of a job's notes (cyrb53, trimmed first as core.ts
+ * stores them), so an outbox line can tell notes put back as they were
+ * without keeping a copy: notes can hold lockbox codes, which stay out of the
+ * outbox. "" for no notes.
+ */
+export function notesFingerprint(notes: string | null | undefined): string {
+  const s = notes?.trim() ?? "";
+  if (!s) return "";
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/** The kinds a later change can put back as they were, and what each is compared on. */
+const UNDOABLE_KINDS = ["TARGET", "NOTES", "STATUS"] as const;
+
+/**
+ * Changes put back before the email goes (Connor, Nov 15): a date moved and
+ * moved back, notes edited back to what they said, a status changed and
+ * changed back. For each of those kinds, when its first line's `from` is
+ * what the job has now, every line of that kind goes: the email would only
+ * report a change that isn't there. A kind that ends somewhere new keeps all
+ * its lines, as before. Lines without `from` (queued before Nov 15) stay.
+ *
+ * A status put back takes a send-back's note with it (it lives inside the
+ * STATUS line); the note comment itself stays on the job. Approve's Undo
+ * deletes its line, which reconcileItems already drops.
+ */
+export function undoneDropped(items: readonly OutboxItem[], now: { due: Ymd | null; notes: string | null; status: TaskStatus }): OutboxItem[] {
+  const current: Record<(typeof UNDOABLE_KINDS)[number], string> = { TARGET: now.due ?? "", NOTES: notesFingerprint(now.notes), STATUS: now.status };
+  const undone = new Set<string>(UNDOABLE_KINDS.filter((kind) => {
+    const first = items.find((i) => i.kind === kind);
+    return first?.from !== undefined && first.from === current[kind];
+  }));
+  return items.filter((i) => !undone.has(i.kind));
+}
+
 /** The update an email's button opens at: the first comment, status or file post the recipient can see. */
 export function firstUpdateId(items: readonly OutboxItem[]): string | null {
   return items.find((i) => i.eventId && (i.kind === "COMMENT" || i.kind === "STATUS" || i.kind === "ATTACHMENT"))?.eventId ?? null;
@@ -300,9 +352,12 @@ export function itemText(item: OutboxItem, title?: string): string {
       if (/^started ".*"$/.test(s)) return "started the job";
       const set = /^set ".*" to (.+)$/.exec(s);
       if (set) return `moved it to ${STATUS_BY_WORDS.get(set[1]) ?? set[1]}`;
-      if (/^marked ".*" done$/.test(s)) return "marked it done";
+      // A contractor's Send for review, as rows queued before Nov 15 word it.
+      if (/^marked ".*" done$/.test(s)) return "sent it for review";
+      // A send-back first: its note may end in "for review" itself.
       const tail = sendBackTail(s, title);
       if (tail !== null) return `sent it back${tail}`;
+      if (/^sent ".*" for review$/.test(s)) return "sent it for review";
       return s.replace(/"[^"]*"/, "it");
     }
     case "DUE_TODAY":
@@ -404,19 +459,49 @@ export function previewText(headline: string, lines: readonly string[]): string 
 }
 
 /**
- * The subject every email about a job carries (Connor, Nov 14: the date
- * first, always "Due"): "Due Mon, Nov 23: Replace kitchen faucet, 118
- * Congress St · Rear". No date, just the job. It doesn't change with the kind
- * of change, so each job keeps one thread per date (threadKey).
+ * A job's street and unit as My jobs shows them (job-view.ts addressLine), so an email names the same unit whose
+ * lockbox code the job page shows (D21): "118 Congress St · Rear".
  */
-export function jobSubject(input: { title: string; where: string; due: string | null }): string {
-  const what = [oneLine(input.title) || "A job", input.where].filter(Boolean).join(", ");
-  return input.due ? `Due ${input.due}: ${what}` : what;
+export function jobWhere(address: string | null, unitLabel?: string | null): string {
+  const street = address ? shortAddress(address) || oneLine(address) : "";
+  return addressLine(street || null, unitLabel ? oneLine(unitLabel) : null);
 }
 
-/** What threads one job's emails under one subject: the job and the date in it (resend.ts makes it a header). */
-export function threadKey(taskId: string, dueYmd: string | null): string {
-  return `job-${taskId}-${dueYmd ?? "none"}`;
+/**
+ * A job email's subject: a word for what the email is, then the job, street
+ * and unit (docs/specs/contractor-job-emails.md 2.1): "Update: Replace
+ * kitchen faucet, 118 Congress St · Rear".
+ */
+export function jobSubject(input: { word: string; title: string; where: string }): string {
+  const what = [oneLine(input.title) || "A job", input.where].filter(Boolean).join(", ");
+  return `${input.word}: ${what}`;
+}
+
+/**
+ * The subject's word (Connor, Nov 15: "Due" on every email read wrong once a
+ * job was done). The first that applies: Done while the job is Done when it
+ * goes; Review on a partner's email while it still waits on their review
+ * (docs/specs/send-for-review.md, section 4), the email that carries Approve
+ * and Send back; New for an email that hands the contractor the job, with its
+ * due date written the brand's way ("New, due Friday", dates.ts dueLabel); Due
+ * today or Due yesterday for the 8 am lines; then Update. Removed is
+ * offEmail's, and Error is the reply path's (replies.ts).
+ */
+export function subjectWord(input: { items: readonly OutboxItem[]; status: TaskStatus; due: Ymd | null; today: Ymd; audience: Audience }): string {
+  if (input.status === "DONE") return "Done";
+  if (input.audience === "staff" && input.status === "REVIEW") return "Review";
+  if (input.items.some((i) => i.kind === "ASSIGNED")) return input.due ? `New, due ${dueLabel(input.due, input.today)}` : "New";
+  if (input.items.some((i) => i.kind === "DUE_TODAY")) return "Due today";
+  if (input.items.some((i) => i.kind === "OVERDUE")) return "Due yesterday";
+  return "Update";
+}
+
+/**
+ * What threads one job's emails (resend.ts makes it a header): one id per job, so a date move no longer splits the
+ * thread. Emails sent before Nov 15 carry `job-<id>-<date>`; inbound.ts threadTaskId reads both.
+ */
+export function threadKey(taskId: string): string {
+  return `job-${taskId}`;
 }
 
 /** Directions to the building, the job page's target (job-details.tsx AddressActions). */
@@ -474,8 +559,6 @@ export interface TaskEmail {
   /** What's new's photos: the bundle's own, up to four, then "+N". */
   photos: EmailPhoto[];
   morePhotos: number;
-  /** A contractor's approval thanks them: "Thanks, Zack." */
-  closing?: string;
   /** The next step; null on an email with nothing left to do (taken off the job). */
   primary: EmailButton | null;
   secondary: EmailButton[];
@@ -484,12 +567,6 @@ export interface TaskEmail {
   footnote?: string;
   /** Threads the job's emails (threadKey). */
   threadKey: string;
-}
-
-/** True when the email's latest status change is an approval. */
-function endsApproved(items: OutboxItem[]): boolean {
-  const last = items.findLast((i) => i.kind === "STATUS");
-  return !!last && /^approved ".*"$/.test(oneLine(last.summary));
 }
 
 /**
@@ -520,7 +597,6 @@ export function replyLine(staffNames: readonly string[]): string {
 function buttons(input: {
   audience: Audience;
   status: TaskStatus;
-  approved: boolean;
   appUrl: string;
   taskId: string;
   items: OutboxItem[];
@@ -543,9 +619,9 @@ function buttons(input: {
     overdue && token && contractorMaySetDate(input.status)
       ? [{ label: "Change date", url: to("date") }]
       : [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Text to my crew", url: to("share") }] : [])];
-  const step = input.approved ? null : nextStep(input.status);
+  const step = nextStep(input.status);
   if (step === "start") return { primary: { label: "Start job", url: to(null) }, secondary: extras };
-  if (step === "done") return { primary: { label: "Mark done", url: to("done") }, secondary: extras };
+  if (step === "done") return { primary: { label: "Send for review", url: to("done") }, secondary: extras };
   return { primary: { label: "See job", url: to(null, updateId) }, secondary: [] };
 }
 
@@ -610,10 +686,9 @@ function footnoteFor(input: {
  * there), no access, notes, photos or buttons: the job isn't theirs now.
  */
 export function offEmail(title: string, where: string, taskId: string): TaskEmail {
-  const what = [oneLine(title) || "A job", where].filter(Boolean).join(", ");
   const headline = "You're off this job. No need to go.";
   return {
-    subject: `Off this job: ${what}`,
+    subject: jobSubject({ word: "Removed", title, where }),
     preview: headline,
     headline,
     lines: [],
@@ -642,19 +717,18 @@ export function offEmail(title: string, where: string, taskId: string): TaskEmai
 }
 
 /**
- * One email about a job (docs/specs/contractor-job-emails.md): the Due
- * subject, the preview line, What's new, the next step's buttons and the job.
+ * One email about a job (docs/specs/contractor-job-emails.md): the subject
+ * (subjectWord), the preview line, What's new, the next step's buttons and
+ * the job.
  *
- * The job names its street and unit as My jobs does (job-view.ts
- * addressLine), so the email names the same unit whose lockbox code the job
- * page shows (D21). A contractor's email carries the notes and checklist; a
- * partner's names the contractor and the checklist's progress.
+ * The job names its street and unit as My jobs does (jobWhere). A
+ * contractor's email carries the notes and checklist; a partner's names the
+ * contractor and the checklist's progress.
  *
  * A contractor's email ends on the reply line while the job is still open: a
  * closed job's page is read-only and core.ts addComment refuses a
- * contractor's comment on it. When its latest status change is an approval,
- * it also thanks them by first name and the button reads See job
- * (BCONTRACT-008): nothing is left to do, only the record to see.
+ * contractor's comment on it. An approval emails them nothing
+ * (docs/specs/send-for-review.md); a closed job's email reads See job.
  */
 export function taskEmail(input: {
   items: OutboxItem[];
@@ -675,8 +749,6 @@ export function taskEmail(input: {
   photoUrl?: string | null;
   /** Staff: the contractor on the job. */
   contractorName?: string | null;
-  /** The contractor's name on their contact, for the thanks. */
-  recipientName?: string | null;
   /** First names of the partners, for a contractor's reply line. */
   staffNames?: readonly string[];
   /** The email's own link (job-links.ts): a contractor's EMAIL link, a partner's STAFF link. Null sends plain links. */
@@ -690,18 +762,15 @@ export function taskEmail(input: {
   /** The email has its own reply address (replies post to the job, section 5): the footer says what a reply does. */
   replyByEmail?: boolean;
 }): TaskEmail {
-  const street = input.address ? shortAddress(input.address) || oneLine(input.address) : "";
-  const where = addressLine(street || null, input.unitLabel ? oneLine(input.unitLabel) : null);
+  const where = jobWhere(input.address, input.unitLabel);
   const contractor = input.audience === "contractor";
-  const approved = contractor && endsApproved(input.items);
-  const thanksTo = greetingName(input.recipientName);
   const due = input.due ? fmtDay(input.due, { weekday: true, year: "auto", now: input.today }) : null;
   const { headline, lines } = whatsNew(input.items, input.title);
   const checklist = input.checklist ?? [];
   const notes = input.notes?.trim() ? keepBreaks(input.notes) : null;
   if (contractor && input.items.some((i) => i.kind === "OFF")) return offEmail(input.title, where, input.taskId);
   const token = input.linkToken ?? null;
-  const btns = buttons({ audience: input.audience, status: input.status, approved, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
+  const btns = buttons({ audience: input.audience, status: input.status, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
   // Tapping a photo opens the job: the contractor's through their link, a partner's on the task page.
   const photoHref = contractor ? (token ? jobLinkUrl(input.appUrl, token, null, firstUpdateId(input.items)) : openUrl(input.appUrl, "contractor", input.taskId)) : openUrl(input.appUrl, "staff", input.taskId, firstUpdateId(input.items));
   // A contractor's link stops opening a closed job, thumbnails included, so a closed job's email shows none.
@@ -710,13 +779,12 @@ export function taskEmail(input: {
   const fresh = showPhotos ? photoStrip(input.newPhotoIds ?? [], input.appUrl, token, photoHref) : none;
   const older = contractor && showPhotos ? photoStrip(input.jobPhotoIds ?? [], input.appUrl, token, photoHref, JOB_PHOTO_MAX) : none;
   return {
-    subject: jobSubject({ title: input.title, where, due }),
+    subject: jobSubject({ word: subjectWord({ items: input.items, status: input.status, due: input.due ?? null, today: input.today, audience: input.audience }), title: input.title, where }),
     preview: previewText(headline, lines),
     headline,
     lines,
     photos: fresh.photos,
     morePhotos: fresh.morePhotos,
-    ...(approved ? { closing: thanksTo ? `Thanks, ${thanksTo}.` : "Thanks." } : {}),
     ...btns,
     job: {
       title: oneLine(input.title),
@@ -735,7 +803,7 @@ export function taskEmail(input: {
       morePhotos: older.morePhotos,
     },
     ...footnoteFor(input),
-    threadKey: threadKey(input.taskId, input.due ?? null),
+    threadKey: threadKey(input.taskId),
   };
 }
 

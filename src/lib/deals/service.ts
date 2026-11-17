@@ -3,13 +3,15 @@ import { revalidatePath } from "next/cache";
 import type { Deal } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { FieldError } from "@/lib/action-result";
-import { splitAddress } from "@/lib/address-suggestions";
+import { duplicateSentence, liveFirst, splitAddress } from "@/lib/address-suggestions";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { amountToDecimal } from "@/lib/money";
 import { containsText } from "@/lib/search";
 import type { DealStatus } from "@/lib/config";
 import { setDealArchived } from "@/lib/archive";
+import { logError } from "@/lib/log";
 import { recordDealChanges, recordDealCreated } from "./log";
+import { CLOSED_STAGE, linkClosedDeal } from "./property-link";
 import { dealConflict, dealPatchData, guardedDealFields, refreshOnConflict, staleDealFields, type DealPatch } from "./edits";
 
 export type { DealPatch } from "./edits";
@@ -29,6 +31,8 @@ export type { DealPatch } from "./edits";
  *     (edits.ts, forms 2.12)
  *   - archive and restore (lib/archive.ts) record who did it and add a line
  *     to the deal's log; an archived deal leaves every list, count and search
+ *   - a deal that moves to Closed links to its property when exactly one
+ *     matches (property-link.ts), with a line in its log
  */
 
 export interface Actor {
@@ -49,7 +53,8 @@ function revalidateDeal(id: string): void {
 /**
  * The existing deal this address would duplicate, or null: the same house
  * number and street however it was typed, with no street type, ZIP or town
- * that disagrees (see sameStreetAddress), newest first. The house number
+ * that disagrees (see sameStreetAddress), a live deal before an archived
+ * one, newest first within each. The house number
  * narrows the rows; the street match is done here. `excludeId` leaves out
  * the deal being renamed, so it isn't its own duplicate.
  */
@@ -60,7 +65,7 @@ export async function findDuplicateDeal(address: string, opts: { excludeId?: str
     where: { address: containsText(lead), ...(opts.excludeId ? { id: { not: opts.excludeId } } : {}) },
     orderBy: { updatedAt: "desc" },
   });
-  return candidates.find((d) => sameStreetAddress(d.address, address)) ?? null;
+  return liveFirst(candidates.filter((d) => sameStreetAddress(d.address, address)));
 }
 
 export interface NewDeal {
@@ -124,7 +129,7 @@ async function writeDealPatch(id: string, patch: DealPatch, actor: Actor, expect
   // A rename onto an address another deal has is refused on the address field, like New deal's.
   if (typeof data.address === "string" && data.address !== before.address) {
     const duplicateOf = await findDuplicateDeal(data.address, { excludeId: id });
-    if (duplicateOf) throw new FieldError({ address: `${splitAddress(duplicateOf.address).street} is already a deal.` });
+    if (duplicateOf) throw new FieldError({ address: duplicateSentence("deal", splitAddress(duplicateOf.address).street, duplicateOf.archivedAt !== null) });
   }
 
   const guarded = guardedDealFields(patch, expected);
@@ -141,7 +146,24 @@ async function writeDealPatch(id: string, patch: DealPatch, actor: Actor, expect
     await prisma.deal.update({ where: { id }, data: { ...data, ...stamp(actor) } });
   }
   await recordDealChanges(id, actor, before, data);
+  if (data.status === CLOSED_STAGE && before.status !== CLOSED_STAGE) await linkToProperty(id, actor);
   revalidateDeal(id);
+}
+
+/**
+ * Links a deal that just moved to Closed to its property, when exactly one
+ * matches (property-link.ts), and writes "Linked to 118 Congress St." in its
+ * log. The stage is saved by now, so a failure here is logged and never
+ * fails that save; the deal stays unlinked, as before this existed.
+ */
+async function linkToProperty(id: string, actor: Actor): Promise<void> {
+  try {
+    const linked = await prisma.$transaction((tx) => linkClosedDeal(tx, id, actor));
+    // The property's page gains its "From deal" line.
+    if (linked) revalidatePath(`/properties/${linked.propertyId}`);
+  } catch (err) {
+    logError("deals:link-property", err, { dealId: id });
+  }
 }
 
 /**

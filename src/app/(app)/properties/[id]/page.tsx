@@ -4,7 +4,7 @@ import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { preload } from "@/lib/preload";
-import { getPropertyById } from "@/lib/properties/read";
+import { getEntityChoices, getPropertyById } from "@/lib/properties/read";
 import { getPropertyFinancials } from "@/lib/quickbooks/queries";
 import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
@@ -13,15 +13,15 @@ import { toYmd, todayYmdEastern } from "@/lib/dates";
 import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
 import { targetDate } from "@/lib/tasks/rules";
-import { loanPosition } from "@/lib/properties/figures";
+import { buildingLine, loanPosition } from "@/lib/properties/figures";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { countUnitRefs } from "@/lib/properties/unit-refs";
 import { BackLink } from "@/components/back-link";
 import { ArchivedNotice } from "@/components/record-archive";
 import { archivedLine } from "@/lib/archive";
+import { shortAddress } from "@/lib/normalize";
 import { setPropertyArchived } from "../actions";
-import { PropertyStatus } from "../property-status";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { DocumentsSection, propertyDocuments } from "./documents-section";
 import { PropertyLoanSection } from "./edit-loan";
@@ -35,6 +35,10 @@ import { PropertyFactStrip } from "./record-strip";
 import { PropertyMoreMenu } from "./property-more-menu";
 import { PropertyPhoto } from "./property-photo";
 import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
+import { FillOnArrival, PropertyMissingLine } from "./missing-line";
+import { PropertyMissingProvider } from "./missing-context";
+import { ofPriority, sectionCounts } from "@/lib/missing/checks";
+import { handedOff, loadMissingInfo } from "@/lib/missing/queries";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
 
@@ -65,8 +69,9 @@ function taskAssignee(t: {
 
 /**
  * A property's record (docs/brand-guidelines.md, sections 5 and 9): capped at
- * 1200 with a 320 rail from lg. The identity header (photo, status, the
- * address as the h1, entity and units), the four-fact strip, then the work
+ * 1200 with a 320 rail from lg. The identity header (the address as the h1,
+ * then beds, baths, square feet and units; the photo once one is set), the
+ * four-fact strip, then the work
  * first (docs/specs/property-page.md): tasks, units and access, financials,
  * CapEx and rental listings, beside the facts rail (details, loan, insurance)
  * and the property's documents and notes. Below lg it's one column in that
@@ -78,7 +83,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   preload(getPropertyFinancials(id));
   preload(propertyDocuments(id));
   // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
-  const [user, property, openTasks, sourceDeal, propertyListings, capexRules] = await Promise.all([
+  const today = todayYmdEastern();
+  const [user, property, openTasks, sourceDeal, propertyListings, capexRules, entities, missingInfo, handed] = await Promise.all([
     requireUser(),
     getPropertyById(id),
     prisma.task.findMany({
@@ -93,8 +99,15 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       include: { photos: { orderBy: { sortOrder: "asc" } } },
     }),
     getCapexRules(),
+    getEntityChoices(),
+    // Its required blanks (docs/specs/missing-info.md, D2): the line under the header and the marks in each section.
+    loadMissingInfo(today, { propertyId: id }),
+    handedOff(),
   ]);
   if (!property) notFound();
+  const missing = ofPriority(missingInfo.gaps, "required");
+  const missingUnits: Record<string, number> = {};
+  for (const g of missing) if (g.section === "units" && g.unitId) missingUnits[g.unitId] = (missingUnits[g.unitId] ?? 0) + 1;
   // Who archived it, for the notice: read only for an archived property, so a live one costs no extra query.
   const archivedBy = property.archivedByUserId
     ? await prisma.user.findUnique({ where: { id: property.archivedByUserId }, select: { name: true, email: true } })
@@ -122,7 +135,6 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   // Each task's Target (D7: the visit date while Scheduled, otherwise Due), soonest first, as on Today.
   // A past Target reads red by Today's rule (isTargetLate: never Waiting or Review); it's
   // the date this list shows, so it's the date judged.
-  const today = todayYmdEastern();
   const tasks = openTasks
     .map((t) => ({
       id: t.id,
@@ -139,147 +151,148 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   const value = d(property.value);
   const balance = d(property.currentLoan);
   const position = loanPosition(value, balance);
-  const subline = [property.llcOwner?.trim(), unitCount > 0 && `${unitCount} ${unitCount === 1 ? "unit" : "units"}`]
-    .filter(Boolean)
-    .join(" · ");
+  const subline = buildingLine({ beds: property.beds, baths: d(property.baths), sqft: property.sqft, units: unitCount });
   const version = property.updatedAt.toISOString();
 
   return (
-    <div className="max-w-300">
-      <BackLink fallback="/properties" label="Portfolio" />
+    <PropertyMissingProvider fields={missing.flatMap((g) => (g.field ? [g.field] : []))} sections={sectionCounts(missing)} units={missingUnits}>
+      <div className="max-w-300">
+        <BackLink fallback="/properties" label="Portfolio" />
 
-      {/* Identity: the building's photo (the fallback tile until it's taken), status, address, entity and units. */}
-      <header className="mt-3 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
-        {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. */}
-        <PropertyPhoto property={{ id: property.id, address: property.address, photoUrl: property.photoUrl }} canEdit />
-        <div className="min-w-0">
-          {property.status && (
-            <p className="text-meta">
-              <PropertyStatus status={property.status} />
-            </p>
-          )}
-          {/* The ⋯ menu is centered on the address's first line, as on a task's page: the heading's 4px padding and half its line, less half the 32px button (44 on touch). */}
-          <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1">
-              <PropertyAddressField id={property.id} value={property.address} />
+        {/* Identity: the address, then what the building is (Connor, Nov 14). Status lives in Details; the photo shows
+          once one is set, and the ⋯ menu's "Add photo" sets the first. */}
+        <header className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
+          {/* Full width at 16:9 on a phone, often held at the building; 96x72 beside the title from sm. Nothing until set. */}
+          <PropertyPhoto property={{ id: property.id, address: property.address, photoUrl: property.photoUrl }} canEdit />
+          <div className="min-w-0 flex-1">
+            {/* The ⋯ menu is centered on the address's first line, as on a task's page: the heading's 4px padding and half its line, less half the 32px button (44 on touch). */}
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <PropertyAddressField id={property.id} value={property.address} />
+              </div>
+              <div className="shrink-0 pt-1 pointer-coarse:-mt-px pointer-coarse:pt-0">
+                <PropertyMoreMenu
+                  id={property.id}
+                  archived={!!property.archivedAt}
+                  canAddListing={!property.archivedAt && listings.length === 0 && unitLabels.length > 0}
+                  canAddPhoto={!property.archivedAt && !property.photoUrl}
+                />
+              </div>
             </div>
-            <div className="shrink-0 pt-1 pointer-coarse:-mt-px pointer-coarse:pt-0">
-              <PropertyMoreMenu id={property.id} archived={!!property.archivedAt} canAddListing={!property.archivedAt && listings.length === 0 && unitLabels.length > 0} />
-            </div>
+            {subline && <p className="text-meta text-muted-foreground">{subline}</p>}
           </div>
-          {subline && <p className="text-meta text-muted-foreground">{subline}</p>}
-        </div>
-      </header>
+        </header>
 
-      {property.archivedAt && (
-        <ArchivedNotice
-          className="mt-4"
-          kind="property"
-          id={property.id}
-          line={archivedLine(archivedBy, property.archivedAt)}
-          action={setPropertyArchived}
+        {property.archivedAt && (
+          <ArchivedNotice className="mt-4" kind="property" id={property.id} line={archivedLine(archivedBy, property.archivedAt)} action={setPropertyArchived} />
+        )}
+
+        {/* Archived, it's out of Missing info, so it says nothing here either. */}
+        {!property.archivedAt && <PropertyMissingLine className="mt-4" gaps={missing} handed={handed} />}
+
+        {/* Open tasks isn't repeated here: the Tasks section shows its count. */}
+        <PropertyFactStrip
+          className="mt-6"
+          property={{ value: toMoneyNumber(property.value), balance: toMoneyNumber(property.currentLoan) }}
+          position={position}
         />
-      )}
 
-      {/* Open tasks isn't repeated here: the Tasks section shows its count. */}
-      <PropertyFactStrip
-        className="mt-6"
-        property={{ value: toMoneyNumber(property.value), balance: toMoneyNumber(property.currentLoan) }}
-        position={position}
-      />
+        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10 pointer-coarse:mt-6">
+          {/* The work: what's open here, how to get in, then the money and the plan. */}
+          <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
+            <PropertyTasksSection propertyId={property.id} tasks={tasks} today={today} />
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10 pointer-coarse:mt-6">
-        {/* The work: what's open here, how to get in, then the money and the plan. */}
-        <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
-          <PropertyTasksSection propertyId={property.id} tasks={tasks} today={today} />
+            <UnitsSection
+              propertyId={property.id}
+              address={property.address}
+              version={version}
+              // Every unit with an id, so the save can tell a rename from a remove and an add.
+              initial={withUnitIds(units)}
+              rules={capexRules}
+              // What names each unit, so removing one that's still in use asks first.
+              unitRefs={countUnitRefs(openTasks, propertyListings)}
+            />
 
-          <UnitsSection
-            propertyId={property.id}
-            address={property.address}
-            version={version}
-            // Every unit with an id, so the save can tell a rename from a remove and an add.
-            initial={withUnitIds(units)}
-            rules={capexRules}
-            // What names each unit, so removing one that's still in use asks first.
-            unitRefs={countUnitRefs(openTasks, propertyListings)}
-          />
+            <PropertyFinancialsCard propertyId={property.id} />
 
-          <PropertyFinancialsCard propertyId={property.id} />
+            <CapexForecastCard units={units} building={buildingCapex} rules={capexRules}>
+              <BuildingSystems propertyId={property.id} version={version} initial={buildingCapex} rules={capexRules} />
+            </CapexForecastCard>
 
-          <CapexForecastCard units={units} building={buildingCapex} rules={capexRules}>
-            <BuildingSystems propertyId={property.id} version={version} initial={buildingCapex} rules={capexRules} />
-          </CapexForecastCard>
+            {/* Nothing until the first listing; the header's ⋯ "Add listing" opens its sheet. */}
+            <ListingsSection propertyId={property.id} version={version} initial={listings} unitLabels={unitLabels} />
+          </div>
 
-          {/* Nothing until the first listing; the header's ⋯ "Add listing" opens its sheet. */}
-          <ListingsSection propertyId={property.id} version={version} initial={listings} unitLabels={unitLabels} />
+          {/* The facts rail, then the property's documents and notes. Sections sit 32px apart, 24 on touch. */}
+          <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
+            <PropertyDetailsSection
+              property={{
+                id: property.id,
+                address: property.address,
+                llcOwner: property.llcOwner,
+                attorney: property.attorney,
+                status: property.status,
+                showOnMoveInForm: property.showOnMoveInForm,
+                purchaseDate: ymd(property.purchaseDate),
+                purchasePrice: d(property.purchasePrice),
+                value,
+                refinanceDate: ymd(property.refinanceDate),
+                sqft: property.sqft,
+                beds: property.beds,
+                baths: d(property.baths),
+                rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
+                propertyTaxDueDate: ymd(property.propertyTaxDueDate),
+              }}
+              entities={entities}
+            />
+
+            <PropertyLoanSection
+              loan={{
+                id: property.id,
+                address: property.address,
+                value,
+                currentLoan: balance,
+                lender: property.lender,
+                loanServicer: property.loanServicer,
+                loanNumber: property.loanNumber,
+                loanType: property.loanType,
+                loanOriginalAmount: d(property.loanOriginalAmount),
+                loanRate: d(property.loanRate),
+                loanPaymentMonthly: d(property.loanPaymentMonthly),
+                loanEscrow: property.loanEscrow,
+                loanOriginationDate: ymd(property.loanOriginationDate),
+                loanMaturityDate: ymd(property.loanMaturityDate),
+              }}
+            />
+
+            <PropertyInsuranceSection
+              insurance={{
+                id: property.id,
+                address: property.address,
+                insuranceCarrier: property.insuranceCarrier,
+                insurancePolicyNo: property.insurancePolicyNo,
+                insurancePremium: d(property.insurancePremium),
+                insuranceCoverage: d(property.insuranceCoverage),
+                insuranceDeductible: d(property.insuranceDeductible),
+                insuranceLiability: property.insuranceLiability,
+                insuranceRenewalDate: ymd(property.insuranceRenewalDate),
+                replacementCost: d(property.replacementCost),
+              }}
+            />
+
+            <DocumentsSection propertyId={property.id} />
+
+            <PropertyNotesSection id={property.id} notes={property.notes} />
+            {sourceDeal && (
+              <p className="text-meta text-muted-foreground">
+                From deal <TextLink href={`/deals/${sourceDeal.id}`}>{shortAddress(sourceDeal.address) || sourceDeal.address}</TextLink>
+              </p>
+            )}
+          </div>
         </div>
-
-        {/* The facts rail, then the property's documents and notes. Sections sit 32px apart, 24 on touch. */}
-        <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
-          <PropertyDetailsSection
-            property={{
-              id: property.id,
-              address: property.address,
-              llcOwner: property.llcOwner,
-              attorney: property.attorney,
-              status: property.status,
-              showOnMoveInForm: property.showOnMoveInForm,
-              strategy: property.strategy,
-              purchaseDate: ymd(property.purchaseDate),
-              purchasePrice: d(property.purchasePrice),
-              value,
-              refinanceDate: ymd(property.refinanceDate),
-              sqft: property.sqft,
-              rentalRegistrationExpiry: ymd(property.rentalRegistrationExpiry),
-              propertyTaxDueDate: ymd(property.propertyTaxDueDate),
-            }}
-          />
-
-          <PropertyLoanSection
-            loan={{
-              id: property.id,
-              address: property.address,
-              value,
-              currentLoan: balance,
-              lender: property.lender,
-              loanServicer: property.loanServicer,
-              loanNumber: property.loanNumber,
-              loanType: property.loanType,
-              loanOriginalAmount: d(property.loanOriginalAmount),
-              loanRate: d(property.loanRate),
-              loanPaymentMonthly: d(property.loanPaymentMonthly),
-              loanEscrow: property.loanEscrow,
-              loanOriginationDate: ymd(property.loanOriginationDate),
-              loanMaturityDate: ymd(property.loanMaturityDate),
-            }}
-          />
-
-          <PropertyInsuranceSection
-            insurance={{
-              id: property.id,
-              address: property.address,
-              insuranceCarrier: property.insuranceCarrier,
-              insurancePolicyNo: property.insurancePolicyNo,
-              insurancePremium: d(property.insurancePremium),
-              insuranceCoverage: d(property.insuranceCoverage),
-              insuranceDeductible: d(property.insuranceDeductible),
-              insuranceLiability: property.insuranceLiability,
-              insuranceRenewalDate: ymd(property.insuranceRenewalDate),
-              replacementCost: d(property.replacementCost),
-            }}
-          />
-
-          <DocumentsSection propertyId={property.id} />
-
-          <PropertyNotesSection id={property.id} notes={property.notes} />
-          {sourceDeal && (
-            <p className="text-meta text-muted-foreground">
-              From deal <TextLink href={`/deals/${sourceDeal.id}`}>{sourceDeal.address}</TextLink>
-            </p>
-          )}
-        </div>
+        <FillOnArrival />
       </div>
-    </div>
+    </PropertyMissingProvider>
   );
 }
 

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
+import { notesFingerprint } from "@/lib/notifications/content";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
@@ -345,10 +346,16 @@ export interface OutboxItem {
   visit?: boolean;
   /** DUE_TODAY and OVERDUE (notifications/reminders.ts): the date the reminder is for, which keeps it to once per date. */
   due?: string;
+  /**
+   * TARGET, NOTES and STATUS: what the job had before this change, so the drain drops a change put back before the
+   * email goes (notifications/content.ts undoneDropped). TARGET the date ("" for none), NOTES notesFingerprint, STATUS
+   * the status.
+   */
+  from?: string;
 }
 
 /** What a line carries beside its summary (OutboxItem's optional fields). */
-type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit">;
+type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit" | "from">;
 
 type NotifyTask = Pick<Task, "id" | "assigneeContactId">;
 
@@ -533,6 +540,12 @@ export interface NewTaskInput {
   taskTemplateId?: string | null;
   autoKey?: string | null;
   priority?: string | null;
+  /**
+   * Checklist items to start with, in order. Missing info's Make task gives each
+   * the row it stands for (`checkKey`, docs/specs/missing-info.md D9), so the
+   * item ticks itself once that row is filled in.
+   */
+  checklist?: { title: string; checkKey?: string | null }[];
 }
 
 export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now = new Date()): Promise<Task> {
@@ -586,6 +599,9 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
     await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
   }
   await logDeal(tx, task.dealId, p, `Task added: ${task.title}`, now);
+  for (const item of input.checklist ?? []) {
+    if (item.title.trim()) await addChecklistItem(tx, task.id, item.title, p, now, item.checkKey ?? null);
+  }
   return task;
 }
 
@@ -604,7 +620,7 @@ export function statusSummary(
   now: Date,
 ): string {
   const t = `"${c.title}"`;
-  if (c.to === "REVIEW" && c.actor === "contractor") return `marked ${t} done`;
+  if (c.to === "REVIEW" && c.actor === "contractor") return `sent ${t} for review`;
   if (c.from === "REVIEW" && c.to === "IN_PROGRESS") return `sent ${t} back${c.note ? `: ${c.note}` : ""}`;
   if (c.from === "REVIEW" && c.to === "DONE") return `approved ${t}`;
   if (c.to === "IN_PROGRESS" && c.actor === "contractor") return `started ${t}`;
@@ -774,8 +790,9 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   if (noteEvent && p.kind === "contractor") {
     await notify(tx, task, p, { kind: "COMMENT", visibility: "SHARED" }, commentSummary(note ?? "", noteEvent.linked), now, { eventId: noteEvent.event.id });
   }
-  const audience = await notify(tx, task, p, { kind: "STATUS", visibility }, summary, now, {
+  const audience = await notify(tx, task, p, { kind: "STATUS", visibility, to }, summary, now, {
     eventId: statusEvent.id,
+    from: before.status,
     ...(noteEvent && p.kind !== "contractor" && note ? { noteEventId: noteEvent.event.id } : {}),
   });
   // A canceled open job tells its contractor there's no need to go (the Canceled line itself stays Internal).
@@ -797,7 +814,8 @@ type ApprovalEmail = { sentAt: Date | null; lastError: string | null; openKey: s
 
 /**
  * What an approval's email rows say about its Undo, as one toast line, or
- * null when nothing stops it. Sent (`sentAt` with no `lastError`): Zack has
+ * null when nothing stops it. Since Nov 15 an approval emails nobody
+ * (rules.ts notifyAudience), so only an approval queued before then has rows. Sent (`sentAt` with no `lastError`): Zack has
  * it. On its way (`sentAt` null, claimed, a try spent): a send run has it,
  * or it failed and waits to try again, and either way it may reach him. A
  * row closed without sending (`sentAt` with a `lastError`: nothing left in
@@ -813,8 +831,8 @@ export function approvalEmailRefusal(rows: readonly ApprovalEmail[]): string | n
  * Approve's Undo (activity 2.8): the job goes back to Review as if it had not
  * been approved. A plain `setStatus(REVIEW)` would not do: it writes a Shared
  * status line, so Zack is emailed "moved it to Review" and the portal shows
- * "Connor marked it done", and it becomes the latest move to Review, so the
- * contractor loses the late-upload hour after his own Mark done. This writes
+ * "Connor moved it to Review", and it becomes the latest move to Review, so
+ * the contractor loses the late-upload hour after his own Send for review. This writes
  * no status line of its own. It soft-deletes the Done line (the events stay
  * in the database; the timeline hides what was undone at once, and the drain
  * drops the approval from an email still waiting, since its item names that
@@ -825,9 +843,10 @@ export function approvalEmailRefusal(rows: readonly ApprovalEmail[]): string | n
  * Staff only, and only the partner who approved, within APPROVAL_UNDO_MS:
  * the toast stays up while hovered or focused, so the server keeps the
  * limit. Refused, with who moved it, when the task is no longer Done or the
- * approval is not the latest status line, and once the approval's email is
- * sent or on its way (approvalEmailRefusal): by then Zack has been told, or
- * may be, and the status menu is the honest way back. A row the drain closed
+ * approval is not the latest status line, and, for an approval from before
+ * approvals stopped emailing, once its email is sent or on its way
+ * (approvalEmailRefusal): by then Zack has been told, or may be, and the
+ * status menu is the honest way back. A row the drain closed
  * without sending doesn't stop it. A retry of an Undo that already went
  * through is a quiet success. Lock order: this task, then its contractor's
  * Contact (FOR SHARE: one archived since the approval doesn't get the job
@@ -1261,10 +1280,10 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
       // Whether the date that moved is the booked visit, so the email says "visit" or "due date" the way the job
       // page labels it (a cleared date is the one the job had).
       const visit = targetIsVisit(targetAfter ? after : before);
-      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { visit });
+      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { visit, from: targetBefore ?? "" });
     }
     if (events.some((e) => e.kind === "NOTES")) {
-      await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now);
+      await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now, { from: notesFingerprint(before.description) });
     }
   }
   return after;
@@ -1299,7 +1318,7 @@ export async function setDateByContractor(tx: Tx, taskId: string, date: Ymd, p: 
   const after = await tx.task.update({ where: { id: taskId }, data: { ...data, ...editStamp(p, now) } });
   for (const e of events) await addEvent(tx, taskId, p, e);
   const was = from ? ` (was ${emailDay(from, now)})` : "";
-  await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { visit: false });
+  await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { visit: false, from: from ?? "" });
   return after;
 }
 
@@ -1997,7 +2016,7 @@ export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p:
   return updated;
 }
 
-export async function addChecklistItem(tx: Tx, taskId: string, title: string, p: Principal, now = new Date()) {
+export async function addChecklistItem(tx: Tx, taskId: string, title: string, p: Principal, now = new Date(), checkKey: string | null = null) {
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't add checklist items yet.");
   const t = title.trim();
   if (!t) throw new TaskRuleError("The item needs a name.");
@@ -2006,7 +2025,7 @@ export async function addChecklistItem(tx: Tx, taskId: string, title: string, p:
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   if (!(await tx.task.findUnique({ where: { id: taskId }, select: { id: true } }))) throw new TaskRuleError("That task no longer exists.");
   const last = await tx.taskChecklistItem.findFirst({ where: { taskId }, orderBy: { position: "desc" }, select: { position: true } });
-  const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1 } });
+  const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1, checkKey } });
   // Stamped like every other edit, so a repeat copy someone added to counts
   // as touched and isn't taken back when the finished task reopens.
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });

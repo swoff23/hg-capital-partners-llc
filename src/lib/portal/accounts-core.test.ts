@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { FieldError, toFailure } from "@/lib/action-result";
 import { TOAST_PHONE_CHARS } from "@/lib/toast-line";
 import {
   ARCHIVED_CONTRACTOR_LINE,
@@ -87,9 +88,9 @@ test("changePortalEmailIn: the same address changes nothing, so open reset links
 
 test("changePortalEmailIn: a refused change writes nothing and leaves the links alone", async () => {
   const taken = fakeAccounts();
-  await assert.rejects(changePortalEmailIn(taken.tx, "a1", "jose@example.com", STAFF), (e) => e instanceof PortalAccountError && /already uses/.test(e.message));
+  await assert.rejects(changePortalEmailIn(taken.tx, "a1", "jose@example.com", STAFF), (e) => e instanceof FieldError && /already uses/.test(e.message) && e.fieldErrors.email === e.message);
   const staff = fakeAccounts({ staffEmails: ["connor@example.com"] });
-  await assert.rejects(changePortalEmailIn(staff.tx, "a1", "connor@example.com", STAFF), (e) => e instanceof PortalAccountError && /staff login/.test(e.message));
+  await assert.rejects(changePortalEmailIn(staff.tx, "a1", "connor@example.com", STAFF), (e) => e instanceof FieldError && /staff login/.test(e.message) && e.fieldErrors.email === e.message);
   const gone = fakeAccounts();
   await assert.rejects(changePortalEmailIn(gone.tx, "nope", "x@example.com", STAFF), (e) => e instanceof PortalAccountError && /no longer exists/.test(e.message));
   for (const f of [taken, staff, gone]) {
@@ -190,9 +191,23 @@ test("createPortalAccountIn: the other refusals still read as before", async () 
     ],
     [{ id: "a-has", contactId: "c-has", email: "has@example.com", status: "ACTIVE" }],
   );
-  await assert.rejects(createPortalAccountIn(f.tx, "c-has", "x@example.com", "hash", STAFF), /already has a login/);
-  await assert.rejects(createPortalAccountIn(f.tx, "c-free", "has@example.com", "hash", STAFF), /already uses that email/);
-  await assert.rejects(createPortalAccountIn(f.tx, "nope", "x@example.com", "hash", STAFF), /no longer exists/);
+  // A refusal about the address marks the Email field (a FieldError on `email`); the others belong to no field, so the
+  // sheet shows them on its own line above the buttons (a plain PortalAccountError, no fieldErrors).
+  await assert.rejects(createPortalAccountIn(f.tx, "c-has", "x@example.com", "hash", STAFF), (e) => e instanceof PortalAccountError && /already has a login/.test(e.message));
+  await assert.rejects(createPortalAccountIn(f.tx, "c-free", "has@example.com", "hash", STAFF), (e) => e instanceof FieldError && e.fieldErrors.email === "Another contractor already uses that email.");
+  await assert.rejects(createPortalAccountIn(f.tx, "nope", "x@example.com", "hash", STAFF), (e) => e instanceof PortalAccountError && /no longer exists/.test(e.message));
+  // A staff address is refused on the Email field here too, the ruling's own example.
+  const staffFound = { ...f.tx, user: { findFirst: async () => ({ id: "u-staff" }) } };
+  await assert.rejects(
+    createPortalAccountIn(staffFound as unknown as typeof f.tx, "c-free", "connor@example.com", "hash", STAFF),
+    (e) => e instanceof FieldError && e.fieldErrors.email === "That email belongs to a staff login.",
+  );
+  assert.deepEqual(toFailure(new PortalAccountError("This contractor already has a login.")), { ok: false, error: "This contractor already has a login." });
+  assert.deepEqual(toFailure(new FieldError({ email: "That email belongs to a staff login." })), {
+    ok: false,
+    error: "That email belongs to a staff login.",
+    fieldErrors: { email: "That email belongs to a staff login." },
+  });
   assert.deepEqual(f.writes, []);
 });
 
@@ -292,4 +307,15 @@ test("setJobEmailsIn: a login that is gone is refused in words staff can read", 
   const { tx, events } = fakeSwitch(true);
   await assert.rejects(() => setJobEmailsIn(tx, "nope", false, STAFF), (err: unknown) => err instanceof PortalAccountError && err.message === "That login no longer exists.");
   assert.equal(events.length, 0);
+});
+
+test("a sign-up that races past the reads still gets the email line: rethrowUnique maps the account step's FieldError", async () => {
+  // invites.ts is server-only, so its source is read. Call 5 made the account step refuse an address as a FieldError.
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./invites.ts", import.meta.url), "utf8");
+  assert.match(src, /import \{ FieldError \} from "@\/lib\/action-result";/);
+  assert.match(
+    src,
+    /function rethrowUnique[\s\S]*?if \(err instanceof FieldError && err\.fieldErrors\.email\) throw new InviteError\(EMAIL_TAKEN, "email"\);[\s\S]*?throw err;/,
+  );
 });

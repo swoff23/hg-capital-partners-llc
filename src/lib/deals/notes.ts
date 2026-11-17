@@ -12,8 +12,10 @@ import { DEAL_MESSAGES, NOTE_MAX } from "./field-rules";
  * A note records who wrote it (`authorUserId`) and is no longer signed with
  * their initials. A partner edits or deletes only their own: an edit sets
  * `editedAt`, a delete sets `deletedAt` and a restore (the toast's Undo)
- * clears it. Notes from before an author was recorded have none, so nobody
- * can edit them until the backfill (scripts/backfill-deal-note-authors.ts)
+ * clears it. A line imported from the deals sheet (`source = "migration"`)
+ * is nobody's, so any partner may edit or delete it (Connor, Nov 15 2026).
+ * Typed notes from before an author was recorded have none, so nobody can
+ * edit them until the backfill (scripts/backfill-deal-note-authors.ts)
  * names theirs.
  */
 
@@ -85,10 +87,15 @@ export async function addDealNote(dealId: string, body: string, actor: NoteAutho
   await createDealNote(dealId, body, actor);
 }
 
-/** The note, when it is the author's own, still there and typed here: what edit and delete both need. */
+/** The note, when it is the author's own typed note or a line imported from the sheet, and still there: what edit and delete both need. */
 async function ownNote(noteId: string, dealId: string, actor: NoteAuthor, opts: { deleted?: boolean } = {}) {
   const note = await prisma.dealNote.findFirst({
-    where: { id: noteId, dealId, source: "manual", authorUserId: actor.id, deletedAt: opts.deleted ? { not: null } : null },
+    where: {
+      id: noteId,
+      dealId,
+      OR: [{ source: "manual", authorUserId: actor.id }, { source: "migration" }],
+      deletedAt: opts.deleted ? { not: null } : null,
+    },
     select: { id: true, body: true },
   });
   if (!note) throw new NoteError("That note is no longer there, or it isn't yours.");

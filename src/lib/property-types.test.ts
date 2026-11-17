@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  applySharedLockbox,
+  lockboxIsShared,
+  lockboxPhotoPaths,
+  splitLockboxValue,
   DEFAULT_CAPEX_RULES,
   orphanedEquipmentTypes,
   parseCapexRules,
@@ -407,4 +411,71 @@ test("projectedYear: install year plus the replace age, or null", () => {
     building: [{ key: "new-system", label: "New system", monitor: 0, replace: 0, defaultCost: 0 }],
   };
   assert.equal(projectedYear({ kind: "building", key: "new-system", year: "2020" }, placeholder), null);
+});
+
+/* ---------------- Lockbox (docs/specs/lockbox-location.md) ---------------- */
+
+test("splitLockboxValue: a trailing parenthesis is the location, capitalized", () => {
+  assert.deepEqual(splitLockboxValue("4857 (back left corner of the house)"), { code: "4857", location: "Back left corner of the house" });
+  assert.deepEqual(splitLockboxValue(" 6385 (gate) "), { code: "6385", location: "Gate" });
+  assert.deepEqual(splitLockboxValue("1924(back entrance)"), { code: "1924", location: "Back entrance" });
+});
+
+test("splitLockboxValue: no parenthesis, or nothing before it, is all code", () => {
+  assert.deepEqual(splitLockboxValue("2374"), { code: "2374", location: null });
+  assert.deepEqual(splitLockboxValue("(gate)"), { code: "(gate)", location: null });
+  assert.deepEqual(splitLockboxValue(""), { code: null, location: null });
+  assert.deepEqual(splitLockboxValue(null), { code: null, location: null });
+});
+
+const photo = { pathname: "properties/p1/lockbox/gate.jpg", thumbPathname: "properties/p1/lockbox/thumb/gate.jpg", width: 2560, height: 1920 };
+
+test("applySharedLockbox: on, every other rentable unit takes the saved unit's lockbox and the flag", () => {
+  const units = [
+    { id: "a", label: "Lower", lockboxCode: "1924", lockboxLocation: "Back entrance" },
+    { id: "b", label: "Upper", lockboxCode: "6385", lockboxLocation: "On the gate", lockboxPhoto: photo, lockboxShared: true },
+    { id: "h", label: "HSE (house)", lockboxCode: null },
+  ];
+  const out = applySharedLockbox(units, 1);
+  assert.deepEqual(out[0], { id: "a", label: "Lower", lockboxCode: "6385", lockboxLocation: "On the gate", lockboxPhoto: photo, lockboxShared: true });
+  assert.deepEqual(out[1], units[1]);
+  // The house meters never share a lockbox.
+  assert.deepEqual(out[2], units[2]);
+  assert.equal(lockboxIsShared(out), true);
+});
+
+test("applySharedLockbox: newly off, the flag leaves every unit and each keeps its values", () => {
+  const units = [
+    { id: "a", label: "Lower", lockboxCode: "6385", lockboxLocation: "On the gate", lockboxShared: true },
+    { id: "b", label: "Upper", lockboxCode: "7000", lockboxLocation: "Side door" },
+  ];
+  const out = applySharedLockbox(units, 1);
+  assert.deepEqual(out, [
+    { id: "a", label: "Lower", lockboxCode: "6385", lockboxLocation: "On the gate" },
+    { id: "b", label: "Upper", lockboxCode: "7000", lockboxLocation: "Side door" },
+  ]);
+  assert.equal(lockboxIsShared(out), false);
+});
+
+test("applySharedLockbox: off and never on changes nothing; a house-meter row can't turn it on", () => {
+  const units = [
+    { id: "a", label: "Lower", lockboxCode: "1924" },
+    { id: "b", label: "Upper", lockboxCode: "2925" },
+  ];
+  assert.deepEqual(applySharedLockbox(units, 0), units);
+  const house = [{ id: "h", label: "HSE (house)", lockboxCode: "1", lockboxShared: true }, { id: "a", label: "Lower", lockboxCode: "2" }];
+  assert.deepEqual(applySharedLockbox(house, 0), [{ id: "h", label: "HSE (house)", lockboxCode: "1" }, { id: "a", label: "Lower", lockboxCode: "2" }]);
+});
+
+test("applySharedLockbox: a unit added while shared joins with the shared lockbox", () => {
+  const units = [
+    { id: "a", label: "Lower", lockboxCode: "6385", lockboxLocation: "On the gate", lockboxPhoto: photo, lockboxShared: true },
+    { label: "Attic", lockboxCode: "6385", lockboxLocation: "On the gate", lockboxPhoto: photo, lockboxShared: true },
+  ];
+  assert.deepEqual(applySharedLockbox(units, 1), units);
+});
+
+test("lockboxPhotoPaths: originals and thumbnails, each once", () => {
+  const paths = lockboxPhotoPaths([{ lockboxPhoto: photo }, { lockboxPhoto: photo }, { lockboxPhoto: null }, {}]);
+  assert.deepEqual([...paths].sort(), [photo.pathname, photo.thumbPathname].sort());
 });

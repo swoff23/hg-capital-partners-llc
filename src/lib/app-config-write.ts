@@ -18,7 +18,9 @@ const ATTEMPTS = 3;
  * Returns the new version.
  *
  * A column that changed since throws a `ConflictError` naming who saved it
- * (`AppConfig.updatedBy`) and when. The write itself is pinned to the row's
+ * (`AppConfig.updatedBy`) and when; when that was the caller (the same
+ * `updatedBy`, from their other tab) it is marked `mine` and reads "You
+ * changed this at 2:14 PM." in place of their own name. The write itself is pinned to the row's
  * `updatedAt` as just read, so two saves in the same moment can't both win; if
  * the other tab saved its own column in between, the row moved but our column
  * didn't, and the write is read and tried again.
@@ -38,7 +40,7 @@ export async function saveAppConfigColumn(
       return blobVersion(value)!;
     }
     if (blobVersion(existing[column]) !== expectedVersion) {
-      throw new ConflictError({ fields: [column], by: existing.updatedBy, at: existing.updatedAt });
+      throw new ConflictError({ fields: [column], by: existing.updatedBy, mine: existing.updatedBy === updatedBy, at: existing.updatedAt });
     }
     const written = await prisma.appConfig.updateMany({
       where: { id: "singleton", updatedAt: existing.updatedAt },

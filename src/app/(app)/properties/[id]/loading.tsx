@@ -7,18 +7,17 @@ import { todayYmdEastern } from "@/lib/dates";
 
 /**
  * The rail's sections and the rows a property usually has in them, as
- * edit-details, edit-loan and edit-insurance list them. Empty rows fold
- * (components/rail-fold.tsx), so Loan and Insurance draw their reminder date,
- * the rows most properties fill, and the fold's row (`fold`).
+ * edit-details, edit-loan and edit-insurance list them: the rows each always
+ * shows, then the fold's row (components/rail-fold.tsx).
  */
 const RAIL = [
   {
     title: "Details",
-    rows: ["Value", "Purchase date", "Purchase price", "Refinance date", "Strategy", "Sq ft", "Entity", "Attorney", "Status", "Move-in form", "Registration", "Tax due"],
-    fold: false,
+    rows: ["Value", "Purchase date", "Purchase price", "Refinance date", "Beds", "Baths", "Square feet", "Entity"],
+    fold: true,
   },
-  { title: "Loan", rows: ["Maturity", "Balance", "Servicer", "Escrow"], fold: true },
-  { title: "Insurance", rows: ["Renewal", "Replacement"], fold: true },
+  { title: "Loan", rows: ["Maturity", "Balance", "Lender", "Rate", "Payment / mo"], fold: true },
+  { title: "Insurance", rows: ["Renewal", "Premium", "Replacement"], fold: true },
 ];
 
 /**
@@ -27,10 +26,10 @@ const RAIL = [
  * figures' labels, then Tasks, Units & access and CapEx (its years, from
  * today, as the card counts them, and the folded Building systems row) beside
  * the rail's Details, Loan and Insurance with every label drawn at once; the
- * photo, the status, the address, the subline, the figures and the sections'
- * values are --muted blocks. The Financials card shows only once QuickBooks
- * is connected, and Rental listings only with a listing, so both stay out.
- * Full width at 16:9 on a phone, the photo is 96x72 from sm.
+ * address, the subline, the figures and the sections' values are --muted
+ * blocks. The photo shows only once one is set, the Financials card only once
+ * QuickBooks is connected, and Rental listings only with a listing, so all
+ * three stay out.
  */
 export default function PropertyLoading() {
   const from = Number(todayYmdEastern().slice(0, 4));
@@ -39,10 +38,8 @@ export default function PropertyLoading() {
     <LoadingScreen className="max-w-300">
       <BackLink fallback="/properties" label="Portfolio" />
 
-      <header className="mt-3 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
-        <Block className="aspect-video w-full rounded-lg sm:aspect-auto sm:h-18 sm:w-24" />
+      <header className="mt-3">
         <div className="min-w-0">
-          <Block text="text-meta" className="w-24" />
           <HeadingBlock className="w-3/5 max-sm:w-full" phoneLines={2} />
           <Block text="text-meta" className="w-48" />
         </div>

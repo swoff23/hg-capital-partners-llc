@@ -27,4 +27,6 @@ export const newTaskSchema = z.object({
   scheduledFor: z.string().optional(),
   // JSON from the Repeat step in the due date's panel; blank for Doesn't repeat.
   repeatRule: z.string().optional(),
+  // Make task (docs/specs/missing-info.md, D9): the Missing info rows, "<check>|<subject>", comma-joined.
+  missing: z.string().max(20_000).optional(),
 });

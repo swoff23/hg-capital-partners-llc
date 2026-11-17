@@ -35,7 +35,8 @@ test("dealSortPhrase: every sortable column reads as a sentence in both directio
   assert.equal(dealSortPhrase("units"), "Fewest units");
   assert.equal(dealSortPhrase("address"), "Address A to Z");
   assert.equal(dealSortPhrase("-address"), "Address Z to A");
-  assert.equal(dealSortPhrase("nextAction"), "Next action A to Z");
+  // Next action left the list (Nov 15, 2026): an old link sorted by it reads as no sort of its own.
+  assert.equal(dealSortPhrase("nextAction"), null);
   assert.equal(dealSortPhrase("-status"), "Stage, last first");
 });
 

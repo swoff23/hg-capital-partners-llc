@@ -4,6 +4,7 @@ import type { FileKind } from "@/lib/attachments/content-types";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
+import { TOAST_ACTION_MS } from "@/lib/toast-time";
 
 /**
  * How the contractor portal words and arranges a job (docs/asana-migration-plan.md
@@ -179,7 +180,7 @@ export function statusUpdateText(from: string | null, to: string | null, by: { c
     case "IN_PROGRESS":
       return from === "REVIEW" ? "sent it back" : by.contractor ? "started the job" : "moved it to In progress";
     case "REVIEW":
-      return by.contractor ? "marked it done" : "moved it to Review";
+      return by.contractor ? "sent it for review" : "moved it to Review";
     case "DONE":
       return from === "REVIEW" ? "approved it" : "closed the job";
     default:
@@ -309,7 +310,7 @@ export function addMorePhotosLine(missing: number): string {
 
 export type MarkDoneState = {
   /** The label never changes (forms 2.7): it waits, and a line says why. */
-  label: "Mark done";
+  label: "Send for review";
   enabled: boolean;
   /** The action is running: the button keeps its label and shows its Spinner. */
   busy: boolean;
@@ -339,7 +340,7 @@ export function markDoneButton(s: {
   uploaded: number;
   required: number;
 }): MarkDoneState {
-  const label = "Mark done" as const;
+  const label = "Send for review" as const;
   if (s.pending > 0) return { label, enabled: false, busy: false, reason: "uploading", line: finishingLabel(s.pending) };
   if (s.sending) return { label, enabled: false, busy: true, reason: null, line: null };
   if (s.failed > 0) return { label, enabled: false, busy: false, reason: "failed", line: null };
@@ -441,18 +442,25 @@ export const MAX_FILES_REASON = `only ${MAX_FILES_PER_POST} at a time`;
  */
 export const TOO_MANY_FILES = `Send up to ${MAX_FILES_PER_POST} at a time.`;
 
+/**
+ * The toast after a Retry the cap turned back: the step, not the rule. "Send these 50, then Retry." on the job page,
+ * "Close this and Send first." inside the Mark done sheet, whose footer has no Send. Each fits one line at 320.
+ */
+export const RETRY_PAST_CAP = `Send these ${MAX_FILES_PER_POST}, then Retry.`;
+export const RETRY_PAST_CAP_IN_SHEET = "Close this and Send first.";
+
 /** Room left for files on the job page's target: what one post takes, less the files recorded and waiting to post. */
 export function postRoom(unposted: number): number {
   return Math.max(0, MAX_FILES_PER_POST - Math.max(0, unposted));
 }
 
-/** How long "3 photos posted · Undo" stays (the toast's own five seconds). */
-export const POST_UNDO_MS = 5_000;
+/** How long "3 photos posted · Undo" stays: the time of a toast with a button (lib/toast-time.ts). */
+export const POST_UNDO_MS = TOAST_ACTION_MS;
 
 /**
  * The server accepts an Undo a little after the toast has gone: the tap spends
  * part of the window in flight on a weak signal, and a toast held under the
- * pointer or focus (toast.tsx) lasts longer than five seconds.
+ * pointer or focus (toast.tsx) lasts longer than its five seconds.
  */
 export const POST_UNDO_GRACE_MS = 10_000;
 
@@ -531,9 +539,12 @@ export function lateUploadsEndsIn(markedDoneAt: Date | string | null | undefined
 /**
  * A My jobs row's uploads line (uploads 2.1): "Uploading 3 photos" while any
  * file for the job is going up, "2 photos didn't upload" once some failed,
- * "No signal · 3 photos waiting" when the only ones left are held for a
- * signal ("Uploads paused · 3 photos waiting" when it is the upload code they
- * wait for, not a signal), and "Open to send 2 photos" when their bytes are
+ * "2 photos not added" in its place when every red one is a photo the job
+ * refused for good (a Retry can't change it, as the job page's tray says),
+ * "3 photos waiting" when the only ones left are held for a signal ("3 photos
+ * paused" when it is the upload code they wait for, not a signal; the job
+ * page's bar keeps "No signal · 3 photos waiting", the row has no room for
+ * the reason), and "Open to send 2 photos" when their bytes are
  * up but only the job's page can record and post them (a sign-in or a reload
  * put them back from the outbox before it opened). Failed leads: it's the one
  * that needs the contractor. Null when the job has no uploads. The queue counts failed
@@ -545,16 +556,21 @@ export function rowUploadLine(c: {
   /** Of `waiting`, the files held for the upload code and not a signal. */
   paused?: number;
   failed: number;
+  /** Of `failed`, the ones the job refused for good. */
+  refused?: number;
   awaitingPage?: number;
   pendingKinds: readonly (FileKind | null)[];
 }): { text: string; tone: "info" | "danger" } | null {
-  if (c.failed > 0) return { text: `${c.failed} ${c.failed === 1 ? "photo" : "photos"} didn't upload`, tone: "danger" };
+  if (c.failed > 0) {
+    const photos = `${c.failed} ${c.failed === 1 ? "photo" : "photos"}`;
+    return { text: `${photos} ${(c.refused ?? 0) >= c.failed ? "not added" : "didn't upload"}`, tone: "danger" };
+  }
   const kinds = c.pendingKinds;
   const noun = kinds.length > 0 && kinds.every((k) => k === "video") ? "video" : kinds.length > 0 && kinds.every((k) => k === "file") ? "file" : "photo";
   const parked = Math.min(c.awaitingPage ?? 0, c.pending);
   const going = c.pending - parked;
   if (going > 0) return { text: `Uploading ${going} ${noun}${going === 1 ? "" : "s"}`, tone: "info" };
-  if (c.waiting > 0) return { text: `${(c.paused ?? 0) > 0 ? "Uploads paused" : "No signal"} · ${c.waiting} ${noun}${c.waiting === 1 ? "" : "s"} waiting`, tone: "info" };
+  if (c.waiting > 0) return { text: `${c.waiting} ${noun}${c.waiting === 1 ? "" : "s"} ${(c.paused ?? 0) > 0 ? "paused" : "waiting"}`, tone: "info" };
   if (parked > 0) return { text: `Open to send ${parked} ${parked === 1 ? "photo" : "photos"}`, tone: "info" };
   return null;
 }

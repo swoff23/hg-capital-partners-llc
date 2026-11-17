@@ -13,8 +13,9 @@ import { cn } from "@/lib/utils";
 import { saveDealFields } from "../actions";
 
 /**
- * The deal page's editing pieces (forms 4.3): the address as its h1, the facts
- * of the rail, the stage, the pass reason. Each is an `InlineField` saved
+ * The deal's editing pieces (forms 4.3), in its sheet (deal-sheet.tsx; there
+ * is no deal page): the address as the sheet's heading, the facts of its
+ * Details column, the stage, the pass reason. Each is an `InlineField` saved
  * through `saveDealFields` with the text it loaded, so a partner's newer
  * change to that field refuses the save and says who made it and when, where
  * before a stale page silently wrote over it. A refused save comes back with
@@ -22,7 +23,7 @@ import { saveDealFields } from "../actions";
  * stage show the current value.
  */
 
-/** The page's h1, with the address field's suggestions and its duplicate line. */
+/** The sheet's heading, with the address field's suggestions and its duplicate line. */
 export function DealAddress({ id, value }: { id: string; value: string }) {
   return (
     <InlineField
@@ -43,7 +44,7 @@ export function DealAddress({ id, value }: { id: string; value: string }) {
 type FactProps = Omit<InlineFieldProps, "label" | "onSave" | "field" | "value"> & {
   id: string;
   /** The deal column the patch carries: "theirPriceRaw". */
-  field: "theirPriceRaw" | "ourPriceRaw" | "nextAction" | "sourceUrl" | "passReason";
+  field: "theirPriceRaw" | "ourPriceRaw" | "sourceUrl" | "passReason";
   label: string;
   value: string | null;
 };

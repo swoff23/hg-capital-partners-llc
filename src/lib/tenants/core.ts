@@ -3,7 +3,7 @@ import type { LeaseSource, Prisma, PrismaClient } from "@prisma/client";
 import { FieldError } from "@/lib/action-result";
 import { toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { isHouseMeterRow, isPlaceholderUnitId, parseUnits, type PropertyUnit } from "@/lib/property-types";
-import { MAX_TENANTS, readDeposit, readStay, readTenant, readTerm, type TenantData } from "./fields";
+import { MAX_TENANTS, readDeposit, readStay, readTenant, readTerm, type TenantData, type TermData } from "./fields";
 import { leaseStatus, overlappingTerms, staysOverlap } from "./status";
 
 /**
@@ -168,8 +168,16 @@ export async function createLease(db: Db, input: NewLease, by: By): Promise<{ id
   });
 }
 
-function termColumns(t: { startsOn: Ymd; endsOn: Ymd | null; rent: string; subsidy: string | null; subsidyFrom: string | null }) {
-  return { startsOn: ymdToDate(t.startsOn)!, endsOn: ymdToDate(t.endsOn), rent: t.rent, subsidy: t.subsidy, subsidyFrom: t.subsidyFrom };
+function termColumns(t: TermData) {
+  return {
+    startsOn: ymdToDate(t.startsOn)!,
+    endsOn: ymdToDate(t.endsOn),
+    rent: t.rent,
+    subsidy: t.subsidy,
+    subsidyFrom: t.subsidyFrom,
+    subsidyContact: t.subsidyContact,
+    subsidyEmail: t.subsidyEmail,
+  };
 }
 
 export type LeasePatch = Partial<Record<"movesIn" | "movesOut" | "deposit" | "notes", string | null>>;
@@ -272,6 +280,8 @@ export async function patchTerm(db: Db, termId: string, patch: Partial<Record<st
       rent: term.rent.toString(),
       subsidy: term.subsidy?.toString() ?? "",
       subsidyFrom: term.subsidyFrom ?? "",
+      subsidyContact: term.subsidyContact ?? "",
+      subsidyEmail: term.subsidyEmail ?? "",
       ...patch,
     };
     const r = readTerm(merged);
@@ -279,6 +289,64 @@ export async function patchTerm(db: Db, termId: string, patch: Partial<Record<st
     const others = await tx.leaseTerm.findMany({ where: { leaseId: term.leaseId, id: { not: termId } }, select: { startsOn: true, endsOn: true } });
     if (overlappingTerms([...others, { startsOn: r.data.startsOn, endsOn: r.data.endsOn }])) fail({ [("startsOn" in patch ? "startsOn" : "endsOn")]: TERMS_OVERLAP });
     await tx.leaseTerm.update({ where: { id: termId }, data: termColumns(r.data) });
+  });
+}
+
+/**
+ * A deleted term as Undo puts it back (docs/specs/lease-term-edits.md): the
+ * values a new term is read from, as text, and the signed lease it had.
+ */
+export type TermSnapshot = {
+  startsOn: Ymd;
+  endsOn: Ymd | "";
+  rent: string;
+  subsidy: string;
+  subsidyFrom: string;
+  subsidyContact: string;
+  subsidyEmail: string;
+  fileId: string | null;
+};
+
+/**
+ * Deletes one term. Its signed lease stays on the lease, unlinked, as a
+ * replaced file does, so Undo can link it back; it goes with the lease.
+ * A lease's only term can go too. Returns what restoreTerm needs.
+ */
+export async function deleteTerm(db: Db, leaseId: string, termId: string): Promise<TermSnapshot> {
+  return db.$transaction(async (tx) => {
+    const term = await tx.leaseTerm.findUnique({ where: { id: termId } });
+    if (!term || term.leaseId !== leaseId) throw new Error("This term is already gone. Reload the page.");
+    await tx.leaseTerm.delete({ where: { id: termId } });
+    return {
+      startsOn: toYmd(term.startsOn)!,
+      endsOn: toYmd(term.endsOn) ?? "",
+      rent: term.rent.toString(),
+      subsidy: term.subsidy?.toString() ?? "",
+      subsidyFrom: term.subsidyFrom ?? "",
+      subsidyContact: term.subsidyContact ?? "",
+      subsidyEmail: term.subsidyEmail ?? "",
+      fileId: term.fileId,
+    };
+  });
+}
+
+/**
+ * Undo for deleteTerm: the term again, read and checked like a new one, so
+ * it's refused when a term added since overlaps it. Its signed lease comes
+ * back only while that file is still this lease's and no other term has it.
+ */
+export async function restoreTerm(db: Db, leaseId: string, snapshot: TermSnapshot): Promise<{ id: string }> {
+  const { fileId, ...input } = snapshot;
+  const r = readTerm(input);
+  if (!r.ok) fail(r.problems);
+  return db.$transaction(async (tx) => {
+    if (!(await tx.lease.findUnique({ where: { id: leaseId }, select: { id: true } }))) throw new Error("This lease is gone.");
+    const terms = await tx.leaseTerm.findMany({ where: { leaseId }, select: { startsOn: true, endsOn: true } });
+    if (overlappingTerms([...terms, { startsOn: r.data.startsOn, endsOn: r.data.endsOn }])) fail({ startsOn: TERMS_OVERLAP });
+    const file = fileId
+      ? await tx.leaseFile.findFirst({ where: { id: fileId, leaseId, term: null }, select: { id: true } })
+      : null;
+    return tx.leaseTerm.create({ data: { leaseId, ...termColumns(r.data), fileId: file?.id ?? null }, select: { id: true } });
   });
 }
 

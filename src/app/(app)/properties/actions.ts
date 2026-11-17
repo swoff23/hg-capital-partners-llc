@@ -5,6 +5,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { withLog, withResult } from "@/lib/server-action";
 import * as properties from "@/lib/properties/service";
 import { staffPrincipal } from "@/lib/tasks/service";
+import { LOCKBOX_LOCATION_MAX } from "@/lib/property-types";
 
 /**
  * Thin server actions: authenticate, validate, call the property service.
@@ -46,6 +47,17 @@ const unitSchema = z.object({
   id: z.string().max(100).nullish(),
   label: z.string().nullish(),
   lockboxCode: z.string().nullish(),
+  lockboxLocation: z.string().max(LOCKBOX_LOCATION_MAX).nullish(),
+  // Checked against the property's lockbox folder by the save (service.ts cleanLockboxPhoto).
+  lockboxPhoto: z
+    .object({
+      pathname: z.string().min(1).max(400),
+      thumbPathname: z.string().max(400).nullish(),
+      width: z.number().nullish(),
+      height: z.number().nullish(),
+    })
+    .nullish(),
+  lockboxShared: z.boolean().optional(),
   utilities: z.record(z.string(), z.string().nullish()).optional(),
   equipment: z
     .array(

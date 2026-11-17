@@ -5,13 +5,24 @@ import { shortAddress } from "@/lib/normalize";
  * Home's Needs you list (docs/home-as-today.md): the things that aren't tasks
  * but need a partner. A property's key date coming up (loan maturity within
  * 90 days, insurance renewal or rental registration within 60; past dates
- * count and read late), this year's CapEx as one row, and a QuickBooks link
- * that expired or a sync over 3 days old. Each item is one row that opens
+ * count and read late), a lease end before its notice deadline and the
+ * Missing info count (docs/specs/missing-info.md), this year's CapEx as one
+ * row, and a QuickBooks link that expired or a sync over 3 days old. Each item is one row that opens
  * its record. Pure; the query that fills it is ./queries, and needs-you.test.ts
  * covers it.
  */
 
-export type NeedsYouKind = "loan" | "insurance" | "registration" | "capex" | "sync-stale" | "sync-lost" | "signup" | "baselane";
+export type NeedsYouKind =
+  | "loan"
+  | "insurance"
+  | "registration"
+  | "lease"
+  | "missing"
+  | "capex"
+  | "sync-stale"
+  | "sync-lost"
+  | "signup"
+  | "baselane";
 
 /** The rows that carry buttons beside them (contractor onboarding, docs/specs/contractor-onboarding.md 4.5). */
 export type NeedsYouActions = "signup" | "baselane";
@@ -95,6 +106,31 @@ export function keyDateItems(properties: KeyDateProperty[], today: Ymd): NeedsYo
   return items.sort(
     (a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0) || a.title.localeCompare(b.title) || a.detail.localeCompare(b.detail),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Missing info
+// ---------------------------------------------------------------------------
+
+/**
+ * The one Missing info row (docs/specs/missing-info.md, D1): the count of
+ * required gaps and where they are, opening the worklist. Null with none.
+ */
+export function missingItem(required: number, places: string): NeedsYouItem | null {
+  if (required <= 0) return null;
+  return {
+    key: "missing",
+    kind: "missing",
+    href: "/missing",
+    title: "Missing info",
+    state: "Missing",
+    detail: [`${required.toLocaleString("en-US")} to fill in`, places].filter(Boolean).join(" · "),
+    amount: null,
+    pastDue: null,
+    dateLabel: null,
+    late: false,
+    date: null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -255,15 +291,27 @@ export function baselaneItems(people: BaselaneContact[], today: Ymd): NeedsYouIt
 }
 
 /**
- * The list in order: key dates (late first, then soonest), new sign-ups, Baselane links to send, this year's
- * CapEx, then QuickBooks.
+ * The list in order: key dates and lease ends (late first, then soonest), new sign-ups, Baselane links to send,
+ * the Missing info row, this year's CapEx, then QuickBooks.
  */
 export function needsYouList(parts: {
   keyDates: NeedsYouItem[];
+  leaseEnds?: NeedsYouItem[];
   signups?: NeedsYouItem[];
   baselane?: NeedsYouItem[];
+  missing?: NeedsYouItem | null;
   capex: NeedsYouItem | null;
   quickbooks: NeedsYouItem | null;
 }): NeedsYouItem[] {
-  return [...parts.keyDates, ...(parts.signups ?? []), ...(parts.baselane ?? []), ...(parts.capex ? [parts.capex] : []), ...(parts.quickbooks ? [parts.quickbooks] : [])];
+  const dated = [...parts.keyDates, ...(parts.leaseEnds ?? [])].sort(
+    (a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0) || a.title.localeCompare(b.title) || a.detail.localeCompare(b.detail),
+  );
+  return [
+    ...dated,
+    ...(parts.signups ?? []),
+    ...(parts.baselane ?? []),
+    ...(parts.missing ? [parts.missing] : []),
+    ...(parts.capex ? [parts.capex] : []),
+    ...(parts.quickbooks ? [parts.quickbooks] : []),
+  ];
 }

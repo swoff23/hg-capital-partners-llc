@@ -13,6 +13,7 @@ import {
 } from "react";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
+import { leaveConfirmed } from "@/components/use-leave-warning";
 import { hasUnsavedWork, holdFor, setHold, type HoldEntry, type LeaveScope, type LeaveWords } from "@/components/leave-holds";
 
 /**
@@ -42,7 +43,8 @@ import { hasUnsavedWork, holdFor, setHold, type HoldEntry, type LeaveScope, type
  * the question on the public site's dark tokens, for the public move-in page.
  *
  * In-app links never fire beforeunload, so a reload or a closed tab is
- * useLeaveWarning's job (media-uploader.tsx), and useDraft's. The browser's
+ * useLeaveWarning's job (media-uploader.tsx, and inline-field.tsx for an
+ * unsaved multi-line note), and useDraft's. The browser's
  * own Back isn't caught here.
  */
 
@@ -104,6 +106,7 @@ export function LeaveGuard({
   const guard = useMemo(() => ({ hold, ask }), [hold, ask]);
 
   function leaveAnyway() {
+    leaveConfirmed();
     setAsking(null);
     leaveTo.current?.();
   }

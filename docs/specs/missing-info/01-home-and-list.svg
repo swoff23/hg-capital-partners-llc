@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="600" viewBox="0 0 860 600" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Home's Missing info row and the Missing info page at laptop 1280 and phone 375</title>
+<rect width="860" height="600" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Home's Missing info row, and the page it opens</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768</text>
+<rect x="0" y="22" width="540" height="112" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="48" font-size="14" font-weight="600" fill="#152133">Needs you</text>
+<line x1="20" y1="58" x2="520" y2="58" stroke="#e7e5e0"/>
+<g font-size="12">
+<circle cx="26" cy="76" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/><text x="38" y="80" font-size="11" font-weight="500" fill="#9a6700">Due</text>
+<text x="132" y="74" fill="#152133">Insurance renewal</text><text x="132" y="88" font-size="11" fill="#5b6576">647 Prospect Ave</text>
+<text x="490" y="80" font-size="11" text-anchor="end" fill="#424e61">Nov 30</text><text x="512" y="80" fill="#8a919c">›</text>
+<line x1="20" y1="96" x2="520" y2="96" stroke="#e7e5e0"/>
+<rect x="21" y="107" width="10" height="10" rx="2" fill="none" stroke="#9a6700" stroke-width="1.5"/><text x="38" y="117" font-size="11" font-weight="500" fill="#9a6700">Missing</text>
+<text x="132" y="111" fill="#152133">Missing info</text><text x="132" y="125" font-size="11" fill="#5b6576">177 to fill in · 11 properties, 8 contractors</text>
+<text x="512" y="117" fill="#8a919c">›</text>
+</g>
+
+<text x="270" y="152" font-size="14" text-anchor="middle" fill="#8a919c">↓</text>
+
+<rect x="0" y="162" width="540" height="372" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="192" font-size="18" font-weight="600" fill="#152133">Missing info</text>
+<text x="20" y="210" font-size="11" fill="#5b6576">177 to fill in · 11 properties, 8 contractors</text>
+<rect x="20" y="222" width="196" height="28" rx="6" fill="#f3f2ef"/>
+<rect x="23" y="225" width="96" height="22" rx="5" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="71" y="240" font-size="11" text-anchor="middle" fill="#152133">Required 177</text>
+<text x="166" y="240" font-size="11" text-anchor="middle" fill="#424e61">Suggested 146</text>
+
+<text x="20" y="276" font-size="13" font-weight="600" fill="#152133">118 Congress St</text>
+<line x1="20" y1="284" x2="520" y2="284" stroke="#e7e5e0"/>
+<g font-size="12" fill="#152133">
+<text x="20" y="302">Insurance carrier</text><text x="510" y="302" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="20" y1="312" x2="520" y2="312" stroke="#e7e5e0"/>
+<text x="20" y="330">Insurance renewal date</text><text x="510" y="330" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="20" y1="340" x2="520" y2="340" stroke="#e7e5e0"/>
+<text x="20" y="358">Lower · Fuel autopay</text>
+<rect x="404" y="345" width="40" height="20" rx="5" fill="#ffffff" stroke="#c9c6bf"/><text x="424" y="359" font-size="11" text-anchor="middle">Done</text>
+<rect x="448" y="345" width="34" height="20" rx="5" fill="#ffffff" stroke="#c9c6bf"/><text x="465" y="359" font-size="11" text-anchor="middle">NA</text>
+<text x="510" y="358" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="20" y1="368" x2="520" y2="368" stroke="#e7e5e0"/>
+<text x="20" y="386">Upper · Signed lease PDF</text>
+<rect x="430" y="373" width="52" height="20" rx="5" fill="#ffffff" stroke="#c9c6bf"/><text x="456" y="387" font-size="11" text-anchor="middle">Upload</text>
+<text x="510" y="386" text-anchor="end" fill="#5b6576">⋯</text>
+<circle cx="392" cy="383" r="9" fill="#ffffff" stroke="#c9c6bf"/><text x="392" y="387" font-size="9" text-anchor="middle" fill="#424e61">P</text>
+</g>
+
+<text x="20" y="420" font-size="13" font-weight="600" fill="#152133">Contractors</text>
+<line x1="20" y1="428" x2="520" y2="428" stroke="#e7e5e0"/>
+<text x="20" y="446" font-size="12" fill="#152133">Zack Reading · W-9</text>
+<rect x="420" y="433" width="62" height="20" rx="5" fill="#ffffff" stroke="#c9c6bf"/><text x="451" y="447" font-size="11" text-anchor="middle" fill="#152133">Add W-9</text>
+<text x="510" y="446" font-size="12" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="20" y1="456" x2="520" y2="456" stroke="#e7e5e0"/>
+<text x="20" y="480" font-size="11" fill="#424e61">›  3 marked doesn't apply</text>
+<text x="20" y="514" font-size="11" fill="#5b6576">The avatar: that row is in Pieter's task. A tap on a row opens its field.</text>
+</g>
+
+<g transform="translate(600 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375</text>
+<rect x="0" y="22" width="228" height="512" rx="16" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="16" y="52" font-size="16" font-weight="600" fill="#152133">Missing info</text>
+<text x="16" y="68" font-size="11" fill="#5b6576">177 to fill in</text>
+<rect x="16" y="80" width="196" height="28" rx="6" fill="#f3f2ef"/>
+<rect x="19" y="83" width="96" height="22" rx="5" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="67" y="98" font-size="11" text-anchor="middle" fill="#152133">Required 177</text>
+<text x="163" y="98" font-size="11" text-anchor="middle" fill="#424e61">Suggested</text>
+<text x="16" y="134" font-size="13" font-weight="600" fill="#152133">118 Congress St</text>
+<line x1="16" y1="142" x2="212" y2="142" stroke="#e7e5e0"/>
+<g font-size="12" fill="#152133">
+<text x="16" y="162">Insurance carrier</text><text x="16" y="176" font-size="11" fill="#5b6576">Insurance</text><text x="206" y="168" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="16" y1="188" x2="212" y2="188" stroke="#e7e5e0"/>
+<text x="16" y="208">Fuel autopay</text><text x="16" y="222" font-size="11" fill="#5b6576">Lower</text><text x="206" y="214" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="16" y1="234" x2="212" y2="234" stroke="#e7e5e0"/>
+<text x="16" y="254">Signed lease PDF</text><text x="16" y="268" font-size="11" fill="#5b6576">Upper</text><text x="206" y="260" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="16" y1="280" x2="212" y2="280" stroke="#e7e5e0"/>
+</g>
+<rect x="72" y="292" width="140" height="92" rx="8" fill="#ffffff" stroke="#c9c6bf"/>
+<g font-size="12" fill="#152133"><text x="84" y="314">Upload</text><text x="84" y="342">Make task</text><text x="84" y="370">Doesn't apply</text></g>
+<text x="16" y="414" font-size="11" fill="#5b6576">The answer moves into ⋯.</text>
+<text x="16" y="430" font-size="11" fill="#5b6576">Make task hands off one row;</text>
+<text x="16" y="446" font-size="11" fill="#5b6576">multi-select is desktop and tablet.</text>
+</g>
+</svg>

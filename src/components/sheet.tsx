@@ -75,6 +75,16 @@ export type SheetProps = {
   isDismissable?: boolean;
   /** Pinned under the scrolling content: the sheet's primary action. */
   footer?: ReactNode;
+  /**
+   * The header's visible content in place of the title's text: a record's
+   * editable name at the title size (the deal sheet's address, an
+   * `InlineField` heading). `title` stays the dialog's accessible name, and
+   * `headerAction` and the X center on the name's first line. Hidden while a
+   * view is on top, which shows its own title.
+   */
+  header?: ReactNode;
+  /** A control in the header beside the X: a record's ⋯ menu. Hidden while a view is on top. */
+  headerAction?: ReactNode;
   /** The centered dialog's width from md: `md` up to 512px (the default), `lg` up to 672px for the unit and listing sheets. */
   size?: "md" | "lg";
   /** On a phone, the sheet takes its full height even when its content is short: long forms and full-height pickers. */
@@ -108,6 +118,8 @@ export function Sheet({
   onOpenChange,
   isDismissable = true,
   footer,
+  header,
+  headerAction,
   size = "md",
   fullHeight = false,
   dirty = false,
@@ -169,6 +181,8 @@ export function Sheet({
           title={title}
           hideTitle={hideTitle}
           footer={footer}
+          header={header}
+          headerAction={headerAction}
           dirty={dirty}
           onDirtyClose={onDirtyClose}
           bodyClass={palette ? paletteBodyClass : scrollClass}
@@ -214,11 +228,13 @@ function SheetDialog({
   title,
   hideTitle,
   footer,
+  header,
+  headerAction,
   dirty,
   onDirtyClose,
   bodyClass,
   children,
-}: Pick<SheetProps, "title" | "hideTitle" | "footer" | "dirty" | "onDirtyClose" | "children"> & { bodyClass: string }) {
+}: Pick<SheetProps, "title" | "hideTitle" | "footer" | "header" | "headerAction" | "dirty" | "onDirtyClose" | "children"> & { bodyClass: string }) {
   useKeyboardInset();
   const state = useContext(OverlayTriggerStateContext);
   const stateRef = useRef(state);
@@ -309,6 +325,8 @@ function SheetDialog({
               hidden={!top && hideTitle === true}
               onClose={requestClose}
               onBack={top?.back}
+              content={top ? undefined : header}
+              action={top ? undefined : headerAction}
             />
             <div ref={baseRef} hidden={!showingBase} className={bodyClass}>
               {typeof children === "function" ? children(renderProps) : (children as ReactNode)}
@@ -360,11 +378,15 @@ function SheetHeader({
   hidden,
   onClose,
   onBack,
+  content,
+  action,
 }: {
   title: string;
   hidden: boolean;
   onClose: () => void;
   onBack?: () => void;
+  content?: ReactNode;
+  action?: ReactNode;
 }) {
   if (hidden) {
     return (
@@ -375,6 +397,27 @@ function SheetHeader({
   }
   const iconButton =
     "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground pointer-coarse:h-11 pointer-coarse:w-11";
+  const close = (
+    <AriaButton onPress={onClose} aria-label="Close" className={iconButton}>
+      <X className="h-4 w-4" aria-hidden="true" />
+    </AriaButton>
+  );
+  if (content) {
+    // A record's name at the title size, which may wrap: the ⋯ and the X center on its first line (the line and
+    // the field's 4px padding and 1px edge above and below), as a record page's ⋯ does.
+    return (
+      <div className="flex shrink-0 items-start gap-1 border-b border-border py-1.5 pr-1.5 pl-4">
+        <Heading slot="title" className="sr-only">
+          {title}
+        </Heading>
+        <div className="min-w-0 flex-1">{content}</div>
+        <div className="flex h-[calc(var(--text-title--line-height)_+_0.625rem)] shrink-0 items-center gap-1">
+          {action}
+          {close}
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className={cn("flex shrink-0 items-center gap-1 border-b border-border py-1.5 pr-1.5", onBack ? "pl-1.5" : "pl-4")}
@@ -387,9 +430,8 @@ function SheetHeader({
       <Heading slot="title" className="min-w-0 flex-1 truncate text-section">
         {title}
       </Heading>
-      <AriaButton onPress={onClose} aria-label="Close" className={iconButton}>
-        <X className="h-4 w-4" aria-hidden="true" />
-      </AriaButton>
+      {action}
+      {close}
     </div>
   );
 }

@@ -13,6 +13,10 @@ test("a stage conflict says what the stage is now", () => {
   // It said only "Connor changed this at 8:31 AM.", which named no field and no stage.
   assert.equal(stageConflictMessage(conflict.conflict!, now), "Connor set Holding at 8:31 AM.");
   assert.equal(stageConflictMessage({ at, theirs: { status: "CLOSED!" } }, now), "Set to Closed at 8:31 AM.");
+  // Your own pick from another tab says You (design call 19), and still shows whole on a phone.
+  const mine = toFailure(new ConflictError({ fields: ["status"], by: "Connor Swofford", mine: true, at, theirs: { status: "6 - Holding" } }));
+  assert.equal(stageConflictMessage(mine.conflict!, now), "You set Holding at 8:31 AM.");
+  assert.ok(stageConflictMessage(mine.conflict!, now)!.length <= TOAST_PHONE_CHARS);
   assert.equal(stageConflictMessage({ at, by: "Connor" }, now), null, "no stage carried, nothing to say");
 
   const worded = withStageConflictLine(conflict, now);

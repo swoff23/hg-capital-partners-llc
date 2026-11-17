@@ -7,8 +7,7 @@ import { ActivityTime, useActivityNow } from "@/components/activity-time";
 import { Menu, MenuHeader, MenuTrigger } from "@/components/menu";
 import { Tooltip } from "@/components/tooltip";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
-import { Button, Kbd, TextLink, buttonClass, textLinkClass } from "@/components/ui";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
+import { Button, TextLink, buttonClass, textLinkClass } from "@/components/ui";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { fmtDay, fullStamp, seenTime, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
@@ -152,7 +151,8 @@ export function CommentCard({
         <Ellipsis className="size-4" aria-hidden="true" />
       </AriaButton>
       <Menu>
-        <MenuHeader title={author ? author.name : `Imported ${noun}`} detail={`${timed ? fullStamp(at, now) : ""}${editedDay ? `${timed ? " · " : ""}edited ${editedDay}` : ""}`} />
+        {/* Who wrote it and when; an imported line names nobody, so its menu starts with its actions. */}
+        {author && <MenuHeader title={author.name} detail={`${timed ? fullStamp(at, now) : ""}${editedDay ? `${timed ? " · " : ""}edited ${editedDay}` : ""}`} />}
         {menuItems}
       </Menu>
     </MenuTrigger>
@@ -273,6 +273,7 @@ export function CommentEditor({
   note,
   hasFiles = false,
   noun = "comment",
+  maxLength = 20_000,
   onSave,
   onCancel,
 }: {
@@ -283,6 +284,8 @@ export function CommentEditor({
   hasFiles?: boolean;
   /** What the field and its refusal call it: "comment", or "note" on a deal ("Add some text, or delete the note"). */
   noun?: "comment" | "note";
+  /** The most the field takes, the caller's own limit: a task comment's 20,000 (the default), a deal note's 5,000. */
+  maxLength?: number;
   onSave: (body: string) => Promise<ActionResult<unknown>>;
   onCancel: () => void;
 }) {
@@ -290,7 +293,6 @@ export function CommentEditor({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
-  const mod = useModKey();
 
   useEffect(() => {
     const el = field.current;
@@ -331,7 +333,7 @@ export function CommentEditor({
         aria-label={`Edit ${noun}`}
         rows={1}
         value={value}
-        maxLength={20_000}
+        maxLength={maxLength}
         onChange={(e) => {
           setValue(e.target.value);
           setError(null);
@@ -358,11 +360,9 @@ export function CommentEditor({
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} aria-keyshortcuts="Escape">
           Cancel
-          <Kbd aria-hidden="true">Esc</Kbd>
         </Button>
         <Button type="button" variant="secondary" size="sm" onClick={() => void save()} pending={saving} aria-keyshortcuts="Meta+Enter Control+Enter">
           Save
-          <Kbd aria-hidden="true">{shortcutLabel(mod, "↵")}</Kbd>
         </Button>
       </div>
     </div>

@@ -6,6 +6,7 @@ import type { User } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { STAFF_PATH_HEADER, staffReturnPath, withNext } from "@/lib/next-path";
 import { SESSION_COOKIE, readSession } from "@/lib/session";
+import { issuedAfterPasswordChange } from "@/lib/session-token";
 
 /** The signed-in partner as pages and actions see them: never the password hash. */
 export type SessionUser = Pick<User, "id" | "email" | "name">;
@@ -16,11 +17,18 @@ export type SessionUser = Pick<User, "id" | "email" | "name">;
  */
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const jar = await cookies();
-  const email = readSession(jar.get(SESSION_COOKIE)?.value);
-  if (!email) return null;
+  const session = readSession(jar.get(SESSION_COOKIE)?.value);
+  if (!session) return null;
   // No hash = not provisioned to sign in: also revokes any existing session
   // immediately if a password is ever cleared, not just at next login.
-  return prisma.user.findUnique({ where: { email, passwordHash: { not: null } }, select: { id: true, email: true, name: true } });
+  const user = await prisma.user.findUnique({
+    where: { email: session.email, passwordHash: { not: null } },
+    select: { id: true, email: true, name: true, passwordChangedAt: true },
+  });
+  // A "Forgot password" reset signs the partner out everywhere: a session
+  // issued before it no longer counts (docs/specs/staff-password-reset.md).
+  if (!user || !issuedAfterPasswordChange(session.issuedAt, user.passwordChangedAt)) return null;
+  return { id: user.id, email: user.email, name: user.name };
 });
 
 /**

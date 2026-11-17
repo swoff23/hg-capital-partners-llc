@@ -12,7 +12,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Camera, ImagePlus, Lock } from "lucide-react";
+import { Camera, ImagePlus, Lock, type LucideIcon } from "lucide-react";
 import {
   MediaUploadTray,
   UploadTile,
@@ -26,9 +26,8 @@ import {
 import { SegmentedControl } from "@/components/segmented-control";
 import { useToast, useToastInset } from "@/components/toast";
 import { DropLabel, useDropTarget, type DropTargetState, type UploadTarget } from "@/components/upload-queue";
-import { Button, Kbd, buttonClass } from "@/components/ui";
+import { Button, buttonClass } from "@/components/ui";
 import { useKeyboardInset } from "@/components/use-keyboard-inset";
-import { shortcutLabel, useModKey } from "@/components/use-platform";
 import { callAction, OFFLINE_ERROR, type ActionResult } from "@/lib/action-result";
 import { fileKindForType, uploadContentType } from "@/lib/attachments/content-types";
 import { EMPTY_DRAFT, adoptSharedDraft, clientIdToReuse, parseDraft, resolvePending, serializeDraft, type Draft } from "@/lib/composer-draft";
@@ -88,11 +87,14 @@ export interface ComposerProps {
   draftKey: string;
   /**
    * Who will see it, as one line over the field for each side of the switch
-   * ("Zack sees this and gets an email"; "Only Connor and Pieter see this",
+   * ("Zack needs a login to see this"; "Only Connor and Pieter see this",
    * shown with the Lock). A node, so a long first name can truncate while the
-   * fixed words stay (AudienceText). None for the deal note box.
+   * fixed words stay (AudienceText). None for the deal note box. `warn` draws
+   * the Shared line as a strip across the top of the box on --warn-tint, led
+   * by that icon, for a reply that won't reach them the usual way ("Zack has
+   * job emails off", Connor, Nov 16).
    */
-  audience?: { shared?: ReactNode; internal?: ReactNode } | null;
+  audience?: { shared?: ReactNode; internal?: ReactNode; warn?: LucideIcon } | null;
   /** "switch": Shared | Internal before Send. "none": always Shared (the portal) or no audience (deal notes). */
   visibility?: "switch" | "none";
   /** Photos, videos and files; none for the deal note box. */
@@ -398,7 +400,6 @@ function ComposerBody({
   );
   const text = draft.text;
   const visibility = mode === "switch" ? draft.visibility : "SHARED";
-  const mod = useModKey();
   const sends = usePendingSends();
   const zone = useContext(ZoneContext);
   const undoable = useUndoableRemove();
@@ -681,9 +682,7 @@ function ComposerBody({
   // The tools row holds the switch and the file button; without either it has nothing to show.
   const tools = mode === "switch" || !!api;
 
-  // The keys that send from the text box sit inside the button, at its trailing edge, for a mouse: Kbd
-  // hides on touch, and here below md and in a narrow column, so Send is just its word there. The button
-  // carries the shortcut for assistive tech; the printed keys stay out of its name.
+  // ⌘↵ sends from the text box; the button carries the shortcut for assistive tech.
   const sendButton = (className: string) => (
     <Button
       type="button"
@@ -698,9 +697,6 @@ function ComposerBody({
       className={className}
     >
       {label}
-      <Kbd aria-hidden="true" className="max-md:hidden @max-md/composer:hidden">
-        {shortcutLabel(mod, "↵")}
-      </Kbd>
     </Button>
   );
 
@@ -756,6 +752,18 @@ function ComposerBody({
         (internal ? (
           <p className={cn("items-center gap-1.5 px-4 pt-2 text-meta font-medium text-fg-2 md:px-3", open ? "flex" : "hidden md:flex")}>
             <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="flex min-w-0 flex-1">{audienceLine}</span>
+          </p>
+        ) : audience?.warn ? (
+          // Edge to edge under the box's top rule, so its corners follow the box's (1px inside its border).
+          <p
+            className={cn(
+              "items-center gap-1.5 bg-warn-tint px-4 py-2 text-meta text-warn md:px-3",
+              pinned ? "md:rounded-t-[calc(var(--radius-lg)-1px)]" : "rounded-t-[calc(var(--radius-lg)-1px)]",
+              open ? "flex" : "hidden md:flex",
+            )}
+          >
+            <audience.warn className="size-3.5 shrink-0 pointer-coarse:size-4" aria-hidden="true" />
             <span className="flex min-w-0 flex-1">{audienceLine}</span>
           </p>
         ) : (

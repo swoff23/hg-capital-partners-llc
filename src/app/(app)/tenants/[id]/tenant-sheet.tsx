@@ -14,8 +14,6 @@ export type TenantRow = {
   phone: string | null;
   phoneE164: string | null;
   email: string | null;
-  emergencyName: string | null;
-  emergencyPhone: string | null;
   notes: string | null;
   primary: boolean;
 };
@@ -26,14 +24,12 @@ const blank = (t: TenantRow | null): Form => ({
   fullName: t?.fullName ?? "",
   phone: t?.phone ?? "",
   email: t?.email ?? "",
-  emergencyName: t?.emergencyName ?? "",
-  emergencyPhone: t?.emergencyPhone ?? "",
   notes: t?.notes ?? "",
 });
 
 /**
- * One tenant's sheet (docs/specs/tenants.md section 6): name, phone, email,
- * emergency contact and notes, with Make primary and Remove from lease for a
+ * One tenant's sheet (docs/specs/tenants.md section 6): name, phone, email
+ * and notes, with Make primary and Remove from lease for a
  * person already on it. `tenant` null adds someone new. A person's details are
  * the same on every lease they're on, so a save here changes them everywhere.
  */
@@ -145,14 +141,6 @@ export function TenantSheet({
         </FormField>
         <FormField label="Email" optional error={errors.email}>
           {(p) => <Input {...p} name="email" type="email" autoComplete="off" value={form.email} onChange={(e) => set("email", e.target.value)} />}
-        </FormField>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Emergency contact" optional error={errors.emergencyName}>
-          {(p) => <Input {...p} name="emergencyName" autoComplete="off" value={form.emergencyName} onChange={(e) => set("emergencyName", e.target.value)} />}
-        </FormField>
-        <FormField label="Emergency phone" optional error={errors.emergencyPhone}>
-          {(p) => <Input {...p} name="emergencyPhone" type="tel" autoComplete="off" value={form.emergencyPhone} onChange={(e) => set("emergencyPhone", e.target.value)} />}
         </FormField>
       </div>
       <FormField label="Notes" optional error={errors.notes}>

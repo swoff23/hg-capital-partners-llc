@@ -12,8 +12,9 @@ import { cn } from "@/lib/utils";
 import { ContactLink } from "../contact-link";
 import { ContractorFilters } from "../filters";
 import { ContractorHeaderActions } from "../invite-sheet";
-import { OnboardingBadge } from "../status-badge";
+import { ContractorStatusBadge } from "../status-badge";
 import {
+  accountStatusOf,
   contractorsCount,
   contractorScope,
   contractorsWhere,
@@ -23,7 +24,6 @@ import {
   matchesStatus,
   matchesTrades,
   STATUS_INCLUDE,
-  statusOf,
   parseContractorFilters,
   contractorQuery,
   resolveTradePicks,
@@ -61,7 +61,7 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
   const picks = resolveTradePicks(f.trades, allTrades);
   if (picks.join(",") !== f.trades.join(",")) redirect(`/contractors?${contractorQuery({ ...f, trades: picks })}`);
   // A W-9 can be named in the notes, so "Needs W-9" reads on the rows, and so does the Trade filter, whose counts come from the rest (query.ts).
-  // The onboarding Status filter reads the same badge the rows show (statusOf), so it's on the rows too.
+  // The Status filter reads the same status the rows show (accountStatusOf), so it's on the rows too.
   const found = searched.filter((c) => matchesNeedsW9(c, f) && matchesStatus(c, f.status));
   const contacts = found.filter((c) => matchesTrades(c, f.trades));
   // Every trade stays listed, counting the contractors the search and the other filters leave.
@@ -97,26 +97,33 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
         ) : (
           // Flat on the page, its first column on the gutter (section 5). Below
           // sm a row keeps two lines: the name over company and trades, with the
-          // phone beside it; the company, trades and docs columns drop.
+          // phone beside it; the company, trades and docs columns drop. The
+          // Status column shows from md (a tablet); narrower, the status badge
+          // sits by the name, leading the subline on a phone.
           <Table className="mt-4">
             <thead>
               <tr>
                 <Th className="pl-0">Name</Th>
                 <Th className="hidden sm:table-cell">Company</Th>
-                {/* A share of the width: the tags take what the column has and end in "+2", never widen it. */}
-                <Th className="hidden w-1/3 sm:table-cell">Trades</Th>
+                {/* A share of the width: the tags take what the column has and end in "+2", never widen it.
+                    A quarter from md to lg, so the name keeps its room beside the Status column on a tablet. */}
+                <Th className="hidden w-1/3 sm:table-cell md:w-1/4 lg:w-1/3">Trades</Th>
                 <Th className="pr-0 sm:pr-3">Phone</Th>
-                <Th className="hidden pr-0 sm:table-cell">Docs</Th>
+                <Th className="hidden pr-0 sm:table-cell md:pr-3">Docs</Th>
+                {/* The onboarding status, named as the Status filter is; the last column, as on Properties. */}
+                <Th className="hidden pr-0 md:table-cell">Status</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {contacts.map((c) => {
                 const names = tradeNames(c.tradeLinks);
                 const subline = [c.company, tradeLine(c.tradeLinks)].filter(Boolean).join(" · ");
-                const status = statusOf(c);
-                const badges = (status || c.tenantFixes || !c.active) && (
+                // The onboarding status while it applies, else the login's: Active, Invited or Access off.
+                const status = accountStatusOf(c);
+                const statusBadge = status && <ContractorStatusBadge status={status} className="shrink-0" />;
+                // Traits stay beside the name; the onboarding status has its own column from md.
+                const traits = (c.tenantFixes || !c.active) && (
                   <>
-                    {status && <OnboardingBadge status={status} className="shrink-0" />}
                     {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
                     {!c.active && <Badge className="shrink-0">Inactive</Badge>}
                   </>
@@ -153,15 +160,22 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                         <LinkPending />
                       </Link>
                       {/* From sm the name keeps its longest word and the badges drop under it when the
-                          column is narrow (a tablet), so a badge never sits on the name. */}
+                          column is narrow (a tablet), so a badge never sits on the name. The status
+                          badge joins them only from sm to md, before the Status column shows. */}
                       <div className="flex min-w-0 items-center gap-x-2 gap-y-1 sm:flex-wrap">
                         <span className="text-foreground max-sm:min-w-0 max-sm:truncate">{c.fullName}</span>
-                        {badges && <span className="hidden shrink-0 items-center gap-2 sm:flex">{badges}</span>}
+                        {(status || traits) && (
+                          <span className={cn("hidden shrink-0 items-center gap-2 sm:flex", !traits && "md:hidden")}>
+                            {status && <ContractorStatusBadge status={status} className="shrink-0 md:hidden" />}
+                            {traits}
+                          </span>
+                        )}
                       </div>
-                      {/* On a phone the name keeps the first line; the badges lead the subline. */}
-                      {(badges || subline) && (
+                      {/* On a phone the name keeps the first line; the status and traits lead the subline. */}
+                      {(statusBadge || traits || subline) && (
                         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:hidden">
-                          {badges}
+                          {statusBadge}
+                          {traits}
                           {subline && <p className="min-w-0 truncate text-meta text-muted-foreground">{subline}</p>}
                         </div>
                       )}
@@ -177,12 +191,14 @@ export default async function ContractorsPage({ searchParams }: PageProps<"/cont
                         EMPTY
                       )}
                     </Td>
-                    <Td className="hidden whitespace-nowrap pr-0 text-fg-2 sm:table-cell">
+                    <Td className="hidden whitespace-nowrap pr-0 text-fg-2 sm:table-cell md:pr-3">
                       {w9}
                       {w9 && coi && " · "}
                       {coi}
                       {!w9 && !coi && EMPTY}
                     </Td>
+                    {/* No login and never in setup is the empty dash. */}
+                    <Td className="hidden whitespace-nowrap pr-0 md:table-cell">{statusBadge || EMPTY}</Td>
                   </tr>
                 );
               })}

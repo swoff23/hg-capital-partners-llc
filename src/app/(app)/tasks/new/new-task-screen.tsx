@@ -4,13 +4,17 @@ import { todayYmdEastern } from "@/lib/dates";
 import { propertyOptions } from "@/lib/picker-options";
 import { shortAddress } from "@/lib/normalize";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
+import { taskFillOf } from "@/lib/missing/checks";
+import { loadMissingInfo } from "@/lib/missing/queries";
 import { NewTaskForm, type NewTaskContext } from "./new-task-fields";
 
 /**
  * Everything New task needs from the server, then the form. Two routes render
  * it: `/tasks/new` as a page, and the intercepting route in the `@modal` slot
  * as a sheet over wherever the link was clicked (`variant`). `?propertyId=` and
- * `?dealId=` say what the task is about.
+ * `?dealId=` say what the task is about. `?missing=` is Missing info's Make
+ * task (docs/specs/missing-info.md, D9): the rows, comma-joined, which fill
+ * the title and the checklist, and the property when they share one.
  */
 export async function NewTaskScreen({
   variant,
@@ -22,8 +26,11 @@ export async function NewTaskScreen({
   const user = await requireUser();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : undefined);
-  const propertyId = one(sp.propertyId);
   const dealId = one(sp.dealId);
+  const missingKeys = one(sp.missing)?.split(",").filter(Boolean) ?? [];
+  const today = todayYmdEastern();
+  const fill = missingKeys.length > 0 ? taskFillOf((await loadMissingInfo(today)).gaps, missingKeys) : null;
+  const propertyId = one(sp.propertyId) ?? fill?.propertyId ?? undefined;
 
   const [{ users, contractors, recent }, properties, deal] = await Promise.all([
     assigneeOptions([], user.id),
@@ -49,7 +56,8 @@ export async function NewTaskScreen({
       properties={properties}
       context={context}
       meId={user.id}
-      today={todayYmdEastern()}
+      today={today}
+      fill={fill}
     />
   );
 }

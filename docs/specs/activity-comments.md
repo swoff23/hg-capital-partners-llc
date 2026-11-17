@@ -412,10 +412,10 @@ Internal turns the box `--muted` and the switch track `--accent`, as today. Tabl
 
 | Situation | Shared | Internal |
 |---|---|---|
-| Contractor assigned, has a login | Zack sees this and gets an email | Lock, Only Connor and Pieter see this |
-| Contractor assigned, never signed in or Job emails off ([contractor-email-switch.md](contractor-email-switch.md)) | Zack won't get an email | Lock, Only Connor and Pieter see this |
-| Contractor assigned, no login | Zack needs a login to see this. Desktop adds a "Set up login" TextLink to his contractor record | same |
-| No contractor (a partner or nobody) | Any contractor you assign sees this | same |
+| Contractor assigned, has a login, Job emails on or never signed in | none (Connor, Nov 16: seeing it is the default) | Lock, Only Connor and Pieter see this |
+| Contractor assigned, Job emails off ([contractor-email-switch.md](contractor-email-switch.md)) | Warning strip with MailX: Zack does not receive email notifications. Remember to call or text them any updates. (phone: Zack does not receive emails) | Lock, Only Connor and Pieter see this |
+| Contractor assigned, no login | Zack needs a login to see this. Desktop adds a "Set up login" TextLink to the contractor record | same |
+| No contractor (a partner or nobody) | none (Connor, Nov 16) | same |
 | Three or more staff | | Lock, Only the HG team sees this |
 | Portal composer | Connor and Pieter get this by email (three or more staff: The HG team gets this by email) | |
 | Deal note box | none | |
@@ -870,7 +870,7 @@ Each slice is its own approval. Each runs `npm run typecheck`, `npm run lint`, `
 5. **Review.** The banner (3.6) and its one-line outcome, one Send back sheet, button order, Undo on Approve, decision pairs (including Mark done's note through `setStatus`).
 6. **Portal.** Updates on the timeline (3.4), the shared composer, the job-page notice (send back now; dates and notes per question 2), the leading dot on My jobs, masked codes, email content and anchors.
 7. **Deals.** Schema batch (question 1), backfill, record log (3.3), note box, Latest note.
-8. **Property and contractor logs,** with the property hub (D10).
+8. **Property and contractor logs,** with the property hub (D10). Archive and restore are the first two lines of each log, worded as the deal's are: "Connor archived this property" and "Connor restored this property", and "Connor archived this contractor" and "Connor restored this contractor". Until then an archive or restore leaves no trace.
 
 ## 5. Reuse check
 

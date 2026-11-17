@@ -10,9 +10,10 @@ import { AssigneePicker, PropertyUnitPicker } from "@/components/entity-picker";
 import type { MenuFollowUp } from "@/components/menu";
 import { StatusMenu } from "@/components/status-menu";
 import { useToast } from "@/components/toast";
-import { Button, FormField, Input, Textarea, tagClass } from "@/components/ui";
+import { Button, CheckboxMark, FormField, Input, Textarea, tagClass } from "@/components/ui";
 import type { FieldErrors } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
+import type { TaskFill } from "@/lib/missing/checks";
 import type { PropertyOption } from "@/lib/picker-options-shape";
 import { firstOccurrence, type RepeatRule } from "@/lib/tasks/repeat";
 import { followDueDay } from "@/lib/tasks/repeat-choice";
@@ -44,9 +45,9 @@ type Values = {
 
 const encodeAssignee = (v: AssigneeValue) => (!v ? "" : "userId" in v ? `u:${v.userId}` : `c:${v.contactId}`);
 
-function blank(context: NewTaskContext | null, meId: string): Values {
+function blank(context: NewTaskContext | null, meId: string, fill: TaskFill | null = null): Values {
   return {
-    title: "",
+    title: fill?.title ?? "",
     notes: "",
     assignee: { userId: meId },
     due: null,
@@ -85,6 +86,7 @@ export function NewTaskForm({
   context,
   meId,
   today,
+  fill = null,
 }: {
   variant: "sheet" | "page";
   users: AssigneeUser[];
@@ -95,10 +97,12 @@ export function NewTaskForm({
   context: NewTaskContext | null;
   meId: string;
   today: Ymd;
+  /** Missing info's Make task (docs/specs/missing-info.md, D9): the title and the checklist it starts with. */
+  fill?: TaskFill | null;
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [values, setValues] = useState<Values>(() => blank(context, meId));
+  const [values, setValues] = useState<Values>(() => blank(context, meId, fill));
   // The context's Tag was removed: the task is about nothing in particular, and the Property chip shows.
   const [tagOn, setTagOn] = useState(context !== null);
   // The last date Due held, so a pinned day follows it even when the field passes through empty.
@@ -191,16 +195,17 @@ export function NewTaskForm({
       values={values}
       onRestore={(draft) => {
         // Over a blank form, so a draft kept before a field existed still has every field.
-        setValues({ ...blank(context, meId), ...draft });
+        setValues({ ...blank(context, meId, fill), ...draft });
         // A draft of a task about nothing keeps the Property chip it had.
         setTagOn(context !== null && (draft.propertyId === context.id || draft.dealId === context.id));
       }}
       onReset={() => {
         // Back to how it opened, Tag and all: Clear on a draft that had the Tag removed would otherwise lose the context for good.
-        setValues(blank(context, meId));
+        setValues(blank(context, meId, fill));
         setTagOn(context !== null);
       }}
-      draftKey={newTaskDraftKey(meId, context)}
+      // A Make task's draft is kept apart from a plain one, under the rows it was made from.
+      draftKey={newTaskDraftKey(meId, fill ? { kind: "missing", id: fill.keys.join("+") } : context)}
       fields={["title", "description"]}
       check={(data): FieldErrors | null => {
         const title = String(data.get("title") ?? "").trim();
@@ -280,6 +285,8 @@ export function NewTaskForm({
             )}
           </FormField>
 
+          {fill && <FillChecklist items={fill.items} />}
+
           {/* One row of the task page's own chips; below it the Waiting reason or the visit day. Past the edge they scroll. */}
           <div className="space-y-1">
             <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none]! [&::-webkit-scrollbar]:hidden">
@@ -333,9 +340,30 @@ export function NewTaskForm({
           <input type="hidden" name="propertyId" value={values.propertyId ?? ""} />
           <input type="hidden" name="unitLabel" value={values.unitLabel ?? ""} />
           <input type="hidden" name="dealId" value={values.dealId ?? ""} />
+          {fill && <input type="hidden" name="missing" value={fill.keys.join(",")} />}
         </>
       )}
     </CreateForm>
+  );
+}
+
+/**
+ * Make task's checklist, as the task will start with it: each Missing info row,
+ * unticked. Read only here; on the task it ticks itself as the rows are filled in.
+ */
+function FillChecklist({ items }: { items: string[] }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-meta font-medium text-fg-2">Checklist · ticks itself as each is filled in</p>
+      <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-md border border-border px-3">
+        {items.map((item, i) => (
+          <li key={i} className="flex min-h-9 items-center gap-2.5 text-body text-foreground">
+            <CheckboxMark checked={false} />
+            <span className="min-w-0 truncate">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

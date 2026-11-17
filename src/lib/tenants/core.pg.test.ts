@@ -14,10 +14,12 @@ import {
   addTerm,
   createLease,
   deleteLease,
+  deleteTerm,
   makePrimary,
   patchLease,
   patchTerm,
   removeTenant,
+  restoreTerm,
   stayOverlapMessage,
   unitHasTenants,
 } from "./core";
@@ -185,8 +187,74 @@ test("addTerm and patchTerm: no overlap, the share at most the rent", { skip }, 
   assert.deepEqual(await refusal(addTerm(prisma, id, { startsOn: "2027-01-01", rent: "2000" })), { startsOn: TERMS_OVERLAP });
   assert.deepEqual(await refusal(patchTerm(prisma, renewal.id, { subsidy: "2500" })), { subsidy: SUBSIDY_OVER_RENT });
   await patchTerm(prisma, renewal.id, { subsidy: "1500", subsidyFrom: "BMHA" });
+  // One fact at a time, as the rail saves: the contact keeps the share and who pays.
+  await patchTerm(prisma, renewal.id, { subsidyContact: "Pat Case" });
+  await patchTerm(prisma, renewal.id, { subsidyEmail: "Pat@BMHA.org" });
   const t = await prisma.leaseTerm.findUniqueOrThrow({ where: { id: renewal.id } });
-  assert.equal(t.subsidy?.toString(), "1500");
+  assert.deepEqual([t.subsidy?.toString(), t.subsidyFrom, t.subsidyContact, t.subsidyEmail], ["1500", "BMHA", "Pat Case", "pat@bmha.org"]);
+  // Clearing the share clears who pays and the contact with it.
+  await patchTerm(prisma, renewal.id, { subsidy: "" });
+  const cleared = await prisma.leaseTerm.findUniqueOrThrow({ where: { id: renewal.id } });
+  assert.deepEqual([cleared.subsidy, cleared.subsidyFrom, cleared.subsidyContact, cleared.subsidyEmail], [null, null, null, null]);
+});
+
+test("patchTerm moves an older term; deleteTerm keeps its file; restoreTerm brings both back", { skip }, async () => {
+  const pid = await property([{ id: "u5", label: "Unit 5" }, { id: "u6", label: "Unit 6" }, { id: "u7", label: "Unit 7" }]);
+  const { id } = await createLease(prisma, { propertyId: pid, unitId: "u5", tenants: [{ new: { fullName: name("Terms") } }], term: { startsOn: "2025-10-01", endsOn: "2025-12-10", rent: "1800" } }, null);
+  const older = await prisma.leaseTerm.findFirstOrThrow({ where: { leaseId: id } });
+  const current = await addTerm(prisma, id, { startsOn: "2025-12-11", endsOn: "2026-12-31", rent: "1530", subsidy: "1530", subsidyFrom: "RAC", subsidyContact: "Pat Case" });
+
+  // An older term's start date moves; running into the next term is refused on the date.
+  await patchTerm(prisma, older.id, { startsOn: "2025-09-15" });
+  assert.equal((await prisma.leaseTerm.findUniqueOrThrow({ where: { id: older.id } })).startsOn.toISOString().slice(0, 10), "2025-09-15");
+  assert.deepEqual(await refusal(patchTerm(prisma, older.id, { startsOn: "2025-09-15", endsOn: "2026-01-31" })), { startsOn: TERMS_OVERLAP });
+
+  // A term with a signed lease: deleting it keeps the file on the lease, unlinked.
+  const file = await prisma.leaseFile.create({ data: { leaseId: id, url: "https://example.test/l.pdf", pathname: `leases/${id}/l.pdf`, filename: "l.pdf", size: 1 } });
+  await prisma.leaseTerm.update({ where: { id: current.id }, data: { fileId: file.id } });
+  const snap = await deleteTerm(prisma, id, current.id);
+  assert.equal(await prisma.leaseTerm.count({ where: { id: current.id } }), 0);
+  assert.equal(await prisma.leaseFile.count({ where: { id: file.id } }), 1, "the file stays on the lease");
+  assert.deepEqual(snap, {
+    startsOn: "2025-12-11",
+    endsOn: "2026-12-31",
+    rent: "1530",
+    subsidy: "1530",
+    subsidyFrom: "RAC",
+    subsidyContact: "Pat Case",
+    subsidyEmail: "",
+    fileId: file.id,
+  });
+  // Only from its own lease, and only once.
+  const other = await createLease(prisma, { propertyId: pid, unitId: "u6", tenants: [{ new: { fullName: name("Other") } }], movesIn: "2030-01-01" }, null);
+  await assert.rejects(deleteTerm(prisma, other.id, older.id), /already gone/);
+  await assert.rejects(deleteTerm(prisma, id, current.id), /already gone/);
+
+  // Undo: the same values and the file, linked again.
+  const back = await restoreTerm(prisma, id, snap);
+  const restored = await prisma.leaseTerm.findUniqueOrThrow({ where: { id: back.id } });
+  assert.deepEqual(
+    [restored.rent.toString(), restored.subsidy?.toString(), restored.subsidyFrom, restored.subsidyContact, restored.fileId],
+    ["1530", "1530", "RAC", "Pat Case", file.id],
+  );
+
+  // A term added over the deleted one's dates refuses Undo.
+  const again = await deleteTerm(prisma, id, back.id);
+  const blocker = await addTerm(prisma, id, { startsOn: "2026-01-01", rent: "1600" });
+  assert.deepEqual(await refusal(restoreTerm(prisma, id, again)), { startsOn: TERMS_OVERLAP });
+
+  // A file another term now holds stays with that term; the restored one comes back without it.
+  await prisma.leaseTerm.delete({ where: { id: blocker.id } });
+  const holder = await addTerm(prisma, id, { startsOn: "2027-01-01", rent: "1700" });
+  await prisma.leaseTerm.update({ where: { id: holder.id }, data: { fileId: file.id } });
+  const without = await restoreTerm(prisma, id, again);
+  assert.equal((await prisma.leaseTerm.findUniqueOrThrow({ where: { id: without.id } })).fileId, null);
+
+  // A lease's only term can go.
+  const solo = await createLease(prisma, { propertyId: pid, unitId: "u7", tenants: [{ new: { fullName: name("Solo") } }], movesIn: "2031-01-01", term: { startsOn: "2031-01-01", rent: "1000" } }, null);
+  const only = await prisma.leaseTerm.findFirstOrThrow({ where: { leaseId: solo.id } });
+  await deleteTerm(prisma, solo.id, only.id);
+  assert.equal(await prisma.leaseTerm.count({ where: { leaseId: solo.id } }), 0);
 });
 
 test("deleteLease keeps its tenants; unitHasTenants sees current and upcoming, not past", { skip }, async () => {

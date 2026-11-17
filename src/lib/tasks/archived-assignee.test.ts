@@ -662,7 +662,7 @@ test("the drop and the give-back stay unless the status lines written with them 
   const givenBack = ev("ASSIGNED", GIVEN_BACK, "2026-10-23T15:01:00.000Z", { id: "a4" });
   const again = ev("STATUS", { from: "REVIEW", to: "DONE" }, "2026-10-23T15:01:00.000Z", { id: "a5", visibility: "SHARED" });
   assert.deepEqual(shown([review, approved, dropped, givenBack, again]), [
-    "Zack marked this done",
+    "Zack sent this for review",
     "Unassigned because Zack Outlaw is archived",
     "Assigned back to Zack Outlaw",
     "Pieter approved this",
@@ -728,7 +728,7 @@ test("a real flow, kept as a regression case: Approve's Undo, a rename, Approve 
       undone("m6", "2026-10-23T15:00:20.000Z", "2026-10-23T15:00:40.000Z"),
       ev("TITLE", { from: "Patch roof (east)", to: "Patch roof" }, "2026-10-23T15:00:50.000Z", { id: "m7" }),
     ]),
-    ["Zack marked this done", "Unassigned because Zack Outlaw is archived", "Assigned back to Zack Outlaw"],
+    ["Zack sent this for review", "Unassigned because Zack Outlaw is archived", "Assigned back to Zack Outlaw"],
   );
 });
 
@@ -757,7 +757,7 @@ test("a give-back whose own approval was undone isn't held with a later drop, th
     ev("ASSIGNED", DROP.data, "2026-10-23T15:01:20.000Z", { id: "n7" }),
     ev("STATUS", { from: "CANCELED", to: "REVIEW", dropped: "c-zack" }, "2026-10-23T15:01:20.000Z", { id: "n8" }),
   ];
-  assert.deepEqual(shown(flow), ["Zack marked this done", "Unassigned because Zack Outlaw is archived and made 2 more changes"]);
+  assert.deepEqual(shown(flow), ["Zack sent this for review", "Unassigned because Zack Outlaw is archived and made 2 more changes"]);
   const run = buildActivity(flow, NAMES, "2026-10-23")[1];
   assert.ok(run.type === "run");
   assert.deepEqual(
@@ -771,7 +771,7 @@ test("a give-back whose own approval was undone isn't held with a later drop, th
     ev("ASSIGNED", { from: { userId: null, contactId: "c-jose" }, to: { userId: null, contactId: "c-zack" } }, "2026-10-23T15:01:10.000Z", { id: "n6b" }),
   ];
   assert.deepEqual(shown([...flow.slice(0, 6), ...picks, ...flow.slice(6)]), [
-    "Zack marked this done",
+    "Zack sent this for review",
     "Unassigned because Zack Outlaw is archived",
     "Assigned back to Zack Outlaw",
     "Connor assigned Jose Alvarez",

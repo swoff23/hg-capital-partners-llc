@@ -19,6 +19,8 @@ const newLeaseSchema = z
     rent: text(40),
     subsidy: text(40),
     subsidyFrom: text(500),
+    subsidyContact: text(500),
+    subsidyEmail: text(600),
   })
   .strict();
 
@@ -40,7 +42,11 @@ export async function createNewLease(input: z.input<typeof newLeaseSchema>): Pro
         primary: 0,
         movesIn: v.movesIn,
         deposit: v.deposit,
-        term: { startsOn: v.startsOn, endsOn: v.endsOn, rent: v.rent, subsidy: v.subsidy, subsidyFrom: v.subsidyFrom },
+        term: { startsOn: v.startsOn, endsOn: v.endsOn, rent: v.rent, subsidy: v.subsidy,
+          subsidyFrom: v.subsidyFrom,
+          subsidyContact: v.subsidyContact,
+          subsidyEmail: v.subsidyEmail,
+        },
       },
       { id: user.id },
     );

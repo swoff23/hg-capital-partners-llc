@@ -16,8 +16,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
+import { readLockboxAccess } from "@/lib/portal/access-code";
 import { resolveJobLink } from "@/lib/portal/job-links";
+import { isLockboxPhotoPath } from "@/lib/properties/photo";
 import { getPortalPrincipal } from "@/lib/portal/session";
+import { isActiveStatus } from "@/lib/task-scope";
 import { assertContractorAccess } from "@/lib/tasks/core";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +41,8 @@ export const maxDuration = 300;
  * - Contractors get task files: Shared, not removed, on a job they can
  *   open (core.assertContractorAccess), and only from our private store.
  *   Never property documents, never the public fallback. And their own W-9
- *   and insurance (`contact`), which staff see too.
+ *   and insurance (`contact`), which staff see too. And a job's lockbox
+ *   photo (`lockbox`, by the job), only while its code shows to them.
  *
  * `?v=thumb` / `?v=poster` serve the row's thumbnail or video poster,
  * authorized by the row itself. A LINK row has no bytes here (the UI links
@@ -63,6 +67,12 @@ const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   contact: ["staff", "contractor"],
   // A signed lease's PDF (docs/specs/tenants.md, section 11): staff only, never a contractor.
   lease: ["staff"],
+  // A job's lockbox photo, by the job (docs/specs/lockbox-location.md): staff, and the contractor the job shows its
+  // code to (D21), the same check the job page makes. The unit is the job's, so no other unit's photo is reachable.
+  lockbox: ["staff", "contractor"],
+  // A lockbox photo or thumbnail in a property's lockbox folder, by its pathname (?p=): staff only, for the Units list
+  // and the unit sheet, which shows a photo uploaded before Save.
+  "property-lockbox": ["staff"],
 };
 
 interface Served {
@@ -100,7 +110,20 @@ async function currentViewer(allowed: readonly Viewer["kind"][]): Promise<Viewer
   return null;
 }
 
-async function lookup(kind: string, id: string, variant: Variant | null, viewer: Viewer, storeId: string | null): Promise<Served | null> {
+async function lookup(
+  kind: string,
+  id: string,
+  variant: Variant | null,
+  viewer: Viewer,
+  storeId: string | null,
+  query: URLSearchParams,
+): Promise<Served | null> {
+  if (kind === "lockbox" && variant !== "poster") return lockboxPhoto(id, variant, viewer);
+  if (kind === "property-lockbox" && viewer.kind === "staff" && !viewer.onlyTaskId && !variant) {
+    const pathname = query.get("p") ?? "";
+    if (!isLockboxPhotoPath(id, pathname)) return null;
+    return { source: pathname, privatePathname: pathname, filename: LOCKBOX_PHOTO_NAME, contentType: null, publicFallback: false };
+  }
   if (kind === "task") {
     const a = await prisma.taskAttachment.findUnique({
       where: { id },
@@ -168,6 +191,32 @@ async function lookup(kind: string, id: string, variant: Variant | null, viewer:
   return null;
 }
 
+/** What a lockbox photo is called when it's saved: its own name, not the camera's. */
+const LOCKBOX_PHOTO_NAME = "Lockbox photo.jpg";
+
+/**
+ * The lockbox photo of job `taskId`, or its thumbnail. A contractor gets it
+ * only while the job is open and theirs, as the code (portal/queries.ts), and
+ * only from a job they can open; a job link's session only for that job.
+ */
+async function lockboxPhoto(taskId: string, variant: Variant | null, viewer: Viewer): Promise<Served | null> {
+  if (viewer.onlyTaskId && viewer.onlyTaskId !== taskId) return null;
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { status: true, propertyId: true, unitLabel: true, assigneeContactId: true } });
+  if (!task?.propertyId) return null;
+  if (viewer.kind === "contractor") {
+    if (!isActiveStatus(task.status) || task.assigneeContactId !== viewer.contactId) return null;
+    try {
+      await assertContractorAccess(prisma, taskId, viewer);
+    } catch {
+      return null;
+    }
+  }
+  const photo = (await readLockboxAccess(prisma, task.propertyId, task.unitLabel))?.photo;
+  const pathname = variant === "thumb" ? photo?.thumbPathname : photo?.pathname;
+  if (!pathname || !isLockboxPhotoPath(task.propertyId, pathname)) return null;
+  return { source: pathname, privatePathname: pathname, filename: LOCKBOX_PHOTO_NAME, contentType: null, publicFallback: false };
+}
+
 /** A GET URL for exactly this pathname, valid 10 minutes; null when the token can't sign one. */
 async function signedVideoUrl(pathname: string, token: string): Promise<string | null> {
   // Signed URLs are built from the raw pathname; an old name with spaces or
@@ -218,7 +267,7 @@ async function serve(req: Request, kind: string, id: string, viewer: Viewer): Pr
   const saving = query.get("download") === "1";
 
   const token = getEnv().BLOB_READ_WRITE_TOKEN;
-  const file = await lookup(kind, id, variant, viewer, storeIdFromToken(token));
+  const file = await lookup(kind, id, variant, viewer, storeIdFromToken(token), query);
   if (!file) return fail("Not found", 404);
 
   const isVideo = !variant && !saving && normalizeContentType(file.contentType).startsWith("video/");

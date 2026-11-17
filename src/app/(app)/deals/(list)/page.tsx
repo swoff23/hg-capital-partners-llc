@@ -3,6 +3,8 @@ import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ScopeButton } from "@/components/filter-bar";
+import { ListFooter } from "@/components/list-footer";
+import { listLimit } from "@/lib/list-page";
 import { SortHeader } from "@/components/sort-header";
 import { LinkButton, PageHeader, Table, Th, EmptyState, chromeIconClass } from "@/components/ui";
 import { DEAL_FIELD_LABEL } from "@/lib/config";
@@ -20,8 +22,6 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Deals" };
 
-const CAP = 300;
-
 const SORT_COLUMNS: Record<
   string,
   (desc: boolean) => Prisma.DealOrderByWithRelationInput
@@ -30,7 +30,6 @@ const SORT_COLUMNS: Record<
   units: (desc) => ({ units: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   theirPrice: (desc) => ({ theirPrice: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   ourPrice: (desc) => ({ ourPrice: { sort: desc ? "desc" : "asc", nulls: "last" } }),
-  nextAction: (desc) => ({ nextAction: { sort: desc ? "desc" : "asc", nulls: "last" } }),
   updated: (desc) => ({ updatedAt: desc ? "desc" : "asc" }),
 };
 
@@ -51,7 +50,6 @@ const LIST_COLUMNS = {
   theirPriceRaw: true,
   ourPrice: true,
   ourPriceRaw: true,
-  nextAction: true,
   sourceUrl: true,
   updatedAt: true,
 } satisfies Prisma.DealSelect;
@@ -82,18 +80,19 @@ function latestNote(note: LatestNote | undefined, today: string): { text: string
 }
 
 /**
- * The rows the list shows, at most CAP, with their latest notes. Every sort but Stage is a DB
- * order that takes the cap directly. Stage has no DB order, so every match's id, stage and update
- * time are read and ranked first (stage-order.ts), and only the CAP shown are read in full: the
- * cap never cuts a stage group before the sort runs, and the rest are never loaded.
+ * The rows the list shows, at most `take` (a page of 100, and Show more asks for another), with their
+ * latest notes. Every sort but Stage is a DB order that takes the limit directly. Stage has no DB order,
+ * so every match's id, stage and update time are read and ranked first (stage-order.ts), and only the
+ * `take` shown are read in full: the limit never cuts a stage group before the sort runs, and the rest
+ * are never loaded. There is no ceiling: Show more reaches every deal.
  */
-async function shownDeals(where: Prisma.DealWhereInput, sortField: string, desc: boolean) {
+async function shownDeals(where: Prisma.DealWhereInput, sortField: string, desc: boolean, take: number) {
   if (sortField !== "status") {
-    const deals = await prisma.deal.findMany({ where, orderBy: dbOrderBy(sortField, desc), take: CAP, select: LIST_COLUMNS });
+    const deals = await prisma.deal.findMany({ where, orderBy: dbOrderBy(sortField, desc), take, select: LIST_COLUMNS });
     return { deals, notes: await latestNotes(deals.map((d) => d.id)) };
   }
   const keys = await prisma.deal.findMany({ where, select: { id: true, status: true, updatedAt: true } });
-  const ids = firstByStage(keys, desc, CAP);
+  const ids = firstByStage(keys, desc, take);
   const [rows, notes] = await Promise.all([
     prisma.deal.findMany({ where: { id: { in: ids } }, select: LIST_COLUMNS }),
     latestNotes(ids),
@@ -104,7 +103,10 @@ async function shownDeals(where: Prisma.DealWhereInput, sortField: string, desc:
 }
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
-  const f = parseDealFilters(await searchParams);
+  const sp = await searchParams;
+  const f = parseDealFilters(sp);
+  // A page of rows at a time, with no ceiling: the footer's Show more asks for another (?show=200).
+  const take = listLimit(sp.show, { ceiling: null });
   const where = dealsWhere(f);
 
   const sortDesc = f.sort.startsWith("-");
@@ -114,7 +116,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   // `where` carries the view's archive scope (dealsWhere), so the shown rows, the Stage sort's keys and the count all keep it.
   const [, { deals, notes }, shown, byStageSearched, byStageAll, archivedSearched, archivedAll] = await Promise.all([
     requireUser(),
-    shownDeals(where, sortField, sortDesc),
+    shownDeals(where, sortField, sortDesc, take),
     prisma.deal.count({ where }),
     // Each view and stage counts the search's hits, so a hit outside the current view shows (DEALS-012).
     // The stage views count live deals; Archived counts the archived ones.
@@ -124,7 +126,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     prisma.deal.count({ where: { AND: [archivedRecord, dealSearchWhere(f.q)] } }),
     f.q ? prisma.deal.count({ where: archivedRecord }) : Promise.resolve(null),
   ]);
-  const truncated = shown > CAP;
   const today = todayYmdEastern();
 
   const stageCounts = Object.fromEntries(byStageSearched.map((s) => [s.status, s._count]));
@@ -224,13 +225,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                       <ResizeHandle columnKey="latestNote" />
                     </Th>
                     <SortHeader
-                      label={DEAL_FIELD_LABEL.nextAction}
-                      field="nextAction"
-                      defaultSort={DEFAULT_DEAL_SORT}
-                      className={COLUMN_DROP.nextAction}
-                      trailing={<ResizeHandle columnKey="nextAction" />}
-                    />
-                    <SortHeader
                       label={DEAL_FIELD_LABEL.updatedAt}
                       field="updated"
                       defaultSort={DEFAULT_DEAL_SORT}
@@ -253,7 +247,6 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
                         theirPriceRaw: d.theirPriceRaw,
                         ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
                         ourPriceRaw: d.ourPriceRaw,
-                        nextAction: d.nextAction,
                         sourceUrl: d.sourceUrl,
                         updated: easternDay(d.updatedAt, today),
                         latestNote: latestNote(notes.get(d.id), today),
@@ -265,13 +258,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
             </ColumnWidthsProvider>
           )}
         </div>
-        {truncated && (
-          // One line at every width: the phone's words are shorter.
-          <p className="mt-2 truncate text-meta text-muted-foreground">
-            <span className="sm:hidden">First {CAP} of {shown}. Search for more.</span>
-            <span className="max-sm:hidden">Showing first {CAP} of {shown}. Search or filter to see the rest.</span>
-          </p>
-        )}
+        <ListFooter shown={take} total={shown} />
       </DealFilters>
     </>
   );

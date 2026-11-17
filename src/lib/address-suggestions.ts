@@ -36,7 +36,15 @@ export const SUGGEST_LIMIT = 6;
 const READ_LIMIT = 40;
 
 /** One record as the matcher sees it. */
-export type AddressRecord = { kind: AddressKind; id: string; address: string; updatedAt: Date | number; stage?: string | null };
+export type AddressRecord = {
+  kind: AddressKind;
+  id: string;
+  address: string;
+  updatedAt: Date | number;
+  stage?: string | null;
+  /** Archived: out of the suggestion rows, still a duplicate (the save refuses it). */
+  archived?: boolean;
+};
 
 /** A suggestion row: the street over "Buffalo, NY 14209 · Property". `address` is what a pick fills in. */
 export type AddressSuggestion = {
@@ -49,7 +57,25 @@ export type AddressSuggestion = {
 };
 
 /** The record a typed address already is. `stage` is a deal's stage as stored. */
-export type AddressMatch = { kind: AddressKind; id: string; address: string; street: string; href: string; stage?: string };
+export type AddressMatch = { kind: AddressKind; id: string; address: string; street: string; href: string; stage?: string; archived?: true };
+
+/**
+ * The sentence for a record the typed address already is, on the line under
+ * the field and in the save's refusal (which has no link): "767 Prospect Ave
+ * is already a property." or "767 Prospect Ave is an archived property."
+ */
+export function duplicateSentence(kind: AddressKind, street: string, archived?: boolean): string {
+  return `${street} is ${archived ? "an archived" : "already a"} ${kind}.`;
+}
+
+/**
+ * Of the records at one address (newest first), the one the save's refusal
+ * names: a live record wins over an archived one, the same order the line
+ * under the field uses.
+ */
+export function liveFirst<T extends { archivedAt: Date | null }>(same: readonly T[]): T | null {
+  return same.find((r) => r.archivedAt === null) ?? same[0] ?? null;
+}
 
 export type AddressAnswer = { suggestions: AddressSuggestion[]; match: AddressMatch | null };
 
@@ -73,18 +99,29 @@ const tidy = (s: string) =>
     .replace(/^[\s,]+|[\s,.]+$/g, "")
     .trim();
 
+/** A house number as it starts an address: "34", "34A", "765/767", "12-14". */
+const HOUSE_NUMBER = /^\d+[a-z]?(?:[/-]\d+[a-z]?)?$/i;
+
 /**
  * Splits a stored address into its two suggestion lines: the street ("767
  * Prospect Avenue") and the place ("Buffalo, NY 14213"). The street runs to
- * the first street-type word after the house number (two in a row stay
+ * the first street-type word after the street's name (two in a row stay
  * together, "Baynes St Street"), or to the first comma when there's none.
+ * A street-type word right after the house number is the name, never the
+ * end: the "St" of a Saint street ("34 St James Pl", which used to split as
+ * "34 St" and save as "34 St, James Pl"), the "Court" of "12 Court St".
+ * After a direction, St is the street's type, never a Saint ("45 N St"), so
+ * "45 N St Clair St" still ends at "45 N St".
  * Spacing and stray commas are tidied; the words are kept as stored.
  */
 export function splitAddress(raw: string): { street: string; place: string } {
   const text = raw.replace(/\n/g, " ").trim();
   const words = text.split(/\s+/);
+  // A street is called something before its type, so the word after a house number is never where it ends,
+  // unless a comma closes it there ("34 St, ..." is left exactly as it was typed or stored).
+  const named = HOUSE_NUMBER.test(words[0]) && words.length > 1 && !words[1].endsWith(",") && STREET_TYPE_WORDS.has(words[1].toLowerCase().replace(/\.+$/, ""));
   let end = -1;
-  for (let i = 1; i < words.length; i++) {
+  for (let i = named ? 2 : 1; i < words.length; i++) {
     const w = words[i].toLowerCase().replace(/[.,]+$/, "");
     if (STREET_TYPE_WORDS.has(w)) {
       end = i;
@@ -258,7 +295,8 @@ export function suggestAddresses(
   const q = query.trim();
   if (q.length < SUGGEST_FROM) return [];
   const candidates = records
-    .filter((r) => r.id !== excludeId && r.address.trim() && matchesSearch(q, r.address))
+    // An archived record leaves every picker (archive.ts); the match below still counts it.
+    .filter((r) => !r.archived && r.id !== excludeId && r.address.trim() && matchesSearch(q, r.address))
     .map((r) => ({ r, ...splitAddress(r.address) }))
     .map((c) => ({ ...c, quality: matchQuality(c.street, q) }))
     .sort(
@@ -303,9 +341,10 @@ export function findAddressMatch(
   if (!/^\d/.test(streetKey(q))) return null;
   const order: AddressKind[] = kind === "property" ? ["property"] : ["deal", "property"];
   for (const k of order) {
+    // Within a kind a live record wins over an archived one, then the newest.
     const hit = records
       .filter((r) => r.kind === k && r.id !== excludeId && sameStreetAddress(r.address, q))
-      .sort((a, b) => time(b.updatedAt) - time(a.updatedAt))[0];
+      .sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || time(b.updatedAt) - time(a.updatedAt))[0];
     if (hit) {
       return {
         kind: hit.kind,
@@ -314,6 +353,7 @@ export function findAddressMatch(
         street: splitAddress(hit.address).street,
         href: hrefOf(hit.kind, hit.id),
         ...(hit.stage ? { stage: hit.stage } : {}),
+        ...(hit.archived ? { archived: true as const } : {}),
       };
     }
   }
@@ -347,20 +387,20 @@ export async function runAddresses(
   const [properties, deals] = await Promise.all([
     db.property.findMany({
       where: anyOf,
-      select: { id: true, address: true, updatedAt: true },
+      select: { id: true, address: true, updatedAt: true, archivedAt: true },
       orderBy: { updatedAt: "desc" },
       take: READ_LIMIT,
     }),
     db.deal.findMany({
       where: anyOf,
-      select: { id: true, address: true, updatedAt: true, status: true },
+      select: { id: true, address: true, updatedAt: true, status: true, archivedAt: true },
       orderBy: { updatedAt: "desc" },
       take: READ_LIMIT,
     }),
   ]);
   const records: AddressRecord[] = [
-    ...properties.map((p) => ({ kind: "property" as const, id: p.id, address: p.address, updatedAt: p.updatedAt })),
-    ...deals.map((d) => ({ kind: "deal" as const, id: d.id, address: d.address, updatedAt: d.updatedAt, stage: d.status })),
+    ...properties.map((p) => ({ kind: "property" as const, id: p.id, address: p.address, updatedAt: p.updatedAt, archived: p.archivedAt != null })),
+    ...deals.map((d) => ({ kind: "deal" as const, id: d.id, address: d.address, updatedAt: d.updatedAt, stage: d.status, archived: d.archivedAt != null })),
   ];
   return {
     suggestions: suggestAddresses(q, records, { excludeId, prefer: kind }),

@@ -67,6 +67,20 @@ export async function patchTerm(leaseId: string, termId: string, patch: Partial<
   revalidateLease(leaseId);
 }
 
+/** One term gone, its signed lease kept on the lease; returns what Undo puts back. */
+export async function deleteTerm(leaseId: string, termId: string): Promise<core.TermSnapshot> {
+  const snapshot = await core.deleteTerm(prisma, leaseId, termId);
+  revalidateLease(leaseId);
+  return snapshot;
+}
+
+/** Undo for deleteTerm. */
+export async function restoreTerm(leaseId: string, snapshot: core.TermSnapshot): Promise<{ id: string }> {
+  const r = await core.restoreTerm(prisma, leaseId, snapshot);
+  revalidateLease(leaseId);
+  return r;
+}
+
 /** Deletes the lease and returns the Blob paths of its files for the caller to remove after the commit. */
 export async function deleteLease(id: string): Promise<string[]> {
   const gone = await core.deleteLease(prisma, id);

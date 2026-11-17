@@ -23,7 +23,6 @@ export type DealRow = {
   theirPriceRaw: string | null;
   ourPrice: number | null;
   ourPriceRaw: string | null;
-  nextAction: string | null;
   sourceUrl: string | null;
   /** The day it last changed, worked out on the server ("Oct 20"). */
   updated: string;
@@ -44,12 +43,14 @@ function Price({ amount, raw }: { amount: number | null; raw: string | null }) {
 const dense = "min-h-10 pointer-coarse:min-h-12";
 
 /**
- * One deal in the list (forms 3.3 A): the row is the link, so a click, a tap,
- * cmd-click and middle-click open the deal, and the stage is the only control
- * in it. With a mouse the stage is a `StatusMenu` showing its ring and word,
- * with the chevron on the row's hover; a pick saves at once, flashes the row
- * and toasts "Moved to High" with Undo. On touch the stage is display only
- * and the row opens the deal, where every field is edited. A row has one tab
+ * One deal in the list (forms 3.3 A): the row is the link, so a click or a
+ * tap opens the deal's sheet over the list (there is no deal page;
+ * deals/[id]/deal-sheet.tsx), and cmd-click and middle-click open the list
+ * with that sheet in a new tab. The stage is the only control in the row.
+ * With a mouse it is a `StatusMenu` showing its ring and word, with the
+ * chevron on the row's hover; a pick saves at once, flashes the row and
+ * toasts "Moved to High" with Undo. On touch the stage is display only and
+ * the row opens the sheet, where every field is edited. A row has one tab
  * stop beside the stage, down from six controls.
  *
  * Where the list is narrower than 520px (a phone), only the address column
@@ -108,7 +109,7 @@ export function DealListRow({ deal }: { deal: DealRow }) {
         className={cn(dense, "flex-col items-start justify-center gap-0 pl-0 @max-[32.5rem]:py-2", deal.sourceUrl && "pr-8 @max-[32.5rem]:pr-0")}
         aside={
           deal.sourceUrl && (
-            // A mouse sees it on the row's hover; touch, and the phone row, open the listing from the deal page.
+            // A mouse sees it on the row's hover; touch, and the phone row, open the listing from the deal's sheet.
             <a
               href={deal.sourceUrl}
               target="_blank"
@@ -167,11 +168,6 @@ export function DealListRow({ deal }: { deal: DealRow }) {
         ) : (
           <span aria-label="No notes">—</span>
         )}
-      </RowCell>
-
-      {/* A blank cell when there's no next action: the deal page keeps the verb. */}
-      <RowCell href={href} cell={COLUMN_DROP.nextAction} className={cn(dense, "text-body text-foreground")}>
-        <span className="truncate">{deal.nextAction}</span>
       </RowCell>
 
       <RowCell href={href} cell={COLUMN_DROP.updated} className={cn(dense, "num pr-0 text-meta text-muted-foreground")}>

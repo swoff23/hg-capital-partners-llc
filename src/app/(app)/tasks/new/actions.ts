@@ -7,6 +7,7 @@ import type { Assignee } from "@/lib/tasks/core";
 import { newTaskSchema } from "@/lib/tasks/new-task-schema";
 import { repeatRuleSchema } from "@/lib/tasks/repeat-schema";
 import * as tasks from "@/lib/tasks/service";
+import { makeTaskChecklist } from "@/lib/missing/service";
 
 /**
  * Thin server action for New task (forms 2.12, 4.4): authenticate, validate,
@@ -46,6 +47,8 @@ export async function createTask(formData: FormData): Promise<ActionResult<Creat
     const p = newTaskSchema.parse(formToObject(formData));
     const assignee = pickedAssignee(p.assignee, p.assigneeUserId);
     if (p.status === "SCHEDULED" && !p.scheduledFor) throw new tasks.TaskRuleError("Pick the visit date.");
+    // Make task: each Missing info row becomes a checklist item that ticks itself once it's filled in.
+    const checklist = p.missing ? await makeTaskChecklist(p.missing.split(",").filter(Boolean), user) : undefined;
     const task = await tasks.createTask(
       {
         title: p.title,
@@ -61,6 +64,7 @@ export async function createTask(formData: FormData): Promise<ActionResult<Creat
         waitingOn: p.waitingOn,
         scheduledFor: p.status === "SCHEDULED" ? p.scheduledFor : null,
         repeatRule: postedRepeat(p.repeatRule),
+        checklist,
       },
       tasks.staffPrincipal(user),
     );

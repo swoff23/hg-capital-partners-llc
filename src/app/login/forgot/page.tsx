@@ -15,8 +15,9 @@ export const metadata: Metadata = {
 // The sign-in frame is the public site's dark material, so the browser's bar is too.
 export const viewport: Viewport = { themeColor: brandTokensDark.canvas };
 
-// Contractor logins only (docs/asana-migration-plan.md, defaults 2): a staff
-// email gets the same "sent" answer, and nothing is emailed.
+// Contractor and staff logins (docs/specs/staff-password-reset.md). An email
+// with no login, or a staff User with no password, gets the same "sent"
+// answer, and nothing is emailed.
 export default async function ForgotPasswordPage({ searchParams }: PageProps<"/login/forgot">) {
   // Read first: a build without PORTAL_ENABLED would otherwise prerender this as a static 404 for good.
   const { sent } = (await searchParams) as { sent?: string };

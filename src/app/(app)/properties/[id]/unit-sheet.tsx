@@ -1,26 +1,38 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
 import { FormSheet } from "@/components/form-sheet";
 import { LoadLatest } from "@/components/load-latest";
 import { NumberInput } from "@/components/number-input";
 import { Select } from "@/components/select";
-import { Button, FormField, Input, Section } from "@/components/ui";
+import { Button, Checkbox, FormField, Input, Section } from "@/components/ui";
 import { useRun } from "@/components/use-run";
-import { UTILITY_GROUPS, UTILITY_STATUS_FIELDS, utilityStatusChoices, type CapexRules, type PropertyUnit, type UnitEquipment } from "@/lib/property-types";
+import {
+  LOCKBOX_LOCATION_MAX,
+  UTILITY_GROUPS,
+  UTILITY_STATUS_FIELDS,
+  isHouseMeterRow,
+  utilityStatusChoices,
+  type CapexRules,
+  type PropertyUnit,
+  type UnitEquipment,
+} from "@/lib/property-types";
 import {
   EQUIPMENT_FOOTER,
   equipmentProblems,
   firstEquipmentProblem,
+  sharedLockboxLine,
   stillFailing,
   unitSheetWords,
   type EquipmentProblems,
+  type OtherUnit,
 } from "@/lib/properties/unit-sheet";
 import { stableJson } from "@/lib/drafts";
 import { cn } from "@/lib/utils";
 import { savePropertyUnit } from "../actions";
 import { isAccountField } from "./edit-units";
+import { LockboxPhotoField, discardLockboxSession } from "./lockbox-photo";
 
 /**
  * The unit editor's sheet: name and lockbox, utilities and the equipment
@@ -44,6 +56,7 @@ export function UnitSheet({
   version,
   latest,
   unit,
+  others,
   isNew,
   gone,
   title,
@@ -57,6 +70,8 @@ export function UnitSheet({
   /** The page's version now: after a refusal the page re-renders on the latest, and "Load the latest" pins this. */
   latest: string;
   unit: PropertyUnit;
+  /** The property's other rentable units, for "Same lockbox for all units" (docs/specs/lockbox-location.md). */
+  others: readonly OtherUnit[];
   isNew: boolean;
   /** The unit was deleted elsewhere: the latest has nothing to load. */
   gone: boolean;
@@ -75,6 +90,9 @@ export function UnitSheet({
   const [openedTitle] = useState(title);
   const run = useRun();
   const router = useRouter();
+  // The lockbox photo still going up: Save waits for it, and says so.
+  const [uploading, setUploading] = useState(0);
+  const sharedId = useId();
   const types = rules.equipment.map((r) => ({ id: r.type, label: r.type }));
   const equipment = draft.equipment ?? [];
   // A year already stored is left as it is ("~2004"), so only one that was typed over has to read.
@@ -95,9 +113,14 @@ export function UnitSheet({
     const found = equipmentProblems(equipment, stored);
     setProblems(found);
     if (Object.keys(found).length > 0) return;
+    const photo = draft.lockboxPhoto ?? null;
     run.run(() => savePropertyUnit(propertyId, draft, pinned), {
       failure: "inline",
-      succeeded: () => onOpenChange(false),
+      succeeded: () => {
+        // Photos uploaded here and then replaced or removed before this Save go; the saved one stays.
+        void discardLockboxSession(propertyId, photo);
+        onOpenChange(false);
+      },
       done: isNew ? `${draft.label?.trim() || "Unit"} added` : `${title} saved`,
       key: `unit:${propertyId}:${draft.id ?? "new"}`,
     });
@@ -128,15 +151,24 @@ export function UnitSheet({
   const label = draft.label?.trim() || title;
   const words = unitSheetWords(isNew, openedTitle, label);
   const firstProblem = firstEquipmentProblem(shown);
+  // "Same lockbox for all units": a rentable unit with another to share with.
+  const canShare = !isHouseMeterRow(draft) && others.length > 0;
+  const sharedLine = sharedLockboxLine({ on: !!draft.lockboxShared, wasOn: !!base.lockboxShared, code: draft.lockboxCode, others });
 
   return (
     <FormSheet
       title={title}
       isOpen={isOpen}
-      onOpenChange={onOpenChange}
+      onOpenChange={(open) => {
+        // Discard, Cancel, X or Esc: a lockbox photo this sheet uploaded goes with the changes.
+        if (!open) void discardLockboxSession(propertyId);
+        onOpenChange(open);
+      }}
       onSubmit={submit}
       primary={isNew ? "Add unit" : "Save unit"}
       pending={run.pending}
+      primaryDisabled={uploading > 0}
+      disabledReason={uploading > 0 ? "Photo uploading" : undefined}
       values={draft}
       // Against what the sheet last loaded, so loading the latest doesn't read as a change of yours.
       dirty={stableJson(draft) !== stableJson(base)}
@@ -152,18 +184,70 @@ export function UnitSheet({
         <FormField label="Name">
           {(p) => <Input {...p} value={draft.label ?? ""} autoComplete="off" onChange={(e) => mutate((u) => (u.label = e.target.value))} />}
         </FormField>
-        <FormField label="Lockbox" optional>
-          {(p) => (
-            <Input
-              {...p}
-              className="font-mono"
-              autoComplete="off"
-              value={draft.lockboxCode ?? ""}
-              onChange={(e) => mutate((u) => (u.lockboxCode = e.target.value))}
-            />
-          )}
-        </FormField>
       </FieldGrid>
+
+      {/* docs/specs/lockbox-location.md, decisions 2, 2b and 4b: the photo on the left, as tall as Code over Location,
+          at every width; nothing here is required. */}
+      <Section as="h3" title="Lockbox">
+        <div className="flex items-stretch gap-3">
+          <LockboxPhotoField
+            propertyId={propertyId}
+            unitName={label}
+            value={draft.lockboxPhoto ?? null}
+            location={draft.lockboxLocation}
+            onChange={(photo) => mutate((u) => (u.lockboxPhoto = photo))}
+            onPendingChange={setUploading}
+          />
+          <div className="min-w-0 flex-1 space-y-4">
+            <FormField label="Code" optional>
+              {(p) => (
+                <Input
+                  {...p}
+                  className="font-mono"
+                  autoComplete="off"
+                  value={draft.lockboxCode ?? ""}
+                  onChange={(e) => mutate((u) => (u.lockboxCode = e.target.value))}
+                />
+              )}
+            </FormField>
+            <FormField label="Location" optional>
+              {(p) => (
+                <Input
+                  {...p}
+                  autoComplete="off"
+                  placeholder="Back entrance"
+                  maxLength={LOCKBOX_LOCATION_MAX}
+                  value={draft.lockboxLocation ?? ""}
+                  onChange={(e) => mutate((u) => (u.lockboxLocation = e.target.value))}
+                />
+              )}
+            </FormField>
+          </div>
+        </div>
+        {canShare && (
+          <div className="mt-4">
+            <label htmlFor={sharedId} className="flex w-fit cursor-pointer items-center gap-2 text-body text-foreground pointer-coarse:min-h-11">
+              <Checkbox
+                id={sharedId}
+                checked={!!draft.lockboxShared}
+                aria-describedby={sharedLine ? `${sharedId}-line` : undefined}
+                onChange={(e) =>
+                  mutate((u) => {
+                    if (e.target.checked) u.lockboxShared = true;
+                    else delete u.lockboxShared;
+                  })
+                }
+              />
+              Same lockbox for all units
+            </label>
+            {sharedLine && (
+              <p id={`${sharedId}-line`} className={cn("mt-1 pl-6 text-meta", sharedLine.warning ? "text-warn" : "text-muted-foreground")}>
+                {sharedLine.text}
+              </p>
+            )}
+          </div>
+        )}
+      </Section>
 
       <Section as="h3" title="Utilities (optional)">
         <div className="grid gap-x-4 gap-y-5 md:grid-cols-3">
@@ -315,3 +399,124 @@ function EquipmentRow({
   );
 }
 
+
+/**
+ * One piece of a unit's equipment in a small sheet, opened from its row in
+ * Units & access the way a building system opens from its row (Connor, Nov
+ * 14): Type, Model #, Comments and Year. Save writes the unit with this one
+ * item changed, pinned to the version the sheet opened at, so a change anyone
+ * made meanwhile refuses it and "Load the latest" starts the sheet over on
+ * it. Adding and removing equipment stay in the unit's own sheet.
+ */
+export function EquipmentSheet({
+  propertyId,
+  version,
+  latest,
+  unit,
+  unitName,
+  index,
+  gone,
+  rules,
+  isOpen,
+  onOpenChange,
+}: {
+  propertyId: string;
+  version: string;
+  latest: string;
+  /** The unit as the page shows it now. */
+  unit: PropertyUnit;
+  unitName: string;
+  /** The item's place in the unit's equipment. */
+  index: number;
+  /** The unit or the item was deleted elsewhere: the latest has nothing to load. */
+  gone: boolean;
+  rules: CapexRules;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const blank: UnitEquipment = { type: "", model: "", installYear: "", comment: "" };
+  const current = unit.equipment?.[index] ?? blank;
+  const [base, setBase] = useState<UnitEquipment>(current);
+  const [pinned, setPinned] = useState(version);
+  const [draft, setDraft] = useState<UnitEquipment>(() => structuredClone(current));
+  const [tried, setTried] = useState(false);
+  // The name as the sheet opened, so the title doesn't change while a new type is picked.
+  const [title] = useState(current.type.trim() || "Equipment");
+  const run = useRun();
+  const router = useRouter();
+  const types = rules.equipment.map((r) => ({ id: r.type, label: r.type }));
+  // A year already stored is left as it is ("~2004"); only one typed over has to read.
+  const problems = equipmentProblems([draft], new Map([[0, base.installYear ?? ""]]))[0];
+  const typeProblem = draft.type.trim() ? undefined : "Choose a type.";
+
+  function change(patch: Partial<UnitEquipment>) {
+    if (run.error) run.reset();
+    setDraft((d) => ({ ...d, ...patch }));
+  }
+
+  function submit() {
+    setTried(true);
+    if (typeProblem || problems) return;
+    const next = structuredClone(unit);
+    next.equipment = [...(next.equipment ?? [])];
+    next.equipment[index] = draft;
+    run.run(() => savePropertyUnit(propertyId, next, pinned), {
+      failure: "inline",
+      succeeded: () => onOpenChange(false),
+      done: `${draft.type.trim() || title} saved`,
+      key: `equipment:${propertyId}:${unit.id ?? unitName}:${index}`,
+    });
+  }
+
+  function loadLatest() {
+    run.reset();
+    setTried(false);
+    if (gone) {
+      onOpenChange(false);
+      return;
+    }
+    setBase(current);
+    setDraft(structuredClone(current));
+    setPinned(latest);
+    router.refresh();
+  }
+
+  return (
+    <FormSheet
+      title={`${title} · ${unitName}`}
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      onSubmit={submit}
+      primary="Save"
+      pending={run.pending}
+      values={draft}
+      dirty={stableJson(draft) !== stableJson(base)}
+      discardTitle={`Discard changes to ${title}?`}
+      leaveTitle={`Leave ${title}?`}
+      error={run.error ?? undefined}
+      errorAction={run.conflict && <LoadLatest onClick={loadLatest} />}
+      fieldErrors={run.fieldErrors}
+    >
+      <Select
+        label="Type"
+        size="md"
+        items={types}
+        value={draft.type.trim() || null}
+        placeholder="Choose a type"
+        onChange={(v) => change({ type: v ?? "" })}
+        isInvalid={tried && !!typeProblem}
+        errorMessage={typeProblem}
+        searchLabel="Search types"
+      />
+      <FormField label="Model #" optional>
+        {(p) => <Input {...p} autoComplete="off" value={draft.model ?? ""} onChange={(ev) => change({ model: ev.target.value })} />}
+      </FormField>
+      <FormField label="Comments" optional>
+        {(p) => <Input {...p} autoComplete="off" value={draft.comment ?? ""} onChange={(ev) => change({ comment: ev.target.value })} />}
+      </FormField>
+      <FormField label="Year installed" optional helper="Adds it to the forecast" error={(tried && problems?.year) || undefined}>
+        {(p) => <NumberInput kind="year" {...p} value={draft.installYear ?? ""} onChange={(next) => change({ installYear: next })} />}
+      </FormField>
+    </FormSheet>
+  );
+}

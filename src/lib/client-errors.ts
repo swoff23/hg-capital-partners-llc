@@ -15,7 +15,8 @@ import { isOfflineError } from "./offline-error";
  * loaded them.
  */
 
-export type ClientErrorSource = "boundary" | "window" | "rejection";
+/** `upload`: a file Blob itself refused (attachments/engine.ts deps.report), which no screen or handler sees. */
+export type ClientErrorSource = "boundary" | "window" | "rejection" | "upload";
 
 export interface ClientError {
   error: unknown;

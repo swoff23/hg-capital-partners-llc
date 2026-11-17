@@ -6,7 +6,7 @@ import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus 
 import { partnersEmailState } from "@/lib/tasks/delivery";
 import { MARK_DONE_WINDOW_MS, finishPhotoIds, orderMedia } from "@/lib/tasks/media";
 import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
-import { lockboxMasker, readLockboxCode, type BodyPart } from "./access-code";
+import { lockboxMasker, readLockboxAccess, type BodyPart, type LockboxAccess } from "./access-code";
 import { JOB_EMAIL_SELECT, jobEmailState } from "./job-emails";
 import { NO_NOTICE, dateChange, dateChangeText, noticeCount, sendBackStands, type DateChange, type DateEvent, type JobNotice } from "./job-notice";
 import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, type JobCard, type JobsTab } from "./job-view";
@@ -316,6 +316,18 @@ export interface JobDelivery {
   to: string[];
 }
 
+/**
+ * The job's Lockbox section (D21, docs/specs/lockbox-location.md): the code,
+ * where the box is, and whether there is a photo, which the page loads from
+ * /api/files/lockbox/<job id>. The photo's files stay on the server.
+ */
+export type JobLockbox = { code: string; location: string | null; photo: { hasThumb: boolean } | null };
+
+function jobLockbox(access: LockboxAccess | null): JobLockbox | null {
+  if (!access) return null;
+  return { code: access.code, location: access.location, photo: access.photo ? { hasThumb: !!access.photo.thumbPathname } : null };
+}
+
 export interface JobDetail {
   id: string;
   title: string;
@@ -344,7 +356,7 @@ export interface JobDetail {
   /** The send back, date and notes changes since the viewer last looked, for the top of the page. */
   notice: JobNotice;
   /** D21: only for the assigned contractor while the job is active, else null. */
-  lockbox: string | null;
+  lockbox: JobLockbox | null;
   /** First names of the partners a Mark done goes to, for the payoff line. */
   staffNames: string[];
   /** HG's changes to their jobs email this contractor (job-emails.ts), so the payoff can say "You'll get an email". */
@@ -464,7 +476,7 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
       orderBy: { createdAt: "asc" },
     }),
     jobUpdates(p, taskId, mask),
-    active && task.assigneeContactId === p.contactId ? readLockboxCode(prisma, task.propertyId, task.unitLabel) : null,
+    active && task.assigneeContactId === p.contactId ? readLockboxAccess(prisma, task.propertyId, task.unitLabel).then(jobLockbox) : null,
     staffFirstNames(),
     // The hour after Mark done runs from the job's newest move to Review, and only when this contractor made it
     // (acceptsContractorUpload reads the same event).

@@ -16,7 +16,12 @@ export function signSession(email: string): string {
   return signSessionToken(email, { secret: getEnv().sessionSecret, now: Date.now(), ttlMs: SESSION_TTL_MS });
 }
 
-/** The session's email (lowercased), or null if missing / invalid / expired. */
-export function readSession(value: string | undefined): string | null {
-  return readSessionToken(value, { secret: getEnv().sessionSecret, now: Date.now() })?.email ?? null;
+/**
+ * The session's email (lowercased) and when it was issued (ms), or null if
+ * missing / invalid / expired. The issue time lets src/lib/auth.ts turn away a
+ * session from before the user's last password reset.
+ */
+export function readSession(value: string | undefined): { email: string; issuedAt: number } | null {
+  const payload = readSessionToken(value, { secret: getEnv().sessionSecret, now: Date.now() });
+  return payload ? { email: payload.email, issuedAt: payload.iat } : null;
 }

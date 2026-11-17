@@ -32,6 +32,10 @@ test("a reply finds its job by the r+ address, or by the thread it answers", () 
   assert.equal(replyAddress(T, "HG Capital Partners <jobs@mail.hg.com>"), `r+${T}@mail.hg.com`);
   assert.equal(threadTaskId("<abc@x> <job-cmvk123-2026-11-23@mail.hg.com>"), "cmvk123");
   assert.equal(threadTaskId("<job-cmvk123-none@mail.hg.com>"), "cmvk123");
+  // One id per job since Nov 15; the older ids above still match.
+  assert.equal(threadTaskId("<abc@x> <job-cmvk123@mail.hg.com>"), "cmvk123");
+  // The off email's thread is its own and names no job a reply could post to.
+  assert.equal(threadTaskId("<job-cmvk123-off@mail.hg.com>"), null);
   assert.equal(threadTaskId("<something@else>"), null);
   assert.equal(threadTaskId(null), null);
 });

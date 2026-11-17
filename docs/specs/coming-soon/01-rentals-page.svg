@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The public Rentals page with coming-soon homes: one grid, Available then Coming soon then Leased, a pill on each photo and Notify me under coming-soon captions</title>
+<rect width="900" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Decisions 2 to 5 and 11: the Rentals page</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 (3 columns); tablet 768 is the same at 2 columns</text>
+<rect x="0" y="22" width="580" height="440" rx="10" fill="#101824"/>
+<text x="24" y="54" font-size="9" letter-spacing="2.4" font-weight="500" fill="#c9a96a">RENTALS · 1 AVAILABLE · 2 COMING SOON</text>
+<text x="24" y="82" font-size="20" fill="#f2efe9">Apartments in Buffalo.</text>
+
+<g transform="translate(24 100)">
+<rect width="168" height="126" rx="8" fill="#1f2a3a"/>
+<text x="0" y="146" font-size="11" font-weight="500" fill="#f2efe9">647 Prospect Ave</text><text x="168" y="146" font-size="11" font-weight="500" fill="#f2efe9" text-anchor="end">$1,295<tspan fill="#8f99a8" font-weight="400">/mo</tspan></text>
+<text x="0" y="162" font-size="10" fill="#8f99a8">Lower</text>
+<text x="0" y="176" font-size="10" fill="#8f99a8">2 bd · 1 ba · 900 sq ft</text>
+<text x="0" y="196" font-size="10" fill="#f2efe9">View on Zillow ↗</text>
+</g>
+
+<g transform="translate(206 100)">
+<rect width="168" height="126" rx="8" fill="#1f2a3a"/>
+<rect x="8" y="8" width="104" height="20" rx="10" fill="#f2efe9"/><text x="60" y="22" font-size="10" fill="#101824" text-anchor="middle">Coming in January</text>
+<text x="0" y="146" font-size="11" font-weight="500" fill="#f2efe9">56 Tamarack St</text><text x="168" y="146" font-size="11" font-weight="500" fill="#f2efe9" text-anchor="end">$1,450<tspan fill="#8f99a8" font-weight="400">/mo</tspan></text>
+<text x="0" y="162" font-size="10" fill="#8f99a8">Upper</text>
+<text x="0" y="176" font-size="10" fill="#8f99a8">2 bd · 1 ba · 950 sq ft</text>
+<text x="0" y="196" font-size="10" fill="#f2efe9" text-decoration="underline">Notify me</text>
+</g>
+
+<g transform="translate(388 100)">
+<rect width="168" height="126" rx="8" fill="#1f2a3a"/>
+<text x="84" y="70" font-size="10" fill="#5d6878" text-anchor="middle">No photos yet: House tile</text>
+<rect x="8" y="8" width="78" height="20" rx="10" fill="#f2efe9"/><text x="47" y="22" font-size="10" fill="#101824" text-anchor="middle">Coming soon</text>
+<text x="0" y="146" font-size="11" font-weight="500" fill="#f2efe9">23 Sherwood Ave</text>
+<text x="0" y="162" font-size="10" fill="#8f99a8">Lower</text>
+<text x="0" y="176" font-size="10" fill="#8f99a8">3 bd · 1 ba</text>
+<text x="0" y="196" font-size="10" fill="#f2efe9" text-decoration="underline">Notify me</text>
+<text x="0" y="214" font-size="9" fill="#5d6878">No rent entered: nothing on the right</text>
+</g>
+
+<g transform="translate(24 330)">
+<rect width="168" height="96" rx="8" fill="#1f2a3a"/>
+<rect x="8" y="8" width="52" height="20" rx="10" fill="#f2efe9"/><text x="34" y="22" font-size="10" fill="#101824" text-anchor="middle">Leased</text>
+<text x="0" y="114" font-size="11" font-weight="500" fill="#f2efe9">15 Oxford Ave</text>
+</g>
+</g>
+
+<g transform="translate(648 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375 (1 column)</text>
+<rect x="0" y="22" width="200" height="440" rx="14" fill="#101824"/>
+<text x="16" y="50" font-size="8" letter-spacing="1.8" font-weight="500" fill="#c9a96a">RENTALS · 1 AVAILABLE</text>
+<text x="16" y="72" font-size="16" fill="#f2efe9">Apartments in Buffalo.</text>
+<rect x="16" y="86" width="168" height="126" rx="8" fill="#1f2a3a"/>
+<text x="16" y="230" font-size="11" font-weight="500" fill="#f2efe9">647 Prospect Ave</text>
+<text x="184" y="230" font-size="11" font-weight="500" fill="#f2efe9" text-anchor="end">$1,295</text>
+<text x="16" y="246" font-size="10" fill="#8f99a8">Lower</text>
+<rect x="16" y="266" width="168" height="126" rx="8" fill="#1f2a3a"/>
+<rect x="24" y="274" width="104" height="20" rx="10" fill="#f2efe9"/><text x="76" y="288" font-size="10" fill="#101824" text-anchor="middle">Coming in January</text>
+<text x="16" y="410" font-size="11" font-weight="500" fill="#f2efe9">56 Tamarack St</text>
+<text x="184" y="410" font-size="11" font-weight="500" fill="#f2efe9" text-anchor="end">$1,450</text>
+<text x="16" y="426" font-size="10" fill="#8f99a8">Upper</text>
+<text x="16" y="446" font-size="10" fill="#f2efe9" text-decoration="underline">Notify me</text>
+</g>
+
+<g transform="translate(32 528)" font-size="11" fill="#424e61">
+<text x="0" y="0">Below 640 the eyebrow keeps one fact ("1 available", or "2 coming soon" when none is open), so it never wraps at 320.</text>
+<text x="0" y="16">Nothing open but homes coming soon: "RENTALS · 2 COMING SOON", the heading, then the grid, with no lead line (decision 11).</text>
+</g>
+</svg>

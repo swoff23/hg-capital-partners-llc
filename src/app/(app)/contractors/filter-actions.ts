@@ -20,6 +20,9 @@ export async function countContractorsAction(query: string): Promise<number> {
       signupSource: true,
       needsReview: true,
       setupDoneAt: true,
+      // The Status filter reads the login's state, which an inactive contact or an archived one changes.
+      active: true,
+      archivedAt: true,
       documents: { where: { kind: "W9" }, select: { kind: true } },
       tradeLinks: { select: { trade: { select: { id: true } } } },
       ...STATUS_INCLUDE,

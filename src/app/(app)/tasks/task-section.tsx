@@ -16,6 +16,7 @@ export function TaskSection({
   icon,
   action,
   collapsible = false,
+  as = "h3",
   children,
 }: {
   title: string;
@@ -25,6 +26,8 @@ export function TaskSection({
   /** At the header's end, e.g. "Move all to today". */
   action?: ReactNode;
   collapsible?: boolean;
+  /** The heading level: h3 under a column's or a building's h2 (Today, a scoped list), h2 straight under the page's h1 (the Tasks list's groups). */
+  as?: "h2" | "h3";
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(!collapsible);
@@ -38,7 +41,7 @@ export function TaskSection({
 
   return (
     <Section
-      as="h3"
+      as={as}
       // Closed, the rows' slot is empty: drop it so no gap hangs under the rule.
       className="[&>div:empty]:hidden"
       actions={action}

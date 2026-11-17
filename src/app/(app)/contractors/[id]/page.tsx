@@ -25,11 +25,14 @@ import { setupProgressLine } from "@/lib/contractors/onboarding";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import { ContactCompany, ContactName, ContactNotes, ContactSection } from "./contact-section";
 import { PortalAccessCard } from "./portal-access-card";
-import { OnboardingBadge } from "../status-badge";
+import { ContractorStatusBadge } from "../status-badge";
 import { statusOf } from "../query";
 import { setContractorArchived } from "../actions";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
+import { ofPriority } from "@/lib/missing/checks";
+import { loadMissingInfo } from "@/lib/missing/queries";
+import { MissingSummary } from "../../missing/missing-summary";
 
 /** The tab names the record (record-title.ts), so tabs and history can be told apart. */
 export async function generateMetadata({ params }: PageProps<"/contractors/[id]">): Promise<Metadata> {
@@ -126,6 +129,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
   const tasks = rows.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   // Buffalo's calendar day, not the server's (UTC on Vercel rolls over at 8pm).
   const today = todayYmdEastern();
+  // Missing info (docs/specs/missing-info.md, D7): a W-9 required of anyone who worked a job this year.
+  const missing = c.archivedAt ? [] : ofPriority((await loadMissingInfo(today, { contactId: c.id })).gaps, "required");
 
   return (
     // A record: capped at 1200, with a 320 rail beside the jobs once the page
@@ -157,9 +162,10 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
           <div className="-my-1 flex min-w-0 has-[input]:flex-1">
             <ContactCompany id={c.id} fullName={c.fullName} company={c.company} />
           </div>
-          {status && <OnboardingBadge status={status} className="shrink-0" />}
+          {status && <ContractorStatusBadge status={status} className="shrink-0" />}
           {c.tenantFixes && <Badge className="shrink-0">Tenant fixes</Badge>}
         </div>
+        <MissingSummary className="mt-4" gaps={missing} />
         {c.archivedAt && (
           <ArchivedNotice
             className="mt-4"
@@ -332,7 +338,7 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
               })}
             </ul>
           )}
-          {jobCount > tasks.length && <p className="mt-3 text-meta text-muted-foreground">Showing the latest {JOBS_SHOWN}</p>}
+          {jobCount > tasks.length && <Link href={`/tasks?status=all&owner=c:${id}`} className="flex min-h-10 items-center border-t border-border text-label text-fg-2 transition-colors hover:text-foreground pointer-coarse:min-h-12">See all jobs</Link>}
         </Section>
       </div>
     </div>

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="560" viewBox="0 0 860 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>A property page's Missing info line and in-place marks at laptop 1280 and phone 375</title>
+<rect width="860" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">The property page: a line at the top, and Missing where each blank sits</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768, the line opened with Show</text>
+<rect x="0" y="22" width="560" height="470" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="54" font-size="18" font-weight="600" fill="#152133">118 Congress St</text>
+<text x="20" y="72" font-size="11" fill="#5b6576">4 units · Refinanced</text>
+
+<rect x="20" y="84" width="520" height="132" rx="8" fill="#ffffff" stroke="#e7e5e0"/>
+<circle cx="34" cy="102" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<text x="46" y="106" font-size="12" fill="#152133">14 missing</text>
+<text x="526" y="106" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Hide</text>
+<line x1="32" y1="116" x2="528" y2="116" stroke="#e7e5e0"/>
+<g font-size="12" fill="#152133">
+<text x="32" y="134">Insurance carrier</text><text x="520" y="134" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="32" y1="142" x2="528" y2="142" stroke="#e7e5e0"/>
+<text x="32" y="160">Next property tax due</text><text x="168" y="160" font-size="11" fill="#5b6576">Oct 31 has passed</text>
+<rect x="430" y="147" width="62" height="20" rx="5" fill="#ffffff" stroke="#c9c6bf"/><text x="461" y="161" font-size="11" text-anchor="middle">Set date</text>
+<text x="520" y="160" text-anchor="end" fill="#5b6576">⋯</text>
+<line x1="32" y1="170" x2="528" y2="170" stroke="#e7e5e0"/>
+<text x="32" y="188">Lower · Fuel leave on for landlord</text>
+<rect x="408" y="175" width="40" height="20" rx="5" fill="#ffffff" stroke="#c9c6bf"/><text x="428" y="189" font-size="11" text-anchor="middle">Done</text>
+<rect x="452" y="175" width="34" height="20" rx="5" fill="#ffffff" stroke="#c9c6bf"/><text x="469" y="189" font-size="11" text-anchor="middle">NA</text>
+<text x="520" y="188" text-anchor="end" fill="#5b6576">⋯</text>
+<text x="32" y="208" font-size="11" fill="#5b6576">11 more rows, as on the Missing info page</text>
+</g>
+
+<text x="20" y="246" font-size="13" font-weight="600" fill="#152133">Units</text><text x="62" y="246" font-size="11" fill="#9a6700">· 2 missing</text>
+<line x1="20" y1="254" x2="320" y2="254" stroke="#e7e5e0"/>
+<g font-size="12" fill="#152133">
+<text x="20" y="274">Lower</text><circle cx="306" cy="270" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<line x1="20" y1="284" x2="320" y2="284" stroke="#e7e5e0"/>
+<text x="20" y="302">Upper</text><circle cx="306" cy="298" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<line x1="20" y1="312" x2="320" y2="312" stroke="#e7e5e0"/>
+<text x="20" y="330">Front</text>
+<line x1="20" y1="340" x2="320" y2="340" stroke="#e7e5e0"/>
+</g>
+<text x="20" y="362" font-size="11" fill="#5b6576">The mark sits in each unit row's fixed status spot.</text>
+
+<text x="350" y="246" font-size="13" font-weight="600" fill="#152133">Insurance</text><text x="420" y="246" font-size="11" fill="#9a6700">· 3 missing</text>
+<line x1="350" y1="254" x2="540" y2="254" stroke="#e7e5e0"/>
+<g font-size="12">
+<text x="350" y="274" font-size="11" fill="#424e61">Renewal</text><text x="440" y="274" fill="#9a6700">Missing</text>
+<line x1="350" y1="284" x2="540" y2="284" stroke="#e7e5e0"/>
+<text x="350" y="302" font-size="11" fill="#424e61">Carrier</text><text x="440" y="302" fill="#9a6700">Missing</text>
+<line x1="350" y1="312" x2="540" y2="312" stroke="#e7e5e0"/>
+<text x="350" y="330" font-size="11" fill="#424e61">Policy #</text><text x="440" y="330" fill="#9a6700">Missing</text>
+<line x1="350" y1="340" x2="540" y2="340" stroke="#e7e5e0"/>
+<text x="350" y="358" font-size="11" fill="#424e61">Premium</text><text x="440" y="358" fill="#8a919c">Add premium</text>
+<line x1="350" y1="368" x2="540" y2="368" stroke="#e7e5e0"/>
+<text x="350" y="386" font-size="11" fill="#424e61">3 more fields</text>
+</g>
+<text x="350" y="420" font-size="13" font-weight="600" fill="#152133">Loan</text><text x="384" y="420" font-size="11" fill="#9a6700">· 2 missing</text>
+<line x1="350" y1="428" x2="540" y2="428" stroke="#e7e5e0"/>
+<g font-size="12">
+<text x="350" y="448" font-size="11" fill="#424e61">Maturity</text><text x="440" y="448" fill="#9a6700">Missing</text>
+<line x1="350" y1="458" x2="540" y2="458" stroke="#e7e5e0"/>
+<text x="350" y="476" font-size="11" fill="#424e61">Payment</text><text x="440" y="476" fill="#9a6700">Missing</text>
+</g>
+</g>
+
+<g transform="translate(620 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375, the line closed</text>
+<rect x="0" y="22" width="208" height="374" rx="16" fill="#ffffff" stroke="#e7e5e0"/>
+<g transform="translate(0 -112)">
+<text x="12" y="162" font-size="16" font-weight="600" fill="#152133">118 Congress St</text>
+<text x="12" y="178" font-size="11" fill="#5b6576">4 units · Refinanced</text>
+<rect x="12" y="190" width="184" height="32" rx="8" fill="#ffffff" stroke="#e7e5e0"/>
+<circle cx="26" cy="206" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<text x="38" y="210" font-size="12" fill="#152133">14 missing</text>
+<text x="184" y="210" font-size="11" text-anchor="end" fill="#152133" text-decoration="underline">Show</text>
+<rect x="12" y="236" width="88" height="44" rx="6" fill="#f3f2ef"/><rect x="108" y="236" width="88" height="44" rx="6" fill="#f3f2ef"/>
+<text x="16" y="254" font-size="10" fill="#5b6576">Value</text><text x="112" y="254" font-size="10" fill="#5b6576">Balance</text>
+<text x="12" y="310" font-size="13" font-weight="600" fill="#152133">Tasks</text>
+<line x1="12" y1="318" x2="196" y2="318" stroke="#e7e5e0"/>
+<rect x="12" y="328" width="184" height="10" rx="3" fill="#f3f2ef"/><rect x="12" y="346" width="140" height="10" rx="3" fill="#f3f2ef"/>
+<text x="12" y="384" font-size="13" font-weight="600" fill="#152133">Units</text><text x="50" y="384" font-size="11" fill="#9a6700">· 2 missing</text>
+<line x1="12" y1="392" x2="196" y2="392" stroke="#e7e5e0"/>
+<text x="12" y="412" font-size="12" fill="#152133">Lower</text><circle cx="186" cy="408" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<line x1="12" y1="422" x2="196" y2="422" stroke="#e7e5e0"/>
+<text x="12" y="442" font-size="12" fill="#152133">Upper</text><circle cx="186" cy="438" r="5" fill="none" stroke="#9a6700" stroke-width="1.5"/>
+<text x="12" y="470" font-size="11" fill="#5b6576">Loan and Insurance sit lower down;</text>
+<text x="12" y="484" font-size="11" fill="#5b6576">the line keeps them in view.</text>
+</g>
+</g>
+</svg>

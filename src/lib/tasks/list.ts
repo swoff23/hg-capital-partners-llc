@@ -1,4 +1,5 @@
 import type { TaskStatus } from "@prisma/client";
+import type { AssigneeValue } from "@/components/assignee-picker";
 import { daysUntil, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { OVERDUE_ELIGIBLE, isActiveStatus, statusRank } from "@/lib/task-scope";
@@ -123,10 +124,15 @@ export const isContractorJob = (t: ListTask) => t.assignee?.kind === "contact" |
  * one it gave you with yours, instead of under Unassigned. A name that is
  * nobody stays as it was.
  */
-export function withLegacyPeople(tasks: ListTask[], people: readonly PersonRef[]): ListTask[] {
+export function withLegacyPeople(
+  tasks: ListTask[],
+  people: readonly PersonRef[],
+  /** Each imported name to its person's key, when the caller already has it (the Tasks page's `legacy.merged`), so its rows and its sort agree. */
+  known?: ReadonlyMap<string, string>,
+): ListTask[] {
   const names = [...new Set(tasks.flatMap((t) => (t.assignee?.kind === "name" ? [t.assignee.name] : [])))];
   if (names.length === 0) return tasks;
-  const { merged } = mergeLegacyNames(names, people);
+  const merged = known ?? mergeLegacyNames(names, people).merged;
   if (merged.size === 0) return tasks;
   const nameOf = new Map(people.map((p) => [p.key, p.name]));
   return tasks.map((t) => {
@@ -142,6 +148,17 @@ export function ownerKeyOf(a: ListAssignee | null): string | null {
   if (a.kind === "user") return `u:${a.id}`;
   if (a.kind === "contact") return `c:${a.id}`;
   return a.person?.key ?? null;
+}
+
+/**
+ * Who the task is assigned to, as the task service compares it: the user or
+ * contractor, or null for nobody. An imported name is nobody here: it has no
+ * person behind it in the database, even when the list files it with one.
+ */
+export function assigneeValueOf(a: ListAssignee | null): AssigneeValue {
+  if (a?.kind === "user") return { userId: a.id };
+  if (a?.kind === "contact") return { contactId: a.id };
+  return null;
 }
 
 /** What a person's name reads as on a row. */
@@ -330,6 +347,8 @@ export type ListPatch =
   | { kind: "dates"; changes: DateChange[] }
   | { kind: "check"; id: string; checked: boolean }
   | { kind: "status"; id: string; status: TaskStatus }
+  /** Assigned from the row's Assignee cell; null for nobody. */
+  | { kind: "assignee"; id: string; assignee: ListAssignee | null }
   /** The row as it was, back in the list: Undo after a tick, once the refresh has dropped it. */
   | { kind: "restore"; task: ListTask };
 
@@ -348,6 +367,8 @@ export function applyPatch(tasks: ListTask[], patch: ListPatch): ListTask[] {
       return tasks.map((t) => (t.id === patch.id ? { ...t, checked: patch.checked } : t));
     case "status":
       return tasks.map((t) => (t.id === patch.id ? { ...t, status: patch.status, checked: patch.status === "DONE" } : t));
+    case "assignee":
+      return tasks.map((t) => (t.id === patch.id ? { ...t, assignee: patch.assignee } : t));
     case "restore":
       return tasks.some((t) => t.id === patch.task.id) ? tasks.map((t) => (t.id === patch.task.id ? patch.task : t)) : [...tasks, patch.task];
   }

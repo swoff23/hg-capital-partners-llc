@@ -45,7 +45,6 @@ const SORT_WORDS: Record<string, SortWords> = {
     desc: `${DEAL_FIELD_LABEL.theirPrice}, high to low`,
   },
   ourPrice: { asc: `${DEAL_FIELD_LABEL.ourPrice}, low to high`, desc: `${DEAL_FIELD_LABEL.ourPrice}, high to low` },
-  nextAction: { asc: `${DEAL_FIELD_LABEL.nextAction} A to Z`, desc: `${DEAL_FIELD_LABEL.nextAction} Z to A` },
   updated: { asc: "Oldest update first", desc: "Newest update first" },
 };
 

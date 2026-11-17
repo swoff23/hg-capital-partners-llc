@@ -228,8 +228,8 @@ Two tokens are public-only.
 **Density.**
 - Rows 40px with a mouse, 48px on touch; two-line phone rows 60px.
 - Below 480px a row keeps two lines: its trailing button drops (the whole row opens the item), and the subline keeps status, place and date. Secondary clauses ("Luis marked it done · 4 photos", "2 bd · 1 ba", "/mo" on unit rows) drop rather than wrap.
-- **Task rows** (Connor, Oct 25): the date always sits at the right edge. On a two-line row the date chip is top right on the title's line and the assignee avatar bottom right on the place line; the title truncates before the date and the place before the avatar. On a one-line row (wide All list) the avatar sits just before the date at the right edge. An undated row's "Due date" chip takes the same slot, so every row's date lines up.
-- Photo rows: Portfolio 56px (48x36 photo); contractor job cards 72px.
+- **Task rows** (Connor, Oct 25): the date always sits at the right edge. On a two-line row the date chip is top right on the title's line and the assignee avatar bottom right on the place line; the title truncates before the date and the place before the avatar. On a one-line row (the wide Tasks list, from a 60rem list) the row reads title, status, Property, Unit, Assignee, Due under a row of column headers, each column a fixed width so it lines up row to row (Connor, Nov 14, docs/specs/task-list-sort.md). The assignee is a 24px avatar with two initials and their first name: avatar first in the Assignee column, the first name before the avatar on a two-line row so the avatar keeps the corner. An undated row's "Due date" chip takes the same slot, so every row's date lines up.
+- Photo rows: contractor job cards 72px. Portfolio rows stay 56px with no photo, and a property page shows its photo only once one is set (Connor, Nov 14).
 - Record fact strip: four facts in one row split by `--border` rules, 16px in from each rule; a 2 by 2 grid on phones so no label wraps.
 - Detail rails: a 112px label column, 96px on phones.
 - Controls 32px (sm) and 36px (md) with a mouse; 44px minimum on touch (`TOUCH_HEIGHT` on HG's own, the touch rules in `globals.css` on stock parts).
@@ -336,10 +336,10 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 ### Inputs and controls
 
 - **Fields** (Input, Textarea, Select): `--background`, 1px `--input`, `rounded-md`, 36px (44 touch), 10px side padding (32px on the left when a search icon leads), `text-body`, placeholder `--muted-foreground`.
-- **Focus:** the edge turns `--ring` plus a 1px inset `--ring` ring, in place of the global outline. **Error:** `--destructive` edge, the inset ring turns `--destructive` on focus, and one `--destructive` line under the field.
+- **Focus:** the edge turns `--primary` plus a 1px inset `--primary` ring, in place of the global outline. **Error:** `--destructive` edge, the inset ring turns `--destructive` on focus, and one `--destructive` line under the field.
 - **Labels** sit above in `text-meta` 500 `--fg-2`, sentence case, 6px above the field. Helper text is one line of `text-meta` `--muted-foreground`.
-- **Checkbox and radio:** 16px, `--background` with an `--input` edge; checked is `--primary` fill and edge with a `--primary-foreground` mark. **Switch:** a 32 by 18 track with a 12px knob. Off is `--background` with an `--input` edge and knob; on is a `--primary` track with a `--primary-foreground` knob.
-- **Segmented control:** `--muted` track, `rounded-md`, 2px padding and 2px between segments; segments are `rounded-sm` and 4px shorter than the control. The selected segment is `--background` with an `--input` edge (3.42 / 3.65 vs the track), same weight, `aria-pressed`.
+- **Checkbox and radio:** 16px, `--background` with a `--input` edge; checked is `--primary` fill and edge with an `--primary-foreground` mark. **Switch:** a 32 by 18 track with a 12px knob. Off is `--background` with a `--input` edge and knob; on is an `--primary` track with an `--primary-foreground` knob.
+- **Segmented control:** `--muted` track, `rounded-md`, 2px padding and 2px between segments; segments are `rounded-sm` and 4px shorter than the control. The selected segment is `--background` with a `--input` edge (3.42 / 3.65 vs the track), same weight, `aria-pressed`.
 - **Menus and listboxes:** hover and keyboard focus use `--accent`; the chosen option carries a lucide `Check` in `--foreground` at its trailing edge, so the pick never rests on a fill.
 - **Calendar:** today carries a 1px inset `--input` ring at the same weight as other days; the picked day is the `--primary` fill ([Material date picker](https://m3.material.io/components/date-pickers/guidelines)).
 - **Avatar:** `--background` ground with a 1px `--line-strong` edge and `--fg-2` initials at 12px, so it holds on any fill, including a highlighted listbox row. 20px avatars show one initial; 24px and up show two, so two people who share a first letter stay apart. Team members are round; contractors are `rounded-sm` squares, so who's in-house reads without color (GitHub draws people round and organizations square).
@@ -348,8 +348,8 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 - **Desktop header** (from `lg`): `--background` with a `--border` rule, running full width above the `--canvas` sidebar with the monogram centered over the rail's icons, so it reads as part of the work area, as Mercury's does.
 - **Phone navigation:** the drawer from the 52px top bar, on `--canvas`, with the sidebar's item styles at 44px. It scrolls when the screen is short (a phone held sideways), and every control in it, Sign out and Appearance included, is 44px on touch. A bottom tab bar is not part of this rollout; if one comes later it is `--canvas` with a `--border` rule above, 20px `--muted-foreground` icons over 12 / 16 500 `--fg-2` labels, and the current tab `--foreground` with a 16 by 2px `--primary` notch on its top edge.
 - **TextLink** (**new**, `ui.tsx`): inherits `--foreground`, solid 1px underline at a 3px offset, 2px on hover. Required for every link in a sentence. Standalone links (breadcrumbs, "See all") are known by position and underline on hover.
-- **Kbd** (**new**, `ui.tsx`): Geist Mono 12px, 20px tall, 20px minimum width, `rounded-sm`, `--muted` with a `--line-strong` edge, `--muted-foreground` glyph (5.17 / 6.25). Printed in menus, the command palette, Find (⌘K) and dialog footers ("Cancel Esc", "Create task ⌘↵") ([Linear menu](https://mobbin.com/screens/83e65fd8-259c-4568-8fa6-5a2269ed4123), [Vercel switcher](https://mobbin.com/screens/63496168-dbae-470d-9039-6883d8d1e479)). Hidden under `pointer: coarse`; touch gets the same actions as visible buttons.
-- **A shortcut prints inside the button it triggers** (Connor, Oct 26), at the trailing edge after the label: "Send ⌘↵", "Create task ⌘↵", "Cancel Esc". It is never a separate keycap beside the button, as in Linear's "Comment ⌘↵" and Stripe's "Add note ⌘↵". Inside a primary (`--primary`) button the keys drop the keycap ground and take `--primary-foreground` at reduced opacity; inside a secondary button they keep the Kbd look. The button carries `aria-keyshortcuts` and the printed keys are `aria-hidden`.
+- **Kbd** (**new**, `ui.tsx`): Geist Mono 12px, 20px tall, 20px minimum width, `rounded-sm`, `--muted` with a `--line-strong` edge, `--muted-foreground` glyph (5.17 / 6.25). Printed in menus, the command palette and Find (⌘K) ([Linear menu](https://mobbin.com/screens/83e65fd8-259c-4568-8fa6-5a2269ed4123), [Vercel switcher](https://mobbin.com/screens/63496168-dbae-470d-9039-6883d8d1e479)). Hidden under `pointer: coarse`; touch gets the same actions as visible buttons.
+- **Buttons don't print Esc or ⌘↵** (Connor, Nov 14; replaces the Oct 26 rule that printed them inside the button). Cancel still answers to Esc and the primary to ⌘↵ (Ctrl ↵ off a Mac); the button carries `aria-keyshortcuts` so assistive tech announces the keys, and nothing is drawn.
 
 ### Badges and status marks
 
@@ -378,7 +378,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 ### Tables and money
 
 - `Table` drops its 70vh box; the page scrolls (VISUAL-V02).
-- `Th`: sticky on `--background` under a `--line-strong` rule, `text-meta` 500 `--muted-foreground`, sentence case, no gray band.
+- `Th`: sticky on `--background` under a `--line-strong` rule, `text-meta` 500 `--muted-foreground`, sentence case, no gray band. It's the only thing that sticks: a list's title, search, filters and New button scroll with the page, since the page scrolls rather than the table, and pinning them would cost a phone a fifth of its screen.
 - `Th` and `Td` take a `numeric` prop: right-aligned, tabular. Rows are 40 / 48px on `--border` dividers, hover `--muted`, and the whole row is the link.
 - A footer row counts and sums ([Attio](https://mobbin.com/screens/fdc76916-ff87-4e2a-8256-80939ffa935c)), with statement rules on finance screens.
 - **Money** (**new**, `src/components/money.tsx`): whole dollars by default, a `cents` prop for transaction lines, true minus, inflow `--ok`, a `failed` state.
@@ -398,7 +398,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 
 - **PhotoThumb** (**new**, `src/components/photo-thumb.tsx`): the sizes, fallback tile, photo edge and fade above.
 - **Failed upload:** the thumbnail stays in the grid with a 2px inset `--destructive` ring (it replaces the photo edge) and an inline Retry pill (`--pill-bg`, `--pill-fg`, 32px tall, 14px label, 14px `RotateCcw`, 44px hit area) 8px above its bottom center ([HBO Max](https://mobbin.com/screens/2c6b51a6-80b2-40f0-8513-83e693c55da3)).
-- While any photo has failed, Mark done stays disabled above one `--destructive` line: "2 photos didn't upload · Retry".
+- While any photo has failed, Send for review stays disabled above one `--destructive` line: "2 photos didn't upload · Retry".
 
 ### Dialogs and sheets
 
@@ -410,7 +410,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 ### Toasts
 
 - The toast pill (`--toast-*`, `rounded-lg`, float shadow): bottom-left on desktop, full width above the bottom bar on phone.
-- One line names the change and its ripple; Undo stays 5 seconds and pauses on hover or focus ([Superhuman](https://mobbin.com/screens/b0cecd33-9403-4c15-af1c-033d84826cf5)).
+- One line names the change and its ripple. A toast stays 5 seconds, with a button (Undo, Retry, Reload, View) or without (`src/lib/toast-time.ts`); either pauses on hover or focus ([Superhuman](https://mobbin.com/screens/b0cecd33-9403-4c15-af1c-033d84826cf5)).
 
 ### Empty and payoff states
 

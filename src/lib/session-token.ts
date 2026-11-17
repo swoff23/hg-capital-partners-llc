@@ -60,3 +60,14 @@ export function readSessionToken(
   if (!Number.isFinite(p.exp) || p.exp <= opts.now) return null;
   return { email: p.email.toLowerCase(), iat: p.iat, exp: p.exp };
 }
+
+/**
+ * Does a session issued at `iat` (ms) still sign in, for a user whose
+ * password was last reset at `passwordChangedAt`? A "Forgot password" reset
+ * ends every session issued before it (docs/specs/staff-password-reset.md):
+ * staff sessions have no row to revoke, so this is how they end. A user who
+ * never reset has no cutoff.
+ */
+export function issuedAfterPasswordChange(iat: number, passwordChangedAt: Date | null): boolean {
+  return !passwordChangedAt || iat >= passwordChangedAt.getTime();
+}

@@ -1,32 +1,130 @@
 "use client";
+import { ChevronsUpDown } from "lucide-react";
+import { Avatar } from "@/components/avatar";
+import { SortHeader, listHeadClass } from "@/components/sort-header";
+import { isContractorJob, type ListTask } from "@/lib/tasks/list";
+import { DEFAULT_TASK_SORT, NO_GROUP, groupKeyOf, personName, type TaskSort } from "@/lib/tasks/list-sort";
 import { describeRepeat } from "@/lib/tasks/repeat";
+import { cn } from "@/lib/utils";
 import { useTaskList } from "./task-list-context";
 import { TaskRow, hasStatusColumn } from "./task-row";
+import { TaskSection } from "./task-section";
 
 /**
- * The Tasks page's rows, in the server's order (soonest due first), flat
- * over hairlines with the first cell on the page gutter, as in Today's
+ * The Tasks page's rows, in the server's sort (docs/specs/task-list-sort.md),
+ * flat over hairlines with the first cell on the page gutter, as in Today's
  * sections (docs/brand-guidelines.md, section 9: Card is for Home and
- * Overview modules only). The status column stays only when a row fills it.
+ * Overview modules only). Sorted by property (the default) the rows sit under
+ * a heading per building, by assignee under a heading per person, by due
+ * date in one list. Each heading counts its whole group (`groups`, from the
+ * server), so one cut by Show more still reads right. On a wide list the
+ * column headers sit on top and sort it. The status column stays only when a
+ * row fills it.
+ *
  * `scoped`: the list is one property's, under a heading that names it, so
- * each row's place is its unit alone. `cadence`: the Repeats filter is on, so
- * each row says how it repeats under its title ("Every week on Fri").
+ * there's no building heading and each row's place is its unit alone.
+ * `cadence`: the Repeats filter is on, so each row says how it repeats ("Every
+ * week on Fri").
  */
-export function AllList({ scoped = false, cadence = false }: { scoped?: boolean; cadence?: boolean }) {
+export function AllList({
+  scoped = false,
+  cadence = false,
+  sort,
+  groups,
+}: {
+  scoped?: boolean;
+  cadence?: boolean;
+  sort: TaskSort;
+  groups: Record<string, number>;
+}) {
   const { tasks } = useTaskList();
   const statusColumn = tasks.some((t) => hasStatusColumn(t));
+  const field = scoped && sort.field === "property" ? null : sort.field === "due" ? null : sort.field;
+
+  const row = (t: ListTask) => (
+    <TaskRow
+      key={t.id}
+      task={t}
+      avatar
+      person={field !== "assignee"}
+      statusColumn={statusColumn}
+      street={!scoped && field !== "property"}
+      cadence={cadence && t.repeat ? describeRepeat(t.repeat, { short: true, from: t.due }) : undefined}
+    />
+  );
+
   return (
-    <ul className="@container divide-y divide-border">
-      {tasks.map((t) => (
-        <TaskRow
-          key={t.id}
-          task={t}
-          avatar
-          statusColumn={statusColumn}
-          street={!scoped}
-          cadence={cadence && t.repeat ? describeRepeat(t.repeat, { short: true, from: t.due }) : undefined}
-        />
-      ))}
-    </ul>
+    <div className="@container">
+      <TaskColumnHeads statusColumn={statusColumn} />
+      {field === null ? (
+        <ul className="@container divide-y divide-border">{tasks.map(row)}</ul>
+      ) : (
+        <div className="space-y-8 pointer-coarse:space-y-6">
+          {runs(tasks, field).map(({ key, rows }) => {
+            const first = rows[0];
+            const name = field === "assignee" ? personName(first.assignee) : null;
+            return (
+              <TaskSection
+                key={key}
+                as={scoped ? "h3" : "h2"}
+                title={key === NO_GROUP ? (field === "property" ? "No property" : "Unassigned") : field === "property" ? (first.place ?? "") : (name ?? "")}
+                count={groups[key] ?? rows.length}
+                icon={name ? <Avatar name={name} size={24} outline={isContractorJob(first)} /> : undefined}
+              >
+                {rows.map(row)}
+              </TaskSection>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The rows split where their heading changes. The server keeps each group together, so each key runs once. */
+function runs(tasks: readonly ListTask[], field: "property" | "assignee"): { key: string; rows: ListTask[] }[] {
+  const out: { key: string; rows: ListTask[] }[] = [];
+  for (const t of tasks) {
+    const key = groupKeyOf(t, field) ?? NO_GROUP;
+    const last = out.at(-1);
+    if (last?.key === key) last.rows.push(t);
+    else out.push({ key, rows: [t] });
+  }
+  return out;
+}
+
+/**
+ * The column headers over a wide list (task-list-sort.md 3.2), on the
+ * one-line rows' widths so each label sits over its column: nothing over the
+ * titles, Status, Property, Unit, Assignee, then Due over the date's right
+ * edge. Property, Assignee and Due sort the list; a click flips one already
+ * picked. Below the one-line width they drop with the columns, and Sort is in
+ * the Filters sheet. `placeholder` draws them inert for the loading screen,
+ * which has no FilterScope and doesn't know the sort.
+ */
+export function TaskColumnHeads({ statusColumn, placeholder = false }: { statusColumn: boolean; placeholder?: boolean }) {
+  const head = (label: string, field: string, className: string, numeric = false) =>
+    placeholder ? (
+      <span className={cn(listHeadClass, "flex items-center gap-1", numeric && "justify-end", className)}>
+        {numeric && <ChevronsUpDown aria-hidden="true" className="size-3.5 shrink-0" />}
+        {label}
+        {!numeric && <ChevronsUpDown aria-hidden="true" className="size-3.5 shrink-0" />}
+      </span>
+    ) : (
+      <SortHeader cell="div" label={label} field={field} defaultSort={DEFAULT_TASK_SORT} numeric={numeric} className={className} />
+    );
+  return (
+    <div className="hidden items-center gap-3 border-b border-border pb-2 lg:@min-[60rem]:flex">
+      {/* The checkbox's 20px. */}
+      <span aria-hidden="true" className="w-5 shrink-0" />
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="min-w-0 flex-1" />
+        {statusColumn && <span className={cn(listHeadClass, "w-44 flex-none")}>Status</span>}
+        {head("Property", "property", "w-36 flex-none")}
+        <span className={cn(listHeadClass, "w-24 flex-none")}>Unit</span>
+        {head("Assignee", "assignee", "w-28 flex-none")}
+        {head("Due", "due", "w-30 flex-none", true)}
+      </div>
+    </div>
   );
 }

@@ -28,8 +28,6 @@ const tenantPatch = z
     fullName: text,
     phone: text,
     email: text,
-    emergencyName: text,
-    emergencyPhone: text,
     notes: text,
   })
   .partial()
@@ -41,6 +39,8 @@ const termFields = z
     rent: text,
     subsidy: text,
     subsidyFrom: text,
+    subsidyContact: text,
+    subsidyEmail: text,
   })
   .partial()
   .strict();
@@ -101,6 +101,38 @@ export async function saveLeaseTerm(leaseId: string, termId: string, patch: z.in
   return withResult("saveLeaseTerm", async () => {
     await requireUser();
     await tenants.patchTerm(id.parse(leaseId), id.parse(termId), termFields.parse(patch));
+  });
+}
+
+const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const shortText = z.string().max(300);
+// What deleteLeaseTerm handed back, as Undo returns it. The server re-reads it like a new term.
+const termSnapshot = z
+  .object({
+    startsOn: ymd,
+    endsOn: z.union([ymd, z.literal("")]),
+    rent: z.string().max(40),
+    subsidy: z.string().max(40),
+    subsidyFrom: shortText,
+    subsidyContact: shortText,
+    subsidyEmail: shortText,
+    fileId: id.nullable(),
+  })
+  .strict();
+
+/** One term gone, its signed lease kept on the lease; the result is what Undo puts back. */
+export async function deleteLeaseTerm(leaseId: string, termId: string): Promise<ActionResult<z.output<typeof termSnapshot>>> {
+  return withResult("deleteLeaseTerm", async () => {
+    await requireUser();
+    return tenants.deleteTerm(id.parse(leaseId), id.parse(termId));
+  });
+}
+
+/** Undo for deleteLeaseTerm: the term again, refused when a newer one overlaps it. */
+export async function restoreLeaseTerm(leaseId: string, snapshot: z.input<typeof termSnapshot>): Promise<ActionResult<{ id: string }>> {
+  return withResult("restoreLeaseTerm", async () => {
+    await requireUser();
+    return tenants.restoreTerm(id.parse(leaseId), termSnapshot.parse(snapshot));
   });
 }
 

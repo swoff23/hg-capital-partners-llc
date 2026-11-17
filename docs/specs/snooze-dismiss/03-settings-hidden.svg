@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Settings, Hidden tab: what's dismissed and your snoozes, each with Bring back, at laptop 1280 and phone 375</title>
+<rect width="900" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Settings › Hidden: one place to see and bring back what's hidden</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768</text>
+<rect x="0" y="22" width="560" height="440" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="58" font-size="20" font-weight="600" fill="#152133">Settings</text>
+<g font-size="12" fill="#5b6576">
+<text x="20" y="90">CapEx rules</text><text x="112" y="90">Move-in form</text><text x="214" y="90">Storage</text><text x="280" y="90" fill="#152133">Hidden</text>
+</g>
+<line x1="20" y1="100" x2="540" y2="100" stroke="#e7e5e0"/>
+<line x1="280" y1="100" x2="320" y2="100" stroke="#152133" stroke-width="2"/>
+
+<text x="20" y="132" font-size="13" font-weight="600" fill="#152133">Dismissed</text>
+<text x="96" y="132" font-size="12" fill="#8a909b">3</text>
+<g font-size="12" fill="#152133">
+<line x1="20" y1="142" x2="540" y2="142" stroke="#e7e5e0"/>
+<text x="20" y="162">415 Crescent Ave. · Unit 5 · Signed lease PDF</text><text x="440" y="162" text-anchor="end" fill="#5b6576">Connor · Nov 16</text><text x="540" y="162" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+<line x1="20" y1="172" x2="540" y2="172" stroke="#e7e5e0"/>
+<text x="20" y="192">118 Congress St · Lower · Fuel autopay</text><text x="440" y="192" text-anchor="end" fill="#5b6576">Pieter · Nov 15</text><text x="540" y="192" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+<line x1="20" y1="202" x2="540" y2="202" stroke="#e7e5e0"/>
+<text x="20" y="222">22 Elm St · Rental registration Jan 5</text><text x="440" y="222" text-anchor="end" fill="#5b6576">Connor · Nov 16</text><text x="540" y="222" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+<line x1="20" y1="232" x2="540" y2="232" stroke="#e7e5e0"/>
+</g>
+
+<text x="20" y="272" font-size="13" font-weight="600" fill="#152133">Your snoozes</text>
+<text x="112" y="272" font-size="12" fill="#8a909b">2</text>
+<g font-size="12" fill="#152133">
+<line x1="20" y1="282" x2="540" y2="282" stroke="#e7e5e0"/>
+<text x="20" y="302">CapEx in 2026</text><text x="440" y="302" text-anchor="end" fill="#5b6576">Until Dec 16</text><text x="540" y="302" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+<line x1="20" y1="312" x2="540" y2="312" stroke="#e7e5e0"/>
+<text x="20" y="332">933 Lafayette Avenue · Floor 1 · Lease ends Dec 31</text><text x="440" y="332" text-anchor="end" fill="#5b6576">Until Nov 23</text><text x="540" y="332" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+<line x1="20" y1="342" x2="540" y2="342" stroke="#e7e5e0"/>
+</g>
+<text x="20" y="378" font-size="11" fill="#5b6576">A row opens its record. Bring back goes at once, with Undo in the toast.</text>
+<text x="20" y="396" font-size="11" fill="#5b6576">Only Pieter sees Pieter's snoozes. Dismissed rows are the same for both of you.</text>
+<text x="20" y="430" font-size="12" fill="#5b6576">Empty: "Nothing hidden. Snooze or dismiss a warning on its page to see it here."</text>
+</g>
+
+<g transform="translate(624 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375</text>
+<rect x="0" y="22" width="244" height="440" rx="20" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="14" y="56" font-size="18" font-weight="600" fill="#152133">Settings</text>
+<g font-size="12" fill="#5b6576"><text x="14" y="86">Move-in form</text><text x="108" y="86">Storage</text><text x="168" y="86" fill="#152133">Hidden</text></g>
+<line x1="0" y1="96" x2="244" y2="96" stroke="#e7e5e0"/>
+<line x1="168" y1="96" x2="208" y2="96" stroke="#152133" stroke-width="2"/>
+<text x="14" y="126" font-size="13" font-weight="600" fill="#152133">Dismissed</text>
+<g font-size="12" fill="#152133">
+<text x="14" y="152">Signed lease PDF</text><text x="14" y="168" font-size="11" fill="#5b6576">415 Crescent · Unit 5 · Nov 16</text><text x="230" y="160" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+<line x1="14" y1="180" x2="230" y2="180" stroke="#e7e5e0"/>
+<text x="14" y="200">Fuel autopay</text><text x="14" y="216" font-size="11" fill="#5b6576">118 Congress · Lower · Nov 15</text><text x="230" y="208" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+</g>
+<text x="14" y="258" font-size="13" font-weight="600" fill="#152133">Your snoozes</text>
+<g font-size="12" fill="#152133">
+<text x="14" y="284">CapEx in 2026</text><text x="14" y="300" font-size="11" fill="#5b6576">Until Dec 16</text><text x="230" y="292" text-anchor="end" font-size="11" text-decoration="underline">Bring back</text>
+</g>
+<text x="14" y="340" font-size="11" fill="#5b6576">Two lines a row: the item over</text>
+<text x="14" y="355" font-size="11" fill="#5b6576">its place and date. The tabs</text>
+<text x="14" y="370" font-size="11" fill="#5b6576">scroll sideways as they do today.</text>
+</g>
+</svg>

@@ -1,8 +1,16 @@
 import type { Prisma } from "@prisma/client";
 import { docOnFile } from "@/lib/contacts";
 import { tradeKey } from "@/lib/contractors/trade-map";
-import { isOnboardingStatus, onboardingStatus, type OnboardingStatus, type SignupSourceValue } from "@/lib/contractors/onboarding";
+import {
+  accountStatus,
+  isAccountStatus,
+  onboardingStatus,
+  type AccountStatus,
+  type OnboardingStatus,
+  type SignupSourceValue,
+} from "@/lib/contractors/onboarding";
 import { hasTradeNamed } from "@/lib/contractors/trades";
+import { portalAccess, type PortalAccessFacts } from "@/lib/portal/access-state";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
 import { archivedRecord, liveRecord } from "@/lib/record-scope";
 import { everyTermMatches, searchTerms } from "@/lib/search";
@@ -10,8 +18,8 @@ import { everyTermMatches, searchTerms } from "@/lib/search";
 /*
  * What the Contractors page asks of the database (docs/specs/selectors.md 5,
  * search 2.11): a search over the name, company and trades; a Trade filter
- * with several picks; a Status filter (New, Invited, Opened, Onboarding: the
- * badge beside the name); and two yes or no filters, "Has login" and "Needs W-9".
+ * with several picks; a Status filter (New, Invited, Opened, Onboarding, Active,
+ * Access off: the Status column); and two yes or no filters, "Has login" and "Needs W-9".
  * A third, "Archived", swaps the list for the archived contractors, whom
  * nothing else shows (lib/archive.ts). Pure, so query.test.ts checks it
  * without a database. The URL: `q`, `trade` (trade ids, comma-joined),
@@ -22,8 +30,8 @@ export interface ContractorFilters {
   q: string;
   /** Trade ids, or names from an older link until `resolveTradePicks` reads them. */
   trades: string[];
-  /** Onboarding statuses: a row passes when its badge is one of them. Empty keeps everyone. */
-  status: OnboardingStatus[];
+  /** Account statuses: a row passes when its Status column reads one of them. Empty keeps everyone. */
+  status: AccountStatus[];
   hasLogin: boolean;
   needsW9: boolean;
   /** The archived contractors instead of the rest. */
@@ -37,7 +45,7 @@ export function parseContractorFilters(sp: Params): ContractorFilters {
   return {
     q: str(sp.q).trim(),
     trades: parseFacet(str(sp.trade)),
-    status: parseFacet(str(sp.status)).filter(isOnboardingStatus),
+    status: parseFacet(str(sp.status)).filter(isAccountStatus),
     hasLogin: str(sp.login) === "1",
     needsW9: str(sp.w9) === "1",
     archived: str(sp.archived) === "1",
@@ -136,9 +144,12 @@ export type StatusRow = {
   archivedAt?: Date | null;
 };
 
-/** The relations a row needs for `statusOf`: the login's id and the newest personal invite's opened time. */
+/**
+ * The relations a row needs for `statusOf` and `accountStatusOf`: the login (what sign-in does with it, never the
+ * password hash) and the newest personal invite's opened time.
+ */
 export const STATUS_INCLUDE = {
-  portalAccount: { select: { id: true } },
+  portalAccount: { select: { id: true, status: true, mustChangePassword: true, lastSignInAt: true, lastSeenAt: true } },
   portalInvites: { where: { shared: false }, orderBy: { createdAt: "desc" }, take: 1, select: { openedAt: true } },
 } as const satisfies Prisma.ContactInclude;
 
@@ -154,10 +165,22 @@ export function statusOf(c: StatusRow): OnboardingStatus | null {
   });
 }
 
-/** Whether a contractor's badge is one of the picked statuses; no picks keeps everyone. */
-export function matchesStatus(c: StatusRow, picks: readonly OnboardingStatus[]): boolean {
+/** What the Status column reads: a `StatusRow` with the whole login and whether the contact is active. */
+export type AccountRow = Omit<StatusRow, "portalAccount"> & {
+  active: boolean;
+  portalAccount: ({ id: string } & PortalAccessFacts) | null;
+};
+
+/** The Status column (lib/contractors/onboarding.ts `accountStatus`): the onboarding badge, else the login's state. Archived is the dash. */
+export function accountStatusOf(c: AccountRow): AccountStatus | null {
+  if (c.archivedAt) return null;
+  return accountStatus(statusOf(c), c.portalAccount ? portalAccess(c.portalAccount, c.active).state : null);
+}
+
+/** Whether a contractor's Status column is one of the picked statuses; no picks keeps everyone. */
+export function matchesStatus(c: AccountRow, picks: readonly AccountStatus[]): boolean {
   if (picks.length === 0) return true;
-  const s = statusOf(c);
+  const s = accountStatusOf(c);
   return !!s && picks.includes(s);
 }
 

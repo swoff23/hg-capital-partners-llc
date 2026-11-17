@@ -15,6 +15,7 @@ import { useRun } from "@/components/use-run";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { inlineProblem } from "@/lib/inline-edit";
 import { firstName } from "@/lib/names";
+import { ACCOUNT_STATUS_LABEL } from "@/lib/contractors/onboarding";
 import { loginOffers, type PortalAccessState } from "@/lib/portal/access-state";
 import { loginTextBody, smsHref } from "@/lib/portal/login-text";
 import { cn } from "@/lib/utils";
@@ -50,11 +51,7 @@ export type PortalAccountView = {
  * money in, and none of the three login states is one of those. The line
  * under Email ("Last seen 2d ago") carries Active (decision 22).
  */
-const BADGE: Record<PortalAccessState, string> = {
-  invited: "Invited",
-  active: "Active",
-  off: "Access off",
-};
+const BADGE: Record<PortalAccessState, string> = ACCOUNT_STATUS_LABEL;
 
 /** Someone who came in by an invite and hasn't made their account: where the invite stands (docs/specs/contractor-onboarding.md, 4.4). */
 export type InviteView = {
@@ -400,7 +397,9 @@ function CreateLoginSheet({
   const [tried, setTried] = useState(false);
   const run = useRun();
   const problem = !email.trim() ? "Enter an email, like name@example.com." : inlineProblem("email", email);
-  const shownProblem = (tried && problem) || run.error || undefined;
+  // A refusal about the address marks the field; every other one goes on the sheet's own line above the buttons.
+  const addressRefusal = run.fieldErrors?.email;
+  const shownProblem = (tried && problem) || addressRefusal || undefined;
 
   function submit() {
     setTried(true);
@@ -426,7 +425,8 @@ function CreateLoginSheet({
       dirty={email !== (defaultEmail ?? "")}
       discardTitle="Discard the new login?"
       leaveTitle="Leave the new login?"
-      fieldErrors={run.error ? { email: run.error } : undefined}
+      fieldErrors={run.fieldErrors}
+      error={addressRefusal ? undefined : run.error}
     >
       <p className="-mt-1 text-body text-fg-2">{first} gets a starting password and picks a new one at first sign-in.</p>
       <FormField
@@ -474,7 +474,9 @@ function ChangeEmailSheet({
   const [tried, setTried] = useState(false);
   const run = useRun();
   const problem = !email.trim() ? "Enter an email, like name@example.com." : inlineProblem("email", email);
-  const shownProblem = (tried && problem) || run.error || undefined;
+  // A refusal about the address marks the field; every other one goes on the sheet's own line above the buttons.
+  const addressRefusal = run.fieldErrors?.email;
+  const shownProblem = (tried && problem) || addressRefusal || undefined;
 
   function submit() {
     setTried(true);
@@ -499,7 +501,8 @@ function ChangeEmailSheet({
       dirty={email.trim().toLowerCase() !== current}
       discardTitle="Discard the change?"
       leaveTitle="Leave the email change?"
-      fieldErrors={run.error ? { email: run.error } : undefined}
+      fieldErrors={run.fieldErrors}
+      error={addressRefusal ? undefined : run.error}
     >
       <FormField label="Email" required helper={`${first} signs in with this from now on`} error={shownProblem}>
         {(p) => (

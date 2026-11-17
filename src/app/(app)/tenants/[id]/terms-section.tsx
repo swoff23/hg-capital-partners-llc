@@ -6,28 +6,22 @@ import { Spinner } from "@/components/spinner";
 import { Button, Section } from "@/components/ui";
 import type { UploadTarget } from "@/components/upload-queue";
 import { UPLOAD_KIND_ALLOWED, leaseDocParent, uploadTargetHref, uploadTargetKey } from "@/lib/attachments/upload-kinds";
-import { fmtDay, type Ymd } from "@/lib/dates";
 import { tenantShare } from "@/lib/tenants/fields";
 import { recordLeaseFileAction } from "./actions";
-import { useTermSheet } from "./term-sheet";
+import { termDates, useTermSheet, type EditTerm } from "./term-sheet";
 
-export type TermRow = {
-  id: string;
-  startsOn: Ymd;
-  endsOn: Ymd | null;
-  rent: number;
-  subsidy: number | null;
-  file: { id: string; filename: string } | null;
-};
+export type TermRow = EditTerm & { file: { id: string; filename: string } | null };
 
 /**
  * The Terms section: one row per signed term, newest first. The dates and
  * rent on one line, the split under it when a housing authority pays part,
- * and the signed lease at the right: its file, or a verb to add it. Renew
+ * and the signed lease at the right: its file, or a verb to add it. A row
+ * opens its term to edit or delete, as a person's row opens their sheet
+ * (docs/specs/lease-term-edits.md); the file stays its own control. Renew
  * adds the next term.
  */
 export function TermsSection({ leaseId, terms }: { leaseId: string; terms: TermRow[] }) {
-  const { open } = useTermSheet();
+  const { open, edit } = useTermSheet();
   return (
     <Section
       title="Terms"
@@ -44,20 +38,25 @@ export function TermsSection({ leaseId, terms }: { leaseId: string; terms: TermR
           {terms.map((t) => (
             <li
               key={t.id}
-              className="flex min-h-12 flex-col items-start gap-1 border-b border-border py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+              className="flex flex-col items-start border-b border-border last:border-0 max-sm:pb-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             >
-              <div className="min-w-0">
-                <p className="text-body text-foreground">
-                  <span className="num">{t.endsOn ? `${fmtDay(t.startsOn)} to ${fmtDay(t.endsOn)}` : `${fmtDay(t.startsOn)}, month to month`}</span>
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => edit(t)}
+                className="-mx-2 my-0.5 flex min-h-12 max-w-[calc(100%+1rem)] min-w-0 flex-col items-start justify-center rounded-md px-2 py-1.5 text-left transition-colors pointer-fine:hover:bg-muted max-sm:self-stretch sm:flex-1"
+              >
+                <span className="text-body text-foreground">
+                  <span className="num">{termDates(t)}</span>
                   <span className="text-muted-foreground"> · </span>
                   <Money value={t.rent} />
-                </p>
+                </span>
                 {t.subsidy ? (
-                  <p className="text-meta text-muted-foreground max-sm:truncate">
+                  <span className="max-w-full text-meta text-muted-foreground max-sm:truncate">
                     Tenant pays <Money value={tenantShare(t.rent, t.subsidy)} /> · Housing authority <Money value={t.subsidy} />
-                  </p>
+                  </span>
                 ) : null}
-              </div>
+              </button>
               <TermFile leaseId={leaseId} term={t} />
             </li>
           ))}

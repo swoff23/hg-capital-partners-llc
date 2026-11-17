@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readSessionToken, signSessionToken } from "./session-token";
+import { issuedAfterPasswordChange, readSessionToken, signSessionToken } from "./session-token";
 
 const secret = "s".repeat(43);
 const now = 1_800_000_000_000;
@@ -43,4 +43,16 @@ test("malformed and legacy-format tokens are rejected", () => {
   // old format: base64url(email).hmac(email) — signature is over the email, not a payload
   const legacyEnc = Buffer.from("a@b.c").toString("base64url");
   assert.equal(readSessionToken(`${legacyEnc}.anything`, { secret, now }), null);
+});
+
+test("a password reset ends sessions issued before it, and only those", () => {
+  const reset = new Date(now);
+  // Signed in a day before the reset: signed out everywhere.
+  assert.equal(issuedAfterPasswordChange(now - 86_400_000, reset), false);
+  assert.equal(issuedAfterPasswordChange(now - 1, reset), false);
+  // Signed in again with the new password, even in the same millisecond.
+  assert.equal(issuedAfterPasswordChange(now, reset), true);
+  assert.equal(issuedAfterPasswordChange(now + 5_000, reset), true);
+  // Never reset: no cutoff.
+  assert.equal(issuedAfterPasswordChange(0, null), true);
 });

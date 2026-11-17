@@ -10,6 +10,7 @@ import { type FileKind } from "@/lib/attachments/content-types";
 import { NO_UPLOADS, UPLOADS_PAUSED_LINE, UPLOADS_RETRYING_LINE, UploadEngine } from "@/lib/attachments/engine";
 import { CAMERA_ACCEPT, documentLook, pickerAccept, redTilesLine, shownReason, uploadCountPhrase, uploadNotice } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ACCESS, uploadTargetKey, type UploadKind } from "@/lib/attachments/upload-kinds";
+import { TOAST_ACTION_MS } from "@/lib/toast-time";
 import { cn } from "@/lib/utils";
 
 export type { UploadKind } from "@/lib/attachments/upload-kinds";
@@ -240,15 +241,15 @@ export function useMediaUploader(input: MediaUploaderOptions | MediaUploaderTarg
   };
 }
 
-/** How long a removal can be taken back, the toast's own five seconds. */
-const UNDO_MS = 5000;
+/** How long a removal can be taken back: as long as its toast, which carries Undo, stays (lib/toast-time.ts). */
+const UNDO_MS = TOAST_ACTION_MS;
 
 /**
  * Taking a ready file out of a reply with an Undo (uploads 2.3): the tile
  * goes at once, the toast reads "Photo removed · Undo", and the file itself is
  * deleted when the toast ends, not before. `restore` brings the tile back;
  * `remove` deletes the file. The delete runs even if the page is gone by
- * then; a reload inside the five seconds leaves the file as a draft.
+ * then; a reload inside the toast's time leaves the file as a draft.
  *
  *   const undoable = useUndoableRemove();
  *   undoable({ message: "Photo removed", hide: () => forget([r.id]), show: () => unforget([r.id]), remove: () => deleteTaskFile(r.id) });

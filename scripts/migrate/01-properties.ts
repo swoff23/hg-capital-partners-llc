@@ -6,7 +6,7 @@
  */
 import { prisma } from "../../src/lib/db";
 import { evenShare } from "../../src/lib/money";
-import { countUnitRecords } from "../../src/lib/property-types";
+import { countUnitRecords, splitLockboxValue } from "../../src/lib/property-types";
 import { report } from "./_report";
 
 import {
@@ -46,6 +46,7 @@ const EQUIP_COLS: Array<[type: string, modelCol: string, yearCol: string]> = [
 type UnitRef = {
   label: string | null;
   lockboxCode: string | null;
+  lockboxLocation: string | null;
   utilities: Record<string, string | null>;
   equipment: Array<{ type: string; model: string | null; installYear: string | null }>;
 };
@@ -103,7 +104,9 @@ export async function migrateProperties() {
     const removed = REMOVED_UNIT_RECORDS[key.split(" ").slice(0, 2).join(" ")] ?? [];
     const units: UnitRef[] = rows.map((r) => ({
       label: r["B"]?.replace(/\n/g, " / ").trim() ?? null,
-      lockboxCode: r["C"] ?? null,
+      // "1924 (back entrance)" is the code and where the box is (docs/specs/lockbox-location.md), as the one-off split them.
+      lockboxCode: splitLockboxValue(r["C"]).code,
+      lockboxLocation: splitLockboxValue(r["C"]).location,
       utilities: {
         nationalGridAcct: r["H"] ?? null,
         nationalGridAutopay: r["I"] ?? null,

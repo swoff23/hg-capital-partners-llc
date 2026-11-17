@@ -3,7 +3,7 @@ import type { MediaUpload, RecordMediaInput, RecordMediaResult } from "@/compone
 import type { UploadCounts, UploadTarget } from "@/components/upload-queue";
 import { usesMultipart, type FileKind } from "./content-types";
 import { EMPTY_UPLOAD } from "./limits";
-import { checkMediaFile, redTilesLine, storedNames, uploadFailureReason, withExtension } from "./media";
+import { checkMediaFile, isStorageRefusal, redTilesLine, storedNames, uploadFailureReason, withExtension } from "./media";
 import {
   STALL_MS,
   FinalRefusalError,
@@ -118,6 +118,8 @@ const AS_PICKED = Symbol("as picked");
 
 export type EngineNotice = {
   message: string;
+  /** After " · " in the toast's lighter tone: where the news is about ("56 Tamarack St"). */
+  detail?: string;
   /** A toast with the key of one showing replaces it. */
   key?: string;
   action?: { label: string; run: () => void };
@@ -154,13 +156,18 @@ export type EngineDeps = {
    * removed it, so no retry fetches it. Without it that notice isn't shown.
    */
   reload?: () => void;
+  /**
+   * Hands an upload Blob itself refused (media.ts isStorageRefusal) to the error reports. The tile says only
+   * "refused by storage", and the refusal never reaches the server's logs, so this is where its own words go.
+   */
+  report?: (error: Error) => void;
 };
 
 /** The tiles of a target with none: one shared array, so a server snapshot and an idle client one are the same. */
 export const NO_UPLOADS: readonly MediaUpload[] = [];
 const EMPTY = NO_UPLOADS;
 /** The counts of a target with nothing in flight: shared, so a server snapshot and an idle client one are the same. */
-export const NO_COUNTS: UploadCounts = { pending: 0, waiting: 0, paused: 0, failed: 0, awaitingPage: 0, pendingKinds: [] };
+export const NO_COUNTS: UploadCounts = { pending: 0, waiting: 0, paused: 0, failed: 0, refused: 0, awaitingPage: 0, pendingKinds: [] };
 
 /** "no more can be added here", "only 3 more can be added here": the reason a file past a target's cap gives. */
 export function capReason(remaining: number): string {
@@ -316,6 +323,7 @@ export class UploadEngine {
             waiting: own.filter((j) => j.status === "waiting").length,
             paused: own.filter((j) => j.status === "waiting" && j.paused).length,
             failed: own.filter((j) => j.status === "failed" || j.status === "invalid").length,
+            refused: own.filter((j) => (j.status === "failed" || j.status === "invalid") && j.final).length,
             awaitingPage: pending.filter((j) => j.needsRecord).length,
             pendingKinds: [...pending, ...own.filter((j) => j.status === "waiting")].map((j) => j.fileKind),
           };
@@ -798,6 +806,10 @@ export class UploadEngine {
             : "offline"
           : classifyFailure(err, online);
     const reason = ownWords ? err.message : failure === "refused" ? uploadFailureReason(err) : "no connection";
+    if (!ownWords && failure === "refused" && isStorageRefusal(err)) {
+      // Blob's own words, and where the file was going, for whoever reads the report: the tile can't say more.
+      this.deps.report?.(new Error(`Upload refused by Blob (${job.spec.uploadKind}, ${job.spec.access}): ${(err as Error).message}`, { cause: err }));
+    }
     const next = afterFailure({ tries: job.tries, waits: job.waits }, failure);
     const codeMissing = err instanceof UploadCodeMissingError;
     if (codeMissing) this.noticeCodeMissing();
@@ -924,7 +936,8 @@ export class UploadEngine {
 
   /**
    * A file failed with its page gone: the tray's own line (media.ts redTilesLine), counted the same way, naming where
-   * the files were going, since the page that's open isn't theirs ("2 photos didn't upload to 56 Tamarack St"), with
+   * the files were going after a middle dot, since the page that's open isn't theirs ("2 photos didn't upload · 56
+   * Tamarack St"), with
    * Retry when any red tile can go again. With nothing to retry (only files the job stopped taking, or those beside a
    * file the check refused) it has no action.
    */
@@ -936,6 +949,7 @@ export class UploadEngine {
     if (!line) return;
     this.deps.notify({
       message: line.text,
+      ...(line.detail ? { detail: line.detail } : {}),
       key: `upload-failed:${job.key}`,
       ...(line.retry ? { action: { label: "Retry", run: () => this.retryAll(job.key) } } : {}),
     });
@@ -947,8 +961,8 @@ export class UploadEngine {
    * A failed file tries again from the start. A refused one (the check said no, or the job stopped taking files first)
    * can only be removed. A target's cap holds here as it does when files are added: with no room left (the files
    * picked since filled it), the retried file doesn't go past it. It stays failed, with its Retry for when there is
-   * room again: its tile takes the cap's reason, and a toast says it (the target's `maxFilesNotice`, "Send up to 50 at
-   * a time." on a contractor's job). Not a refused tile: that one is Remove only, and Remove drops the outbox's copy,
+   * room again: its tile takes the cap's reason, and a toast says it (the target's `maxFilesNotice`, "Send these 50,
+   * then Retry." on a contractor's job). Not a refused tile: that one is Remove only, and Remove drops the outbox's copy,
    * the only one of a photo the camera input took (iOS doesn't save it to Photos). The cap is the page's, from its
    * last render, so it holds only while the page is showing: once it is gone nothing holds a tray and the away rule
    * takes the file (the away toast's Retry).

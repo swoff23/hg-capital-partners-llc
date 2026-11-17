@@ -246,7 +246,7 @@ export function inlineShown(kind: InlineKind, text: string, opts: { unit?: strin
  * note says "Pieter changed this at 2:14 PM" instead: its words would push who and when off the one line, and Keep
  * Pieter's shows them. `theirs` is the value as the field shows it (inlineShown), "" when they cleared it.
  */
-export function inlineConflictLine(kind: InlineKind, conflict: Pick<ActionConflict, "by" | "at">, theirs: string, now: Date = new Date()): string {
+export function inlineConflictLine(kind: InlineKind, conflict: Pick<ActionConflict, "by" | "at" | "mine">, theirs: string, now: Date = new Date()): string {
   if (kind !== "multiline" || theirs === "") return conflictValueLine(conflict, theirs, now);
   // conflictMessage's sentence, as a field's line: no period, like the other conflict lines.
   return conflictMessage(conflict, now).replace(/\.$/, "");

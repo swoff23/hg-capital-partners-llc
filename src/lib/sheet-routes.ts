@@ -1,15 +1,18 @@
 /**
  * The paths that open as a sheet over the page they were linked from: the
  * intercepting pages in `app/(app)/@modal`, each wrapped in `SheetRoute`
- * (components/create-form.tsx). A new create sheet adds its path here;
- * sheet-routes.test.ts fails when a page in the slot is missing.
+ * (components/create-form.tsx). The create sheets, and a deal, which has no
+ * page of its own (`[id]` stands for any one segment). A new sheet adds its
+ * path here; sheet-routes.test.ts fails when a page in the slot is missing.
  *
  * The app shell reads it: it moves focus to a new page's heading, but a
  * sheet looks after focus itself and gives it back to what opened it.
  */
-export const SHEET_PATHS: readonly string[] = ["/tasks/new", "/deals/new", "/properties/new", "/contractors/new"];
+export const SHEET_PATHS: readonly string[] = ["/tasks/new", "/deals/new", "/deals/[id]", "/properties/new", "/contractors/new"];
 
-export const isSheetPath = (path: string): boolean => SHEET_PATHS.includes(path);
+const PATTERNS = SHEET_PATHS.map((p) => new RegExp(`^${p.replace(/\[[^\]]+\]/g, "[^/]+")}$`));
+
+export const isSheetPath = (path: string): boolean => PATTERNS.some((re) => re.test(path));
 
 /**
  * Whether the shell should move focus to the heading after a route change

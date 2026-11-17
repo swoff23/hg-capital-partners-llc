@@ -5,23 +5,18 @@ import { Button as AriaButton } from "react-aria-components";
 import { Avatar } from "@/components/avatar";
 import { useLeaveGuard } from "@/components/leave-guard";
 import { Menu, MenuHeader, MenuItem, MenuSection, MenuSeparator, MenuTrigger } from "@/components/menu";
-import { SegmentedControl } from "@/components/segmented-control";
-import { THEME_PREFS, useThemePref, type ThemePref } from "@/components/theme-toggle";
+import { THEME_PREFS, useThemePref } from "@/components/theme-toggle";
 import { useToast } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
-import { cn } from "@/lib/utils";
 
 /**
- * The signed-in person's menu (docs/specs/selectors.md 3.5): their name over
- * their email, the Theme (System, Light or Dark, with a Check on the pick)
- * and Sign out. Settings isn't here; the sidebar's already opens it.
- *
- * `variant="header"` is the avatar button at the right of the app bar (from
- * lg); `"sidebar"` is the row at the foot of the rail and the phone drawer,
- * the avatar with the name and email beside it, which opens the menu upward.
- * The drawer has its own Appearance row, and the header's menu carries the
- * Theme from lg, so the sidebar's menu leaves the section out
- * (`showTheme={false}`).
+ * The signed-in person's menu (docs/specs/selectors.md 3.5), the one way to
+ * the Theme and Sign out at every size. The trigger is the row at the foot of
+ * the rail and the phone drawer: the avatar with the name and email beside
+ * it. It opens upward onto their name over their email, the Theme (System,
+ * Light or Dark, with a Check on the pick) and Sign out. Settings isn't here;
+ * the sidebar's already opens it. It sits in the sidebar footer, shadcn's
+ * nav-user pattern (Connor, Nov 14), so the app bar carries no avatar.
  *
  * Sign out goes through `useLeaveGuard({ signOut: true })`, which asks first
  * while a hold is on in the LeaveGuard the app layout wraps around the shell:
@@ -33,15 +28,11 @@ export function AccountMenu({
   name,
   email,
   signOutAction,
-  variant = "header",
-  showTheme = variant === "header",
 }: {
   /** The person's name, or null when they have none and the email stands in for it. */
   name: string | null;
   email: string;
   signOutAction: () => Promise<void> | void;
-  variant?: "header" | "sidebar";
-  showTheme?: boolean;
 }) {
   const { toast } = useToast();
   const guard = useLeaveGuard({ signOut: true });
@@ -62,74 +53,42 @@ export function AccountMenu({
     );
   }
 
-  const sidebar = variant === "sidebar";
   return (
     <MenuTrigger>
       <AriaButton
         aria-label={`Account, ${label}`}
-        className={cn(
-          "rounded-md outline-none transition-colors data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring",
-          sidebar
-            ? // 10px in, so the 28px avatar centers on the rail's icons; the words truncate and the collapsed rail clips them.
-              "flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted data-pressed:bg-muted pointer-coarse:min-h-11"
-            : "flex size-8 shrink-0 items-center justify-center hover:bg-muted data-pressed:bg-muted pointer-coarse:size-11",
-        )}
+        // 10px in, so the 28px avatar centers on the rail's icons; the words truncate and the collapsed rail clips them.
+        className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors hover:bg-muted data-pressed:bg-muted data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring pointer-coarse:min-h-11"
       >
         <Avatar name={name} email={email} size={28} />
-        {sidebar && (
-          <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-            <span className="block truncate text-meta font-medium text-foreground">{label}</span>
-            {name && <span className="block truncate text-meta text-muted-foreground">{email}</span>}
-          </span>
-        )}
+        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+          <span className="block truncate text-meta font-medium text-foreground">{label}</span>
+          {name && <span className="block truncate text-meta text-muted-foreground">{email}</span>}
+        </span>
       </AriaButton>
-      <Menu placement={sidebar ? "top start" : "bottom end"} aria-label="Account">
+      <Menu placement="top start" aria-label="Account">
         <MenuHeader title={label} detail={name ? email : undefined} />
-        {showTheme && (
-          <>
-            <MenuSeparator />
-            <MenuSection
-              title="Theme"
-              selectionMode="single"
-              selectedKeys={[pref]}
-              onSelectionChange={(keys) => {
-                const next = [...keys][0];
-                if (next === "system" || next === "light" || next === "dark") setPref(next);
-              }}
-            >
-              {THEME_PREFS.map((t) => (
-                <MenuItem key={t.key} id={t.key}>
-                  {t.label}
-                </MenuItem>
-              ))}
-            </MenuSection>
-          </>
-        )}
+        <MenuSeparator />
+        <MenuSection
+          title="Theme"
+          selectionMode="single"
+          selectedKeys={[pref]}
+          onSelectionChange={(keys) => {
+            const next = [...keys][0];
+            if (next === "system" || next === "light" || next === "dark") setPref(next);
+          }}
+        >
+          {THEME_PREFS.map((t) => (
+            <MenuItem key={t.key} id={t.key}>
+              {t.label}
+            </MenuItem>
+          ))}
+        </MenuSection>
         <MenuSeparator />
         <MenuItem id="sign-out" icon={<LogOut aria-hidden="true" />} isDisabled={pending} onAction={signOut}>
           Sign out
         </MenuItem>
       </Menu>
     </MenuTrigger>
-  );
-}
-
-/**
- * The phone drawer's Appearance: System, Light and Dark as a full-width
- * segmented control (the same three the account menu's Theme section offers).
- * Shown below lg, where the header's menu isn't.
- */
-export function AppearanceRow({ className }: { className?: string }) {
-  const [pref, setPref] = useThemePref();
-  return (
-    <div className={cn("px-2 py-1.5", className)}>
-      <SegmentedControl<ThemePref>
-        aria-label="Appearance"
-        fullWidth
-        options={THEME_PREFS}
-        value={pref}
-        onChange={setPref}
-      />
-    </div>
   );
 }

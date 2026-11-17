@@ -232,7 +232,7 @@ type SearchRow = { id: string; href: string; title: string } & (
 **What comes back**
 - Tasks spread `excludeTemplateTasks` from `src/lib/task-scope.ts` (the plan calls it `taskScope`), with the test `docs/asana-migration-plan.md:241` asks for. Template rows never appear.
 - Contractors: all of them, inactive ones ranked last and marked with a Tag.
-- Deals: every stage. In All, a CLOSED! deal whose `convertedPropertyId` points at a property already in the Properties group folds into that property: the deal row drops there and stays in the Deals scope. Today `convertedPropertyId` is empty on all 11 closed deals, so a backfill list goes to Connor first (IA-I13).
+- Deals: every stage. In All, a CLOSED! deal whose `convertedPropertyId` points at a property already in the Properties group folds into that property: the deal row drops there and stays in the Deals scope. The app sets `convertedPropertyId` on its own when a deal moves to Closed or a property is added, only on an exact one-to-one match by the duplicate check's test (`lib/deals/property-link.ts`). The 11 deals closed before that are still unlinked, so a one-time list goes to Connor first (IA-I13).
 
 **Ranking** (**new** `rankRows` in `lib/search.ts`, tested)
 1. Live before finished. Active tasks, then Done, then Canceled (`STATUS_ORDER`). Active contractors before inactive. Deals in `ACTIVE_DEAL_STATUSES` before the rest.
@@ -276,7 +276,7 @@ model RecentView {
 - **One matcher.** /tasks `q` matches the title, the property and deal address and the assignee, through `searchTerms` and `everyTermMatches` with the same fields as `/api/search`. /deals `q` runs the address through `searchTerms`, so "Prospect Avenue" finds "Prospect Ave". /contractors does the same on name, company and trades. "See all 40 tasks" then opens a page showing those 40.
 - **/deals counts.** While `q` is set, the segment counts come from the same `where` with the query applied, so they change as you type (DEALS-012). The view stays as picked.
 - **/contractors count.** With `q` set the subtitle reads "4 of 52 contractors", so the number never changes without a reason.
-- **Cap lines.** /deals reads "Showing first 300 of 675. Search or filter to see the rest.", with the live total (today it points at "the address filter", which the new field no longer names). /tasks keeps "Showing first 400 of N. Narrow the filters to see the rest."
+- **Cap lines.** /deals read "Showing first 300 of 675. Search or filter to see the rest." until Nov 14; it now opens on 100 rows and reads "Showing 100 of 206" with Show more under a view of more than 100, from the shared `ListFooter` with no ceiling, so every deal can be reached. /tasks read "Showing first 400 of N. Narrow the filters to see the rest." until Nov 14; it now reads "First 400 of N. Search or filter for more." on one line at every width, from the shared `ListFooter` (`src/lib/list-page.ts` holds the words).
 - **No-result states.** `EmptyState`: one sentence, then one secondary sm action. Linear's "16 issues hidden by filters" with Clear filters and Stripe's Clear filters are the pattern.
 
 | Page | Query set | Filters only | Nothing at all |

@@ -99,17 +99,17 @@ export function guardedDealFields(patch: DealPatch, expected: Record<string, str
 /**
  * The refusal for a stale deal save: who saved last when the row says, when,
  * and what each field holds now. When the last save was the same person's
- * (another tab of theirs), it names no one ("This changed to $111 at 8:31
- * AM", "Keep current"), where it read "Connor set this to $111" and "Keep
- * Connor's" to Connor.
+ * (another tab of theirs), it says so ("You set this to $111 at 8:31 AM",
+ * "Keep current"), where it read "Connor set this to $111" and "Keep
+ * Connor's" to Connor. The rule and the words are `rowConflict`'s and
+ * `conflictWho`'s, shared with properties.
  */
 export function dealConflict(
   row: Record<string, unknown> & { updatedAt: Date; updatedByUser?: LastEditor },
   fields: string[],
   actorId?: string,
 ) {
-  const yours = actorId !== undefined && row.updatedByUserId === actorId;
-  return rowConflict(yours ? { ...row, updatedByUser: null } : row, fields, { values: true });
+  return rowConflict(row, fields, { values: true, actorId });
 }
 
 /**

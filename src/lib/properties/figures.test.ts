@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { footedEquity, isSold, leftOutLine, loanPosition, portfolioPosition, type PositionProperty } from "./figures";
+import { buildingLine, footedEquity, isSold, leftOutLine, loanPosition, portfolioPosition, type PositionProperty } from "./figures";
 
 test("loanPosition: equity and LTV from value and balance", () => {
   assert.deepEqual(loanPosition("550000", "292890"), { equity: 257110, ltv: "53.3%" });
@@ -103,4 +103,17 @@ test("isSold reads the stored status", () => {
   assert.equal(isSold(" sold "), true);
   assert.equal(isSold("Stabilized"), false);
   assert.equal(isSold(null), false);
+});
+
+test("buildingLine: beds, baths, square feet and units, in that order", () => {
+  assert.equal(buildingLine({ beds: 6, baths: "2.50", sqft: 2880, units: 2 }), "6 beds · 2.5 baths · 2,880 sq ft · 2 units");
+});
+
+test("buildingLine: one of each reads singular", () => {
+  assert.equal(buildingLine({ beds: 1, baths: "1.00", sqft: null, units: 1 }), "1 bed · 1 bath · 1 unit");
+});
+
+test("buildingLine: what isn't set drops out, and nothing set is null", () => {
+  assert.equal(buildingLine({ beds: null, baths: null, sqft: 3140, units: 3 }), "3,140 sq ft · 3 units");
+  assert.equal(buildingLine({ beds: null, baths: "", sqft: null, units: 0 }), null);
 });

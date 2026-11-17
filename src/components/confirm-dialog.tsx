@@ -1,7 +1,7 @@
 "use client";
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
-import { Button, Kbd } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 /**
  * A small modal confirmation (docs/brand-guidelines.md, section 9, Dialogs),
@@ -12,7 +12,7 @@ import { Button, Kbd } from "@/components/ui";
  *
  * The title names the object; `body` is one sentence of consequence. The
  * dialog draws the Cancel button itself (`cancelLabel`: "Keep it", "Keep
- * editing"), with its Esc key printed beside it for a mouse. `actions` holds
+ * editing"). `actions` holds
  * the rest, the primary last: a destructive confirm is a `destructive`
  * Button that names what goes ("Delete task"). Below sm the actions stack
  * full width with the primary on top, however many there are, as Apple's
@@ -60,10 +60,6 @@ export function ConfirmDialog({
           <div className="mt-4 flex items-center justify-end gap-2 max-sm:flex-col-reverse max-sm:items-stretch">
             <Button size="sm" variant="secondary" disabled={busy} onClick={onClose} aria-keyshortcuts="Escape">
               {cancelLabel}
-              {/* With a mouse only, and from sm, where the footer has room for it. */}
-              <Kbd aria-hidden="true" className="max-sm:hidden">
-                Esc
-              </Kbd>
             </Button>
             {actions}
           </div>

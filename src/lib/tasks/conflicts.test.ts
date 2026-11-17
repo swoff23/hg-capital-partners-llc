@@ -21,12 +21,19 @@ test("a stale notes save reaches the notes field as its conflict: who, what and 
   assert.equal(conflictKeepLabel(failure.conflict!), "Keep Pieter's");
 });
 
-test("notes from your own other tab name nobody, so your first name never reads as someone else", () => {
+test("notes from your own other tab say You, so your first name never reads as someone else", () => {
   const failure = toFailure(asEditorConflict(new NotesChangedError(null, true, AT, "From my other tab")));
   assert.equal(failure.conflict?.by, undefined);
+  assert.equal(failure.conflict?.mine, true);
   // "at 2:14 PM" today, "on Oct 27" on a later day: the clock the test runs on decides which.
-  assert.match(failure.error, /^This changed (at|on) /);
+  assert.match(failure.error, /^You changed this (at|on) /);
+  // Design call 19 (Nov 14): the notes field's line says You, where it read "This changed at 2:14 PM".
+  assert.match(inlineConflictLine("multiline", failure.conflict!, "From my other tab", NOW), /^You changed this at 2:14\sPM$/);
   assert.equal(conflictKeepLabel(failure.conflict!), "Keep current");
+  // A name that came along with `mine` never shows: the caller is "You" whatever the line recorded.
+  const named = toFailure(asEditorConflict(new NotesChangedError("Pieter", true, AT, "x")));
+  assert.equal(named.conflict?.by, undefined);
+  assert.match(named.error, /^You changed this /);
 });
 
 test("a Restore from View previous carries the notes the page loaded, so it can't write over newer ones", () => {

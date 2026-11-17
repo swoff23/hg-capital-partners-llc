@@ -97,7 +97,9 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
         });
         if (more) return;
         if (variant === "sheet") router.back();
-        else router.replace(`/deals/${deal.id}`);
+        // A full load: a client navigation from here would open the deal's sheet over this spent form, and its
+        // close (Back) would leave the app, since /deals/new was a pasted link or a reload.
+        else window.location.replace(`/deals/${deal.id}`);
       }}
     >
       {({ errors, clear }) => (
@@ -118,6 +120,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
               set({ sourceUrl: withScheme(link), address: addressFromListingLink(link) ?? values.address });
             }}
             showSavesAs
+            reserveLine
             isRequired
             isInvalid={!!errors.address}
             errorMessage={errors.address}
@@ -137,7 +140,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
           <Section as="h3" title="Details (optional)">
             <div className="space-y-4">
               <FieldRow>
-                <FormField label={DEAL_FIELD_LABEL.theirPrice} helper={priceHelper(values.theirPriceRaw)} error={errors.theirPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.theirPrice} helper={priceHelper(values.theirPriceRaw)} error={errors.theirPriceRaw} reserveLine>
                   {(p) => (
                     <NumberInput
                       {...p}
@@ -152,7 +155,7 @@ export function NewDealForm({ variant, defaultAddress }: { variant: "sheet" | "p
                     />
                   )}
                 </FormField>
-                <FormField label={DEAL_FIELD_LABEL.ourPrice} helper={priceHelper(values.ourPriceRaw)} error={errors.ourPriceRaw}>
+                <FormField label={DEAL_FIELD_LABEL.ourPrice} helper={priceHelper(values.ourPriceRaw)} error={errors.ourPriceRaw} reserveLine>
                   {(p) => (
                     <NumberInput
                       {...p}

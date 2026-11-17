@@ -4,6 +4,8 @@ import {
   SUGGEST_LIMIT,
   addressFromListingLink,
   answerAddresses,
+  duplicateSentence,
+  liveFirst,
   findAddressMatch,
   looksLikeLink,
   parseAddressParams,
@@ -16,7 +18,7 @@ import {
   type AddressDb,
   type AddressRecord,
 } from "./address-suggestions";
-import { sameStreetAddress, streetKey } from "./normalize";
+import { sameStreetAddress, shortAddress, streetKey } from "./normalize";
 
 test("tidyAddress: the form an address saves in, Saves as 767 Prospect Ave, Buffalo, NY 14209", () => {
   assert.equal(tidyAddress("767 prospect avenue buffalo ny 14209"), "767 Prospect Ave, Buffalo, NY 14209");
@@ -63,6 +65,82 @@ test("tidying never changes which building an address is", () => {
     assert.equal(streetKey(tidyAddress(t)), streetKey(t), t);
     assert.equal(sameStreetAddress(tidyAddress(t), t), true, t);
   }
+});
+
+// The Saint-street bug (found Nov 14, live on New property, New deal and every rename): "34 St James Pl Buffalo, NY
+// 14222" saved as "34 St, James Pl Buffalo, NY 14222", and the record then showed as "34 St". The cause was
+// splitAddress ending the street at the first street-type word after the house number, which on a Saint street is
+// the name's own "St".
+
+test("a Saint street keeps its name: no comma after St, and the record's short name is the whole street", () => {
+  assert.equal(tidyAddress("34 St James Pl Buffalo, NY 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(shortAddress(tidyAddress("34 St James Pl Buffalo, NY 14222")), "34 St James Pl");
+  assert.equal(tidyAddress("34 st james pl buffalo ny 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(tidyAddress("34 ST JAMES PL BUFFALO NY 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(tidyAddress("34 St James Pl, Buffalo, NY 14222"), "34 St James Pl, Buffalo, NY 14222", "already right stays");
+  assert.deepEqual(splitAddress("12-14 St James Pl Buffalo"), { street: "12-14 St James Pl", place: "Buffalo" });
+  assert.equal(tidyAddress("77 St Marks Ave Buffalo NY 14214"), "77 St Marks Ave, Buffalo, NY 14214");
+  assert.equal(tidyAddress("77 st marks avenue"), "77 St Marks Ave");
+  assert.equal(tidyAddress("210 St Paul St Buffalo, NY 14209"), "210 St Paul St, Buffalo, NY 14209");
+  assert.equal(tidyAddress("210 st paul street buffalo ny"), "210 St Paul St, Buffalo, NY");
+  // With no street type typed, the comma that was typed still sets the town apart.
+  assert.equal(tidyAddress("34 st james, buffalo ny"), "34 St James, Buffalo, NY");
+  assert.equal(tidyAddress("34 St James"), "34 St James");
+  // While it is being typed.
+  assert.equal(tidyAddress("34 st"), "34 St");
+  assert.equal(savesAs("34 st james pl buffalo ny 14222"), "34 St James Pl, Buffalo, NY 14222");
+});
+
+test("St. with a period is the same Saint street, and the period goes as it does everywhere", () => {
+  assert.equal(tidyAddress("34 St. James Pl Buffalo, NY 14222"), "34 St James Pl, Buffalo, NY 14222");
+  assert.equal(tidyAddress("210 St. Paul St. Buffalo NY 14209"), "210 St Paul St, Buffalo, NY 14209");
+  // A stored address keeps its words in the two suggestion lines.
+  assert.deepEqual(splitAddress("34 St. James Pl, Buffalo, NY 14222"), { street: "34 St. James Pl", place: "Buffalo, NY 14222" });
+});
+
+test("a street really ending in St is unchanged: the comma still goes after it", () => {
+  assert.equal(tidyAddress("12 Main St"), "12 Main St");
+  assert.equal(tidyAddress("12 main st buffalo ny 14201"), "12 Main St, Buffalo, NY 14201");
+  assert.equal(tidyAddress("12 Main St. Buffalo, NY 14201"), "12 Main St, Buffalo, NY 14201");
+  assert.equal(tidyAddress("12 main street buffalo ny"), "12 Main St, Buffalo, NY");
+  assert.deepEqual(splitAddress("12 Main St Buffalo, NY 14201"), { street: "12 Main St", place: "Buffalo, NY 14201" });
+  // A street named for a type word, then its type: the pair stays together as it always did.
+  assert.equal(tidyAddress("12 court st buffalo ny 14202"), "12 Court St, Buffalo, NY 14202");
+  assert.deepEqual(splitAddress("12 Court St Buffalo, NY 14202"), { street: "12 Court St", place: "Buffalo, NY 14202" });
+  // No house number: the first type word still ends the street.
+  assert.deepEqual(splitAddress("Main St Buffalo, NY"), { street: "Main St", place: "Buffalo, NY" });
+  assert.equal(tidyAddress("lot on main street buffalo ny"), "Lot on Main St, Buffalo, NY");
+  // A comma right after the word closes the street there, as typed.
+  assert.deepEqual(splitAddress("34 St, Buffalo, NY"), { street: "34 St", place: "Buffalo, NY" });
+});
+
+test("splitAddress: a Saint street's two lines are the street and the place", () => {
+  assert.deepEqual(splitAddress("34 St James Pl Buffalo, NY 14222"), { street: "34 St James Pl", place: "Buffalo, NY 14222" });
+  assert.deepEqual(splitAddress("34 St James Pl, Buffalo, NY 14222"), { street: "34 St James Pl", place: "Buffalo, NY 14222" });
+  assert.deepEqual(splitAddress("77 St Marks Ave"), { street: "77 St Marks Ave", place: "" });
+  assert.deepEqual(splitAddress("210 St Paul St Buffalo NY 14209"), { street: "210 St Paul St", place: "Buffalo NY 14209" });
+  assert.deepEqual(splitAddress("765/767 St James Pl, Buffalo"), { street: "765/767 St James Pl", place: "Buffalo" });
+  assert.deepEqual(splitAddress("34A St James Pl Buffalo"), { street: "34A St James Pl", place: "Buffalo" });
+});
+
+test("a Saint street tidies once and stays: a second tidy changes nothing, and the building it is never changes", () => {
+  const typed = [
+    "34 St James Pl Buffalo, NY 14222",
+    "34 st. james pl buffalo ny 14222",
+    "77 St Marks Ave Buffalo NY 14214",
+    "210 St Paul St Buffalo, NY 14209",
+    "34 st james, buffalo ny",
+    "12 Main St Buffalo NY 14201",
+    "12 court st buffalo ny 14202",
+    "10 Avenue D",
+  ];
+  for (const t of typed) {
+    const once = tidyAddress(t);
+    assert.equal(tidyAddress(once), once, t);
+    assert.equal(streetKey(once), streetKey(t), t);
+    assert.equal(sameStreetAddress(once, t), true, t);
+  }
+  assert.equal(streetKey(tidyAddress("34 St James Pl Buffalo, NY 14222")), "34 st james");
 });
 
 test("savesAs: the line under the field, only when saving would change the typing", () => {
@@ -239,7 +317,7 @@ test("parseAddressParams reads q, kind and exclude", () => {
 
 /* ---------------- Against an in-memory database ---------------- */
 
-type Row = { id: string; address: string; updatedAt: Date; status?: string };
+type Row = { id: string; address: string; updatedAt: Date; status?: string; archivedAt?: Date | null };
 type Where = Record<string, unknown>;
 
 function matches(row: Row, where: Where): boolean {
@@ -316,4 +394,66 @@ test("answerAddresses is staff only, checks its params and hides a failure", asy
   const failed = await answerAddresses({ id: "u1" }, new URLSearchParams("q=prospect"), broken, (err) => (logged = err));
   assert.deepEqual(failed, { status: 500, body: { error: "failed" } });
   assert.ok(logged instanceof Error);
+});
+
+/* ---------------- Archived records (call 21) ---------------- */
+
+test("duplicateSentence says archived for an archived record, in the line and in the save's refusal", () => {
+  assert.equal(duplicateSentence("deal", "118 Congress St", true), "118 Congress St is an archived deal.");
+  assert.equal(duplicateSentence("property", "767 Prospect Ave", true), "767 Prospect Ave is an archived property.");
+  assert.equal(duplicateSentence("property", "767 Prospect Ave"), "767 Prospect Ave is already a property.");
+  assert.equal(duplicateSentence("deal", "118 Congress St", false), "118 Congress St is already a deal.");
+});
+
+test("the save's refusal names a live record before a newer archived one at the same address", () => {
+  const archivedNewer = { id: "archived", archivedAt: new Date() };
+  const live = { id: "live", archivedAt: null };
+  assert.equal(liveFirst([archivedNewer, live])?.id, "live");
+  assert.equal(liveFirst([archivedNewer])?.id, "archived");
+  assert.equal(liveFirst([]), null);
+});
+
+test("an archived record leaves the suggestion rows but still is the match", () => {
+  const archived: AddressRecord[] = [
+    { kind: "deal", id: "d118", address: "118 Congress St, Buffalo, NY 14213", updatedAt: at(5), archived: true },
+    { kind: "property", id: "p400", address: "400 Elmwood Ave, Buffalo, NY 14222", updatedAt: at(4) },
+  ];
+  assert.deepEqual(suggestAddresses("118 congress", archived), []);
+  assert.deepEqual(suggestAddresses("elmwood", archived).map((r) => r.id), ["p400"]);
+  const match = findAddressMatch("118 Congress St", "deal", archived);
+  assert.equal(match?.id, "d118");
+  assert.equal(match?.archived, true);
+  // A live record's match carries no flag.
+  assert.equal("archived" in (findAddressMatch("400 Elmwood Ave", "property", archived) ?? {}), false);
+});
+
+test("an archived twin never hides the live row at its address, and a live match wins within a kind", () => {
+  const twins: AddressRecord[] = [
+    { kind: "deal", id: "old", address: "118 Congress St, Buffalo, NY 14213", updatedAt: at(9), archived: true },
+    { kind: "deal", id: "live", address: "118 Congress Street, Buffalo, NY 14213", updatedAt: at(1) },
+  ];
+  assert.deepEqual(suggestAddresses("118 congress", twins).map((r) => r.id), ["live"]);
+  const match = findAddressMatch("118 Congress St", "deal", twins);
+  assert.equal(match?.id, "live");
+  assert.equal(match?.archived, undefined);
+});
+
+test("runAddresses reads archived rows for the match and drops them from the rows", async () => {
+  const row = (id: string, address: string, archivedAt: Date | null) => ({ id, address, updatedAt: new Date(at(3)), archivedAt });
+  const archivedDb = {
+    property: table([row("pa", "767 Prospect Ave, Buffalo, NY 14213", new Date(at(2)))]),
+    deal: table([row("da", "118 Congress St, Buffalo, NY 14213", new Date(at(2)))]),
+  } as unknown as AddressDb;
+  const deal = await runAddresses(archivedDb, { q: "118 Congress St", kind: "deal" });
+  assert.deepEqual(deal.suggestions, []);
+  assert.equal(deal.match?.id, "da");
+  assert.equal(deal.match?.archived, true);
+  const property = await runAddresses(archivedDb, { q: "767 Prospect Ave", kind: "property" });
+  assert.deepEqual(property.suggestions, []);
+  assert.equal(property.match?.archived, true);
+  // The read asks for archivedAt, or every row would read as live.
+  const seen: unknown[] = [];
+  const spy = { findMany: async (args: unknown) => (seen.push(args), []) };
+  await runAddresses({ property: spy, deal: spy } as unknown as AddressDb, { q: "118 Congress", kind: "deal" });
+  assert.match(JSON.stringify(seen), /"archivedAt":true/);
 });

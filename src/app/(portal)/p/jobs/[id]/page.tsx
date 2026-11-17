@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Phone } from "lucide-react";
-import { BackLink } from "@/components/back-link";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { StatusBadge } from "@/components/status-badge";
-import { Section, buttonClass } from "@/components/ui";
+import { Section } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
 import { contractorMaySetDate, jobLinkStep } from "@/lib/portal/job-link-paths";
 import { addressLine, firstName, nextStep } from "@/lib/portal/job-view";
 import { noteJobViewed } from "@/lib/portal/jobs";
-import { officeTelHref } from "@/lib/portal/office";
 import { getJob } from "@/lib/portal/queries";
 import { requirePortalPrincipal } from "@/lib/portal/session";
 import { isActiveStatus } from "@/lib/task-scope";
@@ -17,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { CrewText } from "./_components/crew-text";
 import { HashScroll } from "./_components/hash-scroll";
 import { JobActions } from "./_components/job-actions";
+import { JobHeader } from "./_components/job-header";
 import { JobDate } from "./_components/job-date";
 import { AddressActions, JobChecklist, LockboxSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
@@ -60,7 +58,6 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
   const today = todayYmdEastern(now);
   const active = isActiveStatus(job.status);
   const hasBar = nextStep(job.status) !== null;
-  const tel = officeTelHref();
   const photoAlt = job.address ? `Front of ${addressLine(job.address, null, { short: true })}` : null;
   // The building, for the upload's name and the payoff's photo.
   const place = job.address ? { label: addressLine(job.address, null, { short: true }), photoUrl: job.photoUrl } : null;
@@ -69,20 +66,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
   // posts it, and only Sign out asks.
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-border bg-canvas">
-        <div className="mx-auto flex h-14 max-w-300 items-center justify-between gap-3 px-2 sm:px-4 lg:px-6">
-          <BackLink fallback="/p" label="My jobs" className="h-11 rounded-md px-2 text-label text-fg-2" />
-          <div className="flex items-center gap-1">
-            {/* Text to my crew, while the job is open (docs/specs/contractor-job-emails.md, section 4). */}
-            {active && <CrewText taskId={job.id} openOnLoad={ask === "share"} />}
-            {tel && (
-              <a href={tel} aria-label="Call HG" className={cn(buttonClass({ variant: "ghost", icon: true }), "h-11 w-11")}>
-                <Phone className="h-5 w-5" aria-hidden="true" />
-              </a>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* Text to my crew, while the job is open (docs/specs/contractor-job-emails.md, section 4). */}
+      <JobHeader actions={active && <CrewText taskId={job.id} openOnLoad={ask === "share"} />} />
 
       <main className={cn("mx-auto max-w-300", hasBar ? "pb-[calc(6.5rem+env(safe-area-inset-bottom))]" : "pb-12")}>
         <HashScroll />
@@ -117,7 +102,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
 
           <JobNotice notice={job.notice} now={now.toISOString()} />
 
-          {job.lockbox && <LockboxSection code={job.lockbox} />}
+          {job.lockbox && <LockboxSection taskId={job.id} lockbox={job.lockbox} />}
 
           {job.notes && (
             <Section title="Notes">

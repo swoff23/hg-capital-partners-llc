@@ -11,6 +11,15 @@ import { DEAL_VIEWS, DEFAULT_DEAL_VIEW, hasStageChip, viewStages, type DealView 
 /** Active is the opening view, so it stays out of the URL, and so does the default sort. */
 const DEFAULTS = { status: DEFAULT_DEAL_VIEW, sort: DEFAULT_DEAL_SORT } as const;
 
+/** How many rows are out (`show`) is how the list is being viewed, not a filter: a change to a filter starts it over. */
+const TRANSIENT = ["show"] as const;
+
+/**
+ * The empty place a view's count will take in the loading bar: two invisible digits, so it is two digits wide
+ * in the count's own font and nothing is drawn. The segments hold still when the counts land.
+ */
+const COUNT_SLOT = <span aria-hidden="true" className="invisible">00</span>;
+
 export type DealFilterData = {
   view: DealView;
   /** Deals per view, with the search applied. */
@@ -57,7 +66,7 @@ export function DealFilters({ data, children }: { data: DealFilterData; children
   );
 
   return (
-    <FilterScope list="deals" defaults={DEFAULTS}>
+    <FilterScope list="deals" defaults={DEFAULTS} transient={TRANSIENT}>
       <FilterBar
         noun={{ one: "deal", many: "deals" }}
         search={{ placeholder: "Search deals" }}
@@ -85,7 +94,7 @@ export function DealFilters({ data, children }: { data: DealFilterData; children
   );
 }
 
-/** The bar as the loading screen draws it (deals/(list)/loading.tsx): the view from the URL, its Stage chip by name, inert, no counts. */
+/** The bar as the loading screen draws it (deals/(list)/loading.tsx): the view from the URL, its Stage chip by name, inert, no counts, each view holding its count's place. */
 export function DealFiltersPlaceholder() {
   const params = useSearchParams();
   const view = DEAL_VIEWS.find((v) => v.key === params.get("status"))?.key ?? DEFAULT_DEAL_VIEW;
@@ -97,7 +106,7 @@ export function DealFiltersPlaceholder() {
         param: "status",
         label: "Deal view",
         default: DEFAULT_DEAL_VIEW,
-        options: DEAL_VIEWS.map((v) => ({ key: v.key, label: v.label })),
+        options: DEAL_VIEWS.map((v) => ({ key: v.key, label: v.label, mark: COUNT_SLOT })),
         menu: { sheetTitle: "Show" },
       }}
       facets={hasStageChip(view) ? [{ kind: "multi", param: "statuses", label: "Stage" }] : []}

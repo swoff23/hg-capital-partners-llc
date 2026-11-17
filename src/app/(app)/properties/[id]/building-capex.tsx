@@ -74,6 +74,10 @@ export function BuildingSystems({
   const current = items.find((i) => i.key === sheet?.key) ?? null;
 
   const phoneHidden = "max-[480px]:hidden";
+  // Below 360 the Status column drops and each row's status sits under its component, as Portfolio's does below sm,
+  // so Component, Year and Cost fit a 320 screen with a cost on the row.
+  // (Tailwind's max-[360px] is a width under 360, and min-[360px] one of 360 and over.)
+  const narrowHidden = "max-[360px]:hidden";
   // Type also drops where the record's main column is narrowest (536px at 1024, beside the rail).
   const typeHidden = "max-[480px]:hidden lg:max-xl:hidden";
 
@@ -120,7 +124,7 @@ export function BuildingSystems({
       </button>
 
       {shown && (
-      /* Reading on a phone, the type and age drop so the cost stays on screen. */
+      /* Reading on a phone, the type and age drop so the cost stays on screen, and below 360 the status moves under the name. */
       <Table>
         <thead>
           <tr>
@@ -128,7 +132,7 @@ export function BuildingSystems({
             <Th className={typeHidden}>Type</Th>
             <Th>Year</Th>
             <Th className={phoneHidden}>Age</Th>
-            <Th>Status</Th>
+            <Th className={narrowHidden}>Status</Th>
             <Th numeric className="pr-0">
               Cost
             </Th>
@@ -146,13 +150,19 @@ export function BuildingSystems({
                   <button type="button" aria-label={`Edit ${item.label}`} className="text-left">
                     {item.label}
                   </button>
+                  {/* The status column's word, from where it is dropped (below 360). */}
+                  {rs.status && (
+                    <span className="mt-0.5 block text-meta min-[360px]:hidden">
+                      <EquipmentStatusText status={rs.status} />
+                    </span>
+                  )}
                 </Td>
                 <Td className={cn("align-middle", typeHidden)}>
                   {stored?.type ? <span className="text-fg-2">{stored.type}</span> : <span className="text-muted-foreground">—</span>}
                 </Td>
                 <Td className="num align-middle">{stored?.year || <span className="text-muted-foreground">—</span>}</Td>
                 <Td className={cn("num whitespace-nowrap align-middle text-fg-2", phoneHidden)}>{fmtAge(rs.age)}</Td>
-                <Td className="whitespace-nowrap align-middle">
+                <Td className={cn("whitespace-nowrap align-middle", narrowHidden)}>
                   <EquipmentStatusText status={rs.status} />
                 </Td>
                 <Td numeric className="pr-0 align-middle">

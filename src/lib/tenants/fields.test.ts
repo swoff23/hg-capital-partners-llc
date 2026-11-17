@@ -17,22 +17,22 @@ import {
 } from "./fields";
 
 test("readTenant new: the name is required; phone reads like a contractor's; blanks are null", () => {
-  assert.deepEqual(readTenant({ fullName: "  Dana   Lee ", phone: "(716) 555 1234", email: " Dana@Example.com ", emergencyName: "", notes: "" }, "new"), {
+  assert.deepEqual(readTenant({ fullName: "  Dana   Lee ", phone: "(716) 555 1234", email: " Dana@Example.com ", notes: "" }, "new"), {
     ok: true,
-    data: { fullName: "Dana Lee", phone: "716-555-1234", phoneE164: "+17165551234", email: "dana@example.com", emergencyName: null, notes: null },
+    data: { fullName: "Dana Lee", phone: "716-555-1234", phoneE164: "+17165551234", email: "dana@example.com", notes: null },
   });
   assert.deepEqual(readTenant({ phone: "716-555-1234" }, "new"), { ok: false, problems: { fullName: TENANT_NAME_REQUIRED } });
   assert.deepEqual(readTenant({ fullName: "Sam" }, "new"), { ok: true, data: { fullName: "Sam" } }, "no phone is fine (call 2)");
 });
 
 test("readTenant: every problem comes back, by field", () => {
-  const r = readTenant({ fullName: " ", phone: "555", email: "nope", emergencyPhone: "12" }, "new");
-  assert.deepEqual(r, { ok: false, problems: { fullName: TENANT_NAME_REQUIRED, phone: PHONE_INVALID, email: EMAIL_INVALID, emergencyPhone: PHONE_INVALID } });
+  const r = readTenant({ fullName: " ", phone: "555", email: "nope" }, "new");
+  assert.deepEqual(r, { ok: false, problems: { fullName: TENANT_NAME_REQUIRED, phone: PHONE_INVALID, email: EMAIL_INVALID } });
 });
 
 test("readTenant patch: only the fields present; clearing the phone clears both columns", () => {
   assert.deepEqual(readTenant({ phone: "" }, "patch"), { ok: true, data: { phone: null, phoneE164: null } });
-  assert.deepEqual(readTenant({ emergencyPhone: "716 555 0000 (mom)" }, "patch"), { ok: true, data: { emergencyPhone: "716-555-0000 (mom)" } });
+  assert.deepEqual(readTenant({ notes: " Works nights. " }, "patch"), { ok: true, data: { notes: "Works nights." } });
   assert.deepEqual(readTenant({ fullName: "" }, "patch"), { ok: false, problems: { fullName: TENANT_NAME_REQUIRED } });
 });
 
@@ -48,11 +48,11 @@ test("readStay: dates read as days; move-out must come after move-in, checked ag
 test("readTerm: start and rent required; end after start; the share at most the rent", () => {
   assert.deepEqual(readTerm({ startsOn: "2026-03-01", endsOn: "2027-02-28", rent: "$1,900", subsidy: "1500", subsidyFrom: " BMHA " }), {
     ok: true,
-    data: { startsOn: "2026-03-01", endsOn: "2027-02-28", rent: "1900.00", subsidy: "1500.00", subsidyFrom: "BMHA" },
+    data: { startsOn: "2026-03-01", endsOn: "2027-02-28", rent: "1900.00", subsidy: "1500.00", subsidyFrom: "BMHA", subsidyContact: null, subsidyEmail: null },
   });
   assert.deepEqual(readTerm({ startsOn: "2026-03-01", endsOn: "", rent: "1900", subsidy: "", subsidyFrom: "BMHA" }), {
     ok: true,
-    data: { startsOn: "2026-03-01", endsOn: null, rent: "1900.00", subsidy: null, subsidyFrom: null },
+    data: { startsOn: "2026-03-01", endsOn: null, rent: "1900.00", subsidy: null, subsidyFrom: null, subsidyContact: null, subsidyEmail: null },
   });
   assert.deepEqual(readTerm({ startsOn: "", rent: "" }), { ok: false, problems: { startsOn: STARTS_REQUIRED, rent: RENT_REQUIRED } });
   assert.deepEqual(readTerm({ startsOn: "2026-03-01", endsOn: "2026-02-28", rent: "0" }), { ok: false, problems: { endsOn: ENDS_BEFORE_START, rent: RENT_REQUIRED } });
@@ -66,4 +66,22 @@ test("readDeposit and tenantShare", () => {
   assert.equal(readDeposit("lots").ok, false);
   assert.equal(tenantShare("1900.00", "1500.00"), 400);
   assert.equal(tenantShare("1450.00", null), 1450);
+});
+
+test("rentFromParts: the whole rent is what the tenant pays plus the housing authority's share", async () => {
+  const { rentFromParts, TENANT_PAYS_REQUIRED } = await import("./fields");
+  assert.deepEqual(rentFromParts("517", "683"), { ok: true, data: { rent: "1200.00" } });
+  assert.deepEqual(rentFromParts("1,490", ""), { ok: true, data: { rent: "1490.00" } });
+  assert.deepEqual(rentFromParts("", "1530"), { ok: true, data: { rent: "1530.00" } }, "the housing authority pays it all");
+  assert.deepEqual(rentFromParts("", ""), { ok: false, problems: { tenantPays: TENANT_PAYS_REQUIRED } });
+  assert.deepEqual(rentFromParts("0", "0"), { ok: false, problems: { tenantPays: TENANT_PAYS_REQUIRED } });
+  assert.equal(rentFromParts("lots", "").ok, false);
+});
+
+test("readTerm: the housing authority's contact name and email, kept only with a share", () => {
+  const withShare = readTerm({ startsOn: "2026-03-01", rent: "1200", subsidy: "683", subsidyFrom: "BMHA", subsidyContact: " Pat  Case ", subsidyEmail: " Pat.Case@BMHA.org " });
+  assert.deepEqual(withShare.ok && [withShare.data.subsidyContact, withShare.data.subsidyEmail], ["Pat Case", "pat.case@bmha.org"]);
+  const noShare = readTerm({ startsOn: "2026-03-01", rent: "1200", subsidyContact: "Pat Case", subsidyEmail: "pat@bmha.org" });
+  assert.deepEqual(noShare.ok && [noShare.data.subsidyContact, noShare.data.subsidyEmail], [null, null]);
+  assert.deepEqual(readTerm({ startsOn: "2026-03-01", rent: "1200", subsidy: "683", subsidyEmail: "nope" }), { ok: false, problems: { subsidyEmail: EMAIL_INVALID } });
 });

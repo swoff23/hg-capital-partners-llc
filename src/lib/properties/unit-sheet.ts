@@ -101,3 +101,38 @@ export function firstEquipmentProblem(problems: EquipmentProblems | null): strin
     .flatMap((p) => [p.type, p.year])
     .find(Boolean);
 }
+
+/** Another rentable unit of the property, as the sheet's "Same lockbox for all units" reads it. */
+export type OtherUnit = { name: string; code: string };
+
+/** "Lower", "Lower and Attic", or past two names "3 other units", so the line stays one line. */
+function unitNames(units: readonly OtherUnit[]): string {
+  if (units.length === 1) return units[0].name;
+  if (units.length === 2) return `${units[0].name} and ${units[1].name}`;
+  return `${units.length} other units`;
+}
+
+const sameCode = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * The one line under "Same lockbox for all units" (docs/specs/lockbox-location.md,
+ * decision 4b). Off: none. Being turned on where another unit has a different
+ * code: a warning naming them, since Save replaces theirs. Otherwise who shares
+ * it. Pure; see unit-sheet.test.ts.
+ */
+export function sharedLockboxLine(input: {
+  on: boolean;
+  /** It was on when the sheet opened. */
+  wasOn: boolean;
+  code: string | null | undefined;
+  others: readonly OtherUnit[];
+}): { text: string; warning: boolean } | null {
+  if (!input.on || input.others.length === 0) return null;
+  const code = input.code ?? "";
+  const replaced = input.others.filter((u) => u.code.trim() && !sameCode(u.code, code));
+  if (!input.wasOn && replaced.length > 0) {
+    return { text: `Replaces the ${replaced.length === 1 ? "code" : "codes"} on ${unitNames(replaced)}`, warning: true };
+  }
+  if (input.others.length === 1) return { text: `${input.others[0].name} uses it too`, warning: false };
+  return { text: `The other ${input.others.length} units use it too`, warning: false };
+}

@@ -194,7 +194,7 @@ function quoted(t: string | null): string {
  * the line never reads as if the contractor finished the job.
  */
 export function reviewMoveText(byContractor: boolean): string {
-  return byContractor ? "marked this done" : "set status to Review";
+  return byContractor ? "sent this for review" : "set status to Review";
 }
 
 function statusLine(e: ActivityEvent, d: Data, today: Ymd): string {

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Button as AriaButton } from "react-aria-components";
 import { Images, Trash2, Upload } from "lucide-react";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
@@ -12,6 +13,7 @@ import type { UploadTarget } from "@/components/upload-queue";
 import { callAction } from "@/lib/action-result";
 import { pickerAccept, taskFileUrl } from "@/lib/attachments/media";
 import { shortAddress } from "@/lib/normalize";
+import { TOAST_ACTION_MS } from "@/lib/toast-time";
 import type { TakenHerePhoto } from "@/lib/properties/photo";
 import {
   discardPropertyPhotoAction,
@@ -20,15 +22,20 @@ import {
   setPropertyPhotoAction,
   takenHerePhotosAction,
 } from "./photo-actions";
+import { onPropertyFieldRequest } from "./edit-field-event";
+
+/** The request the header's ⋯ "Add photo" sends: the file picker opens. */
+export const ADD_PHOTO = "property-photo";
 
 /**
  * The building's front photo in the record header
  * (docs/specs/uploads-photos.md 2.10): full width at 16:9 on a phone, often
- * held at the building, and 96x72 beside the title from sm. The fallback
- * tile until a photo is set.
+ * held at the building, and 96x72 beside the title from sm.
  *
- * For staff (`canEdit`) the tile is a button. With no photo it carries "Add
- * photo" under the House. A tap opens a menu: Upload photo, Choose from
+ * For staff (`canEdit`) there's no tile until a photo is set (Connor, Nov
+ * 14): the header's ⋯ "Add photo" opens the file picker (`ADD_PHOTO`), and
+ * the tile shows while the first one goes up. Once set, the tile is a button
+ * whose tap opens a menu: Upload photo, Choose from
  * photos taken here (only when tasks at this property have photos) and
  * Remove photo (once one is set); with one choice, the tap goes straight to
  * the file picker. A photo goes up as a `display` target (upright, a 2560px
@@ -41,8 +48,8 @@ import {
  * "Set as property photo" on a task photo (uploads 2.10, wired in phase 2).
  */
 
-/** The old file stays this long after a change, a beat longer than the toast's five seconds. */
-const KEEP_OLD_MS = 7_000;
+/** The old file stays this long after a change, a beat longer than its toast, which carries Undo (lib/toast-time.ts). */
+const KEEP_OLD_MS = TOAST_ACTION_MS + 2_000;
 
 type PhotoRef = { url: string; pathname: string };
 
@@ -204,6 +211,11 @@ function EditablePhoto({ property }: { property: { id: string; address: string; 
   const hasPhoto = !!property.photoUrl;
   const canChoose = (takenHere?.total ?? 0) > 0;
   const name = `${hasPhoto ? "Change" : "Add"} front photo of ${place}`;
+  // No photo yet: no tile, until the first one is going up.
+  const showTile = hasPhoto || photo.uploading;
+
+  // The header's ⋯ "Add photo", inside its click, so the browser lets the file picker open.
+  useEffect(() => onPropertyFieldRequest([ADD_PHOTO], () => fileRef.current?.click()), []);
 
   const tile = (
     <>
@@ -220,7 +232,7 @@ function EditablePhoto({ property }: { property: { id: string; address: string; 
   const buttonClass = "relative block w-full rounded-lg disabled:cursor-default sm:w-auto";
 
   return (
-    <div>
+    <div className={cn("sm:shrink-0", !showTile && "hidden")}>
       {canChoose || hasPhoto ? (
         <MenuTrigger>
           <AriaButton aria-label={name} isDisabled={photo.uploading} className={buttonClass}>

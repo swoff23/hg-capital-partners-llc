@@ -1,13 +1,13 @@
 "use client";
 import { RailFold } from "@/components/rail-fold";
 import { Section } from "@/components/ui";
-import { PROPERTY_STATUSES, PROPERTY_STRATEGIES } from "@/lib/config";
+import { PROPERTY_STATUSES } from "@/lib/config";
 import { shortAddress } from "@/lib/normalize";
-import { ENTITY_NAMES } from "@/lib/quickbooks/entities";
 import type { OptionItem } from "@/components/option-list";
 import { PropertyStatus } from "../property-status";
 import { PropertyAddressHeading, PropertyNotes } from "./property-heading";
 import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { MissingTitle, useMissingFields } from "./missing-context";
 import { PropertyFact, PropertyKeyDate, PropertyMoveInSwitch, isBlank as blank } from "./property-fact";
 
 export type EditableProperty = {
@@ -18,20 +18,22 @@ export type EditableProperty = {
   status: string | null;
   /** Offered on the public move-in form. */
   showOnMoveInForm: boolean;
-  strategy: string | null;
   purchaseDate: string | null;
   purchasePrice: string | null;
   value: string | null;
   refinanceDate: string | null;
   sqft: number | null;
+  beds: number | null;
+  /** Baths as stored, "1.50"; it reads "1.5". */
+  baths: string | null;
   rentalRegistrationExpiry: string | null;
   propertyTaxDueDate: string | null;
 };
 
 /**
  * A list of words as picker rows, always in the list's order. A stored value
- * the list doesn't have (a name typed before Entity was a list) leads as its
- * own row, so opening never changes it.
+ * the list doesn't have (a company no longer offered, like 58 Mariner's BMK)
+ * leads as its own row, so opening never changes it.
  */
 const rows = (words: readonly string[], stored: string | null): OptionItem[] =>
   (stored && !words.includes(stored) ? [stored, ...words] : [...words]).map((w) => ({ id: w, label: w }));
@@ -47,67 +49,71 @@ export function PropertyAddressField({ id, value }: { id: string; value: string 
 }
 
 /**
- * Details (forms 4.2): the facts of the purchase, the plan and the dates, each
- * changed where it stands. Money, dates, a count and three lists (Strategy,
- * Entity, Status); the empty ones fold behind "N more fields"
- * (docs/specs/property-page.md 2.2), except the move-in switch and the two
- * reminder dates, which always show. The fact strip's "Add value" opens
- * Value, unfolding it first. Entity is one of the five companies
- * (ENTITY_NAMES); a name stored before the list stays as its own row.
+ * Details (forms 4.2): the facts of the purchase and the dates, each changed
+ * where it stands. Value, the purchase, the refinance, beds, baths, square
+ * feet and Entity always show; Attorney, Status, the move-in switch and the two reminder
+ * dates fold behind "5 more fields", filled or not
+ * (docs/specs/property-page.md 2.2). Entity searches the companies and the
+ * names added on any property (`entities`, lib/properties/entity.ts), and
+ * typing a new one adds it; a stored name off the list stays as its own row.
  */
-export function PropertyDetailsSection({ property: p }: { property: EditableProperty }) {
+export function PropertyDetailsSection({ property: p, entities }: { property: EditableProperty; entities: readonly string[] }) {
+  const missing = useMissingFields();
   const context = `Details · ${shortAddress(p.address) || p.address}`;
   const common = { id: p.id, context };
   return (
-    <Section title="Details">
+    <Section title={<MissingTitle section="details">Details</MissingTitle>}>
       <RailFold
+        missing={missing}
         listen={onPropertyFieldRequest}
         reopen={openPropertyField}
         rows={[
           {
             key: "value",
             empty: blank(p.value),
+            keep: true,
             node: <PropertyFact {...common} field="value" label="Value" anchor="value" kind="money" value={p.value} empty="Add value" />,
           },
           {
             key: "purchaseDate",
             empty: blank(p.purchaseDate),
+            keep: true,
             node: <PropertyFact {...common} field="purchaseDate" label="Purchase date" kind="date" value={p.purchaseDate} empty="Add purchase date" />,
           },
           {
             key: "purchasePrice",
             empty: blank(p.purchasePrice),
+            keep: true,
             node: <PropertyFact {...common} field="purchasePrice" label="Purchase price" kind="money" value={p.purchasePrice} empty="Add purchase price" />,
           },
           {
             key: "refinanceDate",
             empty: blank(p.refinanceDate),
+            keep: true,
             node: <PropertyFact {...common} field="refinanceDate" label="Refinance date" kind="date" value={p.refinanceDate} empty="Add refinance date" />,
           },
           {
-            key: "strategy",
-            empty: blank(p.strategy),
-            node: (
-              <PropertyFact
-                {...common}
-                field="strategy"
-                label="Strategy"
-                kind="choice"
-                value={p.strategy}
-                empty="Add strategy"
-                options={rows(PROPERTY_STRATEGIES, p.strategy)}
-                emptyLabel="Not set"
-              />
-            ),
+            key: "beds",
+            empty: blank(p.beds),
+            keep: true,
+            node: <PropertyFact {...common} field="beds" label="Beds" kind="integer" value={p.beds == null ? "" : String(p.beds)} empty="Add beds" />,
+          },
+          {
+            key: "baths",
+            empty: blank(p.baths),
+            keep: true,
+            node: <PropertyFact {...common} field="baths" label="Baths" kind="decimal" value={p.baths} empty="Add baths" />,
           },
           {
             key: "sqft",
             empty: blank(p.sqft),
-            node: <PropertyFact {...common} field="sqft" label="Sq ft" kind="integer" unit="sq ft" value={p.sqft == null ? "" : String(p.sqft)} empty="Add sq ft" />,
+            keep: true,
+            node: <PropertyFact {...common} field="sqft" label="Square feet" kind="integer" unit="sq ft" value={p.sqft == null ? "" : String(p.sqft)} empty="Add square feet" />,
           },
           {
             key: "llcOwner",
             empty: blank(p.llcOwner),
+            keep: true,
             node: (
               <PropertyFact
                 {...common}
@@ -116,19 +122,22 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
                 kind="choice"
                 value={p.llcOwner}
                 empty="Add entity"
-                options={rows(ENTITY_NAMES, p.llcOwner)}
+                options={rows(entities, p.llcOwner)}
                 emptyLabel="Not set"
+                allowAdd
               />
             ),
           },
           {
             key: "attorney",
             empty: blank(p.attorney),
+            fold: true,
             node: <PropertyFact {...common} field="attorney" label="Attorney" kind="text" value={p.attorney} empty="Add attorney" />,
           },
           {
             key: "status",
             empty: blank(p.status),
+            fold: true,
             node: (
               <PropertyFact
                 {...common}
@@ -143,11 +152,11 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
               />
             ),
           },
-          { key: "showOnMoveInForm", empty: false, keep: true, node: <PropertyMoveInSwitch id={p.id} shown={p.showOnMoveInForm} /> },
+          { key: "showOnMoveInForm", empty: false, fold: true, node: <PropertyMoveInSwitch id={p.id} shown={p.showOnMoveInForm} /> },
           {
             key: "rentalRegistrationExpiry",
             empty: blank(p.rentalRegistrationExpiry),
-            keep: true,
+            fold: true,
             // Rail labels fit 96px on a phone on one line: shorter words, not a smaller font.
             node: (
               <PropertyKeyDate
@@ -164,7 +173,7 @@ export function PropertyDetailsSection({ property: p }: { property: EditableProp
           {
             key: "propertyTaxDueDate",
             empty: blank(p.propertyTaxDueDate),
-            keep: true,
+            fold: true,
             node: <PropertyKeyDate {...common} field="propertyTaxDueDate" label="Tax due" name="Tax due date" date={p.propertyTaxDueDate} addLabel="Add due date" leadDays={21} />,
           },
         ]}

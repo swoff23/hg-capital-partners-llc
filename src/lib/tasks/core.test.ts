@@ -514,7 +514,7 @@ test("status email lines: Approve and the contractor's Start have their own word
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "contractor" }, now), 'started "Cabinet install"');
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "staff" }, now), 'set "Cabinet install" to in progress');
   assert.equal(statusSummary({ ...base, from: "REVIEW", to: "IN_PROGRESS", actor: "staff", note: "Level it" }, now), 'sent "Cabinet install" back: Level it');
-  assert.equal(statusSummary({ ...base, from: "IN_PROGRESS", to: "REVIEW", actor: "contractor" }, now), 'marked "Cabinet install" done');
+  assert.equal(statusSummary({ ...base, from: "IN_PROGRESS", to: "REVIEW", actor: "contractor" }, now), 'sent "Cabinet install" for review');
   assert.equal(
     statusSummary({ ...base, from: "OPEN", to: "SCHEDULED", actor: "staff", scheduledFor: new Date("2026-10-29T00:00:00Z") }, now),
     'scheduled "Cabinet install" for Thu, Oct 29',
@@ -878,7 +878,7 @@ test("setStatus: Send back writes the status, then the note tied to it, and the 
   // One email line: the status, with the note's id so an edit or a delete reaches it. No second comment line.
   const items = queued(calls);
   assert.equal(items.length, 1);
-  assert.deepEqual(items[0], { kind: "STATUS", actorLabel: "Pieter Louw", summary: 'sent "Cabinet install" back: Level the uppers', at: items[0].at, eventId: "s1", noteEventId: "n1" });
+  assert.deepEqual(items[0], { kind: "STATUS", actorLabel: "Pieter Louw", summary: 'sent "Cabinet install" back: Level the uppers', at: items[0].at, eventId: "s1", noteEventId: "n1", from: "REVIEW" });
 });
 
 test("setStatus: a move with no note writes no comment and no note id", async () => {
@@ -914,7 +914,7 @@ test("setStatus: a contractor's Mark done posts the note and photos as a comment
   const items = queued(calls);
   assert.deepEqual(items.slice(0, 2).map((i) => [i.kind, i.summary, i.eventId]), [
     ["COMMENT", "added files (+2 files)", "n1"],
-    ["STATUS", 'marked "Fix steps" done', "s1"],
+    ["STATUS", 'sent "Fix steps" for review', "s1"],
   ]);
 });
 

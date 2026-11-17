@@ -188,6 +188,7 @@ export function AddRow({
   onClick,
   onIntent,
   disabled,
+  waiting,
   className,
 }: {
   children: React.ReactNode;
@@ -195,17 +196,25 @@ export function AddRow({
   /** Runs when the pointer reaches the row, it takes focus or it is pressed: warm what the click opens (lib/lazy-module.ts). */
   onIntent?: () => void;
   disabled?: boolean;
+  /** The sheet this row opens was tapped and its code is still arriving: the row takes `sheetWaitingFill`. */
+  waiting?: boolean;
   className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-busy={waiting || undefined}
       onPointerEnter={onIntent}
       onFocus={onIntent}
       onPointerDown={onIntent}
       disabled={disabled}
-      className={cn(addRowClass, className)}
+      className={cn(
+        addRowClass,
+        // The fill reaches 8px past the text, as a list row's does, and the divider above it steps aside while it shows.
+        waiting && cn(sheetWaitingFill, "-mx-2 rounded-md border-transparent px-2"),
+        className,
+      )}
     >
       <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 shrink-0 text-muted-foreground" />
       {children}
@@ -214,12 +223,10 @@ export function AddRow({
 }
 
 /* ---------------- Kbd ----------------
-   A printed shortcut: "Esc", "⌘K". Touch screens get the same actions as
-   visible buttons, so the keycap hides there. A shortcut prints inside the
-   button it triggers, at the trailing edge after the label ("Send ⌘↵",
-   "Cancel Esc"), and the button carries aria-keyshortcuts while the keys are
-   aria-hidden. On a secondary button the keys keep the keycap above. On a
-   primary (--primary) button, where a light keycap would glare, pass
+   A printed shortcut: "⌘K", a menu item's key. Touch screens get the same
+   actions as visible buttons, so the keycap hides there. Buttons don't print
+   their Esc or ⌘↵ keys; they only carry aria-keyshortcuts. For a keycap
+   inside a primary (--primary) button, where a light keycap would glare, pass
    tone="act": no ground and no edge, just the button's own --primary-foreground at 70%
    (8.5:1 on the ink and 6.9:1 on its hover in light; 6.3:1 and 5.6:1 in
    dark), set 2px further from the label. */
@@ -301,6 +308,23 @@ const pickerChipSizes: Record<PickerChipSize, string> = {
 export function pickerChipClass({ size = "row" }: { size?: PickerChipSize } = {}) {
   return cn(pickerChipBase, pickerChipSizes[size]);
 }
+
+/**
+ * A picker trigger that reads as the plain value until a mouse is on it: a
+ * cell in a dense list (the Tasks list's Assignee), where a chip on every row
+ * would be noise. With a mouse it takes the chip's --line-strong edge and
+ * --background fill, and holds them while its layer is open; on touch it
+ * stays plain and a tap opens it. Its 1px edge is transparent at rest, so the
+ * caller sizes it and pulls it out by that edge and padding, keeping the
+ * value where the plain text sat.
+ */
+export const pickerGhost = cn(
+  "relative inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap rounded-md border border-transparent text-meta text-muted-foreground",
+  // The hover look shows with a mouse only (hover: is under @media (hover: hover)).
+  "transition-colors hover:border-line-strong hover:bg-background hover:text-foreground",
+  "aria-expanded:border-line-strong aria-expanded:bg-background aria-expanded:text-foreground",
+  "disabled:opacity-50 data-disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
+);
 
 /**
  * A picker's trigger at field height, for a form where pickers share a grid
@@ -544,6 +568,8 @@ export function FormField({
   error,
   id: idProp,
   hideLabel = false,
+  reserveLine = false,
+  fitLine = false,
   className,
   children,
 }: {
@@ -564,6 +590,19 @@ export function FormField({
   id?: string;
   /** Keep the label for screen readers only (a field whose sheet title already names it). */
   hideLabel?: boolean;
+  /**
+   * Keep one line's space under the control while there is no line, so a
+   * line that comes and goes (a "Saves as" preview that shows on leaving the
+   * field) never moves what sits below it between a press and its release.
+   */
+  reserveLine?: boolean;
+  /**
+   * The line takes the field's width and adds nothing to a sheet that sizes to
+   * its content, for a line that appears between a press and its release (the
+   * address field's Saves as and archived lines), so it can't widen the sheet
+   * and move Create. Other lines still widen a content-sized sheet to show whole.
+   */
+  fitLine?: boolean;
   className?: string;
   children: (control: FormFieldControlProps) => React.ReactNode;
 }) {
@@ -585,8 +624,13 @@ export function FormField({
         ...(required ? { "aria-required": true as const } : {}),
       })}
       {line && (
-        <p id={lineId} className={cn("truncate text-meta", invalid ? "text-destructive" : "text-muted-foreground")}>
+        <p id={lineId} className={cn(fitLine && "w-0 min-w-full", "truncate text-meta", invalid ? "text-destructive" : "text-muted-foreground")}>
           {line}
+        </p>
+      )}
+      {!line && reserveLine && (
+        <p aria-hidden="true" className="text-meta">
+          &nbsp;
         </p>
       )}
     </div>
@@ -682,6 +726,14 @@ export function PageHeader({
  * row's hover fill (docs/specs/performance.md 4.6).
  */
 export const pendingRowFill = "has-[[data-link-pending]]:bg-muted";
+
+/**
+ * The same fill for a row that opens a sheet whose code is still downloading
+ * after the tap (lib/lazy-module.ts `loaded`): the tapped row, or `AddRow`
+ * with `waiting`. No spinner, no words, and nothing moves. The row's own
+ * text stays where it is, so a row that takes it carries `-mx-2 px-2` always.
+ */
+export const sheetWaitingFill = "bg-muted";
 
 /**
  * One cell of a table row that is itself a link to a record, so the whole row

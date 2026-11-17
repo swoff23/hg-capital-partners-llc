@@ -44,17 +44,24 @@ Connor's, as he made them on Nov 14.
 | Tablet 768 | One column, in the main column's order, then the rail's. The fact strip stays one row |
 | Phone 375 | The same order as tablet, so Tasks and lockbox codes sit right under the figures. The photo is 16:9 and the figures 2 by 2, as today |
 
-The header and the fact strip don't change.
+The fact strip doesn't change. The header changed on Nov 14 (see Header under the decisions below).
 
 ### 2.2 The facts rail
 
 ![Details with the Entity list open, Loan folded and opened, Insurance folded](property-page/02-rail.svg)
 
 - **Details** loses Closing costs, Rehab amount and Refi target, going from 16 rows to 12.
-- **Entity** opens the same picker Strategy uses, in a fixed order (the current pick no longer jumps to the top, which also steadies Strategy and Status): HG Capital Partners LLC, HG Buffalo Holding 1 LLC, HG Buffalo Holding 2 LLC, HG Buffalo Property Management LLC, BMK Property Group LLC, and "Not set". On a phone the picker is a titled sheet, as Strategy's is.
-- **Folding.** In Details, Loan and Insurance, a row with no value folds away. The last row of the section reads "7 more fields" with a chevron, and a tap opens the folded rows in place, in their usual order, ending with "Fewer fields". Rows stay 40px with a mouse and 48 on touch at every width, and nothing depends on hover.
-- **What never folds:** the reminder dates (Maturity, Renewal, Registration, Tax due), which stay in orange "+ Add" form because setting one creates its reminder task; switches (Escrow, Move-in form); and any field that has a value.
-- A field you fill counts as filled from then on, so it stays out of the fold after a reload. A field you clear stays visible until you leave the page, so it doesn't vanish under your finger.
+- **Entity** is a find-or-add picker (changed Nov 14, at Connor's ask): "Not set", HG Capital Partners LLC, HG Buffalo Holding 1 LLC and HG Buffalo Holding 2 LLC in that order, then every name added on any property, A to Z. A search sits on top, and typing a name that isn't there offers 'Add "…"', which saves it on this property and lists it on every other. HG Buffalo Property Management LLC and BMK Property Group LLC stay in QuickBooks but aren't offered; 58 Mariner keeps BMK as its own row. A QuickBooks company typed in another case saves in its own spelling, so Financials still finds it (`entityName`, `entityChoices` in `lib/properties/entity.ts`). On a phone the picker is a titled sheet. New property's Entity field works the same way.
+- **What shows, what folds (Nov 14, Connor's lists).** Each section shows its important rows always, empty ones as their "+ Add" verb, and folds the rest, filled or not:
+
+  | Section | Always shown | Folded |
+  |---|---|---|
+  | Details | Value, Purchase date, Purchase price, Refinance date, Beds, Baths, Square feet, Entity | Attorney, Status, Move-in form, Registration, Tax due |
+  | Loan | Maturity, Balance, Lender, Rate, Payment / mo | Servicer, Loan #, Loan type, Original loan, Escrow, Originated |
+  | Insurance | Renewal, Premium, Replacement | Carrier, Policy #, Coverage, Deductible, Liability |
+
+  Registration and Tax due used to never fold, since setting one creates its reminder task; Connor chose to fold them.
+- **Folding.** The last row of the section reads "5 more fields" with a chevron. A tap opens the folded rows under the shown ones, in their usual order, so the shown rows never move, and the row turns into "Fewer fields". While it's open the lower rows stay put, even one you fill. Rows stay 40px with a mouse and 48 on touch at every width, and nothing depends on hover. (`RailFold` still folds an empty row that is neither `keep` nor `fold`, for a future section; none of the three uses that now.)
 - Anything that asks for a folded field opens the fold first. The fact strip's "Add value" on a property with no value is one example.
 - The fold starts closed on every visit. It isn't remembered.
 
@@ -63,7 +70,7 @@ The header and the fact strip don't change.
 ![One CapEx section with building systems folded, and Rental listings only with a listing](property-page/03-capex-rentals.svg)
 
 - **CapEx** is one section titled "CapEx", with the forecast's year range on the right. The forecast is unchanged: total, past due, the year bars and the items table with its 5-year total.
-- Under it, "Building systems" is one row with the "3 of 10 dated" count and its meter. A tap opens the systems table in place. Every system row still opens its own sheet to edit. On a phone the table drops Type and Age, as today.
+- Under it, "Building systems" is one row with the "3 of 10 dated" count and its meter. A tap opens the systems table in place. Every system row still opens its own sheet to edit. On a phone the table drops Type and Age, as today; below 360 the Status column drops too and each row's status sits under its name (design call 17).
 - The separate "Building CapEx" section and its heading are gone.
 - The **Rental listings** section renders only when the property has at least one listing. Without one, the header's ⋯ menu gets "Add listing" above Copy link, which opens the same listing sheet as today. The item only appears when the property has units, matching today's disabled "Add listing".
 - Once a listing exists, the section is back below CapEx with its own "+ Add listing" row, as today.
@@ -84,7 +91,13 @@ The heading "Building CapEx" goes away. "5-year CapEx forecast" becomes "CapEx",
 
 - **58 Mariner Street.** A migration sets `Property.llcOwner` to `BMK Property Group LLC` where it holds the "50% BK" text. QuickBooks already maps both strings to the BMK entity (`QBO_ENTITY_SEED`, `llcOwnerNames`), so Financials doesn't move.
 - **The three removed fields.** The columns `refiTarget`, `closingCosts` and `rehabAmount` stay, with their values. `patchProperty` stops accepting writes to them, since nothing on screen can set them. In the local copy, Refi target is set on 3 properties ("-->HG1", "-->HG3"), and Closing costs and Rehab amount are empty on all 11.
-- **Entity values.** `patchProperty` accepts one of the five names, empty, or the value already stored (so a property nobody has touched is never refused).
+- **Strategy (removed Nov 14, at Connor's ask).** The Details row is gone, leaving 11 rows. The `strategy` column keeps its values and `patchProperty` stops accepting writes to it, the same as the three fields above.
+- **Header (Nov 14, Connor's ask).** The status line above the address is gone; Status lives in Details. The photo tile shows only once a photo is set; until then the ⋯ menu offers "Add photo", which opens the file picker, and a task photo can still be set as the property photo. The line under the address is what the building is: "6 beds · 2.5 baths · 2,880 sq ft · 2 units" (`buildingLine` in `lib/properties/figures.ts`), each part dropping out when it isn't set. Entity left that line; it is always shown in Details.
+- **Beds and baths (Nov 14).** New `Property.beds` (whole number) and `Property.baths` (Decimal(6,2), so 1.5 works) columns, migration `20261115160000_property_beds_baths`, for the whole building. Both are always-shown rows in Details, before Square feet.
+- **Unit equipment rows (Nov 14, Connor's ask).** Each row of a unit's Equipment table opens that one item in a small sheet (Type, Model #, Comments, Year installed), the way a Building systems row does: the same hover fill with a mouse, a click anywhere on the row, and a button on the type for the keyboard. A row tapped while the sheet's code is still downloading takes that fill until the sheet opens (`sheetWaitingFill`, design call L6). It saves the unit with that item changed, pinned to the version it opened at (`EquipmentSheet` in `unit-sheet.tsx`). Adding and removing equipment stay in the unit's sheet.
+- **Utility account numbers (Nov 14).** Always shown in full, wrapping inside their column when long; the reveal button is gone (`Code` no longer has `mask`).
+- **Square feet (Nov 14).** "Sq ft" reads "Square feet" in Details, its error lines and the listing sheet; the unit inside the number field stays "sq ft", and deals keep their "Sq ft" column.
+- **Entity values.** `patchProperty` and New property accept any name (Nov 14): empty clears it, a QuickBooks company is saved in its own spelling, and anything else is a new entity as typed.
 
 **Checked on production, read-only, before the build (Nov 14):** 12 properties; Closing costs and Rehab amount are empty on all of them, Refi target is set on 3, and every `llcOwner` is one of the five, empty (1), or the 58 Mariner text (1).
 

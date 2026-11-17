@@ -1,16 +1,16 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, CircleAlert, MapPin, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Code } from "@/components/code";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
-import { AddRow, Button, Section, Table, Td, Th, buttonClass } from "@/components/ui";
+import { AddRow, Button, Section, Table, Td, Th, buttonClass, sheetWaitingFill, textLinkClass } from "@/components/ui";
 import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
-import type { CapexRules, PropertyUnit, UnitUtilities } from "@/lib/property-types";
+import { lockboxIsShared, type CapexRules, type PropertyUnit, type UnitUtilities } from "@/lib/property-types";
 import {
   UTILITY_GROUPS,
   UTILITY_STATUS_FIELDS,
@@ -29,27 +29,19 @@ import { dueIn } from "@/lib/properties/capex";
 import { shortAddress } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import { deletePropertyUnit } from "../actions";
+import { LockboxPhotoViewer } from "./lockbox-photo-viewer";
 import { EquipmentStatusText, fmtAge, utilityToneClass } from "../capex-ui";
+import { onPropertyUnitRequest } from "./edit-field-event";
+import { MissingTitle, useUnitMissing } from "./missing-context";
 
 // The editor loads after the page has settled or at the first hover, focus or press, not with the page (lib/lazy-module.ts).
 const unitSheet = lazyModule(() => import("./unit-sheet"));
 
-/** The account-number fields, read as codes and masked to their last four. */
+/** The account-number fields, read as codes and shown in full. */
 export const isAccountField = (k: keyof UnitUtilities) => k.endsWith("Acct");
 
 /** What a unit goes by in a row or a dialog: its label, or its place in the list. */
 const unitName = (u: PropertyUnit, i: number) => u.label?.trim() || `Unit ${i + 1}`;
-
-/**
- * A stored lockbox value split into the code and its note: "4857 (back left
- * corner of the house)" is the code 4857 and where the box is. The code is
- * read and copied character by character, so the note never shares its token.
- */
-function splitLockbox(value: string): { code: string; note: string | null } {
-  const m = /^(.*?)\s*\((.+)\)\s*$/.exec(value.trim());
-  if (!m || !m[1]) return { code: value.trim(), note: null };
-  return { code: m[1], note: m[2].trim() || null };
-}
 
 const THIS_YEAR = new Date().getFullYear();
 
@@ -66,6 +58,8 @@ function dueNote(type: string, installYear: string | null | undefined, rules: Ca
 type Sheet = { unitId: string | null; at: number | null; opened: PropertyUnit | null; version: string; id: number };
 /** The unit a Delete confirm is about, by id and place as the sheet finds its unit, so a refresh can't move it onto another. */
 type Removing = { unitId: string | null; at: number; label: string | null | undefined; name: string; title: string; body: string };
+/** The equipment sheet that is up: its unit (found by id, as the unit sheet's is), the item's place, the version it opened at, a fresh `id` per open. */
+type ItemSheet = { unitId: string | null; at: number; label: string | null | undefined; index: number; version: string; id: number };
 
 /**
  * The property's units, one row each (docs/brand-guidelines.md, section 9
@@ -73,7 +67,8 @@ type Removing = { unitId: string | null; at: number; label: string | null | unde
  * menu, so the count shown on the record is always the rows here. A unit's
  * name, or "Edit unit" in its menu, opens it in a sheet (forms 4.2): its name
  * and lockbox, its utilities and its equipment, saved as that one unit at the
- * version the sheet opened at. Adding a unit opens an empty one.
+ * version the sheet opened at. Adding a unit opens an empty one. An equipment
+ * row opens that one item in a small sheet, as a building system's row does.
  */
 export function UnitsSection({
   propertyId,
@@ -97,12 +92,16 @@ export function UnitsSection({
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [removing, setRemoving] = useState<Removing | null>(null);
+  const [item, setItem] = useState<ItemSheet | null>(null);
+  const [itemOpen, setItemOpen] = useState(false);
   const run = useRun();
   // The code is usually here before the first tap; when it can't be fetched the sheet closes with a toast whose Reload
   // brings it back, whatever the cause (lib/lazy-module.ts).
-  const editor = useLazyModule(unitSheet, sheet !== null, () => {
+  const editor = useLazyModule(unitSheet, sheet !== null || item !== null, () => {
     setSheet(null);
     setIsOpen(false);
+    setItem(null);
+    setItemOpen(false);
     run.toast(openFailedToast());
   });
   useEffect(() => warmWhenIdle(unitSheet), []);
@@ -116,6 +115,30 @@ export function UnitsSection({
     const opened = index == null ? null : (initial[index] ?? null);
     setSheet({ unitId: opened?.id ?? null, at: opened ? index : null, opened, version, id: (sheet?.id ?? 0) + 1 });
     setIsOpen(true);
+  }
+
+  // Missing info opens a unit's sheet: a row on this page asks by event, one on the worklist links here with ?unit=.
+  useEffect(() => {
+    const openById = (unitId: string) => {
+      const i = initial.findIndex((u) => u.id === unitId);
+      if (i >= 0) openUnit(i);
+    };
+    const url = new URL(window.location.href);
+    const asked = url.searchParams.get("unit");
+    if (asked) {
+      url.searchParams.delete("unit");
+      window.history.replaceState(window.history.state, "", url);
+      openById(asked);
+    }
+    return onPropertyUnitRequest(openById);
+    // The listener reads the list it was set up with; a newer render sets it up again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
+
+  function openEquipment(i: number, index: number) {
+    const unit = initial[i];
+    setItem({ unitId: unit?.id ?? null, at: i, label: unit?.label, index, version, id: (item?.id ?? 0) + 1 });
+    setItemOpen(true);
   }
 
   /**
@@ -155,9 +178,16 @@ export function UnitsSection({
   // Found by id (unit-sheet.ts sheetUnitAt), so a unit added or deleted elsewhere never moves the sheet onto another one.
   const editingAt = sheet ? sheetUnitAt(initial, { unitId: sheet.unitId, at: sheet.at, label: sheet.opened?.label }) : -1;
   const editing = editingAt >= 0 ? initial[editingAt] : undefined;
+  // Tapped and its code is still on the way: that row (or Add unit) takes the fill a tapped list row takes. Read from
+  // the shared store, not the hook, which only notices code that came in while idle one render after the tap.
+  const waitingFor = sheet !== null && !editor && unitSheet.loaded() === null ? sheet : null;
+  // The same for an equipment row, whose sheet comes in the same chunk.
+  const waitingItem = item !== null && !editor && unitSheet.loaded() === null ? item : null;
+  const itemAt = item ? sheetUnitAt(initial, { unitId: item.unitId, at: item.at, label: item.label }) : -1;
+  const itemUnit = itemAt >= 0 ? initial[itemAt] : undefined;
 
   return (
-    <Section title="Units & access">
+    <Section title={<MissingTitle section="units">Units &amp; access</MissingTitle>}>
       {rentable.length === 0 ? (
         <p className="pb-2 text-body text-muted-foreground">Add each unit to keep its lockbox code, utilities and equipment here.</p>
       ) : (
@@ -165,16 +195,20 @@ export function UnitsSection({
           {rentable.map(({ u, i }) => (
             <ReadUnit
               key={u.id ?? i}
+              propertyId={propertyId}
               unit={u}
               name={unitName(u, i)}
               rules={rules}
+              waiting={waitingFor !== null && waitingFor.at === i}
+              waitingItem={waitingItem !== null && waitingItem.at === i ? waitingItem.index : null}
               onEdit={() => openUnit(i)}
+              onEditEquipment={(j) => openEquipment(i, j)}
               onDelete={() => askDelete(i)}
             />
           ))}
         </ul>
       )}
-      <AddRow onClick={() => openUnit(null)} onIntent={unitSheet.warm}>
+      <AddRow onClick={() => openUnit(null)} onIntent={unitSheet.warm} waiting={waitingFor !== null && waitingFor.at === null}>
         Add unit
       </AddRow>
       {/* The building's own meters aren't units, so they sit under the counted list, apart from it. */}
@@ -185,10 +219,14 @@ export function UnitsSection({
             {meters.map(({ u, i }) => (
               <ReadUnit
                 key={u.id ?? i}
+                propertyId={propertyId}
                 unit={u}
                 name={unitName(u, i)}
                 rules={rules}
+                waiting={waitingFor !== null && waitingFor.at === i}
+                waitingItem={waitingItem !== null && waitingItem.at === i ? waitingItem.index : null}
                 onEdit={() => openUnit(i)}
+                onEditEquipment={(j) => openEquipment(i, j)}
                 onDelete={() => askDelete(i)}
               />
             ))}
@@ -202,13 +240,32 @@ export function UnitsSection({
           propertyId={propertyId}
           version={sheet.version}
           latest={version}
-          unit={editing ?? sheet.opened ?? blankUnit()}
+          unit={editing ?? sheet.opened ?? blankUnit(initial)}
+          others={rentable
+            .filter(({ i }) => i !== editingAt)
+            .map(({ u, i }) => ({ name: unitName(u, i), code: u.lockboxCode?.trim() ?? "" }))}
           isNew={sheet.opened === null}
           gone={sheet.opened !== null && !editing}
           title={editing ? unitName(editing, editingAt) : sheet.opened?.label?.trim() || "New unit"}
           rules={rules}
           isOpen={isOpen}
           onOpenChange={setIsOpen}
+        />
+      )}
+
+      {item && editor && (
+        <editor.EquipmentSheet
+          key={item.id}
+          propertyId={propertyId}
+          version={item.version}
+          latest={version}
+          unit={itemUnit ?? blankUnit()}
+          unitName={itemUnit ? unitName(itemUnit, itemAt) : item.label?.trim() || "Unit"}
+          index={item.index}
+          gone={!itemUnit?.equipment?.[item.index]}
+          rules={rules}
+          isOpen={itemOpen}
+          onOpenChange={setItemOpen}
         />
       )}
 
@@ -274,22 +331,38 @@ function Disclosure({ title, children }: { title: string; children: ReactNode })
 }
 
 function ReadUnit({
+  propertyId,
   unit: u,
   name,
   rules,
+  waiting,
+  waitingItem,
   onEdit,
+  onEditEquipment,
   onDelete,
 }: {
+  propertyId: string;
   unit: PropertyUnit;
   name: string;
   rules: CapexRules;
+  /** Its sheet was tapped and the code is still arriving: the name takes `sheetWaitingFill`. */
+  waiting: boolean;
+  /** The equipment row whose sheet was tapped while the code is still arriving, by its place; it takes `sheetWaitingFill`. */
+  waitingItem: number | null;
   onEdit: () => void;
+  /** Opens one equipment item, by its place in the unit's list. */
+  onEditEquipment: (index: number) => void;
   onDelete: () => void;
 }) {
   const hasUtilities = UTILITY_GROUPS.some((g) => g.fields.some(([k]) => u.utilities?.[k]));
   const equipment = u.equipment ?? [];
-  const lockbox = u.lockboxCode?.trim() ? splitLockbox(u.lockboxCode) : null;
+  const code = u.lockboxCode?.trim() || null;
+  const location = u.lockboxLocation?.trim() || null;
+  const photo = u.lockboxPhoto?.pathname ? u.lockboxPhoto : null;
+  const [viewing, setViewing] = useState(false);
   const datedCount = equipment.filter((e) => parseInstallYear(e.installYear) != null).length;
+  // Its required blanks (Missing info, docs/specs/missing-info.md D2), in the row's one status spot.
+  const missing = useUnitMissing(u.id);
   return (
     <li className="py-1.5">
       <div className="flex min-h-8 items-center gap-3">
@@ -299,24 +372,59 @@ function ReadUnit({
           onClick={onEdit}
           {...warmOnIntent(unitSheet)}
           aria-label={`Edit ${name}`}
-          className="min-w-0 flex-1 truncate rounded-md text-left text-body text-foreground pointer-coarse:min-h-11 pointer-fine:hover:underline pointer-fine:underline-offset-3"
+          aria-busy={waiting || undefined}
+          className={cn(
+            "-mx-2 min-w-0 flex-1 truncate rounded-md px-2 text-left text-body text-foreground transition-colors pointer-coarse:min-h-11 pointer-fine:hover:underline pointer-fine:underline-offset-3",
+            waiting && sheetWaitingFill,
+          )}
         >
           {name}
         </button>
-        {lockbox && (
+        {missing > 0 && (
+          <span className="flex shrink-0 items-center gap-1 text-meta text-warn" aria-label={`${missing} missing`}>
+            <CircleAlert aria-hidden="true" strokeWidth={2} className="size-3.5 pointer-coarse:size-4" />
+            <span aria-hidden="true" className="max-[480px]:hidden">
+              {missing} missing
+            </span>
+          </span>
+        )}
+        {code && (
           <span className="flex shrink-0 items-center gap-1.5">
             <span className="text-meta text-muted-foreground max-[480px]:hidden">Lockbox</span>
-            <Code value={lockbox.code} label="Lockbox code" />
+            <Code value={code} label="Lockbox code" />
           </span>
         )}
         <UnitMenu name={name} onEdit={onEdit} onDelete={onDelete} />
       </div>
-      {/* Where the box is: its own line, so a long note never pushes the code or the menu off screen. */}
-      {lockbox?.note && (
-        <p title={lockbox.note} className="-mt-1 truncate pb-1 text-meta text-muted-foreground">
-          Lockbox at {lockbox.note}
+      {/* Where the box is, then its photo (docs/specs/lockbox-location.md, decision 3): its own line, so a long
+          location never pushes the code or the menu off screen. The location truncates; Photo never does. */}
+      {(location || photo) && (
+        <p className="-mt-1 flex min-w-0 items-center gap-1 pb-1 text-meta text-muted-foreground">
+          {location && (
+            <>
+              <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+              <span title={location} className="min-w-0 truncate">
+                {location}
+              </span>
+            </>
+          )}
+          {photo && (
+            <>
+              {location && <span aria-hidden="true">·</span>}
+              <button
+                type="button"
+                onClick={() => setViewing(true)}
+                aria-label={`Open lockbox photo for ${name}`}
+                // TextLink's look: a link in a line of muted text carries its underline. A 44px hit area on touch.
+                className={cn(textLinkClass, "relative shrink-0 whitespace-nowrap pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-3")}
+              >
+                {location ? "Photo" : "Lockbox photo"}
+              </button>
+            </>
+          )}
         </p>
       )}
+      {photo && <LockboxPhotoViewer propertyId={propertyId} photo={photo} location={location} isOpen={viewing} onOpenChange={setViewing} />}
       {hasUtilities && (
         <Disclosure title="Utilities">
           <div className="@container">
@@ -325,16 +433,19 @@ function ReadUnit({
                 const rows = g.fields.filter(([k]) => u.utilities?.[k]);
                 if (rows.length === 0) return null;
                 return (
-                  <div key={g.name}>
+                  <div key={g.name} className="min-w-0">
                     <p className="mb-1 text-meta font-medium text-foreground">{g.name}</p>
                     <dl className="space-y-1">
                       {rows.map(([k, label]) => {
                         const v = u.utilities![k]!;
                         return (
-                          <div key={k} className="flex min-h-6 items-center justify-between gap-2 text-meta">
-                            <dt className="text-muted-foreground">{label}</dt>
+                          // Baseline, so a long account number that wraps keeps its label on its first line.
+                          <div key={k} className="flex min-h-6 items-baseline justify-between gap-2 text-meta">
+                            {/* The label never gives way to the value: "Acct #" stays on one line and a long number wraps inside its own column. */}
+                            <dt className="shrink-0 whitespace-nowrap text-muted-foreground">{label}</dt>
                             <dd className={cn("min-w-0", UTILITY_STATUS_FIELDS.has(k) ? utilityToneClass(utilityStatusTone(v)) : "text-foreground")}>
-                              {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} mask /> : v}
+                              {/* Shown in full and wrapped in its column: imported ones hold several numbers and notes. */}
+                              {isAccountField(k) ? <Code value={v} label={`${g.name} account number`} wrap className="min-w-0" /> : v}
                             </dd>
                           </div>
                         );
@@ -375,8 +486,19 @@ function ReadUnit({
                 const cost = equipmentReplacementCost(e.type, rules);
                 const due = status === "Monitor" || status === "Replace" ? dueNote(e.type, e.installYear, rules) : null;
                 return (
-                  <tr key={j}>
-                    <Td className="pl-0 text-fg-2">{e.type}</Td>
+                  // The row opens the item with a click, as a building system's does; the button is the keyboard's way in.
+                  <tr
+                    key={j}
+                    onClick={() => onEditEquipment(j)}
+                    onPointerEnter={unitSheet.warm}
+                    aria-busy={j === waitingItem || undefined}
+                    className={cn("transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-muted", j === waitingItem && sheetWaitingFill)}
+                  >
+                    <Td className="pl-0 text-fg-2">
+                      <button type="button" aria-label={`Edit ${e.type || `equipment ${j + 1}`}`} onFocus={unitSheet.warm} className="text-left">
+                        {e.type || <span className="text-muted-foreground">—</span>}
+                      </button>
+                    </Td>
                     <Td className="text-foreground">{e.model || <span className="text-muted-foreground">—</span>}</Td>
                     <Td className="min-w-40 text-fg-2">{e.comment || <span className="text-muted-foreground">—</span>}</Td>
                     <Td className="num">{e.installYear || <span className="text-muted-foreground">—</span>}</Td>
@@ -404,6 +526,17 @@ function ReadUnit({
 }
 
 
-function blankUnit(): PropertyUnit {
-  return { label: "", lockboxCode: "", utilities: {}, equipment: [] };
+/** A new unit's sheet. With "Same lockbox for all units" on, it opens with the shared lockbox and the box ticked. */
+function blankUnit(units: readonly PropertyUnit[] = []): PropertyUnit {
+  const shared = lockboxIsShared(units) ? units.find((u) => u.lockboxShared) : undefined;
+  if (!shared) return { label: "", lockboxCode: "", utilities: {}, equipment: [] };
+  return {
+    label: "",
+    lockboxCode: shared.lockboxCode ?? "",
+    lockboxLocation: shared.lockboxLocation ?? null,
+    lockboxPhoto: shared.lockboxPhoto ?? null,
+    lockboxShared: true,
+    utilities: {},
+    equipment: [],
+  };
 }

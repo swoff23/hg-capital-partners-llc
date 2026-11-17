@@ -2,8 +2,9 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { BlobNotFoundError, del, head, type HeadBlobResult } from "@vercel/blob";
 import { prisma } from "@/lib/db";
-import { storeIdFromToken } from "@/lib/attachments/paths";
-import { getEnv } from "@/lib/env";
+import { blobToken, noStoreMessage, type BlobAccess } from "@/lib/attachments/blob-stores";
+import { isPrivateStoreUrl, storeIdFromToken } from "@/lib/attachments/paths";
+import { lockboxPhotoPaths, parseUnits, type LockboxPhoto } from "@/lib/property-types";
 import { logError } from "@/lib/log";
 
 /**
@@ -45,15 +46,37 @@ export function isPropertyPhotoPath(propertyId: string, pathname: string): boole
   return /^[A-Za-z0-9._-]{1,200}$/.test(name) && /[A-Za-z0-9]/.test(name);
 }
 
+/**
+ * The folder a unit's lockbox photo uploads to (docs/specs/lockbox-location.md),
+ * in the private store; its thumbnail goes to the `thumb/` folder inside it.
+ */
+export function lockboxPhotoFolder(propertyId: string): string {
+  return `properties/${propertyId}/lockbox/`;
+}
+
+/** A lockbox photo's or thumbnail's pathname as Blob keeps it, inside this property's lockbox folder and nowhere else. */
+export function isLockboxPhotoPath(propertyId: string, pathname: string): boolean {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(propertyId) || typeof pathname !== "string") return false;
+  const prefix = lockboxPhotoFolder(propertyId);
+  if (!pathname.startsWith(prefix)) return false;
+  const rest = pathname.slice(prefix.length);
+  const name = rest.startsWith("thumb/") ? rest.slice("thumb/".length) : rest;
+  return /^[A-Za-z0-9._-]{1,200}$/.test(name) && /[A-Za-z0-9]/.test(name);
+}
+
 /** A stored photo: where it is, and the pathname that deletes it. */
 export type PhotoRef = { url: string; pathname: string };
 
 type BlobAuth = { token: string; storeId: string };
 
-function blobAuth(): BlobAuth {
-  const token = getEnv().BLOB_READ_WRITE_TOKEN;
+/**
+ * A store's token and id (blob-stores.ts): the listing and front photos are in the public store, a lockbox photo in
+ * the private one. Neither looks in the other.
+ */
+function blobAuth(access: BlobAccess): BlobAuth {
+  const token = blobToken(access);
   const storeId = storeIdFromToken(token);
-  if (!token || !storeId) throw new Error("File uploads need a Blob store, and none is connected yet.");
+  if (!token || !storeId) throw new Error(noStoreMessage(access));
   return { token, storeId };
 }
 
@@ -79,7 +102,7 @@ async function headOf(pathname: string, auth: BlobAuth): Promise<HeadBlobResult 
 
 /** Best effort: a file already gone, or no token, isn't an error. */
 async function deleteBlobs(targets: readonly string[], auth?: BlobAuth): Promise<void> {
-  const token = auth?.token ?? getEnv().BLOB_READ_WRITE_TOKEN;
+  const token = auth?.token ?? blobToken("public");
   if (!token || targets.length === 0) return;
   try {
     await del([...targets], { token });
@@ -137,7 +160,7 @@ export async function setPropertyPhoto(
   spare: readonly string[] = [],
 ): Promise<{ previous: PhotoRef | null; current: PhotoRef }> {
   if (!isPropertyPhotoPath(propertyId, pathname)) throw new Error("That photo isn't in this property's folder.");
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   const previous = await currentPhoto(propertyId);
   // The front photo keeps no thumbnail: whatever the browser made beside it goes.
   if (spare.length > 0) await discardListingUploads(propertyId, spare);
@@ -162,7 +185,7 @@ export async function removePropertyPhoto(propertyId: string): Promise<{ previou
  */
 export async function restorePropertyPhoto(propertyId: string, pathname: string): Promise<{ displaced: PhotoRef | null; current: PhotoRef }> {
   if (!isPropertyPhotoPath(propertyId, pathname)) throw new Error("That photo isn't in this property's folder.");
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   const blob = await headOf(pathname, auth);
   if (!blob || !isPublicStoreUrl(blob.url, auth.storeId)) throw new Error("That photo is gone, so it can't be put back.");
   const displaced = await currentPhoto(propertyId);
@@ -192,7 +215,7 @@ export async function discardPropertyPhoto(propertyId: string, pathname: string)
 export async function recordListingPhoto(propertyId: string, pathname: string, spare: readonly string[] = []): Promise<PhotoRef> {
   const exists = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } });
   if (!exists) throw new Error("This property is gone.");
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   // A listing keeps neither a thumbnail nor a poster: whatever the browser made beside it goes.
   if (spare.length > 0) await discardListingUploads(propertyId, spare);
   return verifiedPhoto(pathname, auth);
@@ -209,7 +232,7 @@ export async function discardListingUploads(propertyId: string, pathnames: reado
   if (unique.length === 0) return { deleted: 0 };
   const owner = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } });
   if (!owner) return { deleted: 0 };
-  const auth = blobAuth();
+  const auth = blobAuth("public");
   const [listed, shown] = await Promise.all([
     prisma.listingPhoto.findMany({ where: { pathname: { in: unique } }, select: { pathname: true } }),
     prisma.property.findMany({ where: { photoPathname: { in: unique } }, select: { photoPathname: true } }),
@@ -220,6 +243,79 @@ export async function discardListingUploads(propertyId: string, pathnames: reado
   for (const pathname of unique.filter((p) => !used.has(p))) {
     const blob = await headOf(pathname, auth);
     if (blob && blob.pathname === pathname && isPublicStoreUrl(blob.url, auth.storeId)) found.push(blob.url);
+  }
+  await deleteBlobs(found, auth);
+  return { deleted: found.length };
+}
+
+/* ---------------- Lockbox photos (docs/specs/lockbox-location.md) ---------------- */
+
+/** Whether `url` is Blob's own address for `pathname` in our private store. */
+function inPrivateStore(blob: HeadBlobResult, pathname: string, auth: BlobAuth): boolean {
+  return blob.pathname === pathname && isPrivateStoreUrl(blob.url, auth.storeId, pathname);
+}
+
+/**
+ * A lockbox photo the unit sheet just uploaded: checked against Blob (our
+ * private store, this property's lockbox folder, an image of an allowed
+ * type, 25 MB at most) and given back as the unit will store it. Nothing is
+ * written here; the unit's Save stores it (properties/service.ts). A
+ * thumbnail that doesn't check out is dropped and deleted: the photo still
+ * shows, from the original.
+ */
+export async function recordLockboxPhoto(
+  propertyId: string,
+  file: { pathname: string; thumbPathname?: string | null; width?: number | null; height?: number | null },
+  spare: readonly string[] = [],
+): Promise<LockboxPhoto> {
+  const exists = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } });
+  if (!exists) throw new Error("This property is gone.");
+  if (!isLockboxPhotoPath(propertyId, file.pathname)) throw new Error("That photo isn't in this property's lockbox folder.");
+  const auth = blobAuth("private");
+  // A photo keeps no poster: whatever the browser made beside it goes.
+  if (spare.length > 0) await discardLockboxUploads(propertyId, spare);
+  const checked = async (pathname: string): Promise<string | null> => {
+    const blob = await headOf(pathname, auth);
+    if (!blob) return "That upload didn't finish. Try again.";
+    if (!inPrivateStore(blob, pathname, auth)) return "That photo isn't in our storage.";
+    const type = blob.contentType.split(";")[0].trim().toLowerCase();
+    if (!PHOTO_TYPES.includes(type) || blob.size > PHOTO_MAX_BYTES) {
+      await deleteBlobs([blob.url], auth);
+      return PHOTO_TYPES.includes(type) ? "That photo is over the 25 MB limit." : "That type of file can't be a photo.";
+    }
+    return null;
+  };
+  const problem = await checked(file.pathname);
+  if (problem) throw new Error(problem);
+  let thumb = file.thumbPathname && isLockboxPhotoPath(propertyId, file.thumbPathname) ? file.thumbPathname : null;
+  if (thumb && (await checked(thumb))) {
+    await discardLockboxUploads(propertyId, [thumb]);
+    thumb = null;
+  }
+  const size = (n: number | null | undefined) => (typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.round(n) : null);
+  return { pathname: file.pathname, thumbPathname: thumb, width: size(file.width), height: size(file.height) };
+}
+
+/**
+ * Deletes lockbox photos and thumbnails nothing points at: an upload the unit
+ * sheet dropped (Discard, Cancel, X, Esc, Replace before Save), or one a Save
+ * replaced or removed. Skips any file a unit of this property still uses, any
+ * path outside its lockbox folder, and anything not in our private store.
+ */
+export async function discardLockboxUploads(propertyId: string, pathnames: readonly string[]): Promise<{ deleted: number }> {
+  const unique = [...new Set(pathnames.filter((p) => typeof p === "string" && isLockboxPhotoPath(propertyId, p)))];
+  if (unique.length === 0) return { deleted: 0 };
+  const row = await prisma.property.findUnique({ where: { id: propertyId }, select: { units: true } });
+  if (!row) return { deleted: 0 };
+  const used = lockboxPhotoPaths(parseUnits(row.units));
+  const token = blobToken("private");
+  const storeId = storeIdFromToken(token);
+  if (!token || !storeId) return { deleted: 0 };
+  const auth = { token, storeId };
+  const found: string[] = [];
+  for (const pathname of unique.filter((p) => !used.has(p))) {
+    const blob = await headOf(pathname, auth);
+    if (blob && inPrivateStore(blob, pathname, auth)) found.push(blob.url);
   }
   await deleteBlobs(found, auth);
   return { deleted: found.length };

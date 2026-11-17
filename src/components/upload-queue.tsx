@@ -8,6 +8,7 @@ import { useLeaveWarning } from "@/components/use-leave-warning";
 import { NO_COUNTS, UploadEngine, type EngineDeps, type EngineNotice } from "@/lib/attachments/engine";
 import { idbOutbox } from "@/lib/attachments/outbox";
 import { lazyTransfer } from "@/lib/attachments/lazy-transfer";
+import { reportClientError } from "@/lib/client-errors";
 import { reloadPage, warmWhenIdle } from "@/lib/lazy-module";
 import type { FileKind } from "@/lib/attachments/content-types";
 import type { UploadKind } from "@/lib/attachments/upload-kinds";
@@ -70,7 +71,8 @@ export type UploadTarget = {
   maxFilesReason?: string;
   /**
    * The toast when a Retry finds no room past `maxFiles`, one line at 320 (TOAST_PHONE_CHARS): a contractor's update
-   * says "Send up to 50 at a time.". Without it the toast is the reason as a sentence ("No more can be added here.").
+   * says "Send these 50, then Retry." ("Close this and Send first." while the Mark done sheet
+   * is open). Without it the toast is the reason as a sentence ("No more can be added here.").
    */
   maxFilesNotice?: string;
   /** "display" re-encodes a photo to a 2560px JPEG with no metadata before it goes up; "original" sends it as picked. */
@@ -114,6 +116,8 @@ export type UploadCounts = {
   paused: number;
   /** Refused or out of retries: each waits for a Retry or a Remove. */
   failed: number;
+  /** Of `failed`, the files the job refused for good (final: closed, or too late): no Retry changes it, so a My jobs row says "not added". */
+  refused: number;
   /**
    * Of `pending`, the files whose bytes are up and wait for their page to record them: a reload or a new sign-in put
    * them back before that page opened (engine needsRecord). Nothing moves until it does, so a My jobs row says so.
@@ -300,6 +304,7 @@ export function browserDeps(parts: {
     notify: parts.notify,
     navigate: parts.navigate,
     reload: reloadPage,
+    report: (error) => reportClientError(error, "upload"),
     online: () => typeof navigator === "undefined" || navigator.onLine !== false,
     now: () => new Date(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
@@ -368,6 +373,7 @@ export function UploadQueueProvider({ children, scope, onWake }: { children: Rea
       notify: (n) =>
         toast({
           message: n.message,
+          detail: n.detail,
           key: n.key,
           action: n.action && { label: n.action.label, onAction: n.action.run },
         }),
