@@ -144,7 +144,7 @@ The line under a staff update picks the first that applies:
 
 Two lines elsewhere promised an email that this change can now withhold, so the build corrected them. Neither was in the plan above, and both are Connor's to reword.
 
-- **The comment box on a task.** Its audience line reads "Zack sees this and gets an email" when one goes. For a contractor who is quiet or switched off it reads "Zack won't get an email" (Connor, Nov 14: say the rarer case, when no email will go). The line under the sent comment says why.
+- **The comment box on a task.** It says nothing about who sees a Shared reply unless the contractor's Job emails switch is off, when a warning strip reads "Zack does not receive email notifications. Remember to call or text them any updates." ("Zack does not receive emails" on a phone; Connor, Nov 14: say the rarer case; Nov 16: drop the "sees this" line and use Connor's words for the strip). The line under the sent comment says why.
 - **The contractor's Mark done screen.** It read "Sent to Connor and Pieter. You'll get an email if anything else is needed." For a contractor whose switch is off it now reads "Sent to Connor and Pieter. Check back here if anything else is needed."
 
 The rule lives in one place, `src/lib/portal/job-emails.ts`, and every reader calls it: the queue, the send run, the task page and the portal's job page.
