@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "find src -name '*.test.ts' -print0 | xargs -0 tsx --test",
+    "test": "tsx --test 'src/**/*.test.ts'",
     "test:devices": "playwright test",
     "test:devices:known": "UPDATE_KNOWN_ISSUES=1 playwright test",
     "test:devices:dark": "DEVICES_SCHEME=dark playwright test",
