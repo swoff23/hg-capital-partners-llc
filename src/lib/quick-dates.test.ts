@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDaysYmd, mondayPick, quickPickForKey, quickPicks, weekdayOf } from "./quick-dates";
+import { addDaysYmd, fridayPick, mondayPick, quickPickForKey, quickPicks, weekdayOf } from "./quick-dates";
 
-// 2026-10-22 is a Thursday.
+// 2026-10-18 is a Sunday; 2026-10-22 a Thursday; 2026-11-17 a Tuesday.
 
 test("addDaysYmd: crosses months, years and leap days; refuses junk", () => {
   assert.equal(addDaysYmd("2026-10-22", 1), "2026-10-23");
@@ -26,6 +26,15 @@ test("weekdayOf: 0 is Sunday", () => {
   assert.equal(weekdayOf("2026-10-26"), 1);
 });
 
+test("fridayPick: the first Friday after today; the coming week's on a weekend", () => {
+  assert.equal(fridayPick("2026-10-19"), "2026-10-23"); // Mon
+  assert.equal(fridayPick("2026-10-21"), "2026-10-23"); // Wed
+  assert.equal(fridayPick("2026-10-22"), "2026-10-23"); // Thu: tomorrow (the pick hides)
+  assert.equal(fridayPick("2026-10-23"), "2026-10-30"); // Fri: never today (the pick hides)
+  assert.equal(fridayPick("2026-10-24"), "2026-10-30"); // Sat
+  assert.equal(fridayPick("2026-10-25"), "2026-10-30"); // Sun
+});
+
 test("mondayPick: the next Monday; a week out on a Monday; skips tomorrow on a Sunday", () => {
   assert.equal(mondayPick("2026-10-22"), "2026-10-26"); // Thu
   assert.equal(mondayPick("2026-10-24"), "2026-10-26"); // Sat
@@ -34,39 +43,82 @@ test("mondayPick: the next Monday; a week out on a Monday; skips tomorrow on a S
   assert.equal(mondayPick("2026-10-25"), "2026-11-02"); // Sun: tomorrow is already "Tomorrow"
 });
 
-test("quickPicks: five picks in order with their resolved hints and fixed numbers", () => {
-  const picks = quickPicks("2026-10-22");
+test("quickPicks: seven picks in order with their resolved hints and fixed numbers", () => {
+  const picks = quickPicks("2026-11-17"); // a Tuesday
   assert.deepEqual(
     picks.map((p) => [p.key, p.number, p.label, p.value, p.hint]),
     [
-      ["today", 1, "Today", "2026-10-22", "Thu"],
-      ["tomorrow", 2, "Tomorrow", "2026-10-23", "Fri"],
-      ["monday", 3, "Monday", "2026-10-26", "Oct 26"],
-      ["next-week", 4, "Next week", "2026-10-29", "Thu, Oct 29"],
-      ["none", 5, "No date", null, ""],
+      ["today", 1, "Today", "2026-11-17", "Tue"],
+      ["tomorrow", 2, "Tomorrow", "2026-11-18", "Wed"],
+      ["friday", 3, "Friday", "2026-11-20", "Nov 20"],
+      ["next-monday", 4, "Next Monday", "2026-11-23", "Nov 23"],
+      ["week", 5, "In 1 week", "2026-11-24", "Tue, Nov 24"],
+      ["two-weeks", 6, "In 2 weeks", "2026-12-01", "Tue, Dec 1"],
+      ["none", 7, "No date", null, ""],
     ],
   );
 });
 
-test("quickPicks: Monday hides on a Monday, since it lands on the same day as Next week", () => {
-  const picks = quickPicks("2026-10-26"); // a Monday
-  assert.deepEqual(picks.map((p) => p.key), ["today", "tomorrow", "next-week", "none"]);
-  assert.equal(picks.find((p) => p.key === "next-week")!.value, "2026-11-02");
-  // The numbers stay with their picks: 3 is skipped, 4 is still Next week.
-  assert.deepEqual(picks.map((p) => p.number), [1, 2, 4, 5]);
+test("quickPicks: Friday hides on a Thursday (it's Tomorrow) and on a Friday (it's In 1 week)", () => {
+  const thu = quickPicks("2026-10-22");
+  assert.deepEqual(thu.map((p) => p.key), ["today", "tomorrow", "next-monday", "week", "two-weeks", "none"]);
+  // The numbers stay with their picks: 3 is skipped, 4 is still Next Monday.
+  assert.deepEqual(thu.map((p) => p.number), [1, 2, 4, 5, 6, 7]);
+  const fri = quickPicks("2026-10-23");
+  assert.deepEqual(fri.map((p) => p.key), ["today", "tomorrow", "next-monday", "week", "two-weeks", "none"]);
+  assert.equal(fri.find((p) => p.key === "week")!.value, "2026-10-30");
 });
 
-test("quickPicks: Monday shows every other day of the week, and never duplicates another pick's date", () => {
+test("quickPicks: Next Monday hides on a Monday, since it lands on the same day as In 1 week", () => {
+  const picks = quickPicks("2026-10-26"); // a Monday
+  assert.deepEqual(picks.map((p) => p.key), ["today", "tomorrow", "friday", "week", "two-weeks", "none"]);
+  assert.equal(picks.find((p) => p.key === "week")!.value, "2026-11-02");
+  assert.deepEqual(picks.map((p) => p.number), [1, 2, 3, 5, 6, 7]);
+});
+
+test("quickPicks: on a weekend Friday is the coming week's, and Sunday's Next Monday is 8 days out", () => {
+  assert.deepEqual(
+    quickPicks("2026-10-24").map((p) => [p.key, p.value]), // Sat
+    [
+      ["today", "2026-10-24"],
+      ["tomorrow", "2026-10-25"],
+      ["friday", "2026-10-30"],
+      ["next-monday", "2026-10-26"],
+      ["week", "2026-10-31"],
+      ["two-weeks", "2026-11-07"],
+      ["none", null],
+    ],
+  );
+  assert.deepEqual(
+    quickPicks("2026-10-25").map((p) => [p.key, p.value]), // Sun
+    [
+      ["today", "2026-10-25"],
+      ["tomorrow", "2026-10-26"],
+      ["friday", "2026-10-30"],
+      ["next-monday", "2026-11-02"],
+      ["week", "2026-11-01"],
+      ["two-weeks", "2026-11-08"],
+      ["none", null],
+    ],
+  );
+});
+
+test("quickPicks: every day of the week, each pick lands on its weekday and no two picks share a day", () => {
   for (let i = 0; i < 14; i++) {
     const today = addDaysYmd("2026-10-18", i)!;
+    const dow = weekdayOf(today);
     const picks = quickPicks(today);
     const dates = picks.map((p) => p.value).filter((v): v is string => v !== null);
     assert.equal(new Set(dates).size, dates.length, `${today}: two picks land on one day`);
-    const monday = picks.find((p) => p.key === "monday");
-    if (weekdayOf(today) === 1) assert.equal(monday, undefined, today);
+    assert.ok(dates.every((d) => d >= today), `${today}: a pick lands in the past`);
+    const friday = picks.find((p) => p.key === "friday");
+    if (dow === 4 || dow === 5) assert.equal(friday, undefined, today);
+    else assert.equal(weekdayOf(friday!.value!), 5, today);
+    const monday = picks.find((p) => p.key === "next-monday");
+    if (dow === 1) assert.equal(monday, undefined, today);
     else {
       assert.equal(weekdayOf(monday!.value!), 1, today);
-      assert.notEqual(monday!.value, today, today);
+      assert.notEqual(monday!.value, addDaysYmd(today, 1), today);
     }
   }
 });
@@ -77,24 +129,12 @@ test("quickPicks: the numbers are the same on every day of the week", () => {
     const byKey = Object.fromEntries(quickPicks(today).map((p) => [p.key, p.number]));
     assert.equal(byKey.today, 1, today);
     assert.equal(byKey.tomorrow, 2, today);
-    if (byKey.monday !== undefined) assert.equal(byKey.monday, 3, today);
-    assert.equal(byKey["next-week"], 4, today);
-    assert.equal(byKey.none, 5, today);
+    if (byKey.friday !== undefined) assert.equal(byKey.friday, 3, today);
+    if (byKey["next-monday"] !== undefined) assert.equal(byKey["next-monday"], 4, today);
+    assert.equal(byKey.week, 5, today);
+    assert.equal(byKey["two-weeks"], 6, today);
+    assert.equal(byKey.none, 7, today);
   }
-});
-
-test("quickPicks: on a Sunday Monday reads Next Monday, and the picks stay in number order", () => {
-  const picks = quickPicks("2026-10-25");
-  assert.deepEqual(
-    picks.map((p) => [p.key, p.number, p.label, p.value]),
-    [
-      ["today", 1, "Today", "2026-10-25"],
-      ["tomorrow", 2, "Tomorrow", "2026-10-26"],
-      ["monday", 3, "Next Monday", "2026-11-02"],
-      ["next-week", 4, "Next week", "2026-11-01"],
-      ["none", 5, "No date", null],
-    ],
-  );
 });
 
 test("quickPicks: an invalid today throws instead of offering wrong dates", () => {
@@ -102,19 +142,23 @@ test("quickPicks: an invalid today throws instead of offering wrong dates", () =
 });
 
 test("quickPickForKey: a number chooses its pick; a number with no pick today, or any other key, is null", () => {
-  const picks = quickPicks("2026-10-22");
+  const picks = quickPicks("2026-11-17");
   assert.equal(quickPickForKey(picks, "1")?.key, "today");
-  assert.equal(quickPickForKey(picks, "3")?.key, "monday");
-  assert.equal(quickPickForKey(picks, "5")?.key, "none");
-  assert.equal(quickPickForKey(picks, "6"), null);
+  assert.equal(quickPickForKey(picks, "3")?.key, "friday");
+  assert.equal(quickPickForKey(picks, "6")?.key, "two-weeks");
+  assert.equal(quickPickForKey(picks, "7")?.key, "none");
+  assert.equal(quickPickForKey(picks, "8"), null);
   assert.equal(quickPickForKey(picks, "0"), null);
   assert.equal(quickPickForKey(picks, "a"), null);
   assert.equal(quickPickForKey(picks, "Enter"), null);
 });
 
-test("quickPickForKey: on a Monday 3 is nothing and 4 is still Next week", () => {
-  const picks = quickPicks("2026-10-26");
-  assert.equal(quickPickForKey(picks, "3"), null, "the Monday pick is hidden; 4 is not handed down");
-  assert.equal(quickPickForKey(picks, "4")?.key, "next-week");
-  assert.equal(quickPickForKey(picks, "5")?.key, "none");
+test("quickPickForKey: a hidden pick's number is nothing, never handed to the next pick", () => {
+  const thu = quickPicks("2026-10-22");
+  assert.equal(quickPickForKey(thu, "3"), null, "Friday is hidden on a Thursday");
+  assert.equal(quickPickForKey(thu, "4")?.key, "next-monday");
+  const mon = quickPicks("2026-10-26");
+  assert.equal(quickPickForKey(mon, "4"), null, "Next Monday is hidden on a Monday");
+  assert.equal(quickPickForKey(mon, "5")?.key, "week");
+  assert.equal(quickPickForKey(mon, "7")?.key, "none");
 });

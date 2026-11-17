@@ -73,7 +73,7 @@ export type MenuProps<T extends object> = Omit<AriaMenuProps<T>, "className"> & 
    * Value menus: the fixed order behind the number keys. The item whose id is
    * `numberKeys[i]` answers to key i + 1 and prints it as a Kbd with a mouse.
    * An item that's hidden (not rendered) keeps its number, so the next one
-   * never takes it: 4 is always Next week, and Done stays 6 when Review hides.
+   * never takes it: 5 is always In 1 week, and Done stays 6 when Review hides.
    */
   numberKeys?: readonly Key[];
   /**

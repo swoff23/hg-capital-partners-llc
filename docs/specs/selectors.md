@@ -68,7 +68,7 @@ The spec for HG's selector family. Draft for Connor: nothing is built, and build
 - **Closed trigger:** Enter, Space or Down opens. A `Select` also changes value on typed letters while closed, as a native select does.
 - **Open:** arrows move, Home and End jump. Letters jump to a match, or filter when a search field shows. Enter or Space picks. Pick one commits and closes; pick many toggles and stays open.
 - **Esc closes the open layer in one press,** even with text in its search field (the text goes with it), and focus returns to the trigger. This overrides React Aria `SearchField`'s clear-first Esc.
-- **Number keys** pick from value menus with a fixed order (task status, deal stage, date quick picks), printed as `Kbd` with a mouse. Each item owns its number. When one hides (Monday on a Monday, Review on a staff-only task), its number is skipped, never handed to the next item, so 4 is always Next week.
+- **Number keys** pick from value menus with a fixed order (task status, deal stage, date quick picks), printed as `Kbd` with a mouse. Each item owns its number. When one hides (Friday on a Thursday, Review on a staff-only task), its number is skipped, never handed to the next item, so 5 is always In 1 week.
 - **Backspace or Delete** clears a focused set filter chip. Invented: token fields remove a chip this way, but no reference shows it on a filter chip.
 - **No page-level letter shortcuts.** `Kbd` hints never show on touch.
 
@@ -352,7 +352,7 @@ This describes Option 1 of section 4.1, the recommendation. The pattern itself i
 - With a mouse and on a tablet, the quick picks sit under the calendar and over the Repeat row (Connor, Nov 14).
 - Repeat opens below its row in the panel, one line per preset with no "Next:" line (the calendar above shows the date), and the picks fold to one row ("Today, Tomorrow, Monday…") that opens them again (Connor, Nov 14). On a phone Repeat stays a step in the sheet.
 - When the panel fits neither above nor below its chip as it opens (a chip halfway down a 1280x800 laptop), it opens beside the chip, where it has the screen's full height, so nothing scrolls (Connor, Nov 14).
-- Quick picks show a Check on the current value. On a Monday the Monday row hides, since it lands on the same day as Next week. Keys stay with their picks, so the printed keys read 1, 2, 4, 5.
+- Quick picks are Today, Tomorrow, Friday, Next Monday, In 1 week, In 2 weeks and No date (Connor, Nov 17), with a Check on the current value. A row hides when another already lands on its day: Friday on a Thursday and a Friday, Next Monday on a Monday. On a weekend Friday is the coming week's. Keys stay with their picks, so on a Thursday the printed keys read 1, 2, 4, 5, 6, 7.
 - A past date opens the calendar on today's month, and the panel's first line names the current value, in `--destructive` when overdue ("Due Sep 12").
 - Row chips are named with the task: "Due date for Fix the sink: Apr 19" (TASKS-V02). Rows keep their date chip and its "Due date" placeholder, per Connor's Oct 25 task row rule (brand section 5).
 - Calendar cells are 32px squares with a mouse. On touch each cell takes 1/7 of the grid's width at 44px tall: about 42px wide at 320 (a 296px grid) and 50px at 375.
