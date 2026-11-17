@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDate, parseDate } from "@internationalized/date";
 import {
   CalendarArrowUp,
+  CalendarCheck,
   CalendarDays,
+  CalendarRange,
   CalendarX2,
   Check,
   ChevronDown,
@@ -42,8 +44,10 @@ import { cn } from "@/lib/utils";
 const PICK_ICON: Record<QuickPickKey, LucideIcon> = {
   today: Sun,
   tomorrow: Sunrise,
-  monday: CalendarDays,
-  "next-week": CalendarArrowUp,
+  friday: CalendarCheck,
+  "next-monday": CalendarDays,
+  week: CalendarArrowUp,
+  "two-weeks": CalendarRange,
   none: CalendarX2,
 };
 
@@ -114,7 +118,7 @@ export function DatePanel({
   }, [steps, view]);
   const past = value !== null && isPastDay(value, today);
 
-  // A number chooses its quick pick: Today 1 through No date 5, whichever picks show.
+  // A number chooses its quick pick: Today 1 through No date 7, whichever picks show.
   // Listen on the whole dialog, in the capture phase, because focus starts on the dialog
   // itself and React Aria keeps some key presses to its own controls. Only while the picks
   // are on screen: in the Repeat list or the calendar step a digit is not a date.
