@@ -12,7 +12,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Camera, ImagePlus, Lock } from "lucide-react";
+import { Camera, ImagePlus, Lock, type LucideIcon } from "lucide-react";
 import {
   MediaUploadTray,
   UploadTile,
@@ -87,11 +87,14 @@ export interface ComposerProps {
   draftKey: string;
   /**
    * Who will see it, as one line over the field for each side of the switch
-   * ("Zack sees this and gets an email"; "Only Connor and Pieter see this",
+   * ("Zack needs a login to see this"; "Only Connor and Pieter see this",
    * shown with the Lock). A node, so a long first name can truncate while the
-   * fixed words stay (AudienceText). None for the deal note box.
+   * fixed words stay (AudienceText). None for the deal note box. `warn` draws
+   * the Shared line as a strip across the top of the box on --warn-tint, led
+   * by that icon, for a reply that won't reach them the usual way ("Zack has
+   * job emails off", Connor, Nov 16).
    */
-  audience?: { shared?: ReactNode; internal?: ReactNode } | null;
+  audience?: { shared?: ReactNode; internal?: ReactNode; warn?: LucideIcon } | null;
   /** "switch": Shared | Internal before Send. "none": always Shared (the portal) or no audience (deal notes). */
   visibility?: "switch" | "none";
   /** Photos, videos and files; none for the deal note box. */
@@ -749,6 +752,18 @@ function ComposerBody({
         (internal ? (
           <p className={cn("items-center gap-1.5 px-4 pt-2 text-meta font-medium text-fg-2 md:px-3", open ? "flex" : "hidden md:flex")}>
             <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="flex min-w-0 flex-1">{audienceLine}</span>
+          </p>
+        ) : audience?.warn ? (
+          // Edge to edge under the box's top rule, so its corners follow the box's (1px inside its border).
+          <p
+            className={cn(
+              "items-center gap-1.5 bg-warn-tint px-4 py-2 text-meta text-warn md:px-3",
+              pinned ? "md:rounded-t-[calc(var(--radius-lg)-1px)]" : "rounded-t-[calc(var(--radius-lg)-1px)]",
+              open ? "flex" : "hidden md:flex",
+            )}
+          >
+            <audience.warn className="size-3.5 shrink-0 pointer-coarse:size-4" aria-hidden="true" />
             <span className="flex min-w-0 flex-1">{audienceLine}</span>
           </p>
         ) : (

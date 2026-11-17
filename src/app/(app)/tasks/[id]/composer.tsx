@@ -1,4 +1,5 @@
 "use client";
+import { MailX } from "lucide-react";
 import { AudienceText, Composer as SharedComposer, type ComposerDraft } from "@/components/composer";
 import { TextLink } from "@/components/ui";
 import type { UploadTarget } from "@/components/upload-queue";
@@ -20,9 +21,11 @@ export type { ComposerDraft } from "@/components/composer";
  * hands back any left from an earlier visit as `drafts`. The staff wiring
  * stays here, so the shared component never imports from app/(app).
  *
- * The line over the field says who will see the message (activity 2.7): the
- * contractor by first name when they have a login, "Any contractor you assign
- * sees this" when nobody is assigned, and for an Internal note the partners.
+ * The line over the field says who will see the message (activity 2.7), only
+ * where that isn't the default: nothing for a contractor with a login unless
+ * their Job emails are off (then a warning strip with MailX), "needs a login"
+ * without one, nothing when nobody is assigned, and for an Internal note the
+ * partners.
  * The switch reads "Shared | Internal" on every task: Internal is the only
  * way to keep a note private before a contractor is assigned.
  */
@@ -82,9 +85,25 @@ export function Composer({
       pin="phone"
       audience={{
         shared: reachable ? (
-          // Warns only when their Job emails switch is off (Connor, Nov 14). Before their first sign-in no email goes
-          // either, so the line doesn't promise one; the line under the sent comment says "Zack hasn't signed in yet".
-          <AudienceText name={reachable.first} words={audienceWords(reachable.emails)} />
+          // No line at all unless their Job emails switch is off (Connor, Nov 16): seeing it is the default, so saying
+          // so is noise. Before their first sign-in no email goes either; the line under the sent comment says
+          // "Zack hasn't signed in yet".
+          reachable.emails === "off" ? (
+            <>
+              {/* A narrow box (a phone) keeps the news; a wider one adds what to do about it. The long one needs
+                  about 560px (614 with touch type), so it waits for a 672px box. "them", not a guessed pronoun:
+                  this shows for every contractor. */}
+              <span className="flex min-w-0 @2xl/composer:hidden">
+                <AudienceText name={reachable.first} words="does not receive emails" />
+              </span>
+              <span className="hidden min-w-0 @2xl/composer:flex">
+                <AudienceText
+                  name={reachable.first}
+                  words="does not receive email notifications. Remember to call or text them any updates."
+                />
+              </span>
+            </>
+          ) : null
         ) : contractor ? (
           <span className="flex min-w-0 items-baseline gap-2">
             <AudienceText name={contractor.first} words="needs a login to see this" />
@@ -93,13 +112,12 @@ export function Composer({
               Set up login
             </TextLink>
           </span>
-        ) : (
-          <AudienceText words="Any contractor you assign sees this" />
-        ),
+        ) : null, // Nobody assigned: no line (Connor, Nov 16).
         internal: <AudienceText words={only} />,
+        warn: reachable?.emails === "off" ? MailX : undefined,
       }}
       placeholders={{
-        // One placeholder whoever is assigned: the line above already says who sees it (Connor, Nov 14).
+        // One placeholder whoever is assigned (Connor, Nov 14).
         shared: "Add comment…",
         internal: "Add an internal note",
         internalShort: "Internal note",
@@ -115,11 +133,4 @@ export function Composer({
       onSend={({ body, visibility, attachmentIds, clientId }) => addTaskComment(taskId, { body, visibility, attachmentIds, clientId })}
     />
   );
-}
-
-/** What the line over a Shared reply says after the contractor's name. */
-function audienceWords(emails: JobEmailState): string {
-  if (emails === "on") return "sees this and gets an email";
-  if (emails === "off") return "won't get an email";
-  return "sees this";
 }
