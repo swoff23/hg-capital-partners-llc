@@ -24,8 +24,7 @@ export type { ComposerDraft } from "@/components/composer";
  * The line over the field says who will see the message (activity 2.7), only
  * where that isn't the default: nothing for a contractor with a login unless
  * their Job emails are off (then a warning strip with MailX), "needs a login"
- * without one, "Any contractor you
- * assign sees this" when nobody is assigned, and for an Internal note the
+ * without one, nothing when nobody is assigned, and for an Internal note the
  * partners.
  * The switch reads "Shared | Internal" on every task: Internal is the only
  * way to keep a note private before a contractor is assigned.
@@ -91,12 +90,17 @@ export function Composer({
           // "Zack hasn't signed in yet".
           reachable.emails === "off" ? (
             <>
-              {/* A narrow box (a phone) keeps the news; a wider one adds what to do about it. */}
-              <span className="flex min-w-0 @md/composer:hidden">
-                <AudienceText name={reachable.first} words="has job emails off" />
+              {/* A narrow box (a phone) keeps the news; a wider one adds what to do about it. The long one needs
+                  about 560px (614 with touch type), so it waits for a 672px box. "them", not a guessed pronoun:
+                  this shows for every contractor. */}
+              <span className="flex min-w-0 @2xl/composer:hidden">
+                <AudienceText name={reachable.first} words="does not receive emails" />
               </span>
-              <span className="hidden min-w-0 @md/composer:flex">
-                <AudienceText name={reachable.first} words="has job emails off. Call or text if it's urgent." />
+              <span className="hidden min-w-0 @2xl/composer:flex">
+                <AudienceText
+                  name={reachable.first}
+                  words="does not receive email notifications. Remember to call or text them any updates."
+                />
               </span>
             </>
           ) : null
@@ -108,14 +112,12 @@ export function Composer({
               Set up login
             </TextLink>
           </span>
-        ) : (
-          <AudienceText words="Any contractor you assign sees this" />
-        ),
+        ) : null, // Nobody assigned: no line (Connor, Nov 16).
         internal: <AudienceText words={only} />,
         warn: reachable?.emails === "off" ? MailX : undefined,
       }}
       placeholders={{
-        // One placeholder whoever is assigned: the line above already says who sees it (Connor, Nov 14).
+        // One placeholder whoever is assigned (Connor, Nov 14).
         shared: "Add comment…",
         internal: "Add an internal note",
         internalShort: "Internal note",
