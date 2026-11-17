@@ -141,7 +141,7 @@ test("a stored rule round-trips through the editor unchanged", () => {
 });
 
 test("a stored rule and the editor's write the same JSON, so saving it unchanged writes nothing", () => {
-  // Postgres JSONB hands keys back in its own order; RepeatPicker compares JSON strings.
+  // Postgres JSONB hands keys back in its own order, so the check compares JSON strings.
   const stored = repeatRuleSchema.parse({ weekday: 1, interval: 1, freq: "weeks" });
   assert.equal(JSON.stringify(ruleFromChoice(choiceFromRule(stored, 22, 4))), JSON.stringify(stored));
 });

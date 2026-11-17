@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PublicHeader } from "@/components/public/header";
 import { PublicFooter } from "@/components/public/footer";
+import { PublicSurface } from "@/components/public/surface";
 import { publicContainer, publicCtaClass, publicType } from "@/components/public/ui";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
  */
 export default function RootNotFound() {
   return (
-    <div data-surface="public" className="flex min-h-screen flex-col bg-canvas text-foreground">
+    <PublicSurface>
       <PublicHeader />
       <main className={cn(publicContainer, "flex flex-1 flex-col items-center justify-center py-16 text-center")}>
         <h1 className={cn(publicType.heading, "text-foreground")}>Page not found</h1>
@@ -23,6 +24,6 @@ export default function RootNotFound() {
         </Link>
       </main>
       <PublicFooter />
-    </div>
+    </PublicSurface>
   );
 }

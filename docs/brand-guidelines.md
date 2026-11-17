@@ -126,7 +126,7 @@ Email can't read CSS variables, so it reads the hex mirror in `src/lib/brand-tok
 
 - No blue anywhere. The primary is ink in light and limestone in dark, the inversion Vercel's dark dashboard uses ([Vercel dark](https://mobbin.com/screens/e9576405-bcef-419a-922a-8fb84b044a54)). It fixes today's dark primary (white on blue-500, 3.68:1).
 - A link is the same ink as body text (1.00 against `--foreground`, 1.92 / 1.55 against `--fg-2`), so a link in a sentence always carries an underline (WCAG 1.4.1). See TextLink.
-- Focus: 2px `--ring` outline, 2px offset in `--background`, so it stays visible around an ink button. Inside the toast the outline is `--toast-fg`, since ink on the ink toast would vanish.
+- Focus on HG's own elements: a 2px `--ring` outline, 2px offset in `--background`, so it stays visible around an ink button. Inside the toast the outline is `--toast-fg`, since ink on the ink toast would vanish. Stock parts (anything with a `data-slot`) skip it and draw shadcn's ring: a `--ring` edge and a 3px ring at half strength, 3.22 on `--background` in light and 4.60 in dark.
 
 ### Status
 
@@ -210,15 +210,15 @@ Two tokens are public-only.
 
 ## 5. Shape, space and elevation
 
-**Radius.** Rectilinear, like the buildings. Tailwind v4's own steps; never redefine `--radius-*`. Each component moves down one class from today.
+**Radius.** shadcn/ui's scale: `--radius` is 0.625rem on `:root`, and `rounded-sm` to `rounded-4xl` are steps of it (0.6 to 2.6 times) in `@theme inline`, for stock and HG classes alike. Stock components pick their own steps; HG's own keep these classes.
 
-| Class | px | Used for | Today |
-|---|---|---|---|
-| `rounded-sm` | 4 | Badges, checkboxes, keycaps, menu item highlight, photos 32px and under | `rounded-md` |
-| `rounded-md` | 6 | Buttons, inputs, selects, chips, segmented control | `rounded-lg` |
-| `rounded-lg` | 8 | Cards, menus, popovers, toasts, photos over 32px, public listing photos | `rounded-xl`, `rounded-2xl` |
-| `rounded-xl` | 12 | Dialogs, phone sheet top corners | new |
-| `rounded-full` | | Avatars, status dots, switch tracks, the photo status pill. Never buttons | same |
+| Class | px | Used for |
+|---|---|---|
+| `rounded-sm` | 6 | Badges, checkboxes, keycaps, menu item highlight, photos 32px and under |
+| `rounded-md` | 8 | Buttons, inputs, selects, chips, segmented control |
+| `rounded-lg` | 10 | Cards, menus, popovers, toasts, photos over 32px, public listing photos |
+| `rounded-xl` | 14 | Dialogs, phone sheet top corners |
+| `rounded-full` | | Avatars, status dots, switch tracks, the photo status pill. Never buttons |
 
 **Spacing.** 4px base: 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64.
 - Page gutters 32 desktop, 24 tablet, 16 phone. Sections 32 apart (24 on touch); 12 between a heading's rule and its content.
@@ -232,9 +232,9 @@ Two tokens are public-only.
 - Photo rows: contractor job cards 72px. Portfolio rows stay 56px with no photo, and a property page shows its photo only once one is set (Connor, Nov 14).
 - Record fact strip: four facts in one row split by `--border` rules, 16px in from each rule; a 2 by 2 grid on phones so no label wraps.
 - Detail rails: a 112px label column, 96px on phones.
-- Controls 32px (sm) and 36px (md) with a mouse; 44px minimum on touch (`TOUCH_HEIGHT`).
+- Controls 32px (sm) and 36px (md) with a mouse; 44px minimum on touch (`TOUCH_HEIGHT` on HG's own, the touch rules in `globals.css` on stock parts).
 
-**Borders.** All 1px. `--border` separates, `--line-strong` rules, `--input` identifies a control. The only 2px marks are focus, the tab underline and the nav notch. No colored rails on cards.
+**Borders.** All 1px. `--border` separates, `--line-strong` rules, `--input` identifies a control. A `border` with no color class draws `--border` (shadcn's base layer). The only 2px marks are focus, the tab underline and the nav notch. No colored rails on cards.
 
 **Elevation.** Flat in the page flow. Shadow color is ink, not black.
 
@@ -301,7 +301,7 @@ HG's own buildings only. No stock, no AI imagery, no virtual staging.
 - Skeletons match the finished layout, draw labels at once and hold values in static `--muted`. No shimmer.
 - Figures never count up or roll. A changed figure crossfades in 120ms.
 - Line art may draw its strokes once (600ms) on first view. That is the only loop-like motion.
-- `prefers-reduced-motion: reduce` turns everything into an opacity change of 120ms or less and skips the draw-in. One global block in `globals.css` (VISUAL-056).
+- `prefers-reduced-motion: reduce` turns everything into an opacity change of 120ms or less and skips the draw-in. One global block in `globals.css` (VISUAL-056) also takes the zoom, slide and blur out of stock overlays (tw-animate-css has no rule of its own) and stops the stock skeleton's pulse.
 
 ## 8. Voice and tone
 

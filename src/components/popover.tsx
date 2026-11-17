@@ -45,14 +45,13 @@ const popoverMotion: Record<PopoverMotion, string> = {
 /**
  * The floating surface, shared by Popover and Menu: the Float level
  * (docs/brand-guidelines.md, section 5). --popover on a --border edge with the
- * ink float shadow; in dark the edge is --line-strong (--line-float). This
- * string carries the "pop" motion; PopoverSurface's `motion` picks either.
+ * ink float shadow; in dark the edge is --line-strong (--line-float).
+ * PopoverSurface's `motion` adds the "pop" or "none" motion.
  */
 const popoverFrame = cn(
   "overflow-auto rounded-lg border border-line-float bg-popover text-foreground shadow-float outline-none",
   "data-[placement=bottom]:origin-top data-[placement=top]:origin-bottom",
 );
-export const popoverSurface = cn(popoverFrame, popoverMotion.pop);
 
 type SurfaceProps = Omit<AriaPopoverProps, "className"> & {
   className?: string;
@@ -60,8 +59,10 @@ type SurfaceProps = Omit<AriaPopoverProps, "className"> & {
   motion?: PopoverMotion;
   /**
    * "public" puts the public site's dark tokens on the panel
-   * (`data-surface="public"`): a popover is portaled to <body>, outside the
-   * public wrapper, so it carries the surface itself.
+   * (`data-surface="public"`). Inside a PublicSurface the popover portals into
+   * the public ground; anywhere else it portals to <body>, outside any public
+   * wrapper. The prop stays until this family goes stock
+   * (docs/specs/design-foundation.md, section 5.5).
    */
   surface?: "app" | "public";
   /** A panel that fits neither above nor below its trigger opens beside it (the due date panel). */

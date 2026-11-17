@@ -11,14 +11,17 @@ The working rules (planning, reuse, design references, copy, device check, landi
 
 1. **Plan first.** Feature-sized work gets its questions answered and a spec saved in `docs/` before any code.
 2. **Check what we have.** Look up the job in [docs/components.md](docs/components.md) and search `src/components/`. Use what fits, or extend it with a prop instead of copying it.
-3. **Nothing fits?** Research the pattern on Mobbin, then build it.
+3. **Pull before you build.** A missing control comes from shadcn's aria registry (`npx shadcn@4.23.0 add`, never `init`; docs/components.md, "Adding a component"). Screens and flows start on Mobbin.
 4. **Design for every size.** Every mock covers laptop (1280x800), tablet (768x1024) and mobile (375x667).
 5. **Leave it findable.** Add a new reusable component to `docs/components.md` in the same commit.
-6. **Check devices before handoff.** Run `npm run test:devices`, open each dialog and state you touched at 375 and 320, and look over `device-report/index.html`.
+6. **Check devices before handoff.** Run `npm run test:devices` and `npm run test:devices:dark`, open each dialog and state you touched at 375 and 320, and look over `device-report/index.html` and `device-report-dark/index.html`.
 
 ## Stack
 
 - Next.js 16 (App Router, React Compiler) + TypeScript + Tailwind v4
+- UI: stock shadcn/ui on React Aria (the aria-vega style), pulled into
+  `src/components/ui/` by the CLI and themed in `src/app/globals.css`; HG's
+  own components move over family by family (docs/specs/design-foundation.md)
 - Postgres on Supabase, via Prisma 6 — the app connects as the table owner and
   never uses PostgREST or the Supabase client
 - Auth: email + password (scrypt hash in `User.passwordHash`), signed cookie
@@ -62,7 +65,8 @@ Rules of the road:
 
 ## Local development
 
-Prereqs: Node 20+, local Postgres (`brew install postgresql@16`).
+Prereqs: Node 24 (`engines` in package.json; Volta picks it up from the
+`volta` field), local Postgres (`brew install postgresql@16`).
 
 ```bash
 createdb hg_capital_dev
@@ -87,6 +91,7 @@ npm run dev                   # http://localhost:3000
 | `npm test` | All unit tests |
 | `npm run test:devices` | Device check: every route on phones, iPad and desktop, report in `device-report/` |
 | `npm run test:devices:known` | Same run, rewrites `tests/devices/known-issues.json` (owner's OK first) |
+| `npm run test:devices:dark` | The device check with the browsers in dark mode (`DEVICES_SCHEME=dark`), report in `device-report-dark/` |
 | `npm run migrate [step]` | Spreadsheet import (idempotent) |
 | `npm run asana:snapshot` | Full read-only Asana backup to `_private/asana-snapshot/` (needs `ASANA_TOKEN`) |
 | `npm run db:migrate` | Create + apply a new Prisma migration |

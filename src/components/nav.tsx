@@ -129,7 +129,7 @@ export function TopTabs({
             className={cn(
               // 8px sides below sm, so Settings' three tabs keep one line at 320. A fixed
               // 14 / 20 at every size: text-label grows to 16 on touch (section 9).
-              // eslint-disable-next-line hg/design-tokens -- the tab size is fixed
+              // eslint-disable-next-line hg/raw-type -- the tab size is fixed
               "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-foreground sm:px-3",
               "aria-[current=page]:border-primary aria-[current=page]:text-foreground",
               // Tapped before its page was prefetched: the picked look at once (LeaveLink's data-pending).

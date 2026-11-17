@@ -1,4 +1,10 @@
 @import "tailwindcss";
+/* What the aria-vega style asks for (docs/specs/design-foundation.md, section
+   5.3): tw-animate-css draws stock enter and exit motion, and shadcn's file
+   adds the data-* variants, no-scrollbar, scroll-fade and shimmer that stock
+   components in components/ui/ use. */
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 /* Tailwind scans every file git doesn't ignore and builds a rule for each
    class name it finds. The color rename's fixtures and scripts spell out
@@ -97,6 +103,10 @@
      the desktop header (from lg, below). components/app-shell.tsx sizes the
      bar from it, and a sticky table header holds just under it. */
   --app-bar-h: 3.25rem;
+
+  /* Radius (section 5): shadcn/ui's base. rounded-sm to rounded-4xl in
+     @theme inline below are steps of it, so sm is 6px, md 8, lg 10, xl 14. */
+  --radius: 0.625rem;
 }
 
 @media (width >= 64rem) {
@@ -267,6 +277,15 @@
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radius: shadcn/ui's scale on --radius, for stock and HG classes alike */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 /* ---------------- Type scale (section 3) ----------------
@@ -345,6 +364,8 @@
 
 /* Motion (section 7). Hover, press, color changes and every exit run at
    --dur-fast ease-out, so a bare `transition` or `transition-colors` does too.
+   The two defaults come out in landing B, with the first stock transitions
+   (docs/specs/design-foundation.md, section 5.3).
    React Aria keeps an overlay mounted until its exit animation ends, so exits
    are animations as well. Callers pair each with motion-reduce:animate-none.
    fade-in is a scrim or lightbox ground appearing: an opacity change, so
@@ -441,7 +462,15 @@ body:has([data-surface="public"]) {
    ring, as fields do) still wins. Inside the ink toast the outline is
    --toast-fg, set by the toast itself. */
 @layer base {
-  :focus-visible {
+  /* shadcn/ui's base layer: a bare `border` or `border-b` draws --border, and
+     an outline with no color class takes the ring color at half strength. */
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  /* HG's 2px outline, on HG's own elements only. A stock part (anything with
+     a data-slot) and the cells inside a stock calendar draw their own ring. */
+  :focus-visible:not([data-slot], [data-slot="calendar"] *) {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -488,6 +517,29 @@ body:has([data-surface="public"]) {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* Stock overlays enter and leave through tw-animate-css, which has no
+     reduced-motion rule of its own. Its zoom, slide, spin and blur are
+     per-element variables, so neutral values here leave only the fade. */
+  *,
+  ::before,
+  ::after {
+    --tw-enter-scale: 1 !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-rotate: 0 !important;
+    --tw-enter-blur: 0 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-exit-rotate: 0 !important;
+    --tw-exit-blur: 0 !important;
+  }
+
+  /* The stock skeleton holds still. */
+  .animate-pulse {
+    animation: none !important;
+  }
 }
 
 /* iOS Safari zooms the whole page when a focused field's text is under 16px.
@@ -505,6 +557,70 @@ body:has([data-surface="public"]) {
   :is(input, textarea).text-title {
     font-size: var(--text-title);
   }
+}
+
+/* Touch targets on stock parts (Apple HIG's 44pt, WCAG 2.5.5). Stock tops out
+   at 40px, so touch screens raise each stock control to 44px here, keyed on
+   the markup shadcn writes, and the files in components/ui/ stay as
+   `shadcn add` wrote them (docs/specs/design-foundation.md, section 5.3).
+   Unlayered, so it wins over each part's own height. HG's own controls carry
+   pointer-coarse:min-h-11 instead: nothing of HG's has a data-slot. The
+   stock textarea isn't listed, since its own 64px minimum is above this
+   one, and an input-group-control takes its group's height. */
+@media (pointer: coarse) {
+  /* Stock Button writes both attributes, so every part built on it is
+     covered whatever its slot (an alert's action, a dialog's close). */
+  [data-variant][data-size]:is(button, a),
+  [data-slot="input"],
+  [data-slot="input-group"],
+  [data-slot="select-trigger"],
+  [data-slot="toggle"],
+  [data-slot="toggle-group-item"],
+  [data-slot="tabs-trigger"],
+  [data-slot="dropdown-menu-item"],
+  [data-slot="dropdown-menu-sub-trigger"],
+  [data-slot="select-item"],
+  [data-slot="combobox-item"],
+  [data-slot="command-item"],
+  [data-slot="sidebar-menu-button"] {
+    min-height: 2.75rem;
+  }
+  [data-size^="icon"]:is(button, a) {
+    min-width: 2.75rem;
+  }
+  /* WebKit ignores min-height on a select, so the native select takes the
+     height outright. */
+  [data-slot="native-select"] {
+    height: 2.75rem;
+  }
+  /* The calendar's day cells and month buttons size from this, and it beats
+     the root's own --cell-size class. */
+  [data-slot="calendar"] {
+    --cell-size: 2.75rem;
+  }
+  /* Public CTAs (size lg) stand 48px. */
+  [data-surface="public"] [data-size="lg"]:is(button, a) {
+    min-height: 3rem;
+  }
+}
+
+/* A choice card (a field label wrapping a checkbox or switch field) is one
+   44px target on touch. A rule of its own, since a browser without :has()
+   drops a whole selector list. */
+@media (pointer: coarse) {
+  [data-slot="field-label"]:has(> [data-slot="field"]) {
+    min-height: 2.75rem;
+  }
+}
+
+/* A picked toggle carries an ink line just inside its edge, so the pick never
+   rests on stock's pale fill alone (WCAG 1.4.1 and 1.4.11). An outline, so the
+   focus ring, a box-shadow, still draws beside it. Unlayered, so it wins over
+   the toggle's own outline-none. */
+[data-slot="toggle-group-item"][data-selected],
+[data-slot="toggle"][data-selected] {
+  outline: 1px solid var(--foreground);
+  outline-offset: -2px;
 }
 
 /* Print the page, not the app around it. The app shell's header and sidebar

@@ -60,9 +60,10 @@ next-env.d.ts
 # Claude Code local settings
 .claude/settings.local.json
 
-# device check (npm run test:devices)
+# device check (npm run test:devices, and test:devices:dark's own report)
 /.next-devices/
 /device-report/
+/device-report-dark/
 
 # Any other NEXT_DIST_DIR build (".next-live" and the like). Tailwind scans every
 # file git doesn't ignore, and the binary caches inside break globals.css.

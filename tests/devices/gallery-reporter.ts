@@ -5,6 +5,7 @@ import type { FullConfig, Reporter, Suite, TestCase, TestResult } from "@playwri
 import { KIND_LABEL, SEVERITY, type Finding, type FindingKind } from "./checks";
 import { listRoutes } from "./routes";
 import {
+  COLOR_SCHEME,
   DEVICES,
   KNOWN_ISSUES_FILE,
   REPORT_DIR,
@@ -15,6 +16,9 @@ import {
 } from "./config";
 
 type State = "error" | "known" | "warning" | "ok";
+
+/** ", dark" on a dark run's headings, so the two reports can't be mixed up. */
+const HEADING_SCHEME = COLOR_SCHEME === "dark" ? ", dark" : "";
 
 interface Cell {
   url: string | null;
@@ -173,11 +177,11 @@ export default class GalleryReporter implements Reporter {
     const limit = 80;
     return (
       [
-        `## Device check`,
+        `## Device check${HEADING_SCHEME}`,
         ``,
         totals,
         ``,
-        `Screenshots of every page on every device are in \`device-report/index.html\`.`,
+        `Screenshots of every page on every device are in \`${path.basename(REPORT_DIR)}/index.html\`.`,
         ``,
         ...(lines.length
           ? [
@@ -250,7 +254,7 @@ export default class GalleryReporter implements Reporter {
 
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Device check ${esc(sha)}</title>
+<title>Device check${HEADING_SCHEME} ${esc(sha)}</title>
 <style>
   :root { --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b; --red:#dc2626; --known:#9333ea; --amber:#d97706; --green:#16a34a; }
   * { box-sizing: border-box; }
@@ -295,7 +299,7 @@ export default class GalleryReporter implements Reporter {
 </style></head>
 <body data-filter="all">
 <header>
-  <h1>Device check</h1>
+  <h1>Device check${HEADING_SCHEME}</h1>
   <p class="meta">${esc(branch)} @ ${esc(sha)}. ${esc(totals)}</p>
   <div class="filters">
     <button type="button" data-f="all" aria-pressed="true">All pages</button>
