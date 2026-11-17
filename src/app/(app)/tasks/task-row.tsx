@@ -10,6 +10,7 @@ import { isActiveStatus } from "@/lib/task-scope";
 import { isContractorJob, isOverdue, isTargetLate, targetField, targetOf, type ListTask } from "@/lib/tasks/list";
 import { personName, shortName } from "@/lib/tasks/list-sort";
 import { cn } from "@/lib/utils";
+import { AssigneeCell, assigneeCellPull } from "./assignee-cell";
 import { TaskCheckbox } from "./task-checkbox";
 import { useTaskList } from "./task-list-context";
 
@@ -26,7 +27,9 @@ export function hasStatusColumn(task: ListTask, { status = true, reason = false 
 
 /**
  * One task in a list (Today, All). The whole row opens the task; the
- * checkbox, the date chip and any actions sit above that link. Rows sit flat
+ * checkbox, the date chip and any actions sit above that link, and so does
+ * the person where the list offers people (the Tasks page): AssigneeCell
+ * reassigns the task from the row. Rows sit flat
  * over hairlines, flush with their section's heading; the hover fill reaches
  * 8px past each side.
  *
@@ -105,8 +108,11 @@ export function TaskRow({
    */
   unread?: boolean;
 }) {
-  const { today, reschedule, setDone } = useTaskList();
+  const { today, reschedule, setDone, people } = useTaskList();
   const job = isContractorJob(task);
+  // The person reassigns from the row where the list offers people (the Tasks page) and the row names them;
+  // under a person's heading the heading names them and the cell stays empty.
+  const assignable = Boolean(people) && avatar && person;
   const date = job ? targetOf(task) : task.due;
   const late = job ? isTargetLate(task, today) : isOverdue(task, today);
   const visit = job && targetField(task) === "scheduledFor";
@@ -234,6 +240,35 @@ export function TaskRow({
           {statusColumn && (
             <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[60rem]:w-44")}>{wide}</span>
           )}
+          {oneLine && (
+            // The one-line row's own columns, between the status and the date (task-list-sort.md 3.1):
+            // Property 144px, Unit 96 and Assignee 112, the widths TaskColumnHeads labels. Before the
+            // date here too, so Tab reaches the Assignee cell before the date, in the order they show.
+            <div className="hidden lg:@min-[60rem]:contents">
+              <span className="w-36 flex-none truncate text-meta text-muted-foreground">{property}</span>
+              <span className="w-24 flex-none truncate text-meta text-muted-foreground">{task.unitLabel}</span>
+              {avatar && assignable ? (
+                // Reassignable (AssigneeCell): only the trigger takes clicks, so the rest of the cell still opens the task.
+                <span className="flex w-28 flex-none items-center">
+                  <span title={who ?? undefined} className={cn("flex min-w-0 max-w-full", assigneeCellPull.column)}>
+                    <AssigneeCell task={task} layout="column" />
+                  </span>
+                </span>
+              ) : avatar && (
+                <span title={who ?? undefined} className="flex w-28 flex-none items-center gap-1.5 overflow-hidden pointer-fine:pointer-events-auto">
+                  {who && (
+                    <>
+                      <Avatar name={who} size={24} outline={job} />
+                      <span aria-hidden="true" className="truncate text-meta text-muted-foreground">
+                        {first}
+                      </span>
+                      <span className="sr-only">{who}</span>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
           {dateChip}
         </div>
         {/* 20px tall with or without the avatar, so every two-line row is the same height. */}
@@ -264,7 +299,12 @@ export function TaskRow({
           >
             {place}
           </span>
-          {who && (
+          {who && assignable ? (
+            // Bottom right, under the date, reassignable (AssigneeCell). The full name shows on hover with a mouse.
+            <span title={who} className={cn("ml-auto flex min-w-6 shrink justify-end", assigneeCellPull.corner)}>
+              <AssigneeCell task={task} layout="corner" />
+            </span>
+          ) : who && (
             // Bottom right, under the date. The full name shows on hover with a mouse. On touch a
             // tap here opens the row like anywhere else on it, and the task page names the person.
             <span
@@ -282,28 +322,6 @@ export function TaskRow({
             </span>
           )}
         </div>
-
-        {oneLine && (
-          // The one-line row's own columns, between the status and the date (task-list-sort.md 3.1):
-          // Property 144px, Unit 96 and Assignee 112, the widths TaskColumnHeads labels.
-          <div className="hidden lg:@min-[60rem]:contents">
-            <span className="w-36 flex-none truncate text-meta text-muted-foreground">{property}</span>
-            <span className="w-24 flex-none truncate text-meta text-muted-foreground">{task.unitLabel}</span>
-            {avatar && (
-              <span title={who ?? undefined} className="flex w-28 flex-none items-center gap-1.5 overflow-hidden pointer-fine:pointer-events-auto">
-                {who && (
-                  <>
-                    <Avatar name={who} size={24} outline={job} />
-                    <span aria-hidden="true" className="truncate text-meta text-muted-foreground">
-                      {first}
-                    </span>
-                    <span className="sr-only">{who}</span>
-                  </>
-                )}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {actions && (

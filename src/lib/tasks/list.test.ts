@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { TaskStatus } from "@prisma/client";
 import {
   applyPatch,
+  assigneeValueOf,
   byDateThenStatus,
   canReceiveSendBack,
   compareByDue,
@@ -326,6 +327,20 @@ test("applyPatch: date moves, checks and status changes touch only their rows", 
   assert.equal(approved[1].status, "DONE");
   assert.equal(approved[1].checked, true);
   assert.equal(groupContractors(approved).groups.length, 0, "an approved job leaves the column");
+
+  const reassigned = applyPatch(list, { kind: "assignee", id: a.id, assignee: zack });
+  assert.deepEqual(reassigned[0].assignee, zack);
+  assert.equal(reassigned[1], b);
+  assert.equal(list[0].assignee?.kind, "user", "the input is left alone");
+  assert.equal(applyPatch([b], { kind: "assignee", id: b.id, assignee: null })[0].assignee, null);
+});
+
+test("assigneeValueOf: what the task service compares a row's assignee as", () => {
+  assert.deepEqual(assigneeValueOf({ kind: "user", id: "u-1", name: "Connor", email: "c@x.com" }), { userId: "u-1" });
+  assert.deepEqual(assigneeValueOf(zack), { contactId: "c-zack" });
+  assert.equal(assigneeValueOf(null), null);
+  // An imported name is nobody to the service, even when the list files it with a person.
+  assert.equal(assigneeValueOf({ kind: "name", name: "Zack", person: { key: "c:c-zack", name: "Zack Reading" } }), null);
 });
 
 test("toast copy", () => {

@@ -8,7 +8,7 @@ import { OptionList, SEARCH_FROM, countOptions, type OptionItem, type OptionSect
 import { PickerLayer, StepHeader } from "@/components/picker-layer";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { SheetView } from "@/components/sheet";
-import { pickerChipClass, pickerField, pickerFieldChevron, type PickerChipSize } from "@/components/ui";
+import { pickerChipClass, pickerField, pickerFieldChevron, pickerGhost, type PickerChipSize } from "@/components/ui";
 import { assigneeKey, youFirst } from "@/lib/tasks/assignee-people";
 import { offersUnits, propertySubline, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,10 @@ import { cn } from "@/lib/utils";
  * empty, a dashed circle and a placeholder in --muted-foreground (a verb in the rail:
  * "Assign", "Add property"). No chevron. A **field** (`trigger="field"`) for a
  * form where the pick is the main decision: the same at field height, with a
- * chevron. A pick commits and closes; picking the current value closes without
+ * chevron. A **ghost** (`trigger="ghost"`) for a cell in a dense list: the
+ * plain value until a mouse is on it (`pickerGhost`), with the visual before
+ * the name (`leading`) or after it (`trailing`) as the cell places it.
+ * A pick commits and closes; picking the current value closes without
  * a write. A mouse opens an anchored popover, a touch phone a titled sheet, and
  * inside a sheet the list replaces the sheet's body with a back arrow.
  *
@@ -37,7 +40,9 @@ import { cn } from "@/lib/utils";
 
 export type EntityDisplay = {
   /** The visual before the name: an Avatar 20, a lucide icon. */
-  leading: ReactNode;
+  leading?: ReactNode;
+  /** The visual after the name instead, where it holds a row's corner (a task row's avatar under its date). */
+  trailing?: ReactNode;
   /** The name as shown. */
   text: string;
   /** Below `sm`, where a narrow column needs it: the short form of the name. */
@@ -56,8 +61,8 @@ export type EntityPickerProps = {
   /** What it's about, to name the control in a list: "Fix the sink" reads "Assignee for Fix the sink: Zack". */
   subject?: string;
   display: EntityDisplay;
-  /** "chip" (the default) in a row of chips; "field" at field height in a form. */
-  trigger?: "chip" | "field";
+  /** "chip" (the default) in a row of chips; "field" at field height in a form; "ghost" in a list cell, sized by its `className`. */
+  trigger?: "chip" | "field" | "ghost";
   /** The chip's size: `sm` 32px (the rail and forms, the default) or `row` 28px in a list row; 44 on touch either way. */
   size?: PickerChipSize;
   pinned?: OptionItem[];
@@ -139,13 +144,15 @@ function entityTrigger({
   className,
 }: Pick<EntityPickerProps, "label" | "subject" | "display" | "trigger" | "size" | "isDisabled" | "className">) {
   const field = trigger === "field";
+  const ghost = trigger === "ghost";
   return (
     <AriaButton
       isDisabled={isDisabled}
       data-placeholder={display.empty || undefined}
       className={cn(
-        field ? pickerField : pickerChipClass({ size }),
-        field ? !display.empty && "pl-2" : cn("pl-1", display.empty && "pl-2"),
+        field ? pickerField : ghost ? pickerGhost : pickerChipClass({ size }),
+        // A ghost's caller pads it to line its value up with the plain text around it.
+        field ? !display.empty && "pl-2" : !ghost && cn("pl-1", display.empty && "pl-2"),
         display.empty && "text-muted-foreground",
         className,
       )}
@@ -178,6 +185,7 @@ function entityTrigger({
           <span className="shrink-0">{display.suffix}</span>
         </>
       )}
+      {display.trailing}
       {field && <ChevronDown aria-hidden="true" className={pickerFieldChevron} />}
     </AriaButton>
   );
@@ -197,7 +205,8 @@ function EmptyMark({ box }: { box: "size-6" | "size-8" }) {
 /* ---------------- Assignee ---------------- */
 
 const NONE = "none";
-const valueOfKey = (key: string): AssigneeValue => {
+/** A picked assignee row's key as the value it stands for: "u:…" a user, "c:…" a contractor, anything else nobody. */
+export const assigneeValueOfKey = (key: string): AssigneeValue => {
   if (key.startsWith("u:")) return { userId: key.slice(2) };
   if (key.startsWith("c:")) return { contactId: key.slice(2) };
   return null;
@@ -348,7 +357,7 @@ export function AssigneePicker({
       pinned={rows.pinned}
       sections={rows.sections}
       selectedKey={assigneeKeyOf(value)}
-      onPick={(key) => onChange(valueOfKey(key))}
+      onPick={(key) => onChange(assigneeValueOfKey(key))}
       searchLabel="Search people"
       emptyText="No one matches."
       isDisabled={isDisabled}
