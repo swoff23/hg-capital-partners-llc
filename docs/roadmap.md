@@ -4,7 +4,7 @@ Nov 16, 2026 to May 15, 2027. Written on Nov 14, 2026 against main at `200093a`.
 
 The order: trust the app first, then switch on the money, then give every unit a real tenancy, then use it all to grow.
 
-26 items: 19 already planned (a spec, plan or review in this repo proposed them) and 7 new ideas. New ideas are recommendations only. Each one still gets a planning pass, a spec and Connor's "build it" before any code.
+28 items: 19 already planned (a spec, plan or review in this repo proposed them) and 9 new ideas. New ideas are recommendations only. Each one still gets a planning pass, a spec and Connor's "build it" before any code.
 
 **Statuses:** In progress, Spec ready, Needs a spec, Waiting on Connor, Decision.
 **Sizes** are rough build sizes with review and the device check: S about a day, M a few days, L a week or more.
@@ -38,6 +38,8 @@ Three things only Connor can do. Each one unblocks a build.
 | Tidy the secrets (new) | Waiting on Connor | S | Nov 16 to Nov 30 | | README Runbook |
 | Contractor page: W-9s, Billing, job history | Spec ready | S | Dec 1 to Dec 15 | Design calls | contractor page spec, Nov 14 |
 | Tenant contact on jobs | Spec ready | M | Dec 1 to Dec 31 | Design calls | docs/specs/tenant-contact.md |
+| Check photos on file (new) | Needs a spec | S | Nov 23 to Dec 15 | | Connor, Nov 19 |
+| Task recorder (new) | Needs a spec | M | Nov 23 to Dec 15 | | Connor, Nov 19 |
 
 - **Prove email end to end.** Job emails, reply by email and the 8 am Due today run are live, but no real one has gone out yet. One test with the test contractor's login proves all three.
 - **Error alerts.** Nothing tells anyone when the app breaks. Sentry catches server and browser errors, and Better Stack watches the site, the email job and the QuickBooks sync. The spec puts it in before contractors are invited.
@@ -48,6 +50,8 @@ Three things only Connor can do. Each one unblocks a build.
 - **Tidy the secrets.** `CONNOR_PASSWORD` and `PIETER_PASSWORD` are still in Vercel, though the Runbook says they can go once a build has saved them. Skew Protection is still off. Two settings changes and no build.
 - **Contractor page.** Upload and view the actual W-9, Billing as Check, ACH or Credit Card tags, an insurance switch, and an Open | Done switch that reaches each contractor's whole history, Asana jobs included. The W-9 files feed January's 1099 list.
 - **Tenant contact on jobs.** Each unit holds its tenant's name and phone, and each job shares the tenant, the lockbox code or both. It's the first step toward real tenancies. Three of its calls were reopened on Nov 14 and need Connor's answer.
+- **Check photos on file.** Pieter snaps each check he writes from his phone, adds who it's to, the amount, the date and the property, and it files itself. Connor's high priority (Nov 19). Connor can find any check later by payee, property, amount or check number, and each one opens the photo. When contractor invoices land, a check photo attaches to the invoice it paid. Reuses: the private blob store and the attachment upload, file route and safe headers behind task and property files.
+- **Task recorder.** Pieter records one long voice memo, say on a drive between properties, and the app turns it into tasks: a title, the property, who it's for and a due date for each. He reviews the draft list and adds them in one tap, so nothing lands half-read. The recording stays on file with the tasks it made. Connor's high priority (Nov 19). Reuses: New task and the Task model, the property and contact matching behind search, and the private blob store for the audio.
 
 ## Next: Dec 16 to Jan 31. Money and the tax calendar
 
