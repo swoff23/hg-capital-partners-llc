@@ -4,7 +4,7 @@ Nov 16, 2026 to May 15, 2027. Written on Nov 14, 2026 against main at `200093a`.
 
 The order: trust the app first, then switch on the money, then give every unit a real tenancy, then use it all to grow.
 
-29 items: 19 already planned (a spec, plan or review in this repo proposed them) and 10 new ideas. New ideas are recommendations only. Each one still gets a planning pass, a spec and Connor's "build it" before any code.
+30 items: 19 already planned (a spec, plan or review in this repo proposed them) and 11 new ideas. New ideas are recommendations only. Each one still gets a planning pass, a spec and Connor's "build it" before any code.
 
 **Statuses:** In progress, Spec ready, Needs a spec, Waiting on Connor, Decision.
 **Sizes** are rough build sizes with review and the device check: S about a day, M a few days, L a week or more.
@@ -79,12 +79,14 @@ Three things only Connor can do. Each one unblocks a build.
 |---|---|---|---|---|---|
 | The property hub | Needs a spec | L | Feb 1 to Mar 31 | | docs/uiux-review/README.md (move 2), docs/property-page-plan.md section 1 |
 | Resident maintenance requests | Waiting on Connor | M | Feb 1 to Mar 15 | | docs/todo-for-connor.md, docs/uiux-review/journeys.md |
+| Rent records in the app (new) | Needs a spec | M | Feb 1 to Feb 28 | Leases | Connor, Nov 20; scripts/migrate/run.ts |
 | Rent roll from leases | Needs a spec | M | Feb 15 to Mar 15 | Leases, QuickBooks | docs/property-page-plan.md section 2 |
 | Monday note for the partners (new) | Needs a spec | S | Feb 1 to Feb 14 | QuickBooks | |
 | Move-in report by personal link | Needs a spec | S | Mar 1 to Mar 31 | Leases | docs/uiux-review/journeys.md |
 
 - **The property hub.** One record layout, built first on the property page: a summary strip with value, equity, LTV, cash flow and the next key date, tabs with counts and one timeline. It starts with two or three layouts for Connor to pick. Deals, tasks and contractors reuse it later.
 - **Resident maintenance requests.** The Residents page's Request maintenance tile still reads "Soon". A request with photos and permission to enter lands in Needs you as a task, and the resident hears when it's scheduled and when it's done. Waits on how Connor wants residents to reach HG Capital.
+- **Rent records in the app.** The Rent Record Keeping sheet, the history of who paid what and when, moves into the app. The first import left it behind on purpose until the money side was live. Each payment sits on its lease, so a unit shows its full rent history and the sheet can retire. It also becomes the check against QuickBooks that Financials Settings points to today. Connor's ask (Nov 20). Reuses: the lease records and `scripts/migrate/04-tenants.ts`'s dry-run-then-write import, and `LedgerLine` for the QuickBooks side.
 - **Rent roll from leases.** Expected rent per unit from its lease, next to what QuickBooks shows came in, month by month, with late or short months flagged. It extends the Rent roll page that already reads QuickBooks.
 - **Monday note for the partners.** One email each Monday for Connor and Pieter: what's late, what's due this week, jobs waiting for review, key dates coming up, and last week's money in and out. Reuses: the notifications cron and outbox behind the 8 am emails, and Home's Needs you queries.
 - **Move-in report by personal link.** Today it's one long public form that lands as a text dump inside a task. Sent from the NEW TENANT playbook, it saves as the resident goes and files itself to the unit as a dated record.
