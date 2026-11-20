@@ -353,8 +353,14 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
       if (d.done === false) return { text: `${a} unchecked ${title || "an item"}` };
       return { text: `${a} updated ${title || "the checklist"}` };
     }
-    case "ACCESS":
+    case "ACCESS": {
+      // Permission to enter (docs/specs/tenants.md section 8): `entry` is its from and to, `cleared` a unit change's.
+      const entry = d.entry && typeof d.entry === "object" ? (d.entry as Data) : null;
+      if (entry && d.cleared === "unit") return { text: "Permission to enter was cleared when the unit changed" };
+      if (entry?.to === true) return { text: `${a} turned on permission to enter` };
+      if (entry?.to === false) return { text: `${a} turned off permission to enter` };
       return { text: `${a} changed who can see this` };
+    }
     case "REPEAT_CREATED": {
       const due = s(d.due);
       const next = s(d.next);

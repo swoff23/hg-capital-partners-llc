@@ -10,7 +10,7 @@ import { isActiveStatus } from "@/lib/task-scope";
 import { targetDate } from "@/lib/tasks/rules";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
-import { CODE_MASK, lockboxMasker, readLockboxCode } from "./access-code";
+import { CODE_MASK, lockboxMasker, readJobAccess } from "./access-code";
 import { logSecurityEvent } from "./accounts";
 import { crewText } from "./crew-text";
 import { jobLinkUrl } from "./job-link-paths";
@@ -44,21 +44,23 @@ function revalidateJob(taskId: string): void {
 }
 
 /**
- * Opening a job leaves two records: everything in it counts as seen for
- * "2 new", and a lockbox code on screen is logged (D21). The job page calls
- * this while it renders. A render must never write (Next's data-security
- * guide, "Avoiding side-effects during rendering"), so the request is read
- * here and the writes run in after(), once the page has been sent.
+ * Opening a job leaves its records: everything in it counts as seen for
+ * "2 new", and a lockbox code or the tenants on screen are logged (D21,
+ * docs/specs/tenant-contact.md Q12). The job page calls this while it
+ * renders. A render must never write (Next's data-security guide, "Avoiding
+ * side-effects during rendering"), so the request is read here and the writes
+ * run in after(), once the page has been sent.
  */
-export async function noteJobViewed(taskId: string, opts: { lockboxShown: boolean }): Promise<void> {
+export async function noteJobViewed(taskId: string, opts: { lockboxShown: boolean; tenantShown: boolean }): Promise<void> {
   const p = await requirePortalPrincipal();
   // cookies() and headers() can't be read inside after() from a page.
-  const ipHash = opts.lockboxShown ? await requestIpHash() : null;
+  const ipHash = opts.lockboxShown || opts.tenantShown ? await requestIpHash() : null;
   const now = new Date();
   after(async () => {
     try {
       await markJobSeen(p, taskId, now);
-      if (ipHash) await logLockboxView(p, taskId, ipHash, now);
+      if (ipHash && opts.lockboxShown) await logAccessView("LOCKBOX_VIEWED", p, taskId, ipHash, now);
+      if (ipHash && opts.tenantShown) await logAccessView("TENANT_VIEWED", p, taskId, ipHash, now);
     } catch (err) {
       logError("portal:job-viewed", err, { taskId });
     }
@@ -80,18 +82,18 @@ async function markJobSeen(p: PortalPrincipal, taskId: string, now: Date): Promi
 }
 
 /**
- * One LOCKBOX_VIEWED SecurityEvent per contractor, job and Buffalo day,
- * counted under a lock so two loads at once still write one.
+ * One LOCKBOX_VIEWED or TENANT_VIEWED SecurityEvent per contractor, job, kind
+ * and Buffalo day, counted under a lock so two loads at once still write one.
  */
-async function logLockboxView(p: PortalPrincipal, taskId: string, ipHash: string, now: Date): Promise<void> {
+async function logAccessView(kind: "LOCKBOX_VIEWED" | "TENANT_VIEWED", p: PortalPrincipal, taskId: string, ipHash: string, now: Date): Promise<void> {
   const day = todayYmdEastern(now);
   await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LOCKBOX_LOCK}::int, hashtext(${`${p.contactId}:${taskId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LOCKBOX_LOCK}::int, hashtext(${`${kind}:${p.contactId}:${taskId}`}))`;
     const seen = await tx.securityEvent.findFirst({
-      where: { kind: "LOCKBOX_VIEWED", contactId: p.contactId, taskId, data: { path: ["day"], equals: day } },
+      where: { kind, contactId: p.contactId, taskId, data: { path: ["day"], equals: day } },
       select: { id: true },
     });
-    if (!seen) await logSecurityEvent(tx, { kind: "LOCKBOX_VIEWED", contactId: p.contactId, taskId, ipHash, data: { day } });
+    if (!seen) await logSecurityEvent(tx, { kind, contactId: p.contactId, taskId, ipHash, data: { day } });
   });
 }
 
@@ -170,12 +172,14 @@ export async function crewTextFor(taskId: string): Promise<string> {
       dueDate: true,
       scheduledFor: true,
       propertyId: true,
+      entryPermittedAt: true,
       property: { select: { address: true } },
       checklist: { where: { done: false }, select: { title: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
     },
   });
   if (!isActiveStatus(task.status)) throw new core.TaskRuleError("This job is closed.");
-  const [mask, code] = await Promise.all([lockboxMasker(prisma, task.propertyId), readLockboxCode(prisma, task.propertyId, task.unitLabel)]);
+  // The link opens the job as this contractor, so it offers the lockbox only when their job shows it.
+  const [mask, access] = await Promise.all([lockboxMasker(prisma, task.propertyId), readJobAccess(prisma, task)]);
   const notes = task.description?.trim() ? mask(task.description).map((part) => ("text" in part ? part.text : CODE_MASK)).join("") : null;
   const due = toYmd(targetDate(task));
   const token = await mintJobLink(prisma, { taskId, kind: "CREW", contactId: p.contactId });
@@ -185,7 +189,7 @@ export async function crewTextFor(taskId: string): Promise<string> {
     due: due ? fmtDay(due, { weekday: true, year: "auto", now: todayYmdEastern() }) : null,
     notes,
     todo: task.checklist.map((c) => c.title),
-    hasAccess: !!code,
+    hasAccess: !!access.lockbox,
     url: jobLinkUrl(getEnv().appUrl, token),
   });
 }

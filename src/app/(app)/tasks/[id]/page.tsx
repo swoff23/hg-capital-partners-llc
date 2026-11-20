@@ -9,14 +9,14 @@ import { recordView } from "@/lib/recent-views";
 import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { propertyOptions } from "@/lib/picker-options";
-import { parseUnits } from "@/lib/property-types";
 import { activityRecordIds, easternDay } from "@/lib/tasks/activity";
 import { activityRecordNames } from "@/lib/tasks/activity-names";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { asanaProfileGids, asanaTaskGids, taskIdsIn } from "@/lib/tasks/body-links";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { emailStatesIn } from "@/lib/tasks/delivery";
-import { lockboxState, resolveLockboxCode } from "@/lib/tasks/lockbox";
+import { lockboxState } from "@/lib/tasks/lockbox";
+import { readTaskHome } from "@/lib/tenants/living";
 import { lastSeen, markTaskSeen, otherPartnersSeen, seenBaseline } from "@/lib/tasks/read-state";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
 import { copySlot } from "@/lib/tasks/repeat-slot";
@@ -24,7 +24,7 @@ import { isDraftUpload, markDoneComment, mediaItem, reviewPhotos, taskMedia, tas
 import { OVERDUE_ELIGIBLE, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
 import { shapeActivity } from "./activity-rows";
 import type { ReviewDecision, ReviewProof } from "./review-banner";
-import type { TaskLockbox } from "./fields";
+import type { TaskLockbox, TaskTenants } from "./fields";
 import { TaskPageView } from "./view";
 import type { Metadata } from "next";
 import { recordMetadata } from "@/lib/record-metadata";
@@ -59,6 +59,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       scheduledFor: true,
       waitingOn: true,
       unitLabel: true,
+      entryPermittedAt: true,
       repeatRule: true,
       createdAt: true,
       asanaSyncedAt: true,
@@ -139,12 +140,12 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
     .slice(-40)
     .map((e) => e.id);
 
-  const [{ users, contractors, recent }, propertyRow, repeatSlot, contractorSeen, linked, people, emailStates, recordNames] =
+  const [{ users, contractors, recent }, home, repeatSlot, contractorSeen, linked, people, emailStates, recordNames] =
     await Promise.all([
       // Recent: the people this viewer assigned last, for the assignee picker.
       assigneeOptions([task.assigneeContactId], user.id),
-      // The lockbox state reads this task's own property's units, which stay on the server.
-      task.propertyId ? prisma.property.findUnique({ where: { id: task.propertyId }, select: { units: true } }) : null,
+      // Who lives there and the lockbox state, from this task's own property's units and leases, which stay on the server.
+      readTaskHome(prisma, task),
       // The date the series gave this task when it is a repeat copy, so the repeat menu's "Next:" steps from it
       // as finishing does, not from wherever the copy was moved. Reads the same lines core.ts repeatSlot reads.
       copySlot(prisma, task.id, task.events.find((e) => e.kind === "CREATED")?.data),
@@ -182,17 +183,26 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   // Whether a change here emails them, or why not: no login, never signed in, or their Job emails switch is off
   // (docs/specs/contractor-email-switch.md). The same rule core.ts queues by.
   const contractorEmails = contractor ? jobEmailState(contractor.portalAccount, contractor.active) : "no-login";
-  const property = propertyRow;
-
   const lockbox = ((): TaskLockbox | null => {
-    if (!contractorFirst || !property || !active) return null;
-    const units = parseUnits(property.units);
+    if (!contractorFirst || !home || !active) return null;
     const who = { contractor: contractorFirst, hasLogin: contractorHasLogin };
-    // The code the contractor's job shows; with none, a property with codes asks for a unit.
-    const code = resolveLockboxCode(units, task.unitLabel);
-    if (code) return { state: "shown", code, ...who };
-    return lockboxState(units, task.unitLabel) === "pick-unit" ? { state: "pick-unit", ...who } : null;
+    // The code this job resolves to, shown to staff whatever the contractor gets; with none, a property with codes
+    // asks for a unit. At an occupied home the contractor sees it only with Permission to enter (tenants.md 8).
+    const { code, showsLockbox } = home.access;
+    if (code) return { state: "shown", code, contractorSees: showsLockbox, ...who };
+    return lockboxState(home.units, task.unitLabel) === "pick-unit" ? { state: "pick-unit", ...who } : null;
   })();
+
+  // Who lives there today, or with nobody there the household moving in next (tenant-contact.md section 4).
+  const tenants = ((): TaskTenants | null => {
+    const stay = home?.living ?? home?.next;
+    if (!stay || stay.tenants.length === 0) return null;
+    const day = (d: string) => fmtDay(d, { year: "auto", now });
+    const moveLine = home?.living ? stay.movesOut && `Moves out ${day(stay.movesOut)}` : stay.movesIn && `Moves in ${day(stay.movesIn)}`;
+    return { leaseId: stay.leaseId, people: stay.tenants.map(({ name, phone, dial }) => ({ name, phone, dial })), moveLine: moveLine || null };
+  })();
+  // Permission to enter: every open task at a home somebody lives in, whoever has it (tenants.md T10).
+  const entryOffered = active && !!home?.access.occupied;
 
   const userName = (u: { name: string | null; email: string }) => u.name || u.email;
   const staffFirstNames = staff.map((u) => firstName(userName(u)) || userName(u));
@@ -303,6 +313,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
         propertyId: task.propertyId,
         unitLabel: task.unitLabel,
         repeatRule: parseRepeatRule(task.repeatRule),
+        entryPermitted: !!home?.access.permitted,
       }}
       users={users}
       contractors={contractors}
@@ -312,6 +323,8 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       recent={recent}
       repeatSlot={repeatSlot}
       lockbox={lockbox}
+      tenants={tenants}
+      entryOffered={entryOffered}
       created={created}
       contractorFirst={contractorFirst}
       contractorHasLogin={contractorHasLogin}

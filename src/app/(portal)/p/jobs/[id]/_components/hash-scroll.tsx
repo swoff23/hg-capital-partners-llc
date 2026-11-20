@@ -2,11 +2,13 @@
 import { useEffect } from "react";
 
 /**
- * Takes an email's anchor (`#lockbox`, `#updates`, `#update-<id>`) into view
- * once the job page is in. A cold open from an email streams the loading
- * screen first, where the browser finds no such id and lets the scroll go;
- * this mounts with the page itself, so the place is there. The staff app's
- * shell does the same for its pages (app-shell.tsx).
+ * Takes an email's anchor (`#access`, `#updates`, `#update-<id>`, and
+ * `#lockbox` from emails sent before Tenants) into view once the job page is
+ * in. A cold open from an email streams the loading screen first, where the
+ * browser finds no such id and lets the scroll go; this mounts with the page
+ * itself, so the place is there. The staff app's shell does the same for its
+ * pages (app-shell.tsx). `#access` lands on Tenants, or on Lockbox when
+ * nobody lives there (job-link-paths.ts).
  */
 export function HashScroll() {
   useEffect(() => {
@@ -20,7 +22,8 @@ export function HashScroll() {
     } catch {
       // A hand-edited link with a stray %: use it as written.
     }
-    if (id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+    const target = id === "access" ? (document.getElementById("tenants") ?? document.getElementById("lockbox")) : id ? document.getElementById(id) : null;
+    target?.scrollIntoView({ block: "start" });
   }, []);
   return null;
 }

@@ -150,7 +150,7 @@ export interface JobEmailInput {
     checklist: { title: string; done: boolean }[];
     contractor: string | null;
     checklistLine: string | null;
-    /** "Show access": opens the job at its Lockbox. */
+    /** "Show access": opens the job at its Tenants or Lockbox. */
     accessUrl?: string | null;
     /** Add to calendar's .ics. */
     calendarUrl?: string | null;

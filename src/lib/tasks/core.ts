@@ -7,6 +7,7 @@ import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
+import { homeOccupied, readTaskHome } from "@/lib/tenants/living";
 import { hasPinnedDay, isUntouchedCopy, leapDayRule, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
 import { copySlot } from "./repeat-slot";
 import {
@@ -546,6 +547,11 @@ export interface NewTaskInput {
    * item ticks itself once that row is filled in.
    */
   checklist?: { title: string; checkKey?: string | null }[];
+  /**
+   * New task's Permission to enter (docs/specs/tenants.md section 8, T11). Saved only when somebody lives in the
+   * task's home today, checked here again, since the form's answer can be a moment old.
+   */
+  entryPermitted?: boolean;
 }
 
 export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now = new Date()): Promise<Task> {
@@ -562,6 +568,8 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
   if (assigneeContactId && (await contactArchivedLocked(tx, assigneeContactId)) && isActiveStatus(status)) {
     throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
   }
+  const unitLabel = input.unitLabel?.trim() || null;
+  const entryPermitted = !!input.entryPermitted && (await homeOccupied(tx, propertyId, unitLabel, now));
 
   const task = await tx.task.create({
     data: {
@@ -574,7 +582,8 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
       waitingOn: status === "WAITING" ? input.waitingOn!.trim() : null,
       propertyId,
       dealId: input.dealId || null,
-      unitLabel: input.unitLabel?.trim() || null,
+      unitLabel,
+      entryPermittedAt: entryPermitted ? now : null,
       assigneeUserId,
       assigneeContactId,
       assigneeName: assigneeUserId || assigneeContactId ? null : input.assigneeName?.trim() || null,
@@ -594,6 +603,8 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
     kind: "CREATED",
     ...(assigneeUserId || assigneeContactId ? { data: { to: { userId: assigneeUserId, contactId: assigneeContactId } } } : {}),
   });
+  // The same line the task page writes, so the record shows who gave Permission to enter and when.
+  if (entryPermitted) await addEvent(tx, task.id, p, { kind: "ACCESS", data: { entry: { from: false, to: true } } });
   if (assigneeContactId) {
     await syncAssigneeAccess(tx, task.id, assigneeContactId, p, now);
     await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
@@ -1009,6 +1020,7 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
       repeatRule: rule,
       repeatSeriesId: seriesId,
       createdByUserId: done.createdByUserId,
+      // No entryPermittedAt: each visit needs the tenants' own yes (docs/specs/tenants.md T8).
     },
   });
   const items = await tx.taskChecklistItem.findMany({ where: { taskId: done.id }, orderBy: { position: "asc" } });
@@ -1105,6 +1117,12 @@ export interface TaskPatch {
   expectedDescription?: string | null;
   waitingOn?: string | null;
   repeatRule?: RepeatRule | null;
+  /**
+   * Permission to enter (docs/specs/tenants.md section 8): on stamps the server's clock, off clears it. Compared with
+   * whether it holds for the household there now, so turning it on again after a new household moved in writes a new
+   * stamp, and a pick that changes nothing writes no line.
+   */
+  entryPermitted?: boolean;
 }
 
 /** Notes as patchTask stores and compares them: trimmed, with "" for none. */
@@ -1222,6 +1240,22 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
       data.unitLabel = u;
       events.push({ kind: "PROPERTY", data: { unitFrom: before.unitLabel, unitTo: u } });
     }
+  }
+  // Permission to enter belongs to the home, so a new unit or property clears it with a line of its own (T8); a new
+  // assignee keeps it. Only a permission that still held gets the line.
+  const homeMoved = data.propertyId !== undefined || data.unitLabel !== undefined;
+  if (before.entryPermittedAt && (homeMoved || patch.entryPermitted !== undefined)) {
+    const held = !!(await readTaskHome(tx, before, now))?.access.permitted;
+    if (homeMoved) {
+      data.entryPermittedAt = null;
+      if (held) events.push({ kind: "ACCESS", data: { entry: { from: true, to: false }, cleared: "unit" } });
+    } else if (patch.entryPermitted !== held) {
+      data.entryPermittedAt = patch.entryPermitted ? now : null;
+      events.push({ kind: "ACCESS", data: { entry: { from: held, to: !!patch.entryPermitted } } });
+    }
+  } else if (patch.entryPermitted && !homeMoved) {
+    data.entryPermittedAt = now;
+    events.push({ kind: "ACCESS", data: { entry: { from: false, to: true } } });
   }
   if (patch.waitingOn !== undefined && before.status === "WAITING") {
     const w = patch.waitingOn?.trim() || null;

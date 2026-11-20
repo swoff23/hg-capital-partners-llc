@@ -9,6 +9,7 @@ import { DatePanel, DatePicker } from "@/components/due-date-picker";
 import { AssigneePicker, PropertyUnitPicker } from "@/components/entity-picker";
 import type { MenuFollowUp } from "@/components/menu";
 import { StatusMenu } from "@/components/status-menu";
+import { Switch } from "@/components/switch";
 import { useToast } from "@/components/toast";
 import { Button, CheckboxMark, FormField, Input, Textarea, tagClass } from "@/components/ui";
 import type { FieldErrors } from "@/lib/action-result";
@@ -21,7 +22,7 @@ import { fmtShortDay } from "@/lib/tasks/activity";
 import { newTaskNotesProblem } from "@/lib/tasks/limits";
 import { afterCreate, isStillOnNewTask, newTaskDraftKey } from "@/lib/tasks/new-task";
 import { cn } from "@/lib/utils";
-import { createTask, type CreatedTask } from "./actions";
+import { createTask, homeHasTenants, type CreatedTask } from "./actions";
 
 /** A new task starts To do, Scheduled, In progress or Waiting; Review, Done and Canceled come from working it. */
 const NOT_NEW: readonly TaskStatus[] = ["REVIEW", "DONE", "CANCELED"];
@@ -41,6 +42,8 @@ type Values = {
   propertyId: string | null;
   unitLabel: string | null;
   dealId: string | null;
+  /** Permission to enter (docs/specs/tenants.md section 8, T11): sent only while the picked home has tenants. */
+  entryPermitted: boolean;
 };
 
 const encodeAssignee = (v: AssigneeValue) => (!v ? "" : "userId" in v ? `u:${v.userId}` : `c:${v.contactId}`);
@@ -58,6 +61,7 @@ function blank(context: NewTaskContext | null, meId: string, fill: TaskFill | nu
     propertyId: context?.kind === "property" ? context.id : null,
     unitLabel: null,
     dealId: context?.kind === "deal" ? context.id : null,
+    entryPermitted: false,
   };
 }
 
@@ -75,7 +79,8 @@ function blank(context: NewTaskContext | null, meId: string, fill: TaskFill | nu
  * "Create task" with Create more; a task made from the sheet leaves you where
  * you were with "Task created · Open". It posts the same fields the page form
  * did: `assignee` ("u:", "c:" or blank), `dueDate`, `repeatRule` (JSON),
- * `status`, `waitingOn`, `scheduledFor`, `propertyId`, `unitLabel`, `dealId`.
+ * `status`, `waitingOn`, `scheduledFor`, `propertyId`, `unitLabel`, `dealId`,
+ * and `entryPermitted` while the Permission to enter switch shows and is on.
  */
 export function NewTaskForm({
   variant,
@@ -116,6 +121,25 @@ export function NewTaskForm({
     };
   }, []);
   const set = (patch: Partial<Values>) => setValues((v) => ({ ...v, ...patch }));
+
+  // Whether somebody lives in the picked home today, asked again on each pick: the Permission to enter switch shows
+  // only then (tenants.md T11). Held with the home it answers for, so a stale answer never shows the switch.
+  const [lives, setLives] = useState<{ home: string; yes: boolean } | null>(null);
+  const home = values.propertyId ? `${values.propertyId}|${values.unitLabel ?? ""}` : null;
+  useEffect(() => {
+    if (!values.propertyId) return;
+    const asked = `${values.propertyId}|${values.unitLabel ?? ""}`;
+    let live = true;
+    homeHasTenants(values.propertyId, values.unitLabel).then(
+      (yes) => live && setLives({ home: asked, yes }),
+      // Unanswered (offline, signed out): no switch, so nothing is saved.
+      () => live && setLives({ home: asked, yes: false }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [values.propertyId, values.unitLabel]);
+  const offerEntry = home !== null && lives?.home === home && lives.yes;
 
   const showProperty = !(tagOn && context);
 
@@ -241,7 +265,7 @@ export function NewTaskForm({
                   aria-label={`Remove ${context.label}`}
                   onClick={() => {
                     setTagOn(false);
-                    set({ propertyId: null, unitLabel: null, dealId: null });
+                    set({ propertyId: null, unitLabel: null, dealId: null, entryPermitted: false });
                   }}
                   className="relative flex size-4.5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5"
                 >
@@ -323,12 +347,16 @@ export function NewTaskForm({
                   properties={properties}
                   size="sm"
                   className="md:min-w-32 md:shrink"
-                  onChange={set}
+                  // A new home starts without Permission to enter (tenants.md T8).
+                  onChange={(pick) => set({ ...pick, entryPermitted: false })}
                 />
               )}
             </div>
             {reason && <p className="truncate text-meta text-muted-foreground">{reason}</p>}
           </div>
+
+          {/* Under the chips, once the picked home has tenants; off until it's turned on (tenants.md T11, T13). */}
+          {offerEntry && <Switch label="Permission to enter" isSelected={values.entryPermitted} onChange={(entryPermitted) => set({ entryPermitted })} />}
 
           {/* What the form posts, under the names the server action reads. */}
           <input type="hidden" name="assignee" value={encodeAssignee(values.assignee)} />
@@ -341,6 +369,7 @@ export function NewTaskForm({
           <input type="hidden" name="unitLabel" value={values.unitLabel ?? ""} />
           <input type="hidden" name="dealId" value={values.dealId ?? ""} />
           {fill && <input type="hidden" name="missing" value={fill.keys.join(",")} />}
+          {offerEntry && values.entryPermitted && <input type="hidden" name="entryPermitted" value="on" />}
         </>
       )}
     </CreateForm>

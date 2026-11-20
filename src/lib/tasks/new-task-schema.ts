@@ -29,4 +29,6 @@ export const newTaskSchema = z.object({
   repeatRule: z.string().optional(),
   // Make task (docs/specs/missing-info.md, D9): the Missing info rows, "<check>|<subject>", comma-joined.
   missing: z.string().max(20_000).optional(),
+  // Permission to enter (docs/specs/tenants.md section 8): "on" only while the switch shows and is on.
+  entryPermitted: z.literal("on").optional(),
 });

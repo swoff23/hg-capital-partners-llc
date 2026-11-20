@@ -340,6 +340,8 @@ const STAFF_ONLY = [
   "@/lib/tenants/service",
   "@/lib/tenants/queries",
   "@/lib/tenants/core",
+  // Staff's read of a task's tenants (lease ids included); the portal reads its own in access-code.ts.
+  "@/lib/tenants/living",
   "@/app/(app)",
 ];
 

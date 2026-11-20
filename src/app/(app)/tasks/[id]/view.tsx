@@ -10,7 +10,7 @@ import type { JobEmailState } from "@/lib/portal/job-emails";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
 import { Composer, type ComposerDraft } from "./composer";
-import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox } from "./fields";
+import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskTenants } from "./fields";
 import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
 import { ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
@@ -44,6 +44,8 @@ export interface TaskPageViewProps {
   /** The date the series gave this task when it is a repeat copy (its CREATED line), null otherwise. */
   repeatSlot: Ymd | null;
   lockbox: TaskLockbox | null;
+  tenants: TaskTenants | null;
+  entryOffered: boolean;
   created: string;
   /** First name of the assigned contractor. */
   contractorFirst: string | null;
@@ -145,6 +147,8 @@ export function TaskPageView(p: TaskPageViewProps) {
               recent={p.recent}
               repeatSlot={p.repeatSlot}
               lockbox={p.lockbox}
+              tenants={p.tenants}
+              entryOffered={p.entryOffered}
               created={p.created}
             />
           </Section>

@@ -13,6 +13,7 @@ If a line, label, chip or tooltip doesn't help the user decide or act, cut it.
 - Don't restate what the layout already shows, like tab names, column headers or counts that appear elsewhere.
 - Cut subtitles that explain the structure of the page. The structure already explains itself.
 - Drop helper text unless it prevents a real mistake.
+- A toggle, field or row starts as its label and its control, with no line under it. Lines that explain what the control does or why it showed up ("Adds the lockbox code", "Dana Lee lives here") read as AI filler (Connor, Nov 17, 2026). A spec that keeps one names the mistake it prevents.
 
 ### 2. Use the lightest form that works
 
@@ -82,6 +83,7 @@ Run each string through these questions before it ships:
 - [ ] Does this help the user decide or act? If not, cut it.
 - [ ] Does the layout already say this? If so, cut it.
 - [ ] Could a lighter form work: nothing, a chip, a tooltip?
+- [ ] Is there a line under a control explaining it? Cut it unless it prevents a real mistake.
 - [ ] Does it fit on one line at desktop, tablet and 375 / 320?
 - [ ] Any em dashes? Rewrite the sentence, don't swap the punctuation.
 - [ ] Any filler or hype words?

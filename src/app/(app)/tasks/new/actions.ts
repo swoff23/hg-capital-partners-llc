@@ -1,4 +1,5 @@
 "use server";
+import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/auth";
 import { formToObject } from "@/lib/forms";
@@ -8,6 +9,8 @@ import { newTaskSchema } from "@/lib/tasks/new-task-schema";
 import { repeatRuleSchema } from "@/lib/tasks/repeat-schema";
 import * as tasks from "@/lib/tasks/service";
 import { makeTaskChecklist } from "@/lib/missing/service";
+import { prisma } from "@/lib/db";
+import { homeOccupied } from "@/lib/tenants/living";
 
 /**
  * Thin server action for New task (forms 2.12, 4.4): authenticate, validate,
@@ -40,6 +43,17 @@ function postedRepeat(json: string | undefined) {
 
 export type CreatedTask = { id: string; title: string };
 
+/**
+ * Whether somebody lives in the picked home today, for New task's Permission to enter switch (docs/specs/tenants.md
+ * section 8, T11). A yes or no only: no names, numbers or lease fields reach the form.
+ */
+export async function homeHasTenants(propertyId: string, unitLabel: string | null): Promise<boolean> {
+  await requireUser();
+  const pid = z.string().min(1).max(64).parse(propertyId);
+  const unit = unitLabel === null ? null : z.string().max(200).parse(unitLabel);
+  return homeOccupied(prisma, pid, unit);
+}
+
 /** Creates the task and says which one, for "Task created · Open". */
 export async function createTask(formData: FormData): Promise<ActionResult<CreatedTask>> {
   return withResult("createTask", async () => {
@@ -65,6 +79,7 @@ export async function createTask(formData: FormData): Promise<ActionResult<Creat
         scheduledFor: p.status === "SCHEDULED" ? p.scheduledFor : null,
         repeatRule: postedRepeat(p.repeatRule),
         checklist,
+        entryPermitted: p.entryPermitted === "on",
       },
       tasks.staffPrincipal(user),
     );

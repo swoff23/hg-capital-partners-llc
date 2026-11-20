@@ -4,7 +4,7 @@ Nov 16, 2026 to May 15, 2027. Written on Nov 14, 2026 against main at `200093a`.
 
 The order: trust the app first, then switch on the money, then give every unit a real tenancy, then use it all to grow.
 
-26 items: 19 already planned (a spec, plan or review in this repo proposed them) and 7 new ideas. New ideas are recommendations only. Each one still gets a planning pass, a spec and Connor's "build it" before any code.
+31 items: 19 already planned (a spec, plan or review in this repo proposed them) and 12 new ideas. New ideas are recommendations only. Each one still gets a planning pass, a spec and Connor's "build it" before any code.
 
 **Statuses:** In progress, Spec ready, Needs a spec, Waiting on Connor, Decision.
 **Sizes** are rough build sizes with review and the device check: S about a day, M a few days, L a week or more.
@@ -38,6 +38,9 @@ Three things only Connor can do. Each one unblocks a build.
 | Tidy the secrets (new) | Waiting on Connor | S | Nov 16 to Nov 30 | | README Runbook |
 | Contractor page: W-9s, Billing, job history | Spec ready | S | Dec 1 to Dec 15 | Design calls | contractor page spec, Nov 14 |
 | Tenant contact on jobs | Spec ready | M | Dec 1 to Dec 31 | Design calls | docs/specs/tenant-contact.md |
+| Check photos on file (new) | Needs a spec | S | Nov 23 to Dec 15 | | Connor, Nov 19 |
+| Task recorder (new) | Needs a spec | M | Nov 23 to Dec 15 | | Connor, Nov 19 |
+| Shorter activity, comments in line (new) | Needs a spec | S | Nov 23 to Nov 30 | | Connor, Nov 19; docs/specs/activity-comments.md |
 
 - **Prove email end to end.** Job emails, reply by email and the 8 am Due today run are live, but no real one has gone out yet. One test with the test contractor's login proves all three.
 - **Error alerts.** Nothing tells anyone when the app breaks. Sentry catches server and browser errors, and Better Stack watches the site, the email job and the QuickBooks sync. The spec puts it in before contractors are invited.
@@ -48,6 +51,9 @@ Three things only Connor can do. Each one unblocks a build.
 - **Tidy the secrets.** `CONNOR_PASSWORD` and `PIETER_PASSWORD` are still in Vercel, though the Runbook says they can go once a build has saved them. Skew Protection is still off. Two settings changes and no build.
 - **Contractor page.** Upload and view the actual W-9, Billing as Check, ACH or Credit Card tags, an insurance switch, and an Open | Done switch that reaches each contractor's whole history, Asana jobs included. The W-9 files feed January's 1099 list.
 - **Tenant contact on jobs.** Each unit holds its tenant's name and phone, and each job shares the tenant, the lockbox code or both. It's the first step toward real tenancies. Three of its calls were reopened on Nov 14 and need Connor's answer.
+- **Check photos on file.** Pieter snaps each check he writes from his phone, adds who it's to, the amount, the date and the property, and it files itself. Connor's high priority (Nov 19). Connor can find any check later by payee, property, amount or check number, and each one opens the photo. When contractor invoices land, a check photo attaches to the invoice it paid. Reuses: the private blob store and the attachment upload, file route and safe headers behind task and property files.
+- **Task recorder.** Pieter records one long voice memo, say on a drive between properties, and the app turns it into tasks: a title, the property, who it's for and a due date for each. He reviews the draft list and adds them in one tap, so nothing lands half-read. The recording stays on file with the tasks it made. Connor's high priority (Nov 19). Reuses: New task and the Task model, the property and contact matching behind search, and the private blob store for the audio.
+- **Shorter activity, comments in line.** A long task's Activity is a wall of one-line changes. Like Linear, a run of changes between two comments collapses into one line that says what's inside ("Show 5 updates: assignee, due date, unit") and opens in place. Comments stay as cards in time order between the runs, never folded, so a conversation reads top to bottom with the changes around it. Connor's ask for the week of Nov 23. Reuses: `TaskActivity`, `ActivityRun` and the folding in `src/lib/tasks/activity.ts`; it revisits the folding rules and top fold in docs/specs/activity-comments.md 2.3.
 
 ## Next: Dec 16 to Jan 31. Money and the tax calendar
 
@@ -59,6 +65,7 @@ Three things only Connor can do. Each one unblocks a build.
 | Contractor onboarding in the portal | Spec ready | M | Dec 16 to Jan 15 | Contractor page | docs/specs/contractor-onboarding.md (branch `claude/contractor-form-integration-55b2b4`) |
 | Year-end pack for the CPA (new) | Needs a spec | M | Jan 16 to Feb 28 | QuickBooks | |
 | Leases on every unit | Needs a spec | L | Jan 16 to Feb 28 | Tenant contact | docs/property-page-plan.md section 2 |
+| Rehab draw tracker (new) | Needs a spec | M | Dec 16 to Jan 31 | | Connor, Nov 20 |
 
 - **Contractor invoices.** Every invoice in one place, tied to its jobs: from the portal, an `invoices@` inbox or by hand. To review, To pay and Paid, plus a list of finished jobs with no invoice. Money still moves in Baselane. Needs Connor's OK on its 11 defaults.
 - **1099 list for January.** One page lists each contractor's 2026 payments beside their W-9 and address, so whoever files has every number in one place. Reuses: QuickBooks vendor lines (`QboVendor`, `LedgerLine`) and the contractor page's W-9 files.
@@ -66,6 +73,7 @@ Three things only Connor can do. Each one unblocks a build.
 - **Contractor onboarding.** New contractors set themselves up from an invite or one sign-up link: details, trades, W-9 and insurance. It retires the Google Form, whose sheet holds every contractor's bank numbers in plain text.
 - **Year-end pack for the CPA.** For each property and LLC: the 2026 P&L from QuickBooks, the CapEx finished this year and the loan facts, in one export. Ready by mid-February, ahead of the Mar 15 return deadline. Reuses: the QuickBooks queries behind Financials and the property CapEx model.
 - **Leases on every unit.** Rent, lease end and deposit live in task text today. A lease per unit (tenant, dates, rent, deposit) puts renewals in Needs you 90 days out and marks each unit occupied, turning over or vacant.
+- **Rehab draw tracker.** Each rehab loan starts with a draw schedule the lender approves, then HG Capital draws on it as work gets done. Today nobody can see where a loan stands. Each property with a rehab loan holds its approved budget by line, every draw requested, funded or pending, and what's left. Finished work that hasn't been drawn yet shows as ready to pull, across every open rehab, so the next draw request is a list, not a hunt. Connor's ask (Nov 20). Reuses: the property's loan and lender fields (`lender`, `loanNumber`, `rehabAmount`), tasks and jobs marked done for what's finished, and property documents for the approved schedule and draw reports.
 
 ## Then: Feb 1 to Mar 31. Tenancies and residents
 
@@ -73,12 +81,14 @@ Three things only Connor can do. Each one unblocks a build.
 |---|---|---|---|---|---|
 | The property hub | Needs a spec | L | Feb 1 to Mar 31 | | docs/uiux-review/README.md (move 2), docs/property-page-plan.md section 1 |
 | Resident maintenance requests | Waiting on Connor | M | Feb 1 to Mar 15 | | docs/todo-for-connor.md, docs/uiux-review/journeys.md |
+| Rent records in the app (new) | Needs a spec | M | Feb 1 to Feb 28 | Leases | Connor, Nov 20; scripts/migrate/run.ts |
 | Rent roll from leases | Needs a spec | M | Feb 15 to Mar 15 | Leases, QuickBooks | docs/property-page-plan.md section 2 |
 | Monday note for the partners (new) | Needs a spec | S | Feb 1 to Feb 14 | QuickBooks | |
 | Move-in report by personal link | Needs a spec | S | Mar 1 to Mar 31 | Leases | docs/uiux-review/journeys.md |
 
 - **The property hub.** One record layout, built first on the property page: a summary strip with value, equity, LTV, cash flow and the next key date, tabs with counts and one timeline. It starts with two or three layouts for Connor to pick. Deals, tasks and contractors reuse it later.
 - **Resident maintenance requests.** The Residents page's Request maintenance tile still reads "Soon". A request with photos and permission to enter lands in Needs you as a task, and the resident hears when it's scheduled and when it's done. Waits on how Connor wants residents to reach HG Capital.
+- **Rent records in the app.** The Rent Record Keeping sheet, the history of who paid what and when, moves into the app. The first import left it behind on purpose until the money side was live. Each payment sits on its lease, so a unit shows its full rent history and the sheet can retire. It also becomes the check against QuickBooks that Financials Settings points to today. Connor's ask (Nov 20). Reuses: the lease records and `scripts/migrate/04-tenants.ts`'s dry-run-then-write import, and `LedgerLine` for the QuickBooks side.
 - **Rent roll from leases.** Expected rent per unit from its lease, next to what QuickBooks shows came in, month by month, with late or short months flagged. It extends the Rent roll page that already reads QuickBooks.
 - **Monday note for the partners.** One email each Monday for Connor and Pieter: what's late, what's due this week, jobs waiting for review, key dates coming up, and last week's money in and out. Reuses: the notifications cron and outbox behind the 8 am emails, and Home's Needs you queries.
 - **Move-in report by personal link.** Today it's one long public form that lands as a text dump inside a task. Sent from the NEW TENANT playbook, it saves as the resident goes and files itself to the unit as a dated record.

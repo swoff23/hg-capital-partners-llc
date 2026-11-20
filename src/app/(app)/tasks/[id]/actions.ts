@@ -35,6 +35,8 @@ const patchSchema = z
     expectedAssignee: assignee,
     waitingOn: waitingOnText.nullable(),
     repeatRule: repeatRuleSchema.nullable(),
+    // Permission to enter (docs/specs/tenants.md section 8): the server stamps its own clock, never the browser's.
+    entryPermitted: z.boolean(),
   })
   .partial()
   .strict();

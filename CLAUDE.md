@@ -66,6 +66,7 @@ The full standard, with a review checklist to run before a string ships, is [doc
 
 - **Everything on screen gives the user value.** If a line, label, chip or tooltip doesn't help them decide or act, cut it. Don't restate what the layout already shows (tab names, column headers, counts shown elsewhere).
 - **Use the lightest form that works.** Nothing, then a count or chip, then a tooltip, then one short line. Never a paragraph.
+- **A control is its label.** A toggle, field or row ships with its label and nothing under it. A line that explains what the control does or why it's there ("Adds the lockbox code", "Dana Lee lives here") reads as AI filler to Connor. Add one only when leaving it out would cause a real mistake, and say which mistake in the spec.
 - **One line.** Notices, helper text and sublabels don't wrap at the component's normal width. Shorten the words, not the font.
 - **No em dashes.** They read as AI-written. Don't fix one by swapping in a period, comma or colon: a dash usually means the sentence is doing two jobs, so rewrite it. If you can't tell what it should say, ask Connor. A lone "—" standing in for an empty value is fine.
 - **No filler.** No "simply", "easily", "Note that", "This lets you", and no hype ("seamless", "unlock", "supercharge"). Don't repeat the heading in the body.

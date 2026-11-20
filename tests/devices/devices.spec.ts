@@ -82,6 +82,9 @@ for (const route of listRoutes()) {
       const text = msg.text();
       // Failed loads are reported (with the URL) by the response listener.
       if (text.startsWith("Failed to load resource")) return;
+      // WebKit's Linux build says it skips the staff layout's interactive-widget viewport key, which Chrome reads;
+      // the browser's notice, not the app's error (Connor, Nov 17).
+      if (text.startsWith('Viewport argument key "interactive-widget" not recognized')) return;
       findings.add("console-error", "console", text.split("\n")[0].slice(0, 300), width);
     });
     page.on("response", (res) => {

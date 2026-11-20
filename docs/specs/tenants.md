@@ -44,6 +44,22 @@ Nothing here gets built until Connor says "build it" in chat. It also builds onl
 5. The Units editor doesn't get the tenant fields `tenant-contact.md` section 5 drew. Tenants are added from the property's Tenants section or New lease.
 6. A unit with current or upcoming tenants can't be deleted: "Front has current tenants. End their lease first."
 
+**From Nov 17 (Permission to enter, section 8):**
+
+| # | Decision |
+|---|---|
+| T10 | Permission to enter belongs to the home, not to who goes. It shows on every open task at an occupied unit, whether it's assigned to a contractor, to staff or to nobody. For a contractor it adds the lockbox code to their job page. Staff see codes anyway, so for them it records that they can let themselves in. Supersedes "shows when a contractor is assigned" for the Access row (`tenant-contact.md` section 4) |
+| T11 | New task gets a **Permission to enter** switch under its chip row, shown once the picked unit has tenants living there, off by default. Option A of two (B was an Access chip in the chip row) |
+| T12 | The task page uses the same switch in Details, in place of the Tenant only and Permission to enter menu. Connor asked for "a toggle for permission to enter" on the details side |
+| T13 | The switch is its label and nothing else: no line under it. Connor's copy rule, now in `CLAUDE.md` and `docs/copy-rules.md` |
+
+**Calls for Connor to check before "build it" (Nov 17):**
+
+7. The switch works with or without a lockbox code on file. With none, turning it on records the permission and the contractor still sees no code. (Was: disabled with "No lockbox code".) Permission now matters to staff too (T10), so it shouldn't depend on a code.
+8. The task page drops `tenant-contact.md` section 4's status lines ("Tenants and lockbox shown to Zack"). The Lockbox row stays as built and keeps showing the code to staff; its "Shown to Zack" tag shows only while the contractor sees the code (a vacant unit, or permission on).
+9. ~~The job page drops "The tenants said you can let yourself in" under the code.~~ Connor kept it (Nov 17, with "build it"): it stays under the code at an occupied home with permission, "The tenant said" with one person.
+10. Toasts read "Permission to enter on" and "Permission to enter off", with Undo. The activity lines read "Connor turned on permission to enter", "Connor turned off permission to enter" and "Permission to enter was cleared when the unit changed".
+
 ## 3. Data
 
 Three tables and a file table, all new. Money follows `Property` (`Decimal(12,2)`), and dates follow `Task.dueDate` (UTC midnight, read as a Buffalo day).
@@ -215,12 +231,27 @@ A new `TenantsSection` in `src/app/(app)/properties/[id]/`, right under `UnitsSe
 
 ## 8. Tasks and the job page
 
-Exactly `tenant-contact.md` sections 3 and 4, with two changes:
+`tenant-contact.md` sections 3 and 4, with these changes:
 
 - **The source.** The task page's Tenants row and the job page read `livingLease`'s tenants. The rail's "Edit on the property" becomes **Open lease**, to the lease page.
 - **No phone** (call 2): a tenant without a number shows by name only, with no icons, on both pages.
+- **Any assignee** (T10). The task page's Tenants row and the Permission to enter switch show on every active task at an occupied unit, whoever it's assigned to. The job page's rules don't change: only the assigned contractor sees the tenants or the code, and only while the job is open.
+- **A switch, not a menu** (T12, T13). In Details, the Access row's chip and menu become a stock `Switch` labeled "Permission to enter", with nothing under it, between Tenant and Lockbox. At lg it's a rail row, the label on the left and the switch on the right, saving on toggle through `InlineSwitch` and `patchTask({ entryPermitted })`. Below lg it's a line under the chip row, as on New task. A vacant unit has no switch. Drawn in [tenants/04-permission-to-enter.svg](tenants/04-permission-to-enter.svg).
+- **The Lockbox row** stays as built ("2374 · Shown to Brandon", Nov 14) and keeps showing the code to staff. Its tag shows only while the contractor sees the code (call 8). The status lines are dropped.
+- **The job page** keeps the line under the code (call 9, as Connor kept it).
 
-The Access row, Permission to enter, the status lines, the ACCESS events and the `#access` anchor in job emails are unchanged. The five calls in T8 hold. Today's Lockbox row ("2374 · Shown to Brandon", built Nov 14) becomes that Access row, and keeps showing the code to staff.
+The write, the ACCESS events (with the lines in call 10) and the `#access` anchor in job emails are otherwise unchanged. The five calls in T8 hold.
+
+### New task (T11)
+
+![New task's switch, and the same switch in Details](tenants/04-permission-to-enter.svg)
+
+- **When it shows.** Once the picked unit has tenants living there today, by `livingLease`. With no unit picked, a single-unit property uses its unit (Q9). Whoever the assignee is (T10). A vacant unit, a building with several units and none picked, or no property: no switch.
+- **The look.** Option A: the stock `Switch` ("Permission to enter", nothing under it) as a full-width line under the chip row, 32px with a mouse and 44px on touch. The same at laptop 1280, tablet 768 and phones 375 and 320; nothing drops on a phone.
+- **Off by default.** Changing the property or unit turns it off (T8), and it shows again only if the new unit has tenants. The draft keeps it with the unit; a restored draft keeps it on only if that unit still has tenants.
+- **The lookup.** Picking a unit, or a single-unit property, calls a server action that answers one yes or no: whether tenants live there today. No names, numbers or lease fields reach the form.
+- **The write.** The form posts `entryPermitted=on` only while the switch shows. `createTask` checks occupancy again on the server and sets `entryPermittedAt` to `now()` only at an occupied unit, writing the same INTERNAL ACCESS event the task page writes, in the create's transaction. No email or notice.
+- **Make task** from Missing info opens this form, so it gets the switch. Playbook Apply, the move-in form and repeats don't (a repeat starts without permission, T8).
 
 ## 9. Playbooks
 
@@ -254,7 +285,8 @@ A one-time script, `scripts/migrate/04-tenants.ts`, beside the other migrations,
 | Tenants | `src/lib/tenants/service.ts`, `status.ts`, `queries.ts` and their tests; `src/app/(app)/tenants/(list)/page.tsx`, `filters.tsx`, `loading.tsx`, `query.ts`; `src/app/(app)/tenants/[id]/` (page, sections, actions, loading); `src/app/(app)/tenants/new/` |
 | Navigation and search | `src/components/nav.tsx`, `src/lib/list-memory.ts`, `src/lib/commands.ts`, `src/lib/search.ts` and the search route |
 | Property | `src/app/(app)/properties/[id]/page.tsx`, a new `tenants-section.tsx`, `src/lib/properties/service.ts` (`writeUnits`) |
-| Access rules | everything in `tenant-contact.md` section 8's Rule, Portal and Task page rows, reading `livingLease` |
+| Access rules | everything in `tenant-contact.md` section 8's Rule, Portal and Task page rows, reading `livingLease`; the Details switch in `src/app/(app)/tasks/[id]/fields.tsx` |
+| New task | `src/app/(app)/tasks/new/new-task-fields.tsx` and `actions.ts`, `src/lib/tasks/new-task-schema.ts`, `src/lib/tasks/core.ts` (`createTask`), the occupancy lookup action |
 | Playbooks | as `tenant-contact.md` section 8, plus the tenants service |
 | Import | `scripts/migrate/04-tenants.ts` |
 | Devices | `tests/devices/routes.ts` (`SAMPLE_PARAMS` for `tenants/[id]`) |
@@ -268,11 +300,11 @@ A one-time script, `scripts/migrate/04-tenants.ts`, beside the other migrations,
 
 | | What |
 |---|---|
-| **Reused** | `FilterScope`, `FilterBar` with views and a facet, `ResultLine`, `SortHeader`, list memory and the sidebar's `list` link (Contractors' list); `PropertyPicker`, `UnitPicker`; `InlineField` facts and notes; the record grid and Details rail (the task page); `Section`, `FormSheet`, `FormField`, `DateField`, `tagClass`, `StatusMark`, `ConfirmDialog`, `Menu`; the files list and private Blob uploads (property documents); `readPhone`, `telHref`, `textHref`; `Money` |
-| **Extended** | `writeUnits` (lease labels, the delete refusal); global search (tenants); `auth-guard.test`; everything `tenant-contact.md` section 9 extends, reading leases |
+| **Reused** | `FilterScope`, `FilterBar` with views and a facet, `ResultLine`, `SortHeader`, list memory and the sidebar's `list` link (Contractors' list); `PropertyPicker`, `UnitPicker`; `InlineField` facts and notes; the record grid and Details rail (the task page); `Section`, `FormSheet`, `FormField`, `DateField`, `tagClass`, `StatusMark`, `ConfirmDialog`, `Menu`; the files list and private Blob uploads (property documents); `readPhone`, `telHref`, `textHref`; `Money`; `Switch` and `InlineSwitch` for Permission to enter |
+| **Extended** | `writeUnits` (lease labels, the delete refusal); global search (tenants); `auth-guard.test`; everything `tenant-contact.md` section 9 extends, reading leases; New task's form and `createTask` (`entryPermitted`) |
 | **New** | `Tenant`, `Lease`, `LeaseTenant`, `LeaseTerm`, `LeaseFile`; the tenants service, `leaseStatus`, `livingLease`; the Tenants list, `TenantsSection`, the lease page, New lease; the import script |
 
-**References.** Mobbin has no landlord apps, so the list follows Contractors and the lease page follows the task page. Rent roll rows follow [Zillow's units table](https://mobbin.com/screens/62ef5ddd-0469-4cc8-bdaa-5eefe66dd0f8) (unit, then the money and the date per row). The contact rows and the job page keep `tenant-contact.md` section 9's references.
+**References.** Mobbin has no landlord apps, so the list follows Contractors and the lease page follows the task page. Rent roll rows follow [Zillow's units table](https://mobbin.com/screens/62ef5ddd-0469-4cc8-bdaa-5eefe66dd0f8) (unit, then the money and the date per row). The contact rows and the job page keep `tenant-contact.md` section 9's references. Permission to enter (Nov 17) follows a control that shows up only when it applies, as in [Basecamp's New card](https://mobbin.com/screens/56f50dc4-7b99-409c-9d84-4bd6795fb5f3), and access switches as label-and-switch rows, as in [this sharing sheet](https://mobbin.com/screens/f05509aa-9842-4767-9de9-6694b61e8f68). The chip it beat follows [Linear's New issue](https://mobbin.com/screens/7d2d62c7-8fb9-40d8-bd36-f1a8ff0a860c).
 
 ## 14. Build
 
@@ -280,7 +312,7 @@ After `design-calls-nov14` is on main and Connor says "build it". One package in
 
 1. Schema, the tenants service and its rules, `writeUnits`, and the import script with a dry run on local data (Opus: data and migrations).
 2. The Tenants list, the property's section, the lease page and New lease (Sonnet build, Opus review at every size).
-3. The access rules from `tenant-contact.md`, reading leases (Sonnet build, Opus review on privacy).
+3. The access rules from `tenant-contact.md`, reading leases, with section 8's Nov 17 changes: the switch in Details and on New task (Sonnet build, Opus review on privacy).
 4. Playbooks, then the import for real once Connor has checked `review.csv`.
 
 About five hours of build and checks, plus Connor's time on the review file.
@@ -300,3 +332,17 @@ Part one (section 14's steps 1 and 2, and search) is built. What it decided insi
 - **The housing authority's contact** (Connor, Nov 14): each term keeps the caseworker's name and email (`subsidyContact`, `subsidyEmail`, migration `20261115170100_lease_term_subsidy_email`), kept only with a share, like who pays. New lease and Renew ask for them under Who pays; Renew prefills them from the last term. The lease page's rail shows Who pays, Contact and Contact email under Housing authority, each saving inline, with a mail link beside the email. The import reads optional `subsidy_contact` and `subsidy_email` columns; leases already imported skip, so their contacts go in from the rail.
 - **Any term edits, and a term deletes** (Connor, Nov 16, [lease-term-edits.md](lease-term-edits.md)): a term row opens that term in the Renew sheet's fields, titled with its dates, and Delete term removes it with Undo. Its signed lease stays on the lease, unlinked. A lease's only term can go.
 - **The import ran on Nov 14**: 31 leases, 60 people and 38 terms into production from Connor's checked file (Cowork's export, with his corrections), without PDFs. The import now merges rows with the same name on one lease into one person, checks every term and stay overlap in the dry run, reads a file by any name (`--file`), runs without PDFs (`--skip-files`) and prints the database it's about to use.
+
+## 16. Build notes (Nov 17)
+
+Section 14's step 3, with section 8's Nov 17 changes, is built. Connor said "build it" on Nov 17 and kept "The tenants said you can let yourself in" (call 9). Calls 7, 8 and 10 shipped as written. Playbooks (step 4) aren't built yet. What the build decided inside the spec:
+
+- **One rule, two readers.** `src/lib/tasks/lockbox.ts` gains `tenantUnit` (whose home a job is in: its unit by label, or a property's one rentable unit) and `accessState` (occupied, permitted, and whether the lockbox shows). The portal reads through `access-code.ts` `readJobAccess`; staff read through a new `src/lib/tenants/living.ts` `readTaskHome`, which the auth guard keeps out of portal code. Both decide through `accessState`.
+- **The lockbox photo** (`/api/files/lockbox/<job>`) follows the code: a contractor gets it only while their job shows the code.
+- **Show access** in a job email shows when the job page would show the tenants or the lockbox, and opens at `#access`, which lands on Tenants, or on Lockbox with nobody living there. Emails already sent with `#lockbox` still land on Lockbox.
+- **Text to my crew** says "Lockbox, photos, updates" only when the contractor's job shows the code.
+- **The task page's Tenants row** links each name to the lease (T7) rather than adding an Open lease line in the rail; the chip's menu below lg ends in Open lease. It shows on any task whose home has a household on file, open or closed.
+- **The Lockbox row** still shows only with a contractor assigned, as built Nov 14. Staff see the code there whether or not the contractor does.
+- **The switch** writes through `patchTask({ entryPermitted })`, which compares with whether permission holds for the household there now. So after a new household moves in it reads off, and turning it on stamps the day again. A unit or property change clears it; the line names the change only when the permission still held.
+- **New task** asks a staff action (`homeHasTenants`) for a yes or no when a home is picked, and `createTask` checks again before it saves.
+

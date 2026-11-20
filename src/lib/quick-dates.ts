@@ -2,36 +2,42 @@ import { toYmd, type Ymd } from "./dates";
 
 /**
  * The quick picks every date chip offers (docs/asana-migration-plan.md D7):
- * Today, Tomorrow, Monday, Next week, No date, each with the weekday or date
- * it resolves to. Calendar dates only, never shifted by a timezone; pass
- * "today" in as a "YYYY-MM-DD" (todayYmdEastern() on the server). Pure; see
- * quick-dates.test.ts.
+ * Today, Tomorrow, Friday, Next Monday, In 1 week, In 2 weeks, No date, each
+ * with the weekday or date it resolves to. Calendar dates only, never shifted
+ * by a timezone; pass "today" in as a "YYYY-MM-DD" (todayYmdEastern() on the
+ * server). Pure; see quick-dates.test.ts.
  *
- * Each pick owns its number key, always: Today 1, Tomorrow 2, Monday 3, Next
- * week 4, No date 5 (docs/specs/selectors.md 2). A pick that hides keeps its
- * number unused, so 4 is always Next week and the printed keys read 1, 2, 4, 5
- * when Monday hides.
+ * Each pick owns its number key, always: Today 1, Tomorrow 2, Friday 3, Next
+ * Monday 4, In 1 week 5, In 2 weeks 6, No date 7 (docs/specs/selectors.md 2).
+ * A pick that hides keeps its number unused, so 5 is always In 1 week and the
+ * printed keys read 1, 2, 4, 5, 6, 7 when Friday hides.
  *
- * Monday is the first Monday after today. On a Monday that's a week out,
- * which Next week already offers, so the Monday pick hides. On a Sunday the
- * first Monday is tomorrow, which Tomorrow already offers, so it's the Monday
- * after (8 days out) and reads "Next Monday".
+ * No two picks land on one day, so a pick hides when another already offers
+ * its date:
+ * - Friday is the first Friday after today. On a Thursday that's tomorrow and
+ *   on a Friday it's a week out, so it hides both days. On a weekend it's the
+ *   coming week's Friday.
+ * - Next Monday is the first Monday after today. On a Monday that's a week
+ *   out, so it hides. On a Sunday the first Monday is tomorrow, so it's the
+ *   Monday after (8 days out).
  */
 
-export type QuickPickKey = "today" | "tomorrow" | "monday" | "next-week" | "none";
+export type QuickPickKey = "today" | "tomorrow" | "friday" | "next-monday" | "week" | "two-weeks" | "none";
 
 /** The number key that chooses each pick. */
 export const QUICK_PICK_NUMBER: Record<QuickPickKey, number> = {
   today: 1,
   tomorrow: 2,
-  monday: 3,
-  "next-week": 4,
-  none: 5,
+  friday: 3,
+  "next-monday": 4,
+  week: 5,
+  "two-weeks": 6,
+  none: 7,
 };
 
 export interface QuickPick {
   key: QuickPickKey;
-  /** The key (1 to 5) that chooses it, fixed whichever other picks show. */
+  /** The key (1 to 7) that chooses it, fixed whichever other picks show. */
   number: number;
   label: string;
   /** The date it sets, or null for No date. */
@@ -63,7 +69,13 @@ export function weekdayOf(v: Ymd): number {
   return utc(v).getUTCDay();
 }
 
-/** The Monday the "Monday" pick sets: see the module note for Mondays and Sundays. */
+/** The Friday the "Friday" pick sets: the first Friday after today, a week out on a Friday. */
+export function fridayPick(today: Ymd): Ymd {
+  const ahead = ((5 - weekdayOf(today) + 6) % 7) + 1; // Sat +6, Sun +5, Mon +4 … Thu +1, Fri +7
+  return addDaysYmd(today, ahead)!;
+}
+
+/** The Monday the "Next Monday" pick sets: see the module note for Mondays and Sundays. */
 export function mondayPick(today: Ymd): Ymd {
   const dow = weekdayOf(today);
   const ahead = dow === 0 ? 8 : 8 - dow; // Sun +8, Mon +7, Tue +6 … Sat +2
@@ -71,40 +83,37 @@ export function mondayPick(today: Ymd): Ymd {
 }
 
 const fmt = (v: Ymd, opts: Intl.DateTimeFormatOptions) => utc(v).toLocaleDateString("en-US", { timeZone: "UTC", ...opts });
+const monthDay = (v: Ymd) => fmt(v, { month: "short", day: "numeric" });
+const weekdayMonthDay = (v: Ymd) => fmt(v, { weekday: "short", month: "short", day: "numeric" });
 
-/** The picks for `today`, in key order. Monday is left out on a Monday. */
+/** The picks for `today`, in key order. Friday hides on a Thursday and a Friday, Next Monday on a Monday. */
 export function quickPicks(today: Ymd): QuickPick[] {
   const t = toYmd(today);
   if (!t) throw new Error(`quickPicks: not a calendar date: ${today}`);
-  const tomorrow = addDaysYmd(t, 1)!;
-  const monday = mondayPick(t);
-  const nextWeek = addDaysYmd(t, 7)!;
   const dow = weekdayOf(t);
-  const picks: QuickPick[] = [
-    { key: "today", number: QUICK_PICK_NUMBER.today, label: "Today", value: t, hint: fmt(t, { weekday: "short" }) },
-    { key: "tomorrow", number: QUICK_PICK_NUMBER.tomorrow, label: "Tomorrow", value: tomorrow, hint: fmt(tomorrow, { weekday: "short" }) },
-  ];
-  // A Monday's Monday is Next week's day.
-  if (dow !== 1) {
-    picks.push({
-      key: "monday",
-      number: QUICK_PICK_NUMBER.monday,
-      label: dow === 0 ? "Next Monday" : "Monday",
-      value: monday,
-      hint: fmt(monday, { month: "short", day: "numeric" }),
-    });
-  }
-  picks.push(
-    {
-      key: "next-week",
-      number: QUICK_PICK_NUMBER["next-week"],
-      label: "Next week",
-      value: nextWeek,
-      hint: fmt(nextWeek, { weekday: "short", month: "short", day: "numeric" }),
-    },
-    { key: "none", number: QUICK_PICK_NUMBER.none, label: "No date", value: null, hint: "" },
-  );
-  return picks;
+  const tomorrow = addDaysYmd(t, 1)!;
+  const friday = fridayPick(t);
+  const monday = mondayPick(t);
+  const week = addDaysYmd(t, 7)!;
+  const twoWeeks = addDaysYmd(t, 14)!;
+  const pick = (key: QuickPickKey, label: string, value: Ymd | null, hint: string): QuickPick => ({
+    key,
+    number: QUICK_PICK_NUMBER[key],
+    label,
+    value,
+    hint,
+  });
+  return [
+    pick("today", "Today", t, fmt(t, { weekday: "short" })),
+    pick("tomorrow", "Tomorrow", tomorrow, fmt(tomorrow, { weekday: "short" })),
+    // Thursday's Friday is Tomorrow; Friday's is In 1 week.
+    dow !== 4 && dow !== 5 ? pick("friday", "Friday", friday, monthDay(friday)) : null,
+    // A Monday's Monday is In 1 week.
+    dow !== 1 ? pick("next-monday", "Next Monday", monday, monthDay(monday)) : null,
+    pick("week", "In 1 week", week, weekdayMonthDay(week)),
+    pick("two-weeks", "In 2 weeks", twoWeeks, weekdayMonthDay(twoWeeks)),
+    pick("none", "No date", null, ""),
+  ].filter((p): p is QuickPick => p !== null);
 }
 
 /** The pick a number key (1 to 9) chooses, or null when that number has no pick today. */
