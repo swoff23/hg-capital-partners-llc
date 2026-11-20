@@ -1,12 +1,25 @@
 import type { Prisma, PrismaClient, RecentKind, TaskStatus } from "@prisma/client";
 import { SIGNED_OUT, type Answer, type Viewer } from "@/lib/api-answer";
 import { ACTIVE_DEAL_STATUSES } from "@/lib/config";
-import { TRADE_LINKS, hasTradeNamed, tradeLine } from "@/lib/contractors/trades";
+import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import { toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { propertyUnitCount } from "@/lib/property-types";
 import { liveRecord } from "@/lib/record-scope";
+import { propertyFindHref } from "@/lib/find-target";
 import { everyTermMatches, rankRows, searchTerms, type Rankable } from "@/lib/search";
+import {
+  contactFoundLine,
+  contactSearchWhere,
+  gatherHits,
+  keyProbes,
+  propertyFoundLine,
+  propertyWordsWhere,
+  tenantPhoneWhere,
+  type FoundLine,
+  type KeyHits,
+  type KeyProbe,
+} from "@/lib/search-keys";
 import {
   ALL_LIMIT,
   MAX_QUERY,
@@ -47,7 +60,7 @@ import { paletteTaskWhere } from "@/lib/tasks/list-query";
 export * from "@/lib/search-types";
 
 /** The database calls a search makes. */
-export type SearchDb = Pick<PrismaClient, "property" | "task" | "deal" | "contact" | "tenant">;
+export type SearchDb = Pick<PrismaClient, "property" | "task" | "deal" | "contact" | "tenant" | "$queryRaw">;
 
 /* ---------------- Rows ---------------- */
 
@@ -59,6 +72,12 @@ const PROPERTY_SELECT = {
   units: true,
   photoUrl: true,
   updatedAt: true,
+  // What a hit on a hidden field shows (lib/search-keys.ts propertyFoundLine).
+  loanNumber: true,
+  lender: true,
+  loanServicer: true,
+  insurancePolicyNo: true,
+  insuranceCarrier: true,
 } satisfies Prisma.PropertySelect;
 
 const TASK_SELECT = {
@@ -90,6 +109,9 @@ const CONTACT_SELECT = {
   tradeLinks: TRADE_LINKS,
   active: true,
   updatedAt: true,
+  phone: true,
+  phoneE164: true,
+  email: true,
 } satisfies Prisma.ContactSelect;
 
 const TENANT_SELECT = {
@@ -111,15 +133,17 @@ type DealRecord = Prisma.DealGetPayload<{ select: typeof DEAL_SELECT }>;
 type ContactRecord = Prisma.ContactGetPayload<{ select: typeof CONTACT_SELECT }>;
 type TenantRecord = Prisma.TenantGetPayload<{ select: typeof TENANT_SELECT }>;
 
-export function propertyRow(p: PropertyRecord): PropertySearchRow {
+/** A property row; `found`, a hit on a hidden field, names it and lands the link on it. */
+export function propertyRow(p: PropertyRecord, found: FoundLine | null = null): PropertySearchRow {
   return {
     type: "property",
     id: p.id,
-    href: `/properties/${p.id}`,
+    href: found?.target ? propertyFindHref(p.id, found.target) : `/properties/${p.id}`,
     title: shortAddress(p.address) || p.address,
     units: propertyUnitCount(p),
     owner: p.llcOwner?.trim() || null,
     photoUrl: p.photoUrl,
+    ...(found ? { matched: found.matched } : {}),
   };
 }
 
@@ -151,7 +175,8 @@ export function dealRow(d: DealRecord): DealSearchRow {
   };
 }
 
-export function contractorRow(c: ContactRecord): ContractorSearchRow {
+/** A contractor row; `found`, a hit on the phone or email, names it. */
+export function contractorRow(c: ContactRecord, found: FoundLine | null = null): ContractorSearchRow {
   return {
     type: "contractor",
     id: c.id,
@@ -160,6 +185,7 @@ export function contractorRow(c: ContactRecord): ContractorSearchRow {
     trade: tradeLine(c.tradeLinks),
     company: c.company?.trim() || null,
     active: c.active,
+    ...(found ? { matched: found.matched } : {}),
   };
 }
 
@@ -234,15 +260,58 @@ type Found = { rows: SearchRow[]; total: number };
 /** The words, on live records only. */
 const live = <T extends object>(where: T) => ({ AND: [liveRecord, where] });
 
+/**
+ * The live properties where each probe's number is in an equipment model, a
+ * searched account (SEARCHED_ACCOUNTS), the loan or the policy number, or its
+ * spelling starts a word of an equipment type. Prisma can't look inside the
+ * units JSON, so this is SQL; each value is folded on its own (lowercase, a
+ * to z and digits, as foldNumber does) so two values never run together.
+ * Lockbox codes, autopay and LOFL fields are never read. The portfolio is
+ * about 100 properties: if units grow into the thousands, a stored search
+ * column written by the properties service replaces this.
+ */
+async function propertyKeyHits(db: SearchDb, probes: KeyProbe[]): Promise<KeyHits> {
+  if (probes.length === 0) return gatherHits([]);
+  const terms = probes.map((p) => p.term);
+  const kinds = probes.map((p) => p.kind);
+  const texts = probes.map((p) => p.text);
+  const rows = await db.$queryRaw<{ id: string; term: number }[]>`
+    SELECT DISTINCT p.id, k.term
+    FROM "Property" p
+    CROSS JOIN unnest(${terms}::int[], ${kinds}::text[], ${texts}::text[]) AS k(term, kind, text)
+    WHERE p."archivedAt" IS NULL AND (
+      (k.kind = 'number' AND (
+        EXISTS (SELECT 1 FROM jsonb_path_query(p.units, '$[*].equipment[*].model') v
+                WHERE strpos(regexp_replace(lower(v #>> '{}'), '[^a-z0-9]', '', 'g'), k.text) > 0)
+        OR EXISTS (SELECT 1 FROM jsonb_path_query(p.units, '$[*].utilities.nationalGridAcct') v
+                WHERE strpos(regexp_replace(lower(v #>> '{}'), '[^a-z0-9]', '', 'g'), k.text) > 0)
+        OR EXISTS (SELECT 1 FROM jsonb_path_query(p.units, '$[*].utilities.nationalFuelAcct') v
+                WHERE strpos(regexp_replace(lower(v #>> '{}'), '[^a-z0-9]', '', 'g'), k.text) > 0)
+        OR EXISTS (SELECT 1 FROM jsonb_path_query(p.units, '$[*].utilities.waterAcct') v
+                WHERE strpos(regexp_replace(lower(v #>> '{}'), '[^a-z0-9]', '', 'g'), k.text) > 0)
+        OR strpos(regexp_replace(lower(coalesce(p."loanNumber", '')), '[^a-z0-9]', '', 'g'), k.text) > 0
+        OR strpos(regexp_replace(lower(coalesce(p."insurancePolicyNo", '')), '[^a-z0-9]', '', 'g'), k.text) > 0
+      ))
+      OR (k.kind = 'type' AND EXISTS (SELECT 1 FROM jsonb_path_query(p.units, '$[*].equipment[*].type') v
+                WHERE lower(v #>> '{}') ~ ('(^|[^a-z])' || k.text)))
+    )`;
+  return gatherHits(rows.map((r) => ({ id: r.id, term: Number(r.term) })));
+}
+
+/** The property search's where: the words (lib/search-keys.ts propertyWordsWhere), on live properties. */
+async function propertyWhere(db: SearchDb, q: string, terms: string[][]): Promise<Prisma.PropertyWhereInput> {
+  return live(propertyWordsWhere(terms, await propertyKeyHits(db, keyProbes(q, terms))));
+}
+
 async function findProperties(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
-  const where = live(everyTermMatches<Prisma.PropertyWhereInput>(terms, (t) => [{ address: t }]));
+  const where = await propertyWhere(db, q, terms);
   const [pool, total] = await Promise.all([
     db.property.findMany({ where, orderBy: newest, take: POOL, select: PROPERTY_SELECT }),
     db.property.count({ where }),
   ]);
   const rows = ranked(
     pool.map((p) => {
-      const row = propertyRow(p);
+      const row = propertyRow(p, propertyFoundLine(p, q, terms));
       return { row, title: row.title, live: 0, updatedAt: p.updatedAt };
     }),
     q,
@@ -291,37 +360,49 @@ async function findDeals(db: SearchDb, q: string, terms: string[][], limit: numb
 }
 
 async function findContractors(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
-  const where = live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)]));
+  const where = live(contactSearchWhere(q, terms));
   const [pool, total] = await Promise.all([
     db.contact.findMany({ where, orderBy: newest, take: POOL, select: CONTACT_SELECT }),
     db.contact.count({ where }),
   ]);
   // Inactive contractors stay findable, ranked last.
   const rows = ranked(
-    pool.map((c) => ({ row: contractorRow(c), title: c.fullName, live: c.active ? 0 : 1, updatedAt: c.updatedAt })),
+    pool.map((c) => ({
+      row: contractorRow(c, contactFoundLine({ ...c, trade: tradeLine(c.tradeLinks) }, q, terms)),
+      title: c.fullName,
+      live: c.active ? 0 : 1,
+      updatedAt: c.updatedAt,
+    })),
     q,
     limit,
   );
   return { rows, total };
 }
 
-/** A tenant is found by name, phone, email, or the address or unit of a lease they're on. */
-const tenantWhere = (terms: string[][]): Prisma.TenantWhereInput => ({
-  // A tenant on no lease has no page to open.
-  AND: [
-    { leases: { some: {} } },
-    everyTermMatches<Prisma.TenantWhereInput>(terms, (t) => [
+/**
+ * A tenant is found by name, phone, email, or the address or unit of a lease
+ * they're on. A phone also matches by its digits, typed with any dashes,
+ * spaces or parentheses (lib/search-keys.ts).
+ */
+const tenantWhere = (q: string, terms: string[][]): Prisma.TenantWhereInput => {
+  const phone = tenantPhoneWhere(q, terms);
+  const words = everyTermMatches<Prisma.TenantWhereInput>(
+    terms,
+    (t) => [
       { fullName: t },
       { email: t },
       { phone: t },
       { phoneE164: t },
       { leases: { some: { lease: { OR: [{ property: { address: t } }, { unitLabel: t }] } } } },
-    ]),
-  ],
-});
+    ],
+    phone.more,
+  );
+  // A tenant on no lease has no page to open.
+  return { AND: [{ leases: { some: {} } }, phone.whole.length > 0 ? { OR: [words, ...phone.whole] } : words] };
+};
 
 async function findTenants(db: SearchDb, q: string, terms: string[][], limit: number): Promise<Found> {
-  const where = tenantWhere(terms);
+  const where = tenantWhere(q, terms);
   const [pool, total] = await Promise.all([
     db.tenant.findMany({ where, orderBy: newest, take: POOL, select: TENANT_SELECT }),
     db.tenant.count({ where }),
@@ -340,20 +421,15 @@ async function countsOf(db: SearchDb, q: string, terms: string[][], types: reado
     types.map(async (type): Promise<[SearchType, number]> => {
       switch (type) {
         case "property":
-          return [type, await db.property.count({ where: live(everyTermMatches<Prisma.PropertyWhereInput>(terms, (t) => [{ address: t }])) })];
+          return [type, await db.property.count({ where: await propertyWhere(db, q, terms) })];
         case "tenant":
-          return [type, await db.tenant.count({ where: tenantWhere(terms) })];
+          return [type, await db.tenant.count({ where: tenantWhere(q, terms) })];
         case "task":
           return [type, await db.task.count({ where: paletteTaskWhere(q) })];
         case "deal":
           return [type, await db.deal.count({ where: live(everyTermMatches<Prisma.DealWhereInput>(terms, (t) => [{ address: t }])) })];
         case "contractor":
-          return [
-            type,
-            await db.contact.count({
-              where: live(everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)])),
-            }),
-          ];
+          return [type, await db.contact.count({ where: live(contactSearchWhere(q, terms)) })];
       }
     }),
   );

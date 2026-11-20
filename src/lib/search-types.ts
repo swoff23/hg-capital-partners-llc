@@ -27,6 +27,24 @@ export const MAX_QUERY = 200;
 /** Records Recent shows. */
 export const RECENT_SHOWN = 5;
 
+/**
+ * The field a hit matched on when the row doesn't show it
+ * (docs/specs/search-deeper-fields.md 4), printed where the meta sits:
+ * "Upper · Water Heater RG240S6N", "Lender · Vontive".
+ */
+export type MatchedField = {
+  /** The unit's label, or null for a building-wide field or a unit with none. */
+  unit: string | null;
+  /** "Water Heater", "National Grid", "Loan", "Phone". */
+  label: string;
+  /** The value as stored (the matching line of a field holding several), or "" for equipment with no model. */
+  value: string;
+  /** A number, printed in the code look after the label; otherwise "Label · value". */
+  code: boolean;
+  /** Other units of the building where the same match hit. */
+  more: number;
+};
+
 export type PropertySearchRow = {
   type: "property";
   id: string;
@@ -37,6 +55,8 @@ export type PropertySearchRow = {
   owner: string | null;
   /** The property's front photo (public Blob); null until one is set, so the row shows the House tile. */
   photoUrl: string | null;
+  /** Set when a typed word matched only a field the row doesn't show; `href` then lands on it. */
+  matched?: MatchedField;
 };
 
 export type TaskSearchRow = {
@@ -71,6 +91,8 @@ export type ContractorSearchRow = {
   trade: string | null;
   company: string | null;
   active: boolean;
+  /** Set when a typed word matched only the phone or email. */
+  matched?: MatchedField;
 };
 
 export type TenantSearchRow = {

@@ -20,6 +20,27 @@ export function onPropertyFieldRequest(fields: readonly string[], open: (field: 
   return () => window.removeEventListener(EVENT, listener);
 }
 
+const REVEAL_EVENT = "property:reveal-field";
+
+/**
+ * Shows a field's row without opening its editor: a search hit on the loan
+ * number lands on it (docs/specs/search-deeper-fields.md 5), and a row folded
+ * behind "N more fields" has to be out first.
+ */
+export function revealPropertyField(field: string) {
+  window.dispatchEvent(new CustomEvent<string>(REVEAL_EVENT, { detail: field }));
+}
+
+/** Subscribes `reveal` to show requests for any of `fields`; returns the unsubscribe. */
+export function onPropertyFieldReveal(fields: readonly string[], reveal: (field: string) => void): () => void {
+  const listener = (e: Event) => {
+    const field = (e as CustomEvent<string>).detail;
+    if (fields.includes(field)) reveal(field);
+  };
+  window.addEventListener(REVEAL_EVENT, listener);
+  return () => window.removeEventListener(REVEAL_EVENT, listener);
+}
+
 const UNIT_EVENT = "property:edit-unit";
 
 /** Opens one unit's sheet from outside the Units section: Missing info's rows on the property page (docs/specs/missing-info.md). */

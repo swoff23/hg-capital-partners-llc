@@ -2,7 +2,8 @@
 import { RailFold } from "@/components/rail-fold";
 import { Section } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
-import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { findElementId } from "@/lib/find-target";
+import { onPropertyFieldRequest, onPropertyFieldReveal, openPropertyField } from "./edit-field-event";
 import { MissingTitle, useMissingFields } from "./missing-context";
 import { ChangeCodeMenu, PropertyEscrow, PropertyFact, PropertyKeyDate, isBlank } from "./property-fact";
 
@@ -46,6 +47,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
         missing={missing}
         listen={onPropertyFieldRequest}
         reopen={openPropertyField}
+        reveal={onPropertyFieldReveal}
         rows={[
           {
             key: "loanMaturityDate",
@@ -63,13 +65,13 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
             key: "lender",
             empty: isBlank(p.lender),
             keep: true,
-            node: <PropertyFact {...common} field="lender" label="Lender" kind="text" value={p.lender} empty="Add lender" />,
+            node: <PropertyFact {...common} field="lender" anchor={findElementId("lender")} label="Lender" kind="text" value={p.lender} empty="Add lender" />,
           },
           {
             key: "loanServicer",
             empty: isBlank(p.loanServicer),
             fold: true,
-            node: <PropertyFact {...common} field="loanServicer" label="Servicer" kind="text" value={p.loanServicer} empty="Add servicer" />,
+            node: <PropertyFact {...common} field="loanServicer" anchor={findElementId("loanServicer")} label="Servicer" kind="text" value={p.loanServicer} empty="Add servicer" />,
           },
           {
             key: "loanNumber",
@@ -79,6 +81,7 @@ export function PropertyLoanSection({ loan: p }: { loan: EditableLoan }) {
               <PropertyFact
                 {...common}
                 field="loanNumber"
+                anchor={findElementId("loanNumber")}
                 label="Loan #"
                 name="Loan number"
                 kind="text"

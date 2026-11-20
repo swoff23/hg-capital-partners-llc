@@ -63,6 +63,7 @@ import {
 } from "@/lib/search-panel";
 import {
   MIN_QUERY,
+  type MatchedField,
   type RecentResponse,
   type SearchResponse,
   type SearchRow as SearchRowData,
@@ -693,6 +694,12 @@ type RowParts = {
   struck?: boolean;
   /** One line (480px and wider): after the title. */
   meta?: ReactNode;
+  /**
+   * One line: the meta gives way before the title, which keeps up to half the
+   * row. Set when the meta is a hidden field the hit matched on
+   * (search-deeper-fields.md 4), so the address stays whole beside it.
+   */
+  keepTitle?: boolean;
   /** One line: the 100px status column. */
   status?: ReactNode;
   /** One line: the 80px edge column, right-aligned. */
@@ -765,7 +772,7 @@ export function SearchRow({
 
       {/* From 480px: one line, the status and edge columns fixed so they line up row to row. */}
       <span className="hidden min-w-0 flex-1 items-baseline gap-2 @min-[30rem]:flex">
-        <span className={cn(titleClass, "min-w-0 shrink-[4]")}>{parts.title}</span>
+        <span className={cn(titleClass, parts.keepTitle ? "max-w-1/2 shrink-0" : "min-w-0 shrink-[4]")}>{parts.title}</span>
         {parts.meta && <span className="min-w-0 truncate text-meta text-muted-foreground">{parts.meta}</span>}
       </span>
       <span className="hidden w-25 shrink-0 truncate text-meta @min-[30rem]:block @min-[30rem]:pointer-coarse:w-26">
@@ -817,6 +824,34 @@ function Marked({ text, q }: { text: string; q: string }) {
 
 const units = (n: number) => `${n} ${n === 1 ? "unit" : "units"}`;
 
+/**
+ * A hit on a field the row doesn't show, where the meta sits
+ * (docs/specs/search-deeper-fields.md 4): "Upper · Water Heater RG240S6N",
+ * "Lender · Vontive", "· 2 more" when other units hold the same. A number
+ * takes the code look, never the copy button: a button can't sit in a link.
+ * A long unit name ("1st Front / Lower Front") gives way first, so the
+ * number that was typed stays in view; only a very long email truncates too.
+ */
+function Matched({ m }: { m: MatchedField }) {
+  return (
+    <span className="flex min-w-0 items-baseline">
+      {/* The separator rides with the unit, so when a long value takes the whole width both go and the value ends in an ellipsis. */}
+      {m.unit && <span className="min-w-0 truncate whitespace-pre">{`${m.unit} · `}</span>}
+      <span className="max-w-full shrink-0 truncate">
+        {m.label}
+        {m.value && (m.code ? <> <span className="font-mono text-code text-fg-2">{m.value}</span></> : ` · ${m.value}`)}
+        {m.more > 0 && ` · ${m.more} more`}
+      </span>
+    </span>
+  );
+}
+
+/** The same words as plain text, for the row's accessible name. */
+const matchedText = (m: MatchedField): string =>
+  [m.unit, m.code ? [m.label, m.value].filter(Boolean).join(" ") : [m.label, m.value].filter(Boolean).join(", "), m.more > 0 ? `${m.more} more` : ""]
+    .filter(Boolean)
+    .join(", ");
+
 /** A deal stage's word, in its tone: --fg-2, and Closed in --ok. */
 const stageTone = (stage: string) => (stage === "CLOSED!" ? "text-ok" : "text-fg-2");
 
@@ -832,9 +867,11 @@ function rowParts(row: SearchRowData, q: string, today: Ymd): RowParts {
           </span>
         ),
         title: <Marked text={row.title} q={q} />,
-        meta: `${row.units !== null ? units(row.units) : ""}${owner}` || undefined,
-        sub: row.units !== null ? units(row.units) : "Property",
-        text: [row.title, row.owner].filter(Boolean).join(", "),
+        // A hit on a hidden field names it in place of the unit count and owner, on both layouts.
+        meta: row.matched ? <Matched m={row.matched} /> : `${row.units !== null ? units(row.units) : ""}${owner}` || undefined,
+        keepTitle: row.matched !== undefined,
+        sub: row.matched ? <Matched m={row.matched} /> : row.units !== null ? units(row.units) : "Property",
+        text: [row.title, row.matched ? matchedText(row.matched) : row.owner].filter(Boolean).join(", "),
       };
     }
     case "task": {
@@ -897,11 +934,12 @@ function rowParts(row: SearchRowData, q: string, today: Ymd): RowParts {
       return {
         leading: <Avatar name={row.title} size={24} outline />,
         title: <Marked text={row.title} q={q} />,
-        meta: meta || undefined,
+        meta: row.matched ? <Matched m={row.matched} /> : meta || undefined,
+        keepTitle: row.matched !== undefined,
         status: inactive,
-        sub: row.trade ?? row.company ?? "Contractor",
+        sub: row.matched ? <Matched m={row.matched} /> : (row.trade ?? row.company ?? "Contractor"),
         topRight: inactive ?? undefined,
-        text: [row.title, meta, row.active ? "" : "Inactive"].filter(Boolean).join(", "),
+        text: [row.title, row.matched ? matchedText(row.matched) : meta, row.active ? "" : "Inactive"].filter(Boolean).join(", "),
       };
     }
   }

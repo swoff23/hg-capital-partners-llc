@@ -9,15 +9,16 @@ import {
   type OnboardingStatus,
   type SignupSourceValue,
 } from "@/lib/contractors/onboarding";
-import { hasTradeNamed } from "@/lib/contractors/trades";
 import { portalAccess, type PortalAccessFacts } from "@/lib/portal/access-state";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
 import { archivedRecord, liveRecord } from "@/lib/record-scope";
-import { everyTermMatches, searchTerms } from "@/lib/search";
+import { searchTerms } from "@/lib/search";
+import { contactSearchWhere } from "@/lib/search-keys";
 
 /*
  * What the Contractors page asks of the database (docs/specs/selectors.md 5,
- * search 2.11): a search over the name, company and trades; a Trade filter
+ * search 2.11): a search over the name, company, trades, email and phone, the
+ * palette's own (lib/search-keys.ts contactSearchWhere); a Trade filter
  * with several picks; a Status filter (New, Invited, Opened, Onboarding, Active,
  * Access off: the Status column); and two yes or no filters, "Has login" and "Needs W-9".
  * A third, "Archived", swaps the list for the archived contractors, whom
@@ -113,7 +114,7 @@ export function contractorsWhere(f: ContractorFilters): Prisma.ContactWhereInput
   const terms = searchTerms(f.q);
   const parts: Prisma.ContactWhereInput[] = [
     contractorScope(f),
-    terms.length > 0 ? everyTermMatches<Prisma.ContactWhereInput>(terms, (t) => [{ fullName: t }, { company: t }, hasTradeNamed(t)]) : {},
+    terms.length > 0 ? contactSearchWhere(f.q, terms) : {},
     f.hasLogin ? { portalAccount: { is: { status: "ACTIVE" } } } : {},
     f.needsW9 ? { w9Url: null, documents: { none: { kind: "W9" } } } : {},
   ];

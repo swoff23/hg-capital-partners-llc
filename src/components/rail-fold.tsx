@@ -25,11 +25,14 @@ export type RailFoldRow = FoldRow & { node: ReactNode };
  * cleared field doesn't vanish under the finger. A verb elsewhere that asks
  * for a folded row (the fact strip's "Add value") opens the fold through
  * `listen`, and `reopen` asks again once the row is in, so its field opens.
+ * `reveal` opens the fold for a row someone needs to see, not edit: a search
+ * hit landing on the loan number.
  */
 export function RailFold({
   rows: given,
   listen,
   reopen,
+  reveal,
   missing,
 }: {
   rows: RailFoldRow[];
@@ -37,6 +40,8 @@ export function RailFold({
   listen?: (keys: readonly string[], open: (key: string) => void) => () => void;
   /** Asks for `key` again once the fold has opened, so the row's own field takes the request. */
   reopen?: (key: string) => void;
+  /** Subscribes to requests to show any of `keys` without editing them; returns the unsubscribe. */
+  reveal?: (keys: readonly string[], show: (key: string) => void) => () => void;
   /** Rows that are a required blank (Missing info, docs/specs/missing-info.md D2): they stay out of the fold until filled. */
   missing?: ReadonlySet<string>;
 }) {
@@ -62,6 +67,11 @@ export function RailFold({
       setOpened(hiddenKey.split(","));
     });
   }, [listen, hiddenKey]);
+
+  useEffect(() => {
+    if (!reveal || !hiddenKey) return;
+    return reveal(hiddenKey.split(","), () => setOpened(hiddenKey.split(",")));
+  }, [reveal, hiddenKey]);
 
   // The asked-for row is in now: ask again, and its field (subscribed as it mounted) opens.
   useEffect(() => {

@@ -168,6 +168,11 @@ test("an address that is no property or deal offers to become a deal", () => {
   assert.ok(compose({ q: "12 Elmwood", live: ready(group("task", [task("t", "Elmwood")])) }).groups.some((g) => g.id === "add"));
   assert.ok(!compose({ q: "12 Elmwood", live: ready(group("deal", [deal("d", "12 Elmwood Ter")])) }).groups.some((g) => g.id === "add"));
   assert.ok(!compose({ q: "elmwood", live: ready() }).groups.some((g) => g.id === "add"), "not shaped like an address");
+
+  // A property found only by a hidden field ("water" finding a Water Heater) doesn't make "58 Water St" known.
+  const heater = { ...property("p", "58 Mariner Street"), matched: { unit: "Upper", label: "Water Heater", value: "RG240S6N", code: true, more: 0 } };
+  assert.ok(compose({ q: "58 Water St", live: ready(group("property", [heater])) }).groups.some((g) => g.id === "add"));
+  assert.ok(!compose({ q: "58 Water St", live: ready(group("property", [property("q", "58 Water St"), heater])) }).groups.some((g) => g.id === "add"));
 });
 
 test("narrowed to one type: its rows, the total in the band, and the list page under the same words", () => {

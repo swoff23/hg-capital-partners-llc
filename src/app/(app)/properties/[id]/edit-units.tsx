@@ -22,6 +22,7 @@ import {
   projectedYear,
   utilityStatusTone,
 } from "@/lib/property-types";
+import { equipmentTarget, findElementId, utilityTarget } from "@/lib/find-target";
 import { lazyModule, openFailedToast, warmWhenIdle } from "@/lib/lazy-module";
 import { removeUnitQuestion, unitRefKey, type UnitRefs } from "@/lib/properties/unit-refs";
 import { sheetUnitAt } from "@/lib/properties/unit-sheet";
@@ -439,8 +440,13 @@ function ReadUnit({
                       {rows.map(([k, label]) => {
                         const v = u.utilities![k]!;
                         return (
-                          // Baseline, so a long account number that wraps keeps its label on its first line.
-                          <div key={k} className="flex min-h-6 items-baseline justify-between gap-2 text-meta">
+                          // Baseline, so a long account number that wraps keeps its label on its first line. The id is where
+                          // a search hit on the account lands (find-on-arrival.tsx).
+                          <div
+                            key={k}
+                            id={u.id ? findElementId(utilityTarget(u.id, k)) : undefined}
+                            className="flex min-h-6 items-baseline justify-between gap-2 text-meta"
+                          >
                             {/* The label never gives way to the value: "Acct #" stays on one line and a long number wraps inside its own column. */}
                             <dt className="shrink-0 whitespace-nowrap text-muted-foreground">{label}</dt>
                             <dd className={cn("min-w-0", UTILITY_STATUS_FIELDS.has(k) ? utilityToneClass(utilityStatusTone(v)) : "text-foreground")}>
@@ -493,6 +499,8 @@ function ReadUnit({
                     onPointerEnter={unitSheet.warm}
                     aria-busy={j === waitingItem || undefined}
                     className={cn("transition-colors pointer-fine:cursor-pointer pointer-fine:hover:bg-muted", j === waitingItem && sheetWaitingFill)}
+                    // Where a search hit on the model lands (find-on-arrival.tsx).
+                    id={u.id ? findElementId(equipmentTarget(u.id, j)) : undefined}
                   >
                     <Td className="pl-0 text-fg-2">
                       <button type="button" aria-label={`Edit ${e.type || `equipment ${j + 1}`}`} onFocus={unitSheet.warm} className="text-left">
