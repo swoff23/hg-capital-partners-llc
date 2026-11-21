@@ -13,7 +13,7 @@ import { useToast } from "@/components/toast";
 import { useDraft, useRestoredDraft } from "@/components/use-draft";
 import { useInlineEditKeys } from "@/components/use-inline-edit-keys";
 import { useRun } from "@/components/use-run";
-import { Button, Checkbox, FieldRow, FormField, Input, SaveError, Section, TextLink } from "@/components/ui";
+import { Button, Checkbox, FieldRow, FormField, Input, PickField, SaveError, Section, TextLink } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
 import { stableJson } from "@/lib/drafts";
 import { inlineEditCommit } from "@/lib/inline-edit";
@@ -377,17 +377,6 @@ export function ApplyFlow({
           }
         />
       )}
-    </div>
-  );
-}
-
-/** A picker's label over it, and its refusal under it once Create was pressed; the picker has no field wiring of its own. */
-function PickField({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div data-invalid={error ? "true" : undefined} className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-meta font-medium text-fg-2">{label}</span>
-      {children}
-      {error && <p className="truncate text-meta text-destructive">{error}</p>}
     </div>
   );
 }

@@ -2,11 +2,15 @@
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import { PropertyPicker } from "@/components/entity-picker";
 import { FormSheet } from "@/components/form-sheet";
+import { NumberInput } from "@/components/number-input";
+import { Switch } from "@/components/switch";
 import { TagsField } from "@/components/tags-field";
 import { useRun } from "@/components/use-run";
-import { Button, FormField, Input } from "@/components/ui";
+import { Button, FormField, Input, PickField } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
+import type { PropertyOption as PickerProperty } from "@/lib/picker-options-shape";
 import { createRehabAction, saveRehabAction } from "./actions";
 
 export type PropertyOption = { id: string; address: string };
@@ -20,32 +24,51 @@ function propertyLabels(options: PropertyOption[]) {
 }
 
 /**
- * New rehab (docs/specs/rehab-draws.md, L4): the properties it covers and the lender. The rehab's page opens next,
- * with an empty Budget. `preselect` is the property it was opened from.
+ * New rehab (docs/specs/rehab-draws.md, L4): one property, the holdback (the lender's budget to draw from) and
+ * the lender. The rehab's page opens next, with an empty Budget. `preselect` is the property it was opened from.
+ * "More than one property" swaps the picker for Edit rehab's Properties field, for a loan over several; the
+ * pick carries over each way (back to one keeps the first).
  */
 export function NewRehabSheet({
-  options,
+  properties,
   preselect,
   isOpen,
   onOpenChange,
 }: {
-  options: PropertyOption[];
-  preselect?: string[];
+  properties: PickerProperty[];
+  preselect?: string;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const run = useRun();
-  const { labelOf, idOf } = propertyLabels(options);
-  const [picked, setPicked] = useState<string[]>(() => (preselect ?? []).filter((id) => labelOf.has(id)).map((id) => labelOf.get(id)!));
+  const { labelOf, idOf } = propertyLabels(properties);
+  const [propertyId, setPropertyId] = useState<string | null>(() => (preselect && labelOf.has(preselect) ? preselect : null));
+  const [many, setMany] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [holdback, setHoldback] = useState("");
   const [lender, setLender] = useState("");
-  const values = { picked, lender };
+  const values = { propertyId, many, picked, holdback, lender };
+  const errors = run.fieldErrors;
+  const pickedIds = picked.map((l) => idOf.get(l)).filter((v): v is string => !!v);
+
+  function edited() {
+    if (run.error) run.reset();
+  }
+
+  function switchMany(on: boolean) {
+    edited();
+    if (on) setPicked(propertyId && labelOf.has(propertyId) ? [labelOf.get(propertyId)!] : []);
+    else setPropertyId(pickedIds[0] ?? null);
+    setMany(on);
+  }
 
   function submit() {
     run.run(
       () =>
         createRehabAction({
-          propertyIds: picked.map((l) => idOf.get(l)).filter((v): v is string => !!v),
+          ...(many ? { propertyIds: pickedIds } : { propertyId: propertyId ?? "" }),
+          holdback: holdback.trim() || null,
           lender: lender.trim() || null,
         }),
       {
@@ -69,23 +92,54 @@ export function NewRehabSheet({
       values={values}
       discardTitle="Discard the new rehab?"
       leaveTitle="Leave without adding this rehab?"
-      error={run.fieldErrors?.propertyIds || run.fieldErrors?.lender ? undefined : run.error}
-      fieldErrors={run.fieldErrors}
+      error={errors?.propertyId || errors?.propertyIds || errors?.holdback || errors?.lender ? undefined : run.error}
+      fieldErrors={errors}
     >
-      <TagsField
-        label="Properties"
-        options={[...labelOf.values()]}
-        value={picked}
-        onChange={(next) => {
-          if (run.error) run.reset();
-          setPicked(next);
-        }}
-        placeholder="Pick the properties"
-        emptyText="No property matches."
-        isInvalid={!!run.fieldErrors?.propertyIds}
-        errorMessage={run.fieldErrors?.propertyIds}
-      />
-      <FormField label="Lender" optional error={run.fieldErrors?.lender}>
+      {many ? (
+        <TagsField
+          label="Properties"
+          options={[...labelOf.values()]}
+          value={picked}
+          onChange={(next) => {
+            edited();
+            setPicked(next);
+          }}
+          placeholder="Pick the properties"
+          emptyText="No property matches."
+          isInvalid={!!errors?.propertyIds}
+          errorMessage={errors?.propertyIds}
+        />
+      ) : (
+        <PickField label="Property" error={errors?.propertyId}>
+          <PropertyPicker
+            value={propertyId}
+            properties={properties}
+            required
+            trigger="field"
+            className={errors?.propertyId ? "border-destructive" : undefined}
+            onChange={(id) => {
+              edited();
+              setPropertyId(id);
+            }}
+          />
+        </PickField>
+      )}
+      <Switch label="More than one property" isSelected={many} onChange={switchMany} />
+      <FormField label="Holdback" required error={errors?.holdback}>
+        {(p) => (
+          <NumberInput
+            kind="money"
+            {...p}
+            name="holdback"
+            value={holdback}
+            onChange={(next) => {
+              edited();
+              setHoldback(next);
+            }}
+          />
+        )}
+      </FormField>
+      <FormField label="Lender" optional error={errors?.lender}>
         {(p) => <Input {...p} name="lender" autoComplete="off" value={lender} onChange={(e) => setLender(e.target.value)} />}
       </FormField>
     </FormSheet>
@@ -94,15 +148,15 @@ export function NewRehabSheet({
 
 /** A button that opens New rehab. `children` is its label. */
 export function NewRehabButton({
-  options,
+  properties,
   preselect,
   variant = "primary",
   size,
   children = "New rehab",
   icon = true,
 }: {
-  options: PropertyOption[];
-  preselect?: string[];
+  properties: PickerProperty[];
+  preselect?: string;
   variant?: "primary" | "secondary";
   size?: "sm" | "md";
   children?: ReactNode;
@@ -115,7 +169,7 @@ export function NewRehabButton({
         {icon && <Plus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />}
         {children}
       </Button>
-      {open && <NewRehabSheet options={options} preselect={preselect} isOpen={open} onOpenChange={setOpen} />}
+      {open && <NewRehabSheet properties={properties} preselect={preselect} isOpen={open} onOpenChange={setOpen} />}
     </>
   );
 }

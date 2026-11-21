@@ -190,7 +190,7 @@ async function seedRehabFixture(db: PrismaClient): Promise<void> {
   assertLocalDb();
   const property = await db.property.findFirst({ where: { archivedAt: null, rehabs: { none: {} } }, select: { id: true }, orderBy: { createdAt: "asc" } });
   if (!property) return;
-  const { id } = await draws.createRehab(db, { propertyIds: [property.id], lender: "Vontive" }, null);
+  const { id } = await draws.createRehab(db, { propertyId: property.id, holdback: 40000, lender: "Vontive" }, null);
   await draws.patchRehab(db, id, { notes: "Fixture for npm run test:devices. Safe to delete locally." });
   const lines = [];
   for (const [name, original] of [["Demo", 12000], ["Electrical (Rough)", 16000], ["Kitchen Cabinets", 9500]] as const) {

@@ -1,7 +1,8 @@
 import { requireUser } from "@/lib/auth";
 import { todayYmdEastern } from "@/lib/dates";
 import { currentDraw, drawAmount, lineFigures, portfolioDraws, rehabFigures } from "@/lib/draws/figures";
-import { doneCount, listRehabs, rehabPropertyOptions } from "@/lib/draws/queries";
+import { doneCount, listRehabs } from "@/lib/draws/queries";
+import { propertyOptions } from "@/lib/picker-options";
 import { FactStrip } from "@/components/fact-strip";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
@@ -26,11 +27,11 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
   await requireUser();
   const view = (await searchParams).view === "done" ? "done" : "open";
   const today = todayYmdEastern();
-  const [open, shown, done, options] = await Promise.all([
+  const [open, shown, done, properties] = await Promise.all([
     listRehabs("open"),
     view === "done" ? listRehabs("done") : null,
     doneCount(),
-    rehabPropertyOptions(),
+    propertyOptions(),
   ]);
 
   const rows = (shown ?? open).map((r) => {
@@ -38,11 +39,10 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
     return { rehab: r, fig, current: currentDraw(r.draws) };
   });
   const totals = portfolioDraws(open.map((r) => rehabFigures(r.holdback, lineFigures(r.lines, r.draws), r.draws)));
-  const propertyOptions = options.map((o) => ({ id: o.id, address: o.address }));
 
   return (
     <>
-      <PageHeader title="Draws" actions={<NewRehabButton options={propertyOptions} />} />
+      <PageHeader title="Draws" actions={<NewRehabButton properties={properties} />} />
       <div className="mb-4">
         <ViewSwitch view={view} open={open.length} done={done} />
       </div>
@@ -58,7 +58,7 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
       )}
 
       {rows.length === 0 ? (
-        <EmptyState action={view === "open" ? <NewRehabButton options={propertyOptions} /> : undefined}>
+        <EmptyState action={view === "open" ? <NewRehabButton properties={properties} /> : undefined}>
           {view === "open" ? "No open rehabs. Add one to track its draws." : "No rehabs are done yet."}
         </EmptyState>
       ) : (
