@@ -302,7 +302,9 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
       // A copy of a job whose contractor is archived starts unassigned (core.ts createNextRepeat).
       const archived = s(d.archivedAssignee);
       const why = archived ? `, unassigned because ${archivedName(archived, names)} is archived` : "";
-      return of ? { text: `Created as the next repeat${why}`, href: `/tasks/${of}` } : { text: `${a} created this task` };
+      if (of) return { text: `Created as the next repeat${why}`, href: `/tasks/${of}` };
+      // A resident's request from their link (docs/specs/maintenance-requests.md, section 4.1).
+      return { text: d.request === true ? `${a} sent this request` : `${a} created this task` };
     }
     case "ASSIGNED": {
       // A job back at work without its archived contractor (a reopen, Approve's Undo; core.ts archivedAssigneeLine).

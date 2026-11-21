@@ -1,1 +1,8 @@
-{}
+{
+  "src/components/ui/radio-group.tsx": {
+    "item": "radio-group",
+    "source": "https://ui.shadcn.com/r/styles/aria-vega/radio-group.json",
+    "sha256": "174eb5cfa2de8486383e3f2f8c925e6ca0808e07c4f1802aad964c9dfe8e1a9a",
+    "recordedAt": "2026-11-21"
+  }
+}

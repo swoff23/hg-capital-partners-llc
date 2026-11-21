@@ -318,3 +318,6 @@ ${whereLine ? `<tr><td style="padding:2px 0 0;font-size:14px;line-height:1.5;col
 
   return { text, html };
 }
+
+/** The job email's parts, shared with a resident's update email (lib/residents/email-layout.ts, docs/specs/maintenance-requests.md). */
+export { FONT, LABEL, LETTERHEAD, PRIMARY, factRow, previewHtml, safeUrl };

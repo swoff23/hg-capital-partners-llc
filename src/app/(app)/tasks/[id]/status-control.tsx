@@ -5,9 +5,10 @@ import { DatePanel } from "@/components/due-date-picker";
 import type { MenuFollowUp } from "@/components/menu";
 import { Sheet } from "@/components/sheet";
 import { StatusMenu } from "@/components/status-menu";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, Textarea } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import type { Ymd } from "@/lib/dates";
+import { firstName } from "@/lib/names";
 import { STATUS_LABEL } from "@/lib/task-scope";
 import { isApproval } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
@@ -32,12 +33,15 @@ export function StatusControl({
   scheduledFor,
   today,
   hasContractor,
+  residentName = null,
 }: {
   taskId: string;
   status: TaskStatus;
   waitingOn: string | null;
   scheduledFor: Ymd | null;
   today: Ymd;
+  /** A resident sent this (docs/specs/maintenance-requests.md, section 4.2): Canceled asks for a note they see. */
+  residentName?: string | null;
   /** A contractor is assigned, so Review (their "done, please look") means something. */
   hasContractor: boolean;
 }) {
@@ -66,7 +70,7 @@ export function StatusControl({
   }
 
   /** Sends the change with the status this page showed, so a stale page is refused; toasts it with Undo. */
-  function commit(to: TaskStatus, extra: { waitingOn?: string; scheduledFor?: Ymd } = {}) {
+  function commit(to: TaskStatus, extra: { waitingOn?: string; scheduledFor?: Ymd; closedNote?: string } = {}) {
     if (isApproval(status, to)) {
       approve();
       return;
@@ -86,6 +90,22 @@ export function StatusControl({
   }
 
   function followUp(to: TaskStatus): MenuFollowUp | null {
+    if (to === "CANCELED" && residentName) {
+      const first = firstName(residentName) || residentName;
+      return {
+        title: `Close ${first}'s request?`,
+        content: ({ close, container }) => (
+          <CloseRequestForm
+            className={container === "popover" ? "w-80" : undefined}
+            first={first}
+            onClose={(note) => {
+              close();
+              commit("CANCELED", { closedNote: note });
+            }}
+          />
+        ),
+      };
+    }
     if (to === "WAITING") {
       return {
         title: "What's it waiting on?",
@@ -210,6 +230,38 @@ export function WaitingForm({
         <Button type="submit" disabled={!ok}>
           {submitLabel ?? (already ? "Save" : "Set to Waiting")}
         </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Canceled on a resident's request (docs/specs/maintenance-requests.md, section 4.2; drawing 08 A): an optional note
+ * they see on their page and in the email, in place of Done. Blank, they see "Questions? Text us in our group chat."
+ */
+function CloseRequestForm({ first, onClose, className }: { first: string; onClose: (note: string) => void; className?: string }) {
+  const [note, setNote] = useState("");
+  return (
+    <form
+      className={cn("space-y-3 p-4", className)}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onClose(note.trim());
+      }}
+    >
+      <label className="block space-y-1.5">
+        <span className="text-label text-foreground">Note for {first} (optional)</span>
+        <Textarea
+          rows={3}
+          placeholder="Same as your other request."
+          value={note}
+          autoFocus
+          maxLength={500}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </label>
+      <div className="flex justify-end">
+        <Button type="submit">Close request</Button>
       </div>
     </form>
   );

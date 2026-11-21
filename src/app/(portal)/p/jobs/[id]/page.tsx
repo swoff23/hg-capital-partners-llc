@@ -9,6 +9,7 @@ import { addressLine, firstName, nextStep } from "@/lib/portal/job-view";
 import { noteJobViewed } from "@/lib/portal/jobs";
 import { getJob } from "@/lib/portal/queries";
 import { requirePortalPrincipal } from "@/lib/portal/session";
+import { jobPetsLine } from "@/lib/residents/pets";
 import { isActiveStatus } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { CrewText } from "./_components/crew-text";
@@ -52,6 +53,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
   const job = await getJob(principal, id);
   if (!job) notFound();
 
+  // A resident's pets answer, beside Access while they let the contractor in (docs/specs/maintenance-requests.md, 4.6).
+  const pets = job.lockbox && job.tenants.permitted ? await jobPetsLine(job.id) : null;
   // Read state and the lockbox and tenants log, written after the page is sent.
   await noteJobViewed(job.id, { lockboxShown: !!job.lockbox, tenantShown: job.tenants.people.length > 0 });
 
@@ -106,7 +109,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
           {job.tenants.people.length > 0 && <TenantsSection tenants={job.tenants} />}
 
           {job.lockbox && (
-            <LockboxSection taskId={job.id} lockbox={job.lockbox} permittedBy={job.tenants.permitted ? job.tenants.people.length : 0} />
+            <LockboxSection taskId={job.id} lockbox={job.lockbox} permittedBy={job.tenants.permitted ? job.tenants.people.length : 0} pets={pets} />
           )}
 
           {job.notes && (

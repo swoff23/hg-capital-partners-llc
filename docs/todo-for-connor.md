@@ -64,7 +64,7 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 
 - [ ] Database certificate check (date to be set). Its own change: prove Supabase's certificate from a laptop with a read-only connection, then ship it behind one environment variable. A wrong setting fails every query, so the way back is a redeploy or a rollback. See fix 3 in [docs/specs/performance.md](specs/performance.md).
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
-- [ ] Say when to resume the resident maintenance requests build ([docs/specs/maintenance-requests.md](specs/maintenance-requests.md)), paused Nov 21 for computer memory. Until then the Residents page's "Request maintenance" tile reads "Soon".
+- [ ] Resident maintenance requests are built ([docs/specs/maintenance-requests.md](specs/maintenance-requests.md)). Once they're live, press Email request links on the Tenants list and tell each group chat that repairs go through the link from now on.
 
 ## Small calls (no rush)
 

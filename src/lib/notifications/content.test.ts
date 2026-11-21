@@ -99,6 +99,8 @@ test("subject word: Done once the job is, Review for partners, New with its due 
   assert.equal(subject([item("COMMENT", '"Doors in"', "Zack Smith")], { audience: "staff", status: "IN_PROGRESS" }), `Update: ${job}`);
   // A contractor's copy never reads Review: a partner's shared comment while it waits is an Update.
   assert.equal(subject([item("COMMENT", '"Checking it today"', "Connor Swofford")], { status: "REVIEW" }), `Update: ${job}`);
+  // A resident's request from their link reads New request on a partner's copy (docs/specs/maintenance-requests.md, 4.3).
+  assert.equal(subject([item("CREATED", "sent this request", "Dana Lee (resident)")], { audience: "staff", status: "OPEN" }), `New request: ${job}`);
 });
 
 test("one thread per job, so a date move doesn't split it", () => {

@@ -69,6 +69,8 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       assigneeName: true,
       createdBy: { select: { name: true, email: true } },
       assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: JOB_EMAIL_SELECT } } },
+      // A resident's request (docs/specs/maintenance-requests.md, section 4.1): who sent it and their pets answer.
+      resident: { select: { leaseId: true, tenantName: true, pets: true, petsNote: true } },
     },
   });
   const [user, row, access, checklist, attachments, events, staff, properties, previouslySeen, partnersSeen] = await Promise.all([
@@ -325,6 +327,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       lockbox={lockbox}
       tenants={tenants}
       entryOffered={entryOffered}
+      resident={task.resident}
       created={created}
       contractorFirst={contractorFirst}
       contractorHasLogin={contractorHasLogin}

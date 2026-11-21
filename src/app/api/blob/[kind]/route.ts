@@ -1,8 +1,8 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { isFinalRefusal } from "@/lib/attachments/access";
-import { contactUploadLimits, leaseUploadLimits, propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
-import { appScope, ownerRefusal, portalScope } from "@/lib/attachments/queue-owner";
+import { contactUploadLimits, leaseUploadLimits, propertyUploadLimits, residentUploadLimits, uploadLimits } from "@/lib/attachments/limits";
+import { appScope, ownerRefusal, portalScope, residentTokenOf } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
 import { blobToken, noStoreMessage } from "@/lib/attachments/blob-stores";
 import { UPLOAD_KIND_ACCESS, UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindKey } from "@/lib/attachments/upload-kinds";
@@ -10,6 +10,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { getPortalPrincipal } from "@/lib/portal/session";
+import { resolveResidentLink } from "@/lib/residents/links";
+import { UPLOADS_FULL, residentUploadsFull } from "@/lib/residents/requests";
 import { contractorUploadRefusal } from "@/lib/tasks/service";
 
 /**
@@ -29,6 +31,8 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/portal-contact-upload  { contactId, docKind, fileKind }   contractor, their own W-9 or insurance
  *   /api/blob/contact-upload         { contactId, docKind, fileKind }   staff, a contractor's W-9 or insurance
  *   /api/blob/lease-upload           { leaseId, termId, fileKind }      staff, a lease's signed term
+ *   /api/blob/resident-upload        { linkId, fileKind, owner }        a resident, from their request link (no sign-in:
+ *                                                                       the link in `owner` is who they are)
  *
  * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
  * uploaders send; the table below is typed against that list, so a kind
@@ -59,7 +63,7 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  * Mark done may still start, or resume, after the job moved to Review.
  */
 
-type Uploader = { kind: "staff"; userId: string } | { kind: "contractor"; contactId: string; onlyTaskId: string | null };
+type Uploader = { kind: "staff"; userId: string } | { kind: "contractor"; contactId: string; onlyTaskId: string | null } | { kind: "resident" };
 
 interface Limits {
   maximumSizeInBytes: number;
@@ -70,7 +74,7 @@ interface UploadKind {
   /** Who may mint a token for this kind. */
   principal: Uploader["kind"];
   /** clientPayload key naming the parent row. */
-  idKey: "taskId" | "propertyId" | "contactId" | "leaseId";
+  idKey: "taskId" | "propertyId" | "contactId" | "leaseId" | "linkId";
   /** Throws with a message the uploader can act on, or returns the token's limits. */
   authorize: (id: string, pathname: string, payload: Record<string, unknown>, who: Uploader) => Promise<Limits>;
 }
@@ -181,9 +185,29 @@ const KINDS: Record<string, UploadKind> = {
       return limits;
     },
   },
+  "resident-upload": {
+    principal: "resident",
+    idKey: "linkId",
+    // A resident's photo or video (docs/specs/maintenance-requests.md, section 6): the queue's owner names their link,
+    // which must be live and the one this folder is for. An ended link is final, so the tile keeps only Remove.
+    authorize: async (linkId, pathname, payload) => {
+      const limits = residentUploadLimits(linkId, pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      const token = residentTokenOf(payload.owner);
+      const link = token ? await resolveResidentLink(token) : null;
+      if (!link || link.state !== "live" || link.ctx.linkId !== linkId) {
+        throw new UploadRefusal("This ticket has been closed. Questions? Text us in our group chat.", true);
+      }
+      // A day's worth per link, so a leaked link can't fill the store (requests.ts UPLOADS_PER_DAY).
+      if (await residentUploadsFull(linkId)) throw new UploadRefusal(UPLOADS_FULL, true);
+      return limits;
+    },
+  },
 } satisfies Record<UploadKindKey, UploadKind>;
 
 async function currentUploader(kind: Uploader["kind"]): Promise<Uploader | null> {
+  // No session: the kind's authorize reads the resident's link from the payload.
+  if (kind === "resident") return { kind: "resident" };
   if (kind === "staff") {
     const user = await getCurrentUser();
     return user ? { kind: "staff", userId: user.id } : null;
@@ -240,8 +264,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/blob/[kind]
           throw new UploadRefusal("That request isn't valid.");
         }
         const payload = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
-        const wrongQueue = ownerRefusal(payload.owner, who.kind === "staff" ? appScope(who.userId) : portalScope(who.contactId));
-        if (wrongQueue) throw new UploadRefusal(wrongQueue);
+        if (who.kind !== "resident") {
+          const wrongQueue = ownerRefusal(payload.owner, who.kind === "staff" ? appScope(who.userId) : portalScope(who.contactId));
+          if (wrongQueue) throw new UploadRefusal(wrongQueue);
+        }
         const id = payload[cfg.idKey];
         if (typeof id !== "string" || !id) throw new UploadRefusal(`Missing ${cfg.idKey}`);
         const limits = await cfg.authorize(id, pathname, payload, who);

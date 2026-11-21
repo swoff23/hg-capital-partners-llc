@@ -52,6 +52,13 @@ const ALLOWLIST = new Set([
   "src/app/(marketing)/rentals/actions.ts#joinWaitlist", // public form; honeypot, IP and daily caps
   "src/app/join/[token]/actions.ts#createAccount", // a contractor's invite or the sign-up link; the single-use or resettable 32-byte token is the check, per-IP limit
   "src/app/join/[token]/actions.ts#openInvite", // only stamps a first-open time on a live invite; the token is the check, returns nothing
+  // A resident's request link (docs/specs/maintenance-requests.md): the 32-byte link token is the check
+  // (residents/links.ts requireResidentLink), live only while the lease is, and each acts on that household alone.
+  "src/app/(marketing)/r/[token]/actions.ts#recordUpload", // checks the blob is in the link's own folder with head()
+  "src/app/(marketing)/r/[token]/actions.ts#sendRequest", // 20 requests a day per tenant
+  "src/app/(marketing)/r/[token]/actions.ts#addMore", // only on the household's own open request
+  "src/app/(marketing)/r/[token]/actions.ts#cancelRequest", // only the household's own, while it shows Received
+  "src/app/(marketing)/residents/maintenance/actions.ts#emailMyLink", // emails only an address already on file, same answer either way; honeypot, IP and daily caps
   "/login/reset/submit", // the reset link's form; does nothing without a live single-use token
   "/api/health", // detail behind HEALTH_TOKEN
   "/api/version", // only the live commit, which /api/health already shows anyone; no database (update-notice.tsx asks it)

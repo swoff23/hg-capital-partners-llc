@@ -10,7 +10,7 @@ import type { JobEmailState } from "@/lib/portal/job-emails";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
 import { Composer, type ComposerDraft } from "./composer";
-import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskTenants } from "./fields";
+import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskResident, type TaskTenants } from "./fields";
 import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
 import { ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
@@ -46,6 +46,8 @@ export interface TaskPageViewProps {
   lockbox: TaskLockbox | null;
   tenants: TaskTenants | null;
   entryOffered: boolean;
+  /** Set when a resident sent this from their link (docs/specs/maintenance-requests.md, section 4.1). */
+  resident: TaskResident | null;
   created: string;
   /** First name of the assigned contractor. */
   contractorFirst: string | null;
@@ -113,6 +115,7 @@ export function TaskPageView(p: TaskPageViewProps) {
               status={task.status}
               waitingOn={task.waitingOn}
               scheduledFor={p.values.scheduledFor}
+              residentName={p.resident?.tenantName ?? null}
               today={p.today}
               hasContractor={!!p.values.assignee && "contactId" in p.values.assignee}
             />
@@ -149,6 +152,7 @@ export function TaskPageView(p: TaskPageViewProps) {
               lockbox={p.lockbox}
               tenants={p.tenants}
               entryOffered={p.entryOffered}
+              resident={p.resident}
               created={p.created}
             />
           </Section>

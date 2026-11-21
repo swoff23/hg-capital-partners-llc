@@ -114,7 +114,18 @@ export function TenantsSection({ tenants }: { tenants: JobTenants }) {
   );
 }
 
-export function LockboxSection({ taskId, lockbox, permittedBy = 0 }: { taskId: string; lockbox: JobLockbox; permittedBy?: number }) {
+export function LockboxSection({
+  taskId,
+  lockbox,
+  permittedBy = 0,
+  pets = null,
+}: {
+  taskId: string;
+  lockbox: JobLockbox;
+  permittedBy?: number;
+  /** "Pets inside. Keep doors shut.": the resident's answer on their request (docs/specs/maintenance-requests.md, 4.6). */
+  pets?: string | null;
+}) {
   const [viewing, setViewing] = useState(false);
   const [broken, setBroken] = useState(false);
   const url = `/api/files/lockbox/${encodeURIComponent(taskId)}`;
@@ -129,6 +140,7 @@ export function LockboxSection({ taskId, lockbox, permittedBy = 0 }: { taskId: s
           {permittedBy > 0 && (
             <p className="mt-2 text-body text-ok">{permittedBy === 1 ? "The tenant said you can let yourself in" : "The tenants said you can let yourself in"}</p>
           )}
+          {pets && <p className="mt-2 text-body text-foreground">{pets}</p>}
           {lockbox.location && (
             <p className="mt-2 flex items-start gap-1.5 text-body text-foreground">
               <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

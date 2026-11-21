@@ -448,6 +448,16 @@ async function notify(
 }
 
 /**
+ * A resident's request, addition or cancel (docs/specs/maintenance-requests.md, section 4.3): one line in each
+ * partner's task email bundle, as a contractor's update is. Residents aren't principals with an audience rule of
+ * their own, so their writes queue here directly.
+ */
+export async function notifyPartners(tx: Tx, taskId: string, item: OutboxItem, now: Date): Promise<void> {
+  const staff = await tx.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true }, orderBy: { id: "asc" } });
+  for (const s of staff) await enqueue(tx, { userId: s.id }, taskId, item, now);
+}
+
+/**
  * "You're off this job" (docs/specs/contractor-job-emails.md, section 6): a
  * partner took the contractor off an open job, or canceled it. Queued for
  * that contractor under the same email rules as any staff change (a login,

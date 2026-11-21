@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { todayYmdEastern, ymdToDate } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
-import { generateStartingPassword, hashToken, newToken, signupLinkToken } from "../../src/lib/portal/tokens";
+import { generateStartingPassword, hashToken, newToken, residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
 import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
 import * as core from "../../src/lib/tasks/core";
@@ -125,6 +125,42 @@ async function seedSignupLink(db: PrismaClient): Promise<void> {
   const id = crypto.randomUUID().replace(/-/g, "");
   const token = signupLinkToken(id, process.env.DEVICE_SESSION_SECRET!);
   await db.portalInvite.create({ data: { id, shared: true, tokenHash: hashToken(token) } });
+}
+
+/** The resident link the device check opens (docs/specs/maintenance-requests.md): a fixed row, its token rebuilt under the check's own secret. */
+export const DEVICE_RESIDENT_LINK_ID = "devicecheckresidentlink";
+
+/**
+ * A live request link and one open request on it, so /r/[token], its form and
+ * /r/[token]/[requestId] render with real parts: the first lease that isn't
+ * past, its first tenant, and a request with a note and the let-us-in and pets
+ * answers. The link's hash is set again every run, since each run has its own
+ * SESSION_SECRET. Rows only, through core.createTask, so nothing is emailed.
+ */
+async function seedResidentFixture(db: PrismaClient): Promise<void> {
+  assertLocalDb();
+  const today = new Date();
+  const lease = await db.lease.findFirst({
+    where: { OR: [{ movesOut: null }, { movesOut: { gt: today } }], tenants: { some: {} } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, propertyId: true, unitLabel: true, tenants: { select: { tenant: { select: { id: true, fullName: true } } }, orderBy: { position: "asc" }, take: 1 } },
+  });
+  const tenant = lease?.tenants[0]?.tenant;
+  if (!lease || !tenant) return;
+  const tokenHash = hashToken(residentLinkToken(DEVICE_RESIDENT_LINK_ID, process.env.DEVICE_SESSION_SECRET!));
+  await db.residentLink.upsert({
+    where: { id: DEVICE_RESIDENT_LINK_ID },
+    create: { id: DEVICE_RESIDENT_LINK_ID, tenantId: tenant.id, leaseId: lease.id, tokenHash },
+    update: { tenantId: tenant.id, leaseId: lease.id, tokenHash, revokedAt: null },
+  });
+  if (await db.residentRequest.findFirst({ where: { leaseId: lease.id, task: { status: "OPEN" } }, select: { id: true } })) return;
+  await db.$transaction(async (tx) => {
+    const p: core.Principal = { kind: "system", label: `${tenant.fullName} (resident)` };
+    const task = await core.createTask(tx, { title: "Kitchen sink leaks", description: "Water under the sink when the dishwasher runs.", propertyId: lease.propertyId, unitLabel: lease.unitLabel }, p);
+    await tx.residentRequest.create({
+      data: { taskId: task.id, leaseId: lease.id, tenantId: tenant.id, tenantName: tenant.fullName, whatsWrong: task.title, details: task.description, letUsIn: true, pets: true, petsNote: "A cat" },
+    });
+  });
 }
 
 /** The fixture job's actor: a system writer, so seeding it never queues an email. */
@@ -287,6 +323,7 @@ export default async function setup() {
     });
     process.env.DEVICE_PORTAL_SETUP_TOKEN = setup.token;
     await seedSignupLink(db);
+    await seedResidentFixture(db);
     await seedRehabFixture(db);
     await seedComingSoonFixture(db);
 

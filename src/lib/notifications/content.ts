@@ -519,6 +519,8 @@ export function jobSubject(input: { word: string; title: string; where: string }
 export function subjectWord(input: { items: readonly OutboxItem[]; status: TaskStatus; due: Ymd | null; today: Ymd; audience: Audience }): string {
   if (input.status === "DONE") return "Done";
   if (input.audience === "staff" && input.status === "REVIEW") return "Review";
+  // A resident's request from their link (docs/specs/maintenance-requests.md, section 4.3).
+  if (input.audience === "staff" && input.items.some((i) => i.kind === "CREATED")) return "New request";
   if (input.items.some((i) => i.kind === "ASSIGNED")) return input.due ? `New, due ${dueLabel(input.due, input.today)}` : "New";
   if (input.items.some((i) => i.kind === "DUE_TODAY")) return "Due today";
   if (input.items.some((i) => i.kind === "OVERDUE")) return "Due yesterday";

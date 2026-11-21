@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { PrismaClient } from "@prisma/client";
-import { signupLinkToken } from "../../src/lib/portal/tokens";
+import { residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
 
 const APP_DIR = path.join(__dirname, "../../src/app");
 
@@ -55,6 +55,17 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     });
     const secret = process.env.DEVICE_SESSION_SECRET;
     return row && secret ? { id: signupLinkToken(row.id, secret) } : null;
+  },
+  // A resident's request link (docs/specs/maintenance-requests.md): the fixture link setup.ts keeps live, its token
+  // rebuilt under the device check's own SESSION_SECRET, and an open request on its lease.
+  "r/[token]": async (db) => {
+    const secret = process.env.DEVICE_SESSION_SECRET;
+    const row = await db.residentLink.findUnique({ where: { id: "devicecheckresidentlink" }, select: { id: true } });
+    return row && secret ? { id: residentLinkToken(row.id, secret) } : null;
+  },
+  "[token]/[requestId]": async (db) => {
+    const link = await db.residentLink.findUnique({ where: { id: "devicecheckresidentlink" }, select: { leaseId: true } });
+    return link ? db.residentRequest.findFirst({ where: { leaseId: link.leaseId }, select: { id: true }, orderBy: { createdAt: "desc" } }) : null;
   },
   "tasks/[id]": (db) =>
     db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),

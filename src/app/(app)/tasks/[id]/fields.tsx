@@ -15,6 +15,7 @@ import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { telHref, textHref } from "@/lib/contacts";
 import { useRun } from "@/components/use-run";
 import type { Ymd } from "@/lib/dates";
+import { firstName } from "@/lib/names";
 import { offersUnits, unitAfterMove, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
 import { fmtShortDay } from "@/lib/tasks/activity";
 import { describeRepeat, repeatDue, type RepeatRule } from "@/lib/tasks/repeat";
@@ -39,6 +40,9 @@ export type TaskTenant = { name: string; phone: string | null; dial: string | nu
  * one moving in next. `moveLine` is "Moves out Jan 31" or "Moves in Feb 1", when that date is set.
  */
 export type TaskTenants = { leaseId: string; people: TaskTenant[]; moveLine: string | null };
+
+/** A resident's request (docs/specs/maintenance-requests.md, section 4.1): who sent it, and their pets answer after a Yes. */
+export type TaskResident = { leaseId: string; tenantName: string; pets: boolean | null; petsNote: string | null };
 
 export interface TaskFieldValues {
   assignee: AssigneeValue;
@@ -79,6 +83,7 @@ export function TaskFields({
   lockbox,
   tenants,
   entryOffered,
+  resident = null,
   created,
   className,
 }: {
@@ -102,6 +107,8 @@ export function TaskFields({
   tenants: TaskTenants | null;
   /** The Permission to enter switch: an open task at a home somebody lives in, whoever it's assigned to (tenants.md T10). */
   entryOffered: boolean;
+  /** Set when a resident sent it: the Pets and Requested by rows (drawing 13 A). */
+  resident?: TaskResident | null;
   created: string;
   className?: string;
 }) {
@@ -308,6 +315,33 @@ export function TaskFields({
         {/* In the rail between Tenant and Lockbox; below lg it's a line under the chips, after this row. */}
         {entryOffered && (
           <div className="hidden min-h-10 items-center border-b border-border lg:flex lg:pointer-coarse:min-h-12">{entrySwitch()}</div>
+        )}
+        {resident?.pets && (
+          <Row label="Pets">
+            <span className="relative inline-flex min-h-7 items-center whitespace-nowrap px-2 text-body text-foreground lg:whitespace-normal lg:px-0 lg:py-1.5">
+              <span className="lg:hidden">Pets:&nbsp;</span>
+              {resident.petsNote?.trim() ? (
+                <>
+                  <span className="hidden lg:inline">Yes,&nbsp;</span>
+                  {resident.petsNote.trim()}
+                </>
+              ) : (
+                "Yes"
+              )}
+            </span>
+          </Row>
+        )}
+        {resident && (
+          <Row label="Requested by">
+            <span className="relative inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap px-2 lg:px-0">
+              <Link href={`/tenants/${resident.leaseId}`} className="text-body text-foreground underline-offset-4 hover:underline">
+                <span className="lg:hidden">From </span>
+                {firstName(resident.tenantName) || resident.tenantName}
+              </Link>
+              {/* A status change emails them (section 5); the comments never reach them. */}
+              <span className="text-meta text-muted-foreground">· sees status</span>
+            </span>
+          </Row>
         )}
         {lockbox && (
           <Row label="Lockbox">

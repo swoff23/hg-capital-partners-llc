@@ -28,6 +28,17 @@ export const appScope = (userId: string): string => `app:${userId}`;
 /** The queue scope of a signed-in contractor. */
 export const portalScope = (contactId: string): string => `portal:${contactId}`;
 
+/**
+ * A resident's queue on their request link (docs/specs/maintenance-requests.md): "resident:<token>". There's no
+ * sign-in, so the link itself is who they are; the token route and the record step read it back from `owner`.
+ */
+export const residentScope = (token: string): string => `resident:${token}`;
+
+/** The link token a resident queue's owner names, or null when it isn't one. */
+export function residentTokenOf(owner: unknown): string | null {
+  return typeof owner === "string" && owner.startsWith("resident:") ? owner.slice("resident:".length) : null;
+}
+
 /** The refusal's words when `sent` names a queue other than `mine` (the session's), else null. Absent means not named. */
 export function ownerRefusal(sent: unknown, mine: string): string | null {
   if (sent === undefined || sent === null) return null;

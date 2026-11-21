@@ -72,6 +72,8 @@ test("system events read as one sentence, people by first name", () => {
   assert.equal(line(ev("ATTACHMENT", { attachmentId: "a1", filename: "quote.pdf", removed: true })), "Connor removed quote.pdf");
   assert.equal(line(ev("ATTACHMENT", { removed: true })), "Connor removed a file");
   assert.equal(line(ev("CREATED", {}, { actorLabel: "Property reminder", actorUserId: null })), "Property reminder created this task");
+  // A resident's request from their link (docs/specs/maintenance-requests.md, section 4.1).
+  assert.equal(line(ev("CREATED", { request: true }, { actorLabel: "Dana Lee (resident)", actorUserId: null })), "Dana Lee (resident) sent this request");
 });
 
 test("checklist edits read as what was done, not as a tick", () => {

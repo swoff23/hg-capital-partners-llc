@@ -76,14 +76,14 @@ Three things only Connor can do. Each one unblocks a build.
 | Item | Status | Size | When | After | Source |
 |---|---|---|---|---|---|
 | The property hub | Needs a spec | L | Feb 1 to Mar 31 | | docs/uiux-review/README.md (move 2), docs/property-page-plan.md section 1 |
-| Resident maintenance requests | Spec ready | M | Feb 1 to Mar 15 | | docs/specs/maintenance-requests.md |
+| Resident maintenance requests | In progress | M | Feb 1 to Mar 15 | | docs/specs/maintenance-requests.md |
 | Rent records in the app (new) | Needs a spec | M | Feb 1 to Feb 28 | Leases | Connor, Nov 20; scripts/migrate/run.ts |
 | Rent roll from leases | Needs a spec | M | Feb 15 to Mar 15 | Leases, QuickBooks | docs/property-page-plan.md section 2 |
 | Monday note for the partners (new) | Needs a spec | S | Feb 1 to Feb 14 | QuickBooks | |
 | Move-in report by personal link | Needs a spec | S | Mar 1 to Mar 31 | Leases | docs/uiux-review/journeys.md |
 
 - **The property hub.** One record layout, built first on the property page: a summary strip with value, equity, LTV, cash flow and the next key date, tabs with counts and one timeline. It starts with two or three layouts for Connor to pick. Deals, tasks and contractors reuse it later.
-- **Resident maintenance requests.** Each current tenant gets their own link to report a repair with photos or video and permission to enter. It lands in Needs you as a task, both partners get an email, and the resident follows three steps (Received, Scheduled, Done) by email. Emergencies stay in the group chat. Planned with Connor on Nov 21 (docs/specs/maintenance-requests.md). He said "build it", then paused it before any code: not enough memory on his computer to run the build.
+- **Resident maintenance requests.** Each current tenant gets their own link to report a repair with photos or video and permission to enter. It lands in Needs you as a task, both partners get an email, and the resident follows three steps (Received, Scheduled, Done) by email. Emergencies stay in the group chat. Planned with Connor on Nov 21 (docs/specs/maintenance-requests.md) and built the same day; waits for his commit. On launch day he presses Email request links on the Tenants list.
 - **Rent records in the app.** The Rent Record Keeping sheet, the history of who paid what and when, moves into the app. The first import left it behind on purpose until the money side was live. Each payment sits on its lease, so a unit shows its full rent history and the sheet can retire. It also becomes the check against QuickBooks that Financials Settings points to today. Connor's ask (Nov 20). Reuses: the lease records and `scripts/migrate/04-tenants.ts`'s dry-run-then-write import, and `LedgerLine` for the QuickBooks side.
 - **Rent roll from leases.** Expected rent per unit from its lease, next to what QuickBooks shows came in, month by month, with late or short months flagged. It extends the Rent roll page that already reads QuickBooks.
 - **Monday note for the partners.** One email each Monday for Connor and Pieter: what's late, what's due this week, jobs waiting for review, key dates coming up, and last week's money in and out. Reuses: the notifications cron and outbox behind the 8 am emails, and Home's Needs you queries.
@@ -117,7 +117,7 @@ Three things only Connor can do. Each one unblocks a build.
 | Stop using Asana, and check when its billing ends | Finish leaving Asana |
 | Answer the three reopened tenant contact calls | Tenant contact |
 | Emails for 14 contractors, and the office phone | Invite the contractors |
-| Say when to resume the maintenance requests build | Maintenance requests |
+| Commit maintenance requests, then Email request links on launch day | Maintenance requests |
 | Remove the two password variables, turn on Skew Protection | Tidy the secrets |
 | An address provider key, the Zillow link, playbook timing | The public site and playbooks |
 

@@ -5,6 +5,7 @@ import { logError } from "@/lib/log";
 import { settleMissingInfo } from "@/lib/missing/service";
 import { drainDue } from "@/lib/notifications/outbox";
 import { queueDueReminders } from "@/lib/notifications/reminders";
+import { sendResidentUpdates } from "@/lib/residents/updates";
 import { cronAuthorized, cronRefusal } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export const maxDuration = 60;
  * 503 and sends nothing while CRON_SECRET is unset, and 401 to anyone else.
  * Neither body says why (cronRefusal); the unset secret goes to the logs.
  *
- * It also ticks Make task's checklist items whose Missing info rows were filled
+ * It also sends residents their request updates (lib/residents/updates.ts), and ticks Make task's checklist items whose Missing info rows were filled
  * in anywhere in the app, and finishes a task when its last one ticks
  * (docs/specs/missing-info.md, D9). A failure there is logged and never stops
  * the emails.
@@ -46,6 +47,11 @@ export async function GET(request: NextRequest) {
     logError("cron:missing-info", err);
     return 0;
   });
+  // A resident's update emails (docs/specs/maintenance-requests.md, section 5). A failure is logged and never stops the rest.
+  const residents = await sendResidentUpdates(now).catch((err: unknown) => {
+    logError("cron:resident-updates", err);
+    return { sent: 0, recorded: 0 };
+  });
   after(() => checkInBackgroundJobs(new Date()));
-  return NextResponse.json({ ...result, reminders: reminders.queued, settled });
+  return NextResponse.json({ ...result, reminders: reminders.queued, settled, residentEmails: residents.sent });
 }

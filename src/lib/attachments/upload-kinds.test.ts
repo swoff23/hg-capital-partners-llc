@@ -21,7 +21,7 @@ import { propertyUploadLimits, uploadLimits } from "./limits";
 const T = "cm1abc2def3ghi";
 const P = "cm9prop8erty7";
 
-test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox photo, the contractor's documents and signed leases, each with a parent and an access", () => {
+test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox photo, the contractor's documents, signed leases and a resident's request photos, each with a parent and an access", () => {
   assert.deepEqual(
     [...UPLOAD_KINDS],
     [
@@ -34,6 +34,7 @@ test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox ph
       "portal-contact-upload",
       "contact-upload",
       "lease-upload",
+      "resident-upload",
     ],
   );
   for (const k of UPLOAD_KINDS) {
@@ -71,10 +72,12 @@ test("UPLOAD_KIND_ALLOWED: what each target takes, and previews only where the r
   assert.deepEqual(UPLOAD_KIND_ALLOWED["listing-photo-upload"], ["image"]);
   assert.deepEqual(UPLOAD_KIND_ALLOWED["property-photo-upload"], ["image"]);
   assert.deepEqual(UPLOAD_KIND_ALLOWED["lockbox-photo-upload"], ["image"]);
+  // A resident's request (docs/specs/maintenance-requests.md): photos and videos, kept with their previews like a task's.
+  assert.deepEqual(UPLOAD_KIND_ALLOWED["resident-upload"], ["image", "video"]);
   // The lockbox photo keeps its thumbnail (properties/photo.ts recordLockboxPhoto) for the tile and the job page.
   assert.deepEqual(
     UPLOAD_KINDS.filter((k) => UPLOAD_KIND_PREVIEWS[k]),
-    ["task-upload", "portal-task-upload", "lockbox-photo-upload"],
+    ["task-upload", "portal-task-upload", "lockbox-photo-upload", "resident-upload"],
   );
 });
 

@@ -495,6 +495,8 @@ model Task {
   linkSessions  PortalSession[]      @relation("PortalSessionOnlyTask")
   readStates    TaskReadState[]
   notifications NotificationOutbox[]
+  // Set when a resident sent this from their link (docs/specs/maintenance-requests.md).
+  resident      ResidentRequest?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -546,6 +548,9 @@ model TaskAttachment {
   uploadedByUserId    String?
   uploadedByContact   Contact? @relation("AttachmentUploadedByContact", fields: [uploadedByContactId], references: [id], onDelete: SetNull)
   uploadedByContactId String?
+  // A resident's photo or video from their request link (docs/specs/maintenance-requests.md). At most one uploader of the three (CHECK).
+  uploadedByTenant    Tenant?  @relation("AttachmentUploadedByTenant", fields: [uploadedByTenantId], references: [id], onDelete: SetNull)
+  uploadedByTenantId  String?
   // A staff upload's contractor: whoever was assigned when it was Shared. The
   // portal shows it to that contractor only, never to the next one on the
   // job (src/lib/portal/queries.ts). Null when no contractor was assigned. No
@@ -1333,6 +1338,11 @@ model Tenant {
   updatedAt DateTime      @updatedAt
   leases    LeaseTenant[]
 
+  // Maintenance requests (docs/specs/maintenance-requests.md).
+  links    ResidentLink[]
+  requests ResidentRequest[]
+  uploads  TaskAttachment[]  @relation("AttachmentUploadedByTenant")
+
   @@index([fullName])
 }
 
@@ -1365,6 +1375,10 @@ model Lease {
   tenants         LeaseTenant[]
   terms           LeaseTerm[]
   files           LeaseFile[]
+
+  // Maintenance requests (docs/specs/maintenance-requests.md).
+  residentLinks ResidentLink[]
+  requests      ResidentRequest[]
 
   @@index([propertyId, unitId])
 }
@@ -1543,4 +1557,76 @@ model DrawLine {
 
   @@id([drawId, lineId])
   @@index([lineId])
+}
+
+// A tenant's own link for reporting repairs (docs/specs/maintenance-requests.md):
+// /r/<token>, the token stored only as its hash, as job links are. It works
+// while the lease is current; Turn off link or a new link revokes it.
+model ResidentLink {
+  id         String           @id @default(cuid())
+  tokenHash  String           @unique
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId   String
+  lease      Lease            @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  leaseId    String
+  emailedAt  DateTime?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime         @default(now())
+  uploads    ResidentUpload[]
+
+  @@index([tenantId])
+  @@index([leaseId])
+}
+
+// What a resident sent, beside the task it became: their own words for their
+// page (the task's title and notes are staff's to edit), the answers the task
+// has no field for, and the step their last email told them.
+model ResidentRequest {
+  id                   String    @id @default(cuid())
+  task                 Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId               String    @unique
+  lease                Lease     @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  leaseId              String
+  tenant               Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  tenantId             String?
+  tenantName           String // kept for labels if the tenant row goes
+  whatsWrong           String
+  details              String?   @db.Text
+  letUsIn              Boolean
+  pets                 Boolean?
+  petsNote             String?
+  closedNote           String?
+  canceledByResidentAt DateTime?
+  // The step and day the resident was last emailed about ("received" until the first change).
+  notifiedStep         String    @default("received")
+  notifiedDay          DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([leaseId])
+  @@index([notifiedStep])
+}
+
+// A photo or video a resident uploaded from their link, checked with head()
+// and waiting to be attached to the request it goes with. usedAt is set when
+// it is.
+model ResidentUpload {
+  id             String         @id @default(cuid())
+  link           ResidentLink   @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  linkId         String
+  pathname       String         @unique
+  url            String
+  filename       String
+  size           Int
+  contentType    String
+  kind           AttachmentKind
+  thumbPathname  String?
+  posterPathname String?
+  width          Int?
+  height         Int?
+  durationSec    Float?
+  usedAt         DateTime?
+  createdAt      DateTime       @default(now())
+
+  @@index([linkId])
 }
