@@ -63,7 +63,6 @@ Three things only Connor can do. Each one unblocks a build.
 | Contractor onboarding in the portal | Spec ready | M | Dec 16 to Jan 15 | Contractor page | docs/specs/contractor-onboarding.md (branch `claude/contractor-form-integration-55b2b4`) |
 | Year-end pack for the CPA (new) | Needs a spec | M | Jan 16 to Feb 28 | QuickBooks | |
 | Leases on every unit | Needs a spec | L | Jan 16 to Feb 28 | Tenant contact | docs/property-page-plan.md section 2 |
-| Rehab draw tracker (new) | Spec ready | M | Dec 16 to Jan 31 | | docs/specs/rehab-draws.md |
 
 - **Contractor invoices.** Every invoice in one place, tied to its jobs: from the portal, an `invoices@` inbox or by hand. To review, To pay and Paid, plus a list of finished jobs with no invoice. Money still moves in Baselane. Needs Connor's OK on its 11 defaults.
 - **1099 list for January.** One page lists each contractor's 2026 payments beside their W-9 and address, so whoever files has every number in one place. Reuses: QuickBooks vendor lines (`QboVendor`, `LedgerLine`) and the contractor page's W-9 files.
@@ -71,7 +70,6 @@ Three things only Connor can do. Each one unblocks a build.
 - **Contractor onboarding.** New contractors set themselves up from an invite or one sign-up link: details, trades, W-9 and insurance. It retires the Google Form, whose sheet holds every contractor's bank numbers in plain text.
 - **Year-end pack for the CPA.** For each property and LLC: the 2026 P&L from QuickBooks, the CapEx finished this year and the loan facts, in one export. Ready by mid-February, ahead of the Mar 15 return deadline. Reuses: the QuickBooks queries behind Financials and the property CapEx model.
 - **Leases on every unit.** Rent, lease end and deposit live in task text today. A lease per unit (tenant, dates, rent, deposit) puts renewals in Needs you 90 days out and marks each unit occupied, turning over or vacant.
-- **Rehab draw tracker.** Each rehab loan holds back a budget that HG Capital draws on as work gets done, and today nobody but Pieter can see where a draw stands. A Draws page shows ready to draw, submitted, funded and left across every open rehab. Each rehab follows its loan (765 and 767 Prospect share one), keeps the lender's budget line by line, and starts from Vontive's uploaded worksheet. The next draw stays open as a draft Pieter fills in, then moves through Sent, Inspection, Approved and Funded, and Needs you flags a draw waiting on us or stuck 10 days. Planned with Connor on Nov 20 as a lightweight MVP, layouts included; waits for "build it". Costs, tasks on lines and forwarded lender emails come after.
 
 ## Then: Feb 1 to Mar 31. Tenancies and residents
 
@@ -139,4 +137,5 @@ Update a row's status when it changes, and move finished items to a short "Done"
 
 ## Done
 
+- **Rehab draw tracker** (Nov 20, `8b29fea`). A Draws page shows ready to draw, submitted, funded and left across every open rehab; each rehab follows its loan, keeps the lender's budget line by line from Vontive's uploaded worksheet or typed lines, holds a running draft, and moves each draw through Sent, Inspection, Approved and Funded. Needs you flags a draw waiting on us or stuck 10 days. Spec: docs/specs/rehab-draws.md.
 - **Shorter activity** (Nov 20, `bc996d0`). Older changes between comments collapse Linear style ("Show 5 updates: assignee, due date and Asana move"), the newest 2 stay in view, and day headings are gone, on the task page, the contractor's job page and the deal log. Spec: docs/specs/activity-collapse.md.
