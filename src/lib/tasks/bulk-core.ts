@@ -1,7 +1,7 @@
 import { Prisma, type TaskStatus } from "@prisma/client";
 import { toYmd, type Ymd } from "@/lib/dates";
 import { unitAfterMove, unitLabels } from "@/lib/picker-options-shape";
-import { isActiveStatus } from "@/lib/task-scope";
+import { isActiveStatus, isDiscarded, isDraftStatus } from "@/lib/task-scope";
 import * as core from "./core";
 import { targetField, type DateChange } from "./list";
 import { repeatCreatedCopy } from "./repeat";
@@ -20,6 +20,16 @@ import { repeatCreatedCopy } from "./repeat";
  * list loaded, a contractor archived since) rolls back just that task and
  * counts it as skipped, with its reason, while the rest go ahead. Anything
  * else fails the whole batch.
+ *
+ * No bulk edit, and no bulk Undo, touches a draft from Claude
+ * (docs/specs/tasks-from-claude.md 6.2), whatever ids the request carries.
+ * The list never offers one to pick, so the server is the guard: lockTasks
+ * hands on tasks only, and every change and Undo here takes its rows from it
+ * (eachTask). A draft among the picks was a task when its row was picked (an
+ * Add's Undo made it a draft again), so it counts as changed since. One a
+ * partner has discarded since is gone to everyone (task-scope.ts draftTask),
+ * so it counts as gone, as a deleted task does. Delete isn't one transaction
+ * (each task's delete is its own), so it has its own rule, deleteEach.
  */
 
 export type BulkSkip = "closed" | "changed" | "gone" | "needsDate" | "refused";
@@ -85,6 +95,8 @@ export interface PropertyChange {
 export interface LockedTask {
   id: string;
   status: TaskStatus;
+  /** Set on a draft a partner discarded; null on every task. */
+  discardedAt: Date | null;
   waitingOn: string | null;
   scheduledFor: Date | null;
   dueDate: Date | null;
@@ -150,9 +162,21 @@ async function repeatCopiesOf(tx: core.Tx, ids: readonly string[]): Promise<stri
   });
 }
 
+/** What lockTasks read: the tasks a bulk edit may change, and how many of the picks are drafts, which it may not. */
+export interface LockedPicks {
+  tasks: LockedTask[];
+  drafts: number;
+}
+
 /**
  * Locks these tasks as it reads them, in id order, and returns them. A task
  * deleted since the list loaded isn't read; the caller counts it as gone.
+ *
+ * A draft from Claude is locked with the rest, so the status read here is the
+ * one it has until the batch commits (an Add waits its turn), and is counted
+ * but never returned: nothing past this function is handed a draft. A
+ * discarded draft is neither returned nor counted, so the caller counts it as
+ * gone.
  *
  * `withCopies`: a status change that can reopen a closed task, or Undo a
  * finish, also takes the repeat copy each closed one last made. Taken here,
@@ -160,22 +184,25 @@ async function repeatCopiesOf(tx: core.Tx, ids: readonly string[]): Promise<stri
  * order, as bulk.ts requires; taken inside the reopen instead, a copy could
  * come after a pick with a later id that is already held.
  */
-export async function lockTasks(tx: core.Tx, ids: readonly string[], { withCopies = false } = {}): Promise<LockedTask[]> {
-  if (!ids.length) return [];
+export async function lockTasks(tx: core.Tx, ids: readonly string[], { withCopies = false } = {}): Promise<LockedPicks> {
+  if (!ids.length) return { tasks: [], drafts: 0 };
   const extra = withCopies ? await repeatCopiesOf(tx, ids) : [];
   const all = [...new Set([...ids, ...extra])];
   const rows = await tx.$queryRaw<LockedTask[]>`
-    SELECT "id", "status", "waitingOn", "scheduledFor", "dueDate", "propertyId", "unitLabel", "dealId", "assigneeUserId", "assigneeContactId", "assigneeName"
+    SELECT "id", "status", "discardedAt", "waitingOn", "scheduledFor", "dueDate", "propertyId", "unitLabel", "dealId", "assigneeUserId", "assigneeContactId", "assigneeName"
     FROM "Task" WHERE "id" IN (${Prisma.join(all)}) ORDER BY "id" FOR NO KEY UPDATE`;
   const picked = new Set(ids);
-  return rows.filter((r) => picked.has(r.id));
+  const read = rows.filter((r) => picked.has(r.id) && !isDiscarded(r));
+  const tasks = read.filter((r) => !isDraftStatus(r.status));
+  return { tasks, drafts: read.length - tasks.length };
 }
 
 /**
  * Runs `each` for every locked task, one savepoint apiece, and collects what
  * it returns: a change for Undo, "done" for a task that changed with nothing
  * to undo or already was where asked. A rule refusal rolls back that task
- * alone and counts as a skip.
+ * alone and counts as a skip. A draft among the picks is never run: it is
+ * skipped as changed since, before any savepoint.
  */
 async function eachTask<C>(
   tx: core.Tx,
@@ -184,9 +211,11 @@ async function eachTask<C>(
   lock: { withCopies?: boolean } = {},
 ): Promise<BulkOutcome<C> & { rows: LockedTask[] }> {
   const unique = [...new Set(ids)];
-  const rows = await lockTasks(tx, unique, lock);
+  const { tasks: rows, drafts } = await lockTasks(tx, unique, lock);
   const out: BulkOutcome<C> = { changed: [], done: 0, skipped: {} };
-  if (rows.length < unique.length) addSkip(out.skipped, "gone", unique.length - rows.length);
+  if (drafts) addSkip(out.skipped, "changed", drafts);
+  const gone = unique.length - rows.length - drafts;
+  if (gone > 0) addSkip(out.skipped, "gone", gone);
   for (const row of rows) {
     await tx.$executeRaw`SAVEPOINT bulk_task`;
     try {
@@ -433,4 +462,59 @@ export async function undoDatesEach(tx: core.Tx, moves: readonly DateMove[], p: 
       return "done";
     },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+export interface DeleteOutcome {
+  /** Deleted, or already gone: what was asked. */
+  deleted: number;
+  failed: number;
+  /** Picks that are drafts from Claude: left as they are, and neither deleted nor failed. */
+  drafts: number;
+}
+
+/**
+ * Delete for many: each pick through `remove` (service.deleteTask), one at a
+ * time, each its own transaction. One that fails is reported to `failedOne`
+ * and counted, and the rest still go. One already gone counts as deleted,
+ * since that's what was asked, and so does a draft a partner discarded, which
+ * is gone to everyone.
+ *
+ * Never a draft from Claude, whatever ids arrive (docs/specs/tasks-from-claude.md
+ * 6.2): a draft goes by Discard, on its own row or page, which keeps it for
+ * its Undo (core.ts discardDrafts). The delete itself is the guard: it locks
+ * the row and refuses a draft (core.ts deleteTask), so a task that becomes a
+ * draft again as it is deleted (an Add's Undo) is left alone. The read here
+ * only saves that trip for a pick that is a draft already, and counts it;
+ * one the delete refuses is counted the same way.
+ */
+export async function deleteEach(
+  db: { task: Pick<core.Tx["task"], "findUnique"> },
+  ids: readonly string[],
+  remove: (id: string) => Promise<void>,
+  failedOne: (err: unknown, id: string) => void = () => {},
+): Promise<DeleteOutcome> {
+  const out: DeleteOutcome = { deleted: 0, failed: 0, drafts: 0 };
+  for (const id of new Set(ids)) {
+    try {
+      const row = await db.task.findUnique({ where: { id }, select: { status: true, discardedAt: true } });
+      if (row && isDraftStatus(row.status) && !isDiscarded(row)) {
+        out.drafts += 1;
+        continue;
+      }
+      await remove(id);
+      out.deleted += 1;
+    } catch (err) {
+      if (err instanceof core.TaskRuleError && err.message === core.DRAFT_DELETE_LINE) {
+        out.drafts += 1;
+        continue;
+      }
+      failedOne(err, id);
+      out.failed += 1;
+    }
+  }
+  return out;
 }

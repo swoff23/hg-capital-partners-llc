@@ -8,6 +8,8 @@ import {
   STALE_SYNC_MS,
   capexItem,
   drawItems,
+  draftsItem,
+  withDraftsItem,
   keyDateItems,
   missingItem,
   moreCount,
@@ -307,4 +309,23 @@ test("draw rows sit after the dated rows and before sign-ups", () => {
   const list = needsYouList({ keyDates: dated, draws, capex: null, quickbooks: null });
   assert.deepEqual(list.map((i) => i.kind), ["loan", "draw"]);
   assert.equal(list[1].detail, "No change in 24 days · Sent");
+});
+
+test("drafts row: one row with your own count, none at zero", () => {
+  assert.equal(draftsItem(0), null);
+  const row = draftsItem(3)!;
+  assert.equal(row.kind, "drafts");
+  assert.equal(row.title, "Drafts from Claude");
+  assert.equal(row.href, "/tasks");
+  assert.equal(row.detail, "3 to add");
+});
+
+test("drafts row: first in the list, ahead of the key dates, so a phone's three rows never hide it; with none the list is as it was", () => {
+  const dated = keyDateItems([property({ id: "a", loanMaturityDate: utc("2026-11-30") })], TODAY);
+  const missing = missingItem(2, "")!;
+  const base = needsYouList({ keyDates: dated, capex: null, quickbooks: null, missing });
+  assert.deepEqual(withDraftsItem(base, 0), base);
+  assert.deepEqual(withDraftsItem(base, 2).map((i) => i.kind), ["drafts", "loan", "missing"]);
+  assert.deepEqual(withDraftsItem([missing], 1).map((i) => i.kind), ["drafts", "missing"]);
+  assert.deepEqual(withDraftsItem([], 1).map((i) => i.kind), ["drafts"]);
 });

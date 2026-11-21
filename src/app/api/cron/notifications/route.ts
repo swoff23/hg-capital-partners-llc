@@ -6,6 +6,7 @@ import { settleMissingInfo } from "@/lib/missing/service";
 import { drainDue } from "@/lib/notifications/outbox";
 import { queueDueReminders } from "@/lib/notifications/reminders";
 import { cronAuthorized, cronRefusal } from "@/lib/secrets";
+import { sweepDiscardedDrafts } from "@/lib/tasks/service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,6 +23,12 @@ export const maxDuration = 60;
  * in anywhere in the app, and finishes a task when its last one ticks
  * (docs/specs/missing-info.md, D9). A failure there is logged and never stops
  * the emails.
+ *
+ * And it deletes the drafts from Claude that a partner discarded more than
+ * ten minutes ago, with their files (docs/specs/tasks-from-claude.md 6.3;
+ * tasks/core.ts sweepDiscardedDrafts): Discard only hides a draft, so its Undo
+ * can bring it back whole, and this is where it goes for good. A failure
+ * there is logged too, and the drafts wait for the next minute.
  *
  * After a run it checks in with Sentry's "background-jobs" monitor, which is
  * how a stopped job, a stuck queue or a stale QuickBooks sync reaches Connor
@@ -46,6 +53,10 @@ export async function GET(request: NextRequest) {
     logError("cron:missing-info", err);
     return 0;
   });
+  const discarded = await sweepDiscardedDrafts(now).catch((err: unknown) => {
+    logError("cron:discarded-drafts", err);
+    return 0;
+  });
   after(() => checkInBackgroundJobs(new Date()));
-  return NextResponse.json({ ...result, reminders: reminders.queued, settled });
+  return NextResponse.json({ ...result, reminders: reminders.queued, settled, discarded });
 }

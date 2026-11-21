@@ -96,6 +96,19 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "no-store" },
         ],
       },
+      {
+        // Where a partner approves Claude (docs/specs/tasks-from-claude.md 7.2). Its address carries the id of the
+        // request it was drawn for: never passed to another site as a Referer, never kept in a cache. same-origin,
+        // not no-referrer: Allow and Cancel are forms, and one posted before the page's script has loaded goes as a
+        // plain form post, which a no-referrer page sends with "Origin: null", and Next turns that away. No
+        // Cross-Origin-Opener-Policy either: it would cut this window off from the Claude page that opened it, and
+        // Allow already acts only on the request this screen was drawn for.
+        source: "/settings/claude/approve",
+        headers: [
+          { key: "Referrer-Policy", value: "same-origin" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
     ];
   },
 };

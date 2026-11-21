@@ -18,6 +18,8 @@ export const STATUS_TONE: Record<TaskStatus, string> = {
   REVIEW: "text-warn",
   DONE: "text-ok",
   CANCELED: "text-muted-foreground",
+  // A draft never shows a status mark (its row and its page hide it), so it borrows To do's.
+  DRAFT: "text-muted-foreground",
 };
 
 /* The ring family, drawn on lucide's 24 grid. Each starts from the same
@@ -69,6 +71,8 @@ const GLYPH: Record<TaskStatus, ReactNode> = {
       <path d="M5.64 18.36 18.36 5.64" />
     </>
   ),
+  // A draft never shows a status mark (its row and its page hide it), so it borrows To do's empty ring.
+  DRAFT: RING,
 };
 
 /** How far along a stage is: the ring's inner pie, empty to full. */

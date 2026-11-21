@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { daysUntil, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { isArchived } from "@/lib/record-scope";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
+import { activeTask, listedTask } from "@/lib/task-scope";
 import { listedContactsWhere, mergeLegacyNames, personRefs } from "@/lib/tasks/assignee-people";
 
 /**
@@ -171,7 +171,9 @@ export async function contractorArchiveBlockers(tx: BlockersTx, id: string): Pro
 
 /**
  * A contractor's open jobs as Archive counts them: tasks assigned to them that
- * are still open (never a playbook's template rows), whether they name them by
+ * are still open (never a playbook's template rows, and never a draft Claude
+ * saved: a draft is nobody's job yet, and Add refuses an archived contractor,
+ * tasks/core.ts addDraft), whether they name them by
  * id or only by an imported name that Today and the Tasks filter file under
  * them (namedOpenJobs). Archive would move that one to Others without a word
  * (NOV3-TASKS-4). `names` are those imported names, so the contractor page
@@ -179,19 +181,20 @@ export async function contractorArchiveBlockers(tx: BlockersTx, id: string): Pro
  * this too, so the menu, the list and the toast agree.
  */
 export async function contractorOpenJobs(tx: BlockersTx, id: string): Promise<{ count: number; names: string[] }> {
-  const [linked, named] = await Promise.all([tx.task.count({ where: { assigneeContactId: id, ...activeTask, ...excludeTemplateTasks } }), namedOpenJobs(tx, id)]);
+  const [linked, named] = await Promise.all([tx.task.count({ where: { assigneeContactId: id, ...activeTask, ...listedTask } }), namedOpenJobs(tx, id)]);
   return { count: linked + named.count, names: named.names };
 }
 
 /**
  * The jobs a contractor's page lists: every task assigned to them by id, and
  * the open ones only an imported name of theirs ties to them (`names`, from
- * contractorOpenJobs), which Archive counts. Never a playbook's template rows.
+ * contractorOpenJobs), which Archive counts. Never a playbook's template rows
+ * or a draft (task-scope.ts listedTask).
  */
 export function contractorJobsWhere(id: string, names: readonly string[]): Prisma.TaskWhereInput {
-  if (names.length === 0) return { assigneeContactId: id, ...excludeTemplateTasks };
+  if (names.length === 0) return { assigneeContactId: id, ...listedTask };
   return {
-    ...excludeTemplateTasks,
+    ...listedTask,
     OR: [{ assigneeContactId: id }, { assigneeUserId: null, assigneeContactId: null, assigneeName: { in: [...names] }, ...activeTask }],
   };
 }
@@ -208,7 +211,7 @@ export function contractorJobsWhere(id: string, names: readonly string[]): Prism
 async function namedOpenJobs(tx: BlockersTx, id: string): Promise<{ count: number; names: string[] }> {
   const names = await tx.task.groupBy({
     by: ["assigneeName"],
-    where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...activeTask, ...excludeTemplateTasks },
+    where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...activeTask, ...listedTask },
     _count: { _all: true },
   });
   if (names.length === 0) return { count: 0, names: [] };

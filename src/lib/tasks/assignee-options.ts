@@ -1,10 +1,10 @@
 import "server-only";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isArchived } from "@/lib/record-scope";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { listedContactsWhere, recentAssigneeKeys } from "./assignee-people";
+import { recentAssignmentsWhere } from "./list-query";
 
 const isLive = (c: { archivedAt: Date | null }) => !isArchived(c);
 
@@ -26,8 +26,9 @@ const RECENT = 3;
  * recently, newest first, from their own ASSIGNED events and the assignee they
  * gave a task when they created it (its CREATED line's `to`, core.ts
  * createTask), so the picker's Recent rows follow them across devices
- * (selectors 3.3). Without it `recent` is empty and the picker shows no Recent
- * section.
+ * (selectors 3.3). A draft's lines don't count until a partner adds it
+ * (list-query.ts recentAssignmentsWhere). Without it `recent` is empty and
+ * the picker shows no Recent section.
  */
 export async function assigneeOptions(
   include: (string | null | undefined)[] = [],
@@ -54,12 +55,7 @@ export async function assigneeOptions(
     }),
     viewerId
       ? prisma.taskEvent.findMany({
-          where: {
-            actorUserId: viewerId,
-            deletedAt: null,
-            // A CREATED line with no `to` assigned no one; leaving those out keeps them from crowding the window below.
-            OR: [{ kind: "ASSIGNED" }, { kind: "CREATED", data: { path: ["to"], not: Prisma.DbNull } }],
-          },
+          where: recentAssignmentsWhere(viewerId),
           orderBy: { createdAt: "desc" },
           // Enough that three distinct people turn up even when one gets most of the jobs.
           take: 60,

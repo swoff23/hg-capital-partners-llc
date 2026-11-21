@@ -243,4 +243,5 @@ Built on Nov 20 after Connor's "build it" on the rework, nothing committed yet:
   - Three-digit counts fit at 320.
   - Undo after a change that emptied the list shows the rows again.
   - Docs, and the brand guidelines' notch rule.
+- **Drafts from Claude** (Nov 20, [tasks-from-claude.md](tasks-from-claude.md)): a draft row is never picked. Bulk edit, its Undo and bulk delete pass a draft over as if it were gone, and a delete that reaches nothing reads "Nothing changed".
 - **Delete** says "They go for good, with their notes, checklists, activity and files.", the task page's own wording.

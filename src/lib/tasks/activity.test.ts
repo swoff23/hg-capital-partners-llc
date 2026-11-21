@@ -481,6 +481,39 @@ test("imported history is flagged: story rows and the importer's creation line, 
   assert.ok(out[0].type === "line" && !out[0].viaAsana);
 });
 
+// docs/specs/tasks-from-claude.md D14 and section 10: "Pieter created this task via Claude · Pieter added this draft".
+test("a draft from Claude: its creation line is tagged via Claude, and Add reads 'added this draft'", () => {
+  const created = ev("CREATED", { to: { userId: null, contactId: "c-zack" } }, { ...PIETER, source: "CLAUDE" });
+  const edited = ev("DUE", { from: null, to: "2026-10-30" }, PIETER);
+  const added = ev("STATUS", { from: "DRAFT", to: "OPEN" }, PIETER);
+  const out = build([created, edited, added]);
+  assert.deepEqual(texts(out), ["Pieter created this task", "Pieter set the due date to Fri, Oct 30", "Pieter added this draft"]);
+  // The tag is its own field, as viaAsana is, so the page draws "via Claude" beside the line.
+  assert.ok(out[0].type === "line" && out[0].viaClaude === true && !out[0].viaAsana && !out[0].imported);
+  assert.ok(out[2].type === "line" && !out[2].viaClaude && out[2].status === "OPEN", "the Add was made in the app, and the task is To do");
+  // A task made in the app says nothing of Claude.
+  const plain = build([ev("CREATED", {}, PIETER)]);
+  assert.ok(plain[0].type === "line" && plain[0].text === "Pieter created this task" && plain[0].viaClaude === undefined);
+  assert.equal(eventLine(ev("STATUS", { from: "DRAFT", to: "OPEN" }), names, TODAY).text, "Connor added this draft");
+});
+
+test("Add is never folded into a burst, and an Add taken back by its Undo leaves nothing", () => {
+  // The same partner, the same minute: a status change beside it would otherwise merge into "changed the status 2 times".
+  const added = ev("STATUS", { from: "DRAFT", to: "OPEN" }, { ...PIETER, createdAt: at(1) });
+  const started = ev("STATUS", { from: "OPEN", to: "IN_PROGRESS" }, { ...PIETER, createdAt: at(2) });
+  const renamed = ev("TITLE", { from: "Gutters", to: "Fix gutters" }, { ...PIETER, createdAt: at(3) });
+  const out = build([added, started, renamed]);
+  assert.equal(out[0].type, "line");
+  assert.equal(texts(out)[0], "Pieter added this draft");
+  assert.ok(!texts(out).some((t) => /changed the status/.test(t)));
+  // Undo soft-deletes the Add's line (core.ts undoAddDraft): the timeline shows the draft as it was.
+  const created = ev("CREATED", {}, { ...PIETER, source: "CLAUDE", createdAt: at(0) });
+  const undone = ev("STATUS", { from: "DRAFT", to: "OPEN" }, { ...PIETER, createdAt: at(4), deletedAt: at(5) });
+  const again = ev("STATUS", { from: "DRAFT", to: "OPEN" }, { ...PIETER, createdAt: at(6) });
+  assert.deepEqual(texts(build([created, undone])), ["Pieter created this task"]);
+  assert.deepEqual(texts(build([created, undone, again])), ["Pieter created this task", "Pieter added this draft"]);
+});
+
 /* ---------------- Reading it ---------------- */
 
 test("entries come out oldest first whatever order they went in", () => {

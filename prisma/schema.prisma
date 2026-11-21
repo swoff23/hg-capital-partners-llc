@@ -29,6 +29,13 @@ model User {
   // Set by a "Forgot password" reset. A session cookie issued before it no
   // longer signs in (src/lib/auth.ts), so a reset signs the user out everywhere.
   passwordChangedAt DateTime?
+  // Connect Claude (docs/specs/tasks-from-claude.md 7.1, D24): this partner's own
+  // connector address is <APP_URL>/api/mcp/<key>. The key is never stored: it is
+  // rebuilt from claudeKeyId and the session secret (src/lib/claude/oauth-core.ts),
+  // and claudeKeyHash is its SHA-256, the lookup for a call to that address. Both
+  // null: no address yet, or Disconnect retired it.
+  claudeKeyId       String?
+  claudeKeyHash     String?   @unique
   createdAt         DateTime  @default(now())
 
   asanaGid String? @unique // Asana user gid, matched once by the import
@@ -72,6 +79,8 @@ model User {
   qboConnections      QuickbooksConnection[]
   // "Forgot password" links for this partner (docs/specs/staff-password-reset.md).
   passwordResetTokens PasswordResetToken[]
+  // This partner's Claude, connected through the connector (docs/specs/tasks-from-claude.md).
+  claudeConnections   ClaudeConnection[]
 }
 
 // ---------------------------------------------------------------------------
@@ -425,6 +434,9 @@ enum TaskStatus {
   WAITING
   REVIEW
   CANCELED
+  // Saved by Claude and waiting for a partner to Add it (docs/specs/tasks-from-claude.md
+  // section 6). Neither active nor closed: no list, count, email or contractor sees it.
+  DRAFT
 }
 
 model Task {
@@ -451,6 +463,9 @@ model Task {
   entryPermittedAt DateTime?
   waitingOn        String? // the reason while WAITING: "city inspection", "gas co."
   unitLabel        String? // matches a Property.units[].label; picks the lockbox code
+  // Set by Discard on a draft from Claude (docs/specs/tasks-from-claude.md 6.3): gone from every list
+  // at once, and deleted with its files by the every-minute run about 10 minutes later. Undo clears it.
+  discardedAt      DateTime?
   priority         String?
 
   // Repeats: when done, the next copy is created (src/lib/tasks/repeat.ts).
@@ -590,6 +605,7 @@ enum EventSource {
   PORTAL // a contractor
   SYSTEM // reminders, the move-in form, repeats
   ASANA // imported story
+  CLAUDE // a partner, through their Claude connector: the draft's CREATED event
 }
 
 // One timeline per task: comments, system changes and imported Asana stories.
@@ -826,6 +842,56 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+// One partner's Claude account, allowed to read the directory and save draft
+// tasks as that partner (docs/specs/tasks-from-claude.md, sections 7 and 8).
+// Made when the partner taps Allow; connectedAt is set when Claude swaps the
+// code for tokens. One live row per partner: a new Allow revokes the old one.
+// A password change ends it too (the token check compares createdAt with
+// User.passwordChangedAt, as src/lib/auth.ts does for sessions).
+model ClaudeConnection {
+  id              String    @id @default(cuid())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  clientId        String // Claude's client identity as it presented itself
+  createdAt       DateTime  @default(now())
+  connectedAt     DateTime?
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  revokedByUserId String? // which partner tapped Disconnect; no FK, it's a note
+
+  tokens OAuthToken[]
+
+  @@index([userId])
+}
+
+enum OAuthTokenKind {
+  CODE
+  ACCESS
+  REFRESH
+}
+
+// The connector's sign-in tokens. Only the SHA-256 of each is stored, like
+// PortalSession and JobLink (src/lib/portal/tokens.ts). A code is single use
+// (usedAt); a refresh token is replaced on every use, and one presented again
+// after that revokes the whole connection.
+model OAuthToken {
+  id            String           @id @default(cuid())
+  connection    ClaudeConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connectionId  String
+  kind          OAuthTokenKind
+  tokenHash     String           @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  // On a CODE: what the token call has to match.
+  codeChallenge String?
+  redirectUri   String?
+  resource      String?
+  createdAt     DateTime         @default(now())
+
+  @@index([connectionId])
+  @@index([expiresAt])
+}
+
 enum SecurityEventKind {
   SIGN_IN_OK
   SIGN_IN_FAILED
@@ -837,6 +903,8 @@ enum SecurityEventKind {
   ACCOUNT_DISABLED
   LOCKBOX_VIEWED
   TENANT_VIEWED
+  CLAUDE_CONNECTED
+  CLAUDE_DISCONNECTED
 }
 
 // Audit log for the portal. No foreign keys on purpose: it outlives the rows

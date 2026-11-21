@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { toYmd, type Ymd } from "@/lib/dates";
 import { logError } from "@/lib/log";
-import { isActiveStatus } from "@/lib/task-scope";
+import { isActiveStatus, isDraftStatus } from "@/lib/task-scope";
 import * as core from "./core";
-import { assignEach, moveDatesEach, setPropertyEach, setStatusEach, undoAssignEach, undoDatesEach, undoPropertyEach, undoStatusEach } from "./bulk-core";
-import type { AssignChange, AssignPick, DateMove, PropertyChange, StatusChange, StatusPick } from "./bulk-core";
+import { assignEach, deleteEach, moveDatesEach, setPropertyEach, setStatusEach, undoAssignEach, undoDatesEach, undoPropertyEach, undoStatusEach } from "./bulk-core";
+import type { AssignChange, AssignPick, DateMove, DeleteOutcome, PropertyChange, StatusChange, StatusPick } from "./bulk-core";
 import { targetField, type DateChange } from "./list";
 import { deleteTask } from "./service";
 
@@ -17,6 +17,10 @@ import { deleteTask } from "./service";
  * core.patchTask, so it gets its own timeline line and, on a contractor's
  * job, the email the move calls for. All of a batch commits together or not
  * at all.
+ *
+ * Neither touches a draft from Claude (docs/specs/tasks-from-claude.md 6.2):
+ * a draft isn't active, so a move passes it over, and an Undo skips a task
+ * that has become a draft again since its date moved (an Add's Undo).
  *
  * Both take their tasks in id order, as every write that holds more than one
  * task does (renameTaskUnits; a reopen and Approve's Undo hold the finished
@@ -46,8 +50,8 @@ function revalidate(rows: { id: string; propertyId: string | null; dealId: strin
  *   "due"    the due date (staff tasks, "Move all to today");
  *   "target" what a contractor sees (D7): a Scheduled job's visit date,
  *            otherwise its due date.
- * Closed tasks, tasks deleted since the list was drawn and dates already at
- * `to` are skipped. Returns each moved date as it was, for Undo.
+ * Closed tasks, drafts, tasks deleted since the list was drawn and dates
+ * already at `to` are skipped. Returns each moved date as it was, for Undo.
  */
 export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" | "target", p: core.Principal): Promise<DateChange[]> {
   const value = to === null ? null : toYmd(to);
@@ -79,7 +83,7 @@ export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" 
   return moved;
 }
 
-/** Undo: put each date back as it was. Tasks deleted since are skipped. */
+/** Undo: put each date back as it was. Tasks deleted since are skipped, and so is one that is a draft again. */
 export async function restoreTaskDates(changes: DateChange[], p: core.Principal): Promise<void> {
   if (!changes.length) return;
   const ids = [...new Set(changes.map((c) => c.id))];
@@ -87,9 +91,10 @@ export async function restoreTaskDates(changes: DateChange[], p: core.Principal)
     // Locked as they are read, in the database's id order (as moveTaskDates takes them), whatever order the Undo's
     // list came in. Held from here, a task can't be deleted between this read and its patch, which would fail the
     // whole Undo; one deleted before it isn't read, and is skipped. NO KEY UPDATE, the lock patchTask's update takes.
-    const rows = await tx.$queryRaw<{ id: string; propertyId: string | null; dealId: string | null }[]>`
-      SELECT "id", "propertyId", "dealId" FROM "Task" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR NO KEY UPDATE`;
+    const rows = await tx.$queryRaw<{ id: string; status: TaskStatus; propertyId: string | null; dealId: string | null }[]>`
+      SELECT "id", "status", "propertyId", "dealId" FROM "Task" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR NO KEY UPDATE`;
     for (const r of rows) {
+      if (isDraftStatus(r.status)) continue;
       for (const c of changes) {
         if (c.id !== r.id) continue;
         await core.patchTask(tx, c.id, c.field === "dueDate" ? { dueDate: c.value } : { scheduledFor: c.value }, p);
@@ -102,6 +107,11 @@ export async function restoreTaskDates(changes: DateChange[], p: core.Principal)
 
 // ---------------------------------------------------------------------------
 // Bulk edit on the Tasks list (docs/specs/bulk-edit.md); the rules are bulk-core.ts
+//
+// None of these touches a draft from Claude, whatever ids arrive
+// (docs/specs/tasks-from-claude.md 6.2): each change and Undo takes its rows
+// from bulk-core.ts lockTasks, which hands on tasks only, and Delete goes
+// through deleteEach. Keep every new bulk write behind one of the two.
 // ---------------------------------------------------------------------------
 
 /** A status, assignee or property change on up to 400 tasks: room for each one's own rules and lines. */
@@ -166,19 +176,15 @@ export async function undoBulkProperty(changes: PropertyChange[], p: core.Princi
  * Delete each task for good, files and all (service.deleteTask), one at a
  * time: each is its own transaction, and its files go once it commits. One
  * that fails is counted and the rest still go; one already gone counts as
- * deleted, since that's what was asked.
+ * deleted, since that's what was asked. A draft from Claude is left as it is
+ * and counted apart (bulk-core.ts deleteEach; service.deleteTask refuses one
+ * under the row's lock): a draft goes by Discard, on its own row or page.
  */
-export async function bulkDeleteTasks(ids: string[], p: core.Principal): Promise<{ deleted: number; failed: number }> {
-  let deleted = 0;
-  let failed = 0;
-  for (const id of [...new Set(ids)]) {
-    try {
-      await deleteTask(id, p);
-      deleted += 1;
-    } catch (err) {
-      logError("tasks:bulk-delete", err, { taskId: id });
-      failed += 1;
-    }
-  }
-  return { deleted, failed };
+export async function bulkDeleteTasks(ids: string[], p: core.Principal): Promise<DeleteOutcome> {
+  return deleteEach(
+    prisma,
+    ids,
+    (id) => deleteTask(id, p),
+    (err, id) => logError("tasks:bulk-delete", err, { taskId: id }),
+  );
 }

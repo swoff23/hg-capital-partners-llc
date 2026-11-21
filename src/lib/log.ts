@@ -2,6 +2,7 @@
  * One-line JSON error logging. Vercel captures console.error per invocation,
  * so a single structured line per failure is what shows up in the Logs tab
  * and can be searched by `scope`. No dependency; safe to call from scripts.
+ * logWarning writes the same line through console.warn.
  *
  * Every line is also handed to the error reporter when one is set
  * (docs/specs/error-alerts.md, Q13). src/instrumentation.ts sets it at start-up
@@ -46,23 +47,39 @@ export function setErrorReporter(reporter: ErrorReporter | null): void {
   s.lastSent.clear();
 }
 
+function line(level: ReportLevel, scope: string, e: Error, ctx: Record<string, unknown>): string {
+  const digest = (e as { digest?: string }).digest;
+  return JSON.stringify({
+    level,
+    scope,
+    name: e.name,
+    message: e.message,
+    ...(digest ? { digest } : {}),
+    ...ctx,
+    stack: e.stack?.split("\n").slice(1, 5).map((l) => l.trim()),
+    at: new Date().toISOString(),
+  });
+}
+
 export function logError(scope: string, err: unknown, ctx: Record<string, unknown> = {}, opts: LogOptions = {}): void {
   const e = err instanceof Error ? err : new Error(String(err));
-  const digest = (e as { digest?: string }).digest;
-  console.error(
-    JSON.stringify({
-      level: "error",
-      scope,
-      name: e.name,
-      message: e.message,
-      ...(digest ? { digest } : {}),
-      ...ctx,
-      stack: e.stack?.split("\n").slice(1, 5).map((l) => l.trim()),
-      at: new Date().toISOString(),
-    }),
-  );
+  console.error(line("error", scope, e, ctx));
   if (opts.report === false) return;
   report(scope, e, ctx, opts.level ?? "error");
+}
+
+/**
+ * The same line for something that is expected while the app runs well (a
+ * sign-in request turned away), so Vercel files it as a warning: console.warn,
+ * level "warning", and a warning to the reporter. logError prints every line
+ * as an error whatever `level` it is given, which is right for a failure and
+ * wrong for these.
+ */
+export function logWarning(scope: string, err: unknown, ctx: Record<string, unknown> = {}, opts: Pick<LogOptions, "report"> = {}): void {
+  const e = err instanceof Error ? err : new Error(String(err));
+  console.warn(line("warning", scope, e, ctx));
+  if (opts.report === false) return;
+  report(scope, e, ctx, "warning");
 }
 
 function report(scope: string, err: Error, ctx: Record<string, unknown>, level: ReportLevel): void {

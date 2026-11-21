@@ -59,6 +59,13 @@ const ALLOWLIST = new Set([
   "/api/cron/notifications", // CRON_SECRET, the same check as /api/quickbooks/sync
   "/j/[token]/calendar", // a job email's link token (job-links.ts resolveJobLink): only while it still opens the job
   "/api/email/inbound", // Resend's webhook signature (RESEND_WEBHOOK_SECRET), checked before anything is read
+  // Tasks from Claude (docs/specs/tasks-from-claude.md, section 8). All six answer 404 to every method while CLAUDE_CONNECTOR_ENABLED is off.
+  "/api/mcp/[key]", // Claude's connector at a partner's own address: the bearer token issued for that address is the check (verifyAccessToken), with per-connection limits
+  "/api/oauth/authorize", // where Claude sends a partner's browser: parks a request for the owner of the address it names and grants nothing (Allow does, behind requireUser); GET asks getCurrentUser; per-IP limit
+  "/api/oauth/token", // the single-use code with its PKCE verifier, or the rotating refresh token, is the check; per-IP limit
+  "/api/oauth/revoke", // the token is the check; the same answer either way
+  "/.well-known/oauth-protected-resource/api/mcp/[key]", // public discovery document for one address; no data, and the key is never looked up
+  "/.well-known/oauth-authorization-server", // public discovery document; no data
 ]);
 
 /**

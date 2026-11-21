@@ -64,6 +64,12 @@ const schema = z.object({
     .string()
     .regex(/^(1|0|true|false)$/i, 'must be "1", "0", "true" or "false"')
     .optional(),
+  // Tasks from Claude (docs/specs/tasks-from-claude.md, section 8). Off unless "1" or
+  // "true": the connector, its sign-in endpoints and its discovery documents all 404 while off.
+  CLAUDE_CONNECTOR_ENABLED: z
+    .string()
+    .regex(/^(1|0|true|false)$/i, 'must be "1", "0", "true" or "false"')
+    .optional(),
   // Resend (src/lib/email/send.ts). Both unset locally: emails print to the console.
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(), // "HG Capital <jobs@mail.example.com>"
@@ -112,6 +118,8 @@ export interface Env extends Raw {
   readonly qbo: QboEnv | null;
   /** PORTAL_ENABLED is "1" or "true". */
   readonly portalEnabled: boolean;
+  /** CLAUDE_CONNECTOR_ENABLED is "1" or "true". */
+  readonly claudeConnectorEnabled: boolean;
   /** Resend config, or null unless both RESEND_API_KEY and EMAIL_FROM are set. EMAIL_REPLY_TO is optional. */
   readonly email: EmailEnv | null;
   /** Origin for links in emails, no trailing slash. Throws in production if unset. */
@@ -172,6 +180,9 @@ function build(source: EnvSource): Env {
     },
     get portalEnabled(): boolean {
       return /^(1|true)$/i.test(raw.PORTAL_ENABLED ?? "");
+    },
+    get claudeConnectorEnabled(): boolean {
+      return /^(1|true)$/i.test(raw.CLAUDE_CONNECTOR_ENABLED ?? "");
     },
     get email(): EmailEnv | null {
       if (!raw.RESEND_API_KEY || !raw.EMAIL_FROM) return null;

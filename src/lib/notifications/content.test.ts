@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   DAILY_EMAIL_CAP,
   MAX_ATTEMPTS,
+  claimedRowVerdict,
   deliveryFor,
+  dueRowVerdict,
   easternDayStart,
   jobSubject,
   jobWhere,
@@ -29,6 +31,8 @@ import {
   sendFailureKind,
   taskEmail,
   undoneDropped,
+  type ClaimedJob,
+  type DueRow,
   type EventSnapshot,
   type OutboxItem,
 } from "./content";
@@ -869,4 +873,75 @@ test("notes fingerprint: the same notes print the same, trimmed as stored, and n
   assert.match(notesFingerprint("Lockbox 4321"), /^[0-9a-z]{1,11}$/);
   assert.equal(notesFingerprint(null), "");
   assert.equal(notesFingerprint("   "), "");
+});
+
+// ---------------------------------------------------------------------------
+// The send run's two decisions (outbox.ts drainDue calls these and nothing else to decide)
+// ---------------------------------------------------------------------------
+
+const ZACK_LOGIN = { active: true, portalAccount: { email: "zack@example.test", status: "ACTIVE", jobEmails: true } };
+const dueRow = (over: Partial<DueRow> = {}): DueRow => ({
+  taskId: "t1",
+  recipientContactId: "c-zack",
+  recipientUser: null,
+  recipientContact: ZACK_LOGIN,
+  items: [item("ASSIGNED", `assigned you "${TITLE}"`)],
+  task: { status: "OPEN", access: [{ contactId: "c-zack" }] },
+  ...over,
+});
+const toPartner = (over: Partial<DueRow> = {}) => dueRow({ recipientContactId: null, recipientContact: null, recipientUser: { email: "connor@example.test" }, ...over });
+
+test("the first decision: a row goes to a contractor who can open the job, or to a partner", () => {
+  const zack = dueRowVerdict(dueRow());
+  assert.deepEqual(zack.send && [zack.delivery, zack.taskId, zack.task.status], [{ ok: true, to: "zack@example.test", audience: "contractor" }, "t1", "OPEN"]);
+  const connor = dueRowVerdict(toPartner());
+  assert.deepEqual(connor.send && connor.delivery, { ok: true, to: "connor@example.test", audience: "staff" });
+  // The reasons a row is closed unsent, as before: its task gone, no access, no login, their switch off.
+  assert.deepEqual(dueRowVerdict(dueRow({ task: null })), { send: false, reason: "no task" });
+  assert.deepEqual(dueRowVerdict(dueRow({ task: { status: "OPEN", access: [{ contactId: "c-amy" }] } })), { send: false, reason: "no access" });
+  assert.deepEqual(dueRowVerdict(dueRow({ recipientContact: { active: false, portalAccount: ZACK_LOGIN.portalAccount } })), { send: false, reason: "no login" });
+  assert.deepEqual(dueRowVerdict(dueRow({ recipientContact: { active: true, portalAccount: { ...ZACK_LOGIN.portalAccount, jobEmails: false } } })), { send: false, reason: "emails off" });
+  assert.deepEqual(dueRowVerdict(dueRow({ taskId: null })), { send: false, reason: "no recipient" });
+  // "You're off this job" goes though their access has just ended.
+  const off = dueRowVerdict(dueRow({ items: [item("OFF", `took you off "${TITLE}"`)], task: { status: "OPEN", access: [] } }));
+  assert.equal(off.send, true);
+});
+
+// docs/specs/tasks-from-claude.md 6.1: a draft emails nobody. Nothing queues a row for one and Add's Undo deletes the
+// rows its Add queued; this is the run's own guard for a row that outlived both.
+test("the first decision closes any row whose task is a draft, a contractor's and a partner's alike, whatever else holds", () => {
+  const draft = { status: "DRAFT" as const, access: [{ contactId: "c-zack" }] };
+  // He holds an access row (one shared by hand), a login and his switch on: everything else says send.
+  assert.deepEqual(dueRowVerdict(dueRow({ task: draft })), { send: false, reason: "draft" });
+  assert.deepEqual(dueRowVerdict(toPartner({ task: draft })), { send: false, reason: "draft" });
+  assert.deepEqual(dueRowVerdict(dueRow({ task: draft, items: [item("OFF", `took you off "${TITLE}"`)] })), { send: false, reason: "draft" });
+});
+
+const JOB: ClaimedJob = { status: "OPEN", dueDate: new Date("2026-10-23T00:00:00Z"), scheduledFor: null, description: "Bring the tall ladder." };
+const claimed = (over: Partial<Parameters<typeof claimedRowVerdict>[0]> = {}) =>
+  claimedRowVerdict({ audience: "contractor", items: [item("ASSIGNED", `assigned you "${TITLE}"`)], job: JOB, hasAccess: true, today: "2026-10-22", ...over });
+
+test("the second decision, on the job read again after the claim: what is left to say, the date they see, or why nothing goes", () => {
+  const goes = claimed();
+  assert.deepEqual(goes.send && [goes.items.map((i) => i.kind), goes.due, goes.job], [["ASSIGNED"], "2026-10-23", JOB]);
+  // A Scheduled job's date is its visit.
+  const visit = claimed({ job: { ...JOB, status: "SCHEDULED", scheduledFor: new Date("2026-10-30T00:00:00Z") } });
+  assert.equal(visit.send && visit.due, "2026-10-30");
+  assert.deepEqual(claimed({ job: null }), { send: false, reason: "no task" });
+  // Taken off since the batch read, with nothing saying so: nothing about a job that isn't theirs.
+  assert.deepEqual(claimed({ hasAccess: false }), { send: false, reason: "nothing to send" });
+  // A partner's lines don't hang on anyone's access.
+  const partner = claimed({ audience: "staff", hasAccess: false, items: [item("COMMENT", "commented", "Zack Reading")] });
+  assert.deepEqual(partner.send && partner.items.map((i) => i.kind), ["COMMENT"]);
+  // A reminder for a date the job no longer has is dropped (liveReminders).
+  const stale = claimed({ items: [{ ...item("DUE_TODAY", "due today", "HG"), due: "2026-10-22" }] });
+  assert.deepEqual(stale, { send: false, reason: "nothing to send" });
+});
+
+test("the second decision closes a claimed row whose task became a draft since the batch read: an Add's Undo landed in between", () => {
+  const draft: ClaimedJob = { ...JOB, status: "DRAFT" };
+  // Still holding access and a line to say: only the draft stops it.
+  assert.deepEqual(claimed({ job: draft }), { send: false, reason: "draft" });
+  assert.deepEqual(claimed({ job: draft, audience: "staff", items: [item("COMMENT", "commented", "Zack Reading")] }), { send: false, reason: "draft" });
+  assert.deepEqual(claimed({ job: draft, hasAccess: false, items: [item("OFF", `took you off "${TITLE}"`)] }), { send: false, reason: "draft" });
 });

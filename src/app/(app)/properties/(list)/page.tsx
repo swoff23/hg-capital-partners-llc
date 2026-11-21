@@ -6,7 +6,7 @@ import { SortHeader } from "@/components/sort-header";
 import { EmptyState, LinkButton, PageHeader, RowCell, Table, Td, Th, pendingRowFill } from "@/components/ui";
 import { Money } from "@/components/money";
 import { shortAddress } from "@/lib/normalize";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
+import { openByPropertyWhere } from "@/lib/tasks/list-query";
 import { parseBuildingCapex, parseUnits, propertyUnitCount } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
 import { cn, toMoneyNumber } from "@/lib/utils";
@@ -48,7 +48,7 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
     prisma.property.findMany({ orderBy: { address: "asc" } }),
     prisma.task.groupBy({
       by: ["propertyId"],
-      where: { ...activeTask, ...excludeTemplateTasks, propertyId: { not: null } },
+      where: openByPropertyWhere,
       _count: true,
     }),
     getCapexRules(),

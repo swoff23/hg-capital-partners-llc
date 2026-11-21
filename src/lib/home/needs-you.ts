@@ -25,7 +25,8 @@ export type NeedsYouKind =
   | "sync-lost"
   | "signup"
   | "baselane"
-  | "draw";
+  | "draw"
+  | "drafts";
 
 /** The rows that carry buttons beside them (contractor onboarding, docs/specs/contractor-onboarding.md 4.5). */
 export type NeedsYouActions = "signup" | "baselane";
@@ -140,6 +141,42 @@ export function missingItem(required: number, places: string): NeedsYouItem | nu
     late: false,
     date: null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Drafts from Claude
+// ---------------------------------------------------------------------------
+
+/**
+ * The one "Drafts from Claude" row (docs/specs/tasks-from-claude.md 6.3, D22):
+ * how many of the viewer's own drafts wait, opening the Tasks list where My
+ * drafts sits on top. It leads Needs you (`withDraftsItem`). Null with none. The other partner's drafts never count
+ * here: they have their own reminder.
+ */
+export function draftsItem(count: number): NeedsYouItem | null {
+  if (!(count > 0)) return null;
+  return {
+    key: "drafts",
+    kind: "drafts",
+    href: "/tasks",
+    title: "Drafts from Claude",
+    state: "Draft",
+    detail: `${count.toLocaleString("en-US")} to add`,
+    amount: null,
+    pastDue: null,
+    dateLabel: null,
+    late: false,
+    date: null,
+  };
+}
+
+/**
+ * The list with the drafts row (see `draftsItem`) first. It is the only reminder that drafts wait (D22), and a
+ * phone shows three rows and hides the rest behind "N more", so it never goes behind the key dates.
+ */
+export function withDraftsItem(items: NeedsYouItem[], count: number): NeedsYouItem[] {
+  const row = draftsItem(count);
+  return row ? [row, ...items] : items;
 }
 
 // ---------------------------------------------------------------------------
