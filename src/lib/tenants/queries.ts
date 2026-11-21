@@ -4,7 +4,7 @@ import { toYmd, type Ymd } from "@/lib/dates";
 import { compareStreet, shortAddress } from "@/lib/normalize";
 import { parseUnits } from "@/lib/property-types";
 import { phoneHasWord } from "@/lib/search-keys";
-import { rentableUnits } from "./core";
+import { unitSlots } from "./unit-slots";
 import { homeLabel, leaseEndsLabel, leaseStatus, livingLease, nextLease, termToday, type LeaseStatus } from "./status";
 
 export { homeLabel };
@@ -151,10 +151,7 @@ export async function propertyTenants(propertyId: string, units: unknown, today:
     where: { propertyId },
     include: { tenants: { include: { tenant: { select: { fullName: true } } }, orderBy: [{ primary: "desc" }, { position: "asc" }] }, terms: { orderBy: { startsOn: "desc" } } },
   });
-  const rentable = rentableUnits(parseUnits(units));
-  const slots: { unitId: string | null; label: string }[] = rentable.length
-    ? rentable.map((u, i) => ({ unitId: u.id ?? null, label: u.label?.trim() || `Unit ${i + 1}` }))
-    : [{ unitId: null, label: "Home" }];
+  const slots = unitSlots(units);
   const names = (l: (typeof leases)[number]) => l.tenants.map((t) => t.tenant.fullName);
   const rows: PropertyTenantUnit[] = slots.map((s) => {
     const living = livingLease(leases, s.unitId, today);

@@ -1,4 +1,8 @@
-import type { Ymd } from "@/lib/dates";
+import { fmtDay, type Ymd } from "@/lib/dates";
+import { rentableUnitCount, unitDisplay } from "@/lib/picker-options-shape";
+import { shortNames } from "@/lib/names";
+import { joinNames } from "@/lib/portal/job-view";
+import { isHouseMeterRow } from "@/lib/property-types";
 import { addDaysYmd } from "@/lib/quick-dates";
 
 /**
@@ -241,3 +245,130 @@ export function applyDraftKey(meId: string, templateId: string, items: readonly 
 export function dueFromOffset(anchor: Ymd | null | undefined, offset: number | null | undefined): Ymd | null {
   return anchor && typeof offset === "number" && Number.isFinite(offset) ? addDaysYmd(anchor, Math.trunc(offset)) : null;
 }
+
+/*
+ * Playbooks and leases (docs/specs/tenants.md section 9, adapting
+ * tenant-contact.md section 6): which playbook moves a household in or out,
+ * the fill-ins the household living there prefills, and the words of the
+ * checkbox that writes the lease with Apply.
+ */
+
+/** A date label that reads as a move-in ("Move-in date") makes a move-in playbook. */
+export const MOVE_IN_LABEL = /move[- ]?in/i;
+/** One that reads as a move-out ("Move-out date") makes a move-out playbook. */
+export const MOVE_OUT_LABEL = /move[- ]?out/i;
+
+export type PlaybookKind = "move-in" | "move-out";
+
+/**
+ * Which playbook this is, from its date label. Renaming the label only drops
+ * the lease checkbox, so it fails safe; a label that reads as both is neither.
+ */
+export function playbookKind(anchorLabel: string | null | undefined): PlaybookKind | null {
+  const label = anchorLabel ?? "";
+  const movesIn = MOVE_IN_LABEL.test(label);
+  if (movesIn === MOVE_OUT_LABEL.test(label)) return null;
+  return movesIn ? "move-in" : "move-out";
+}
+
+/** [Tenant] and [tenant name]: the fill-in the tenants' names go in. */
+export function isTenantNameToken(name: string): boolean {
+  return tokenKey(name) === "tenant";
+}
+
+/** A tenant's phone: a phone fill-in whose name starts with "tenant" ([tenant number], [tenant phone], [tenant cell]). */
+export function isTenantPhoneToken(name: string): boolean {
+  return /^tenant\b/.test(tokenKey(name)) && !isTenantNameToken(name) && tokenInputType(name) === "tel";
+}
+
+/** The household living in the picked home today, as the prefill action answers: names primary first, the primary's phone as shown. */
+export type HomeTenants = { names: string[]; phone: string | null };
+
+/** The household's names as they're said, trimmed and a blank one left out, for the join comments and the portal use (job-view.ts). */
+const spoken = (names: readonly string[]): string[] => names.map((s) => s.trim()).filter(Boolean);
+
+// One helper for a household in a short line, shared with the lease page (src/lib/names.ts).
+export { shortNames };
+
+/** Whose names prefill: the household living there, except on a move-in playbook, whose tenants are new. */
+export function prefillHousehold(kind: PlaybookKind | null, living: HomeTenants | null | undefined): HomeTenants | null {
+  return kind === "move-in" ? null : (living ?? null);
+}
+
+/**
+ * A fill-in's prefill from the household: everyone's names for [Tenant] ("Dana
+ * Lee, Sam Ortiz and Ana Ruiz"), the primary's phone for a tenant phone.
+ */
+export function tenantPrefill(token: string, household: HomeTenants | null | undefined): string | undefined {
+  if (!household || household.names.length === 0) return undefined;
+  if (isTenantNameToken(token)) return joinNames(spoken(household.names)) || undefined;
+  if (isTenantPhoneToken(token)) return household.phone?.trim() || undefined;
+  return undefined;
+}
+
+/**
+ * A fill-in's value on the Apply page: what was typed, or else its computed
+ * default, the property's address for [Address] or the household's prefill.
+ * A default is never written into `typed`, so it stays out of the saved draft
+ * and never marks the form changed; anything typed wins, a cleared field too.
+ */
+export function fillInValue(
+  token: string,
+  typed: Readonly<Record<string, string>>,
+  defaults: { address?: string | null; household?: HomeTenants | null },
+): string {
+  const own = typed[token];
+  if (own !== undefined) return own;
+  if (isAddressToken(token)) return defaults.address ?? "";
+  return tenantPrefill(token, defaults.household) ?? "";
+}
+
+/**
+ * Whether the picked home names one household, from its unit labels as
+ * lockbox.ts tenantUnit decides it: a unit picked (not the house meter), or a
+ * building with at most one rentable unit. A building with several units and
+ * none picked names nobody.
+ */
+export function homeResolves(units: readonly string[], unitLabel: string | null | undefined): boolean {
+  if (unitLabel?.trim()) return !isHouseMeterRow({ label: unitLabel });
+  return rentableUnitCount(units) <= 1;
+}
+
+/** Where a playbook's lease is, for its checkbox: the unit picked ("Unit 2", "Front"), or the property with none ("767 Prospect"). */
+export function leaseWhere(propertyLabel: string, unitLabel: string | null | undefined): string {
+  const unit = unitLabel?.trim();
+  return unit ? unitDisplay(unit) : propertyLabel;
+}
+
+/** "Feb 1", with the year only when it isn't this year's. */
+const moveDay = (day: Ymd, today: Ymd) => fmtDay(day, { year: "auto", now: today });
+
+/** The move-in playbook's checkbox: "Create a lease for Dana Lee at Unit 2, moving in Feb 1". */
+export function createLeaseLabel(name: string, where: string, movesIn: Ymd, today: Ymd): string {
+  return `Create a lease for ${name.replace(/\s+/g, " ").trim()} at ${where}, moving in ${moveDay(movesIn, today)}`;
+}
+
+/** The move-out playbook's checkbox: "Set Dana Lee and Sam Ortiz to move out Jan 31". */
+export function moveOutLabel(names: readonly string[], movesOut: Ymd, today: Ymd): string {
+  return `Set ${shortNames(names)} to move out ${moveDay(movesOut, today)}`;
+}
+
+/** The lease box, ticked, as Apply sends it: a move-in's one new tenant, or a move-out. `on` is the playbook's date. */
+export type PlaybookLease = { kind: "move-in"; name: string; phone?: string | null; on: Ymd } | { kind: "move-out"; on: Ymd };
+
+/** What Apply did to a lease, for the toast after "10 tasks created for 767 Prospect". */
+export type AppliedLease = { kind: "move-in"; name: string } | { kind: "move-out"; names: string[]; movesOut: Ymd };
+
+/** The toast's second clause: "Lease created for Dana Lee", "Dana Lee and Sam Ortiz move out Jan 31". */
+export function appliedLeaseLine(lease: AppliedLease, today: Ymd): string {
+  if (lease.kind === "move-in") return `Lease created for ${lease.name}`;
+  return `${shortNames(lease.names)} ${lease.names.length === 1 ? "moves" : "move"} out ${moveDay(lease.movesOut, today)}`;
+}
+
+/**
+ * The end of every refused lease write on the Apply page: the way through
+ * without it. It sits after the refusal and is never cut (SaveError's
+ * action), so a phone gets the short one and the refusal gives way.
+ */
+export const UNTICK_LEASE = "Untick the box to apply without it.";
+export const UNTICK_LEASE_SHORT = "Untick to skip it.";

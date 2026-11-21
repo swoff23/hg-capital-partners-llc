@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { ListingStatus } from "@prisma/client";
 import { DateField } from "@/components/date-field";
 import { FormSheet } from "@/components/form-sheet";
 import { LoadLatest } from "@/components/load-latest";
@@ -12,8 +13,10 @@ import { stableJson } from "@/lib/drafts";
 import { listingProblems } from "@/lib/properties/listing-checks";
 import { loadLatestListing } from "@/lib/properties/listing-latest";
 import { savePropertyListing } from "../actions";
+import type { WaitlistRow } from "@/lib/waitlist/fields";
 import { STATUS_LABEL, type EditableListing } from "./edit-listings";
 import { LISTING_PHOTO_MAX, ListingPhotos, discardSessionUploads } from "./listing-photos";
+import { WaitlistSection } from "./waitlist-section";
 
 /**
  * The listing editor's sheet. It opens on a tap and carries the photo manager
@@ -21,7 +24,7 @@ import { LISTING_PHOTO_MAX, ListingPhotos, discardSessionUploads } from "./listi
  * open instead of with the page (edit-listings.tsx).
  */
 
-const STATUS_ITEMS = (["HIDDEN", "AVAILABLE", "LEASED"] as const).map((id) => ({ id, label: STATUS_LABEL[id] }));
+const STATUS_ITEMS = (["HIDDEN", "COMING_SOON", "AVAILABLE", "LEASED"] as const satisfies readonly ListingStatus[]).map((id) => ({ id, label: STATUS_LABEL[id] }));
 
 /**
  * One listing in a sheet (forms 4.2, 2.9): unit and status, the photos, the
@@ -31,13 +34,17 @@ const STATUS_ITEMS = (["HIDDEN", "AVAILABLE", "LEASED"] as const).map((id) => ({
  * Refused because the property moved on (any fact on it, not only this
  * listing), "Load the latest" moves the save to the page's version and keeps
  * the draft and its photos; only a listing that changed itself starts over
- * on the new one (lib/properties/listing-latest.ts).
+ * on the new one (lib/properties/listing-latest.ts). The sign-up list under
+ * the fields is the page's own data (`waitlist`): it never joins the draft,
+ * the dirty check or the save.
  */
 export function ListingSheet({
   propertyId,
   version,
   latest,
   listing,
+  waitlist,
+  street,
   gone,
   unitLabels,
   isOpen,
@@ -50,6 +57,10 @@ export function ListingSheet({
   latest: string;
   /** The listing as the page holds it now. */
   listing: EditableListing;
+  /** The listing's sign-ups as the page holds them, newest first. */
+  waitlist: WaitlistRow[];
+  /** The property's street, which names the sign-up list's .csv. */
+  street: string;
   /** The listing was deleted elsewhere: the latest has nothing to load. */
   gone: boolean;
   unitLabels: string[];
@@ -217,6 +228,8 @@ export function ListingSheet({
           {(p) => <NumberInput kind="decimal" {...p} value={draft.baths} onBlur={() => leave("baths")} onChange={(v) => change({ baths: v })} />}
         </FormField>
       </div>
+
+      {!isNew && <WaitlistSection propertyId={propertyId} street={street} unitLabel={listing.unitLabel} rows={waitlist} />}
     </FormSheet>
   );
 }

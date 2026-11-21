@@ -11,7 +11,10 @@ import {
   APPROVED_NEEDED,
   DRAFT_EMPTY,
   FUNDED_NEEDED,
+  HOLDBACK_NEEDED,
   LINE_ON_A_DRAW,
+  PICK_ONE_PROPERTY,
+  PICK_PROPERTY,
   overLineMessage,
   REHAB_DONE,
   addLine,
@@ -21,6 +24,7 @@ import {
   deleteLine,
   deleteRehab,
   importWorksheet,
+  patchRehab,
   rehabName,
   restoreDrawStage,
   restoreLine,
@@ -74,7 +78,7 @@ async function property(street: string, units: { id?: string; label: string }[] 
 }
 
 async function rehab(street: string, units: { id?: string; label: string }[] = []): Promise<string> {
-  const r = await createRehab(prisma, { propertyIds: [await property(street, units)], lender: "Vontive" }, null);
+  const r = await createRehab(prisma, { propertyId: await property(street, units), holdback: 50000, lender: "Vontive" }, null);
   rehabIds.push(r.id);
   return r.id;
 }
@@ -111,15 +115,36 @@ test("a rehab's name joins streets, folding a shared street", () => {
   assert.equal(rehabName(["1 A St", "2 B St", "3 C St"]), "1 A St, 2 B St and 3 C St");
 });
 
+test("New rehab needs a property and a holdback, and saves the holdback", { skip }, async () => {
+  assert.deepEqual(await refusal(createRehab(prisma, { propertyId: "", holdback: null, lender: null }, null)), {
+    propertyId: PICK_ONE_PROPERTY,
+    holdback: HOLDBACK_NEEDED,
+  });
+  const a = await property("9 Holdback Street");
+  assert.deepEqual(await refusal(createRehab(prisma, { propertyId: a, holdback: 0, lender: null }, null)), { holdback: HOLDBACK_NEEDED });
+  const r = await createRehab(prisma, { propertyId: a, holdback: 85000, lender: "Vontive" }, null);
+  rehabIds.push(r.id);
+  const row = await prisma.rehab.findUniqueOrThrow({ where: { id: r.id }, include: { properties: true } });
+  assert.equal(row.name, "9 Holdback Street");
+  assert.equal(Number(row.holdback), 85000);
+  assert.equal(row.properties.length, 1);
+});
+
 test("one loan covers two properties, and neither can join a second open rehab", { skip }, async () => {
+  assert.deepEqual(await refusal(createRehab(prisma, { propertyIds: [], holdback: 1000, lender: null }, null)), { propertyIds: PICK_PROPERTY });
   const a = await property("765 Prospect Avenue");
   const b = await property("767 Prospect Avenue");
-  const r = await createRehab(prisma, { propertyIds: [a, b], lender: "Vontive" }, null);
+  // "More than one property" sends the list; the rehab is named for both.
+  const r = await createRehab(prisma, { propertyIds: [b, a], holdback: 120000, lender: "Vontive" }, null);
   rehabIds.push(r.id);
   const row = await prisma.rehab.findUniqueOrThrow({ where: { id: r.id }, include: { properties: true } });
   assert.equal(row.name, "765 and 767 Prospect Avenue");
   assert.equal(row.properties.length, 2);
-  assert.deepEqual(await refusal(createRehab(prisma, { propertyIds: [b], lender: null }, null)), { propertyIds: alreadyOpenMessage("767 Prospect Avenue") });
+  assert.deepEqual(await refusal(createRehab(prisma, { propertyId: b, holdback: 1000, lender: null }, null)), { propertyId: alreadyOpenMessage("767 Prospect Avenue") });
+  // A property can also join later, from Edit rehab.
+  const c = await property("769 Prospect Avenue");
+  await patchRehab(prisma, r.id, { propertyIds: [a, b, c] });
+  assert.equal(await prisma.rehabProperty.count({ where: { rehabId: r.id } }), 3);
 });
 
 test("the draft opens on its first amount, sends with its total, and Undo puts it back", { skip }, async () => {
@@ -207,7 +232,7 @@ test("a line's unit comes from the rehab's properties; a placeholder becomes the
   assert.deepEqual(await refusal(addLine(prisma, id, { unit: { propertyId: other, unitId: "u-else" }, name: "X", original: 1, changeOrder: 0 })), { unit: UNIT_NOT_HERE });
 });
 
-test("a worksheet comes in once: lines, holdback and past draws as Funded without dates", { skip }, async () => {
+test("a worksheet comes in once: lines and past draws as Funded without dates, the typed holdback kept", { skip }, async () => {
   const id = await rehab("4 Upload St", [{ id: "u-lower", label: "Lower" }]);
   const [propertyId] = (await prisma.rehabProperty.findMany({ where: { rehabId: id } })).map((r) => r.propertyId);
   const read = {
@@ -226,7 +251,8 @@ test("a worksheet comes in once: lines, holdback and past draws as Funded withou
   assert.deepEqual(await importWorksheet(prisma, id, read, { "Unit 1": { propertyId, unitId: "u-lower" }, "Unit 2": null }), { lines: 3, draws: 2 });
   const r = await prisma.rehab.findUniqueOrThrow({ where: { id }, include: { lines: { orderBy: { position: "asc" } } } });
   assert.equal(r.source, "WORKSHEET");
-  assert.equal(r.holdback?.toString(), "12500.5");
+  // New rehab asked for the holdback, so the worksheet's own figure doesn't replace it.
+  assert.equal(r.holdback?.toString(), "50000");
   // Unit 1 matched to the property's Lower; Unit 2 left unmatched keeps the worksheet's words.
   assert.deepEqual(r.lines.map((l) => [l.unitId, l.unitLabel, l.name]), [["u-lower", "Lower", "Demolition"], [null, "Unit 2", "Demolition"], [null, "Unit 2", "Contingency"]]);
   const all = await draws(id);

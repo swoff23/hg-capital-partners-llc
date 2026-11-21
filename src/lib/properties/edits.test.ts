@@ -43,15 +43,18 @@ test("rowConflict: your own newer save says You and names no one (design call 19
 });
 
 test("every property save hands its conflict the person saving, and reads the row's last editor id to compare (design call 19)", async () => {
-  // service.ts talks to the database, so its source is read.
+  // service.ts talks to the database, so its source is read, with the units write it hands to units-write.ts.
   const { readFileSync } = await import("node:fs");
-  const service = readFileSync(new URL("./service.ts", import.meta.url), "utf8");
+  const unitsWrite = readFileSync(new URL("./units-write.ts", import.meta.url), "utf8");
+  const service = readFileSync(new URL("./service.ts", import.meta.url), "utf8") + unitsWrite;
   // No conflict is built without the actor: each rowConflict passes actorId, each conflictOf passes `by`.
   const built = service.match(/throw rowConflict\([^\n]*\);/g) ?? [];
   assert.equal(built.length, 3);
   for (const call of built) assert.match(call, /actorId: by\?\.id \}\);$/, call);
+  // The units write's lost race rebuilds its conflict from the row it reads, with the actor too.
+  assert.match(unitsWrite, /throw row \? rowConflict\(row, \["units"\], \{ actorId: by\?\.id \}\)/);
   const read = service.match(/throw await conflictOf\([^\n]*\);/g) ?? [];
-  assert.equal(read.length, 4);
+  assert.equal(read.length, 3);
   for (const call of read) assert.match(call, /^throw await conflictOf\([a-zA-Z]+, \[[^\]]*\]|^throw await conflictOf\([a-zA-Z]+, guarded/, call);
   for (const call of read) assert.match(call, /, by(, \{[^}]*\})?\);$/, call);
   assert.match(service, /return rowConflict\(row, fields, \{ values: opts\.values, actorId: by\?\.id \}\);/);

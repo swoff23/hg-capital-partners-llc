@@ -7,7 +7,6 @@ import { TEMPLATE_BUCKET } from "@/lib/config";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { firstName } from "@/lib/names";
-import type { UnitRename } from "@/lib/property-types";
 import { activeTask } from "@/lib/task-scope";
 import { asEditorConflict } from "./conflicts";
 import * as core from "./core";
@@ -88,15 +87,6 @@ export async function patchTask(id: string, patch: core.TaskPatch, p: core.Princ
   }
 }
 
-/**
- * A unit renamed on its property: the tasks that name it follow
- * (core.renameTaskUnits). Runs inside the property save's transaction, so
- * the units and their tasks change together; pass the ids it returns to
- * revalidateTasks once that commits.
- */
-export function renameTaskUnits(tx: core.Tx, propertyId: string, renames: readonly UnitRename[], p: core.Principal): Promise<string[]> {
-  return core.renameTaskUnits(tx, propertyId, renames, p);
-}
 
 /** Refresh the task lists and these tasks' pages after a write made from another page. */
 export function revalidateTasks(ids: readonly string[]): void {

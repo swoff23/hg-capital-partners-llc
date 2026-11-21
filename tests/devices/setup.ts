@@ -1,11 +1,14 @@
 import { PrismaClient } from "@prisma/client";
-import { todayYmdEastern } from "../../src/lib/dates";
+import { todayYmdEastern, ymdToDate } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
 import { generateStartingPassword, hashToken, newToken, signupLinkToken } from "../../src/lib/portal/tokens";
 import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
 import * as core from "../../src/lib/tasks/core";
 import * as draws from "../../src/lib/draws/core";
+import { rentableUnitLabels } from "../../src/lib/property-types";
+import * as waitlist from "../../src/lib/waitlist/core";
+import { readSignUp } from "../../src/lib/waitlist/fields";
 import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes } from "./routes";
 
 /**
@@ -15,10 +18,13 @@ import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes
  * and seeds two fixture contractor logins for the (portal) pages. All of it
  * reaches the test workers through process.env.
  *
- * Staff data is only read. The portal fixtures are the one write: for each,
- * a Contact, its PortalAccount and a fresh PortalSession, reused across runs
- * by email, plus one job assigned to the "portal" contractor. A DB with no
- * open rehab also gets one, so /draws/[id] has a page to load. Like
+ * Staff data is otherwise read; the writes are fixtures, each made once and
+ * reused. The portal fixtures: for each, a Contact, its PortalAccount and a
+ * fresh PortalSession, reused across runs by email, plus one job assigned to
+ * the "portal" contractor. A DB with no open rehab also gets one, so
+ * /draws/[id] has a page to load. A DB with no coming-soon listing gets two
+ * on the sample property page, one with two sign-ups, so Rentals, the
+ * listing row and its Waiting section render with them. Like
  * `npm run db:dev-passwords`, it refuses anything but a localhost
  * DATABASE_URL.
  *
@@ -190,7 +196,7 @@ async function seedRehabFixture(db: PrismaClient): Promise<void> {
   assertLocalDb();
   const property = await db.property.findFirst({ where: { archivedAt: null, rehabs: { none: {} } }, select: { id: true }, orderBy: { createdAt: "asc" } });
   if (!property) return;
-  const { id } = await draws.createRehab(db, { propertyIds: [property.id], lender: "Vontive" }, null);
+  const { id } = await draws.createRehab(db, { propertyId: property.id, holdback: 40000, lender: "Vontive" }, null);
   await draws.patchRehab(db, id, { notes: "Fixture for npm run test:devices. Safe to delete locally." });
   const lines = [];
   for (const [name, original] of [["Demo", 12000], ["Electrical (Rough)", 16000], ["Kitchen Cabinets", 9500]] as const) {
@@ -200,6 +206,49 @@ async function seedRehabFixture(db: PrismaClient): Promise<void> {
   const sent = await draws.sendDraft(db, id, todayYmdEastern());
   await draws.updateDraw(db, sent.drawId, { stage: "INSPECTION" }, todayYmdEastern());
   await draws.setDraftAmount(db, lines[1].id, 6000);
+}
+
+/** The sign-ups on the dated fixture listing: hg.localhost addresses, one with a phone. */
+const COMING_SOON_SIGN_UPS = [
+  { firstName: "Dana", email: "device-check-dana@hg.localhost", phone: "716-555-0142" },
+  { firstName: "Sam", email: "device-check-sam@hg.localhost", phone: "" },
+];
+
+/**
+ * Two coming-soon listings on the property the property page samples (routes.ts SAMPLE_PARAMS), when the local DB
+ * has none at a live property (docs/specs/coming-soon.md 6): one dated next month, with a rent and a Zillow link,
+ * and one with no date, rent or photos. The first gets two sign-ups through src/lib/waitlist/core.ts like any
+ * Notify me. A DB that already has a coming-soon listing is left alone, so it can run twice.
+ */
+async function seedComingSoonFixture(db: PrismaClient): Promise<void> {
+  assertLocalDb();
+  if ((await db.listing.count({ where: { status: "COMING_SOON", property: { archivedAt: null } } })) > 0) return;
+  const sample = await SAMPLE_PARAMS["properties/[id]"](db);
+  const property = sample && (await db.property.findFirst({ where: { id: sample.id, archivedAt: null }, select: { id: true, units: true } }));
+  if (!property) return;
+  const units = rentableUnitLabels(property.units);
+  // The 1st of next month, so the pill reads "Coming in" that month.
+  const [y, m] = todayYmdEastern().split("-").map(Number);
+  const nextMonth = ymdToDate(`${m === 12 ? y + 1 : y}-${String((m % 12) + 1).padStart(2, "0")}-01`);
+  const dated = await db.listing.create({
+    data: {
+      propertyId: property.id,
+      unitLabel: units[0] ?? "Unit",
+      status: "COMING_SOON",
+      availableDate: nextMonth,
+      rent: 1450,
+      beds: "2",
+      baths: "1",
+      zillowUrl: "https://www.zillow.com/buffalo-ny/rentals/",
+    },
+    select: { id: true },
+  });
+  await db.listing.create({ data: { propertyId: property.id, unitLabel: units[1] ?? units[0] ?? "Unit", status: "COMING_SOON" } });
+  for (const input of COMING_SOON_SIGN_UPS) {
+    const read = readSignUp(input);
+    if (!read.ok) throw new Error(`The coming-soon fixture's sign-up for ${input.firstName} doesn't read: ${Object.values(read.problems).join(" ")}`);
+    await waitlist.join(db, dated.id, read.data);
+  }
 }
 
 export default async function setup() {
@@ -239,6 +288,7 @@ export default async function setup() {
     process.env.DEVICE_PORTAL_SETUP_TOKEN = setup.token;
     await seedSignupLink(db);
     await seedRehabFixture(db);
+    await seedComingSoonFixture(db);
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

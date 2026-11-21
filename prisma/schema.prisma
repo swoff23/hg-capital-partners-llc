@@ -907,7 +907,8 @@ model PropertyAttachment {
 // ---------------------------------------------------------------------------
 enum ListingStatus {
   AVAILABLE
-  LEASED // shown in "Previously Leased" for credibility, per the PRD
+  COMING_SOON // on Rentals with a "Coming soon" pill and Notify me
+  LEASED // on Rentals last, with a Leased pill
   HIDDEN // saved but not shown publicly (e.g. still being prepped)
 }
 
@@ -927,13 +928,29 @@ model Listing {
   availableDate DateTime?
   status        ListingStatus @default(HIDDEN)
 
-  photos ListingPhoto[]
+  photos   ListingPhoto[]
+  waitlist ListingWaitlistEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([propertyId])
   @@index([status])
+}
+
+// Someone who signed up to hear about a listing (docs/specs/coming-soon.md).
+// One row per email per listing; a second sign-up updates the first.
+model ListingWaitlistEntry {
+  id        String   @id @default(cuid())
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+  firstName String
+  email     String // normalizeEmail: trimmed and lowercased
+  phone     String? // readPhone's display form, "716-555-1234"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([listingId, email])
 }
 
 // A listing's photo gallery — deliberately its own table, not
@@ -1332,7 +1349,8 @@ model Lease {
   property        Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   propertyId      String
   // The unit's id in Property.units; null on a property with no units. unitLabel
-  // follows renames through writeUnits, and stays as it read on a past lease.
+  // follows renames through writeUnits, past leases included, and keeps its last
+  // label once the unit is deleted.
   unitId          String?
   unitLabel       String?
   movesIn         DateTime? // UTC midnight of a Buffalo day; null: they live there now

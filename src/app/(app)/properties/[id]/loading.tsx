@@ -23,7 +23,7 @@ const RAIL = [
 /**
  * A property while it loads (docs/specs/performance.md 4.3), on the page's
  * grid and in its order (docs/specs/property-page.md): Portfolio, the four
- * figures' labels, then Tasks, Units & access and CapEx (its years, from
+ * figures' labels, then Tasks, Units & access, Tenants and CapEx (its years, from
  * today, as the card counts them, and the folded Building systems row) beside
  * the rail's Details, Loan and Insurance with every label drawn at once; the
  * address, the subline, the figures and the sections' values are --muted
@@ -65,6 +65,10 @@ export default function PropertyLoading() {
           </Section>
 
           <Section title="Units & access">
+            <SectionLines lines={2} />
+          </Section>
+
+          <Section title="Tenants">
             <SectionLines lines={2} />
           </Section>
 

@@ -7,6 +7,7 @@ import { Money } from "@/components/money";
 import { RailVerb } from "@/components/rail";
 import { buttonClass } from "@/components/ui";
 import { mailtoHref } from "@/lib/contacts";
+import { shortNames } from "@/lib/names";
 import { fmtDay, type Ymd } from "@/lib/dates";
 import { tenantShare } from "@/lib/tenants/fields";
 import type { LeaseStatus } from "@/lib/tenants/status";
@@ -38,12 +39,6 @@ export type FactValues = {
     endsOn: Ymd | null;
   } | null;
 };
-
-/** "Dana Lee", "Dana Lee and Sam Lee", "Dana Lee and 2 others": short enough for a toast. */
-function nameList(names: string[]): string {
-  if (names.length <= 2) return names.join(" and ");
-  return `${names[0]} and ${names.length - 1} others`;
-}
 
 /**
  * The lease's facts: a sticky rail of label and value rows from lg, a row of
@@ -105,7 +100,7 @@ export function LeaseFacts(v: FactValues) {
               ? "Move-out date cleared"
               : v.status === "past"
                 ? `Moves out set to ${fmtDay(next)}`
-                : `${nameList(v.names)} ${v.names.length === 1 ? "moves" : "move"} out ${fmtDay(next, { year: "auto" })}`
+                : `${shortNames(v.names)} ${v.names.length === 1 ? "moves" : "move"} out ${fmtDay(next, { year: "auto" })}`
           }
           onSave={(next) => saveLease(v.leaseId, { movesOut: next || null })}
         />
