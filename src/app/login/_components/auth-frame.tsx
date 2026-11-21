@@ -16,7 +16,7 @@ export function AuthFrame({
   subtitle,
   children,
 }: {
-  /** One short heading. /login itself has none, so its "HG Login" eyebrow is its h1. */
+  /** One short heading. /login itself has none, so its "Login" eyebrow is its h1. */
   title?: string;
   /** One line under the heading. */
   subtitle?: React.ReactNode;
@@ -29,7 +29,7 @@ export function AuthFrame({
       <main className={cn(publicContainer, "flex flex-1 flex-col items-center justify-center py-16")}>
         <div className="w-full max-w-sm text-center">
           {/* The eyebrow is /login's own heading; a page with a title of its own goes without it (Connor, Nov 14). */}
-          {title ? <h1 className={cn(publicType.heading, "text-foreground")}>{title}</h1> : <Eyebrow as="h1">HG Login</Eyebrow>}
+          {title ? <h1 className={cn(publicType.heading, "text-foreground")}>{title}</h1> : <Eyebrow as="h1">Login</Eyebrow>}
           {subtitle && <p className="mt-1.5 text-meta text-muted-foreground">{subtitle}</p>}
 
           {children}

@@ -199,7 +199,7 @@ Two tokens are public-only.
 | Lead, nav, card meta, second clause | `--muted-foreground` | `#a19e98` | 7.22 / 6.90 |
 | Field outlines | `--input` | `#6e7684` | 4.22 / 4.03 |
 | Hairlines (decorative) | `--border` | `#212835` | 1.30 / 1.25 |
-| HG Login, legal lines, placeholders | `--pub-faint` | `#858991` | 5.50 / 5.25 |
+| Login, legal lines, placeholders | `--pub-faint` | `#858991` | 5.50 / 5.25 |
 | Eyebrow, link hover, CTA hover fill | `--gold` | `#c8a765` | 8.43 / 8.05 |
 | Pressed gold link | `--pub-gold-hi` | `#d8ba7e` | 10.33 / 9.87 |
 | Form errors | `--destructive` | `#f47b76` | 7.30 / 6.97 |
@@ -433,7 +433,7 @@ The dark front door stays and becomes the app's own dark material. Same Geist, s
 | Wordmark | 13 / 16 | 13 / 16 | 13 / 16 | 500 | 0.28em caps | "HG CAPITAL PARTNERS" |
 
 - **Gutters** 40 / 32 / 16 at 1280 / 768 / 375, for the header, hero type, listings and footer alike.
-- **Header.** 64px over a `--border` rule. Wordmark in `--foreground` left; Rentals and Residents in `--muted-foreground` at 14 / 20, 28px apart, the current page in `--foreground`; HG Login last in `--pub-faint`. Below 600 the links fold into a 44px menu button.
+- **Header.** 64px over a `--border` rule. Wordmark in `--foreground` left; Rentals and Residents in `--muted-foreground` at 14 / 20, 28px apart, the current page in `--foreground`; Login last in `--pub-faint`. Below 600 the links fold into a 44px menu button.
 - **Uppercase** lives only here, in the eyebrow and wordmark. The gold hairline (56px) appears once, under the welcome eyebrow.
 - **Listings** are borderless 4:3 photo cards, `rounded-lg`, with a "1 / 8" counter and swipe on touch ([KOBU](https://mobbin.com/sites/sections/4226456d-e845-483a-ad1b-305a93fe7d36), [Airbnb](https://mobbin.com/screens/8a6b4476-52d7-4c85-965b-2a870b388eb3)).
 - **Caption.** Street with rent right-aligned (tabular, "/mo" in `--muted-foreground`), then neighborhood and unit, then the facts line ([Realtor.com](https://mobbin.com/screens/b0a7e96c-8e57-41b8-9029-a9521f0fa412)). Desktop hover turns the street gold.

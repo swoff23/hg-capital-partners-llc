@@ -11,16 +11,16 @@ import { cn } from "@/lib/utils";
 import { publicContainer, publicLinkHover, publicType } from "./ui";
 
 /**
- * Top nav for every public page (PRD §3: "Primary navigation: Rentals |
- * Residents | HG Login"), 64px over a --border rule (docs/brand-guidelines.md,
- * section 10). Plain text links, not pills or buttons: HG Login stays the
+ * Top nav for every public page (Rentals | Residents | Login; PRD §3 called the
+ * last one "HG Login"), 64px over a --border rule (docs/brand-guidelines.md,
+ * section 10). Plain text links, not pills or buttons: Login stays the
  * quietest link on the page, in --pub-faint; it's a door for two people, not
  * a call to action. Below 600px the links fold into a 44px menu button.
  */
 const LINKS = [
   { href: "/rentals", label: "Rentals" },
   { href: "/residents", label: "Residents" },
-  { href: "/login", label: "HG Login" },
+  { href: "/login", label: "Login" },
 ] as const;
 
 function isCurrent(pathname: string, href: string): boolean {
