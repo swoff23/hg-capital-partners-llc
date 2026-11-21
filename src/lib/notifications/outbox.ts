@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { replyAddress } from "@/lib/email/inbound";
 import { renderJobEmail } from "@/lib/email/render";
-import { todayYmdEastern, toYmd } from "@/lib/dates";
+import { todayYmdEastern } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
@@ -10,14 +10,11 @@ import { SEEABLE_FILE, contractorMaySee } from "@/lib/attachments/access";
 import { CODE_MASK, lockboxMasker, readJobAccess } from "@/lib/portal/access-code";
 import { mintJobLink } from "@/lib/portal/job-links";
 import { staffFirstNames } from "@/lib/portal/queries";
-import { scheduledDay } from "@/lib/tasks/rules";
 import {
   DAILY_EMAIL_CAP,
-  deliveryFor,
+  claimedRowVerdict,
+  dueRowVerdict,
   easternDayStart,
-  liveReminders,
-  jobKey,
-  offItems,
   parseItems,
   reachedCapNow,
   reconcileItems,
@@ -26,7 +23,6 @@ import {
   sendBudget,
   sendFailureKind,
   taskEmail,
-  undoneDropped,
   type EventSnapshot,
   type OutboxItem,
 } from "./content";
@@ -43,6 +39,12 @@ import { sentSince } from "./sent-count";
  * (and a new email) instead of being lost, and two drains running at once
  * never send the same row twice. The claim pushes sendAfter out by a lease,
  * so a run that dies mid-send is retried later rather than never.
+ *
+ * Whether a row goes is decided twice, by two rules in content.ts that a
+ * database test runs on real rows: once on the row as the batch read found
+ * it (dueRowVerdict), and again on the job and the recipient's access read
+ * after the claim (claimedRowVerdict). Either can close it unsent. A row
+ * whose task is a draft from Claude is closed by both, whoever it is for.
  *
  * Failures retry with backoff (content.ts retryAt) and give up after the
  * fifth try. At most DAILY_EMAIL_CAP emails go out per Buffalo day (D30);
@@ -76,7 +78,7 @@ export async function sentTodayCount(now = new Date()): Promise<number> {
   return sentSince(prisma, easternDayStart(now));
 }
 
-/** Close a row without sending: no login, no access, no recipient, no task. */
+/** Close a row without sending: no login, no access, no recipient, no task, or its task is a draft. */
 async function closeUnsent(id: string, now: Date, reason: string): Promise<void> {
   await prisma.notificationOutbox.updateMany({
     where: { id, sentAt: null },
@@ -242,15 +244,14 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
   for (const row of rows) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
 
-    const contractorHasAccess = !!row.recipientContactId && !!row.task?.access.some((a) => a.contactId === row.recipientContactId);
-    // "You're off this job" goes though their access has just ended: it says only that (offItems).
-    const tellsOff = !contractorHasAccess && parseItems(row.items).some((i) => i.kind === "OFF");
-    const delivery = deliveryFor(row, { contractorHasAccess: contractorHasAccess || tellsOff });
-    if (!row.task || !row.taskId || !delivery.ok) {
-      await closeUnsent(row.id, now, !row.task ? "no task" : delivery.ok ? "no recipient" : delivery.reason);
+    // The first decision, on the row as the batch read found it: no task, a draft, no login, no access, emails off.
+    const first = dueRowVerdict(row);
+    if (!first.send) {
+      await closeUnsent(row.id, now, first.reason);
       result.skipped++;
       continue;
     }
+    const { delivery, taskId } = first;
     if (refused || result.sent >= budget) {
       result.held++;
       continue;
@@ -258,47 +259,38 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
 
     const claimed = await claim(row.id, now);
     if (!claimed) continue;
-    const live = await liveItems(row.taskId, parseItems(claimed.items), {
+    const live = await liveItems(taskId, parseItems(claimed.items), {
       audience: delivery.audience,
       recipientContactId: row.recipientContactId,
     });
     const photosByEvent = live.photosByEvent;
     // The job's state and the recipient's access, read again now the row is claimed: the batch read before the claim can
-    // be a write behind (taken off and put back, canceled, a date moved), and these decide what goes.
+    // be a write behind (taken off and put back, canceled, a date moved, an Add undone), and these decide what goes.
     const [fresh, accessRow] = await Promise.all([
-      prisma.task.findUnique({ where: { id: row.taskId }, select: { status: true, dueDate: true, scheduledFor: true, description: true } }),
+      prisma.task.findUnique({ where: { id: taskId }, select: { status: true, dueDate: true, scheduledFor: true, description: true } }),
       delivery.audience === "contractor" && row.recipientContactId
-        ? prisma.taskAccess.findFirst({ where: { taskId: row.taskId, contactId: row.recipientContactId, revokedAt: null }, select: { id: true } })
+        ? prisma.taskAccess.findFirst({ where: { taskId, contactId: row.recipientContactId, revokedAt: null }, select: { id: true } })
         : null,
     ]);
-    if (!fresh) {
-      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "no task" } });
-      result.skipped++;
-      continue;
-    }
-    const task = { ...row.task, status: fresh.status, dueDate: fresh.dueDate, scheduledFor: fresh.scheduledFor, description: fresh.description };
-    const due = toYmd(task.dueDate);
-    const scheduled = toYmd(scheduledDay(task));
+    // The second decision: the task gone or a draft since, or nothing left to say.
     // Who lives there, for the 24-hour notice (docs/specs/contractor-scheduled-date.md, Q6): read once for a contractor.
-    const jobAccess = delivery.audience === "contractor" && row.recipientContactId ? await readJobAccess(prisma, task) : null;
-    const kept =
-      delivery.audience === "contractor"
-        ? liveReminders(offItems(live.items, { hasAccess: !!accessRow, canceled: task.status === "CANCELED", job: jobKey({ status: task.status, due, scheduled, notes: task.description }) }), {
-            status: task.status,
-            due,
-            scheduled,
-            needsNotice: !!jobAccess?.needsNotice,
-            today: todayYmdEastern(now),
-          })
-        : live.items;
-    // A date, the notes or a status put back as they were before the bundle's first change says nothing (undoneDropped).
-    const items = undoneDropped(kept, { due, scheduled, notes: task.description, status: task.status });
-    const off = items.some((i) => i.kind === "OFF");
-    if (items.length === 0) {
-      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
+    const jobAccess = delivery.audience === "contractor" && row.recipientContactId ? await readJobAccess(prisma, first.task) : null;
+    const second = claimedRowVerdict({
+      audience: delivery.audience,
+      items: live.items,
+      job: fresh,
+      hasAccess: !!accessRow,
+      needsNotice: !!jobAccess?.needsNotice,
+      today: todayYmdEastern(now),
+    });
+    if (!second.send) {
+      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: second.reason } });
       result.skipped++;
       continue;
     }
+    const { items, due, scheduled, job } = second;
+    const task = { ...first.task, status: job.status, dueDate: job.dueDate, scheduledFor: job.scheduledFor, description: job.description };
+    const off = items.some((i) => i.kind === "OFF");
 
     if (delivery.audience === "contractor") staffNames ??= await staffFirstNames();
     // The notes go to the contractor with this property's lockbox codes masked: the code itself stays behind the job's
@@ -311,13 +303,13 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     const newPhotoIds = off ? [] : [...new Set(items.flatMap((i) => (i.eventId ? (photosByEvent.get(i.eventId) ?? []) : [])))];
     // Off the job: no link, photos or lockbox (content.ts offEmail).
     const contractorId = delivery.audience === "contractor" && !off ? row.recipientContactId : null;
-    const jobPhotoIds = contractorId ? await hgPhotoIds(row.taskId, contractorId, new Set(newPhotoIds)) : [];
+    const jobPhotoIds = contractorId ? await hgPhotoIds(taskId, contractorId, new Set(newPhotoIds)) : [];
     // The email's own link (job-links.ts): a contractor's opens the job as them; a partner's only shows its photos, so
     // it's made only when there are some.
     const linkToken = contractorId
-      ? await mintJobLink(prisma, { taskId: row.taskId, kind: "EMAIL", contactId: contractorId })
+      ? await mintJobLink(prisma, { taskId: taskId, kind: "EMAIL", contactId: contractorId })
       : row.recipientUserId && newPhotoIds.length
-        ? await mintJobLink(prisma, { taskId: row.taskId, kind: "STAFF", userId: row.recipientUserId })
+        ? await mintJobLink(prisma, { taskId: taskId, kind: "STAFF", userId: row.recipientUserId })
         : null;
     // "Show access" when the job page would show the tenants or the lockbox (docs/specs/tenant-contact.md section 3).
     const access = contractorId ? jobAccess : null;
@@ -325,7 +317,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     // Its own reply address, while replies by email are on (section 5): a reply posts to this job as this recipient.
     const replyConfig = getEnv().email;
     const replyWho = row.recipientContactId ? { contactId: row.recipientContactId } : row.recipientUserId ? { userId: row.recipientUserId } : null;
-    const replyToken = replyConfig?.webhookSecret && !off && replyWho ? await mintJobLink(prisma, { taskId: row.taskId, kind: "REPLY", ...replyWho }) : null;
+    const replyToken = replyConfig?.webhookSecret && !off && replyWho ? await mintJobLink(prisma, { taskId: taskId, kind: "REPLY", ...replyWho }) : null;
     const email = taskEmail({
       items,
       linkToken,
@@ -337,7 +329,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       unitLabel: task.unitLabel,
       audience: delivery.audience,
       appUrl,
-      taskId: row.taskId,
+      taskId: taskId,
       status: task.status,
       due,
       scheduled,

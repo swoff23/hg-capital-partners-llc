@@ -200,11 +200,13 @@ test("a contractor with open jobs or a login isn't archived, and the refusal is 
   const login = fakeTx({ contact: [{ id: "c1", archivedAt: null, portalAccount: { status: "ACTIVE" } }] });
   await assert.rejects(setContactArchived(login.tx, "c1", true, BY, NOW), /Remove portal access first\./);
 
-  // The open jobs are counted on open work only, never a playbook's template rows.
+  // The open jobs are counted on open work only, never a playbook's template rows, and never a draft Claude saved
+  // (docs/specs/tasks-from-claude.md 6.2): a draft doesn't stop an archive, and Add refuses the archived contractor.
   const count = busy.calls.find(([m, op]) => m === "task" && op === "count")?.[2] as { where: Row };
   assert.equal(count.where.assigneeContactId, "c1");
   assert.deepEqual(count.where.status, { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW"] });
   assert.deepEqual(count.where.bucket, { not: "Template" });
+  assert.deepEqual(count.where.NOT, { status: "DRAFT" });
 });
 
 test("a contractor whose access was removed can be archived; the login itself is never written", async () => {
@@ -264,6 +266,7 @@ test("an open job that carries only their imported name counts as theirs, the wa
   assert.deepEqual(group.by, ["assigneeName"]);
   assert.deepEqual(group.where.status, { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW"] });
   assert.deepEqual(group.where.bucket, { not: "Template" });
+  assert.deepEqual(group.where.NOT, { status: "DRAFT" });
   assert.equal(group.where.assigneeUserId, null);
   assert.equal(group.where.assigneeContactId, null);
   assert.equal(busy.calls.filter(([m]) => m === "$executeRaw").length, 1, "still the only lock");
@@ -299,9 +302,11 @@ test("contractorOpenJobs names the imported names it counts, and the page's list
   assert.deepEqual(open, { count: 4, names: ["Zack Outlaw", "zack@outlaw.example"] }, "one by id and three by name; Kenneth is nobody's");
   assert.deepEqual(await contractorArchiveBlockers(tx, "c1"), { openJobs: open.count, hasLogin: false }, "the toast's count is the list's");
 
-  // The list: every job linked by id, and the open ones those names carry, unassigned otherwise; never a template row.
+  // The list: every job linked by id, and the open ones those names carry, unassigned otherwise; never a template row,
+  // and never a draft, which is nobody's job until a partner adds it.
   assert.deepEqual(contractorJobsWhere("c1", open.names), {
     bucket: { not: "Template" },
+    NOT: { status: "DRAFT" },
     OR: [
       { assigneeContactId: "c1" },
       {
@@ -313,7 +318,7 @@ test("contractorOpenJobs names the imported names it counts, and the page's list
     ],
   });
   // With none, the list it always was.
-  assert.deepEqual(contractorJobsWhere("c1", []), { assigneeContactId: "c1", bucket: { not: "Template" } });
+  assert.deepEqual(contractorJobsWhere("c1", []), { assigneeContactId: "c1", bucket: { not: "Template" }, NOT: { status: "DRAFT" } });
   const quiet = fakeTx({ contact: [{ ...ZACK }], user: TEAM });
   assert.deepEqual(await contractorOpenJobs(quiet.tx, "c1"), { count: 0, names: [] });
 });

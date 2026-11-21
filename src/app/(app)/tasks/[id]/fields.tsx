@@ -121,7 +121,8 @@ export function TaskFields({
    * turns it Scheduled, as a contractor's pick does; on a Scheduled one it moves the day. Undo puts both back.
    */
   function pickScheduled(scheduledFor: Ymd | null) {
-    if (!scheduledFor) return;
+    // A draft never shows the row (tasks-from-claude.md 6.1): nothing schedules it.
+    if (!scheduledFor || status === "DRAFT") return;
     const done = `Scheduled for ${fmtShortDay(scheduledFor, today)}`;
     if (shownStatus === "SCHEDULED") {
       save({ scheduledFor }, { done, field: "scheduled", undo: { scheduledFor: v.scheduledFor } });

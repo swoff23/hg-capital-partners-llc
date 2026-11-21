@@ -5,8 +5,8 @@ import { BackLink } from "@/components/back-link";
 import { PageHeader } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
 import { propertyOptions } from "@/lib/picker-options";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
+import { playbookOpenTasksWhere } from "@/lib/tasks/list-query";
 import { parseTemplateItems } from "@/lib/tasks/template-items";
 import { ApplyFlow } from "./apply-flow";
 import type { Metadata } from "next";
@@ -37,7 +37,7 @@ export default async function ApplyPlaybookPage({ params, searchParams }: PagePr
     // How many of this playbook's tasks are still open on each building, for the line above the list (BPLAY-V01).
     prisma.task.groupBy({
       by: ["propertyId"],
-      where: { ...excludeTemplateTasks, ...activeTask, taskTemplateId: template.id, propertyId: { not: null } },
+      where: playbookOpenTasksWhere(template.id),
       _count: { _all: true },
     }),
   ]);

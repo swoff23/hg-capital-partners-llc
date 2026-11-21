@@ -1,3 +1,4 @@
+import { taskPageWhere } from "@/lib/tasks/list-query";
 import "server-only";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
@@ -25,7 +26,8 @@ async function nameOf(kind: RecordKind, id: string): Promise<string | null> {
     case "deal":
       return (await prisma.deal.findUnique({ where: { id }, select: { address: true } }))?.address ?? null;
     case "task":
-      return (await prisma.task.findUnique({ where: { id }, select: { title: true } }))?.title ?? null;
+      // A discarded draft reads as no task, as its page does (list-query.ts taskPageWhere).
+      return (await prisma.task.findFirst({ where: taskPageWhere(id), select: { title: true } }))?.title ?? null;
     case "contractor":
       return (await prisma.contact.findUnique({ where: { id }, select: { fullName: true } }))?.fullName ?? null;
     case "template":

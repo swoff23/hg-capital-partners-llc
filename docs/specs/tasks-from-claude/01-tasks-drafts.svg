@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Tasks list with a Drafts group on top: My drafts with Discard and Add on each draft, Discard all and Add all on the group, at laptop 1280, tablet 768 and phone 375</title>
+<rect width="900" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Tasks: drafts from Claude wait in their own group until a partner adds them</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768</text>
+<rect x="0" y="22" width="560" height="440" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="60" font-size="20" font-weight="600" fill="#152133">Tasks</text>
+<rect x="452" y="42" width="88" height="28" rx="8" fill="#152133"/>
+<text x="496" y="60" font-size="12" font-weight="500" fill="#ffffff" text-anchor="middle">+ New task</text>
+
+<text x="20" y="106" font-size="13" font-weight="600" fill="#152133">My drafts</text>
+<text x="88" y="106" font-size="12" fill="#8a909b">3</text>
+<text x="466" y="106" font-size="12" fill="#5b6576" text-anchor="end">Discard all</text>
+<rect x="478" y="90" width="62" height="24" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="509" y="106" font-size="12" fill="#152133" text-anchor="middle">Add all</text>
+<line x1="20" y1="120" x2="540" y2="120" stroke="#e7e5e0"/>
+
+<g font-size="12" fill="#152133">
+<text x="20" y="146">Fix gutters pulling off the back</text>
+<text x="226" y="146" fill="#5b6576">Zack</text>
+<text x="272" y="146" fill="#5b6576">Fri, Nov 27</text>
+<text x="346" y="146" fill="#5b6576">933 Laf… · 2</text>
+<text x="486" y="146" fill="#5b6576" text-anchor="end">Discard</text>
+<rect x="496" y="130" width="44" height="24" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="518" y="146" text-anchor="middle">Add</text>
+<line x1="20" y1="162" x2="540" y2="162" stroke="#e7e5e0"/>
+
+<text x="20" y="188">Fix leaking kitchen faucet</text>
+<text x="226" y="188" fill="#5b6576">Rob</text>
+<text x="272" y="188" fill="#8a909b">No date</text>
+<text x="346" y="188" fill="#5b6576">118 Con… · Rear</text>
+<text x="486" y="188" fill="#5b6576" text-anchor="end">Discard</text>
+<rect x="496" y="172" width="44" height="24" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="518" y="188" text-anchor="middle">Add</text>
+<line x1="20" y1="204" x2="540" y2="204" stroke="#e7e5e0"/>
+
+<text x="20" y="230">Call the city about the permit</text>
+<text x="226" y="230" fill="#5b6576">Pieter</text>
+<text x="272" y="230" fill="#5b6576">Mon, Nov 23</text>
+<text x="486" y="230" fill="#5b6576" text-anchor="end">Discard</text>
+<rect x="496" y="214" width="44" height="24" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="518" y="230" text-anchor="middle">Add</text>
+<line x1="20" y1="246" x2="540" y2="246" stroke="#e7e5e0"/>
+</g>
+
+<text x="20" y="286" font-size="13" font-weight="600" fill="#152133">118 Congress St</text>
+<text x="134" y="286" font-size="12" fill="#8a909b">4</text>
+<line x1="20" y1="296" x2="540" y2="296" stroke="#e7e5e0"/>
+<g font-size="12" fill="#8a909b">
+<text x="20" y="322">Replace kitchen faucet</text><text x="226" y="322">Zack</text><text x="272" y="322">Tue, Nov 24</text><text x="346" y="322">Rear</text>
+<line x1="20" y1="338" x2="540" y2="338" stroke="#e7e5e0"/>
+<text x="20" y="364">Patch ceiling in hallway</text><text x="226" y="364">Pieter</text><text x="272" y="364">Dec 1</text><text x="346" y="364">Front</text>
+<line x1="20" y1="380" x2="540" y2="380" stroke="#e7e5e0"/>
+</g>
+<text x="20" y="430" font-size="11" fill="#5b6576">My drafts shows only while you have drafts. Filters and sorting don't move it.</text>
+<text x="20" y="446" font-size="11" fill="#5b6576">The other partner's wait under it as "Connor's drafts", with no Add all or Discard all.</text>
+</g>
+
+<g transform="translate(624 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375</text>
+<rect x="0" y="22" width="244" height="440" rx="16" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="16" y="56" font-size="17" font-weight="600" fill="#152133">Tasks</text>
+
+<text x="16" y="94" font-size="13" font-weight="600" fill="#152133">My drafts</text>
+<text x="80" y="94" font-size="12" fill="#8a909b">3</text>
+<text x="160" y="94" font-size="11" fill="#5b6576" text-anchor="end">Discard all</text>
+<rect x="166" y="76" width="62" height="28" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="197" y="94" font-size="12" fill="#152133" text-anchor="middle">Add all</text>
+<line x1="16" y1="110" x2="228" y2="110" stroke="#e7e5e0"/>
+
+<g font-size="12">
+<text x="16" y="134" fill="#152133">Fix gutters pull…</text>
+<text x="16" y="152" fill="#5b6576" font-size="11">Zack · Fri · 933…</text>
+<text x="176" y="142" fill="#5b6576" text-anchor="end">Discard</text>
+<rect x="184" y="124" width="44" height="28" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="206" y="142" fill="#152133" text-anchor="middle">Add</text>
+<line x1="16" y1="164" x2="228" y2="164" stroke="#e7e5e0"/>
+
+<text x="16" y="188" fill="#152133">Fix leaking kit…</text>
+<text x="16" y="206" fill="#5b6576" font-size="11">Rob · 118 Con…</text>
+<text x="176" y="196" fill="#5b6576" text-anchor="end">Discard</text>
+<rect x="184" y="178" width="44" height="28" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="206" y="196" fill="#152133" text-anchor="middle">Add</text>
+<line x1="16" y1="218" x2="228" y2="218" stroke="#e7e5e0"/>
+
+<text x="16" y="242" fill="#152133">Call the city ab…</text>
+<text x="16" y="260" fill="#5b6576" font-size="11">Pieter · Mon</text>
+<text x="176" y="250" fill="#5b6576" text-anchor="end">Discard</text>
+<rect x="184" y="232" width="44" height="28" rx="6" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="206" y="250" fill="#152133" text-anchor="middle">Add</text>
+<line x1="16" y1="272" x2="228" y2="272" stroke="#e7e5e0"/>
+</g>
+
+<text x="16" y="308" font-size="13" font-weight="600" fill="#152133">118 Congress St</text>
+<text x="130" y="308" font-size="12" fill="#8a909b">4</text>
+<line x1="16" y1="318" x2="228" y2="318" stroke="#e7e5e0"/>
+<text x="16" y="342" font-size="12" fill="#8a909b">Replace kitchen faucet</text>
+<text x="16" y="360" font-size="11" fill="#8a909b">Zack · Tue · Rear</text>
+
+<text x="16" y="420" font-size="11" fill="#5b6576">Title and details shorten first.</text>
+<text x="16" y="436" font-size="11" fill="#5b6576">Both buttons keep 44px targets.</text>
+</g>
+
+<text x="32" y="540" font-size="11" fill="#5b6576">A row opens the draft. Every discard toasts with Undo. At 320 the title shortens first; the heading row never wraps.</text>
+</svg>

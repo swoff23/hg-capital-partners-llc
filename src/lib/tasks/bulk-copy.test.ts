@@ -70,6 +70,8 @@ test("Delete asks with the count, in the singular for one, and says what went", 
   assert.deepEqual(deletedLine(2, 1), { message: "Deleted 2 of 3 tasks", detail: "Try the other one again" });
   assert.equal(deletedLine(0, 1).message, "Couldn't delete that task. Try again.");
   assert.equal(deletedLine(0, 2).message, "Couldn't delete those tasks. Try again.");
+  // Every pick was left alone (a draft from Claude, which bulk delete never takes): not "Deleted 0 tasks".
+  assert.deepEqual(deletedLine(0, 0), { message: "Nothing changed" });
 });
 
 test("the news fits a laptop toast beside Undo and a phone's line, at 3 and at 400 tasks, with any skips", () => {
@@ -86,6 +88,7 @@ test("the news fits a laptop toast beside Undo and a phone's line, at 3 and at 4
     undoLine(0, { changed: 17 })!,
     deletedLine(399, 1),
     deletedLine(0, 2),
+    deletedLine(0, 0),
     statusLine(3, "IN_PROGRESS"),
     statusLine(2, "WAITING", { changed: 1 }),
     dueLine(3, null),

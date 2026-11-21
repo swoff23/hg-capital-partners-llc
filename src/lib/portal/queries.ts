@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma, type AttachmentKind, type TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
-import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
+import { ACTIVE_STATUSES, CLOSED_STATUSES, contractorCanOpen, isActiveStatus } from "@/lib/task-scope";
 import { partnersEmailState } from "@/lib/tasks/delivery";
 import { MARK_DONE_WINDOW_MS, finishPhotoIds, orderMedia } from "@/lib/tasks/media";
 import { scheduledDay } from "@/lib/tasks/rules";
@@ -112,9 +112,12 @@ const visibleFile = (contactId: string, kinds: readonly AttachmentKind[]) =>
     ],
   }) satisfies Prisma.TaskAttachmentWhereInput;
 
-/** Jobs this contact can open: an unrevoked access row, and not a playbook template. */
-const accessibleTo = (contactId: string) =>
-  ({ ...excludeTemplateTasks, access: { some: { contactId, revokedAt: null } } }) satisfies Prisma.TaskWhereInput;
+/**
+ * Jobs this contact can open: an unrevoked access row, and never a playbook template or a draft Claude saved that no
+ * partner has added (task-scope.ts contractorCanOpen). My jobs and the job page both start here, and every other read
+ * below is of a job one of them returned, so a draft stays out of the portal even if an access row somehow exists.
+ */
+const accessibleTo = contractorCanOpen;
 
 // ---------------------------------------------------------------------------
 // My jobs

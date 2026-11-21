@@ -1,10 +1,10 @@
 import type { TaskStatus } from "@prisma/client";
-import { HG_TIME_ZONE, dueLabel, fmtDay, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { HG_TIME_ZONE, dueLabel, fmtDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { contractorMaySetDate, jobLinkUrl, type JobLinkStep } from "@/lib/portal/job-link-paths";
-import { isAfterDue } from "@/lib/tasks/rules";
+import { isAfterDue, scheduledDay } from "@/lib/tasks/rules";
 import { reminderFor } from "./reminder-rules";
 import { addressLine, firstName, joinNames, nextStep } from "@/lib/portal/job-view";
 
@@ -332,6 +332,105 @@ export function undoneDropped(
     return first?.from !== undefined && first.from === current[kind];
   }));
   return items.filter((i) => !undone.has(i.kind));
+}
+
+// ---------------------------------------------------------------------------
+// The send run's two decisions about a row (outbox.ts drainDue)
+// ---------------------------------------------------------------------------
+
+/** A due row as the send run's batch read finds it, before it is claimed. */
+export interface DueRow extends RowRecipient {
+  taskId: string | null;
+  recipientContactId: string | null;
+  items: unknown;
+  /** The job: its status, and who can open it right now (unrevoked access rows). Null once the task is gone. */
+  task: { status: TaskStatus; access: readonly { contactId: string }[] } | null;
+}
+
+/**
+ * Whether a due row goes at all, decided on the row as the batch read found
+ * it. `send: false` closes it unsent with `reason`, and it is never claimed.
+ *
+ *  - Its task is gone: "no task".
+ *  - Its task is a draft: "draft". A draft emails nobody, a contractor or a
+ *    partner (docs/specs/tasks-from-claude.md 6.1). Nothing queues a row for
+ *    one (tasks/core.ts notify) and Add's Undo deletes the rows its Add
+ *    queued, so this is the run's own guard for a row that outlived both: one
+ *    a refused send left waiting to try again, or an access row someone made
+ *    by hand.
+ *  - Otherwise as deliveryFor decides, on who can open the job. "You're off
+ *    this job" goes though their access has just ended: it says only that
+ *    (offItems).
+ */
+export function dueRowVerdict<R extends DueRow>(
+  row: R,
+): { send: true; delivery: Extract<Delivery, { ok: true }>; task: NonNullable<R["task"]>; taskId: string } | { send: false; reason: string } {
+  if (!row.task) return { send: false, reason: "no task" };
+  if (row.task.status === "DRAFT") return { send: false, reason: "draft" };
+  const contractorHasAccess = !!row.recipientContactId && row.task.access.some((a) => a.contactId === row.recipientContactId);
+  const tellsOff = !contractorHasAccess && parseItems(row.items).some((i) => i.kind === "OFF");
+  const delivery = deliveryFor(row, { contractorHasAccess: contractorHasAccess || tellsOff });
+  if (!delivery.ok) return { send: false, reason: delivery.reason };
+  if (!row.taskId) return { send: false, reason: "no recipient" };
+  return { send: true, delivery, task: row.task as NonNullable<R["task"]>, taskId: row.taskId };
+}
+
+/** The job as the send run reads it again once a row is claimed. */
+export interface ClaimedJob {
+  status: TaskStatus;
+  dueDate: Date | null;
+  scheduledFor: Date | null;
+  description: string | null;
+}
+
+/**
+ * What a claimed row still has to say, decided on the job and the recipient's
+ * access as they are read again after the claim: the batch read can be a
+ * write behind (taken off and put back, canceled, a date moved, an Add
+ * undone). `send: false` closes the claimed row unsent with `reason`.
+ *
+ *  - The task is gone since: "no task".
+ *  - It is a draft now (an Add's Undo landed between the batch read and the
+ *    claim): "draft", for a contractor's row and a partner's alike.
+ *  - A contractor's lines go through offItems and liveReminders; then, for
+ *    anyone, a change put back before the email goes is dropped
+ *    (undoneDropped). Nothing left: "nothing to send".
+ *
+ * `items` are the row's lines after reconcileItems. With `send`, `due` is
+ * the date the contractor sees and `job` the job as read, which the email is
+ * built from.
+ */
+export function claimedRowVerdict(input: {
+  audience: Audience;
+  items: readonly OutboxItem[];
+  job: ClaimedJob | null;
+  /** The recipient has an unrevoked access row now; ignored for a partner. */
+  hasAccess: boolean;
+  /** Contractor: the home still needs 24 hours' notice (docs/specs/contractor-scheduled-date.md, Q6). */
+  needsNotice?: boolean;
+  today: Ymd;
+}):
+  | { send: true; items: OutboxItem[]; due: Ymd | null; scheduled: Ymd | null; job: ClaimedJob }
+  | { send: false; reason: "no task" | "draft" | "nothing to send" } {
+  const job = input.job;
+  if (!job) return { send: false, reason: "no task" };
+  if (job.status === "DRAFT") return { send: false, reason: "draft" };
+  // Two dates (docs/specs/contractor-scheduled-date.md): Due, and the contractor's scheduled day while Scheduled.
+  const due = toYmd(job.dueDate);
+  const scheduled = toYmd(scheduledDay(job));
+  const kept =
+    input.audience === "contractor"
+      ? liveReminders(offItems(input.items, { hasAccess: input.hasAccess, canceled: job.status === "CANCELED", job: jobKey({ status: job.status, due, scheduled, notes: job.description }) }), {
+          status: job.status,
+          due,
+          scheduled,
+          needsNotice: !!input.needsNotice,
+          today: input.today,
+        })
+      : [...input.items];
+  // A date, the notes or a status put back as they were before the bundle's first change says nothing (undoneDropped).
+  const items = undoneDropped(kept, { due, scheduled, notes: job.description, status: job.status });
+  return items.length === 0 ? { send: false, reason: "nothing to send" } : { send: true, items, due, scheduled, job };
 }
 
 /** The update an email's button opens at: the first comment, status or file post the recipient can see. */

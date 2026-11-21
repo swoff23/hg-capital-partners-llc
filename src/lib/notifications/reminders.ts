@@ -6,9 +6,10 @@ import { addDaysYmd } from "@/lib/quick-dates";
 import type { TaskStatus } from "@prisma/client";
 import { readJobAccess } from "@/lib/portal/access-code";
 import { queueDueReminder, type Tx } from "@/lib/tasks/core";
+import { dueReminderWhere } from "@/lib/tasks/list-query";
 import { scheduledDay } from "@/lib/tasks/rules";
 import { easternDayStart } from "./content";
-import { REMINDER_STATUSES, inReminderHour, isSoon, reminderFor } from "./reminder-rules";
+import { inReminderHour, isSoon, reminderFor } from "./reminder-rules";
 
 /**
  * The 8 am emails (docs/specs/contractor-job-emails.md, section 6, and
@@ -30,11 +31,8 @@ export async function queueDueReminders(now = new Date()): Promise<{ queued: num
   const days = [addDaysYmd(today, -1), today, addDaysYmd(today, 1)].map(ymdToDate).filter((d): d is Date => !!d);
   const tasks = await prisma.task
     .findMany({
-      where: {
-        assigneeContactId: { not: null },
-        status: { in: [...REMINDER_STATUSES] },
-        OR: [{ dueDate: { in: days } }, { status: "SCHEDULED", scheduledFor: { in: days } }],
-      },
+      // Never a draft (tasks/list-query.ts dueReminderWhere).
+      where: dueReminderWhere(days),
       select: { id: true, status: true, dueDate: true, scheduledFor: true, assigneeContactId: true, propertyId: true, unitLabel: true, entryPermittedAt: true },
       orderBy: { id: "asc" },
     })

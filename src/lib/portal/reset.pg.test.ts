@@ -2,6 +2,9 @@ import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
+import { connectAddress, listConnections, verifyAccessTokenValue } from "@/lib/claude/connections-core";
+import { connectorConfigFor } from "@/lib/claude/oauth-core";
+import { approveClaude, exchangeCode, signInClaude } from "@/lib/claude/sign-in-fixture";
 import { makeClient } from "@/lib/db-client";
 import { scratchRows } from "@/lib/scratch-rows";
 import { ResetTokenTaken, RESET_TOKEN_SELECT, findResetOwner, resetTokenOwner, saveStaffReset, usableReset } from "./reset-core";
@@ -124,6 +127,52 @@ test("a staff reset sets the password, stamps the sign-out time, ends the other 
     ResetTokenTaken,
   );
   assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: connor.id } })).passwordHash, "new.hash");
+});
+
+test("a staff reset ends the partner's Claude connection in the same transaction, logs it, and keeps their address", { skip, timeout }, async () => {
+  const cfg = connectorConfigFor("https://app.example.test", "scratch-secret-scratch-secret-scratch!!");
+  const pieter = await partner("pieter-claude");
+  const connor = await partner("connor-claude");
+  const t0 = new Date(Date.now() - 10 * 60_000);
+  const claude = await signInClaude(prisma, cfg, pieter, t0);
+  const theirs = await signInClaude(prisma, cfg, connor, t0);
+  // Allowed in a browser the reset is about to sign out, and not yet swapped by Claude.
+  const waiting = await partner("waiting-claude");
+  const half = await approveClaude(prisma, cfg, waiting, t0);
+  const now = new Date();
+  assert.ok(await verifyAccessTokenValue(prisma, cfg, claude.tokens.access_token, claude.key, now));
+
+  const link = await staffToken(pieter.id);
+  await prisma.$transaction((tx) => saveStaffReset(tx, { tokenId: link.id, userId: pieter.id, passwordHash: "new.hash", now }));
+
+  const row = await prisma.claudeConnection.findUniqueOrThrow({ where: { id: claude.connectionId } });
+  assert.equal(row.revokedAt?.getTime(), now.getTime(), "ended, not left to the sign-out date alone");
+  assert.equal(row.revokedByUserId, null);
+  assert.equal(await prisma.oAuthToken.count({ where: { connectionId: claude.connectionId } }), 0, "its tokens are deleted");
+  assert.equal(await verifyAccessTokenValue(prisma, cfg, claude.tokens.access_token, claude.key, new Date(now.getTime() + 1_000)), null);
+  const events = await prisma.securityEvent.findMany({ where: { kind: "CLAUDE_DISCONNECTED", userId: pieter.id } });
+  assert.deepEqual(events.map((e) => e.data), [{ connectionId: claude.connectionId, reason: "password-reset" }]);
+  assert.equal((await listConnections(prisma, cfg, now)).find((r) => r.userId === pieter.id)?.connection, null);
+  // The address is kept: their Claude only has to sign in again.
+  assert.equal(await connectAddress(prisma, cfg, pieter.id, now), claude.address);
+  // The other partner's Claude is untouched.
+  assert.ok(await verifyAccessTokenValue(prisma, cfg, theirs.tokens.access_token, theirs.key, now));
+
+  // A refused reset rolls back whole: the connection it would have ended is still live.
+  const again = await signInClaude(prisma, cfg, pieter, new Date(now.getTime() + 1_000));
+  await assert.rejects(
+    prisma.$transaction((tx) => saveStaffReset(tx, { tokenId: link.id, userId: pieter.id, passwordHash: "third.hash", now: new Date(now.getTime() + 120_000) })),
+    ResetTokenTaken,
+  );
+  assert.ok(await verifyAccessTokenValue(prisma, cfg, again.tokens.access_token, again.key, new Date(now.getTime() + 121_000)));
+
+  // A connection Claude hasn't finished ends too, so the code approved before the reset can't be swapped after it.
+  const second = await staffToken(waiting.id);
+  const at = new Date(half.allowedAt.getTime() + 1_000);
+  await prisma.$transaction((tx) => saveStaffReset(tx, { tokenId: second.id, userId: waiting.id, passwordHash: "new.hash", now: at }));
+  assert.ok((await prisma.claudeConnection.findUniqueOrThrow({ where: { id: half.connectionId } })).revokedAt);
+  const swap = await exchangeCode(prisma, cfg, { code: half.code, verifier: half.attempt.verifier, address: half.address, at: new Date(at.getTime() + 1_000) });
+  assert.equal(swap.status, 400);
 });
 
 test("only one of two racing submissions of a link wins", { skip, timeout }, async () => {

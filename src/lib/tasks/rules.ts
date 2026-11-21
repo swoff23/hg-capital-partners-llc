@@ -15,8 +15,13 @@ const CONTRACTOR_CAN_FINISH: readonly TaskStatus[] = ["OPEN", "SCHEDULED", "IN_P
 /** Picking their day turns a To do or Waiting job Scheduled (docs/specs/contractor-scheduled-date.md, Q2). Only core.ts scheduleByContractor asks. */
 const CONTRACTOR_CAN_SCHEDULE: readonly TaskStatus[] = ["OPEN", "WAITING"];
 
+/**
+ * No status change goes to or from Draft, for anyone (docs/specs/tasks-from-claude.md 6.1): a draft becomes a task
+ * only through Add (core.ts addDraft), and goes back only through that Add's Undo (undoAddDraft).
+ */
 export function canSetStatus(kind: PrincipalKind, from: TaskStatus, to: TaskStatus): boolean {
   if (from === to) return false;
+  if (from === "DRAFT" || to === "DRAFT") return false;
   if (kind !== "contractor") return true;
   if (to === "IN_PROGRESS") return CONTRACTOR_CAN_START.includes(from);
   if (to === "REVIEW") return CONTRACTOR_CAN_FINISH.includes(from);
@@ -157,8 +162,21 @@ export const BUNDLE_MAX_MS = 10 * 60_000;
  * How long Approve's Undo lasts (core.ts undoApproval). An approval emails
  * nobody (notifyAudience), so nothing else limits it; the refusal for an
  * approval email claimed or sent only covers rows queued before that rule.
+ *
+ * Also how long Add's Undo lasts on a draft from Claude (core.ts
+ * undoAddDraft): shorter than BUNDLE_QUIET_MS on purpose, so the job email
+ * Add queued is still waiting, unsent, when the Undo deletes it with the
+ * contractor's access (rules.test.ts holds the two apart).
  */
 export const APPROVAL_UNDO_MS = 2 * 60_000;
+
+/**
+ * How long a discarded draft's row is kept before the every-minute run deletes
+ * it with its files (core.ts sweepDiscardedDrafts): far longer than the toast
+ * that offers Discard's Undo stays up, so an Undo tapped late, after a slow
+ * answer or on a second look, still finds the draft whole.
+ */
+export const DISCARD_KEEP_MS = 10 * 60_000;
 
 export function bundleSendAfter(firstAt: Date, now: Date): Date {
   return new Date(Math.min(firstAt.getTime() + BUNDLE_MAX_MS, now.getTime() + BUNDLE_QUIET_MS));

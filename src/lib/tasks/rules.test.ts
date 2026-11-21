@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { TaskStatus } from "@prisma/client";
 import {
+  APPROVAL_UNDO_MS,
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
   bundleSendAfter,
@@ -20,6 +22,26 @@ test("staff can make any status change; nobody can 'change' to the same status",
   assert.equal(canSetStatus("staff", "DONE", "OPEN"), true);
   assert.equal(canSetStatus("staff", "OPEN", "CANCELED"), true);
   assert.equal(canSetStatus("staff", "OPEN", "OPEN"), false);
+});
+
+// docs/specs/tasks-from-claude.md 6.1: a draft becomes a task only through Add, and goes back only through its Undo.
+test("no status change goes to or from Draft, for anyone", () => {
+  const settable: TaskStatus[] = ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW", "DONE", "CANCELED"];
+  for (const who of ["staff", "contractor", "system", "asana"] as const) {
+    for (const status of settable) {
+      assert.equal(canSetStatus(who, "DRAFT", status), false, `${who}: Draft to ${status}`);
+      assert.equal(canSetStatus(who, status, "DRAFT"), false, `${who}: ${status} to Draft`);
+    }
+    assert.equal(canSetStatus(who, "DRAFT", "DRAFT"), false);
+  }
+  // Everything else staff could do, they still can.
+  assert.equal(canSetStatus("staff", "OPEN", "IN_PROGRESS"), true);
+});
+
+// Add's Undo relies on it (core.ts undoAddDraft): the job email Add queued is still waiting when the Undo lands.
+test("Add's Undo ends before the job email's quiet time does", () => {
+  assert.ok(APPROVAL_UNDO_MS < BUNDLE_QUIET_MS);
+  assert.ok(BUNDLE_QUIET_MS - APPROVAL_UNDO_MS >= 60_000, "a full minute to spare, the send run's own interval");
 });
 
 test("contractors can only Start job, Mark done and schedule their own day", () => {
