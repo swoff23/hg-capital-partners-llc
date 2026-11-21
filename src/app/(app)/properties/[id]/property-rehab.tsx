@@ -5,7 +5,8 @@ import { Section, buttonClass } from "@/components/ui";
 import { fmtMoney } from "@/lib/utils";
 import { todayYmdEastern } from "@/lib/dates";
 import { currentDraw, lineFigures, rehabFigures } from "@/lib/draws/figures";
-import { rehabForProperty, rehabPropertyOptions } from "@/lib/draws/queries";
+import { rehabForProperty } from "@/lib/draws/queries";
+import { propertyOptions } from "@/lib/picker-options";
 import { CurrentDraw } from "../../draws/current-draw";
 import { NewRehabButton } from "../../draws/new-rehab";
 
@@ -18,9 +19,9 @@ export async function PropertyRehabSection({ propertyId, status }: { propertyId:
   const rehab = await rehabForProperty(propertyId);
   if (!rehab) {
     if (!/^rehab/i.test(status ?? "")) return null;
-    const options = (await rehabPropertyOptions()).map((o) => ({ id: o.id, address: o.address }));
+    const properties = await propertyOptions([propertyId]);
     return (
-      <Section title="Rehab" actions={<NewRehabButton options={options} preselect={[propertyId]} variant="secondary" size="sm" icon={false}>Add rehab</NewRehabButton>}>
+      <Section title="Rehab" actions={<NewRehabButton properties={properties} preselect={propertyId} variant="secondary" size="sm" icon={false}>Add rehab</NewRehabButton>}>
         <p className="text-meta text-muted-foreground">No rehab yet.</p>
       </Section>
     );

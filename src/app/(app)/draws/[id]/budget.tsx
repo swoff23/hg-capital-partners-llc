@@ -39,6 +39,7 @@ const over = (line: LineFigures) => Math.max(0, -line.available);
  */
 export function BudgetSection({
   rehabId,
+  holdback,
   units,
   groups,
   draws,
@@ -49,6 +50,8 @@ export function BudgetSection({
   done,
 }: {
   rehabId: string;
+  /** The holdback as entered, or null; the worksheet upload compares its own with it. */
+  holdback: number | null;
   units: UnitOption[];
   groups: UnitGroup[];
   draws: DrawIn[];
@@ -87,7 +90,7 @@ export function BudgetSection({
         done ? (
           <p className="py-3 text-meta text-muted-foreground">No budget lines.</p>
         ) : (
-          <WorksheetUpload rehabId={rehabId} units={units} onAdd={() => setOpen({ add: true, unit: "" })} />
+          <WorksheetUpload rehabId={rehabId} holdback={holdback} units={units} onAdd={() => setOpen({ add: true, unit: "" })} />
         )
       ) : (
         <Table>

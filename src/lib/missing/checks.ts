@@ -1,3 +1,4 @@
+import type { ListingStatus } from "@prisma/client";
 import { toYmd, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { isSold } from "@/lib/properties/figures";
@@ -127,7 +128,7 @@ export interface CheckProperty {
   propertyTaxDueDate: Day;
   rentalRegistrationExpiry: Day;
   units: unknown;
-  /** Its listings' unit labels and statuses: an Available one means the unit is empty (D6). */
+  /** Its listings' unit labels and statuses: an Available or Coming soon one means the unit is empty (D6). */
   listings: { unitLabel: string; status: string }[];
   leases: CheckLease[];
 }
@@ -208,6 +209,8 @@ export const UTILITY_BOXES: { field: keyof UnitUtilities; label: string }[] = UT
 const STATUS_FIELDS = new Set<keyof UnitUtilities>(["nationalGridAutopay", "nationalFuelAutopay", "nationalFuelLofl", "waterAutopay"]);
 
 const isRehabbing = (status: string | null) => /^rehab/i.test(status?.trim() ?? "");
+/** Listing statuses that say the unit is empty (D6): Available, and Coming soon while it's readied (docs/specs/coming-soon.md). */
+const LISTED_STATUSES = new Set<string>(["AVAILABLE", "COMING_SOON"] satisfies ListingStatus[]);
 
 /** The terms a check reads for a lease: the one in force today, or an upcoming lease's first. */
 function termInForce(lease: CheckLease, today: Ymd): CheckTerm | null {
@@ -298,7 +301,7 @@ function propertyGaps(p: CheckProperty, today: Ymd): Gap[] {
   // Units, in the list's order. House meters get the utility checks only.
   const units = withUnitIds(parseUnits(p.units));
   const leases = p.leases.filter((l) => leaseStatus(l, today) !== "past");
-  const listed = new Set(p.listings.filter((l) => l.status === "AVAILABLE").map((l) => l.unitLabel.trim().toLowerCase()));
+  const listed = new Set(p.listings.filter((l) => LISTED_STATUSES.has(l.status)).map((l) => l.unitLabel.trim().toLowerCase()));
   units.forEach((u, i) => {
     const unitId = u.id as string;
     const place = u.label?.trim() || `Unit ${i + 1}`;
@@ -329,7 +332,7 @@ function propertyGaps(p: CheckProperty, today: Ymd): Gap[] {
     }
     if (isHouseMeterRow(u)) return;
 
-    // No lease living here or on its way (D6): Rehabbing or an Available listing says it's empty, and so does
+    // No lease living here or on its way (D6): Rehabbing or an Available or Coming soon listing says it's empty, and so does
     // "Vacant since"; otherwise ask once.
     const housed = leases.some((l) => (l.unitId ?? null) === unitId);
     // Vacant since holds until a lease moves in on or after it: once that household has left, the unit asks again.

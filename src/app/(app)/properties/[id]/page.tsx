@@ -21,6 +21,7 @@ import { BackLink } from "@/components/back-link";
 import { ArchivedNotice } from "@/components/record-archive";
 import { archivedLine } from "@/lib/archive";
 import { shortAddress } from "@/lib/normalize";
+import { toWaitlistRow, type WaitlistRow } from "@/lib/waitlist/fields";
 import { setPropertyArchived } from "../actions";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { DocumentsSection, propertyDocuments } from "./documents-section";
@@ -100,7 +101,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     prisma.listing.findMany({
       where: { propertyId: id },
       orderBy: { createdAt: "asc" },
-      include: { photos: { orderBy: { sortOrder: "asc" } } },
+      // The sign-up list rides along for the sheet's Waiting section; it never enters the editable listing.
+      include: { photos: { orderBy: { sortOrder: "asc" } }, waitlist: { orderBy: { createdAt: "desc" } } },
     }),
     getCapexRules(),
     getEntityChoices(),
@@ -134,6 +136,9 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     status: l.status,
     photos: l.photos.map((p) => ({ url: p.url, pathname: p.pathname })),
   }));
+
+  // Each listing's sign-ups, newest first, their days read in Eastern.
+  const waitlists: Record<string, WaitlistRow[]> = Object.fromEntries(propertyListings.map((l) => [l.id, l.waitlist.map(toWaitlistRow)]));
 
   const unitCount = propertyUnitCount(property) ?? 0;
   const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
@@ -231,7 +236,14 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             </CapexForecastCard>
 
             {/* Nothing until the first listing; the header's ⋯ "Add listing" opens its sheet. */}
-            <ListingsSection propertyId={property.id} version={version} initial={listings} unitLabels={unitLabels} />
+            <ListingsSection
+              propertyId={property.id}
+              version={version}
+              initial={listings}
+              waitlists={waitlists}
+              street={shortAddress(property.address)}
+              unitLabels={unitLabels}
+            />
           </div>
 
           {/* The facts rail, then the property's documents and notes. Sections sit 32px apart, 24 on touch. */}

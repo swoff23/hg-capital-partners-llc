@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="600" viewBox="0 0 860 600" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>The property page's Rental listings on a phone: option A moves the Zillow link into the row's menu so "3 waiting" shows; option C leaves it and the count is cut off</title>
+<rect width="860" height="600" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">On your phone: how the listing row shows "3 waiting"</text>
+
+<!-- A -->
+<g transform="translate(32 60)">
+<rect x="0" y="0" width="92" height="22" rx="6" fill="#e6effb"/><text x="46" y="15" font-size="11" fill="#1c4f8a" text-anchor="middle">Recommended</text>
+<rect x="0" y="32" width="375" height="420" rx="26" fill="#ffffff" stroke="#1c4f8a" stroke-width="2"/>
+<rect x="16" y="52" width="24" height="24" rx="6" fill="#152133"/>
+<rect x="50" y="52" width="309" height="24" rx="6" fill="#fff" stroke="#c9c4bb"/><text x="62" y="68" font-size="11" fill="#8a93a1">Search</text>
+<text x="16" y="112" font-size="16" font-weight="600" fill="#152133">Rental listings</text>
+<line x1="16" y1="124" x2="359" y2="124" stroke="#e7e5e0"/>
+<rect x="16" y="136" width="44" height="44" rx="8" fill="#f3f1ec" stroke="#e1ddd5"/>
+<text x="72" y="154" font-size="14" fill="#152133">Rear</text>
+<text x="72" y="172" font-size="12" fill="#5b6576"><tspan font-weight="600" fill="#424e61">Coming soon</tspan> · 3 waiting · $1,450</text>
+<rect x="327" y="144" width="28" height="28" rx="6" fill="#efede8"/><text x="341" y="163" font-size="14" fill="#424e61" text-anchor="middle">⋯</text>
+<rect x="189" y="182" width="170" height="114" rx="10" fill="#ffffff" stroke="#c9c4bb"/>
+<rect x="190" y="183" width="168" height="34" rx="9" fill="#f3f1ec"/>
+<text x="204" y="205" font-size="13" fill="#152133">↗  View on Zillow</text>
+<text x="204" y="240" font-size="13" fill="#152133">✎  Edit listing</text>
+<line x1="189" y1="256" x2="359" y2="256" stroke="#e7e5e0"/>
+<text x="204" y="280" font-size="13" fill="#b4372b">Delete listing</text>
+<line x1="16" y1="192" x2="180" y2="192" stroke="#e7e5e0"/>
+<rect x="16" y="308" width="44" height="44" rx="8" fill="#f3f1ec" stroke="#e1ddd5"/>
+<text x="72" y="326" font-size="14" fill="#152133">2nd Floor</text>
+<text x="72" y="344" font-size="12" fill="#5b6576"><tspan font-weight="600" fill="#424e61">Coming soon</tspan> · No details yet</text>
+<text x="341" y="335" font-size="14" fill="#424e61" text-anchor="middle">⋯</text>
+<line x1="16" y1="364" x2="359" y2="364" stroke="#e7e5e0"/>
+<text x="16" y="392" font-size="13" fill="#5b6576">+  Add listing</text>
+<text x="0" y="482" font-size="14" font-weight="600" fill="#152133">A. Zillow moves into ⋯ on phones</text>
+<text x="0" y="502" font-size="12" fill="#5b6576">"3 waiting" always shows. Tap ⋯ for View on Zillow.</text>
+<text x="0" y="520" font-size="12" fill="#5b6576">Laptop and tablet keep the Zillow link on the row.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(453 60)">
+<text x="0" y="15" font-size="11" fill="#8a93a1">How it is now</text>
+<rect x="0" y="32" width="375" height="420" rx="26" fill="#ffffff" stroke="#c9c4bb"/>
+<rect x="16" y="52" width="24" height="24" rx="6" fill="#152133"/>
+<rect x="50" y="52" width="309" height="24" rx="6" fill="#fff" stroke="#c9c4bb"/><text x="62" y="68" font-size="11" fill="#8a93a1">Search</text>
+<text x="16" y="112" font-size="16" font-weight="600" fill="#152133">Rental listings</text>
+<line x1="16" y1="124" x2="359" y2="124" stroke="#e7e5e0"/>
+<rect x="16" y="136" width="44" height="44" rx="8" fill="#f3f1ec" stroke="#e1ddd5"/>
+<text x="72" y="154" font-size="14" fill="#152133">Rear</text>
+<text x="72" y="172" font-size="12" fill="#5b6576"><tspan font-weight="600" fill="#424e61">Coming soon</tspan> · 3 waitin…</text>
+<text x="252" y="163" font-size="12" fill="#152133" text-decoration="underline">Zillow ↗</text>
+<text x="341" y="163" font-size="14" fill="#424e61" text-anchor="middle">⋯</text>
+<line x1="16" y1="192" x2="359" y2="192" stroke="#e7e5e0"/>
+<rect x="16" y="204" width="44" height="44" rx="8" fill="#f3f1ec" stroke="#e1ddd5"/>
+<text x="72" y="222" font-size="14" fill="#152133">2nd Floor</text>
+<text x="72" y="240" font-size="12" fill="#5b6576"><tspan font-weight="600" fill="#424e61">Coming soon</tspan> · No details yet</text>
+<text x="341" y="231" font-size="14" fill="#424e61" text-anchor="middle">⋯</text>
+<line x1="16" y1="260" x2="359" y2="260" stroke="#e7e5e0"/>
+<text x="16" y="288" font-size="13" fill="#5b6576">+  Add listing</text>
+<circle cx="190" cy="168" r="26" fill="none" stroke="#b4372b" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="0" y="482" font-size="14" font-weight="600" fill="#152133">C. Leave it</text>
+<text x="0" y="502" font-size="12" fill="#5b6576">The Zillow link stays, so the count is cut off.</text>
+<text x="0" y="520" font-size="12" fill="#5b6576">Tap the listing to see who's waiting.</text>
+</g>
+</svg>

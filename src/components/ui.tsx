@@ -638,6 +638,35 @@ export function FormField({
 }
 
 /**
+ * FormField's look for a picker (`PropertyPicker`, `UnitPicker` with
+ * `trigger="field"`), which has no field wiring of its own: the label over it
+ * and the refusal under it. The picker's own `label` names it for screen
+ * readers; pass the refusal's red edge to the picker's `className`.
+ */
+export function PickField({
+  label,
+  error,
+  optional = false,
+  children,
+}: {
+  label: string;
+  error?: string;
+  optional?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div data-invalid={error ? "true" : undefined} className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-meta font-medium text-fg-2">
+        {label}
+        {optional && <span className="font-normal text-muted-foreground"> (optional)</span>}
+      </span>
+      {children}
+      {error && <p className="truncate text-meta text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+/**
  * Two fields side by side from sm, one column below it (forms 2.2): only for
  * short, related values whose labels both fit on one line (City and ZIP, the
  * two deal prices, Beds and Baths). 16px between them either way.

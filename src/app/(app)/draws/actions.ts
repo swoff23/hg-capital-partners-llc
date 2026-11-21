@@ -50,13 +50,21 @@ function amount(field: string, value: string | null | undefined, opts: { signed?
 // Rehabs
 // ---------------------------------------------------------------------------
 
-const newRehab = z.object({ propertyIds: z.array(id).max(20), lender: z.string().max(200).nullable() }).strict();
+// The property may be blank, so the service can say "Pick the property." beside the holdback's own line.
+// `propertyIds` instead is the "More than one property" switch.
+const newRehab = z
+  .object({ propertyId: z.string().max(64), propertyIds: z.array(id).max(20), holdback: raw, lender: z.string().max(200).nullable() })
+  .partial({ propertyId: true, propertyIds: true })
+  .strict()
+  .refine((r) => (r.propertyId === undefined) !== (r.propertyIds === undefined), "Send the property or the properties.");
 
-/** New rehab (L4): the properties and the lender. The rehab page opens next. */
+/** New rehab (L4): the property (or several, for a shared loan), the holdback and the lender. The rehab page opens next. */
 export async function createRehabAction(input: z.input<typeof newRehab>): Promise<ActionResult<{ id: string }>> {
   return withResult("createRehab", async () => {
     const user = await requireUser();
-    return draws.createRehab(newRehab.parse(input), { id: user.id });
+    const p = newRehab.parse(input);
+    const where = p.propertyIds !== undefined ? { propertyIds: p.propertyIds } : { propertyId: p.propertyId ?? "" };
+    return draws.createRehab({ ...where, holdback: amount("holdback", p.holdback), lender: p.lender }, { id: user.id });
   });
 }
 

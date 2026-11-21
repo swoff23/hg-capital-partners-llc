@@ -9,6 +9,7 @@ import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 import { AppShell } from "@/components/app-shell";
 import { LeaveGuard } from "@/components/leave-guard";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
+import { ScrollMemory } from "@/components/scroll-memory";
 import { UpdateNotice } from "@/components/update-notice";
 import { UploadQueueProvider } from "@/components/upload-queue";
 
@@ -31,7 +32,8 @@ export const viewport: Viewport = { interactiveWidget: "resizes-content" };
  * person signing in gets a fresh one and the old one stops
  * (attachments/queue-owner.ts). `UpdateNotice` sits beside RefreshOnReturn:
  * it needs the queue, the toasts and the guard above it, and gets the commit
- * this page was built from (docs/specs/update-notice.md).
+ * this page was built from (docs/specs/update-notice.md). `ScrollMemory`
+ * puts a page back where it was left on Back, even when the page reloads.
  */
 export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
   const user = await requireUser();
@@ -51,6 +53,7 @@ export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
       >
         <UploadQueueProvider key={scope} scope={scope}>
           <RefreshOnReturn />
+          <ScrollMemory />
           <UpdateNotice version={getEnv().VERCEL_GIT_COMMIT_SHA ?? null} />
           {children}
           {modal}

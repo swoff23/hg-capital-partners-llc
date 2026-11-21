@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { CreateForm } from "@/components/create-form";
@@ -7,7 +7,7 @@ import { DateField } from "@/components/date-field";
 import { PropertyPicker, UnitPicker } from "@/components/entity-picker";
 import { NumberInput } from "@/components/number-input";
 import { useToast } from "@/components/toast";
-import { AddRow, Button, Checkbox, FieldRow, FormField, Input, Section } from "@/components/ui";
+import { AddRow, Button, Checkbox, FieldRow, FormField, Input, PickField, Section } from "@/components/ui";
 import type { FieldErrors } from "@/lib/action-result";
 import { fmtDay, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
@@ -104,20 +104,6 @@ function problemsOf(v: Values, units: readonly LeaseUnit[]): FieldErrors | null 
   const deposit = readDeposit(v.deposit);
   if (!deposit.ok) Object.assign(found, deposit.problems);
   return Object.keys(found).length > 0 ? found : null;
-}
-
-/** A picker's label over it and its refusal under it; the pickers and the date field have no field wiring of their own. */
-function PickField({ label, error, optional = false, children }: { label: string; error?: string; optional?: boolean; children: ReactNode }) {
-  return (
-    <div data-invalid={error ? "true" : undefined} className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-meta font-medium text-fg-2">
-        {label}
-        {optional && <span className="font-normal text-muted-foreground"> (optional)</span>}
-      </span>
-      {children}
-      {error && <p className="truncate text-meta text-destructive">{error}</p>}
-    </div>
-  );
 }
 
 /**

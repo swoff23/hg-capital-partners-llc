@@ -6,7 +6,7 @@ import { Sheet } from "@/components/sheet";
 import { Switch } from "@/components/switch";
 import { Button, SaveError } from "@/components/ui";
 import { stableJson } from "@/lib/drafts";
-import { returnFocusAfterSave } from "@/lib/focus";
+import { focusFirstInvalid, returnFocusAfterSave } from "@/lib/focus";
 import { cn } from "@/lib/utils";
 
 export type FormSheetProps = {
@@ -308,17 +308,7 @@ export function FormSheet({
   );
 }
 
-/**
- * Moves focus to the first field a check marked invalid (`aria-invalid`) and
- * scrolls it to the middle of the view, so a refusal is seen where it is, not
- * at the top of the form (forms 2.0). Does nothing when no field is marked.
- */
-export function focusFirstInvalid(root: ParentNode | null): void {
-  const bad = root?.querySelector<HTMLElement>('[aria-invalid="true"]');
-  if (!bad) return;
-  bad.focus({ preventScroll: true });
-  bad.scrollIntoView({ block: "center", behavior: "auto" });
-}
+export { focusFirstInvalid };
 
 /** The form inside the sheet's body: focus goes to the first empty field once it shows. */
 function FormBody({
