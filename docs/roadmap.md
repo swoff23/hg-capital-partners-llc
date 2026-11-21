@@ -57,7 +57,7 @@ Three things only Connor can do. Each one unblocks a build.
 
 | Item | Status | Size | When | After | Source |
 |---|---|---|---|---|---|
-| Contractor invoices | Spec ready (MVP) | M | Dec 16 to Feb 14 | Invite the contractors | docs/contractor-invoices-plan.md |
+| Contractor invoices | Building (MVP, Nov 21) | M | Dec 16 to Feb 14 | Invite the contractors | docs/contractor-invoices-plan.md |
 | 1099 list for January (new) | Needs a spec | S | Jan 1 to Jan 31 | QuickBooks, Contractor page | |
 | Financials you can trust | Needs a spec | M | Dec 16 to Jan 15 | QuickBooks | docs/uiux-review/financials.md |
 | Contractor onboarding in the portal | Spec ready | M | Dec 16 to Jan 15 | Contractor page | docs/specs/contractor-onboarding.md (branch `claude/contractor-form-integration-55b2b4`) |
@@ -116,7 +116,6 @@ Three things only Connor can do. Each one unblocks a build.
 | Add the QuickBooks production keys, then Connect | QuickBooks, Financials fixes, 1099 list, CPA pack, Rent roll |
 | Stop using Asana, and check when its billing ends | Finish leaving Asana |
 | Answer the three reopened tenant contact calls | Tenant contact |
-| Say "build it" for invoices (spec and screens done Nov 21) | Contractor invoices |
 | Emails for 14 contractors, and the office phone | Invite the contractors |
 | Say how residents should request maintenance | Maintenance requests |
 | Remove the two password variables, turn on Skew Protection | Tidy the secrets |

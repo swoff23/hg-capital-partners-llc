@@ -61,7 +61,6 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - [ ] Look at the new screens on a computer: Today, All, the task page, playbooks and a contractor's page.
 - [ ] Pick a provider for address suggestions (Google Places, Mapbox or Smarty) and get its API key. Until then, suggestions come from your own properties and deals.
 - [ ] To give old deal notes their author, Claude needs a way to write to the production database (the same `.env.prod-write` the Asana import needs). Until then, old notes keep the author in their text, as today.
-- [ ] Contractor invoices: the MVP spec and its screens are done ([docs/contractor-invoices-plan.md](contractor-invoices-plan.md), Nov 21). Say "build it" when you want it built. No setup is needed first.
 
 - [ ] Database certificate check (date to be set). Its own change: prove Supabase's certificate from a laptop with a read-only connection, then ship it behind one environment variable. A wrong setting fails every query, so the way back is a redeploy or a rollback. See fix 3 in [docs/specs/performance.md](specs/performance.md).
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
