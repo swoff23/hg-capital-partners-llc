@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ActivityDivider, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
-import { ActivitySpan, ActivityTime } from "@/components/activity-time";
+import { ActivityDivider, ActivityFold, ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
+import { ActivityTime } from "@/components/activity-time";
 import { CommentBody, CommentCard, DeliveryLine } from "@/components/comment-card";
 import { FilesList, type FileLink } from "@/components/files-list";
 import { MediaGrid } from "@/components/media-grid";
@@ -96,7 +96,7 @@ export function JobUpdates({
         const open = anchor !== null && x.rows.some((e) => holds(e, anchor));
         const words = stretchSummary(x.rows.length, x.rows.map(kindOf));
         return (
-          <ActivityRun
+          <ActivityFold
             key={`${x.id}:${open ? "open" : "closed"}`}
             defaultOpen={open}
             summary={
@@ -106,12 +106,11 @@ export function JobUpdates({
               </>
             }
             openSummary={words.hide}
-            time={<ActivitySpan from={{ at: x.rows[0].update.createdAt }} to={{ at: x.rows[x.rows.length - 1].update.createdAt }} />}
           >
             {x.rows.map((e) => (
               <EntryView key={e.update.id} entry={e} delivery={delivery} viewerName={viewerName} />
             ))}
-          </ActivityRun>
+          </ActivityFold>
         );
       })}
     </ActivityTimeline>

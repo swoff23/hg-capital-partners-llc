@@ -1018,16 +1018,17 @@ export function collapseStretches<T>(
 }
 
 /**
- * A collapsed line's words (activity-collapse 3.3): "Show 5 updates", the
- * kinds inside ("assignee, due date and Asana move", up to three, then "and
- * more"; null when there are none to name), and "Hide 5 updates" for when it's open.
+ * A collapsed line's words (activity-collapse 3.3), Linear's way: "Show 5
+ * updates", the kinds inside ending in an ellipsis ("assignee, due date and
+ * Asana move…", up to three; with more, "assignee, due date, unit…"; null
+ * when there are none to name), and "Hide 5 updates" for when it's open.
  */
 export function stretchSummary(count: number, kinds: readonly string[]): { show: string; hide: string; kinds: string | null } {
   const noun = `${count} ${count === 1 ? "update" : "updates"}`;
   const named = [...new Set(kinds)];
   let list: string | null = null;
-  if (named.length > 3) list = `${named.slice(0, 3).join(", ")} and more`;
-  else if (named.length > 1) list = `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
-  else if (named.length === 1) list = named[0];
+  if (named.length > 3) list = `${named.slice(0, 3).join(", ")}\u2026`;
+  else if (named.length > 1) list = `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}\u2026`;
+  else if (named.length === 1) list = `${named[0]}\u2026`;
   return { show: `Show ${noun}`, hide: `Hide ${noun}`, kinds: list };
 }
