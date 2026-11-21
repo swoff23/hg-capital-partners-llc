@@ -1,5 +1,5 @@
 import { dayLabel, daysUntil, fmtDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
-import { STAGE_LABEL, atLender, daysInStage, isStuck, type DrawIn } from "@/lib/draws/figures";
+import { STAGE_LABEL, daysInStage, isStuck, type DrawIn } from "@/lib/draws/figures";
 import { shortAddress } from "@/lib/normalize";
 import { fmtMoney } from "@/lib/utils";
 
@@ -306,30 +306,38 @@ export function baselaneItems(people: BaselaneContact[], today: Ymd): NeedsYouIt
 export interface DrawRehab {
   id: string;
   name: string;
-  draws: Pick<DrawIn, "number" | "stage" | "stageChangedAt" | "waitingOnUs" | "waitingNote">[];
+  draws: Pick<DrawIn, "number" | "stage" | "stageChangedAt">[];
 }
 
 /**
- * Draws that need a partner (docs/specs/rehab-draws.md, R11): one the lender
- * is waiting on us for, and one with the lender that hasn't moved in 10 days.
- * A ready draft doesn't earn a row. Waiting first, then the longest stuck.
+ * Draws that need a partner (docs/specs/rehab-draws.md, R11): one with the lender that hasn't moved in 10 days,
+ * the longest stuck first. A draw being built doesn't earn a row.
  */
 export function drawItems(rehabs: readonly DrawRehab[], today: Ymd): NeedsYouItem[] {
-  const waiting: NeedsYouItem[] = [];
   const stuck: { item: NeedsYouItem; days: number }[] = [];
   for (const r of rehabs) {
     for (const d of r.draws) {
-      if (!atLender(d.stage)) continue;
-      const base = { kind: "draw" as const, href: `/draws/${r.id}`, title: `${r.name} · draw ${d.number}`, amount: null, pastDue: null, dateLabel: null, late: false, date: null };
-      if (d.waitingOnUs) {
-        waiting.push({ ...base, key: `draw-waiting:${r.id}:${d.number}`, state: "Waiting", detail: d.waitingNote?.trim() || "Waiting on us" });
-      } else if (isStuck(d, today)) {
-        const days = daysInStage(d, today);
-        stuck.push({ days, item: { ...base, key: `draw-stuck:${r.id}:${d.number}`, state: "Stuck", detail: `No change in ${days} days · ${STAGE_LABEL[d.stage]}` } });
-      }
+      if (!isStuck(d, today)) continue;
+      const days = daysInStage(d, today);
+      stuck.push({
+        days,
+        item: {
+          key: `draw-stuck:${r.id}:${d.number}`,
+          kind: "draw",
+          href: `/draws/${r.id}`,
+          title: `${r.name} · draw ${d.number}`,
+          state: "Stuck",
+          detail: `No change in ${days} days · ${STAGE_LABEL[d.stage]}`,
+          amount: null,
+          pastDue: null,
+          dateLabel: null,
+          late: false,
+          date: null,
+        },
+      });
     }
   }
-  return [...waiting.sort((a, b) => a.title.localeCompare(b.title)), ...stuck.sort((a, b) => b.days - a.days || a.item.title.localeCompare(b.item.title)).map((s) => s.item)];
+  return stuck.sort((a, b) => b.days - a.days || a.item.title.localeCompare(b.item.title)).map((s) => s.item);
 }
 
 /**

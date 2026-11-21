@@ -4,6 +4,7 @@ import { Money } from "@/components/money";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
 import type { DrawIn, LineIn } from "@/lib/draws/figures";
+import { NextStep } from "../next-step";
 import { DrawSheet } from "./draw-sheet";
 
 /** A draw as its row reads it: the figures module's draw, the words for its stage and what it is worth. */
@@ -11,7 +12,7 @@ export type DrawRow = { draw: DrawIn; stage: string; amount: number };
 
 /**
  * The Draws section (docs/specs/rehab-draws.md, L2): draws with the lender first, then the funded ones, newest
- * first. The draft is the Budget's Draft column, so it isn't listed. A row opens its Draw sheet.
+ * first. The draft is the Budget's Draw column, so it isn't listed. A row opens its Draw sheet; draws with the lender carry the next-step button under the row.
  */
 export function DrawsSection({ rows, lines, today, done }: { rows: DrawRow[]; lines: LineIn[]; today: Ymd; done: boolean }) {
   const [open, setOpen] = useState<DrawRow | null>(null);
@@ -28,16 +29,18 @@ export function DrawsSection({ rows, lines, today, done }: { rows: DrawRow[]; li
                   <span className="block truncate text-body text-foreground">Draw {r.draw.number}</span>
                   <span className="block truncate text-meta text-muted-foreground">
                     {r.stage}
-                    {r.draw.waitingOnUs && (
-                      <>
-                        {" · "}
-                        <span className="text-warn">Waiting on us</span>
-                      </>
-                    )}
                   </span>
                 </span>
                 <Money value={r.amount} className="shrink-0" />
               </DrawRowBox>
+              {/* A sibling of the row's button, never inside it. */}
+              {!done && r.draw.stage !== "FUNDED" && r.draw.stage !== "DRAFT" && (
+                <div className="pb-2.5">
+                  <NextStep
+                    draw={{ id: r.draw.id, number: r.draw.number, stage: r.draw.stage, sentAmount: r.draw.sentAmount, approvedAmount: r.draw.approvedAmount }}
+                  />
+                </div>
+              )}
             </li>
           ))}
         </ul>

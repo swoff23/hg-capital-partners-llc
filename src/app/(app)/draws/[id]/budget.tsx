@@ -1,65 +1,88 @@
 "use client";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { DatePicker } from "@/components/due-date-picker";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Money } from "@/components/money";
 import { NumberInput } from "@/components/number-input";
 import { useRun } from "@/components/use-run";
-import { AddRow, Button, Section, Table, Td, Th } from "@/components/ui";
+import { FormSheet } from "@/components/form-sheet";
+import { AddRow, Button, FormField, Section, Table, Td, Th } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import type { Ymd } from "@/lib/dates";
-import type { LineFigures, UnitGroup } from "@/lib/draws/figures";
+import type { DrawIn, LineFigures, UnitGroup } from "@/lib/draws/figures";
 import type { UnitOption } from "@/lib/draws/queries";
 import { parseAmount } from "@/lib/money";
-import { sendDraftAction, setDraftAmountAction, unsendDrawAction } from "../actions";
+import { deleteDrawAction, sendDraftAction, setDraftAmountAction, startDraftAction, unsendDrawAction } from "../actions";
 import { fmtCents, optionalAmountText } from "../format";
 import { DraftSheet } from "./draft-sheet";
 import { LineSheet } from "./line-sheet";
 import { WorksheetUpload } from "./worksheet-upload";
 
-/** The sheet on screen: a phone's draft sheet, a line to edit, or a new line (with the unit it starts in). */
+/** The sheet on screen: a phone's draw-amount sheet, a line to edit, or a new line (with the unit it starts in). */
 type Open = { line: LineFigures; quick: boolean } | { add: true; unit: string };
 
-/** Below sm a tap on a line opens the draft sheet; from sm the full Line sheet. */
+/** The draw being built: its id and number. */
+export type Draft = { id: string; number: number };
+
+/** Below sm a tap on a line opens the draw-amount sheet (while a draw is being built); from sm the full Line sheet. */
 const onPhone = () => !window.matchMedia("(min-width: 640px)").matches;
 
+/** What's available on a line, below zero when its budget was cut under what's drawn. */
+const over = (line: LineFigures) => Math.max(0, -line.available);
+
 /**
- * The Budget section (docs/specs/rehab-draws.md, L2): a row per line, grouped under a heading row per unit when the
- * lender splits the budget. From lg the Draft cell is an input that saves as you leave it; the line's name opens the
- * Line sheet, and on a phone a small sheet for the draft first. A line past its budget says "Over by $X" on its Left
- * figure only. Mark sent sits under the table once the draft has a total. A rehab marked done is read-only.
+ * The Budget section (docs/specs/rehab-draws.md, L2), in two modes. Day to day: Line, Budget, Funded, Submitted (only
+ * while some line has any) and Available, with New draw in the header. While a draw is being built: one more
+ * column, "Draw N", with an input per line that saves as you leave it, and a footer with the draw's total, Cancel and
+ * Send to lender. A row opens the Line sheet; on a phone, while a draw is being built, a small sheet for the line's
+ * amount first. A rehab marked done is read-only.
  */
 export function BudgetSection({
   rehabId,
   units,
   groups,
+  draws,
+  draft,
   ready,
-  draftNumber,
+  lender,
   today,
   done,
 }: {
   rehabId: string;
   units: UnitOption[];
   groups: UnitGroup[];
+  draws: DrawIn[];
+  /** The rehab's lender, named in Send to lender's confirm. */
+  lender: string | null;
+  /** The draw being built, or null day to day. */
+  draft: Draft | null;
   /** The draft's total. */
   ready: number;
-  /** The draft's number, for Mark sent's toast. */
-  draftNumber: number | null;
   today: Ymd;
   done: boolean;
 }) {
   const [open, setOpen] = useState<Open | null>(null);
+  const start = useRun();
   const hasLines = groups.some((g) => g.lines.length > 0);
   const split = groups.some((g) => g.unitLabel);
-  // The Submitted column (money on draws sent and not yet funded) shows only while some line has some
-  // (Connor, Nov 20: "only need to show that column if there is anything at the lender").
-  const lender = groups.some((g) => g.lines.some((l) => l.atLender !== 0));
+  const submitted = groups.some((g) => g.lines.some((l) => l.atLender > 0));
   // A new line starts in the last group's unit.
   const lastUnitId = groups.length ? groups[groups.length - 1].unitId : null;
   const lastUnit = units.find((u) => u.unitId === lastUnitId)?.value ?? "";
-  const openLine = (line: LineFigures) => setOpen({ line, quick: onPhone() });
+  const openLine = (line: LineFigures) => setOpen({ line, quick: draft != null && onPhone() });
+  const building = draft != null && !done;
 
   return (
-    <Section title="Budget">
+    <Section
+      title="Budget"
+      actions={
+        hasLines && !done && !draft ? (
+          <Button variant="secondary" size="sm" pending={start.pending} onClick={() => start.run(() => startDraftAction(rehabId))}>
+            New draw
+          </Button>
+        ) : undefined
+      }
+    >
       {!hasLines ? (
         done ? (
           <p className="py-3 text-meta text-muted-foreground">No budget lines.</p>
@@ -77,35 +100,44 @@ export function BudgetSection({
               <Th numeric className="max-lg:hidden">
                 Funded
               </Th>
-              {lender && (
+              {submitted && (
                 <Th numeric className="max-lg:hidden">
                   Submitted
                 </Th>
               )}
-              <Th numeric>
-                Draft
-              </Th>
-              <Th numeric className="max-sm:hidden">
-                Left
-              </Th>
+              {building && (
+                <Th numeric className="max-sm:hidden">
+                  Draw {draft.number}
+                </Th>
+              )}
+              <Th numeric>Available</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {groups.map((g) => (
-              <GroupRows key={g.unitId ?? g.unitLabel ?? ""} group={g} split={split} lender={lender} done={done} onOpen={openLine} />
+              <GroupRows
+                key={g.unitId ?? g.unitLabel ?? ""}
+                group={g}
+                split={split}
+                done={done}
+                submitted={submitted}
+                draft={building ? draft : null}
+                onOpen={openLine}
+              />
             ))}
           </tbody>
         </Table>
       )}
       {hasLines && !done && <AddRow onClick={() => setOpen({ add: true, unit: lastUnit })}>Add a line</AddRow>}
-      {hasLines && !done && ready > 0 && draftNumber != null && <MarkSent rehabId={rehabId} number={draftNumber} total={ready} today={today} />}
+      {hasLines && building && <DrawFooter rehabId={rehabId} draft={draft} total={ready} lender={lender} today={today} />}
 
       {open && "add" in open && (
-        <LineSheet rehabId={rehabId} units={units} line={null} unit={open.unit} isOpen onOpenChange={(o) => !o && setOpen(null)} />
+        <LineSheet rehabId={rehabId} units={units} draws={draws} line={null} unit={open.unit} isOpen onOpenChange={(o) => !o && setOpen(null)} />
       )}
-      {open && "line" in open && open.quick && (
+      {open && "line" in open && open.quick && draft && (
         <DraftSheet
           key={`quick:${open.line.id}`}
+          drawNumber={draft.number}
           line={open.line}
           isOpen
           onOpenChange={(o) => !o && setOpen(null)}
@@ -113,7 +145,15 @@ export function BudgetSection({
         />
       )}
       {open && "line" in open && !open.quick && (
-        <LineSheet key={open.line.id} rehabId={rehabId} units={units} line={open.line} isOpen onOpenChange={(o) => !o && setOpen(null)} />
+        <LineSheet
+          key={open.line.id}
+          rehabId={rehabId}
+          units={units}
+          draws={draws}
+          line={open.line}
+          isOpen
+          onOpenChange={(o) => !o && setOpen(null)}
+        />
       )}
     </Section>
   );
@@ -122,14 +162,16 @@ export function BudgetSection({
 function GroupRows({
   group,
   split,
-  lender,
   done,
+  submitted,
+  draft,
   onOpen,
 }: {
   group: UnitGroup;
   split: boolean;
-  lender: boolean;
   done: boolean;
+  submitted: boolean;
+  draft: Draft | null;
   onOpen: (line: LineFigures) => void;
 }) {
   return (
@@ -141,24 +183,38 @@ function GroupRows({
             <Money value={group.revised} />
           </Td>
           <Td className="max-lg:hidden" />
-          {lender && <Td className="max-lg:hidden" />}
-          <Td />
-          <Td numeric className="font-semibold max-sm:hidden">
-            <Money value={group.left} />
+          {submitted && <Td className="max-lg:hidden" />}
+          {draft && <Td className="max-sm:hidden" />}
+          <Td numeric className="font-semibold">
+            <Money value={Math.round(group.lines.reduce((s, l) => s + Math.round(l.available * 100), 0)) / 100} />
           </Td>
         </tr>
       )}
       {group.lines.map((l) => (
-        <LineRow key={l.id} line={l} split={split} lender={lender} done={done} onOpen={() => onOpen(l)} />
+        <LineRow key={l.id} line={l} split={split} done={done} submitted={submitted} draft={draft} onOpen={() => onOpen(l)} />
       ))}
     </>
   );
 }
 
-function LineRow({ line, split, lender, done, onOpen }: { line: LineFigures; split: boolean; lender: boolean; done: boolean; onOpen: () => void }) {
+function LineRow({
+  line,
+  split,
+  done,
+  submitted,
+  draft,
+  onOpen,
+}: {
+  line: LineFigures;
+  split: boolean;
+  done: boolean;
+  submitted: boolean;
+  draft: Draft | null;
+  onOpen: () => void;
+}) {
   return (
     <tr
-      // The whole row opens the line, as a Portfolio row opens its property; the draft input keeps its own clicks.
+      // The whole row opens the line, as a Portfolio row opens its property; the draw's input keeps its own clicks.
       onClick={done ? undefined : (e) => !(e.target as HTMLElement).closest("input") && onOpen()}
       className={done ? undefined : "transition-colors duration-fast pointer-fine:cursor-pointer hover:bg-muted"}
     >
@@ -183,81 +239,53 @@ function LineRow({ line, split, lender, done, onOpen }: { line: LineFigures; spl
       <Td numeric className="align-middle max-lg:hidden">
         <Money value={line.funded} />
       </Td>
-      {/* What's on draws sent and not yet funded (Connor, Nov 20, option B), so Budget less these columns reads as Left. */}
-      {lender && (
+      {submitted && (
         <Td numeric className="align-middle max-lg:hidden">
           <Money value={line.atLender} />
         </Td>
       )}
+      {draft && (
+        <Td numeric className="align-middle max-sm:hidden">
+          <span className="max-lg:hidden">
+            {/* Remounts with the saved figure, so what shows is what the page now holds. */}
+            <DraftInput key={`${line.id}:${line.draft}`} line={line} draft={draft} name={`${split && line.unitLabel ? `${line.unitLabel} · ` : ""}${line.name}`} />
+          </span>
+          <span className="lg:hidden">{line.draft > 0 ? <Money value={line.draft} /> : <span className="text-muted-foreground">—</span>}</span>
+        </Td>
+      )}
       <Td numeric className="align-middle">
-        <DraftCell line={line} split={split} done={done} />
-      </Td>
-      <Td numeric className="align-middle max-sm:hidden">
-        <Left line={line} />
+        <Available line={line} draft={draft} />
       </Td>
     </tr>
   );
 }
 
-/** What's left on a line; past zero it's "Over by $X" in --destructive, on this figure only. */
-function Left({ line }: { line: LineFigures }) {
-  if (line.left < 0) {
-    return (
-      <span className="whitespace-nowrap text-destructive">
-        Over by <Money value={line.over} />
-      </span>
-    );
-  }
-  return <Money value={line.left} />;
-}
-
-/** The phone's figure: the draft, or what's left when there's none. */
-function PhoneFigure({ line }: { line: LineFigures }) {
-  if (line.draft > 0) return <Money value={line.draft} />;
-  if (line.left < 0) {
-    return (
-      <span className="whitespace-nowrap text-destructive">
-        Over by <Money value={line.over} />
-      </span>
-    );
-  }
-  return (
-    <span className="whitespace-nowrap text-muted-foreground">
-      <Money value={line.left} /> left
-    </span>
-  );
-}
-
 /**
- * The draft's figure on a line. From lg an input that saves on Enter or leaving it (blank clears, Esc puts the old
- * figure back) and moves down a row on Enter; at tablet width the figure; on a phone the draft, or what's left when
- * there's none, which opens the draft sheet. A rehab marked done shows the figure only.
+ * What's available on a line; below zero "Over by $X" in --destructive, on this figure only. On a phone, while a draw
+ * is being built, a line with an amount in that draw shows it, labelled, since the column for it is hidden there.
  */
-function DraftCell({ line, split, done }: { line: LineFigures; split: boolean; done: boolean }) {
-  const figure = line.draft > 0 ? <Money value={line.draft} /> : <span className="text-muted-foreground">—</span>;
-  const name = `${split && line.unitLabel ? `${line.unitLabel} · ` : ""}${line.name}`;
+function Available({ line, draft }: { line: LineFigures; draft: Draft | null }) {
+  const figure =
+    line.available < 0 ? (
+      <span className="whitespace-nowrap text-destructive">
+        Over by <Money value={over(line)} />
+      </span>
+    ) : (
+      <Money value={line.available} />
+    );
+  if (!draft || line.draft <= 0) return figure;
   return (
     <>
-      {done ? (
-        figure
-      ) : (
-        <span className="max-lg:hidden">
-          {/* Remounts with the saved figure, so what shows is what the page now holds. */}
-          <DraftInput key={`${line.id}:${line.draft}`} line={line} name={name} />
-        </span>
-      )}
-      {!done && <span className="max-sm:hidden lg:hidden">{figure}</span>}
-      {done ? null : (
-        <button type="button" aria-haspopup="dialog" className="-my-2 min-h-12 py-2 text-right sm:hidden">
-          <span className="sr-only">Draft for {name}: </span>
-          <PhoneFigure line={line} />
-        </button>
-      )}
+      <span className="flex flex-col items-end sm:hidden">
+        <Money value={line.draft} />
+        <span className="text-meta text-muted-foreground">Draw {draft.number}</span>
+      </span>
+      <span className="max-sm:hidden">{figure}</span>
     </>
   );
 }
 
-function DraftInput({ line, name }: { line: LineFigures; name: string }) {
+function DraftInput({ line, draft, name }: { line: LineFigures; draft: Draft; name: string }) {
   const start = optionalAmountText(line.draft);
   const [text, setText] = useState(start);
   const run = useRun();
@@ -292,7 +320,7 @@ function DraftInput({ line, name }: { line: LineFigures; name: string }) {
         kind="money"
         size="sm"
         align="end"
-        aria-label={`Draft for ${name}`}
+        aria-label={`Draw ${draft.number} for ${name}`}
         className="w-32"
         value={text}
         onChange={(next) => {
@@ -309,24 +337,90 @@ function DraftInput({ line, name }: { line: LineFigures; name: string }) {
   );
 }
 
-/** Mark sent: the day (today unless picked) and the draft's total go to the lender; Undo takes it back to a draft. */
-function MarkSent({ rehabId, number, total, today }: { rehabId: string; number: number; total: number; today: Ymd }) {
-  const [day, setDay] = useState<Ymd>(today);
-  const run = useRun();
+/**
+ * Under the table while a draw is being built: its total, Cancel and Send to lender together at the bottom right, as
+ * QuickBooks' invoice and Airwallex's payment pages set their actions (Mobbin). Send opens a short confirm with the
+ * amount, the lender and the day it went (today unless changed), the way Mercury's and Melio's reviews ask before
+ * money moves. Cancel asks first once the draw has amounts. Send toasts what was recorded, with Undo.
+ */
+function DrawFooter({ rehabId, draft, total, lender, today }: { rehabId: string; draft: Draft; total: number; lender: string | null; today: Ymd }) {
+  const [confirming, setConfirming] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const cancel = useRun();
 
-  function send() {
-    run.run(() => sendDraftAction(rehabId, day), {
+  function cancelIt() {
+    cancel.run(() => deleteDrawAction(draft.id), {
+      succeeded: () => setAsking(false),
+      failed: () => setAsking(false),
+      done: `Draw ${draft.number} cancelled`,
+      key: `rehab:${rehabId}:send`,
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-end">
+      <span className="min-w-0 truncate text-body text-foreground">
+        Draw {draft.number} · <Money value={total} />
+      </span>
+      <div className="flex items-center gap-3">
+        <Button variant="secondary" pending={cancel.pending} onClick={() => (total > 0 ? setAsking(true) : cancelIt())}>
+          Cancel
+        </Button>
+        <Button variant="primary" disabled={total <= 0} onClick={() => setConfirming(true)}>
+          Send to lender
+        </Button>
+      </div>
+      {confirming && <SendSheet rehabId={rehabId} draft={draft} total={total} lender={lender} today={today} onOpenChange={setConfirming} />}
+      {asking && (
+        <ConfirmDialog
+          title={`Cancel draw ${draft.number}?`}
+          body="Its amounts are cleared."
+          onClose={() => !cancel.pending && setAsking(false)}
+          cancelLabel="Keep it"
+          busy={cancel.pending}
+          actions={
+            <Button variant="destructive" size="sm" disabled={cancel.pending} onClick={cancelIt}>
+              Cancel draw
+            </Button>
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+/** Send to lender's confirm: the draw's amount and lender, and the day it was sent. */
+function SendSheet({
+  rehabId,
+  draft,
+  total,
+  lender,
+  today,
+  onOpenChange,
+}: {
+  rehabId: string;
+  draft: Draft;
+  total: number;
+  lender: string | null;
+  today: Ymd;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [day, setDay] = useState<Ymd>(today);
+  const send = useRun();
+
+  function submit() {
+    send.run(() => sendDraftAction(rehabId, day), {
+      failure: "inline",
       succeeded: (data) => {
-        // What the server recorded as sent, not the total on screen when the button was pressed.
-        const sent = (data as { sentAmount?: number }).sentAmount ?? total;
-        run.toast({
-          message: `Draw ${number} sent · ${fmtCents(sent)}`,
+        onOpenChange(false);
+        send.toast({
+          message: `Draw ${draft.number} sent · ${fmtCents(data.sentAmount)}`,
           key: `rehab:${rehabId}:send`,
           action: {
             label: "Undo",
             onAction: async () => {
               const r = await callAction(() => unsendDrawAction(data.drawId));
-              if (!r.ok) run.toast({ message: r.error });
+              if (!r.ok) send.toast({ message: r.error });
             },
           },
         });
@@ -335,11 +429,26 @@ function MarkSent({ rehabId, number, total, today }: { rehabId: string; number: 
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-      <DatePicker variant="chip" label="Sent on" prefix={<span>Sent</span>} today={today} allowNone={false} value={day} onChange={(v) => setDay(v ?? today)} />
-      <Button variant="primary" pending={run.pending} onClick={send}>
-        Mark sent
-      </Button>
-    </div>
+    <FormSheet
+      title={`Send draw ${draft.number}`}
+      isOpen
+      onOpenChange={onOpenChange}
+      onSubmit={submit}
+      primary="Send"
+      pending={send.pending}
+      values={day}
+      discardTitle="Close without sending?"
+      leaveTitle="Leave without sending?"
+      error={send.error}
+      fieldErrors={send.fieldErrors}
+    >
+      <p className="text-body text-foreground">
+        <Money value={total} />
+        {lender ? ` to ${lender}` : ""}
+      </p>
+      <FormField label="Sent on" error={send.fieldErrors?.sentOn}>
+        {() => <DatePicker variant="field" label="Sent on" today={today} allowNone={false} value={day} onChange={(v) => setDay(v ?? today)} />}
+      </FormField>
+    </FormSheet>
   );
 }

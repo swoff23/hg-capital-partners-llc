@@ -9,7 +9,7 @@ import { Section } from "@/components/ui";
  * are --muted blocks.
  */
 export default function RehabLoading() {
-  const labels = ["Holdback", "Funded", "Submitted", "Ready", "Left"];
+  const labels = ["Holdback", "Funded", "Submitted", "Available"];
   return (
     <LoadingScreen
       className={
@@ -34,7 +34,7 @@ export default function RehabLoading() {
         />
         <FactStrip
           className="sm:hidden"
-          facts={labels.slice(3).map((label) => ({ label, value: <Block inline className="h-5 w-24 max-w-full" /> }))}
+          facts={["Available", "Submitted"].map((label) => ({ label, value: <Block inline className="h-5 w-24 max-w-full" /> }))}
         />
       </div>
 

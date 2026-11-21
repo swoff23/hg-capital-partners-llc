@@ -4,7 +4,7 @@ import { ymdToDate, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { ensureUnitIds, rentableUnits } from "@/lib/tenants/core";
 import { fmtMoney } from "@/lib/utils";
-import { STAGE_LABEL, atLender, nextNumber } from "./figures";
+import { NEXT_STAGE, nextNumber } from "./figures";
 import type { WorksheetRead } from "./worksheet";
 
 /**
@@ -399,6 +399,21 @@ export async function setDraftAmount(db: Db, lineId: string, amount: number | nu
   });
 }
 
+/**
+ * New draw (Connor, Nov 20): opens the next draw for Pieter to fill in line by line, or hands back the one already
+ * being built. Nothing else is asked; Cancel deletes it.
+ */
+export async function startDraft(db: Db, rehabId: string): Promise<{ drawId: string; number: number }> {
+  return db.$transaction(async (tx) => {
+    await openRehab(tx, rehabId);
+    const open = await tx.draw.findFirst({ where: { rehabId, stage: "DRAFT" }, select: { id: true, number: true } });
+    if (open) return { drawId: open.id, number: open.number };
+    const numbers = await tx.draw.findMany({ where: { rehabId }, select: { number: true } });
+    const d = await tx.draw.create({ data: { rehabId, number: nextNumber(numbers) }, select: { id: true, number: true } });
+    return { drawId: d.id, number: d.number };
+  });
+}
+
 /** Marks the draft sent (R4): it records the day and the draft's total as the amount sent. */
 export async function sendDraft(db: Db, rehabId: string, sentOn: Ymd): Promise<{ drawId: string; number: number; sentAmount: number }> {
   return db.$transaction(async (tx) => {
@@ -437,12 +452,10 @@ export interface DrawPatch {
   approvedAmount?: number | null;
   fundedOn?: Ymd | null;
   fundedAmount?: number | null;
-  waitingOnUs?: boolean;
-  waitingNote?: string | null;
 }
 
 /**
- * A sent draw's stage, dates, amounts and Waiting on us flag (R4, R5). Moving
+ * A sent draw's stage, dates and amounts (R4, R5). Moving
  * to Approved needs the approved amount and to Funded what landed, each with
  * its day (today unless picked). A move resets its days-in-stage count; the
  * flag doesn't. Funded clears the flag.
@@ -473,17 +486,82 @@ export async function updateDraw(db: Db, drawId: string, patch: DrawPatch, today
       ...(patch.approvedAmount !== undefined ? { approvedAmount: approved == null ? null : money(approved) } : {}),
       ...(patch.fundedOn !== undefined ? { fundedOn: day(patch.fundedOn) } : {}),
       ...(patch.fundedAmount !== undefined ? { fundedAmount: funded == null ? null : money(funded) } : {}),
-      ...(patch.waitingOnUs !== undefined ? { waitingOnUs: patch.waitingOnUs } : {}),
-      ...(patch.waitingNote !== undefined ? { waitingNote: patch.waitingNote?.trim() || null } : {}),
     };
     if (moved && (stage === "APPROVED" || stage === "FUNDED") && d.approvedOn == null && patch.approvedOn === undefined) data.approvedOn = ymdToDate(today);
     if (moved && stage === "FUNDED" && d.fundedOn == null && patch.fundedOn === undefined) data.fundedOn = ymdToDate(today);
-    if (patch.waitingOnUs === true && !atLender(stage)) {
-      throw new FieldError({ waitingOnUs: `A draw that's ${STAGE_LABEL[stage].toLowerCase()} isn't waiting on anyone.` });
-    }
-    if (stage === "FUNDED") data.waitingOnUs = false;
     await tx.draw.update({ where: { id: drawId }, data });
     return { rehabId: d.rehabId, stage };
+  });
+}
+
+/** What a stage move changes, so Undo can put it back exactly, days-in-stage count included. */
+export interface StageSnapshot {
+  stage: DrawStage;
+  stageChangedAt: string;
+  approvedOn: string | null;
+  approvedAmount: number | null;
+  fundedOn: string | null;
+  fundedAmount: number | null;
+}
+
+/**
+ * The next-step button (Connor, Nov 20): moves a sent draw one stage on. Inspection needs nothing; Approved takes
+ * the approved amount and Funded what landed, each dated today. Returns what it was, for Undo.
+ */
+export async function advanceDraw(
+  db: Db,
+  drawId: string,
+  amount: number | null,
+  today: Ymd,
+): Promise<{ rehabId: string; number: number; stage: DrawStage; amount: number | null; before: StageSnapshot }> {
+  return db.$transaction(async (tx) => {
+    const d = await tx.draw.findUnique({ where: { id: drawId } });
+    if (!d) throw new FieldError({ draw: NOT_FOUND });
+    await openRehab(tx, d.rehabId);
+    const next = NEXT_STAGE[d.stage];
+    if (!next) throw new FieldError({ draw: d.stage === "DRAFT" ? "Mark the draft sent first." : "This draw is already funded." });
+    if (next === "APPROVED" && amount == null) throw new FieldError({ amount: APPROVED_NEEDED });
+    if (next === "FUNDED" && amount == null) throw new FieldError({ amount: FUNDED_NEEDED });
+    const before: StageSnapshot = {
+      stage: d.stage,
+      stageChangedAt: d.stageChangedAt.toISOString(),
+      approvedOn: d.approvedOn?.toISOString() ?? null,
+      approvedAmount: d.approvedAmount == null ? null : Number(d.approvedAmount),
+      fundedOn: d.fundedOn?.toISOString() ?? null,
+      fundedAmount: d.fundedAmount == null ? null : Number(d.fundedAmount),
+    };
+    await tx.draw.update({
+      where: { id: drawId },
+      data: {
+        stage: next,
+        stageChangedAt: new Date(),
+        ...(next === "APPROVED" ? { approvedAmount: money(amount!), approvedOn: ymdToDate(today) } : {}),
+        ...(next === "FUNDED" ? { fundedAmount: money(amount!), fundedOn: ymdToDate(today) } : {}),
+      },
+    });
+    return { rehabId: d.rehabId, number: d.number, stage: next, amount, before };
+  });
+}
+
+/** Undo of a next-step move: the draw's stage, its day count and what the move set, as they were. */
+export async function restoreDrawStage(db: Db, drawId: string, before: StageSnapshot): Promise<{ rehabId: string }> {
+  return db.$transaction(async (tx) => {
+    const d = await tx.draw.findUnique({ where: { id: drawId }, select: { rehabId: true, stage: true } });
+    if (!d) throw new FieldError({ draw: NOT_FOUND });
+    await openRehab(tx, d.rehabId);
+    if (before.stage === "DRAFT") throw new FieldError({ draw: "Mark the draft sent first." });
+    await tx.draw.update({
+      where: { id: drawId },
+      data: {
+        stage: before.stage,
+        stageChangedAt: new Date(before.stageChangedAt),
+        approvedOn: before.approvedOn ? new Date(before.approvedOn) : null,
+        approvedAmount: before.approvedAmount == null ? null : money(before.approvedAmount),
+        fundedOn: before.fundedOn ? new Date(before.fundedOn) : null,
+        fundedAmount: before.fundedAmount == null ? null : money(before.fundedAmount),
+      },
+    });
+    return { rehabId: d.rehabId };
   });
 }
 

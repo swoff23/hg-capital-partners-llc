@@ -9,15 +9,17 @@ import { setDraftAmountAction } from "../actions";
 import { optionalAmountText } from "../format";
 
 /**
- * A phone's tap on a budget line: a small sheet with only the draft amount, which is what's typed there. "Edit line"
+ * A phone's tap on a budget line while a draw is being built: a small sheet with only that draw's amount, which is what's typed there. "Edit line"
  * goes on to the full Line sheet (name, unit, budget, delete).
  */
 export function DraftSheet({
+  drawNumber,
   line,
   isOpen,
   onOpenChange,
   onEditLine,
 }: {
+  drawNumber: number;
   line: LineFigures;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,11 +46,11 @@ export function DraftSheet({
   const error = problem ?? run.fieldErrors?.draft;
   return (
     <FormSheet
-      title={line.unitLabel ? `${line.unitLabel} · ${line.name}` : line.name}
+      title={`Draw ${drawNumber} · ${line.unitLabel ? `${line.unitLabel} · ` : ""}${line.name}`}
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       onSubmit={submit}
-      primary="Save draft"
+      primary="Save"
       pending={run.pending}
       values={text}
       discardTitle="Discard this draft amount?"
@@ -56,7 +58,7 @@ export function DraftSheet({
       error={run.fieldErrors?.draft ? undefined : run.error}
       fieldErrors={run.fieldErrors}
     >
-      <FormField label="Draft" error={error}>
+      <FormField label={`Draw ${drawNumber}`} error={error}>
         {(p) => (
           <NumberInput
             kind="money"

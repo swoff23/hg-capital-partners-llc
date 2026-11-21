@@ -1432,7 +1432,7 @@ enum RehabSource {
   WORKSHEET // read from the lender's Renovation Draw Worksheet
 }
 
-// A draw's stages, in order (R4). Waiting on us is a flag beside them, not a stage.
+// A draw's stages, in order (R4).
 enum DrawStage {
   DRAFT
   SENT
@@ -1499,7 +1499,7 @@ model Draw {
   rehabId        String
   number         Int
   stage          DrawStage  @default(DRAFT)
-  // When it last moved, for "6 days" and Needs you's no change in 10 days. Waiting on us doesn't move it.
+  // When it last moved, for "6 days" and Needs you's no change in 10 days.
   stageChangedAt DateTime   @default(now())
   // Calendar days (UTC midnight of a Buffalo day), and what each stage recorded.
   sentOn         DateTime?
@@ -1508,9 +1508,6 @@ model Draw {
   approvedAmount Decimal?   @db.Decimal(12, 2)
   fundedOn       DateTime?
   fundedAmount   Decimal?   @db.Decimal(12, 2) // what landed, after the lender's fee
-  // The lender is waiting on HG Capital (a lien waiver, an invoice). Any stage after Draft.
-  waitingOnUs    Boolean    @default(false)
-  waitingNote    String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   lines          DrawLine[]

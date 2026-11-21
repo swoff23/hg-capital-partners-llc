@@ -98,8 +98,6 @@ function toRecord(r: Raw): RehabRecord {
       approvedAmount: num(d.approvedAmount),
       fundedOn: d.fundedOn,
       fundedAmount: num(d.fundedAmount),
-      waitingOnUs: d.waitingOnUs,
-      waitingNote: d.waitingNote,
       lines: d.lines.map((l) => ({ lineId: l.lineId, amount: num(l.amount) ?? 0 })),
     })),
   };

@@ -19,7 +19,7 @@ function revalidateRehab(rehabId?: string): void {
   revalidatePath("/");
 }
 
-export type { By, DrawPatch, LineInput, LineSnapshot, NewRehab, RehabPatch, UnitPick } from "./core";
+export type { By, DrawPatch, LineInput, LineSnapshot, NewRehab, RehabPatch, StageSnapshot, UnitPick } from "./core";
 
 export async function createRehab(input: core.NewRehab, by: core.By): Promise<{ id: string }> {
   const r = await core.createRehab(prisma, input, by);
@@ -100,3 +100,21 @@ export async function deleteDraw(drawId: string): Promise<void> {
   const { rehabId } = await core.deleteDraw(prisma, drawId);
   revalidateRehab(rehabId);
 }
+
+export async function advanceDraw(drawId: string, amount: number | null, today: Ymd): ReturnType<typeof core.advanceDraw> {
+  const r = await core.advanceDraw(prisma, drawId, amount, today);
+  revalidateRehab(r.rehabId);
+  return r;
+}
+
+export async function restoreDrawStage(drawId: string, before: core.StageSnapshot): Promise<void> {
+  const { rehabId } = await core.restoreDrawStage(prisma, drawId, before);
+  revalidateRehab(rehabId);
+}
+
+export async function startDraft(rehabId: string): Promise<{ drawId: string; number: number }> {
+  const r = await core.startDraft(prisma, rehabId);
+  revalidateRehab(rehabId);
+  return r;
+}
+

@@ -1,14 +1,15 @@
 import { requireUser } from "@/lib/auth";
 import { todayYmdEastern } from "@/lib/dates";
-import { currentDraw, lineFigures, portfolioDraws, rehabFigures } from "@/lib/draws/figures";
+import { currentDraw, drawAmount, lineFigures, portfolioDraws, rehabFigures } from "@/lib/draws/figures";
 import { doneCount, listRehabs, rehabPropertyOptions } from "@/lib/draws/queries";
 import { FactStrip } from "@/components/fact-strip";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
-import { EmptyState, PageHeader, RowCell, Table, Th, pendingRowFill } from "@/components/ui";
+import { EmptyState, PageHeader, RowCell, Table, Td, Th, pendingRowFill } from "@/components/ui";
 import { cn, fmtMoney } from "@/lib/utils";
 import { CurrentDraw } from "../current-draw";
 import { NewRehabButton } from "../new-rehab";
+import { NextStep } from "../next-step";
 import { ViewSwitch } from "../view-switch";
 import type { Metadata } from "next";
 
@@ -49,10 +50,9 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
       {view === "open" && open.length > 0 && (
         <FactStrip
           facts={[
-            { label: "Ready to draw", value: <Money value={totals.ready} /> },
+            { label: "Available", value: <Money value={totals.available} /> },
             { label: "Submitted", value: <Money value={totals.atLender} /> },
             { label: "Funded", value: <Money value={totals.funded} /> },
-            { label: "Left", value: <Money value={totals.left} /> },
           ]}
         />
       )}
@@ -68,13 +68,16 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
               <Th className="pl-0">Rehab</Th>
               <Th className="max-sm:hidden">Current draw</Th>
               <Th numeric className="max-sm:hidden">
-                Ready
+                Requested
               </Th>
               <Th numeric className="max-sm:hidden">
-                Left
+                Available
               </Th>
               <Th numeric className="max-lg:hidden">
                 Funded
+              </Th>
+              <Th className="max-sm:hidden">
+                <span className="sr-only">Next step</span>
               </Th>
             </tr>
           </thead>
@@ -88,6 +91,12 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
                       <span className="block truncate text-body text-foreground">{rehab.name}</span>
                       <span className="block truncate text-meta text-muted-foreground sm:hidden">
                         <CurrentDraw draw={current} today={today} />
+                        {current && (
+                          <>
+                            {" · "}
+                            <Money value={current.sentAmount ?? drawAmount(current)} />
+                          </>
+                        )}
                       </span>
                       <Meter
                         className="mt-1.5 sm:hidden"
@@ -102,10 +111,10 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
                     <CurrentDraw draw={current} today={today} />
                   </RowCell>
                   <RowCell href={href} numeric cell="max-sm:hidden">
-                    <Money value={fig.ready} />
+                    {current ? <Money value={current.sentAmount ?? drawAmount(current)} /> : <span className="text-muted-foreground">—</span>}
                   </RowCell>
                   <RowCell href={href} numeric cell="max-sm:hidden">
-                    <Money value={fig.left} />
+                    <Money value={fig.available} />
                   </RowCell>
                   <RowCell href={href} numeric cell="max-lg:hidden">
                     <span className="flex w-36 flex-col items-end gap-1.5">
@@ -113,6 +122,14 @@ export default async function DrawsPage({ searchParams }: PageProps<"/draws">) {
                       <Meter value={fig.funded} max={fig.holdback} label={`${rehab.name} funded`} valueText={fundedWords(fig.funded, fig.holdback)} />
                     </span>
                   </RowCell>
+                  {/* Not a link: the button acts on the row's current draw. */}
+                  <Td className="align-middle max-sm:hidden">
+                    {current && (
+                      <NextStep
+                        draw={{ id: current.id, number: current.number, stage: current.stage, sentAmount: current.sentAmount, approvedAmount: current.approvedAmount }}
+                      />
+                    )}
+                  </Td>
                 </tr>
               );
             })}

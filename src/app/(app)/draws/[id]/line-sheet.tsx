@@ -5,15 +5,15 @@ import { NumberInput, numberProblem } from "@/components/number-input";
 import { Select } from "@/components/select";
 import { useRun } from "@/components/use-run";
 import { Button, FieldRow, FormField, Input } from "@/components/ui";
-import type { LineFigures } from "@/lib/draws/figures";
+import { STAGE_LABEL, lineHistory, type DrawIn, type LineFigures } from "@/lib/draws/figures";
 import type { UnitOption } from "@/lib/draws/queries";
-import { addLineAction, deleteLineAction, restoreLineAction, saveLineAction, setDraftAmountAction } from "../actions";
-import { amountText, optionalAmountText } from "../format";
+import { addLineAction, deleteLineAction, restoreLineAction, saveLineAction } from "../actions";
+import { amountText, fmtCents, optionalAmountText } from "../format";
 
 /** The current pick of a line that only has a worksheet's own words for its unit. */
 const WORKSHEET = "__worksheet__";
 
-type Form = { name: string; unit: string; original: string; changeOrder: string; draft: string };
+type Form = { name: string; unit: string; original: string; changeOrder: string };
 
 function startingForm(line: LineFigures | null, units: UnitOption[], unit: string): Form {
   const picked = line ? units.find((u) => u.unitId === line.unitId)?.value : undefined;
@@ -22,18 +22,18 @@ function startingForm(line: LineFigures | null, units: UnitOption[], unit: strin
     unit: line ? (picked ?? (line.unitLabel ? WORKSHEET : "")) : unit,
     original: amountText(line?.original),
     changeOrder: optionalAmountText(line?.changeOrder),
-    draft: optionalAmountText(line?.draft),
   };
 }
 
 /**
- * A budget line in a sheet (docs/specs/rehab-draws.md, L2): its name, unit, original budget, change order and the
- * draft's amount. Empty, it adds a line. On a phone this is where the draft is typed; a line on a draw already sent
- * keeps to its place, so Delete line comes back with the reason.
+ * A budget line in a sheet (docs/specs/rehab-draws.md, L2): its name, unit, original budget and change order, and
+ * when editing, what each draw has taken from it. Empty, it adds a line. A line on a draw already sent keeps to its
+ * place, so Delete line comes back with the reason.
  */
 export function LineSheet({
   rehabId,
   units,
+  draws,
   line,
   unit = "",
   isOpen,
@@ -42,6 +42,8 @@ export function LineSheet({
   rehabId: string;
   /** The rehab's units to pick from; empty hides the field. */
   units: UnitOption[];
+  /** The rehab's draws, for the line's history. */
+  draws: DrawIn[];
   /** The line to edit, or null to add one. */
   line: LineFigures | null;
   /** The unit (a picker value) a new line starts in. */
@@ -66,7 +68,7 @@ export function LineSheet({
   function submit() {
     const found: Record<string, string> = {};
     if (!form.name.trim()) found.name = "Name the line.";
-    for (const k of ["original", "changeOrder", "draft"] as const) {
+    for (const k of ["original", "changeOrder"] as const) {
       const text = form[k];
       // A change order may be negative; the server reads it. Here only the plain money rules.
       const bad = k === "changeOrder" ? null : numberProblem("money", text, { required: k === "original" });
@@ -82,33 +84,27 @@ export function LineSheet({
         onOpenChange(false);
         return;
       }
-      run.run(
-        async () => {
-          const patch = {
-            ...(changed("name") ? { name: form.name.trim() } : {}),
-            ...(changed("unit") ? { unit: form.unit && form.unit !== WORKSHEET ? form.unit : null } : {}),
-            ...(changed("original") ? { original: form.original } : {}),
-            ...(changed("changeOrder") ? { changeOrder: form.changeOrder } : {}),
-          };
-          if (Object.keys(patch).length) {
-            const saved = await saveLineAction(line.id, patch);
-            if (!saved.ok) return saved;
-          }
-          return changed("draft") ? setDraftAmountAction(line.id, form.draft) : { ok: true as const, data: undefined };
-        },
-        { failure: "inline", succeeded: () => onOpenChange(false), done: "Line saved", key: `rehab:${rehabId}:line` },
-      );
+      const patch = {
+        ...(changed("name") ? { name: form.name.trim() } : {}),
+        ...(changed("unit") ? { unit: form.unit && form.unit !== WORKSHEET ? form.unit : null } : {}),
+        ...(changed("original") ? { original: form.original } : {}),
+        ...(changed("changeOrder") ? { changeOrder: form.changeOrder } : {}),
+      };
+      run.run(() => saveLineAction(line.id, patch), {
+        failure: "inline",
+        succeeded: () => onOpenChange(false),
+        done: "Line saved",
+        key: `rehab:${rehabId}:line`,
+      });
       return;
     }
     run.run(
-      // One call: the line and its draft save together, so a refused draft leaves no line behind to duplicate.
       () =>
         addLineAction(rehabId, {
           name: form.name.trim(),
           unit: form.unit && form.unit !== WORKSHEET ? form.unit : null,
           original: form.original,
           changeOrder: form.changeOrder,
-          draft: form.draft.trim() || null,
         }),
       { failure: "inline", succeeded: () => onOpenChange(false), done: "Line added", key: `rehab:${rehabId}:line` },
     );
@@ -129,9 +125,10 @@ export function LineSheet({
     });
   }
 
+  const history = line ? lineHistory(line.id, draws) : [];
   const errors = { ...run.fieldErrors, ...problems };
   // A refusal shows on its field when it has one here, and above the buttons when it has none (the line is on a draw).
-  const onField = Object.keys(errors).some((k) => ["name", "unit", "original", "changeOrder", "draft"].includes(k));
+  const onField = Object.keys(errors).some((k) => ["name", "unit", "original", "changeOrder"].includes(k));
 
   return (
     <FormSheet
@@ -172,9 +169,22 @@ export function LineSheet({
           {(p) => <NumberInput kind="money" {...p} value={form.changeOrder} onChange={(changeOrder) => set({ changeOrder })} />}
         </FormField>
       </FieldRow>
-      <FormField label="Draft" optional error={errors.draft}>
-        {(p) => <NumberInput kind="money" {...p} value={form.draft} onChange={(draft) => set({ draft })} />}
-      </FormField>
+      {line && (
+        <div>
+          <p className="mb-1 text-meta font-medium text-fg-2">Draws</p>
+          {history.length === 0 ? (
+            <p className="text-body text-muted-foreground">Not drawn yet.</p>
+          ) : (
+            <ul className="space-y-0.5 text-body text-foreground">
+              {history.map((h) => (
+                <li key={h.number}>
+                  Draw {h.number} · {STAGE_LABEL[h.stage]} · {fmtCents(h.amount)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {line && (
         <div>
           <Button type="button" variant="danger" size="sm" disabled={run.pending} onClick={remove}>

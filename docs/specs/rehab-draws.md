@@ -13,8 +13,8 @@ Planned with Connor on Nov 20, 2026, one question at a time (R1 to R11 below), a
 - Each rehab holds its **budget line by line**: original, change order, revised, funded, at the lender, draft and left (R1). Lines are grouped by unit when the lender's sheet splits by unit, as on 23 Sherwood (R8).
 - A Vontive rehab starts from an **uploaded Renovation Draw Worksheet**: its lines, change orders and past draws come in whole. Conventus rehabs and new ones are typed in (R7).
 - The **next draw is always open as a draft**. Pieter types amounts on its lines as work wraps up; the draft's total is "ready to draw" (R3).
-- A draw moves through **Draft, Sent, Inspection, Approved and Funded**, with a **Waiting on us** flag and note that can sit on any stage (R4). Pieter moves it by hand (R5).
-- Home's **Needs you** flags a draw waiting on us, a draw with no change in 10 days, and a loan maturing with money not drawn (R11).
+- A draw moves through **Draft, Sent, Inspection, Approved and Funded** (R4), one step at a time with a next-step button. Pieter moves it by hand (R5).
+- Home's **Needs you** flags a draw with no change in 10 days, and a loan maturing with money not drawn (R11).
 - Tasks don't connect to budget lines in the MVP (R9). Costs, tasks and forwarded emails come after it (section 8).
 
 ## 2. Decisions
@@ -24,14 +24,14 @@ Planned with Connor on Nov 20, 2026, one question at a time (R1 to R11 below), a
 | R1 | The budget is kept line by line, the way Vontive's worksheet keeps it: original, change order and revised per line, and each draw's amount per line. Totals only couldn't say which lines still have money |
 | R2 | One Draws page summarizes every open rehab (how much can be pulled, what's coming), and each rehab opens to its own progress and over or under. Connor: "an entire draws page where I can see all draws and everything going on as a summary" |
 | R3 | MVP: no payments or costs. The next draw stays open as a running draft that Pieter fills in as work wraps up, like Vontive's next column today. Its total is ready to draw. Over or under in the MVP compares funded, at the lender and draft against the revised budget per line; true spend comes with costs later |
-| R4 | Five stages: Draft, Sent (date, amount sent), Inspection, Approved (approved amount), Funded (date, amount that landed). A Waiting on us flag with a short note can sit on any stage after Draft. Each draw shows its days in the current stage |
+| R4 | Five stages: Draft, Sent (date, amount sent), Inspection, Approved (approved amount), Funded (date, amount that landed). A Waiting on us flag with a short note can sit on any stage after Draft. Each draw shows its days in the current stage. (Nov 20: the Waiting on us flag was removed; see section 10.) |
 | R5 | Pieter moves stages by hand in the MVP. Forwarding lender emails to a draws@ address that suggests the next stage is the first add-on. Reading Pieter's Gmail directly is out |
 | R6 | One rehab per loan. A rehab links one or more properties and shows on each of their pages |
 | R7 | A Vontive rehab is set up by uploading its Renovation Draw Worksheet (.xlsx): lines, change orders, the rehab holdback and every past draw. Anything else is typed: line name, original and change order. The upload happens once, at setup; after that the app is the record |
 | R8 | When the lender splits the budget by unit, lines are grouped under each unit with its own totals, and the draft is filled per unit. A rehab without a split shows a plain list |
 | R9 | Tasks stay out of the MVP. Linking them to lines gives a hint ("2 of 3 done") but no dollars, since tasks carry no cost |
 | R10 | Draws is its own sidebar item, right after Portfolio (and in the phone drawer). Not a Financials tab: Financials reads QuickBooks and draws don't |
-| R11 | Needs you gets three draw flags: a draw Waiting on us, a draw in Sent, Inspection or Approved with no change in 10 days, and a loan maturing with holdback not yet drawn (the existing loan maturity row gains the undrawn amount). A ready draft doesn't flag |
+| R11 | Needs you gets three draw flags: a draw Waiting on us, a draw in Sent, Inspection or Approved with no change in 10 days, and a loan maturing with holdback not yet drawn (the existing loan maturity row gains the undrawn amount). A ready draft doesn't flag. (Nov 20: the Waiting on us flag was removed; stuck and maturity remain.) |
 
 **Defaults taken with the summary (Connor, Nov 20: "Yes, save the spec").**
 
@@ -85,7 +85,7 @@ Planning-level sketch; the build settles names and indexes (Opus for the schema 
 - **Rehab**: name ("765 and 767 Prospect"), lender, holdback, status (open or done) with done date, notes, how it started (upload or typed), who changed it last.
 - **RehabProperty**: links a rehab to each property it covers.
 - **RehabLine**: rehab, position, unit (the property unit's lasting id, picked from the rehab's properties' units, and its label when set; a worksheet's "Unit 1" that wasn't matched keeps its words), name, original, change order.
-- **Draw**: rehab, number, stage, stage changed at, sent at and amount, approved at and amount, funded at and amount, waiting on us with its note. One open Draft per rehab at most. Imported past draws arrive as Funded with no dates; Pieter can add them.
+- **Draw**: rehab, number, stage, stage changed at, sent at and amount, approved at and amount, funded at and amount. One open Draft per rehab at most. Imported past draws arrive as Funded with no dates; Pieter can add them.
 - **DrawLine**: draw, line, amount.
 
 Amounts are `Decimal(12, 2)`. `Property.rehabAmount` stays dormant; the rehab's lines replace it.
@@ -108,7 +108,7 @@ Picked with Connor on Nov 20, one at a time, each drawn as low-fi options at lap
 - **Property page.** The Rehab section keeps its place after Tasks at every size, so it's second on a phone.
 - **New rehab.** The sheet is Sheet's own: a centered dialog from md, a bottom sheet below it. On a phone the upload opens the Files app, so a worksheet saved from email works.
 
-**Color and charts.** No stacked bars: docs/specs/charts.md 2.9, ruling 1, allows no stacked categories and puts comparisons across properties in tables. Progress is the stock `Meter` (funded of the holdback, `--chart-1`). A line past its budget shows "Over by $X" in `--destructive` on that figure only, as charts.md plans for budget against actual. Stages are words, not colored chips, so they never echo the task `StatusMark` tones; only Waiting on us takes the warning color.
+**Color and charts.** No stacked bars: docs/specs/charts.md 2.9, ruling 1, allows no stacked categories and puts comparisons across properties in tables. Progress is the stock `Meter` (funded of the holdback, `--chart-1`). A line past its budget shows "Over by $X" in `--destructive` on that figure only, as charts.md plans for budget against actual. Stages are words, not colored chips, so they never echo the task `StatusMark` tones.
 
 Mobbin references behind the picks:
 
@@ -164,6 +164,17 @@ Connor's calls during the build, all in the code:
 - **The Details rail** is Lender, Holdback and Properties.
 - **Rows** take the app's usual table hover on a laptop, and a whole budget row opens its line (the draft input aside).
 - **Table padding**: the first and last columns sit inset from the row edge, as the app's other tables do.
+
+**Ready is gone (Connor, Nov 20, after seeing it built).** A standing "ready to draw" total read as if the app knew what could be drawn; it only knew what Pieter had typed. The real workflow: Connor says money is running low, Pieter checks each rehab's lines for what's been drawn and what's left, builds a request and sends it. So:
+
+- **Available** replaces Ready and Left: revised less funded and submitted, per line, per rehab and across every open rehab. The Draws strip is Available, Submitted, Funded.
+- **New draw** on a rehab opens the next draw (no running draft between draws). While it's open, the budget gets a "Draw N" column to fill in line by line, each capped at the line's Available, with Cancel and Send to lender under it. Otherwise the budget has no draft column.
+- **Each line's history**: its sheet lists what every sent draw took from it ("Draw 1 · Funded · $8,000"), so a line isn't drawn twice. Vontive's worksheet and Conventus's approvals both work line by line.
+- **Next-step button** (option A): an open draw's row has "Mark inspection", "Mark approved" or "Mark funded". Inspection is one tap; Approved and Funded ask for the amount, filled in from the step before. Each has Undo. It's on the rehab's Draws rows and in the Draws list's last column (laptop and tablet).
+- The Draws list moved into the rehab page's right column, under Details.
+- **Waiting on us is gone** (Connor: "get rid of the whole waiting on us toggle/feature"). No switch or note on a draw, no amber label, no Needs you row for it; a draw that sits shows as stuck after 10 days. Migration 20261120140000_drop_draw_waiting drops the two columns.
+- **The draw being built's footer** sits at the bottom right: its total, Cancel and Send to lender, as QuickBooks' invoice and Airwallex's payment pages set their actions ([QuickBooks](https://mobbin.com/screens/8c6e5809-f27c-403e-8055-5007b16d5b81), [Airwallex](https://mobbin.com/screens/8127491a-6e62-492e-bac5-5c6d59840c5a)). Send opens a short confirm with the amount, the lender and the day it went (today unless changed), the way Mercury's and Melio's reviews ask before money moves ([Mercury](https://mobbin.com/screens/cd2dc4bc-de9e-447e-93bf-c12e92c2f2dc), [Melio](https://mobbin.com/screens/7382bfe2-2bbe-4353-8546-5319faec7cea)). On a phone the total sits on its own line above the two buttons.
+- **Requested** on the Draws list: each rehab's current draw's requested amount, beside Current draw.
 
 The device check's setup seeds one small open rehab when a local DB has none, so /draws/[id] always has a page.
 

@@ -21,7 +21,7 @@ export default function DrawsLoading() {
       />
       <div className="mb-4 h-8 w-40 bg-muted pointer-coarse:h-11" aria-hidden="true" />
       <FactStrip
-        facts={["Ready to draw", "Submitted", "Funded", "Left"].map((label) => ({
+        facts={["Available", "Submitted", "Funded"].map((label) => ({
           label,
           value: <Block inline className="h-5 w-24 max-w-full" />,
         }))}
@@ -32,13 +32,16 @@ export default function DrawsLoading() {
             <Th className="pl-0">Rehab</Th>
             <Th className="max-sm:hidden">Current draw</Th>
             <Th numeric className="max-sm:hidden">
-              Ready
+              Requested
             </Th>
             <Th numeric className="max-sm:hidden">
-              Left
+              Available
             </Th>
             <Th numeric className="max-lg:hidden">
               Funded
+            </Th>
+            <Th className="max-sm:hidden">
+              <span className="sr-only">Next step</span>
             </Th>
           </tr>
         </thead>
@@ -68,6 +71,11 @@ export default function DrawsLoading() {
               <td className="p-0 align-middle max-lg:hidden">
                 <div className="flex min-h-14 items-center justify-end px-3 pointer-coarse:min-h-15">
                   <Block text="text-body" className="w-36" />
+                </div>
+              </td>
+              <td className="p-0 align-middle max-sm:hidden">
+                <div className="flex min-h-14 items-center px-3 pointer-coarse:min-h-15">
+                  <Block className="h-8 w-28" />
                 </div>
               </td>
             </tr>

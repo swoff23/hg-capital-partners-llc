@@ -13,7 +13,7 @@ import { MoreMenu } from "./more-menu";
  * 320px rail from lg with Details, then Draws (Connor, Nov 20: Draws "into right column"). The rail scrolls with
  * the page, since a long list of draws would run past a sticky one; below lg it stacks under the Budget. Back and, once it's marked
  * done, "Done" and the day sit on the first row with the ⋯, the name on its own line below, then the figures. The
- * phone's figures are Ready and Left.
+ * phone's figures are Available and Submitted.
  */
 export function RehabView({
   rehabId,
@@ -71,15 +71,14 @@ export function RehabView({
             { label: "Holdback", value: <Money value={fig.holdback} /> },
             { label: "Funded", value: <Money value={fig.funded} /> },
             { label: "Submitted", value: <Money value={fig.atLender} /> },
-            { label: "Ready", value: <Money value={fig.ready} /> },
-            { label: "Left", value: <Money value={fig.left} /> },
+            { label: "Available", value: <Money value={fig.available} /> },
           ]}
         />
         <FactStrip
           className="sm:hidden"
           facts={[
-            { label: "Ready", value: <Money value={fig.ready} /> },
-            { label: "Left", value: <Money value={fig.left} /> },
+            { label: "Available", value: <Money value={fig.available} /> },
+            { label: "Submitted", value: <Money value={fig.atLender} /> },
           ]}
         />
         {gap != null && (

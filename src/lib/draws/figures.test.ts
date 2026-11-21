@@ -7,6 +7,7 @@ import {
   drawLine,
   isStuck,
   lineFigures,
+  lineHistory,
   nextNumber,
   openDraft,
   portfolioDraws,
@@ -35,8 +36,6 @@ const draw = (over: Partial<DrawIn> & Pick<DrawIn, "number" | "stage" | "lines">
   approvedAmount: null,
   fundedOn: null,
   fundedAmount: null,
-  waitingOnUs: false,
-  waitingNote: null,
   ...over,
 });
 
@@ -68,6 +67,7 @@ test("the rehab: holdback, at the lender by draw, ready from the draft, undrawn"
     funded: 6000,
     atLender: 7000,
     ready: 3200.25,
+    available: 3500.45,
     left: 300.2,
     undrawn: 10500.45,
     holdbackGap: 0,
@@ -115,12 +115,11 @@ test("the draft, the draw longest with the lender, and the next number", () => {
   assert.equal(nextNumber([]), 1);
 });
 
-test("days in a stage count Buffalo days, and 10 without a move is stuck unless it's waiting on us", () => {
+test("days in a stage count Buffalo days, and 10 without a move is stuck", () => {
   const d = draw({ number: 2, stage: "SENT", lines: [], stageChangedAt: "2026-11-06T03:00:00Z" }); // Nov 5 in Buffalo
   assert.equal(daysInStage(d, "2026-11-14"), 9);
   assert.equal(isStuck(d, "2026-11-14"), false);
   assert.equal(isStuck(d, "2026-11-15"), true);
-  assert.equal(isStuck({ ...d, waitingOnUs: true }, "2026-11-20"), false);
   assert.equal(isStuck({ ...d, stage: "FUNDED" }, "2026-11-20"), false);
 });
 
@@ -128,7 +127,6 @@ test("the current draw's words", () => {
   const d = draw({ number: 4, stage: "INSPECTION", lines: [], stageChangedAt: "2026-11-14T15:00:00Z" });
   assert.equal(drawLine(d, "2026-11-20"), "Draw 4 · Inspection · 6 days");
   assert.equal(drawLine({ ...d, stageChangedAt: "2026-11-19T15:00:00Z" }, "2026-11-20"), "Draw 4 · Inspection · 1 day");
-  assert.equal(drawLine({ ...d, waitingOnUs: true }, "2026-11-20"), "Draw 4 · Waiting on us");
   assert.equal(drawLine(null), null);
 });
 
@@ -139,5 +137,19 @@ test("the fee is approved less funded, once both are known", () => {
 
 test("the Draws strip adds every open rehab to the cent", () => {
   const a = rehabFigures(null, lineFigures(LINES, DRAWS), DRAWS);
-  assert.deepEqual(portfolioDraws([a, a]), { ready: 6400.5, atLender: 14000, funded: 12000, left: 600.4 });
+  assert.deepEqual(portfolioDraws([a, a]), { available: 7000.9, atLender: 14000, funded: 12000 });
 });
+
+test("a line's available is revised less funded and submitted; the draw being built doesn't count yet", () => {
+  const f = lineFigures(LINES, DRAWS);
+  assert.deepEqual(f.map((l) => [l.id, l.available]), [["demo", 0], ["plumbing", 2000], ["contingency", 0], ["appliances", 1500.45]]);
+});
+
+test("a line's history lists what each sent draw took from it, oldest first, without the draft", () => {
+  assert.deepEqual(lineHistory("demo", DRAWS), [
+    { number: 1, stage: "FUNDED", amount: 6000 },
+    { number: 2, stage: "INSPECTION", amount: 4000 },
+  ]);
+  assert.deepEqual(lineHistory("appliances", DRAWS), []);
+});
+

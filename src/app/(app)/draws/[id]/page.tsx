@@ -64,7 +64,7 @@ export default async function RehabPage({ params }: { params: Promise<{ id: stri
       }
       draws={<DrawsSection rows={rows} lines={rehab.lines} today={today} done={rehab.doneAt !== null} />}
     >
-      <BudgetSection rehabId={rehab.id} units={rehab.units} groups={unitGroups(lines)} ready={fig.ready} draftNumber={draft?.number ?? null} today={today} done={rehab.doneAt !== null} />
+      <BudgetSection rehabId={rehab.id} units={rehab.units} groups={unitGroups(lines)} draws={rehab.draws} draft={draft ? { id: draft.id, number: draft.number } : null} ready={fig.ready} lender={rehab.lender} today={today} done={rehab.doneAt !== null} />
     </RehabView>
   );
 }

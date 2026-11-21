@@ -46,6 +46,11 @@ export type FormSheetProps = {
    */
   createMore?: { isSelected: boolean; onChange: (isSelected: boolean) => void };
   /**
+   * An action at the footer's left, opposite Cancel and the primary: a record's Delete (Connor, Nov 20, on the
+   * draw sheet: "put delete in bottom left"). On phones it sits beside the primary.
+   */
+  footerStart?: ReactNode;
+  /**
    * The form's values. The sheet compares them with what it opened with, and
    * once they differ, Cancel, X and Esc ask before throwing them away, a
    * backdrop tap does nothing, and in-app links ask first (LeaveGuard).
@@ -129,6 +134,7 @@ export function FormSheet({
   primaryDisabled = false,
   disabledReason,
   createMore,
+  footerStart,
   values,
   dirty: dirtyProp,
   discardTitle = "Discard changes?",
@@ -247,10 +253,11 @@ export function FormSheet({
                   className="mr-auto w-auto max-md:hidden"
                 />
               )}
+              {footerStart && <div className="mr-auto flex min-w-0 items-center">{footerStart}</div>}
               <Button
                 type="button"
                 variant="secondary"
-                className={cn("max-md:hidden", !createMore && "ml-auto")}
+                className={cn("max-md:hidden", !createMore && !footerStart && "ml-auto")}
                 onClick={requestClose}
                 aria-keyshortcuts="Escape"
               >

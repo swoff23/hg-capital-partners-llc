@@ -22,6 +22,12 @@ export const STAGE_LABEL: Record<DrawStage, string> = {
 /** The stages where a draw is with the lender: asked for, not yet in the bank. */
 export const AT_LENDER: readonly DrawStage[] = ["SENT", "INSPECTION", "APPROVED"];
 
+/** The stage a draw moves to next, one step at a time (Connor, Nov 20: "easier to adjust the status ... from stage to stage"). */
+export const NEXT_STAGE: Partial<Record<DrawStage, DrawStage>> = { SENT: "INSPECTION", INSPECTION: "APPROVED", APPROVED: "FUNDED" };
+
+/** The next-step button's words for a draw in each stage. */
+export const NEXT_STEP_LABEL: Partial<Record<DrawStage, string>> = { SENT: "Mark inspection", INSPECTION: "Mark approved", APPROVED: "Mark funded" };
+
 /** A draw that hasn't moved in this many days earns a Needs you row (R11). */
 export const STUCK_DAYS = 10;
 
@@ -52,8 +58,6 @@ export interface DrawIn {
   approvedAmount: number | null;
   fundedOn: Date | string | null;
   fundedAmount: number | null;
-  waitingOnUs: boolean;
-  waitingNote: string | null;
   lines: { lineId: string; amount: number }[];
 }
 
@@ -62,6 +66,11 @@ export interface LineFigures extends LineIn {
   funded: number;
   atLender: number;
   draft: number;
+  /**
+   * What the line can still be drawn on: revised less funded and submitted (Connor, Nov 20: the number Pieter
+   * looks at when it's time for a draw). The draw being built counts against it only when it's sent.
+   */
+  available: number;
   /** Revised less funded, at the lender and draft. Below zero when the line is over. */
   left: number;
   /** How far past its revised budget the line goes; 0 when it isn't over. */
@@ -94,6 +103,7 @@ export function lineFigures(lines: readonly LineIn[], draws: readonly DrawIn[]):
         funded: dollars(row.funded),
         atLender: dollars(row.atLender),
         draft: dollars(row.draft),
+        available: dollars(revised - row.funded - row.atLender),
         left: dollars(left),
         over: dollars(Math.max(0, -left)),
       };
@@ -158,8 +168,10 @@ export interface RehabFigures {
   funded: number;
   /** Draws with the lender, at what they're worth to it (drawAmount). */
   atLender: number;
-  /** The open draft's total: what Pieter can ask for now. */
+  /** The draw being built: its total. */
   ready: number;
+  /** What the rehab can still be drawn on: revised less funded and submitted. */
+  available: number;
   left: number;
   /** Revised less funded: the money the loan still holds back. */
   undrawn: number;
@@ -184,6 +196,7 @@ export function rehabFigures(holdback: number | null, lines: readonly LineFigure
     funded: dollars(funded),
     atLender: dollars(atLenderC),
     ready: dollars(ready),
+    available: dollars(sum((l) => l.available)),
     left: dollars(sum((l) => l.left)),
     undrawn: dollars(revised - funded),
     holdbackGap: gap == null ? null : dollars(gap),
@@ -212,9 +225,9 @@ export function daysInStage(d: Pick<DrawIn, "stageChangedAt">, today: Ymd = toda
   return Math.max(0, Math.round((Date.parse(today) - Date.parse(moved)) / 86_400_000));
 }
 
-/** A draw with the lender that hasn't moved in STUCK_DAYS and isn't already flagged as waiting on us. */
-export function isStuck(d: Pick<DrawIn, "stage" | "stageChangedAt" | "waitingOnUs">, today: Ymd = todayYmdEastern()): boolean {
-  return atLender(d.stage) && !d.waitingOnUs && daysInStage(d, today) >= STUCK_DAYS;
+/** A draw with the lender that hasn't moved in STUCK_DAYS. */
+export function isStuck(d: Pick<DrawIn, "stage" | "stageChangedAt">, today: Ymd = todayYmdEastern()): boolean {
+  return atLender(d.stage) && daysInStage(d, today) >= STUCK_DAYS;
 }
 
 /** "6 days", "1 day", "Today". */
@@ -225,25 +238,41 @@ export function daysLabel(days: number): string {
 
 /**
  * The current draw's cell on Draws and the property page: "Draw 4 · Inspection · 6 days",
- * "Draw 5 · Waiting on us", or null with nothing at the lender.
+ * or null with nothing submitted.
  */
-export function drawLine(d: Pick<DrawIn, "number" | "stage" | "stageChangedAt" | "waitingOnUs"> | null, today: Ymd = todayYmdEastern()): string | null {
+export function drawLine(d: Pick<DrawIn, "number" | "stage" | "stageChangedAt"> | null, today: Ymd = todayYmdEastern()): string | null {
   if (!d) return null;
-  if (d.waitingOnUs) return `Draw ${d.number} · Waiting on us`;
   return `Draw ${d.number} · ${STAGE_LABEL[d.stage]} · ${daysLabel(daysInStage(d, today))}`;
 }
 
 export interface PortfolioDraws {
-  ready: number;
+  available: number;
   atLender: number;
   funded: number;
-  left: number;
 }
 
-/** The Draws page's strip: every open rehab added up (L1). */
+/** The Draws page's strip: every open rehab added up (L1): available, submitted, funded. */
 export function portfolioDraws(rehabs: readonly RehabFigures[]): PortfolioDraws {
   const add = (pick: (r: RehabFigures) => number) => dollars(rehabs.reduce((s, r) => s + cents(pick(r)), 0));
-  return { ready: add((r) => r.ready), atLender: add((r) => r.atLender), funded: add((r) => r.funded), left: add((r) => r.left) };
+  return { available: add((r) => r.available), atLender: add((r) => r.atLender), funded: add((r) => r.funded) };
+}
+
+/** One draw's take on a line, for the line's history: "Draw 1 · $8,000". */
+export interface LineDraw {
+  number: number;
+  stage: DrawStage;
+  amount: number;
+}
+
+/**
+ * What each sent draw took from one line, oldest first (Connor, Nov 20: "associating the work that was done with
+ * previous draws, so Peter realizes ... he can't pull from that again"). The draw being built isn't in it.
+ */
+export function lineHistory(lineId: string, draws: readonly Pick<DrawIn, "number" | "stage" | "lines">[]): LineDraw[] {
+  return draws
+    .filter((d) => d.stage !== "DRAFT")
+    .flatMap((d) => d.lines.filter((a) => a.lineId === lineId && a.amount !== 0).map((a) => ({ number: d.number, stage: d.stage, amount: a.amount })))
+    .sort((a, b) => a.number - b.number);
 }
 
 /** A calendar day as the draw records it, for the forms: "2026-10-22", or null. */

@@ -8,9 +8,8 @@ import { FormSheet } from "@/components/form-sheet";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Money } from "@/components/money";
 import { NumberInput, numberProblem } from "@/components/number-input";
-import { Switch } from "@/components/switch";
 import { useRun } from "@/components/use-run";
-import { Button, FieldRow, FormField, Input, buttonClass } from "@/components/ui";
+import { Button, FieldRow, FormField, buttonClass } from "@/components/ui";
 import { dayOf, drawFee, linesTotal, STAGE_LABEL, type DrawIn, type DrawStage, type LineIn } from "@/lib/draws/figures";
 import { parseAmount } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -29,8 +28,6 @@ type Form = {
   approvedAmount: string;
   fundedOn: string;
   fundedAmount: string;
-  waitingOnUs: boolean;
-  waitingNote: string;
   lines: Record<string, string>;
 };
 
@@ -43,8 +40,6 @@ function startingForm(d: DrawIn): Form {
     approvedAmount: amountText(d.approvedAmount),
     fundedOn: dayOf(d.fundedOn) ?? "",
     fundedAmount: amountText(d.fundedAmount),
-    waitingOnUs: d.waitingOnUs,
-    waitingNote: d.waitingNote ?? "",
     lines: Object.fromEntries(d.lines.map((l) => [l.lineId, optionalAmountText(l.amount)])),
   };
 }
@@ -53,8 +48,8 @@ function startingForm(d: DrawIn): Form {
 const dollars = (text: string): number | null => (text.trim() ? parseAmount(text) : null);
 
 /**
- * A draw in a sheet (docs/specs/rehab-draws.md, L2): its stage, the days and amounts that stage asks for, the Waiting
- * on us flag with a note, and the line amounts. Approved asks for the approved amount and Funded for what landed,
+ * A draw in a sheet (docs/specs/rehab-draws.md, L2): its stage, the days and amounts that stage asks for, and the
+ * line amounts. Approved asks for the approved amount and Funded for what landed,
  * with the lender's fee between them. Pieter moves the stage by hand (R5).
  */
 export function DrawSheet({
@@ -88,7 +83,6 @@ export function DrawSheet({
   const rank = STAGES.indexOf(form.stage);
   const approvedShown = rank >= 2 || form.approvedAmount !== "";
   const fundedShown = rank >= 3;
-  const withLender = form.stage !== "FUNDED";
   const lineRows = lines.filter((l) => l.id in form.lines);
   const lineSum = linesTotal(lineRows.map((l) => ({ amount: dollars(form.lines[l.id]) ?? 0 })));
   const approved = dollars(form.approvedAmount);
@@ -99,7 +93,6 @@ export function DrawSheet({
     // Days the stage asks for start as today, so what's shown is what saves.
     if (STAGES.indexOf(next) >= 2 && !form.approvedOn) patch.approvedOn = today;
     if (next === "FUNDED" && !form.fundedOn) patch.fundedOn = today;
-    if (next === "FUNDED") patch.waitingOnUs = false;
     set(patch);
   }
 
@@ -130,8 +123,6 @@ export function DrawSheet({
       ...(changed("approvedAmount") ? { approvedAmount: form.approvedAmount || null } : {}),
       ...(changed("fundedOn") ? { fundedOn: form.fundedOn || null } : {}),
       ...(changed("fundedAmount") ? { fundedAmount: form.fundedAmount || null } : {}),
-      ...(changed("waitingOnUs") ? { waitingOnUs: form.waitingOnUs } : {}),
-      ...(changed("waitingNote") ? { waitingNote: form.waitingNote.trim() || null } : {}),
     };
     const edited = lineRows.filter((l) => form.lines[l.id] !== initial.lines[l.id]);
     if (Object.keys(patch).length === 0 && edited.length === 0) {
@@ -175,7 +166,7 @@ export function DrawSheet({
   const errors = { ...run.fieldErrors, ...problems };
   // A refusal shows on its field when it has one in this sheet, and above the buttons when it has none.
   const onField = Object.keys(errors).some((k) =>
-    ["stage", "sentOn", "sentAmount", "approvedOn", "approvedAmount", "fundedOn", "fundedAmount", "waitingNote"].includes(k) || k.startsWith("line:"),
+    ["stage", "sentOn", "sentAmount", "approvedOn", "approvedAmount", "fundedOn", "fundedAmount"].includes(k) || k.startsWith("line:"),
   );
 
   return (
@@ -193,6 +184,11 @@ export function DrawSheet({
         error={onField ? undefined : run.error}
         fieldErrors={errors}
         fullHeight
+        footerStart={
+          <Button type="button" variant="danger" disabled={run.pending} onClick={() => setConfirming(true)}>
+            Delete draw
+          </Button>
+        }
       >
         <FormField label="Stage" error={errors.stage}>
           {(p) => (
@@ -262,19 +258,6 @@ export function DrawSheet({
           </>
         )}
 
-        {withLender && (
-          <>
-            <Switch label="Waiting on us" isSelected={form.waitingOnUs} onChange={(waitingOnUs) => set({ waitingOnUs })} />
-            {form.waitingOnUs && (
-              <FormField label="Note" optional error={errors.waitingNote}>
-                {(p) => (
-                  <Input {...p} name="waitingNote" autoComplete="off" value={form.waitingNote} onChange={(e) => set({ waitingNote: e.target.value })} />
-                )}
-              </FormField>
-            )}
-          </>
-        )}
-
         {lineRows.length > 0 && (
           <fieldset className="min-w-0 space-y-2">
             <legend className="mb-1 text-meta font-medium text-fg-2">Lines</legend>
@@ -305,12 +288,6 @@ export function DrawSheet({
             )}
           </fieldset>
         )}
-
-        <div>
-          <Button type="button" variant="danger" size="sm" disabled={run.pending} onClick={() => setConfirming(true)}>
-            Delete draw
-          </Button>
-        </div>
       </FormSheet>
       {confirming && (
         <ConfirmDialog

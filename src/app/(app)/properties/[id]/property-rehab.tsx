@@ -49,7 +49,7 @@ export async function PropertyRehabSection({ propertyId, status }: { propertyId:
           valueText={`${fmtMoney(fig.funded)} funded of ${fmtMoney(fig.holdback)}`}
         />
         <p className="text-meta text-muted-foreground">
-          Ready <Money value={fig.ready} /> · Left <Money value={fig.left} /> of <Money value={fig.holdback} />
+          Available <Money value={fig.available} /> of <Money value={fig.holdback} />
         </p>
       </div>
     </Section>

@@ -137,5 +137,5 @@ Update a row's status when it changes, and move finished items to a short "Done"
 
 ## Done
 
-- **Rehab draw tracker** (Nov 20, `8b29fea`). A Draws page shows ready to draw, submitted, funded and left across every open rehab; each rehab follows its loan, keeps the lender's budget line by line from Vontive's uploaded worksheet or typed lines, holds a running draft, and moves each draw through Sent, Inspection, Approved and Funded. Needs you flags a draw waiting on us or stuck 10 days. Spec: docs/specs/rehab-draws.md.
+- **Rehab draw tracker** (Nov 20, `8b29fea`). A Draws page shows available, submitted and funded across every open rehab, with each one's current draw and its requested amount. Each rehab follows its loan and keeps the lender's budget line by line, from Vontive's uploaded worksheet or typed lines; New draw builds a request line by line, capped at what each line has available, and each draw moves through Sent, Inspection, Approved and Funded with a next-step button. Needs you flags a draw stuck 10 days. Spec: docs/specs/rehab-draws.md.
 - **Shorter activity** (Nov 20, `bc996d0`). Older changes between comments collapse Linear style ("Show 5 updates: assignee, due date and Asana move"), the newest 2 stay in view, and day headings are gone, on the task page, the contractor's job page and the deal log. Spec: docs/specs/activity-collapse.md.

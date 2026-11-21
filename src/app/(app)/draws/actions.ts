@@ -256,13 +256,11 @@ const drawPatch = z
     approvedAmount: raw,
     fundedOn: day,
     fundedAmount: raw,
-    waitingOnUs: z.boolean(),
-    waitingNote: z.string().max(500).nullable(),
   })
   .partial()
   .strict();
 
-/** A sent draw's stage, days, amounts and Waiting on us flag (R4). */
+/** A sent draw's stage, days and amounts (R4). */
 export async function saveDrawAction(drawId: string, patch: z.input<typeof drawPatch>): Promise<ActionResult> {
   return withResult("saveDraw", async () => {
     await requireUser();
@@ -274,8 +272,6 @@ export async function saveDrawAction(drawId: string, patch: z.input<typeof drawP
         ...(p.sentOn !== undefined ? { sentOn: p.sentOn } : {}),
         ...(p.approvedOn !== undefined ? { approvedOn: p.approvedOn } : {}),
         ...(p.fundedOn !== undefined ? { fundedOn: p.fundedOn } : {}),
-        ...(p.waitingOnUs !== undefined ? { waitingOnUs: p.waitingOnUs } : {}),
-        ...(p.waitingNote !== undefined ? { waitingNote: p.waitingNote } : {}),
         ...(p.sentAmount !== undefined ? { sentAmount: amount("sentAmount", p.sentAmount) } : {}),
         ...(p.approvedAmount !== undefined ? { approvedAmount: amount("approvedAmount", p.approvedAmount) } : {}),
         ...(p.fundedAmount !== undefined ? { fundedAmount: amount("fundedAmount", p.fundedAmount) } : {}),
@@ -299,3 +295,45 @@ export async function deleteDrawAction(drawId: string): Promise<ActionResult> {
     await draws.deleteDraw(id.parse(drawId));
   });
 }
+
+/**
+ * The next-step button: one stage on from where the draw is. Approved takes the approved amount and Funded what
+ * landed (the field's text); Inspection takes none. Returns what it was, for Undo.
+ */
+export async function advanceDrawAction(
+  drawId: string,
+  value: string | null,
+): Promise<ActionResult<{ number: number; stage: string; amount: number | null; before: draws.StageSnapshot }>> {
+  return withResult("advanceDraw", async () => {
+    await requireUser();
+    const r = await draws.advanceDraw(id.parse(drawId), amount("amount", raw.parse(value)), todayYmdEastern());
+    return { number: r.number, stage: r.stage, amount: r.amount, before: r.before };
+  });
+}
+
+const stageSnapshot = z
+  .object({
+    stage: z.enum(["SENT", "INSPECTION", "APPROVED", "FUNDED"]),
+    stageChangedAt: z.string().datetime(),
+    approvedOn: z.string().datetime().nullable(),
+    approvedAmount: dollars.nullable(),
+    fundedOn: z.string().datetime().nullable(),
+    fundedAmount: dollars.nullable(),
+  })
+  .strict();
+
+export async function restoreDrawStageAction(drawId: string, before: draws.StageSnapshot): Promise<ActionResult> {
+  return withResult("restoreDrawStage", async () => {
+    await requireUser();
+    await draws.restoreDrawStage(id.parse(drawId), stageSnapshot.parse(before));
+  });
+}
+
+/** New draw: opens the next draw to fill in, or the one already being built. Cancel is deleteDrawAction. */
+export async function startDraftAction(rehabId: string): Promise<ActionResult<{ drawId: string; number: number }>> {
+  return withResult("startDraft", async () => {
+    await requireUser();
+    return draws.startDraft(id.parse(rehabId));
+  });
+}
+

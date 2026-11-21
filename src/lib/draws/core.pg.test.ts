@@ -15,16 +15,19 @@ import {
   overLineMessage,
   REHAB_DONE,
   addLine,
+  advanceDraw,
   alreadyOpenMessage,
   createRehab,
   deleteLine,
   deleteRehab,
   importWorksheet,
   rehabName,
+  restoreDrawStage,
   restoreLine,
   sendDraft,
   setDone,
   setDraftAmount,
+  startDraft,
   unsendDraw,
   updateDraw,
 } from "./core";
@@ -155,24 +158,22 @@ test("the draft opens on its first amount, sends with its total, and Undo puts i
   assert.equal(all[0].sentAmount, null);
 });
 
-test("Approved needs its amount and Funded what landed; Funded clears Waiting on us", { skip }, async () => {
+test("Approved needs its amount and Funded what landed", { skip }, async () => {
   const id = await rehab("2 Stage St");
   const line = await addLine(prisma, id, { unit: null, name: "Electrical", original: 5000, changeOrder: 0 });
   await setDraftAmount(prisma, line.id, 4000);
   const { drawId } = await sendDraft(prisma, id, "2026-11-01");
 
-  await updateDraw(prisma, drawId, { stage: "INSPECTION", waitingOnUs: true, waitingNote: "Lien waiver from the electrician" }, "2026-11-05");
+  await updateDraw(prisma, drawId, { stage: "INSPECTION" }, "2026-11-05");
   assert.deepEqual(await refusal(updateDraw(prisma, drawId, { stage: "APPROVED" }, "2026-11-06")), { approvedAmount: APPROVED_NEEDED });
   await updateDraw(prisma, drawId, { stage: "APPROVED", approvedAmount: 3800 }, "2026-11-06");
   let d = await prisma.draw.findUniqueOrThrow({ where: { id: drawId } });
   assert.equal(d.approvedOn?.toISOString().slice(0, 10), "2026-11-06");
-  assert.equal(d.waitingOnUs, true);
 
   assert.deepEqual(await refusal(updateDraw(prisma, drawId, { stage: "FUNDED" }, "2026-11-07")), { fundedAmount: FUNDED_NEEDED });
   await updateDraw(prisma, drawId, { stage: "FUNDED", fundedAmount: 3600 }, "2026-11-07");
   d = await prisma.draw.findUniqueOrThrow({ where: { id: drawId } });
   assert.equal(d.fundedOn?.toISOString().slice(0, 10), "2026-11-07");
-  assert.equal(d.waitingOnUs, false);
 });
 
 test("a line on a sent draw stays; one only on the draft deletes and comes back with its amount", { skip }, async () => {
@@ -250,3 +251,38 @@ test("a done rehab refuses changes until it's reopened", { skip }, async () => {
   await setDone(prisma, id, false);
   await addLine(prisma, id, { unit: null, name: "Late", original: 1, changeOrder: 0 });
 });
+
+test("the next-step button moves a draw one stage at a time, and Undo puts it back exactly", { skip }, async () => {
+  const id = await rehab("8 Step St");
+  const line = await addLine(prisma, id, { unit: null, name: "Roof", original: 9000, changeOrder: 0 });
+  await setDraftAmount(prisma, line.id, 5000);
+  const { drawId } = await sendDraft(prisma, id, "2026-11-10");
+  const sentAt = (await prisma.draw.findUniqueOrThrow({ where: { id: drawId } })).stageChangedAt;
+
+  const toInspection = await advanceDraw(prisma, drawId, null, "2026-11-12");
+  assert.equal(toInspection.stage, "INSPECTION");
+  await restoreDrawStage(prisma, drawId, toInspection.before);
+  const back = await prisma.draw.findUniqueOrThrow({ where: { id: drawId } });
+  assert.equal(back.stage, "SENT");
+  assert.equal(back.stageChangedAt.toISOString(), sentAt.toISOString());
+
+  await advanceDraw(prisma, drawId, null, "2026-11-12");
+  assert.deepEqual(await refusal(advanceDraw(prisma, drawId, null, "2026-11-14")), { amount: APPROVED_NEEDED });
+  await advanceDraw(prisma, drawId, 4800, "2026-11-14");
+  const funded = await advanceDraw(prisma, drawId, 4600, "2026-11-15");
+  const d = await prisma.draw.findUniqueOrThrow({ where: { id: drawId } });
+  assert.deepEqual([d.stage, d.approvedAmount?.toString(), d.approvedOn?.toISOString().slice(0, 10), d.fundedAmount?.toString(), d.fundedOn?.toISOString().slice(0, 10)], ["FUNDED", "4800", "2026-11-14", "4600", "2026-11-15"]);
+  assert.deepEqual(await refusal(advanceDraw(prisma, drawId, 1, "2026-11-16")), { draw: "This draw is already funded." });
+  await restoreDrawStage(prisma, drawId, funded.before);
+  const undone = await prisma.draw.findUniqueOrThrow({ where: { id: drawId } });
+  assert.deepEqual([undone.stage, undone.fundedAmount, undone.fundedOn], ["APPROVED", null, null]);
+});
+
+test("New draw opens the next draw once; a second tap hands back the same one", { skip }, async () => {
+  const id = await rehab("9 Start St");
+  const first = await startDraft(prisma, id);
+  const again = await startDraft(prisma, id);
+  assert.equal(first.number, 1);
+  assert.equal(again.drawId, first.drawId);
+});
+
