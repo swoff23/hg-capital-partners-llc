@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Building2,
@@ -88,6 +89,9 @@ export function SideNav({
   );
 }
 
+/** The room a tab's focus ring takes outside it: a 2px ring at a 2px offset. The tab row keeps this much as padding. */
+const RING_ROOM = 4;
+
 /**
  * Page sections that are separate routes (CLAUDE.md, One switch per job):
  * underline tabs over a --border divider (docs/brand-guidelines.md, section 9).
@@ -97,6 +101,12 @@ export function SideNav({
  * "current page" rather than a tab choice (selectors question 8). 44px on
  * touch. `label` names the nav ("Financials sections"); `keep` names query
  * params that hold across the tabs (Financials' ?basis=).
+ *
+ * When the tabs outgrow the width (Settings' four at 320), the row scrolls
+ * sideways by itself with no scrollbar, so the page never does (Connor,
+ * Nov 20, docs/specs/tasks-from-claude.md section 9). The tab you're on is
+ * brought into view. The divider is the nav's, and the scrolling row sits a
+ * pixel over it so the selected underline still covers it.
  */
 export function TopTabs({
   tabs,
@@ -117,32 +127,56 @@ export function TopTabs({
     if (value) carried.set(key, value);
   }
   const query = carried.toString();
+  const row = useRef<HTMLDivElement>(null);
+  // Brings a tab wholly into view with the 4px its focus ring needs on each side. It moves the row, never the
+  // page: scrollIntoView would also scroll the page to the tabs on a reload, and a browser leaves a tab that is
+  // partly in view where it is when it takes focus.
+  const reveal = (tab: HTMLElement | null | undefined) => {
+    const r = row.current;
+    if (!r || !tab || r.scrollWidth <= r.clientWidth) return;
+    const box = r.getBoundingClientRect();
+    const at = tab.getBoundingClientRect();
+    if (at.left - RING_ROOM < box.left) r.scrollLeft -= box.left - (at.left - RING_ROOM);
+    else if (at.right + RING_ROOM > box.right) r.scrollLeft += at.right + RING_ROOM - box.right;
+  };
+  useEffect(() => {
+    reveal(row.current?.querySelector<HTMLElement>('[aria-current="page"]'));
+  }, [pathname]);
   return (
-    <nav aria-label={label} className="flex gap-1 border-b border-border">
-      {tabs.map((t) => {
-        const path = `${base}${t.href}`;
-        const href = query ? `${path}?${query}` : path;
-        const active = pathname === path || (t.href === "" && pathname === base);
-        return (
-          <LeaveLink
-            key={t.href}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              // 8px sides below sm, so Settings' three tabs keep one line at 320. A fixed
-              // 14 / 20 at every size: text-label grows to 16 on touch (section 9).
-              // eslint-disable-next-line hg/raw-type -- the tab size is fixed
-              "-mb-px flex items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-foreground sm:px-3",
-              "aria-[current=page]:border-primary aria-[current=page]:text-foreground",
-              // Tapped before its page was prefetched: the picked look at once (LeaveLink's data-pending).
-              "data-pending:border-primary data-pending:text-foreground",
-              TOUCH_HEIGHT,
-            )}
-          >
-            {t.label}
-          </LeaveLink>
-        );
-      })}
+    <nav aria-label={label} className="border-b border-border">
+      {/* A scroller clips on every side, so the row keeps 4px of room for a tab's focus ring and gives it back in
+          margins: the tabs and the divider sit where they did, a pixel of overlap included. The scrollbar is
+          hidden with the pair the task page's chip row uses; a global rule beats no-scrollbar. */}
+      <div ref={row} className="-mx-1 -mt-1 -mb-1.25 flex gap-1 overflow-x-auto p-1 [scrollbar-width:none]! [&::-webkit-scrollbar]:hidden">
+        {tabs.map((t) => {
+          const path = `${base}${t.href}`;
+          const href = query ? `${path}?${query}` : path;
+          const active = pathname === path || (t.href === "" && pathname === base);
+          return (
+            <LeaveLink
+              key={t.href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              // Keyboard focus only: a press on a tab at the row's cut edge would otherwise slide it out from under the pointer.
+              onFocus={(e) => {
+                if (e.currentTarget.matches(":focus-visible")) reveal(e.currentTarget);
+              }}
+              className={cn(
+                // 8px sides below sm, so Settings' three tabs keep one line at 320. A fixed
+                // 14 / 20 at every size: text-label grows to 16 on touch (section 9).
+                // eslint-disable-next-line hg/raw-type -- the tab size is fixed
+                "flex shrink-0 items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-foreground sm:px-3",
+                "aria-[current=page]:border-primary aria-[current=page]:text-foreground",
+                // Tapped before its page was prefetched: the picked look at once (LeaveLink's data-pending).
+                "data-pending:border-primary data-pending:text-foreground",
+                TOUCH_HEIGHT,
+              )}
+            >
+              {t.label}
+            </LeaveLink>
+          );
+        })}
+      </div>
     </nav>
   );
 }

@@ -11,7 +11,9 @@ import type { Breadcrumb, BrowserOptions, Event } from "@sentry/browser";
  * - A token in a one-tap job link (/j/<token>), an invite or sign-up link
  *   (/join/<token>) or a query value (?token=, an OAuth ?code=) is
  *   replaced wherever it appears: the page
- *   address, the route name, the message, the click trail.
+ *   address, the route name, the message, the click trail. So is the key in
+ *   a partner's own Claude connector address (/api/mcp/<key>), and an OAuth
+ *   ?resource= value, which is that address.
  * - The user is reduced to an ID. Extra fields pass only through an
  *   allowlist, so a field added to a log call later sends nothing until
  *   someone allows it here.
@@ -41,12 +43,25 @@ export const DATA_COLLECTION: NonNullable<BrowserOptions["dataCollection"]> = {
 
 /** One-tap job links (/j/<token>) and contractor invite and sign-up links (/join/<token>) carry a working token in the path. */
 const TOKEN_PATH = /\/(j|join)\/(?!\[token\])[^/?#\s"'<>]+/g;
-const SECRET_QUERY = /([?&](?:token|code|state|access_token|refresh_token|secret|signature|sig|key)=)[^&#\s"'<>]*/gi;
+/**
+ * A partner's own Claude connector address carries their key in its path (docs/specs/tasks-from-claude.md, section
+ * 8): /api/mcp/<key>, and the discovery document for it at /.well-known/oauth-protected-resource/api/mcp/<key>, which
+ * ends the same way. Whatever follows /api/mcp/ goes, since a mistyped key is still most of a key. The one thing
+ * kept is "auth_callback": Claude's own return address is claude.ai/api/mcp/auth_callback, and a report should still
+ * say so. The second form is the same path as it reads percent-encoded inside another address.
+ */
+const CONNECTOR_KEY_PATH = /(\/api\/mcp\/)(?!\[key\]|auth_callback(?![A-Za-z0-9_.~-]))[^/?#\s"'<>&%]+/g;
+const CONNECTOR_KEY_PATH_ENCODED = /(%2Fapi%2Fmcp%2F)(?!%5Bkey%5D|auth_callback(?![A-Za-z0-9_.~-]))[A-Za-z0-9_.~-]+/gi;
+const SECRET_QUERY = /([?&](?:token|code|state|access_token|refresh_token|secret|signature|sig|key|resource)=)[^&#\s"'<>]*/gi;
 const REDACTED = "[redacted]";
 
 /** Removes the tokens that work as a sign-in or a grant from any text that may hold an address. */
 export function scrubText(text: string): string {
-  return text.replace(TOKEN_PATH, "/$1/[token]").replace(SECRET_QUERY, `$1${REDACTED}`);
+  return text
+    .replace(TOKEN_PATH, "/$1/[token]")
+    .replace(CONNECTOR_KEY_PATH, "$1[key]")
+    .replace(CONNECTOR_KEY_PATH_ENCODED, "$1%5Bkey%5D")
+    .replace(SECRET_QUERY, `$1${REDACTED}`);
 }
 
 /** Extra fields that may leave: IDs, counts and kinds. Anything else, a subject line or a file name, stays home. */

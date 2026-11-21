@@ -287,6 +287,34 @@ async function seedComingSoonFixture(db: PrismaClient): Promise<void> {
   }
 }
 
+/**
+ * Two drafts from Claude for the signed-in partner, so /tasks shows My drafts
+ * with its heading buttons and row buttons at every size, and Home shows the
+ * "Drafts from Claude" row (docs/specs/tasks-from-claude.md 6.3). Saved the
+ * way the connector saves them; the same batch key again adds nothing, so
+ * every run after the first reuses them unless they were added or discarded.
+ * One goes to the fixture contractor, so its row and banner name who hears, and
+ * its page is the second sample for /tasks/[id] (routes.ts EXTRA_PAGES). A draft
+ * a person discarded doesn't count: it is gone from every screen.
+ */
+async function seedDraftFixture(db: PrismaClient, userEmail: string, contactId: string): Promise<void> {
+  assertLocalDb();
+  const user = await db.user.findUnique({ where: { email: userEmail }, select: { id: true, name: true } });
+  if (!user) return;
+  if ((await db.task.count({ where: { status: "DRAFT", discardedAt: null, createdByUserId: user.id } })) > 0) return;
+  const property = await db.property.findFirst({ where: { archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } });
+  const writer: core.Principal = { kind: "staff", userId: user.id, label: user.name ?? "Device check" };
+  const batchKey = `device-check-${Date.now()}`;
+  await db.$transaction(async (tx) => {
+    await core.createTask(
+      tx,
+      { title: "Fix gutters pulling off the back", description: "Gutters are pulling off the back. Get out there before the rain.", propertyId: property?.id ?? null, assignee: { contactId }, dueDate: addDaysYmd(todayYmdEastern(), 7), draft: { batchKey, index: 0 } },
+      writer,
+    );
+    await core.createTask(tx, { title: "Call the city about the permit", draft: { batchKey, index: 1 } }, writer);
+  });
+}
+
 export default async function setup() {
   // A renamed page would otherwise leave its override behind, and the page
   // would quietly load with the default session.
@@ -326,6 +354,7 @@ export default async function setup() {
     await seedResidentFixture(db);
     await seedRehabFixture(db);
     await seedComingSoonFixture(db);
+    await seedDraftFixture(db, user.email, portal.contactId);
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

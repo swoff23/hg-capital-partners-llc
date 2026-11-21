@@ -10,8 +10,8 @@ import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
 import { toMoneyNumber } from "@/lib/utils";
 import { toYmd, todayYmdEastern } from "@/lib/dates";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
+import { propertyOpenTasksWhere } from "@/lib/tasks/list-query";
 import { targetDate } from "@/lib/tasks/rules";
 import { buildingLine, loanPosition } from "@/lib/properties/figures";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
@@ -93,7 +93,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     requireUser(),
     getPropertyById(id),
     prisma.task.findMany({
-      where: { propertyId: id, ...activeTask, ...excludeTemplateTasks },
+      where: propertyOpenTasksWhere(id),
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
       include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
     }),

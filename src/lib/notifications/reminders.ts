@@ -4,6 +4,7 @@ import { toYmd, todayYmdEastern, ymdToDate } from "@/lib/dates";
 import { logError } from "@/lib/log";
 import { addDaysYmd } from "@/lib/quick-dates";
 import { queueDueReminder } from "@/lib/tasks/core";
+import { dueReminderWhere } from "@/lib/tasks/list-query";
 import { targetDate } from "@/lib/tasks/rules";
 import { inReminderHour, reminderFor } from "./reminder-rules";
 
@@ -12,7 +13,8 @@ import { inReminderHour, reminderFor } from "./reminder-rules";
  * minute of the 8 o'clock hour in Buffalo, every open job with a contractor
  * whose date is today gets "Due today", and one whose date was yesterday
  * gets "Due yesterday". Open means waiting on them: To do, Scheduled,
- * Waiting or In progress, never In review, Done or Canceled. The date is the
+ * Waiting or In progress, never In review, Done or Canceled, and never a
+ * draft (tasks/list-query.ts dueReminderWhere). The date is the
  * one the contractor sees (rules.ts targetDate). core.ts queueDueReminder
  * keeps each to once per date and applies the email rules; the outbox sends
  * them as it sends everything (outbox.ts drainDue). Run by
@@ -30,17 +32,7 @@ export async function queueDueReminders(
   );
   const tasks = await prisma.task
     .findMany({
-      where: {
-        assigneeContactId: { not: null },
-        OR: [
-          { status: "SCHEDULED", scheduledFor: { in: days } },
-          { status: "SCHEDULED", scheduledFor: null, dueDate: { in: days } },
-          {
-            status: { in: ["OPEN", "WAITING", "IN_PROGRESS"] },
-            dueDate: { in: days },
-          },
-        ],
-      },
+      where: dueReminderWhere(days),
       select: {
         id: true,
         status: true,

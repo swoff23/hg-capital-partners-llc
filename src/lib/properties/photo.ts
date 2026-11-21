@@ -6,6 +6,7 @@ import { blobToken, noStoreMessage, type BlobAccess } from "@/lib/attachments/bl
 import { isPrivateStoreUrl, storeIdFromToken } from "@/lib/attachments/paths";
 import { lockboxPhotoPaths, parseUnits, type LockboxPhoto } from "@/lib/property-types";
 import { logError } from "@/lib/log";
+import { takenHerePhotosWhere } from "@/lib/tasks/list-query";
 
 /**
  * A property's photos in public Blob (docs/specs/uploads-photos.md 2.9 and
@@ -334,7 +335,8 @@ const TAKEN_HERE_LIMIT = 60;
  * every photo there, `photos` the newest ones.
  */
 export async function takenHerePhotos(propertyId: string): Promise<{ total: number; photos: TakenHerePhoto[] }> {
-  const where = { kind: "IMAGE" as const, deletedAt: null, task: { propertyId } };
+  // Never a draft's photos (tasks/list-query.ts takenHerePhotosWhere).
+  const where = takenHerePhotosWhere(propertyId);
   const [total, rows] = await Promise.all([
     prisma.taskAttachment.count({ where }),
     prisma.taskAttachment.findMany({

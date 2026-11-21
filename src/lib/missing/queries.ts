@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { easternDayStart, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { liveRecord } from "@/lib/record-scope";
-import { excludeTemplateTasks } from "@/lib/task-scope";
+import { openMakeTaskItemsWhere, workedSinceWhere } from "@/lib/tasks/list-query";
 import { missingInfo, type CheckInput, type CheckProperty, type MissingInfo } from "./checks";
 import { leaseEndItems, type LeaseEndInput } from "./lease-notice";
 import type { NeedsYouItem } from "@/lib/home/needs-you";
@@ -57,18 +57,14 @@ const yearStart = (today: Ymd) => easternDayStart(`${today.slice(0, 4)}-01-01`);
 /**
  * The contractors who worked this calendar year (D7): a job assigned to them
  * that's open now or was finished this year, or, with QuickBooks connected, a
- * payment this year to their vendor.
+ * payment this year to their vendor. A draft Claude saved for them is no job
+ * yet (tasks/list-query.ts workedSinceWhere).
  */
 async function workedThisYear(today: Ymd, contactIds?: string[]): Promise<Set<string>> {
   const since = yearStart(today);
   const [jobs, vendors] = await Promise.all([
     prisma.task.findMany({
-      where: {
-        ...excludeTemplateTasks,
-        assigneeContactId: contactIds ? { in: contactIds } : { not: null },
-        status: { not: "CANCELED" },
-        OR: [{ status: { not: "DONE" } }, { completedAt: { gte: since } }],
-      },
+      where: workedSinceWhere(since, contactIds),
       select: { assigneeContactId: true },
       distinct: ["assigneeContactId"],
     }),
@@ -185,7 +181,8 @@ export interface HandedOff {
 /** The rows already in an open Make task, by key, so the worklist shows whose they are and doesn't hand them off twice. */
 export async function handedOff(): Promise<Record<string, HandedOff>> {
   const items = await prisma.taskChecklistItem.findMany({
-    where: { checkKey: { not: null }, done: false, task: { status: { notIn: ["DONE", "CANCELED"] } } },
+    // Open means active (task-scope.ts), so a draft no partner has added hands nothing off.
+    where: openMakeTaskItemsWhere,
     select: {
       checkKey: true,
       task: { select: { id: true, assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } } },

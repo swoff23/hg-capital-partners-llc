@@ -1,19 +1,25 @@
-import { randomUUID } from "node:crypto";
-import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
+import { createHash, randomUUID } from "node:crypto";
+import { Prisma, type EventSource, type Task, type TaskAttachment, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
+import { stableJson } from "@/lib/drafts";
 import { firstName } from "@/lib/names";
 import { jobKey, notesFingerprint } from "@/lib/notifications/content";
+import { unitDisplay, unitLabels } from "@/lib/picker-options-shape";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
-import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
+import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, draftTask, isActiveStatus, isDiscarded } from "@/lib/task-scope";
 import { homeOccupied, readTaskHome } from "@/lib/tenants/living";
+import { listedContactsWhere, type PersonRef } from "./assignee-people";
+import { DRAFT_BATCH_KEY_MAX, MAX_WAITING_DRAFTS, draftBatchPrefix, draftContractor, draftIndexOf, nameAmong, type DraftContractor } from "./drafts";
+import { myDraftsWhere } from "./list-query";
 import { hasPinnedDay, isUntouchedCopy, leapDayRule, nextRepeatDue, parseRepeatRule, repeatCreatedCopy, repeatDue, repeatFrom, ruleKey, type RepeatRule } from "./repeat";
 import { copySlot } from "./repeat-slot";
 import {
   APPROVAL_UNDO_MS,
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
+  DISCARD_KEEP_MS,
   canSetStatus,
   contractorStatusRefusal,
   notifyAudience,
@@ -34,6 +40,15 @@ import {
  * the next copy of a repeating task (one per finish, taken back by a reopen
  * while untouched), and queues the email the change calls for, all inside
  * the caller's transaction.
+ *
+ * A draft a partner's Claude saved (docs/specs/tasks-from-claude.md, section
+ * 6) is the one task that does none of the last two: while it is a Draft no
+ * contractor gets access and nothing is queued for anyone, whatever is edited
+ * or posted on it (syncAssigneeAccess, notify, notifyOff and queueDueReminder
+ * each stop at a draft). Add makes it a task and does both (addDraft).
+ * Discard only marks it (`discardedAt`): it is gone to everyone at once, its
+ * Undo clears the mark, and the every-minute run deletes the row and hands
+ * back its files once the Undo has run out (sweepDiscardedDrafts).
  *
  * Deliberately no `server-only`, no revalidatePath, no network: the importer
  * runs this outside Next, and the service layer revalidates and talks to Blob
@@ -109,6 +124,17 @@ export class NotesChangedError extends TaskRuleError {
 const kindOf = (p: Principal): PrincipalKind => p.kind;
 
 /**
+ * Who a comment or a file is addressed to as it's written (rules.ts
+ * writeAudience): the contractor assigned then. On a draft, nobody yet: no
+ * contractor has the job and its assignee can still change, so what's posted
+ * as Shared waits with the draft (D21). Add addresses it to the contractor
+ * the draft is added for, as if it had been written on their job, so it
+ * never reaches whoever gets the job after them (addLockedDraft).
+ */
+const audienceOf = (p: Principal, task: Pick<Task, "status" | "assigneeContactId">): string | null =>
+  task.status === "DRAFT" ? null : writeAudience(kindOf(p), task.assigneeContactId);
+
+/**
  * Who made a change the caller's screen didn't see, for a refusal's words:
  * "You" when it was the caller (another tab of theirs, where two people
  * share a first name the name alone reads as someone else), otherwise the
@@ -151,6 +177,8 @@ export interface EventInput {
   asanaStoryGid?: string | null;
   /** The contractor a staff or system line is addressed to (rules.ts writeAudience). */
   audienceContactId?: string | null;
+  /** Where it was written, when that isn't the writer's own place: CLAUDE on the lines a draft is saved with (createTask). */
+  source?: EventSource;
 }
 
 export function addEvent(tx: Tx, taskId: string, p: Principal, e: EventInput): Promise<TaskEvent> {
@@ -165,6 +193,7 @@ export function addEvent(tx: Tx, taskId: string, p: Principal, e: EventInput): P
       audienceContactId: e.audienceContactId ?? null,
       ...(e.createdAt ? { createdAt: e.createdAt } : {}),
       ...actorFields(p),
+      ...(e.source ? { source: e.source } : {}),
     },
   });
 }
@@ -180,7 +209,8 @@ export type ContractorWho = { contactId: string; onlyTaskId?: string | null };
  * A contractor may act on a task only through an unrevoked access row, with
  * an active contact and an active portal login. (The portal layer separately
  * checks the session itself.) A session an email's job link started reaches
- * only its own job, whatever else the contact has.
+ * only its own job, whatever else the contact has. Never a draft: no
+ * contractor can read or write one, even if an access row somehow exists.
  */
 export async function assertContractorAccess(tx: Tx, taskId: string, who: ContractorWho): Promise<void> {
   // A tab left on another job after a newer link (an email's or a crew text's) took over the session.
@@ -188,9 +218,9 @@ export async function assertContractorAccess(tx: Tx, taskId: string, who: Contra
   const contactId = who.contactId;
   const access = await tx.taskAccess.findUnique({
     where: { taskId_contactId: { taskId, contactId } },
-    select: { revokedAt: true, contact: { select: { active: true, portalAccount: { select: { status: true } } } } },
+    select: { revokedAt: true, task: { select: { status: true } }, contact: { select: { active: true, portalAccount: { select: { status: true } } } } },
   });
-  if (!access || access.revokedAt || !access.contact.active || access.contact.portalAccount?.status !== "ACTIVE") {
+  if (!access || access.revokedAt || access.task?.status === "DRAFT" || !access.contact.active || access.contact.portalAccount?.status !== "ACTIVE") {
     throw new TaskRuleError("You don't have access to this job.");
   }
 }
@@ -199,8 +229,16 @@ export async function assertContractorAccess(tx: Tx, taskId: string, who: Contra
  * Keep the automatic access row in step with the assignee: grant it to the
  * contractor now assigned, revoke it from anyone who was. Rows shared by hand
  * (MANUAL) are left alone.
+ *
+ * Nothing for a draft: picking or changing a draft's contractor shows the job
+ * to no one. The contractor gets access when a partner adds it (addDraft).
  */
-async function syncAssigneeAccess(tx: Tx, taskId: string, contactId: string | null, p: Principal, now: Date): Promise<void> {
+async function syncAssigneeAccess(tx: Tx, task: Pick<Task, "id" | "status">, contactId: string | null, p: Principal, now: Date): Promise<void> {
+  if (task.status === "DRAFT") return;
+  await writeAssigneeAccess(tx, task.id, contactId, p, now);
+}
+
+async function writeAssigneeAccess(tx: Tx, taskId: string, contactId: string | null, p: Principal, now: Date): Promise<void> {
   await tx.taskAccess.updateMany({
     where: { taskId, source: "ASSIGNEE", revokedAt: null, ...(contactId ? { NOT: { contactId } } : {}) },
     data: { revokedAt: now },
@@ -215,9 +253,10 @@ async function syncAssigneeAccess(tx: Tx, taskId: string, contactId: string | nu
 
 /**
  * The same, for the Asana importer (src/lib/asana/import.ts), which writes
- * task rows itself so it can keep Asana's ids and timestamps.
+ * task rows itself so it can keep Asana's ids and timestamps. By id: its
+ * tasks come from Asana and are never drafts.
  */
-export { syncAssigneeAccess as grantAssigneeAccess };
+export { writeAssigneeAccess as grantAssigneeAccess };
 
 /**
  * The refusal when a write would give an open job to an archived contractor:
@@ -232,6 +271,9 @@ export { syncAssigneeAccess as grantAssigneeAccess };
  * gives it back without a pick (setStatus, archivedAssigneeToGiveBack).
  */
 export const ARCHIVED_ASSIGNEE_LINE = "Archived. Pick someone else.";
+
+/** The statuses that refuse an archived contractor: open work, and a draft, which is work about to open. */
+const refusesArchived = (s: TaskStatus) => isActiveStatus(s) || s === "DRAFT";
 
 /**
  * Whether a contractor is archived, read under a FOR SHARE lock on their
@@ -363,7 +405,8 @@ export interface OutboxItem {
 /** What a line carries beside its summary (OutboxItem's optional fields). */
 type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit" | "from">;
 
-type NotifyTask = Pick<Task, "id" | "assigneeContactId">;
+/** What a notification reads from the task. Its status says whether it is still a draft, which emails nobody. */
+type NotifyTask = Pick<Task, "id" | "assigneeContactId" | "status">;
 
 /**
  * A date as an email line says it: "Thu, Oct 29", with the year only when it
@@ -422,7 +465,8 @@ async function enqueue(
 /**
  * Route one change to whoever should hear about it (rules.ts notifyAudience).
  * Says who it was queued for, so a caller can tell the person what happens
- * next ("Zack gets an email"): null when nobody hears.
+ * next ("Zack gets an email"): null when nobody hears. Nobody hears about a
+ * draft: its edits, comments and files wait with it (D21).
  */
 async function notify(
   tx: Tx,
@@ -433,6 +477,7 @@ async function notify(
   now: Date,
   refs: ItemRefs = {},
 ): Promise<"contractor" | "staff" | null> {
+  if (task.status === "DRAFT") return null;
   const getsEmail = await contractorGetsEmail(tx, task.assigneeContactId);
   const audience = notifyAudience(kindOf(p), change, { contractorGetsEmail: getsEmail });
   if (!audience) return null;
@@ -462,9 +507,11 @@ export async function notifyPartners(tx: Tx, taskId: string, item: OutboxItem, n
  * partner took the contractor off an open job, or canceled it. Queued for
  * that contractor under the same email rules as any staff change (a login,
  * a first sign-in, their switch on). The send run delivers it though their
- * access is gone, and carries nothing else about the job.
+ * access is gone, and carries nothing else about the job. Never for a draft:
+ * a contractor taken off one never knew of it.
  */
 async function notifyOff(tx: Tx, task: NotifyTask, contactId: string, p: Principal, summary: string, now: Date, job?: string): Promise<void> {
+  if (task.status === "DRAFT") return;
   if (p.kind !== "staff" || !(await contractorGetsEmail(tx, contactId))) return;
   await enqueue(tx, { contactId }, task.id, { kind: "OFF", actorLabel: p.label, summary, at: now.toISOString(), ...(job ? { job } : {}) }, now);
 }
@@ -479,7 +526,12 @@ const REMINDER_LOCK = 7304;
  * on). Once per job, contractor and date: a reminder already queued or sent
  * for that date is found in the outbox and not queued again, under a lock so
  * two runs at once queue one. It bundles with anything else waiting for them
- * on the job. Returns whether it queued.
+ * on the job. Returns whether it queued. Never for a draft, read here again
+ * inside the transaction: the run's own list of jobs can be a moment old, and
+ * an Add's Undo may have made the job a draft since. A reminder that landed
+ * beside such an Undo and was closed unsent for it (the send run's "draft",
+ * notifications/content.ts) reached nobody, so it doesn't count as queued:
+ * the job added again that morning gets its reminder.
  */
 export async function queueDueReminder(
   tx: Tx,
@@ -489,12 +541,15 @@ export async function queueDueReminder(
   now: Date,
 ): Promise<boolean> {
   const contactId = task.assigneeContactId;
+  const row = await tx.task.findUnique({ where: { id: task.id }, select: { status: true } });
+  if (!row || row.status === "DRAFT") return false;
   if (!(await contractorGetsEmail(tx, contactId))) return false;
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REMINDER_LOCK}::int, hashtext(${`${contactId}:${task.id}`}))`;
   const marker = JSON.stringify([{ kind, due }]);
   const seen = await tx.$queryRaw<{ one: number }[]>`
     SELECT 1 AS one FROM "NotificationOutbox"
     WHERE "recipientContactId" = ${contactId} AND "taskId" = ${task.id} AND "items" @> ${marker}::jsonb
+      AND "lastError" IS DISTINCT FROM 'draft'
     LIMIT 1`;
   if (seen.length > 0) return false;
   const summary = kind === "DUE_TODAY" ? "due today" : "due yesterday";
@@ -567,20 +622,189 @@ export interface NewTaskInput {
    * task's home today, checked here again, since the form's answer can be a moment old.
    */
   entryPermitted?: boolean;
+  /**
+   * Saved by a partner's Claude (docs/specs/tasks-from-claude.md 6.1), so it starts as a Draft whatever `status`
+   * says: no contractor gets access and nothing is emailed until a partner adds it (addDraft). `batchKey` names the
+   * save and `index` this draft's place in it. Together with the partner they make its `autoKey` (drafts.ts
+   * draftAutoKey), so the same save sent twice returns the draft already there and writes nothing. `sent` is the
+   * save's fingerprint (saveDrafts), kept on the draft's "created" line. Staff only.
+   */
+  draft?: { batchKey: string; index: number; sent?: string };
+}
+
+/** Advisory-lock namespace for one save of drafts (the 8 am reminders take 7304, the portal 7301 to 7303). */
+const DRAFT_SAVE_LOCK = 7305;
+
+/** Advisory-lock namespace for one partner's saves, so the count of their waiting drafts holds while a save runs. */
+const DRAFT_PARTNER_LOCK = 7306;
+
+/**
+ * One writer at a time per key, to the end of the transaction. The key is a save's prefix (a partner and a batch
+ * key), so the same save sent twice at once writes its drafts once.
+ */
+async function lockDraftSave(tx: Tx, key: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DRAFT_SAVE_LOCK}::int, hashtext(${key}))`;
+}
+
+/** One save at a time per partner, to the end of the transaction (saveDrafts takes it first). */
+async function lockPartnerSaves(tx: Tx, userId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DRAFT_PARTNER_LOCK}::int, hashtext(${userId}))`;
+}
+
+/** The refusal for a save whose key can't be stored. The connector checks the key first, so no screen shows it. */
+function draftKeyProblem(d: { batchKey: string; index: number }): string | null {
+  if (!d.batchKey || d.batchKey.length > DRAFT_BATCH_KEY_MAX || !Number.isInteger(d.index) || d.index < 0) return "That save's key isn't valid.";
+  return null;
+}
+
+/**
+ * The tasks an earlier send of this save made, in the save's order: its
+ * drafts, any a partner has added since (they keep their key), and any a
+ * partner discarded that the sweep hasn't deleted yet (a discarded draft
+ * still holds its key, so its save sent again is still a save already made).
+ * Empty for a save that hasn't run. Takes the save's lock, so what it reads
+ * holds until the transaction ends.
+ */
+export async function savedDraftBatch(tx: Tx, userId: string, batchKey: string): Promise<Task[]> {
+  const prefix = draftBatchPrefix(userId, batchKey);
+  await lockDraftSave(tx, prefix);
+  const rows = await tx.task.findMany({ where: { autoKey: { startsWith: prefix } } });
+  const at = (t: Task) => draftIndexOf(t.autoKey, prefix);
+  return rows.filter((t) => at(t) !== null).sort((a, b) => (at(a) ?? 0) - (at(b) ?? 0));
+}
+
+/** A draft's fields as a save sends them, without what the save sets itself (saveDrafts). */
+export type DraftInput = Omit<NewTaskInput, "draft" | "status" | "autoKey"> & {
+  /**
+   * The draft as its sender sent it, when the fields here were worked out from that against today's records: the
+   * connector matches a property, a unit's label and a person to the directory (claude/tools.ts checkDrafts). A
+   * save sent twice is told by this and not by those fields (draftsFingerprint), so a record that changed between
+   * the two sends never makes the same send read as another. Never saved.
+   */
+  asSent?: unknown;
+};
+
+/** What a save did (saveDrafts). Nothing is written for any outcome but `saved`. */
+export type SaveDraftsResult =
+  /** Written now, in the order sent. */
+  | { kind: "saved"; tasks: Task[] }
+  /** This batchKey already saved these same drafts: the tasks it made, as they are now. */
+  | { kind: "replay"; tasks: Task[] }
+  /** This batchKey already saved different drafts. */
+  | { kind: "key-reused" }
+  /** The partner already has `waiting` drafts, and these would pass MAX_WAITING_DRAFTS. */
+  | { kind: "too-many"; waiting: number };
+
+/**
+ * A save's fingerprint: SHA-256 over its drafts as they were sent, with every
+ * object's keys sorted, so the same drafts always make the same one however
+ * they were built. Each draft's "created" line keeps it (`data.sent`), and a
+ * second send under the same batchKey is told apart by it: the same drafts
+ * again, or other drafts under a key that was already used.
+ *
+ * A draft that carries what its sender sent (`asSent`) is read by that alone:
+ * its other fields follow the records as they stand today, and a unit
+ * relabeled or a contractor archived since the first send would turn a plain
+ * retry into "other drafts", which the connector answers by asking for the
+ * save again under a new key, a second copy of every draft.
+ */
+export function draftsFingerprint(drafts: readonly DraftInput[]): string {
+  const sent = drafts.map((d) => (d.asSent === undefined ? d : { asSent: d.asSent }));
+  return createHash("sha256").update(stableJson(sent)).digest("hex");
+}
+
+/**
+ * Whether the drafts a key already saved are the ones sent now: every one of
+ * their "created" lines carries this fingerprint. A line with none (saved
+ * before fingerprints were kept) counts as the same save.
+ */
+async function sameSave(tx: Tx, saved: readonly Task[], sent: string): Promise<boolean> {
+  const lines = await tx.taskEvent.findMany({ where: { taskId: { in: saved.map((t) => t.id) }, kind: "CREATED" }, select: { data: true } });
+  return lines.every((line) => {
+    const was = line.data && typeof line.data === "object" && !Array.isArray(line.data) ? (line.data as Prisma.JsonObject).sent : undefined;
+    return typeof was !== "string" || was === sent;
+  });
+}
+
+/**
+ * One save from a partner's Claude (docs/specs/tasks-from-claude.md, section
+ * 5): every draft, or none. No contractor gets access and nothing is emailed
+ * until a partner adds a draft.
+ *
+ *  - The same `batchKey` from the same partner again writes nothing. With the
+ *    same drafts it answers `replay` and the tasks the first send made (Claude
+ *    sent it twice). With other drafts it answers `key-reused`: a key holds
+ *    one save, and saying "saved" for drafts that weren't would lose them.
+ *  - A partner's waiting drafts are capped (MAX_WAITING_DRAFTS), counted here,
+ *    in the database, so the cap holds across server instances. A save that
+ *    would pass it answers `too-many` with how many wait.
+ *  - `check` runs only for a save that is new and fits, and throws to refuse
+ *    it: the connector's own checks (the unit is the building's, the due date
+ *    isn't past, Permission to enter was answered) and its save budget go
+ *    there, so a send that changes nothing is never judged by today's date
+ *    and never spends the budget.
+ *
+ * The drafts are made last first, so within one save the first thing said is
+ * the newest row and lists first under the groups' newest-first order
+ * (list-query.ts DRAFTS_ORDER_BY); `tasks` comes back in the order sent.
+ *
+ * Lock order, for every write that takes more than one of these: the
+ * partner's saves (lockPartnerSaves), then the save's key (lockDraftSave),
+ * then each draft's contractor (contactArchivedLocked, in createTask). The
+ * partner's lock makes the count and the inserts one step, so two saves at
+ * once can't both fit under the cap.
+ */
+export async function saveDrafts(
+  tx: Tx,
+  batchKey: string,
+  drafts: readonly DraftInput[],
+  p: Principal,
+  check?: (tx: Tx) => Promise<void>,
+  now = new Date(),
+): Promise<SaveDraftsResult> {
+  if (p.kind !== "staff") throw new TaskRuleError("Only a partner can save a draft.");
+  await lockPartnerSaves(tx, p.userId);
+  const before = await savedDraftBatch(tx, p.userId, batchKey);
+  const sent = draftsFingerprint(drafts);
+  if (before.length > 0) return (await sameSave(tx, before, sent)) ? { kind: "replay", tasks: before } : { kind: "key-reused" };
+  const waiting = await tx.task.count({ where: myDraftsWhere(p.userId) });
+  if (waiting + drafts.length > MAX_WAITING_DRAFTS) return { kind: "too-many", waiting };
+  await check?.(tx);
+  const tasks = new Array<Task>(drafts.length);
+  for (let index = drafts.length - 1; index >= 0; index--) {
+    // `asSent` goes no further than the fingerprint: createTask saves the fields it names, and that isn't one.
+    tasks[index] = await createTask(tx, { ...drafts[index], draft: { batchKey, index, sent } }, p, now);
+  }
+  return { kind: "saved", tasks };
 }
 
 export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now = new Date()): Promise<Task> {
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't create tasks yet.");
+  const draft = !!input.draft;
+  if (draft && p.kind !== "staff") throw new TaskRuleError("Only a partner can save a draft.");
   const title = input.title.trim();
   if (title.length < 2) throw new TaskRuleError("A task needs a title.");
-  const status = input.status ?? "OPEN";
+  // Draft is never asked for as a status: only the draft flag makes one.
+  if (!draft && input.status === "DRAFT") throw new TaskRuleError("That status change isn't allowed.");
+  const status: TaskStatus = draft ? "DRAFT" : (input.status ?? "OPEN");
   if (status === "WAITING" && !input.waitingOn?.trim()) throw new TaskRuleError("Say what it's waiting on.");
+  let autoKey = input.autoKey ?? null;
+  if (input.draft && p.kind === "staff") {
+    const problem = draftKeyProblem(input.draft);
+    if (problem) throw new TaskRuleError(problem);
+    const prefix = draftBatchPrefix(p.userId, input.draft.batchKey);
+    await lockDraftSave(tx, prefix);
+    autoKey = `${prefix}${input.draft.index}`;
+    // Sent twice (Claude retried the save): the task this key already made comes back, and nothing is written.
+    const saved = await tx.task.findUnique({ where: { autoKey } });
+    if (saved) return saved;
+  }
   const propertyId = input.propertyId || null;
   const assigneeUserId = input.assignee && "userId" in input.assignee ? input.assignee.userId : null;
   const assigneeContactId = input.assignee && "contactId" in input.assignee ? input.assignee.contactId : null;
-  // A picker loaded before the contractor was archived still offers them. Only open work is refused
-  // (ARCHIVED_ASSIGNEE_LINE); the lock is taken either way, so every assign keeps one order.
-  if (assigneeContactId && (await contactArchivedLocked(tx, assigneeContactId)) && isActiveStatus(status)) {
+  // A picker loaded before the contractor was archived still offers them. Only open work, and a draft of it, is
+  // refused (ARCHIVED_ASSIGNEE_LINE); the lock is taken either way, so every assign keeps one order.
+  if (assigneeContactId && (await contactArchivedLocked(tx, assigneeContactId)) && refusesArchived(status)) {
     throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
   }
   const unitLabel = input.unitLabel?.trim() || null;
@@ -606,29 +830,596 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
       repeatRule: input.repeatRule ?? undefined,
       repeatSeriesId: input.repeatSeriesId ?? null,
       taskTemplateId: input.taskTemplateId ?? null,
-      autoKey: input.autoKey ?? null,
+      autoKey,
       priority: input.priority ?? null,
+      // Whose draft it is: the Tasks list files it under My drafts for them (list-query.ts myDraftsWhere).
       createdByUserId: p.kind === "staff" ? p.userId : null,
       ...editStamp(p, now),
     },
   });
+  // The lines a draft is saved with say they came through Claude, in the partner's own name: Activity reads "Pieter
+  // created this task", "via Claude" (D14), and the same beside Permission to enter, so the record never reads as a
+  // partner turning it on by hand.
+  const through = draft ? { source: "CLAUDE" as const } : {};
   // Assigning at creation is an assignment: the line carries `to` as ASSIGNED does, so the picker's Recent
-  // rows see it (assignee-options.ts). It has no `repeatOf`, so it is no copy's slot (copyOrigin).
-  await addEvent(tx, task.id, p, {
-    kind: "CREATED",
-    ...(assigneeUserId || assigneeContactId ? { data: { to: { userId: assigneeUserId, contactId: assigneeContactId } } } : {}),
-  });
+  // rows see it (list-query.ts recentAssignmentsWhere). It has no `repeatOf`, so it is no copy's slot (copyOrigin).
+  // A draft's line also keeps its save's fingerprint (saveDrafts).
+  const created = {
+    ...(assigneeUserId || assigneeContactId ? { to: { userId: assigneeUserId, contactId: assigneeContactId } } : {}),
+    ...(input.draft?.sent ? { sent: input.draft.sent } : {}),
+  };
+  await addEvent(tx, task.id, p, { kind: "CREATED", ...through, ...(Object.keys(created).length ? { data: created } : {}) });
   // The same line the task page writes, so the record shows who gave Permission to enter and when.
-  if (entryPermitted) await addEvent(tx, task.id, p, { kind: "ACCESS", data: { entry: { from: false, to: true } } });
-  if (assigneeContactId) {
-    await syncAssigneeAccess(tx, task.id, assigneeContactId, p, now);
+  if (entryPermitted) await addEvent(tx, task.id, p, { kind: "ACCESS", ...through, data: { entry: { from: false, to: true } } });
+  // A draft is nobody's job yet: its contractor gets access, the email and the deal its line when a partner adds
+  // it (addDraft does these three, as written here).
+  if (!draft) {
+    if (assigneeContactId) {
+      await syncAssigneeAccess(tx, task, assigneeContactId, p, now);
+      await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
+    }
+    await logDeal(tx, task.dealId, p, `Task added: ${task.title}`, now);
+  }
+  // The checklist in one statement. Nothing else can hold a row this transaction made a moment ago, so the items
+  // take the places addChecklistItem would give them one at a time (0, 1, 2, in order), with the words it would keep
+  // (trimmed, a blank one left out). The row's own edit stamp above covers them.
+  const items = (input.checklist ?? []).flatMap((item) => (item.title.trim() ? [{ title: item.title.trim(), checkKey: item.checkKey ?? null }] : []));
+  if (items.length > 0) await tx.taskChecklistItem.createMany({ data: items.map((item, position) => ({ taskId: task.id, ...item, position })) });
+  return task;
+}
+
+// ---------------------------------------------------------------------------
+// Drafts from Claude: Add, its Undo, Discard, its Undo and the sweep (docs/specs/tasks-from-claude.md 6.3)
+// ---------------------------------------------------------------------------
+
+/** A partner as the one acting on a draft. */
+type Partner = Extract<Principal, { kind: "staff" }>;
+
+function partnerOnly(p: Principal): asserts p is Partner {
+  if (p.kind !== "staff") throw new TaskRuleError("Only a partner can do that with a draft.");
+}
+
+/** Whether a draft sits in this partner's My drafts: their Claude saved it, or its partner is gone (list-query.ts myDraftsWhere). */
+const isOwnDraft = (t: Pick<Task, "createdByUserId">, p: Partner) => t.createdByUserId === p.userId || t.createdByUserId === null;
+
+/** The refusal for a draft that isn't there: deleted, or discarded, which is gone to everyone at once. */
+const DRAFT_GONE_LINE = "That draft no longer exists.";
+
+/**
+ * A write that reaches a task by its id stops here when the task is a draft a
+ * partner discarded. Discard only marks the row (discardDrafts), so the
+ * draft's page left open in another tab can still send an edit, a comment, a
+ * file, a checklist item or a tick. Each would land on a row nobody can see,
+ * which the sweep deletes ten minutes later without a word to whoever wrote
+ * it. To everyone the draft is gone, so each is refused in the line a missing
+ * draft gets.
+ *
+ * Every write that names one task, or a comment, file or checklist item of
+ * one, calls this on the row it reads before it writes: setStatus, patchTask,
+ * addComment, a comment's edit, delete and restore (ownComment),
+ * recordAttachment, removeAttachment, renameAttachment, setChecklistItem,
+ * addChecklistItem and a checklist item's rename, removal and restore
+ * (drafts-core.test.ts holds the list to this file). A contractor's own
+ * writes are refused first by their access check, which no draft passes.
+ *
+ * The draft's own moves decide for themselves: Add and Discard refuse a
+ * discarded one in this same line, Discard's Undo and the sweep exist for
+ * them, its save sent again reads it as saved, and a unit renamed on its
+ * building still carries it along (renameTaskUnits), so its Undo brings back
+ * a draft that Add takes. A row that isn't there is the caller's to refuse,
+ * in its own words.
+ */
+function refuseDiscarded(task: Pick<Task, "discardedAt"> | null | undefined): void {
+  if (task && isDiscarded(task)) throw new TaskRuleError(DRAFT_GONE_LINE);
+}
+
+/**
+ * Add was refused for one draft. `taskId` and `title` say which, so Add all's
+ * toast can open the draft to fix; the message is the line to show.
+ */
+export class DraftRefusedError extends TaskRuleError {
+  constructor(
+    message: string,
+    readonly taskId: string,
+    readonly title: string,
+  ) {
+    super(message);
+    this.name = "DraftRefusedError";
+  }
+}
+
+export interface AddedDraft {
+  task: Task;
+  /** The line this Add wrote; its Undo names it (undoAddDraft). */
+  addEventId: string;
+  /**
+   * The contractor the job went to and whether they get its email, for the toast's "Emails Zack" or "No email to
+   * Rob" (drafts.ts draftsAddedNames). Null for a partner's own task or nobody's.
+   */
+  contractor: DraftContractor | null;
+}
+
+/**
+ * Everyone a name in a refusal's line could be read as (drafts.ts nameAmong):
+ * the team and the contractors the pickers list, by their picker keys. Read
+ * only once a refusal is certain, so no write that goes through pays for it.
+ */
+async function knownPeople(tx: Tx): Promise<PersonRef[]> {
+  const users = await tx.user.findMany({ select: { id: true, name: true, email: true } });
+  const contacts = await tx.contact.findMany({ where: { ...listedContactsWhere, archivedAt: null }, select: { id: true, fullName: true } });
+  return [...users.map((u) => ({ key: `u:${u.id}`, name: u.name ?? u.email })), ...contacts.map((c) => ({ key: `c:${c.id}`, name: c.fullName }))];
+}
+
+/** What a draft's unit line says once its unit is no longer on its building, or null while it still is (or it names none). */
+async function goneUnitLine(tx: Tx, draft: Pick<Task, "propertyId" | "unitLabel">): Promise<string | null> {
+  const label = draft.unitLabel?.trim();
+  if (!draft.propertyId || !label) return null;
+  // A plain read: locking the property here would cross a units save, which holds the property and then takes the
+  // tasks that name a renamed unit (properties/service.ts, renameTaskUnits).
+  const property = await tx.property.findUnique({ where: { id: draft.propertyId }, select: { units: true } });
+  // Matched as the lockbox code and the tenants are (tasks/lockbox.ts): trimmed, whatever the case.
+  const there = unitLabels(property?.units).some((unit) => unit.toLowerCase() === label.toLowerCase());
+  return there ? null : `${unitDisplay(label)} is gone. Pick the unit.`;
+}
+
+/** The rows an Add addressed to its contractor, kept on the Add's line so only its Undo puts them back (addLockedDraft). */
+type Addressed = { to: string; events: string[]; files: string[] };
+
+function addressedOf(data: unknown): Addressed | null {
+  const kept = data && typeof data === "object" && !Array.isArray(data) ? (data as { addressed?: unknown }).addressed : null;
+  if (!kept || typeof kept !== "object") return null;
+  const { to, events, files } = kept as { to?: unknown; events?: unknown; files?: unknown };
+  const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+  return typeof to === "string" ? { to, events: ids(events), files: ids(files) } : null;
+}
+
+/**
+ * What was posted as Shared while the job was a draft, addressed now to the
+ * contractor it is added for, as a Shared line written on their job is
+ * (rules.ts writeAudience). Until now it was addressed to nobody, which the
+ * portal shows to whoever holds the job, so the next contractor on it would
+ * have read what was written for this one. Staff rows only (a draft holds no
+ * others), a deleted comment's included: its Undo brings it back as it was
+ * addressed. Returns what it changed, for the Add's line; null when there was
+ * nothing.
+ */
+async function addressDraftPosts(tx: Tx, taskId: string, contactId: string): Promise<Addressed | null> {
+  const events = await tx.taskEvent.findMany({
+    where: { taskId, visibility: "SHARED", audienceContactId: null, actorContactId: null, source: { not: "ASANA" } },
+    select: { id: true },
+  });
+  const files = await tx.taskAttachment.findMany({
+    where: { taskId, visibility: "SHARED", audienceContactId: null, uploadedByContactId: null, asanaGid: null },
+    select: { id: true },
+  });
+  if (events.length === 0 && files.length === 0) return null;
+  const addressed: Addressed = { to: contactId, events: events.map((e) => e.id), files: files.map((f) => f.id) };
+  if (addressed.events.length) await tx.taskEvent.updateMany({ where: { id: { in: addressed.events } }, data: { audienceContactId: contactId } });
+  if (addressed.files.length) await tx.taskAttachment.updateMany({ where: { id: { in: addressed.files } }, data: { audienceContactId: contactId } });
+  return addressed;
+}
+
+/**
+ * One draft becomes a To do task, its row already locked by the caller: what
+ * createTask does for a new task, a moment later. The contractor's contact
+ * is locked right after the task and before any child or email row, as every
+ * assigning path does, and one archived since the draft was saved is refused
+ * (6.4), in the house's own line for it: the row and the page already say
+ * who the draft is for. A unit removed from the building since is refused
+ * too, so no job names a unit that isn't there. Then the status, the line
+ * Activity reads as "Pieter added this draft", the contractor's access, what
+ * was posted on the draft addressed to them, their "assigned you" email and
+ * the deal's line. The email waits BUNDLE_QUIET_MS, longer than the Undo
+ * lasts.
+ */
+async function addLockedDraft(tx: Tx, before: Task, p: Partner, now: Date): Promise<AddedDraft> {
+  const contactId = before.assigneeContactId;
+  let contractor: DraftContractor | null = null;
+  if (contactId) {
+    const archived = await contactArchivedLocked(tx, contactId);
+    const contact = await tx.contact.findUnique({ where: { id: contactId }, select: { id: true, fullName: true, active: true, portalAccount: { select: JOB_EMAIL_SELECT } } });
+    contractor = draftContractor(contact);
+    if (archived) throw new DraftRefusedError(ARCHIVED_ASSIGNEE_LINE, before.id, before.title);
+  }
+  const noUnit = await goneUnitLine(tx, before);
+  if (noUnit) throw new DraftRefusedError(noUnit, before.id, before.title);
+  const task = await tx.task.update({ where: { id: before.id }, data: { status: "OPEN", ...editStamp(p, now) } }); // status-write: an added draft starts as To do
+  const addressed = contactId ? await addressDraftPosts(tx, task.id, contactId) : null;
+  // Internal, as any move to To do is: the contractor's job page never shows it.
+  const added = await addEvent(tx, task.id, p, { kind: "STATUS", visibility: "INTERNAL", data: { from: "DRAFT", to: "OPEN", ...(addressed ? { addressed } : {}) } });
+  if (contactId) {
+    await syncAssigneeAccess(tx, task, contactId, p, now);
     await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
   }
-  await logDeal(tx, task.dealId, p, `Task added: ${task.title}`, now);
-  for (const item of input.checklist ?? []) {
-    if (item.title.trim()) await addChecklistItem(tx, task.id, item.title, p, now, item.checkKey ?? null);
+  await logDeal(tx, task.dealId, p, `Task added: ${task.title}`, now, added.id);
+  return { task, addEventId: added.id, contractor };
+}
+
+/**
+ * Add (D12): the draft becomes a To do task, its contractor can open the job
+ * and their email is queued, exactly as New task would have done. Refused
+ * when it is gone (deleted, or discarded: a discarded draft is gone to
+ * everyone until its Undo), with who moved it when it is no longer a draft
+ * (the other partner added it), and with DraftRefusedError when its
+ * contractor was archived or its unit removed since.
+ */
+export async function addDraft(tx: Tx, taskId: string, p: Principal, now = new Date()): Promise<AddedDraft> {
+  partnerOnly(p);
+  await lockTask(tx, taskId);
+  const before = await tx.task.findUnique({ where: { id: taskId } });
+  if (!before || isDiscarded(before)) throw new TaskRuleError(DRAFT_GONE_LINE);
+  if (before.status !== "DRAFT") throw await taskChanged(tx, taskId, before.status, p);
+  return addLockedDraft(tx, before, p, now);
+}
+
+/**
+ * Add all: every one of these drafts, or none. A refusal (DraftRefusedError
+ * names the draft) throws, and the caller's transaction rolls every add back.
+ * A draft added or discarded since the list was drawn is passed over: it is
+ * already where it was headed. With `mine`, so is one that isn't the
+ * partner's own, so Add all never touches the other partner's group.
+ *
+ * The rows are locked as they are read, in the database's id order, as every
+ * write that holds more than one task takes them (bulk.ts), so both partners'
+ * Add all at once run one after the other.
+ */
+export async function addDrafts(tx: Tx, taskIds: readonly string[], p: Principal, now = new Date(), opts: { mine?: boolean } = {}): Promise<AddedDraft[]> {
+  partnerOnly(p);
+  const ids = [...new Set(taskIds)];
+  if (ids.length === 0) return [];
+  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR NO KEY UPDATE`;
+  const added: AddedDraft[] = [];
+  for (const { id } of rows) {
+    const before = await tx.task.findUnique({ where: { id } });
+    if (!before || before.status !== "DRAFT" || isDiscarded(before)) continue;
+    if (opts.mine && !isOwnDraft(before, p)) continue;
+    added.push(await addLockedDraft(tx, before, p, now));
   }
-  return task;
+  return added;
+}
+
+/**
+ * The contractor who has opened or written on this job, if any: a line or a
+ * file of theirs on it, or their read mark, which opening the job in the
+ * portal writes (portal/jobs.ts markJobSeen), the rule takeBackRepeat uses for
+ * a copy somebody has seen. A draft has none of these (no contractor can open
+ * or write one), and an Add is never undone once one exists, so anything
+ * found here is from the Add being undone. Null when nobody has.
+ */
+async function contractorOnJob(tx: Tx, taskId: string): Promise<string | null> {
+  const line = await tx.taskEvent.findFirst({ where: { taskId, actorContactId: { not: null } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { actorContactId: true } });
+  if (line?.actorContactId) return line.actorContactId;
+  const file = await tx.taskAttachment.findFirst({ where: { taskId, uploadedByContactId: { not: null } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { uploadedByContactId: true } });
+  if (file?.uploadedByContactId) return file.uploadedByContactId;
+  const seen = await tx.taskReadState.findFirst({ where: { taskId, contactId: { not: null } }, select: { contactId: true } });
+  return seen?.contactId ?? null;
+}
+
+/**
+ * Add's Undo: the task is a draft again, as if it had not been added. Like
+ * Approve's Undo it writes no line of its own: the Add's line is soft-deleted
+ * (the timeline hides what was undone), the deal's "Task added" goes with it,
+ * the access row the Add made is removed, so the contractor can't open the
+ * job and adding it again starts their "new since" from then, and what the
+ * Add addressed to them is addressed to nobody again, as it was on the draft.
+ *
+ * What a partner posted as Shared after the Add, while the job was a task,
+ * is addressed to nobody again too, so it waits with the draft.
+ *
+ * The emails the Add's time as a task queued for a contractor go too: every
+ * one still waiting, unsent and held by no send run, is deleted (their
+ * "assigned you", a "took you off" from a reassignment in between, a "Due
+ * today" the 8 am run added). So nothing about a job that is a draft again
+ * can follow, and a second Add starts clean: its email is a new row, and its
+ * 8 am reminder queues as for a first Add (queueDueReminder looks for one
+ * already queued).
+ * Only the access row an assignment made is removed (source ASSIGNEE): one
+ * someone shared by hand is not the Undo's to take, and the send run closes
+ * any row for a draft unsent itself (notifications/content.ts dueRowVerdict).
+ *
+ * Staff only, only the partner who added it, within APPROVAL_UNDO_MS, and
+ * only while the job is still To do with the Add as its latest status line.
+ * Refused once its contractor has opened or written on the job
+ * (contractorOnJob): the job would vanish under them, and their words would
+ * be left on a draft. Refused once a job email for it is sent or on its way
+ * (approvalEmailState, as Approve's Undo): that can't happen inside the window
+ * on a first Add, but a draft added, undone and added again for ten minutes
+ * reaches the bundle's limit, and by then the contractor has been told. Each
+ * refusal is one toast line that fits a phone (lib/toast-line.ts), and none
+ * points to the status menu: no status makes a task a draft again. A retry
+ * of an Undo that went through is a quiet success. Lock order: this task,
+ * then its email rows (id order); the send run locks email rows only.
+ */
+export async function undoAddDraft(tx: Tx, taskId: string, addEventId: string, p: Principal, now = new Date()): Promise<{ task: Task }> {
+  partnerOnly(p);
+  await lockTask(tx, taskId);
+  const before = await tx.task.findUnique({ where: { id: taskId } });
+  if (!before) throw new TaskRuleError("That task no longer exists.");
+  // Only this function soft-deletes an Add's line, and only for the partner who added: deleted and theirs, on a task
+  // that is still the draft it made, is a retry. Added again since, it is another Add's task, and this Undo is late.
+  if (before.status === "DRAFT") {
+    const undone = await tx.taskEvent.findFirst({
+      where: { id: addEventId, taskId, kind: "STATUS", actorUserId: p.userId, deletedAt: { not: null } },
+      select: { id: true },
+    });
+    if (undone) return { task: before };
+  }
+  if (before.status !== "OPEN") throw await taskChanged(tx, taskId, before.status, p);
+  const latest = await tx.taskEvent.findFirst({
+    where: { taskId, kind: "STATUS", deletedAt: null },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, data: true, createdAt: true, actorUserId: true, actorLabel: true },
+  });
+  const fromDraft = (latest?.data as { from?: unknown } | null)?.from === "DRAFT";
+  if (!latest || latest.id !== addEventId || !fromDraft) throw new TaskRuleError("This task changed since.");
+  if (latest.actorUserId !== p.userId) {
+    const by = latest.actorUserId ? nameAmong({ key: `u:${latest.actorUserId}`, name: latest.actorLabel }, await knownPeople(tx)) : firstName(latest.actorLabel);
+    throw new TaskRuleError(by ? `Only ${by} can undo this.` : "Not yours to undo.");
+  }
+  if (now.getTime() - latest.createdAt.getTime() > APPROVAL_UNDO_MS) throw new TaskRuleError("Too late to undo.");
+  const onJob = await contractorOnJob(tx, taskId);
+  if (onJob) {
+    const who = await tx.contact.findUnique({ where: { id: onJob }, select: { fullName: true } });
+    const name = who ? nameAmong({ key: `c:${onJob}`, name: who.fullName }, await knownPeople(tx)) : "";
+    throw new TaskRuleError(`${name || "Someone"} already opened it.`);
+  }
+  // Every email row to a contractor on this job, locked so a send run can't claim one between this check and the
+  // delete below.
+  const emails = await tx.$queryRaw<ApprovalEmail[]>`
+    SELECT "sentAt", "lastError", "openKey", "attempts" FROM "NotificationOutbox"
+    WHERE "taskId" = ${taskId} AND "recipientContactId" IS NOT NULL
+    ORDER BY "id" FOR UPDATE`;
+  const emailed = approvalEmailState(emails);
+  if (emailed === "sent") throw new TaskRuleError("Email already sent.");
+  if (emailed === "sending") throw new TaskRuleError("The email is on its way.");
+  const task = await tx.task.update({ where: { id: taskId }, data: { status: "DRAFT", ...editStamp(p, now) } });
+  await tx.taskEvent.update({ where: { id: addEventId }, data: { deletedAt: now } });
+  await tx.taskAccess.deleteMany({ where: { taskId, source: "ASSIGNEE" } });
+  // Unsent and held by no send run: the rows still waiting, and one a run claimed and handed back untried (the
+  // mail provider turned the run away, so its try was given back with `openKey` already cleared). Left behind, that
+  // one would send beside the next Add's own row. A row a run holds or is retrying has a try against it and was
+  // refused above as on its way; one a run closed unsent has `sentAt` set and stays as its record.
+  await tx.notificationOutbox.deleteMany({ where: { taskId, recipientContactId: { not: null }, sentAt: null, attempts: 0 } });
+  const addressed = addressedOf(latest.data);
+  if (addressed) {
+    if (addressed.events.length) await tx.taskEvent.updateMany({ where: { id: { in: addressed.events }, taskId, audienceContactId: addressed.to }, data: { audienceContactId: null } });
+    if (addressed.files.length) await tx.taskAttachment.updateMany({ where: { id: { in: addressed.files }, taskId, audienceContactId: addressed.to }, data: { audienceContactId: null } });
+  }
+  // What a partner posted as Shared between the Add and this Undo stays addressed to the contractor the job had
+  // then (rules.ts writeAudience). If the draft is added again for someone else, they never see a note written for
+  // the first contractor.
+  if (task.dealId) {
+    await tx.dealNote.updateMany({
+      where: { dealId: task.dealId, source: "change", deletedAt: null, data: { path: ["taskEventId"], equals: addEventId } },
+      data: { deletedAt: now },
+    });
+  }
+  return { task };
+}
+
+/** What Add all's Undo did, task by task. */
+export interface UndoneAdds {
+  /** The tasks that are drafts again. */
+  undone: Task[];
+  /** The ones that stayed tasks, each with its title and the line why ("Zack already opened it."). `title` is "" for one that is gone. */
+  kept: { taskId: string; title: string; message: string }[];
+}
+
+/**
+ * Add all's Undo, and one Add's: each task is taken back or kept on its own.
+ * One that can't go back (its contractor opened it, someone moved it, its
+ * email went) stays a task and is listed in `kept` with its title and the
+ * rule's own line; the rest are drafts again. Each runs inside its own
+ * savepoint, as a bulk edit's tasks do (bulk-core.ts eachTask), so a refusal
+ * rolls back only that task's reads and locks. Anything that isn't a rule's
+ * refusal fails the whole Undo. The tasks are locked first, in the database's
+ * id order, as addDrafts took them.
+ */
+export async function undoAddDrafts(tx: Tx, adds: readonly { taskId: string; addEventId: string }[], p: Principal, now = new Date()): Promise<UndoneAdds> {
+  partnerOnly(p);
+  const out: UndoneAdds = { undone: [], kept: [] };
+  if (adds.length === 0) return out;
+  const rows = await tx.$queryRaw<{ id: string; title: string }[]>`
+    SELECT "id", "title" FROM "Task" WHERE "id" IN (${Prisma.join([...new Set(adds.map((a) => a.taskId))])}) ORDER BY "id" FOR NO KEY UPDATE`;
+  const titles = new Map(rows.map((r) => [r.id, r.title]));
+  // The tasks that are there, in the order they were locked, then any that are gone.
+  const order = [...rows.map((r) => r.id), ...new Set(adds.map((a) => a.taskId).filter((id) => !titles.has(id)))];
+  for (const id of order) {
+    for (const add of adds) {
+      if (add.taskId !== id) continue;
+      await tx.$executeRaw`SAVEPOINT undo_add`;
+      try {
+        const { task } = await undoAddDraft(tx, id, add.addEventId, p, now);
+        await tx.$executeRaw`RELEASE SAVEPOINT undo_add`;
+        out.undone.push(task);
+      } catch (err) {
+        if (!(err instanceof TaskRuleError)) throw err;
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT undo_add`;
+        out.kept.push({ taskId: id, title: titles.get(id) ?? "", message: err.message });
+      }
+    }
+  }
+  return out;
+}
+
+/** What Discard marked, for the caller's refresh of the pages that showed them. */
+export interface DiscardedDrafts {
+  /** The drafts discarded, in the order asked for. Undo sends these back (restoreDrafts). */
+  ids: string[];
+  /** Their properties, whose pages are refreshed with everything else. */
+  propertyIds: string[];
+}
+
+/**
+ * Discard all, and Discard on one row (D19): each draft is marked discarded
+ * (`discardedAt`) and nothing is deleted. To everyone it is gone at once
+ * (task-scope.ts draftTask is what every draft read filters by), and its Undo
+ * brings it back whole by clearing the mark (restoreDrafts). The row and its
+ * files go when the sweep finds the mark older than DISCARD_KEEP_MS
+ * (sweepDiscardedDrafts). Only a waiting draft is ever marked: one a partner
+ * added since the list was drawn is a task now and is passed over, as is one
+ * already discarded or gone. With `mine`, so is a draft that isn't the
+ * partner's own, so Discard all never touches the other partner's group.
+ * Locked in the database's id order, as every write that holds more than one
+ * task takes them.
+ */
+export async function discardDrafts(tx: Tx, taskIds: readonly string[], p: Principal, now = new Date(), opts: { mine?: boolean } = {}): Promise<DiscardedDrafts> {
+  partnerOnly(p);
+  const ids = [...new Set(taskIds)];
+  const out: DiscardedDrafts = { ids: [], propertyIds: [] };
+  if (ids.length === 0) return out;
+  await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR NO KEY UPDATE`;
+  const rows = await tx.task.findMany({ where: { id: { in: ids }, ...draftTask }, select: { id: true, propertyId: true, createdByUserId: true } });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  for (const id of ids) {
+    const draft = byId.get(id);
+    if (!draft || (opts.mine && !isOwnDraft(draft, p))) continue;
+    out.ids.push(id);
+    if (draft.propertyId && !out.propertyIds.includes(draft.propertyId)) out.propertyIds.push(draft.propertyId);
+  }
+  if (out.ids.length > 0) await tx.task.updateMany({ where: { id: { in: out.ids } }, data: { discardedAt: now } });
+  return out;
+}
+
+/**
+ * Discard on one draft, from its row or its page. Refused, with who moved
+ * it, when a partner has added it since: a task is never discarded. One
+ * already discarded is gone, as a deleted one is.
+ */
+export async function discardDraft(tx: Tx, taskId: string, p: Principal, now = new Date()): Promise<DiscardedDrafts> {
+  partnerOnly(p);
+  await lockTask(tx, taskId);
+  const before = await tx.task.findUnique({ where: { id: taskId }, select: { status: true, discardedAt: true } });
+  if (!before || isDiscarded(before)) throw new TaskRuleError(DRAFT_GONE_LINE);
+  if (before.status !== "DRAFT") throw await taskChanged(tx, taskId, before.status, p);
+  return discardDrafts(tx, [taskId], p, now);
+}
+
+export interface RestoredDrafts {
+  /** The drafts that wait again, in the order given: the ones this brought back, and any already back (a second Undo, another tab). */
+  restored: Task[];
+  /** The ids that can't come back as drafts: the sweep has deleted them, or a partner added one after an earlier Undo. */
+  gone: string[];
+}
+
+/**
+ * Discard's Undo: the mark is cleared, by id, and the draft is back whole
+ * (its fields, its checklist with its ticks, its comments, photos and
+ * timeline, its id and its place in its group), because nothing was deleted.
+ * Nothing but the ids comes from the browser, and they only ever clear a
+ * discard: a row that isn't a discarded draft is not written. Nothing about
+ * the draft is checked again here: its contractor may have been archived
+ * since, and Add refuses that in its own words.
+ */
+export async function restoreDrafts(tx: Tx, taskIds: readonly string[], p: Principal): Promise<RestoredDrafts> {
+  partnerOnly(p);
+  const ids = [...new Set(taskIds)];
+  const out: RestoredDrafts = { restored: [], gone: [] };
+  if (ids.length === 0) return out;
+  await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR NO KEY UPDATE`;
+  await tx.task.updateMany({ where: { id: { in: ids }, status: "DRAFT", discardedAt: { not: null } }, data: { discardedAt: null } });
+  const rows = await tx.task.findMany({ where: { id: { in: ids }, ...draftTask } });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  for (const id of ids) {
+    const draft = byId.get(id);
+    if (draft) out.restored.push(draft);
+    else out.gone.push(id);
+  }
+  return out;
+}
+
+/** What the sweep deleted, and what the caller clears up once that commits. */
+export interface SweptDrafts {
+  ids: string[];
+  /** The Blob paths of the files posted on them, to remove after the commit. */
+  blobs: string[];
+}
+
+/** The most drafts one sweep deletes; the next minute's run takes the rest. */
+const SWEEP_BATCH = 200;
+
+/** A LINK has no blob; an older row may still point at a public one, which the delete takes by URL. */
+export const blobsOf = (files: readonly Pick<TaskAttachment, "url" | "thumbPathname" | "posterPathname">[]): string[] =>
+  files.flatMap((a) => [a.url, a.thumbPathname, a.posterPathname]).filter((x): x is string => !!x);
+
+/**
+ * The every-minute run's sweep: every draft discarded more than
+ * DISCARD_KEEP_MS before `now` is deleted, with its timeline, checklist and
+ * files (all cascade), as a deleted task loses them. Its Undo has long run
+ * out by then. Returns the files' Blob paths, which the caller removes once
+ * the delete has committed.
+ *
+ * Each row is locked as it is read, FOR UPDATE (the lock its delete takes),
+ * in id order, and one somebody holds right now is passed over until the next
+ * run (SKIP LOCKED), so the sweep never waits on a late Undo or a write on a
+ * tab left open. The mark is read under that lock: an Undo that cleared it a
+ * moment ago is not deleted. A write that waited on the sweep finds the task
+ * gone and says so.
+ */
+export async function sweepDiscardedDrafts(tx: Tx, now = new Date()): Promise<SweptDrafts> {
+  // The column is a timestamp without time zone, holding UTC: convert explicitly, as enqueue does.
+  const before = Prisma.sql`(${new Date(now.getTime() - DISCARD_KEEP_MS).toISOString()}::timestamptz AT TIME ZONE 'UTC')`;
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id" FROM "Task" WHERE "status" = 'DRAFT' AND "discardedAt" < ${before}
+    ORDER BY "id" LIMIT ${SWEEP_BATCH} FOR UPDATE SKIP LOCKED`;
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return { ids, blobs: [] };
+  const files = await tx.taskAttachment.findMany({ where: { taskId: { in: ids } }, select: { url: true, thumbPathname: true, posterPathname: true } });
+  await tx.task.deleteMany({ where: { id: { in: ids } } });
+  return { ids, blobs: blobsOf(files) };
+}
+
+// ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+/** The refusal for Delete on a draft: a draft goes by Discard, which has an Undo. */
+export const DRAFT_DELETE_LINE = "This is a draft. Discard it.";
+
+/** What a delete removed, for the caller's refresh and its files' cleanup. */
+export interface DeletedTask {
+  id: string;
+  propertyId: string | null;
+  dealId: string | null;
+  /** The Blob paths of its files, to remove after the commit. */
+  blobs: string[];
+}
+
+/**
+ * Staff only: removes the task for good, with its timeline, checklist, files,
+ * access rows and queued emails (all cascade). A task on a deal leaves a line
+ * on the deal's timeline. Null, and nothing written, when the task doesn't
+ * exist.
+ *
+ * Never a draft (DRAFT_DELETE_LINE): a draft goes by Discard, which keeps it
+ * for its Undo. The row is locked first, FOR UPDATE (the lock the delete
+ * takes), so the status read here is the one the row has when it is deleted:
+ * a task an Add's Undo turns back into a draft at that moment waits its turn
+ * and is then refused, from its own page and from bulk delete alike. A
+ * discarded draft is gone already, so it answers as a missing task does.
+ */
+export async function deleteTask(tx: Tx, id: string, p: Principal, now = new Date()): Promise<DeletedTask | null> {
+  if (p.kind !== "staff") throw new TaskRuleError("Only staff can delete a task.");
+  await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id" = ${id} FOR UPDATE`;
+  const task = await tx.task.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      discardedAt: true,
+      propertyId: true,
+      dealId: true,
+      attachments: { select: { url: true, thumbPathname: true, posterPathname: true } },
+    },
+  });
+  if (!task || isDiscarded(task)) return null;
+  if (task.status === "DRAFT") throw new TaskRuleError(DRAFT_DELETE_LINE);
+  await tx.task.delete({ where: { id } });
+  if (task.dealId) {
+    await tx.dealNote.create({ data: { dealId: task.dealId, body: `Task deleted: ${task.title}  ·  ${p.label}`, noteDate: now, source: "change" } });
+  }
+  return { id: task.id, propertyId: task.propertyId, dealId: task.dealId, blobs: blobsOf(task.attachments) };
 }
 
 // ---------------------------------------------------------------------------
@@ -718,6 +1509,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
+  refuseDiscarded(before);
   if (opts.expected && before.status !== opts.expected) throw await taskChanged(tx, taskId, before.status, p);
   if (!canSetStatus(kindOf(p), before.status, to)) {
     // A contractor's refusal says where the job is now: their tab is usually stale (approved, or done in another tab).
@@ -763,7 +1555,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   });
   if (dropArchived && before.assigneeContactId) {
     await addEvent(tx, taskId, p, archivedAssigneeLine(before.assigneeContactId));
-    await syncAssigneeAccess(tx, taskId, null, p, now);
+    await syncAssigneeAccess(tx, task, null, p, now);
   }
   if (giveBack) {
     // Marked `givenBack`: nobody picked him, so the timeline words it as his job again and never pairs it (activity.ts).
@@ -771,7 +1563,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
       kind: "ASSIGNED",
       data: { from: { userId: null, contactId: null, name: before.assigneeName }, to: { userId: null, contactId: giveBack }, givenBack: true },
     });
-    await syncAssigneeAccess(tx, taskId, giveBack, p, now);
+    await syncAssigneeAccess(tx, task, giveBack, p, now);
   }
 
   const visibility = statusEventVisibility(to, !!task.assigneeContactId);
@@ -848,8 +1640,21 @@ type ApprovalEmail = { sentAt: Date | null; lastError: string | null; openKey: s
  * it, no login, given up) never reached him, so it doesn't stop the Undo.
  */
 export function approvalEmailRefusal(rows: readonly ApprovalEmail[]): string | null {
-  if (rows.some((e) => e.sentAt !== null && e.lastError === null)) return "Email already sent. Change the status.";
-  if (rows.some((e) => e.sentAt === null && e.openKey === null && e.attempts > 0)) return "The email is on its way. Change the status.";
+  const emailed = approvalEmailState(rows);
+  if (emailed === "sent") return "Email already sent. Change the status.";
+  if (emailed === "sending") return "The email is on its way. Change the status.";
+  return null;
+}
+
+/**
+ * The same read of a job's email rows, without Approve's words: "sent",
+ * "sending" (on its way), or null when nothing stops an Undo. Add's Undo
+ * says it in lines of its own (undoAddDraft), since the status menu is no way
+ * back to a draft.
+ */
+export function approvalEmailState(rows: readonly ApprovalEmail[]): "sent" | "sending" | null {
+  if (rows.some((e) => e.sentAt !== null && e.lastError === null)) return "sent";
+  if (rows.some((e) => e.sentAt === null && e.openKey === null && e.attempts > 0)) return "sending";
   return null;
 }
 
@@ -929,7 +1734,7 @@ export async function undoApproval(tx: Tx, taskId: string, approvedEventId: stri
   });
   if (dropArchived && before.assigneeContactId) {
     await addEvent(tx, taskId, p, archivedAssigneeLine(before.assigneeContactId));
-    await syncAssigneeAccess(tx, taskId, null, p, now);
+    await syncAssigneeAccess(tx, task, null, p, now);
   }
   await tx.taskEvent.update({ where: { id: approvedEventId }, data: { deletedAt: now } });
   const completedLine = task.dealId
@@ -1050,7 +1855,7 @@ export async function createNextRepeat(tx: Tx, done: Task, p: Principal, now: Da
   );
   await addEvent(tx, done.id, { kind: "system", label: "Repeats" }, { kind: "REPEAT_CREATED", data: { next: next.id, due } });
   if (next.assigneeContactId) {
-    await syncAssigneeAccess(tx, next.id, next.assigneeContactId, p, now);
+    await syncAssigneeAccess(tx, next, next.assigneeContactId, p, now);
     await notify(tx, next, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(next, now), now);
   }
   return next.id;
@@ -1183,6 +1988,14 @@ async function assigneeChanged(tx: Tx, t: Task, p: Principal): Promise<AssigneeC
  * (`expectedDescription`); each is refused when that's out of date.
  */
 export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Principal, now = new Date()): Promise<Task> {
+  return writePatch(tx, taskId, patch, p, now, "refuse");
+}
+
+/**
+ * patchTask's write. `discarded` says what a discarded draft gets: every edit sent by id is refused, as any write
+ * to one is (refuseDiscarded). Only a unit renamed on its building is carried onto it (renameTaskUnits).
+ */
+async function writePatch(tx: Tx, taskId: string, patch: TaskPatch, p: Principal, now: Date, discarded: "refuse" | "carry"): Promise<Task> {
   if (p.kind === "contractor") throw new TaskRuleError("Contractors can't edit job details.");
   // A reassignment or a guarded notes save locks the row first, as setStatus does, so two at once (both
   // partners, two tabs) run one after the other and the second sees the first.
@@ -1190,6 +2003,7 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
   if (guarded) await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That task no longer exists.");
+  if (discarded === "refuse") refuseDiscarded(before);
   if (
     patch.assignee !== undefined &&
     patch.expectedAssignee !== undefined &&
@@ -1295,7 +2109,8 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
       // A picker loaded before the contractor was archived still offers them. One who already has the job keeps it,
       // and a closed job can go back to them: only open work is refused (ARCHIVED_ASSIGNEE_LINE). The row lock above
       // holds the status read here until this commits, so a reopen runs after it and starts the job unassigned.
-      if (contactId && contactId !== before.assigneeContactId && (await contactArchivedLocked(tx, contactId)) && isActiveStatus(before.status)) {
+      // A draft is work about to open, so it refuses them as open work does.
+      if (contactId && contactId !== before.assigneeContactId && (await contactArchivedLocked(tx, contactId)) && refusesArchived(before.status)) {
         throw new TaskRuleError(ARCHIVED_ASSIGNEE_LINE);
       }
       // Exactly one kind of assignee; the legacy free text goes once a real one is chosen.
@@ -1316,7 +2131,7 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
   for (const e of events) await addEvent(tx, taskId, p, e);
 
   if (newContactId !== undefined) {
-    await syncAssigneeAccess(tx, taskId, newContactId, p, now);
+    await syncAssigneeAccess(tx, after, newContactId, p, now);
     if (newContactId) await notify(tx, after, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(after, now), now);
     // The contractor taken off an open job hears so, so nobody makes the trip (docs/specs/contractor-job-emails.md 6).
     if (before.assigneeContactId && isActiveStatus(before.status)) {
@@ -1383,7 +2198,9 @@ export async function setDateByContractor(tx: Tx, taskId: string, date: Ymd, p: 
  * code (D21) and its unit reads the same everywhere. Each goes through
  * patchTask, so it gets the usual internal unit line. Rows are matched
  * against the labels as they were, so two units swapping names swap their
- * tasks. Returns the ids of the tasks it changed.
+ * tasks. A draft is carried too, and so is one a partner discarded: its Undo
+ * brings it back within ten minutes, and Add refuses a draft whose unit is no
+ * longer on its building. Returns the ids of the tasks it changed.
  */
 export async function renameTaskUnits(
   tx: Tx,
@@ -1403,7 +2220,7 @@ export async function renameTaskUnits(
   for (const t of tasks) {
     const to = renamedLabel(renames, t.unitLabel);
     if (!to) continue;
-    await patchTask(tx, t.id, { unitLabel: to }, p, now);
+    await writePatch(tx, t.id, { unitLabel: to }, p, now, "carry");
     changed.push(t.id);
   }
   return changed;
@@ -1523,6 +2340,7 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
+  refuseDiscarded(task);
   if (input.clientId) {
     // After the access check, so a contractor who lost the job never gets an earlier post back. Before the
     // closed-job check, so a Retry of an update that did post before the job closed gets that post back instead
@@ -1533,7 +2351,7 @@ export async function addComment(tx: Tx, taskId: string, input: CommentInput, p:
   if (p.kind === "contractor" && !isActiveStatus(task.status)) throw new TaskRuleError("This job is closed.");
   if (empty) throw new TaskRuleError("Write something or add a photo.");
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (input.visibility ?? "INTERNAL");
-  const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
+  const audienceContactId = audienceOf(p, task);
   // Only a contractor's files posting on their own are a batch, the one kind of post they can take back.
   const batch = input.batch === true && p.kind === "contractor" && !body;
   const { event, linked } = await writeComment(tx, taskId, p, {
@@ -1639,18 +2457,21 @@ function isCommentAuthor(e: Pick<TaskEvent, "actorUserId" | "actorContactId" | "
  * A partner deleting a reply while another removes a photo on it would
  * otherwise each hold the row the other waits for (Postgres aborts one with
  * 40P01). The first read names the task and takes no lock; the second, once
- * both are held, is the one the checks use.
+ * both are held, is the one the checks use. It also says whether the task is
+ * a draft a partner discarded, where a comment's edit, delete and restore are
+ * refused like any other write (refuseDiscarded).
  */
 async function ownComment(tx: Tx, eventId: string, p: Principal, { deleted }: { deleted: boolean | null }): Promise<TaskEvent> {
   const named = await tx.taskEvent.findUnique({ where: { id: eventId }, select: { taskId: true } });
   if (!named) throw new TaskRuleError("That comment no longer exists.");
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${named.taskId} FOR NO KEY UPDATE`;
   await tx.$executeRaw`SELECT 1 FROM "TaskEvent" WHERE "id" = ${eventId} FOR NO KEY UPDATE`;
-  const ev = await tx.taskEvent.findUnique({ where: { id: eventId } });
+  const ev = await tx.taskEvent.findUnique({ where: { id: eventId }, include: { task: { select: { discardedAt: true } } } });
   if (!ev || ev.kind !== "COMMENT") throw new TaskRuleError("That comment no longer exists.");
   if (!isCommentAuthor(ev, p)) throw new TaskRuleError("You can only change your own comments.");
   if (deleted === false && ev.deletedAt) throw new TaskRuleError("That comment was deleted.");
   if (p.kind === "contractor") await assertContractorAccess(tx, ev.taskId, p);
+  refuseDiscarded(ev.task);
   return ev;
 }
 
@@ -1912,8 +2733,9 @@ export async function recordAttachment(
   const task = await tx.task.findUnique({ where: { id: taskId } });
   if (!task) throw new TaskRuleError("That task no longer exists.");
   if (p.kind === "contractor") await assertContractorAccess(tx, taskId, p);
+  refuseDiscarded(task);
   const visibility: Visibility = p.kind === "contractor" ? "SHARED" : (opts.visibility ?? "INTERNAL");
-  const audienceContactId = writeAudience(kindOf(p), task.assigneeContactId);
+  const audienceContactId = audienceOf(p, task);
   const att = await tx.taskAttachment.create({
     data: {
       taskId,
@@ -1999,8 +2821,9 @@ export type RemovedFile = Pick<TaskAttachment, "id" | "taskId" | "asanaGid">;
  */
 export async function removeAttachment(tx: Tx, att: RemovedFile, p?: Principal, now = new Date()): Promise<boolean> {
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${att.taskId} FOR NO KEY UPDATE`;
-  const posted = await tx.taskAttachment.findUnique({ where: { id: att.id }, select: { eventId: true, filename: true } });
+  const posted = await tx.taskAttachment.findUnique({ where: { id: att.id }, select: { eventId: true, filename: true, task: { select: { discardedAt: true } } } });
   if (!posted) return false;
+  refuseDiscarded(posted.task);
   const { count } = att.asanaGid
     ? await tx.taskAttachment.updateMany({ where: { id: att.id, deletedAt: null }, data: { deletedAt: now } })
     : await tx.taskAttachment.deleteMany({ where: { id: att.id, deletedAt: null } });
@@ -2034,8 +2857,9 @@ export async function renameAttachment(tx: Tx, attachmentId: string, filename: s
   const named = await tx.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true } });
   if (!named) throw new TaskRuleError("That file no longer exists.");
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${named.taskId} FOR NO KEY UPDATE`;
-  const att = await tx.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true, deletedAt: true } });
+  const att = await tx.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true, deletedAt: true, task: { select: { discardedAt: true } } } });
   if (!att || att.deletedAt) throw new TaskRuleError("That file no longer exists.");
+  refuseDiscarded(att.task);
   await tx.taskAttachment.update({ where: { id: attachmentId }, data: { filename } });
   await tx.task.update({ where: { id: att.taskId }, data: editStamp(p, now) });
   return { taskId: att.taskId };
@@ -2046,12 +2870,13 @@ export async function setChecklistItem(tx: Tx, itemId: string, done: boolean, p:
   // beside a Remove or a task delete waits, then finds the item gone and says so, instead of failing on a row that
   // vanished between the read and the write (P2025).
   await lockChecklistItem(tx, itemId);
-  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { id: true, status: true } } } });
+  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { id: true, status: true, discardedAt: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   if (p.kind === "contractor") {
     await assertContractorAccess(tx, item.taskId, p);
     if (!isActiveStatus(item.task.status)) throw new TaskRuleError("This job is closed.");
   }
+  refuseDiscarded(item.task);
   if (item.done === done) return item;
   const updated = await tx.taskChecklistItem.update({
     where: { id: itemId },
@@ -2076,7 +2901,9 @@ export async function addChecklistItem(tx: Tx, taskId: string, title: string, p:
   // The task row first, as every writer on a task takes it: two adds at once take the next place one after the
   // other, and an add beside a task delete waits and then finds the task gone.
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
-  if (!(await tx.task.findUnique({ where: { id: taskId }, select: { id: true } }))) throw new TaskRuleError("That task no longer exists.");
+  const task = await tx.task.findUnique({ where: { id: taskId }, select: { id: true, discardedAt: true } });
+  if (!task) throw new TaskRuleError("That task no longer exists.");
+  refuseDiscarded(task);
   const last = await tx.taskChecklistItem.findFirst({ where: { taskId }, orderBy: { position: "desc" }, select: { position: true } });
   const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1, checkKey } });
   // Stamped like every other edit, so a repeat copy someone added to counts
@@ -2175,8 +3002,9 @@ export async function renameChecklistItem(tx: Tx, itemId: string, title: string,
   checklistStaffOnly(p);
   const next = checklistTitle(title);
   await lockChecklistItem(tx, itemId);
-  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId } });
+  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { discardedAt: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
+  refuseDiscarded(item.task);
   if (item.title === next) return item;
   const updated = await tx.taskChecklistItem.update({ where: { id: itemId }, data: { title: next } });
   await recordChecklistEdit(tx, item.taskId, p, "renamed", { id: itemId, title: next }, { from: item.title, to: next }, now);
@@ -2191,8 +3019,9 @@ export async function renameChecklistItem(tx: Tx, itemId: string, title: string,
 export async function removeChecklistItem(tx: Tx, itemId: string, p: Principal, now = new Date()): Promise<ChecklistSnapshot> {
   checklistStaffOnly(p);
   await lockChecklistItem(tx, itemId);
-  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId } });
+  const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { discardedAt: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
+  refuseDiscarded(item.task);
   await tx.taskChecklistItem.delete({ where: { id: itemId } });
   await recordChecklistEdit(tx, item.taskId, p, "removed", { id: itemId, title: item.title }, { from: item.title, to: null }, now);
   return {
@@ -2224,8 +3053,9 @@ export async function restoreChecklistItem(tx: Tx, snapshot: ChecklistSnapshot, 
   const existing = await tx.taskChecklistItem.findUnique({ where: { id: snapshot.id } });
   if (existing) return;
   if (snapshot.asanaGid && (await tx.taskChecklistItem.findUnique({ where: { asanaGid: snapshot.asanaGid } }))) return;
-  const task = await tx.task.findUnique({ where: { id: snapshot.taskId }, select: { id: true } });
+  const task = await tx.task.findUnique({ where: { id: snapshot.taskId }, select: { id: true, discardedAt: true } });
   if (!task) throw new TaskRuleError("This task is gone, so the item can't come back.");
+  refuseDiscarded(task);
   await tx.taskChecklistItem.create({
     data: {
       id: snapshot.id,

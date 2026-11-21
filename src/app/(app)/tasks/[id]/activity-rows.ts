@@ -89,6 +89,8 @@ export interface LineFields {
   /** Who did it, a first name: "Notes before Connor's edit". */
   by: string;
   viaAsana: boolean;
+  /** The line came from a draft Claude saved: "Pieter created this task via Claude". */
+  viaClaude: boolean;
   media: MediaItem[];
   files: FileLink[];
 }
@@ -258,7 +260,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
 
   const lineFields = (l: LineEntry<ActivityEvent>): LineFields => {
     const own = filesOf(l.events.map((e) => e.id));
-    return { text: l.text, href: l.href ?? null, status: l.status ?? null, previous: l.previousNotes ?? null, by: byOf(l.event), viaAsana: l.viaAsana === true, ...own };
+    return { text: l.text, href: l.href ?? null, status: l.status ?? null, previous: l.previousNotes ?? null, by: byOf(l.event), viaAsana: l.viaAsana === true, viaClaude: l.viaClaude === true, ...own };
   };
 
   const rows: ActivityRow[] = entries.map((entry, i): ActivityRow => {
@@ -298,6 +300,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
           previous: entry.previousNotes ?? null,
           by: byOf(entry.events[0]),
           viaAsana: false,
+          viaClaude: false,
           media: [],
           files: [],
           members: entry.lines.map((l) => ({ ...lineFields(l), id: l.id, at: l.at.toISOString() })),
@@ -305,7 +308,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
         };
       case "batch": {
         const own = filesOf(entry.events.map((e) => e.id));
-        return { ...base, type: "batch", text: entry.text, href: null, status: null, previous: null, by: byOf(entry.events[0]), viaAsana: false, ...own };
+        return { ...base, type: "batch", text: entry.text, href: null, status: null, previous: null, by: byOf(entry.events[0]), viaAsana: false, viaClaude: false, ...own };
       }
       case "decision":
         return { ...base, type: "decision", status: entry.line.status ?? null, text: entry.line.text, note: entry.note ? comment(entry.note) : null };

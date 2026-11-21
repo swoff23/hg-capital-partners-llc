@@ -68,7 +68,15 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     return link ? db.residentRequest.findFirst({ where: { leaseId: link.leaseId }, select: { id: true }, orderBy: { createdAt: "desc" } }) : null;
   },
   "tasks/[id]": (db) =>
-    db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+    db.task.findFirst({ where: { bucket: { not: "Template" }, status: { not: "DRAFT" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // A draft from Claude's own page (its banner, both buttons, the one-item menu): the first of the drafts setup.ts
+  // makes, the one with a contractor on it so the banner's line shows. See EXTRA_PAGES.
+  "tasks/[id]#draft": (db) =>
+    db.task.findFirst({
+      where: { status: "DRAFT", discardedAt: null, assigneeContactId: { not: null } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }),
   // Playbooks come from the Asana load (scripts/asana/20-load.ts).
   "templates/[id]": (db) =>
     db.taskTemplate.findFirst({ where: { archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } }),
@@ -131,7 +139,19 @@ function findPages(dir: string, segments: string[] = []): string[][] {
   return found;
 }
 
+/**
+ * A page in a state its route's one sample doesn't reach, loaded as well as the route itself. The pattern ends in
+ * `#name`, which is the page's own name in the report and the fragment of the URL it loads (no page reads it), and
+ * the SAMPLE_PARAMS key is the pattern's. A draft's page is the one: the task page's sample is never a draft.
+ */
+const EXTRA_PAGES: Route[] = [{ pattern: "/tasks/[id]#draft", params: ["tasks/[id]#draft"], session: "staff" }];
+
 export function listRoutes(): Route[] {
+  const own = listOwnRoutes();
+  return [...own, ...EXTRA_PAGES].sort((a, b) => a.pattern.localeCompare(b.pattern));
+}
+
+function listOwnRoutes(): Route[] {
   return findPages(APP_DIR)
     .map((segments) => {
       // Route groups like (marketing) don't appear in the URL.

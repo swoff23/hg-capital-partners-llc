@@ -33,6 +33,15 @@ export default defineConfig({
     timeout: 600_000,
     // PORTAL_ENABLED so the (portal) pages and the reset pages render instead
     // of 404ing; tests/devices/setup.ts seeds their fixture contractor.
-    env: { NEXT_DIST_DIR: ".next-devices", SESSION_SECRET: process.env.DEVICE_SESSION_SECRET, PORTAL_ENABLED: "1" },
+    // CLAUDE_CONNECTOR_ENABLED so Settings › Claude and its approval page
+    // render (docs/specs/tasks-from-claude.md); they show the connector's
+    // address, which a production build only knows from APP_URL.
+    env: {
+      NEXT_DIST_DIR: ".next-devices",
+      SESSION_SECRET: process.env.DEVICE_SESSION_SECRET,
+      PORTAL_ENABLED: "1",
+      CLAUDE_CONNECTOR_ENABLED: "1",
+      APP_URL: `http://localhost:${PORT}`,
+    },
   },
 });

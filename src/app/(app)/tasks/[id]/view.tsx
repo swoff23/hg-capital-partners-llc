@@ -7,9 +7,12 @@ import { ComposerDropZone, PendingSendsProvider } from "@/components/composer";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
 import type { JobEmailState } from "@/lib/portal/job-emails";
+import { personRefs } from "@/lib/tasks/assignee-people";
+import type { DraftContractor } from "@/lib/tasks/drafts";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
 import { Composer, type ComposerDraft } from "./composer";
+import { DraftBanner } from "./draft-banner";
 import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskResident, type TaskTenants } from "./fields";
 import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
@@ -57,6 +60,8 @@ export interface TaskPageViewProps {
   contractor: { id: string; first: string; hasLogin: boolean; emails: JobEmailState } | null;
   /** The partners' first names: who sees an Internal note. */
   staffFirstNames: string[];
+  /** Set while the task is a draft from Claude: the banner in place of the status control, and who hears when it's added. */
+  draft?: { contractor: DraftContractor | null } | null;
   /** The proof the Review banner shows while the job waits on staff, else null. */
   review: ReviewProof | null;
   /** Who decided, while nothing has moved since: the banner's one-line outcome. */
@@ -107,23 +112,33 @@ export function TaskPageView(p: TaskPageViewProps) {
         <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title'_'reason_reason']">
           <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
             <BackLink fallback="/tasks" label="Tasks" />
-            <span aria-hidden="true" className="text-meta text-muted-foreground">
-              /
-            </span>
-            <StatusControl
-              taskId={task.id}
-              status={task.status}
-              waitingOn={task.waitingOn}
-              scheduledFor={p.values.scheduledFor}
-              residentName={p.resident?.tenantName ?? null}
-              today={p.today}
-              hasContractor={!!p.values.assignee && "contactId" in p.values.assignee}
-            />
+            {/* A draft has no status to change: its banner below is the one control. */}
+            {!p.draft && (
+              <>
+                <span aria-hidden="true" className="text-meta text-muted-foreground">
+                  /
+                </span>
+                <StatusControl
+                  taskId={task.id}
+                  status={task.status}
+                  waitingOn={task.waitingOn}
+                  scheduledFor={p.values.scheduledFor}
+                  residentName={p.resident?.tenantName ?? null}
+                  today={p.today}
+                  hasContractor={!!p.values.assignee && "contactId" in p.values.assignee}
+                />
+              </>
+            )}
           </div>
           <div className="[grid-area:more]">
-            <MoreMenu taskId={task.id} title={task.title} />
+            <MoreMenu taskId={task.id} title={task.title} draft={!!p.draft} />
           </div>
           <div className="min-w-0 [grid-area:title]">
+            {p.draft && (
+              <div className="mb-3">
+                <DraftBanner taskId={task.id} contractor={p.draft.contractor} people={personRefs(p.users, p.contractors)} />
+              </div>
+            )}
             <TitleField taskId={task.id} title={task.title} closed={!p.active} />
           </div>
           {task.status === "WAITING" && task.waitingOn && (
@@ -173,7 +188,8 @@ export function TaskPageView(p: TaskPageViewProps) {
 
             <div>
               {task.legacyAssignee && <p className="mb-2 text-meta text-muted-foreground">Assigned in Asana to {task.legacyAssignee}</p>}
-              <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} hasLogin={p.contractorHasLogin} />
+              {/* "Zack sees this" would be untrue on a draft: nobody can open it until it's added. */}
+              <NotesField taskId={task.id} value={task.description} visibleTo={p.draft ? null : p.contractorFirst} hasLogin={p.contractorHasLogin} />
             </div>
 
             <Checklist taskId={task.id} items={p.checklist} />

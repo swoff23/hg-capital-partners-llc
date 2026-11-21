@@ -39,7 +39,7 @@ import {
   type TenantSearchRow,
 } from "@/lib/search-types";
 import { homeLabel, leaseStatus, type LeaseStatus } from "@/lib/tenants/status";
-import { activeTask, closedTask, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
+import { activeTask, closedTask, listedTask, isActiveStatus } from "@/lib/task-scope";
 import { isOverdue } from "@/lib/tasks/list";
 import { paletteTaskWhere } from "@/lib/tasks/list-query";
 
@@ -321,7 +321,8 @@ async function findProperties(db: SearchDb, q: string, terms: string[][], limit:
 }
 
 async function findTasks(db: SearchDb, q: string, limit: number): Promise<Found> {
-  // Template rows are playbooks, not work: paletteTaskWhere leaves them out of the pool and the count alike.
+  // Template rows are playbooks, not work, and a draft isn't a task until a partner adds it: paletteTaskWhere leaves
+  // both out of the pool and the count alike.
   const where = paletteTaskWhere(q);
   const [active, closed, total] = await Promise.all([
     db.task.findMany({ where: { AND: [where, activeTask] }, orderBy: newest, take: TASK_ACTIVE_POOL, select: TASK_SELECT }),
@@ -494,7 +495,8 @@ function clampLimit(limit: number | undefined, fallback: number): number {
 /**
  * The records a person opened last as search rows, in the order they opened
  * them. A record deleted or archived since is skipped, and so is a Template
- * task (a playbook, not work). `entries` come newest first; the result is cut to `take`.
+ * task (a playbook, not work) or a draft from Claude (not a task yet, though a
+ * partner opened its page). `entries` come newest first; the result is cut to `take`.
  */
 export async function recentRows(
   db: SearchDb,
@@ -507,7 +509,7 @@ export async function recentRows(
       ? db.property.findMany({ where: { id: { in: idsOf("PROPERTY") }, ...liveRecord }, select: PROPERTY_SELECT })
       : [],
     idsOf("TASK").length
-      ? db.task.findMany({ where: { AND: [{ id: { in: idsOf("TASK") } }, excludeTemplateTasks] }, select: TASK_SELECT })
+      ? db.task.findMany({ where: { AND: [{ id: { in: idsOf("TASK") } }, listedTask] }, select: TASK_SELECT })
       : [],
     idsOf("DEAL").length ? db.deal.findMany({ where: { id: { in: idsOf("DEAL") }, ...liveRecord }, select: DEAL_SELECT }) : [],
     idsOf("CONTACT").length ? db.contact.findMany({ where: { id: { in: idsOf("CONTACT") }, ...liveRecord }, select: CONTACT_SELECT }) : [],

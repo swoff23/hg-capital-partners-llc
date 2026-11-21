@@ -71,19 +71,22 @@ export function StatusControl({
 
   /** Sends the change with the status this page showed, so a stale page is refused; toasts it with Undo. */
   function commit(to: TaskStatus, extra: { waitingOn?: string; scheduledFor?: Ymd; closedNote?: string } = {}) {
-    if (isApproval(status, to)) {
+    // Neither end is ever Draft: no menu offers it, and a draft's page shows its banner in place of this control.
+    const from = status;
+    if (to === "DRAFT" || from === "DRAFT") return;
+    if (isApproval(from, to)) {
       approve();
       return;
     }
-    run(() => setTaskStatus(taskId, to, { ...extra, expected: status }), {
+    run(() => setTaskStatus(taskId, to, { ...extra, expected: from }), {
       before: () => setShown(to),
       done: `Status set to ${STATUS_LABEL[to]}`,
       key: `task:${taskId}:status`,
       // Back to what it was, if nothing has moved it since. Waiting needs its reason again, and a visit date this change set goes with it.
       undo: () =>
-        setTaskStatus(taskId, status, {
+        setTaskStatus(taskId, from, {
           expected: to,
-          ...(status === "WAITING" ? { waitingOn } : {}),
+          ...(from === "WAITING" ? { waitingOn } : {}),
           ...(extra.scheduledFor !== undefined ? { scheduledFor } : {}),
         }),
     });

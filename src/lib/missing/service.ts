@@ -6,6 +6,7 @@ import { todayYmdEastern, type Ymd } from "@/lib/dates";
 import { logError } from "@/lib/log";
 import { changeUnit, ensureUnitIds, type Editor } from "@/lib/properties/service";
 import { isPlaceholderUnitId, type UnitUtilities } from "@/lib/property-types";
+import { openMakeTaskItemsWhere } from "@/lib/tasks/list-query";
 import * as tasks from "@/lib/tasks/service";
 import * as core from "@/lib/tasks/core";
 import { MAKE_TASK_MAX, gapKey, itemsToSettle, taskFillOf, unitSubject } from "./checks";
@@ -160,7 +161,7 @@ const SETTLER = tasks.systemPrincipal("Missing info");
  */
 export async function settleMissingInfo(today: Ymd = todayYmdEastern()): Promise<number> {
   const open = await prisma.taskChecklistItem.findMany({
-    where: { checkKey: { not: null }, done: false, task: { status: { notIn: ["DONE", "CANCELED"] } } },
+    where: openMakeTaskItemsWhere,
     select: { id: true, taskId: true, checkKey: true },
   });
   if (open.length === 0) return 0;

@@ -22,7 +22,8 @@ import { describeRepeat, parseRepeatRule } from "./repeat";
  *    assigned Zack and made 3 more changes"), each a folded run that opens
  *    onto its original lines;
  *  - never folded: comments, Mark done, Approve, Send back, a contractor's
- *    Start, creation, the next repeat, access changes and sync conflicts;
+ *    Start, creation, Add on a draft from Claude, the next repeat, access
+ *    changes and sync conflicts;
  *  - a change that reverses the field's latest move within 2 minutes doesn't
  *    show, and neither does that move, when the same person made both and
  *    both were Internal (reversedPairs). A move by anyone else in between
@@ -50,7 +51,7 @@ export interface ActivityEvent {
   body: string | null;
   data: unknown;
   createdAt: Date;
-  /** "APP", "PORTAL", "SYSTEM" or "ASANA". Absent reads as "APP". */
+  /** "APP", "PORTAL", "SYSTEM", "ASANA" or "CLAUDE" (a draft's creation line). Absent reads as "APP". */
   source?: string;
   /** Set on a story the Asana import brought in. */
   asanaStoryGid?: string | null;
@@ -92,6 +93,11 @@ export interface LineEntry<E extends ActivityEvent = ActivityEvent> extends Base
   previousNotes?: string;
   /** A live Asana sync event, after the move: " · via Asana". */
   viaAsana?: boolean;
+  /**
+   * Written through a partner's Claude (docs/specs/tasks-from-claude.md D14): the creation line of a task that began
+   * as a draft, "Pieter created this task" with "via Claude" beside it, the way `viaAsana` tags a line.
+   */
+  viaClaude?: boolean;
 }
 
 export type ActivityEntry<E extends ActivityEvent = ActivityEvent> =
@@ -205,6 +211,8 @@ function statusLine(e: ActivityEvent, d: Data, today: Ymd): string {
   const a = who(e);
   const to = s(d.to) as TaskStatus | null;
   const from = s(d.from) as TaskStatus | null;
+  // Add on a draft from Claude (core.ts addDraft): the one move out of Draft.
+  if (from === "DRAFT") return `${a} added this draft`;
   if (!to || !(to in STATUS_LABEL)) return `${a} changed the status`;
   if (to === "REVIEW") return `${a} ${reviewMoveText(!!e.actorContactId)}`;
   if (from === "REVIEW" && to === "DONE") return `${a} approved this`;
@@ -418,13 +426,13 @@ export function isImported(e: ActivityEvent): boolean {
   return e.source === "ASANA" && (!!e.asanaStoryGid || e.kind === "CREATED");
 }
 
-/** A status change that is a decision or a contractor's first move: Mark done, Approve, Send back, Start. Never folded. */
+/** A status change that is a decision or a contractor's first move: Mark done, Approve, Send back, Start, and Add on a draft. Never folded. */
 function isDecisionStatus(e: ActivityEvent): boolean {
   if (e.kind !== "STATUS") return false;
   const d = dataOf(e);
   const to = s(d.to);
   const from = s(d.from);
-  if (to === "REVIEW" || from === "REVIEW") return true;
+  if (to === "REVIEW" || from === "REVIEW" || from === "DRAFT") return true;
   return !!e.actorContactId && to === "IN_PROGRESS";
 }
 
@@ -704,6 +712,7 @@ export function buildActivity<E extends ActivityEvent>(events: readonly E[], nam
       ...(statusOf(e) ? { status: statusOf(e) } : {}),
       ...(notesBefore(e) !== undefined ? { previousNotes: notesBefore(e) } : {}),
       ...(e.source === "ASANA" && !imported ? { viaAsana: true } : {}),
+      ...(e.source === "CLAUDE" ? { viaClaude: true } : {}),
     };
   };
 

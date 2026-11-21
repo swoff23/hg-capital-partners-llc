@@ -30,9 +30,13 @@ import {
 } from "./list";
 import { Prisma } from "@prisma/client";
 import {
+  DRAFTS_ORDER_BY,
   NONE,
   allTasksOrderBy,
   allTasksWhere,
+  legacyNameWhere,
+  myDraftsWhere,
+  othersDraftsWhere,
   ownerCounts,
   ownerWhere,
   paletteTaskWhere,
@@ -41,6 +45,7 @@ import {
   personRefs,
   propertyCounts,
   propertyWhere,
+  todayWhere,
   searchWhere,
   toQuery,
   viewScopeWhere,
@@ -441,12 +446,13 @@ type Row = Record<string, unknown>;
 
 /**
  * A stand-in for Postgres over the where clauses list-query builds: AND, OR,
- * equality, `in`, `not`, `contains` (ILIKE) and a relation's own filter.
+ * NOT, equality, `in`, `not`, `contains` (ILIKE) and a relation's own filter.
  */
 function matches(row: Row, cond: Record<string, unknown>): boolean {
   return Object.entries(cond).every(([field, filter]) => {
     if (field === "AND") return (filter as Row[]).every((c) => matches(row, c));
     if (field === "OR") return (filter as Row[]).some((c) => matches(row, c));
+    if (field === "NOT") return !matches(row, filter as Row);
     const value = row[field];
     if (filter === null) return value === null || value === undefined;
     if (typeof filter !== "object") return value === filter;
@@ -472,6 +478,7 @@ function dbTask(over: Row & { id: string; title: string }): Row {
     assigneeName: null,
     assigneeUserId: null,
     assigneeContactId: null,
+    createdByUserId: null,
     repeatRule: null,
     ...over,
   };
@@ -487,6 +494,11 @@ const TASKS: Row[] = [
   dbTask({ id: "deal-task", title: "Walk through", deal: { address: "767 Prospect Avenue, Buffalo" } }),
   dbTask({ id: "playbook", title: "Move-in checklist", bucket: "Template" }),
   dbTask({ id: "done", title: "Fix the fence", status: "DONE", property: TAMARACK, propertyId: "p-tam" }),
+  // Drafts from Claude (docs/specs/tasks-from-claude.md): Pieter's for Zack at Tamarack, repeating and with an imported
+  // name on one, so every filter above would find them if the listed-task filter ever let a draft through.
+  dbTask({ id: "draft-pieter", title: "Fix the roof gutters", status: "DRAFT", createdByUserId: "u-pieter", propertyId: "p-tam", property: TAMARACK, assigneeContactId: "c-zack", assigneeContact: { fullName: "Zack Reading" }, repeatRule: { freq: "monthly", interval: 1 } }),
+  dbTask({ id: "draft-connor", title: "Call the city about the fence permit", status: "DRAFT", createdByUserId: "u-connor", assigneeUserId: "u-connor", assignee: { name: "Connor" } }),
+  dbTask({ id: "draft-orphan", title: "Old plumbing estimate", status: "DRAFT", assigneeName: "Zack Reading" }),
 ];
 const found = (f: Partial<AllFilters>, legacy: LegacyNames = new Map()) =>
   TASKS.filter((t) => matches(t, allTasksWhere({ status: "open", owner: [], property: [], repeats: false, q: "", ...f }, legacy) as Row)).map(
@@ -632,6 +644,83 @@ test("the palette's task search finds what the Tasks page does, and never a Temp
   assert.deepEqual(found({ status: "all", q: "move-in checklist" }), []);
   // Finished work still comes up, as it does on the page.
   assert.deepEqual(palette("fence"), ["done"]);
+});
+
+// ---------------------------------------------------------------------------
+// Drafts from Claude: in their own groups, and nowhere else (docs/specs/tasks-from-claude.md 6.2, 6.3)
+// ---------------------------------------------------------------------------
+
+const idsWhere = (where: unknown) => TASKS.filter((t) => matches(t, where as Row)).map((t) => t.id);
+const isDraftId = (id: unknown) => typeof id === "string" && id.startsWith("draft-");
+
+test("a draft is in no view, no search, no filter and no count of the Tasks page", () => {
+  for (const status of ["open", "done", "all"] as const) {
+    assert.deepEqual(found({ status }).filter(isDraftId), [], `the ${status} view`);
+    assert.deepEqual(idsWhere(viewScopeWhere(status)).filter(isDraftId), [], `${status}: what "hidden by filters" counts`);
+    for (const omit of ["owner", "property"] as const) {
+      assert.deepEqual(idsWhere(allTasksWhere({ status, owner: [], property: [], repeats: false, q: "" }, new Map(), omit)).filter(isDraftId), [], `${status}: the ${omit} counts`);
+    }
+  }
+  // The words, people, place and repeat that would each find one.
+  const legacy: LegacyNames = new Map([["c:c-zack", ["Zack Reading"]]]);
+  for (const f of [{ q: "gutters" }, { q: "permit" }, { q: "zack" }, { q: "tamarack" }, { owner: ["c:c-zack"] }, { owner: ["u:u-connor"] }, { owner: [NONE] }, { property: ["p-tam"] }, { repeats: true }]) {
+    assert.deepEqual(found({ status: "all", ...f }, legacy).filter(isDraftId), [], JSON.stringify(f));
+  }
+  assert.deepEqual(idsWhere(paletteTaskWhere("gutters")).filter(isDraftId), [], "the palette's search");
+  assert.deepEqual(idsWhere(paletteTaskWhere("permit")), []);
+});
+
+test("Today and the filter's imported names never read a draft", () => {
+  // Today: your own active tasks, every contractor job, and what nobody owns.
+  assert.deepEqual(idsWhere(todayWhere("u-pieter")), ["roof", "gutters", "legacy-zack", "legacy-bob", "deal-task"]);
+  assert.deepEqual(idsWhere(todayWhere("u-connor")), ["roof", "taxes", "legacy-zack", "legacy-bob", "deal-task"]);
+  // The names the filter lists come from listed tasks: a draft's name is never one.
+  assert.deepEqual(idsWhere(legacyNameWhere), ["legacy-zack", "legacy-bob"]);
+});
+
+test("My drafts holds your own, the other group the other partner's, and a draft with no partner is everyone's", () => {
+  assert.deepEqual(idsWhere(myDraftsWhere("u-pieter")), ["draft-pieter", "draft-orphan"]);
+  assert.deepEqual(idsWhere(othersDraftsWhere("u-pieter")), ["draft-connor"]);
+  assert.deepEqual(idsWhere(myDraftsWhere("u-connor")), ["draft-connor", "draft-orphan"]);
+  assert.deepEqual(idsWhere(othersDraftsWhere("u-connor")), ["draft-pieter"]);
+  // Each draft is in exactly one of a partner's two groups, and nothing but a draft is in either.
+  for (const me of ["u-pieter", "u-connor", "u-someone-new"]) {
+    const both = [...idsWhere(myDraftsWhere(me)), ...idsWhere(othersDraftsWhere(me))].sort();
+    assert.deepEqual(both, ["draft-connor", "draft-orphan", "draft-pieter"], me);
+  }
+  // Newest first, with a unique last key so the order holds between loads.
+  assert.deepEqual(DRAFTS_ORDER_BY, [{ createdAt: "desc" }, { id: "desc" }]);
+});
+
+test("queries.ts reads tasks only through the builders above, and drafts only for their own groups and Home's count", () => {
+  // queries.ts loads the database and Next, which node:test can't, so this pins its source; drafts.pg.test.ts runs the builders on Postgres.
+  const source = readFileSync(join(import.meta.dirname, "queries.ts"), "utf8");
+  // What each task read filters by: a builder's name, allTasks' own `where`, or the ids that `where` returned.
+  const reads = [...source.matchAll(/prisma\.task\.(?:findMany|count|groupBy)\(/g)].map((m) => {
+    const after = source.slice(m.index, m.index + 220);
+    const by = /where(?:: (\{ id: \{ in: ids \} \}|[A-Za-z]+))?/.exec(after);
+    return by ? (by[1] ?? "where") : "none";
+  });
+  assert.deepEqual([...reads].sort(), [
+    "allTasksWhere",
+    "allTasksWhere",
+    "allTasksWhere",
+    "allTasksWhere",
+    "legacyNameWhere",
+    "myDraftsWhere",
+    "myDraftsWhere",
+    "othersDraftsWhere",
+    "todayWhere",
+    "viewScopeWhere",
+    "where",
+    "where",
+    "where",
+    "{ id: { in: ids } }",
+  ]);
+  assert.equal((source.match(/prisma\.task\./g) ?? []).length, reads.length, "no task read this test didn't see");
+  // The three bare `where`s are allTasks' own, built once at its top; the read by id is of rows that where returned.
+  assert.match(source, /const where = allTasksWhere\(f, legacy\);/);
+  assert.match(source, /const ids = sorted\.slice\(0, take\)\.map\(\(r\) => r\.id\);/);
 });
 
 test("owner: several picks are any of them; Unassigned is no real person", () => {
